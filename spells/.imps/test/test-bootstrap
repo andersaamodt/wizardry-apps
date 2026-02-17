@@ -1,0 +1,252 @@
+#!/bin/sh
+# test-bootstrap - lightweight local test helpers for wizardry-apps web migration tests.
+
+set -eu
+
+if [ -n "${ROOT_DIR-}" ]; then
+  ROOT_DIR=$ROOT_DIR
+elif [ -n "${test_root-}" ]; then
+  ROOT_DIR=$test_root
+else
+  ROOT_DIR=$(pwd -P)
+fi
+TEST_FAILURE_REASON=${TEST_FAILURE_REASON-}
+TEST_SKIP_REASON=${TEST_SKIP_REASON-}
+TEST_COUNT=0
+TEST_FAILED=0
+TEST_LAST_STATUS=0
+
+WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
+
+add_path_dir() {
+  dir=$1
+  if [ -d "$dir" ]; then
+    PATH="$dir:$PATH"
+  fi
+}
+
+# Prefer local repo spells first, then installed wizardry support tooling.
+add_path_dir "$ROOT_DIR/spells"
+add_path_dir "$ROOT_DIR/spells/web"
+add_path_dir "$ROOT_DIR/spells/.arcana/web-wizardry"
+add_path_dir "$ROOT_DIR/spells/.imps/test"
+
+if [ -d "$WIZARDRY_DIR/spells" ]; then
+  add_path_dir "$WIZARDRY_DIR/spells"
+  add_path_dir "$WIZARDRY_DIR/spells/.arcana/web-wizardry"
+  if [ -d "$WIZARDRY_DIR/spells/.imps" ]; then
+    for imp_dir in "$WIZARDRY_DIR"/spells/.imps/*; do
+      [ -d "$imp_dir" ] || continue
+      add_path_dir "$imp_dir"
+    done
+  fi
+fi
+
+export PATH
+export WIZARDRY_DIR
+export WIZARDRY_TEST_HELPERS_ONLY=1
+
+OUTPUT=''
+ERROR=''
+STATUS=0
+
+make_tempdir() {
+  temp_dir "wizardry-apps-test"
+}
+
+temp_dir() {
+  prefix=${1:-wizardry-apps-test}
+  mktemp -d "${TMPDIR:-/tmp}/${prefix}.XXXXXX"
+}
+
+temp_file() {
+  prefix=${1:-wizardry-apps-test}
+  mktemp "${TMPDIR:-/tmp}/${prefix}.XXXXXX"
+}
+
+run_cmd() {
+  out_file=$(temp_file run-out)
+  err_file=$(temp_file run-err)
+  had_errexit=0
+
+  case $- in
+    *e*) had_errexit=1 ;;
+  esac
+
+  set +e
+  "$@" >"$out_file" 2>"$err_file"
+  STATUS=$?
+  if [ "$had_errexit" -eq 1 ]; then
+    set -e
+  else
+    set +e
+  fi
+
+  OUTPUT=$(cat "$out_file")
+  ERROR=$(cat "$err_file")
+
+  rm -f "$out_file" "$err_file"
+}
+
+run_spell() {
+  spell_rel=${1-}
+  shift || true
+
+  if [ -z "$spell_rel" ]; then
+    TEST_FAILURE_REASON="run_spell requires spell path"
+    STATUS=1
+    OUTPUT=''
+    ERROR=''
+    return 1
+  fi
+
+  spell_path="$ROOT_DIR/$spell_rel"
+  if [ ! -f "$spell_path" ]; then
+    spell_path="$spell_rel"
+  fi
+
+  run_cmd "$spell_path" "$@"
+}
+
+_run_spell() {
+  run_spell "$@"
+}
+
+assert_success() {
+  if [ "$STATUS" -eq 0 ]; then
+    return 0
+  fi
+  TEST_FAILURE_REASON=${TEST_FAILURE_REASON:-"expected success, got status $STATUS"}
+  return 1
+}
+
+_assert_success() {
+  assert_success
+}
+
+assert_failure() {
+  if [ "$STATUS" -ne 0 ]; then
+    return 0
+  fi
+  TEST_FAILURE_REASON=${TEST_FAILURE_REASON:-"expected failure, got success"}
+  return 1
+}
+
+_assert_failure() {
+  assert_failure
+}
+
+assert_status() {
+  expected=${1-}
+  if [ -z "$expected" ]; then
+    TEST_FAILURE_REASON=${TEST_FAILURE_REASON:-"assert_status requires expected code"}
+    return 1
+  fi
+  if [ "$STATUS" -eq "$expected" ]; then
+    return 0
+  fi
+  TEST_FAILURE_REASON=${TEST_FAILURE_REASON:-"expected status $expected, got $STATUS"}
+  return 1
+}
+
+_assert_status() {
+  assert_status "$@"
+}
+
+assert_output_contains() {
+  needle=${1-}
+  case "$OUTPUT\n$ERROR" in
+    *"$needle"*)
+      return 0
+      ;;
+  esac
+  TEST_FAILURE_REASON=${TEST_FAILURE_REASON:-"expected output to contain: $needle"}
+  return 1
+}
+
+_assert_output_contains() {
+  assert_output_contains "$@"
+}
+
+assert_error_contains() {
+  needle=${1-}
+  case "$ERROR" in
+    *"$needle"*)
+      return 0
+      ;;
+  esac
+  TEST_FAILURE_REASON=${TEST_FAILURE_REASON:-"expected error to contain: $needle"}
+  return 1
+}
+
+_assert_error_contains() {
+  assert_error_contains "$@"
+}
+
+stub_sudo() {
+  stub_dir=${1-}
+  [ -n "$stub_dir" ] || return 1
+  mkdir -p "$stub_dir"
+  cat > "$stub_dir/sudo" <<'STUB'
+#!/bin/sh
+set -eu
+if [ "${1-}" = "-n" ]; then
+  shift
+fi
+exec "$@"
+STUB
+  chmod +x "$stub_dir/sudo"
+}
+
+run_test_case() {
+  name=$1
+  func=$2
+  TEST_COUNT=$((TEST_COUNT + 1))
+  TEST_FAILURE_REASON=''
+  TEST_SKIP_REASON=''
+
+  set +e
+  "$func"
+  rc=$?
+  set -e
+  TEST_LAST_STATUS=$rc
+
+  if [ "$rc" -eq 0 ]; then
+    printf 'ok - %s\n' "$name"
+    return 0
+  fi
+
+  if [ "$rc" -eq 77 ]; then
+    printf 'skip - %s (compiled mode)\n' "$name"
+    return 0
+  fi
+
+  if [ -n "${TEST_SKIP_REASON-}" ]; then
+    printf 'skip - %s (%s)\n' "$name" "$TEST_SKIP_REASON"
+    return 0
+  fi
+
+  TEST_FAILED=$((TEST_FAILED + 1))
+  if [ -z "${TEST_FAILURE_REASON-}" ]; then
+    TEST_FAILURE_REASON="test returned failure"
+  fi
+  printf 'not ok - %s: %s\n' "$name" "$TEST_FAILURE_REASON" >&2
+  return 0
+}
+
+_run_test_case() {
+  run_test_case "$@"
+}
+
+finish_tests() {
+  if [ "$TEST_FAILED" -ne 0 ]; then
+    printf 'FAIL %s/%s tests\n' "$TEST_FAILED" "$TEST_COUNT" >&2
+    exit 1
+  fi
+  printf 'PASS %s tests\n' "$TEST_COUNT"
+  exit 0
+}
+
+_finish_tests() {
+  finish_tests
+}

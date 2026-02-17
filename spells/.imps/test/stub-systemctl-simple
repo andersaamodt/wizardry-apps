@@ -1,0 +1,39 @@
+#!/bin/sh
+# stub-systemctl-simple STUB_DIR - create a logging systemctl test stub.
+
+set -eu
+
+stub_dir=${1-}
+if [ -z "$stub_dir" ]; then
+  printf '%s\n' "stub-systemctl-simple: STUB_DIR required" >&2
+  exit 2
+fi
+
+mkdir -p "$stub_dir"
+cat > "$stub_dir/systemctl" <<'STUB'
+#!/bin/sh
+set -eu
+state_dir=${SYSTEMCTL_STATE_DIR:-${TMPDIR:-/tmp}/wizardry-systemctl-state}
+mkdir -p "$state_dir"
+printf '%s\n' "$*" >> "$state_dir/systemctl.log"
+
+case "${1-}" in
+  is-enabled)
+    exit "${SYSTEMCTL_IS_ENABLED_STATUS:-0}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+STUB
+chmod +x "$stub_dir/systemctl"
+
+cat > "$stub_dir/sudo" <<'STUB'
+#!/bin/sh
+set -eu
+if [ "${1-}" = "-n" ]; then
+  shift
+fi
+exec "$@"
+STUB
+chmod +x "$stub_dir/sudo"

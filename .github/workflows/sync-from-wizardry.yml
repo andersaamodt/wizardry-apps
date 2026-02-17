@@ -1,0 +1,42 @@
+name: Sync From Wizardry
+
+on:
+  schedule:
+    - cron: '12 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone source wizardry repo
+        run: git clone --depth=1 https://github.com/andersaamodt/wizardry.git /tmp/wizardry-source
+
+      - name: Run sync script
+        run: sh tools/sync-from-wizardry.sh /tmp/wizardry-source
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/sync-from-wizardry
+          title: "chore: sync web/apps surfaces from wizardry"
+          commit-message: "chore: sync from wizardry"
+          body: |
+            Automated one-way sync from wizardry via tools/sync-from-wizardry.sh.
+           
+            Imported scope:
+            - spells/web
+            - spells/.arcana/web-wizardry
+            - .web
+            - .apps
+            - .tests/web
+            - .tests/.arcana/web-wizardry
+          labels: |
+            automation
+            sync

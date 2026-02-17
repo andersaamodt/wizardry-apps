@@ -1,0 +1,21 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: toggle-all-wizardry-apps-and-exit [--enable|--disable]
+
+Toggles all wizardry-apps components then exits the current menu.
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+"$script_dir/toggle-all-wizardry-apps" "$@"
+kill -TERM "$PPID"

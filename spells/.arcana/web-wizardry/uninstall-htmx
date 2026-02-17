@@ -1,0 +1,51 @@
+#!/bin/sh
+
+# Uninstall htmx and idiomorph JavaScript libraries.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: uninstall-htmx
+
+Removes htmx and idiomorph libraries from the local directory.
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+# Shared installation directory for web wizardry JS libraries
+install_dir="${WIZARDRY_WEB_JS_DIR:-$HOME/.local/share/wizardry/web/js}"
+
+# Also check old location for backward compatibility
+old_install_dir="${HTMX_DIR:-$HOME/.local/share/htmx}"
+
+files_found=0
+
+# Check and remove from new location
+if [ -f "$install_dir/htmx.min.js" ] || [ -f "$install_dir/idiomorph-ext.min.js" ]; then
+  files_found=1
+  step "Uninstalling web libraries..."
+  rm -f "$install_dir/htmx.min.js"
+  rm -f "$install_dir/idiomorph-ext.min.js"
+  rmdir "$install_dir" 2>/dev/null || true
+  rmdir "$(dirname "$install_dir")" 2>/dev/null || true
+fi
+
+# Check and remove from old location
+if [ -f "$old_install_dir/htmx.min.js" ]; then
+  files_found=1
+  rm -f "$old_install_dir/htmx.min.js"
+  rmdir "$old_install_dir" 2>/dev/null || true
+fi
+
+if [ "$files_found" -eq 0 ]; then
+  info "Web libraries are not installed."
+  exit 0
+fi
+
+success "Web libraries uninstalled"

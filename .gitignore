@@ -1,0 +1,29 @@
+# Build outputs
+build/
+dist/
+out/
+*.o
+*.a
+*.so
+*.dylib
+*.app
+*.AppImage
+*.ipa
+*.aab
+
+# Local tooling
+.env
+.env.*
+.DS_Store
+
+# Test artifacts
+_tmp/
+coverage/
+
+# Workspace logs
+.log
+
+# Mobile build caches
+.gradle/
+**/build/
+DerivedData/

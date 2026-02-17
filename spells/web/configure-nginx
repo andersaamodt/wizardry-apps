@@ -1,0 +1,391 @@
+#!/bin/sh
+
+# Configure nginx for a wizardry web site.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: configure-nginx SITENAME [OPTIONS]
+
+Generates nginx configuration for a website.
+
+Options:
+  --port PORT       Port number (default: 8080)
+  --domain DOMAIN   Domain name (default: localhost)
+  --https           Enable HTTPS with Let's Encrypt
+
+Examples:
+  web-configure-nginx mysite
+  web-configure-nginx mysite --port 80 --domain example.com --https
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+. env-clear
+
+site_name=${1-}
+if [ -z "$site_name" ]; then
+  die 2 "configure-nginx: SITENAME required"
+fi
+shift
+
+# Parse options
+port=8080
+domain=localhost
+use_https=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --port)
+      port=${2-}
+      if [ -z "$port" ]; then
+        die 2 "configure-nginx: --port requires value"
+      fi
+      shift 2
+      ;;
+    --domain)
+      domain=${2-}
+      if [ -z "$domain" ]; then
+        die 2 "configure-nginx: --domain requires value"
+      fi
+      shift 2
+      ;;
+    --https)
+      use_https=true
+      shift
+      ;;
+    *)
+      die 2 "configure-nginx: unknown option '$1'"
+      ;;
+  esac
+done
+
+WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+SITES_DIR="$WEB_ROOT"
+SITE_DIR="$SITES_DIR/$site_name"
+
+if [ ! -d "$SITE_DIR" ]; then
+  die "configure-nginx: site '$site_name' not found"
+fi
+
+site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '-' '_')"
+site_user=$(config-get "$SITE_DIR/site.conf" site-user 2>/dev/null || printf '')
+[ -z "$site_user" ] && site_user="$site_user_default"
+
+# Note: configure-nginx runs as actual user to modify both nginx.conf and site.conf
+# nginx.conf is owned by site user, but we can write to it as actual user
+# site.conf is owned by actual user (per ownership model)
+# This aligns with update-from-template which also modifies source files
+
+# Read existing values from site.conf if options were not provided
+# This preserves existing configuration when rebuilding nginx.conf
+if [ "$port" = "8080" ] && [ -f "$SITE_DIR/site.conf" ]; then
+  # No --port option was given, use existing port from config
+  existing_port=$(config-get "$SITE_DIR/site.conf" port 2>/dev/null || echo "")
+  if [ -n "$existing_port" ]; then
+    port=$existing_port
+  fi
+fi
+
+if [ "$domain" = "localhost" ] && [ -f "$SITE_DIR/site.conf" ]; then
+  # No --domain option was given, use existing domain from config
+  existing_domain=$(config-get "$SITE_DIR/site.conf" domain 2>/dev/null || echo "")
+  if [ -n "$existing_domain" ]; then
+    domain=$existing_domain
+  fi
+fi
+
+if [ "$use_https" = "false" ] && [ -f "$SITE_DIR/site.conf" ]; then
+  # No --https option was given, use existing https setting from config
+  existing_https=$(config-get "$SITE_DIR/site.conf" https 2>/dev/null || echo "")
+  if [ "$existing_https" = "true" ]; then
+    use_https=true
+  fi
+fi
+
+# Create nginx config directory
+NGINX_CONF_DIR="$SITE_DIR/nginx"
+mkdir -p "$NGINX_CONF_DIR"
+
+# Ensure nginx temp directories exist with proper permissions
+# nginx/ is owned by actual user, but may have stale permissions from old sites
+# Call fix-site-security to fix ownership/permissions before creating
+if [ ! -d "$NGINX_CONF_DIR/temp/client_body" ] || \
+   [ ! -d "$NGINX_CONF_DIR/temp/proxy" ] || \
+   [ ! -d "$NGINX_CONF_DIR/temp/fastcgi" ] || \
+   [ ! -d "$NGINX_CONF_DIR/temp/uwsgi" ] || \
+   [ ! -d "$NGINX_CONF_DIR/temp/scgi" ]; then
+  # Fix permissions first (handles stale ownership from old wizardry versions)
+  has fix-site-security && fix-site-security "$site_name" >/dev/null 2>&1 || true
+  # Now create temp directories (fix-site-security may have already created them)
+  mkdir -p "$NGINX_CONF_DIR/temp/client_body" 2>/dev/null || true
+  mkdir -p "$NGINX_CONF_DIR/temp/proxy" 2>/dev/null || true
+  mkdir -p "$NGINX_CONF_DIR/temp/fastcgi" 2>/dev/null || true
+  mkdir -p "$NGINX_CONF_DIR/temp/uwsgi" 2>/dev/null || true
+  mkdir -p "$NGINX_CONF_DIR/temp/scgi" 2>/dev/null || true
+fi
+
+# Path to CGI scripts (site-specific first, then shared)
+WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
+CGI_DIR="$WIZARDRY_DIR/spells/.imps/cgi"
+SITE_CGI_DIR=$(config-get "$SITE_DIR/site.conf" cgi-dir 2>/dev/null || printf '')
+if [ -z "$SITE_CGI_DIR" ]; then
+  SITE_CGI_DIR="$SITE_DIR/cgi"
+elif [ "${SITE_CGI_DIR#/*}" = "$SITE_CGI_DIR" ]; then
+  SITE_CGI_DIR="$SITE_DIR/$SITE_CGI_DIR"
+fi
+
+# Copy mime.types to local directory if not exists
+# nginx/ is owned by actual user, so we can write directly
+MIME_TYPES="$NGINX_CONF_DIR/mime.types"
+if [ ! -f "$MIME_TYPES" ]; then
+  if [ -f /etc/nginx/mime.types ]; then
+    cp /etc/nginx/mime.types "$MIME_TYPES"
+  else
+    # Create minimal mime.types if system one doesn't exist
+    cat > "$MIME_TYPES" <<'MIMETYPES'
+types {
+    text/html                                        html htm shtml;
+    text/css                                         css;
+    text/xml                                         xml;
+    image/gif                                        gif;
+    image/jpeg                                       jpeg jpg;
+    application/javascript                           js;
+    application/json                                 json;
+    text/plain                                       txt;
+    image/png                                        png;
+    image/svg+xml                                    svg svgz;
+    image/webp                                       webp;
+    application/pdf                                  pdf;
+    application/zip                                  zip;
+}
+MIMETYPES
+  fi
+fi
+
+# Generate nginx configuration
+NGINX_CONF="$NGINX_CONF_DIR/nginx.conf"
+
+step "Generating nginx configuration for $site_name"
+
+cat > "$NGINX_CONF" <<EOF
+# nginx configuration for $site_name
+# Generated by web-wizardry
+# Config version: 4
+
+worker_processes 1;
+daemon off;
+error_log $SITE_DIR/nginx/error.log warn;
+pid $SITE_DIR/nginx/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include $NGINX_CONF_DIR/mime.types;
+    default_type application/octet-stream;
+    
+    # Use local temp directories instead of system paths
+    client_body_temp_path $NGINX_CONF_DIR/temp/client_body;
+    proxy_temp_path $NGINX_CONF_DIR/temp/proxy;
+    fastcgi_temp_path $NGINX_CONF_DIR/temp/fastcgi;
+    uwsgi_temp_path $NGINX_CONF_DIR/temp/uwsgi;
+    scgi_temp_path $NGINX_CONF_DIR/temp/scgi;
+    
+    access_log $SITE_DIR/nginx/access.log;
+    
+    sendfile on;
+    keepalive_timeout 65;
+    
+    # Allow larger file uploads (25MB)
+    client_max_body_size 25M;
+    
+    server {
+        listen $port;
+        # Accept configured domain and any .onion address (for Tor hidden services)
+        server_name $domain *.onion;
+        
+        root $SITE_DIR/build;
+
+        # Agent runs can take minutes; keep FastCGI timeouts high globally.
+        fastcgi_connect_timeout 30s;
+        fastcgi_send_timeout 900s;
+        fastcgi_read_timeout 900s;
+        
+        # Disable directory listing
+        autoindex off;
+        
+        # Root path - serve main index page
+        location = / {
+            try_files /pages/index.html =404;
+        }
+        
+        # Serve pages
+        location /pages/ {
+            index index.html;
+            try_files \$uri \$uri.html \$uri/index.html =404;
+        }
+        
+        # Serve static files
+        location /static/ {
+            alias $SITE_DIR/build/static/;
+        }
+        
+        # Serve uploaded files (from site data directory)
+        location /uploads/ {
+            alias $SITES_DIR/.sitedata/$site_name/uploads/;
+        }
+        
+        # SSE endpoint - requires unbuffered streaming
+        location ~ ^/cgi/chat-stream$ {
+            # Resolve site-specific CGI first, then shared CGI
+            set \$site_cgi "$SITE_CGI_DIR/chat-stream";
+            set \$shared_cgi "$CGI_DIR/chat-stream";
+            set \$cgi_path \$shared_cgi;
+            if (-f \$site_cgi) {
+                set \$cgi_path \$site_cgi;
+            }
+            if (!-f \$cgi_path) {
+                return 404;
+            }
+            
+            # Disable ALL buffering for Server-Sent Events (critical!)
+            # These settings are required for real-time SSE delivery
+            fastcgi_buffering off;           # Disable FastCGI buffering
+            proxy_buffering off;             # Disable proxy buffering (if used)
+            fastcgi_cache off;               # Disable FastCGI cache
+            fastcgi_request_buffering off;   # Disable request buffering
+            fastcgi_keep_conn on;            # Keep connection alive for streaming
+            
+            # Force immediate flush by disabling gzip
+            gzip off;
+            
+            # Increase timeouts for long-lived SSE connections
+            fastcgi_read_timeout 300s;
+            fastcgi_send_timeout 300s;
+            
+            # FastCGI configuration
+            fastcgi_pass unix:$SITE_DIR/nginx/fcgiwrap.sock;
+            fastcgi_param SCRIPT_FILENAME \$cgi_path;
+            fastcgi_param QUERY_STRING \$query_string;
+            fastcgi_param REQUEST_METHOD \$request_method;
+            fastcgi_param CONTENT_TYPE \$content_type;
+            fastcgi_param CONTENT_LENGTH \$content_length;
+            fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+            fastcgi_param SERVER_SOFTWARE nginx;
+            fastcgi_param REMOTE_ADDR \$remote_addr;
+            fastcgi_param REMOTE_PORT \$remote_port;
+            fastcgi_param SERVER_ADDR \$server_addr;
+            fastcgi_param SERVER_PORT \$server_port;
+            fastcgi_param SERVER_NAME \$server_name;
+            fastcgi_param SERVER_PROTOCOL \$server_protocol;
+            fastcgi_param WIZARDRY_DIR $WIZARDRY_DIR;
+            fastcgi_param WIZARDRY_SITE_NAME $site_name;
+        }
+        
+        # CGI execution (site-specific first, then shared)
+        location ~ ^/cgi/(.+)$ {
+            # Resolve site-specific CGI first, then shared CGI
+            set \$cgi_script \$1;
+            set \$site_cgi "$SITE_CGI_DIR/\$cgi_script";
+            set \$shared_cgi "$CGI_DIR/\$cgi_script";
+            set \$cgi_path \$shared_cgi;
+            if (-f \$site_cgi) {
+                set \$cgi_path \$site_cgi;
+            }
+            if (!-f \$cgi_path) {
+                return 404;
+            }
+
+            # Allow long-running coding agent requests.
+            fastcgi_connect_timeout 30s;
+            fastcgi_send_timeout 900s;
+            fastcgi_read_timeout 900s;
+            
+            # FastCGI configuration
+            fastcgi_pass unix:$SITE_DIR/nginx/fcgiwrap.sock;
+            fastcgi_param SCRIPT_FILENAME \$cgi_path;
+            fastcgi_param QUERY_STRING \$query_string;
+            fastcgi_param REQUEST_METHOD \$request_method;
+            fastcgi_param CONTENT_TYPE \$content_type;
+            fastcgi_param CONTENT_LENGTH \$content_length;
+            fastcgi_param GATEWAY_INTERFACE CGI/1.1;
+            fastcgi_param SERVER_SOFTWARE nginx;
+            fastcgi_param REMOTE_ADDR \$remote_addr;
+            fastcgi_param REMOTE_PORT \$remote_port;
+            fastcgi_param SERVER_ADDR \$server_addr;
+            fastcgi_param SERVER_PORT \$server_port;
+            fastcgi_param SERVER_NAME \$server_name;
+            fastcgi_param SERVER_PROTOCOL \$server_protocol;
+            fastcgi_param WIZARDRY_DIR $WIZARDRY_DIR;
+            fastcgi_param WIZARDRY_SITE_NAME $site_name;
+        }
+    }
+}
+EOF
+
+# Update site config
+config-set "$SITE_DIR/site.conf" port "$port"
+config-set "$SITE_DIR/site.conf" domain "$domain"
+config-set "$SITE_DIR/site.conf" https "$use_https"
+
+# Update Tor hidden service port if Tor hosting is enabled for this site
+if is-tor-installed; then
+  tor_config_path=$(torrc-path 2>/dev/null || echo "")
+  if [ -n "$tor_config_path" ] && [ -f "$tor_config_path" ]; then
+    # Check if Tor hosting is enabled by looking for this site's HiddenServiceDir
+    # Use a more specific pattern to avoid false matches with similar site names
+    if grep -q "^HiddenServiceDir.*/${site_name}/\?\$" "$tor_config_path" 2>/dev/null || \
+       grep -q "^HiddenServiceDir.*/${site_name}\$" "$tor_config_path" 2>/dev/null; then
+      # Tor hosting is enabled for this site - update the port
+      step "Updating Tor hidden service port to $port..."
+      
+      temp_torrc=$(mktemp)
+      in_site_block=0
+      
+      while IFS= read -r line; do
+        # Check if we're entering this site's hidden service block
+        # Match lines ending with /site_name or /site_name/
+        if printf '%s' "$line" | grep -q "^HiddenServiceDir.*/${site_name}/\?\$" || \
+           printf '%s' "$line" | grep -q "^HiddenServiceDir.*/${site_name}\$"; then
+          in_site_block=1
+          printf '%s\n' "$line" >> "$temp_torrc"
+          continue
+        fi
+        
+        # If we're in this site's block and hit HiddenServicePort, update it
+        if [ "$in_site_block" -eq 1 ]; then
+          if printf '%s' "$line" | grep -q "^HiddenServicePort"; then
+            printf 'HiddenServicePort 80 127.0.0.1:%s\n' "$port" >> "$temp_torrc"
+            in_site_block=0
+            continue
+          fi
+        fi
+        
+        printf '%s\n' "$line" >> "$temp_torrc"
+      done < "$tor_config_path"
+      
+      sudo cp "$temp_torrc" "$tor_config_path"
+      # Preserve existing torrc permissions
+      sudo chmod 644 "$tor_config_path"
+      rm -f "$temp_torrc"
+      
+      # Restart Tor to apply changes
+      info "Restarting Tor to apply port change..."
+      restart-tor >/dev/null 2>&1 || warn "configure-nginx: failed to restart Tor"
+    fi
+  fi
+fi
+
+success "nginx configuration written to $NGINX_CONF"
+info "Port: $port"
+info "Domain: $domain"
+
+if [ "$use_https" = "true" ]; then
+  info "HTTPS: enabled (requires Let's Encrypt setup)"
+else
+  info "HTTPS: disabled"
+fi

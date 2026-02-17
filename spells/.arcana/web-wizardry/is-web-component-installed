@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# Check if a web wizardry component is installed.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: is-web-component-installed COMPONENT
+
+Returns 0 if the component is installed, 1 otherwise.
+Components: pandoc, nginx, fcgiwrap, openssl, htmx, certbot
+USAGE
+  exit 0
+  ;;
+esac
+
+# Note: No set -eu because this is a conditional script (returns exit codes for flow control)
+set +e
+set +u
+
+component=${1:-}
+[ -z "$component" ] && exit 1
+
+case "$component" in
+  pandoc|nginx|fcgiwrap|openssl)
+    command -v "$component" >/dev/null 2>&1
+    ;;
+  htmx)
+    # Check new shared location first, then fall back to old location
+    htmx_new_dir="${WIZARDRY_WEB_JS_DIR:-$HOME/.local/share/wizardry/web/js}"
+    htmx_old_dir="${HTMX_DIR:-$HOME/.local/share/htmx}"
+    [ -f "$htmx_new_dir/htmx.min.js" ] || \
+    [ -f "$htmx_old_dir/htmx.min.js" ] || \
+    [ -f /usr/local/share/htmx/htmx.min.js ] || \
+    [ -f /usr/share/htmx/htmx.min.js ]
+    ;;
+  certbot)
+    # Check for certbot command or acme.sh (on macOS we use acme.sh as certbot alternative)
+    command -v certbot >/dev/null 2>&1 || [ -f "$HOME/.acme.sh/acme.sh" ]
+    ;;
+  *)
+    exit 1
+    ;;
+esac

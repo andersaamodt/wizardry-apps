@@ -1,0 +1,76 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: wizardry-apps-status [--section SECTION]
+
+Reports wizardry-apps component toggle status.
+SECTIONS: web, desktop, mobile
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+. "$script_dir/_state"
+
+section=${1-}
+if [ "$section" = "--section" ]; then
+  section=${2-}
+fi
+
+print_component() {
+  component=$1
+  label=$2
+  if "$script_dir/is-apps-component-enabled" "$component" >/dev/null 2>&1; then
+    printf '[X] %s\n' "$label"
+  else
+    printf '[ ] %s\n' "$label"
+  fi
+}
+
+print_web() {
+  printf 'web\n'
+  print_component web-hosted "Hosted Web pipeline"
+  print_component web-templates "Web templates"
+  print_component web-cgi-adapter "HTTP CGI adapter"
+}
+
+print_desktop() {
+  printf 'desktop\n'
+  print_component desktop-macos "macOS host pipeline"
+  print_component desktop-linux "Linux host pipeline"
+  print_component desktop-release "Desktop release ops"
+}
+
+print_mobile() {
+  printf 'mobile\n'
+  print_component mobile-ios "iOS host pipeline"
+  print_component mobile-android "Android host pipeline"
+  print_component mobile-release "Mobile release ops"
+}
+
+if [ -z "$section" ]; then
+  print_web
+  printf '---\n'
+  print_desktop
+  printf '---\n'
+  print_mobile
+  exit 0
+fi
+
+case "$section" in
+  web) print_web ;;
+  desktop) print_desktop ;;
+  mobile) print_mobile ;;
+  *)
+    printf '%s\n' "wizardry-apps-status: unknown section '$section'" >&2
+    exit 2
+    ;;
+esac

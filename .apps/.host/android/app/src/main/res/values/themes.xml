@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.WizardryHost" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">#10151A</item>
+        <item name="android:statusBarColor">#10151A</item>
+    </style>
+</resources>

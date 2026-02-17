@@ -1,0 +1,21 @@
+#!/bin/sh
+# stub-sudo STUB_DIR - create sudo passthrough test stub.
+
+set -eu
+
+stub_dir=${1-}
+if [ -z "$stub_dir" ]; then
+  printf '%s\n' "stub-sudo: STUB_DIR required" >&2
+  exit 2
+fi
+
+mkdir -p "$stub_dir"
+cat > "$stub_dir/sudo" <<'STUB'
+#!/bin/sh
+set -eu
+if [ "${1-}" = "-n" ]; then
+  shift
+fi
+exec "$@"
+STUB
+chmod +x "$stub_dir/sudo"

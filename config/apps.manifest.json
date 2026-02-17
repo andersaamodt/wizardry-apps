@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1",
+  "apps": [
+    {
+      "slug": "artificer",
+      "name": "Artificer",
+      "production": true,
+      "bundleIds": {
+        "macos": "com.wizardry.apps.artificer.macos",
+        "ios": "com.wizardry.apps.artificer.ios",
+        "android": "com.wizardry.apps.artificer.android"
+      }
+    },
+    {
+      "slug": "unix-settings",
+      "name": "UNIX Settings",
+      "production": true,
+      "bundleIds": {
+        "macos": "com.wizardry.apps.unixsettings.macos",
+        "ios": "com.wizardry.apps.unixsettings.ios",
+        "android": "com.wizardry.apps.unixsettings.android"
+      }
+    },
+    {
+      "slug": "chatroom",
+      "name": "Chatroom",
+      "production": false,
+      "bundleIds": {
+        "macos": "com.wizardry.apps.chatroom.macos",
+        "ios": "com.wizardry.apps.chatroom.ios",
+        "android": "com.wizardry.apps.chatroom.android"
+      }
+    },
+    {
+      "slug": "menu-app",
+      "name": "Menu App",
+      "production": false,
+      "bundleIds": {
+        "macos": "com.wizardry.apps.menuapp.macos",
+        "ios": "com.wizardry.apps.menuapp.ios",
+        "android": "com.wizardry.apps.menuapp.android"
+      }
+    }
+  ]
+}

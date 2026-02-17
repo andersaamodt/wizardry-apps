@@ -1,0 +1,48 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: set-apps-component-state COMPONENT [--enable|--disable|--toggle]
+
+Sets a wizardry-apps component toggle state.
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+. "$script_dir/_state"
+
+component=${1-}
+action=${2-}
+
+if [ -z "$component" ] || [ -z "$action" ]; then
+  printf '%s\n' "Usage: set-apps-component-state COMPONENT [--enable|--disable|--toggle]" >&2
+  exit 2
+fi
+
+case "$action" in
+  --enable)
+    set_enabled "$component"
+    ;;
+  --disable)
+    set_disabled "$component"
+    ;;
+  --toggle)
+    if is_enabled "$component"; then
+      set_disabled "$component"
+    else
+      set_enabled "$component"
+    fi
+    ;;
+  *)
+    printf '%s\n' "Usage: set-apps-component-state COMPONENT [--enable|--disable|--toggle]" >&2
+    exit 2
+    ;;
+esac

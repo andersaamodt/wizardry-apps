@@ -1,0 +1,31 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: toggle-all-wizardry-apps-section SECTION [--enable|--disable]
+
+Enables or disables all components in one section: web, desktop, mobile.
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+. "$script_dir/_state"
+
+section=${1-}
+action=${2-}
+if [ -z "$section" ] || { [ "$action" != "--enable" ] && [ "$action" != "--disable" ]; }; then
+  printf '%s\n' "Usage: toggle-all-wizardry-apps-section SECTION [--enable|--disable]" >&2
+  exit 2
+fi
+
+for component in $(list_section_components "$section"); do
+  "$script_dir/set-apps-component-state" "$component" "$action"
+done

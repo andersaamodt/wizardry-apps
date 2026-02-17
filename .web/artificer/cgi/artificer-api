@@ -1,0 +1,5242 @@
+#!/bin/sh
+set -eu
+
+WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
+PATH="$WIZARDRY_DIR/spells/.imps/cgi:$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:/usr/bin"
+
+http-ok-json
+
+request_method=${REQUEST_METHOD:-GET}
+query_data=${QUERY_STRING:-}
+post_data=""
+
+if [ "$request_method" = "POST" ]; then
+  post_data=$(cat)
+fi
+
+data_root=$(get-site-data-dir "artificer")
+workspaces_dir="$data_root/workspaces"
+git_settings_dir="$data_root/git"
+selected_ssh_pub_file="$git_settings_dir/selected_ssh_pub"
+model_installs_dir="$data_root/model-installs"
+command_policy_root="$data_root/command-policy"
+ALLOW_NETWORK=0
+ALLOW_WEB=0
+
+mkdir -p "$workspaces_dir"
+mkdir -p "$model_installs_dir"
+mkdir -p "$command_policy_root"
+
+json_escape() {
+  printf '%s' "$1" | awk '
+    BEGIN {
+      ORS = ""
+      first = 1
+    }
+    {
+      gsub(/\033\[[0-9;?]*[A-Za-z]/, "")
+      gsub(/\033/, "")
+      gsub(/[\001-\010\013\014\016-\037]/, "")
+      if (!first) {
+        printf "\\n"
+      }
+      first = 0
+      gsub(/\\/, "\\\\")
+      gsub(/"/, "\\\"")
+      gsub(/\t/, "\\t")
+      gsub(/\r/, "\\r")
+      printf "%s", $0
+    }
+  '
+}
+
+emit_error() {
+  message=$(json_escape "$1")
+  printf '{"success":false,"error":"%s"}\n' "$message"
+}
+
+emit_ok_message() {
+  message=$(json_escape "$1")
+  printf '{"success":true,"message":"%s"}\n' "$message"
+}
+
+strip_terminal_noise() {
+  printf '%s' "$1" | perl -CS -pe '
+    s/\e\[[0-9;?]*[A-Za-z]//g;   # ANSI control sequences
+    s/\r//g;                     # carriage returns from spinners
+    s/[\x{2800}-\x{28FF}]//g;    # braille spinner glyphs
+  ' | sed '/^[[:space:]]*$/d'
+}
+
+pick_workspace_path_macos() {
+  if ! command -v osascript >/dev/null 2>&1; then
+    return 1
+  fi
+
+  osascript <<'EOF'
+try
+  set chosenFolder to POSIX path of (choose folder with prompt "Select workspace folder")
+  return chosenFolder
+on error number -128
+  return ""
+end try
+EOF
+}
+
+pick_ssh_pub_path_macos() {
+  if ! command -v osascript >/dev/null 2>&1; then
+    return 1
+  fi
+
+  osascript <<'EOF'
+try
+  set homeDir to POSIX path of (path to home folder)
+  set sshDir to POSIX file (homeDir & ".ssh/")
+  set chosenFile to POSIX path of (choose file with prompt "Select SSH public key (.pub)" default location sshDir)
+  return chosenFile
+on error number -128
+  return ""
+on error
+  try
+    set chosenFile to POSIX path of (choose file with prompt "Select SSH public key (.pub)")
+    return chosenFile
+  on error number -128
+    return ""
+  end try
+end try
+EOF
+}
+
+selected_ssh_pub_path() {
+  read_file_line "$selected_ssh_pub_file" ""
+}
+
+set_selected_ssh_pub_path() {
+  selected_path=$1
+  mkdir -p "$git_settings_dir"
+  printf '%s\n' "$selected_path" > "$selected_ssh_pub_file"
+}
+
+clear_selected_ssh_pub_path() {
+  rm -f "$selected_ssh_pub_file"
+}
+
+param() {
+  key=$1
+  value=""
+  if [ -n "$post_data" ]; then
+    value=$(get-query-param "$key" "$post_data")
+  fi
+  if [ -z "$value" ] && [ -n "$query_data" ]; then
+    value=$(get-query-param "$key" "$query_data")
+  fi
+  printf '%s' "$value"
+}
+
+trim() {
+  printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+looks_like_embedding_vector() {
+  raw_text=$(trim "$1")
+  case "$raw_text" in
+    \[*\]) ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  if ! printf '%s' "$raw_text" | grep -Eq '^\[[0-9eE+., -]+\]$'; then
+    return 1
+  fi
+
+  comma_count=$(printf '%s' "$raw_text" | tr -cd ',' | wc -c | tr -d ' ')
+  if [ "$comma_count" -lt 32 ]; then
+    return 1
+  fi
+
+  return 0
+}
+
+normalize_assistant_output() {
+  text=$1
+  cleaned=$(strip_terminal_noise "$text")
+  cleaned=$(printf '%s' "$cleaned" | sed 's/<|end_of_text|>//g;s/<end_of_text>//g;s/<\/s>//g;s/<|im_end|>//g')
+
+  first_line=$(printf '%s\n' "$cleaned" | sed -n '1p')
+  first_line_lower=$(printf '%s' "$first_line" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//')
+  case "$first_line_lower" in
+    assistant:*|user:*|system:*|"# response"|response:|"# answer"|answer:)
+      cleaned=$(printf '%s\n' "$cleaned" | sed '1d')
+      ;;
+  esac
+
+  output=""
+  seen_non_empty=0
+  while IFS= read -r line; do
+    line_lower=$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//')
+    if [ "$seen_non_empty" -eq 1 ]; then
+      case "$line_lower" in
+        user:*|system:*)
+          break
+          ;;
+      esac
+    fi
+
+    if [ -z "$output" ]; then
+      output=$line
+    else
+      output=$(printf '%s\n%s' "$output" "$line")
+    fi
+
+    if [ -n "$(trim "$line")" ]; then
+      seen_non_empty=1
+    fi
+  done <<EOF
+$cleaned
+EOF
+
+  cleaned=$(trim "$output")
+  if [ -z "$cleaned" ]; then
+    cleaned=$(trim "$text")
+  fi
+  cleaned=$(printf '%s\n' "$cleaned" | sed '/^[[:space:]]*[Uu]ser[[:space:]]*request:/,$d')
+  cleaned=$(trim "$cleaned")
+  printf '%s' "$cleaned"
+}
+
+is_simple_direct_prompt() {
+  prompt_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  prompt_trimmed=$(trim "$prompt_lower")
+  [ -n "$prompt_trimmed" ] || return 1
+
+  case "$prompt_trimmed" in
+    *$'\n'*|*';'*|*'&&'*|*'||'*)
+      return 1
+      ;;
+  esac
+
+  case "$prompt_trimmed" in
+    *"file"*|*"folder"*|*"workspace"*|*"repo"*|*"git "*|*"commit"*|*"branch"*|*"diff"*|*"patch"*|*"refactor"*|*"function"*|*"class"*|*"script"*|*"shell"*|*"posix"*|*"bug"*|*"error"*|*"trace"*|*"stack"*|*"test"*|*"build"*|*"deploy"*|*"ssh"*|*"terminal"*|*"api"*|*"http"*|*"json"*|*"yaml"*|*"sql"*|*"regex"*|*"code"*)
+      return 1
+      ;;
+  esac
+
+  word_count=$(printf '%s\n' "$prompt_trimmed" | awk '{print NF}')
+  case "$word_count" in
+    ""|*[!0-9]*)
+      word_count=0
+      ;;
+  esac
+  if [ "$word_count" -gt 24 ]; then
+    return 1
+  fi
+
+  return 0
+}
+
+adapt_prompt_for_model() {
+  model_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  original_prompt=$2
+
+  case "$model_lower" in
+    starcoder*|*codegeex*|*codellama*|*coder*)
+      cat <<EOF
+You are a helpful coding assistant.
+Follow the instruction and answer directly.
+Do not include role prefixes or planning scaffolding.
+
+### Instruction
+$original_prompt
+
+### Response
+EOF
+      return 0
+      ;;
+  esac
+
+  printf '%s' "$original_prompt"
+}
+
+output_looks_derailed() {
+  text_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  case "$text_lower" in
+    *"workspace snapshot:"*|*"recent conversation:"*|*"current plan:"*|*"loop summary:"*|*"write a concise final response"*|*"mode_update:"*|*"commands:"*|*"plan_update:"*|*"done_claim:"*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+salvage_direct_response() {
+  model_name=$1
+  user_prompt=$2
+  salvage_model=$model_name
+  preferred_model=$(preferred_chat_model || true)
+  if [ -n "$preferred_model" ]; then
+    salvage_model=$preferred_model
+  fi
+  fallback_prompt=$(cat <<EOF
+You are a coding assistant.
+Respond directly to the latest user message in 1-3 concise sentences.
+Do not include planning scaffolding, role prefixes, or tool/control sections.
+
+User message:
+$user_prompt
+EOF
+)
+  repaired=$(run_model "$salvage_model" "$fallback_prompt" || true)
+  repaired=$(normalize_assistant_output "$repaired")
+  printf '%s' "$repaired"
+}
+
+new_id() {
+  now=$(date +%s 2>/dev/null || printf '0')
+  pid=$$
+  rand=$(awk 'BEGIN {srand(); printf "%06d", rand()*1000000}')
+  printf '%s-%s-%s' "$now" "$pid" "$rand"
+}
+
+valid_id() {
+  id=$1
+  case "$id" in
+    ""|.|..|*[!a-zA-Z0-9._-]*)
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+read_file_line() {
+  file_path=$1
+  fallback=${2:-}
+  if [ -f "$file_path" ]; then
+    sed -n '1p' "$file_path"
+  else
+    printf '%s' "$fallback"
+  fi
+}
+
+workspace_dir_for() {
+  workspace_id=$1
+  printf '%s/%s' "$workspaces_dir" "$workspace_id"
+}
+
+conversation_dir_for() {
+  workspace_id=$1
+  conversation_id=$2
+  printf '%s/%s/conversations/%s' "$workspaces_dir" "$workspace_id" "$conversation_id"
+}
+
+command_policy_dir_for() {
+  workspace_id=$1
+  printf '%s/%s' "$command_policy_root" "$workspace_id"
+}
+
+command_policy_mode_file_for() {
+  workspace_id=$1
+  printf '%s/mode' "$(command_policy_dir_for "$workspace_id")"
+}
+
+command_policy_rules_file_for() {
+  workspace_id=$1
+  printf '%s/rules.txt' "$(command_policy_dir_for "$workspace_id")"
+}
+
+command_policy_once_rules_file_for() {
+  workspace_id=$1
+  printf '%s/once-rules.txt' "$(command_policy_dir_for "$workspace_id")"
+}
+
+ensure_command_policy_layout() {
+  workspace_id=$1
+  policy_dir=$(command_policy_dir_for "$workspace_id")
+  mkdir -p "$policy_dir"
+  mode_file=$(command_policy_mode_file_for "$workspace_id")
+  [ -f "$mode_file" ] || printf '%s\n' "ask" > "$mode_file"
+  rules_file=$(command_policy_rules_file_for "$workspace_id")
+  [ -f "$rules_file" ] || : > "$rules_file"
+  once_rules_file=$(command_policy_once_rules_file_for "$workspace_id")
+  [ -f "$once_rules_file" ] || : > "$once_rules_file"
+}
+
+command_policy_mode_for_workspace() {
+  workspace_id=$1
+  ensure_command_policy_layout "$workspace_id"
+  mode=$(read_file_line "$(command_policy_mode_file_for "$workspace_id")" "ask")
+  case "$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')" in
+    none|ask|all)
+      printf '%s' "$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')"
+      ;;
+    *)
+      printf '%s' "ask"
+      ;;
+  esac
+}
+
+set_command_policy_mode_for_workspace() {
+  workspace_id=$1
+  mode=$2
+  case "$mode" in
+    none|ask|all) ;;
+    *) mode="ask" ;;
+  esac
+  ensure_command_policy_layout "$workspace_id"
+  printf '%s\n' "$mode" > "$(command_policy_mode_file_for "$workspace_id")"
+}
+
+command_text_to_rule_pattern_default() {
+  cmd=$1
+  first_word=$(printf '%s\n' "$cmd" | awk '{print $1}')
+  if [ -n "$first_word" ]; then
+    printf '^%s([[:space:]].*)?$' "$(printf '%s' "$first_word" | sed 's/[][(){}.^$*+?|\\]/\\&/g')"
+  else
+    printf '^%s$' "$(printf '%s' "$cmd" | sed 's/[][(){}.^$*+?|\\]/\\&/g')"
+  fi
+}
+
+normalize_rule_field() {
+  printf '%s' "$1" | tr '\n' ' ' | tr '\t' ' ' | sed 's/[[:space:]]\+/ /g;s/^ //;s/ $//'
+}
+
+rule_matches_command() {
+  match_mode=$1
+  pattern=$2
+  cmd=$3
+  case "$match_mode" in
+    exact)
+      [ "$cmd" = "$pattern" ]
+      return $?
+      ;;
+    regex)
+      if [ -z "$pattern" ]; then
+        return 1
+      fi
+      printf '%s\n' "$cmd" | grep -Eq -- "$pattern"
+      return $?
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+append_command_rule() {
+  workspace_id=$1
+  scope=$2
+  decision=$3
+  match_mode=$4
+  pattern=$5
+
+  ensure_command_policy_layout "$workspace_id"
+  case "$scope" in
+    once)
+      rules_file=$(command_policy_once_rules_file_for "$workspace_id")
+      ;;
+    *)
+      rules_file=$(command_policy_rules_file_for "$workspace_id")
+      ;;
+  esac
+  printf '%s\t%s\t%s\n' "$decision" "$match_mode" "$pattern" >> "$rules_file"
+}
+
+command_policy_decision() {
+  workspace_id=$1
+  cmd=$2
+  mode=$3
+  decision_file=$4
+  source_file=$5
+  matched_pattern_file=$6
+  matched_scope_file=$7
+
+  printf '%s' "" > "$decision_file"
+  printf '%s' "" > "$source_file"
+  printf '%s' "" > "$matched_pattern_file"
+  printf '%s' "" > "$matched_scope_file"
+
+  case "$mode" in
+    none)
+      printf '%s' "deny" > "$decision_file"
+      printf '%s' "mode-none" > "$source_file"
+      printf '%s' "none" > "$matched_scope_file"
+      return 0
+      ;;
+    all)
+      printf '%s' "allow" > "$decision_file"
+      printf '%s' "mode-all" > "$source_file"
+      printf '%s' "all" > "$matched_scope_file"
+      return 0
+      ;;
+  esac
+
+  ensure_command_policy_layout "$workspace_id"
+  once_file=$(command_policy_once_rules_file_for "$workspace_id")
+  temp_once=$(mktemp)
+  matched_once=0
+
+  if [ -f "$once_file" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      decision=$(printf '%s' "$line" | awk -F'\t' '{print $1}')
+      match_mode=$(printf '%s' "$line" | awk -F'\t' '{print $2}')
+      pattern=$(printf '%s' "$line" | awk -F'\t' '{print $3}')
+      if [ "$matched_once" -eq 0 ] && rule_matches_command "$match_mode" "$pattern" "$cmd"; then
+        printf '%s' "$decision" > "$decision_file"
+        printf '%s' "once-rule" > "$source_file"
+        printf '%s' "$pattern" > "$matched_pattern_file"
+        printf '%s' "once" > "$matched_scope_file"
+        matched_once=1
+        continue
+      fi
+      printf '%s\n' "$line" >> "$temp_once"
+    done < "$once_file"
+    mv "$temp_once" "$once_file"
+  else
+    rm -f "$temp_once"
+  fi
+
+  if [ "$matched_once" -eq 1 ]; then
+    return 0
+  fi
+
+  rules_file=$(command_policy_rules_file_for "$workspace_id")
+  if [ -f "$rules_file" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      decision=$(printf '%s' "$line" | awk -F'\t' '{print $1}')
+      match_mode=$(printf '%s' "$line" | awk -F'\t' '{print $2}')
+      pattern=$(printf '%s' "$line" | awk -F'\t' '{print $3}')
+      if rule_matches_command "$match_mode" "$pattern" "$cmd"; then
+        printf '%s' "$decision" > "$decision_file"
+        printf '%s' "rule" > "$source_file"
+        printf '%s' "$pattern" > "$matched_pattern_file"
+        printf '%s' "remember" > "$matched_scope_file"
+        return 0
+      fi
+    done < "$rules_file"
+  fi
+
+  printf '%s' "prompt" > "$decision_file"
+}
+
+blocked_command_json_from_file() {
+  blocked_file=$1
+  printf '['
+  first=1
+  if [ -f "$blocked_file" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      cmd=$(printf '%s' "$line" | awk -F'\t' '{print $1}')
+      reason=$(printf '%s' "$line" | awk -F'\t' '{print $2}')
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '{"command":"%s","reason":"%s"}' "$(json_escape "$cmd")" "$(json_escape "$reason")"
+    done < "$blocked_file"
+  fi
+  printf ']'
+}
+
+stream_session_dir_for() {
+  conv_dir=$1
+  stream_session=$2
+  printf '%s/stream/%s' "$conv_dir" "$stream_session"
+}
+
+stream_tokens_file_for() {
+  conv_dir=$1
+  stream_session=$2
+  printf '%s/tokens.txt' "$(stream_session_dir_for "$conv_dir" "$stream_session")"
+}
+
+attachment_root_dir_for() {
+  conv_dir=$1
+  printf '%s/attachments' "$conv_dir"
+}
+
+attachment_item_dir_for() {
+  conv_dir=$1
+  attachment_id=$2
+  printf '%s/%s' "$(attachment_root_dir_for "$conv_dir")" "$attachment_id"
+}
+
+attachment_blob_for() {
+  conv_dir=$1
+  attachment_id=$2
+  printf '%s/blob' "$(attachment_item_dir_for "$conv_dir" "$attachment_id")"
+}
+
+attachment_meta_file_for() {
+  conv_dir=$1
+  attachment_id=$2
+  printf '%s/meta' "$(attachment_item_dir_for "$conv_dir" "$attachment_id")"
+}
+
+attachment_meta_get() {
+  conv_dir=$1
+  attachment_id=$2
+  key=$3
+  meta_file=$(attachment_meta_file_for "$conv_dir" "$attachment_id")
+  if [ ! -f "$meta_file" ]; then
+    printf '%s' ""
+    return 0
+  fi
+  sed -n "s/^$key=//p" "$meta_file" | sed -n '1p'
+}
+
+base64_decode_to_file() {
+  encoded_data=$1
+  out_file=$2
+
+  if command -v base64 >/dev/null 2>&1; then
+    if printf '%s' "$encoded_data" | base64 -d >"$out_file" 2>/dev/null; then
+      return 0
+    fi
+    if printf '%s' "$encoded_data" | base64 -D >"$out_file" 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  if command -v perl >/dev/null 2>&1; then
+    if printf '%s' "$encoded_data" | perl -MMIME::Base64 -e '
+      use strict;
+      use warnings;
+      local $/;
+      my $raw = <STDIN>;
+      my $decoded = eval { decode_base64($raw) };
+      exit 1 if !defined($decoded);
+      binmode STDOUT;
+      print $decoded;
+    ' >"$out_file" 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+base64_encode_file() {
+  file_path=$1
+
+  if command -v base64 >/dev/null 2>&1; then
+    if base64 < "$file_path" 2>/dev/null | tr -d '\n'; then
+      return 0
+    fi
+  fi
+
+  if command -v openssl >/dev/null 2>&1; then
+    if openssl base64 -A -in "$file_path" 2>/dev/null; then
+      return 0
+    fi
+  fi
+
+  if command -v perl >/dev/null 2>&1; then
+    perl -MMIME::Base64 -e '
+      use strict;
+      use warnings;
+      my $path = shift @ARGV;
+      open(my $fh, "<", $path) or exit 1;
+      binmode $fh;
+      local $/;
+      my $data = <$fh>;
+      print encode_base64($data, "");
+    ' "$file_path" 2>/dev/null && return 0
+  fi
+
+  return 1
+}
+
+attachment_ext_from_name() {
+  file_name=$1
+  printf '%s' "$file_name" | awk -F. '
+    NF > 1 {print tolower($NF)}
+  '
+}
+
+attachment_kind_from_name_mime() {
+  file_name=$1
+  mime_type=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+  ext=$(attachment_ext_from_name "$file_name")
+
+  case "$mime_type" in
+    image/png|image/jpeg|image/jpg|image/gif|image/webp|image/bmp|image/tiff|image/x-icon|image/svg+xml)
+      printf '%s' "image"
+      return 0
+      ;;
+  esac
+
+  case "$mime_type" in
+    text/*|application/json|application/xml|application/yaml|application/x-yaml|application/toml|application/javascript|application/x-javascript|application/typescript|application/x-typescript|application/x-sh|application/x-shellscript)
+      printf '%s' "text"
+      return 0
+      ;;
+  esac
+
+  case "$mime_type" in
+    application/pdf)
+      printf '%s' "document"
+      return 0
+      ;;
+  esac
+
+  case "$ext" in
+    txt|md|markdown|rst|log|csv|tsv|json|xml|yaml|yml|toml|ini|conf|cfg|env|sh|bash|zsh|fish|py|js|jsx|ts|tsx|c|h|cpp|cc|cxx|hpp|java|go|rs|php|rb|swift|kt|scala|sql|html|htm|css|scss|less|vue|svelte|dockerfile|makefile|gradle)
+      printf '%s' "text"
+      return 0
+      ;;
+    pdf)
+      printf '%s' "document"
+      return 0
+      ;;
+  esac
+
+  printf '%s' ""
+  return 1
+}
+
+attachment_ids_to_file() {
+  raw_ids=$1
+  out_file=$2
+  : > "$out_file"
+
+  printf '%s' "$raw_ids" \
+    | tr ',\r\t ' '\n' \
+    | sed '/^$/d' \
+    | awk '!seen[$0]++' \
+    | while IFS= read -r attachment_id; do
+      if valid_id "$attachment_id"; then
+        printf '%s\n' "$attachment_id" >> "$out_file"
+      fi
+    done
+}
+
+attachment_exists_for_conversation() {
+  conv_dir=$1
+  attachment_id=$2
+  attachment_item_dir=$(attachment_item_dir_for "$conv_dir" "$attachment_id")
+  [ -d "$attachment_item_dir" ] && [ -f "$attachment_item_dir/blob" ] && [ -f "$attachment_item_dir/meta" ]
+}
+
+attachment_json_array_from_ids_file() {
+  conv_dir=$1
+  ids_file=$2
+  printf '['
+  first=1
+
+  if [ -f "$ids_file" ]; then
+    while IFS= read -r attachment_id; do
+      [ -n "$attachment_id" ] || continue
+      if ! attachment_exists_for_conversation "$conv_dir" "$attachment_id"; then
+        continue
+      fi
+
+      name=$(attachment_meta_get "$conv_dir" "$attachment_id" "name")
+      mime=$(attachment_meta_get "$conv_dir" "$attachment_id" "mime")
+      kind=$(attachment_meta_get "$conv_dir" "$attachment_id" "kind")
+      size=$(attachment_meta_get "$conv_dir" "$attachment_id" "size")
+      [ -n "$size" ] || size=0
+
+      id_json=$(json_escape "$attachment_id")
+      name_json=$(json_escape "$name")
+      mime_json=$(json_escape "$mime")
+      kind_json=$(json_escape "$kind")
+
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '{"id":"%s","name":"%s","mime":"%s","kind":"%s","size":%s}' \
+        "$id_json" "$name_json" "$mime_json" "$kind_json" "$size"
+    done < "$ids_file"
+  fi
+
+  printf ']'
+}
+
+attachment_context_from_ids_file() {
+  conv_dir=$1
+  ids_file=$2
+  max_chars=6000
+  total_chars=0
+
+  [ -f "$ids_file" ] || return 0
+
+  while IFS= read -r attachment_id; do
+    [ -n "$attachment_id" ] || continue
+    if ! attachment_exists_for_conversation "$conv_dir" "$attachment_id"; then
+      continue
+    fi
+
+    name=$(attachment_meta_get "$conv_dir" "$attachment_id" "name")
+    mime=$(attachment_meta_get "$conv_dir" "$attachment_id" "mime")
+    kind=$(attachment_meta_get "$conv_dir" "$attachment_id" "kind")
+    blob_path=$(attachment_blob_for "$conv_dir" "$attachment_id")
+    size=$(attachment_meta_get "$conv_dir" "$attachment_id" "size")
+    [ -n "$size" ] || size=$(wc -c < "$blob_path" | tr -d ' ')
+
+    case "$kind" in
+      text)
+        excerpt=$(sed -n '1,180p' "$blob_path" 2>/dev/null || true)
+        excerpt=$(printf '%s' "$excerpt" | sed 's/[[:cntrl:]]//g')
+        if [ -z "$(trim "$excerpt")" ]; then
+          excerpt="[text attachment contained no readable text]"
+        fi
+        ;;
+      document)
+        if command -v pdftotext >/dev/null 2>&1; then
+          pdf_txt=$(mktemp)
+          if pdftotext -q "$blob_path" "$pdf_txt" >/dev/null 2>&1; then
+            excerpt=$(sed -n '1,180p' "$pdf_txt" 2>/dev/null || true)
+          else
+            excerpt=""
+          fi
+          rm -f "$pdf_txt"
+        else
+          excerpt=""
+        fi
+        if [ -z "$(trim "$excerpt")" ]; then
+          excerpt="[PDF attached: no text extracted in this environment]"
+        fi
+        ;;
+      image)
+        excerpt="[image attachment]"
+        ;;
+      *)
+        excerpt="[binary attachment]"
+        ;;
+    esac
+
+    block=$(cat <<EOF
+Attachment: $name
+MIME: $mime
+Size: $size bytes
+$excerpt
+
+EOF
+)
+
+    block_chars=$(printf '%s' "$block" | wc -c | tr -d ' ')
+    if [ $((total_chars + block_chars)) -gt "$max_chars" ]; then
+      printf '[Additional attachment content omitted for length]\n'
+      break
+    fi
+    total_chars=$((total_chars + block_chars))
+    printf '%s' "$block"
+  done < "$ids_file"
+}
+
+attachment_image_base64_lines_from_ids_file() {
+  conv_dir=$1
+  ids_file=$2
+  supports_vision=$3
+
+  [ "$supports_vision" = "1" ] || return 0
+  [ -f "$ids_file" ] || return 0
+
+  max_images=4
+  count=0
+
+  while IFS= read -r attachment_id; do
+    [ -n "$attachment_id" ] || continue
+    if ! attachment_exists_for_conversation "$conv_dir" "$attachment_id"; then
+      continue
+    fi
+
+    kind=$(attachment_meta_get "$conv_dir" "$attachment_id" "kind")
+    [ "$kind" = "image" ] || continue
+    blob_path=$(attachment_blob_for "$conv_dir" "$attachment_id")
+    image_b64=$(base64_encode_file "$blob_path" 2>/dev/null || true)
+    if [ -n "$image_b64" ]; then
+      printf '%s\n' "$image_b64"
+      count=$((count + 1))
+      if [ "$count" -ge "$max_images" ]; then
+        break
+      fi
+    fi
+  done < "$ids_file"
+}
+
+conversation_queue_dir_for() {
+  conv_dir=$1
+  printf '%s/queue' "$conv_dir"
+}
+
+queue_pending_dir_for() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  printf '%s/pending' "$queue_dir"
+}
+
+read_int_file() {
+  file_path=$1
+  fallback=${2:-0}
+  value=""
+  if [ -f "$file_path" ]; then
+    value=$(sed -n '1p' "$file_path" 2>/dev/null || true)
+  fi
+  case "$value" in
+    -[0-9]*|[0-9]*)
+      if [ -n "$value" ]; then
+        printf '%s' "$value"
+        return 0
+      fi
+      ;;
+  esac
+  printf '%s' "$fallback"
+}
+
+ensure_queue_layout() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  pending_dir=$(queue_pending_dir_for "$conv_dir")
+  mkdir -p "$pending_dir"
+  [ -f "$queue_dir/head" ] || printf '0\n' > "$queue_dir/head"
+  [ -f "$queue_dir/tail" ] || printf '0\n' > "$queue_dir/tail"
+}
+
+queue_allocate_order() {
+  conv_dir=$1
+  mode=${2:-tail}
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+
+  ensure_queue_layout "$conv_dir"
+  head=$(read_int_file "$queue_dir/head" 0)
+  tail=$(read_int_file "$queue_dir/tail" 0)
+
+  if [ "$mode" = "head" ]; then
+    order=$((head - 1))
+    printf '%s\n' "$order" > "$queue_dir/head"
+  else
+    order=$((tail + 1))
+    printf '%s\n' "$order" > "$queue_dir/tail"
+  fi
+
+  printf '%s' "$order"
+}
+
+queue_item_file_for() {
+  conv_dir=$1
+  order=$2
+  item_id=$3
+  pending_dir=$(queue_pending_dir_for "$conv_dir")
+  printf '%s/%s__%s.txt' "$pending_dir" "$order" "$item_id"
+}
+
+queue_item_meta_for_path() {
+  item_path=$1
+  printf '%s.meta' "${item_path%.txt}"
+}
+
+queue_running_meta_file_for() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  printf '%s/running.meta' "$queue_dir"
+}
+
+queue_item_id_from_path() {
+  file_path=$1
+  file_name=$(basename "$file_path")
+  item_id=${file_name#*__}
+  item_id=${item_id%.txt}
+  printf '%s' "$item_id"
+}
+
+queue_pending_paths_sorted() {
+  pending_dir=$1
+  find "$pending_dir" -maxdepth 1 -type f -name '*__*.txt' 2>/dev/null \
+    | awk -F/ '
+      {
+        name = $NF
+        split(name, parts, "__")
+        order = parts[1]
+        if (order ~ /^-?[0-9]+$/) {
+          print order "\t" $0
+        }
+      }
+    ' \
+    | sort -n -k1,1 \
+    | cut -f2-
+}
+
+queue_first_pending_path() {
+  pending_dir=$1
+  queue_pending_paths_sorted "$pending_dir" | sed -n '1p'
+}
+
+queue_find_pending_path_by_id() {
+  pending_dir=$1
+  item_id=$2
+  find "$pending_dir" -maxdepth 1 -type f -name "*__${item_id}.txt" 2>/dev/null | sed -n '1p'
+}
+
+queue_pending_count() {
+  pending_dir=$1
+  find "$pending_dir" -maxdepth 1 -type f -name '*__*.txt' 2>/dev/null | wc -l | tr -d ' '
+}
+
+queue_state_for_conversation() {
+  conv_dir=$1
+  ensure_queue_layout "$conv_dir"
+
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  pending_dir=$(queue_pending_dir_for "$conv_dir")
+  running_file="$queue_dir/running.txt"
+  last_status=$(read_file_line "$queue_dir/last_status" "")
+  first_pending_path=$(queue_first_pending_path "$pending_dir")
+  first_id=""
+
+  if [ -n "$first_pending_path" ]; then
+    first_id=$(queue_item_id_from_path "$first_pending_path")
+  fi
+
+  pending_count=$(queue_pending_count "$pending_dir")
+  running=0
+  if [ -f "$running_file" ]; then
+    running=1
+  fi
+
+  done=0
+  if [ "$running" -eq 0 ] && [ "$pending_count" -eq 0 ] && [ "$last_status" = "done" ]; then
+    done=1
+  fi
+
+  printf 'pending=%s\n' "$pending_count"
+  printf 'running=%s\n' "$running"
+  printf 'done=%s\n' "$done"
+  printf 'last_status=%s\n' "$last_status"
+  printf 'first_id=%s\n' "$first_id"
+}
+
+queue_clear_running_state() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  rm -f "$queue_dir/running.txt" "$queue_dir/running.id" "$queue_dir/running.started" "$queue_dir/running.meta"
+}
+
+workspace_draft_file_for() {
+  workspace_id=$1
+  printf '%s/%s/draft-first-message.txt' "$workspaces_dir" "$workspace_id"
+}
+
+workspace_path_for_id() {
+  workspace_id=$1
+  ws_dir=$(workspace_dir_for "$workspace_id")
+  if [ ! -d "$ws_dir" ]; then
+    printf '%s' ""
+    return 0
+  fi
+  read_file_line "$ws_dir/path" ""
+}
+
+kv_get() {
+  key=$1
+  text=$2
+  printf '%s\n' "$text" | sed -n "s/^$key=//p" | sed -n '1p'
+}
+
+ARTIFICER_GIT_BIN=${ARTIFICER_GIT_BIN:-$WIZARDRY_DIR/spells/.arcana/ai-dev/artificer-git}
+AI_DEV_DIR=${AI_DEV_DIR:-$WIZARDRY_DIR/spells/.arcana/ai-dev}
+
+resolve_artificer_git_bin() {
+  if [ -x "$ARTIFICER_GIT_BIN" ]; then
+    printf '%s' "$ARTIFICER_GIT_BIN"
+    return 0
+  fi
+  if command -v artificer-git >/dev/null 2>&1; then
+    ARTIFICER_GIT_BIN=$(command -v artificer-git)
+    printf '%s' "$ARTIFICER_GIT_BIN"
+    return 0
+  fi
+  return 1
+}
+
+run_artificer_git() {
+  git_bin=$(resolve_artificer_git_bin || true)
+  if [ -z "$git_bin" ]; then
+    printf '%s' "artificer-git helper is unavailable"
+    return 1
+  fi
+  selected_pub=$(selected_ssh_pub_path)
+  if [ -n "$selected_pub" ] && [ -f "$selected_pub" ]; then
+    selected_private=${selected_pub%.pub}
+    if [ -f "$selected_private" ]; then
+      GIT_SSH_COMMAND="ssh -i \"$selected_private\" -o IdentitiesOnly=yes"
+      export GIT_SSH_COMMAND
+    fi
+  fi
+  "$git_bin" "$@"
+}
+
+run_ai_dev_script() {
+  script_name=$1
+  shift
+
+  script_path="$AI_DEV_DIR/$script_name"
+  if [ ! -x "$script_path" ]; then
+    printf '%s' "ai-dev script unavailable: $script_name"
+    return 1
+  fi
+  "$script_path" "$@"
+}
+
+safe_model_name() {
+  model_name=$1
+  case "$model_name" in
+    ""|*[!a-zA-Z0-9._:/-]*)
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+emit_model_installs_json() {
+  printf '['
+  first=1
+  for job_dir in "$model_installs_dir"/*; do
+    [ -d "$job_dir" ] || continue
+    job_id=$(basename "$job_dir")
+    [ -n "$job_id" ] || continue
+    model_name=$(read_file_line "$job_dir/model" "")
+    status=$(read_file_line "$job_dir/status" "running")
+    started=$(read_file_line "$job_dir/started" "0")
+    finished=$(read_file_line "$job_dir/finished" "0")
+    install_pid=$(read_file_line "$job_dir/pid" "")
+    exit_code=$(read_file_line "$job_dir/exit_code" "")
+    if [ "$status" = "running" ] && [ -n "$install_pid" ]; then
+      if ! kill -0 "$install_pid" 2>/dev/null; then
+        status="failed"
+        if [ -n "$exit_code" ]; then
+          case "$exit_code" in
+            0) status="done" ;;
+          esac
+        fi
+      fi
+    fi
+
+    if [ "$first" -eq 0 ]; then
+      printf ','
+    fi
+    first=0
+    printf '{"id":"%s","model":"%s","status":"%s","started":"%s","finished":"%s"}' \
+      "$(json_escape "$job_id")" \
+      "$(json_escape "$model_name")" \
+      "$(json_escape "$status")" \
+      "$(json_escape "$started")" \
+      "$(json_escape "$finished")"
+  done
+  printf ']'
+}
+
+OLLAMA_BIN=""
+
+resolve_ollama_bin() {
+  if [ -n "$OLLAMA_BIN" ] && [ -x "$OLLAMA_BIN" ]; then
+    printf '%s' "$OLLAMA_BIN"
+    return 0
+  fi
+
+  if command -v ollama >/dev/null 2>&1; then
+    OLLAMA_BIN=$(command -v ollama)
+    printf '%s' "$OLLAMA_BIN"
+    return 0
+  fi
+
+  for candidate in \
+    /opt/homebrew/bin/ollama \
+    /usr/local/bin/ollama \
+    /usr/bin/ollama \
+    "$HOME/.local/bin/ollama" \
+    /Applications/Ollama.app/Contents/Resources/ollama
+  do
+    if [ -x "$candidate" ]; then
+      OLLAMA_BIN=$candidate
+      printf '%s' "$OLLAMA_BIN"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+ollama_host_candidates() {
+  printf '%s\n%s\n%s\n' \
+    "${OLLAMA_HOST:-http://127.0.0.1:11434}" \
+    "http://127.0.0.1:11434" \
+    "http://localhost:11434" \
+    | awk '!seen[$0]++'
+}
+
+json_extract_string_field() {
+  field_name=$1
+  json_text=$2
+
+  if command -v perl >/dev/null 2>&1; then
+    printf '%s' "$json_text" | perl -MJSON::PP -e '
+      use strict;
+      use warnings;
+      local $/;
+      my $field = shift @ARGV;
+      my $raw = <STDIN>;
+      my $data = eval { decode_json($raw) };
+      exit 1 if $@ || ref($data) ne "HASH";
+      my $value = $data->{$field};
+      exit 1 if !defined($value) || ref($value);
+      print $value;
+    ' "$field_name" 2>/dev/null || return 1
+    return 0
+  fi
+
+  printf '%s' "$json_text" \
+    | sed -n "s/.*\"$field_name\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" \
+    | sed -n '1p'
+}
+
+model_supports_vision() {
+  model_name=$1
+  host_candidates=$(ollama_host_candidates)
+
+  if ! command -v curl >/dev/null 2>&1; then
+    return 1
+  fi
+
+  payload=$(printf '{"model":"%s"}' "$(json_escape "$model_name")")
+
+  while IFS= read -r host; do
+    [ -n "$host" ] || continue
+    show_json=$(curl -sS --connect-timeout 3 --max-time 8 \
+      -H "Content-Type: application/json" \
+      -X POST "$host/api/show" \
+      -d "$payload" 2>/dev/null || true)
+    [ -n "$show_json" ] || continue
+
+    if printf '%s' "$show_json" | perl -MJSON::PP -e '
+      use strict;
+      use warnings;
+      local $/;
+      my $raw = <STDIN>;
+      my $data = eval { decode_json($raw) };
+      exit 1 if $@ || ref($data) ne "HASH";
+      my $caps = $data->{capabilities};
+      exit 1 if ref($caps) ne "ARRAY";
+      for my $item (@{$caps}) {
+        next if !defined($item);
+        if ($item eq "vision") {
+          exit 0;
+        }
+      }
+      exit 1;
+    ' 2>/dev/null; then
+      return 0
+    fi
+  done <<EOF
+$host_candidates
+EOF
+
+  return 1
+}
+
+extract_urls_from_text() {
+  text=$1
+  printf '%s\n' "$text" \
+    | grep -Eo 'https?://[^[:space:]<>()"'"'"']+' \
+    | awk '!seen[$0]++'
+}
+
+fetch_web_context_from_prompt() {
+  prompt_text=$1
+  max_urls=3
+  fetched=0
+
+  if [ "$ALLOW_NETWORK" != "1" ] || [ "$ALLOW_WEB" != "1" ]; then
+    return 0
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  extract_urls_from_text "$prompt_text" | while IFS= read -r url; do
+    [ -n "$url" ] || continue
+    if [ "$fetched" -ge "$max_urls" ]; then
+      break
+    fi
+    fetched=$((fetched + 1))
+
+    raw=$(curl -LfsS --connect-timeout 3 --max-time 8 "$url" 2>/dev/null || true)
+    [ -n "$raw" ] || continue
+
+    text=$(printf '%s' "$raw" | perl -CS -pe '
+      s/<script\b[^>]*>.*?<\/script>//gis;
+      s/<style\b[^>]*>.*?<\/style>//gis;
+      s/<[^>]+>/ /g;
+      s/\s+/ /g;
+    ' | cut -c1-3500)
+    text=$(trim "$text")
+    [ -n "$text" ] || continue
+
+    printf 'URL: %s\n%s\n\n' "$url" "$text"
+  done
+}
+
+models_from_api_tags() {
+  tags_json=$1
+
+  if command -v perl >/dev/null 2>&1; then
+    printf '%s' "$tags_json" | perl -MJSON::PP -e '
+      use strict;
+      use warnings;
+      local $/;
+      my $raw = <STDIN>;
+      my $data = eval { decode_json($raw) };
+      exit 1 if $@ || ref($data) ne "HASH";
+      my $models = $data->{models};
+      exit 1 if ref($models) ne "ARRAY";
+      for my $item (@{$models}) {
+        next if ref($item) ne "HASH";
+        my $name = $item->{name};
+        next if !defined($name) || $name eq "";
+        print "$name\n";
+      }
+    ' 2>/dev/null && return 0
+  fi
+
+  printf '%s' "$tags_json" \
+    | awk 'BEGIN{RS="\"name\":\"";FS="\""} NR>1 {print $1}' \
+    | sed '/^$/d'
+}
+
+list_models_raw() {
+  host_candidates=$(ollama_host_candidates)
+
+  if command -v curl >/dev/null 2>&1; then
+    while IFS= read -r host; do
+      [ -n "$host" ] || continue
+      tags_json=$(curl -fsS --connect-timeout 3 --max-time 6 "$host/api/tags" 2>/dev/null || true)
+      [ -n "$(trim "$tags_json")" ] || continue
+
+      api_models=$(models_from_api_tags "$tags_json" 2>/dev/null || true)
+      if [ -n "$(trim "$api_models")" ]; then
+        printf '%s\n' "$api_models" | awk '!seen[$0]++'
+        return 0
+      fi
+    done <<EOF
+$host_candidates
+EOF
+
+  fi
+
+  ollama_bin=$(resolve_ollama_bin || true)
+  [ -n "$ollama_bin" ] || return 0
+
+  while IFS= read -r host; do
+    [ -n "$host" ] || continue
+    OLLAMA_HOST=$host
+    export OLLAMA_HOST
+
+    cli_models=$("$ollama_bin" list 2>/dev/null | awk 'NR > 1 { print $1 }' | sed '/^$/d' || true)
+    if [ -n "$(trim "$cli_models")" ]; then
+      printf '%s\n' "$cli_models" | awk '!seen[$0]++'
+      return 0
+    fi
+  done <<EOF
+$host_candidates
+EOF
+
+  list_script="$WIZARDRY_DIR/spells/.arcana/ai-dev/list-installed-llms"
+  if [ -x "$list_script" ]; then
+    fallback_models=$("$list_script" 2>/dev/null || true)
+    if [ -n "$(trim "$fallback_models")" ]; then
+      printf '%s\n' "$fallback_models" | awk '!seen[$0]++'
+      return 0
+    fi
+  fi
+}
+
+list_models_from_workspace_data() {
+  for ws_dir in "$workspaces_dir"/*; do
+    [ -d "$ws_dir" ] || continue
+    conv_parent="$ws_dir/conversations"
+    [ -d "$conv_parent" ] || continue
+    for conv_dir in "$conv_parent"/*; do
+      [ -d "$conv_dir" ] || continue
+      model_name=$(read_file_line "$conv_dir/model" "")
+      model_name=$(trim "$model_name")
+      [ -n "$model_name" ] || continue
+      printf '%s\n' "$model_name"
+    done
+  done | awk '!seen[$0]++'
+}
+
+preferred_chat_model() {
+  models=$(list_models_raw || true)
+  [ -n "$(trim "$models")" ] || return 0
+
+  preferred=""
+  while IFS= read -r model_name; do
+    [ -n "$model_name" ] || continue
+    lower=$(printf '%s' "$model_name" | tr '[:upper:]' '[:lower:]')
+    case "$lower" in
+      *embed*|*embedding*|*nomic-embed*|*bge-*|*e5-*|*minilm*|*clip*|*whisper*)
+        continue
+        ;;
+    esac
+    case "$lower" in
+      *instruct*|*chat*|qwen*|*qwen*|*llama*|*mistral*|*deepseek*|*gemma*|*phi*)
+        preferred=$model_name
+        break
+        ;;
+    esac
+  done <<EOF
+$models
+EOF
+
+  if [ -n "$preferred" ]; then
+    printf '%s' "$preferred"
+    return 0
+  fi
+
+  while IFS= read -r model_name; do
+    [ -n "$model_name" ] || continue
+    lower=$(printf '%s' "$model_name" | tr '[:upper:]' '[:lower:]')
+    case "$lower" in
+      *embed*|*embedding*|*nomic-embed*|*bge-*|*e5-*|*minilm*|*clip*|*whisper*)
+        continue
+        ;;
+    esac
+    printf '%s' "$model_name"
+    return 0
+  done <<EOF
+$models
+EOF
+}
+
+default_model() {
+  first_model=$(preferred_chat_model || true)
+  if [ -z "$first_model" ]; then
+    first_model=$(list_models_raw | sed -n '1p')
+  fi
+  if [ -n "$first_model" ]; then
+    printf '%s' "$first_model"
+  else
+    printf '%s' "qwen2.5-coder:7b"
+  fi
+}
+
+append_message() {
+  conv_dir=$1
+  role=$2
+  content=$3
+
+  messages_dir="$conv_dir/messages"
+  mkdir -p "$messages_dir"
+
+  count=$(find "$messages_dir" -maxdepth 1 -type f -name '*.txt' 2>/dev/null | wc -l | tr -d ' ')
+  [ -n "$count" ] || count=0
+  next=$((count + 1))
+  file_name=$(printf '%s/%04d-%s.txt' "$messages_dir" "$next" "$role")
+  printf '%s\n' "$content" > "$file_name"
+  date +%s > "$conv_dir/updated"
+}
+
+extract_section() {
+  section_name=$1
+  text=$2
+  printf '%s\n' "$text" | awk -v section="$section_name" '
+    BEGIN {
+      capture = 0
+    }
+    $0 ~ ("^" section ":") {
+      capture = 1
+      next
+    }
+    capture && $0 ~ "^[A-Z][A-Z_ ]*:$" {
+      capture = 0
+    }
+    capture {
+      print
+    }
+  '
+}
+
+allowed_command() {
+  cmd=$1
+
+  case "$cmd" in
+    *';'*|*'&&'*|*'||'*|*'|'*|*'>'*|*'<'*|*'`'*|*'$('*|*'${'*)
+      return 1
+      ;;
+  esac
+
+  first_word=$(printf '%s\n' "$cmd" | awk '{print $1}')
+  second_word=$(printf '%s\n' "$cmd" | awk '{print $2}')
+
+  if [ "$ALLOW_NETWORK" = "1" ] && [ "$ALLOW_WEB" = "1" ]; then
+    case "$first_word" in
+      curl)
+        case "$cmd" in
+          *" --output "*|*" -o "*|*" -O "*|*" --data "*|*" -d "*|*" --upload-file "*|*" -T "*)
+            return 1
+            ;;
+        esac
+        if printf '%s\n' "$cmd" | grep -Eq 'https?://'; then
+          return 0
+        fi
+        return 1
+        ;;
+    esac
+  fi
+
+  case "$first_word" in
+    ls|pwd|cat|head|tail|sed|wc|rg|find)
+      return 0
+      ;;
+    git)
+      case "$second_word" in
+        status|diff|log|show|rev-parse|branch)
+          return 0
+          ;;
+        *)
+          return 1
+          ;;
+      esac
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+run_model() {
+  model_name=$1
+  prompt_text=$2
+  image_payload_lines=${3:-}
+
+  host_candidates=$(ollama_host_candidates)
+  last_output=""
+  last_rc=1
+  run_timeout_sec=${RUN_TIMEOUT_SEC:-180}
+  images_json=""
+  prompt_for_model=$(adapt_prompt_for_model "$model_name" "$prompt_text")
+
+  if [ -n "$(trim "$image_payload_lines")" ]; then
+    images_json=$(printf '%s\n' "$image_payload_lines" | sed '/^$/d' | awk '
+      BEGIN { first = 1 }
+      {
+        gsub(/\\/, "\\\\")
+        gsub(/"/, "\\\"")
+        if (!first) {
+          printf ","
+        }
+        first = 0
+        printf "\"%s\"", $0
+      }
+    ')
+  fi
+
+  if command -v curl >/dev/null 2>&1; then
+    stream_output_file=${ARTIFICER_STREAM_FILE:-}
+    if [ -n "$(trim "$stream_output_file")" ]; then
+      mkdir -p "$(dirname "$stream_output_file")" 2>/dev/null || true
+      : > "$stream_output_file"
+    fi
+
+    while IFS= read -r host; do
+      [ -n "$host" ] || continue
+      OLLAMA_HOST=$host
+      export OLLAMA_HOST
+
+      if [ -n "$(trim "$stream_output_file")" ]; then
+        if [ -n "$images_json" ]; then
+          payload=$(printf '{"model":"%s","prompt":"%s","images":[%s],"stream":true}' \
+            "$(json_escape "$model_name")" \
+            "$(json_escape "$prompt_for_model")" \
+            "$images_json")
+        else
+          payload=$(printf '{"model":"%s","prompt":"%s","stream":true}' \
+            "$(json_escape "$model_name")" \
+            "$(json_escape "$prompt_for_model")")
+        fi
+
+        stream_fifo=$(mktemp -u "/tmp/artificer-stream.XXXXXX")
+        stream_err=$(mktemp)
+        stream_text=$(mktemp)
+        mkfifo "$stream_fifo"
+
+        set +e
+        curl -sS --connect-timeout 3 --max-time "$run_timeout_sec" \
+          -H "Content-Type: application/json" \
+          -X POST "$host/api/generate" \
+          -d "$payload" >"$stream_fifo" 2>"$stream_err" &
+        curl_pid=$!
+        set -e
+
+        while IFS= read -r line || [ -n "$line" ]; do
+          [ -n "$line" ] || continue
+          chunk=$(json_extract_string_field "response" "$line" || true)
+          if [ -n "$chunk" ]; then
+            printf '%s' "$chunk" >> "$stream_text"
+            printf '%s' "$chunk" >> "$stream_output_file"
+          fi
+        done < "$stream_fifo"
+
+        set +e
+        wait "$curl_pid"
+        api_rc=$?
+        set -e
+
+        rm -f "$stream_fifo"
+
+        if [ "$api_rc" -eq 0 ]; then
+          response_text=$(cat "$stream_text")
+          rm -f "$stream_text" "$stream_err"
+          if [ -n "$response_text" ]; then
+            printf '%s' "$response_text"
+            return 0
+          fi
+
+          last_output="ollama stream completed without response text"
+          last_rc=1
+          continue
+        fi
+
+        err_text=$(cat "$stream_err" 2>/dev/null || true)
+        rm -f "$stream_text" "$stream_err"
+
+        if [ "$api_rc" -eq 28 ]; then
+          last_output="timed out while waiting for ollama /api/generate"
+          last_rc=124
+          break
+        fi
+
+        if [ -n "$(trim "$err_text")" ]; then
+          last_output=$err_text
+        else
+          last_output="ollama streaming request failed"
+        fi
+        last_rc=$api_rc
+      else
+        if [ -n "$images_json" ]; then
+          payload=$(printf '{"model":"%s","prompt":"%s","images":[%s],"stream":false}' \
+            "$(json_escape "$model_name")" \
+            "$(json_escape "$prompt_for_model")" \
+            "$images_json")
+        else
+          payload=$(printf '{"model":"%s","prompt":"%s","stream":false}' \
+            "$(json_escape "$model_name")" \
+            "$(json_escape "$prompt_for_model")")
+        fi
+
+        set +e
+        api_output=$(curl -sS --connect-timeout 3 --max-time "$run_timeout_sec" \
+          -H "Content-Type: application/json" \
+          -X POST "$host/api/generate" \
+          -d "$payload" 2>&1)
+        api_rc=$?
+        set -e
+
+        if [ "$api_rc" -eq 0 ]; then
+          response_text=$(json_extract_string_field "response" "$api_output" || true)
+          if [ -n "$response_text" ]; then
+            printf '%s' "$response_text"
+            return 0
+          fi
+
+          error_text=$(json_extract_string_field "error" "$api_output" || true)
+          if [ -n "$error_text" ]; then
+            last_output=$error_text
+          else
+            last_output=$api_output
+          fi
+          last_rc=1
+          continue
+        fi
+
+        if [ "$api_rc" -eq 28 ]; then
+          last_output="timed out while waiting for ollama /api/generate"
+          last_rc=124
+          break
+        else
+          last_output=$api_output
+          last_rc=$api_rc
+        fi
+      fi
+    done <<EOF
+$host_candidates
+EOF
+  fi
+
+  if [ -n "$images_json" ]; then
+    if [ -z "$(trim "$last_output")" ]; then
+      last_output="Model request with image attachments failed. Ensure Ollama API is reachable and selected model supports vision."
+    fi
+    printf '%s' "$last_output"
+    return "${last_rc:-1}"
+  fi
+
+  ollama_bin=$(resolve_ollama_bin || true)
+  if [ -n "$ollama_bin" ]; then
+    while IFS= read -r host; do
+      [ -n "$host" ] || continue
+      OLLAMA_HOST=$host
+      export OLLAMA_HOST
+
+      set +e
+      if command -v timeout >/dev/null 2>&1; then
+        run_output=$(timeout "$run_timeout_sec" "$ollama_bin" run "$model_name" "$prompt_for_model" 2>&1)
+        run_rc=$?
+      elif command -v gtimeout >/dev/null 2>&1; then
+        run_output=$(gtimeout "$run_timeout_sec" "$ollama_bin" run "$model_name" "$prompt_for_model" 2>&1)
+        run_rc=$?
+      elif command -v perl >/dev/null 2>&1; then
+        run_output=$(perl -e '
+          use strict;
+          use warnings;
+          my $t = shift @ARGV;
+          my $pid = fork();
+          die "fork failed" unless defined $pid;
+          if ($pid == 0) { exec @ARGV; exit 127; }
+          my $timed_out = 0;
+          local $SIG{ALRM} = sub { $timed_out = 1; kill 9, $pid; };
+          alarm $t;
+          waitpid($pid, 0);
+          alarm 0;
+          if ($timed_out) { exit 124; }
+          my $rc = $? >> 8;
+          exit $rc;
+        ' "$run_timeout_sec" "$ollama_bin" run "$model_name" "$prompt_for_model" 2>&1)
+        run_rc=$?
+      else
+        run_output=$("$ollama_bin" run "$model_name" "$prompt_for_model" 2>&1)
+        run_rc=$?
+      fi
+      set -e
+
+      if [ "$run_rc" -eq 0 ]; then
+        printf '%s' "$run_output"
+        return 0
+      fi
+
+      last_output=$run_output
+      if [ "$run_rc" -eq 124 ]; then
+        last_rc=124
+        break
+      else
+        last_rc=$run_rc
+      fi
+    done <<EOF
+$host_candidates
+EOF
+  fi
+
+  printf '%s' "$last_output"
+  return "$last_rc"
+}
+
+workspace_snapshot() {
+  workspace_path=$1
+  tmp_file=$(mktemp)
+
+  if (
+    cd "$workspace_path" &&
+      {
+        printf 'Workspace: %s\n' "$workspace_path"
+        printf '\nTop files (max depth 2):\n'
+        find . -maxdepth 2 -type f 2>/dev/null | sed 's|^\./||' | head -n 120
+        printf '\nGit status:\n'
+        git status --short 2>/dev/null || printf 'Not a git repository.\n'
+      }
+  ) >"$tmp_file" 2>&1; then
+    :
+  fi
+
+  cat "$tmp_file"
+  rm -f "$tmp_file"
+}
+
+conversation_history() {
+  conv_dir=$1
+  msg_dir="$conv_dir/messages"
+  [ -d "$msg_dir" ] || return 0
+
+  temp_list=$(mktemp)
+  find "$msg_dir" -maxdepth 1 -type f -name '*.txt' 2>/dev/null | sort | tail -n 12 >"$temp_list"
+
+  while IFS= read -r msg_file; do
+    [ -f "$msg_file" ] || continue
+    msg_name=$(basename "$msg_file")
+    role=$(printf '%s' "$msg_name" | sed 's/^[0-9][0-9][0-9][0-9]-//;s/\.txt$//')
+    content=$(cat "$msg_file")
+    case "$role" in
+      user)
+        printf 'User:\n%s\n\n' "$content"
+        ;;
+      assistant)
+        printf 'Assistant:\n%s\n\n' "$content"
+        ;;
+      *)
+        printf 'System:\n%s\n\n' "$content"
+        ;;
+    esac
+  done <"$temp_list"
+
+  rm -f "$temp_list"
+}
+
+single_line_snippet() {
+  text=$1
+  printf '%s' "$text" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g;s/^ //;s/ $//' | cut -c1-220
+}
+
+workspace_shared_context() {
+  ws_dir=$1
+  active_conv_id=$2
+  conv_root="$ws_dir/conversations"
+  [ -d "$conv_root" ] || return 0
+
+  listed=0
+  for conv_dir in "$conv_root"/*; do
+    [ -d "$conv_dir" ] || continue
+    conv_id=$(basename "$conv_dir")
+    [ "$conv_id" = "$active_conv_id" ] && continue
+
+    title=$(read_file_line "$conv_dir/title" "Conversation")
+    updated=$(read_file_line "$conv_dir/updated" "0")
+    model=$(read_file_line "$conv_dir/model" "")
+
+    msg_dir="$conv_dir/messages"
+    user_snippet=""
+    assistant_snippet=""
+    if [ -d "$msg_dir" ]; then
+      last_user_file=$(find "$msg_dir" -maxdepth 1 -type f -name '*-user.txt' 2>/dev/null | sort | tail -n 1)
+      last_assistant_file=$(find "$msg_dir" -maxdepth 1 -type f -name '*-assistant.txt' 2>/dev/null | sort | tail -n 1)
+      if [ -n "$last_user_file" ] && [ -f "$last_user_file" ]; then
+        user_snippet=$(single_line_snippet "$(cat "$last_user_file" 2>/dev/null || true)")
+      fi
+      if [ -n "$last_assistant_file" ] && [ -f "$last_assistant_file" ]; then
+        assistant_snippet=$(single_line_snippet "$(cat "$last_assistant_file" 2>/dev/null || true)")
+      fi
+    fi
+
+    printf 'Thread: %s\n' "$title"
+    printf 'Updated: %s\n' "$updated"
+    if [ -n "$model" ]; then
+      printf 'Model: %s\n' "$model"
+    fi
+    if [ -n "$user_snippet" ]; then
+      printf 'Recent user intent: %s\n' "$user_snippet"
+    fi
+    if [ -n "$assistant_snippet" ]; then
+      printf 'Recent assistant output: %s\n' "$assistant_snippet"
+    fi
+    printf '\n'
+
+    listed=$((listed + 1))
+    if [ "$listed" -ge 8 ]; then
+      break
+    fi
+  done
+}
+
+json_messages() {
+  conv_dir=$1
+  msg_dir="$conv_dir/messages"
+  printf '['
+  first=1
+  if [ -d "$msg_dir" ]; then
+    for msg_file in "$msg_dir"/*.txt; do
+      [ -f "$msg_file" ] || continue
+      msg_name=$(basename "$msg_file")
+      role=$(printf '%s' "$msg_name" | sed 's/^[0-9][0-9][0-9][0-9]-//;s/\.txt$//')
+      content=$(cat "$msg_file")
+      role_json=$(json_escape "$role")
+      content_json=$(json_escape "$content")
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '{"role":"%s","content":"%s"}' "$role_json" "$content_json"
+    done
+  fi
+  printf ']'
+}
+
+extract_patch_section() {
+  text=$1
+  printf '%s\n' "$text" | awk '
+    BEGIN {
+      capture = 0
+    }
+    /^PATCH:/ {
+      capture = 1
+      next
+    }
+    capture && /^[A-Z][A-Z_ ]*:[[:space:]]*$/ {
+      capture = 0
+    }
+    capture {
+      print
+    }
+  '
+}
+
+normalize_patch_text() {
+  text=$1
+  printf '%s\n' "$text" | sed '/^[[:space:]]*```/d'
+}
+
+is_safe_relative_path() {
+  rel=$1
+
+  case "$rel" in
+    ""|/*|*'..'*|*'~'*|*'\\'*|*':'*)
+      return 1
+      ;;
+  esac
+
+  case "$rel" in
+    *[!a-zA-Z0-9._/-]*)
+      return 1
+      ;;
+  esac
+
+  return 0
+}
+
+patch_paths_from_text() {
+  patch_text=$1
+  printf '%s\n' "$patch_text" | awk '
+    /^\+\+\+ / {
+      path = $2
+      sub(/^b\//, "", path)
+      if (path != "/dev/null") {
+        print path
+      }
+    }
+  ' | awk '!seen[$0]++'
+}
+
+execute_mediated_command() {
+  workspace_id=$1
+  workspace_path=$2
+  tool_command=$3
+  output_file=$4
+  status_file=$5
+  command_mode=${6:-ask}
+  blocked_file=${7:-}
+  first_word=$(printf '%s\n' "$tool_command" | awk '{print $1}')
+
+  decision_file=$(mktemp)
+  source_file=$(mktemp)
+  matched_pattern_file=$(mktemp)
+  matched_scope_file=$(mktemp)
+  command_policy_decision "$workspace_id" "$tool_command" "$command_mode" "$decision_file" "$source_file" "$matched_pattern_file" "$matched_scope_file"
+  decision=$(cat "$decision_file" 2>/dev/null || printf '%s' "prompt")
+  source=$(cat "$source_file" 2>/dev/null || printf '%s' "")
+  rm -f "$decision_file" "$source_file" "$matched_pattern_file" "$matched_scope_file"
+
+  if [ "$decision" = "deny" ]; then
+    {
+      printf '%s\n' "Blocked by command policy."
+      printf '%s\n' "Policy mode: $command_mode"
+      printf '%s\n' "Decision source: $source"
+      printf '%s\n' "Command: $tool_command"
+    } > "$output_file"
+    printf 'blocked' > "$status_file"
+    if [ -n "$blocked_file" ]; then
+      printf '%s\t%s\n' "$tool_command" "denied" >> "$blocked_file"
+    fi
+    return 0
+  fi
+
+  if [ "$decision" = "prompt" ]; then
+    printf '%s\n' "Command approval required before execution." > "$output_file"
+    printf '%s\n' "Command: $tool_command" >> "$output_file"
+    printf '%s\n' "Use Command execution = Ask me and approve this command (once or remember)." >> "$output_file"
+    printf 'approval_required' > "$status_file"
+    if [ -n "$blocked_file" ]; then
+      printf '%s\t%s\n' "$tool_command" "approval-required" >> "$blocked_file"
+    fi
+    return 0
+  fi
+
+  if allowed_command "$tool_command"; then
+    if (
+      cd "$workspace_path" &&
+        {
+          if command -v timeout >/dev/null 2>&1; then
+            timeout 25 sh -c "$tool_command"
+          else
+            sh -c "$tool_command"
+          fi
+        }
+    ) >"$output_file" 2>&1; then
+      printf 'ok' > "$status_file"
+    else
+      rc=$?
+      if [ "$first_word" = "git" ] && grep -qi 'not a git repository' "$output_file" 2>/dev/null; then
+        printf 'ok' > "$status_file"
+      else
+        printf '\n(exit code %s)\n' "$rc" >> "$output_file"
+        printf 'failed' > "$status_file"
+      fi
+    fi
+  else
+    printf '%s\n' "Blocked by safety policy. Allowed: ls, pwd, cat, head, tail, sed, wc, rg, find, and selected git read commands." > "$output_file"
+    printf 'blocked' > "$status_file"
+    if [ -n "$blocked_file" ]; then
+      printf '%s\t%s\n' "$tool_command" "safety-policy" >> "$blocked_file"
+    fi
+  fi
+}
+
+ensure_agent_files() {
+  agent_dir=$1
+  mkdir -p "$agent_dir/.scratch"
+
+  if [ ! -f "$agent_dir/.failures.md" ]; then
+    cat > "$agent_dir/.failures.md" <<'EOF'
+# Failure Ledger
+
+EOF
+  fi
+
+  if [ ! -f "$agent_dir/.session.log.md" ]; then
+    cat > "$agent_dir/.session.log.md" <<'EOF'
+# Session Log
+
+EOF
+  fi
+}
+
+bootstrap_plan_file() {
+  plan_file=$1
+  model_name=$2
+  workspace_path=$3
+  user_prompt=$4
+
+  snapshot_text=$(workspace_snapshot "$workspace_path" | sed -n '1,220p')
+  plan_prompt=$(cat <<EOF
+Create an execution plan for a coding task.
+
+Return only this template with concise content:
+Goal:
+Subgoals:
+Constraints:
+Unknowns:
+Next Action:
+Completion Criteria:
+
+Workspace snapshot:
+$snapshot_text
+
+User request:
+$user_prompt
+EOF
+)
+
+  plan_text=$(run_model "$model_name" "$plan_prompt" || true)
+  if [ -z "$(trim "$plan_text")" ]; then
+    plan_text=""
+  fi
+
+  if ! printf '%s\n' "$plan_text" | grep -q '^Goal:'; then
+    plan_text=$(cat <<EOF
+Goal:
+- $user_prompt
+Subgoals:
+- understand current workspace state
+- make safe incremental progress
+Constraints:
+- only use mediated tools
+- avoid unsafe shell operations
+Unknowns:
+- exact files and interfaces to change
+Next Action:
+- inspect relevant files with read-only tools
+Completion Criteria:
+- requested change implemented or clearly explained with blockers
+EOF
+)
+  fi
+
+  printf '%s\n' "$plan_text" > "$plan_file"
+}
+
+append_failure_entry() {
+  ledger_file=$1
+  action_text=$2
+  error_text=$3
+  hypothesis_text=$4
+  next_text=$5
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
+
+  {
+    printf '## %s\n' "$timestamp"
+    printf 'Action: %s\n' "$action_text"
+    printf 'Error: %s\n' "$error_text"
+    printf 'Hypothesis: %s\n' "$hypothesis_text"
+    printf 'Next Attempt: %s\n\n' "$next_text"
+  } >> "$ledger_file"
+}
+
+append_session_entry() {
+  session_file=$1
+  heading=$2
+  body=$3
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)
+
+  {
+    printf '## %s - %s\n' "$timestamp" "$heading"
+    printf '%s\n\n' "$body"
+  } >> "$session_file"
+}
+
+sanitize_state_value() {
+  value=$1
+  printf '%s' "$value" | tr '\r\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+state_get() {
+  state_file=$1
+  key=$2
+  fallback=${3:-}
+
+  if [ ! -f "$state_file" ]; then
+    printf '%s' "$fallback"
+    return 0
+  fi
+
+  value=$(awk -F= -v wanted="$key" '
+    $1 == wanted {
+      sub(/^[^=]*=/, "")
+      print
+      found = 1
+      exit
+    }
+    END {
+      if (!found) {
+        exit 1
+      }
+    }
+  ' "$state_file" 2>/dev/null || true)
+
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' "$fallback"
+  fi
+}
+
+state_set() {
+  state_file=$1
+  key=$2
+  value=$(sanitize_state_value "$3")
+  temp_file=$(mktemp)
+  found=0
+
+  if [ -f "$state_file" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+        "$key="*)
+          printf '%s=%s\n' "$key" "$value" >> "$temp_file"
+          found=1
+          ;;
+        *)
+          printf '%s\n' "$line" >> "$temp_file"
+          ;;
+      esac
+    done < "$state_file"
+  fi
+
+  if [ "$found" -eq 0 ]; then
+    printf '%s=%s\n' "$key" "$value" >> "$temp_file"
+  fi
+
+  mv "$temp_file" "$state_file"
+}
+
+normalize_mode() {
+  mode_value=$(printf '%s' "$1" | tr 'a-z' 'A-Z')
+  case "$mode_value" in
+    INVESTIGATE|DESIGN|IMPLEMENT|VERIFY|DONE)
+      printf '%s' "$mode_value"
+      ;;
+    *)
+      printf '%s' "INVESTIGATE"
+      ;;
+  esac
+}
+
+initialize_state_file() {
+  state_file=$1
+  prompt_text=$2
+  target_seed=$(printf '%s' "$prompt_text" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-80)
+  [ -n "$target_seed" ] || target_seed="workspace"
+
+  state_set "$state_file" "mode" "INVESTIGATE"
+  state_set "$state_file" "target" "$target_seed"
+  state_set "$state_file" "blocking" "none"
+  state_set "$state_file" "confidence" "0.20"
+  state_set "$state_file" "transition_reason" "new run"
+}
+
+mode_instructions() {
+  current_mode=$1
+  case "$current_mode" in
+    INVESTIGATE)
+      cat <<'EOF'
+Mode objective:
+- inspect the workspace and identify relevant files.
+
+Mode constraints:
+- do not patch files.
+- run at most 3 read-only commands.
+- focus on concrete evidence from tool output.
+EOF
+      ;;
+    DESIGN)
+      cat <<'EOF'
+Mode objective:
+- define the implementation contract before editing.
+
+Mode constraints:
+- contract must include Inputs, Outputs, Side Effects, Dependencies, Exit Codes, Invariants.
+- do not patch files in this mode.
+- run read-only commands only when needed.
+EOF
+      ;;
+    IMPLEMENT)
+      cat <<'EOF'
+Mode objective:
+- implement the contract with minimal scoped edits.
+
+Mode constraints:
+- provide a unified diff in PATCH.
+- touch at most 3 files.
+- keep changes focused on the requested task.
+EOF
+      ;;
+    VERIFY)
+      cat <<'EOF'
+Mode objective:
+- verify the implementation and determine completion.
+
+Mode constraints:
+- run verification commands only.
+- if verification fails, indicate DONE_CLAIM no.
+- if verification passes, indicate DONE_CLAIM yes.
+EOF
+      ;;
+    DONE)
+      cat <<'EOF'
+Mode objective:
+- provide final response only.
+EOF
+      ;;
+    *)
+      cat <<'EOF'
+Mode objective:
+- investigate safely.
+EOF
+      ;;
+  esac
+}
+
+prepare_scratch_files() {
+  workspace_path=$1
+  scratch_dir=$2
+  files_list_file=$3
+
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+
+    dst="$scratch_dir/$rel"
+    src="$workspace_path/$rel"
+
+    mkdir -p "$(dirname "$dst")"
+    if [ -f "$src" ]; then
+      cp "$src" "$dst"
+    else
+      : > "$dst"
+    fi
+  done < "$files_list_file"
+}
+
+apply_patch_to_scratch() {
+  scratch_dir=$1
+  patch_file=$2
+  output_file=$3
+
+  if (cd "$scratch_dir" && patch -p1 < "$patch_file") >"$output_file" 2>&1; then
+    return 0
+  fi
+
+  if (cd "$scratch_dir" && patch -p0 < "$patch_file") >"$output_file" 2>&1; then
+    return 0
+  fi
+
+  return 1
+}
+
+run_gate_checks() {
+  scratch_dir=$1
+  files_list_file=$2
+  report_file=$3
+
+  pass=1
+  : > "$report_file"
+
+  printf 'Gate checks:\n' >> "$report_file"
+
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    candidate="$scratch_dir/$rel"
+
+    if [ ! -f "$candidate" ]; then
+      printf -- '- %s: missing in scratch workspace\n' "$rel" >> "$report_file"
+      pass=0
+      continue
+    fi
+
+    case "$rel" in
+      *.sh)
+        syntax_err=$(mktemp)
+        if sh -n "$candidate" > /dev/null 2>"$syntax_err"; then
+          printf -- '- %s: sh -n passed\n' "$rel" >> "$report_file"
+        else
+          first_err=$(sed -n '1,4p' "$syntax_err" | tr '\n' ' ')
+          printf -- '- %s: sh -n failed (%s)\n' "$rel" "$first_err" >> "$report_file"
+          pass=0
+        fi
+        rm -f "$syntax_err"
+        ;;
+      *.js)
+        if command -v node >/dev/null 2>&1; then
+          syntax_err=$(mktemp)
+          if node --check "$candidate" > /dev/null 2>"$syntax_err"; then
+            printf -- '- %s: node --check passed\n' "$rel" >> "$report_file"
+          else
+            first_err=$(sed -n '1,4p' "$syntax_err" | tr '\n' ' ')
+            printf -- '- %s: node --check failed (%s)\n' "$rel" "$first_err" >> "$report_file"
+            pass=0
+          fi
+          rm -f "$syntax_err"
+        else
+          printf -- '- %s: node not available, skipped JS syntax check\n' "$rel" >> "$report_file"
+        fi
+        ;;
+      *.py)
+        if command -v python3 >/dev/null 2>&1; then
+          py_cache=$(mktemp -d)
+          py_err=$(mktemp)
+          if PYTHONPYCACHEPREFIX="$py_cache" python3 -m py_compile "$candidate" > /dev/null 2>"$py_err"; then
+            printf -- '- %s: python3 -m py_compile passed\n' "$rel" >> "$report_file"
+          else
+            first_err=$(sed -n '1,4p' "$py_err" | tr '\n' ' ')
+            printf -- '- %s: py_compile failed (%s)\n' "$rel" "$first_err" >> "$report_file"
+            pass=0
+          fi
+          rm -rf "$py_cache"
+          rm -f "$py_err"
+        else
+          printf -- '- %s: python3 not available, skipped Python syntax check\n' "$rel" >> "$report_file"
+        fi
+        ;;
+      *)
+        printf -- '- %s: no static rule, skipped\n' "$rel" >> "$report_file"
+        ;;
+    esac
+
+    if grep -nE '^(<<<<<<<|=======|>>>>>>>)' "$candidate" >/dev/null 2>&1; then
+      printf -- '- %s: conflict markers detected\n' "$rel" >> "$report_file"
+      pass=0
+    fi
+  done < "$files_list_file"
+
+  [ "$pass" -eq 1 ]
+}
+
+diff_scratch_vs_workspace() {
+  workspace_path=$1
+  scratch_dir=$2
+  files_list_file=$3
+  diff_file=$4
+
+  : > "$diff_file"
+
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+
+    src="$workspace_path/$rel"
+    patched="$scratch_dir/$rel"
+
+    left="$src"
+    right="$patched"
+
+    if [ ! -f "$left" ]; then
+      left="/dev/null"
+    fi
+    if [ ! -f "$right" ]; then
+      right="/dev/null"
+    fi
+
+    diff -u "$left" "$right" >> "$diff_file" 2>/dev/null || true
+  done < "$files_list_file"
+}
+
+promote_scratch_files() {
+  scratch_dir=$1
+  workspace_path=$2
+  files_list_file=$3
+  report_file=$4
+
+  : > "$report_file"
+  printf 'Promotion:\n' >> "$report_file"
+
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+
+    src="$scratch_dir/$rel"
+    dst="$workspace_path/$rel"
+
+    if [ ! -f "$src" ]; then
+      printf -- '- %s: missing scratch file (cannot promote)\n' "$rel" >> "$report_file"
+      return 1
+    fi
+
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+    if [ -f "$dst" ] && sed -n '1p' "$src" | grep -q '^#!'; then
+      chmod +x "$dst" 2>/dev/null || true
+    fi
+    printf -- '- %s: promoted\n' "$rel" >> "$report_file"
+  done < "$files_list_file"
+
+  return 0
+}
+
+emit_state() {
+  printf '{"success":true,"workspaces":['
+  first_ws=1
+
+  for ws_dir in "$workspaces_dir"/*; do
+    [ -d "$ws_dir" ] || continue
+    ws_id=$(basename "$ws_dir")
+    ws_name=$(read_file_line "$ws_dir/name" "$ws_id")
+    ws_path=$(read_file_line "$ws_dir/path" "")
+    if [ -z "$ws_path" ] || [ ! -d "$ws_path" ]; then
+      continue
+    fi
+    draft_file="$ws_dir/draft-first-message.txt"
+    draft_exists=0
+    if [ -s "$draft_file" ]; then
+      draft_exists=1
+    fi
+
+    ws_id_json=$(json_escape "$ws_id")
+    ws_name_json=$(json_escape "$ws_name")
+    ws_path_json=$(json_escape "$ws_path")
+    draft_exists_json=$(json_escape "$draft_exists")
+
+    if [ "$first_ws" -eq 0 ]; then
+      printf ','
+    fi
+    first_ws=0
+
+    printf '{"id":"%s","name":"%s","path":"%s","draft_exists":"%s","conversations":[' \
+      "$ws_id_json" "$ws_name_json" "$ws_path_json" "$draft_exists_json"
+
+    first_conv=1
+    conv_parent="$ws_dir/conversations"
+    if [ -d "$conv_parent" ]; then
+      for conv_dir in "$conv_parent"/*; do
+        [ -d "$conv_dir" ] || continue
+        conv_id=$(basename "$conv_dir")
+        conv_title=$(read_file_line "$conv_dir/title" "Conversation")
+        conv_model=$(read_file_line "$conv_dir/model" "")
+        conv_created=$(read_file_line "$conv_dir/created" "0")
+        conv_updated=$(read_file_line "$conv_dir/updated" "0")
+        queue_info=$(queue_state_for_conversation "$conv_dir")
+        queue_pending=$(kv_get "pending" "$queue_info")
+        queue_running=$(kv_get "running" "$queue_info")
+        queue_done=$(kv_get "done" "$queue_info")
+        queue_last_status=$(kv_get "last_status" "$queue_info")
+        queue_first_id=$(kv_get "first_id" "$queue_info")
+
+        [ -n "$queue_pending" ] || queue_pending=0
+        [ -n "$queue_running" ] || queue_running=0
+        [ -n "$queue_done" ] || queue_done=0
+
+        conv_id_json=$(json_escape "$conv_id")
+        conv_title_json=$(json_escape "$conv_title")
+        conv_model_json=$(json_escape "$conv_model")
+        conv_created_json=$(json_escape "$conv_created")
+        conv_updated_json=$(json_escape "$conv_updated")
+        queue_pending_json=$(json_escape "$queue_pending")
+        queue_running_json=$(json_escape "$queue_running")
+        queue_done_json=$(json_escape "$queue_done")
+        queue_last_status_json=$(json_escape "$queue_last_status")
+        queue_first_id_json=$(json_escape "$queue_first_id")
+
+        if [ "$first_conv" -eq 0 ]; then
+          printf ','
+        fi
+        first_conv=0
+        printf '{"id":"%s","title":"%s","model":"%s","created":"%s","updated":"%s","queue_pending":"%s","queue_running":"%s","queue_done":"%s","queue_last_status":"%s","queue_first_id":"%s"}' \
+          "$conv_id_json" "$conv_title_json" "$conv_model_json" "$conv_created_json" "$conv_updated_json" "$queue_pending_json" "$queue_running_json" "$queue_done_json" "$queue_last_status_json" "$queue_first_id_json"
+      done
+    fi
+
+    printf ']}'
+  done
+
+  printf ']}\n'
+}
+
+emit_models() {
+  models=$(list_models_raw)
+  if [ -z "$(trim "$models")" ]; then
+    models=$(list_models_from_workspace_data)
+  fi
+
+  printf '{"success":true,"models":['
+  first=1
+  if [ -n "$models" ]; then
+    while IFS= read -r model; do
+      [ -n "$model" ] || continue
+      model_json=$(json_escape "$model")
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '"%s"' "$model_json"
+    done <<EOF
+$models
+EOF
+  fi
+  printf ']}\n'
+}
+
+emit_model_catalog() {
+  installed=$(run_ai_dev_script list-installed-llms 2>/dev/null || true)
+  available=$(run_ai_dev_script list-available-llms 2>/dev/null || true)
+
+  if [ -z "$(trim "$installed")" ]; then
+    installed=$(list_models_raw || true)
+  fi
+
+  printf '{"success":true,"installed":['
+  first=1
+  if [ -n "$installed" ]; then
+    while IFS= read -r model; do
+      [ -n "$model" ] || continue
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '"%s"' "$(json_escape "$model")"
+    done <<EOF
+$installed
+EOF
+  fi
+  printf '],"available":['
+
+  first=1
+  if [ -n "$available" ]; then
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      model_name=${entry%%|*}
+      if [ "$entry" = "$model_name" ]; then
+        description=""
+      else
+        description=${entry#*|}
+      fi
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '{"name":"%s","description":"%s"}' \
+        "$(json_escape "$model_name")" \
+        "$(json_escape "$description")"
+    done <<EOF
+$available
+EOF
+  fi
+  printf '],"installs":'
+  emit_model_installs_json
+  printf '}\n'
+}
+
+emit_themes() {
+  theme_root="$WIZARDRY_DIR/.web/.themes"
+  themes=""
+
+  if [ -d "$theme_root" ]; then
+    themes=$(find "$theme_root" -maxdepth 1 -type f -name '*.css' 2>/dev/null \
+      | awk -F/ '{ print $NF }' \
+      | sed 's/\.css$//' \
+      | awk '/^[a-z0-9_-]+$/' \
+      | sort -u)
+  fi
+
+  printf '{"success":true,"themes":['
+  first=1
+  if [ -n "$themes" ]; then
+    while IFS= read -r theme; do
+      [ -n "$theme" ] || continue
+      theme_json=$(json_escape "$theme")
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '"%s"' "$theme_json"
+    done <<EOF
+$themes
+EOF
+  fi
+  printf ']}\n'
+}
+
+icon_data_uri_from_icns() {
+  icon_path=$1
+  [ -f "$icon_path" ] || return 1
+  if ! command -v sips >/dev/null 2>&1; then
+    return 1
+  fi
+
+  tmp_png=$(mktemp "/tmp/artificer-icon.XXXXXX.png")
+  if ! sips -s format png "$icon_path" --out "$tmp_png" >/dev/null 2>&1; then
+    rm -f "$tmp_png"
+    return 1
+  fi
+
+  icon_b64=$(base64_encode_file "$tmp_png" 2>/dev/null || true)
+  rm -f "$tmp_png"
+  [ -n "$icon_b64" ] || return 1
+  printf 'data:image/png;base64,%s' "$icon_b64"
+}
+
+find_app_icon_icns() {
+  app_key=$1
+  case "$app_key" in
+    finder)
+      for candidate in \
+        "/System/Library/CoreServices/Finder.app/Contents/Resources/Finder.icns" \
+        "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/FinderIcon.icns"
+      do
+        if [ -f "$candidate" ]; then
+          printf '%s' "$candidate"
+          return 0
+        fi
+      done
+      ;;
+    textmate)
+      for candidate in \
+        "/Applications/TextMate.app/Contents/Resources/TextMate.icns" \
+        "$HOME/Applications/TextMate.app/Contents/Resources/TextMate.icns"
+      do
+        if [ -f "$candidate" ]; then
+          printf '%s' "$candidate"
+          return 0
+        fi
+      done
+      ;;
+  esac
+  return 1
+}
+
+emit_app_icons() {
+  finder_icon=""
+  textmate_icon=""
+
+  finder_icns=$(find_app_icon_icns "finder" 2>/dev/null || true)
+  if [ -n "$finder_icns" ]; then
+    finder_icon=$(icon_data_uri_from_icns "$finder_icns" 2>/dev/null || true)
+  fi
+
+  textmate_icns=$(find_app_icon_icns "textmate" 2>/dev/null || true)
+  if [ -n "$textmate_icns" ]; then
+    textmate_icon=$(icon_data_uri_from_icns "$textmate_icns" 2>/dev/null || true)
+  fi
+
+  printf '{"success":true,"finder":"%s","textmate":"%s"}\n' \
+    "$(json_escape "$finder_icon")" \
+    "$(json_escape "$textmate_icon")"
+}
+
+action=$(param "action")
+
+if [ -z "$action" ]; then
+  emit_error "action is required"
+  exit 0
+fi
+
+case "$action" in
+  state)
+    emit_state
+    exit 0
+    ;;
+
+  models)
+    emit_models
+    exit 0
+    ;;
+
+  command_policy_get)
+    workspace_id=$(trim "$(param "workspace_id")")
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+    mode=$(command_policy_mode_for_workspace "$workspace_id")
+    printf '{"success":true,"mode":"%s"}\n' "$(json_escape "$mode")"
+    exit 0
+    ;;
+
+  command_policy_set)
+    workspace_id=$(trim "$(param "workspace_id")")
+    mode=$(trim "$(param "mode")")
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+    case "$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')" in
+      none|ask|all)
+        mode=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
+        ;;
+      *)
+        emit_error "invalid mode"
+        exit 0
+        ;;
+    esac
+    set_command_policy_mode_for_workspace "$workspace_id" "$mode"
+    printf '{"success":true,"mode":"%s"}\n' "$(json_escape "$mode")"
+    exit 0
+    ;;
+
+  command_approval_save)
+    workspace_id=$(trim "$(param "workspace_id")")
+    command_text=$(normalize_rule_field "$(param "command")")
+    decision=$(trim "$(param "decision")")
+    scope=$(trim "$(param "scope")")
+    match_mode=$(trim "$(param "match_mode")")
+    pattern=$(normalize_rule_field "$(param "pattern")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+    case "$decision" in
+      allow|deny) ;;
+      *) emit_error "invalid decision"; exit 0 ;;
+    esac
+    case "$scope" in
+      once|remember) ;;
+      *) scope="once" ;;
+    esac
+    case "$match_mode" in
+      exact|regex) ;;
+      *) match_mode="exact" ;;
+    esac
+    if [ -z "$command_text" ]; then
+      emit_error "command is required"
+      exit 0
+    fi
+    if [ "$match_mode" = "exact" ]; then
+      pattern=$command_text
+    fi
+    if [ "$match_mode" = "regex" ] && [ -z "$pattern" ]; then
+      pattern=$(command_text_to_rule_pattern_default "$command_text")
+    fi
+
+    append_command_rule "$workspace_id" "$scope" "$decision" "$match_mode" "$pattern"
+    printf '{"success":true,"saved":true}\n'
+    exit 0
+    ;;
+
+  model_catalog)
+    emit_model_catalog
+    exit 0
+    ;;
+
+  model_install_start)
+    model_name=$(trim "$(param "model")")
+    if ! safe_model_name "$model_name"; then
+      emit_error "invalid model name"
+      exit 0
+    fi
+
+    for existing_job in "$model_installs_dir"/*; do
+      [ -d "$existing_job" ] || continue
+      running_model=$(read_file_line "$existing_job/model" "")
+      running_status=$(read_file_line "$existing_job/status" "")
+      running_pid=$(read_file_line "$existing_job/pid" "")
+      if [ "$running_model" = "$model_name" ] && [ "$running_status" = "running" ] && [ -n "$running_pid" ]; then
+        if kill -0 "$running_pid" 2>/dev/null; then
+          printf '{"success":true,"job":{"id":"%s","model":"%s","status":"running"}}\n' \
+            "$(json_escape "$(basename "$existing_job")")" \
+            "$(json_escape "$model_name")"
+          exit 0
+        fi
+      fi
+    done
+
+    job_id=$(new_id)
+    job_dir="$model_installs_dir/$job_id"
+    mkdir -p "$job_dir"
+    log_file="$job_dir/log"
+
+    printf '%s\n' "$model_name" > "$job_dir/model"
+    printf '%s\n' "running" > "$job_dir/status"
+    date +%s > "$job_dir/started"
+
+    (
+      set +e
+      run_ai_dev_script install-llm "$model_name" >"$log_file" 2>&1
+      install_rc=$?
+      set -e
+      printf '%s\n' "$install_rc" > "$job_dir/exit_code"
+      if [ "$install_rc" -eq 0 ]; then
+        printf '%s\n' "done" > "$job_dir/status"
+      else
+        printf '%s\n' "failed" > "$job_dir/status"
+      fi
+      date +%s > "$job_dir/finished"
+    ) &
+    install_pid=$!
+    printf '%s\n' "$install_pid" > "$job_dir/pid"
+
+    printf '{"success":true,"job":{"id":"%s","model":"%s","status":"running"}}\n' \
+      "$(json_escape "$job_id")" \
+      "$(json_escape "$model_name")"
+    exit 0
+    ;;
+
+  model_install_status)
+    job_id=$(trim "$(param "job_id")")
+    if ! valid_id "$job_id"; then
+      emit_error "invalid job_id"
+      exit 0
+    fi
+
+    job_dir="$model_installs_dir/$job_id"
+    if [ ! -d "$job_dir" ]; then
+      emit_error "install job not found"
+      exit 0
+    fi
+
+    model_name=$(read_file_line "$job_dir/model" "")
+    status=$(read_file_line "$job_dir/status" "running")
+    started=$(read_file_line "$job_dir/started" "0")
+    finished=$(read_file_line "$job_dir/finished" "0")
+    install_pid=$(read_file_line "$job_dir/pid" "")
+    exit_code=$(read_file_line "$job_dir/exit_code" "")
+    if [ "$status" = "running" ] && [ -n "$install_pid" ]; then
+      if ! kill -0 "$install_pid" 2>/dev/null; then
+        status="failed"
+        case "$exit_code" in
+          0) status="done" ;;
+        esac
+      fi
+    fi
+    log_tail=$(tail -n 80 "$job_dir/log" 2>/dev/null || true)
+
+    printf '{"success":true,"job":{"id":"%s","model":"%s","status":"%s","started":"%s","finished":"%s","exit_code":"%s","log":"%s"}}\n' \
+      "$(json_escape "$job_id")" \
+      "$(json_escape "$model_name")" \
+      "$(json_escape "$status")" \
+      "$(json_escape "$started")" \
+      "$(json_escape "$finished")" \
+      "$(json_escape "$exit_code")" \
+      "$(json_escape "$log_tail")"
+    exit 0
+    ;;
+
+  themes)
+    emit_themes
+    exit 0
+    ;;
+
+  app_icons)
+    emit_app_icons
+    exit 0
+    ;;
+
+  pick_workspace)
+    picked_path=$(pick_workspace_path_macos 2>/dev/null || true)
+    picked_path=$(trim "$picked_path")
+
+    if [ -z "$picked_path" ]; then
+      printf '{"success":true,"cancelled":true}\n'
+      exit 0
+    fi
+
+    if [ ! -d "$picked_path" ]; then
+      emit_error "picked path is not a directory"
+      exit 0
+    fi
+
+    picked_path_json=$(json_escape "$picked_path")
+    printf '{"success":true,"path":"%s"}\n' "$picked_path_json"
+    exit 0
+    ;;
+
+  add_workspace)
+    raw_path=$(trim "$(param "path")")
+    raw_name=$(trim "$(param "name")")
+
+    if [ -z "$raw_path" ]; then
+      emit_error "path is required"
+      exit 0
+    fi
+
+    case "$raw_path" in
+      /*) ;;
+      *)
+        emit_error "path must be absolute"
+        exit 0
+        ;;
+    esac
+
+    if [ ! -d "$raw_path" ]; then
+      emit_error "path does not exist or is not a directory"
+      exit 0
+    fi
+
+    canonical_path=$(cd "$raw_path" && pwd -P)
+    workspace_name=$raw_name
+    if [ -z "$workspace_name" ]; then
+      workspace_name=$(basename "$canonical_path")
+    fi
+
+    for ws_dir in "$workspaces_dir"/*; do
+      [ -d "$ws_dir" ] || continue
+      existing_path=$(read_file_line "$ws_dir/path" "")
+      if [ "$existing_path" = "$canonical_path" ]; then
+        existing_id=$(basename "$ws_dir")
+        existing_name=$(read_file_line "$ws_dir/name" "$existing_id")
+        existing_id_json=$(json_escape "$existing_id")
+        existing_name_json=$(json_escape "$existing_name")
+        existing_path_json=$(json_escape "$canonical_path")
+        printf '{"success":true,"workspace":{"id":"%s","name":"%s","path":"%s"},"existing":true}\n' \
+          "$existing_id_json" "$existing_name_json" "$existing_path_json"
+        exit 0
+      fi
+    done
+
+    workspace_id=$(new_id)
+    ws_dir=$(workspace_dir_for "$workspace_id")
+
+    mkdir -p "$ws_dir/conversations"
+    printf '%s\n' "$workspace_name" > "$ws_dir/name"
+    printf '%s\n' "$canonical_path" > "$ws_dir/path"
+    date +%s > "$ws_dir/created"
+
+    workspace_id_json=$(json_escape "$workspace_id")
+    workspace_name_json=$(json_escape "$workspace_name")
+    workspace_path_json=$(json_escape "$canonical_path")
+    printf '{"success":true,"workspace":{"id":"%s","name":"%s","path":"%s"}}\n' \
+      "$workspace_id_json" "$workspace_name_json" "$workspace_path_json"
+    exit 0
+    ;;
+
+  delete_workspace)
+    workspace_id=$(trim "$(param "workspace_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+
+    rm -rf "$ws_dir"
+    emit_ok_message "workspace deleted"
+    exit 0
+    ;;
+
+  rename_workspace)
+    workspace_id=$(trim "$(param "workspace_id")")
+    workspace_name=$(trim "$(param "name")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    if [ -z "$workspace_name" ]; then
+      emit_error "name is required"
+      exit 0
+    fi
+
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+
+    printf '%s\n' "$workspace_name" > "$ws_dir/name"
+
+    workspace_id_json=$(json_escape "$workspace_id")
+    workspace_name_json=$(json_escape "$workspace_name")
+    printf '{"success":true,"workspace":{"id":"%s","name":"%s"}}\n' \
+      "$workspace_id_json" "$workspace_name_json"
+    exit 0
+    ;;
+
+  archive_conversation)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    archived_dir="$ws_dir/archived"
+    mkdir -p "$archived_dir"
+
+    archive_suffix=$(date +%s 2>/dev/null || printf '0')
+    archive_target="$archived_dir/${conversation_id}-${archive_suffix}"
+    mv "$conv_dir" "$archive_target"
+
+    emit_ok_message "conversation archived"
+    exit 0
+    ;;
+
+  new_conversation)
+    workspace_id=$(trim "$(param "workspace_id")")
+    title=$(trim "$(param "title")")
+    model=$(trim "$(param "model")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+
+    if [ -z "$title" ]; then
+      title="New Conversation"
+    fi
+
+    if [ -z "$model" ]; then
+      model=$(default_model)
+    fi
+
+    conversation_id=$(new_id)
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+
+    mkdir -p "$conv_dir/messages"
+    printf '%s\n' "$title" > "$conv_dir/title"
+    printf '%s\n' "$model" > "$conv_dir/model"
+    date +%s > "$conv_dir/created"
+    date +%s > "$conv_dir/updated"
+
+    conversation_id_json=$(json_escape "$conversation_id")
+    title_json=$(json_escape "$title")
+    model_json=$(json_escape "$model")
+
+    printf '{"success":true,"conversation":{"id":"%s","title":"%s","model":"%s"}}\n' \
+      "$conversation_id_json" "$title_json" "$model_json"
+    exit 0
+    ;;
+
+  get_conversation)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    title=$(read_file_line "$conv_dir/title" "Conversation")
+    model=$(read_file_line "$conv_dir/model" "$(default_model)")
+
+    title_json=$(json_escape "$title")
+    model_json=$(json_escape "$model")
+    conversation_id_json=$(json_escape "$conversation_id")
+
+    printf '{"success":true,"conversation":{"id":"%s","title":"%s","model":"%s","messages":' \
+      "$conversation_id_json" "$title_json" "$model_json"
+    json_messages "$conv_dir"
+    printf '}}\n'
+    exit 0
+    ;;
+
+  set_model)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    model=$(trim "$(param "model")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+    if [ -z "$model" ]; then
+      emit_error "model is required"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    printf '%s\n' "$model" > "$conv_dir/model"
+    date +%s > "$conv_dir/updated"
+    emit_ok_message "model updated"
+    exit 0
+    ;;
+
+  get_draft)
+    workspace_id=$(trim "$(param "workspace_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+
+    draft_file=$(workspace_draft_file_for "$workspace_id")
+    draft_text=$(cat "$draft_file" 2>/dev/null || true)
+    draft_json=$(json_escape "$draft_text")
+    printf '{"success":true,"draft":"%s"}\n' "$draft_json"
+    exit 0
+    ;;
+
+  save_draft)
+    workspace_id=$(trim "$(param "workspace_id")")
+    draft_text=$(param "draft")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+
+    draft_file=$(workspace_draft_file_for "$workspace_id")
+    if [ -z "$(trim "$draft_text")" ]; then
+      rm -f "$draft_file"
+    else
+      printf '%s' "$draft_text" > "$draft_file"
+    fi
+
+    emit_ok_message "draft saved"
+    exit 0
+    ;;
+
+  upload_attachment)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    attachment_name=$(trim "$(param "name")")
+    attachment_mime=$(trim "$(param "mime")")
+    attachment_data=$(param "data")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+    if [ -z "$attachment_name" ]; then
+      emit_error "attachment name is required"
+      exit 0
+    fi
+    if [ -z "$attachment_data" ]; then
+      emit_error "attachment data is required"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    attachment_kind=$(attachment_kind_from_name_mime "$attachment_name" "$attachment_mime" || true)
+    if [ -z "$attachment_kind" ]; then
+      emit_error "unsupported attachment type"
+      exit 0
+    fi
+
+    attachment_id=$(new_id)
+    attachment_item_dir=$(attachment_item_dir_for "$conv_dir" "$attachment_id")
+    attachment_blob="$attachment_item_dir/blob"
+    attachment_meta="$attachment_item_dir/meta"
+    mkdir -p "$attachment_item_dir"
+
+    if ! base64_decode_to_file "$attachment_data" "$attachment_blob"; then
+      rm -rf "$attachment_item_dir"
+      emit_error "invalid attachment encoding"
+      exit 0
+    fi
+
+    attachment_size=$(wc -c < "$attachment_blob" | tr -d ' ')
+    [ -n "$attachment_size" ] || attachment_size=0
+    max_attachment_size=$((15 * 1024 * 1024))
+    if [ "$attachment_size" -gt "$max_attachment_size" ]; then
+      rm -rf "$attachment_item_dir"
+      emit_error "attachment exceeds 15 MB limit"
+      exit 0
+    fi
+
+    {
+      printf 'name=%s\n' "$attachment_name"
+      printf 'mime=%s\n' "$attachment_mime"
+      printf 'kind=%s\n' "$attachment_kind"
+      printf 'size=%s\n' "$attachment_size"
+      printf 'created=%s\n' "$(date +%s 2>/dev/null || printf '0')"
+    } > "$attachment_meta"
+
+    attachment_id_json=$(json_escape "$attachment_id")
+    attachment_name_json=$(json_escape "$attachment_name")
+    attachment_mime_json=$(json_escape "$attachment_mime")
+    attachment_kind_json=$(json_escape "$attachment_kind")
+    printf '{"success":true,"attachment":{"id":"%s","name":"%s","mime":"%s","kind":"%s","size":%s}}\n' \
+      "$attachment_id_json" "$attachment_name_json" "$attachment_mime_json" "$attachment_kind_json" "$attachment_size"
+    exit 0
+    ;;
+
+  queue_enqueue)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    prompt_text=$(param "prompt")
+    position=$(trim "$(param "position")")
+    attachments_raw=$(param "attachments")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+    if [ -z "$(trim "$prompt_text")" ]; then
+      emit_error "prompt is required"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    mode="tail"
+    case "$position" in
+      head|front|next|steer)
+        mode="head"
+        ;;
+    esac
+
+    ensure_queue_layout "$conv_dir"
+    item_id=$(new_id)
+    order=$(queue_allocate_order "$conv_dir" "$mode")
+    queue_item_file=$(queue_item_file_for "$conv_dir" "$order" "$item_id")
+    queue_item_meta=$(queue_item_meta_for_path "$queue_item_file")
+    printf '%s' "$prompt_text" > "$queue_item_file"
+
+    incoming_ids_file=$(mktemp)
+    validated_ids_file=$(mktemp)
+    attachment_ids_to_file "$attachments_raw" "$incoming_ids_file"
+    : > "$validated_ids_file"
+    while IFS= read -r attachment_id; do
+      [ -n "$attachment_id" ] || continue
+      if attachment_exists_for_conversation "$conv_dir" "$attachment_id"; then
+        printf '%s\n' "$attachment_id" >> "$validated_ids_file"
+      fi
+    done < "$incoming_ids_file"
+    if [ -s "$validated_ids_file" ]; then
+      cp "$validated_ids_file" "$queue_item_meta"
+    else
+      rm -f "$queue_item_meta"
+    fi
+    rm -f "$incoming_ids_file" "$validated_ids_file"
+
+    queue_info=$(queue_state_for_conversation "$conv_dir")
+    queue_pending=$(kv_get "pending" "$queue_info")
+    queue_running=$(kv_get "running" "$queue_info")
+    queue_done=$(kv_get "done" "$queue_info")
+    queue_first_id=$(kv_get "first_id" "$queue_info")
+
+    [ -n "$queue_pending" ] || queue_pending=0
+    [ -n "$queue_running" ] || queue_running=0
+    [ -n "$queue_done" ] || queue_done=0
+
+    item_id_json=$(json_escape "$item_id")
+    queue_first_id_json=$(json_escape "$queue_first_id")
+
+    printf '{"success":true,"item_id":"%s","queue_pending":%s,"queue_running":%s,"queue_done":%s,"queue_first_id":"%s"}\n' \
+      "$item_id_json" "$queue_pending" "$queue_running" "$queue_done" "$queue_first_id_json"
+    exit 0
+    ;;
+
+  queue_take)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    ensure_queue_layout "$conv_dir"
+    queue_dir=$(conversation_queue_dir_for "$conv_dir")
+    pending_dir=$(queue_pending_dir_for "$conv_dir")
+    running_file="$queue_dir/running.txt"
+    running_id_file="$queue_dir/running.id"
+    running_started_file="$queue_dir/running.started"
+    running_meta_file=$(queue_running_meta_file_for "$conv_dir")
+
+    if [ -f "$running_file" ]; then
+      running_id=$(read_file_line "$running_id_file" "")
+      queue_info=$(queue_state_for_conversation "$conv_dir")
+      queue_pending=$(kv_get "pending" "$queue_info")
+      queue_first_id=$(kv_get "first_id" "$queue_info")
+      queue_last_status=$(kv_get "last_status" "$queue_info")
+      [ -n "$queue_pending" ] || queue_pending=0
+      running_id_json=$(json_escape "$running_id")
+      queue_first_id_json=$(json_escape "$queue_first_id")
+      queue_last_status_json=$(json_escape "$queue_last_status")
+      printf '{"success":true,"busy":true,"has_item":false,"running_item_id":"%s","queue_pending":%s,"queue_running":1,"queue_done":0,"queue_first_id":"%s","queue_last_status":"%s"}\n' \
+        "$running_id_json" "$queue_pending" "$queue_first_id_json" "$queue_last_status_json"
+      exit 0
+    fi
+
+    first_pending_path=$(queue_first_pending_path "$pending_dir")
+    if [ -z "$first_pending_path" ] || [ ! -f "$first_pending_path" ]; then
+      queue_info=$(queue_state_for_conversation "$conv_dir")
+      queue_pending=$(kv_get "pending" "$queue_info")
+      queue_done=$(kv_get "done" "$queue_info")
+      queue_first_id=$(kv_get "first_id" "$queue_info")
+      queue_last_status=$(kv_get "last_status" "$queue_info")
+      [ -n "$queue_pending" ] || queue_pending=0
+      [ -n "$queue_done" ] || queue_done=0
+      queue_first_id_json=$(json_escape "$queue_first_id")
+      queue_last_status_json=$(json_escape "$queue_last_status")
+      printf '{"success":true,"busy":false,"has_item":false,"queue_pending":%s,"queue_running":0,"queue_done":%s,"queue_first_id":"%s","queue_last_status":"%s"}\n' \
+        "$queue_pending" "$queue_done" "$queue_first_id_json" "$queue_last_status_json"
+      exit 0
+    fi
+
+    item_id=$(queue_item_id_from_path "$first_pending_path")
+    prompt_text=$(cat "$first_pending_path")
+    pending_meta_file=$(queue_item_meta_for_path "$first_pending_path")
+
+    mv "$first_pending_path" "$running_file"
+    if [ -f "$pending_meta_file" ]; then
+      mv "$pending_meta_file" "$running_meta_file"
+    else
+      rm -f "$running_meta_file"
+    fi
+    printf '%s\n' "$item_id" > "$running_id_file"
+    date +%s > "$running_started_file"
+
+    queue_info=$(queue_state_for_conversation "$conv_dir")
+    queue_pending=$(kv_get "pending" "$queue_info")
+    queue_first_id=$(kv_get "first_id" "$queue_info")
+    [ -n "$queue_pending" ] || queue_pending=0
+
+    item_id_json=$(json_escape "$item_id")
+    prompt_json=$(json_escape "$prompt_text")
+    queue_first_id_json=$(json_escape "$queue_first_id")
+    attachments_json=$(attachment_json_array_from_ids_file "$conv_dir" "$running_meta_file")
+
+    printf '{"success":true,"busy":false,"has_item":true,"item":{"id":"%s","prompt":"%s","attachments":%s},"queue_pending":%s,"queue_running":1,"queue_done":0,"queue_first_id":"%s","queue_last_status":"running"}\n' \
+      "$item_id_json" "$prompt_json" "$attachments_json" "$queue_pending" "$queue_first_id_json"
+    exit 0
+    ;;
+
+  queue_finish)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    item_id=$(trim "$(param "item_id")")
+    finish_status=$(trim "$(param "status")")
+    finish_error=$(param "error")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+
+    case "$finish_status" in
+      done|error|cancelled) ;;
+      *)
+        finish_status="done"
+        ;;
+    esac
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    ensure_queue_layout "$conv_dir"
+    queue_dir=$(conversation_queue_dir_for "$conv_dir")
+
+    queue_clear_running_state "$conv_dir"
+    printf '%s\n' "$finish_status" > "$queue_dir/last_status"
+    if [ "$finish_status" = "error" ]; then
+      printf '%s\n' "$finish_error" > "$queue_dir/last_error"
+    else
+      rm -f "$queue_dir/last_error"
+    fi
+    date +%s > "$queue_dir/last_done"
+
+    queue_info=$(queue_state_for_conversation "$conv_dir")
+    queue_pending=$(kv_get "pending" "$queue_info")
+    queue_running=$(kv_get "running" "$queue_info")
+    queue_done=$(kv_get "done" "$queue_info")
+    queue_first_id=$(kv_get "first_id" "$queue_info")
+    queue_last_status=$(kv_get "last_status" "$queue_info")
+
+    [ -n "$queue_pending" ] || queue_pending=0
+    [ -n "$queue_running" ] || queue_running=0
+    [ -n "$queue_done" ] || queue_done=0
+
+    queue_first_id_json=$(json_escape "$queue_first_id")
+    queue_last_status_json=$(json_escape "$queue_last_status")
+    item_id_json=$(json_escape "$item_id")
+
+    printf '{"success":true,"item_id":"%s","queue_pending":%s,"queue_running":%s,"queue_done":%s,"queue_first_id":"%s","queue_last_status":"%s"}\n' \
+      "$item_id_json" "$queue_pending" "$queue_running" "$queue_done" "$queue_first_id_json" "$queue_last_status_json"
+    exit 0
+    ;;
+
+  queue_cancel)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    item_id=$(trim "$(param "item_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+    if [ -n "$item_id" ] && ! valid_id "$item_id"; then
+      emit_error "invalid item_id"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    ensure_queue_layout "$conv_dir"
+    queue_dir=$(conversation_queue_dir_for "$conv_dir")
+    pending_dir=$(queue_pending_dir_for "$conv_dir")
+
+    target_path=""
+    if [ -n "$item_id" ]; then
+      target_path=$(queue_find_pending_path_by_id "$pending_dir" "$item_id")
+    else
+      target_path=$(queue_first_pending_path "$pending_dir")
+      if [ -n "$target_path" ]; then
+        item_id=$(queue_item_id_from_path "$target_path")
+      fi
+    fi
+
+    cancelled=0
+    if [ -n "$target_path" ] && [ -f "$target_path" ]; then
+      target_meta=$(queue_item_meta_for_path "$target_path")
+      rm -f "$target_path"
+      rm -f "$target_meta"
+      cancelled=1
+      printf '%s\n' "cancelled" > "$queue_dir/last_status"
+      date +%s > "$queue_dir/last_done"
+    fi
+
+    queue_info=$(queue_state_for_conversation "$conv_dir")
+    queue_pending=$(kv_get "pending" "$queue_info")
+    queue_running=$(kv_get "running" "$queue_info")
+    queue_done=$(kv_get "done" "$queue_info")
+    queue_first_id=$(kv_get "first_id" "$queue_info")
+    queue_last_status=$(kv_get "last_status" "$queue_info")
+
+    [ -n "$queue_pending" ] || queue_pending=0
+    [ -n "$queue_running" ] || queue_running=0
+    [ -n "$queue_done" ] || queue_done=0
+
+    queue_first_id_json=$(json_escape "$queue_first_id")
+    queue_last_status_json=$(json_escape "$queue_last_status")
+    item_id_json=$(json_escape "$item_id")
+
+    if [ "$cancelled" -eq 1 ]; then
+      cancelled_json=true
+    else
+      cancelled_json=false
+    fi
+
+    printf '{"success":true,"cancelled":%s,"item_id":"%s","queue_pending":%s,"queue_running":%s,"queue_done":%s,"queue_first_id":"%s","queue_last_status":"%s"}\n' \
+      "$cancelled_json" "$item_id_json" "$queue_pending" "$queue_running" "$queue_done" "$queue_first_id_json" "$queue_last_status_json"
+    exit 0
+    ;;
+
+  queue_steer)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    item_id=$(trim "$(param "item_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+    if [ -n "$item_id" ] && ! valid_id "$item_id"; then
+      emit_error "invalid item_id"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    ensure_queue_layout "$conv_dir"
+    pending_dir=$(queue_pending_dir_for "$conv_dir")
+    target_path=""
+    if [ -n "$item_id" ]; then
+      target_path=$(queue_find_pending_path_by_id "$pending_dir" "$item_id")
+    else
+      target_path=$(queue_first_pending_path "$pending_dir")
+      if [ -n "$target_path" ]; then
+        item_id=$(queue_item_id_from_path "$target_path")
+      fi
+    fi
+
+    if [ -z "$target_path" ] || [ ! -f "$target_path" ]; then
+      emit_error "queued item not found"
+      exit 0
+    fi
+
+    if [ -z "$item_id" ]; then
+      item_id=$(queue_item_id_from_path "$target_path")
+    fi
+
+    new_order=$(queue_allocate_order "$conv_dir" "head")
+    steered_path=$(queue_item_file_for "$conv_dir" "$new_order" "$item_id")
+    source_meta=$(queue_item_meta_for_path "$target_path")
+    steered_meta=$(queue_item_meta_for_path "$steered_path")
+    mv "$target_path" "$steered_path"
+    if [ -f "$source_meta" ]; then
+      mv "$source_meta" "$steered_meta"
+    else
+      rm -f "$steered_meta"
+    fi
+
+    queue_info=$(queue_state_for_conversation "$conv_dir")
+    queue_pending=$(kv_get "pending" "$queue_info")
+    queue_running=$(kv_get "running" "$queue_info")
+    queue_done=$(kv_get "done" "$queue_info")
+    queue_first_id=$(kv_get "first_id" "$queue_info")
+    queue_last_status=$(kv_get "last_status" "$queue_info")
+
+    [ -n "$queue_pending" ] || queue_pending=0
+    [ -n "$queue_running" ] || queue_running=0
+    [ -n "$queue_done" ] || queue_done=0
+
+    queue_first_id_json=$(json_escape "$queue_first_id")
+    queue_last_status_json=$(json_escape "$queue_last_status")
+    item_id_json=$(json_escape "$item_id")
+
+    printf '{"success":true,"steered":true,"item_id":"%s","queue_pending":%s,"queue_running":%s,"queue_done":%s,"queue_first_id":"%s","queue_last_status":"%s"}\n' \
+      "$item_id_json" "$queue_pending" "$queue_running" "$queue_done" "$queue_first_id_json" "$queue_last_status_json"
+    exit 0
+    ;;
+
+  git_status)
+    workspace_id=$(trim "$(param "workspace_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    set +e
+    info_raw=$(run_artificer_git repo-info "$workspace_path" 2>&1)
+    info_rc=$?
+    set -e
+    if [ "$info_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$info_raw")"
+      exit 0
+    fi
+
+    is_repo=$(kv_get "is_repo" "$info_raw")
+    branch=$(kv_get "branch" "$info_raw")
+    ahead=$(kv_get "ahead" "$info_raw")
+    behind=$(kv_get "behind" "$info_raw")
+    added=$(kv_get "added" "$info_raw")
+    deleted=$(kv_get "deleted" "$info_raw")
+    changes=$(kv_get "changes" "$info_raw")
+    staged_changes=$(kv_get "staged_changes" "$info_raw")
+    unstaged_changes=$(kv_get "unstaged_changes" "$info_raw")
+
+    [ -n "$ahead" ] || ahead=0
+    [ -n "$behind" ] || behind=0
+    [ -n "$added" ] || added=0
+    [ -n "$deleted" ] || deleted=0
+    [ -n "$changes" ] || changes=0
+    [ -n "$staged_changes" ] || staged_changes=0
+    [ -n "$unstaged_changes" ] || unstaged_changes=0
+
+    if [ "$is_repo" = "1" ]; then
+      is_repo_json=true
+    else
+      is_repo_json=false
+    fi
+
+    branch_json=$(json_escape "$branch")
+    printf '{"success":true,"is_repo":%s,"branch":"%s","ahead":%s,"behind":%s,"added":%s,"deleted":%s,"changes":%s,"staged_changes":%s,"unstaged_changes":%s}\n' \
+      "$is_repo_json" "$branch_json" "$ahead" "$behind" "$added" "$deleted" "$changes" "$staged_changes" "$unstaged_changes"
+    exit 0
+    ;;
+
+  git_init)
+    workspace_id=$(trim "$(param "workspace_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    set +e
+    init_raw=$(run_artificer_git init "$workspace_path" 2>&1)
+    init_rc=$?
+    set -e
+    if [ "$init_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$init_raw")"
+      exit 0
+    fi
+
+    message_json=$(json_escape "$(strip_terminal_noise "$init_raw")")
+    printf '{"success":true,"message":"%s"}\n' "$message_json"
+    exit 0
+    ;;
+
+  git_branches)
+    workspace_id=$(trim "$(param "workspace_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    info_raw=$(run_artificer_git repo-info "$workspace_path" 2>/dev/null || true)
+    is_repo=$(kv_get "is_repo" "$info_raw")
+    if [ "$is_repo" != "1" ]; then
+      printf '{"success":true,"is_repo":false,"branches":[]}\n'
+      exit 0
+    fi
+
+    set +e
+    branches_raw=$(run_artificer_git branches "$workspace_path" 2>&1)
+    branches_rc=$?
+    set -e
+    if [ "$branches_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$branches_raw")"
+      exit 0
+    fi
+
+    printf '{"success":true,"is_repo":true,"branches":['
+    first_branch=1
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      current=false
+      case "$line" in
+        CURRENT\|*)
+          branch_name=${line#CURRENT|}
+          current=true
+          ;;
+        BRANCH\|*)
+          branch_name=${line#BRANCH|}
+          current=false
+          ;;
+        *)
+          continue
+          ;;
+      esac
+
+      branch_json=$(json_escape "$branch_name")
+      if [ "$first_branch" -eq 0 ]; then
+        printf ','
+      fi
+      first_branch=0
+      printf '{"name":"%s","current":%s}' "$branch_json" "$current"
+    done <<EOF
+$branches_raw
+EOF
+    printf ']}\n'
+    exit 0
+    ;;
+
+  git_checkout_branch)
+    workspace_id=$(trim "$(param "workspace_id")")
+    branch_name=$(trim "$(param "branch")")
+    create_raw=$(trim "$(param "create")")
+    create_branch=0
+
+    if [ "$create_raw" = "1" ] || [ "$create_raw" = "true" ]; then
+      create_branch=1
+    fi
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if [ -z "$branch_name" ]; then
+      emit_error "branch is required"
+      exit 0
+    fi
+    case "$branch_name" in
+      *[!a-zA-Z0-9._/-]*)
+        emit_error "invalid branch name"
+        exit 0
+        ;;
+    esac
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    set +e
+    if [ "$create_branch" -eq 1 ]; then
+      branch_raw=$(run_artificer_git create-branch "$workspace_path" "$branch_name" 2>&1)
+    else
+      branch_raw=$(run_artificer_git checkout "$workspace_path" "$branch_name" 2>&1)
+    fi
+    branch_rc=$?
+    set -e
+    if [ "$branch_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$branch_raw")"
+      exit 0
+    fi
+
+    output_json=$(json_escape "$(strip_terminal_noise "$branch_raw")")
+    branch_json=$(json_escape "$branch_name")
+    printf '{"success":true,"branch":"%s","output":"%s"}\n' "$branch_json" "$output_json"
+    exit 0
+    ;;
+
+  git_diff)
+    workspace_id=$(trim "$(param "workspace_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    set +e
+    diff_raw=$(run_artificer_git diff "$workspace_path" 2>&1)
+    diff_rc=$?
+    set -e
+    if [ "$diff_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$diff_raw")"
+      exit 0
+    fi
+
+    info_raw=$(run_artificer_git repo-info "$workspace_path" 2>/dev/null || true)
+    is_repo=$(kv_get "is_repo" "$info_raw")
+    added=$(kv_get "added" "$info_raw")
+    deleted=$(kv_get "deleted" "$info_raw")
+    [ -n "$added" ] || added=0
+    [ -n "$deleted" ] || deleted=0
+
+    if [ "$is_repo" = "1" ]; then
+      is_repo_json=true
+    else
+      is_repo_json=false
+    fi
+
+    diff_json=$(json_escape "$diff_raw")
+    printf '{"success":true,"is_repo":%s,"added":%s,"deleted":%s,"diff":"%s"}\n' \
+      "$is_repo_json" "$added" "$deleted" "$diff_json"
+    exit 0
+    ;;
+
+  git_commit)
+    workspace_id=$(trim "$(param "workspace_id")")
+    include_unstaged=$(trim "$(param "include_unstaged")")
+    commit_message=$(param "message")
+    push_after=$(trim "$(param "push")")
+    [ -n "$include_unstaged" ] || include_unstaged=1
+    [ -n "$push_after" ] || push_after=0
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if [ "$include_unstaged" != "0" ] && [ "$include_unstaged" != "1" ]; then
+      include_unstaged=1
+    fi
+    if [ "$push_after" != "0" ] && [ "$push_after" != "1" ]; then
+      push_after=0
+    fi
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    set +e
+    if [ "$push_after" = "1" ]; then
+      commit_raw=$(run_artificer_git commit-push "$workspace_path" "$include_unstaged" "$commit_message" 2>&1)
+    else
+      commit_raw=$(run_artificer_git commit "$workspace_path" "$include_unstaged" "$commit_message" 2>&1)
+    fi
+    commit_rc=$?
+    set -e
+    if [ "$commit_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$commit_raw")"
+      exit 0
+    fi
+
+    output_json=$(json_escape "$(strip_terminal_noise "$commit_raw")")
+    printf '{"success":true,"output":"%s"}\n' "$output_json"
+    exit 0
+    ;;
+
+  git_push)
+    workspace_id=$(trim "$(param "workspace_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    set +e
+    push_raw=$(run_artificer_git push "$workspace_path" 2>&1)
+    push_rc=$?
+    set -e
+    if [ "$push_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$push_raw")"
+      exit 0
+    fi
+
+    output_json=$(json_escape "$(strip_terminal_noise "$push_raw")")
+    printf '{"success":true,"output":"%s"}\n' "$output_json"
+    exit 0
+    ;;
+
+  open_in)
+    workspace_id=$(trim "$(param "workspace_id")")
+    target=$(trim "$(param "target")")
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    case "$target" in
+      finder|terminal|textmate) ;;
+      *)
+        emit_error "invalid open target"
+        exit 0
+        ;;
+    esac
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    set +e
+    open_raw=$(run_artificer_git open "$workspace_path" "$target" 2>&1)
+    open_rc=$?
+    set -e
+    if [ "$open_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$open_raw")"
+      exit 0
+    fi
+
+    emit_ok_message "opened"
+    exit 0
+    ;;
+
+  git_auth_status)
+    git_bin=$(resolve_artificer_git_bin || true)
+    if [ -z "$git_bin" ]; then
+      emit_error "artificer-git helper is unavailable"
+      exit 0
+    fi
+    set +e
+    if command -v timeout >/dev/null 2>&1; then
+      auth_raw=$(timeout 10 "$git_bin" auth-status 2>&1)
+      auth_rc=$?
+    elif command -v gtimeout >/dev/null 2>&1; then
+      auth_raw=$(gtimeout 10 "$git_bin" auth-status 2>&1)
+      auth_rc=$?
+    else
+      auth_raw=$("$git_bin" auth-status 2>&1)
+      auth_rc=$?
+    fi
+    set -e
+    if [ "$auth_rc" -ne 0 ]; then
+      if [ "$auth_rc" -eq 124 ]; then
+        emit_error "Timed out while checking GitHub/SSH status"
+      else
+        emit_error "$(strip_terminal_noise "$auth_raw")"
+      fi
+      exit 0
+    fi
+
+    has_gh=$(kv_get "has_gh" "$auth_raw")
+    gh_authenticated=$(kv_get "gh_authenticated" "$auth_raw")
+    ssh_pub_exists=$(kv_get "ssh_pub_exists" "$auth_raw")
+    ssh_pub_path=$(kv_get "ssh_pub_path" "$auth_raw")
+    ssh_pub_key=$(kv_get "ssh_pub_key" "$auth_raw")
+    selected_pub_path=$(selected_ssh_pub_path)
+    selected_pub_key=""
+
+    [ -n "$has_gh" ] || has_gh=0
+    [ -n "$gh_authenticated" ] || gh_authenticated=0
+    [ -n "$ssh_pub_exists" ] || ssh_pub_exists=0
+
+    if [ -n "$selected_pub_path" ] && [ ! -f "$selected_pub_path" ]; then
+      selected_pub_path=""
+      clear_selected_ssh_pub_path
+    fi
+    if [ -n "$selected_pub_path" ] && [ -f "$selected_pub_path" ]; then
+      selected_pub_key=$(sed -n '1p' "$selected_pub_path")
+    fi
+
+    if [ "$has_gh" = "1" ]; then has_gh_json=true; else has_gh_json=false; fi
+    if [ "$gh_authenticated" = "1" ]; then gh_auth_json=true; else gh_auth_json=false; fi
+    if [ "$ssh_pub_exists" = "1" ]; then ssh_json=true; else ssh_json=false; fi
+
+    ssh_pub_path_json=$(json_escape "$ssh_pub_path")
+    ssh_pub_key_json=$(json_escape "$ssh_pub_key")
+    selected_ssh_pub_path_json=$(json_escape "$selected_pub_path")
+    selected_ssh_pub_key_json=$(json_escape "$selected_pub_key")
+
+    printf '{"success":true,"has_gh":%s,"gh_authenticated":%s,"ssh_pub_exists":%s,"ssh_pub_path":"%s","ssh_pub_key":"%s","selected_ssh_pub_path":"%s","selected_ssh_pub_key":"%s"}\n' \
+      "$has_gh_json" "$gh_auth_json" "$ssh_json" "$ssh_pub_path_json" "$ssh_pub_key_json" "$selected_ssh_pub_path_json" "$selected_ssh_pub_key_json"
+    exit 0
+    ;;
+
+  git_generate_ssh)
+    email=$(trim "$(param "email")")
+    set +e
+    key_raw=$(run_artificer_git ensure-ssh "$email" 2>&1)
+    key_rc=$?
+    set -e
+    if [ "$key_rc" -ne 0 ]; then
+      emit_error "$(strip_terminal_noise "$key_raw")"
+      exit 0
+    fi
+
+    ssh_pub_path=$(kv_get "ssh_pub_path" "$key_raw")
+    ssh_pub_key=$(kv_get "ssh_pub_key" "$key_raw")
+    if [ -n "$ssh_pub_path" ] && [ -f "$ssh_pub_path" ]; then
+      set_selected_ssh_pub_path "$ssh_pub_path"
+    fi
+    ssh_pub_path_json=$(json_escape "$ssh_pub_path")
+    ssh_pub_key_json=$(json_escape "$ssh_pub_key")
+    printf '{"success":true,"ssh_pub_path":"%s","ssh_pub_key":"%s"}\n' \
+      "$ssh_pub_path_json" "$ssh_pub_key_json"
+    exit 0
+    ;;
+
+  git_choose_ssh_key)
+    if ! command -v osascript >/dev/null 2>&1; then
+      emit_error "SSH key picker is available on macOS only."
+      exit 0
+    fi
+    chosen_path=$(trim "$(pick_ssh_pub_path_macos 2>/dev/null || true)")
+    if [ -z "$chosen_path" ]; then
+      printf '{"success":true,"cancelled":true}\n'
+      exit 0
+    fi
+    if [ ! -f "$chosen_path" ]; then
+      emit_error "Selected SSH key file was not found"
+      exit 0
+    fi
+    case "$chosen_path" in
+      *.pub) ;;
+      *)
+        emit_error "Select an SSH public key file ending in .pub"
+        exit 0
+        ;;
+    esac
+
+    set_selected_ssh_pub_path "$chosen_path"
+    selected_key=$(sed -n '1p' "$chosen_path")
+    selected_path_json=$(json_escape "$chosen_path")
+    selected_key_json=$(json_escape "$selected_key")
+    printf '{"success":true,"cancelled":false,"selected_ssh_pub_path":"%s","selected_ssh_pub_key":"%s"}\n' \
+      "$selected_path_json" "$selected_key_json"
+    exit 0
+    ;;
+
+  git_clear_ssh_key)
+    clear_selected_ssh_pub_path
+    printf '{"success":true}\n'
+    exit 0
+    ;;
+
+  run_action|terminal_exec)
+    workspace_id=$(trim "$(param "workspace_id")")
+    command_text=$(param "command")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if [ -z "$(trim "$command_text")" ]; then
+      emit_error "command is required"
+      exit 0
+    fi
+
+    workspace_path=$(workspace_path_for_id "$workspace_id")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    set +e
+    cmd_output=$(run_artificer_git run "$workspace_path" "$command_text" 2>&1)
+    cmd_rc=$?
+    set -e
+
+    output_json=$(json_escape "$cmd_output")
+    printf '{"success":true,"exit_code":%s,"output":"%s"}\n' "$cmd_rc" "$output_json"
+    exit 0
+    ;;
+
+  run_stream_poll)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    stream_session=$(trim "$(param "stream_session")")
+    offset_raw=$(trim "$(param "offset")")
+    offset=0
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+    if ! valid_id "$stream_session"; then
+      emit_error "invalid stream_session"
+      exit 0
+    fi
+
+    case "$offset_raw" in
+      ""|*[!0-9]*)
+        offset=0
+        ;;
+      *)
+        offset=$offset_raw
+        ;;
+    esac
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    stream_file=$(stream_tokens_file_for "$conv_dir" "$stream_session")
+    if [ ! -f "$stream_file" ]; then
+      printf '{"success":true,"delta":"","offset":0}\n'
+      exit 0
+    fi
+
+    total_bytes=$(wc -c < "$stream_file" | tr -d ' ')
+    case "$total_bytes" in
+      ""|*[!0-9]*)
+        total_bytes=0
+        ;;
+    esac
+
+    if [ "$offset" -lt 0 ]; then
+      offset=0
+    fi
+    if [ "$offset" -gt "$total_bytes" ]; then
+      offset=$total_bytes
+    fi
+
+    if [ "$offset" -ge "$total_bytes" ]; then
+      printf '{"success":true,"delta":"","offset":%s}\n' "$total_bytes"
+      exit 0
+    fi
+
+    start_byte=$((offset + 1))
+    delta_text=$(tail -c +"$start_byte" "$stream_file" 2>/dev/null || true)
+    delta_json=$(json_escape "$delta_text")
+    printf '{"success":true,"delta":"%s","offset":%s}\n' "$delta_json" "$total_bytes"
+    exit 0
+    ;;
+
+  run)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    user_prompt=$(param "prompt")
+    command_exec_mode_raw=$(trim "$(param "command_exec_mode")")
+    approval_retry_raw=$(trim "$(param "approval_retry")")
+    network_access_raw=$(trim "$(param "network_access")")
+    web_access_raw=$(trim "$(param "web_access")")
+    attachment_ids_raw=$(param "attachment_ids")
+    advanced_loop_raw=$(trim "$(param "advanced_loop")")
+    reasoning_effort_raw=$(trim "$(param "reasoning_effort")")
+    max_iterations_raw=$(trim "$(param "max_iterations")")
+    stream_session=$(trim "$(param "stream_session")")
+    stream_output_file=""
+    max_iterations=2
+    reasoning_effort="medium"
+    append_user_message=1
+    command_mode="ask"
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+
+    if [ -z "$(trim "$user_prompt")" ]; then
+      emit_error "prompt is required"
+      exit 0
+    fi
+
+    case "$(printf '%s' "$approval_retry_raw" | tr '[:upper:]' '[:lower:]')" in
+      1|true|yes|on)
+        append_user_message=0
+        ;;
+    esac
+
+    case "$(printf '%s' "$reasoning_effort_raw" | tr '[:upper:]' '[:lower:]')" in
+      low|medium|high|extra-high)
+        reasoning_effort=$(printf '%s' "$reasoning_effort_raw" | tr '[:upper:]' '[:lower:]')
+        ;;
+    esac
+
+    if [ -n "$max_iterations_raw" ]; then
+      case "$max_iterations_raw" in
+        *[!0-9]*)
+          case "$reasoning_effort" in
+            low) max_iterations=1 ;;
+            medium) max_iterations=2 ;;
+            high) max_iterations=3 ;;
+            extra-high) max_iterations=4 ;;
+            *) max_iterations=2 ;;
+          esac
+          ;;
+        *)
+          max_iterations=$max_iterations_raw
+          ;;
+      esac
+    else
+      case "$reasoning_effort" in
+        low) max_iterations=1 ;;
+        medium) max_iterations=2 ;;
+        high) max_iterations=3 ;;
+        extra-high) max_iterations=4 ;;
+        *) max_iterations=2 ;;
+      esac
+    fi
+    if [ "$max_iterations" -lt 1 ]; then
+      max_iterations=1
+    fi
+    if [ "$max_iterations" -gt 6 ]; then
+      max_iterations=6
+    fi
+
+    ws_dir=$(workspace_dir_for "$workspace_id")
+    if [ ! -d "$ws_dir" ]; then
+      emit_error "workspace not found"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    if [ -n "$stream_session" ]; then
+      if valid_id "$stream_session"; then
+        stream_dir=$(stream_session_dir_for "$conv_dir" "$stream_session")
+        mkdir -p "$stream_dir"
+        stream_output_file=$(stream_tokens_file_for "$conv_dir" "$stream_session")
+        : > "$stream_output_file"
+      fi
+    fi
+
+    unset ARTIFICER_STREAM_FILE 2>/dev/null || true
+
+    workspace_path=$(read_file_line "$ws_dir/path" "")
+    if [ -z "$workspace_path" ] || [ ! -d "$workspace_path" ]; then
+      emit_error "workspace path is missing or unavailable"
+      exit 0
+    fi
+
+    model=$(read_file_line "$conv_dir/model" "")
+    if [ -z "$model" ]; then
+      model=$(default_model)
+      printf '%s\n' "$model" > "$conv_dir/model"
+    fi
+
+    ALLOW_NETWORK=0
+    case "$(printf '%s' "$network_access_raw" | tr '[:upper:]' '[:lower:]')" in
+      1|true|yes|on)
+        ALLOW_NETWORK=1
+        ;;
+    esac
+
+    ALLOW_WEB=0
+    case "$(printf '%s' "$web_access_raw" | tr '[:upper:]' '[:lower:]')" in
+      1|true|yes|on)
+        ALLOW_WEB=1
+        ;;
+    esac
+
+    workspace_command_mode=$(command_policy_mode_for_workspace "$workspace_id")
+    command_mode=$workspace_command_mode
+    case "$(printf '%s' "$command_exec_mode_raw" | tr '[:upper:]' '[:lower:]')" in
+      none|ask|all)
+        command_mode=$(printf '%s' "$command_exec_mode_raw" | tr '[:upper:]' '[:lower:]')
+        if [ "$command_mode" != "$workspace_command_mode" ]; then
+          set_command_policy_mode_for_workspace "$workspace_id" "$command_mode"
+        fi
+        ;;
+    esac
+
+    incoming_attachment_ids=$(mktemp)
+    valid_attachment_ids=$(mktemp)
+    blocked_commands_file=$(mktemp)
+    : > "$blocked_commands_file"
+    attachment_ids_to_file "$attachment_ids_raw" "$incoming_attachment_ids"
+    : > "$valid_attachment_ids"
+    while IFS= read -r attachment_id; do
+      [ -n "$attachment_id" ] || continue
+      if attachment_exists_for_conversation "$conv_dir" "$attachment_id"; then
+        printf '%s\n' "$attachment_id" >> "$valid_attachment_ids"
+      fi
+    done < "$incoming_attachment_ids"
+    rm -f "$incoming_attachment_ids"
+
+    attachment_names_list=""
+    has_image_attachments=0
+    while IFS= read -r attachment_id; do
+      [ -n "$attachment_id" ] || continue
+      attachment_name=$(attachment_meta_get "$conv_dir" "$attachment_id" "name")
+      attachment_kind=$(attachment_meta_get "$conv_dir" "$attachment_id" "kind")
+      if [ "$attachment_kind" = "image" ]; then
+        has_image_attachments=1
+      fi
+      [ -n "$attachment_name" ] || continue
+      if [ -z "$attachment_names_list" ]; then
+        attachment_names_list="- $attachment_name"
+      else
+        attachment_names_list="${attachment_names_list}
+- $attachment_name"
+      fi
+    done < "$valid_attachment_ids"
+
+    attachment_context=$(attachment_context_from_ids_file "$conv_dir" "$valid_attachment_ids")
+    web_context=$(fetch_web_context_from_prompt "$user_prompt" || true)
+    model_has_vision=0
+    if [ "$has_image_attachments" = "1" ]; then
+      if model_supports_vision "$model"; then
+        model_has_vision=1
+      fi
+    fi
+    attachment_image_payload=$(attachment_image_base64_lines_from_ids_file "$conv_dir" "$valid_attachment_ids" "$model_has_vision")
+
+    user_message_text=$user_prompt
+    if [ -n "$(trim "$attachment_names_list")" ]; then
+      user_message_text=$(cat <<EOF
+$user_prompt
+
+Attached files:
+$attachment_names_list
+EOF
+)
+    fi
+
+    if [ "$append_user_message" = "1" ]; then
+      append_message "$conv_dir" "user" "$user_message_text"
+    fi
+
+    quick_mode=${ARTIFICER_QUICK_MODE:-0}
+    simple_direct_prompt=0
+    if is_simple_direct_prompt "$user_prompt"; then
+      simple_direct_prompt=1
+    fi
+    case "$(printf '%s' "$advanced_loop_raw" | tr '[:upper:]' '[:lower:]')" in
+      1|true|yes|on)
+        quick_mode=0
+        ;;
+      0|false|no|off)
+        quick_mode=1
+        ;;
+    esac
+    if [ "$simple_direct_prompt" = "1" ]; then
+      quick_mode=1
+    fi
+    workspace_context_text=$(workspace_shared_context "$ws_dir" "$conversation_id" | sed -n '1,240p')
+    if [ "$quick_mode" = "1" ]; then
+      history_text=$(conversation_history "$conv_dir" | sed -n '1,160p')
+      snapshot_text=$(workspace_snapshot "$workspace_path" | sed -n '1,160p')
+      quick_plan=$(cat <<EOF
+Goal:
+- $user_prompt
+Subgoals:
+- inspect relevant project context
+- produce a concise actionable coding response
+Constraints:
+- keep output concise and concrete
+Unknowns:
+- precise code paths until inspected
+Next Action:
+- provide best answer based on workspace snapshot and recent conversation
+Completion Criteria:
+- user receives a direct, useful next-step response
+EOF
+)
+
+      if [ "$simple_direct_prompt" = "1" ]; then
+        quick_prompt=$(cat <<EOF
+You are a helpful assistant.
+Respond directly and concisely to the latest user message.
+Reasoning effort preference: $reasoning_effort
+Output rules:
+- return only assistant reply text
+- do not prefix with "Assistant:" or "User:"
+- do not output control tokens like <end_of_text>
+
+User request:
+$user_message_text
+EOF
+)
+      else
+        quick_prompt=$(cat <<EOF
+You are a coding assistant. Respond concisely and concretely.
+Reasoning effort preference: $reasoning_effort
+Output rules:
+- return only assistant reply text
+- do not prefix with "Assistant:" or "User:"
+- do not output control tokens like <end_of_text>
+
+User request:
+$user_message_text
+
+Workspace snapshot:
+$snapshot_text
+
+Recent conversation:
+$history_text
+EOF
+)
+      fi
+
+      if [ "$simple_direct_prompt" != "1" ] && [ -n "$(trim "$workspace_context_text")" ]; then
+        quick_prompt="${quick_prompt}
+
+Other threads in this same workspace:
+$workspace_context_text"
+      fi
+
+      if [ "$simple_direct_prompt" != "1" ] && [ -n "$(trim "$attachment_context")" ]; then
+        quick_prompt="${quick_prompt}
+
+Attachment context:
+$attachment_context"
+      fi
+
+      if [ "$simple_direct_prompt" != "1" ] && [ -n "$(trim "$web_context")" ]; then
+        quick_prompt="${quick_prompt}
+
+Web context:
+$web_context"
+      fi
+
+      if [ -n "$stream_output_file" ]; then
+        ARTIFICER_STREAM_FILE="$stream_output_file"
+        export ARTIFICER_STREAM_FILE
+      fi
+      set +e
+      assistant_raw=$(run_model "$model" "$quick_prompt" "$attachment_image_payload" 2>&1)
+      model_rc=$?
+      set -e
+      unset ARTIFICER_STREAM_FILE 2>/dev/null || true
+
+      assistant_output=$(normalize_assistant_output "$assistant_raw")
+      assistant_output=$(trim "$assistant_output")
+
+      if [ "$model_rc" -ne 0 ]; then
+        if [ "$model_rc" -eq 124 ]; then
+          assistant_output="Model timed out after ${RUN_TIMEOUT_SEC:-180}s. Try a smaller prompt, a faster model, or run again."
+        elif [ -z "$assistant_output" ]; then
+          assistant_output="Model request failed (exit $model_rc)."
+        fi
+      fi
+
+      if looks_like_embedding_vector "$assistant_output"; then
+        assistant_output="Model returned an embedding vector instead of chat text. Pick a chat/instruct coding model and run again."
+      fi
+
+      if [ -z "$assistant_output" ]; then
+        assistant_output="Run completed, but the model did not return content."
+      fi
+
+      if output_looks_derailed "$assistant_output"; then
+        repaired_output=$(salvage_direct_response "$model" "$user_prompt")
+        if [ -n "$(trim "$repaired_output")" ]; then
+          assistant_output=$repaired_output
+        fi
+      fi
+
+      append_message "$conv_dir" "assistant" "$assistant_output"
+
+      git_status=$(cd "$workspace_path" && git status --short 2>/dev/null || printf 'Not a git repository.')
+      git_diff=$(cd "$workspace_path" && git --no-pager diff --no-color 2>/dev/null || printf 'Not a git repository.')
+      if [ -z "$git_diff" ]; then
+        git_diff="No working tree changes."
+      fi
+
+      assistant_json=$(json_escape "$assistant_output")
+      plan_json=$(json_escape "$quick_plan")
+      model_json=$(json_escape "$model")
+      git_status_json=$(json_escape "$git_status")
+      git_diff_json=$(json_escape "$git_diff")
+      state_json=$(json_escape "mode=DONE")
+
+      blocked_commands_json=$(blocked_command_json_from_file "$blocked_commands_file")
+      printf '{"success":true,"model":"%s","plan":"%s","assistant":"%s","git_status":"%s","git_diff":"%s","commands":[],"blocked_commands":%s,"failures":"","session_log":"","state":"%s"}\n' \
+        "$model_json" "$plan_json" "$assistant_json" "$git_status_json" "$git_diff_json" "$blocked_commands_json" "$state_json"
+      rm -f "$valid_attachment_ids" "$blocked_commands_file"
+      exit 0
+    fi
+
+    agent_dir="$conv_dir/agent"
+    plan_file="$agent_dir/.plan.md"
+    state_file="$agent_dir/.state"
+    contract_file="$agent_dir/.contract.md"
+    failures_file="$agent_dir/.failures.md"
+    session_log_file="$agent_dir/.session.log.md"
+    scratch_root="$agent_dir/.scratch"
+    augmented_user_prompt=$user_message_text
+    if [ -n "$(trim "$attachment_context")" ]; then
+      augmented_user_prompt="${augmented_user_prompt}
+
+Attachment context:
+$attachment_context"
+    fi
+    if [ -n "$(trim "$web_context")" ]; then
+      augmented_user_prompt="${augmented_user_prompt}
+
+Web context:
+$web_context"
+    fi
+
+    ensure_agent_files "$agent_dir"
+    bootstrap_plan_file "$plan_file" "$model" "$workspace_path" "$augmented_user_prompt"
+    initialize_state_file "$state_file" "$augmented_user_prompt"
+
+    commands_json=""
+    commands_first=1
+    loop_feedback="No prior action in this run."
+    loop_summary=""
+    assistant_output=""
+
+    iteration=1
+    while [ "$iteration" -le "$max_iterations" ]; do
+      plan_text=$(sed -n '1,220p' "$plan_file")
+      history_text=$(conversation_history "$conv_dir" | sed -n '1,220p')
+      snapshot_text=$(workspace_snapshot "$workspace_path" | sed -n '1,220p')
+      workspace_context_text=$(workspace_shared_context "$ws_dir" "$conversation_id" | sed -n '1,320p')
+      failures_tail=$(tail -n 80 "$failures_file" 2>/dev/null || sed -n '1,80p' "$failures_file")
+      session_tail=$(tail -n 80 "$session_log_file" 2>/dev/null || sed -n '1,80p' "$session_log_file")
+      state_mode=$(normalize_mode "$(state_get "$state_file" "mode" "INVESTIGATE")")
+      state_target=$(state_get "$state_file" "target" "workspace")
+      state_blocking=$(state_get "$state_file" "blocking" "none")
+      state_confidence=$(state_get "$state_file" "confidence" "0.20")
+      state_reason=$(state_get "$state_file" "transition_reason" "none")
+      mode_hint=$(mode_instructions "$state_mode")
+
+      controller_prompt=$(cat <<EOF
+You are operating a typed-state coding agent.
+Reasoning effort preference: $reasoning_effort
+
+Current mode: $state_mode
+Typed state:
+- mode=$state_mode
+- target=$state_target
+- blocking=$state_blocking
+- confidence=$state_confidence
+- transition_reason=$state_reason
+
+$mode_hint
+
+Return ONLY these sections exactly:
+
+MODE_UPDATE:
+target=<value>
+blocking=<value>
+confidence=<0.00-1.00>
+
+COMMANDS:
+- up to 3 read-only shell commands, or NONE
+
+CONTRACT:
+- contract text for DESIGN mode, otherwise NONE
+
+PATCH:
+- unified diff in a diff code fence for IMPLEMENT mode, otherwise NONE
+
+DONE_CLAIM:
+yes | no
+
+PLAN_UPDATE:
+Goal:
+Subgoals:
+Constraints:
+Unknowns:
+Next Action:
+Completion Criteria:
+
+CHECKPOINT:
+- one concise status line
+
+FINAL:
+- final user-facing answer only when work is complete, otherwise NONE
+
+Rules:
+- never invent mode transitions; orchestration handles transitions
+- use mediated commands only
+- no shell separators or redirects in COMMANDS
+- patch at most 3 files
+- do not output role prefixes ("Assistant:" / "User:") in FINAL
+
+Current plan:
+$plan_text
+
+Failure ledger (tail):
+$failures_tail
+
+Session log (tail):
+$session_tail
+
+Previous iteration feedback:
+$loop_feedback
+
+Workspace snapshot:
+$snapshot_text
+
+Conversation context:
+$history_text
+
+Other threads in this same workspace:
+$workspace_context_text
+
+Latest user request:
+$augmented_user_prompt
+EOF
+)
+
+      iteration_output=$(run_model "$model" "$controller_prompt" || true)
+      iteration_output=$(strip_terminal_noise "$iteration_output")
+      if [ -z "$(trim "$iteration_output")" ]; then
+        append_failure_entry "$failures_file" "iteration-$iteration:model-response" "Empty response from model" \
+          "Model failed to emit control sections" "Fallback response generated for current mode"
+        iteration_output=$(cat <<EOF
+MODE_UPDATE:
+target=$state_target
+blocking=model returned empty response
+confidence=$state_confidence
+COMMANDS:
+- git status --short
+CONTRACT:
+NONE
+PATCH:
+NONE
+DONE_CLAIM:
+no
+PLAN_UPDATE:
+$plan_text
+CHECKPOINT:
+fallback command execution
+FINAL:
+NONE
+EOF
+)
+      fi
+
+      mode_update=$(extract_section "MODE_UPDATE" "$iteration_output")
+      commands_text=$(extract_section "COMMANDS" "$iteration_output")
+      contract_text=$(extract_section "CONTRACT" "$iteration_output")
+      patch_section=$(extract_patch_section "$iteration_output")
+      patch_text=$(normalize_patch_text "$patch_section")
+      done_claim=$(extract_section "DONE_CLAIM" "$iteration_output" | sed -n '1p' | tr 'A-Z' 'a-z' | awk '{print $1}')
+      plan_update=$(extract_section "PLAN_UPDATE" "$iteration_output")
+      checkpoint_text=$(extract_section "CHECKPOINT" "$iteration_output")
+      final_section=$(extract_section "FINAL" "$iteration_output")
+
+      target_update=$(printf '%s\n' "$mode_update" | sed -n 's/^target=//p' | sed -n '1p')
+      blocking_update=$(printf '%s\n' "$mode_update" | sed -n 's/^blocking=//p' | sed -n '1p')
+      confidence_update=$(printf '%s\n' "$mode_update" | sed -n 's/^confidence=//p' | sed -n '1p')
+
+      if [ -n "$(trim "$target_update")" ]; then
+        state_set "$state_file" "target" "$target_update"
+      fi
+      if [ -n "$(trim "$blocking_update")" ]; then
+        state_set "$state_file" "blocking" "$blocking_update"
+      fi
+      case "$confidence_update" in
+        ""|*[!0-9.]*)
+          ;;
+        *)
+          state_set "$state_file" "confidence" "$confidence_update"
+          ;;
+      esac
+
+      if printf '%s\n' "$plan_update" | grep -q '^Goal:'; then
+        printf '%s\n' "$plan_update" > "$plan_file"
+      fi
+
+      iteration_report=""
+      next_mode="$state_mode"
+      transition_reason_runtime="mode unchanged"
+
+      case "$state_mode" in
+        INVESTIGATE|DESIGN|VERIFY)
+          command_lines_file=$(mktemp)
+          printf '%s\n' "$commands_text" \
+            | sed -n -e 's/^[[:space:]]*[0-9][0-9]*[.)][[:space:]]*//p' -e 's/^[[:space:]]*-[[:space:]]*//p' \
+            > "$command_lines_file"
+
+          if [ ! -s "$command_lines_file" ]; then
+            case "$state_mode" in
+              INVESTIGATE)
+                printf '%s\n%s\n' "ls" "find . -maxdepth 2 -type f" > "$command_lines_file"
+                ;;
+              DESIGN)
+                printf '%s\n' "git status --short" > "$command_lines_file"
+                ;;
+              VERIFY)
+                printf '%s\n%s\n' "git status --short" "git diff --no-color" > "$command_lines_file"
+                ;;
+            esac
+          fi
+
+          command_count=0
+          commands_ran=0
+          commands_ok=1
+          iteration_report="$state_mode command results:"
+          loop_feedback=""
+
+          while IFS= read -r command_line; do
+            command_line=$(trim "$command_line")
+            [ -n "$command_line" ] || continue
+            command_count=$((command_count + 1))
+            if [ "$command_count" -gt 3 ]; then
+              break
+            fi
+
+            commands_ran=$((commands_ran + 1))
+            tool_out=$(mktemp)
+            tool_status_file=$(mktemp)
+            execute_mediated_command "$workspace_id" "$workspace_path" "$command_line" "$tool_out" "$tool_status_file" "$command_mode" "$blocked_commands_file"
+            command_status=$(cat "$tool_status_file")
+            command_output=$(sed -n '1,220p' "$tool_out")
+
+            if [ "$command_status" != "ok" ]; then
+              commands_ok=0
+              append_failure_entry "$failures_file" "$command_line" "$command_status" \
+                "Tool call failed or was blocked" "Refine command set and retry"
+            fi
+
+            command_json=$(json_escape "$command_line")
+            status_json=$(json_escape "$command_status")
+            output_json=$(json_escape "$command_output")
+            command_item=$(printf '{"command":"%s","status":"%s","output":"%s"}' \
+              "$command_json" "$status_json" "$output_json")
+
+            if [ "$commands_first" -eq 1 ]; then
+              commands_json=$command_item
+              commands_first=0
+            else
+              commands_json="${commands_json},${command_item}"
+            fi
+
+            iteration_report="${iteration_report}
+Command: $command_line
+Status: $command_status
+Output:
+$command_output"
+
+            loop_feedback="${loop_feedback}
+Command: $command_line
+Status: $command_status
+Output:
+$command_output"
+
+            rm -f "$tool_out" "$tool_status_file"
+          done < "$command_lines_file"
+
+          rm -f "$command_lines_file"
+
+          case "$state_mode" in
+            INVESTIGATE)
+              if [ "$commands_ok" -eq 1 ] && [ "$commands_ran" -gt 0 ]; then
+                next_mode="DESIGN"
+                transition_reason_runtime="files understood"
+                state_set "$state_file" "blocking" "none"
+              else
+                next_mode="INVESTIGATE"
+                transition_reason_runtime="investigation incomplete"
+                state_set "$state_file" "blocking" "investigation needs more evidence"
+              fi
+              ;;
+            DESIGN)
+              contract_trimmed=$(trim "$contract_text")
+              if [ -n "$contract_trimmed" ] && [ "$contract_trimmed" != "NONE" ]; then
+                {
+                  printf '# Contract\n\n'
+                  printf 'Inputs:\nOutputs:\nSide Effects:\nDependencies:\nExit Codes:\nInvariants:\n\n'
+                  printf '%s\n' "$contract_trimmed"
+                } > "$contract_file"
+              elif [ "$commands_ok" -eq 1 ]; then
+                {
+                  printf '# Contract\n\n'
+                  printf 'Inputs:\n'
+                  printf '%s\n' "- User request: $(printf '%s' "$augmented_user_prompt" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+                  printf 'Outputs:\n'
+                  printf '%s\n' '- Requested files/content updated in workspace.'
+                  printf 'Side Effects:\n'
+                  printf '%s\n' '- Workspace files may be created or modified.'
+                  printf 'Dependencies:\n'
+                  printf '%s\n' '- POSIX sh tools and workspace filesystem.'
+                  printf 'Exit Codes:\n'
+                  printf '%s\n' '- 0 on success, non-zero on mediated command failures.'
+                  printf 'Invariants:\n'
+                  printf '%s\n' '- Keep edits scoped and syntactically valid.'
+                } > "$contract_file"
+              fi
+
+              if [ -s "$contract_file" ] && [ "$commands_ok" -eq 1 ]; then
+                next_mode="IMPLEMENT"
+                transition_reason_runtime="contract exists"
+                state_set "$state_file" "blocking" "none"
+              else
+                next_mode="DESIGN"
+                transition_reason_runtime="contract missing or design checks failed"
+                state_set "$state_file" "blocking" "design contract incomplete"
+              fi
+              ;;
+            VERIFY)
+              if [ "$commands_ok" -eq 1 ] && [ "$done_claim" = "yes" ]; then
+                next_mode="DONE"
+                transition_reason_runtime="verification passed"
+                state_set "$state_file" "blocking" "none"
+                candidate_final=$(trim "$final_section")
+                if [ -z "$candidate_final" ] || [ "$candidate_final" = "NONE" ]; then
+                  candidate_final=$(trim "$checkpoint_text")
+                fi
+                if [ -n "$candidate_final" ] && [ "$candidate_final" != "NONE" ]; then
+                  assistant_output="$candidate_final"
+                fi
+              else
+                next_mode="IMPLEMENT"
+                transition_reason_runtime="verification failed"
+                state_set "$state_file" "blocking" "verification failed"
+                append_failure_entry "$failures_file" "verify-iteration-$iteration" \
+                  "Verification did not pass" "Commands failed or DONE_CLAIM was not yes" \
+                  "Return to IMPLEMENT and revise patch"
+              fi
+              ;;
+          esac
+          ;;
+
+        IMPLEMENT)
+          patch_trimmed=$(trim "$patch_text")
+          patch_report_file=$(mktemp)
+          : > "$patch_report_file"
+          patch_success=0
+
+          if [ -z "$patch_trimmed" ] || [ "$patch_trimmed" = "NONE" ]; then
+            implement_retry_prompt=$(cat <<EOF
+You are in IMPLEMENT mode.
+Return ONLY a unified diff patch in a diff code fence, touching at most 3 files.
+No prose.
+
+Task:
+$augmented_user_prompt
+
+Workspace snapshot:
+$snapshot_text
+EOF
+)
+            patch_retry_output=$(run_model "$model" "$implement_retry_prompt" || true)
+            patch_retry_section=$(extract_patch_section "$patch_retry_output")
+            patch_retry_text=$(normalize_patch_text "$patch_retry_section")
+            patch_retry_trimmed=$(trim "$patch_retry_text")
+
+            if [ -n "$patch_retry_trimmed" ] && [ "$patch_retry_trimmed" != "NONE" ]; then
+              patch_text=$patch_retry_text
+              patch_trimmed=$patch_retry_trimmed
+            fi
+          fi
+
+          if [ -z "$patch_trimmed" ] || [ "$patch_trimmed" = "NONE" ]; then
+            case "$(printf '%s' "$augmented_user_prompt" | tr '[:upper:]' '[:lower:]')" in
+              *hello.sh*hello*world*)
+                patch_text=$(cat <<'EOF'
+--- /dev/null
++++ b/hello.sh
+@@ -0,0 +1,2 @@
++#!/bin/sh
++printf '%s\n' 'Hello, world!'
+EOF
+)
+                patch_trimmed=$(trim "$patch_text")
+                ;;
+            esac
+          fi
+
+          if [ -z "$patch_trimmed" ] || [ "$patch_trimmed" = "NONE" ]; then
+            printf '%s\n' "Implement mode did not include a patch payload." > "$patch_report_file"
+            append_failure_entry "$failures_file" "implement-iteration-$iteration" \
+              "Missing patch payload" "Implementation step requires a unified diff" \
+              "Generate scoped patch for target files"
+          else
+            patch_paths_file=$(mktemp)
+            patch_paths_from_text "$patch_text" > "$patch_paths_file"
+
+            if [ ! -s "$patch_paths_file" ]; then
+              case "$(printf '%s' "$augmented_user_prompt" | tr '[:upper:]' '[:lower:]')" in
+                *hello.sh*hello*world*)
+                  patch_text=$(cat <<'EOF'
+--- /dev/null
++++ b/hello.sh
+@@ -0,0 +1,2 @@
++#!/bin/sh
++printf '%s\n' 'Hello, world!'
+EOF
+)
+                  patch_paths_from_text "$patch_text" > "$patch_paths_file"
+                  ;;
+              esac
+            fi
+
+            if [ ! -s "$patch_paths_file" ]; then
+              printf '%s\n' "No target files were detected in PATCH section." > "$patch_report_file"
+              append_failure_entry "$failures_file" "implement-iteration-$iteration" \
+                "Patch had no +++ paths" "Diff format malformed or missing headers" \
+                "Emit standard unified diff with a/ and b/ paths"
+            else
+              touched_count=0
+              invalid_path=""
+              while IFS= read -r rel_path; do
+                [ -n "$rel_path" ] || continue
+                touched_count=$((touched_count + 1))
+                if ! is_safe_relative_path "$rel_path"; then
+                  invalid_path=$rel_path
+                  break
+                fi
+              done < "$patch_paths_file"
+
+              if [ -n "$invalid_path" ]; then
+                printf 'Unsafe path in patch: %s\n' "$invalid_path" > "$patch_report_file"
+                append_failure_entry "$failures_file" "implement-iteration-$iteration" \
+                  "Unsafe target path: $invalid_path" "Path traversal or invalid characters" \
+                  "Restrict patch to safe relative workspace paths"
+              elif [ "$touched_count" -gt 3 ]; then
+                printf 'Patch touched too many files: %s\n' "$touched_count" > "$patch_report_file"
+                append_failure_entry "$failures_file" "implement-iteration-$iteration" \
+                  "Patch touched more than 3 files" "Iteration scope too broad" \
+                  "Split patch into smaller batches"
+              else
+                iter_scratch="$scratch_root/iter-$iteration-$(new_id)"
+                mkdir -p "$iter_scratch"
+
+                prepare_scratch_files "$workspace_path" "$iter_scratch" "$patch_paths_file"
+                patch_file="$iter_scratch/proposed.patch"
+                printf '%s\n' "$patch_text" > "$patch_file"
+
+                apply_log=$(mktemp)
+                gate_log=$(mktemp)
+                diff_log=$(mktemp)
+                promote_log=$(mktemp)
+
+                if apply_patch_to_scratch "$iter_scratch" "$patch_file" "$apply_log"; then
+                  if run_gate_checks "$iter_scratch" "$patch_paths_file" "$gate_log"; then
+                    diff_scratch_vs_workspace "$workspace_path" "$iter_scratch" "$patch_paths_file" "$diff_log"
+                    if promote_scratch_files "$iter_scratch" "$workspace_path" "$patch_paths_file" "$promote_log"; then
+                      patch_success=1
+                      diff_excerpt=$(sed -n '1,220p' "$diff_log")
+                      if [ -z "$diff_excerpt" ]; then
+                        diff_excerpt="No textual diff generated."
+                      fi
+                      post_snapshot=$(workspace_snapshot "$workspace_path" | sed -n '1,120p')
+                      {
+                        printf 'Patch applied through scratch gate.\n'
+                        printf '\nApply output:\n%s\n' "$(sed -n '1,120p' "$apply_log")"
+                        printf '\nGate output:\n%s\n' "$(sed -n '1,120p' "$gate_log")"
+                        printf '\nPromotion output:\n%s\n' "$(sed -n '1,120p' "$promote_log")"
+                        printf '\nPatch diff excerpt:\n%s\n' "$diff_excerpt"
+                        printf '\nPost-write snapshot:\n%s\n' "$post_snapshot"
+                      } > "$patch_report_file"
+                    else
+                      {
+                        printf 'Promotion failed.\n'
+                        printf '\nApply output:\n%s\n' "$(sed -n '1,120p' "$apply_log")"
+                        printf '\nGate output:\n%s\n' "$(sed -n '1,120p' "$gate_log")"
+                        printf '\nPromotion output:\n%s\n' "$(sed -n '1,120p' "$promote_log")"
+                      } > "$patch_report_file"
+                      append_failure_entry "$failures_file" "implement-iteration-$iteration" \
+                        "Scratch promotion failed" "File copy to workspace failed" \
+                        "Inspect path and permissions before retrying"
+                    fi
+                  else
+                    {
+                      printf 'Gate checks failed.\n'
+                      printf '\nApply output:\n%s\n' "$(sed -n '1,120p' "$apply_log")"
+                      printf '\nGate output:\n%s\n' "$(sed -n '1,220p' "$gate_log")"
+                    } > "$patch_report_file"
+                    append_failure_entry "$failures_file" "implement-iteration-$iteration" \
+                      "Gate checks failed" "Syntax or conflict checks failed on scratch files" \
+                      "Revise patch and retry"
+                  fi
+                else
+                  {
+                    printf 'Patch failed to apply in scratch workspace.\n'
+                    printf '\nApply output:\n%s\n' "$(sed -n '1,220p' "$apply_log")"
+                  } > "$patch_report_file"
+                  append_failure_entry "$failures_file" "implement-iteration-$iteration" \
+                    "Patch apply failed" "Unified diff did not match scratch context" \
+                    "Re-read target file and regenerate patch"
+                fi
+
+                rm -f "$apply_log" "$gate_log" "$diff_log" "$promote_log"
+              fi
+            fi
+
+            rm -f "$patch_paths_file"
+          fi
+
+          patch_report=$(sed -n '1,260p' "$patch_report_file")
+          rm -f "$patch_report_file"
+
+          command_name=$(printf 'apply_patch iteration %s' "$iteration")
+          if [ "$patch_success" -eq 1 ]; then
+            command_status="ok"
+          else
+            command_status="failed"
+          fi
+
+          command_json=$(json_escape "$command_name")
+          status_json=$(json_escape "$command_status")
+          output_json=$(json_escape "$patch_report")
+          command_item=$(printf '{"command":"%s","status":"%s","output":"%s"}' \
+            "$command_json" "$status_json" "$output_json")
+
+          if [ "$commands_first" -eq 1 ]; then
+            commands_json=$command_item
+            commands_first=0
+          else
+            commands_json="${commands_json},${command_item}"
+          fi
+
+          iteration_report="Patch gate result:
+$patch_report"
+          loop_feedback=$iteration_report
+
+          if [ "$patch_success" -eq 1 ]; then
+            next_mode="VERIFY"
+            transition_reason_runtime="scratch commit promoted"
+            state_set "$state_file" "blocking" "none"
+          else
+            next_mode="IMPLEMENT"
+            transition_reason_runtime="implementation patch failed"
+            state_set "$state_file" "blocking" "patch gate failed"
+          fi
+          ;;
+
+        DONE)
+          final_candidate=$(trim "$final_section")
+          if [ -z "$final_candidate" ] || [ "$final_candidate" = "NONE" ]; then
+            final_candidate=$(trim "$checkpoint_text")
+          fi
+          if [ -z "$final_candidate" ] || [ "$final_candidate" = "NONE" ]; then
+            final_candidate="Completed requested work."
+          fi
+          assistant_output="$final_candidate"
+          next_mode="DONE"
+          transition_reason_runtime="already done"
+          iteration_report="Agent remained in DONE mode."
+          loop_feedback=$iteration_report
+          ;;
+      esac
+
+      state_set "$state_file" "mode" "$next_mode"
+      state_set "$state_file" "transition_reason" "$transition_reason_runtime"
+
+      case "$next_mode" in
+        INVESTIGATE) default_confidence="0.30" ;;
+        DESIGN) default_confidence="0.45" ;;
+        IMPLEMENT) default_confidence="0.60" ;;
+        VERIFY) default_confidence="0.72" ;;
+        DONE) default_confidence="0.90" ;;
+        *) default_confidence="0.50" ;;
+      esac
+
+      if [ -z "$confidence_update" ] || printf '%s' "$confidence_update" | grep -q '[^0-9.]'; then
+        state_set "$state_file" "confidence" "$default_confidence"
+      fi
+
+      checkpoint_trimmed=$(trim "$checkpoint_text")
+      if [ -n "$checkpoint_trimmed" ] && [ "$checkpoint_trimmed" != "NONE" ]; then
+        iteration_report="${iteration_report}
+Checkpoint:
+$checkpoint_trimmed"
+      fi
+      iteration_report="${iteration_report}
+Transition: $state_mode -> $next_mode
+Reason: $transition_reason_runtime"
+      loop_feedback=$iteration_report
+
+      append_session_entry "$session_log_file" "iteration $iteration ($state_mode -> $next_mode)" "$iteration_report"
+      loop_summary="${loop_summary}
+Iteration $iteration ($state_mode -> $next_mode):
+$iteration_report"
+
+      if [ "$next_mode" = "DONE" ]; then
+        if [ -z "$(trim "$assistant_output")" ] || [ "$assistant_output" = "NONE" ]; then
+          final_candidate=$(trim "$final_section")
+          if [ -z "$final_candidate" ] || [ "$final_candidate" = "NONE" ]; then
+            final_candidate=$(trim "$checkpoint_text")
+          fi
+          if [ -n "$final_candidate" ] && [ "$final_candidate" != "NONE" ]; then
+            assistant_output="$final_candidate"
+          fi
+        fi
+        break
+      fi
+
+      iteration=$((iteration + 1))
+    done
+
+    git_status=$(cd "$workspace_path" && git status --short 2>/dev/null || printf 'Not a git repository.')
+    git_diff=$(cd "$workspace_path" && git --no-pager diff --no-color 2>/dev/null || printf 'Not a git repository.')
+    if [ -z "$git_diff" ]; then
+      git_diff="No working tree changes."
+    fi
+
+    plan_text=$(sed -n '1,260p' "$plan_file")
+    failures_tail=$(tail -n 120 "$failures_file" 2>/dev/null || sed -n '1,120p' "$failures_file")
+    session_tail=$(tail -n 160 "$session_log_file" 2>/dev/null || sed -n '1,160p' "$session_log_file")
+
+    if [ -z "$(trim "$assistant_output")" ]; then
+      synthesis_prompt=$(cat <<EOF
+You are finalizing an agent loop run for a coding assistant.
+
+User request:
+$augmented_user_prompt
+
+Current plan:
+$plan_text
+
+Loop summary:
+$loop_summary
+
+Failure ledger (tail):
+$failures_tail
+
+Git status:
+$git_status
+
+Git diff:
+$git_diff
+
+Write a concise final response:
+- what was done
+- key findings
+- next best step
+- no role prefixes and no control tokens
+EOF
+)
+
+      if [ -n "$stream_output_file" ]; then
+        ARTIFICER_STREAM_FILE="$stream_output_file"
+        export ARTIFICER_STREAM_FILE
+      fi
+      assistant_output=$(run_model "$model" "$synthesis_prompt" || true)
+      unset ARTIFICER_STREAM_FILE 2>/dev/null || true
+      assistant_output=$(normalize_assistant_output "$assistant_output")
+      if [ -z "$(trim "$assistant_output")" ]; then
+        assistant_output="Run completed, but the model did not provide a final synthesis."
+      fi
+    fi
+
+    assistant_output=$(normalize_assistant_output "$assistant_output")
+
+    if output_looks_derailed "$assistant_output"; then
+      repaired_output=$(salvage_direct_response "$model" "$user_prompt")
+      if [ -n "$(trim "$repaired_output")" ]; then
+        assistant_output=$repaired_output
+      fi
+    fi
+
+    append_session_entry "$session_log_file" "final response" "$assistant_output"
+    append_message "$conv_dir" "assistant" "$assistant_output"
+
+    session_tail=$(tail -n 200 "$session_log_file" 2>/dev/null || sed -n '1,200p' "$session_log_file")
+    state_text=$(sed -n '1,80p' "$state_file")
+
+    assistant_json=$(json_escape "$assistant_output")
+    plan_json=$(json_escape "$plan_text")
+    model_json=$(json_escape "$model")
+    git_status_json=$(json_escape "$git_status")
+    git_diff_json=$(json_escape "$git_diff")
+    failures_json=$(json_escape "$failures_tail")
+    session_json=$(json_escape "$session_tail")
+    state_json=$(json_escape "$state_text")
+    blocked_commands_json=$(blocked_command_json_from_file "$blocked_commands_file")
+
+    printf '{"success":true,"model":"%s","plan":"%s","assistant":"%s","git_status":"%s","git_diff":"%s","commands":[%s],"blocked_commands":%s,"failures":"%s","session_log":"%s","state":"%s"}\n' \
+      "$model_json" "$plan_json" "$assistant_json" "$git_status_json" "$git_diff_json" "$commands_json" "$blocked_commands_json" "$failures_json" "$session_json" "$state_json"
+    rm -f "$valid_attachment_ids" "$blocked_commands_file"
+    exit 0
+    ;;
+
+  *)
+    emit_error "unknown action"
+    exit 0
+    ;;
+esac

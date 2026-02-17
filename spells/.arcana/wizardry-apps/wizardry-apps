@@ -1,0 +1,68 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: wizardry-apps [COMMAND]
+
+Commands:
+  menu (default)          open wizardry-apps menu
+  status [SECTION]        show status (optional section: web|desktop|mobile)
+  enable [TARGET]         enable target (all|web|desktop|mobile|component)
+  disable [TARGET]        disable target (all|web|desktop|mobile|component)
+  web-admin               open web admin submenu
+  desktop-admin           open desktop admin submenu
+  mobile-admin            open mobile admin submenu
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+cmd=${1-menu}
+
+case "$cmd" in
+  menu)
+    exec "$script_dir/wizardry-apps-menu"
+    ;;
+  status)
+    section=${2-}
+    if [ -n "$section" ]; then
+      exec "$script_dir/wizardry-apps-status" --section "$section"
+    fi
+    exec "$script_dir/wizardry-apps-status"
+    ;;
+  enable|disable)
+    action="--$cmd"
+    target=${2-all}
+    case "$target" in
+      all)
+        exec "$script_dir/toggle-all-wizardry-apps" "$action"
+        ;;
+      web|desktop|mobile)
+        exec "$script_dir/toggle-all-wizardry-apps-section" "$target" "$action"
+        ;;
+      *)
+        exec "$script_dir/set-apps-component-state" "$target" "$action"
+        ;;
+    esac
+    ;;
+  web-admin)
+    exec "$script_dir/wizardry-apps-web-admin"
+    ;;
+  desktop-admin)
+    exec "$script_dir/wizardry-apps-desktop-admin"
+    ;;
+  mobile-admin)
+    exec "$script_dir/wizardry-apps-mobile-admin"
+    ;;
+  *)
+    printf '%s\n' "wizardry-apps: unknown command '$cmd'" >&2
+    exit 2
+    ;;
+esac

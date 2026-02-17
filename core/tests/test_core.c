@@ -1,0 +1,257 @@
+#include "wizardry_core.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+static int event_count = 0;
+static char last_event[64];
+
+static void on_event(const char *event_name, const char *payload, void *user_data) {
+  (void)payload;
+  (void)user_data;
+  event_count++;
+  if (event_name) {
+    snprintf(last_event, sizeof(last_event), "%s", event_name);
+  }
+}
+
+static int contains(const char *haystack, const char *needle) {
+  return strstr(haystack, needle) != NULL;
+}
+
+static int run_rpc(wizardry_core *core, const char *request, char *response, size_t response_size) {
+  if (wizardry_core_rpc(core, request, response, response_size) != 0) {
+    fprintf(stderr, "rpc failure for request: %s\n", request);
+    return -1;
+  }
+  return 0;
+}
+
+int main(void) {
+  wizardry_core core;
+  char response[16384];
+  char sidecar_path[2048];
+  char tmp_template[] = "/tmp/wizardry-core-test-XXXXXX";
+  char *vault_dir;
+
+  if (wizardry_core_init(&core) != 0) {
+    fprintf(stderr, "core init failed\n");
+    return 1;
+  }
+
+  if (wizardry_core_subscribe(&core, on_event, NULL) != 0) {
+    fprintf(stderr, "subscribe failed\n");
+    return 1;
+  }
+
+  vault_dir = mkdtemp(tmp_template);
+  if (!vault_dir) {
+    fprintf(stderr, "mkdtemp failed\n");
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"core.ping\"}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"result\"") || !contains(response, "\"ok\":true")) {
+    fprintf(stderr, "unexpected ping response: %s\n", response);
+    return 1;
+  }
+
+  {
+    char req[4096];
+    snprintf(req,
+             sizeof(req),
+             "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"vault.mount\",\"params\":{\"path\":\"%s\"}}",
+             vault_dir);
+    if (run_rpc(&core, req, response, sizeof(response)) != 0) {
+      return 1;
+    }
+  }
+
+  if (!contains(response, "\"mounted\":true")) {
+    fprintf(stderr, "unexpected vault.mount response: %s\n", response);
+    return 1;
+  }
+
+  if (event_count < 1 || strcmp(last_event, "vaultMounted") != 0) {
+    fprintf(stderr, "expected vaultMounted event\n");
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"doc.write\",\"params\":{\"path\":\"notes/one.md\",\"content\":\"hello\\nworld\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"written\":true")) {
+    fprintf(stderr, "unexpected doc.write response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/one.md\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"path\":\"notes/one.md\"") ||
+      !contains(response, "hello\\nworld")) {
+    fprintf(stderr, "unexpected doc.read response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"doc.list\",\"params\":{\"path\":\"notes\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "notes/one.md")) {
+    fprintf(stderr, "unexpected doc.list response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"meta.set\",\"params\":{\"path\":\"notes/one.md\",\"key\":\"user.tag\",\"value\":\"alpha\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"set\":true")) {
+    fprintf(stderr, "unexpected meta.set response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"meta.get\",\"params\":{\"path\":\"notes/one.md\",\"key\":\"user.tag\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"found\":true") || !contains(response, "\"value\":\"alpha\"")) {
+    fprintf(stderr, "unexpected meta.get(key) response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"meta.get\",\"params\":{\"path\":\"notes/one.md\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"xattrs\"") || !contains(response, "\"user.tag\":\"alpha\"")) {
+    fprintf(stderr, "unexpected meta.get(all) response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"meta.unset\",\"params\":{\"path\":\"notes/one.md\",\"key\":\"user.tag\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"unset\":true")) {
+    fprintf(stderr, "unexpected meta.unset response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"meta.get\",\"params\":{\"path\":\"notes/one.md\",\"key\":\"user.tag\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"found\":false")) {
+    fprintf(stderr, "unexpected meta.get(after unset) response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"txn.begin\"}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"txn.commit\"}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"committed\":true")) {
+    fprintf(stderr, "unexpected txn.commit response: %s\n", response);
+    return 1;
+  }
+
+  if (strcmp(last_event, "txnCommitted") != 0) {
+    fprintf(stderr, "expected txnCommitted event\n");
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":13,\"method\":\"doc.delete\",\"params\":{\"path\":\"notes/one.md\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"deleted\":true")) {
+    fprintf(stderr, "unexpected doc.delete response: %s\n", response);
+    return 1;
+  }
+
+  {
+    char deleted_path[4096];
+    snprintf(deleted_path, sizeof(deleted_path), "%s/notes/one.md", vault_dir);
+    if (access(deleted_path, F_OK) == 0) {
+      fprintf(stderr, "doc.delete did not remove file\n");
+      return 1;
+    }
+  }
+
+  {
+    char doc_path[4096];
+    snprintf(doc_path, sizeof(doc_path), "%s/notes/one.md", vault_dir);
+    if (wizardry_sidecar_path(doc_path, sidecar_path, sizeof(sidecar_path)) != 0) {
+      fprintf(stderr, "sidecar path failed\n");
+      return 1;
+    }
+
+    if (!contains(sidecar_path, ".xattr.json")) {
+      fprintf(stderr, "unexpected sidecar path: %s\n", sidecar_path);
+      return 1;
+    }
+  }
+
+  if (wizardry_core_shutdown(&core) != 0) {
+    fprintf(stderr, "shutdown failed\n");
+    return 1;
+  }
+
+  {
+    char cleanup_cmd[4096];
+    snprintf(cleanup_cmd, sizeof(cleanup_cmd), "rm -rf '%s'", vault_dir);
+    (void)system(cleanup_cmd);
+  }
+
+  printf("wizardry-core tests passed\n");
+  return 0;
+}

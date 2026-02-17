@@ -1,0 +1,95 @@
+#!/bin/sh
+# Shared state helpers for wizardry-apps arcana toggles.
+
+set -eu
+
+state_root=${WIZARDRY_APPS_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps}
+components_dir=$state_root/components-enabled
+
+ensure_state_dirs() {
+  mkdir -p "$components_dir"
+}
+
+validate_component() {
+  component=${1-}
+  case "$component" in
+    web-hosted|web-templates|web-cgi-adapter|desktop-macos|desktop-linux|desktop-release|mobile-ios|mobile-android|mobile-release)
+      return 0
+      ;;
+    *)
+      printf '%s\n' "wizardry-apps: unknown component '$component'" >&2
+      return 2
+      ;;
+  esac
+}
+
+component_file() {
+  component=$1
+  printf '%s/%s.enabled\n' "$components_dir" "$component"
+}
+
+is_enabled() {
+  component=$1
+  validate_component "$component"
+  [ -f "$(component_file "$component")" ]
+}
+
+set_enabled() {
+  component=$1
+  validate_component "$component"
+  ensure_state_dirs
+  : > "$(component_file "$component")"
+}
+
+set_disabled() {
+  component=$1
+  validate_component "$component"
+  rm -f "$(component_file "$component")"
+}
+
+list_all_components() {
+  printf '%s\n' \
+    web-hosted \
+    web-templates \
+    web-cgi-adapter \
+    desktop-macos \
+    desktop-linux \
+    desktop-release \
+    mobile-ios \
+    mobile-android \
+    mobile-release
+}
+
+list_section_components() {
+  section=${1-}
+  case "$section" in
+    web)
+      printf '%s\n' web-hosted web-templates web-cgi-adapter
+      ;;
+    desktop)
+      printf '%s\n' desktop-macos desktop-linux desktop-release
+      ;;
+    mobile)
+      printf '%s\n' mobile-ios mobile-android mobile-release
+      ;;
+    *)
+      printf '%s\n' "wizardry-apps: unknown section '$section'" >&2
+      return 2
+      ;;
+  esac
+}
+
+all_enabled() {
+  for component in $(list_all_components); do
+    is_enabled "$component" || return 1
+  done
+  return 0
+}
+
+section_enabled() {
+  section=$1
+  for component in $(list_section_components "$section"); do
+    is_enabled "$component" || return 1
+  done
+  return 0
+}

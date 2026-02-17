@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1",
+  "templates": [
+    {
+      "slug": "demo",
+      "publish": true
+    },
+    {
+      "slug": "blog",
+      "publish": true
+    },
+    {
+      "slug": "unix-settings",
+      "publish": true
+    },
+    {
+      "slug": "artificer",
+      "publish": true
+    }
+  ]
+}

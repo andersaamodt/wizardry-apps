@@ -1,0 +1,10 @@
+#!/bin/sh
+# skip-if-compiled - return 77 in compiled test mode.
+
+set -eu
+
+if [ "${WIZARDRY_TEST_COMPILED-0}" = "1" ]; then
+  exit 77
+fi
+
+exit 0

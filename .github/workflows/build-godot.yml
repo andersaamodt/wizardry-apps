@@ -1,0 +1,135 @@
+name: Build Godot Tools
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: 4.2.2-stable
+  GODOT_TEMPLATE_VERSION: 4.2.2.stable
+
+jobs:
+  export-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux
+          - os: macos-latest
+            target: macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y curl unzip zip file
+
+      - name: Install Godot CLI
+        run: |
+          set -eu
+          tmp="$RUNNER_TEMP/godot-install"
+          rm -rf "$tmp"
+          mkdir -p "$tmp"
+
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            url="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+            curl -fsSL "$url" -o "$tmp/godot.zip"
+            unzip -q "$tmp/godot.zip" -d "$tmp"
+            bin=$(find "$tmp" -type f -name 'Godot_v*linux*.x86_64' | head -n 1)
+          else
+            url="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_macos.universal.zip"
+            curl -fsSL "$url" -o "$tmp/godot.zip"
+            unzip -q "$tmp/godot.zip" -d "$tmp"
+            bin="$tmp/Godot.app/Contents/MacOS/Godot"
+          fi
+
+          [ -n "$bin" ] && [ -x "$bin" ] || {
+            echo "Failed to locate Godot binary" >&2
+            exit 1
+          }
+
+          chmod +x "$bin"
+          echo "GODOT_BIN=$bin" >> "$GITHUB_ENV"
+
+      - name: Install export templates
+        run: |
+          set -eu
+          tmp="$RUNNER_TEMP/godot-templates"
+          rm -rf "$tmp"
+          mkdir -p "$tmp"
+
+          url="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          curl -fsSL "$url" -o "$tmp/templates.tpz"
+          unzip -q "$tmp/templates.tpz" -d "$tmp/unpacked"
+
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            dst="$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}"
+          else
+            dst="$HOME/Library/Application Support/Godot/export_templates/${GODOT_TEMPLATE_VERSION}"
+          fi
+
+          mkdir -p "$dst"
+          cp -R "$tmp/unpacked/templates"/. "$dst/"
+
+      - name: Export desktop artifact
+        run: |
+          set -eu
+          out="dist/godot"
+          mkdir -p "$out"
+          sh godot/scripts/export-godot-desktop.sh "$out" "${{ matrix.target }}"
+
+      - name: Smoke check exported artifact
+        run: |
+          set -eu
+          if [ "${{ matrix.target }}" = "linux" ]; then
+            [ -f dist/godot/wizardry-godot-linux.tar.gz ]
+            tar -tzf dist/godot/wizardry-godot-linux.tar.gz >/dev/null
+          else
+            [ -f dist/godot/wizardry-godot-macos.zip ]
+            unzip -l dist/godot/wizardry-godot-macos.zip >/dev/null
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-desktop-${{ matrix.target }}
+          path: dist/godot/*
+
+  bundle:
+    needs: export-desktop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: godot-desktop-*
+          merge-multiple: true
+          path: dist/godot
+
+      - name: Verify combined artifacts
+        run: |
+          set -eu
+          [ -f dist/godot/wizardry-godot-linux.tar.gz ]
+          [ -f dist/godot/wizardry-godot-macos.zip ]
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-desktop
+          path: dist/godot/*

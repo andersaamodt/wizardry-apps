@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wizardry.example/schemas/events-v1.json",
+  "title": "wizardry-core events v1",
+  "type": "object",
+  "required": ["name", "payload", "ts"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "enum": [
+        "cardUpdated",
+        "tagSetChanged",
+        "txnCommitted",
+        "docChanged",
+        "vaultMounted"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "ts": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

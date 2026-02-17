@@ -1,0 +1,42 @@
+name: Lint and Contract Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Validate manifests
+        run: sh tools/validate-manifest.sh
+
+      - name: Shell syntax check
+        run: |
+          set -eu
+          find spells tools adapters godot core .tests -type f \( -name '*.sh' -o -perm -111 \) 2>/dev/null | while IFS= read -r file; do
+            case "$file" in
+              *.c|*.h|*.m|*.kt|*.swift|*.html|*.css|*.js|*.json|*.md|*.cfg)
+                continue
+                ;;
+            esac
+            sh -n "$file"
+          done
+
+      - name: Ensure required workflows exist
+        run: sh .tests/release/test-workflow-presence.sh

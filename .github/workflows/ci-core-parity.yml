@@ -1,0 +1,40 @@
+name: Core Parity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run core tests
+        run: sh core/tests/test_core.sh
+
+      - name: Compare shell and core ping semantics
+        run: |
+          set -eu
+          shell_json=$(adapters/shell-reference/rpc-shell-reference core.ping)
+          printf '%s\n' "$shell_json" | grep -q '"ok":true'
+
+          body='{"jsonrpc":"2.0","id":1,"method":"core.ping"}'
+          cgi_out=$(REQUEST_METHOD=POST CONTENT_LENGTH=$(printf '%s' "$body" | wc -c | tr -d ' ') sh -c "printf '%s' '$body' | adapters/http-cgi/wizardry-core-api")
+          printf '%s' "$cgi_out" | grep -q '"ok":true'
+
+      - name: Compare selected shell and http-cgi semantics
+        run: sh .tests/adapters/test-shell-parity.sh
+
+      - name: Compare shell reference with core method matrix
+        run: sh .tests/adapters/test-core-shell-parity.sh

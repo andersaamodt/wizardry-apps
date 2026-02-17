@@ -1,0 +1,98 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: wizardry-apps-menu
+
+Displays wizardry-apps menu with web, desktop, and mobile sections.
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+if ! require menu "wizardry-apps-menu needs the 'menu' command to present options."; then
+  exit 1
+fi
+
+trap 'exit 130' INT
+trap 'exit 0' TERM
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+. "$script_dir/_state"
+
+toggle_label() {
+  component=$1
+  label=$2
+  if "$script_dir/is-apps-component-enabled" "$component" >/dev/null 2>&1; then
+    printf '[X] %s%%%s/set-apps-component-state %s --disable\n' "$label" "$script_dir" "$component"
+  else
+    printf '[ ] %s%%%s/set-apps-component-state %s --enable\n' "$label" "$script_dir" "$component"
+  fi
+}
+
+global_toggle_and_exit() {
+  if all_enabled; then
+    printf '[X] Disable all and exit%%%s/toggle-all-wizardry-apps-and-exit --disable\n' "$script_dir"
+  else
+    printf '[ ] Enable all and exit%%%s/toggle-all-wizardry-apps-and-exit --enable\n' "$script_dir"
+  fi
+}
+
+while true; do
+  web_hosted=$(toggle_label web-hosted "Hosted Web pipeline")
+  web_templates=$(toggle_label web-templates "Web templates")
+  web_adapter=$(toggle_label web-cgi-adapter "HTTP CGI adapter")
+
+  desktop_macos=$(toggle_label desktop-macos "macOS host pipeline")
+  desktop_linux=$(toggle_label desktop-linux "Linux host pipeline")
+  desktop_release=$(toggle_label desktop-release "Desktop release ops")
+
+  mobile_ios=$(toggle_label mobile-ios "iOS host pipeline")
+  mobile_android=$(toggle_label mobile-android "Android host pipeline")
+  mobile_release=$(toggle_label mobile-release "Mobile release ops")
+
+  all_toggle=$(global_toggle_and_exit)
+
+  exit_label=$(exit-label)
+  exit_item="${exit_label}%kill -TERM \$PPID"
+
+  menu "wizardry-apps arcana" \
+    "Web:" \
+    "$web_hosted" \
+    "$web_templates" \
+    "$web_adapter" \
+    "Enable all web%$script_dir/toggle-all-wizardry-apps-web --enable" \
+    "Disable all web%$script_dir/toggle-all-wizardry-apps-web --disable" \
+    "Web admin%$script_dir/wizardry-apps-web-admin" \
+    "---" \
+    "Desktop:" \
+    "$desktop_macos" \
+    "$desktop_linux" \
+    "$desktop_release" \
+    "Enable all desktop%$script_dir/toggle-all-wizardry-apps-desktop --enable" \
+    "Disable all desktop%$script_dir/toggle-all-wizardry-apps-desktop --disable" \
+    "Desktop admin%$script_dir/wizardry-apps-desktop-admin" \
+    "---" \
+    "Mobile:" \
+    "$mobile_ios" \
+    "$mobile_android" \
+    "$mobile_release" \
+    "Enable all mobile%$script_dir/toggle-all-wizardry-apps-mobile --enable" \
+    "Disable all mobile%$script_dir/toggle-all-wizardry-apps-mobile --disable" \
+    "Mobile admin%$script_dir/wizardry-apps-mobile-admin" \
+    "---" \
+    "$all_toggle" \
+    "$exit_item" || menu_status=$?
+
+  menu_status=${menu_status:-0}
+  if [ "$menu_status" -eq 130 ]; then
+    printf 'ESC\n' >&2
+    exit 0
+  fi
+done

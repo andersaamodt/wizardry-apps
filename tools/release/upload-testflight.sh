@@ -1,0 +1,61 @@
+#!/bin/sh
+
+# Upload IPA artifact to TestFlight.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: upload-testflight.sh IPA_PATH
+
+Uploads IPA using App Store Connect API key env vars.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+
+ipa=${1-}
+if [ -z "$ipa" ] || [ ! -f "$ipa" ]; then
+  printf '%s\n' "upload-testflight: IPA_PATH required" >&2
+  exit 2
+fi
+
+if [ -z "${APP_STORE_CONNECT_KEY_ID-}" ] || [ -z "${APP_STORE_CONNECT_ISSUER_ID-}" ] || [ -z "${APP_STORE_CONNECT_PRIVATE_KEY_BASE64-}" ]; then
+  printf '%s\n' "upload-testflight: missing App Store Connect credentials" >&2
+  exit 1
+fi
+
+if ! command -v xcrun >/dev/null 2>&1; then
+  printf '%s\n' "upload-testflight: xcrun is required" >&2
+  exit 1
+fi
+
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/asc-upload.XXXXXX")
+key_dir="$tmp_dir/private_keys"
+mkdir -p "$key_dir"
+key_file="$key_dir/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+
+cleanup() {
+  rm -rf "$tmp_dir"
+}
+trap cleanup EXIT HUP INT TERM
+
+printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | openssl base64 -d -A > "$key_file"
+
+if xcrun altool --help >/dev/null 2>&1; then
+  API_PRIVATE_KEYS_DIR="$key_dir" \
+  xcrun altool --upload-app \
+    --file "$ipa" \
+    --type ios \
+    --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+    --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+else
+  xcrun iTMSTransporter \
+    -m upload \
+    -assetFile "$ipa" \
+    -apiKey "$APP_STORE_CONNECT_KEY_ID" \
+    -apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+fi
+
+printf '%s\n' "upload-testflight: uploaded $ipa"

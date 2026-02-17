@@ -1,0 +1,64 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  core-and-adapters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential jq
+
+      - name: Core and adapter tests
+        run: |
+          set -eu
+          sh .tests/core/test-core-rpc.sh
+          sh .tests/adapters/test-http-cgi.sh
+          sh .tests/adapters/test-shell-parity.sh
+          sh .tests/adapters/test-core-shell-parity.sh
+          sh .tests/adapters/test-bridge-contract.sh
+          sh .tests/adapters/test-bridge-behavior.sh
+          sh .tests/release/test-manifest-validation.sh
+          sh .tests/release/test-release-tools.sh
+          sh .tests/release/test-godot-export-script.sh
+          sh .tests/release/test-ios-promotion-script.sh
+          for t in .tests/.arcana/wizardry-apps/test-*.sh; do
+            sh "$t"
+          done
+
+  migrated-web-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq git
+
+      - name: Fetch canonical wizardry for runtime dependencies
+        run: git clone --depth=1 https://github.com/andersaamodt/wizardry.git /tmp/wizardry
+
+      - name: Run migrated web tests
+        env:
+          WIZARDRY_DIR: /tmp/wizardry
+        run: |
+          set -eu
+          for t in .tests/web/test-*.sh; do
+            sh "$t"
+          done
+          for t in .tests/.arcana/web-wizardry/test-*.sh; do
+            sh "$t"
+          done

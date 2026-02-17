@@ -1,0 +1,35 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: wizardry-apps-mobile-admin
+
+Administrative menu for wizardry-apps mobile pipelines.
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+if ! require menu "wizardry-apps-mobile-admin needs the 'menu' command."; then
+  exit 1
+fi
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
+
+while true; do
+  exit_label=$(exit-label)
+  menu "wizardry-apps mobile admin" \
+    "Mobile status%$script_dir/wizardry-apps-status --section mobile" \
+    "iOS promotion dry-run test%sh $repo_root/.tests/release/test-ios-promotion-script.sh" \
+    "Manifest validation%sh $repo_root/tools/validate-manifest.sh" \
+    "${exit_label}%kill -TERM \$PPID" || menu_status=$?
+  menu_status=${menu_status:-0}
+  [ "$menu_status" -eq 130 ] && exit 0
+done

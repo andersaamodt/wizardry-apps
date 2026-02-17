@@ -1,0 +1,232 @@
+#!/bin/sh
+
+# Build a wizardry web site (Markdown to HTML with Pandoc).
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: build SITENAME [--full] [--watch]
+
+Builds a website by converting Markdown to HTML with Pandoc.
+
+Options:
+  --full    Full rebuild (ignore mtime)
+  --watch   Watch mode (rebuild on changes)
+
+Default is incremental rebuild using mtime.
+
+Example: web-build mysite
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+. env-clear
+
+WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
+
+site_name=${1-}
+if [ -z "$site_name" ]; then
+  die 2 "build: SITENAME required"
+fi
+
+# Parse options
+full_rebuild=0
+watch_mode=0
+shift
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --full) full_rebuild=1; shift ;;
+    --watch) watch_mode=1; shift ;;
+    *) die 2 "build: unknown option '$1'" ;;
+  esac
+done
+
+WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+SITES_DIR="$WEB_ROOT"
+SITE_DIR="$SITES_DIR/$site_name"
+SITE_DATA_DIR="$SITES_DIR/.sitedata/$site_name"
+
+if [ ! -d "$SITE_DIR" ]; then
+  die "build: site '$site_name' not found"
+fi
+
+# Note: We don't re-exec as site user here - the actual user should be able to build
+# The build/ directory is owned by site user but has proper permissions (755/644)
+# set by fix-site-security to allow the actual user to write to it.
+
+# Check for pandoc
+if ! has pandoc; then
+  die "build: pandoc is required but not installed"
+fi
+
+build_site() {
+  step "Building site: $site_name"
+  shared_theme_dir="$WIZARDRY_DIR/.web/.themes"
+  
+  # Create build directories
+  mkdir -p "$SITE_DIR/build/pages"
+  mkdir -p "$SITE_DIR/build/static"
+  mkdir -p "$SITE_DIR/build/static/js"
+  
+  # Ensure web libraries are installed.
+  # Default cache lives in per-site data (outside project source tree).
+  default_js_lib_dir="$SITE_DATA_DIR/.web-libs/js"
+  js_lib_dir="${WIZARDRY_WEB_JS_DIR:-$default_js_lib_dir}"
+  if ! mkdir -p "$js_lib_dir" 2>/dev/null; then
+    warn "build: cannot write web lib cache at $js_lib_dir"
+    if [ "$js_lib_dir" != "$default_js_lib_dir" ] && \
+      mkdir -p "$default_js_lib_dir" 2>/dev/null; then
+      info "build: using fallback cache: $default_js_lib_dir"
+      js_lib_dir="$default_js_lib_dir"
+    else
+      die "build: failed to create web lib cache at $default_js_lib_dir"
+    fi
+  fi
+  if [ ! -f "$js_lib_dir/htmx.min.js" ] || [ ! -f "$js_lib_dir/idiomorph-ext.min.js" ]; then
+    info "Web libraries not found, installing..."
+    WIZARDRY_WEB_JS_DIR="$js_lib_dir"
+    export WIZARDRY_WEB_JS_DIR
+    install-htmx || die "build: failed to install web libraries"
+  fi
+  
+  # Copy web libraries to site's static directory
+  info "Copying web libraries to build/static/js/..."
+  cp "$js_lib_dir/htmx.min.js" "$SITE_DIR/build/static/js/" || \
+    die "build: failed to copy htmx.min.js"
+  cp "$js_lib_dir/idiomorph-ext.min.js" "$SITE_DIR/build/static/js/" || \
+    die "build: failed to copy idiomorph-ext.min.js"
+  
+  # Copy static files
+  if [ -d "$shared_theme_dir" ]; then
+    mkdir -p "$SITE_DIR/site/static/themes"
+    cp -f "$shared_theme_dir"/*.css "$SITE_DIR/site/static/themes/" 2>/dev/null || true
+  fi
+
+  # Copy static files
+  if [ -d "$SITE_DIR/site/static" ]; then
+    info "Copying static files to build/static/..."
+    cp -r "$SITE_DIR/site/static"/* "$SITE_DIR/build/static/" 2>/dev/null || true
+  fi
+  
+  # Build each Markdown page
+  info "Converting Markdown to HTML..."
+  built_count=0
+  if [ -d "$SITE_DIR/site/pages" ]; then
+    # Check if there are any .md files
+    md_file_count=$(find "$SITE_DIR/site/pages" -name "*.md" -type f 2>/dev/null | wc -l)
+    if [ "$md_file_count" -eq 0 ]; then
+      warn "No Markdown files found in $SITE_DIR/site/pages/"
+      warn "Create .md files there to build HTML pages."
+    fi
+    
+    for md_file in "$SITE_DIR/site/pages"/*.md; do
+      [ -f "$md_file" ] || continue
+      
+      base_name=$(basename "$md_file" .md)
+      html_file="$SITE_DIR/build/pages/${base_name}.html"
+      
+      # Incremental build: skip if HTML is newer than MD (unless --full)
+      if [ "$full_rebuild" -eq 0 ] && [ -f "$html_file" ] && newer "$html_file" "$md_file"; then
+        debug "Skipping $base_name (up to date)"
+        continue
+      fi
+      
+      info "  Building: $base_name.md → $base_name.html"
+      
+      base_name=$(basename "$md_file" .md)
+      html_file="$SITE_DIR/build/pages/${base_name}.html"
+      
+      # Incremental build: skip if HTML is newer than MD (unless --full)
+      if [ "$full_rebuild" -eq 0 ] && [ -f "$html_file" ] && newer "$html_file" "$md_file"; then
+        debug "Skipping $base_name (up to date)"
+        continue
+      fi
+      
+      info "  Building: $base_name.md → $base_name.html"
+      
+      # Create temporary header file with htmx and idiomorph extension (local copies)
+      htmx_header=$(temp-file htmx-header)
+      cat > "$htmx_header" <<'HTMX_HEADER'
+<script src="/static/js/htmx.min.js"></script>
+<script src="/static/js/idiomorph-ext.min.js"></script>
+HTMX_HEADER
+      
+      # Check for includes directory
+      includes_dir="$SITE_DIR/site/includes"
+      nav_file="$includes_dir/nav.md"
+      head_file="$includes_dir/head.html"
+      head_arg=""
+      if [ -f "$head_file" ]; then
+        head_arg="--include-in-header=$head_file"
+      fi
+      
+      # Use Pandoc to convert Markdown to HTML with YAML front matter
+      # Include htmx for interactive CGI features
+      # raw_html extension allows HTML blocks to pass through
+      pandoc \
+        --from markdown+yaml_metadata_block+raw_html \
+        --to html5 \
+        --standalone \
+        --css=/static/style.css \
+        --include-in-header="$htmx_header" \
+        $head_arg \
+        --output="$html_file" \
+        "$md_file"
+      
+      # If nav file exists, insert it right after <body> tag (above title/header)
+      if [ -f "$nav_file" ]; then
+        # Use awk to insert nav immediately after <body> tag
+        temp_html=$(temp-file html-with-nav)
+        awk -v nav_file="$nav_file" '
+          /<body>/ {
+            print
+            while ((getline line < nav_file) > 0) {
+              print line
+            }
+            close(nav_file)
+            next
+          }
+          { print }
+        ' "$html_file" > "$temp_html"
+        mv "$temp_html" "$html_file"
+      fi
+      
+      # Clean up temporary header file
+      rm -f "$htmx_header"
+      
+      # Ensure generated file is readable by nginx
+      chmod 644 "$html_file"
+      
+      built_count=$((built_count + 1))
+    done
+  else
+    warn "Pages directory not found: $SITE_DIR/site/pages/"
+    warn "Expected site structure:"
+    warn "  $SITE_DIR/site/pages/    - Markdown files (.md)"
+    warn "  $SITE_DIR/site/static/   - CSS, images, etc."
+    warn "  $SITE_DIR/build/         - Generated HTML (output)"
+  fi
+  
+  # Ensure all directories have proper permissions
+  info "Setting file permissions..."
+  find "$SITE_DIR/build" -type d -exec chmod 755 {} \; 2>/dev/null || true
+  find "$SITE_DIR/build" -type f -exec chmod 644 {} \; 2>/dev/null || true
+  
+  success "Built $built_count pages for $site_name"
+  info "Build output: $SITE_DIR/build/"
+}
+
+if [ "$watch_mode" -eq 1 ]; then
+  # Watch mode - rebuild on changes
+  # This is a simple implementation; a production version might use inotify
+  step "Watching $site_name for changes (Ctrl-C to stop)"
+  while true; do
+    build_site
+    sleep 2
+  done
+else
+  # Single build
+  build_site
+fi

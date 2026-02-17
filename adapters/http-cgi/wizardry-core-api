@@ -1,0 +1,383 @@
+#!/bin/sh
+
+# CGI adapter exposing wizardry-core JSON-RPC surface over HTTP + SSE.
+
+set -eu
+
+STATE_DIR=${WIZARDRY_HTTP_CGI_STATE_DIR:-${TMPDIR:-/tmp}/wizardry-http-cgi}
+STATE_FILE="$STATE_DIR/state.json"
+
+mkdir -p "$STATE_DIR"
+
+json_response() {
+  body=$1
+  printf 'Status: 200 OK\r\n'
+  printf 'Content-Type: application/json\r\n'
+  printf 'Cache-Control: no-store\r\n'
+  printf 'Access-Control-Allow-Origin: *\r\n'
+  printf '\r\n'
+  printf '%s\n' "$body"
+}
+
+options_response() {
+  printf 'Status: 204 No Content\r\n'
+  printf 'Access-Control-Allow-Origin: *\r\n'
+  printf 'Access-Control-Allow-Methods: GET,POST,OPTIONS\r\n'
+  printf 'Access-Control-Allow-Headers: Content-Type\r\n'
+  printf '\r\n'
+}
+
+sse_response() {
+  now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  printf 'Status: 200 OK\r\n'
+  printf 'Content-Type: text/event-stream\r\n'
+  printf 'Cache-Control: no-cache\r\n'
+  printf 'Connection: keep-alive\r\n'
+  printf 'Access-Control-Allow-Origin: *\r\n'
+  printf '\r\n'
+  printf ': wizardry-core events v1\n\n'
+  printf 'event: vaultMounted\n'
+  printf 'data: {"path":"%s","ts":"%s"}\n\n' "$(jq -r '.mounted_vault // ""' "$STATE_FILE" 2>/dev/null || printf '')" "$now"
+}
+
+ensure_state() {
+  if [ ! -f "$STATE_FILE" ]; then
+    printf '%s\n' '{"mounted_vault":"","tx_open":false,"tx_id":0}' > "$STATE_FILE"
+  fi
+}
+
+read_body() {
+  content_length=${CONTENT_LENGTH-0}
+  if [ "$content_length" -gt 0 ] 2>/dev/null; then
+    dd bs=1 count="$content_length" 2>/dev/null || true
+  else
+    cat
+  fi
+}
+
+rpc_ok() {
+  id_json=$1
+  result_json=$2
+  printf '{"jsonrpc":"2.0","id":%s,"result":%s}' "$id_json" "$result_json"
+}
+
+rpc_err() {
+  id_json=$1
+  code=$2
+  msg=$3
+  escaped=$(printf '%s' "$msg" | jq -Rr @json)
+  printf '{"jsonrpc":"2.0","id":%s,"error":{"code":%s,"message":%s}}' "$id_json" "$code" "$escaped"
+}
+
+safe_rel_path() {
+  rel=$1
+  case "$rel" in
+    "" ) return 0 ;;
+    /*) return 1 ;;
+    *".."* ) return 1 ;;
+  esac
+  return 0
+}
+
+join_path() {
+  base=$1
+  rel=$2
+  if [ -z "$rel" ]; then
+    printf '%s' "$base"
+  else
+    printf '%s/%s' "$base" "$rel"
+  fi
+}
+
+meta_sidecar_path() {
+  doc=$1
+  printf '%s.xattr.json' "$doc"
+}
+
+meta_get_value() {
+  sidecar=$1
+  key=$2
+  if [ ! -f "$sidecar" ]; then
+    printf ''
+    return 1
+  fi
+  jq -r --arg k "$key" '.xattrs[$k] // empty' "$sidecar"
+}
+
+meta_write() {
+  sidecar=$1
+  key=$2
+  value=$3
+  tmp="$sidecar.tmp.$$"
+
+  if [ -f "$sidecar" ]; then
+    jq --arg k "$key" --arg v "$value" '
+      .version = ( .version // "1" )
+      | .docPath = ( .docPath // "" )
+      | .xattrs = ( .xattrs // {} )
+      | .xattrs[$k] = $v
+    ' "$sidecar" > "$tmp"
+  else
+    jq -n --arg k "$key" --arg v "$value" '{version:"1",docPath:"",xattrs:{($k):$v}}' > "$tmp"
+  fi
+
+  mv "$tmp" "$sidecar"
+}
+
+meta_unset() {
+  sidecar=$1
+  key=$2
+  [ -f "$sidecar" ] || return 0
+  tmp="$sidecar.tmp.$$"
+  jq --arg k "$key" '(.xattrs // {}) as $x | .xattrs = ($x | del(.[$k]))' "$sidecar" > "$tmp"
+  mv "$tmp" "$sidecar"
+}
+
+if [ "${REQUEST_METHOD-GET}" = "OPTIONS" ]; then
+  options_response
+  exit 0
+fi
+
+if [ "${REQUEST_METHOD-GET}" = "GET" ] && [ "${QUERY_STRING-}" = "stream=events" ]; then
+  ensure_state
+  sse_response
+  exit 0
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  json_response "$(rpc_err null -32603 'jq is required by http-cgi adapter')"
+  exit 0
+fi
+
+ensure_state
+body=$(read_body)
+
+if [ -z "$body" ]; then
+  json_response "$(rpc_err null -32600 'request body required')"
+  exit 0
+fi
+
+if ! printf '%s' "$body" | jq -e . >/dev/null 2>&1; then
+  json_response "$(rpc_err null -32700 'invalid json')"
+  exit 0
+fi
+
+jsonrpc=$(printf '%s' "$body" | jq -r '.jsonrpc // empty')
+id_json=$(printf '%s' "$body" | jq -c '.id // null')
+method=$(printf '%s' "$body" | jq -r '.method // empty')
+
+if [ "$jsonrpc" != "2.0" ]; then
+  json_response "$(rpc_err "$id_json" -32600 'jsonrpc must be 2.0')"
+  exit 0
+fi
+
+if [ -z "$method" ]; then
+  json_response "$(rpc_err "$id_json" -32600 'method is required')"
+  exit 0
+fi
+
+mounted_vault=$(jq -r '.mounted_vault // ""' "$STATE_FILE")
+tx_open=$(jq -r '.tx_open // false' "$STATE_FILE")
+tx_id=$(jq -r '.tx_id // 0' "$STATE_FILE")
+
+case "$method" in
+  core.ping)
+    json_response "$(rpc_ok "$id_json" '{"ok":true,"engine":"http-cgi","version":"0.1.0"}')"
+    ;;
+
+  vault.mount)
+    path=$(printf '%s' "$body" | jq -r '.params.path // empty')
+    if [ -z "$path" ]; then
+      json_response "$(rpc_err "$id_json" -32602 'vault.mount requires params.path')"
+      exit 0
+    fi
+
+    jq --arg p "$path" '.mounted_vault=$p' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    json_response "$(rpc_ok "$id_json" '{"mounted":true}')"
+    ;;
+
+  vault.info)
+    if [ -n "$mounted_vault" ]; then
+      result=$(jq -cn --arg p "$mounted_vault" '{mounted:true,path:$p}')
+    else
+      result='{"mounted":false,"path":""}'
+    fi
+    json_response "$(rpc_ok "$id_json" "$result")"
+    ;;
+
+  doc.list)
+    rel=$(printf '%s' "$body" | jq -r '.params.path // ""')
+    if [ -z "$mounted_vault" ] || ! safe_rel_path "$rel"; then
+      json_response "$(rpc_err "$id_json" -32602 'doc.list requires mounted vault and safe params.path')"
+      exit 0
+    fi
+
+    abs=$(join_path "$mounted_vault" "$rel")
+    if [ ! -d "$abs" ]; then
+      json_response "$(rpc_err "$id_json" -32602 'doc.list path is not readable')"
+      exit 0
+    fi
+
+    docs=$(find "$abs" -maxdepth 1 -type f \( -name '*.md' -o -name '*.markdown' \) -print 2>/dev/null | \
+      while IFS= read -r f; do
+        name=$(basename "$f")
+        if [ -n "$rel" ]; then
+          printf '%s/%s\n' "$rel" "$name"
+        else
+          printf '%s\n' "$name"
+        fi
+      done | jq -R . | jq -s '{docs:.}')
+
+    json_response "$(rpc_ok "$id_json" "$docs")"
+    ;;
+
+  doc.read)
+    rel=$(printf '%s' "$body" | jq -r '.params.path // empty')
+    if [ -z "$mounted_vault" ] || [ -z "$rel" ] || ! safe_rel_path "$rel"; then
+      json_response "$(rpc_err "$id_json" -32602 'doc.read requires mounted vault and params.path')"
+      exit 0
+    fi
+
+    abs=$(join_path "$mounted_vault" "$rel")
+    if [ ! -f "$abs" ]; then
+      json_response "$(rpc_err "$id_json" -32602 'doc.read path is not readable')"
+      exit 0
+    fi
+
+    content=$(cat "$abs")
+    result=$(jq -cn --arg p "$rel" --arg c "$content" '{path:$p,content:$c}')
+    json_response "$(rpc_ok "$id_json" "$result")"
+    ;;
+
+  doc.write)
+    rel=$(printf '%s' "$body" | jq -r '.params.path // empty')
+    content=$(printf '%s' "$body" | jq -r '.params.content // empty')
+    if [ -z "$mounted_vault" ] || [ -z "$rel" ] || ! safe_rel_path "$rel"; then
+      json_response "$(rpc_err "$id_json" -32602 'doc.write requires mounted vault and params.path')"
+      exit 0
+    fi
+
+    abs=$(join_path "$mounted_vault" "$rel")
+    mkdir -p "$(dirname "$abs")"
+    printf '%s' "$content" > "$abs"
+    json_response "$(rpc_ok "$id_json" '{"written":true}')"
+    ;;
+
+  doc.delete)
+    rel=$(printf '%s' "$body" | jq -r '.params.path // empty')
+    if [ -z "$mounted_vault" ] || [ -z "$rel" ] || ! safe_rel_path "$rel"; then
+      json_response "$(rpc_err "$id_json" -32602 'doc.delete requires mounted vault and params.path')"
+      exit 0
+    fi
+
+    abs=$(join_path "$mounted_vault" "$rel")
+    if [ ! -f "$abs" ]; then
+      json_response "$(rpc_err "$id_json" -32602 'doc.delete failed (path missing?)')"
+      exit 0
+    fi
+
+    rm -f "$abs"
+    rm -f "$(meta_sidecar_path "$abs")"
+    json_response "$(rpc_ok "$id_json" '{"deleted":true}')"
+    ;;
+
+  meta.get)
+    rel=$(printf '%s' "$body" | jq -r '.params.path // empty')
+    key=$(printf '%s' "$body" | jq -r '.params.key // empty')
+    if [ -z "$mounted_vault" ] || [ -z "$rel" ] || ! safe_rel_path "$rel"; then
+      json_response "$(rpc_err "$id_json" -32602 'meta.get requires mounted vault and params.path')"
+      exit 0
+    fi
+
+    abs=$(join_path "$mounted_vault" "$rel")
+    sidecar=$(meta_sidecar_path "$abs")
+
+    if [ -n "$key" ]; then
+      val=$(meta_get_value "$sidecar" "$key" || true)
+      if [ -n "$val" ]; then
+        result=$(jq -cn --arg k "$key" --arg v "$val" '{found:true,key:$k,value:$v}')
+      else
+        result=$(jq -cn --arg k "$key" '{found:false,key:$k,value:null}')
+      fi
+      json_response "$(rpc_ok "$id_json" "$result")"
+    else
+      if [ -f "$sidecar" ]; then
+        result=$(jq -c '{xattrs:(.xattrs // {})}' "$sidecar")
+      else
+        result='{"xattrs":{}}'
+      fi
+      json_response "$(rpc_ok "$id_json" "$result")"
+    fi
+    ;;
+
+  meta.set)
+    rel=$(printf '%s' "$body" | jq -r '.params.path // empty')
+    key=$(printf '%s' "$body" | jq -r '.params.key // empty')
+    value=$(printf '%s' "$body" | jq -r '.params.value // empty')
+
+    if [ -z "$mounted_vault" ] || [ -z "$rel" ] || [ -z "$key" ] || ! safe_rel_path "$rel"; then
+      json_response "$(rpc_err "$id_json" -32602 'meta.set requires mounted vault and params.path')"
+      exit 0
+    fi
+
+    abs=$(join_path "$mounted_vault" "$rel")
+    mkdir -p "$(dirname "$abs")"
+    sidecar=$(meta_sidecar_path "$abs")
+    meta_write "$sidecar" "$key" "$value"
+    json_response "$(rpc_ok "$id_json" '{"set":true}')"
+    ;;
+
+  meta.unset)
+    rel=$(printf '%s' "$body" | jq -r '.params.path // empty')
+    key=$(printf '%s' "$body" | jq -r '.params.key // empty')
+
+    if [ -z "$mounted_vault" ] || [ -z "$rel" ] || [ -z "$key" ] || ! safe_rel_path "$rel"; then
+      json_response "$(rpc_err "$id_json" -32602 'meta.unset requires mounted vault and params.path')"
+      exit 0
+    fi
+
+    abs=$(join_path "$mounted_vault" "$rel")
+    sidecar=$(meta_sidecar_path "$abs")
+    meta_unset "$sidecar" "$key"
+    json_response "$(rpc_ok "$id_json" '{"unset":true}')"
+    ;;
+
+  txn.begin)
+    if [ "$tx_open" = "true" ]; then
+      json_response "$(rpc_err "$id_json" -32600 'transaction already open')"
+      exit 0
+    fi
+
+    tx_id=$((tx_id + 1))
+    jq --argjson id "$tx_id" '.tx_open=true | .tx_id=$id' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    json_response "$(rpc_ok "$id_json" '{"opened":true}')"
+    ;;
+
+  txn.commit)
+    if [ "$tx_open" != "true" ]; then
+      json_response "$(rpc_err "$id_json" -32600 'no open transaction')"
+      exit 0
+    fi
+
+    jq '.tx_open=false' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    json_response "$(rpc_ok "$id_json" '{"committed":true}')"
+    ;;
+
+  txn.rollback)
+    if [ "$tx_open" != "true" ]; then
+      json_response "$(rpc_err "$id_json" -32600 'no open transaction')"
+      exit 0
+    fi
+
+    jq '.tx_open=false' "$STATE_FILE" > "$STATE_FILE.tmp"
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    json_response "$(rpc_ok "$id_json" '{"rolledBack":true}')"
+    ;;
+
+  *)
+    json_response "$(rpc_err "$id_json" -32601 'method not found')"
+    ;;
+esac

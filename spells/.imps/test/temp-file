@@ -1,0 +1,7 @@
+#!/bin/sh
+# temp-file PREFIX - create temporary file path.
+
+set -eu
+
+prefix=${1:-wizardry-apps-test}
+mktemp "${TMPDIR:-/tmp}/${prefix}.XXXXXX"

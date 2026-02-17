@@ -1,0 +1,194 @@
+name: Build Mobile
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Validate manifests and host source
+        run: |
+          set -eu
+          sh tools/validate-manifest.sh
+          [ -f .apps/.host/android/app/src/main/java/com/wizardry/apps/host/MainActivity.kt ]
+          [ -f .apps/.host/ios/Host/WizardryHostApp.swift ]
+          [ -f .apps/.host/shared/wizardry-bridge.js ]
+
+  android-smoke:
+    needs: validate
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Build debug APKs for production apps
+        run: |
+          set -eu
+          mkdir -p dist/android/smoke
+          version_name="0.0.0-smoke"
+          version_code="${GITHUB_RUN_NUMBER}"
+
+          for app in $(sh tools/release/list-production-apps.sh); do
+            app_name=$(sh tools/release/get-app-name.sh "$app")
+            app_id=$(sh tools/release/get-app-bundle-id.sh android "$app")
+
+            sh tools/release/stage-web-assets.sh "$app" ".apps/.host/android/app/src/main/assets"
+
+            gradle -p .apps/.host/android :app:assembleDebug \
+              -PwizardryApplicationId="$app_id" \
+              -PwizardryAppName="$app_name" \
+              -PwizardryVersionName="$version_name" \
+              -PwizardryVersionCode="$version_code"
+
+            apk=$(find .apps/.host/android/app/build/outputs/apk/debug -type f -name '*.apk' | head -n 1)
+            [ -n "$apk" ]
+            cp "$apk" "dist/android/smoke/wizardry-$app-debug.apk"
+            rm -rf .apps/.host/android/app/build
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-android-smoke
+          path: dist/android/smoke/*.apk
+
+  ios-smoke:
+    needs: validate
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          set -eu
+          brew install jq xcodegen
+      - name: Build iOS simulator app bundles
+        run: |
+          set -eu
+          mkdir -p dist/ios/smoke
+          for app in $(sh tools/release/list-production-apps.sh); do
+            sh tools/release/build-ios-app.sh "$app" dist/ios/smoke smoke
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-ios-smoke
+          path: dist/ios/smoke/*.zip
+
+  android-release-signed:
+    needs: validate
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Enforce signing secrets
+        run: |
+          set -eu
+          for v in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            eval "val=\${$v-}"
+            if [ -z "$val" ]; then
+              echo "Missing required signing secret: $v" >&2
+              exit 1
+            fi
+          done
+      - name: Build signed release AABs
+        run: |
+          set -eu
+          mkdir -p dist/android
+          keystore="$RUNNER_TEMP/wizardry-upload.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | openssl base64 -d -A > "$keystore"
+
+          version_name="${GITHUB_REF_NAME#v}"
+          version_code="${GITHUB_RUN_NUMBER}"
+
+          for app in $(sh tools/release/list-production-apps.sh); do
+            app_name=$(sh tools/release/get-app-name.sh "$app")
+            app_id=$(sh tools/release/get-app-bundle-id.sh android "$app")
+
+            sh tools/release/stage-web-assets.sh "$app" ".apps/.host/android/app/src/main/assets"
+
+            gradle -p .apps/.host/android :app:bundleRelease \
+              -PwizardryApplicationId="$app_id" \
+              -PwizardryAppName="$app_name" \
+              -PwizardryVersionName="$version_name" \
+              -PwizardryVersionCode="$version_code" \
+              -PandroidKeystorePath="$keystore" \
+              -PandroidKeystorePassword="$ANDROID_KEYSTORE_PASSWORD" \
+              -PandroidKeyAlias="$ANDROID_KEY_ALIAS" \
+              -PandroidKeyPassword="$ANDROID_KEY_PASSWORD"
+
+            aab=$(find .apps/.host/android/app/build/outputs/bundle/release -type f -name '*.aab' | head -n 1)
+            [ -n "$aab" ]
+            cp "$aab" "dist/android/wizardry-$app-release.aab"
+            rm -rf .apps/.host/android/app/build
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-android
+          path: dist/android/*.aab
+
+  ios-release-signed:
+    needs: validate
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: macos-latest
+    env:
+      APPLE_P12_BASE64: ${{ secrets.APPLE_P12_BASE64 }}
+      APPLE_P12_PASSWORD: ${{ secrets.APPLE_P12_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+      RELEASE_VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          set -eu
+          brew install jq xcodegen
+      - name: Build signed IPA artifacts
+        run: |
+          set -eu
+          mkdir -p dist/ios
+          for app in $(sh tools/release/list-production-apps.sh); do
+            sh tools/release/build-ios-app.sh "$app" dist/ios release
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-ios
+          path: dist/ios/*.ipa

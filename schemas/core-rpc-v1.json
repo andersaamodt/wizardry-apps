@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wizardry.example/schemas/core-rpc-v1.json",
+  "title": "wizardry-core JSON-RPC v1",
+  "type": "object",
+  "required": ["jsonrpc", "method", "id"],
+  "properties": {
+    "jsonrpc": {
+      "type": "string",
+      "const": "2.0"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "core.ping",
+        "vault.mount",
+        "vault.info",
+        "doc.list",
+        "doc.read",
+        "doc.write",
+        "doc.delete",
+        "meta.get",
+        "meta.set",
+        "meta.unset",
+        "txn.begin",
+        "txn.commit",
+        "txn.rollback"
+      ]
+    },
+    "params": {
+      "type": ["object", "array", "null"]
+    },
+    "id": {
+      "type": ["string", "number", "null"]
+    }
+  },
+  "additionalProperties": false
+}

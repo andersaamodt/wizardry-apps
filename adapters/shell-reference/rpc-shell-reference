@@ -1,0 +1,241 @@
+#!/bin/sh
+
+# Reference shell adapter for core RPC parity checks.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: rpc-shell-reference METHOD [ARG1] [ARG2] [ARG3]
+
+Supported methods:
+  core.ping
+  vault.mount PATH
+  vault.info
+  doc.list PATH
+  doc.read PATH
+  doc.write PATH CONTENT
+  doc.delete PATH
+  meta.get PATH [KEY]
+  meta.set PATH KEY VALUE
+  meta.unset PATH KEY
+  txn.begin
+  txn.commit
+  txn.rollback
+
+Environment:
+  WIZARDRY_SHELL_REF_VAULT (required for doc/meta methods)
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+
+method=${1-}
+a1=${2-}
+a2=${3-}
+a3=${4-}
+
+STATE_DIR=${WIZARDRY_SHELL_REF_STATE_DIR:-${TMPDIR:-/tmp}/wizardry-shell-reference}
+STATE_FILE="$STATE_DIR/state"
+mkdir -p "$STATE_DIR"
+
+if [ ! -f "$STATE_FILE" ]; then
+  printf '%s\n' 'mounted= tx_open=0 tx_id=0' > "$STATE_FILE"
+fi
+
+# shellcheck disable=SC1090
+. "$STATE_FILE"
+
+save_state() {
+  printf 'mounted=%s tx_open=%s tx_id=%s\n' "$mounted" "$tx_open" "$tx_id" > "$STATE_FILE"
+}
+
+safe_rel_path() {
+  rel=$1
+  case "$rel" in
+    "" ) return 0 ;;
+    /*) return 1 ;;
+    *".."*) return 1 ;;
+  esac
+  return 0
+}
+
+vault_root() {
+  if [ -n "$mounted" ]; then
+    printf '%s' "$mounted"
+  else
+    printf '%s' "${WIZARDRY_SHELL_REF_VAULT-}"
+  fi
+}
+
+join_path() {
+  base=$1
+  rel=$2
+  if [ -z "$rel" ]; then
+    printf '%s' "$base"
+  else
+    printf '%s/%s' "$base" "$rel"
+  fi
+}
+
+sidecar_path() {
+  printf '%s.xattr.json' "$1"
+}
+
+case "$method" in
+  core.ping)
+    printf '%s\n' '{"ok":true,"engine":"shell-reference","version":"0.1.0"}'
+    ;;
+
+  vault.mount)
+    [ -n "$a1" ] || { printf '%s\n' '{"error":"path required"}'; exit 2; }
+    mounted=$a1
+    save_state
+    printf '{"mounted":true,"path":"%s"}\n' "$mounted"
+    ;;
+
+  vault.info)
+    root=$(vault_root)
+    if [ -n "$root" ]; then
+      printf '{"mounted":true,"path":"%s"}\n' "$root"
+    else
+      printf '%s\n' '{"mounted":false,"path":""}'
+    fi
+    ;;
+
+  doc.list)
+    root=$(vault_root)
+    [ -n "$root" ] || { printf '%s\n' '{"error":"vault not mounted"}'; exit 1; }
+    safe_rel_path "$a1" || { printf '%s\n' '{"error":"unsafe path"}'; exit 1; }
+    abs=$(join_path "$root" "$a1")
+    [ -d "$abs" ] || { printf '%s\n' '{"error":"path not readable"}'; exit 1; }
+    find "$abs" -maxdepth 1 -type f \( -name '*.md' -o -name '*.markdown' \) -print | while IFS= read -r f; do
+      bn=$(basename "$f")
+      if [ -n "$a1" ]; then
+        printf '%s/%s\n' "$a1" "$bn"
+      else
+        printf '%s\n' "$bn"
+      fi
+    done | jq -R . | jq -s '{docs:.}'
+    ;;
+
+  doc.read)
+    root=$(vault_root)
+    [ -n "$root" ] || { printf '%s\n' '{"error":"vault not mounted"}'; exit 1; }
+    [ -n "$a1" ] || { printf '%s\n' '{"error":"path required"}'; exit 1; }
+    safe_rel_path "$a1" || { printf '%s\n' '{"error":"unsafe path"}'; exit 1; }
+    abs=$(join_path "$root" "$a1")
+    [ -f "$abs" ] || { printf '%s\n' '{"error":"path not readable"}'; exit 1; }
+    c=$(cat "$abs")
+    jq -cn --arg p "$a1" --arg c "$c" '{path:$p,content:$c}'
+    ;;
+
+  doc.write)
+    root=$(vault_root)
+    [ -n "$root" ] || { printf '%s\n' '{"error":"vault not mounted"}'; exit 1; }
+    [ -n "$a1" ] || { printf '%s\n' '{"error":"path required"}'; exit 1; }
+    safe_rel_path "$a1" || { printf '%s\n' '{"error":"unsafe path"}'; exit 1; }
+    abs=$(join_path "$root" "$a1")
+    mkdir -p "$(dirname "$abs")"
+    printf '%s' "$a2" > "$abs"
+    printf '%s\n' '{"written":true}'
+    ;;
+
+  doc.delete)
+    root=$(vault_root)
+    [ -n "$root" ] || { printf '%s\n' '{"error":"vault not mounted"}'; exit 1; }
+    [ -n "$a1" ] || { printf '%s\n' '{"error":"path required"}'; exit 1; }
+    safe_rel_path "$a1" || { printf '%s\n' '{"error":"unsafe path"}'; exit 1; }
+    abs=$(join_path "$root" "$a1")
+    [ -f "$abs" ] || { printf '%s\n' '{"error":"path missing"}'; exit 1; }
+    rm -f "$abs" "$(sidecar_path "$abs")"
+    printf '%s\n' '{"deleted":true}'
+    ;;
+
+  meta.get)
+    root=$(vault_root)
+    [ -n "$root" ] || { printf '%s\n' '{"error":"vault not mounted"}'; exit 1; }
+    [ -n "$a1" ] || { printf '%s\n' '{"error":"path required"}'; exit 1; }
+    safe_rel_path "$a1" || { printf '%s\n' '{"error":"unsafe path"}'; exit 1; }
+    abs=$(join_path "$root" "$a1")
+    side=$(sidecar_path "$abs")
+
+    if [ -n "$a2" ]; then
+      if [ -f "$side" ]; then
+        val=$(jq -r --arg k "$a2" '.xattrs[$k] // empty' "$side")
+      else
+        val=''
+      fi
+      if [ -n "$val" ]; then
+        jq -cn --arg k "$a2" --arg v "$val" '{found:true,key:$k,value:$v}'
+      else
+        jq -cn --arg k "$a2" '{found:false,key:$k,value:null}'
+      fi
+    else
+      if [ -f "$side" ]; then
+        jq -c '{xattrs:(.xattrs // {})}' "$side"
+      else
+        printf '%s\n' '{"xattrs":{}}'
+      fi
+    fi
+    ;;
+
+  meta.set)
+    root=$(vault_root)
+    [ -n "$root" ] || { printf '%s\n' '{"error":"vault not mounted"}'; exit 1; }
+    [ -n "$a1" ] && [ -n "$a2" ] || { printf '%s\n' '{"error":"path/key required"}'; exit 1; }
+    safe_rel_path "$a1" || { printf '%s\n' '{"error":"unsafe path"}'; exit 1; }
+    abs=$(join_path "$root" "$a1")
+    side=$(sidecar_path "$abs")
+    mkdir -p "$(dirname "$side")"
+    if [ -f "$side" ]; then
+      jq --arg k "$a2" --arg v "$a3" '.xattrs = (.xattrs // {}) | .xattrs[$k] = $v' "$side" > "$side.tmp"
+      mv "$side.tmp" "$side"
+    else
+      jq -n --arg k "$a2" --arg v "$a3" '{version:"1",docPath:"",xattrs:{($k):$v}}' > "$side"
+    fi
+    printf '%s\n' '{"set":true}'
+    ;;
+
+  meta.unset)
+    root=$(vault_root)
+    [ -n "$root" ] || { printf '%s\n' '{"error":"vault not mounted"}'; exit 1; }
+    [ -n "$a1" ] && [ -n "$a2" ] || { printf '%s\n' '{"error":"path/key required"}'; exit 1; }
+    safe_rel_path "$a1" || { printf '%s\n' '{"error":"unsafe path"}'; exit 1; }
+    abs=$(join_path "$root" "$a1")
+    side=$(sidecar_path "$abs")
+    if [ -f "$side" ]; then
+      jq --arg k "$a2" '.xattrs = ((.xattrs // {}) | del(.[$k]))' "$side" > "$side.tmp"
+      mv "$side.tmp" "$side"
+    fi
+    printf '%s\n' '{"unset":true}'
+    ;;
+
+  txn.begin)
+    [ "$tx_open" = "0" ] || { printf '%s\n' '{"error":"transaction already open"}'; exit 1; }
+    tx_open=1
+    tx_id=$((tx_id + 1))
+    save_state
+    printf '%s\n' '{"opened":true}'
+    ;;
+
+  txn.commit)
+    [ "$tx_open" = "1" ] || { printf '%s\n' '{"error":"no open transaction"}'; exit 1; }
+    tx_open=0
+    save_state
+    printf '%s\n' '{"committed":true}'
+    ;;
+
+  txn.rollback)
+    [ "$tx_open" = "1" ] || { printf '%s\n' '{"error":"no open transaction"}'; exit 1; }
+    tx_open=0
+    save_state
+    printf '%s\n' '{"rolledBack":true}'
+    ;;
+
+  *)
+    printf '%s\n' '{"error":"method not implemented in shell reference"}'
+    exit 1
+    ;;
+esac

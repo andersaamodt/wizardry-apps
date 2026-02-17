@@ -1,0 +1,31 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: is-apps-component-enabled COMPONENT
+
+Returns success when the wizardry-apps component is enabled.
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+. "$script_dir/_state"
+
+component=${1-}
+if [ -z "$component" ]; then
+  printf '%s\n' "Usage: is-apps-component-enabled COMPONENT" >&2
+  exit 2
+fi
+
+if is_enabled "$component"; then
+  exit 0
+fi
+exit 1

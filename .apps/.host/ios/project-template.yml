@@ -1,0 +1,31 @@
+name: WizardryHost
+options:
+  minimumXcodeGenVersion: 2.38.0
+settings:
+  base:
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: __APP_VERSION__
+
+targets:
+  WizardryHost:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Host
+    resources:
+      - path: Resources
+    settings:
+      base:
+        PRODUCT_NAME: "__APP_NAME__"
+        PRODUCT_BUNDLE_IDENTIFIER: __BUNDLE_ID__
+        INFOPLIST_KEY_CFBundleDisplayName: "__APP_NAME__"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        CODE_SIGN_STYLE: Automatic
+
+schemes:
+  WizardryHost:
+    build:
+      targets:
+        WizardryHost: all

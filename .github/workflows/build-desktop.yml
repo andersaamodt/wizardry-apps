@@ -1,0 +1,136 @@
+name: Build Desktop
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux-appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq wget file libfuse2 gcc pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Validate manifest
+        run: sh tools/validate-manifest.sh
+
+      - name: Build linux host
+        run: |
+          set -eu
+          cc -O2 .apps/.host/linux/main.c -o wizardry-host $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.1)
+
+      - name: Download appimagetool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+
+      - name: Build AppImage artifacts
+        run: |
+          set -eu
+          mkdir -p dist
+          for app in $(sh tools/release/list-production-apps.sh); do
+            [ -d ".apps/$app" ] || { echo "missing app: $app" >&2; exit 1; }
+            appdir="AppDir-$app"
+            rm -rf "$appdir"
+            mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$app" "$appdir/usr/share/wizardry-apps/core"
+            cp -R ".apps/$app"/. "$appdir/usr/share/$app/"
+            cp -R .apps/.host/shared "$appdir/usr/share/$app/.host"
+            cp -R core/include core/src "$appdir/usr/share/wizardry-apps/core/"
+            cp wizardry-host "$appdir/usr/bin/"
+            cat > "$appdir/AppRun" <<'APP'
+#!/bin/sh
+set -eu
+HERE=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+exec "$HERE/usr/bin/wizardry-host" "$HERE/usr/share/APP_SLUG"
+APP
+            sed -i "s/APP_SLUG/$app/g" "$appdir/AppRun"
+            chmod +x "$appdir/AppRun"
+            ARCH=x86_64 ./appimagetool "$appdir" "dist/wizardry-$app-x86_64.AppImage"
+          done
+
+      - name: AppImage smoke check
+        run: |
+          set -eu
+          ls -1 dist/*.AppImage >/dev/null
+          for f in dist/*.AppImage; do
+            file "$f"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: dist/*.AppImage
+
+  macos-app:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install jq || true
+
+      - name: Validate manifest
+        run: sh tools/validate-manifest.sh
+
+      - name: Build macOS host
+        run: |
+          set -eu
+          clang -O2 -fobjc-arc -fmodules .apps/.host/macos/main.m -o wizardry-host -framework Cocoa -framework WebKit
+
+      - name: Build .app bundles
+        run: |
+          set -eu
+          mkdir -p dist
+          for app in $(sh tools/release/list-production-apps.sh); do
+            [ -d ".apps/$app" ] || { echo "missing app: $app" >&2; exit 1; }
+            app_name=$(sh tools/release/get-app-name.sh "$app")
+            bundle_id=$(sh tools/release/get-app-bundle-id.sh macos "$app")
+            bundle="dist/${app_name}.app"
+            mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$app" "$bundle/Contents/Resources/wizardry-apps/core"
+            cp -R ".apps/$app"/. "$bundle/Contents/Resources/$app/"
+            cp -R .apps/.host/shared "$bundle/Contents/Resources/$app/.host"
+            cp -R core/include core/src "$bundle/Contents/Resources/wizardry-apps/core/"
+            cp wizardry-host "$bundle/Contents/MacOS/wizardry-host"
+            cat > "$bundle/Contents/MacOS/$app" <<'APP'
+#!/bin/sh
+set -eu
+APPDIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
+exec "$APPDIR/MacOS/wizardry-host" "$APPDIR/Resources/APP_SLUG"
+APP
+            sed -i '' "s/APP_SLUG/$app/g" "$bundle/Contents/MacOS/$app"
+            chmod +x "$bundle/Contents/MacOS/$app"
+            cat > "$bundle/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>$app_name</string>
+<key>CFBundleDisplayName</key><string>$app_name</string>
+<key>CFBundleIdentifier</key><string>$bundle_id</string>
+<key>CFBundleVersion</key><string>1.0</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleExecutable</key><string>$app</string>
+</dict></plist>
+PLIST
+            ditto -c -k --sequesterRsrc --keepParent "$bundle" "dist/${app_name}.zip"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: dist/*

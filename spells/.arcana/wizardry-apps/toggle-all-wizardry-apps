@@ -1,0 +1,30 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: toggle-all-wizardry-apps [--enable|--disable]
+
+Enables or disables all wizardry-apps components.
+USAGE
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+. "$script_dir/_state"
+
+action=${1-}
+if [ "$action" != "--enable" ] && [ "$action" != "--disable" ]; then
+  printf '%s\n' "Usage: toggle-all-wizardry-apps [--enable|--disable]" >&2
+  exit 2
+fi
+
+for component in $(list_all_components); do
+  "$script_dir/set-apps-component-state" "$component" "$action"
+done

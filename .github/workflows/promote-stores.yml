@@ -1,0 +1,93 @@
+name: Promote Store Releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      ios_build:
+        description: "Optional iOS build number (defaults to latest VALID build per app)"
+        required: false
+        type: string
+      ios_version:
+        description: "Optional iOS marketing version (defaults to build pre-release version)"
+        required: false
+        type: string
+      ios_submit_for_review:
+        description: "Submit attached iOS versions for App Review"
+        required: false
+        default: true
+        type: boolean
+      ios_release_after_approval:
+        description: "When version is pending developer release, release to production"
+        required: false
+        default: false
+        type: boolean
+      android_version_codes:
+        description: "Optional comma-separated Android version codes (defaults to latest internal release)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  promote_play:
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON_BASE64 }}
+      VERSION_CODES: ${{ inputs.android_version_codes }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq curl openssl
+      - name: Promote internal track to production for all production apps
+        run: |
+          set -eu
+          [ -n "${PLAY_SERVICE_ACCOUNT_JSON_BASE64-}" ] || {
+            echo "Missing required Play secret: PLAY_SERVICE_ACCOUNT_JSON_BASE64" >&2
+            exit 1
+          }
+
+          for app in $(sh tools/release/list-production-apps.sh); do
+            pkg=$(sh tools/release/get-app-bundle-id.sh android "$app")
+            sh tools/release/promote-play-track.sh "$pkg" internal production "${VERSION_CODES-}"
+          done
+
+  promote_ios:
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+      IOS_BUILD: ${{ inputs.ios_build }}
+      IOS_VERSION: ${{ inputs.ios_version }}
+      IOS_SUBMIT_FOR_REVIEW_INPUT: ${{ inputs.ios_submit_for_review }}
+      IOS_RELEASE_AFTER_APPROVAL_INPUT: ${{ inputs.ios_release_after_approval }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq curl openssl
+      - name: Promote iOS TestFlight builds for production apps
+        run: |
+          set -eu
+
+          for v in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY_BASE64; do
+            eval "val=\${$v-}"
+            if [ -z "$val" ]; then
+              echo "Missing required App Store secret: $v" >&2
+              exit 1
+            fi
+          done
+
+          submit=0
+          release_now=0
+          [ "$IOS_SUBMIT_FOR_REVIEW_INPUT" = "true" ] && submit=1
+          [ "$IOS_RELEASE_AFTER_APPROVAL_INPUT" = "true" ] && release_now=1
+
+          for app in $(sh tools/release/list-production-apps.sh); do
+            bundle=$(sh tools/release/get-app-bundle-id.sh ios "$app")
+            IOS_SUBMIT_FOR_REVIEW="$submit" \
+            IOS_RELEASE_AFTER_APPROVAL="$release_now" \
+            sh tools/release/promote-ios-release.sh "$bundle" "${IOS_BUILD-}" "${IOS_VERSION-}"
+          done

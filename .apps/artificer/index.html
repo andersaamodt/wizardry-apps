@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artificer Desktop</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0e151b; color: #e6eef7; }
+    header { padding: 0.9rem 1rem; border-bottom: 1px solid #263340; display: flex; gap: 0.6rem; align-items: center; }
+    button { background: #1d2a36; color: #e6eef7; border: 1px solid #2f4356; border-radius: 6px; padding: 0.45rem 0.7rem; cursor: pointer; }
+    pre { margin: 0; padding: 0.8rem 1rem; border-bottom: 1px solid #263340; min-height: 5rem; white-space: pre-wrap; }
+    iframe { width: 100%; height: calc(100vh - 160px); border: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Artificer</strong>
+    <button onclick="run('build')">Build</button>
+    <button onclick="run('start')">Start</button>
+    <button onclick="run('stop')">Stop</button>
+    <button onclick="refreshFrame()">Refresh</button>
+  </header>
+  <pre id="log">ready</pre>
+  <iframe id="app" src="http://localhost:8080/pages/index.html" title="Artificer"></iframe>
+
+  <script>
+    (function loadBridge() {
+      var candidates = ['./.host/shared/wizardry-bridge.js', '../.host/shared/wizardry-bridge.js'];
+      var i = 0;
+      function tryNext() {
+        if (i >= candidates.length) {
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = candidates[i++];
+        s.onload = function () {};
+        s.onerror = tryNext;
+        document.head.appendChild(s);
+      }
+      tryNext();
+    })();
+  </script>
+  <script>
+    const commands = {
+      build: ['web-wizardry', 'build', 'artificer'],
+      start: ['web-wizardry', 'serve', 'artificer'],
+      stop: ['web-wizardry', 'stop', 'artificer']
+    };
+
+    async function run(action) {
+      const log = document.getElementById('log');
+      try {
+        const res = await window.wizardry.rpc('bridge.exec', { argv: commands[action] });
+        log.textContent = [
+          `exit=${res.exit_code}`,
+          res.stdout || '',
+          res.stderr || ''
+        ].filter(Boolean).join('\n');
+      } catch (err) {
+        log.textContent = `error: ${err.message}`;
+      }
+    }
+
+    function refreshFrame() {
+      document.getElementById('app').contentWindow.location.reload();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+#!/bin/sh
+# stub-menu STUB_DIR - create a deterministic menu stub for tests.
+
+set -eu
+
+stub_dir=${1-}
+if [ -z "$stub_dir" ]; then
+  printf '%s\n' "stub-menu: STUB_DIR required" >&2
+  exit 2
+fi
+
+mkdir -p "$stub_dir"
+cat > "$stub_dir/menu" <<'STUB'
+#!/bin/sh
+set -eu
+
+log_file=${MENU_LOG:-${TMPDIR:-/tmp}/wizardry-menu.log}
+mkdir -p "$(dirname "$log_file")"
+
+for item in "$@"; do
+  printf '%s\n' "$item" >> "$log_file"
+done
+
+chosen_cmd=''
+menu_select=${MENU_SELECT:-exit}
+
+if [ "$menu_select" = "add" ]; then
+  for item in "$@"; do
+    case "$item" in
+      Add\ allowed\ dir%*)
+        chosen_cmd=${item#*%}
+        break
+        ;;
+    esac
+  done
+fi
+
+if [ -z "$chosen_cmd" ]; then
+  for item in "$@"; do
+    case "$item" in
+      *%kill\ -TERM\ *)
+        chosen_cmd=${item#*%}
+        break
+        ;;
+    esac
+  done
+fi
+
+if [ -z "$chosen_cmd" ]; then
+  for item in "$@"; do
+    case "$item" in
+      *%*)
+        chosen_cmd=${item#*%}
+        break
+        ;;
+    esac
+  done
+fi
+
+if [ -n "$chosen_cmd" ]; then
+  case "$chosen_cmd" in
+    kill\ -TERM\ *)
+      exit 130
+      ;;
+  esac
+  sh -c "$chosen_cmd"
+fi
+
+exit 0
+STUB
+chmod +x "$stub_dir/menu"

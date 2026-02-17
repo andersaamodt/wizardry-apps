@@ -1,0 +1,66 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def appId = project.findProperty("wizardryApplicationId") ?: "com.wizardry.apps.host.dev"
+def appName = project.findProperty("wizardryAppName") ?: "Wizardry Host"
+def versionNameValue = project.findProperty("wizardryVersionName") ?: "0.1.0"
+def versionCodeValue = (project.findProperty("wizardryVersionCode") ?: "1").toInteger()
+
+android {
+    namespace "com.wizardry.apps.host"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId appId
+        minSdk 26
+        targetSdk 34
+        versionCode versionCodeValue
+        versionName versionNameValue
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        resValue "string", "app_name", appName
+    }
+
+    signingConfigs {
+        release {
+            if (project.hasProperty("androidKeystorePath")) {
+                storeFile file(project.property("androidKeystorePath"))
+                storePassword project.findProperty("androidKeystorePassword")
+                keyAlias project.findProperty("androidKeyAlias")
+                keyPassword project.findProperty("androidKeyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+
+        release {
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (project.hasProperty("androidKeystorePath")) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}

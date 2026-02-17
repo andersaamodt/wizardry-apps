@@ -1,0 +1,101 @@
+#!/bin/sh
+
+# Delete a wizardry web site.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: delete-site SITENAME
+
+Deletes a website and all its files.
+
+Example: web-delete-site mysite
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+. env-clear
+. declare-globals
+
+site_name=${1-}
+if [ -z "$site_name" ]; then
+  die 2 "delete-site: SITENAME required"
+fi
+
+SITES_DIR="${WIZARDRY_SITES_DIR}"
+SITE_DIR="$SITES_DIR/$site_name"
+SITE_DATA_DIR="$SITES_DIR/.sitedata/$site_name"
+
+if [ ! -d "$SITE_DIR" ]; then
+  die "delete-site: site '$site_name' not found"
+fi
+
+site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '-' '_')"
+site_user=$(config-get "$SITE_DIR/site.conf" site-user 2>/dev/null || printf '')
+[ -z "$site_user" ] && site_user="$site_user_default"
+if [ -n "$site_user" ] && [ "$(id -un)" != "$site_user" ] && [ -z "${WIZARDRY_SITE_USER_REEXEC-}" ]; then
+  if has sudo; then
+    exec sudo -u "$site_user" -- env WIZARDRY_SITE_USER_REEXEC=1 "$0" "$site_name" "$@"
+  fi
+fi
+
+# Check if server is running and stop it first
+is_running=0
+
+# Check nginx
+if [ -f "$SITE_DIR/nginx/nginx.pid" ]; then
+  pid=$(cat "$SITE_DIR/nginx/nginx.pid" 2>/dev/null || echo "")
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    is_running=1
+  fi
+fi
+
+# Check fcgiwrap
+if [ -f "$SITE_DIR/nginx/fcgiwrap.pid" ]; then
+  pid=$(cat "$SITE_DIR/nginx/fcgiwrap.pid" 2>/dev/null || echo "")
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    is_running=1
+  fi
+fi
+
+# Stop server if running
+if [ "$is_running" -eq 1 ]; then
+  warn "Site '$site_name' is currently running"
+  step "Stopping server before deletion..."
+  stop-site "$site_name" 2>/dev/null || true
+  sleep 1
+fi
+
+# Confirm deletion
+printf 'Delete site %s? [y/N] ' "$site_name"
+read -r confirm
+
+case "$confirm" in
+  y|Y|yes|YES)
+    step "Deleting site: $site_name"
+    rm -rf "$SITE_DIR"
+    success "Site '$site_name' deleted"
+    
+    # Ask about deleting site data
+    if [ -d "$SITE_DATA_DIR" ]; then
+      printf 'Also delete site data (uploads, etc.)? [y/N] ' 
+      read -r confirm_data
+      
+      case "$confirm_data" in
+        y|Y|yes|YES)
+          step "Deleting site data: $SITE_DATA_DIR"
+          rm -rf "$SITE_DATA_DIR"
+          success "Site data deleted"
+          ;;
+        *)
+          info "Site data preserved at: $SITE_DATA_DIR"
+          ;;
+      esac
+    fi
+    ;;
+  *)
+    info "Deletion cancelled"
+    ;;
+esac
