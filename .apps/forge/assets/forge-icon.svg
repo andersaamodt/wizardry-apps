@@ -1,0 +1,39 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Wizardry Forge icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#132028"/>
+      <stop offset="55%" stop-color="#1f3440"/>
+      <stop offset="100%" stop-color="#0f171d"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffe49d"/>
+      <stop offset="100%" stop-color="#d7972d"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dae4ef"/>
+      <stop offset="100%" stop-color="#8597aa"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="40" y="40" width="944" height="944" rx="220" fill="url(#bg)"/>
+  <rect x="70" y="70" width="884" height="884" rx="190" fill="none" stroke="#30424d" stroke-width="8"/>
+
+  <g filter="url(#glow)">
+    <path d="M230 700 L512 250 L794 700" fill="none" stroke="url(#metal)" stroke-width="82" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M362 700 L512 460 L662 700" fill="none" stroke="#1a2b35" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="418" y="312" width="188" height="86" rx="24" fill="url(#steel)" transform="rotate(22 512 355)"/>
+    <rect x="486" y="372" width="58" height="264" rx="20" fill="#7a3d1f" transform="rotate(22 515 504)"/>
+
+    <circle cx="512" cy="728" r="54" fill="#f7d58d"/>
+    <path d="M484 728 h56" stroke="#885f1f" stroke-width="12" stroke-linecap="round"/>
+    <path d="M512 700 v56" stroke="#885f1f" stroke-width="12" stroke-linecap="round"/>
+  </g>
+</svg>

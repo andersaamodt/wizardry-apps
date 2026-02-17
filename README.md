@@ -55,6 +55,11 @@ sh .tests/adapters/test-bridge-behavior.sh
 for t in .tests/.arcana/wizardry-apps/test-*.sh; do
   sh "$t"
 done
+
+# Run flagship desktop app tests
+for t in .tests/apps/test-*.sh; do
+  sh "$t"
+done
 ```
 
 ## App Arcana Menus
@@ -68,6 +73,38 @@ spells/.arcana/wizardry-apps/wizardry-apps web-admin
 spells/.arcana/wizardry-apps/wizardry-apps desktop-admin
 spells/.arcana/wizardry-apps/wizardry-apps mobile-admin
 ```
+
+## Flagship Desktop App
+
+```sh
+# Wizardry Forge (desktop control plane)
+# Download-and-run from this repository:
+./run-forge
+
+# Install user-local app launcher integration (macOS/Linux):
+./install-forge
+
+# macOS options:
+# force /Applications install
+./install-forge --system
+# force ~/Applications install
+./install-forge --user
+
+# Remove launcher integration:
+./uninstall-forge
+
+# Inspect backend directly:
+sh .apps/forge/scripts/forge-backend.sh --help
+```
+
+After `./install-forge`:
+- macOS: launch `/Applications/Wizardry Forge.app` (falls back to `~/Applications` if needed)
+- Linux: launch `Wizardry Forge` from your desktop app menu (or run `~/.local/bin/wizardry-forge`)
+
+The macOS app bundle is first-class:
+- embedded native host binary
+- Dock/Finder icon resource
+- proper Dock + menu-bar app behavior
 
 ## Mobile Build Helpers
 

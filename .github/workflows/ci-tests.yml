@@ -36,6 +36,9 @@ jobs:
           sh .tests/release/test-release-tools.sh
           sh .tests/release/test-godot-export-script.sh
           sh .tests/release/test-ios-promotion-script.sh
+          for t in .tests/apps/test-*.sh; do
+            sh "$t"
+          done
           for t in .tests/.arcana/wizardry-apps/test-*.sh; do
             sh "$t"
           done

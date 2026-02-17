@@ -95,14 +95,31 @@
     <p>Start the UNIX Settings server to load the interface.</p>
   </div>
 
-  <iframe id="settings-frame" src="http://localhost:8080/pages/index.html" title="UNIX Settings"></iframe>
+  <iframe id="settings-frame" src="about:blank" title="UNIX Settings"></iframe>
 
   <script>
+    const siteName = 'unix-settings';
+    const entryPath = '/pages/index.html';
+
     const commands = {
       build: ['web-wizardry', 'build', 'unix-settings'],
       start: ['web-wizardry', 'serve', 'unix-settings'],
-      stop: ['web-wizardry', 'stop', 'unix-settings']
+      stop: ['web-wizardry', 'stop', 'unix-settings'],
+      getPort: ['sh', '-c', 'cfg="$HOME/sites/unix-settings/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
     };
+
+    let appUrl = '';
+
+    async function resolveAppUrl() {
+      const result = await window.wizardry.exec(commands.getPort);
+      const raw = (result.stdout || '').trim();
+      const port = /^[0-9]+$/.test(raw) ? raw : '';
+      if (!port) {
+        throw new Error(`unable to resolve port for '${siteName}' from $HOME/sites/${siteName}/site.conf`);
+      }
+      appUrl = `http://localhost:${port}${entryPath}`;
+      return appUrl;
+    }
 
     async function runCommand(action) {
       const status = document.getElementById('status');
@@ -124,17 +141,22 @@
     function checkServer() {
       const frame = document.getElementById('settings-frame');
       const error = document.getElementById('error');
-      fetch('http://localhost:8080/pages/index.html', { method: 'HEAD', mode: 'no-cors' })
+
+      resolveAppUrl()
+        .then((url) => fetch(url, { method: 'HEAD', mode: 'no-cors' }))
         .then(() => {
           error.style.display = 'none';
           frame.style.display = 'block';
-          if (frame.contentWindow) {
+          if (appUrl && frame.src !== appUrl) {
+            frame.src = appUrl;
+          } else if (frame.contentWindow) {
             frame.contentWindow.location.reload();
           }
         })
         .catch(() => {
           error.style.display = 'block';
           frame.style.display = 'none';
+          frame.src = 'about:blank';
         });
     }
 

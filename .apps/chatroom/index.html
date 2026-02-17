@@ -63,8 +63,7 @@
     </nav>
   </div>
   
-  <!-- Chat iframe - needs server running at http://localhost:8080 -->
-  <iframe id="chat-frame" src="http://localhost:8080/pages/chat.html" title="Chatroom" onerror="handleIframeError()"></iframe>
+  <iframe id="chat-frame" src="about:blank" title="Chatroom"></iframe>
   
   <div id="error-message" style="display: none; padding: 3rem 2rem; text-align: center; color: #666;">
     <h2 style="color: #dc3545; margin-bottom: 1rem;">⚠️ Server Not Running</h2>
@@ -82,43 +81,51 @@
   </div>
 
   <script>
-    // Check if iframe loaded successfully
+    const chatUrlKey = 'wizardry.chatroom.url';
     let iframeCheckInterval;
+
+    function configuredChatUrl() {
+      const saved = localStorage.getItem(chatUrlKey) || '';
+      return /^https?:\/\/[^ ]+\/pages\/chat\.html$/.test(saved) ? saved : '';
+    }
     
     function checkIframeLoaded() {
       const iframe = document.getElementById('chat-frame');
       const errorMsg = document.getElementById('error-message');
+      const url = configuredChatUrl();
+
+      if (!url) {
+        iframe.style.display = 'none';
+        errorMsg.style.display = 'block';
+        return;
+      }
       
-      // Try to check if iframe loaded
       try {
-        // Simple connectivity check - try to load from server
-        fetch('http://localhost:8080/pages/chat.html', { method: 'HEAD', mode: 'no-cors' })
+        fetch(url, { method: 'HEAD', mode: 'no-cors' })
           .then(() => {
-            // Server is up, show iframe
+            if (iframe.src !== url) {
+              iframe.src = url;
+            }
             iframe.style.display = 'block';
             errorMsg.style.display = 'none';
           })
           .catch(() => {
-            // Server is down, show error
             iframe.style.display = 'none';
             errorMsg.style.display = 'block';
           });
       } catch (e) {
-        // Fallback - assume server is down
         iframe.style.display = 'none';
         errorMsg.style.display = 'block';
       }
     }
     
     function showChat() {
-      const chatContainer = document.getElementById('chat-frame').parentElement;
       document.getElementById('chat-frame').style.display = 'block';
       document.getElementById('error-message').style.display = 'none';
       document.getElementById('settings-frame').style.display = 'none';
       document.getElementById('chat-tab').classList.add('active');
       document.getElementById('settings-tab').classList.remove('active');
       
-      // Check if server is running when switching to chat
       checkIframeLoaded();
     }
     

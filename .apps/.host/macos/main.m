@@ -13,6 +13,48 @@
 
 @implementation AppDelegate
 
+- (void)setupMainMenuWithAppName:(NSString *)appName {
+    NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
+
+    NSMenuItem *appMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    [mainMenu addItem:appMenuItem];
+
+    NSMenu *appMenu = [[NSMenu alloc] initWithTitle:appName];
+    NSString *aboutTitle = [NSString stringWithFormat:@"About %@", appName];
+    [appMenu addItemWithTitle:aboutTitle action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem *hideItem = [appMenu addItemWithTitle:[NSString stringWithFormat:@"Hide %@", appName]
+                                             action:@selector(hide:)
+                                      keyEquivalent:@"h"];
+    (void)hideItem;
+
+    NSMenuItem *hideOthers = [appMenu addItemWithTitle:@"Hide Others"
+                                                action:@selector(hideOtherApplications:)
+                                         keyEquivalent:@"h"];
+    [hideOthers setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagOption)];
+
+    [appMenu addItemWithTitle:@"Show All" action:@selector(unhideAllApplications:) keyEquivalent:@""];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+
+    NSString *quitTitle = [NSString stringWithFormat:@"Quit %@", appName];
+    [appMenu addItemWithTitle:quitTitle action:@selector(terminate:) keyEquivalent:@"q"];
+
+    [appMenuItem setSubmenu:appMenu];
+
+    NSMenuItem *windowMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    [mainMenu addItem:windowMenuItem];
+    NSMenu *windowMenu = [[NSMenu alloc] initWithTitle:@"Window"];
+    [windowMenu addItemWithTitle:@"Minimize" action:@selector(performMiniaturize:) keyEquivalent:@"m"];
+    [windowMenu addItemWithTitle:@"Zoom" action:@selector(performZoom:) keyEquivalent:@""];
+    [windowMenu addItem:[NSMenuItem separatorItem]];
+    [windowMenu addItemWithTitle:@"Close Window" action:@selector(performClose:) keyEquivalent:@"w"];
+    [windowMenuItem setSubmenu:windowMenu];
+
+    [NSApp setWindowsMenu:windowMenu];
+    [NSApp setMainMenu:mainMenu];
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
     // Get app directory from command line argument
     NSArray *args = [[NSProcessInfo processInfo] arguments];
@@ -36,6 +78,9 @@
     NSString *appName = [[self.appPath lastPathComponent] 
                          stringByReplacingOccurrencesOfString:@"-" withString:@" "];
     appName = [appName capitalizedString];
+
+    [self setupMainMenuWithAppName:appName];
+    [NSApp activateIgnoringOtherApps:YES];
     
     // Create window
     NSRect frame = NSMakeRect(0, 0, 1024, 768);

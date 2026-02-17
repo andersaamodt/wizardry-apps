@@ -76,6 +76,8 @@ window.wizardry.exec(commands[action]);
 
 **Security**: The WebView can only execute commands that are explicitly hardcoded in the GUI. There's no way for user input to construct arbitrary commands.
 
+**Port safety rule**: Desktop app wrappers must not hardcode `localhost:8080` (or any fixed localhost port) for embedded site iframes. Resolve the target site port from the site's `site.conf`, then construct the URL at runtime so apps cannot accidentally point at the wrong daemon.
+
 ### style.css
 
 Optional styling for your app. Keep it simple.
@@ -230,6 +232,16 @@ See `.apps/unix-settings/` for a focused system settings shell that:
 - Wraps the `unix-settings` site template in a desktop frame
 - Provides explicit Build/Start/Stop controls
 - Keeps the interface strictly web-first, with commands hardcoded for security
+
+### forge
+
+See `.apps/forge/` for the flagship wizardry-apps desktop control plane that:
+- Builds and runs built-in wizardry apps from one GUI
+- Stages mobile host assets and triggers mobile debug/smoke builds when toolchains exist
+- Scaffolds new `.apps/<slug>/` directories from shell-backed templates
+- Scaffolds hosted sites from `.web` templates into user-selected roots
+- Exposes all actions through `.apps/forge/scripts/forge-backend.sh` for CLI parity
+- Supports checkout-local run (`./run-forge`) and user-local install (`./install-forge`)
 
 ## Development Workflow
 

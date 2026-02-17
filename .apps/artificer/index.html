@@ -21,7 +21,7 @@
     <button onclick="refreshFrame()">Refresh</button>
   </header>
   <pre id="log">ready</pre>
-  <iframe id="app" src="http://localhost:8080/pages/index.html" title="Artificer"></iframe>
+  <iframe id="app" src="about:blank" title="Artificer"></iframe>
 
   <script>
     (function loadBridge() {
@@ -41,29 +41,74 @@
     })();
   </script>
   <script>
+    const siteName = 'artificer';
+    const entryPath = '/pages/index.html';
+
     const commands = {
       build: ['web-wizardry', 'build', 'artificer'],
       start: ['web-wizardry', 'serve', 'artificer'],
-      stop: ['web-wizardry', 'stop', 'artificer']
+      stop: ['web-wizardry', 'stop', 'artificer'],
+      getPort: ['sh', '-c', 'cfg="$HOME/sites/artificer/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
     };
 
-    async function run(action) {
-      const log = document.getElementById('log');
+    function getLog() {
+      return document.getElementById('log');
+    }
+
+    async function bridgeExec(argv) {
+      return window.wizardry.rpc('bridge.exec', { argv: argv });
+    }
+
+    async function resolveAppUrl() {
+      const res = await bridgeExec(commands.getPort);
+      const raw = (res.stdout || '').trim();
+      const port = /^[0-9]+$/.test(raw) ? raw : '';
+      if (!port) {
+        throw new Error(`unable to resolve port for '${siteName}' from $HOME/sites/${siteName}/site.conf`);
+      }
+      return `http://localhost:${port}${entryPath}`;
+    }
+
+    async function loadFrame() {
+      const iframe = document.getElementById('app');
+      const log = getLog();
       try {
-        const res = await window.wizardry.rpc('bridge.exec', { argv: commands[action] });
+        const url = await resolveAppUrl();
+        iframe.src = url;
+        log.textContent = `loaded ${url}`;
+      } catch (err) {
+        iframe.src = 'about:blank';
+        log.textContent = `error: ${err.message}`;
+      }
+    }
+
+    async function run(action) {
+      const log = getLog();
+      try {
+        const res = await bridgeExec(commands[action]);
         log.textContent = [
           `exit=${res.exit_code}`,
           res.stdout || '',
           res.stderr || ''
         ].filter(Boolean).join('\n');
+        if (action === 'start' || action === 'build') {
+          await loadFrame();
+        }
+        if (action === 'stop') {
+          document.getElementById('app').src = 'about:blank';
+        }
       } catch (err) {
         log.textContent = `error: ${err.message}`;
       }
     }
 
     function refreshFrame() {
-      document.getElementById('app').contentWindow.location.reload();
+      loadFrame();
     }
+
+    window.addEventListener('DOMContentLoaded', function () {
+      loadFrame();
+    });
   </script>
 </body>
 </html>

@@ -267,18 +267,21 @@
     };
     
     // Hardcoded commands for security - these are executed via native bridge
+    const chatUrlKey = 'wizardry.chatroom.url';
+    const chatPath = '/pages/chat.html';
+
     const commands = {
       'get-ip': ['sh', '-c', "ip route get 1 2>/dev/null | awk '{print $7}' | head -1 || hostname -I | awk '{print $1}'"],
       'get-tor': ['sh', '-c', 'cat /var/lib/tor/hidden_service/hostname 2>/dev/null || cat /usr/local/var/lib/tor/hidden_service/hostname 2>/dev/null'],
       'check-server': ['sh', '-c', 'pgrep -f "nginx.*demo" > /dev/null && echo "running" || echo "stopped"'],
-      'get-port': ['sh', '-c', 'cat $HOME/sites/demo/site.conf 2>/dev/null | grep "^port=" | cut -d= -f2 || echo "8080"'],
+      'get-port': ['sh', '-c', 'cfg="$HOME/sites/demo/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi'],
       'create-demo': ['sh', '-c', 'cd ~/.wizardry && [ -d ~/sites/demo ] || (echo "Creating demo site..." && web-wizardry create demo --template demo)'],
       'start-server': ['sh', '-c', 'cd ~/.wizardry && web-wizardry serve demo'],
       'stop-server': ['sh', '-c', 'web-wizardry stop demo']
     };
     
     let serverRunning = false;
-    let serverPort = '8080';
+    let serverPort = '';
     let currentMode = 'client'; // default to client mode
     
     // Initialize mode from localStorage
@@ -320,15 +323,55 @@
       }
     }
     
+    function localChatUrl() {
+      if (!serverPort) {
+        return '';
+      }
+      return `http://localhost:${serverPort}${chatPath}`;
+    }
+
+    function saveChatUrl(url) {
+      if (url) {
+        localStorage.setItem(chatUrlKey, url);
+      } else {
+        localStorage.removeItem(chatUrlKey);
+      }
+    }
+
+    async function loadPort() {
+      if (!window.wizardry || !window.wizardry.exec) {
+        serverPort = '';
+        saveChatUrl('');
+        updateConnectionURL();
+        return;
+      }
+
+      try {
+        const res = await window.wizardry.exec(commands['get-port']);
+        const raw = (res.stdout || '').trim();
+        serverPort = /^[0-9]+$/.test(raw) ? raw : '';
+      } catch (_err) {
+        serverPort = '';
+      }
+
+      saveChatUrl(localChatUrl());
+      updateConnectionURL();
+    }
+
     // Check server status
-    function checkServerStatus() {
-      // In production: window.wizardry.exec(commands['check-server'])
-      // For now, try to fetch from the demo site to see if it's running
-      fetch('http://localhost:8080/pages/chat.html', { method: 'HEAD', mode: 'no-cors' })
+    async function checkServerStatus() {
+      await loadPort();
+      const url = localChatUrl();
+      if (!url) {
+        serverRunning = false;
+        updateServerStatus('stopped');
+        return;
+      }
+
+      fetch(url, { method: 'HEAD', mode: 'no-cors' })
         .then(() => {
           serverRunning = true;
           updateServerStatus('running');
-          loadPort();
         })
         .catch(() => {
           serverRunning = false;
@@ -430,16 +473,16 @@
       }
     }
     
-    function loadPort() {
-      // In production: window.wizardry.exec(commands['get-port'])
-      // For now, try to detect from config or use default
-      serverPort = '8080';
-      updateConnectionURL();
-    }
-    
     function updateConnectionURL() {
       const urlElement = document.getElementById('connection-url');
       const copyBtn = document.getElementById('copy-url-btn');
+      const localUrl = localChatUrl();
+      if (!localUrl) {
+        urlElement.textContent = 'Set and start demo site to publish chat URL';
+        urlElement.classList.remove('success');
+        copyBtn.style.display = 'none';
+        return;
+      }
       
       // Get IP address first, then construct URL
       fetch('/cgi/system-info')
@@ -447,12 +490,13 @@
         .then(html => {
           const ipMatch = html.match(/(\d+\.\d+\.\d+\.\d+)/);
           const ip = (ipMatch && ipMatch[1] !== '127.0.0.1') ? ipMatch[1] : 'localhost';
-          const url = `http://${ip}:${serverPort}/pages/chat.html`;
+          const url = `http://${ip}:${serverPort}${chatPath}`;
           
           urlElement.textContent = url;
           urlElement.classList.remove('loading');
           urlElement.classList.add('success');
           copyBtn.style.display = 'inline-block';
+          saveChatUrl(localUrl);
           
           // Also update IP address display
           const ipElement = document.getElementById('ip-address');
@@ -464,9 +508,11 @@
           }
         })
         .catch(err => {
-          urlElement.textContent = `http://localhost:${serverPort}/pages/chat.html`;
+          urlElement.textContent = localUrl;
           urlElement.classList.remove('loading');
+          urlElement.classList.add('success');
           copyBtn.style.display = 'inline-block';
+          saveChatUrl(localUrl);
         });
     }
     

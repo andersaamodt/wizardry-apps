@@ -7,6 +7,9 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer)
 [ "$name" = "Artificer" ]
 
+forge_name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" forge)
+[ "$forge_name" = "Wizardry Forge" ]
+
 bundle_id=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer)
 printf '%s' "$bundle_id" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'
 
@@ -18,5 +21,9 @@ sh "$ROOT_DIR/tools/release/stage-web-assets.sh" artificer "$tmp_dir/assets"
 [ -f "$tmp_dir/assets/app/.host/shared/wizardry-bridge.js" ]
 [ -d "$tmp_dir/assets/core/include" ]
 [ -d "$tmp_dir/assets/core/src" ]
+
+sh "$ROOT_DIR/tools/release/stage-web-assets.sh" forge "$tmp_dir/forge-assets"
+[ -f "$tmp_dir/forge-assets/app/index.html" ]
+[ -f "$tmp_dir/forge-assets/app/.host/shared/wizardry-bridge.js" ]
 
 printf '%s\n' "release tools smoke passed"

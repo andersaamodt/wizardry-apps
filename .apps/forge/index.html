@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wizardry Forge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="forge-shell">
+    <header class="topbar">
+      <div class="traffic" aria-hidden="true">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+      </div>
+      <div class="title-block">
+        <h1>Wizardry Forge</h1>
+        <p>Structured control center for building and publishing wizardry apps.</p>
+      </div>
+      <div class="status-block">
+        <span id="bridge-status" class="status-pill">Bridge: checking</span>
+        <span id="activity-pill" class="activity-pill idle">Idle</span>
+      </div>
+    </header>
+
+    <section class="workspace-banner panel">
+      <div class="banner-main">
+        <h2>Workspace</h2>
+        <p id="workspace-root-display">Resolving wizardry-apps root…</p>
+      </div>
+      <div class="banner-metrics">
+        <div class="metric">
+          <span class="metric-label">Apps</span>
+          <span class="metric-value" id="metric-apps-total">0</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Production</span>
+          <span class="metric-value" id="metric-apps-prod">0</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Templates</span>
+          <span class="metric-value" id="metric-templates">0</span>
+        </div>
+      </div>
+      <div class="banner-actions">
+        <button id="refresh-workspace" type="button" class="action">Refresh</button>
+        <button id="goto-settings" type="button" class="action">Fix Workspace</button>
+      </div>
+    </section>
+
+    <main class="main-grid">
+      <nav class="sidebar panel" aria-label="Forge sections">
+        <button type="button" class="nav-btn active" data-view="dashboard">Dashboard</button>
+        <button type="button" class="nav-btn" data-view="apps">Manage Apps</button>
+        <button type="button" class="nav-btn" data-view="create">Create</button>
+        <button type="button" class="nav-btn" data-view="quality">Quality</button>
+        <button type="button" class="nav-btn" data-view="settings">Settings</button>
+      </nav>
+
+      <section class="center panel">
+        <section class="view active" id="view-dashboard">
+          <article class="card">
+            <h2>Workflow</h2>
+            <p class="sub">Follow this sequence for clean app operations.</p>
+            <ol class="steps">
+              <li><strong>1.</strong> Confirm workspace root and toolchain.</li>
+              <li><strong>2.</strong> Select or scaffold an app.</li>
+              <li><strong>3.</strong> Build desktop and stage mobile assets.</li>
+              <li><strong>4.</strong> Run quality tasks before release.</li>
+            </ol>
+            <div class="button-grid three">
+              <button type="button" class="action" id="dashboard-go-manage">Go To Manage</button>
+              <button type="button" class="action" id="dashboard-go-create">Go To Create</button>
+              <button type="button" class="action primary" id="dashboard-build">Build Selected App</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <h2>Current App Summary</h2>
+            <p class="sub">Use Manage Apps for operations. This card mirrors the current selection.</p>
+            <pre id="dashboard-current-app" class="mono compact">No app selected.</pre>
+          </article>
+        </section>
+
+        <section class="view" id="view-apps">
+          <article class="card">
+            <h2>Step 1: Select App</h2>
+            <label for="app-select">Built-in app</label>
+            <select id="app-select"></select>
+            <pre id="apps-summary" class="mono compact">No app data yet.</pre>
+          </article>
+
+          <article class="card">
+            <h2>Step 2: Build + Stage</h2>
+            <div class="button-grid three">
+              <button type="button" id="build-app" class="action primary">Build Desktop</button>
+              <button type="button" id="stage-mobile" class="action">Stage Mobile</button>
+              <button type="button" id="run-app" class="action">Run Native</button>
+            </div>
+            <div class="button-grid two">
+              <button type="button" id="build-ios" class="action">Build iOS Smoke</button>
+              <button type="button" id="build-android" class="action">Build Android Debug</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <h2>Step 3: App Details</h2>
+            <pre id="app-details" class="mono compact">Select an app to inspect details.</pre>
+          </article>
+        </section>
+
+        <section class="view" id="view-create">
+          <article class="card">
+            <h2>Create Workspace Assets</h2>
+            <p class="sub">Choose one creation flow at a time.</p>
+            <div class="mini-tabs" aria-label="Create type">
+              <button type="button" class="mini-tab active" data-create-mode="app">App Scaffold</button>
+              <button type="button" class="mini-tab" data-create-mode="site">Site Scaffold</button>
+            </div>
+          </article>
+
+          <article class="card create-panel active" id="create-app-panel">
+            <h2>New App Scaffold</h2>
+            <div class="form-grid">
+              <label for="new-app-slug">Slug</label>
+              <input id="new-app-slug" type="text" placeholder="my-tool" spellcheck="false">
+
+              <label for="new-app-name">Name</label>
+              <input id="new-app-name" type="text" placeholder="My Tool">
+
+              <label for="new-app-template">Template</label>
+              <select id="new-app-template">
+                <option value="minimal">minimal</option>
+                <option value="panel">panel</option>
+                <option value="clone">clone</option>
+              </select>
+
+              <label for="source-app">Clone source</label>
+              <select id="source-app"></select>
+            </div>
+            <button type="button" id="create-app" class="action primary wide">Create App Scaffold</button>
+          </article>
+
+          <article class="card create-panel" id="create-site-panel">
+            <h2>New Site Scaffold</h2>
+            <div class="form-grid">
+              <label for="site-name">Site name</label>
+              <input id="site-name" type="text" placeholder="my-site" spellcheck="false">
+
+              <label for="site-template">Template</label>
+              <select id="site-template"></select>
+
+              <label for="site-dest">Destination root</label>
+              <input id="site-dest" type="text" placeholder="$HOME/sites" spellcheck="false">
+            </div>
+            <button type="button" id="create-site" class="action primary wide">Create Site Folder</button>
+          </article>
+        </section>
+
+        <section class="view" id="view-quality">
+          <article class="card">
+            <h2>Quality Gates</h2>
+            <p class="sub">Run these checks before tag/release workflows.</p>
+            <div class="button-grid two quality-grid">
+              <button type="button" data-task="validate-manifest" class="action">Validate Manifest</button>
+              <button type="button" data-task="test-core" class="action">Core Tests</button>
+              <button type="button" data-task="test-adapters" class="action">Adapter Tests</button>
+              <button type="button" data-task="test-release-tools" class="action">Release Tools</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <h2>Release Reminder</h2>
+            <ul class="plain-list">
+              <li>Manifest validation is a hard release blocker.</li>
+              <li>macOS release requires notarization success.</li>
+              <li>Linux release requires AppImage smoke pass.</li>
+              <li>Store promotion happens after test-track approval.</li>
+            </ul>
+          </article>
+        </section>
+
+        <section class="view" id="view-settings">
+          <article class="card">
+            <h2>Workspace Root</h2>
+            <p class="sub">Forge needs this path to discover built-in apps and templates.</p>
+            <label for="root-path">wizardry-apps root</label>
+            <div class="root-row">
+              <input id="root-path" type="text" placeholder="/absolute/path/to/wizardry-apps" spellcheck="false">
+              <button type="button" id="refresh-root" class="action">Apply</button>
+            </div>
+            <p class="hint">Tip: this value is saved locally, and install/launch scripts keep it synced.</p>
+          </article>
+
+          <article class="card">
+            <h2>Doctor</h2>
+            <pre id="doctor" class="mono">Waiting for workspace check.</pre>
+          </article>
+        </section>
+      </section>
+
+      <aside class="rail panel">
+        <article class="card">
+          <h2>Artifacts</h2>
+          <ul id="artifact-list"></ul>
+        </article>
+
+        <article class="card log-card">
+          <div class="log-head">
+            <h2>Command Log</h2>
+            <button type="button" id="clear-log">Clear</button>
+          </div>
+          <pre id="log" class="mono">Wizardry Forge ready.</pre>
+        </article>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function loadBridge() {
+      var candidates = [
+        './.host/shared/wizardry-bridge.js',
+        '../.host/shared/wizardry-bridge.js',
+        '../../.host/shared/wizardry-bridge.js'
+      ];
+      var i = 0;
+      function tryNext() {
+        if (i >= candidates.length) {
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = candidates[i++];
+        s.onerror = tryNext;
+        document.head.appendChild(s);
+      }
+      tryNext();
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var ROOT_KEY = 'wizardry.forge.root';
+
+      var state = {
+        appDir: inferAppDir(),
+        rootHint: loadRootHint(),
+        apps: [],
+        templates: [],
+        busy: false,
+        toastTimer: null,
+        currentView: 'dashboard',
+        createMode: 'app'
+      };
+
+      var els = {};
+
+      function inferAppDir() {
+        var p = decodeURIComponent(window.location.pathname || '');
+        return p.replace(/\/index\.html$/, '');
+      }
+
+      function backendScript() {
+        return state.appDir + '/scripts/forge-backend.sh';
+      }
+
+      function loadRootHint() {
+        try {
+          return localStorage.getItem(ROOT_KEY) || '';
+        } catch (_err) {
+          return '';
+        }
+      }
+
+      function saveRootHint(root) {
+        try {
+          if (root) {
+            localStorage.setItem(ROOT_KEY, root);
+          } else {
+            localStorage.removeItem(ROOT_KEY);
+          }
+        } catch (_err) {
+          return;
+        }
+      }
+
+      function now() {
+        return new Date().toLocaleTimeString();
+      }
+
+      function text(el, value) {
+        if (el) {
+          el.textContent = value;
+        }
+      }
+
+      function appendLog(line) {
+        if (!els.log) {
+          return;
+        }
+        var next = '[' + now() + '] ' + line + '\n' + (els.log.textContent || '');
+        if (next.length > 30000) {
+          next = next.slice(0, 30000);
+        }
+        els.log.textContent = next;
+      }
+
+      function setBridgeStatus(ok, msg) {
+        text(els.bridgeStatus, msg);
+        if (!els.bridgeStatus) {
+          return;
+        }
+        els.bridgeStatus.classList.toggle('ok', !!ok);
+        els.bridgeStatus.classList.toggle('bad', !ok);
+      }
+
+      function setActivity(kind, msg) {
+        if (!els.activityPill) {
+          return;
+        }
+        els.activityPill.className = 'activity-pill ' + kind;
+        els.activityPill.textContent = msg;
+      }
+
+      function toast(msg, kind) {
+        if (!els.toast) {
+          return;
+        }
+        els.toast.className = 'toast show ' + (kind || 'ok');
+        els.toast.textContent = msg;
+        if (state.toastTimer) {
+          clearTimeout(state.toastTimer);
+        }
+        state.toastTimer = setTimeout(function () {
+          els.toast.className = 'toast';
+        }, 2600);
+      }
+
+      function bridgeAvailable() {
+        return !!(window.wizardry && window.wizardry.rpc);
+      }
+
+      async function execArgv(argv) {
+        if (!bridgeAvailable()) {
+          throw new Error('wizardry bridge unavailable; run this app in the native host');
+        }
+
+        var result = await window.wizardry.rpc('bridge.exec', { argv: argv });
+        if (typeof result.exit_code === 'undefined') {
+          return result;
+        }
+
+        if (result.exit_code !== 0) {
+          var message = (result.stderr || result.stdout || 'command failed').trim();
+          throw new Error(message + ' (exit ' + result.exit_code + ')');
+        }
+
+        return result;
+      }
+
+      function kv(blob) {
+        var out = {};
+        (blob || '').split('\n').forEach(function (line) {
+          if (!line) {
+            return;
+          }
+          var idx = line.indexOf('=');
+          if (idx <= 0) {
+            return;
+          }
+          out[line.slice(0, idx)] = line.slice(idx + 1);
+        });
+        return out;
+      }
+
+      function parseTSV(blob, width) {
+        var rows = [];
+        (blob || '').trim().split('\n').forEach(function (line) {
+          if (!line) {
+            return;
+          }
+          var cols = line.split('\t');
+          if (cols.length >= width) {
+            rows.push(cols);
+          }
+        });
+        return rows;
+      }
+
+      function rootArgv(cmd) {
+        return [backendScript(), cmd, state.rootHint || ''];
+      }
+
+      async function backend(cmd, extraArgs) {
+        var argv = rootArgv(cmd);
+        (extraArgs || []).forEach(function (item) {
+          argv.push(item);
+        });
+        appendLog('> ' + argv.join(' '));
+        var res = await execArgv(argv);
+        if (res.stdout) {
+          appendLog(res.stdout.trim());
+        }
+        if (res.stderr) {
+          appendLog('[stderr] ' + res.stderr.trim());
+        }
+        return res;
+      }
+
+      function setArtifacts(lines) {
+        if (!els.artifacts) {
+          return;
+        }
+
+        els.artifacts.innerHTML = '';
+        var values = lines && lines.length ? lines : ['No artifacts yet.'];
+        values.forEach(function (line) {
+          var li = document.createElement('li');
+          li.textContent = line;
+          els.artifacts.appendChild(li);
+        });
+      }
+
+      function setBusy(flag) {
+        state.busy = flag;
+        document.body.classList.toggle('is-busy', flag);
+        document.querySelectorAll('.action').forEach(function (btn) {
+          btn.disabled = flag;
+        });
+        syncCloneSourceEnabled();
+      }
+
+      async function perform(label, fn, opts) {
+        if (state.busy) {
+          return;
+        }
+
+        opts = opts || {};
+        setBusy(true);
+        setActivity('working', label);
+
+        try {
+          await fn();
+          if (!opts.noToast) {
+            toast(label + ' complete', 'ok');
+          }
+        } catch (err) {
+          var message = String(err && err.message ? err.message : err);
+          appendLog('error: ' + message);
+          setActivity('fault', 'Error');
+          toast(message, 'bad');
+          if (!opts.swallow) {
+            throw err;
+          }
+        } finally {
+          setBusy(false);
+          if (!document.body.classList.contains('bridge-missing')) {
+            setActivity('ready', 'Ready');
+          }
+        }
+      }
+
+      function setWorkspaceRoot(root) {
+        state.rootHint = root || '';
+        saveRootHint(state.rootHint);
+        text(els.workspaceRootDisplay, state.rootHint || 'Workspace root not resolved. Open Settings and set it manually.');
+        if (els.rootPath) {
+          els.rootPath.value = state.rootHint;
+        }
+      }
+
+      async function refreshWorkspace() {
+        var res = await backend('doctor');
+        var info = kv(res.stdout || '');
+
+        if (info.root) {
+          setWorkspaceRoot(info.root);
+        } else if (state.rootHint) {
+          text(els.workspaceRootDisplay, state.rootHint + ' (unverified)');
+        } else {
+          text(els.workspaceRootDisplay, 'Workspace root not resolved. Open Settings and set it manually.');
+        }
+
+        var lines = [
+          'root: ' + (info.root || '(not found)'),
+          'os: ' + (info.os || '?'),
+          'home: ' + (info.home || '?'),
+          'jq: ' + (info.jq === '1' ? 'yes' : 'no'),
+          'clang: ' + (info.clang === '1' ? 'yes' : 'no'),
+          'gradle: ' + (info.gradle === '1' ? 'yes' : 'no'),
+          'xcodebuild: ' + (info.xcodebuild === '1' ? 'yes' : 'no'),
+          'apps: ' + (info.apps_total || '0') + ' total / ' + (info.apps_production || '0') + ' production',
+          'templates: ' + (info.templates_total || '0')
+        ];
+        text(els.doctor, lines.join('\n'));
+
+        text(els.metricAppsTotal, info.apps_total || '0');
+        text(els.metricAppsProd, info.apps_production || '0');
+        text(els.metricTemplates, info.templates_total || '0');
+
+        if (!els.siteDest.value.trim() && info.home) {
+          els.siteDest.value = info.home + '/sites';
+        }
+
+        if (!info.root) {
+          state.apps = [];
+          state.templates = [];
+          renderApps();
+          renderTemplates();
+          return;
+        }
+
+        await refreshApps();
+        await refreshTemplates();
+      }
+
+      function renderApps() {
+        var summary = state.apps.map(function (app) {
+          return (app.production ? '[prod] ' : '[dev]  ') + app.slug + ' - ' + app.name;
+        }).join('\n');
+
+        text(els.appsSummary, summary || 'No apps in manifest.');
+
+        els.appSelect.innerHTML = '';
+        els.sourceApp.innerHTML = '';
+
+        state.apps.forEach(function (app) {
+          var option = document.createElement('option');
+          option.value = app.slug;
+          option.textContent = app.slug + ' - ' + app.name;
+          els.appSelect.appendChild(option);
+
+          var clone = document.createElement('option');
+          clone.value = app.slug;
+          clone.textContent = app.slug;
+          els.sourceApp.appendChild(clone);
+        });
+
+        if (!state.apps.length) {
+          var empty = document.createElement('option');
+          empty.value = '';
+          empty.textContent = 'No apps found';
+          els.appSelect.appendChild(empty);
+        }
+
+        syncCloneSourceEnabled();
+        renderSelectedAppDetails();
+      }
+
+      function renderTemplates() {
+        els.siteTemplate.innerHTML = '';
+        state.templates.forEach(function (tpl) {
+          var opt = document.createElement('option');
+          opt.value = tpl.slug;
+          opt.textContent = tpl.slug + (tpl.publish ? ' (publish)' : '');
+          els.siteTemplate.appendChild(opt);
+        });
+      }
+
+      function renderSelectedAppDetails() {
+        var slug = selectedApp();
+        var app = null;
+
+        state.apps.forEach(function (item) {
+          if (item.slug === slug) {
+            app = item;
+          }
+        });
+
+        if (!app) {
+          text(els.appDetails, 'No app selected.');
+          text(els.dashboardCurrentApp, 'No app selected.');
+          return;
+        }
+
+        var lines = [
+          'slug: ' + app.slug,
+          'name: ' + app.name,
+          'production: ' + (app.production ? 'yes' : 'no'),
+          'directory_exists: ' + (app.exists ? 'yes' : 'no')
+        ];
+
+        text(els.appDetails, lines.join('\n'));
+        text(els.dashboardCurrentApp, lines.join('\n'));
+      }
+
+      async function refreshApps() {
+        var res = await backend('list-apps');
+        var rows = parseTSV(res.stdout || '', 4);
+        state.apps = rows.map(function (row) {
+          return {
+            slug: row[0],
+            name: row[1],
+            production: row[2] === 'true',
+            exists: row[3] === '1'
+          };
+        });
+        renderApps();
+      }
+
+      async function refreshTemplates() {
+        var res = await backend('list-templates');
+        var rows = parseTSV(res.stdout || '', 3);
+        state.templates = rows.map(function (row) {
+          return {
+            slug: row[0],
+            publish: row[1] === 'true',
+            exists: row[2] === '1'
+          };
+        });
+        renderTemplates();
+      }
+
+      function selectedApp() {
+        return els.appSelect.value;
+      }
+
+      function requireRoot() {
+        if (state.rootHint) {
+          return;
+        }
+        activateView('settings');
+        throw new Error('Set workspace root in Settings before running this action');
+      }
+
+      async function runBuiltIn() {
+        requireRoot();
+        var slug = selectedApp();
+        if (!slug) {
+          throw new Error('choose an app first');
+        }
+        var res = await backend('run-desktop', [slug]);
+        var out = kv(res.stdout || '');
+        setArtifacts([
+          'Launched app: ' + slug,
+          'PID: ' + (out.pid || '?'),
+          'Log: ' + (out.log || '(none)')
+        ]);
+      }
+
+      async function buildBuiltIn() {
+        requireRoot();
+        var slug = selectedApp();
+        if (!slug) {
+          throw new Error('choose an app first');
+        }
+        var res = await backend('build-desktop', [slug]);
+        var out = kv(res.stdout || '');
+        var lines = [];
+        if (out.host) lines.push('Host: ' + out.host);
+        if (out.artifact) lines.push('Artifact: ' + out.artifact);
+        if (out.zip) lines.push('Zip: ' + out.zip);
+        setArtifacts(lines);
+      }
+
+      async function stageMobile() {
+        requireRoot();
+        var slug = selectedApp();
+        if (!slug) {
+          throw new Error('choose an app first');
+        }
+        var res = await backend('stage-mobile', [slug]);
+        var out = kv(res.stdout || '');
+        setArtifacts(['Staged: ' + (out.staged || '(none)')]);
+      }
+
+      async function buildIos() {
+        requireRoot();
+        var slug = selectedApp();
+        if (!slug) {
+          throw new Error('choose an app first');
+        }
+        var res = await backend('build-ios-smoke', [slug]);
+        var out = kv(res.stdout || '');
+        setArtifacts(['iOS output dir: ' + (out.out || '(none)')]);
+      }
+
+      async function buildAndroid() {
+        requireRoot();
+        var slug = selectedApp();
+        if (!slug) {
+          throw new Error('choose an app first');
+        }
+        var res = await backend('build-android-debug', [slug]);
+        var out = kv(res.stdout || '');
+        setArtifacts(['Android artifact: ' + (out.artifact || '(none)')]);
+      }
+
+      async function createAppScaffold() {
+        requireRoot();
+
+        var slug = els.newAppSlug.value.trim();
+        var name = els.newAppName.value.trim();
+        var template = els.newAppTemplate.value;
+        var source = els.sourceApp.value;
+
+        if (!slug || !name) {
+          throw new Error('scaffold app requires slug + name');
+        }
+
+        var args = [slug, name, template];
+        if (template === 'clone') {
+          args.push(source);
+        }
+
+        var res = await backend('scaffold-app', args);
+        var out = kv(res.stdout || '');
+        setArtifacts([
+          'Created app: ' + (out.created || slug),
+          'Manifest: ' + (out.manifest || '(updated)')
+        ]);
+
+        els.newAppSlug.value = '';
+        els.newAppName.value = '';
+
+        await refreshWorkspace();
+        activateView('apps');
+      }
+
+      async function createSiteScaffold() {
+        requireRoot();
+
+        var name = els.siteName.value.trim();
+        var template = els.siteTemplate.value;
+        var dest = els.siteDest.value.trim();
+
+        if (!name || !template) {
+          throw new Error('scaffold site requires site name + template');
+        }
+
+        var args = [name, template];
+        if (dest) {
+          args.push(dest);
+        }
+
+        var res = await backend('scaffold-site', args);
+        var out = kv(res.stdout || '');
+        setArtifacts(['Created site: ' + (out.created || name)]);
+
+        els.siteName.value = '';
+      }
+
+      async function runTask(task) {
+        requireRoot();
+        await backend('run-task', [task]);
+        setArtifacts(['Task complete: ' + task]);
+      }
+
+      function syncCloneSourceEnabled() {
+        var needsSource = els.newAppTemplate.value === 'clone';
+        els.sourceApp.disabled = state.busy || !needsSource;
+      }
+
+      function activateView(name) {
+        state.currentView = name;
+        document.querySelectorAll('.nav-btn').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-view') === name);
+        });
+        document.querySelectorAll('.view').forEach(function (view) {
+          view.classList.toggle('active', view.id === 'view-' + name);
+        });
+      }
+
+      function activateCreateMode(mode) {
+        state.createMode = mode;
+        document.querySelectorAll('.mini-tab').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-create-mode') === mode);
+        });
+        document.querySelectorAll('.create-panel').forEach(function (panel) {
+          panel.classList.toggle('active', panel.id === 'create-' + mode + '-panel');
+        });
+      }
+
+      function bindKeyboardShortcuts() {
+        document.addEventListener('keydown', function (event) {
+          var target = event.target;
+          var tag = target && target.tagName ? target.tagName.toLowerCase() : '';
+          var typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+          if (typing) {
+            return;
+          }
+
+          var meta = event.metaKey || event.ctrlKey;
+          if (!meta) {
+            return;
+          }
+
+          var key = event.key.toLowerCase();
+          if (key === 'r') {
+            event.preventDefault();
+            perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
+          } else if (key === 'b') {
+            event.preventDefault();
+            perform('Build desktop app', buildBuiltIn, { swallow: true });
+          }
+        });
+      }
+
+      function bindButtons() {
+        els.refreshWorkspace.addEventListener('click', function () {
+          perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
+        });
+
+        els.gotoSettings.addEventListener('click', function () {
+          activateView('settings');
+        });
+
+        els.refreshRoot.addEventListener('click', function () {
+          setWorkspaceRoot(els.rootPath.value.trim());
+          perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
+        });
+
+        els.runApp.addEventListener('click', function () {
+          perform('Run native app', runBuiltIn, { swallow: true });
+        });
+
+        els.buildApp.addEventListener('click', function () {
+          perform('Build desktop app', buildBuiltIn, { swallow: true });
+        });
+
+        els.stageMobile.addEventListener('click', function () {
+          perform('Stage mobile assets', stageMobile, { swallow: true });
+        });
+
+        els.buildIos.addEventListener('click', function () {
+          perform('Build iOS smoke', buildIos, { swallow: true });
+        });
+
+        els.buildAndroid.addEventListener('click', function () {
+          perform('Build Android debug', buildAndroid, { swallow: true });
+        });
+
+        els.createApp.addEventListener('click', function () {
+          perform('Create app scaffold', createAppScaffold, { swallow: true });
+        });
+
+        els.createSite.addEventListener('click', function () {
+          perform('Create site scaffold', createSiteScaffold, { swallow: true });
+        });
+
+        document.querySelectorAll('button[data-task]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var task = btn.getAttribute('data-task');
+            perform('Run task: ' + task, function () {
+              return runTask(task);
+            }, { swallow: true });
+          });
+        });
+
+        document.querySelectorAll('.nav-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            activateView(btn.getAttribute('data-view'));
+          });
+        });
+
+        document.querySelectorAll('.mini-tab').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            activateCreateMode(btn.getAttribute('data-create-mode'));
+          });
+        });
+
+        els.appSelect.addEventListener('change', renderSelectedAppDetails);
+        els.newAppTemplate.addEventListener('change', syncCloneSourceEnabled);
+
+        els.dashboardGoManage.addEventListener('click', function () {
+          activateView('apps');
+        });
+
+        els.dashboardGoCreate.addEventListener('click', function () {
+          activateView('create');
+          activateCreateMode('app');
+        });
+
+        els.dashboardBuild.addEventListener('click', function () {
+          activateView('apps');
+          perform('Build desktop app', buildBuiltIn, { swallow: true });
+        });
+
+        els.clearLog.addEventListener('click', function () {
+          text(els.log, 'Wizardry Forge ready.');
+        });
+      }
+
+      function cacheElements() {
+        els.bridgeStatus = document.getElementById('bridge-status');
+        els.activityPill = document.getElementById('activity-pill');
+        els.workspaceRootDisplay = document.getElementById('workspace-root-display');
+        els.metricAppsTotal = document.getElementById('metric-apps-total');
+        els.metricAppsProd = document.getElementById('metric-apps-prod');
+        els.metricTemplates = document.getElementById('metric-templates');
+        els.refreshWorkspace = document.getElementById('refresh-workspace');
+        els.gotoSettings = document.getElementById('goto-settings');
+        els.dashboardCurrentApp = document.getElementById('dashboard-current-app');
+        els.dashboardGoManage = document.getElementById('dashboard-go-manage');
+        els.dashboardGoCreate = document.getElementById('dashboard-go-create');
+        els.dashboardBuild = document.getElementById('dashboard-build');
+
+        els.rootPath = document.getElementById('root-path');
+        els.refreshRoot = document.getElementById('refresh-root');
+        els.doctor = document.getElementById('doctor');
+
+        els.appSelect = document.getElementById('app-select');
+        els.runApp = document.getElementById('run-app');
+        els.buildApp = document.getElementById('build-app');
+        els.stageMobile = document.getElementById('stage-mobile');
+        els.buildIos = document.getElementById('build-ios');
+        els.buildAndroid = document.getElementById('build-android');
+        els.appsSummary = document.getElementById('apps-summary');
+        els.appDetails = document.getElementById('app-details');
+
+        els.newAppSlug = document.getElementById('new-app-slug');
+        els.newAppName = document.getElementById('new-app-name');
+        els.newAppTemplate = document.getElementById('new-app-template');
+        els.sourceApp = document.getElementById('source-app');
+        els.createApp = document.getElementById('create-app');
+
+        els.siteName = document.getElementById('site-name');
+        els.siteTemplate = document.getElementById('site-template');
+        els.siteDest = document.getElementById('site-dest');
+        els.createSite = document.getElementById('create-site');
+
+        els.artifacts = document.getElementById('artifact-list');
+        els.log = document.getElementById('log');
+        els.clearLog = document.getElementById('clear-log');
+        els.toast = document.getElementById('toast');
+      }
+
+      async function boot() {
+        cacheElements();
+        bindButtons();
+        bindKeyboardShortcuts();
+        activateView(state.currentView);
+        activateCreateMode(state.createMode);
+        syncCloneSourceEnabled();
+        setArtifacts([]);
+
+        if (state.rootHint) {
+          setWorkspaceRoot(state.rootHint);
+        }
+
+        if (bridgeAvailable()) {
+          setBridgeStatus(true, 'Bridge: connected');
+          setActivity('ready', 'Ready');
+          await perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
+          return;
+        }
+
+        document.body.classList.add('bridge-missing');
+        setBridgeStatus(false, 'Bridge: unavailable (open in native host)');
+        setActivity('idle', 'Waiting');
+        appendLog('Native bridge unavailable in browser preview mode.');
+
+        var retries = 0;
+        var maxRetries = 20;
+        var timer = setInterval(function () {
+          retries += 1;
+          if (!bridgeAvailable()) {
+            if (retries >= maxRetries) {
+              clearInterval(timer);
+            }
+            return;
+          }
+
+          clearInterval(timer);
+          document.body.classList.remove('bridge-missing');
+          setBridgeStatus(true, 'Bridge: connected');
+          setActivity('ready', 'Ready');
+          perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
+        }, 250);
+      }
+
+      window.addEventListener('load', boot);
+    })();
+  </script>
+</body>
+</html>

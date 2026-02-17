@@ -27,6 +27,10 @@ while true; do
   exit_label=$(exit-label)
   menu "wizardry-apps desktop admin" \
     "Desktop status%$script_dir/wizardry-apps-status --section desktop" \
+    "Wizardry Forge doctor%sh $repo_root/.apps/forge/scripts/forge-backend.sh doctor $repo_root" \
+    "Run Wizardry Forge%sh $repo_root/.apps/forge/scripts/forge-backend.sh run-desktop $repo_root forge" \
+    "Install Wizardry Forge launcher%$script_dir/install-wizardry-forge $repo_root" \
+    "Uninstall Wizardry Forge launcher%$script_dir/uninstall-wizardry-forge" \
     "Desktop workflow sanity%[ -f $repo_root/.github/workflows/build-desktop.yml ] && printf 'build-desktop workflow present\\n'" \
     "Release tooling self-check%sh $repo_root/.tests/release/test-release-tools.sh" \
     "${exit_label}%kill -TERM \$PPID" || menu_status=$?

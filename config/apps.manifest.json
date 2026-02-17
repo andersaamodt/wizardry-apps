@@ -22,6 +22,16 @@
       }
     },
     {
+      "slug": "forge",
+      "name": "Wizardry Forge",
+      "production": true,
+      "bundleIds": {
+        "macos": "com.wizardry.apps.forge.macos",
+        "ios": "com.wizardry.apps.forge.ios",
+        "android": "com.wizardry.apps.forge.android"
+      }
+    },
+    {
       "slug": "chatroom",
       "name": "Chatroom",
       "production": false,
