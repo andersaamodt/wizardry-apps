@@ -4,217 +4,265 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wizardry Forge</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=forge20260218b">
+  <link id="forge-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=forge20260218a">
 </head>
 <body>
   <div class="forge-shell">
-    <header class="topbar">
-      <div class="traffic" aria-hidden="true">
-        <span class="dot red"></span>
-        <span class="dot yellow"></span>
-        <span class="dot green"></span>
-      </div>
-      <div class="title-block">
-        <h1>Wizardry Forge</h1>
-        <p>Structured control center for building and publishing wizardry apps.</p>
-      </div>
-      <div class="status-block">
-        <span id="bridge-status" class="status-pill">Bridge: checking</span>
-        <span id="activity-pill" class="activity-pill idle">Idle</span>
-      </div>
-    </header>
+    <header class="topbar topbar-minimal"></header>
 
-    <section class="workspace-banner panel">
-      <div class="banner-main">
-        <h2>Workspace</h2>
-        <p id="workspace-root-display">Resolving wizardry-apps root…</p>
-      </div>
-      <div class="banner-metrics">
-        <div class="metric">
-          <span class="metric-label">Apps</span>
-          <span class="metric-value" id="metric-apps-total">0</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Production</span>
-          <span class="metric-value" id="metric-apps-prod">0</span>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Templates</span>
-          <span class="metric-value" id="metric-templates">0</span>
-        </div>
-      </div>
-      <div class="banner-actions">
-        <button id="refresh-workspace" type="button" class="action">Refresh</button>
-        <button id="goto-settings" type="button" class="action">Fix Workspace</button>
-      </div>
-    </section>
+    <div class="workbench">
+      <aside id="settings-panel" class="slide-panel left panel" aria-label="Settings">
+        <div class="panel-scroll">
+          <header class="slide-head settings-head">
+            <h2>Settings</h2>
+            <div class="settings-status-row">
+              <span id="bridge-status" class="status-pill">Bridge: checking</span>
+              <span id="activity-pill" class="activity-pill idle">Idle</span>
+            </div>
+          </header>
 
-    <main class="main-grid">
-      <nav class="sidebar panel" aria-label="Forge sections">
-        <button type="button" class="nav-btn active" data-view="dashboard">Dashboard</button>
-        <button type="button" class="nav-btn" data-view="apps">Manage Apps</button>
-        <button type="button" class="nav-btn" data-view="create">Create</button>
-        <button type="button" class="nav-btn" data-view="quality">Quality</button>
-        <button type="button" class="nav-btn" data-view="settings">Settings</button>
-      </nav>
-
-      <section class="center panel">
-        <section class="view active" id="view-dashboard">
           <article class="card">
-            <h2>Workflow</h2>
-            <p class="sub">Follow this sequence for clean app operations.</p>
-            <ol class="steps">
-              <li><strong>1.</strong> Confirm workspace root and toolchain.</li>
-              <li><strong>2.</strong> Select or scaffold an app.</li>
-              <li><strong>3.</strong> Build desktop and stage mobile assets.</li>
-              <li><strong>4.</strong> Run quality tasks before release.</li>
-            </ol>
-            <div class="button-grid three">
-              <button type="button" class="action" id="dashboard-go-manage">Go To Manage</button>
-              <button type="button" class="action" id="dashboard-go-create">Go To Create</button>
-              <button type="button" class="action primary" id="dashboard-build">Build Selected App</button>
+            <h3>Projects Root</h3>
+            <label for="settings-projects-root">Default projects folder</label>
+            <div class="input-row">
+              <input id="settings-projects-root" type="text" placeholder="/Users/you/git" spellcheck="false">
+              <button id="apply-projects-root" type="button" class="action">Apply</button>
             </div>
           </article>
 
           <article class="card">
-            <h2>Current App Summary</h2>
-            <p class="sub">Use Manage Apps for operations. This card mirrors the current selection.</p>
-            <pre id="dashboard-current-app" class="mono compact">No app selected.</pre>
-          </article>
-        </section>
-
-        <section class="view" id="view-apps">
-          <article class="card">
-            <h2>Step 1: Select App</h2>
-            <label for="app-select">Built-in app</label>
-            <select id="app-select"></select>
-            <pre id="apps-summary" class="mono compact">No app data yet.</pre>
-          </article>
-
-          <article class="card">
-            <h2>Step 2: Build + Stage</h2>
-            <div class="button-grid three">
-              <button type="button" id="build-app" class="action primary">Build Desktop</button>
-              <button type="button" id="stage-mobile" class="action">Stage Mobile</button>
-              <button type="button" id="run-app" class="action">Run Native</button>
+            <h3>Repository Root</h3>
+            <label for="repo-root">wizardry-apps root</label>
+            <div class="input-row">
+              <input id="repo-root" type="text" placeholder="/absolute/path/to/wizardry-apps" spellcheck="false">
+              <button id="apply-repo-root" type="button" class="action">Apply</button>
             </div>
-            <div class="button-grid two">
-              <button type="button" id="build-ios" class="action">Build iOS Smoke</button>
-              <button type="button" id="build-android" class="action">Build Android Debug</button>
+            <header class="route-head route-head-scope settings-quality-head">
+              <div>
+                <h3>Quality</h3>
+                <p id="quality-scope" class="sub">Global checks for the wizardry-apps repository.</p>
+              </div>
+              <span class="scope-pill">Global</span>
+            </header>
+            <div class="button-row compact">
+              <button type="button" class="action" data-task="validate-manifest">Validate Manifest</button>
+              <button type="button" class="action" data-task="test-core">Core Tests</button>
+              <button type="button" class="action" data-task="test-adapters">Adapter Tests</button>
+              <button type="button" class="action" data-task="test-release-tools">Release Tools Tests</button>
             </div>
           </article>
 
           <article class="card">
-            <h2>Step 3: App Details</h2>
-            <pre id="app-details" class="mono compact">Select an app to inspect details.</pre>
-          </article>
-        </section>
-
-        <section class="view" id="view-create">
-          <article class="card">
-            <h2>Create Workspace Assets</h2>
-            <p class="sub">Choose one creation flow at a time.</p>
-            <div class="mini-tabs" aria-label="Create type">
-              <button type="button" class="mini-tab active" data-create-mode="app">App Scaffold</button>
-              <button type="button" class="mini-tab" data-create-mode="site">Site Scaffold</button>
-            </div>
-          </article>
-
-          <article class="card create-panel active" id="create-app-panel">
-            <h2>New App Scaffold</h2>
-            <div class="form-grid">
-              <label for="new-app-slug">Slug</label>
-              <input id="new-app-slug" type="text" placeholder="my-tool" spellcheck="false">
-
-              <label for="new-app-name">Name</label>
-              <input id="new-app-name" type="text" placeholder="My Tool">
-
-              <label for="new-app-template">Template</label>
-              <select id="new-app-template">
-                <option value="minimal">minimal</option>
-                <option value="panel">panel</option>
-                <option value="clone">clone</option>
-              </select>
-
-              <label for="source-app">Clone source</label>
-              <select id="source-app"></select>
-            </div>
-            <button type="button" id="create-app" class="action primary wide">Create App Scaffold</button>
-          </article>
-
-          <article class="card create-panel" id="create-site-panel">
-            <h2>New Site Scaffold</h2>
-            <div class="form-grid">
-              <label for="site-name">Site name</label>
-              <input id="site-name" type="text" placeholder="my-site" spellcheck="false">
-
-              <label for="site-template">Template</label>
-              <select id="site-template"></select>
-
-              <label for="site-dest">Destination root</label>
-              <input id="site-dest" type="text" placeholder="$HOME/sites" spellcheck="false">
-            </div>
-            <button type="button" id="create-site" class="action primary wide">Create Site Folder</button>
-          </article>
-        </section>
-
-        <section class="view" id="view-quality">
-          <article class="card">
-            <h2>Quality Gates</h2>
-            <p class="sub">Run these checks before tag/release workflows.</p>
-            <div class="button-grid two quality-grid">
-              <button type="button" data-task="validate-manifest" class="action">Validate Manifest</button>
-              <button type="button" data-task="test-core" class="action">Core Tests</button>
-              <button type="button" data-task="test-adapters" class="action">Adapter Tests</button>
-              <button type="button" data-task="test-release-tools" class="action">Release Tools</button>
-            </div>
-          </article>
-
-          <article class="card">
-            <h2>Release Reminder</h2>
-            <ul class="plain-list">
-              <li>Manifest validation is a hard release blocker.</li>
-              <li>macOS release requires notarization success.</li>
-              <li>Linux release requires AppImage smoke pass.</li>
-              <li>Store promotion happens after test-track approval.</li>
-            </ul>
-          </article>
-        </section>
-
-        <section class="view" id="view-settings">
-          <article class="card">
-            <h2>Workspace Root</h2>
-            <p class="sub">Forge needs this path to discover built-in apps and templates.</p>
-            <label for="root-path">wizardry-apps root</label>
-            <div class="root-row">
-              <input id="root-path" type="text" placeholder="/absolute/path/to/wizardry-apps" spellcheck="false">
-              <button type="button" id="refresh-root" class="action">Apply</button>
-            </div>
-            <p class="hint">Tip: this value is saved locally, and install/launch scripts keep it synced.</p>
-          </article>
-
-          <article class="card">
-            <h2>Doctor</h2>
+            <h3>Debug Info</h3>
             <pre id="doctor" class="mono">Waiting for workspace check.</pre>
           </article>
-        </section>
-      </section>
-
-      <aside class="rail panel">
-        <article class="card">
-          <h2>Artifacts</h2>
-          <ul id="artifact-list"></ul>
-        </article>
-
-        <article class="card log-card">
-          <div class="log-head">
-            <h2>Command Log</h2>
-            <button type="button" id="clear-log">Clear</button>
-          </div>
-          <pre id="log" class="mono">Wizardry Forge ready.</pre>
-        </article>
+        </div>
       </aside>
-    </main>
+
+      <div class="app-grid">
+      <aside class="left-rail panel">
+        <section class="card apps-list-card">
+          <div class="apps-list-head">
+            <input id="builtin-search" type="text" placeholder="Filter" spellcheck="false">
+            <div class="menu-anchor">
+              <button id="organize-btn" class="icon-action" type="button" aria-haspopup="menu" aria-expanded="false" title="Organize">☰</button>
+              <div id="organize-menu" class="floating-menu organize-menu hidden" role="menu" aria-label="Organize apps">
+                <p class="organize-title">Show</p>
+                <button type="button" data-organize-show="both"><span>Built-in and user-created</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-show="builtin"><span>Built-in only</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-show="workspace"><span>User-created only</span><span class="check" aria-hidden="true">&check;</span></button>
+              </div>
+            </div>
+            <button id="open-create-workflow" class="icon-action" type="button" title="Create App" aria-label="Create App">+</button>
+          </div>
+          <div id="catalog-list" class="list catalog-list"></div>
+        </section>
+
+        <section class="card sidebar-footer">
+          <div class="footer-bar">
+            <button id="toggle-settings-panel" type="button" class="footer-icon-btn" aria-label="Toggle settings panel" title="Settings">⚙︎</button>
+            <div class="menu-anchor footer-theme-anchor">
+              <button id="theme-picker-btn" class="footer-theme-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Select theme">Psionic</button>
+              <div id="theme-picker-menu" class="floating-menu hidden" role="menu" aria-label="Theme selector">
+                <div id="theme-picker-list" class="menu-list"></div>
+              </div>
+            </div>
+            <div class="footer-spacer" aria-hidden="true"></div>
+          </div>
+        </section>
+      </aside>
+
+      <div id="rail-divider" class="rail-divider" role="separator" aria-orientation="vertical" aria-label="Resize app list"></div>
+
+      <main class="stage panel">
+        <div id="stage-tools" class="stage-tools">
+          <div class="toolbar-meta">
+            <div class="selected-title-row">
+              <h3 id="selected-title">Selected App</h3>
+              <span id="selected-type-badge" class="type-badge hidden"></span>
+              <span id="selected-suite-badge" class="suite-badge hidden"><span>wizardry suite</span></span>
+            </div>
+            <div class="selected-path-row">
+              <button id="open-selected-path" type="button" class="path-link hidden" title="Open folder" aria-label="Open folder"></button>
+              <button id="terminal-selected-path" type="button" class="terminal-icon hidden" title="Open in terminal" aria-label="Open in terminal">
+                <img src="assets/terminal-icon.png" alt="Terminal">
+              </button>
+            </div>
+          </div>
+          <div class="toolbar-actions">
+            <div class="toolbar-left">
+              <div class="build-split menu-anchor">
+                <button id="action-build" type="button" class="action toolbar-btn primary" title="Compile Desktop">🛠 Build</button>
+                <button id="action-build-menu" type="button" class="action toolbar-btn menu-toggle" aria-haspopup="menu" aria-expanded="false" title="Advanced Builds">▾</button>
+                <div id="build-menu" class="floating-menu hidden" role="menu" aria-label="Build options">
+                  <button id="action-ios" type="button" class="menu-action">📱 Build iOS Smoke</button>
+                  <button id="action-android" type="button" class="menu-action">🤖 Build Android Debug</button>
+                </div>
+              </div>
+              <button id="action-run" type="button" class="action toolbar-btn" title="Run app">▶ Run</button>
+              <button id="action-stage" type="button" class="action toolbar-btn" title="Stage mobile assets">📦 Stage</button>
+            </div>
+          </div>
+        </div>
+
+        <section id="route-pipeline" class="route active">
+          <article class="card details-card">
+            <div id="selected-app-grid" class="kv-grid"></div>
+            <section id="selected-targets-editor" class="targets-editor">
+              <div class="pipeline-sections">
+                <details class="pipeline-section" open>
+                  <summary class="pipeline-section-head">App icon</summary>
+                  <div class="pipeline-section-body">
+                    <div class="icon-editor">
+                      <label id="selected-icon-drop" class="icon-dropzone" for="selected-icon-input" aria-label="Drop app icon or choose a file">
+                        <div class="icon-preview-wrap">
+                          <button id="selected-icon-clear" type="button" class="icon-clear-btn hidden" title="Clear icon" aria-label="Clear icon">×</button>
+                          <img id="selected-icon-preview" class="icon-preview hidden" alt="App icon preview">
+                          <span id="selected-icon-placeholder" class="icon-placeholder">No icon</span>
+                        </div>
+                        <div class="icon-drop-copy">Drop icon here or choose a file</div>
+                      </label>
+                      <input id="selected-icon-input" class="icon-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                    </div>
+                  </div>
+                </details>
+
+                <details class="pipeline-section" open>
+                  <summary class="pipeline-section-head">Publish targets</summary>
+                  <div class="pipeline-section-body">
+                    <h5 class="targets-subhead">Active Targets</h5>
+                    <div id="target-active-list" class="target-list"></div>
+                    <details id="inactive-targets-section" class="targets-subsection">
+                      <summary class="targets-subhead targets-subhead-toggle">Inactive Targets</summary>
+                      <div id="target-inactive-list" class="target-list"></div>
+                    </details>
+                  </div>
+                </details>
+
+                <details class="pipeline-section" open>
+                  <summary class="pipeline-section-head with-action">
+                    <span>Log</span>
+                    <button id="clear-log" type="button" class="action section-clear-btn">Clear</button>
+                  </summary>
+                  <div class="pipeline-section-body">
+                    <div class="command-log-frame">
+                      <pre id="log" class="mono command-log">Wizardry Forge ready.</pre>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </section>
+          </article>
+        </section>
+
+        <section id="route-create" class="route">
+          <header class="route-head">
+            <h2>Create App</h2>
+            <p>Create a new app workspace in your projects root (default: <code>~/git</code>).</p>
+          </header>
+
+          <article class="card">
+            <h3>Project Type</h3>
+            <div class="type-picker">
+              <label class="type-option" id="type-application-card">
+                <input type="radio" name="project-type" value="application" checked>
+                <span class="type-icon">🖥</span>
+                <span class="type-title">Application</span>
+                <span class="type-desc">A website-based app packaged as a real app. Good for most applications.</span>
+              </label>
+              <label class="type-option" id="type-game-card">
+                <input type="radio" name="project-type" value="game">
+                <span class="type-icon">🎮</span>
+                <span class="type-title">Game</span>
+                <span class="type-desc">A simulation-based app. Good for making games and interactive tools.</span>
+              </label>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Project Identity</h3>
+            <div class="form-grid">
+              <div>
+                <label for="create-title">Type name or title</label>
+                <input id="create-title" type="text" placeholder="My App">
+              </div>
+              <div>
+                <label for="create-folder">Folder name</label>
+                <input id="create-folder" type="text" placeholder="my-app" spellcheck="false">
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Starter</h3>
+            <div id="starter-application" class="starter-pane active">
+              <label for="starter-application-select">Application starter</label>
+              <select id="starter-application-select">
+                <option value="minimal">Minimal app</option>
+                <option value="panel">Control panel app</option>
+                <option value="clone">Clone built-in app</option>
+              </select>
+
+              <label for="starter-application-source">Clone source app</label>
+              <select id="starter-application-source"></select>
+            </div>
+
+            <div id="starter-game" class="starter-pane">
+              <label for="starter-game-select">Game starter</label>
+              <select id="starter-game-select">
+                <option value="blank">Blank game workspace</option>
+                <option value="clone">Clone existing game workspace</option>
+              </select>
+
+              <label for="starter-game-source">Clone source game workspace</label>
+              <select id="starter-game-source"></select>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Publishing Targets</h3>
+            <div class="target-grid">
+              <label class="target-item" data-target-groups="application"><input id="target-hosted-web" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-hosted-web.svg" alt=""></span>Hosted Web</label>
+              <label class="target-item" data-target-groups="application,game"><input id="target-macos" type="checkbox" checked><span class="target-icon" aria-hidden="true"></span>macOS Desktop</label>
+              <label class="target-item" data-target-groups="application,game"><input id="target-linux" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-linux.svg" alt=""></span>Linux Desktop</label>
+              <label class="target-item" data-target-groups="application,game"><input id="target-ios" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-ios.svg" alt=""></span>iOS</label>
+              <label class="target-item" data-target-groups="application,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</label>
+            </div>
+          </article>
+
+          <article class="card">
+            <h3>Location</h3>
+            <label for="projects-root">Projects root</label>
+            <input id="projects-root" type="text" placeholder="/Users/you/git" spellcheck="false">
+            <p class="sub">Forge only treats folders as projects if they contain <code>wizardry.workspace.conf</code>.</p>
+            <button id="create-submit" type="button" class="action primary">Create Project</button>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    </div>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -243,16 +291,47 @@
   <script>
     (function () {
       var ROOT_KEY = 'wizardry.forge.root';
+      var PROJECTS_ROOT_KEY = 'wizardry.forge.projects.root';
+      var ORGANIZE_SHOW_KEY = 'wizardry.forge.organize.show';
+      var THEME_KEY = 'wizardry.forge.theme';
+      var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
+      var ICON_MAP_KEY = 'wizardry.forge.icon.map.v1';
+      var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
+      var ASSET_VERSION = 'forge20260218a';
 
       var state = {
         appDir: inferAppDir(),
-        rootHint: loadRootHint(),
+        rootHint: loadStorage(ROOT_KEY),
+        projectsRoot: loadStorage(PROJECTS_ROOT_KEY),
+        homeDir: '',
+        os: '',
+        tools: {},
         apps: [],
-        templates: [],
+        workspaces: [],
+        organizeShow: loadStorage(ORGANIZE_SHOW_KEY) || 'both',
+        themes: [
+          'adept', 'alchemist', 'archmage', 'chronomancer', 'conjurer', 'druid',
+          'empath', 'enchanter', 'geomancer', 'hermeticist', 'hierophant', 'illusionist',
+          'lich', 'necromancer', 'psionic', 'pyromancer', 'seer', 'shaman', 'sorcerer', 'sorceress',
+          'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet', 'warlock', 'wizard'
+        ],
+        activeTheme: loadStorage(THEME_KEY) || 'psionic',
+        selectedBuiltIn: '',
+        selectedWorkspace: '',
+        selectedCatalog: loadStorage(SELECTED_CATALOG_KEY),
+        route: 'pipeline',
         busy: false,
         toastTimer: null,
-        currentView: 'dashboard',
-        createMode: 'app'
+        latestResult: null,
+        settingsOpen: false,
+        autoRefreshTimer: null,
+        lastProjectType: '',
+        windowFitTimer: null,
+        createDraftActive: false,
+        leftRailWidth: parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240,
+        targetRuntime: {},
+        targetSectionByRow: {},
+        iconMap: loadJSONStorage(ICON_MAP_KEY, {})
       };
 
       var els = {};
@@ -262,28 +341,59 @@
         return p.replace(/\/index\.html$/, '');
       }
 
-      function backendScript() {
-        return state.appDir + '/scripts/forge-backend.sh';
-      }
-
-      function loadRootHint() {
+      function loadStorage(key) {
         try {
-          return localStorage.getItem(ROOT_KEY) || '';
+          return localStorage.getItem(key) || '';
         } catch (_err) {
           return '';
         }
       }
 
-      function saveRootHint(root) {
+      function saveStorage(key, value) {
         try {
-          if (root) {
-            localStorage.setItem(ROOT_KEY, root);
+          if (value) {
+            localStorage.setItem(key, value);
           } else {
-            localStorage.removeItem(ROOT_KEY);
+            localStorage.removeItem(key);
           }
         } catch (_err) {
           return;
         }
+      }
+
+      function setSelectedCatalog(value) {
+        state.selectedCatalog = value || '';
+        if (/^(builtin|workspace):/.test(state.selectedCatalog)) {
+          saveStorage(SELECTED_CATALOG_KEY, state.selectedCatalog);
+        }
+      }
+
+      function loadJSONStorage(key, fallback) {
+        var raw = loadStorage(key);
+        if (!raw) {
+          return fallback;
+        }
+        try {
+          var parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            return parsed;
+          }
+        } catch (_err) {
+          return fallback;
+        }
+        return fallback;
+      }
+
+      function saveJSONStorage(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value || {}));
+        } catch (_err) {
+          return;
+        }
+      }
+
+      function backendScript() {
+        return state.appDir + '/scripts/forge-backend.sh';
       }
 
       function now() {
@@ -296,15 +406,31 @@
         }
       }
 
+      function syncLogClearVisibility() {
+        if (!els.clearLog || !els.log) {
+          return;
+        }
+        var hasContent = (els.log.textContent || '').trim().length > 0;
+        els.clearLog.classList.toggle('hidden', !hasContent);
+      }
+
+      function setLogContent(value) {
+        if (!els.log) {
+          return;
+        }
+        els.log.textContent = value || '';
+        syncLogClearVisibility();
+      }
+
       function appendLog(line) {
         if (!els.log) {
           return;
         }
         var next = '[' + now() + '] ' + line + '\n' + (els.log.textContent || '');
-        if (next.length > 30000) {
-          next = next.slice(0, 30000);
+        if (next.length > 36000) {
+          next = next.slice(0, 36000);
         }
-        els.log.textContent = next;
+        setLogContent(next);
       }
 
       function setBridgeStatus(ok, msg) {
@@ -393,43 +519,31 @@
         return [backendScript(), cmd, state.rootHint || ''];
       }
 
-      async function backend(cmd, extraArgs) {
+      async function backend(cmd, extraArgs, opts) {
+        opts = opts || {};
         var argv = rootArgv(cmd);
         (extraArgs || []).forEach(function (item) {
           argv.push(item);
         });
-        appendLog('> ' + argv.join(' '));
+        if (!opts.quiet) {
+          appendLog('> ' + argv.join(' '));
+        }
         var res = await execArgv(argv);
-        if (res.stdout) {
+        if (!opts.quiet && res.stdout) {
           appendLog(res.stdout.trim());
         }
-        if (res.stderr) {
+        if (!opts.quiet && res.stderr) {
           appendLog('[stderr] ' + res.stderr.trim());
         }
         return res;
       }
 
-      function setArtifacts(lines) {
-        if (!els.artifacts) {
-          return;
-        }
-
-        els.artifacts.innerHTML = '';
-        var values = lines && lines.length ? lines : ['No artifacts yet.'];
-        values.forEach(function (line) {
-          var li = document.createElement('li');
-          li.textContent = line;
-          els.artifacts.appendChild(li);
-        });
-      }
-
       function setBusy(flag) {
         state.busy = flag;
         document.body.classList.toggle('is-busy', flag);
-        document.querySelectorAll('.action').forEach(function (btn) {
+        document.querySelectorAll('.action, .row-play, .row-mini').forEach(function (btn) {
           btn.disabled = flag;
         });
-        syncCloneSourceEnabled();
       }
 
       async function perform(label, fn, opts) {
@@ -439,7 +553,19 @@
 
         opts = opts || {};
         setBusy(true);
-        setActivity('working', label);
+        setActivity('working', label + '...');
+        if (!opts.keepResult) {
+          renderResult({
+            status: 'working',
+            summary: label + ' in progress...',
+            help: {
+              title: 'Working',
+              body: 'Forge is running this command. You can switch sections while it completes.'
+            },
+            paths: [],
+            actions: []
+          });
+        }
 
         try {
           await fn();
@@ -448,8 +574,15 @@
           }
         } catch (err) {
           var message = String(err && err.message ? err.message : err);
+          var logPath = extractLogPath(message);
           appendLog('error: ' + message);
           setActivity('fault', 'Error');
+          renderResult({
+            status: 'error',
+            summary: message,
+            help: actionableHelp(message),
+            paths: logPath ? [{ label: 'Failure log', path: logPath, canReveal: true }] : []
+          });
           toast(message, 'bad');
           if (!opts.swallow) {
             throw err;
@@ -462,319 +595,1949 @@
         }
       }
 
+      function actionableHelp(message) {
+        var lower = (message || '').toLowerCase();
+        var hasBrew = state.tools && state.tools.brew === '1';
+
+        if (lower.indexOf('xcodegen is required') >= 0) {
+          return {
+            title: 'xcodegen is required for iOS smoke builds',
+            body: hasBrew
+              ? 'Install xcodegen, then retry.\nCommand: brew install xcodegen'
+              : 'Install xcodegen, then retry.\nHomebrew is not detected, so install it first or install xcodegen manually.',
+            installTool: hasBrew ? 'xcodegen' : ''
+          };
+        }
+
+        if (lower.indexOf('required tool not found: gradle') >= 0) {
+          return {
+            title: 'Gradle is required for Android debug builds',
+            body: hasBrew
+              ? 'Install Gradle, then retry Android build.\nCommand: brew install gradle'
+              : 'Install Gradle and ensure it is on PATH, then retry Android build.',
+            installTool: hasBrew ? 'gradle' : ''
+          };
+        }
+
+        if (lower.indexOf('required tool not found: java') >= 0) {
+          return {
+            title: 'Java is required for Android debug builds',
+            body: hasBrew
+              ? 'Install a JDK, then retry Android build.\nCommand: brew install openjdk'
+              : 'Install a JDK and ensure java is on PATH, then retry Android build.',
+            installTool: hasBrew ? 'java' : ''
+          };
+        }
+
+        if (lower.indexOf('required tool not found: xcodebuild') >= 0) {
+          return {
+            title: 'Xcode command line tools are required',
+            body: 'Install Xcode and its command line tools, then retry iOS build.',
+            installTool: ''
+          };
+        }
+
+        return null;
+      }
+
+      function extractLogPath(message) {
+        var match = String(message || '').match(/see log:\s*([^)]+)/i);
+        if (!match || !match[1]) {
+          return '';
+        }
+        return match[1].trim();
+      }
+
+      async function installTool(tool) {
+        if (state.os !== 'darwin') {
+          throw new Error('automatic install helper is currently available on macOS only');
+        }
+        if (!state.tools || state.tools.brew !== '1') {
+          throw new Error('Homebrew is not available on this system; install it first or install ' + tool + ' manually');
+        }
+
+        if (tool === 'xcodegen') {
+          await execArgv(['brew', 'install', 'xcodegen']);
+          return;
+        }
+
+        if (tool === 'gradle') {
+          await execArgv(['brew', 'install', 'gradle']);
+          return;
+        }
+
+        if (tool === 'java') {
+          await execArgv(['brew', 'install', 'openjdk']);
+          return;
+        }
+
+        throw new Error('no installer helper for tool: ' + tool);
+      }
+
+      async function openPath(path, reveal) {
+        if (!path) {
+          return;
+        }
+
+        if (state.os === 'darwin') {
+          if (reveal) {
+            await execArgv(['open', '-R', path]);
+          } else {
+            await execArgv(['open', path]);
+          }
+          return;
+        }
+
+        if (state.os === 'linux') {
+          await execArgv(['xdg-open', path]);
+          return;
+        }
+
+        throw new Error('open path helper unsupported on this OS');
+      }
+
+      async function openTerminalAtPath(path) {
+        if (!path) {
+          return;
+        }
+        if (state.os === 'darwin') {
+          await execArgv(['open', '-a', 'Terminal', path]);
+          return;
+        }
+        if (state.os === 'linux') {
+          if (state.tools && state.tools.x_terminal === '1') {
+            await execArgv(['x-terminal-emulator', '--working-directory=' + path]);
+            return;
+          }
+          if (state.tools && state.tools.gnome_terminal === '1') {
+            await execArgv(['gnome-terminal', '--working-directory=' + path]);
+            return;
+          }
+          if (state.tools && state.tools.konsole === '1') {
+            await execArgv(['konsole', '--workdir', path]);
+            return;
+          }
+          throw new Error('terminal launcher unavailable on this OS');
+        }
+        throw new Error('open terminal helper unsupported on this OS');
+      }
+
+      function filteredCatalogItems() {
+        var query = (els.builtinSearch.value || '').toLowerCase().trim();
+        var showMode = state.organizeShow || 'both';
+        return catalogItems().filter(function (item) {
+          if (showMode === 'builtin' && item.kind !== 'builtin') {
+            return false;
+          }
+          if (showMode === 'workspace' && item.kind !== 'workspace') {
+            return false;
+          }
+          if (!query) {
+            return true;
+          }
+          return item.id.toLowerCase().indexOf(query) >= 0 || item.title.toLowerCase().indexOf(query) >= 0;
+        });
+      }
+
+      function scheduleWindowFit() {
+        return;
+      }
+
+      async function requestWindowFit() {
+        return;
+      }
+
       function setWorkspaceRoot(root) {
         state.rootHint = root || '';
-        saveRootHint(state.rootHint);
-        text(els.workspaceRootDisplay, state.rootHint || 'Workspace root not resolved. Open Settings and set it manually.');
-        if (els.rootPath) {
-          els.rootPath.value = state.rootHint;
+        saveStorage(ROOT_KEY, state.rootHint);
+        text(els.workspaceRootDisplay, state.rootHint || 'Workspace root not resolved. Use the settings gear.');
+        els.repoRoot.value = state.rootHint;
+      }
+
+      function setProjectsRoot(path) {
+        state.projectsRoot = path || '';
+        saveStorage(PROJECTS_ROOT_KEY, state.projectsRoot);
+        els.projectsRoot.value = state.projectsRoot;
+        els.settingsProjectsRoot.value = state.projectsRoot;
+      }
+
+      function setLeftRailWidth(width) {
+        var next = parseInt(width, 10);
+        if (isNaN(next)) {
+          next = 320;
+        }
+        if (next < 240) {
+          next = 240;
+        }
+        if (next > 560) {
+          next = 560;
+        }
+        state.leftRailWidth = next;
+        saveStorage(LEFT_RAIL_WIDTH_KEY, String(next));
+        if (els.appGrid) {
+          els.appGrid.style.setProperty('--left-rail-width', next + 'px');
+        }
+        scheduleLayoutRecoveryCheck();
+      }
+
+      function enforceLayoutRecovery() {
+        if (!els.stage || !els.appGrid) {
+          return;
+        }
+        var stageRect = els.stage.getBoundingClientRect();
+        var gridRect = els.appGrid.getBoundingClientRect();
+        if (gridRect.width <= 0) {
+          return;
+        }
+        var collapsed = gridRect.width > 420 && stageRect.width < 240;
+        if (!collapsed) {
+          return;
+        }
+        document.body.classList.add('layout-recovery');
+        appendLog('layout recovery: main pane collapsed; applying stable width fallback');
+      }
+
+      function scheduleLayoutRecoveryCheck() {
+        window.requestAnimationFrame(function () {
+          enforceLayoutRecovery();
+        });
+      }
+
+      function setPanel(name, open) {
+        if (name === 'settings') {
+          state.settingsOpen = !!open;
+          document.body.classList.toggle('settings-open', state.settingsOpen);
+          if (els.toggleSettingsPanel) {
+            els.toggleSettingsPanel.classList.toggle('active', state.settingsOpen);
+          }
+          scheduleWindowFit();
         }
       }
 
-      async function refreshWorkspace() {
-        var res = await backend('doctor');
+      function normalizeProjectsRoot() {
+        if (state.projectsRoot) {
+          return;
+        }
+        if (state.homeDir) {
+          setProjectsRoot(state.homeDir + '/git');
+          return;
+        }
+        setProjectsRoot('~/git');
+      }
+
+      function setWorkflowMode(mode) {
+        var leavingCreate = state.route === 'create' && mode !== 'create';
+        if (leavingCreate && !createDraftHasInput()) {
+          state.createDraftActive = false;
+          setSelectedCatalog('');
+        }
+        state.route = mode === 'create' ? 'create' : 'pipeline';
+        if (state.route === 'create') {
+          state.createDraftActive = true;
+          setSelectedCatalog('draft:create');
+        }
+        document.querySelectorAll('.route').forEach(function (panel) {
+          panel.classList.toggle('active', panel.id === 'route-' + state.route);
+        });
+        if (els.openCreateWorkflow) {
+          els.openCreateWorkflow.classList.toggle('active', state.route === 'create');
+        }
+        renderCatalogList();
+        renderSelectedBuiltIn();
+        scheduleWindowFit();
+      }
+
+      function inferProjectTypeFromContext(ctx) {
+        return ctx === 'godot' ? 'Game' : 'Application';
+      }
+
+      function projectTypeKeyForContext(ctx) {
+        return ctx === 'godot' ? 'game' : 'application';
+      }
+
+      function parseTargetsCSV(value) {
+        var out = [];
+        String(value || '').split(',').forEach(function (item) {
+          var part = item.trim();
+          if (!part) {
+            return;
+          }
+          if (out.indexOf(part) >= 0) {
+            return;
+          }
+          out.push(part);
+        });
+        return out;
+      }
+
+      function targetSpecs(projectType) {
+        var specs = [
+          { id: 'hosted-web', iconSrc: 'assets/target-hosted-web.svg', iconAlt: 'Hosted Web', label: 'Hosted Web' },
+          { id: 'linux', iconSrc: 'assets/target-linux.svg', iconAlt: 'Linux Desktop', label: 'Linux Desktop' },
+          { id: 'macos', iconText: '', label: 'macOS Desktop' },
+          { id: 'android', iconSrc: 'assets/target-android.svg', iconAlt: 'Android', label: 'Android' },
+          { id: 'ios', iconSrc: 'assets/target-ios.svg', iconAlt: 'iOS', label: 'iOS' }
+        ];
+        if (projectType === 'game') {
+          return specs.filter(function (item) {
+            return item.id !== 'hosted-web';
+          });
+        }
+        return specs;
+      }
+
+      function normalizeUITargets(projectType, list) {
+        var allowed = targetSpecs(projectType).map(function (item) { return item.id; });
+        var seen = {};
+        var out = [];
+        (list || []).forEach(function (item) {
+          if (allowed.indexOf(item) < 0 || seen[item]) {
+            return;
+          }
+          seen[item] = true;
+          out.push(item);
+        });
+        return out;
+      }
+
+      function uiTargetsFromStored(projectType, storedTargets) {
+        return normalizeUITargets(projectType, (storedTargets || []).filter(function (item) {
+          return item !== 'godot-desktop';
+        }));
+      }
+
+      function storedTargetsFromUI(projectType, uiTargets) {
+        var out = normalizeUITargets(projectType, uiTargets);
+        if (projectType === 'game') {
+          out.unshift('godot-desktop');
+        }
+        return out;
+      }
+
+      function ensureTargetRuntime(projectKey) {
+        if (!state.targetRuntime[projectKey]) {
+          state.targetRuntime[projectKey] = {};
+        }
+        return state.targetRuntime[projectKey];
+      }
+
+      function setTargetRuntime(projectKey, targetId, status, path) {
+        if (!projectKey || !targetId) {
+          return;
+        }
+        var bucket = ensureTargetRuntime(projectKey);
+        bucket[targetId] = bucket[targetId] || {};
+        bucket[targetId].status = status || '';
+        if (typeof path === 'string') {
+          bucket[targetId].path = path;
+        }
+      }
+
+      function getTargetRuntime(projectKey, targetId) {
+        var bucket = state.targetRuntime[projectKey] || {};
+        return bucket[targetId] || null;
+      }
+
+      function targetStatusLabel(selected, targetId, active) {
+        if (!active) {
+          return 'inactive';
+        }
+        var entry = getTargetRuntime(selected.key, targetId);
+        if (!entry || !entry.status) {
+          return '';
+        }
+        return entry.status;
+      }
+
+      function targetOpenPath(selected, targetId) {
+        var entry = getTargetRuntime(selected.key, targetId);
+        if (entry && entry.path) {
+          return entry.path;
+        }
+        return selected.path || '';
+      }
+
+      function isTargetRunnable(targetId) {
+        if (targetId === 'hosted-web') {
+          return false;
+        }
+        if (targetId === 'macos') {
+          return state.os === 'darwin';
+        }
+        if (targetId === 'linux') {
+          return state.os === 'linux';
+        }
+        if (targetId === 'ios' || targetId === 'android') {
+          return false;
+        }
+        return false;
+      }
+
+      function captureTargetRowRects() {
+        var rects = {};
+        document.querySelectorAll('.target-row[data-row-key]').forEach(function (row) {
+          rects[row.getAttribute('data-row-key')] = row.getBoundingClientRect();
+        });
+        return rects;
+      }
+
+      function animateTargetRowReflow(previousRects) {
+        if (!previousRects) {
+          return;
+        }
+        document.querySelectorAll('.target-row[data-row-key]').forEach(function (row) {
+          var key = row.getAttribute('data-row-key');
+          var prev = previousRects[key];
+          if (!prev) {
+            return;
+          }
+          var next = row.getBoundingClientRect();
+          var dy = prev.top - next.top;
+          if (Math.abs(dy) < 1) {
+            return;
+          }
+          row.animate(
+            [
+              { transform: 'translateY(' + dy + 'px)' },
+              { transform: 'translateY(0)' }
+            ],
+            {
+              duration: 220,
+              easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)'
+            }
+          );
+        });
+      }
+
+      function themeLabel(name) {
+        var value = String(name || '').replace(/[-_]+/g, ' ').trim();
+        if (!value) {
+          return 'Theme';
+        }
+        return value.charAt(0).toUpperCase() + value.slice(1);
+      }
+
+      function applyTheme(themeName) {
+        var normalized = String(themeName || '').toLowerCase().trim();
+        if (!/^[a-z0-9_-]+$/.test(normalized)) {
+          normalized = 'psionic';
+        }
+        state.activeTheme = normalized;
+        saveStorage(THEME_KEY, normalized);
+        if (els.themeStylesheet) {
+          els.themeStylesheet.href = 'themes/' + normalized + '.css?v=' + ASSET_VERSION;
+        }
+        if (els.themePickerBtn) {
+          els.themePickerBtn.textContent = themeLabel(normalized);
+        }
+      }
+
+      function cycleTheme(step) {
+        var total = state.themes.length;
+        if (!total) {
+          return;
+        }
+        var current = state.themes.indexOf(state.activeTheme);
+        if (current < 0) {
+          current = 0;
+        }
+        var next = (current + step + total) % total;
+        applyTheme(state.themes[next]);
+        renderThemePicker();
+      }
+
+      function renderThemePicker() {
+        if (!els.themePickerList) {
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < state.themes.length; i += 1) {
+          var theme = state.themes[i];
+          var active = theme === state.activeTheme ? ' active' : '';
+          html += "<button type='button' class='theme-item" + active + "' data-theme-name='" + theme + "'>" + themeLabel(theme) + "</button>";
+        }
+        els.themePickerList.innerHTML = html;
+        if (els.themePickerBtn) {
+          els.themePickerBtn.textContent = themeLabel(state.activeTheme);
+        }
+      }
+
+      function catalogItems() {
+        var builtIn = state.apps.map(function (app) {
+          return {
+            key: 'builtin:' + app.id,
+            kind: 'builtin',
+            id: app.id,
+            title: app.title,
+            production: app.production,
+            context: app.context,
+            projectType: inferProjectTypeFromContext(app.context).toLowerCase(),
+            targets: app.targets || '',
+            path: state.rootHint ? (state.rootHint + '/.apps/' + app.id) : ''
+          };
+        });
+        var workspaces = state.workspaces.map(function (ws) {
+          return {
+            key: 'workspace:' + ws.id,
+            kind: 'workspace',
+            id: ws.id,
+            title: ws.title,
+            production: false,
+            context: ws.context || 'web',
+            projectType: ws.projectType || inferProjectTypeFromContext(ws.context).toLowerCase(),
+            targets: ws.targets || '',
+            path: ws.path
+          };
+        });
+        if (state.createDraftActive) {
+          workspaces.unshift(createDraftItem());
+        }
+        return builtIn.concat(workspaces);
+      }
+
+      function createDraftHasInput() {
+        if (!els.createTitle || !els.createFolder) {
+          return false;
+        }
+        return !!(els.createTitle.value.trim() || els.createFolder.value.trim());
+      }
+
+      function createDraftItem() {
+        var projectType = selectedProjectType();
+        var title = (els.createTitle && els.createTitle.value.trim()) || 'New App';
+        var folder = (els.createFolder && els.createFolder.value.trim()) || 'new-app';
+        var context = projectType === 'game' ? 'godot' : 'web';
+        return {
+          key: 'draft:create',
+          kind: 'workspace',
+          draft: true,
+          id: folder,
+          title: title,
+          production: false,
+          context: context,
+          projectType: projectType,
+          targets: selectedTargets().join(','),
+          path: '(new project)'
+        };
+      }
+
+      function syncCreateDraftList() {
+        if (!state.createDraftActive) {
+          return;
+        }
+        renderCatalogList();
+        if (state.selectedCatalog === 'draft:create') {
+          renderSelectedBuiltIn();
+        }
+      }
+
+      function setOrganizeShow(mode) {
+        var value = mode;
+        if (value !== 'builtin' && value !== 'workspace' && value !== 'both') {
+          value = 'both';
+        }
+        state.organizeShow = value;
+        saveStorage(ORGANIZE_SHOW_KEY, value);
+        renderOrganizeMenuState();
+        renderCatalogList();
+      }
+
+      function renderOrganizeMenuState() {
+        if (!els.organizeMenu) {
+          return;
+        }
+        els.organizeMenu.querySelectorAll('button[data-organize-show]').forEach(function (btn) {
+          var value = btn.getAttribute('data-organize-show');
+          btn.classList.toggle('active', value === state.organizeShow);
+        });
+      }
+
+      function closeFloatingMenus() {
+        if (els.organizeMenu) {
+          els.organizeMenu.classList.add('hidden');
+        }
+        if (els.themePickerMenu) {
+          els.themePickerMenu.classList.add('hidden');
+        }
+        if (els.buildMenu) {
+          els.buildMenu.classList.add('hidden');
+        }
+        if (els.organizeBtn) {
+          els.organizeBtn.setAttribute('aria-expanded', 'false');
+        }
+        if (els.themePickerBtn) {
+          els.themePickerBtn.setAttribute('aria-expanded', 'false');
+        }
+        if (els.actionBuildMenu) {
+          els.actionBuildMenu.setAttribute('aria-expanded', 'false');
+        }
+      }
+
+      function toggleFloatingMenu(menuEl, buttonEl) {
+        if (!menuEl || !buttonEl) {
+          return;
+        }
+        var open = !menuEl.classList.contains('hidden');
+        closeFloatingMenus();
+        if (!open) {
+          menuEl.classList.remove('hidden');
+          buttonEl.setAttribute('aria-expanded', 'true');
+        }
+      }
+
+      async function runWorkspaceItem(item) {
+        if (!item || item.kind !== 'workspace') {
+          throw new Error('Select a user-created app to run');
+        }
+
+        if (item.context === 'godot') {
+          await openPath(item.path, false);
+          setTargetRuntime(item.key, 'linux', 'ready', item.path);
+          setTargetRuntime(item.key, 'macos', 'ready', item.path);
+          setTargetRuntime(item.key, 'android', 'enabled', item.path);
+          setTargetRuntime(item.key, 'ios', 'enabled', item.path);
+          renderSelectedTargetsEditor(selectedCatalogItem());
+          renderResult({
+            status: 'ok',
+            summary: item.title + ' opened.',
+            paths: [{ label: 'Project folder', path: item.path, canReveal: true }],
+            help: {
+              title: 'Game workspace',
+              body: 'Game projects are opened as workspace folders by default.'
+            }
+          });
+          return;
+        }
+
+        var res = await backend('run-workspace', [item.path, item.context]);
+        var out = kv(res.stdout || '');
+        var workspaceKey = item.key || ('workspace:' + item.id);
+        if (item.context === 'web') {
+          setTargetRuntime(workspaceKey, 'hosted-web', 'ready', out.entry || item.path || '');
+          setTargetRuntime(workspaceKey, state.os === 'darwin' ? 'macos' : 'linux', 'running', out.artifact || out.entry || item.path || '');
+        } else {
+          setTargetRuntime(workspaceKey, 'linux', 'ready', out.entry || item.path || '');
+          setTargetRuntime(workspaceKey, 'macos', 'ready', out.entry || item.path || '');
+        }
+        renderSelectedTargetsEditor(selectedCatalogItem());
+        renderResult({
+          status: 'ok',
+          summary: item.title + ' launched in native host.',
+          paths: [
+            out.entry ? { label: 'Entry folder', path: out.entry, canReveal: true } : null,
+            out.log ? { label: 'Launch log', path: out.log, canReveal: true } : null
+          ].filter(Boolean),
+          help: {
+            title: 'Workspace launch',
+            body: 'Mode: ' + (out.mode || 'host') + '\nPID: ' + (out.pid || '(managed by OS)')
+          }
+        });
+      }
+
+      function selectedCatalogItem() {
+        var items = filteredCatalogItems();
+        if (!items.length) {
+          return null;
+        }
+        if (!state.selectedCatalog) {
+          setSelectedCatalog(items[0].key);
+        }
+        var selected = items.find(function (item) {
+          return item.key === state.selectedCatalog;
+        });
+        if (selected) {
+          return selected;
+        }
+        setSelectedCatalog(items[0].key);
+        return items[0];
+      }
+
+      function renderCatalogList() {
+        var items = filteredCatalogItems();
+
+        els.catalogList.innerHTML = '';
+        if (!items.length) {
+          var empty = document.createElement('p');
+          empty.className = 'empty';
+          empty.textContent = 'No apps match current filters.';
+          els.catalogList.appendChild(empty);
+          return;
+        }
+
+        items.forEach(function (item) {
+          var row = document.createElement('div');
+          row.className = 'list-row catalog-row';
+          row.setAttribute('role', 'button');
+          row.setAttribute('tabindex', '0');
+          if (state.selectedCatalog === item.key) {
+            row.classList.add('active');
+          }
+
+          var thumb = document.createElement('span');
+          thumb.className = 'catalog-thumb';
+          var iconSrc = state.iconMap[item.key] || '';
+          if (iconSrc) {
+            var thumbImg = document.createElement('img');
+            thumbImg.src = iconSrc;
+            thumbImg.alt = '';
+            thumb.appendChild(thumbImg);
+          }
+
+          var line = document.createElement('div');
+          line.className = 'catalog-line';
+
+          var nameWrap = document.createElement('span');
+          nameWrap.className = 'name';
+          var title = document.createElement('span');
+          title.className = 'name-text';
+          title.textContent = item.title;
+          nameWrap.appendChild(title);
+          var contextPill = document.createElement('span');
+          contextPill.className = 'context-dot';
+          contextPill.textContent = item.context === 'godot' ? 'game' : 'web';
+          nameWrap.appendChild(contextPill);
+          if (item.kind === 'builtin') {
+            var suiteDot = document.createElement('span');
+            suiteDot.className = 'suite-dot';
+            suiteDot.setAttribute('aria-label', 'Wizardry suite app');
+            suiteDot.title = 'Wizardry suite';
+            suiteDot.textContent = 'wizardry';
+            nameWrap.appendChild(suiteDot);
+          }
+
+          line.appendChild(nameWrap);
+          var content = document.createElement('div');
+          content.className = 'catalog-content';
+
+          if (!item.draft) {
+            var play = document.createElement('button');
+            play.type = 'button';
+            play.className = 'row-play';
+            play.title = 'Run';
+            play.textContent = '▶';
+            play.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              setSelectedCatalog(item.key);
+              if (item.kind === 'builtin') {
+                state.selectedBuiltIn = item.id;
+                perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
+              } else {
+                state.selectedWorkspace = item.id;
+                perform('Run workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
+              }
+              renderCatalogList();
+              renderSelectedBuiltIn();
+            });
+            line.appendChild(play);
+          }
+
+          content.appendChild(line);
+          row.appendChild(thumb);
+          row.appendChild(content);
+          function selectItem() {
+            if (item.draft) {
+              setWorkflowMode('create');
+              if (els.createTitle) {
+                els.createTitle.focus();
+              }
+              return;
+            }
+            if (state.route !== 'pipeline') {
+              setWorkflowMode('pipeline');
+            }
+            setSelectedCatalog(item.key);
+            if (item.kind === 'builtin') {
+              state.selectedBuiltIn = item.id;
+            } else {
+              state.selectedWorkspace = item.id;
+            }
+            renderCatalogList();
+            renderSelectedBuiltIn();
+          }
+          row.addEventListener('click', selectItem);
+          row.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              selectItem();
+            }
+          });
+          els.catalogList.appendChild(row);
+        });
+        scheduleWindowFit();
+      }
+
+      function selectedBuiltInApp() {
+        var selected = selectedCatalogItem();
+        if (selected && selected.kind === 'builtin') {
+          state.selectedBuiltIn = selected.id;
+        }
+        if (!state.selectedBuiltIn && state.apps.length) {
+          state.selectedBuiltIn = state.apps[0].id;
+        }
+        return state.apps.find(function (app) {
+          return app.id === state.selectedBuiltIn;
+        }) || null;
+      }
+
+      function renderSelectedBuiltIn() {
+        var selected = selectedCatalogItem();
+        els.selectedAppGrid.innerHTML = '';
+
+        if (!selected) {
+          syncStageActionVisibility(null);
+          els.selectedAppGrid.innerHTML = '';
+          els.selectedAppGrid.classList.add('hidden');
+          if (els.selectedTitle) {
+            text(els.selectedTitle, 'Selected App');
+          }
+          if (els.selectedTypeBadge) {
+            els.selectedTypeBadge.classList.add('hidden');
+          }
+          if (els.selectedSuiteBadge) {
+            els.selectedSuiteBadge.classList.add('hidden');
+          }
+          if (els.openSelectedPath) {
+            text(els.openSelectedPath, '');
+            els.openSelectedPath.classList.add('hidden');
+          }
+          if (els.terminalSelectedPath) {
+            els.terminalSelectedPath.classList.add('hidden');
+          }
+          if (els.selectedTargetsEditor) {
+            els.selectedTargetsEditor.classList.add('hidden');
+          }
+          renderSelectedIconEditor(null);
+          return;
+        }
+        syncStageActionVisibility(selected);
+        els.selectedAppGrid.innerHTML = '';
+        els.selectedAppGrid.classList.add('hidden');
+        if (els.selectedTargetsEditor) {
+          els.selectedTargetsEditor.classList.remove('hidden');
+        }
+
+        if (els.selectedTitle) {
+          text(els.selectedTitle, selected.title);
+        }
+        if (els.selectedTypeBadge) {
+          var typeText = inferProjectTypeFromContext(selected.context) + ' (' + (selected.context === 'godot' ? 'Godot' : selected.context) + ')';
+          els.selectedTypeBadge.innerHTML = '';
+          var typeLabel = document.createElement('span');
+          typeLabel.textContent = typeText;
+          els.selectedTypeBadge.appendChild(typeLabel);
+          els.selectedTypeBadge.classList.remove('hidden');
+        }
+        if (els.selectedSuiteBadge) {
+          els.selectedSuiteBadge.classList.toggle('hidden', selected.kind !== 'builtin');
+        }
+        if (els.openSelectedPath) {
+          if (selected.path) {
+            text(els.openSelectedPath, selected.path);
+            els.openSelectedPath.classList.remove('hidden');
+          } else {
+            text(els.openSelectedPath, '');
+            els.openSelectedPath.classList.add('hidden');
+          }
+        }
+        if (els.terminalSelectedPath) {
+          els.terminalSelectedPath.classList.toggle('hidden', !selected.path);
+        }
+        renderSelectedTargetsEditor(selected);
+        renderSelectedIconEditor(selected);
+        scheduleWindowFit();
+      }
+
+      function hasMobileTargets(selected) {
+        if (!selected) {
+          return false;
+        }
+        var projectType = projectTypeKeyForContext(selected.context);
+        var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
+        return activeTargets.indexOf('ios') >= 0 || activeTargets.indexOf('android') >= 0;
+      }
+
+      function syncStageActionVisibility(selected) {
+        if (!els.actionStage) {
+          return;
+        }
+        var show = !!selected && state.route === 'pipeline' && hasMobileTargets(selected);
+        els.actionStage.classList.toggle('hidden', !show);
+      }
+
+      function renderSelectedIconEditor(selected) {
+        if (!els.selectedIconPreview || !els.selectedIconPlaceholder || !els.selectedIconClear) {
+          return;
+        }
+        var key = selected && selected.key ? selected.key : '';
+        var src = key ? (state.iconMap[key] || '') : '';
+        if (src) {
+          els.selectedIconPreview.src = src;
+          els.selectedIconPreview.classList.remove('hidden');
+          els.selectedIconPlaceholder.classList.add('hidden');
+          els.selectedIconClear.classList.remove('hidden');
+          return;
+        }
+        els.selectedIconPreview.removeAttribute('src');
+        els.selectedIconPreview.classList.add('hidden');
+        els.selectedIconPlaceholder.classList.remove('hidden');
+        els.selectedIconClear.classList.add('hidden');
+      }
+
+      function applySelectedIconData(dataUrl) {
+        var selected = selectedCatalogItem();
+        if (!selected || !selected.key) {
+          return;
+        }
+        if (dataUrl) {
+          state.iconMap[selected.key] = dataUrl;
+        } else {
+          delete state.iconMap[selected.key];
+        }
+        saveJSONStorage(ICON_MAP_KEY, state.iconMap);
+        renderCatalogList();
+        renderSelectedIconEditor(selected);
+      }
+
+      function readImageFileToDataUrl(file) {
+        return new Promise(function (resolve, reject) {
+          if (!file) {
+            reject(new Error('No file selected'));
+            return;
+          }
+          if (!/^image\//.test(file.type || '')) {
+            reject(new Error('Icon file must be an image'));
+            return;
+          }
+          var reader = new FileReader();
+          reader.onerror = function () {
+            reject(new Error('Could not read icon file'));
+          };
+          reader.onload = function () {
+            var img = new Image();
+            img.onload = function () {
+              var size = 96;
+              var canvas = document.createElement('canvas');
+              canvas.width = size;
+              canvas.height = size;
+              var ctx = canvas.getContext('2d');
+              if (!ctx) {
+                resolve(String(reader.result || ''));
+                return;
+              }
+              ctx.clearRect(0, 0, size, size);
+              var scale = Math.min(size / img.width, size / img.height);
+              var w = Math.max(1, Math.round(img.width * scale));
+              var h = Math.max(1, Math.round(img.height * scale));
+              var x = Math.floor((size - w) / 2);
+              var y = Math.floor((size - h) / 2);
+              ctx.drawImage(img, x, y, w, h);
+              resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = function () {
+              resolve(String(reader.result || ''));
+            };
+            img.src = String(reader.result || '');
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function renderSelectedTargetsEditor(selected) {
+        if (!els.selectedTargetsEditor || !selected || !els.targetActiveList || !els.targetInactiveList) {
+          return;
+        }
+        var previousRects = captureTargetRowRects();
+        var projectType = projectTypeKeyForContext(selected.context);
+        var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
+        var activeSet = {};
+        activeTargets.forEach(function (targetId) {
+          activeSet[targetId] = true;
+        });
+
+        var specs = targetSpecs(projectType);
+        var activeFragment = document.createDocumentFragment();
+        var inactiveFragment = document.createDocumentFragment();
+
+        function createTargetRow(spec, active) {
+          var row = document.createElement('label');
+          row.className = 'target-item target-row';
+          var rowKey = selected.key + ':' + spec.id;
+          row.setAttribute('data-row-key', rowKey);
+          var section = active ? 'active' : 'inactive';
+          if (state.targetSectionByRow[rowKey] && state.targetSectionByRow[rowKey] !== section) {
+            row.classList.add(section === 'active' ? 'target-move-up' : 'target-move-down');
+          }
+          state.targetSectionByRow[rowKey] = section;
+
+          var toggle = document.createElement('input');
+          toggle.type = 'checkbox';
+          toggle.checked = !!active;
+          toggle.disabled = false;
+          toggle.addEventListener('change', function () {
+            var checked = !!toggle.checked;
+            perform('Update publish targets', function () {
+              return setSelectedTargetEnabled(selected, spec.id, checked);
+            }, { swallow: true, noToast: true, keepResult: true });
+          });
+          row.appendChild(toggle);
+
+          var icon = document.createElement('span');
+          icon.className = 'target-icon';
+          icon.setAttribute('aria-hidden', 'true');
+          if (spec.iconSrc) {
+            var iconImg = document.createElement('img');
+            iconImg.src = spec.iconSrc;
+            iconImg.alt = spec.iconAlt || '';
+            icon.appendChild(iconImg);
+          } else {
+            icon.textContent = spec.iconText || '';
+          }
+          row.appendChild(icon);
+
+          var label = document.createElement('span');
+          label.className = 'target-label';
+          label.textContent = spec.label;
+          row.appendChild(label);
+
+          var status = document.createElement('span');
+          status.className = 'target-status';
+          status.textContent = targetStatusLabel(selected, spec.id, active);
+          row.appendChild(status);
+
+          var rowActions = document.createElement('span');
+          rowActions.className = 'target-actions';
+
+          var openBtn = document.createElement('button');
+          openBtn.type = 'button';
+          openBtn.className = 'row-mini row-open';
+          openBtn.title = 'Open';
+          openBtn.setAttribute('aria-label', 'Open');
+          openBtn.textContent = '📂';
+          openBtn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var openPathValue = targetOpenPath(selected, spec.id);
+            if (!openPathValue) {
+              return;
+            }
+            perform('Open target', function () { return openPath(openPathValue, false); }, { swallow: true, noToast: true, keepResult: true });
+          });
+          rowActions.appendChild(openBtn);
+
+          var runBtn = document.createElement('button');
+          runBtn.type = 'button';
+          runBtn.className = 'row-mini';
+          var runnable = isTargetRunnable(spec.id);
+          runBtn.title = runnable ? 'Run' : 'Compile';
+          runBtn.setAttribute('aria-label', runnable ? 'Run' : 'Compile');
+          runBtn.textContent = runnable ? '▶' : '🛠';
+          runBtn.disabled = state.busy || !active;
+          runBtn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            perform(runnable ? 'Run target' : 'Compile target', function () { return runTargetAction(selected, spec.id); }, { swallow: true, keepResult: true });
+          });
+          rowActions.appendChild(runBtn);
+
+          row.appendChild(rowActions);
+          return row;
+        }
+
+        specs.forEach(function (spec) {
+          if (activeSet[spec.id]) {
+            activeFragment.appendChild(createTargetRow(spec, true));
+            return;
+          }
+          inactiveFragment.appendChild(createTargetRow(spec, false));
+        });
+
+        els.targetActiveList.innerHTML = '';
+        els.targetInactiveList.innerHTML = '';
+        els.targetActiveList.appendChild(activeFragment);
+        els.targetInactiveList.appendChild(inactiveFragment);
+        requestAnimationFrame(function () {
+          animateTargetRowReflow(previousRects);
+        });
+      }
+
+      async function persistSelectedTargets(selected, uiTargets) {
+        var projectType = projectTypeKeyForContext(selected.context);
+        var storedTargets = storedTargetsFromUI(projectType, uiTargets);
+        if (!storedTargets.length) {
+          throw new Error('Select at least one publish target');
+        }
+        var targetsCSV = storedTargets.join(',');
+
+        if (selected.draft) {
+          selected.targets = targetsCSV;
+          renderSelectedBuiltIn();
+          renderCatalogList();
+          return;
+        }
+
+        if (selected.kind === 'builtin') {
+          await backend('set-app-targets', [selected.id, targetsCSV]);
+          await refreshApps({ quiet: true });
+        } else {
+          await backend('set-workspace-targets', [selected.path, targetsCSV]);
+          await refreshWorkspaces({ quiet: true });
+        }
+
+        renderSelectedBuiltIn();
+        renderCatalogList();
+      }
+
+      async function setSelectedTargetEnabled(selected, targetId, enabled) {
+        var projectType = projectTypeKeyForContext(selected.context);
+        var current = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
+        var next = current.filter(function (entry) { return entry !== targetId; });
+        if (enabled) {
+          next.push(targetId);
+        }
+        next = normalizeUITargets(projectType, next);
+        await persistSelectedTargets(selected, next);
+      }
+
+      function renderResult(result) {
+        state.latestResult = result;
+        if (result && result.summary) {
+          appendLog('[result] ' + result.summary);
+        }
+        if (result && result.paths && result.paths.length) {
+          result.paths.forEach(function (item) {
+            if (item && item.path) {
+              appendLog('  path: ' + item.path);
+            }
+          });
+        }
+        if (result && result.help && result.help.body) {
+          appendLog('  note: ' + String(result.help.body).split('\n')[0]);
+        }
+        scheduleWindowFit();
+      }
+
+      async function runTargetAction(selected, targetId) {
+        if (!selected) {
+          throw new Error('Select an app first');
+        }
+        if (selected.kind === 'builtin') {
+          state.selectedBuiltIn = selected.id;
+          if (targetId === 'ios') {
+            await runPipelineAction('ios');
+            return;
+          }
+          if (targetId === 'android') {
+            await runPipelineAction('android');
+            return;
+          }
+          if (targetId === 'hosted-web') {
+            throw new Error('Hosted Web target is build/deploy oriented and is not runnable from desktop.');
+          }
+          if (targetId === 'macos') {
+            if (state.os === 'darwin') {
+              await runPipelineAction('run');
+              return;
+            }
+            await runPipelineAction('build');
+            return;
+          }
+          if (targetId === 'linux') {
+            if (state.os === 'linux') {
+              await runPipelineAction('run');
+              return;
+            }
+            await runPipelineAction('build');
+            return;
+          }
+          await runPipelineAction('build');
+          return;
+        }
+        if (targetId === 'ios' || targetId === 'android' || targetId === 'hosted-web') {
+          throw new Error('This target cannot be run directly from the current desktop host.');
+        }
+        if (targetId === 'macos' && state.os !== 'darwin') {
+          throw new Error('macOS target can only be run on macOS.');
+        }
+        if (targetId === 'linux' && state.os !== 'linux') {
+          throw new Error('Linux target can only be run on Linux.');
+        }
+        await runWorkspaceItem(selected);
+      }
+
+      function setArtifacts(_lines) {
+        return;
+      }
+
+      function qualityDescription(task) {
+        if (task === 'validate-manifest') {
+          return 'Checks app/template manifest contracts and required fields for release eligibility.';
+        }
+        if (task === 'test-core') {
+          return 'Runs core runtime tests and JSON-RPC contract checks.';
+        }
+        if (task === 'test-adapters') {
+          return 'Runs adapter/bridge parity and transport behavior tests.';
+        }
+        if (task === 'test-release-tools') {
+          return 'Runs release pipeline helper tests for packaging and publish tooling.';
+        }
+        return '';
+      }
+
+      function selectedProjectType() {
+        var checked = document.querySelector('input[name="project-type"]:checked');
+        return checked ? checked.value : 'application';
+      }
+
+      function applyTargetPreset(projectType) {
+        if (projectType === 'game') {
+          els.targetHostedWeb.checked = false;
+          els.targetMacos.checked = true;
+          els.targetLinux.checked = true;
+          els.targetIos.checked = false;
+          els.targetAndroid.checked = false;
+          return;
+        }
+
+        els.targetHostedWeb.checked = true;
+        els.targetMacos.checked = true;
+        els.targetLinux.checked = true;
+        els.targetIos.checked = false;
+        els.targetAndroid.checked = false;
+      }
+
+      function updateTargetAvailability(projectType) {
+        document.querySelectorAll('.target-item[data-target-groups]').forEach(function (item) {
+          var groups = (item.getAttribute('data-target-groups') || '').split(',');
+          var visible = groups.indexOf(projectType) >= 0;
+          item.classList.toggle('hidden', !visible);
+          var checkbox = item.querySelector('input');
+          if (checkbox) {
+            checkbox.disabled = !visible;
+            if (!visible) {
+              checkbox.checked = false;
+            }
+          }
+        });
+      }
+
+      function syncCreateUI() {
+        var projectType = selectedProjectType();
+        var applicationActive = projectType === 'application';
+
+        document.getElementById('starter-application').classList.toggle('active', applicationActive);
+        document.getElementById('starter-game').classList.toggle('active', !applicationActive);
+
+        document.getElementById('type-application-card').classList.toggle('active', applicationActive);
+        document.getElementById('type-game-card').classList.toggle('active', !applicationActive);
+
+        if (state.lastProjectType !== projectType) {
+          applyTargetPreset(projectType);
+          state.lastProjectType = projectType;
+        }
+        updateTargetAvailability(projectType);
+
+        els.starterApplicationSource.disabled = els.starterApplicationSelect.value !== 'clone' || state.busy;
+        els.starterGameSource.disabled = els.starterGameSelect.value !== 'clone' || state.busy;
+        syncCreateDraftList();
+        scheduleWindowFit();
+      }
+
+      function inferFolderFromTitle(title) {
+        return title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+/, '')
+          .replace(/-+$/, '')
+          .replace(/--+/g, '-');
+      }
+
+      function selectedTargets() {
+        var out = [];
+        if (els.targetHostedWeb.checked) out.push('hosted-web');
+        if (els.targetMacos.checked) out.push('macos');
+        if (els.targetLinux.checked) out.push('linux');
+        if (els.targetIos.checked) out.push('ios');
+        if (els.targetAndroid.checked) out.push('android');
+        if (selectedProjectType() === 'game') out.unshift('godot-desktop');
+        return out;
+      }
+
+      async function refreshWorkspace(options) {
+        options = options || {};
+        var quiet = !!options.quiet;
+        var res = await backend('doctor', [], { quiet: quiet });
         var info = kv(res.stdout || '');
+
+        state.os = info.os || '';
+        state.homeDir = info.home || '';
+        state.tools = info;
 
         if (info.root) {
           setWorkspaceRoot(info.root);
         } else if (state.rootHint) {
           text(els.workspaceRootDisplay, state.rootHint + ' (unverified)');
         } else {
-          text(els.workspaceRootDisplay, 'Workspace root not resolved. Open Settings and set it manually.');
+          text(els.workspaceRootDisplay, 'Workspace root not resolved. Use the settings gear.');
         }
 
-        var lines = [
+        normalizeProjectsRoot();
+
+        var doctorLines = [
           'root: ' + (info.root || '(not found)'),
           'os: ' + (info.os || '?'),
           'home: ' + (info.home || '?'),
           'jq: ' + (info.jq === '1' ? 'yes' : 'no'),
           'clang: ' + (info.clang === '1' ? 'yes' : 'no'),
+          'brew: ' + (info.brew === '1' ? 'yes' : 'no'),
           'gradle: ' + (info.gradle === '1' ? 'yes' : 'no'),
+          'x-terminal-emulator: ' + (info.x_terminal === '1' ? 'yes' : 'no'),
+          'gnome-terminal: ' + (info.gnome_terminal === '1' ? 'yes' : 'no'),
+          'konsole: ' + (info.konsole === '1' ? 'yes' : 'no'),
+          'xcodegen: ' + (info.xcodegen === '1' ? 'yes' : 'no'),
           'xcodebuild: ' + (info.xcodebuild === '1' ? 'yes' : 'no'),
           'apps: ' + (info.apps_total || '0') + ' total / ' + (info.apps_production || '0') + ' production',
           'templates: ' + (info.templates_total || '0')
         ];
-        text(els.doctor, lines.join('\n'));
+        text(els.doctor, doctorLines.join('\n'));
 
         text(els.metricAppsTotal, info.apps_total || '0');
         text(els.metricAppsProd, info.apps_production || '0');
         text(els.metricTemplates, info.templates_total || '0');
 
-        if (!els.siteDest.value.trim() && info.home) {
-          els.siteDest.value = info.home + '/sites';
-        }
-
         if (!info.root) {
           state.apps = [];
-          state.templates = [];
-          renderApps();
-          renderTemplates();
+          state.workspaces = [];
+          renderCatalogList();
+          renderSelectedBuiltIn();
           return;
         }
 
-        await refreshApps();
-        await refreshTemplates();
+        await refreshApps({ quiet: quiet });
+        await refreshWorkspaces({ quiet: quiet });
+        scheduleWindowFit();
       }
 
-      function renderApps() {
-        var summary = state.apps.map(function (app) {
-          return (app.production ? '[prod] ' : '[dev]  ') + app.slug + ' - ' + app.name;
-        }).join('\n');
-
-        text(els.appsSummary, summary || 'No apps in manifest.');
-
-        els.appSelect.innerHTML = '';
-        els.sourceApp.innerHTML = '';
-
-        state.apps.forEach(function (app) {
-          var option = document.createElement('option');
-          option.value = app.slug;
-          option.textContent = app.slug + ' - ' + app.name;
-          els.appSelect.appendChild(option);
-
-          var clone = document.createElement('option');
-          clone.value = app.slug;
-          clone.textContent = app.slug;
-          els.sourceApp.appendChild(clone);
-        });
-
-        if (!state.apps.length) {
-          var empty = document.createElement('option');
-          empty.value = '';
-          empty.textContent = 'No apps found';
-          els.appSelect.appendChild(empty);
-        }
-
-        syncCloneSourceEnabled();
-        renderSelectedAppDetails();
-      }
-
-      function renderTemplates() {
-        els.siteTemplate.innerHTML = '';
-        state.templates.forEach(function (tpl) {
-          var opt = document.createElement('option');
-          opt.value = tpl.slug;
-          opt.textContent = tpl.slug + (tpl.publish ? ' (publish)' : '');
-          els.siteTemplate.appendChild(opt);
-        });
-      }
-
-      function renderSelectedAppDetails() {
-        var slug = selectedApp();
-        var app = null;
-
-        state.apps.forEach(function (item) {
-          if (item.slug === slug) {
-            app = item;
-          }
-        });
-
-        if (!app) {
-          text(els.appDetails, 'No app selected.');
-          text(els.dashboardCurrentApp, 'No app selected.');
-          return;
-        }
-
-        var lines = [
-          'slug: ' + app.slug,
-          'name: ' + app.name,
-          'production: ' + (app.production ? 'yes' : 'no'),
-          'directory_exists: ' + (app.exists ? 'yes' : 'no')
-        ];
-
-        text(els.appDetails, lines.join('\n'));
-        text(els.dashboardCurrentApp, lines.join('\n'));
-      }
-
-      async function refreshApps() {
-        var res = await backend('list-apps');
-        var rows = parseTSV(res.stdout || '', 4);
+      async function refreshApps(options) {
+        options = options || {};
+        var res = await backend('list-apps', [], { quiet: !!options.quiet });
+        var rows = parseTSV(res.stdout || '', 6);
         state.apps = rows.map(function (row) {
           return {
-            slug: row[0],
-            name: row[1],
+            id: row[0],
+            title: row[1],
             production: row[2] === 'true',
-            exists: row[3] === '1'
+            exists: row[3] === '1',
+            context: row[4] || 'web',
+            targets: row[5] || 'macos,linux'
           };
         });
-        renderApps();
+
+        if (!state.selectedBuiltIn && state.apps.length) {
+          state.selectedBuiltIn = state.apps[0].id;
+        }
+
+        renderCatalogList();
+        renderSelectedBuiltIn();
+
+        els.starterApplicationSource.innerHTML = '';
+        state.apps.forEach(function (app) {
+          var opt = document.createElement('option');
+          opt.value = app.id;
+          opt.textContent = app.title + ' (' + app.id + ')';
+          els.starterApplicationSource.appendChild(opt);
+        });
       }
 
-      async function refreshTemplates() {
-        var res = await backend('list-templates');
-        var rows = parseTSV(res.stdout || '', 3);
-        state.templates = rows.map(function (row) {
+      async function refreshWorkspaces(options) {
+        options = options || {};
+        var res = await backend('list-workspaces', [state.projectsRoot], { quiet: !!options.quiet });
+        var rows = parseTSV(res.stdout || '', 6);
+        state.workspaces = rows.map(function (row) {
           return {
-            slug: row[0],
-            publish: row[1] === 'true',
-            exists: row[2] === '1'
+            id: row[0],
+            title: row[1],
+            projectType: row[2],
+            context: row[3],
+            targets: row[4],
+            path: row[5]
           };
         });
-        renderTemplates();
-      }
 
-      function selectedApp() {
-        return els.appSelect.value;
+        renderCatalogList();
+
+        els.starterGameSource.innerHTML = '';
+        state.workspaces
+          .filter(function (ws) { return ws.projectType === 'game'; })
+          .forEach(function (ws) {
+            var opt = document.createElement('option');
+            opt.value = ws.id;
+            opt.textContent = ws.title + ' (' + ws.id + ')';
+            els.starterGameSource.appendChild(opt);
+          });
+
+        if (!els.starterGameSource.options.length) {
+          var empty = document.createElement('option');
+          empty.value = '';
+          empty.textContent = 'No game workspace sources';
+          els.starterGameSource.appendChild(empty);
+        }
       }
 
       function requireRoot() {
         if (state.rootHint) {
           return;
         }
-        activateView('settings');
-        throw new Error('Set workspace root in Settings before running this action');
+        setPanel('settings', true);
+        throw new Error('Set repository root in Settings before running this action');
       }
 
-      async function runBuiltIn() {
-        requireRoot();
-        var slug = selectedApp();
-        if (!slug) {
-          throw new Error('choose an app first');
+      function requireBuiltInSelection() {
+        var selected = selectedCatalogItem();
+        if (!selected || selected.kind !== 'builtin') {
+          throw new Error('Select a built-in app from the list to use this action');
         }
-        var res = await backend('run-desktop', [slug]);
+        state.selectedBuiltIn = selected.id;
+        var app = selectedBuiltInApp();
+        if (app) {
+          return app;
+        }
+        throw new Error('Select a built-in app first');
+      }
+
+      async function runPipelineAction(kind) {
+        requireRoot();
+        var app = requireBuiltInSelection();
+        var projectKey = 'builtin:' + app.id;
+        var nativeTarget = state.os === 'darwin' ? 'macos' : 'linux';
+
+        if (kind === 'build') {
+          var build = await backend('build-desktop', [app.id]);
+          var buildOut = kv(build.stdout || '');
+          var buildPaths = [
+            buildOut.artifact ? { label: 'Desktop artifact', path: buildOut.artifact, canReveal: true } : null,
+            buildOut.zip ? { label: 'Zip package', path: buildOut.zip, canReveal: true } : null,
+            buildOut.host ? { label: 'Host binary', path: buildOut.host, canReveal: true } : null
+          ].filter(Boolean);
+
+          renderResult({
+            status: 'ok',
+            summary: app.title + ' compiled successfully. Use Run App to launch it now.',
+            paths: buildPaths,
+            actions: [
+              {
+                label: 'Run App',
+                primary: true,
+                run: function () { return runPipelineAction('run'); }
+              }
+            ],
+            help: {
+              title: 'Next steps',
+              body: 'Compilation finished without blocking the UI.\nUse Run App, or open artifact locations to inspect and distribute builds.'
+            }
+          });
+          setTargetRuntime(projectKey, nativeTarget, 'built', buildOut.artifact || buildOut.zip || buildOut.host || '');
+          setTargetRuntime(projectKey, 'linux', nativeTarget === 'linux' ? 'built' : 'enabled', buildOut.artifact || '');
+          setTargetRuntime(projectKey, 'macos', nativeTarget === 'macos' ? 'built' : 'enabled', buildOut.artifact || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
+          return;
+        }
+
+        if (kind === 'run') {
+          var runModeRequest = state.os === 'darwin' ? 'bundle' : 'auto';
+          var run = await backend('run-desktop', [app.id, runModeRequest]);
+          var runOut = kv(run.stdout || '');
+          var runMode = runOut.mode || 'host';
+          var runSummary = runMode === 'bundle'
+            ? app.title + ' launched from the compiled desktop app bundle.'
+            : app.title + ' launched in native host.';
+
+          renderResult({
+            status: 'ok',
+            summary: runSummary,
+            paths: [
+              runOut.artifact ? { label: 'Launched app bundle', path: runOut.artifact, canReveal: true } : null,
+              runOut.entry ? { label: 'App source folder', path: runOut.entry, canReveal: true } : null,
+              runOut.log ? { label: 'Launch log', path: runOut.log, canReveal: true } : null
+            ].filter(Boolean),
+            help: {
+              title: 'Launch details',
+              body: 'Mode: ' + runMode + '\nPID: ' + (runOut.pid || '(managed by OS)') + '\nIf the app window is behind others, use Dock or Mission Control to focus it.'
+            }
+          });
+          setTargetRuntime(projectKey, nativeTarget, 'running', runOut.artifact || runOut.entry || '');
+          setTargetRuntime(projectKey, 'hosted-web', 'ready', runOut.entry || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
+          return;
+        }
+
+        if (kind === 'stage') {
+          var stage = await backend('stage-mobile', [app.id]);
+          var stageOut = kv(stage.stdout || '');
+          renderResult({
+            status: 'ok',
+            summary: app.title + ' mobile assets staged.',
+            paths: [
+              stageOut.staged ? { label: 'Staged folder', path: stageOut.staged, canReveal: true } : null
+            ].filter(Boolean),
+            actions: [
+              {
+                label: 'Build iOS Smoke',
+                run: function () { return runPipelineAction('ios'); }
+              },
+              {
+                label: 'Build Android Debug',
+                run: function () { return runPipelineAction('android'); }
+              }
+            ],
+            help: {
+              title: 'Next steps',
+              body: 'Use Advanced Builds from the Build button to run iOS or Android smoke builds.'
+            }
+          });
+          setTargetRuntime(projectKey, 'ios', 'staged', stageOut.staged || '');
+          setTargetRuntime(projectKey, 'android', 'staged', stageOut.staged || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
+          return;
+        }
+
+        if (kind === 'ios') {
+          var ios = await backend('build-ios-smoke', [app.id]);
+          var iosOut = kv(ios.stdout || '');
+          renderResult({
+            status: 'ok',
+            summary: app.title + ' iOS smoke build completed.',
+            paths: [
+              iosOut.out ? { label: 'iOS output folder', path: iosOut.out, canReveal: true } : null
+            ].filter(Boolean),
+            help: {
+              title: 'iOS build notes',
+              body: 'Smoke build verifies host integration and packaging paths.\nOpen the output folder for generated build products.'
+            }
+          });
+          setTargetRuntime(projectKey, 'ios', 'built', iosOut.out || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
+          return;
+        }
+
+        if (kind === 'android') {
+          var android = await backend('build-android-debug', [app.id]);
+          var androidOut = kv(android.stdout || '');
+          renderResult({
+            status: 'ok',
+            summary: app.title + ' Android debug build completed.',
+            paths: [
+              androidOut.artifact ? { label: 'Android APK', path: androidOut.artifact, canReveal: true } : null
+            ].filter(Boolean),
+            help: {
+              title: 'Android build notes',
+              body: 'Debug APK can be installed on connected devices for smoke testing.\nOpen or reveal the artifact path to inspect it.'
+            }
+          });
+          setTargetRuntime(projectKey, 'android', 'built', androidOut.artifact || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
+        }
+      }
+
+      async function runQualityTask(task) {
+        requireRoot();
+        var res = await backend('run-task', [task]);
         var out = kv(res.stdout || '');
-        setArtifacts([
-          'Launched app: ' + slug,
-          'PID: ' + (out.pid || '?'),
-          'Log: ' + (out.log || '(none)')
-        ]);
+        var taskName = out.task || task;
+        renderResult({
+          status: 'ok',
+          summary: taskName + ' completed with a detailed log.',
+          paths: [
+            out.log ? { label: 'Task log', path: out.log, canReveal: true } : null
+          ].filter(Boolean),
+          help: {
+            title: 'What this ran',
+            body: qualityDescription(task)
+          },
+          actions: [
+            out.log ? {
+              label: 'Open Task Log',
+              run: function () { return openPath(out.log, false); }
+            } : null
+          ].filter(Boolean)
+        });
       }
 
-      async function buildBuiltIn() {
-        requireRoot();
-        var slug = selectedApp();
-        if (!slug) {
-          throw new Error('choose an app first');
-        }
-        var res = await backend('build-desktop', [slug]);
-        var out = kv(res.stdout || '');
-        var lines = [];
-        if (out.host) lines.push('Host: ' + out.host);
-        if (out.artifact) lines.push('Artifact: ' + out.artifact);
-        if (out.zip) lines.push('Zip: ' + out.zip);
-        setArtifacts(lines);
-      }
-
-      async function stageMobile() {
-        requireRoot();
-        var slug = selectedApp();
-        if (!slug) {
-          throw new Error('choose an app first');
-        }
-        var res = await backend('stage-mobile', [slug]);
-        var out = kv(res.stdout || '');
-        setArtifacts(['Staged: ' + (out.staged || '(none)')]);
-      }
-
-      async function buildIos() {
-        requireRoot();
-        var slug = selectedApp();
-        if (!slug) {
-          throw new Error('choose an app first');
-        }
-        var res = await backend('build-ios-smoke', [slug]);
-        var out = kv(res.stdout || '');
-        setArtifacts(['iOS output dir: ' + (out.out || '(none)')]);
-      }
-
-      async function buildAndroid() {
-        requireRoot();
-        var slug = selectedApp();
-        if (!slug) {
-          throw new Error('choose an app first');
-        }
-        var res = await backend('build-android-debug', [slug]);
-        var out = kv(res.stdout || '');
-        setArtifacts(['Android artifact: ' + (out.artifact || '(none)')]);
-      }
-
-      async function createAppScaffold() {
+      async function createProject() {
         requireRoot();
 
-        var slug = els.newAppSlug.value.trim();
-        var name = els.newAppName.value.trim();
-        var template = els.newAppTemplate.value;
-        var source = els.sourceApp.value;
+        var title = els.createTitle.value.trim();
+        var folder = els.createFolder.value.trim();
+        var projectType = selectedProjectType();
+        var starter = projectType === 'application' ? els.starterApplicationSelect.value : els.starterGameSelect.value;
+        var source = projectType === 'application' ? els.starterApplicationSource.value : els.starterGameSource.value;
+        var targets = selectedTargets();
+        var projectsRoot = els.projectsRoot.value.trim() || state.projectsRoot;
 
-        if (!slug || !name) {
-          throw new Error('scaffold app requires slug + name');
+        if (!title || !folder) {
+          throw new Error('Create App requires a project title and folder name');
         }
 
-        var args = [slug, name, template];
-        if (template === 'clone') {
+        if (!targets.length) {
+          throw new Error('Select at least one publishing target');
+        }
+
+        if (starter === 'clone' && !source) {
+          throw new Error('Clone starter requires a source project');
+        }
+
+        setProjectsRoot(projectsRoot);
+
+        var args = [folder, title, projectType, starter, targets.join(',')];
+        if (starter === 'clone') {
           args.push(source);
+        } else {
+          args.push('');
         }
+        args.push(projectsRoot);
 
-        var res = await backend('scaffold-app', args);
+        var res = await backend('scaffold-workspace', args);
         var out = kv(res.stdout || '');
-        setArtifacts([
-          'Created app: ' + (out.created || slug),
-          'Manifest: ' + (out.manifest || '(updated)')
-        ]);
 
-        els.newAppSlug.value = '';
-        els.newAppName.value = '';
+        renderResult({
+          status: 'ok',
+          summary: title + ' created successfully.',
+          paths: [
+            out.created ? { label: 'Project folder', path: out.created, canReveal: true } : null,
+            out.workspace_profile ? { label: 'Workspace profile', path: out.workspace_profile, canReveal: true } : null
+          ].filter(Boolean),
+          help: {
+            title: 'Project profile',
+            body: 'Type: ' + (out.project_type || projectType) + '\nDevelopment context: ' + (out.development_context || projectType) + '\nTargets: ' + (out.targets || targets.join(','))
+          }
+        });
 
-        await refreshWorkspace();
-        activateView('apps');
+        state.createDraftActive = false;
+        setSelectedCatalog('');
+        await refreshWorkspaces();
+        setWorkflowMode('pipeline');
       }
 
-      async function createSiteScaffold() {
-        requireRoot();
+      function bindButtons() {
+        document.querySelectorAll('.pipeline-section > .pipeline-section-head').forEach(function (summary) {
+          summary.addEventListener('click', function (event) {
+            var details = summary.parentElement;
+            if (!details || details.dataset.animating === '1') {
+              return;
+            }
+            event.preventDefault();
+            animatePipelineSectionToggle(details);
+          });
+        });
 
-        var name = els.siteName.value.trim();
-        var template = els.siteTemplate.value;
-        var dest = els.siteDest.value.trim();
+        els.toggleSettingsPanel.addEventListener('click', function () {
+          setPanel('settings', !state.settingsOpen);
+        });
 
-        if (!name || !template) {
-          throw new Error('scaffold site requires site name + template');
+        els.openCreateWorkflow.addEventListener('click', function () {
+          setWorkflowMode('create');
+        });
+
+        els.builtinSearch.addEventListener('input', renderCatalogList);
+        els.builtinSearch.addEventListener('keydown', function (event) {
+          var meta = event.metaKey || event.ctrlKey;
+          if (meta && event.key.toLowerCase() === 'a') {
+            event.preventDefault();
+            els.builtinSearch.select();
+          }
+        });
+
+        els.organizeBtn.addEventListener('click', function () {
+          toggleFloatingMenu(els.organizeMenu, els.organizeBtn);
+        });
+
+        els.organizeMenu.addEventListener('click', function (event) {
+          var button = event.target.closest('button[data-organize-show]');
+          if (!button) {
+            return;
+          }
+          setOrganizeShow(button.getAttribute('data-organize-show'));
+          closeFloatingMenus();
+        });
+
+        els.themePickerBtn.addEventListener('click', function () {
+          toggleFloatingMenu(els.themePickerMenu, els.themePickerBtn);
+        });
+
+        els.themePickerBtn.addEventListener('keydown', function (event) {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            closeFloatingMenus();
+            cycleTheme(1);
+            return;
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            closeFloatingMenus();
+            cycleTheme(-1);
+          }
+        });
+
+        els.actionBuildMenu.addEventListener('click', function () {
+          toggleFloatingMenu(els.buildMenu, els.actionBuildMenu);
+        });
+
+        els.buildMenu.addEventListener('click', function (event) {
+          var actionButton = event.target.closest('button[id]');
+          if (!actionButton) {
+            return;
+          }
+          closeFloatingMenus();
+          if (actionButton.id === 'action-ios') {
+            perform('Build iOS smoke', function () { return runPipelineAction('ios'); }, { swallow: true });
+            return;
+          }
+          if (actionButton.id === 'action-android') {
+            perform('Build Android debug', function () { return runPipelineAction('android'); }, { swallow: true });
+          }
+        });
+
+        els.themePickerList.addEventListener('click', function (event) {
+          var button = event.target.closest('button[data-theme-name]');
+          if (!button) {
+            return;
+          }
+          applyTheme(button.getAttribute('data-theme-name'));
+          closeFloatingMenus();
+          renderThemePicker();
+          if (els.themePickerBtn) {
+            els.themePickerBtn.focus();
+          }
+        });
+
+        els.themePickerList.addEventListener('keydown', function (event) {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            closeFloatingMenus();
+            cycleTheme(1);
+            return;
+          }
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            closeFloatingMenus();
+            cycleTheme(-1);
+          }
+        });
+
+        document.addEventListener('click', function (event) {
+          if (
+            event.target.closest('#organize-menu') ||
+            event.target.closest('#organize-btn') ||
+            event.target.closest('#theme-picker-menu') ||
+            event.target.closest('#theme-picker-btn') ||
+            event.target.closest('#build-menu') ||
+            event.target.closest('#action-build-menu')
+          ) {
+            return;
+          }
+          closeFloatingMenus();
+        });
+
+        if (els.settingsPanel) {
+          els.settingsPanel.addEventListener('click', function (event) {
+            if (event.target === els.settingsPanel) {
+              setPanel('settings', false);
+            }
+          });
         }
 
-        var args = [name, template];
-        if (dest) {
-          args.push(dest);
+        els.actionBuild.addEventListener('click', function () {
+          perform('Compile desktop', function () { return runPipelineAction('build'); }, { swallow: true });
+        });
+
+        els.actionRun.addEventListener('click', function () {
+          perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
+        });
+
+        els.actionStage.addEventListener('click', function () {
+          perform('Stage mobile assets', function () { return runPipelineAction('stage'); }, { swallow: true });
+        });
+
+        els.openSelectedPath.addEventListener('click', function () {
+          var selected = selectedCatalogItem();
+          if (!selected || !selected.path) {
+            return;
+          }
+          perform('Open folder', function () { return openPath(selected.path, false); }, { swallow: true, noToast: true });
+        });
+
+        els.terminalSelectedPath.addEventListener('click', function () {
+          var selected = selectedCatalogItem();
+          if (!selected || !selected.path) {
+            return;
+          }
+          perform('Open terminal', function () { return openTerminalAtPath(selected.path); }, { swallow: true, noToast: true });
+        });
+
+        document.querySelectorAll('button[data-task]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var task = btn.getAttribute('data-task');
+            var label = btn.textContent ? btn.textContent.trim() : 'Quality task';
+            perform(label, function () { return runQualityTask(task); }, { swallow: true });
+          });
+        });
+
+        els.createTitle.addEventListener('input', function () {
+          if (!els.createFolder.value.trim()) {
+            els.createFolder.value = inferFolderFromTitle(els.createTitle.value.trim());
+          }
+          syncCreateDraftList();
+        });
+        els.createFolder.addEventListener('input', syncCreateDraftList);
+
+        document.querySelectorAll('input[name="project-type"]').forEach(function (radio) {
+          radio.addEventListener('change', syncCreateUI);
+        });
+
+        els.starterApplicationSelect.addEventListener('change', syncCreateUI);
+        els.starterGameSelect.addEventListener('change', syncCreateUI);
+        [els.targetHostedWeb, els.targetMacos, els.targetLinux, els.targetIos, els.targetAndroid].forEach(function (checkbox) {
+          checkbox.addEventListener('change', syncCreateDraftList);
+        });
+        els.createSubmit.addEventListener('click', function () {
+          perform('Create project', createProject, { swallow: true });
+        });
+
+        if (els.selectedIconInput) {
+          els.selectedIconInput.addEventListener('change', function () {
+            var file = els.selectedIconInput.files && els.selectedIconInput.files[0];
+            if (!file) {
+              return;
+            }
+            readImageFileToDataUrl(file).then(function (dataUrl) {
+              applySelectedIconData(dataUrl);
+            }).catch(function (err) {
+              toast(String(err && err.message ? err.message : err), 'bad');
+            }).finally(function () {
+              els.selectedIconInput.value = '';
+            });
+          });
         }
 
-        var res = await backend('scaffold-site', args);
-        var out = kv(res.stdout || '');
-        setArtifacts(['Created site: ' + (out.created || name)]);
+        if (els.selectedIconClear) {
+          els.selectedIconClear.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            applySelectedIconData('');
+          });
+        }
 
-        els.siteName.value = '';
-      }
+        if (els.selectedIconDrop) {
+          ['dragenter', 'dragover'].forEach(function (name) {
+            els.selectedIconDrop.addEventListener(name, function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              els.selectedIconDrop.classList.add('drag-over');
+            });
+          });
+          ['dragleave', 'dragend', 'drop'].forEach(function (name) {
+            els.selectedIconDrop.addEventListener(name, function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (name !== 'drop') {
+                els.selectedIconDrop.classList.remove('drag-over');
+              }
+            });
+          });
+          els.selectedIconDrop.addEventListener('drop', function (event) {
+            els.selectedIconDrop.classList.remove('drag-over');
+            var files = event.dataTransfer && event.dataTransfer.files;
+            var file = files && files[0] ? files[0] : null;
+            if (!file) {
+              return;
+            }
+            readImageFileToDataUrl(file).then(function (dataUrl) {
+              applySelectedIconData(dataUrl);
+            }).catch(function (err) {
+              toast(String(err && err.message ? err.message : err), 'bad');
+            });
+          });
+          els.selectedIconDrop.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              if (els.selectedIconInput) {
+                els.selectedIconInput.click();
+              }
+            }
+          });
+        }
 
-      async function runTask(task) {
-        requireRoot();
-        await backend('run-task', [task]);
-        setArtifacts(['Task complete: ' + task]);
-      }
-
-      function syncCloneSourceEnabled() {
-        var needsSource = els.newAppTemplate.value === 'clone';
-        els.sourceApp.disabled = state.busy || !needsSource;
-      }
-
-      function activateView(name) {
-        state.currentView = name;
-        document.querySelectorAll('.nav-btn').forEach(function (btn) {
-          btn.classList.toggle('active', btn.getAttribute('data-view') === name);
+        els.applyRepoRoot.addEventListener('click', function () {
+          setWorkspaceRoot(els.repoRoot.value.trim());
+          perform('Update workspace root', function () {
+            return refreshWorkspace({ quiet: true });
+          }, { noToast: true, swallow: true, keepResult: true });
         });
-        document.querySelectorAll('.view').forEach(function (view) {
-          view.classList.toggle('active', view.id === 'view-' + name);
-        });
-      }
 
-      function activateCreateMode(mode) {
-        state.createMode = mode;
-        document.querySelectorAll('.mini-tab').forEach(function (btn) {
-          btn.classList.toggle('active', btn.getAttribute('data-create-mode') === mode);
+        els.applyProjectsRoot.addEventListener('click', function () {
+          setProjectsRoot(els.settingsProjectsRoot.value.trim());
+          perform('Update projects root', function () {
+            return refreshWorkspaces({ quiet: true });
+          }, { noToast: true, swallow: true, keepResult: true });
         });
-        document.querySelectorAll('.create-panel').forEach(function (panel) {
-          panel.classList.toggle('active', panel.id === 'create-' + mode + '-panel');
+
+        els.projectsRoot.addEventListener('change', function () {
+          setProjectsRoot(els.projectsRoot.value.trim());
         });
+
+        els.clearLog.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          setLogContent('');
+        });
+
+        if (els.railDivider) {
+          els.railDivider.addEventListener('pointerdown', function (event) {
+            event.preventDefault();
+            var startX = event.clientX;
+            var startWidth = state.leftRailWidth;
+            document.body.classList.add('is-resizing');
+            if (els.railDivider.setPointerCapture) {
+              try {
+                els.railDivider.setPointerCapture(event.pointerId);
+              } catch (_err) {
+                return;
+              }
+            }
+
+            function onMove(moveEvent) {
+              var delta = moveEvent.clientX - startX;
+              setLeftRailWidth(startWidth + delta);
+            }
+
+            function onUp(upEvent) {
+              document.body.classList.remove('is-resizing');
+              window.removeEventListener('pointermove', onMove);
+              window.removeEventListener('pointerup', onUp);
+              if (els.railDivider.releasePointerCapture) {
+                try {
+                  els.railDivider.releasePointerCapture(upEvent.pointerId);
+                } catch (_err) {
+                  return;
+                }
+              }
+            }
+
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+          });
+        }
       }
 
       function bindKeyboardShortcuts() {
         document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape' && state.settingsOpen) {
+            event.preventDefault();
+            setPanel('settings', false);
+            return;
+          }
+
           var target = event.target;
           var tag = target && target.tagName ? target.tagName.toLowerCase() : '';
           var typing = tag === 'input' || tag === 'textarea' || tag === 'select';
@@ -788,162 +2551,234 @@
           }
 
           var key = event.key.toLowerCase();
-          if (key === 'r') {
+          if (key === 'b') {
             event.preventDefault();
-            perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
-          } else if (key === 'b') {
-            event.preventDefault();
-            perform('Build desktop app', buildBuiltIn, { swallow: true });
+            perform('Compile desktop', function () { return runPipelineAction('build'); }, { swallow: true });
           }
         });
       }
 
-      function bindButtons() {
-        els.refreshWorkspace.addEventListener('click', function () {
-          perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
-        });
+      function animatePipelineSectionToggle(details) {
+        var summary = details.querySelector('.pipeline-section-head');
+        if (!summary) {
+          details.open = !details.open;
+          return;
+        }
 
-        els.gotoSettings.addEventListener('click', function () {
-          activateView('settings');
-        });
+        var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        if (reduceMotion) {
+          details.open = !details.open;
+          return;
+        }
 
-        els.refreshRoot.addEventListener('click', function () {
-          setWorkspaceRoot(els.rootPath.value.trim());
-          perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
-        });
+        var startHeight = details.offsetHeight;
+        var isExpanding = !details.open;
 
-        els.runApp.addEventListener('click', function () {
-          perform('Run native app', runBuiltIn, { swallow: true });
-        });
+        if (isExpanding) {
+          details.open = true;
+        }
 
-        els.buildApp.addEventListener('click', function () {
-          perform('Build desktop app', buildBuiltIn, { swallow: true });
-        });
+        var endHeight = isExpanding ? details.offsetHeight : summary.offsetHeight;
+        if (!isExpanding && startHeight <= endHeight + 1) {
+          details.open = false;
+          return;
+        }
 
-        els.stageMobile.addEventListener('click', function () {
-          perform('Stage mobile assets', stageMobile, { swallow: true });
-        });
+        details.dataset.animating = '1';
+        details.classList.add('is-animating');
+        details.style.overflow = 'hidden';
+        details.style.height = startHeight + 'px';
 
-        els.buildIos.addEventListener('click', function () {
-          perform('Build iOS smoke', buildIos, { swallow: true });
-        });
+        var animation = details.animate(
+          [
+            { height: startHeight + 'px' },
+            { height: endHeight + 'px' }
+          ],
+          {
+            duration: 180,
+            easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+          }
+        );
 
-        els.buildAndroid.addEventListener('click', function () {
-          perform('Build Android debug', buildAndroid, { swallow: true });
-        });
+        animation.onfinish = function () {
+          if (!isExpanding) {
+            details.open = false;
+          }
+          details.classList.remove('is-animating');
+          details.style.height = '';
+          details.style.overflow = '';
+          delete details.dataset.animating;
+        };
 
-        els.createApp.addEventListener('click', function () {
-          perform('Create app scaffold', createAppScaffold, { swallow: true });
-        });
+        animation.oncancel = function () {
+          details.classList.remove('is-animating');
+          details.style.height = '';
+          details.style.overflow = '';
+          delete details.dataset.animating;
+        };
+      }
 
-        els.createSite.addEventListener('click', function () {
-          perform('Create site scaffold', createSiteScaffold, { swallow: true });
-        });
+      function startAutoRefresh() {
+        if (state.autoRefreshTimer) {
+          clearInterval(state.autoRefreshTimer);
+          state.autoRefreshTimer = null;
+        }
 
-        document.querySelectorAll('button[data-task]').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            var task = btn.getAttribute('data-task');
-            perform('Run task: ' + task, function () {
-              return runTask(task);
-            }, { swallow: true });
+        state.autoRefreshTimer = setInterval(function () {
+          if (state.busy || !bridgeAvailable()) {
+            return;
+          }
+          refreshWorkspace({ quiet: true }).catch(function (err) {
+            appendLog('background refresh error: ' + String(err && err.message ? err.message : err));
+          });
+        }, 15000);
+
+        window.addEventListener('focus', function () {
+          if (state.busy || !bridgeAvailable()) {
+            return;
+          }
+          refreshWorkspace({ quiet: true }).catch(function (_err) {
+            return;
           });
         });
 
-        document.querySelectorAll('.nav-btn').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            activateView(btn.getAttribute('data-view'));
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden || state.busy || !bridgeAvailable()) {
+            return;
+          }
+          refreshWorkspace({ quiet: true }).catch(function (_err) {
+            return;
           });
-        });
-
-        document.querySelectorAll('.mini-tab').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            activateCreateMode(btn.getAttribute('data-create-mode'));
-          });
-        });
-
-        els.appSelect.addEventListener('change', renderSelectedAppDetails);
-        els.newAppTemplate.addEventListener('change', syncCloneSourceEnabled);
-
-        els.dashboardGoManage.addEventListener('click', function () {
-          activateView('apps');
-        });
-
-        els.dashboardGoCreate.addEventListener('click', function () {
-          activateView('create');
-          activateCreateMode('app');
-        });
-
-        els.dashboardBuild.addEventListener('click', function () {
-          activateView('apps');
-          perform('Build desktop app', buildBuiltIn, { swallow: true });
-        });
-
-        els.clearLog.addEventListener('click', function () {
-          text(els.log, 'Wizardry Forge ready.');
         });
       }
 
       function cacheElements() {
         els.bridgeStatus = document.getElementById('bridge-status');
         els.activityPill = document.getElementById('activity-pill');
+        els.toggleSettingsPanel = document.getElementById('toggle-settings-panel');
+
         els.workspaceRootDisplay = document.getElementById('workspace-root-display');
         els.metricAppsTotal = document.getElementById('metric-apps-total');
         els.metricAppsProd = document.getElementById('metric-apps-prod');
         els.metricTemplates = document.getElementById('metric-templates');
-        els.refreshWorkspace = document.getElementById('refresh-workspace');
-        els.gotoSettings = document.getElementById('goto-settings');
-        els.dashboardCurrentApp = document.getElementById('dashboard-current-app');
-        els.dashboardGoManage = document.getElementById('dashboard-go-manage');
-        els.dashboardGoCreate = document.getElementById('dashboard-go-create');
-        els.dashboardBuild = document.getElementById('dashboard-build');
 
-        els.rootPath = document.getElementById('root-path');
-        els.refreshRoot = document.getElementById('refresh-root');
-        els.doctor = document.getElementById('doctor');
+        els.builtinSearch = document.getElementById('builtin-search');
+        els.catalogList = document.getElementById('catalog-list');
+        els.organizeBtn = document.getElementById('organize-btn');
+        els.organizeMenu = document.getElementById('organize-menu');
+        els.themePickerBtn = document.getElementById('theme-picker-btn');
+        els.themePickerMenu = document.getElementById('theme-picker-menu');
+        els.themePickerList = document.getElementById('theme-picker-list');
+        els.actionBuildMenu = document.getElementById('action-build-menu');
+        els.buildMenu = document.getElementById('build-menu');
+        els.themeStylesheet = document.getElementById('forge-theme-stylesheet');
+        els.stage = document.querySelector('.stage');
+        els.stageTools = document.getElementById('stage-tools');
+        els.appGrid = document.querySelector('.app-grid');
+        els.railDivider = document.getElementById('rail-divider');
+        els.openCreateWorkflow = document.getElementById('open-create-workflow');
+        els.settingsPanelScroll = document.querySelector('#settings-panel .panel-scroll');
+        els.settingsPanel = document.getElementById('settings-panel');
 
-        els.appSelect = document.getElementById('app-select');
-        els.runApp = document.getElementById('run-app');
-        els.buildApp = document.getElementById('build-app');
-        els.stageMobile = document.getElementById('stage-mobile');
-        els.buildIos = document.getElementById('build-ios');
-        els.buildAndroid = document.getElementById('build-android');
-        els.appsSummary = document.getElementById('apps-summary');
-        els.appDetails = document.getElementById('app-details');
+        els.selectedAppGrid = document.getElementById('selected-app-grid');
+        els.selectedTitle = document.getElementById('selected-title');
+        els.selectedTypeBadge = document.getElementById('selected-type-badge');
+        els.selectedSuiteBadge = document.getElementById('selected-suite-badge');
+        els.openSelectedPath = document.getElementById('open-selected-path');
+        els.terminalSelectedPath = document.getElementById('terminal-selected-path');
+        els.selectedTargetsEditor = document.getElementById('selected-targets-editor');
+        els.targetActiveList = document.getElementById('target-active-list');
+        els.targetInactiveList = document.getElementById('target-inactive-list');
+        els.selectedIconDrop = document.getElementById('selected-icon-drop');
+        els.selectedIconPreview = document.getElementById('selected-icon-preview');
+        els.selectedIconPlaceholder = document.getElementById('selected-icon-placeholder');
+        els.selectedIconChoose = document.getElementById('selected-icon-choose');
+        els.selectedIconInput = document.getElementById('selected-icon-input');
+        els.selectedIconClear = document.getElementById('selected-icon-clear');
 
-        els.newAppSlug = document.getElementById('new-app-slug');
-        els.newAppName = document.getElementById('new-app-name');
-        els.newAppTemplate = document.getElementById('new-app-template');
-        els.sourceApp = document.getElementById('source-app');
-        els.createApp = document.getElementById('create-app');
+        els.actionBuild = document.getElementById('action-build');
+        els.actionRun = document.getElementById('action-run');
+        els.actionStage = document.getElementById('action-stage');
+        els.actionIos = document.getElementById('action-ios');
+        els.actionAndroid = document.getElementById('action-android');
 
-        els.siteName = document.getElementById('site-name');
-        els.siteTemplate = document.getElementById('site-template');
-        els.siteDest = document.getElementById('site-dest');
-        els.createSite = document.getElementById('create-site');
+        els.createTitle = document.getElementById('create-title');
+        els.createFolder = document.getElementById('create-folder');
+        els.starterApplicationSelect = document.getElementById('starter-application-select');
+        els.starterApplicationSource = document.getElementById('starter-application-source');
+        els.starterGameSelect = document.getElementById('starter-game-select');
+        els.starterGameSource = document.getElementById('starter-game-source');
+        els.projectsRoot = document.getElementById('projects-root');
+        els.createSubmit = document.getElementById('create-submit');
 
-        els.artifacts = document.getElementById('artifact-list');
+        els.targetHostedWeb = document.getElementById('target-hosted-web');
+        els.targetMacos = document.getElementById('target-macos');
+        els.targetLinux = document.getElementById('target-linux');
+        els.targetIos = document.getElementById('target-ios');
+        els.targetAndroid = document.getElementById('target-android');
+
+        els.qualityScope = document.getElementById('quality-scope');
+        els.qualityHelp = document.getElementById('quality-help');
+
         els.log = document.getElementById('log');
         els.clearLog = document.getElementById('clear-log');
+
+        els.repoRoot = document.getElementById('repo-root');
+        els.applyRepoRoot = document.getElementById('apply-repo-root');
+        els.settingsProjectsRoot = document.getElementById('settings-projects-root');
+        els.applyProjectsRoot = document.getElementById('apply-projects-root');
+        els.doctor = document.getElementById('doctor');
+
         els.toast = document.getElementById('toast');
       }
 
       async function boot() {
+        document.body.classList.remove('settings-open', 'activity-open');
+        state.settingsOpen = false;
+        document.body.classList.remove('layout-recovery');
         cacheElements();
+        syncLogClearVisibility();
         bindButtons();
         bindKeyboardShortcuts();
-        activateView(state.currentView);
-        activateCreateMode(state.createMode);
-        syncCloneSourceEnabled();
+        startAutoRefresh();
+        setPanel('settings', false);
         setArtifacts([]);
+        applyTheme(state.activeTheme);
+        renderThemePicker();
+        setOrganizeShow(state.organizeShow);
+        setLeftRailWidth(state.leftRailWidth);
+        setWorkflowMode(state.route);
+        closeFloatingMenus();
+        syncCreateUI();
+        scheduleLayoutRecoveryCheck();
+        window.addEventListener('resize', scheduleLayoutRecoveryCheck);
 
         if (state.rootHint) {
           setWorkspaceRoot(state.rootHint);
         }
+        if (state.projectsRoot) {
+          els.projectsRoot.value = state.projectsRoot;
+          els.settingsProjectsRoot.value = state.projectsRoot;
+        }
+
+        renderResult({
+          status: 'neutral',
+          summary: 'Run an action to see structured results and next steps.',
+          paths: [],
+          help: null
+        });
 
         if (bridgeAvailable()) {
           setBridgeStatus(true, 'Bridge: connected');
           setActivity('ready', 'Ready');
-          await perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
+          try {
+            await refreshWorkspace({ quiet: true });
+          } catch (err) {
+            appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
+          }
+          text(els.qualityScope, 'Global checks for repository: ' + (state.rootHint || '(not set)'));
+          text(els.qualityHelp, 'These checks run against the repository and pipeline tooling, not one selected app.');
+          scheduleWindowFit();
           return;
         }
 
@@ -967,7 +2802,10 @@
           document.body.classList.remove('bridge-missing');
           setBridgeStatus(true, 'Bridge: connected');
           setActivity('ready', 'Ready');
-          perform('Refresh workspace', refreshWorkspace, { noToast: true, swallow: true });
+          refreshWorkspace({ quiet: true }).catch(function (err) {
+            appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
+          });
+          scheduleWindowFit();
         }, 250);
       }
 

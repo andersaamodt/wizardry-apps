@@ -21,6 +21,25 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 grep -F "Wizardry Forge" "$root/.apps/forge/index.html" >/dev/null
 grep -F "forge-backend.sh" "$root/.apps/forge/index.html" >/dev/null
 grep -F "window.wizardry.rpc('bridge.exec'" "$root/.apps/forge/index.html" >/dev/null
+grep -F 'id="toggle-settings-panel"' "$root/.apps/forge/index.html" >/dev/null
+grep -F 'id="organize-menu"' "$root/.apps/forge/index.html" >/dev/null
+grep -F 'id="open-create-workflow"' "$root/.apps/forge/index.html" >/dev/null
+grep -F 'data-organize-show="builtin"' "$root/.apps/forge/index.html" >/dev/null
+grep -F 'data-organize-show="workspace"' "$root/.apps/forge/index.html" >/dev/null
+grep -F 'id="theme-picker-menu"' "$root/.apps/forge/index.html" >/dev/null
+grep -F 'id="selected-targets-editor"' "$root/.apps/forge/index.html" >/dev/null
+grep -F ">Log<" "$root/.apps/forge/index.html" >/dev/null
+grep -F 'id="target-active-list"' "$root/.apps/forge/index.html" >/dev/null
+grep -F 'id="target-inactive-list"' "$root/.apps/forge/index.html" >/dev/null
+grep -F "row-play" "$root/.apps/forge/index.html" >/dev/null
+grep -F "placeholder=\"Filter\"" "$root/.apps/forge/index.html" >/dev/null
+! grep -F "Refresh" "$root/.apps/forge/index.html" >/dev/null
+! grep -F 'id="artifact-list"' "$root/.apps/forge/index.html" >/dev/null
+! grep -F 'id="result-status"' "$root/.apps/forge/index.html" >/dev/null
+! grep -F ">Reveal<" "$root/.apps/forge/index.html" >/dev/null
+! grep -F "class=\"stage-tab\" data-route=\"quality\"" "$root/.apps/forge/index.html" >/dev/null
+! grep -F "stage-nav" "$root/.apps/forge/index.html" >/dev/null
+! grep -F "stage-tab" "$root/.apps/forge/index.html" >/dev/null
 grep -F -- "--accent" "$root/.apps/forge/style.css" >/dev/null
 grep -F "scaffold-app" "$root/.apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "Install user-local launchers/integration" "$root/.apps/forge/README.md" >/dev/null

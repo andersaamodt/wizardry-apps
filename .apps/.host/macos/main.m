@@ -5,10 +5,29 @@
 @import Cocoa;
 @import WebKit;
 
+@interface WizardryDragStripView : NSView
+@end
+
+@implementation WizardryDragStripView
+- (BOOL)mouseDownCanMoveWindow {
+    return YES;
+}
+
+- (void)mouseDown:(NSEvent *)event {
+    NSWindow *window = [self window];
+    if (window) {
+        [window performWindowDragWithEvent:event];
+        return;
+    }
+    [super mouseDown:event];
+}
+@end
+
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler>
 @property (strong) NSWindow *window;
 @property (strong) WKWebView *webView;
 @property (strong) NSString *appPath;
+@property (strong) NSImage *appIconImage;
 @end
 
 @implementation AppDelegate
@@ -66,6 +85,7 @@
     
     self.appPath = args[1];
     NSString *indexPath = [self.appPath stringByAppendingPathComponent:@"index.html"];
+    NSString *customIconPath = [self.appPath stringByAppendingPathComponent:@"assets/forge-icon.png"];
     
     // Check if index.html exists
     if (![[NSFileManager defaultManager] fileExistsAtPath:indexPath]) {
@@ -80,21 +100,40 @@
     appName = [appName capitalizedString];
 
     [self setupMainMenuWithAppName:appName];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:customIconPath]) {
+        NSImage *iconImage = [[NSImage alloc] initWithContentsOfFile:customIconPath];
+        if (iconImage) {
+            self.appIconImage = iconImage;
+            [NSApp setApplicationIconImage:self.appIconImage];
+        }
+    }
     [NSApp activateIgnoringOtherApps:YES];
     
     // Create window
-    NSRect frame = NSMakeRect(0, 0, 1024, 768);
-    NSWindowStyleMask styleMask = NSWindowStyleMaskTitled | 
-                                   NSWindowStyleMaskClosable | 
+    NSRect frame = NSMakeRect(0, 0, 860, 620);
+    NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |
+                                   NSWindowStyleMaskClosable |
                                    NSWindowStyleMaskMiniaturizable |
-                                   NSWindowStyleMaskResizable;
+                                   NSWindowStyleMaskResizable |
+                                   NSWindowStyleMaskFullSizeContentView;
     
     self.window = [[NSWindow alloc] initWithContentRect:frame
                                               styleMask:styleMask
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
+    [self.window setMinSize:NSMakeSize(860, 620)];
     [self.window center];
     [self.window setTitle:[NSString stringWithFormat:@"Wizardry - %@", appName]];
+    [self.window setTitlebarAppearsTransparent:YES];
+    [self.window setTitleVisibility:NSWindowTitleHidden];
+    [self.window setMovableByWindowBackground:YES];
+    [self.window setBackgroundColor:[NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0]];
+    if (@available(macOS 11.0, *)) {
+        [self.window setToolbarStyle:NSWindowToolbarStyleUnified];
+    }
+    if (@available(macOS 11.0, *)) {
+        [self.window setTitlebarSeparatorStyle:NSTitlebarSeparatorStyleNone];
+    }
     [self.window makeKeyAndOrderFront:nil];
     
     // Create WebView with message handler
@@ -103,8 +142,23 @@
     [contentController addScriptMessageHandler:self name:@"wizardry"];
     config.userContentController = contentController;
     
-    self.webView = [[WKWebView alloc] initWithFrame:frame configuration:config];
-    [self.window setContentView:self.webView];
+    NSView *rootView = [[NSView alloc] initWithFrame:frame];
+    [rootView setAutoresizesSubviews:YES];
+
+    CGFloat dragStripHeight = 24.0;
+    NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
+    self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
+    [self.webView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [rootView addSubview:self.webView];
+
+    NSRect stripFrame = NSMakeRect(0, frame.size.height - dragStripHeight, frame.size.width, dragStripHeight);
+    NSView *dragStrip = [[WizardryDragStripView alloc] initWithFrame:stripFrame];
+    [dragStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [dragStrip setWantsLayer:YES];
+    dragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+    [rootView addSubview:dragStrip];
+
+    [self.window setContentView:rootView];
     
     // Load the app HTML
     NSURL *url = [NSURL fileURLWithPath:indexPath];
@@ -135,39 +189,72 @@
 }
 
 - (void)executeCommand:(NSArray *)command withId:(NSString *)messageId {
-    NSString *program = command[0];
-    NSArray *args = (command.count > 1) ? [command subarrayWithRange:NSMakeRange(1, command.count - 1)] : @[];
-    
-    NSTask *task = [[NSTask alloc] init];
-    task.launchPath = @"/usr/bin/env";
-    
-    // Build arguments: env program arg1 arg2 ...
-    NSMutableArray *taskArgs = [NSMutableArray arrayWithObject:program];
-    [taskArgs addObjectsFromArray:args];
-    task.arguments = taskArgs;
-    
-    NSPipe *outPipe = [NSPipe pipe];
-    NSPipe *errPipe = [NSPipe pipe];
-    task.standardOutput = outPipe;
-    task.standardError = errPipe;
-    
-    @try {
-        [task launch];
-    } @catch (NSException *exception) {
-        [self sendError:messageId message:[NSString stringWithFormat:@"Failed to launch: %@", exception.reason]];
-        return;
-    }
-    
-    [task waitUntilExit];
-    
-    NSData *outData = [[outPipe fileHandleForReading] readDataToEndOfFile];
-    NSData *errData = [[errPipe fileHandleForReading] readDataToEndOfFile];
-    
-    NSString *stdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
-    NSString *stderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
-    int exitCode = [task terminationStatus];
-    
-    [self sendResult:messageId stdout:stdout stderr:stderr exitCode:exitCode error:nil];
+    NSArray *commandCopy = [command copy];
+    NSString *messageIdCopy = [messageId copy];
+
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *program = commandCopy[0];
+        NSArray *args = (commandCopy.count > 1) ? [commandCopy subarrayWithRange:NSMakeRange(1, commandCopy.count - 1)] : @[];
+
+        if ([program isEqualToString:@"__wizardry_host_resize"]) {
+            CGFloat width = 1060.0;
+            CGFloat height = 860.0;
+            if (args.count >= 1) {
+                width = MAX(680.0, [args[0] doubleValue]);
+            }
+            if (args.count >= 2) {
+                height = MAX(520.0, [args[1] doubleValue]);
+            }
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.window) {
+                    NSRect frame = [self.window frame];
+                    NSRect newFrame = frame;
+                    newFrame.origin.y = NSMaxY(frame) - height;
+                    newFrame.size.width = width;
+                    newFrame.size.height = height;
+                    [self.window setFrame:newFrame display:YES animate:NO];
+                }
+                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        NSTask *task = [[NSTask alloc] init];
+        task.launchPath = @"/usr/bin/env";
+
+        // Build arguments: env program arg1 arg2 ...
+        NSMutableArray *taskArgs = [NSMutableArray arrayWithObject:program];
+        [taskArgs addObjectsFromArray:args];
+        task.arguments = taskArgs;
+
+        NSPipe *outPipe = [NSPipe pipe];
+        NSPipe *errPipe = [NSPipe pipe];
+        task.standardOutput = outPipe;
+        task.standardError = errPipe;
+
+        @try {
+            [task launch];
+        } @catch (NSException *exception) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self sendError:messageIdCopy message:[NSString stringWithFormat:@"Failed to launch: %@", exception.reason]];
+            });
+            return;
+        }
+
+        [task waitUntilExit];
+
+        NSData *outData = [[outPipe fileHandleForReading] readDataToEndOfFile];
+        NSData *errData = [[errPipe fileHandleForReading] readDataToEndOfFile];
+
+        NSString *stdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
+        NSString *stderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
+        int exitCode = [task terminationStatus];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self sendResult:messageIdCopy stdout:stdout stderr:stderr exitCode:exitCode error:nil];
+        });
+    });
 }
 
 - (void)sendResult:(NSString *)messageId 

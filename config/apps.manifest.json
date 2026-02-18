@@ -9,7 +9,8 @@
         "macos": "com.wizardry.apps.artificer.macos",
         "ios": "com.wizardry.apps.artificer.ios",
         "android": "com.wizardry.apps.artificer.android"
-      }
+      },
+      "targets": "hosted-web,linux,macos"
     },
     {
       "slug": "unix-settings",
@@ -19,7 +20,8 @@
         "macos": "com.wizardry.apps.unixsettings.macos",
         "ios": "com.wizardry.apps.unixsettings.ios",
         "android": "com.wizardry.apps.unixsettings.android"
-      }
+      },
+      "targets": "macos,linux"
     },
     {
       "slug": "forge",
@@ -29,7 +31,8 @@
         "macos": "com.wizardry.apps.forge.macos",
         "ios": "com.wizardry.apps.forge.ios",
         "android": "com.wizardry.apps.forge.android"
-      }
+      },
+      "targets": "macos,linux"
     },
     {
       "slug": "chatroom",
@@ -39,7 +42,8 @@
         "macos": "com.wizardry.apps.chatroom.macos",
         "ios": "com.wizardry.apps.chatroom.ios",
         "android": "com.wizardry.apps.chatroom.android"
-      }
+      },
+      "targets": "hosted-web"
     },
     {
       "slug": "menu-app",
@@ -49,7 +53,8 @@
         "macos": "com.wizardry.apps.menuapp.macos",
         "ios": "com.wizardry.apps.menuapp.ios",
         "android": "com.wizardry.apps.menuapp.android"
-      }
+      },
+      "targets": "macos,linux,hosted-web"
     }
   ]
 }

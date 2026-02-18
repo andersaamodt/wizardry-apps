@@ -5,9 +5,18 @@ Wizardry Forge is the flagship wizardry-apps desktop control plane.
 It provides a native WebView UI backed by POSIX shell scripts for:
 - building and running built-in wizardry apps
 - staging assets for mobile hosts
-- scaffolding new app folders from starter templates
+- creating new workspaces through Create App (Application or Game project type)
 - scaffolding hosted web sites from `.web` templates
 - running core quality checks
+
+The GUI is organized around two primary use-cases:
+- App Pipeline: select app -> compile/run -> stage/publish checks
+- Create App: project type -> starter -> platforms -> scaffold workspace
+- Unified left app list: built-in and user-created apps together, with organize filters and per-row run action
+- Settings panel (bottom-left gear): roots, diagnostics, bridge status, and global quality checks
+- Activity panel (top-right icon): artifacts and command logs
+- Theme picker (left footer): all bundled wizardry themes, persisted locally
+- Projects are external by default under `~/git`, and only folders with `wizardry.workspace.conf` are shown as managed workspaces.
 
 ## Backend
 
@@ -68,5 +77,6 @@ sh .apps/forge/scripts/forge-backend.sh run-desktop /path/to/wizardry-apps artif
 
 # Scaffold a new app and a new site
 sh .apps/forge/scripts/forge-backend.sh scaffold-app /path/to/wizardry-apps my-tool "My Tool" minimal
+sh .apps/forge/scripts/forge-backend.sh scaffold-workspace /path/to/wizardry-apps my-tool "My Tool" web panel "hosted-web,macos,linux"
 sh .apps/forge/scripts/forge-backend.sh scaffold-site /path/to/wizardry-apps my-site demo "$HOME/sites"
 ```

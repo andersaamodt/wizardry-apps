@@ -11,12 +11,18 @@ Commands:
   doctor [ROOT_HINT]
   list-apps [ROOT_HINT]
   list-templates [ROOT_HINT]
+  list-godot-tools [ROOT_HINT]
+  list-workspaces [ROOT_HINT] [PROJECT_ROOT]
+  set-app-targets [ROOT_HINT] APP_SLUG TARGETS
+  set-workspace-targets [ROOT_HINT] WORKSPACE_PATH TARGETS
   build-desktop [ROOT_HINT] APP_SLUG
-  run-desktop [ROOT_HINT] APP_SLUG
+  run-desktop [ROOT_HINT] APP_SLUG [RUN_MODE]
+  run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
   stage-mobile [ROOT_HINT] APP_SLUG
   build-ios-smoke [ROOT_HINT] APP_SLUG
   build-android-debug [ROOT_HINT] APP_SLUG
-  scaffold-app [ROOT_HINT] APP_SLUG APP_NAME TEMPLATE [SOURCE_APP]
+  scaffold-app [ROOT_HINT] APP_SLUG APP_NAME TEMPLATE [SOURCE_APP]   # legacy
+  scaffold-workspace [ROOT_HINT] APP_SLUG APP_NAME CONTEXT STARTER TARGETS [SOURCE] [PROJECT_ROOT]
   scaffold-site [ROOT_HINT] SITE_NAME TEMPLATE [DEST_ROOT]
   run-task [ROOT_HINT] TASK
 
@@ -25,6 +31,9 @@ TASK values:
 
 TEMPLATE values for scaffold-app:
   minimal | panel | clone
+
+CONTEXT values for scaffold-workspace:
+  web | godot | application | game
 USAGE
   exit 0
   ;;
@@ -146,18 +155,18 @@ os_id() {
 }
 
 validate_slug() {
-  slug=${1-}
-  case "$slug" in
+  candidate=${1-}
+  case "$candidate" in
     [a-z][a-z0-9-]*) ;;
     *)
-      printf '%s\n' "forge-backend: invalid slug '$slug' (expected [a-z][a-z0-9-]*)" >&2
+      printf '%s\n' "forge-backend: invalid slug '$candidate' (expected [a-z][a-z0-9-]*)" >&2
       exit 2
       ;;
   esac
 
-  case "$slug" in
+  case "$candidate" in
     *-|*--*)
-      printf '%s\n' "forge-backend: invalid slug '$slug' (no trailing or consecutive hyphens)" >&2
+      printf '%s\n' "forge-backend: invalid slug '$candidate' (no trailing or consecutive hyphens)" >&2
       exit 2
       ;;
   esac
@@ -239,11 +248,20 @@ cmd_doctor() {
   printf 'os=%s\n' "$(os_id)"
   printf 'home=%s\n' "$HOME"
 
-  for t in jq clang cc gcc xcodebuild xcodegen pkg-config gradle java open xdg-open appimagetool; do
+  for t in jq clang cc gcc xcodebuild xcodegen pkg-config gradle java brew open xdg-open appimagetool; do
     if command -v "$t" >/dev/null 2>&1; then
       printf '%s=%s\n' "$t" "1"
     else
       printf '%s=%s\n' "$t" "0"
+    fi
+  done
+
+  for p in x-terminal-emulator gnome-terminal konsole; do
+    key=$(printf '%s' "$p" | tr '-' '_')
+    if command -v "$p" >/dev/null 2>&1; then
+      printf '%s=%s\n' "$key" "1"
+    else
+      printf '%s=%s\n' "$key" "0"
     fi
   done
 
@@ -261,11 +279,33 @@ cmd_list_apps() {
   require_jq
 
   manifest="$root/config/apps.manifest.json"
-  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end)] | @tsv' "$manifest" |
-  while IFS="$(printf '\t')" read -r slug name production; do
+  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (.targets // "")] | @tsv' "$manifest" |
+  while IFS="$(printf '\t')" read -r slug name production bundle_targets manifest_targets; do
     exists=0
     app_exists "$root" "$slug" && exists=1
-    printf '%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists"
+    development_context=web
+    [ -d "$root/godot/tools/$slug" ] && development_context=godot
+
+    if [ -n "$manifest_targets" ]; then
+      targets=$manifest_targets
+    else
+      targets="macos,linux"
+      case ",$bundle_targets," in
+        *,ios,*)
+          targets="$targets,ios"
+          ;;
+      esac
+      case ",$bundle_targets," in
+        *,android,*)
+          targets="$targets,android"
+          ;;
+      esac
+      if [ -d "$root/.web/$slug" ]; then
+        targets="hosted-web,$targets"
+      fi
+    fi
+
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets"
   done
 }
 
@@ -280,6 +320,162 @@ cmd_list_templates() {
     [ -d "$root/.web/$slug" ] && exists=1
     printf '%s\t%s\t%s\n' "$slug" "$publish" "$exists"
   done
+}
+
+cmd_list_godot_tools() {
+  root=$(require_root "${1-}")
+  tools_dir="$root/godot/tools"
+  [ -d "$tools_dir" ] || return 0
+
+  for path in "$tools_dir"/*; do
+    [ -d "$path" ] || continue
+    tool=$(basename "$path")
+    case "$tool" in
+      .* ) continue ;;
+    esac
+    printf '%s\n' "$tool"
+  done | sort
+}
+
+workspace_default_root() {
+  if [ -n "${WIZARDRY_FORGE_PROJECTS_ROOT-}" ]; then
+    printf '%s\n' "$WIZARDRY_FORGE_PROJECTS_ROOT"
+    return 0
+  fi
+  printf '%s\n' "$HOME/git"
+}
+
+workspace_field() {
+  file=$1
+  key=$2
+  fallback=${3-}
+  value=$(sed -n "s/^$key=//p" "$file" | head -n 1 | tr -d '\r')
+  if [ -n "$value" ]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
+cmd_list_workspaces() {
+  root=$(require_root "${1-}")
+  project_root=${2-}
+  [ -n "$project_root" ] || project_root=$(workspace_default_root)
+  [ -d "$project_root" ] || return 0
+
+  for path in "$project_root"/*; do
+    [ -d "$path" ] || continue
+    conf="$path/wizardry.workspace.conf"
+    [ -f "$conf" ] || continue
+
+    project_id=$(workspace_field "$conf" project_id "")
+    [ -n "$project_id" ] || project_id=$(workspace_field "$conf" slug "$(basename "$path")")
+
+    title=$(workspace_field "$conf" title "")
+    [ -n "$title" ] || title=$(workspace_field "$conf" name "$project_id")
+
+    project_type=$(workspace_field "$conf" project_type "")
+    [ -n "$project_type" ] || project_type=$(workspace_field "$conf" context "application")
+
+    development_context=$(workspace_field "$conf" development_context "")
+    [ -n "$development_context" ] || development_context=$(workspace_field "$conf" context "web")
+
+    targets=$(workspace_field "$conf" targets "")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$project_id" "$title" "$project_type" "$development_context" "$targets" "$path"
+  done | sort
+}
+
+write_key_value_file() {
+  file=$1
+  key=$2
+  value=$3
+
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/wizardry-forge-kv.XXXXXX")
+  found=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      "$key="*)
+        if [ "$found" -eq 0 ]; then
+          printf '%s=%s\n' "$key" "$value" >>"$tmp_file"
+          found=1
+        fi
+        ;;
+      *)
+        printf '%s\n' "$line" >>"$tmp_file"
+        ;;
+    esac
+  done <"$file"
+
+  if [ "$found" -eq 0 ]; then
+    printf '%s=%s\n' "$key" "$value" >>"$tmp_file"
+  fi
+  mv "$tmp_file" "$file"
+}
+
+cmd_set_app_targets() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  targets=${3-}
+
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: set-app-targets requires APP_SLUG" >&2
+    exit 2
+  }
+  [ -n "$targets" ] || {
+    printf '%s\n' "forge-backend: set-app-targets requires TARGETS" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+
+  manifest="$root/config/apps.manifest.json"
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/wizardry-forge-manifest.XXXXXX")
+  jq --arg slug "$slug" --arg targets "$targets" '
+    if any(.apps[]; .slug == $slug) then
+      .apps |= map(if .slug == $slug then (.targets = $targets) else . end)
+    else
+      error("app-not-found")
+    end
+  ' "$manifest" >"$tmp_file" || {
+    rm -f "$tmp_file"
+    printf '%s\n' "forge-backend: app not found: $slug" >&2
+    exit 1
+  }
+  mv "$tmp_file" "$manifest"
+
+  printf 'slug=%s\n' "$slug"
+  printf 'targets=%s\n' "$targets"
+  printf 'manifest=%s\n' "$manifest"
+}
+
+cmd_set_workspace_targets() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  targets=${3-}
+
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: set-workspace-targets requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -n "$targets" ] || {
+    printf '%s\n' "forge-backend: set-workspace-targets requires TARGETS" >&2
+    exit 2
+  }
+  [ -d "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+
+  conf="$workspace_path/wizardry.workspace.conf"
+  [ -f "$conf" ] || {
+    printf '%s\n' "forge-backend: workspace profile missing: $workspace_path" >&2
+    exit 1
+  }
+
+  write_key_value_file "$conf" targets "$targets"
+  printf 'workspace=%s\n' "$workspace_path"
+  printf 'targets=%s\n' "$targets"
+  printf 'profile=%s\n' "$conf"
 }
 
 cmd_build_desktop() {
@@ -347,6 +543,7 @@ PLIST
         zip_path=''
       fi
 
+      printf 'app_name=%s\n' "$app_name"
       printf 'host=%s\n' "$host_bin"
       printf 'artifact=%s\n' "$bundle"
       [ -n "$zip_path" ] && printf 'zip=%s\n' "$zip_path"
@@ -388,6 +585,7 @@ APP
         artifact="$tar_path"
       fi
 
+      printf 'app_name=%s\n' "$slug"
       printf 'host=%s\n' "$host_bin"
       printf 'artifact=%s\n' "$artifact"
       ;;
@@ -402,6 +600,7 @@ APP
 cmd_run_desktop() {
   root=$(require_root "${1-}")
   slug=${2-}
+  run_mode=${3-auto}
   [ -n "$slug" ] || {
     printf '%s\n' "forge-backend: run-desktop requires APP_SLUG" >&2
     exit 2
@@ -418,6 +617,39 @@ cmd_run_desktop() {
   host_bin=''
   case "$os" in
     darwin)
+      app_name=$(app_name_from_manifest "$root" "$slug")
+      bundle="$root/_tmp/workbench/dist/macos/$app_name.app"
+      if [ "$run_mode" = "bundle" ]; then
+        [ -d "$bundle" ] || {
+          printf '%s\n' "forge-backend: desktop bundle not found, run Compile Desktop first" >&2
+          exit 1
+        }
+        command -v open >/dev/null 2>&1 || {
+          printf '%s\n' "forge-backend: open command not available on this system" >&2
+          exit 1
+        }
+        open -na "$bundle"
+        printf 'launched=1\n'
+        printf 'mode=bundle\n'
+        printf 'artifact=%s\n' "$bundle"
+        exit 0
+      fi
+      if [ "$run_mode" != "host" ] && [ -d "$bundle" ] && command -v open >/dev/null 2>&1; then
+        stale_bundle=0
+        if find "$app_dir" -type f -newer "$bundle" | grep -q . 2>/dev/null; then
+          stale_bundle=1
+        fi
+        if [ "$stale_bundle" -eq 0 ] && find "$root/.apps/.host/shared" -type f -newer "$bundle" | grep -q . 2>/dev/null; then
+          stale_bundle=1
+        fi
+        if [ "$stale_bundle" -eq 0 ]; then
+          open -na "$bundle"
+          printf 'launched=1\n'
+          printf 'mode=bundle\n'
+          printf 'artifact=%s\n' "$bundle"
+          exit 0
+        fi
+      fi
       host_bin=$(ensure_macos_host "$root")
       ;;
     linux)
@@ -441,6 +673,81 @@ cmd_run_desktop() {
   pid=$!
 
   printf 'launched=1\n'
+  printf 'mode=host\n'
+  printf 'entry=%s\n' "$app_dir"
+  printf 'pid=%s\n' "$pid"
+  printf 'log=%s\n' "$log_path"
+}
+
+cmd_run_workspace() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  context_hint=${3-}
+
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: run-workspace requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -d "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+
+  context=$context_hint
+  if [ -z "$context" ] && [ -f "$workspace_path/wizardry.workspace.conf" ]; then
+    context=$(workspace_field "$workspace_path/wizardry.workspace.conf" development_context "")
+    [ -n "$context" ] || context=$(workspace_field "$workspace_path/wizardry.workspace.conf" context "")
+  fi
+  [ -n "$context" ] || context=web
+
+  case "$context" in
+    godot|game)
+      printf 'launched=1\n'
+      printf 'mode=open\n'
+      printf 'entry=%s\n' "$workspace_path"
+      return 0
+      ;;
+  esac
+
+  app_dir="$workspace_path/app"
+  if [ ! -f "$app_dir/index.html" ] && [ -f "$workspace_path/index.html" ]; then
+    app_dir="$workspace_path"
+  fi
+  [ -f "$app_dir/index.html" ] || {
+    printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
+    exit 1
+  }
+
+  os=$(os_id)
+  host_bin=''
+  case "$os" in
+    darwin)
+      host_bin=$(ensure_macos_host "$root")
+      ;;
+    linux)
+      host_bin=$(ensure_linux_host "$root")
+      ;;
+    *)
+      printf '%s\n' "forge-backend: unsupported desktop OS: $os" >&2
+      exit 1
+      ;;
+  esac
+
+  workspace_id=$(basename "$workspace_path")
+  log_dir="$root/_tmp/workbench/log"
+  mkdir -p "$log_dir"
+  log_path="$log_dir/workspace-$workspace_id-host.log"
+
+  if command -v nohup >/dev/null 2>&1; then
+    nohup "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+  else
+    "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+  fi
+  pid=$!
+
+  printf 'launched=1\n'
+  printf 'mode=host\n'
+  printf 'entry=%s\n' "$app_dir"
   printf 'pid=%s\n' "$pid"
   printf 'log=%s\n' "$log_path"
 }
@@ -480,6 +787,8 @@ cmd_build_ios_smoke() {
     printf '%s\n' "forge-backend: build-ios-smoke is supported on macOS only" >&2
     exit 1
   }
+  require_tool xcodegen
+  require_tool xcodebuild
 
   out_dir="$root/_tmp/workbench/dist/ios"
   mkdir -p "$out_dir"
@@ -529,6 +838,22 @@ cmd_build_android_debug() {
   cp "$apk" "$out_apk"
 
   printf 'artifact=%s\n' "$out_apk"
+}
+
+run_logged_step() {
+  log=$1
+  label=$2
+  script_path=$3
+
+  printf 'step=%s\n' "$label" >>"$log"
+  printf '$ sh %s\n' "$script_path" >>"$log"
+  if sh "$script_path" >>"$log" 2>&1; then
+    printf 'step_status=%s:ok\n' "$label" >>"$log"
+    return 0
+  fi
+
+  printf 'step_status=%s:failed\n' "$label" >>"$log"
+  return 1
 }
 
 write_minimal_template() {
@@ -875,6 +1200,185 @@ cmd_scaffold_app() {
   printf 'manifest=%s\n' "$root/config/apps.manifest.json"
 }
 
+cmd_scaffold_workspace() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  app_name=${3-}
+  context=${4-}
+  starter=${5-}
+  targets=${6-}
+  source=${7-}
+  project_root=${8-}
+
+  [ -n "$slug" ] || { printf '%s\n' "forge-backend: scaffold-workspace requires APP_SLUG" >&2; exit 2; }
+  [ -n "$app_name" ] || { printf '%s\n' "forge-backend: scaffold-workspace requires APP_NAME" >&2; exit 2; }
+  [ -n "$context" ] || { printf '%s\n' "forge-backend: scaffold-workspace requires CONTEXT" >&2; exit 2; }
+  [ -n "$starter" ] || { printf '%s\n' "forge-backend: scaffold-workspace requires STARTER" >&2; exit 2; }
+  [ -n "$targets" ] || { printf '%s\n' "forge-backend: scaffold-workspace requires TARGETS" >&2; exit 2; }
+
+  validate_slug "$slug"
+
+  case "$targets" in
+    *[!a-zA-Z0-9,._-]*)
+      printf '%s\n' "forge-backend: scaffold-workspace targets contain invalid characters" >&2
+      exit 2
+      ;;
+  esac
+
+  [ -n "$project_root" ] || project_root=$(workspace_default_root)
+  case "$project_root" in
+    /*) ;;
+    *)
+      project_root="$(pwd -P)/$project_root"
+      ;;
+  esac
+  mkdir -p "$project_root"
+
+  workspace_dir="$project_root/$slug"
+  [ ! -e "$workspace_dir" ] || {
+    printf '%s\n' "forge-backend: workspace path already exists: $workspace_dir" >&2
+    exit 1
+  }
+
+  case "$context" in
+    web|application)
+      project_type=application
+      development_context=web
+
+      case "$starter" in
+        minimal|panel|clone) ;;
+        *)
+          printf '%s\n' "forge-backend: scaffold-workspace unknown web starter: $starter" >&2
+          exit 2
+          ;;
+      esac
+
+      app_dir="$workspace_dir/app"
+      mkdir -p "$app_dir"
+
+      case "$starter" in
+        minimal)
+          write_minimal_template "$app_dir" "$app_name"
+          ;;
+        panel)
+          write_panel_template "$app_dir" "$app_name"
+          ;;
+        clone)
+          [ -n "$source" ] || {
+            printf '%s\n' "forge-backend: scaffold-workspace web clone requires SOURCE" >&2
+            exit 2
+          }
+          validate_slug "$source"
+          source_dir="$root/.apps/$source"
+          [ -d "$source_dir" ] || {
+            printf '%s\n' "forge-backend: source app not found: $source" >&2
+            exit 1
+          }
+          rm -rf "$app_dir"
+          mkdir -p "$app_dir"
+          cp -R "$source_dir"/. "$app_dir/"
+          ;;
+      esac
+
+      cat > "$workspace_dir/README.md" <<README
+# $app_name
+
+Application workspace scaffolded by Wizardry Forge.
+
+- Development context: web
+- App files: app/
+README
+      ;;
+
+    godot|game)
+      project_type=game
+      development_context=godot
+
+      case "$starter" in
+        blank)
+          mkdir -p "$workspace_dir"
+          cat > "$workspace_dir/README.md" <<README
+# $app_name
+
+Godot workspace scaffold generated by Wizardry Forge.
+README
+          cat > "$workspace_dir/tool_main.gd" <<'GDSCRIPT'
+extends Node
+
+func _ready():
+    print("Wizardry Godot tool workspace ready.")
+GDSCRIPT
+          ;;
+        clone)
+          [ -n "$source" ] || {
+            printf '%s\n' "forge-backend: scaffold-workspace godot clone requires SOURCE" >&2
+            exit 2
+          }
+          validate_slug "$source"
+
+          source_dir=''
+          for candidate in \
+            "$root/godot/tools/$source" \
+            "$project_root/$source"; do
+            if [ -d "$candidate" ]; then
+              source_dir=$candidate
+              break
+            fi
+          done
+
+          [ -d "$source_dir" ] || {
+            printf '%s\n' "forge-backend: source godot tool not found: $source" >&2
+            exit 1
+          }
+          cp -R "$source_dir" "$workspace_dir"
+          if [ ! -f "$workspace_dir/README.md" ]; then
+            cat > "$workspace_dir/README.md" <<README
+# $app_name
+
+Godot workspace cloned by Wizardry Forge.
+README
+          fi
+          ;;
+        *)
+          printf '%s\n' "forge-backend: scaffold-workspace unknown godot starter: $starter" >&2
+          exit 2
+          ;;
+      esac
+
+      ;;
+
+    *)
+      printf '%s\n' "forge-backend: scaffold-workspace context must be web/application or godot/game" >&2
+      exit 2
+      ;;
+  esac
+
+  profile="$workspace_dir/wizardry.workspace.conf"
+  cat > "$profile" <<CONF
+# Wizardry Apps workspace profile
+project_id=$slug
+title=$app_name
+project_type=$project_type
+development_context=$development_context
+starter=$starter
+targets=$targets
+source=${source-}
+root=$workspace_dir
+
+# Legacy keys preserved for compatibility.
+slug=$slug
+name=$app_name
+context=$development_context
+CONF
+
+  printf 'created=%s\n' "$workspace_dir"
+  printf 'workspace_profile=%s\n' "$profile"
+  printf 'project_root=%s\n' "$project_root"
+  printf 'project_type=%s\n' "$project_type"
+  printf 'development_context=%s\n' "$development_context"
+  printf 'targets=%s\n' "$targets"
+}
+
 cmd_scaffold_site() {
   root=$(require_root "${1-}")
   site_name=${2-}
@@ -953,29 +1457,50 @@ cmd_run_task() {
     exit 2
   }
 
+  task_log_dir="$root/_tmp/workbench/log/tasks"
+  mkdir -p "$task_log_dir"
+  task_log="$task_log_dir/$task-$(date +%Y%m%d-%H%M%S).log"
+  {
+    printf 'task=%s\n' "$task"
+    printf 'root=%s\n' "$root"
+    printf 'started_at=%s\n' "$(date)"
+  } >"$task_log"
+
+  status=0
   case "$task" in
     validate-manifest)
-      sh "$root/tools/validate-manifest.sh"
+      run_logged_step "$task_log" "validate-manifest" "$root/tools/validate-manifest.sh" || status=$?
       ;;
     test-core)
-      sh "$root/core/tests/test_core.sh"
-      sh "$root/.tests/core/test-core-rpc.sh"
+      run_logged_step "$task_log" "core-tests" "$root/core/tests/test_core.sh" || status=$?
+      [ "$status" -eq 0 ] && run_logged_step "$task_log" "core-rpc-tests" "$root/.tests/core/test-core-rpc.sh" || status=$?
       ;;
     test-adapters)
-      sh "$root/.tests/adapters/test-http-cgi.sh"
-      sh "$root/.tests/adapters/test-shell-parity.sh"
-      sh "$root/.tests/adapters/test-core-shell-parity.sh"
-      sh "$root/.tests/adapters/test-bridge-contract.sh"
-      sh "$root/.tests/adapters/test-bridge-behavior.sh"
+      run_logged_step "$task_log" "adapter-http-cgi" "$root/.tests/adapters/test-http-cgi.sh" || status=$?
+      [ "$status" -eq 0 ] && run_logged_step "$task_log" "adapter-shell-parity" "$root/.tests/adapters/test-shell-parity.sh" || status=$?
+      [ "$status" -eq 0 ] && run_logged_step "$task_log" "adapter-core-shell-parity" "$root/.tests/adapters/test-core-shell-parity.sh" || status=$?
+      [ "$status" -eq 0 ] && run_logged_step "$task_log" "adapter-bridge-contract" "$root/.tests/adapters/test-bridge-contract.sh" || status=$?
+      [ "$status" -eq 0 ] && run_logged_step "$task_log" "adapter-bridge-behavior" "$root/.tests/adapters/test-bridge-behavior.sh" || status=$?
       ;;
     test-release-tools)
-      sh "$root/.tests/release/test-release-tools.sh"
+      run_logged_step "$task_log" "release-tools" "$root/.tests/release/test-release-tools.sh" || status=$?
       ;;
     *)
       printf '%s\n' "forge-backend: unknown task: $task" >&2
       exit 2
       ;;
   esac
+
+  printf 'finished_at=%s\n' "$(date)" >>"$task_log"
+
+  if [ "$status" -ne 0 ]; then
+    printf '%s\n' "forge-backend: task $task failed (see log: $task_log)" >&2
+    exit "$status"
+  fi
+
+  printf 'task=%s\n' "$task"
+  printf 'status=ok\n'
+  printf 'log=%s\n' "$task_log"
 }
 
 cmd=${1-}
@@ -989,11 +1514,26 @@ case "$cmd" in
   list-templates)
     cmd_list_templates "${2-}"
     ;;
+  list-godot-tools)
+    cmd_list_godot_tools "${2-}"
+    ;;
+  list-workspaces)
+    cmd_list_workspaces "${2-}" "${3-}"
+    ;;
+  set-app-targets)
+    cmd_set_app_targets "${2-}" "${3-}" "${4-}"
+    ;;
+  set-workspace-targets)
+    cmd_set_workspace_targets "${2-}" "${3-}" "${4-}"
+    ;;
   build-desktop)
     cmd_build_desktop "${2-}" "${3-}"
     ;;
   run-desktop)
     cmd_run_desktop "${2-}" "${3-}"
+    ;;
+  run-workspace)
+    cmd_run_workspace "${2-}" "${3-}" "${4-}"
     ;;
   stage-mobile)
     cmd_stage_mobile "${2-}" "${3-}"
@@ -1006,6 +1546,9 @@ case "$cmd" in
     ;;
   scaffold-app)
     cmd_scaffold_app "${2-}" "${3-}" "${4-}" "${5-}" "${6-}"
+    ;;
+  scaffold-workspace)
+    cmd_scaffold_workspace "${2-}" "${3-}" "${4-}" "${5-}" "${6-}" "${7-}" "${8-}" "${9-}"
     ;;
   scaffold-site)
     cmd_scaffold_site "${2-}" "${3-}" "${4-}" "${5-}"

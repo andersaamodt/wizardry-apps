@@ -48,7 +48,7 @@ printf '%s\n' "$test_root" > "$home_dir/.config/wizardry-apps/forge-root"
 config_doctor=$(HOME="$home_dir" "$bundle_scripts/forge-backend.sh" doctor)
 printf '%s\n' "$config_doctor" | grep -F "root=$test_root" >/dev/null
 
-mkdir -p "$scratch/config" "$scratch/.apps" "$scratch/.web"
+mkdir -p "$scratch/config" "$scratch/.apps" "$scratch/.web" "$scratch/godot/tools/base-tool"
 cp "$test_root/config/apps.manifest.json" "$scratch/config/apps.manifest.json"
 cp "$test_root/config/templates.manifest.json" "$scratch/config/templates.manifest.json"
 cp -R "$test_root/.web/demo" "$scratch/.web/demo"
@@ -66,5 +66,46 @@ printf '%s\n' "$site_out" | grep -F "created=$scratch/sites/sandbox-site" >/dev/
 [ -f "$scratch/sites/sandbox-site/site.allowlist" ]
 [ -d "$scratch/sites/sandbox-site/site/pages" ]
 [ -d "$scratch/sites/sandbox-site/build" ]
+
+godot_tools=$("$backend" list-godot-tools "$scratch")
+printf '%s\n' "$godot_tools" | grep -E '^base-tool$' >/dev/null
+
+workspaces_root="$scratch/workspaces"
+workspace_web_out=$("$backend" scaffold-workspace "$scratch" workspace-web "Workspace Web" web panel "hosted-web,macos,linux" "" "$workspaces_root")
+printf '%s\n' "$workspace_web_out" | grep -F "created=$workspaces_root/workspace-web" >/dev/null
+[ -f "$workspaces_root/workspace-web/wizardry.workspace.conf" ]
+[ -f "$workspaces_root/workspace-web/app/index.html" ]
+grep -F "development_context=web" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+grep -F "project_type=application" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+grep -F "targets=hosted-web,macos,linux" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+
+workspace_godot_out=$("$backend" scaffold-workspace "$scratch" workspace-godot "Workspace Godot" godot clone "macos,linux,godot-desktop" base-tool "$workspaces_root")
+printf '%s\n' "$workspace_godot_out" | grep -F "created=$workspaces_root/workspace-godot" >/dev/null
+[ -f "$workspaces_root/workspace-godot/wizardry.workspace.conf" ]
+[ -f "$workspaces_root/workspace-godot/README.md" ]
+grep -F "development_context=godot" "$workspaces_root/workspace-godot/wizardry.workspace.conf" >/dev/null
+grep -F "starter=clone" "$workspaces_root/workspace-godot/wizardry.workspace.conf" >/dev/null
+
+workspaces=$("$backend" list-workspaces "$scratch" "$workspaces_root")
+printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
+printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
+
+set_app_targets_out=$("$backend" set-app-targets "$scratch" sandbox-tool "hosted-web,macos,linux,ios,android")
+printf '%s\n' "$set_app_targets_out" | grep -F "slug=sandbox-tool" >/dev/null
+jq -e '.apps[] | select(.slug == "sandbox-tool" and .targets == "hosted-web,macos,linux,ios,android")' "$scratch/config/apps.manifest.json" >/dev/null
+apps_after_set=$("$backend" list-apps "$scratch")
+printf '%s\n' "$apps_after_set" | grep -E '^sandbox-tool\t' | grep -F "$(printf '\thosted-web,macos,linux,ios,android')" >/dev/null
+
+set_workspace_targets_out=$("$backend" set-workspace-targets "$scratch" "$workspaces_root/workspace-web" "hosted-web,macos,linux,android")
+printf '%s\n' "$set_workspace_targets_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
+grep -F "targets=hosted-web,macos,linux,android" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+
+run_workspace_open=$("$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot" godot)
+printf '%s\n' "$run_workspace_open" | grep -F "launched=1" >/dev/null
+printf '%s\n' "$run_workspace_open" | grep -F "mode=open" >/dev/null
+printf '%s\n' "$run_workspace_open" | grep -F "entry=$workspaces_root/workspace-godot" >/dev/null
+
+run_workspace_infer=$("$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot")
+printf '%s\n' "$run_workspace_infer" | grep -F "mode=open" >/dev/null
 
 printf '%s\n' "forge backend tests passed"
