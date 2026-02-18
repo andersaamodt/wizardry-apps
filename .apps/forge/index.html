@@ -1444,31 +1444,17 @@
           throw new Error('Select a user-created app to run');
         }
 
-        if (item.context === 'godot') {
-          await openPath(item.path, false);
-          setTargetRuntime(item.key, 'linux', 'ready', item.path);
-          setTargetRuntime(item.key, 'macos', 'ready', item.path);
-          setTargetRuntime(item.key, 'android', 'enabled', item.path);
-          setTargetRuntime(item.key, 'ios', 'enabled', item.path);
-          renderSelectedTargetsEditor(selectedCatalogItem());
-          renderResult({
-            status: 'ok',
-            summary: item.title + ' opened.',
-            paths: [{ label: 'Project folder', path: item.path, canReveal: true }],
-            help: {
-              title: 'Game workspace',
-              body: 'Game projects are opened as workspace folders by default.'
-            }
-          });
-          return;
-        }
-
         var res = await backend('run-workspace', [item.path, item.context]);
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || ('workspace:' + item.id);
         if (item.context === 'web') {
           setTargetRuntime(workspaceKey, 'hosted-web', 'ready', out.entry || item.path || '');
           setTargetRuntime(workspaceKey, state.os === 'darwin' ? 'macos' : 'linux', 'running', out.artifact || out.entry || item.path || '');
+        } else if (item.context === 'godot') {
+          setTargetRuntime(workspaceKey, 'linux', 'running', out.entry || item.path || '');
+          setTargetRuntime(workspaceKey, 'macos', 'running', out.entry || item.path || '');
+          setTargetRuntime(workspaceKey, 'android', 'enabled', out.entry || item.path || '');
+          setTargetRuntime(workspaceKey, 'ios', 'enabled', out.entry || item.path || '');
         } else {
           setTargetRuntime(workspaceKey, 'linux', 'ready', out.entry || item.path || '');
           setTargetRuntime(workspaceKey, 'macos', 'ready', out.entry || item.path || '');
@@ -1476,14 +1462,16 @@
         renderSelectedTargetsEditor(selectedCatalogItem());
         renderResult({
           status: 'ok',
-          summary: item.title + ' launched in native host.',
+          summary: item.context === 'godot' ? (item.title + ' launched in Godot.') : (item.title + ' launched in native host.'),
           paths: [
-            out.entry ? { label: 'Entry folder', path: out.entry, canReveal: true } : null,
+            out.entry ? { label: (item.context === 'godot' ? 'Godot project' : 'Entry folder'), path: out.entry, canReveal: true } : null,
             out.log ? { label: 'Launch log', path: out.log, canReveal: true } : null
           ].filter(Boolean),
           help: {
-            title: 'Workspace launch',
-            body: 'Mode: ' + (out.mode || 'host') + '\nPID: ' + (out.pid || '(managed by OS)')
+            title: item.context === 'godot' ? 'Game launch' : 'Workspace launch',
+            body: item.context === 'godot'
+              ? ('Mode: ' + (out.mode || 'godot') + '\nPID: ' + (out.pid || '(managed by OS)'))
+              : ('Mode: ' + (out.mode || 'host') + '\nPID: ' + (out.pid || '(managed by OS)'))
           }
         });
       }
@@ -1565,7 +1553,7 @@
           var content = document.createElement('div');
           content.className = 'catalog-content';
 
-          if (!item.draft && !(item.kind === 'workspace' && item.context === 'godot')) {
+          if (!item.draft) {
             var play = document.createElement('button');
             play.type = 'button';
             play.className = 'row-play';
@@ -1999,22 +1987,19 @@
           rowActions.appendChild(openBtn);
 
           var runnable = isTargetRunnable(spec.id);
-          var hideRunAsFolderOpen = selected.kind === 'workspace' && selected.context === 'godot' && runnable;
-          if (!hideRunAsFolderOpen) {
-            var runBtn = document.createElement('button');
-            runBtn.type = 'button';
-            runBtn.className = 'row-mini';
-            runBtn.title = runnable ? 'Run' : 'Compile';
-            runBtn.setAttribute('aria-label', runnable ? 'Run' : 'Compile');
-            runBtn.textContent = runnable ? '▶' : '🛠';
-            runBtn.disabled = state.busy || !active;
-            runBtn.addEventListener('click', function (event) {
-              event.preventDefault();
-              event.stopPropagation();
-              perform(runnable ? 'Run target' : 'Compile target', function () { return runTargetAction(selected, spec.id); }, { swallow: true, keepResult: true });
-            });
-            rowActions.appendChild(runBtn);
-          }
+          var runBtn = document.createElement('button');
+          runBtn.type = 'button';
+          runBtn.className = 'row-mini';
+          runBtn.title = runnable ? 'Run' : 'Compile';
+          runBtn.setAttribute('aria-label', runnable ? 'Run' : 'Compile');
+          runBtn.textContent = runnable ? '▶' : '🛠';
+          runBtn.disabled = state.busy || !active;
+          runBtn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            perform(runnable ? 'Run target' : 'Compile target', function () { return runTargetAction(selected, spec.id); }, { swallow: true, keepResult: true });
+          });
+          rowActions.appendChild(runBtn);
 
           if (spec.id === 'ios' || spec.id === 'android') {
             var mobileBtn = document.createElement('button');
@@ -2529,7 +2514,7 @@
               paths: [{ label: 'Project folder', path: selected.path, canReveal: true }],
               help: {
                 title: 'Game project build',
-                body: 'Game projects are built/exported in your external editor.\nUse Run to open the project folder quickly.'
+                body: 'Game projects are built/exported in your external editor.\nUse Run to launch the game through Godot.'
               }
             });
             return;

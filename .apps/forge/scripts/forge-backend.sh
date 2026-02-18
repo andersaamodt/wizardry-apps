@@ -154,6 +154,71 @@ os_id() {
   esac
 }
 
+resolve_godot_engine() {
+  if [ -n "${GODOT_BIN-}" ] && [ -x "$GODOT_BIN" ]; then
+    printf '%s\n' "$GODOT_BIN"
+    return 0
+  fi
+  if command -v godot4 >/dev/null 2>&1; then
+    command -v godot4
+    return 0
+  fi
+  if command -v godot >/dev/null 2>&1; then
+    command -v godot
+    return 0
+  fi
+  if [ "$(os_id)" = "darwin" ] && command -v open >/dev/null 2>&1; then
+    printf '%s\n' "__GODOT_APP__"
+    return 0
+  fi
+  return 1
+}
+
+ensure_godot_project() {
+  workspace_path=$1
+  project_title=${2-}
+
+  if [ -f "$workspace_path/project.godot" ]; then
+    printf '%s\n' "$workspace_path"
+    return 0
+  fi
+  if [ -f "$workspace_path/game/project.godot" ]; then
+    printf '%s\n' "$workspace_path/game"
+    return 0
+  fi
+
+  [ -f "$workspace_path/tool_main.gd" ] || return 1
+
+  [ -w "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace is not writable for Godot bootstrap: $workspace_path" >&2
+    return 1
+  }
+
+  [ -n "$project_title" ] || project_title=$(basename "$workspace_path")
+
+  cat > "$workspace_path/Main.tscn" <<'TSCN'
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tool_main.gd" id="1_tool"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_tool")
+TSCN
+
+  cat > "$workspace_path/project.godot" <<PROJECT
+; Engine configuration file.
+config_version=5
+
+[application]
+config/name="$project_title"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.2")
+PROJECT
+
+  printf '%s\n' "$workspace_path"
+  return 0
+}
+
 validate_slug() {
   candidate=${1-}
   case "$candidate" in
@@ -694,9 +759,48 @@ cmd_run_workspace() {
 
   case "$context" in
     godot|game)
+      project_title=''
+      if [ -f "$workspace_path/wizardry.workspace.conf" ]; then
+        project_title=$(workspace_field "$workspace_path/wizardry.workspace.conf" title "")
+      fi
+      if ! project_path=$(ensure_godot_project "$workspace_path" "$project_title"); then
+        printf '%s\n' "forge-backend: Godot project not found in workspace (missing project.godot): $workspace_path" >&2
+        exit 1
+      fi
+
+      engine=$(resolve_godot_engine) || {
+        printf '%s\n' "forge-backend: godot4/godot not found (set GODOT_BIN or install Godot)" >&2
+        exit 1
+      }
+
+      workspace_id=$(basename "$workspace_path")
+      log_dir="$root/_tmp/workbench/log"
+      mkdir -p "$log_dir"
+      log_path="$log_dir/workspace-$workspace_id-godot.log"
+
+      if [ "$engine" = "__GODOT_APP__" ]; then
+        open -na "Godot" --args --path "$project_path" >/dev/null 2>&1 || {
+          printf '%s\n' "forge-backend: failed to launch Godot.app" >&2
+          exit 1
+        }
+        printf 'launched=1\n'
+        printf 'mode=godot-app\n'
+        printf 'entry=%s\n' "$project_path"
+        printf 'log=%s\n' "$log_path"
+        return 0
+      fi
+
+      if command -v nohup >/dev/null 2>&1; then
+        nohup "$engine" --path "$project_path" >"$log_path" 2>&1 &
+      else
+        "$engine" --path "$project_path" >"$log_path" 2>&1 &
+      fi
+      pid=$!
       printf 'launched=1\n'
-      printf 'mode=open\n'
-      printf 'entry=%s\n' "$workspace_path"
+      printf 'mode=godot\n'
+      printf 'entry=%s\n' "$project_path"
+      printf 'pid=%s\n' "$pid"
+      printf 'log=%s\n' "$log_path"
       return 0
       ;;
   esac
@@ -1289,6 +1393,23 @@ README
       case "$starter" in
         blank)
           mkdir -p "$workspace_dir"
+          cat > "$workspace_dir/project.godot" <<PROJECT
+; Engine configuration file.
+config_version=5
+
+[application]
+config/name="$app_name"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.2")
+PROJECT
+          cat > "$workspace_dir/Main.tscn" <<'TSCN'
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tool_main.gd" id="1_tool"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_tool")
+TSCN
           cat > "$workspace_dir/README.md" <<README
 # $app_name
 
