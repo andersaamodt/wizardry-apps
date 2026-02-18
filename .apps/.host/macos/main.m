@@ -145,7 +145,7 @@
     NSView *rootView = [[NSView alloc] initWithFrame:frame];
     [rootView setAutoresizesSubviews:YES];
 
-    CGFloat dragStripHeight = 24.0;
+    CGFloat dragStripHeight = 10.0;
     NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
     self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
     [self.webView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
