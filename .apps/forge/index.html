@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wizardry Forge</title>
-  <link rel="stylesheet" href="style.css?v=forge20260218b">
-  <link id="forge-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=forge20260218a">
+  <link rel="stylesheet" href="style.css?v=forge20260218t">
+  <link id="forge-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=forge20260218b">
 </head>
 <body>
   <div class="forge-shell">
@@ -51,6 +51,19 @@
               <button type="button" class="action" data-task="test-adapters">Adapter Tests</button>
               <button type="button" class="action" data-task="test-release-tools">Release Tools Tests</button>
             </div>
+          </article>
+
+          <article class="card">
+            <h3>Prerequisites</h3>
+            <p class="sub">Install toolchain dependencies required by Build, Run, and Stage actions.</p>
+            <div class="button-row compact">
+              <button id="install-xcodegen" type="button" class="action">Install xcodegen</button>
+              <button id="install-gradle" type="button" class="action">Install Gradle</button>
+              <button id="install-java" type="button" class="action">Install Java (JDK)</button>
+              <button id="install-xcode-clt" type="button" class="action">Install Xcode CLT</button>
+              <button id="refresh-toolchain" type="button" class="action">Refresh Tool Status</button>
+            </div>
+            <pre id="toolchain-summary" class="mono">Waiting for workspace check.</pre>
           </article>
 
           <article class="card">
@@ -102,24 +115,17 @@
               <h3 id="selected-title">Selected App</h3>
               <span id="selected-type-badge" class="type-badge hidden"></span>
               <span id="selected-suite-badge" class="suite-badge hidden"><span>wizardry suite</span></span>
-            </div>
-            <div class="selected-path-row">
-              <button id="open-selected-path" type="button" class="path-link hidden" title="Open folder" aria-label="Open folder"></button>
-              <button id="terminal-selected-path" type="button" class="terminal-icon hidden" title="Open in terminal" aria-label="Open in terminal">
-                <img src="assets/terminal-icon.png" alt="Terminal">
-              </button>
+              <div class="selected-path-row">
+                <button id="open-selected-path" type="button" class="path-link hidden" title="Open folder" aria-label="Open folder"></button>
+                <button id="terminal-selected-path" type="button" class="terminal-icon hidden" title="Open in terminal" aria-label="Open in terminal">
+                  <img src="assets/terminal-icon.png" alt="Terminal">
+                </button>
+              </div>
             </div>
           </div>
           <div class="toolbar-actions">
             <div class="toolbar-left">
-              <div class="build-split menu-anchor">
-                <button id="action-build" type="button" class="action toolbar-btn primary" title="Compile Desktop">🛠 Build</button>
-                <button id="action-build-menu" type="button" class="action toolbar-btn menu-toggle" aria-haspopup="menu" aria-expanded="false" title="Advanced Builds">▾</button>
-                <div id="build-menu" class="floating-menu hidden" role="menu" aria-label="Build options">
-                  <button id="action-ios" type="button" class="menu-action">📱 Build iOS Smoke</button>
-                  <button id="action-android" type="button" class="menu-action">🤖 Build Android Debug</button>
-                </div>
-              </div>
+              <button id="action-build" type="button" class="action toolbar-btn primary" title="Build enabled publish targets">🛠 Build</button>
               <button id="action-run" type="button" class="action toolbar-btn" title="Run app">▶ Run</button>
               <button id="action-stage" type="button" class="action toolbar-btn" title="Stage mobile assets">📦 Stage</button>
             </div>
@@ -135,7 +141,7 @@
                   <summary class="pipeline-section-head">App icon</summary>
                   <div class="pipeline-section-body">
                     <div class="icon-editor">
-                      <label id="selected-icon-drop" class="icon-dropzone" for="selected-icon-input" aria-label="Drop app icon or choose a file">
+                      <label id="selected-icon-drop" class="icon-dropzone" for="selected-icon-input" aria-label="Drop app icon or choose a file" tabindex="0">
                         <div class="icon-preview-wrap">
                           <button id="selected-icon-clear" type="button" class="icon-clear-btn hidden" title="Clear icon" aria-label="Clear icon">×</button>
                           <img id="selected-icon-preview" class="icon-preview hidden" alt="App icon preview">
@@ -151,7 +157,7 @@
                 <details class="pipeline-section" open>
                   <summary class="pipeline-section-head">Publish targets</summary>
                   <div class="pipeline-section-body">
-                    <h5 class="targets-subhead">Active Targets</h5>
+                    <h5 id="active-targets-subhead" class="targets-subhead">Active Targets</h5>
                     <div id="target-active-list" class="target-list"></div>
                     <details id="inactive-targets-section" class="targets-subsection">
                       <summary class="targets-subhead targets-subhead-toggle">Inactive Targets</summary>
@@ -167,7 +173,7 @@
                   </summary>
                   <div class="pipeline-section-body">
                     <div class="command-log-frame">
-                      <pre id="log" class="mono command-log">Wizardry Forge ready.</pre>
+                      <pre id="log" class="mono command-log" data-empty-message="Log is empty">Wizardry Forge ready.</pre>
                     </div>
                   </div>
                 </details>
@@ -179,85 +185,78 @@
         <section id="route-create" class="route">
           <header class="route-head">
             <h2>Create App</h2>
-            <p>Create a new app workspace in your projects root (default: <code>~/git</code>).</p>
+            <p>Create a new app project in your projects root (default: <code>~/git</code>).</p>
           </header>
 
-          <article class="card">
-            <h3>Project Type</h3>
-            <div class="type-picker">
-              <label class="type-option" id="type-application-card">
-                <input type="radio" name="project-type" value="application" checked>
-                <span class="type-icon">🖥</span>
-                <span class="type-title">Application</span>
-                <span class="type-desc">A website-based app packaged as a real app. Good for most applications.</span>
-              </label>
-              <label class="type-option" id="type-game-card">
-                <input type="radio" name="project-type" value="game">
-                <span class="type-icon">🎮</span>
-                <span class="type-title">Game</span>
-                <span class="type-desc">A simulation-based app. Good for making games and interactive tools.</span>
-              </label>
-            </div>
-          </article>
-
-          <article class="card">
-            <h3>Project Identity</h3>
-            <div class="form-grid">
-              <div>
-                <label for="create-title">Type name or title</label>
-                <input id="create-title" type="text" placeholder="My App">
+          <div class="pipeline-sections create-sections">
+            <details class="pipeline-section" open>
+              <summary class="pipeline-section-head">Project Type</summary>
+              <div class="pipeline-section-body">
+                <div class="type-picker">
+                  <label class="type-option" id="type-application-card">
+                    <input type="radio" name="project-type" value="application" checked>
+                    <span class="type-icon">🖥</span>
+                    <span class="type-title">Application</span>
+                    <span class="type-desc">A website-based app packaged as a real app. Good for most applications.</span>
+                  </label>
+                  <label class="type-option" id="type-game-card">
+                    <input type="radio" name="project-type" value="game">
+                    <span class="type-icon">🎮</span>
+                    <span class="type-title">Game</span>
+                    <span class="type-desc">A simulation-based app. Good for making games and interactive tools.</span>
+                  </label>
+                </div>
               </div>
-              <div>
-                <label for="create-folder">Folder name</label>
-                <input id="create-folder" type="text" placeholder="my-app" spellcheck="false">
+            </details>
+
+            <details class="pipeline-section" open>
+              <summary class="pipeline-section-head">App Details</summary>
+              <div class="pipeline-section-body">
+                <div class="form-grid">
+                  <div>
+                    <label for="create-title" class="label-plain">App title</label>
+                    <input id="create-title" type="text" placeholder="My App">
+                    <p id="create-path-preview" class="sub create-path-preview"><span class="create-path-label">Path:</span> <span class="create-path-value">~/git/new-app</span></p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </article>
+            </details>
 
-          <article class="card">
-            <h3>Starter</h3>
-            <div id="starter-application" class="starter-pane active">
-              <label for="starter-application-select">Application starter</label>
-              <select id="starter-application-select">
-                <option value="minimal">Minimal app</option>
-                <option value="panel">Control panel app</option>
-                <option value="clone">Clone built-in app</option>
-              </select>
+            <details class="pipeline-section" open>
+              <summary class="pipeline-section-head">Starter</summary>
+              <div class="pipeline-section-body">
+                <div id="starter-application" class="starter-pane active">
+                  <label for="starter-application-select">Application starter</label>
+                  <select id="starter-application-select" class="starter-select">
+                    <option value="minimal">Blank application project</option>
+                    <option value="panel">Template: Control panel project</option>
+                  </select>
+                </div>
 
-              <label for="starter-application-source">Clone source app</label>
-              <select id="starter-application-source"></select>
-            </div>
+                <div id="starter-game" class="starter-pane">
+                  <label for="starter-game-select">Game starter</label>
+                  <select id="starter-game-select" class="starter-select">
+                    <option value="blank">Blank game project</option>
+                  </select>
+                </div>
+              </div>
+            </details>
 
-            <div id="starter-game" class="starter-pane">
-              <label for="starter-game-select">Game starter</label>
-              <select id="starter-game-select">
-                <option value="blank">Blank game workspace</option>
-                <option value="clone">Clone existing game workspace</option>
-              </select>
-
-              <label for="starter-game-source">Clone source game workspace</label>
-              <select id="starter-game-source"></select>
-            </div>
-          </article>
-
-          <article class="card">
-            <h3>Publishing Targets</h3>
-            <div class="target-grid">
-              <label class="target-item" data-target-groups="application"><input id="target-hosted-web" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-hosted-web.svg" alt=""></span>Hosted Web</label>
-              <label class="target-item" data-target-groups="application,game"><input id="target-macos" type="checkbox" checked><span class="target-icon" aria-hidden="true"></span>macOS Desktop</label>
-              <label class="target-item" data-target-groups="application,game"><input id="target-linux" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-linux.svg" alt=""></span>Linux Desktop</label>
-              <label class="target-item" data-target-groups="application,game"><input id="target-ios" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-ios.svg" alt=""></span>iOS</label>
-              <label class="target-item" data-target-groups="application,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</label>
-            </div>
-          </article>
-
-          <article class="card">
-            <h3>Location</h3>
-            <label for="projects-root">Projects root</label>
-            <input id="projects-root" type="text" placeholder="/Users/you/git" spellcheck="false">
-            <p class="sub">Forge only treats folders as projects if they contain <code>wizardry.workspace.conf</code>.</p>
-            <button id="create-submit" type="button" class="action primary">Create Project</button>
-          </article>
+            <details class="pipeline-section" open>
+              <summary class="pipeline-section-head">Publishing Targets</summary>
+              <div class="pipeline-section-body">
+                <div class="target-grid">
+                  <label class="target-item" data-target-groups="application"><input id="target-hosted-web" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-hosted-web.svg" alt=""></span>Hosted Web</label>
+                  <label class="target-item" data-target-groups="application,game"><input id="target-macos" type="checkbox" checked><span class="target-icon" aria-hidden="true"></span>macOS Desktop</label>
+                  <label class="target-item" data-target-groups="application,game"><input id="target-linux" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-linux.svg" alt=""></span>Linux Desktop</label>
+                  <label class="target-item" data-target-groups="application,game"><input id="target-ios" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-ios.svg" alt=""></span>iOS</label>
+                  <label class="target-item" data-target-groups="application,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</label>
+                </div>
+                <p class="sub target-grid-note">You can change this later.</p>
+                <button id="create-submit" type="button" class="action primary">Create Project</button>
+              </div>
+            </details>
+          </div>
         </section>
       </main>
     </div>
@@ -327,11 +326,16 @@
         autoRefreshTimer: null,
         lastProjectType: '',
         windowFitTimer: null,
+        startupWindowSized: false,
+        lastWindowFitHeight: 0,
+        windowFitInFlight: false,
         createDraftActive: false,
         leftRailWidth: parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240,
         targetRuntime: {},
         targetSectionByRow: {},
-        iconMap: loadJSONStorage(ICON_MAP_KEY, {})
+        iconMap: loadJSONStorage(ICON_MAP_KEY, {}),
+        themeTypeahead: '',
+        themeTypeaheadTimer: null
       };
 
       var els = {};
@@ -410,7 +414,10 @@
         if (!els.clearLog || !els.log) {
           return;
         }
-        var hasContent = (els.log.textContent || '').trim().length > 0;
+        var rawLog = (els.log.dataset && typeof els.log.dataset.rawLog === 'string')
+          ? els.log.dataset.rawLog
+          : (els.log.textContent || '');
+        var hasContent = rawLog.trim().length > 0;
         els.clearLog.classList.toggle('hidden', !hasContent);
       }
 
@@ -418,7 +425,11 @@
         if (!els.log) {
           return;
         }
-        els.log.textContent = value || '';
+        var next = String(value || '');
+        els.log.dataset.rawLog = next;
+        els.log.textContent = next;
+        var isEmpty = next.trim().length === 0;
+        els.log.classList.toggle('is-empty', isEmpty);
         syncLogClearVisibility();
       }
 
@@ -426,7 +437,10 @@
         if (!els.log) {
           return;
         }
-        var next = '[' + now() + '] ' + line + '\n' + (els.log.textContent || '');
+        var current = (els.log.dataset && typeof els.log.dataset.rawLog === 'string')
+          ? els.log.dataset.rawLog
+          : (els.log.textContent || '');
+        var next = '[' + now() + '] ' + line + '\n' + current;
         if (next.length > 36000) {
           next = next.slice(0, 36000);
         }
@@ -575,15 +589,19 @@
         } catch (err) {
           var message = String(err && err.message ? err.message : err);
           var logPath = extractLogPath(message);
+          var help = actionableHelp(message);
           appendLog('error: ' + message);
           setActivity('fault', 'Error');
           renderResult({
             status: 'error',
             summary: message,
-            help: actionableHelp(message),
+            help: help,
             paths: logPath ? [{ label: 'Failure log', path: logPath, canReveal: true }] : []
           });
-          toast(message, 'bad');
+          if (help && help.installTool) {
+            setPanel('settings', true);
+          }
+          toast(help && help.title ? help.title : message, 'bad');
           if (!opts.swallow) {
             throw err;
           }
@@ -599,7 +617,7 @@
         var lower = (message || '').toLowerCase();
         var hasBrew = state.tools && state.tools.brew === '1';
 
-        if (lower.indexOf('xcodegen is required') >= 0) {
+        if (lower.indexOf('xcodegen is required') >= 0 || lower.indexOf('required tool not found: xcodegen') >= 0) {
           return {
             title: 'xcodegen is required for iOS smoke builds',
             body: hasBrew
@@ -640,6 +658,48 @@
         return null;
       }
 
+      function toolAvailable(name) {
+        return !!(state.tools && state.tools[name] === '1');
+      }
+
+      function syncToolchainUI() {
+        if (!els.toolchainSummary) {
+          return;
+        }
+        var lines = [
+          'xcodegen: ' + (toolAvailable('xcodegen') ? 'yes' : 'no'),
+          'xcodebuild: ' + (toolAvailable('xcodebuild') ? 'yes' : 'no'),
+          'gradle: ' + (toolAvailable('gradle') ? 'yes' : 'no'),
+          'java: ' + (toolAvailable('java') ? 'yes' : 'no'),
+          'brew: ' + (toolAvailable('brew') ? 'yes' : 'no')
+        ];
+        text(els.toolchainSummary, lines.join('\n'));
+
+        if (els.installXcodegen) {
+          var hasXcodegen = toolAvailable('xcodegen');
+          var hasBrew = toolAvailable('brew');
+          els.installXcodegen.disabled = hasXcodegen || !hasBrew;
+          els.installXcodegen.textContent = hasXcodegen ? 'xcodegen installed' : (hasBrew ? 'Install xcodegen' : 'Install xcodegen (requires Homebrew)');
+        }
+        if (els.installGradle) {
+          var hasGradle = toolAvailable('gradle');
+          var hasBrewForGradle = toolAvailable('brew');
+          els.installGradle.disabled = hasGradle || !hasBrewForGradle;
+          els.installGradle.textContent = hasGradle ? 'Gradle installed' : (hasBrewForGradle ? 'Install Gradle' : 'Install Gradle (requires Homebrew)');
+        }
+        if (els.installJava) {
+          var hasJava = toolAvailable('java');
+          var hasBrewForJava = toolAvailable('brew');
+          els.installJava.disabled = hasJava || !hasBrewForJava;
+          els.installJava.textContent = hasJava ? 'Java installed' : (hasBrewForJava ? 'Install Java (JDK)' : 'Install Java (JDK) (requires Homebrew)');
+        }
+        if (els.installXcodeClt) {
+          var hasXcodebuild = toolAvailable('xcodebuild');
+          els.installXcodeClt.disabled = hasXcodebuild;
+          els.installXcodeClt.textContent = hasXcodebuild ? 'Xcode CLT installed' : 'Install Xcode CLT';
+        }
+      }
+
       function extractLogPath(message) {
         var match = String(message || '').match(/see log:\s*([^)]+)/i);
         if (!match || !match[1]) {
@@ -672,6 +732,22 @@
         }
 
         throw new Error('no installer helper for tool: ' + tool);
+      }
+
+      async function installXcodeCommandLineTools() {
+        if (state.os !== 'darwin') {
+          throw new Error('Xcode command line tools installer is available on macOS only');
+        }
+        try {
+          await execArgv(['xcode-select', '--install']);
+        } catch (err) {
+          var message = String(err && err.message ? err.message : err);
+          var lower = message.toLowerCase();
+          if (lower.indexOf('already installed') >= 0) {
+            return;
+          }
+          throw err;
+        }
       }
 
       async function openPath(path, reveal) {
@@ -722,6 +798,38 @@
         throw new Error('open terminal helper unsupported on this OS');
       }
 
+      async function copyTextToClipboard(value) {
+        var textValue = String(value || '');
+        if (!textValue) {
+          return false;
+        }
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          try {
+            await navigator.clipboard.writeText(textValue);
+            return true;
+          } catch (_err) {
+            // fall back to execCommand path below
+          }
+        }
+        var el = document.createElement('textarea');
+        el.value = textValue;
+        el.setAttribute('readonly', '');
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        el.style.left = '-9999px';
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        var ok = false;
+        try {
+          ok = document.execCommand('copy');
+        } catch (_err) {
+          ok = false;
+        }
+        document.body.removeChild(el);
+        return ok;
+      }
+
       function filteredCatalogItems() {
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
         var showMode = state.organizeShow || 'both';
@@ -740,11 +848,50 @@
       }
 
       function scheduleWindowFit() {
-        return;
+        if (state.os !== 'darwin') {
+          return;
+        }
+        if (state.windowFitTimer) {
+          clearTimeout(state.windowFitTimer);
+        }
+        state.windowFitTimer = setTimeout(function () {
+          state.windowFitTimer = null;
+          requestWindowFit().catch(function () {
+            return;
+          });
+        }, 80);
       }
 
       async function requestWindowFit() {
-        return;
+        if (state.os !== 'darwin' || state.windowFitInFlight) {
+          return;
+        }
+        if (!bridgeAvailable()) {
+          return;
+        }
+        state.windowFitInFlight = true;
+        try {
+          var innerWidth = window.innerWidth || 660;
+          var innerHeight = window.innerHeight || 620;
+          var width = Math.max(660, Math.round(innerWidth + 24));
+          var height = Math.max(760, Math.round(innerHeight + 110));
+
+          var activeRoute = document.querySelector('.route.active');
+          if (activeRoute && activeRoute.scrollHeight > activeRoute.clientHeight + 4) {
+            var overflow = activeRoute.scrollHeight - activeRoute.clientHeight;
+            height = Math.max(height, Math.round(innerHeight + overflow + 110));
+          }
+
+          if (state.startupWindowSized && state.lastWindowFitHeight && height <= state.lastWindowFitHeight + 2) {
+            return;
+          }
+
+          await bridgeExec(['__wizardry_host_resize', String(width), String(height)]);
+          state.startupWindowSized = true;
+          state.lastWindowFitHeight = Math.max(state.lastWindowFitHeight || 0, height);
+        } finally {
+          state.windowFitInFlight = false;
+        }
       }
 
       function setWorkspaceRoot(root) {
@@ -757,8 +904,8 @@
       function setProjectsRoot(path) {
         state.projectsRoot = path || '';
         saveStorage(PROJECTS_ROOT_KEY, state.projectsRoot);
-        els.projectsRoot.value = state.projectsRoot;
         els.settingsProjectsRoot.value = state.projectsRoot;
+        updateCreatePathPreview();
       }
 
       function setLeftRailWidth(width) {
@@ -827,9 +974,11 @@
 
       function setWorkflowMode(mode) {
         var leavingCreate = state.route === 'create' && mode !== 'create';
-        if (leavingCreate && !createDraftHasInput()) {
+        if (leavingCreate) {
           state.createDraftActive = false;
-          setSelectedCatalog('');
+          if (state.selectedCatalog === 'draft:create') {
+            setSelectedCatalog('');
+          }
         }
         state.route = mode === 'create' ? 'create' : 'pipeline';
         if (state.route === 'create') {
@@ -841,6 +990,12 @@
         });
         if (els.openCreateWorkflow) {
           els.openCreateWorkflow.classList.toggle('active', state.route === 'create');
+        }
+        if (els.toolbarActions) {
+          els.toolbarActions.classList.toggle('hidden', state.route === 'create');
+        }
+        if (els.selectedPathRow) {
+          els.selectedPathRow.classList.toggle('hidden', state.route === 'create');
         }
         renderCatalogList();
         renderSelectedBuiltIn();
@@ -954,7 +1109,7 @@
         if (entry && entry.path) {
           return entry.path;
         }
-        return selected.path || '';
+        return '';
       }
 
       function isTargetRunnable(targetId) {
@@ -1062,6 +1217,111 @@
         }
       }
 
+      function clearThemeTypeahead() {
+        state.themeTypeahead = '';
+        if (state.themeTypeaheadTimer) {
+          clearTimeout(state.themeTypeaheadTimer);
+          state.themeTypeaheadTimer = null;
+        }
+      }
+
+      function isThemePickerOpen() {
+        return !!(els.themePickerMenu && !els.themePickerMenu.classList.contains('hidden'));
+      }
+
+      function focusThemeItem(themeName) {
+        if (!els.themePickerList) {
+          return;
+        }
+        var selector = "button[data-theme-name='" + String(themeName || '').replace(/'/g, "\\'") + "']";
+        var btn = els.themePickerList.querySelector(selector);
+        if (!btn) {
+          btn = els.themePickerList.querySelector('button[data-theme-name]');
+        }
+        if (btn && typeof btn.focus === 'function') {
+          btn.focus();
+        }
+      }
+
+      function openThemePickerMenu() {
+        if (!els.themePickerMenu || !els.themePickerBtn) {
+          return;
+        }
+        closeFloatingMenus();
+        els.themePickerMenu.classList.remove('hidden');
+        els.themePickerBtn.setAttribute('aria-expanded', 'true');
+        clearThemeTypeahead();
+        focusThemeItem(state.activeTheme);
+      }
+
+      function closeThemePickerMenu(restoreFocus) {
+        if (!els.themePickerMenu || !els.themePickerBtn) {
+          return;
+        }
+        els.themePickerMenu.classList.add('hidden');
+        els.themePickerBtn.setAttribute('aria-expanded', 'false');
+        clearThemeTypeahead();
+        if (restoreFocus && typeof els.themePickerBtn.focus === 'function') {
+          els.themePickerBtn.focus();
+        }
+      }
+
+      function applyThemeTypeahead(key) {
+        if (!key) {
+          return false;
+        }
+        var ch = String(key).toLowerCase();
+        if (!/^[a-z0-9 _-]$/.test(ch)) {
+          return false;
+        }
+        var previous = state.themeTypeahead || '';
+        state.themeTypeahead += ch;
+        if (state.themeTypeaheadTimer) {
+          clearTimeout(state.themeTypeaheadTimer);
+        }
+        state.themeTypeaheadTimer = setTimeout(function () {
+          clearThemeTypeahead();
+        }, 700);
+
+        function findByPrefix(query, startAt) {
+          if (!query || !state.themes.length) {
+            return -1;
+          }
+          var total = state.themes.length;
+          for (var i = 0; i < total; i += 1) {
+            var idx = (startAt + i) % total;
+            var theme = state.themes[idx];
+            var label = themeLabel(theme).toLowerCase();
+            var raw = String(theme || '').toLowerCase();
+            if (label.indexOf(query) === 0 || raw.indexOf(query) === 0) {
+              return idx;
+            }
+          }
+          return -1;
+        }
+
+        var current = state.themes.indexOf(state.activeTheme);
+        if (current < 0) {
+          current = 0;
+        }
+        if (!state.themes.length) {
+          return false;
+        }
+        var start = (current + 1) % state.themes.length;
+        var idx = findByPrefix(state.themeTypeahead, start);
+        if (idx < 0 && previous) {
+          state.themeTypeahead = ch;
+          idx = findByPrefix(ch, start);
+        }
+        if (idx < 0) {
+          return false;
+        }
+        applyTheme(state.themes[idx]);
+        renderThemePicker();
+        focusThemeItem(state.activeTheme);
+        return true;
+      }
+
       function catalogItems() {
         var builtIn = state.apps.map(function (app) {
           return {
@@ -1095,17 +1355,10 @@
         return builtIn.concat(workspaces);
       }
 
-      function createDraftHasInput() {
-        if (!els.createTitle || !els.createFolder) {
-          return false;
-        }
-        return !!(els.createTitle.value.trim() || els.createFolder.value.trim());
-      }
-
       function createDraftItem() {
         var projectType = selectedProjectType();
         var title = (els.createTitle && els.createTitle.value.trim()) || 'New App';
-        var folder = (els.createFolder && els.createFolder.value.trim()) || 'new-app';
+        var folder = deriveCreateFolder();
         var context = projectType === 'game' ? 'godot' : 'web';
         return {
           key: 'draft:create',
@@ -1117,7 +1370,7 @@
           context: context,
           projectType: projectType,
           targets: selectedTargets().join(','),
-          path: '(new project)'
+          path: deriveCreatePath()
         };
       }
 
@@ -1171,6 +1424,7 @@
         if (els.actionBuildMenu) {
           els.actionBuildMenu.setAttribute('aria-expanded', 'false');
         }
+        clearThemeTypeahead();
       }
 
       function toggleFloatingMenu(menuEl, buttonEl) {
@@ -1294,7 +1548,9 @@
           nameWrap.appendChild(title);
           var contextPill = document.createElement('span');
           contextPill.className = 'context-dot';
-          contextPill.textContent = item.context === 'godot' ? 'game' : 'web';
+          var isGameContext = item.context === 'godot';
+          contextPill.classList.add(isGameContext ? 'game' : 'web');
+          contextPill.textContent = isGameContext ? 'game' : 'web';
           nameWrap.appendChild(contextPill);
           if (item.kind === 'builtin') {
             var suiteDot = document.createElement('span');
@@ -1309,7 +1565,7 @@
           var content = document.createElement('div');
           content.className = 'catalog-content';
 
-          if (!item.draft) {
+          if (!item.draft && !(item.kind === 'workspace' && item.context === 'godot')) {
             var play = document.createElement('button');
             play.type = 'button';
             play.className = 'row-play';
@@ -1399,6 +1655,7 @@
           }
           if (els.openSelectedPath) {
             text(els.openSelectedPath, '');
+            els.openSelectedPath.title = 'Path (click to copy, double-click to open)';
             els.openSelectedPath.classList.add('hidden');
           }
           if (els.terminalSelectedPath) {
@@ -1421,11 +1678,14 @@
           text(els.selectedTitle, selected.title);
         }
         if (els.selectedTypeBadge) {
-          var typeText = inferProjectTypeFromContext(selected.context) + ' (' + (selected.context === 'godot' ? 'Godot' : selected.context) + ')';
+          var isGameType = selected.context === 'godot';
+          var typeText = inferProjectTypeFromContext(selected.context) + ' (' + (isGameType ? 'Godot' : selected.context) + ')';
           els.selectedTypeBadge.innerHTML = '';
           var typeLabel = document.createElement('span');
           typeLabel.textContent = typeText;
           els.selectedTypeBadge.appendChild(typeLabel);
+          els.selectedTypeBadge.classList.toggle('game', isGameType);
+          els.selectedTypeBadge.classList.toggle('web', !isGameType);
           els.selectedTypeBadge.classList.remove('hidden');
         }
         if (els.selectedSuiteBadge) {
@@ -1433,10 +1693,15 @@
         }
         if (els.openSelectedPath) {
           if (selected.path) {
-            text(els.openSelectedPath, selected.path);
+            var normalizedPath = String(selected.path).replace(/[\\/]+$/, '');
+            var pathParts = normalizedPath.split(/[\\/]/).filter(Boolean);
+            var folderName = pathParts.length ? pathParts[pathParts.length - 1] : normalizedPath;
+            text(els.openSelectedPath, folderName);
+            els.openSelectedPath.title = selected.path + ' (click to copy, double-click to open)';
             els.openSelectedPath.classList.remove('hidden');
           } else {
             text(els.openSelectedPath, '');
+            els.openSelectedPath.title = 'Path (click to copy, double-click to open)';
             els.openSelectedPath.classList.add('hidden');
           }
         }
@@ -1457,12 +1722,95 @@
         return activeTargets.indexOf('ios') >= 0 || activeTargets.indexOf('android') >= 0;
       }
 
+      function activeTargetIds(selected) {
+        if (!selected) {
+          return [];
+        }
+        var projectType = projectTypeKeyForContext(selected.context);
+        return uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
+      }
+
+      function hasBuildAction(selected) {
+        if (!selected) {
+          return false;
+        }
+        var active = activeTargetIds(selected);
+        if (!active.length) {
+          return false;
+        }
+        if (selected.kind === 'builtin') {
+          return active.some(function (targetId) {
+            return targetId === 'macos' || targetId === 'linux' || targetId === 'ios' || targetId === 'android';
+          });
+        }
+        return true;
+      }
+
+      function mobileStageTooltip(selected) {
+        if (!selected) {
+          return 'Stage mobile assets';
+        }
+        var projectType = projectTypeKeyForContext(selected.context);
+        var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
+        var hasIos = activeTargets.indexOf('ios') >= 0;
+        var hasAndroid = activeTargets.indexOf('android') >= 0;
+        if (hasIos && hasAndroid) {
+          return 'Stage Android & iOS mobile assets';
+        }
+        if (hasIos) {
+          return 'Stage iOS mobile assets';
+        }
+        if (hasAndroid) {
+          return 'Stage Android mobile assets';
+        }
+        return 'Stage mobile assets';
+      }
+
+      function hasMeaningfulRun(selected) {
+        if (!selected) {
+          return false;
+        }
+        return true;
+      }
+
+      function hostTargetId() {
+        return state.os === 'darwin' ? 'macos' : (state.os === 'linux' ? 'linux' : '');
+      }
+
+      function hasEnabledHostRunTarget(selected) {
+        if (!selected) {
+          return false;
+        }
+        var hostTarget = hostTargetId();
+        if (!hostTarget) {
+          return false;
+        }
+        var projectType = projectTypeKeyForContext(selected.context);
+        var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
+        return activeTargets.indexOf(hostTarget) >= 0;
+      }
+
       function syncStageActionVisibility(selected) {
+        if (els.actionBuild) {
+          var showBuild = !!selected && state.route === 'pipeline' && hasBuildAction(selected);
+          els.actionBuild.classList.toggle('hidden', !showBuild);
+        }
+        if (els.actionRun) {
+          var showRun = !!selected && state.route === 'pipeline' && hasMeaningfulRun(selected) && hasEnabledHostRunTarget(selected);
+          els.actionRun.classList.toggle('hidden', !showRun);
+          var runTargetName = state.os === 'darwin' ? 'macOS' : (state.os === 'linux' ? 'Linux' : 'desktop');
+          var runTitle = 'Run ' + runTargetName + ' app';
+          els.actionRun.title = runTitle;
+          els.actionRun.setAttribute('aria-label', runTitle);
+        }
         if (!els.actionStage) {
           return;
         }
-        var show = !!selected && state.route === 'pipeline' && hasMobileTargets(selected);
+        var show = !!selected && state.route === 'pipeline' && selected.kind === 'builtin' && hasMobileTargets(selected);
         els.actionStage.classList.toggle('hidden', !show);
+        var stageTitle = mobileStageTooltip(selected);
+        els.actionStage.title = stageTitle;
+        els.actionStage.setAttribute('aria-label', stageTitle);
       }
 
       function renderSelectedIconEditor(selected) {
@@ -1543,6 +1891,19 @@
         });
       }
 
+      function openSelectedIconPicker() {
+        if (!els.selectedIconInput) {
+          return;
+        }
+        // showPicker() can consume activation in some embedded webviews.
+        // Use direct click() only for reliable native file-dialog behavior.
+        try {
+          els.selectedIconInput.click();
+        } catch (_err) {
+          return;
+        }
+      }
+
       function renderSelectedTargetsEditor(selected) {
         if (!els.selectedTargetsEditor || !selected || !els.targetActiveList || !els.targetInactiveList) {
           return;
@@ -1556,6 +1917,17 @@
         });
 
         var specs = targetSpecs(projectType);
+        var hostTarget = state.os === 'darwin' ? 'macos' : (state.os === 'linux' ? 'linux' : '');
+        if (hostTarget) {
+          specs.sort(function (a, b) {
+            var aHost = a.id === hostTarget ? -1 : 0;
+            var bHost = b.id === hostTarget ? -1 : 0;
+            if (aHost !== bHost) {
+              return aHost - bHost;
+            }
+            return 0;
+          });
+        }
         var activeFragment = document.createDocumentFragment();
         var inactiveFragment = document.createDocumentFragment();
 
@@ -1611,9 +1983,10 @@
           var openBtn = document.createElement('button');
           openBtn.type = 'button';
           openBtn.className = 'row-mini row-open';
-          openBtn.title = 'Open';
-          openBtn.setAttribute('aria-label', 'Open');
+          openBtn.title = 'Open target output';
+          openBtn.setAttribute('aria-label', 'Open target output');
           openBtn.textContent = '📂';
+          openBtn.disabled = state.busy || !active || !targetOpenPath(selected, spec.id);
           openBtn.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -1625,20 +1998,40 @@
           });
           rowActions.appendChild(openBtn);
 
-          var runBtn = document.createElement('button');
-          runBtn.type = 'button';
-          runBtn.className = 'row-mini';
           var runnable = isTargetRunnable(spec.id);
-          runBtn.title = runnable ? 'Run' : 'Compile';
-          runBtn.setAttribute('aria-label', runnable ? 'Run' : 'Compile');
-          runBtn.textContent = runnable ? '▶' : '🛠';
-          runBtn.disabled = state.busy || !active;
-          runBtn.addEventListener('click', function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            perform(runnable ? 'Run target' : 'Compile target', function () { return runTargetAction(selected, spec.id); }, { swallow: true, keepResult: true });
-          });
-          rowActions.appendChild(runBtn);
+          var hideRunAsFolderOpen = selected.kind === 'workspace' && selected.context === 'godot' && runnable;
+          if (!hideRunAsFolderOpen) {
+            var runBtn = document.createElement('button');
+            runBtn.type = 'button';
+            runBtn.className = 'row-mini';
+            runBtn.title = runnable ? 'Run' : 'Compile';
+            runBtn.setAttribute('aria-label', runnable ? 'Run' : 'Compile');
+            runBtn.textContent = runnable ? '▶' : '🛠';
+            runBtn.disabled = state.busy || !active;
+            runBtn.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              perform(runnable ? 'Run target' : 'Compile target', function () { return runTargetAction(selected, spec.id); }, { swallow: true, keepResult: true });
+            });
+            rowActions.appendChild(runBtn);
+          }
+
+          if (spec.id === 'ios' || spec.id === 'android') {
+            var mobileBtn = document.createElement('button');
+            mobileBtn.type = 'button';
+            mobileBtn.className = 'row-mini';
+            var isIos = spec.id === 'ios';
+            mobileBtn.title = isIos ? 'Build iOS Smoke' : 'Build Android Debug';
+            mobileBtn.setAttribute('aria-label', mobileBtn.title);
+            mobileBtn.textContent = isIos ? '📱' : '🤖';
+            mobileBtn.disabled = state.busy || !active;
+            mobileBtn.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              perform(mobileBtn.title, function () { return runPipelineAction(isIos ? 'ios' : 'android'); }, { swallow: true, keepResult: true });
+            });
+            rowActions.appendChild(mobileBtn);
+          }
 
           row.appendChild(rowActions);
           return row;
@@ -1656,6 +2049,16 @@
         els.targetInactiveList.innerHTML = '';
         els.targetActiveList.appendChild(activeFragment);
         els.targetInactiveList.appendChild(inactiveFragment);
+        if (els.activeTargetsSubhead) {
+          els.activeTargetsSubhead.classList.toggle('hidden', activeTargets.length === 0);
+        }
+        if (els.inactiveTargetsSection) {
+          var hasInactive = specs.length > activeTargets.length;
+          els.inactiveTargetsSection.classList.toggle('hidden', !hasInactive);
+          if (!hasInactive) {
+            els.inactiveTargetsSection.open = false;
+          }
+        }
         requestAnimationFrame(function () {
           animateTargetRowReflow(previousRects);
         });
@@ -1664,9 +2067,6 @@
       async function persistSelectedTargets(selected, uiTargets) {
         var projectType = projectTypeKeyForContext(selected.context);
         var storedTargets = storedTargetsFromUI(projectType, uiTargets);
-        if (!storedTargets.length) {
-          throw new Error('Select at least one publish target');
-        }
         var targetsCSV = storedTargets.join(',');
 
         if (selected.draft) {
@@ -1739,7 +2139,10 @@
               await runPipelineAction('run');
               return;
             }
-            await runPipelineAction('build');
+            var macBuild = await backend('build-desktop', [selected.id]);
+            var macBuildOut = kv(macBuild.stdout || '');
+            setTargetRuntime(selected.key, 'macos', 'built', macBuildOut.artifact || macBuildOut.zip || macBuildOut.host || '');
+            renderSelectedTargetsEditor(selectedCatalogItem());
             return;
           }
           if (targetId === 'linux') {
@@ -1747,10 +2150,16 @@
               await runPipelineAction('run');
               return;
             }
-            await runPipelineAction('build');
+            var linuxBuild = await backend('build-desktop', [selected.id]);
+            var linuxBuildOut = kv(linuxBuild.stdout || '');
+            setTargetRuntime(selected.key, 'linux', 'built', linuxBuildOut.artifact || linuxBuildOut.zip || linuxBuildOut.host || '');
+            renderSelectedTargetsEditor(selectedCatalogItem());
             return;
           }
-          await runPipelineAction('build');
+          var defaultBuild = await backend('build-desktop', [selected.id]);
+          var defaultBuildOut = kv(defaultBuild.stdout || '');
+          setTargetRuntime(selected.key, state.os === 'darwin' ? 'macos' : 'linux', 'built', defaultBuildOut.artifact || defaultBuildOut.zip || defaultBuildOut.host || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
           return;
         }
         if (targetId === 'ios' || targetId === 'android' || targetId === 'hosted-web') {
@@ -1837,9 +2246,7 @@
           state.lastProjectType = projectType;
         }
         updateTargetAvailability(projectType);
-
-        els.starterApplicationSource.disabled = els.starterApplicationSelect.value !== 'clone' || state.busy;
-        els.starterGameSource.disabled = els.starterGameSelect.value !== 'clone' || state.busy;
+        updateCreatePathPreview();
         syncCreateDraftList();
         scheduleWindowFit();
       }
@@ -1851,6 +2258,31 @@
           .replace(/^-+/, '')
           .replace(/-+$/, '')
           .replace(/--+/g, '-');
+      }
+
+      function deriveCreateFolder() {
+        return inferFolderFromTitle((els.createTitle && els.createTitle.value.trim()) || '') || 'new-app';
+      }
+
+      function deriveCreatePath() {
+        var root = state.projectsRoot || '~/git';
+        var folder = deriveCreateFolder();
+        return root.replace(/\/+$/, '') + '/' + folder;
+      }
+
+      function updateCreatePathPreview() {
+        if (!els.createPathPreview) {
+          return;
+        }
+        els.createPathPreview.innerHTML = '';
+        var label = document.createElement('span');
+        label.className = 'create-path-label';
+        label.textContent = 'Path:';
+        var value = document.createElement('span');
+        value.className = 'create-path-value';
+        value.textContent = ' ' + deriveCreatePath();
+        els.createPathPreview.appendChild(label);
+        els.createPathPreview.appendChild(value);
       }
 
       function selectedTargets() {
@@ -1873,6 +2305,7 @@
         state.os = info.os || '';
         state.homeDir = info.home || '';
         state.tools = info;
+        syncToolchainUI();
 
         if (info.root) {
           setWorkspaceRoot(info.root);
@@ -1930,7 +2363,7 @@
             production: row[2] === 'true',
             exists: row[3] === '1',
             context: row[4] || 'web',
-            targets: row[5] || 'macos,linux'
+            targets: (typeof row[5] === 'string' ? row[5] : 'macos,linux')
           };
         });
 
@@ -1940,13 +2373,21 @@
 
         renderCatalogList();
         renderSelectedBuiltIn();
-
-        els.starterApplicationSource.innerHTML = '';
+        els.starterApplicationSelect.innerHTML = '';
+        [
+          { value: 'minimal', label: 'Blank application project' },
+          { value: 'panel', label: 'Template: Control panel project' }
+        ].forEach(function (item) {
+          var opt = document.createElement('option');
+          opt.value = item.value;
+          opt.textContent = item.label;
+          els.starterApplicationSelect.appendChild(opt);
+        });
         state.apps.forEach(function (app) {
           var opt = document.createElement('option');
-          opt.value = app.id;
-          opt.textContent = app.title + ' (' + app.id + ')';
-          els.starterApplicationSource.appendChild(opt);
+          opt.value = 'clone:' + app.id;
+          opt.textContent = 'Clone ' + app.title;
+          els.starterApplicationSelect.appendChild(opt);
         });
       }
 
@@ -1966,23 +2407,19 @@
         });
 
         renderCatalogList();
-
-        els.starterGameSource.innerHTML = '';
+        els.starterGameSelect.innerHTML = '';
+        var blank = document.createElement('option');
+        blank.value = 'blank';
+        blank.textContent = 'Blank game project';
+        els.starterGameSelect.appendChild(blank);
         state.workspaces
           .filter(function (ws) { return ws.projectType === 'game'; })
           .forEach(function (ws) {
             var opt = document.createElement('option');
-            opt.value = ws.id;
-            opt.textContent = ws.title + ' (' + ws.id + ')';
-            els.starterGameSource.appendChild(opt);
+            opt.value = 'clone:' + ws.id;
+            opt.textContent = 'Clone ' + ws.title;
+            els.starterGameSelect.appendChild(opt);
           });
-
-        if (!els.starterGameSource.options.length) {
-          var empty = document.createElement('option');
-          empty.value = '';
-          empty.textContent = 'No game workspace sources';
-          els.starterGameSource.appendChild(empty);
-        }
       }
 
       function requireRoot() {
@@ -1996,7 +2433,7 @@
       function requireBuiltInSelection() {
         var selected = selectedCatalogItem();
         if (!selected || selected.kind !== 'builtin') {
-          throw new Error('Select a built-in app from the list to use this action');
+          throw new Error('Select an app first');
         }
         state.selectedBuiltIn = selected.id;
         var app = selectedBuiltInApp();
@@ -2006,25 +2443,157 @@
         throw new Error('Select a built-in app first');
       }
 
-      async function runPipelineAction(kind) {
-        requireRoot();
-        var app = requireBuiltInSelection();
-        var projectKey = 'builtin:' + app.id;
-        var nativeTarget = state.os === 'darwin' ? 'macos' : 'linux';
+      function enabledTargetsForApp(app) {
+        var out = {};
+        parseTargetsCSV(app && app.targets ? app.targets : '').forEach(function (targetId) {
+          out[targetId] = true;
+        });
+        return out;
+      }
 
-        if (kind === 'build') {
+      async function buildEnabledTargets(app, projectKey) {
+        var enabled = enabledTargetsForApp(app);
+        var nativeTarget = state.os === 'darwin' ? 'macos' : 'linux';
+        var builtTargets = [];
+        var paths = [];
+
+        if (enabled.macos || enabled.linux) {
           var build = await backend('build-desktop', [app.id]);
           var buildOut = kv(build.stdout || '');
-          var buildPaths = [
+          builtTargets.push(nativeTarget);
+          paths.push(
             buildOut.artifact ? { label: 'Desktop artifact', path: buildOut.artifact, canReveal: true } : null,
             buildOut.zip ? { label: 'Zip package', path: buildOut.zip, canReveal: true } : null,
             buildOut.host ? { label: 'Host binary', path: buildOut.host, canReveal: true } : null
-          ].filter(Boolean);
+          );
+          setTargetRuntime(projectKey, nativeTarget, 'built', buildOut.artifact || buildOut.zip || buildOut.host || '');
+          if (nativeTarget === 'macos' && enabled.linux) {
+            setTargetRuntime(projectKey, 'linux', 'enabled', '');
+          }
+          if (nativeTarget === 'linux' && enabled.macos) {
+            setTargetRuntime(projectKey, 'macos', 'enabled', '');
+          }
+        }
+
+        if (enabled.ios) {
+          var ios = await backend('build-ios-smoke', [app.id]);
+          var iosOut = kv(ios.stdout || '');
+          builtTargets.push('ios');
+          paths.push(iosOut.out ? { label: 'iOS output folder', path: iosOut.out, canReveal: true } : null);
+          setTargetRuntime(projectKey, 'ios', 'built', iosOut.out || '');
+        }
+
+        if (enabled.android) {
+          var android = await backend('build-android-debug', [app.id]);
+          var androidOut = kv(android.stdout || '');
+          builtTargets.push('android');
+          paths.push(androidOut.artifact ? { label: 'Android APK', path: androidOut.artifact, canReveal: true } : null);
+          setTargetRuntime(projectKey, 'android', 'built', androidOut.artifact || '');
+        }
+
+        paths = paths.filter(Boolean);
+        return {
+          enabled: enabled,
+          builtTargets: builtTargets,
+          paths: paths
+        };
+      }
+
+      async function runWorkspacePipelineAction(kind, selected) {
+        if (!selected || selected.kind !== 'workspace') {
+          throw new Error('Select a project first');
+        }
+        if (selected.draft) {
+          throw new Error('Create the project first, then run Build or Run.');
+        }
+
+        var projectKey = selected.key || ('workspace:' + selected.id);
+        var nativeTarget = state.os === 'darwin' ? 'macos' : 'linux';
+
+        if (kind === 'run') {
+          var hostTarget = hostTargetId();
+          if (!hostTarget || !hasEnabledHostRunTarget(selected)) {
+            throw new Error('Enable the ' + (state.os === 'darwin' ? 'macOS' : 'Linux') + ' target to run this project on the current platform.');
+          }
+          await runWorkspaceItem(selected);
+          return;
+        }
+
+        if (kind === 'build') {
+          if (selected.context === 'godot') {
+            setTargetRuntime(projectKey, nativeTarget, 'ready', selected.path || '');
+            renderSelectedTargetsEditor(selectedCatalogItem());
+            renderResult({
+              status: 'ok',
+              summary: selected.title + ' is ready as a game project.',
+              paths: [{ label: 'Project folder', path: selected.path, canReveal: true }],
+              help: {
+                title: 'Game project build',
+                body: 'Game projects are built/exported in your external editor.\nUse Run to open the project folder quickly.'
+              }
+            });
+            return;
+          }
+
+          var run = await backend('run-workspace', [selected.path, selected.context]);
+          var runOut = kv(run.stdout || '');
+          setTargetRuntime(projectKey, nativeTarget, 'ready', runOut.entry || selected.path || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
+          renderResult({
+            status: 'ok',
+            summary: selected.title + ' is ready.',
+            paths: [
+              runOut.entry ? { label: 'Project entry folder', path: runOut.entry, canReveal: true } : null,
+              runOut.log ? { label: 'Launch log', path: runOut.log, canReveal: true } : null
+            ].filter(Boolean),
+            help: {
+              title: 'Workspace projects',
+              body: 'Workspace projects use host/editor workflows.\nUse Run to launch/open them from Forge.'
+            }
+          });
+          return;
+        }
+
+        if (kind === 'stage' || kind === 'ios' || kind === 'android') {
+          throw new Error('Mobile packaging actions are currently available for built-in apps.');
+        }
+      }
+
+      async function runPipelineAction(kind) {
+        requireRoot();
+        var selected = selectedCatalogItem();
+        if (!selected) {
+          throw new Error('Select an app first');
+        }
+        if (selected.kind === 'workspace' || (selected.kind !== 'builtin' && !!selected.path)) {
+          return runWorkspacePipelineAction(kind, selected);
+        }
+        state.selectedBuiltIn = selected.id;
+        var app = selectedBuiltInApp();
+        if (!app) {
+          throw new Error('Select a built-in app first');
+        }
+        var projectKey = 'builtin:' + app.id;
+        var nativeTarget = state.os === 'darwin' ? 'macos' : 'linux';
+        var enabledTargets = enabledTargetsForApp(app);
+
+        if (kind === 'build') {
+          var built = await buildEnabledTargets(app, projectKey);
+          if (!built.builtTargets.length) {
+            throw new Error('No buildable publish targets are enabled for this app.');
+          }
+          var targetSummary = built.builtTargets.map(function (targetId) {
+            if (targetId === 'macos') return 'macOS';
+            if (targetId === 'linux') return 'Linux';
+            if (targetId === 'ios') return 'iOS';
+            if (targetId === 'android') return 'Android';
+            return targetId;
+          }).join(', ');
 
           renderResult({
             status: 'ok',
-            summary: app.title + ' compiled successfully. Use Run App to launch it now.',
-            paths: buildPaths,
+            summary: app.title + ' built enabled targets: ' + targetSummary + '.',
+            paths: built.paths,
             actions: [
               {
                 label: 'Run App',
@@ -2034,24 +2603,25 @@
             ],
             help: {
               title: 'Next steps',
-              body: 'Compilation finished without blocking the UI.\nUse Run App, or open artifact locations to inspect and distribute builds.'
+              body: 'Build finished for enabled publish targets.\nUse Run App to launch the app on this machine.'
             }
           });
-          setTargetRuntime(projectKey, nativeTarget, 'built', buildOut.artifact || buildOut.zip || buildOut.host || '');
-          setTargetRuntime(projectKey, 'linux', nativeTarget === 'linux' ? 'built' : 'enabled', buildOut.artifact || '');
-          setTargetRuntime(projectKey, 'macos', nativeTarget === 'macos' ? 'built' : 'enabled', buildOut.artifact || '');
           renderSelectedTargetsEditor(selectedCatalogItem());
           return;
         }
 
         if (kind === 'run') {
+          if (!enabledTargets[nativeTarget]) {
+            throw new Error('Enable the ' + (nativeTarget === 'macos' ? 'macOS' : 'Linux') + ' target to run this app on the current platform.');
+          }
+          await buildEnabledTargets(app, projectKey);
           var runModeRequest = state.os === 'darwin' ? 'bundle' : 'auto';
           var run = await backend('run-desktop', [app.id, runModeRequest]);
           var runOut = kv(run.stdout || '');
           var runMode = runOut.mode || 'host';
           var runSummary = runMode === 'bundle'
-            ? app.title + ' launched from the compiled desktop app bundle.'
-            : app.title + ' launched in native host.';
+            ? app.title + ' built enabled targets and launched from the compiled desktop app bundle.'
+            : app.title + ' built enabled targets and launched in native host.';
 
           renderResult({
             status: 'ok',
@@ -2093,7 +2663,7 @@
             ],
             help: {
               title: 'Next steps',
-              body: 'Use Advanced Builds from the Build button to run iOS or Android smoke builds.'
+              body: 'Use per-target actions in Publish Targets for iOS Smoke and Android Debug builds.'
             }
           });
           setTargetRuntime(projectKey, 'ios', 'staged', stageOut.staged || '');
@@ -2168,15 +2738,20 @@
         requireRoot();
 
         var title = els.createTitle.value.trim();
-        var folder = els.createFolder.value.trim();
+        var folder = deriveCreateFolder();
         var projectType = selectedProjectType();
-        var starter = projectType === 'application' ? els.starterApplicationSelect.value : els.starterGameSelect.value;
-        var source = projectType === 'application' ? els.starterApplicationSource.value : els.starterGameSource.value;
+        var starterValue = projectType === 'application' ? els.starterApplicationSelect.value : els.starterGameSelect.value;
+        var starter = starterValue;
+        var source = '';
+        if (starterValue.indexOf('clone:') === 0) {
+          starter = 'clone';
+          source = starterValue.slice(6);
+        }
         var targets = selectedTargets();
-        var projectsRoot = els.projectsRoot.value.trim() || state.projectsRoot;
+        var projectsRoot = state.projectsRoot;
 
-        if (!title || !folder) {
-          throw new Error('Create App requires a project title and folder name');
+        if (!title) {
+          throw new Error('Create App requires an app title');
         }
 
         if (!targets.length) {
@@ -2205,7 +2780,7 @@
           summary: title + ' created successfully.',
           paths: [
             out.created ? { label: 'Project folder', path: out.created, canReveal: true } : null,
-            out.workspace_profile ? { label: 'Workspace profile', path: out.workspace_profile, canReveal: true } : null
+            out.workspace_profile ? { label: 'Project profile', path: out.workspace_profile, canReveal: true } : null
           ].filter(Boolean),
           help: {
             title: 'Project profile',
@@ -2261,42 +2836,63 @@
           closeFloatingMenus();
         });
 
-        els.themePickerBtn.addEventListener('click', function () {
-          toggleFloatingMenu(els.themePickerMenu, els.themePickerBtn);
+        els.themePickerBtn.addEventListener('click', function (event) {
+          event.preventDefault();
+          if (isThemePickerOpen()) {
+            closeThemePickerMenu(true);
+            return;
+          }
+          openThemePickerMenu();
         });
 
         els.themePickerBtn.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            if (isThemePickerOpen()) {
+              closeThemePickerMenu(true);
+              return;
+            }
+            openThemePickerMenu();
+            return;
+          }
           if (event.key === 'ArrowDown') {
             event.preventDefault();
-            closeFloatingMenus();
             cycleTheme(1);
             return;
           }
           if (event.key === 'ArrowUp') {
             event.preventDefault();
-            closeFloatingMenus();
             cycleTheme(-1);
+            return;
+          }
+          if (event.key === 'Escape' && isThemePickerOpen()) {
+            event.preventDefault();
+            closeThemePickerMenu(true);
           }
         });
 
-        els.actionBuildMenu.addEventListener('click', function () {
-          toggleFloatingMenu(els.buildMenu, els.actionBuildMenu);
-        });
+        if (els.actionBuildMenu) {
+          els.actionBuildMenu.addEventListener('click', function () {
+            toggleFloatingMenu(els.buildMenu, els.actionBuildMenu);
+          });
+        }
 
-        els.buildMenu.addEventListener('click', function (event) {
-          var actionButton = event.target.closest('button[id]');
-          if (!actionButton) {
-            return;
-          }
-          closeFloatingMenus();
-          if (actionButton.id === 'action-ios') {
-            perform('Build iOS smoke', function () { return runPipelineAction('ios'); }, { swallow: true });
-            return;
-          }
-          if (actionButton.id === 'action-android') {
-            perform('Build Android debug', function () { return runPipelineAction('android'); }, { swallow: true });
-          }
-        });
+        if (els.buildMenu) {
+          els.buildMenu.addEventListener('click', function (event) {
+            var actionButton = event.target.closest('button[id]');
+            if (!actionButton) {
+              return;
+            }
+            closeFloatingMenus();
+            if (actionButton.id === 'action-ios') {
+              perform('Build iOS smoke', function () { return runPipelineAction('ios'); }, { swallow: true });
+              return;
+            }
+            if (actionButton.id === 'action-android') {
+              perform('Build Android debug', function () { return runPipelineAction('android'); }, { swallow: true });
+            }
+          });
+        }
 
         els.themePickerList.addEventListener('click', function (event) {
           var button = event.target.closest('button[data-theme-name]');
@@ -2304,24 +2900,32 @@
             return;
           }
           applyTheme(button.getAttribute('data-theme-name'));
-          closeFloatingMenus();
+          closeThemePickerMenu(true);
           renderThemePicker();
-          if (els.themePickerBtn) {
-            els.themePickerBtn.focus();
-          }
         });
 
         els.themePickerList.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            closeThemePickerMenu(true);
+            return;
+          }
           if (event.key === 'ArrowDown') {
             event.preventDefault();
-            closeFloatingMenus();
             cycleTheme(1);
+            focusThemeItem(state.activeTheme);
             return;
           }
           if (event.key === 'ArrowUp') {
             event.preventDefault();
-            closeFloatingMenus();
             cycleTheme(-1);
+            focusThemeItem(state.activeTheme);
+            return;
+          }
+          if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key && event.key.length === 1) {
+            if (applyThemeTypeahead(event.key)) {
+              event.preventDefault();
+            }
           }
         });
 
@@ -2348,18 +2952,63 @@
         }
 
         els.actionBuild.addEventListener('click', function () {
-          perform('Compile desktop', function () { return runPipelineAction('build'); }, { swallow: true });
+          if (state.route === 'create') {
+            return;
+          }
+          var selected = selectedCatalogItem();
+          if (!hasBuildAction(selected)) {
+            return;
+          }
+          perform('Build enabled targets', function () { return runPipelineAction('build'); }, { swallow: true });
         });
 
         els.actionRun.addEventListener('click', function () {
+          if (state.route === 'create') {
+            return;
+          }
           perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
         });
 
         els.actionStage.addEventListener('click', function () {
+          if (state.route === 'create') {
+            return;
+          }
           perform('Stage mobile assets', function () { return runPipelineAction('stage'); }, { swallow: true });
         });
 
-        els.openSelectedPath.addEventListener('click', function () {
+        var pathClickTimer = null;
+        els.openSelectedPath.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (state.route === 'create') {
+            return;
+          }
+          var selected = selectedCatalogItem();
+          if (!selected || !selected.path) {
+            return;
+          }
+          var pathValue = selected.path;
+          if (pathClickTimer) {
+            clearTimeout(pathClickTimer);
+          }
+          pathClickTimer = setTimeout(function () {
+            pathClickTimer = null;
+            copyTextToClipboard(pathValue).then(function (ok) {
+              toast(ok ? 'Path copied' : 'Could not copy path', ok ? 'ok' : 'bad');
+            });
+          }, 220);
+        });
+
+        els.openSelectedPath.addEventListener('dblclick', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (pathClickTimer) {
+            clearTimeout(pathClickTimer);
+            pathClickTimer = null;
+          }
+          if (state.route === 'create') {
+            return;
+          }
           var selected = selectedCatalogItem();
           if (!selected || !selected.path) {
             return;
@@ -2368,6 +3017,9 @@
         });
 
         els.terminalSelectedPath.addEventListener('click', function () {
+          if (state.route === 'create') {
+            return;
+          }
           var selected = selectedCatalogItem();
           if (!selected || !selected.path) {
             return;
@@ -2384,12 +3036,9 @@
         });
 
         els.createTitle.addEventListener('input', function () {
-          if (!els.createFolder.value.trim()) {
-            els.createFolder.value = inferFolderFromTitle(els.createTitle.value.trim());
-          }
+          updateCreatePathPreview();
           syncCreateDraftList();
         });
-        els.createFolder.addEventListener('input', syncCreateDraftList);
 
         document.querySelectorAll('input[name="project-type"]').forEach(function (radio) {
           radio.addEventListener('change', syncCreateUI);
@@ -2429,6 +3078,13 @@
         }
 
         if (els.selectedIconDrop) {
+          els.selectedIconDrop.addEventListener('click', function (event) {
+            if (event.target && event.target.closest('#selected-icon-clear')) {
+              return;
+            }
+            event.preventDefault();
+            openSelectedIconPicker();
+          });
           ['dragenter', 'dragover'].forEach(function (name) {
             els.selectedIconDrop.addEventListener(name, function (event) {
               event.preventDefault();
@@ -2461,9 +3117,7 @@
           els.selectedIconDrop.addEventListener('keydown', function (event) {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              if (els.selectedIconInput) {
-                els.selectedIconInput.click();
-              }
+              openSelectedIconPicker();
             }
           });
         }
@@ -2482,9 +3136,49 @@
           }, { noToast: true, swallow: true, keepResult: true });
         });
 
-        els.projectsRoot.addEventListener('change', function () {
-          setProjectsRoot(els.projectsRoot.value.trim());
-        });
+        if (els.installXcodegen) {
+          els.installXcodegen.addEventListener('click', function () {
+            perform('Install xcodegen', async function () {
+              await installTool('xcodegen');
+              await refreshWorkspace({ quiet: true });
+            }, { swallow: true });
+          });
+        }
+
+        if (els.installGradle) {
+          els.installGradle.addEventListener('click', function () {
+            perform('Install Gradle', async function () {
+              await installTool('gradle');
+              await refreshWorkspace({ quiet: true });
+            }, { swallow: true });
+          });
+        }
+
+        if (els.installJava) {
+          els.installJava.addEventListener('click', function () {
+            perform('Install Java (JDK)', async function () {
+              await installTool('java');
+              await refreshWorkspace({ quiet: true });
+            }, { swallow: true });
+          });
+        }
+
+        if (els.installXcodeClt) {
+          els.installXcodeClt.addEventListener('click', function () {
+            perform('Install Xcode command line tools', async function () {
+              await installXcodeCommandLineTools();
+              await refreshWorkspace({ quiet: true });
+            }, { swallow: true });
+          });
+        }
+
+        if (els.refreshToolchain) {
+          els.refreshToolchain.addEventListener('click', function () {
+            perform('Refresh tool status', function () {
+              return refreshWorkspace({ quiet: true });
+            }, { swallow: true, noToast: true, keepResult: true });
+          });
+        }
 
         els.clearLog.addEventListener('click', function (event) {
           event.preventDefault();
@@ -2540,20 +3234,41 @@
 
           var target = event.target;
           var tag = target && target.tagName ? target.tagName.toLowerCase() : '';
+          var meta = event.metaKey || event.ctrlKey;
+
+          if (meta && !event.altKey && !event.shiftKey && event.key && event.key.toLowerCase() === 'a') {
+            if (tag === 'input' || tag === 'textarea') {
+              event.preventDefault();
+              if (typeof target.focus === 'function') {
+                target.focus();
+              }
+              if (typeof target.select === 'function') {
+                target.select();
+              }
+              return;
+            }
+          }
+
           var typing = tag === 'input' || tag === 'textarea' || tag === 'select';
           if (typing) {
             return;
           }
 
-          var meta = event.metaKey || event.ctrlKey;
           if (!meta) {
             return;
           }
 
           var key = event.key.toLowerCase();
           if (key === 'b') {
+            if (state.route === 'create') {
+              return;
+            }
+            var selected = selectedCatalogItem();
+            if (!hasBuildAction(selected)) {
+              return;
+            }
             event.preventDefault();
-            perform('Compile desktop', function () { return runPipelineAction('build'); }, { swallow: true });
+            perform('Build enabled targets', function () { return runPipelineAction('build'); }, { swallow: true });
           }
         });
       }
@@ -2684,11 +3399,15 @@
         els.selectedTitle = document.getElementById('selected-title');
         els.selectedTypeBadge = document.getElementById('selected-type-badge');
         els.selectedSuiteBadge = document.getElementById('selected-suite-badge');
+        els.selectedPathRow = document.querySelector('#stage-tools .selected-path-row');
+        els.toolbarActions = document.querySelector('#stage-tools .toolbar-actions');
         els.openSelectedPath = document.getElementById('open-selected-path');
         els.terminalSelectedPath = document.getElementById('terminal-selected-path');
         els.selectedTargetsEditor = document.getElementById('selected-targets-editor');
+        els.activeTargetsSubhead = document.getElementById('active-targets-subhead');
         els.targetActiveList = document.getElementById('target-active-list');
         els.targetInactiveList = document.getElementById('target-inactive-list');
+        els.inactiveTargetsSection = document.getElementById('inactive-targets-section');
         els.selectedIconDrop = document.getElementById('selected-icon-drop');
         els.selectedIconPreview = document.getElementById('selected-icon-preview');
         els.selectedIconPlaceholder = document.getElementById('selected-icon-placeholder');
@@ -2703,12 +3422,9 @@
         els.actionAndroid = document.getElementById('action-android');
 
         els.createTitle = document.getElementById('create-title');
-        els.createFolder = document.getElementById('create-folder');
+        els.createPathPreview = document.getElementById('create-path-preview');
         els.starterApplicationSelect = document.getElementById('starter-application-select');
-        els.starterApplicationSource = document.getElementById('starter-application-source');
         els.starterGameSelect = document.getElementById('starter-game-select');
-        els.starterGameSource = document.getElementById('starter-game-source');
-        els.projectsRoot = document.getElementById('projects-root');
         els.createSubmit = document.getElementById('create-submit');
 
         els.targetHostedWeb = document.getElementById('target-hosted-web');
@@ -2727,6 +3443,12 @@
         els.applyRepoRoot = document.getElementById('apply-repo-root');
         els.settingsProjectsRoot = document.getElementById('settings-projects-root');
         els.applyProjectsRoot = document.getElementById('apply-projects-root');
+        els.installXcodegen = document.getElementById('install-xcodegen');
+        els.installGradle = document.getElementById('install-gradle');
+        els.installJava = document.getElementById('install-java');
+        els.installXcodeClt = document.getElementById('install-xcode-clt');
+        els.refreshToolchain = document.getElementById('refresh-toolchain');
+        els.toolchainSummary = document.getElementById('toolchain-summary');
         els.doctor = document.getElementById('doctor');
 
         els.toast = document.getElementById('toast');
@@ -2737,6 +3459,7 @@
         state.settingsOpen = false;
         document.body.classList.remove('layout-recovery');
         cacheElements();
+        syncToolchainUI();
         syncLogClearVisibility();
         bindButtons();
         bindKeyboardShortcuts();
@@ -2757,7 +3480,6 @@
           setWorkspaceRoot(state.rootHint);
         }
         if (state.projectsRoot) {
-          els.projectsRoot.value = state.projectsRoot;
           els.settingsProjectsRoot.value = state.projectsRoot;
         }
 

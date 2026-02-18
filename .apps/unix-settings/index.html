@@ -18,7 +18,6 @@
     .status {
       margin: 0;
       padding: 0.64rem 0.9rem;
-      border-bottom: 1px solid #263547;
       background: #101823;
       font-family: "SF Mono", ui-monospace, Menlo, monospace;
       font-size: 0.82rem;
@@ -60,8 +59,13 @@
     var siteName = 'unix-settings';
     var entryPath = '/pages/index.html';
     var commands = {
+      ensureSite: [
+        'sh',
+        '-c',
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; if [ ! -f "$cfg" ]; then create-from-template ' + siteName + ' unix-settings; fi; web-wizardry build ' + siteName
+      ],
       start: ['web-wizardry', 'serve', siteName],
-      getPort: ['sh', '-c', 'cfg="$HOME/sites/' + siteName + '/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
+      getPort: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
     };
 
     function statusLine(text) {
@@ -78,8 +82,20 @@
       return window.wizardry.rpc('bridge.exec', { argv: argv });
     }
 
+    async function bridgeExecChecked(argv, label) {
+      var result = await bridgeExec(argv);
+      var code = Number(result && result.exit_code);
+      if (!Number.isFinite(code) || code === 0) {
+        return result || {};
+      }
+      var stderr = String((result && result.stderr) || '').trim();
+      var stdout = String((result && result.stdout) || '').trim();
+      var detail = stderr || stdout || ('exit ' + code);
+      throw new Error((label || 'command failed') + ': ' + detail);
+    }
+
     async function resolvePort() {
-      var result = await bridgeExec(commands.getPort);
+      var result = await bridgeExecChecked(commands.getPort, 'port lookup failed');
       var raw = String((result && result.stdout) || '').trim();
       if (!/^[0-9]+$/.test(raw)) {
         throw new Error('unable to resolve UNIX Settings port from site.conf');
@@ -90,8 +106,10 @@
     async function boot() {
       var frame = document.getElementById('settings-frame');
       try {
+        statusLine('Preparing UNIX Settings site…');
+        await bridgeExecChecked(commands.ensureSite, 'site bootstrap failed');
         statusLine('Starting UNIX Settings daemon…');
-        await bridgeExec(commands.start);
+        await bridgeExecChecked(commands.start, 'daemon start failed');
         var port = await resolvePort();
         var url = 'http://localhost:' + port + entryPath;
         frame.src = url;

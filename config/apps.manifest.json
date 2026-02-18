@@ -54,7 +54,7 @@
         "ios": "com.wizardry.apps.menuapp.ios",
         "android": "com.wizardry.apps.menuapp.android"
       },
-      "targets": "macos,linux,hosted-web"
+      "targets": "macos,linux,hosted-web,android,ios"
     }
   ]
 }

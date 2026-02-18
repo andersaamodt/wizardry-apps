@@ -279,14 +279,14 @@ cmd_list_apps() {
   require_jq
 
   manifest="$root/config/apps.manifest.json"
-  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (.targets // "")] | @tsv' "$manifest" |
+  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (if has("targets") then (.targets // "") else "__FORGE_TARGETS_MISSING__" end)] | @tsv' "$manifest" |
   while IFS="$(printf '\t')" read -r slug name production bundle_targets manifest_targets; do
     exists=0
     app_exists "$root" "$slug" && exists=1
     development_context=web
     [ -d "$root/godot/tools/$slug" ] && development_context=godot
 
-    if [ -n "$manifest_targets" ]; then
+    if [ "$manifest_targets" != "__FORGE_TARGETS_MISSING__" ]; then
       targets=$manifest_targets
     else
       targets="macos,linux"
@@ -421,10 +421,6 @@ cmd_set_app_targets() {
     printf '%s\n' "forge-backend: set-app-targets requires APP_SLUG" >&2
     exit 2
   }
-  [ -n "$targets" ] || {
-    printf '%s\n' "forge-backend: set-app-targets requires TARGETS" >&2
-    exit 2
-  }
   validate_slug "$slug"
   require_jq
 
@@ -455,10 +451,6 @@ cmd_set_workspace_targets() {
 
   [ -n "$workspace_path" ] || {
     printf '%s\n' "forge-backend: set-workspace-targets requires WORKSPACE_PATH" >&2
-    exit 2
-  }
-  [ -n "$targets" ] || {
-    printf '%s\n' "forge-backend: set-workspace-targets requires TARGETS" >&2
     exit 2
   }
   [ -d "$workspace_path" ] || {
