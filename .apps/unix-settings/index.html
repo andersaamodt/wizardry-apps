@@ -58,14 +58,20 @@
   <script>
     var siteName = 'unix-settings';
     var entryPath = '/pages/index.html';
+    var launchedServer = false;
+    var wasRunningAtBoot = false;
+
     var commands = {
       ensureSite: [
         'sh',
         '-c',
-        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; if [ ! -f "$cfg" ]; then create-from-template ' + siteName + ' unix-settings; fi; web-wizardry build ' + siteName
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/' + siteName + '"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template ' + siteName + ' unix-settings; web-wizardry build ' + siteName + '; elif [ ! -f "$built" ]; then web-wizardry build ' + siteName + '; fi'
       ],
       start: ['web-wizardry', 'serve', siteName],
+      stop: ['web-wizardry', 'stop', siteName],
       getPort: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
+      ,
+      isRunning: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; pidf="$root/' + siteName + '/nginx/nginx.pid"; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "yes"; else printf "no"; fi']
     };
 
     function statusLine(text) {
@@ -103,13 +109,38 @@
       return raw;
     }
 
+    async function isRunning() {
+      var result = await bridgeExecChecked(commands.isRunning, 'status lookup failed');
+      return String((result && result.stdout) || '').trim() === 'yes';
+    }
+
+    async function stopIfOwned() {
+      if (!launchedServer || wasRunningAtBoot) {
+        return;
+      }
+      try {
+        await bridgeExec(commands.stop);
+      } catch (_) {
+        // Best-effort shutdown when window closes.
+      }
+    }
+
     async function boot() {
       var frame = document.getElementById('settings-frame');
       try {
+        wasRunningAtBoot = await isRunning();
+        if (wasRunningAtBoot) {
+          var existingPort = await resolvePort();
+          var existingUrl = 'http://localhost:' + existingPort + entryPath;
+          frame.src = existingUrl;
+          statusLine('Running: ' + existingUrl);
+          return;
+        }
         statusLine('Preparing UNIX Settings site…');
         await bridgeExecChecked(commands.ensureSite, 'site bootstrap failed');
         statusLine('Starting UNIX Settings daemon…');
         await bridgeExecChecked(commands.start, 'daemon start failed');
+        launchedServer = true;
         var port = await resolvePort();
         var url = 'http://localhost:' + port + entryPath;
         frame.src = url;
@@ -124,6 +155,8 @@
       // Wait one tick so bridge loader can attach window.wizardry.
       setTimeout(boot, 20);
     });
+    window.addEventListener('pagehide', stopIfOwned);
+    window.addEventListener('beforeunload', stopIfOwned);
   </script>
 </body>
 </html>
