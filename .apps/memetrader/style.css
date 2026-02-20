@@ -1,0 +1,220 @@
+:root {
+  --mt-bg: var(--bg, #091118);
+  --mt-panel: var(--bg-panel, #102130);
+  --mt-panel-2: var(--bg-panel-2, #142a3d);
+  --mt-ink: var(--text, #e6eef7);
+  --mt-muted: var(--text-muted, var(--light-text, #8ba5bc));
+  --mt-line: var(--line, var(--border, #2b455d));
+  --mt-accent: var(--accent-strong, var(--primary, #3bc9a5));
+  --mt-accent-soft: var(--accent-soft, #1f3a52);
+  --mt-danger: var(--danger, #c85e6d);
+  --mt-hot: var(--danger, #ff6b5f);
+  --mt-warm: #d48f2f;
+  --mt-cold: #4f93cc;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--mt-ink);
+  background: radial-gradient(circle at 12% 8%, var(--mt-accent-soft), var(--mt-bg) 46%);
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 18px 84px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+}
+
+.hero p {
+  margin: 0.35rem 0 0.75rem;
+  color: var(--mt-muted);
+}
+
+.status {
+  display: inline-block;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--mt-line);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--mt-panel), transparent 18%);
+  color: var(--mt-accent);
+  font-size: 0.85rem;
+}
+
+.status.error {
+  color: #ffd2cb;
+  border-color: var(--mt-danger);
+  background: color-mix(in oklab, var(--mt-danger), transparent 78%);
+}
+
+.panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--mt-line);
+  border-radius: 12px;
+  background: linear-gradient(160deg, var(--mt-panel), var(--mt-panel-2));
+}
+
+.grid-two {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+h2 {
+  margin: 0 0 0.65rem;
+  font-size: 1.03rem;
+}
+
+label {
+  display: block;
+  margin: 0.5rem 0 0.25rem;
+  color: var(--mt-muted);
+  font-size: 0.85rem;
+}
+
+input, select, button {
+  width: 100%;
+  border: 1px solid var(--mt-line);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+  color: var(--mt-ink);
+  background: color-mix(in oklab, var(--mt-panel), black 12%);
+}
+
+button {
+  cursor: pointer;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--mt-panel-2), white 8%), var(--mt-panel));
+}
+
+button:hover {
+  filter: brightness(1.06);
+}
+
+.row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  border-bottom: 1px solid var(--mt-line);
+  text-align: left;
+  padding: 0.45rem;
+  font-size: 0.88rem;
+  vertical-align: top;
+}
+
+tr:hover {
+  background: color-mix(in oklab, var(--mt-accent-soft), transparent 40%);
+  cursor: pointer;
+}
+
+.cluster {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+}
+
+.temp-hot { color: var(--mt-hot); }
+.temp-warm { color: var(--mt-warm); }
+.temp-cold { color: var(--mt-cold); }
+
+pre {
+  margin: 0;
+  min-height: 110px;
+  max-height: 250px;
+  overflow: auto;
+  background: color-mix(in oklab, var(--mt-panel), black 24%);
+  border-radius: 8px;
+  border: 1px solid var(--mt-line);
+  padding: 0.6rem;
+  color: var(--mt-ink);
+}
+
+.theme-dock {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 50;
+}
+
+.menu-anchor {
+  position: relative;
+}
+
+.theme-picker-btn {
+  min-width: 132px;
+  width: auto;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  background: color-mix(in oklab, var(--mt-panel), black 10%);
+}
+
+.floating-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 186px;
+  max-height: min(56vh, 420px);
+  overflow: auto;
+  background: var(--mt-panel);
+  border: 1px solid var(--mt-line);
+  border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+.hidden {
+  display: none;
+}
+
+.menu-list {
+  padding: 6px;
+}
+
+.menu-list button {
+  text-align: left;
+  background: transparent;
+  border-radius: 8px;
+}
+
+.menu-list button:hover {
+  background: color-mix(in oklab, var(--mt-accent-soft), transparent 44%);
+}
+
+.menu-list button.active {
+  background: color-mix(in oklab, var(--mt-accent-soft), transparent 22%);
+  border-color: color-mix(in oklab, var(--mt-accent), transparent 40%);
+}
+
+@media (max-width: 760px) {
+  .row { grid-template-columns: 1fr; }
+  th:nth-child(6), th:nth-child(7), td:nth-child(6), td:nth-child(7) { display: none; }
+  .theme-dock {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+  }
+  .theme-picker-btn {
+    width: 100%;
+  }
+  .floating-menu {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+}

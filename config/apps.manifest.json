@@ -55,6 +55,17 @@
         "android": "com.wizardry.apps.priorities.android"
       },
       "targets": "hosted-web,macos,linux,ios,android"
+    },
+    {
+      "slug": "memetrader",
+      "name": "Memetrader",
+      "production": false,
+      "bundleIds": {
+        "macos": "com.wizardry.apps.memetrader.macos",
+        "ios": "com.wizardry.apps.memetrader.ios",
+        "android": "com.wizardry.apps.memetrader.android"
+      },
+      "targets": "hosted-web,macos,linux,ios,android"
     }
   ]
 }

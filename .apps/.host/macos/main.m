@@ -202,6 +202,15 @@
     CGFloat dragStripHeight = 44.0;
     NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
     self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
+    NSString *pageZoomEnv = [[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_PAGE_ZOOM"];
+    if (pageZoomEnv) {
+        if (@available(macOS 11.0, *)) {
+            double pageZoom = [pageZoomEnv doubleValue];
+            if (pageZoom >= 0.50 && pageZoom <= 2.00) {
+                self.webView.pageZoom = pageZoom;
+            }
+        }
+    }
     [self.webView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [rootView addSubview:self.webView];
 

@@ -580,6 +580,22 @@ exec "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$slug"
 APP
       chmod +x "$bundle/Contents/MacOS/$slug"
 
+      icon_key=''
+      if [ -f "$app_dir/assets/forge.icns" ]; then
+        cp "$app_dir/assets/forge.icns" "$bundle/Contents/Resources/forge.icns"
+        icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
+      elif [ -f "$app_dir/assets/forge-icon.png" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+        iconset=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-iconset.XXXXXX")
+        for size in 16 32 128 256 512; do
+          sips -z "$size" "$size" "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+          sips -z $((size * 2)) $((size * 2)) "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+        done
+        if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/forge.icns" >/dev/null 2>&1; then
+          icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
+        fi
+        rm -rf "$iconset"
+      fi
+
       cat > "$bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -590,6 +606,7 @@ APP
 <key>CFBundleVersion</key><string>1.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>$slug</string>
+$icon_key
 </dict></plist>
 PLIST
 
@@ -722,10 +739,23 @@ cmd_run_desktop() {
   mkdir -p "$log_dir"
   log_path="$log_dir/$slug-host.log"
 
+  host_zoom=''
+  if [ "$slug" = "artificer" ]; then
+    host_zoom=${WIZARDRY_ARTIFICER_PAGE_ZOOM:-0.92}
+  fi
+
   if command -v nohup >/dev/null 2>&1; then
-    nohup "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+    if [ -n "$host_zoom" ]; then
+      nohup env WIZARDRY_PAGE_ZOOM="$host_zoom" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+    else
+      nohup "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+    fi
   else
-    "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+    if [ -n "$host_zoom" ]; then
+      env WIZARDRY_PAGE_ZOOM="$host_zoom" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+    else
+      "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+    fi
   fi
   pid=$!
 

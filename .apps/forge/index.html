@@ -1112,6 +1112,20 @@
         return '';
       }
 
+      function targetOpenDestination(targetId, path) {
+        if (!path) {
+          return '';
+        }
+        if (targetId === 'macos' && /\.app\/?$/i.test(path)) {
+          var trimmed = path.replace(/\/+$/, '');
+          var slash = trimmed.lastIndexOf('/');
+          if (slash > 0) {
+            return trimmed.slice(0, slash);
+          }
+        }
+        return path;
+      }
+
       function isTargetSupportedForSelected(selected, targetId) {
         if (!selected || !targetId) {
           return false;
@@ -2018,7 +2032,8 @@
             if (!openPathValue) {
               return;
             }
-            perform('Open target', function () { return openPath(openPathValue, false); }, { swallow: true, noToast: true, keepResult: true });
+            var destination = targetOpenDestination(spec.id, openPathValue);
+            perform('Open target', function () { return openPath(destination, false); }, { swallow: true, noToast: true, keepResult: true });
           });
           rowActions.appendChild(openBtn);
 
