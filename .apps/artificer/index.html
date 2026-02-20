@@ -3,29 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Artificer Desktop</title>
+  <title>Artificer</title>
   <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0e151b; color: #e6eef7; }
-    header { padding: 0.9rem 1rem; border-bottom: 1px solid #263340; display: flex; gap: 0.6rem; align-items: center; }
-    button { background: #1d2a36; color: #e6eef7; border: 1px solid #2f4356; border-radius: 6px; padding: 0.45rem 0.7rem; cursor: pointer; }
-    pre { margin: 0; padding: 0.8rem 1rem; border-bottom: 1px solid #263340; min-height: 5rem; white-space: pre-wrap; }
-    iframe { width: 100%; height: calc(100vh - 160px); border: none; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #0b121a;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #0b121a;
+    }
+
+    #status {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #0b121a;
+      color: #9bb0c8;
+      font-size: 0.95rem;
+      z-index: 10;
+      transition: opacity 120ms ease;
+    }
+
+    #status.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #status.error {
+      color: #ffb4b4;
+      white-space: pre-wrap;
+      text-align: center;
+      padding: 1rem;
+    }
   </style>
 </head>
 <body>
-  <header>
-    <strong>Artificer</strong>
-    <button onclick="run('build')">Build</button>
-    <button onclick="run('start')">Start</button>
-    <button onclick="run('stop')">Stop</button>
-    <button onclick="refreshFrame()">Refresh</button>
-  </header>
-  <pre id="log">ready</pre>
+  <div id="status">Starting Artificer…</div>
   <iframe id="app" src="about:blank" title="Artificer"></iframe>
 
   <script>
     (function loadBridge() {
-      var candidates = ['./.host/shared/wizardry-bridge.js', '../.host/shared/wizardry-bridge.js'];
+      var candidates = [
+        './.host/shared/wizardry-bridge.js',
+        '../.host/shared/wizardry-bridge.js',
+        '../../.host/shared/wizardry-bridge.js'
+      ];
       var i = 0;
       function tryNext() {
         if (i >= candidates.length) {
@@ -33,81 +64,168 @@
         }
         var s = document.createElement('script');
         s.src = candidates[i++];
-        s.onload = function () {};
         s.onerror = tryNext;
         document.head.appendChild(s);
       }
       tryNext();
     })();
   </script>
-  <script>
-    const siteName = 'artificer';
-    const entryPath = '/pages/index.html';
 
-    const commands = {
-      build: ['web-wizardry', 'build', 'artificer'],
-      start: ['web-wizardry', 'serve', 'artificer'],
-      stop: ['web-wizardry', 'stop', 'artificer'],
-      getPort: ['sh', '-c', 'cfg="$HOME/sites/artificer/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
+  <script>
+    var siteName = 'artificer';
+    var entryPath = '/pages/index.html';
+
+    var commands = {
+      siteReady: [
+        'sh',
+        '-c',
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ -f "$cfg" ] && [ -f "$built" ]; then printf "yes"; else printf "no"; fi'
+      ],
+      ensureSite: [
+        'sh',
+        '-c',
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template artificer artificer; fi; if [ ! -f "$built" ]; then web-wizardry build artificer; fi'
+      ],
+      startDetached: ['sh', '-c', 'web-wizardry serve artificer >/dev/null 2>&1 &'],
+      ensureUsablePort: [
+        'sh',
+        '-c',
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; pidf="$root/artificer/nginx/nginx.pid"; port=$(sed -n "s/^port=//p" "$cfg" 2>/dev/null | head -n 1); [ -n "$port" ] || port=8080; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "$port"; exit 0; fi; if command -v lsof >/dev/null 2>&1; then if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then printf "$port"; exit 0; fi; p=8081; while [ "$p" -le 8120 ]; do if ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then change-site-port artificer "$p" >/dev/null 2>&1 && printf "$p" && exit 0; fi; p=$((p+1)); done; exit 1; fi; printf "$port"; exit 0'
+      ],
+      setPort: ['change-site-port', 'artificer'],
+      isRunning: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; pidf="$root/artificer/nginx/nginx.pid"; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "yes"; else printf "no"; fi'],
+      getPort: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
     };
 
-    function getLog() {
-      return document.getElementById('log');
+    function statusEl() {
+      return document.getElementById('status');
+    }
+
+    function setStatus(text, isError) {
+      var el = statusEl();
+      el.textContent = text;
+      el.className = isError ? 'error' : '';
+    }
+
+    function hideStatus() {
+      statusEl().classList.add('hidden');
+    }
+
+    function hasBridge() {
+      return !!(window.wizardry && typeof window.wizardry.rpc === 'function');
+    }
+
+    async function waitForBridge(timeoutMs) {
+      var start = Date.now();
+      while (!hasBridge()) {
+        if (Date.now() - start > (timeoutMs || 4000)) {
+          throw new Error('wizardry bridge unavailable; run this app in the native host');
+        }
+        await new Promise(function (resolve) { setTimeout(resolve, 50); });
+      }
     }
 
     async function bridgeExec(argv) {
-      return window.wizardry.rpc('bridge.exec', { argv: argv });
-    }
-
-    async function resolveAppUrl() {
-      const res = await bridgeExec(commands.getPort);
-      const raw = (res.stdout || '').trim();
-      const port = /^[0-9]+$/.test(raw) ? raw : '';
-      if (!port) {
-        throw new Error(`unable to resolve port for '${siteName}' from $HOME/sites/${siteName}/site.conf`);
+      await waitForBridge(4000);
+      var res = await window.wizardry.rpc('bridge.exec', { argv: argv });
+      var code = Number(res && res.exit_code);
+      if (!Number.isFinite(code) || code === 0) {
+        return res || {};
       }
-      return `http://localhost:${port}${entryPath}`;
+      var stderr = String((res && res.stderr) || '').trim();
+      var stdout = String((res && res.stdout) || '').trim();
+      var detail = stderr || stdout || ('exit ' + code);
+      throw new Error(detail);
     }
 
-    async function loadFrame() {
-      const iframe = document.getElementById('app');
-      const log = getLog();
+    async function resolvePort() {
+      var res = await bridgeExec(commands.getPort);
+      var raw = String((res && res.stdout) || '').trim();
+      if (!/^[0-9]+$/.test(raw)) {
+        throw new Error('unable to resolve Artificer port from site.conf');
+      }
+      return raw;
+    }
+
+    async function isRunning() {
+      var res = await bridgeExec(commands.isRunning);
+      return String((res && res.stdout) || '').trim() === 'yes';
+    }
+
+    async function waitUntilRunning(timeoutMs) {
+      var start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        try {
+          if (await isRunning()) {
+            return true;
+          }
+        } catch (_) {
+          // Keep polling.
+        }
+        await new Promise(function (resolve) { setTimeout(resolve, 125); });
+      }
+      return false;
+    }
+
+    async function ensureSiteIfNeeded() {
+      var res = await bridgeExec(commands.siteReady);
+      var ready = String((res && res.stdout) || '').trim() === 'yes';
+      if (!ready) {
+        await bridgeExec(commands.ensureSite);
+      }
+    }
+
+    async function startWithFallbackPort() {
+      await bridgeExec(commands.startDetached);
+      if (await waitUntilRunning(7000)) {
+        return;
+      }
+
+      // One emergency retry after re-checking port usability.
+      await bridgeExec(commands.ensureUsablePort);
+      await bridgeExec(commands.startDetached);
+      if (await waitUntilRunning(5000)) {
+        return;
+      }
+
+      throw new Error('daemon start timed out');
+    }
+
+    async function boot() {
+      var iframe = document.getElementById('app');
       try {
-        const url = await resolveAppUrl();
+        await waitForBridge(4000);
+
+        if (await isRunning()) {
+          var hotPort = await resolvePort();
+          iframe.onload = hideStatus;
+          iframe.src = 'http://localhost:' + hotPort + entryPath;
+          return;
+        }
+
+        setStatus('Preparing Artificer…', false);
+        await ensureSiteIfNeeded();
+
+        setStatus('Starting Artificer…', false);
+        try {
+          await bridgeExec(commands.ensureUsablePort);
+        } catch (_) {
+          // Non-fatal: we'll still try start/fallback.
+        }
+        await startWithFallbackPort();
+
+        var port = await resolvePort();
+        var url = 'http://localhost:' + port + entryPath;
+        iframe.onload = hideStatus;
         iframe.src = url;
-        log.textContent = `loaded ${url}`;
-      } catch (err) {
+      } catch (error) {
         iframe.src = 'about:blank';
-        log.textContent = `error: ${err.message}`;
+        setStatus('Error: ' + String(error && error.message ? error.message : error), true);
       }
-    }
-
-    async function run(action) {
-      const log = getLog();
-      try {
-        const res = await bridgeExec(commands[action]);
-        log.textContent = [
-          `exit=${res.exit_code}`,
-          res.stdout || '',
-          res.stderr || ''
-        ].filter(Boolean).join('\n');
-        if (action === 'start' || action === 'build') {
-          await loadFrame();
-        }
-        if (action === 'stop') {
-          document.getElementById('app').src = 'about:blank';
-        }
-      } catch (err) {
-        log.textContent = `error: ${err.message}`;
-      }
-    }
-
-    function refreshFrame() {
-      loadFrame();
     }
 
     window.addEventListener('DOMContentLoaded', function () {
-      loadFrame();
+      setTimeout(boot, 20);
     });
   </script>
 </body>

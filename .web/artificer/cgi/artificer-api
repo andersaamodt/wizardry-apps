@@ -23,6 +23,8 @@ model_installs_dir="$data_root/model-installs"
 command_policy_root="$data_root/command-policy"
 terminal_sessions_root="$data_root/terminal-sessions"
 mode_runtime_root="$data_root/mode-runtime"
+llm_settings_dir="$data_root/llm-settings"
+llm_use_gpu_file="$llm_settings_dir/use-gpu"
 ALLOW_NETWORK=0
 ALLOW_WEB=0
 
@@ -31,6 +33,7 @@ mkdir -p "$model_installs_dir"
 mkdir -p "$command_policy_root"
 mkdir -p "$terminal_sessions_root"
 mkdir -p "$mode_runtime_root"
+mkdir -p "$llm_settings_dir"
 
 json_escape() {
   printf '%s' "$1" | awk '
@@ -155,6 +158,31 @@ set_selected_ssh_pub_path() {
 
 clear_selected_ssh_pub_path() {
   rm -f "$selected_ssh_pub_file"
+}
+
+llm_use_gpu_enabled() {
+  raw_value=$(trim "$(read_file_line "$llm_use_gpu_file" "1")")
+  case "$raw_value" in
+    0|false|FALSE|False|no|NO|No|off|OFF|Off)
+      printf '%s' "0"
+      ;;
+    *)
+      printf '%s' "1"
+      ;;
+  esac
+}
+
+set_llm_use_gpu_enabled() {
+  next_value=$1
+  mkdir -p "$llm_settings_dir"
+  case "$next_value" in
+    1)
+      printf '%s\n' "1" > "$llm_use_gpu_file"
+      ;;
+    *)
+      printf '%s\n' "0" > "$llm_use_gpu_file"
+      ;;
+  esac
 }
 
 param() {
@@ -6143,16 +6171,49 @@ run_ollama_cli_once() {
   model_name=$2
   prompt_text=$3
   timeout_sec=$4
+  use_gpu=${5:-1}
+
+  env_prefix=""
+  if [ "$use_gpu" != "1" ]; then
+    env_prefix="OLLAMA_NUM_GPU=0"
+  fi
 
   if command -v timeout >/dev/null 2>&1; then
-    timeout "$timeout_sec" "$ollama_path" run "$model_name" "$prompt_text"
+    if [ -n "$env_prefix" ]; then
+      timeout "$timeout_sec" env $env_prefix "$ollama_path" run "$model_name" "$prompt_text"
+    else
+      timeout "$timeout_sec" "$ollama_path" run "$model_name" "$prompt_text"
+    fi
     return $?
   fi
   if command -v gtimeout >/dev/null 2>&1; then
-    gtimeout "$timeout_sec" "$ollama_path" run "$model_name" "$prompt_text"
+    if [ -n "$env_prefix" ]; then
+      gtimeout "$timeout_sec" env $env_prefix "$ollama_path" run "$model_name" "$prompt_text"
+    else
+      gtimeout "$timeout_sec" "$ollama_path" run "$model_name" "$prompt_text"
+    fi
     return $?
   fi
   if command -v perl >/dev/null 2>&1; then
+    if [ -n "$env_prefix" ]; then
+      perl -e '
+      use strict;
+      use warnings;
+      my $t = shift @ARGV;
+      my $pid = fork();
+      die "fork failed" unless defined $pid;
+      if ($pid == 0) { exec @ARGV; exit 127; }
+      my $timed_out = 0;
+      local $SIG{ALRM} = sub { $timed_out = 1; kill 9, $pid; };
+      alarm $t;
+      waitpid($pid, 0);
+      alarm 0;
+      if ($timed_out) { exit 124; }
+      my $rc = $? >> 8;
+      exit $rc;
+    ' "$timeout_sec" env $env_prefix "$ollama_path" run "$model_name" "$prompt_text"
+      return $?
+    fi
     perl -e '
       use strict;
       use warnings;
@@ -6172,7 +6233,11 @@ run_ollama_cli_once() {
     return $?
   fi
 
-  "$ollama_path" run "$model_name" "$prompt_text"
+  if [ -n "$env_prefix" ]; then
+    env $env_prefix "$ollama_path" run "$model_name" "$prompt_text"
+  else
+    "$ollama_path" run "$model_name" "$prompt_text"
+  fi
   return $?
 }
 
@@ -6186,6 +6251,11 @@ run_model() {
   last_rc=1
   run_timeout_sec=${RUN_TIMEOUT_SEC:-120}
   images_json=""
+  ollama_use_gpu=$(llm_use_gpu_enabled)
+  ollama_options_fragment=""
+  if [ "$ollama_use_gpu" != "1" ]; then
+    ollama_options_fragment=',"options":{"num_gpu":0}'
+  fi
   prompt_for_model=$(adapt_prompt_for_model "$model_name" "$prompt_text")
 
   if [ -n "$(trim "$image_payload_lines")" ]; then
@@ -6219,14 +6289,16 @@ run_model() {
 
       if [ -n "$(trim "$stream_output_file")" ]; then
         if [ -n "$images_json" ]; then
-          payload=$(printf '{"model":"%s","prompt":"%s","images":[%s],"stream":true}' \
+          payload=$(printf '{"model":"%s","prompt":"%s","images":[%s],"stream":true%s}' \
             "$(json_escape "$model_name")" \
             "$(json_escape "$prompt_for_model")" \
-            "$images_json")
+            "$images_json" \
+            "$ollama_options_fragment")
         else
-          payload=$(printf '{"model":"%s","prompt":"%s","stream":true}' \
+          payload=$(printf '{"model":"%s","prompt":"%s","stream":true%s}' \
             "$(json_escape "$model_name")" \
-            "$(json_escape "$prompt_for_model")")
+            "$(json_escape "$prompt_for_model")" \
+            "$ollama_options_fragment")
         fi
 
         stream_fifo=$(mktemp -u "/tmp/artificer-stream.XXXXXX")
@@ -6288,14 +6360,16 @@ run_model() {
         last_rc=$api_rc
       else
         if [ -n "$images_json" ]; then
-          payload=$(printf '{"model":"%s","prompt":"%s","images":[%s],"stream":false}' \
+          payload=$(printf '{"model":"%s","prompt":"%s","images":[%s],"stream":false%s}' \
             "$(json_escape "$model_name")" \
             "$(json_escape "$prompt_for_model")" \
-            "$images_json")
+            "$images_json" \
+            "$ollama_options_fragment")
         else
-          payload=$(printf '{"model":"%s","prompt":"%s","stream":false}' \
+          payload=$(printf '{"model":"%s","prompt":"%s","stream":false%s}' \
             "$(json_escape "$model_name")" \
-            "$(json_escape "$prompt_for_model")")
+            "$(json_escape "$prompt_for_model")" \
+            "$ollama_options_fragment")
         fi
 
         set +e
@@ -6357,7 +6431,7 @@ EOF
         cli_output_file=$(mktemp)
         cli_rc_file=$(mktemp)
         (
-          run_ollama_cli_once "$ollama_bin" "$model_name" "$prompt_for_model" "$run_timeout_sec"
+          run_ollama_cli_once "$ollama_bin" "$model_name" "$prompt_for_model" "$run_timeout_sec" "$ollama_use_gpu"
           cli_rc=$?
           printf '%s\n' "$cli_rc" > "$cli_rc_file"
           exit 0
@@ -6366,7 +6440,7 @@ EOF
         run_output=$(cat "$cli_output_file" 2>/dev/null || true)
         rm -f "$cli_output_file" "$cli_rc_file"
       else
-        run_output=$(run_ollama_cli_once "$ollama_bin" "$model_name" "$prompt_for_model" "$run_timeout_sec" 2>&1)
+        run_output=$(run_ollama_cli_once "$ollama_bin" "$model_name" "$prompt_for_model" "$run_timeout_sec" "$ollama_use_gpu" 2>&1)
         run_rc=$?
       fi
       set -e
@@ -8912,12 +8986,7 @@ promote_scratch_files() {
 }
 
 emit_state() {
-  if command -v mode_runtime_bootstrap >/dev/null 2>&1; then
-    mode_runtime_bootstrap
-    if command -v mr_mode_scheduler_tick_json >/dev/null 2>&1; then
-      mr_mode_scheduler_tick_json "" "" >/dev/null 2>&1 || true
-    fi
-  fi
+  # Keep the primary state endpoint fast; mode runtime has dedicated endpoints.
   printf '{"success":true,"workspaces":['
   first_ws=1
 
@@ -9093,9 +9162,6 @@ EOF_TOG
       "$(ma_curated_residents_json)" \
       "$(ma_target_type_enum_json)" \
       "$(ma_escalation_class_enum_json)"
-  fi
-  if command -v mode_runtime_state_json >/dev/null 2>&1; then
-    printf ',"mode_runtime":%s' "$(mode_runtime_state_json)"
   fi
   printf '}\n'
 }
@@ -9291,6 +9357,41 @@ fi
 case "$action" in
   state)
     emit_state
+    exit 0
+    ;;
+
+  llm_runtime_settings_get)
+    use_gpu=$(llm_use_gpu_enabled)
+    if [ "$use_gpu" = "1" ]; then
+      use_gpu_json=true
+    else
+      use_gpu_json=false
+    fi
+    printf '{"success":true,"provider":"ollama","use_gpu":%s}\n' "$use_gpu_json"
+    exit 0
+    ;;
+
+  llm_runtime_settings_set)
+    use_gpu=$(trim "$(param "use_gpu")")
+    case "$use_gpu" in
+      1|true|TRUE|True|yes|YES|Yes|on|ON|On)
+        normalized_gpu=1
+        ;;
+      0|false|FALSE|False|no|NO|No|off|OFF|Off)
+        normalized_gpu=0
+        ;;
+      *)
+        emit_error "invalid use_gpu value"
+        exit 0
+        ;;
+    esac
+    set_llm_use_gpu_enabled "$normalized_gpu"
+    if [ "$normalized_gpu" = "1" ]; then
+      use_gpu_json=true
+    else
+      use_gpu_json=false
+    fi
+    printf '{"success":true,"provider":"ollama","use_gpu":%s}\n' "$use_gpu_json"
     exit 0
     ;;
 

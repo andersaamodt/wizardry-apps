@@ -399,6 +399,7 @@
     permissionMode: storageGet("artificer.permissionMode", "default"),
     commandExecMode: storageGet("artificer.commandExecMode", "ask-some"),
     githubUsername: storageGet("artificer.githubUsername", ""),
+    llmUseGpu: storageGet("artificer.llmUseGpu", "1") !== "0",
     networkAccess: storageGet("artificer.networkAccess", "0") === "1",
     webAccess: storageGet("artificer.webAccess", "0") === "1",
     agentLoopEnabled: storageGet("artificer.agentLoopEnabled", "1") !== "0",
@@ -775,6 +776,7 @@
     settingsCloseBtn: document.getElementById("settings-close-btn"),
     ghAuthStatus: document.getElementById("gh-auth-status"),
     sshKeyStatus: document.getElementById("ssh-key-status"),
+    llmUseGpuToggle: document.getElementById("llm-use-gpu-toggle"),
     githubUsername: document.getElementById("github-username"),
     sshEmail: document.getElementById("ssh-email"),
     refreshAuthBtn: document.getElementById("refresh-auth-btn"),
@@ -844,6 +846,9 @@
   }
   if (el.githubUsername) {
     el.githubUsername.value = state.githubUsername || "";
+  }
+  if (el.llmUseGpuToggle) {
+    el.llmUseGpuToggle.checked = !!state.llmUseGpu;
   }
 
   var menuById = {
@@ -11571,6 +11576,42 @@
     });
   }
 
+  function loadLlmRuntimeSettings() {
+    return apiGet("llm_runtime_settings_get", {}, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Failed to load LLM runtime settings");
+      }
+      state.llmUseGpu = response.use_gpu !== false;
+      storageSet("artificer.llmUseGpu", state.llmUseGpu ? "1" : "0");
+      if (el.llmUseGpuToggle) {
+        el.llmUseGpuToggle.checked = !!state.llmUseGpu;
+      }
+      return response;
+    }).catch(function () {
+      if (el.llmUseGpuToggle) {
+        el.llmUseGpuToggle.checked = !!state.llmUseGpu;
+      }
+      return null;
+    });
+  }
+
+  function saveLlmRuntimeSettings(useGpuEnabled) {
+    var next = !!useGpuEnabled;
+    return apiPost("llm_runtime_settings_set", {
+      use_gpu: next ? "1" : "0"
+    }, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Failed to save LLM runtime settings");
+      }
+      state.llmUseGpu = response.use_gpu !== false;
+      storageSet("artificer.llmUseGpu", state.llmUseGpu ? "1" : "0");
+      if (el.llmUseGpuToggle) {
+        el.llmUseGpuToggle.checked = !!state.llmUseGpu;
+      }
+      return response;
+    });
+  }
+
   function loadModeRuntimeState() {
     state.modeRuntimeLoading = true;
     return apiGet("mode_runtime_state", {}, { timeoutMs: 12000 })
@@ -12019,6 +12060,9 @@
     renderCommandRulesSettings();
     return Promise.all([
       loadAuthStatus().catch(function () {
+        return null;
+      }),
+      loadLlmRuntimeSettings().catch(function () {
         return null;
       }),
       loadCommandRules(preferredWorkspace).catch(function () {
@@ -15181,6 +15225,23 @@
       on(el.githubUsername, "input", function () {
         state.githubUsername = trim(el.githubUsername.value);
         storageSet("artificer.githubUsername", state.githubUsername);
+      });
+    }
+
+    if (el.llmUseGpuToggle) {
+      on(el.llmUseGpuToggle, "change", function () {
+        var requested = !!el.llmUseGpuToggle.checked;
+        var previous = !!state.llmUseGpu;
+        state.llmUseGpu = requested;
+        storageSet("artificer.llmUseGpu", requested ? "1" : "0");
+        runWithControlPending(el.llmUseGpuToggle, function () {
+          return saveLlmRuntimeSettings(requested);
+        }, { spinner: false }).catch(function (error) {
+          state.llmUseGpu = previous;
+          storageSet("artificer.llmUseGpu", previous ? "1" : "0");
+          el.llmUseGpuToggle.checked = previous;
+          showError(error);
+        });
       });
     }
 

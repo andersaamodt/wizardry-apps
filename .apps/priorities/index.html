@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Priorities</title>
+  <link rel="stylesheet" href="style.css">
+  <link id="priorities-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=priorities20260220a">
+</head>
+<body>
+  <div id="startup-modal" class="startup-modal hidden" role="dialog" aria-modal="true" aria-labelledby="startup-title">
+    <div class="startup-card">
+      <h2 id="startup-title">Choose Priorities Folder</h2>
+      <p>Type a path or browse for the folder containing your priorities.</p>
+      <div class="startup-row">
+        <input id="startup-path" type="text" placeholder="/path/to/folder" spellcheck="false">
+        <button id="startup-browse" type="button">Browse</button>
+      </div>
+      <div class="startup-actions">
+        <button id="startup-open" type="button">Open Folder</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="app">
+    <header class="topbar">
+      <div class="topbar-main">
+        <h1 id="title-folder">Priorities</h1>
+        <button id="drill-up" class="drill-up hidden" type="button" title="Up one level" aria-label="Up one level">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7.5a2 2 0 0 1 2-2h4l1.5 2H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M12 15V10M12 10l-2 2M12 10l2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="right-tools">
+          <div class="dock-toolbar" role="group" aria-label="Window position">
+            <button id="dock-left" class="corner-dock" type="button" title="Move to top-left corner" aria-label="Move to top-left corner">◀</button>
+            <button id="dock-center" class="corner-dock corner-dock-center" type="button" title="Move to top-center" aria-label="Move to top-center">•</button>
+            <button id="dock-right" class="corner-dock" type="button" title="Move to top-right corner" aria-label="Move to top-right corner">▶</button>
+          </div>
+          <button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false" title="Settings">
+            <img src="assets/settings-gear.svg" alt="Settings">
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <section id="settings-panel" class="settings-panel hidden popover" aria-label="Settings">
+      <div class="settings-row">
+        <label for="root-dir">Folder</label>
+        <div class="root-row">
+          <input id="root-dir" type="text" value="." spellcheck="false">
+          <button id="browse" type="button">Browse</button>
+          <button id="refresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <label for="theme-picker-btn">Theme</label>
+        <div class="menu-anchor">
+          <button id="theme-picker-btn" type="button" class="theme-picker-btn" aria-haspopup="menu" aria-expanded="false">Psionic</button>
+          <div id="theme-picker-menu" class="floating-menu hidden" role="menu" aria-label="Theme selector">
+            <div id="theme-picker-list" class="menu-list"></div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-row">
+        <label for="text-size-value">Scale</label>
+        <div class="text-size-row">
+          <div class="scale-stepper" role="group" aria-label="Scale">
+            <button id="text-size-decrease" type="button" class="scale-btn" title="Decrease scale" aria-label="Decrease scale">−</button>
+            <span id="text-size-value" class="text-size-value">100%</span>
+            <button id="text-size-increase" type="button" class="scale-btn" title="Increase scale" aria-label="Increase scale">+</button>
+          </div>
+          <button id="text-size-reset" type="button" class="scale-reset" title="Reset scale">Reset</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="loading-overlay" class="loading-overlay hidden" aria-hidden="true">
+      <div class="loading-card">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span class="loading-text">Loading...</span>
+      </div>
+    </div>
+
+    <div id="status" class="status"></div>
+    <div id="tree" class="tree" aria-live="polite"></div>
+  </main>
+
+  <script>
+    (function loadBridge() {
+      var candidates = [
+        './.host/shared/wizardry-bridge.js',
+        '../.host/shared/wizardry-bridge.js',
+        '../../.host/shared/wizardry-bridge.js'
+      ];
+      var i = 0;
+      function tryNext() {
+        if (i >= candidates.length) {
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = candidates[i++];
+        s.onerror = tryNext;
+        document.head.appendChild(s);
+      }
+      tryNext();
+    })();
+  </script>
+
+  <script>
+    var THEME_KEY = 'wizardry.priorities.theme';
+    var UI_SCALE_KEY = 'wizardry.priorities.uiScale';
+    var TEXT_SCALE_KEY = 'wizardry.priorities.textScale';
+    var THEME_ASSET_VERSION = 'priorities20260220a';
+
+    var state = {
+      root: '.',
+      expanded: Object.create(null),
+      cache: Object.create(null),
+      pendingNextAction: Object.create(null),
+      busy: false,
+      pendingPrioritizePath: '',
+      pendingCheckPath: '',
+      pendingExpandPath: '',
+      pendingAdd: false,
+      pendingMakeProjectPath: '',
+      revealedMakeProjectPath: '',
+      openMenuPath: '',
+      editingPath: '',
+      pendingRenamePath: '',
+      pendingAddText: '',
+      previewRefreshTimer: null,
+      uiScale: 1,
+      drillStack: [],
+      rowClickTimer: null,
+      themes: [
+        'adept', 'alchemist', 'archmage', 'chronomancer', 'conjurer', 'druid',
+        'empath', 'enchanter', 'geomancer', 'hermeticist', 'hierophant', 'illusionist',
+        'lich', 'necromancer', 'psionic', 'pyromancer', 'seer', 'shaman', 'sorcerer', 'sorceress',
+        'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet', 'warlock', 'wizard'
+      ],
+      activeTheme: '',
+      themeHotkeysEnabled: false,
+      dockState: 'none',
+      dockPollTimer: null,
+      backendScriptPath: '',
+      dragReorder: null
+    };
+
+    function loadStorage(key) {
+      try {
+        return window.localStorage.getItem(key) || '';
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function saveStorage(key, value) {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (_) {
+        // Ignore storage failures.
+      }
+    }
+
+    function clampTextScale(value) {
+      var n = Number(value);
+      if (!Number.isFinite(n)) {
+        return 1;
+      }
+      if (n < 0.8) {
+        return 0.8;
+      }
+      if (n > 1.6) {
+        return 1.6;
+      }
+      return Math.round(n * 100) / 100;
+    }
+
+    function updateTextSizeDisplays() {
+      var percent = Math.round(state.uiScale * 100) + '%';
+      var el = document.getElementById('text-size-value');
+      if (el) {
+        el.textContent = percent;
+      }
+    }
+
+    function applyTextScale(nextScale) {
+      state.uiScale = clampTextScale(nextScale);
+      saveStorage(UI_SCALE_KEY, String(state.uiScale));
+      saveStorage(TEXT_SCALE_KEY, String(state.uiScale));
+      document.documentElement.style.setProperty('--ui-scale', String(state.uiScale));
+      document.documentElement.style.setProperty('--text-scale', String(state.uiScale));
+      updateTextSizeDisplays();
+    }
+
+    function increaseTextScale() {
+      applyTextScale(state.uiScale + 0.1);
+    }
+
+    function decreaseTextScale() {
+      applyTextScale(state.uiScale - 0.1);
+    }
+
+    function resetTextScale() {
+      applyTextScale(1);
+    }
+
+    function hasBridge() {
+      return !!(window.wizardry && typeof window.wizardry.rpc === 'function');
+    }
+
+    async function waitForBridge(timeoutMs) {
+      var start = Date.now();
+      while (!hasBridge()) {
+        if (Date.now() - start > (timeoutMs || 4000)) {
+          throw new Error('wizardry bridge unavailable; run this app in the native host');
+        }
+        await new Promise(function (resolve) { setTimeout(resolve, 50); });
+      }
+    }
+
+    async function bridgeExec(argv) {
+      await waitForBridge(4000);
+      var res = await window.wizardry.rpc('bridge.exec', { argv: argv });
+      var code = Number(res && res.exit_code);
+      if (!Number.isFinite(code) || code === 0) {
+        return res || {};
+      }
+      var stderr = String((res && res.stderr) || '').trim();
+      var stdout = String((res && res.stdout) || '').trim();
+      throw new Error(stderr || stdout || ('exit ' + code));
+    }
+
+    async function requestWindowShape() {
+      try {
+        var width = 420;
+        var height = 640;
+        await bridgeExec(['__wizardry_host_resize', String(width), String(height)]);
+        await bridgeExec(['__wizardry_host_pin_top']);
+        await bridgeExec(['__wizardry_host_center_x']);
+        await refreshDockState();
+      } catch (_) {
+        // Ignore host resize errors.
+      }
+    }
+
+    async function dockWindow(side) {
+      try {
+        if (side === 'left') {
+          await bridgeExec(['__wizardry_host_snap_top_left']);
+        } else if (side === 'center') {
+          await bridgeExec(['__wizardry_host_pin_top']);
+          await bridgeExec(['__wizardry_host_center_x']);
+        } else if (side === 'right') {
+          await bridgeExec(['__wizardry_host_snap_top_right']);
+        }
+        await refreshDockState();
+        return;
+      } catch (_) {
+        // Fallback for older hosts: at least pin to top.
+      }
+      try {
+        await bridgeExec(['__wizardry_host_pin_top']);
+        await refreshDockState();
+      } catch (error) {
+        status('Window docking requires updated mac host build.', true);
+      }
+    }
+
+    function setDockButtonsDisabled(activeDock) {
+      var left = document.getElementById('dock-left');
+      var center = document.getElementById('dock-center');
+      var right = document.getElementById('dock-right');
+      if (!left || !center || !right) {
+        return;
+      }
+      left.disabled = false;
+      center.disabled = false;
+      right.disabled = false;
+      left.classList.toggle('snap-active-hidden', activeDock === 'left');
+      center.classList.toggle('snap-active-hidden', activeDock === 'center');
+      right.classList.toggle('snap-active-hidden', activeDock === 'right');
+    }
+
+    async function refreshDockState() {
+      try {
+        var result = await bridgeExec(['__wizardry_host_snap_state']);
+        var stateText = String((result && result.stdout) || '').trim();
+        if (stateText !== 'left' && stateText !== 'center' && stateText !== 'right') {
+          stateText = 'none';
+        }
+        state.dockState = stateText;
+        setDockButtonsDisabled(stateText);
+      } catch (_) {
+        state.dockState = 'none';
+        setDockButtonsDisabled('none');
+      }
+    }
+
+    function status(text, isError) {
+      var el = document.getElementById('status');
+      el.textContent = text;
+      el.classList.toggle('error', !!isError);
+    }
+
+    function setLoadingOverlay(visible) {
+      var el = document.getElementById('loading-overlay');
+      if (!el) {
+        return;
+      }
+      if (visible) {
+        if (el._hideTimer) {
+          clearTimeout(el._hideTimer);
+          el._hideTimer = null;
+        }
+        el.classList.remove('hidden');
+        el.classList.add('visible');
+        el.classList.remove('fading-out');
+        el.setAttribute('aria-hidden', 'false');
+        return;
+      }
+      if (el.classList.contains('hidden')) {
+        return;
+      }
+      el.classList.remove('visible');
+      el.classList.add('fading-out');
+      el.setAttribute('aria-hidden', 'true');
+      el._hideTimer = setTimeout(function () {
+        el.classList.add('hidden');
+        el.classList.remove('fading-out');
+        el._hideTimer = null;
+      }, 220);
+    }
+
+    function rootInputValue() {
+      return String(document.getElementById('root-dir').value || '.').trim() || '.';
+    }
+
+    function folderNameFromPath(path) {
+      var p = String(path || '').replace(/\/+$/, '');
+      if (!p || p === '.') {
+        return '.';
+      }
+      if (p === '/') {
+        return '/';
+      }
+      var slash = p.lastIndexOf('/');
+      if (slash < 0) {
+        return p;
+      }
+      return p.slice(slash + 1) || '/';
+    }
+
+    function parentDirOfPath(path) {
+      var p = String(path || '').replace(/\/+$/, '');
+      if (!p || p === '.') {
+        return '.';
+      }
+      if (p === '/') {
+        return '/';
+      }
+      var slash = p.lastIndexOf('/');
+      if (slash < 0) {
+        return '.';
+      }
+      if (slash === 0) {
+        return '/';
+      }
+      return p.slice(0, slash);
+    }
+
+    function updateTitleFromRoot() {
+      var el = document.getElementById('title-folder');
+      if (!el) {
+        return;
+      }
+      el.textContent = folderNameFromPath(rootInputValue());
+    }
+
+    async function runBackend(args) {
+      var argv;
+      if (!state.backendScriptPath) {
+        try {
+          var pagePath = decodeURIComponent(String(window.location && window.location.pathname ? window.location.pathname : ''));
+          var marker = '/.apps/priorities/';
+          var idx = pagePath.lastIndexOf(marker);
+          if (idx > 0) {
+            state.backendScriptPath = pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh';
+          }
+        } catch (_) {
+          state.backendScriptPath = '';
+        }
+      }
+      if (state.backendScriptPath) {
+        argv = ['sh', state.backendScriptPath].concat(args);
+      } else {
+        argv = [
+          'sh',
+          '-c',
+          'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/.apps/priorities/scripts/priorities-backend.sh" "$@"',
+          'priorities-backend'
+        ].concat(args);
+      }
+      return bridgeExec(argv);
+    }
+
+    function parseListOutput(text) {
+      var out = [];
+      var lines = String(text || '').split('\n');
+      for (var i = 0; i < lines.length; i += 1) {
+        if (!lines[i]) {
+          continue;
+        }
+        var fields = lines[i].split('\t');
+        if (fields.length < 8) {
+          continue;
+        }
+        out.push({
+          path: fields[0],
+          name: fields[1],
+          kind: fields[2],
+          echelon: Number(fields[3]) || 0,
+          priority: Number(fields[4]) || 0,
+          checked: Number(fields[5]) || 0,
+          upvotes: Number(fields[6]) || 0,
+          hasSubpriorities: Number(fields[7]) === 1
+        });
+      }
+      return out;
+    }
+
+    async function listDir(dir) {
+      var result = await runBackend(['list', dir]);
+      return parseListOutput(result && result.stdout);
+    }
+
+    function hydrateCachedDirFromResult(dir, result) {
+      if (!dir) {
+        return;
+      }
+      state.cache[dir] = parseListOutput(result && result.stdout);
+    }
+
+    function getNextActionLabel(path) {
+      var items = state.cache[path];
+      if (!items || !items.length) {
+        return '';
+      }
+      var next = null;
+      for (var i = 0; i < items.length; i += 1) {
+        if (items[i].checked !== 1) {
+          next = items[i];
+          break;
+        }
+      }
+      if (!next) {
+        next = items[0];
+      }
+      return next ? (next.name + (next.kind === 'dir' ? '/' : '')) : '';
+    }
+
+    function prefetchNextAction(path) {
+      if (!path || state.cache[path] || state.pendingNextAction[path]) {
+        return;
+      }
+      state.pendingNextAction[path] = true;
+      listDir(path).then(function (items) {
+        state.cache[path] = items;
+      }).catch(function () {
+        // Ignore preview prefetch failures.
+      }).finally(function () {
+        delete state.pendingNextAction[path];
+        schedulePreviewRefresh();
+      });
+    }
+
+    function schedulePreviewRefresh() {
+      if (state.previewRefreshTimer) {
+        return;
+      }
+      state.previewRefreshTimer = setTimeout(function () {
+        state.previewRefreshTimer = null;
+        render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+      }, 90);
+    }
+
+    function captureTreeInputSelection() {
+      var active = document.activeElement;
+      if (!active) {
+        return null;
+      }
+      if (!(active.classList && active.classList.contains('add-inline-input'))) {
+        return null;
+      }
+      return {
+        kind: 'add-inline-input',
+        start: Number(active.selectionStart),
+        end: Number(active.selectionEnd),
+        direction: active.selectionDirection || 'none'
+      };
+    }
+
+    function restoreTreeInputSelection(snapshot) {
+      if (!snapshot || snapshot.kind !== 'add-inline-input') {
+        return;
+      }
+      var input = treeEl().querySelector('.add-inline-input');
+      if (!input || input.disabled) {
+        return;
+      }
+      input.focus();
+      var valueLen = String(input.value || '').length;
+      var start = Number.isFinite(snapshot.start) ? Math.max(0, Math.min(valueLen, snapshot.start)) : valueLen;
+      var end = Number.isFinite(snapshot.end) ? Math.max(0, Math.min(valueLen, snapshot.end)) : start;
+      try {
+        input.setSelectionRange(start, end, snapshot.direction);
+      } catch (_) {
+        // Ignore selection restore failures.
+      }
+    }
+
+    function indent(depth) {
+      return String(depth * 18) + 'px';
+    }
+
+    function treeEl() {
+      return document.getElementById('tree');
+    }
+
+    function invalidateCachedDirs(dirs) {
+      if (!dirs || !dirs.length) {
+        return;
+      }
+      for (var i = 0; i < dirs.length; i += 1) {
+        var dir = String(dirs[i] || '').trim();
+        if (!dir) {
+          continue;
+        }
+        delete state.cache[dir];
+      }
+    }
+
+    function captureRowPositions() {
+      var map = {};
+      var rows = treeEl().querySelectorAll('.row[data-path]');
+      for (var i = 0; i < rows.length; i += 1) {
+        var row = rows[i];
+        map[row.getAttribute('data-path')] = row.getBoundingClientRect().top;
+      }
+      return map;
+    }
+
+    function animateRowReorder(previousPositions) {
+      if (!previousPositions) {
+        return;
+      }
+      var rows = treeEl().querySelectorAll('.row[data-path]');
+      var moved = [];
+      for (var i = 0; i < rows.length; i += 1) {
+        var row = rows[i];
+        var key = row.getAttribute('data-path');
+        if (!key || typeof previousPositions[key] !== 'number') {
+          continue;
+        }
+        var nextTop = row.getBoundingClientRect().top;
+        var deltaY = previousPositions[key] - nextTop;
+        if (Math.abs(deltaY) < 1) {
+          continue;
+        }
+        row.style.willChange = 'transform';
+        row.style.transition = 'none';
+        row.style.transform = 'translateY(' + deltaY + 'px)';
+        moved.push(row);
+      }
+      if (!moved.length) {
+        return;
+      }
+      // Force styles to apply before transitioning back to natural position.
+      treeEl().getBoundingClientRect();
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          for (var j = 0; j < moved.length; j += 1) {
+            var movedRow = moved[j];
+            movedRow.style.transition = 'transform 260ms cubic-bezier(0.2, 0.75, 0.2, 1)';
+            movedRow.style.transform = 'translateY(0)';
+            movedRow.addEventListener('transitionend', function onEnd() {
+              this.style.transition = '';
+              this.style.transform = '';
+              this.style.willChange = '';
+              this.removeEventListener('transitionend', onEnd);
+            });
+          }
+        });
+      });
+      setTimeout(function () {
+        for (var k = 0; k < moved.length; k += 1) {
+          var movedRow = moved[k];
+          movedRow.style.transition = '';
+          movedRow.style.transform = '';
+          movedRow.style.willChange = '';
+        }
+      }, 360);
+    }
+
+    function sameOrderedValues(a, b) {
+      if (!a || !b || a.length !== b.length) {
+        return false;
+      }
+      for (var i = 0; i < a.length; i += 1) {
+        if (a[i] !== b[i]) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function updateQueueDragPosition(pointerY) {
+      var drag = state.dragReorder;
+      if (!drag) {
+        return;
+      }
+
+      drag.row.style.top = Math.round(pointerY - drag.pointerOffsetY) + 'px';
+
+      var selector = '.row.row-root[data-path][data-echelon="' + drag.echelon + '"]';
+      var rows = drag.container.querySelectorAll(selector);
+      var before = null;
+      for (var i = 0; i < rows.length; i += 1) {
+        var candidate = rows[i];
+        if (candidate === drag.row) {
+          continue;
+        }
+        var rect = candidate.getBoundingClientRect();
+        if (pointerY < rect.top + (rect.height / 2)) {
+          before = candidate;
+          break;
+        }
+      }
+      if (before) {
+        drag.container.insertBefore(drag.placeholder, before);
+      } else {
+        drag.container.appendChild(drag.placeholder);
+      }
+
+      var edge = 48;
+      var scrollStep = 14;
+      if (pointerY < edge) {
+        window.scrollBy(0, -scrollStep);
+      } else if (pointerY > window.innerHeight - edge) {
+        window.scrollBy(0, scrollStep);
+      }
+    }
+
+    function onQueueDragPointerMove(event) {
+      var drag = state.dragReorder;
+      if (!drag) {
+        return;
+      }
+      event.preventDefault();
+      var pointerY = Number(event.clientY);
+      if (!Number.isFinite(pointerY)) {
+        return;
+      }
+      if (drag.rafId) {
+        drag.pendingPointerY = pointerY;
+        return;
+      }
+      drag.rafId = requestAnimationFrame(function () {
+        drag.rafId = 0;
+        var y = Number.isFinite(drag.pendingPointerY) ? drag.pendingPointerY : pointerY;
+        drag.pendingPointerY = null;
+        updateQueueDragPosition(y);
+      });
+    }
+
+    function actReorderEchelon(dir, echelon, orderedPaths) {
+      if (state.busy || !dir || !orderedPaths || orderedPaths.length < 2) {
+        return;
+      }
+      runAction(function () {
+        var args = ['set-order-fast', dir, String(echelon)].concat(orderedPaths);
+        return runBackend(args).then(function (result) {
+          hydrateCachedDirFromResult(dir, result);
+        });
+      }, {
+        animateReorder: true,
+        suppressLoadingOverlay: true
+      });
+    }
+
+    function finishQueueDrag(cancelDrop) {
+      var drag = state.dragReorder;
+      if (!drag) {
+        return;
+      }
+      state.dragReorder = null;
+
+      window.removeEventListener('pointermove', onQueueDragPointerMove);
+      window.removeEventListener('pointerup', onQueueDragPointerUp);
+      window.removeEventListener('pointercancel', onQueueDragPointerCancel);
+      document.body.classList.remove('row-drag-active');
+
+      if (drag.rafId) {
+        cancelAnimationFrame(drag.rafId);
+      }
+
+      if (drag.placeholder && drag.placeholder.parentNode) {
+        drag.container.insertBefore(drag.row, drag.placeholder);
+        drag.placeholder.parentNode.removeChild(drag.placeholder);
+      }
+
+      drag.row.classList.remove('row-dragging');
+      drag.row.style.position = '';
+      drag.row.style.left = '';
+      drag.row.style.top = '';
+      drag.row.style.width = '';
+      drag.row.style.height = '';
+      drag.row.style.zIndex = '';
+      drag.row.style.pointerEvents = '';
+      drag.row.style.transform = '';
+
+      if (cancelDrop) {
+        return;
+      }
+
+      var selector = '.row.row-root[data-path][data-echelon="' + drag.echelon + '"]';
+      var rows = drag.container.querySelectorAll(selector);
+      var nextOrder = [];
+      for (var i = 0; i < rows.length; i += 1) {
+        nextOrder.push(rows[i].getAttribute('data-path'));
+      }
+      if (!sameOrderedValues(drag.initialOrder, nextOrder)) {
+        actReorderEchelon(drag.parentDir, drag.echelon, nextOrder);
+      }
+    }
+
+    function onQueueDragPointerUp() {
+      finishQueueDrag(false);
+    }
+
+    function onQueueDragPointerCancel() {
+      finishQueueDrag(true);
+    }
+
+    function startQueueReorderDrag(event, row, item, depth) {
+      if (!event || event.button !== 0 || depth !== 0 || state.busy || state.dragReorder) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+
+      var container = row && row.parentElement;
+      if (!container || !item || !item.path) {
+        return;
+      }
+
+      var echelon = Number(item.echelon);
+      if (!Number.isFinite(echelon)) {
+        return;
+      }
+
+      var selector = '.row.row-root[data-path][data-echelon="' + echelon + '"]';
+      var rows = container.querySelectorAll(selector);
+      if (!rows || rows.length < 2) {
+        return;
+      }
+
+      var initialOrder = [];
+      for (var i = 0; i < rows.length; i += 1) {
+        initialOrder.push(rows[i].getAttribute('data-path'));
+      }
+
+      var rowRect = row.getBoundingClientRect();
+      var placeholder = document.createElement('div');
+      placeholder.className = 'row row-root row-drag-placeholder';
+      placeholder.style.height = rowRect.height + 'px';
+
+      container.insertBefore(placeholder, row.nextSibling);
+
+      row.classList.add('row-dragging');
+      row.style.position = 'fixed';
+      row.style.left = rowRect.left + 'px';
+      row.style.top = rowRect.top + 'px';
+      row.style.width = rowRect.width + 'px';
+      row.style.height = rowRect.height + 'px';
+      row.style.zIndex = '1200';
+      row.style.pointerEvents = 'none';
+
+      document.body.classList.add('row-drag-active');
+
+      state.dragReorder = {
+        row: row,
+        container: container,
+        placeholder: placeholder,
+        echelon: String(echelon),
+        parentDir: parentDirOfPath(item.path),
+        initialOrder: initialOrder,
+        pointerOffsetY: Math.max(0, event.clientY - rowRect.top),
+        pendingPointerY: null,
+        rafId: 0
+      };
+
+      window.addEventListener('pointermove', onQueueDragPointerMove);
+      window.addEventListener('pointerup', onQueueDragPointerUp);
+      window.addEventListener('pointercancel', onQueueDragPointerCancel);
+      updateQueueDragPosition(event.clientY);
+    }
+
+    function themeLabel(name) {
+      var value = String(name || '').replace(/[-_]+/g, ' ').trim();
+      if (!value) {
+        return 'Theme';
+      }
+      return value.charAt(0).toUpperCase() + value.slice(1);
+    }
+
+    function renderThemePicker() {
+      var list = document.getElementById('theme-picker-list');
+      var button = document.getElementById('theme-picker-btn');
+      if (!list || !button) {
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < state.themes.length; i += 1) {
+        var theme = state.themes[i];
+        var active = theme === state.activeTheme ? ' active' : '';
+        html += "<button type='button' class='theme-item" + active + "' data-theme-name='" + theme + "'>" + themeLabel(theme) + "</button>";
+      }
+      list.innerHTML = html;
+      button.textContent = themeLabel(state.activeTheme);
+    }
+
+    function applyTheme(themeName) {
+      var normalized = String(themeName || '').toLowerCase().trim();
+      if (!/^[a-z0-9_-]+$/.test(normalized) || state.themes.indexOf(normalized) < 0) {
+        normalized = 'psionic';
+      }
+      state.activeTheme = normalized;
+      saveStorage(THEME_KEY, normalized);
+      var stylesheet = document.getElementById('priorities-theme-stylesheet');
+      if (stylesheet) {
+        stylesheet.href = 'themes/' + normalized + '.css?v=' + THEME_ASSET_VERSION;
+      }
+      renderThemePicker();
+    }
+
+    function cycleTheme(step) {
+      var total = state.themes.length;
+      if (!total) {
+        return;
+      }
+      var current = state.themes.indexOf(state.activeTheme);
+      if (current < 0) {
+        current = 0;
+      }
+      var next = (current + step + total) % total;
+      applyTheme(state.themes[next]);
+    }
+
+    function isThemePickerOpen() {
+      var menu = document.getElementById('theme-picker-menu');
+      return !!(menu && !menu.classList.contains('hidden'));
+    }
+
+    function closeThemePickerMenu() {
+      var menu = document.getElementById('theme-picker-menu');
+      var button = document.getElementById('theme-picker-btn');
+      if (!menu || !button) {
+        return;
+      }
+      menu.classList.add('hidden');
+      button.setAttribute('aria-expanded', 'false');
+    }
+
+    function openThemePickerMenu() {
+      var menu = document.getElementById('theme-picker-menu');
+      var button = document.getElementById('theme-picker-btn');
+      if (!menu || !button) {
+        return;
+      }
+      menu.classList.remove('hidden');
+      button.setAttribute('aria-expanded', 'true');
+    }
+
+    function isTypingContext(target) {
+      if (!target) {
+        return false;
+      }
+      var tag = String(target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+        return true;
+      }
+      return !!target.isContentEditable;
+    }
+
+    function bindStandardTextboxBehavior(input) {
+      if (!input || input._prioritiesTextboxBound) {
+        return;
+      }
+      input._prioritiesTextboxBound = true;
+      input.addEventListener('keydown', function (event) {
+        var key = String(event.key || '').toLowerCase();
+        if ((event.metaKey || event.ctrlKey) && key === 'a') {
+          event.preventDefault();
+          event.stopPropagation();
+          input.select();
+          return;
+        }
+        event.stopPropagation();
+      });
+      input.addEventListener('click', function (event) {
+        event.stopPropagation();
+      });
+      input.addEventListener('mousedown', function (event) {
+        event.stopPropagation();
+      });
+    }
+
+    function makeButton(label, className, onClick, title) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.className = className;
+      if (title) {
+        b.title = title;
+      }
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    function setPrioritizeButtonBusy(button, busy) {
+      if (!button) {
+        return;
+      }
+      if (busy) {
+        button.classList.add('loading');
+        button.setAttribute('aria-busy', 'true');
+        button.setAttribute('aria-label', 'Prioritizing');
+        button.disabled = true;
+        button.textContent = '';
+      } else {
+        button.classList.remove('loading');
+        button.removeAttribute('aria-busy');
+        button.setAttribute('aria-label', 'Prioritize');
+        button.disabled = false;
+        button.textContent = '⬆';
+      }
+    }
+
+    function setExpandButtonBusy(button, busy) {
+      if (!button) {
+        return;
+      }
+      if (busy) {
+        button.classList.add('loading');
+        button.setAttribute('aria-busy', 'true');
+        button.setAttribute('aria-label', 'Loading subpriorities');
+        button.disabled = true;
+        button.textContent = '';
+      } else {
+        button.classList.remove('loading');
+        button.removeAttribute('aria-busy');
+        button.disabled = false;
+      }
+    }
+
+    function startRename(path, currentName) {
+      if (!path || state.pendingRenamePath) {
+        return;
+      }
+      state.openMenuPath = '';
+      state.editingPath = path;
+      render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+    }
+
+    function findPrioritizeButtonForPath(path) {
+      var rows = treeEl().querySelectorAll('.row');
+      for (var i = 0; i < rows.length; i += 1) {
+        if (rows[i].getAttribute('data-path') === path) {
+          return rows[i].querySelector('.btn.pri');
+        }
+      }
+      return null;
+    }
+
+    function buildRow(item, depth, edgeClass, options) {
+      options = options || {};
+      var row = document.createElement('div');
+      row.className = 'row';
+      if (depth > 0) {
+        row.classList.add('row-subtask');
+      } else {
+        row.classList.add('row-root');
+      }
+      if (edgeClass) {
+        row.classList.add(edgeClass);
+      }
+      if (item.hasSubpriorities && depth === 0) {
+        row.classList.add('row-project');
+      }
+      if (options.highlightFirstRow && !item.hasSubpriorities) {
+        row.classList.add('row-first-task');
+      }
+      if (item.hasSubpriorities && item.checked !== 1) {
+        row.classList.add('row-project-unchecked');
+      }
+      row.setAttribute('data-path', item.path);
+      row.setAttribute('data-echelon', String(item.echelon));
+      row.style.paddingLeft = indent(depth);
+
+      var prioritizeBtn = makeButton('⋮⋮', 'btn pri', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }, 'Drag to reorder');
+      prioritizeBtn.setAttribute('aria-label', 'Drag to reorder');
+      prioritizeBtn.addEventListener('pointerdown', function (event) {
+        startQueueReorderDrag(event, row, item, depth);
+      });
+      row.appendChild(prioritizeBtn);
+
+      var left = document.createElement('div');
+      left.className = 'left';
+
+      if (item.kind === 'dir') {
+        var hasChildren = item.hasSubpriorities;
+        var open = !!state.expanded[item.path];
+        var useProjectSlotTriangle = item.hasSubpriorities && item.checked !== 1;
+        var expandLoading = state.pendingExpandPath === item.path;
+        if (useProjectSlotTriangle) {
+          var expPlaceholderProject = document.createElement('span');
+          expPlaceholderProject.className = 'exp-placeholder exp-placeholder-collapsed';
+          expPlaceholderProject.setAttribute('aria-hidden', 'true');
+          left.appendChild(expPlaceholderProject);
+        } else {
+          var expand = makeButton(hasChildren ? (open ? '▾' : '▸') : '·', 'btn exp', function () {
+            // Row click handles toggling; this keeps the symbol as a visual affordance.
+          }, hasChildren ? 'Expand/collapse' : '');
+          if (expandLoading) {
+            setExpandButtonBusy(expand, true);
+          } else if (!hasChildren) {
+            expand.disabled = true;
+          }
+          left.appendChild(expand);
+        }
+      } else {
+        var expPlaceholder = document.createElement('span');
+        expPlaceholder.className = 'exp-placeholder';
+        expPlaceholder.setAttribute('aria-hidden', 'true');
+        left.appendChild(expPlaceholder);
+      }
+
+      var checkSlot = document.createElement('span');
+      checkSlot.className = 'check-slot';
+      if (item.hasSubpriorities) {
+        checkSlot.classList.add('project-slot');
+        if (state.expanded[item.path]) {
+          checkSlot.classList.add('project-open');
+        }
+      }
+
+      var checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'chk';
+      checkbox.checked = item.checked === 1;
+      checkbox.title = checkbox.checked ? 'Uncheck' : 'Check';
+      if (state.pendingCheckPath === item.path) {
+        checkbox.disabled = true;
+        checkbox.classList.add('loading');
+        checkSlot.classList.add('loading');
+      }
+      checkbox.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        actToggleChecked(item.path);
+      });
+      checkSlot.appendChild(checkbox);
+
+      left.appendChild(checkSlot);
+
+      if (item.hasSubpriorities && !state.cache[item.path] && !state.pendingNextAction[item.path]) {
+        prefetchNextAction(item.path);
+      }
+
+      var nameStack = document.createElement('div');
+      nameStack.className = 'name-stack';
+
+      var name = document.createElement('span');
+      name.className = 'name';
+      if (state.editingPath === item.path) {
+        var edit = document.createElement('input');
+        edit.type = 'text';
+        edit.className = 'name-edit';
+        edit.value = item.name;
+        edit.disabled = state.pendingRenamePath === item.path;
+        bindStandardTextboxBehavior(edit);
+        setTimeout(function () {
+          try {
+            edit.focus();
+            edit.select();
+          } catch (_) {
+            // Ignore focus failures.
+          }
+        }, 0);
+        var done = false;
+        var commit = function () {
+          if (done) {
+            return;
+          }
+          done = true;
+          var nextName = String(edit.value || '').trim();
+          if (!nextName || nextName === item.name) {
+            state.editingPath = '';
+            render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+            return;
+          }
+          actRename(item.path, nextName);
+        };
+        var cancel = function () {
+          if (done) {
+            return;
+          }
+          done = true;
+          state.editingPath = '';
+          render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        };
+        edit.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+            return;
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            cancel();
+          }
+        });
+        edit.addEventListener('blur', function () {
+          commit();
+        });
+        nameStack.appendChild(edit);
+      } else {
+        name.textContent = item.name + (item.kind === 'dir' && !item.hasSubpriorities ? '/' : '');
+        if (!item.hasSubpriorities) {
+          name.classList.add('editable-name');
+          name.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            startRename(item.path, item.name);
+          });
+        }
+        nameStack.appendChild(name);
+      }
+
+      if (item.hasSubpriorities) {
+        var nextActionText = getNextActionLabel(item.path);
+        if (nextActionText) {
+          var nextAction = document.createElement('span');
+          nextAction.className = 'next-action';
+          if (options.highlightFirstNextActionPill) {
+            nextAction.classList.add('next-action-first-pill');
+          }
+          nextAction.textContent = '➜ ' + nextActionText;
+          nameStack.appendChild(nextAction);
+        }
+      }
+      left.appendChild(nameStack);
+
+      var right = document.createElement('div');
+      right.className = 'right';
+
+      if (item.hasSubpriorities) {
+        var menuBtn = document.createElement('button');
+        menuBtn.type = 'button';
+        menuBtn.className = 'btn more';
+        menuBtn.title = 'Actions';
+        menuBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2.3"/><circle cx="12" cy="12" r="2.3"/><circle cx="12" cy="19" r="2.3"/></svg>';
+        menuBtn.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          state.openMenuPath = state.openMenuPath === item.path ? '' : item.path;
+          render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        });
+        right.appendChild(menuBtn);
+
+        if (state.openMenuPath === item.path) {
+          var menu = document.createElement('div');
+          menu.className = 'row-menu';
+          var renameItem = document.createElement('button');
+          renameItem.type = 'button';
+          renameItem.className = 'row-menu-item';
+          renameItem.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16v4zM13 7l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Rename</span>';
+          renameItem.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            state.openMenuPath = '';
+            startRename(item.path, item.name);
+          });
+          menu.appendChild(renameItem);
+
+          var deleteItem = document.createElement('button');
+          deleteItem.type = 'button';
+          deleteItem.className = 'row-menu-item danger';
+          deleteItem.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.74 9l-.35 9m-4.78 0L9.26 9m9.97-3.21c.34.05.68.1 1.02.16M4.77 5.79c.34-.06.68-.11 1.02-.16m0 0L6.85 19.67A2 2 0 0 0 8.84 21h6.32a2 2 0 0 0 1.99-1.83l1.06-13.54M5.79 5.63A48.1 48.1 0 0 1 12 5c2.12 0 4.2.14 6.21.41m-9.13 0V4.04A2 2 0 0 1 11.08 2h1.84a2 2 0 0 1 2 2.04v1.37" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Delete</span>';
+          deleteItem.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            state.openMenuPath = '';
+            actRemove(item.path);
+          });
+          menu.appendChild(deleteItem);
+          right.appendChild(menu);
+        }
+      } else {
+        var trash = document.createElement('button');
+        trash.type = 'button';
+        trash.className = 'btn trash';
+        trash.title = 'Delete';
+        trash.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.35 9m-4.78 0L9.26 9m9.97-3.21c.34.05.68.1 1.02.16M4.77 5.79c.34-.06.68-.11 1.02-.16m0 0L6.85 19.67A2 2 0 0 0 8.84 21h6.32a2 2 0 0 0 1.99-1.83l1.06-13.54M5.79 5.63A48.1 48.1 0 0 1 12 5c2.12 0 4.2.14 6.21.41m-9.13 0V4.04A2 2 0 0 1 11.08 2h1.84a2 2 0 0 1 2 2.04v1.37"/></svg>';
+        trash.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          actRemove(item.path);
+        });
+        right.appendChild(trash);
+      }
+
+      if (item.kind === 'dir') {
+        row.addEventListener('click', function (event) {
+          if (event.target.closest('.btn.pri')) {
+            return;
+          }
+          if (event.target.closest('.chk')) {
+            return;
+          }
+          if (event.target.closest('.btn.more') || event.target.closest('.btn.trash') || event.target.closest('.row-menu')) {
+            return;
+          }
+          if (!item.hasSubpriorities) {
+            return;
+          }
+          if (state.rowClickTimer) {
+            clearTimeout(state.rowClickTimer);
+            state.rowClickTimer = null;
+          }
+          state.rowClickTimer = setTimeout(function () {
+            var wasOpen = !!state.expanded[item.path];
+            var willOpen = !wasOpen;
+            if (willOpen && !state.cache[item.path]) {
+              expandWithSpinner(item.path);
+            } else {
+              state.expanded[item.path] = willOpen;
+              render();
+            }
+            state.rowClickTimer = null;
+          }, 220);
+        });
+        row.addEventListener('dblclick', function (event) {
+          if (event.target.closest('.btn')) {
+            return;
+          }
+          if (state.rowClickTimer) {
+            clearTimeout(state.rowClickTimer);
+            state.rowClickTimer = null;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          drillInto(item.path);
+        });
+      } else {
+        row.addEventListener('dblclick', function (event) {
+          if (event.target.closest('.btn') || event.target.closest('.chk') || event.target.closest('input')) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          state.revealedMakeProjectPath = (state.revealedMakeProjectPath === item.path) ? '' : item.path;
+          render({ suppressLoadingOverlay: true });
+        });
+      }
+
+      row.appendChild(left);
+      row.appendChild(right);
+      return row;
+    }
+
+    function buildInlineAddRow(depth, edgeClass) {
+      var row = document.createElement('div');
+      row.className = 'row add-inline';
+      if (edgeClass) {
+        row.classList.add(edgeClass);
+      }
+      row.style.paddingLeft = indent(depth);
+
+      var left = document.createElement('div');
+      left.className = 'left';
+
+      var spacer = document.createElement('span');
+      spacer.className = 'add-spacer';
+      spacer.setAttribute('aria-hidden', 'true');
+      left.appendChild(spacer);
+
+      var checkSpacer = document.createElement('span');
+      checkSpacer.className = 'add-check-spacer';
+      checkSpacer.setAttribute('aria-hidden', 'true');
+      left.appendChild(checkSpacer);
+
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'add-inline-input';
+      input.placeholder = 'New priority';
+      input.value = state.pendingAddText;
+      input.disabled = !!state.pendingAdd;
+      bindStandardTextboxBehavior(input);
+      input.addEventListener('input', function () {
+        state.pendingAddText = input.value;
+      });
+      input.addEventListener('keydown', function (event) {
+        if ((event.metaKey || event.ctrlKey) && String(event.key || '').toLowerCase() === 'a') {
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          addAtRoot(input.value);
+        }
+      });
+      left.appendChild(input);
+
+      var right = document.createElement('div');
+      right.className = 'right';
+
+      var addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'add-inline-btn';
+      addBtn.textContent = state.pendingAdd ? '' : '+';
+      if (state.pendingAdd) {
+        addBtn.classList.add('loading');
+      }
+      addBtn.disabled = !!state.pendingAdd;
+      addBtn.title = 'Add priority';
+      addBtn.addEventListener('click', function () {
+        addAtRoot(input.value);
+      });
+      right.appendChild(addBtn);
+
+      row.appendChild(left);
+      row.appendChild(right);
+      row.addEventListener('click', function (event) {
+        if (!state.pendingAdd && !event.target.closest('button')) {
+          input.focus();
+        }
+      });
+      return row;
+    }
+
+    function buildMakeProjectRevealRow(path, depth) {
+      var row = document.createElement('div');
+      row.className = 'row-reveal';
+      row.style.paddingLeft = indent(depth);
+
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'make-project-btn';
+      button.textContent = state.pendingMakeProjectPath === path ? '' : 'Make project';
+      if (state.pendingMakeProjectPath === path) {
+        button.classList.add('loading');
+      }
+      button.disabled = !!state.pendingMakeProjectPath;
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        actMakeProject(path);
+      });
+      row.appendChild(button);
+      return row;
+    }
+
+    async function renderDir(container, dir, depth, options) {
+      var items = state.cache[dir];
+      if (!items) {
+        items = await listDir(dir);
+        state.cache[dir] = items;
+      }
+
+      var insertedAddRow = false;
+      var topEchelon = (depth === 0 && items.length) ? items[0].echelon : -1;
+      var currentBlock = null;
+      var currentBlockEchelon = null;
+      for (var i = 0; i < items.length; i += 1) {
+        var item = items[i];
+        var edgeClass = '';
+        if (depth === 0) {
+          var prevItem = i > 0 ? items[i - 1] : null;
+          var nextItem = i < items.length - 1 ? items[i + 1] : null;
+          var startOfEchelon = !prevItem || prevItem.echelon !== item.echelon;
+          var endOfEchelon = !nextItem || nextItem.echelon !== item.echelon;
+          var topEchelonAddAfter = topEchelon >= 0 && item.echelon === topEchelon && endOfEchelon;
+          if (topEchelonAddAfter) {
+            if (startOfEchelon) {
+              edgeClass = 'echelon-start';
+            } else {
+              edgeClass = 'echelon-mid';
+            }
+          } else if (startOfEchelon && endOfEchelon) {
+            edgeClass = 'echelon-single';
+          } else if (startOfEchelon) {
+            edgeClass = 'echelon-start';
+          } else if (endOfEchelon) {
+            edgeClass = 'echelon-end';
+          } else {
+            edgeClass = 'echelon-mid';
+          }
+
+          if (currentBlockEchelon !== item.echelon) {
+            currentBlock = document.createElement('div');
+            currentBlock.className = 'echelon-block';
+            container.appendChild(currentBlock);
+            currentBlockEchelon = item.echelon;
+          }
+        }
+
+        var firstRootItem = depth === 0 && i === 0;
+        var row = buildRow(item, depth, edgeClass, {
+          highlightFirstRow: firstRootItem,
+          highlightFirstNextActionPill: firstRootItem && !!item.hasSubpriorities
+        });
+        if (depth === 0 && currentBlock) {
+          currentBlock.appendChild(row);
+        } else {
+          container.appendChild(row);
+        }
+        if (item.kind === 'file' && state.revealedMakeProjectPath === item.path) {
+          container.appendChild(buildMakeProjectRevealRow(item.path, depth));
+        }
+        if (depth === 0 && !insertedAddRow && topEchelon >= 0) {
+          var nextTop = i < items.length - 1 ? items[i + 1] : null;
+          var shouldInsertAddHere = item.echelon === topEchelon && (!nextTop || nextTop.echelon !== topEchelon);
+          if (shouldInsertAddHere) {
+            if (currentBlock) {
+              currentBlock.appendChild(buildInlineAddRow(depth, 'echelon-end'));
+            } else {
+              container.appendChild(buildInlineAddRow(depth, 'echelon-end'));
+            }
+            insertedAddRow = true;
+          }
+        }
+        if (item.kind === 'dir' && state.expanded[item.path] && item.hasSubpriorities) {
+          if (!(options && options.deferPendingExpandPath && options.deferPendingExpandPath === item.path)) {
+            await renderDir(container, item.path, depth + 1, options);
+          }
+        }
+      }
+
+      if (depth === 0 && !insertedAddRow) {
+        container.appendChild(buildInlineAddRow(depth, 'echelon-single'));
+      }
+    }
+
+    async function render(options) {
+      options = options || {};
+      var tree = treeEl();
+      var previousPositions = null;
+      var showOverlay = !options.animateReorder && !options.suppressLoadingOverlay;
+      var selectionSnapshot = options.preserveInputSelection ? captureTreeInputSelection() : null;
+      if (options.animateReorder) {
+        previousPositions = captureRowPositions();
+      }
+
+      try {
+        if (showOverlay) {
+          setLoadingOverlay(true);
+        }
+        var fragment = document.createDocumentFragment();
+        await renderDir(fragment, state.root, 0, options);
+        tree.replaceChildren(fragment);
+        if (selectionSnapshot) {
+          restoreTreeInputSelection(selectionSnapshot);
+        }
+
+        if (options.animateReorder) {
+          animateRowReorder(previousPositions);
+        }
+        if (!tree.childNodes.length) {
+          status('No priorities found.', false);
+        } else {
+          status('', false);
+        }
+      } catch (error) {
+        status(String(error && error.message ? error.message : error), true);
+      } finally {
+        if (showOverlay) {
+          setLoadingOverlay(false);
+        }
+      }
+    }
+
+    async function expandWithSpinner(path) {
+      if (!path) {
+        return;
+      }
+      state.expanded[path] = true;
+      state.pendingExpandPath = path;
+      try {
+        await render({ suppressLoadingOverlay: true, deferPendingExpandPath: path });
+        var items = await listDir(path);
+        state.cache[path] = items;
+      } catch (error) {
+        state.expanded[path] = false;
+        status(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.pendingExpandPath = '';
+        await render({ suppressLoadingOverlay: true });
+      }
+    }
+
+    async function runAction(fn, options) {
+      options = options || {};
+      if (state.busy) {
+        return;
+      }
+      state.busy = true;
+      try {
+        await fn();
+        if (options.invalidateAllCache) {
+          state.cache = Object.create(null);
+        } else {
+          invalidateCachedDirs(options.invalidateDirs || []);
+        }
+        await render({
+          animateReorder: !!options.animateReorder,
+          suppressLoadingOverlay: !!options.suppressLoadingOverlay
+        });
+      } catch (error) {
+        status(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.busy = false;
+      }
+    }
+
+    function actPrioritize(path, button) {
+      if (state.busy) {
+        return;
+      }
+      var parentDir = parentDirOfPath(path);
+      state.pendingPrioritizePath = path;
+      setPrioritizeButtonBusy(button, true);
+      runAction(function () {
+        return runBackend(['prioritize-fast', path]).then(function (result) {
+          hydrateCachedDirFromResult(parentDir, result);
+        });
+      }, {
+        animateReorder: true
+      }).finally(function () {
+        state.pendingPrioritizePath = '';
+        setPrioritizeButtonBusy(findPrioritizeButtonForPath(path), false);
+      });
+    }
+
+    function actRemove(path) {
+      var parentDir = parentDirOfPath(path);
+      runAction(function () {
+        return runBackend(['remove-fast', path]).then(function (result) {
+          hydrateCachedDirFromResult(parentDir, result);
+        });
+      });
+    }
+
+    function actRename(path, nextName) {
+      if (!path || !nextName || state.pendingRenamePath) {
+        return;
+      }
+      state.pendingRenamePath = path;
+      runAction(function () {
+        var parentDir = parentDirOfPath(path);
+        return runBackend(['rename-fast', path, nextName]).then(function (result) {
+          hydrateCachedDirFromResult(parentDir, result);
+        });
+      }, {
+        suppressLoadingOverlay: true
+      }).finally(function () {
+        state.pendingRenamePath = '';
+        state.editingPath = '';
+      });
+    }
+
+    function actToggleChecked(path) {
+      if (state.busy) {
+        return;
+      }
+      var parentDir = parentDirOfPath(path);
+      state.pendingCheckPath = path;
+      runAction(function () {
+        return runBackend(['check-toggle-fast', path]).then(function (result) {
+          hydrateCachedDirFromResult(parentDir, result);
+        });
+      }, {
+        suppressLoadingOverlay: true
+      }).finally(function () {
+        state.pendingCheckPath = '';
+      });
+    }
+
+    function addAtRoot(rawValue) {
+      var name = String(rawValue || '').trim();
+      if (!name || state.pendingAdd || state.busy) {
+        return;
+      }
+      state.pendingAdd = true;
+      render({ suppressLoadingOverlay: true });
+      runAction(function () {
+        return runBackend(['add-fast', state.root, name]).then(function (result) {
+          hydrateCachedDirFromResult(state.root, result);
+        });
+      }, {
+        suppressLoadingOverlay: true
+      }).then(function () {
+        state.pendingAddText = '';
+      }).finally(function () {
+        state.pendingAdd = false;
+        render({ suppressLoadingOverlay: true });
+      });
+    }
+
+    function actMakeProject(path) {
+      if (!path || state.busy || state.pendingMakeProjectPath) {
+        return;
+      }
+      state.pendingMakeProjectPath = path;
+      render({ suppressLoadingOverlay: true });
+      runAction(function () {
+        return runBackend(['make-project', path]);
+      }, {
+        suppressLoadingOverlay: true,
+        invalidateDirs: [parentDirOfPath(path)]
+      }).then(function () {
+        state.revealedMakeProjectPath = '';
+        drillInto(path);
+      }).finally(function () {
+        state.pendingMakeProjectPath = '';
+        render({ suppressLoadingOverlay: true });
+      });
+    }
+
+    function updateDrillUpVisibility() {
+      var up = document.getElementById('drill-up');
+      if (!up) {
+        return;
+      }
+      up.classList.toggle('hidden', state.drillStack.length === 0);
+    }
+
+    function drillInto(path) {
+      if (!path) {
+        return;
+      }
+      state.drillStack.push(rootInputValue());
+      document.getElementById('root-dir').value = path;
+      setRootAndRefresh({ keepDrillStack: true, persistRoot: false });
+      updateDrillUpVisibility();
+    }
+
+    function drillUp() {
+      if (!state.drillStack.length) {
+        return;
+      }
+      var previous = state.drillStack.pop();
+      if (!previous) {
+        updateDrillUpVisibility();
+        return;
+      }
+      document.getElementById('root-dir').value = previous;
+      setRootAndRefresh({ keepDrillStack: true, persistRoot: false });
+      updateDrillUpVisibility();
+    }
+
+    function setRootAndRefresh(options) {
+      options = options || {};
+      if (state.previewRefreshTimer) {
+        clearTimeout(state.previewRefreshTimer);
+        state.previewRefreshTimer = null;
+      }
+      state.root = rootInputValue();
+      state.expanded = Object.create(null);
+      state.expanded[state.root] = true;
+      state.cache = Object.create(null);
+      state.revealedMakeProjectPath = '';
+      state.pendingMakeProjectPath = '';
+      state.openMenuPath = '';
+      state.editingPath = '';
+      state.pendingRenamePath = '';
+      if (options.persistRoot !== false) {
+        saveStorage('priorities.root', state.root);
+      }
+      updateTitleFromRoot();
+      if (!options.keepDrillStack) {
+        state.drillStack = [];
+      }
+      updateDrillUpVisibility();
+      render();
+    }
+
+    function persistRootInputOnly() {
+      var value = rootInputValue();
+      saveStorage('priorities.root', value);
+      updateTitleFromRoot();
+    }
+
+    async function browseForFolder(setter) {
+      try {
+        var result = await runBackend(['pick-dir']);
+        var path = String((result && result.stdout) || '').trim();
+        if (path) {
+          setter(path);
+        }
+      } catch (error) {
+        status(String(error && error.message ? error.message : error), true);
+      }
+    }
+
+    function showStartupIfNeeded() {
+      var modal = document.getElementById('startup-modal');
+      var startupPath = document.getElementById('startup-path');
+      var saved = loadStorage('priorities.root');
+
+      if (saved) {
+        document.getElementById('root-dir').value = saved;
+        updateTitleFromRoot();
+        setRootAndRefresh();
+        return;
+      }
+
+      updateTitleFromRoot();
+      modal.classList.remove('hidden');
+      startupPath.focus();
+    }
+
+    function toggleSettingsPanel(forceOpen) {
+      var panel = document.getElementById('settings-panel');
+      var button = document.getElementById('settings-toggle');
+      var open = forceOpen;
+      if (typeof open !== 'boolean') {
+        open = panel.classList.contains('hidden');
+      }
+      panel.classList.toggle('hidden', !open);
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) {
+        closeThemePickerMenu();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', function () {
+      requestWindowShape();
+      state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
+      applyTheme(state.activeTheme);
+      applyTextScale(loadStorage(UI_SCALE_KEY) || loadStorage(TEXT_SCALE_KEY) || '1');
+
+      document.getElementById('settings-toggle').addEventListener('click', function () {
+        toggleSettingsPanel();
+      });
+      document.getElementById('dock-left').addEventListener('click', function () {
+        dockWindow('left');
+      });
+      document.getElementById('dock-center').addEventListener('click', function () {
+        dockWindow('center');
+      });
+      document.getElementById('dock-right').addEventListener('click', function () {
+        dockWindow('right');
+      });
+      setDockButtonsDisabled('none');
+      refreshDockState();
+      if (state.dockPollTimer) {
+        clearInterval(state.dockPollTimer);
+      }
+      state.dockPollTimer = setInterval(refreshDockState, 1200);
+      window.addEventListener('focus', refreshDockState);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+          refreshDockState();
+        }
+      });
+      window.addEventListener('beforeunload', function () {
+        if (state.dockPollTimer) {
+          clearInterval(state.dockPollTimer);
+          state.dockPollTimer = null;
+        }
+      });
+      document.getElementById('refresh').addEventListener('click', setRootAndRefresh);
+      document.getElementById('drill-up').addEventListener('click', drillUp);
+      var rootDirInput = document.getElementById('root-dir');
+      var startupPathInput = document.getElementById('startup-path');
+      bindStandardTextboxBehavior(rootDirInput);
+      bindStandardTextboxBehavior(startupPathInput);
+      rootDirInput.addEventListener('input', persistRootInputOnly);
+      rootDirInput.addEventListener('change', persistRootInputOnly);
+      rootDirInput.addEventListener('keydown', function (event) {
+        if ((event.metaKey || event.ctrlKey) && String(event.key || '').toLowerCase() === 'a') {
+          return;
+        }
+        if (event.key === 'Enter') {
+          setRootAndRefresh();
+        }
+      });
+      document.getElementById('browse').addEventListener('click', function () {
+        browseForFolder(function (path) {
+          document.getElementById('root-dir').value = path;
+          persistRootInputOnly();
+        });
+      });
+
+      document.getElementById('startup-browse').addEventListener('click', function () {
+        browseForFolder(function (path) {
+          document.getElementById('startup-path').value = path;
+        });
+      });
+      document.getElementById('startup-open').addEventListener('click', function () {
+        var path = String(document.getElementById('startup-path').value || '').trim();
+        if (!path) {
+          return;
+        }
+        document.getElementById('root-dir').value = path;
+        document.getElementById('startup-modal').classList.add('hidden');
+        setRootAndRefresh();
+      });
+      startupPathInput.addEventListener('keydown', function (event) {
+        if ((event.metaKey || event.ctrlKey) && String(event.key || '').toLowerCase() === 'a') {
+          return;
+        }
+        if (event.key === 'Enter') {
+          document.getElementById('startup-open').click();
+        }
+      });
+
+      document.getElementById('theme-picker-btn').addEventListener('click', function () {
+        state.themeHotkeysEnabled = true;
+        if (isThemePickerOpen()) {
+          closeThemePickerMenu();
+        } else {
+          openThemePickerMenu();
+        }
+      });
+      document.getElementById('theme-picker-list').addEventListener('click', function (event) {
+        var button = event.target.closest('button[data-theme-name]');
+        if (!button) {
+          return;
+        }
+        applyTheme(button.getAttribute('data-theme-name'));
+        closeThemePickerMenu();
+      });
+      document.getElementById('text-size-increase').addEventListener('click', increaseTextScale);
+      document.getElementById('text-size-decrease').addEventListener('click', decreaseTextScale);
+      document.getElementById('text-size-reset').addEventListener('click', resetTextScale);
+
+      document.addEventListener('click', function (event) {
+        var inThemePicker = event.target.closest('#theme-picker-menu') || event.target.closest('#theme-picker-btn');
+        if (!inThemePicker) {
+          closeThemePickerMenu();
+        }
+        var inRowMenu = event.target.closest('.row-menu') || event.target.closest('.btn.more');
+        if (!inRowMenu && state.openMenuPath) {
+          state.openMenuPath = '';
+          render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        }
+        var inSettings = event.target.closest('#settings-panel') || event.target.closest('#settings-toggle');
+        if (!inSettings && !document.getElementById('settings-panel').classList.contains('hidden')) {
+          toggleSettingsPanel(false);
+        }
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          closeThemePickerMenu();
+          if (!document.getElementById('settings-panel').classList.contains('hidden')) {
+            toggleSettingsPanel(false);
+          }
+          return;
+        }
+
+        if (isTypingContext(event.target)) {
+          return;
+        }
+
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          if (state.themeHotkeysEnabled) {
+            event.preventDefault();
+            cycleTheme(event.key === 'ArrowDown' ? 1 : -1);
+          }
+        }
+      });
+
+      window.prioritiesHostAction = function (actionName) {
+        var action = String(actionName || '');
+        if (action === 'increase-text-size') {
+          increaseTextScale();
+          return;
+        }
+        if (action === 'decrease-text-size') {
+          decreaseTextScale();
+          return;
+        }
+        if (action === 'reset-text-size') {
+          resetTextScale();
+        }
+      };
+
+      showStartupIfNeeded();
+      updateDrillUpVisibility();
+    });
+  </script>
+</body>
+</html>

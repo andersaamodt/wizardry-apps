@@ -74,9 +74,7 @@ jq -e '.templates[] | (.slug | type == "string" and length > 0) and (.publish | 
 
 jq -e '
   (.templates | map(.slug) | index("demo")) != null and
-  (.templates | map(.slug) | index("blog")) != null and
-  (.templates | map(.slug) | index("unix-settings")) != null and
-  (.templates | map(.slug) | index("artificer")) != null
+  (.templates | map(.slug) | index("blog")) != null
 ' "$templates_manifest" >/dev/null
 
 printf '%s\n' "validate-manifest: OK"

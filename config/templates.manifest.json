@@ -8,14 +8,6 @@
     {
       "slug": "blog",
       "publish": true
-    },
-    {
-      "slug": "unix-settings",
-      "publish": true
-    },
-    {
-      "slug": "artificer",
-      "publish": true
     }
   ]
 }

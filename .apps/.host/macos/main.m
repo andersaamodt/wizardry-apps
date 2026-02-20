@@ -28,6 +28,7 @@
 @property (strong) WKWebView *webView;
 @property (strong) NSString *appPath;
 @property (strong) NSImage *appIconImage;
+@property (assign) BOOL enableNativeViewMenu;
 @end
 
 @implementation AppDelegate
@@ -70,8 +71,54 @@
     [windowMenu addItemWithTitle:@"Close Window" action:@selector(performClose:) keyEquivalent:@"w"];
     [windowMenuItem setSubmenu:windowMenu];
 
+    if (self.enableNativeViewMenu) {
+        NSMenuItem *viewMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+        [mainMenu addItem:viewMenuItem];
+        NSMenu *viewMenu = [[NSMenu alloc] initWithTitle:@"View"];
+
+        NSMenuItem *increase = [viewMenu addItemWithTitle:@"Increase Text Size"
+                                                    action:@selector(nativeIncreaseTextSize:)
+                                             keyEquivalent:@"+"];
+        [increase setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+
+        NSMenuItem *decrease = [viewMenu addItemWithTitle:@"Decrease Text Size"
+                                                    action:@selector(nativeDecreaseTextSize:)
+                                             keyEquivalent:@"-"];
+        [decrease setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+
+        NSMenuItem *reset = [viewMenu addItemWithTitle:@"Actual Size"
+                                                 action:@selector(nativeResetTextSize:)
+                                          keyEquivalent:@"0"];
+        [reset setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+
+        [viewMenuItem setSubmenu:viewMenu];
+    }
+
     [NSApp setWindowsMenu:windowMenu];
     [NSApp setMainMenu:mainMenu];
+}
+
+- (void)dispatchPrioritiesViewAction:(NSString *)actionName {
+    if (!self.webView || !actionName) {
+        return;
+    }
+    NSString *js = [NSString stringWithFormat:@"if (window && typeof window.prioritiesHostAction === 'function') { window.prioritiesHostAction('%@'); }", actionName];
+    [self.webView evaluateJavaScript:js completionHandler:nil];
+}
+
+- (void)nativeIncreaseTextSize:(id)sender {
+    (void)sender;
+    [self dispatchPrioritiesViewAction:@"increase-text-size"];
+}
+
+- (void)nativeDecreaseTextSize:(id)sender {
+    (void)sender;
+    [self dispatchPrioritiesViewAction:@"decrease-text-size"];
+}
+
+- (void)nativeResetTextSize:(id)sender {
+    (void)sender;
+    [self dispatchPrioritiesViewAction:@"reset-text-size"];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
@@ -98,6 +145,8 @@
     NSString *appName = [[self.appPath lastPathComponent] 
                          stringByReplacingOccurrencesOfString:@"-" withString:@" "];
     appName = [appName capitalizedString];
+    NSString *appSlug = [[self.appPath lastPathComponent] lowercaseString];
+    self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
 
     [self setupMainMenuWithAppName:appName];
     if ([[NSFileManager defaultManager] fileExistsAtPath:customIconPath]) {
@@ -111,6 +160,11 @@
     
     // Create window
     NSRect frame = NSMakeRect(0, 0, 860, 620);
+    NSSize minSize = NSMakeSize(860, 620);
+    if (self.enableNativeViewMenu) {
+        // Priorities starts narrow and should remain resizable down to a compact width.
+        minSize = NSMakeSize(340, 260);
+    }
     NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |
                                    NSWindowStyleMaskClosable |
                                    NSWindowStyleMaskMiniaturizable |
@@ -121,7 +175,7 @@
                                               styleMask:styleMask
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
-    [self.window setMinSize:NSMakeSize(860, 620)];
+    [self.window setMinSize:minSize];
     [self.window center];
     [self.window setTitle:[NSString stringWithFormat:@"Wizardry - %@", appName]];
     [self.window setTitlebarAppearsTransparent:YES];
@@ -145,15 +199,23 @@
     NSView *rootView = [[NSView alloc] initWithFrame:frame];
     [rootView setAutoresizesSubviews:YES];
 
-    CGFloat dragStripHeight = 10.0;
+    CGFloat dragStripHeight = 44.0;
     NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
     self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
     [self.webView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [rootView addSubview:self.webView];
 
-    NSRect stripFrame = NSMakeRect(0, frame.size.height - dragStripHeight, frame.size.width, dragStripHeight);
+    // Keep the drag area centered around the title region, leaving side controls clickable.
+    CGFloat dragStripWidth = self.enableNativeViewMenu ? 140.0 : 320.0;
+    if (dragStripWidth > frame.size.width) {
+        dragStripWidth = frame.size.width;
+    }
+    NSRect stripFrame = NSMakeRect((frame.size.width - dragStripWidth) / 2.0,
+                                   frame.size.height - dragStripHeight,
+                                   dragStripWidth,
+                                   dragStripHeight);
     NSView *dragStrip = [[WizardryDragStripView alloc] initWithFrame:stripFrame];
-    [dragStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [dragStrip setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin)];
     [dragStrip setWantsLayer:YES];
     dragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
     [rootView addSubview:dragStrip];
@@ -200,7 +262,7 @@
             CGFloat width = 1060.0;
             CGFloat height = 860.0;
             if (args.count >= 1) {
-                width = MAX(680.0, [args[0] doubleValue]);
+                width = MAX(420.0, [args[0] doubleValue]);
             }
             if (args.count >= 2) {
                 height = MAX(520.0, [args[1] doubleValue]);
@@ -216,6 +278,113 @@
                     [self.window setFrame:newFrame display:YES animate:NO];
                 }
                 [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_center_x"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.window) {
+                    NSScreen *screen = self.window.screen ?: [NSScreen mainScreen];
+                    if (screen) {
+                        NSRect visible = [screen visibleFrame];
+                        NSRect frame = [self.window frame];
+                        frame.origin.x = NSMinX(visible) + (visible.size.width - frame.size.width) / 2.0;
+                        if (frame.origin.x < NSMinX(visible)) {
+                            frame.origin.x = NSMinX(visible);
+                        }
+                        [self.window setFrame:frame display:YES animate:NO];
+                    }
+                }
+                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_pin_top"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.window) {
+                    NSScreen *screen = self.window.screen ?: [NSScreen mainScreen];
+                    if (screen) {
+                        NSRect visible = [screen visibleFrame];
+                        NSRect frame = [self.window frame];
+                        frame.origin.y = NSMaxY(visible) - frame.size.height;
+                        if (frame.origin.y < NSMinY(visible)) {
+                            frame.origin.y = NSMinY(visible);
+                        }
+                        [self.window setFrame:frame display:YES animate:NO];
+                    }
+                }
+                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_snap_top_left"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.window) {
+                    NSScreen *screen = self.window.screen ?: [NSScreen mainScreen];
+                    if (screen) {
+                        NSRect visible = [screen visibleFrame];
+                        NSRect frame = [self.window frame];
+                        frame.origin.x = NSMinX(visible);
+                        frame.origin.y = NSMaxY(visible) - frame.size.height;
+                        if (frame.origin.y < NSMinY(visible)) {
+                            frame.origin.y = NSMinY(visible);
+                        }
+                        [self.window setFrame:frame display:YES animate:NO];
+                    }
+                }
+                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_snap_top_right"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (self.window) {
+                    NSScreen *screen = self.window.screen ?: [NSScreen mainScreen];
+                    if (screen) {
+                        NSRect visible = [screen visibleFrame];
+                        NSRect frame = [self.window frame];
+                        frame.origin.x = NSMaxX(visible) - frame.size.width;
+                        if (frame.origin.x < NSMinX(visible)) {
+                            frame.origin.x = NSMinX(visible);
+                        }
+                        frame.origin.y = NSMaxY(visible) - frame.size.height;
+                        if (frame.origin.y < NSMinY(visible)) {
+                            frame.origin.y = NSMinY(visible);
+                        }
+                        [self.window setFrame:frame display:YES animate:NO];
+                    }
+                }
+                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_snap_state"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *snapState = @"none";
+                if (self.window) {
+                    NSScreen *screen = self.window.screen ?: [NSScreen mainScreen];
+                    if (screen) {
+                        NSRect visible = [screen visibleFrame];
+                        NSRect frame = [self.window frame];
+                        CGFloat tol = 2.0;
+                        BOOL topAligned = fabs(NSMaxY(frame) - NSMaxY(visible)) <= tol;
+                        if (topAligned) {
+                            if (fabs(NSMinX(frame) - NSMinX(visible)) <= tol) {
+                                snapState = @"left";
+                            } else if (fabs(NSMaxX(frame) - NSMaxX(visible)) <= tol) {
+                                snapState = @"right";
+                            } else if (fabs(NSMidX(frame) - NSMidX(visible)) <= tol) {
+                                snapState = @"center";
+                            }
+                        }
+                    }
+                }
+                [self sendResult:messageIdCopy stdout:snapState stderr:@"" exitCode:0 error:nil];
             });
             return;
         }

@@ -2599,14 +2599,22 @@
           if (!enabledTargets[nativeTarget]) {
             throw new Error('Enable the ' + (nativeTarget === 'macos' ? 'macOS' : 'Linux') + ' target to run this app on the current platform.');
           }
-          await buildEnabledTargets(app, projectKey);
-          var runModeRequest = state.os === 'darwin' ? 'bundle' : 'auto';
+          var desktopBuild = await backend('build-desktop', [app.id]);
+          var desktopBuildOut = kv(desktopBuild.stdout || '');
+          setTargetRuntime(
+            projectKey,
+            nativeTarget,
+            'built',
+            desktopBuildOut.artifact || desktopBuildOut.zip || desktopBuildOut.host || ''
+          );
+          // Prefer auto so updated app sources launch immediately when bundles are stale.
+          var runModeRequest = 'auto';
           var run = await backend('run-desktop', [app.id, runModeRequest]);
           var runOut = kv(run.stdout || '');
           var runMode = runOut.mode || 'host';
           var runSummary = runMode === 'bundle'
-            ? app.title + ' built enabled targets and launched from the compiled desktop app bundle.'
-            : app.title + ' built enabled targets and launched in native host.';
+            ? app.title + ' built the desktop target and launched from the compiled app bundle.'
+            : app.title + ' built the desktop target and launched in native host.';
 
           renderResult({
             status: 'ok',

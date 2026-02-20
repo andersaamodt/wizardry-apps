@@ -375,6 +375,10 @@ pagetitle: "Artificer"
 <div class="stack">
 <div class="info-row"><span>GitHub CLI</span><strong id="gh-auth-status">Checking...</strong></div>
 <div class="info-row"><span>SSH key</span><strong id="ssh-key-status">Checking...</strong></div>
+<label class="toggle-row" title="Use Ollama GPU acceleration when available on this system">
+<input id="llm-use-gpu-toggle" type="checkbox" checked /> Use GPU acceleration for LLMs
+</label>
+<p class="settings-hint">Applies to Ollama inference on macOS (Metal) and Linux (CUDA/ROCm when available).</p>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
 <label for="ssh-email">SSH key email/comment (optional)</label>

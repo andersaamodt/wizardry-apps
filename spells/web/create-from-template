@@ -11,9 +11,7 @@ Creates a new site by copying a template.
 
 Templates:
   demo    - Interactive demo site with 15+ CGI examples
-  unix-settings - Local system authority dashboard (read-only)
   blog    - Personal blog with content-addressable posts
-  artificer - Local coding assistant UI + agent backend
 
 Example: create-from-template mysite demo
 USAGE

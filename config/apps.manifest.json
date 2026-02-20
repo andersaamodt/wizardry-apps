@@ -43,18 +43,18 @@
         "ios": "com.wizardry.apps.chatroom.ios",
         "android": "com.wizardry.apps.chatroom.android"
       },
-      "targets": "hosted-web"
+      "targets": "hosted-web,macos"
     },
     {
-      "slug": "menu-app",
-      "name": "Menu App",
-      "production": false,
+      "slug": "priorities",
+      "name": "Priorities",
+      "production": true,
       "bundleIds": {
-        "macos": "com.wizardry.apps.menuapp.macos",
-        "ios": "com.wizardry.apps.menuapp.ios",
-        "android": "com.wizardry.apps.menuapp.android"
+        "macos": "com.wizardry.apps.priorities.macos",
+        "ios": "com.wizardry.apps.priorities.ios",
+        "android": "com.wizardry.apps.priorities.android"
       },
-      "targets": "macos,linux,hosted-web,android,ios"
+      "targets": "hosted-web,macos,linux,ios,android"
     }
   ]
 }
