@@ -10,13 +10,13 @@ Usage: priorities-backend.sh ACTION [ARGS...]
 Actions:
   list [DIR]            List prioritized items in DIR (default: current dir)
   prioritize PATH       Promote PATH using the prioritize spell
-  set-order-fast DIR ECHELON PATH...
-                        Persist queue order for items in one echelon
+  prioritize-quick PATH Promote PATH and print: echelon<tab>priority<tab>checked
   check-toggle PATH     Toggle checked state using check/uncheck spells
   make-project PATH     Convert PATH file to project folder
   rename PATH NAME      Rename PATH to NAME in same directory
   add DIR NAME          Add NAME in DIR and prioritize it
-  remove PATH           Remove PATH from priorities (deprioritize)
+  remove PATH           Move PATH to system trash
+  descendant-count PATH Count nested items beneath PATH
   pick-dir              Open a native folder picker (prints selected path)
   parent DIR            Print parent directory path
 USAGE
@@ -462,6 +462,54 @@ collect_prioritized_rows_fast() {
   esac
 }
 
+compute_highest_priority_xattr() {
+  directory=$1
+
+  # shellcheck disable=SC2039
+  set -- "$directory"/*
+  if [ ! -e "${1-}" ]; then
+    printf '%s\t%s\n' "0" "0"
+    return 0
+  fi
+
+  xattr -l "$@" 2>/dev/null | awk '
+    function is_num(v) { return v ~ /^[0-9]+$/ }
+    {
+      sep1 = index($0, ": ")
+      if (sep1 == 0) next
+      path = substr($0, 1, sep1 - 1)
+      rest = substr($0, sep1 + 2)
+      sep2 = index(rest, ": ")
+      if (sep2 == 0) next
+      key = substr(rest, 1, sep2 - 1)
+      val = substr(rest, sep2 + 2)
+      if (key == "user.echelon" && is_num(val)) {
+        e[path] = val + 0
+        seen[path] = 1
+      } else if (key == "user.priority" && is_num(val)) {
+        p[path] = val + 0
+        seen[path] = 1
+      }
+    }
+    END {
+      he = 0
+      hp = 0
+      for (path in seen) {
+        if (!(path in e)) continue
+        fe = e[path] + 0
+        fp = (path in p) ? (p[path] + 0) : 0
+        if (fe > he) {
+          he = fe
+          hp = fp
+        } else if (fe == he && fp > hp) {
+          hp = fp
+        }
+      }
+      printf "%d\t%d\n", he, hp
+    }
+  '
+}
+
 prioritize_impl() {
   target=$1
   auto_create=${2:-0}
@@ -509,27 +557,46 @@ prioritize_impl() {
 
   highest_echelon=0
   highest_priority_in_echelon=0
-  for f in "$directory"/*; do
-    [ -e "$f" ] || continue
-    read_item_attrs "$f"
-    file_echelon=$attr_echelon
-    file_priority=$attr_priority
-    case "$file_echelon" in
-      *Error*|''|*[!0-9]*) continue ;;
-    esac
-    if [ "$file_echelon" -gt "$highest_echelon" ]; then
-      highest_echelon=$file_echelon
+  case "$ATTR_BACKEND" in
+    xattr)
+      summary=$(compute_highest_priority_xattr "$directory")
+      tab=$(printf '\t')
+      highest_echelon=0
       highest_priority_in_echelon=0
-    fi
-    if [ "$file_echelon" -eq "$highest_echelon" ]; then
-      case "$file_priority" in
-        *Error*|''|*[!0-9]*) file_priority=0 ;;
+      IFS="$tab" read -r highest_echelon highest_priority_in_echelon <<EOF
+$summary
+EOF
+      case "$highest_echelon" in
+        *Error*|''|*[!0-9]*) highest_echelon=0 ;;
       esac
-      if [ "$file_priority" -gt "$highest_priority_in_echelon" ]; then
-        highest_priority_in_echelon=$file_priority
-      fi
-    fi
-  done
+      case "$highest_priority_in_echelon" in
+        *Error*|''|*[!0-9]*) highest_priority_in_echelon=0 ;;
+      esac
+      ;;
+    *)
+      for f in "$directory"/*; do
+        [ -e "$f" ] || continue
+        read_item_attrs "$f"
+        file_echelon=$attr_echelon
+        file_priority=$attr_priority
+        case "$file_echelon" in
+          *Error*|''|*[!0-9]*) continue ;;
+        esac
+        if [ "$file_echelon" -gt "$highest_echelon" ]; then
+          highest_echelon=$file_echelon
+          highest_priority_in_echelon=0
+        fi
+        if [ "$file_echelon" -eq "$highest_echelon" ]; then
+          case "$file_priority" in
+            *Error*|''|*[!0-9]*) file_priority=0 ;;
+          esac
+          if [ "$file_priority" -gt "$highest_priority_in_echelon" ]; then
+            highest_priority_in_echelon=$file_priority
+          fi
+        fi
+      done
+      ;;
+  esac
 
   if [ "$highest_echelon" -eq 0 ]; then
     set_user_attr "$target" echelon 1
@@ -547,6 +614,34 @@ prioritize_impl() {
   new_priority=$((highest_priority_in_echelon + 1))
   set_user_attr "$target" echelon "$highest_echelon"
   set_user_attr "$target" priority "$new_priority"
+}
+
+prioritize_quick_impl() {
+  target=$1
+  auto_create=${2:-0}
+  if [ -z "$target" ]; then
+    printf '%s\n' "priorities-backend: path required for prioritize-quick" >&2
+    return 2
+  fi
+
+  prioritize_impl "$target" "$auto_create"
+  read_item_attrs "$target"
+
+  quick_echelon=$attr_echelon
+  quick_priority=$attr_priority
+  quick_checked=$attr_checked
+
+  case "$quick_echelon" in
+    *Error*|''|*[!0-9]*) quick_echelon=0 ;;
+  esac
+  case "$quick_priority" in
+    *Error*|''|*[!0-9]*) quick_priority=0 ;;
+  esac
+  case "$quick_checked" in
+    *Error*|''|*[!0-9]*) quick_checked=0 ;;
+  esac
+
+  printf '%s\t%s\t%s\n' "$quick_echelon" "$quick_priority" "$quick_checked"
 }
 
 check_toggle_impl() {
@@ -585,6 +680,135 @@ deprioritize_impl() {
   fi
   unset_user_attr "$target" echelon
   unset_user_attr "$target" priority
+}
+
+resolve_abs_path() {
+  input_path=$1
+  case "$input_path" in
+    /*) printf '%s\n' "$input_path" ;;
+    *) printf '%s/%s\n' "$(pwd -P)" "$input_path" ;;
+  esac
+}
+
+TRASH_BACKEND=''
+detect_trash_backend() {
+  if [ -n "$TRASH_BACKEND" ]; then
+    return 0
+  fi
+
+  kernel=$(uname -s 2>/dev/null || printf 'unknown')
+  case "$kernel" in
+    Darwin)
+      if command -v osascript >/dev/null 2>&1; then
+        TRASH_BACKEND=osascript
+      fi
+      ;;
+    Linux)
+      if command -v gio >/dev/null 2>&1; then
+        TRASH_BACKEND=gio
+      elif command -v trash-put >/dev/null 2>&1; then
+        TRASH_BACKEND=trash-put
+      elif command -v kioclient5 >/dev/null 2>&1; then
+        TRASH_BACKEND=kioclient5
+      fi
+      ;;
+  esac
+
+  if [ -z "$TRASH_BACKEND" ]; then
+    if command -v trash >/dev/null 2>&1; then
+      TRASH_BACKEND=spell
+    else
+      TRASH_BACKEND=none
+    fi
+  fi
+}
+
+safe_trash_impl() {
+  target=$1
+  if [ -z "$target" ]; then
+    printf '%s\n' "priorities-backend: path required for remove-fast" >&2
+    return 2
+  fi
+  if [ ! -e "$target" ]; then
+    printf '%s\n' "priorities-backend: file not found: $target" >&2
+    return 1
+  fi
+
+  try_trash_backend() {
+    backend=$1
+    case "$backend" in
+      osascript)
+        abs_path=$(resolve_abs_path "$target")
+        escaped_path=$(printf '%s' "$abs_path" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        osascript -e "tell application \"Finder\" to delete POSIX file \"$escaped_path\"" >/dev/null 2>&1
+        ;;
+      gio)
+        gio trash -- "$target" >/dev/null 2>&1
+        ;;
+      trash-put)
+        trash-put -- "$target" >/dev/null 2>&1
+        ;;
+      kioclient5)
+        abs_path=$(resolve_abs_path "$target")
+        kioclient5 move "$abs_path" trash:/ >/dev/null 2>&1
+        ;;
+      spell)
+        trash -r -- "$target" >/dev/null 2>&1
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  detect_trash_backend
+
+  if [ "$TRASH_BACKEND" != "none" ] && try_trash_backend "$TRASH_BACKEND"; then
+    return 0
+  fi
+
+  for backend in osascript gio trash-put kioclient5 spell; do
+    if [ "$backend" = "$TRASH_BACKEND" ]; then
+      continue
+    fi
+    case "$backend" in
+      osascript) command -v osascript >/dev/null 2>&1 || continue ;;
+      gio) command -v gio >/dev/null 2>&1 || continue ;;
+      trash-put) command -v trash-put >/dev/null 2>&1 || continue ;;
+      kioclient5) command -v kioclient5 >/dev/null 2>&1 || continue ;;
+      spell) command -v trash >/dev/null 2>&1 || continue ;;
+    esac
+    if try_trash_backend "$backend"; then
+      TRASH_BACKEND=$backend
+      return 0
+    fi
+  done
+
+  printf '%s\n' "priorities-backend: failed to move to trash: $target" >&2
+  return 1
+}
+
+descendant_count_impl() {
+  target=$1
+  if [ -z "$target" ]; then
+    printf '%s\n' "priorities-backend: path required for descendant-count" >&2
+    return 2
+  fi
+  if [ ! -e "$target" ]; then
+    printf '%s\n' "priorities-backend: file not found: $target" >&2
+    return 1
+  fi
+
+  if [ ! -d "$target" ]; then
+    printf '%s\n' "0"
+    return 0
+  fi
+
+  count=$(find "$target" -mindepth 1 -print 2>/dev/null | wc -l | tr -d '[:space:]')
+  case "$count" in
+    ''|*[!0-9]*) count=0 ;;
+  esac
+  printf '%s\n' "$count"
 }
 
 set_order_emit_impl() {
@@ -780,9 +1004,9 @@ prioritize_emit_impl() {
   esac
 
   scan_file=$(mktemp "${TMPDIR:-/tmp}/priorities-scan.XXXXXX")
-  out_file=$(mktemp "${TMPDIR:-/tmp}/priorities-out.XXXXXX")
+  emit_file=$(mktemp "${TMPDIR:-/tmp}/priorities-out.XXXXXX")
   summary_file=$(mktemp "${TMPDIR:-/tmp}/priorities-summary.XXXXXX")
-  trap 'rm -f "$scan_file" "$out_file" "$summary_file"' EXIT HUP INT TERM
+  trap 'rm -f "$scan_file" "$emit_file" "$summary_file"' EXIT HUP INT TERM
 
   highest_echelon=0
   highest_priority_in_echelon=0
@@ -790,6 +1014,7 @@ prioritize_emit_impl() {
   if collect_prioritized_rows_fast "$directory" "$summary_file"; then
     while IFS="$(printf '\t')" read -r item row_echelon row_priority row_checked row_upvotes row_has_sub; do
       [ -n "$item" ] || continue
+      [ -e "$item" ] || continue
       row_prioritized=1
       row_name=$(basename "$item")
       row_kind='file'
@@ -913,6 +1138,8 @@ prioritize_emit_impl() {
 
   target_found=0
   while IFS="$(printf '\t')" read -r row_path row_name row_kind row_echelon row_priority row_checked row_upvotes row_has_sub row_prioritized; do
+    [ -n "$row_path" ] || continue
+    [ -e "$row_path" ] || continue
     if [ "$row_path" = "$target" ]; then
       target_found=1
       row_echelon=$new_echelon
@@ -931,7 +1158,7 @@ prioritize_emit_impl() {
       "$row_kind" \
       "$row_checked" \
       "$row_upvotes" \
-      "$row_has_sub" >> "$out_file"
+      "$row_has_sub" >> "$emit_file"
   done < "$scan_file"
 
   if [ "$target_found" -ne 1 ]; then
@@ -960,10 +1187,10 @@ prioritize_emit_impl() {
       "$target_kind" \
       "0" \
       "$target_upvotes" \
-      "$target_has_sub" >> "$out_file"
+      "$target_has_sub" >> "$emit_file"
   fi
 
-  emit_sorted_rows "$out_file"
+  emit_sorted_rows "$emit_file"
 }
 
 case "$action" in
@@ -989,11 +1216,13 @@ case "$action" in
     prioritize_emit_impl "$target" 0
     ;;
 
-  set-order-fast)
-    directory=${1-}
-    echelon=${2-}
-    shift 2 || true
-    set_order_emit_impl "$directory" "$echelon" "$@"
+  prioritize-quick)
+    target=${1-}
+    if [ -z "$target" ]; then
+      printf '%s\n' "priorities-backend: path required for prioritize-quick" >&2
+      exit 2
+    fi
+    prioritize_quick_impl "$target" 0
     ;;
 
   check-toggle)
@@ -1099,7 +1328,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for remove" >&2
       exit 2
     fi
-    deprioritize_impl "$target"
+    safe_trash_impl "$target"
     ;;
 
   remove-fast)
@@ -1108,8 +1337,17 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for remove-fast" >&2
       exit 2
     fi
-    deprioritize_impl "$target"
+    safe_trash_impl "$target"
     emit_list "$(dirname "$target")"
+    ;;
+
+  descendant-count)
+    target=${1-}
+    if [ -z "$target" ]; then
+      printf '%s\n' "priorities-backend: path required for descendant-count" >&2
+      exit 2
+    fi
+    descendant_count_impl "$target"
     ;;
 
   pick-dir)

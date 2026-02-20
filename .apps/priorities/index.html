@@ -25,13 +25,15 @@
   <main class="app">
     <header class="topbar">
       <div class="topbar-main">
-        <h1 id="title-folder">Priorities</h1>
-        <button id="drill-up" class="drill-up hidden" type="button" title="Up one level" aria-label="Up one level">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 7.5a2 2 0 0 1 2-2h4l1.5 2H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-            <path d="M12 15V10M12 10l-2 2M12 10l2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
+        <div class="title-cluster">
+          <button id="drill-up" class="drill-up hidden" type="button" title="Up one level" aria-label="Up one level">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7.5a2 2 0 0 1 2-2h4l1.5 2H18a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="M12 15V10M12 10l-2 2M12 10l2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <h1 id="title-folder">Priorities</h1>
+        </div>
         <div class="right-tools">
           <div class="dock-toolbar" role="group" aria-label="Window position">
             <button id="dock-left" class="corner-dock" type="button" title="Move to top-left corner" aria-label="Move to top-left corner">◀</button>
@@ -39,7 +41,7 @@
             <button id="dock-right" class="corner-dock" type="button" title="Move to top-right corner" aria-label="Move to top-right corner">▶</button>
           </div>
           <button id="settings-toggle" class="settings-toggle" type="button" aria-expanded="false" title="Settings">
-            <img src="assets/settings-gear.svg" alt="Settings">
+            <span class="settings-gear-glyph" aria-hidden="true"></span>
           </button>
         </div>
       </div>
@@ -62,6 +64,10 @@
             <div id="theme-picker-list" class="menu-list"></div>
           </div>
         </div>
+      </div>
+      <div class="settings-row">
+        <label for="font-select">Font</label>
+        <select id="font-select" class="font-select" aria-label="Font"></select>
       </div>
       <div class="settings-row">
         <label for="text-size-value">Scale</label>
@@ -110,6 +116,7 @@
 
   <script>
     var THEME_KEY = 'wizardry.priorities.theme';
+    var FONT_KEY = 'wizardry.priorities.font';
     var UI_SCALE_KEY = 'wizardry.priorities.uiScale';
     var TEXT_SCALE_KEY = 'wizardry.priorities.textScale';
     var THEME_ASSET_VERSION = 'priorities20260220a';
@@ -130,7 +137,8 @@
       editingPath: '',
       pendingRenamePath: '',
       pendingAddText: '',
-      previewRefreshTimer: null,
+      prioritizeQueue: [],
+      prioritizeQueueActive: false,
       uiScale: 1,
       drillStack: [],
       rowClickTimer: null,
@@ -141,11 +149,15 @@
         'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet', 'warlock', 'wizard'
       ],
       activeTheme: '',
+      activeFont: '',
+      fontOptions: [],
       themeHotkeysEnabled: false,
       dockState: 'none',
       dockPollTimer: null,
       backendScriptPath: '',
-      dragReorder: null
+      windowWidthRequested: 0,
+      windowHeightRequested: 640,
+      windowAutoGrowTimer: null
     };
 
     function loadStorage(key) {
@@ -184,6 +196,11 @@
       if (el) {
         el.textContent = percent;
       }
+      var reset = document.getElementById('text-size-reset');
+      if (reset) {
+        reset.hidden = Math.abs(state.uiScale - 1) < 0.001;
+        reset.disabled = reset.hidden;
+      }
     }
 
     function applyTextScale(nextScale) {
@@ -193,6 +210,7 @@
       document.documentElement.style.setProperty('--ui-scale', String(state.uiScale));
       document.documentElement.style.setProperty('--text-scale', String(state.uiScale));
       updateTextSizeDisplays();
+      scheduleAutoGrowWindowWidth();
     }
 
     function increaseTextScale() {
@@ -235,8 +253,10 @@
 
     async function requestWindowShape() {
       try {
-        var width = 420;
-        var height = 640;
+        var width = 300;
+        var height = state.windowHeightRequested || 640;
+        state.windowWidthRequested = width;
+        state.windowHeightRequested = height;
         await bridgeExec(['__wizardry_host_resize', String(width), String(height)]);
         await bridgeExec(['__wizardry_host_pin_top']);
         await bridgeExec(['__wizardry_host_center_x']);
@@ -244,6 +264,93 @@
       } catch (_) {
         // Ignore host resize errors.
       }
+    }
+
+    function clampAutoWindowWidth(widthPx) {
+      var n = Number(widthPx);
+      if (!Number.isFinite(n)) {
+        return 0;
+      }
+      var minWidth = 300;
+      var maxWidth = 920;
+      var availWidth = 0;
+      try {
+        availWidth = Number(window.screen && window.screen.availWidth) || 0;
+      } catch (_) {
+        availWidth = 0;
+      }
+      if (availWidth > 0) {
+        maxWidth = Math.min(maxWidth, Math.max(minWidth, Math.floor(availWidth * 0.92)));
+      }
+      if (n < minWidth) {
+        n = minWidth;
+      }
+      if (n > maxWidth) {
+        n = maxWidth;
+      }
+      return Math.round(n);
+    }
+
+    function computeAutoWindowWidthFromContent() {
+      var app = document.querySelector('.app');
+      if (!app) {
+        return 0;
+      }
+      var top = document.querySelector('.topbar-main');
+      var tree = document.getElementById('tree');
+      var statusEl = document.getElementById('status');
+      var contentWidth = 0;
+      if (top) {
+        contentWidth = Math.max(contentWidth, Math.ceil(top.scrollWidth));
+      }
+      if (tree) {
+        contentWidth = Math.max(contentWidth, Math.ceil(tree.scrollWidth));
+      }
+      if (statusEl) {
+        contentWidth = Math.max(contentWidth, Math.ceil(statusEl.scrollWidth));
+      }
+      if (contentWidth <= 0) {
+        return 0;
+      }
+      var styles = window.getComputedStyle(app);
+      var padLeft = parseFloat(styles.paddingLeft || '0') || 0;
+      var padRight = parseFloat(styles.paddingRight || '0') || 0;
+      var chromeAllowance = 18;
+      return clampAutoWindowWidth(contentWidth + padLeft + padRight + chromeAllowance);
+    }
+
+    async function maybeAutoGrowWindowWidth() {
+      if (!hasBridge()) {
+        return;
+      }
+      var desired = computeAutoWindowWidthFromContent();
+      if (!desired) {
+        return;
+      }
+      var current = Number(state.windowWidthRequested) || 0;
+      if (desired <= current + 2) {
+        return;
+      }
+      state.windowWidthRequested = desired;
+      try {
+        await bridgeExec(['__wizardry_host_resize', String(desired), String(state.windowHeightRequested || 640)]);
+        await bridgeExec(['__wizardry_host_pin_top']);
+        if (state.dockState !== 'left' && state.dockState !== 'right') {
+          await bridgeExec(['__wizardry_host_center_x']);
+        }
+      } catch (_) {
+        // Ignore host resize errors.
+      }
+    }
+
+    function scheduleAutoGrowWindowWidth() {
+      if (state.windowAutoGrowTimer) {
+        clearTimeout(state.windowAutoGrowTimer);
+      }
+      state.windowAutoGrowTimer = setTimeout(function () {
+        state.windowAutoGrowTimer = null;
+        maybeAutoGrowWindowWidth();
+      }, 28);
     }
 
     async function dockWindow(side) {
@@ -431,6 +538,90 @@
       return out;
     }
 
+    function parsePrioritizeQuickOutput(text) {
+      var line = '';
+      var lines = String(text || '').split('\n');
+      for (var i = 0; i < lines.length; i += 1) {
+        if (lines[i]) {
+          line = lines[i];
+          break;
+        }
+      }
+      if (!line) {
+        return null;
+      }
+      var fields = line.split('\t');
+      if (fields.length < 3) {
+        return null;
+      }
+      var echelon = Number(fields[0]);
+      var priority = Number(fields[1]);
+      var checked = Number(fields[2]);
+      if (!Number.isFinite(echelon) || !Number.isFinite(priority) || !Number.isFinite(checked)) {
+        return null;
+      }
+      return {
+        echelon: echelon,
+        priority: priority,
+        checked: checked
+      };
+    }
+
+    function comparePriorityItems(a, b) {
+      var echelonA = Number(a && a.echelon) || 0;
+      var echelonB = Number(b && b.echelon) || 0;
+      if (echelonA !== echelonB) {
+        return echelonB - echelonA;
+      }
+      var priorityA = Number(a && a.priority) || 0;
+      var priorityB = Number(b && b.priority) || 0;
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      var nameA = String((a && a.name) || '');
+      var nameB = String((b && b.name) || '');
+      if (nameA < nameB) {
+        return -1;
+      }
+      if (nameA > nameB) {
+        return 1;
+      }
+      var pathA = String((a && a.path) || '');
+      var pathB = String((b && b.path) || '');
+      if (pathA < pathB) {
+        return -1;
+      }
+      if (pathA > pathB) {
+        return 1;
+      }
+      return 0;
+    }
+
+    function applyPrioritizeQuickToCache(dir, path, quickData) {
+      if (!dir || !path || !quickData) {
+        return false;
+      }
+      var items = state.cache[dir];
+      if (!items || !items.length) {
+        return false;
+      }
+      var target = null;
+      for (var i = 0; i < items.length; i += 1) {
+        if (items[i] && items[i].path === path) {
+          target = items[i];
+          break;
+        }
+      }
+      if (!target) {
+        return false;
+      }
+      target.echelon = Number(quickData.echelon) || 0;
+      target.priority = Number(quickData.priority) || 0;
+      target.checked = Number(quickData.checked) || 0;
+      items.sort(comparePriorityItems);
+      return true;
+    }
+
     async function listDir(dir) {
       var result = await runBackend(['list', dir]);
       return parseListOutput(result && result.stdout);
@@ -461,6 +652,44 @@
       return next ? (next.name + (next.kind === 'dir' ? '/' : '')) : '';
     }
 
+    function upsertNextActionForPath(path) {
+      if (!path) {
+        return;
+      }
+      var row = null;
+      var rows = treeEl().querySelectorAll('.row[data-path]');
+      for (var i = 0; i < rows.length; i += 1) {
+        if (rows[i].getAttribute('data-path') === path) {
+          row = rows[i];
+          break;
+        }
+      }
+      if (!row) {
+        return;
+      }
+      var nameStack = row.querySelector('.name-stack');
+      if (!nameStack) {
+        return;
+      }
+      var existing = nameStack.querySelector('.next-action');
+      var nextActionText = getNextActionLabel(path);
+      if (!nextActionText) {
+        if (existing) {
+          existing.remove();
+        }
+        return;
+      }
+      if (!existing) {
+        existing = document.createElement('span');
+        existing.className = 'next-action';
+        if (row.classList.contains('row-first-task')) {
+          existing.classList.add('next-action-first-pill');
+        }
+        nameStack.appendChild(existing);
+      }
+      existing.textContent = '➜ ' + nextActionText;
+    }
+
     function prefetchNextAction(path) {
       if (!path || state.cache[path] || state.pendingNextAction[path]) {
         return;
@@ -468,22 +697,12 @@
       state.pendingNextAction[path] = true;
       listDir(path).then(function (items) {
         state.cache[path] = items;
+        upsertNextActionForPath(path);
       }).catch(function () {
         // Ignore preview prefetch failures.
       }).finally(function () {
         delete state.pendingNextAction[path];
-        schedulePreviewRefresh();
       });
-    }
-
-    function schedulePreviewRefresh() {
-      if (state.previewRefreshTimer) {
-        return;
-      }
-      state.previewRefreshTimer = setTimeout(function () {
-        state.previewRefreshTimer = null;
-        render({ suppressLoadingOverlay: true, preserveInputSelection: true });
-      }, 90);
     }
 
     function captureTreeInputSelection() {
@@ -604,210 +823,6 @@
       }, 360);
     }
 
-    function sameOrderedValues(a, b) {
-      if (!a || !b || a.length !== b.length) {
-        return false;
-      }
-      for (var i = 0; i < a.length; i += 1) {
-        if (a[i] !== b[i]) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    function updateQueueDragPosition(pointerY) {
-      var drag = state.dragReorder;
-      if (!drag) {
-        return;
-      }
-
-      drag.row.style.top = Math.round(pointerY - drag.pointerOffsetY) + 'px';
-
-      var selector = '.row.row-root[data-path][data-echelon="' + drag.echelon + '"]';
-      var rows = drag.container.querySelectorAll(selector);
-      var before = null;
-      for (var i = 0; i < rows.length; i += 1) {
-        var candidate = rows[i];
-        if (candidate === drag.row) {
-          continue;
-        }
-        var rect = candidate.getBoundingClientRect();
-        if (pointerY < rect.top + (rect.height / 2)) {
-          before = candidate;
-          break;
-        }
-      }
-      if (before) {
-        drag.container.insertBefore(drag.placeholder, before);
-      } else {
-        drag.container.appendChild(drag.placeholder);
-      }
-
-      var edge = 48;
-      var scrollStep = 14;
-      if (pointerY < edge) {
-        window.scrollBy(0, -scrollStep);
-      } else if (pointerY > window.innerHeight - edge) {
-        window.scrollBy(0, scrollStep);
-      }
-    }
-
-    function onQueueDragPointerMove(event) {
-      var drag = state.dragReorder;
-      if (!drag) {
-        return;
-      }
-      event.preventDefault();
-      var pointerY = Number(event.clientY);
-      if (!Number.isFinite(pointerY)) {
-        return;
-      }
-      if (drag.rafId) {
-        drag.pendingPointerY = pointerY;
-        return;
-      }
-      drag.rafId = requestAnimationFrame(function () {
-        drag.rafId = 0;
-        var y = Number.isFinite(drag.pendingPointerY) ? drag.pendingPointerY : pointerY;
-        drag.pendingPointerY = null;
-        updateQueueDragPosition(y);
-      });
-    }
-
-    function actReorderEchelon(dir, echelon, orderedPaths) {
-      if (state.busy || !dir || !orderedPaths || orderedPaths.length < 2) {
-        return;
-      }
-      runAction(function () {
-        var args = ['set-order-fast', dir, String(echelon)].concat(orderedPaths);
-        return runBackend(args).then(function (result) {
-          hydrateCachedDirFromResult(dir, result);
-        });
-      }, {
-        animateReorder: true,
-        suppressLoadingOverlay: true
-      });
-    }
-
-    function finishQueueDrag(cancelDrop) {
-      var drag = state.dragReorder;
-      if (!drag) {
-        return;
-      }
-      state.dragReorder = null;
-
-      window.removeEventListener('pointermove', onQueueDragPointerMove);
-      window.removeEventListener('pointerup', onQueueDragPointerUp);
-      window.removeEventListener('pointercancel', onQueueDragPointerCancel);
-      document.body.classList.remove('row-drag-active');
-
-      if (drag.rafId) {
-        cancelAnimationFrame(drag.rafId);
-      }
-
-      if (drag.placeholder && drag.placeholder.parentNode) {
-        drag.container.insertBefore(drag.row, drag.placeholder);
-        drag.placeholder.parentNode.removeChild(drag.placeholder);
-      }
-
-      drag.row.classList.remove('row-dragging');
-      drag.row.style.position = '';
-      drag.row.style.left = '';
-      drag.row.style.top = '';
-      drag.row.style.width = '';
-      drag.row.style.height = '';
-      drag.row.style.zIndex = '';
-      drag.row.style.pointerEvents = '';
-      drag.row.style.transform = '';
-
-      if (cancelDrop) {
-        return;
-      }
-
-      var selector = '.row.row-root[data-path][data-echelon="' + drag.echelon + '"]';
-      var rows = drag.container.querySelectorAll(selector);
-      var nextOrder = [];
-      for (var i = 0; i < rows.length; i += 1) {
-        nextOrder.push(rows[i].getAttribute('data-path'));
-      }
-      if (!sameOrderedValues(drag.initialOrder, nextOrder)) {
-        actReorderEchelon(drag.parentDir, drag.echelon, nextOrder);
-      }
-    }
-
-    function onQueueDragPointerUp() {
-      finishQueueDrag(false);
-    }
-
-    function onQueueDragPointerCancel() {
-      finishQueueDrag(true);
-    }
-
-    function startQueueReorderDrag(event, row, item, depth) {
-      if (!event || event.button !== 0 || depth !== 0 || state.busy || state.dragReorder) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-
-      var container = row && row.parentElement;
-      if (!container || !item || !item.path) {
-        return;
-      }
-
-      var echelon = Number(item.echelon);
-      if (!Number.isFinite(echelon)) {
-        return;
-      }
-
-      var selector = '.row.row-root[data-path][data-echelon="' + echelon + '"]';
-      var rows = container.querySelectorAll(selector);
-      if (!rows || rows.length < 2) {
-        return;
-      }
-
-      var initialOrder = [];
-      for (var i = 0; i < rows.length; i += 1) {
-        initialOrder.push(rows[i].getAttribute('data-path'));
-      }
-
-      var rowRect = row.getBoundingClientRect();
-      var placeholder = document.createElement('div');
-      placeholder.className = 'row row-root row-drag-placeholder';
-      placeholder.style.height = rowRect.height + 'px';
-
-      container.insertBefore(placeholder, row.nextSibling);
-
-      row.classList.add('row-dragging');
-      row.style.position = 'fixed';
-      row.style.left = rowRect.left + 'px';
-      row.style.top = rowRect.top + 'px';
-      row.style.width = rowRect.width + 'px';
-      row.style.height = rowRect.height + 'px';
-      row.style.zIndex = '1200';
-      row.style.pointerEvents = 'none';
-
-      document.body.classList.add('row-drag-active');
-
-      state.dragReorder = {
-        row: row,
-        container: container,
-        placeholder: placeholder,
-        echelon: String(echelon),
-        parentDir: parentDirOfPath(item.path),
-        initialOrder: initialOrder,
-        pointerOffsetY: Math.max(0, event.clientY - rowRect.top),
-        pendingPointerY: null,
-        rafId: 0
-      };
-
-      window.addEventListener('pointermove', onQueueDragPointerMove);
-      window.addEventListener('pointerup', onQueueDragPointerUp);
-      window.addEventListener('pointercancel', onQueueDragPointerCancel);
-      updateQueueDragPosition(event.clientY);
-    }
-
     function themeLabel(name) {
       var value = String(name || '').replace(/[-_]+/g, ' ').trim();
       if (!value) {
@@ -895,6 +910,96 @@
       return !!target.isContentEditable;
     }
 
+    function detectPlatform() {
+      var platform = String(navigator.platform || '').toLowerCase();
+      var userAgent = String(navigator.userAgent || '').toLowerCase();
+      if (platform.indexOf('mac') >= 0 || userAgent.indexOf('mac os') >= 0) {
+        return 'mac';
+      }
+      if (platform.indexOf('linux') >= 0 || userAgent.indexOf('linux') >= 0) {
+        return 'linux';
+      }
+      if (platform.indexOf('win') >= 0 || userAgent.indexOf('windows') >= 0) {
+        return 'windows';
+      }
+      return 'other';
+    }
+
+    function getPlatformFontOptions() {
+      var platform = detectPlatform();
+      if (platform === 'mac') {
+        return [
+          { label: 'Avenir Next', value: '"Avenir Next", "Avenir", "Helvetica Neue", sans-serif' },
+          { label: 'San Francisco', value: '-apple-system, "SF Pro Text", "SF Pro Display", sans-serif' },
+          { label: 'Helvetica Neue', value: '"Helvetica Neue", "Helvetica", "Arial", sans-serif' },
+          { label: 'Iowan (Serif)', value: '"Iowan Old Style", "Palatino", serif' },
+          { label: 'Menlo (Mono)', value: '"Menlo", "SFMono-Regular", monospace' }
+        ];
+      }
+      if (platform === 'linux') {
+        return [
+          { label: 'Noto Sans', value: '"Noto Sans", "DejaVu Sans", "Liberation Sans", sans-serif' },
+          { label: 'Ubuntu', value: '"Ubuntu", "Cantarell", "DejaVu Sans", sans-serif' },
+          { label: 'Source Sans 3', value: '"Source Sans 3", "Noto Sans", sans-serif' },
+          { label: 'DejaVu Serif', value: '"DejaVu Serif", "Noto Serif", serif' },
+          { label: 'Fira Sans', value: '"Fira Sans", "Noto Sans", sans-serif' }
+        ];
+      }
+      if (platform === 'windows') {
+        return [
+          { label: 'Segoe UI', value: '"Segoe UI Variable Text", "Segoe UI", sans-serif' },
+          { label: 'Calibri', value: '"Calibri", "Arial", sans-serif' },
+          { label: 'Verdana', value: '"Verdana", "Segoe UI", sans-serif' },
+          { label: 'Georgia (Serif)', value: '"Georgia", "Times New Roman", serif' },
+          { label: 'Bahnschrift', value: '"Bahnschrift", "Segoe UI", sans-serif' }
+        ];
+      }
+      return [
+        { label: 'Avenir Next', value: '"Avenir Next", "Segoe UI", sans-serif' },
+        { label: 'Noto Sans', value: '"Noto Sans", "DejaVu Sans", sans-serif' },
+        { label: 'Serif', value: '"Georgia", "Times New Roman", serif' }
+      ];
+    }
+
+    function populateFontSelect() {
+      var select = document.getElementById('font-select');
+      if (!select) {
+        return;
+      }
+      select.innerHTML = '';
+      for (var i = 0; i < state.fontOptions.length; i += 1) {
+        var option = state.fontOptions[i];
+        var el = document.createElement('option');
+        el.value = option.value;
+        el.textContent = option.label;
+        select.appendChild(el);
+      }
+    }
+
+    function applyFontFamily(fontValue) {
+      var normalized = '';
+      for (var i = 0; i < state.fontOptions.length; i += 1) {
+        if (state.fontOptions[i].value === fontValue) {
+          normalized = state.fontOptions[i].value;
+          break;
+        }
+      }
+      if (!normalized && state.fontOptions.length) {
+        normalized = state.fontOptions[0].value;
+      }
+      if (!normalized) {
+        return;
+      }
+      state.activeFont = normalized;
+      saveStorage(FONT_KEY, normalized);
+      document.documentElement.style.setProperty('--app-font-family', normalized);
+      var select = document.getElementById('font-select');
+      if (select && select.value !== normalized) {
+        select.value = normalized;
+      }
+      scheduleAutoGrowWindowWidth();
+    }
+
     function bindStandardTextboxBehavior(input) {
       if (!input || input._prioritiesTextboxBound) {
         return;
@@ -935,17 +1040,70 @@
         return;
       }
       if (busy) {
+        button.classList.remove('queued');
         button.classList.add('loading');
         button.setAttribute('aria-busy', 'true');
         button.setAttribute('aria-label', 'Prioritizing');
         button.disabled = true;
         button.textContent = '';
       } else {
+        button.classList.remove('queued');
         button.classList.remove('loading');
         button.removeAttribute('aria-busy');
         button.setAttribute('aria-label', 'Prioritize');
         button.disabled = false;
         button.textContent = '⬆';
+      }
+    }
+
+    function setPrioritizeButtonQueued(button, queuePosition) {
+      if (!button) {
+        return;
+      }
+      button.classList.remove('loading');
+      button.classList.add('queued');
+      button.removeAttribute('aria-busy');
+      button.setAttribute('aria-label', 'Queued prioritize ' + String(queuePosition));
+      button.disabled = false;
+      button.textContent = String(queuePosition);
+    }
+
+    function getPrioritizeQueuePosition(path) {
+      if (!path) {
+        return 0;
+      }
+      for (var i = 0; i < state.prioritizeQueue.length; i += 1) {
+        var entry = state.prioritizeQueue[i];
+        if (entry && entry.path === path) {
+          return i + 1;
+        }
+      }
+      return 0;
+    }
+
+    function syncPrioritizeButtonsToQueue() {
+      var tree = treeEl();
+      if (!tree) {
+        return;
+      }
+      var rows = tree.querySelectorAll('.row');
+      for (var i = 0; i < rows.length; i += 1) {
+        var row = rows[i];
+        var path = row.getAttribute('data-path') || '';
+        var button = row.querySelector('.btn.pri');
+        if (!button) {
+          continue;
+        }
+        if (state.pendingPrioritizePath === path) {
+          setPrioritizeButtonBusy(button, true);
+          continue;
+        }
+        var queuePosition = getPrioritizeQueuePosition(path);
+        if (queuePosition > 0) {
+          setPrioritizeButtonQueued(button, queuePosition);
+        } else {
+          setPrioritizeButtonBusy(button, false);
+        }
       }
     }
 
@@ -975,16 +1133,6 @@
       render({ suppressLoadingOverlay: true, preserveInputSelection: true });
     }
 
-    function findPrioritizeButtonForPath(path) {
-      var rows = treeEl().querySelectorAll('.row');
-      for (var i = 0; i < rows.length; i += 1) {
-        if (rows[i].getAttribute('data-path') === path) {
-          return rows[i].querySelector('.btn.pri');
-        }
-      }
-      return null;
-    }
-
     function buildRow(item, depth, edgeClass, options) {
       options = options || {};
       var row = document.createElement('div');
@@ -997,27 +1145,36 @@
       if (edgeClass) {
         row.classList.add(edgeClass);
       }
-      if (item.hasSubpriorities && depth === 0) {
+      if (item.kind === 'dir' && depth === 0) {
         row.classList.add('row-project');
       }
-      if (options.highlightFirstRow && !item.hasSubpriorities) {
+      if (item.kind === 'dir') {
+        row.classList.add('row-expandable');
+      }
+      if (options.highlightFirstRow && item.kind !== 'dir') {
         row.classList.add('row-first-task');
       }
-      if (item.hasSubpriorities && item.checked !== 1) {
+      if (item.kind === 'dir' && item.checked !== 1) {
         row.classList.add('row-project-unchecked');
       }
       row.setAttribute('data-path', item.path);
       row.setAttribute('data-echelon', String(item.echelon));
       row.style.paddingLeft = indent(depth);
 
-      var prioritizeBtn = makeButton('⋮⋮', 'btn pri', function (event) {
+      var prioritizeBtn = makeButton('⬆', 'btn pri', function (event) {
         event.preventDefault();
         event.stopPropagation();
-      }, 'Drag to reorder');
-      prioritizeBtn.setAttribute('aria-label', 'Drag to reorder');
-      prioritizeBtn.addEventListener('pointerdown', function (event) {
-        startQueueReorderDrag(event, row, item, depth);
-      });
+        actPrioritize(item.path, prioritizeBtn);
+      }, 'Prioritize');
+      prioritizeBtn.setAttribute('aria-label', 'Prioritize');
+      if (state.pendingPrioritizePath === item.path) {
+        setPrioritizeButtonBusy(prioritizeBtn, true);
+      } else {
+        var queuePosition = getPrioritizeQueuePosition(item.path);
+        if (queuePosition > 0) {
+          setPrioritizeButtonQueued(prioritizeBtn, queuePosition);
+        }
+      }
       row.appendChild(prioritizeBtn);
 
       var left = document.createElement('div');
@@ -1026,7 +1183,7 @@
       if (item.kind === 'dir') {
         var hasChildren = item.hasSubpriorities;
         var open = !!state.expanded[item.path];
-        var useProjectSlotTriangle = item.hasSubpriorities && item.checked !== 1;
+        var useProjectSlotTriangle = item.checked !== 1;
         var expandLoading = state.pendingExpandPath === item.path;
         if (useProjectSlotTriangle) {
           var expPlaceholderProject = document.createElement('span');
@@ -1066,8 +1223,8 @@
       checkbox.checked = item.checked === 1;
       checkbox.title = checkbox.checked ? 'Uncheck' : 'Check';
       if (state.pendingCheckPath === item.path) {
-        checkbox.disabled = true;
         checkbox.classList.add('loading');
+        checkbox.setAttribute('aria-busy', 'true');
         checkSlot.classList.add('loading');
       }
       checkbox.addEventListener('click', function (event) {
@@ -1079,7 +1236,7 @@
 
       left.appendChild(checkSlot);
 
-      if (item.hasSubpriorities && !state.cache[item.path] && !state.pendingNextAction[item.path]) {
+      if (item.kind === 'dir' && item.hasSubpriorities && !state.cache[item.path] && !state.pendingNextAction[item.path]) {
         prefetchNextAction(item.path);
       }
 
@@ -1141,8 +1298,12 @@
         });
         nameStack.appendChild(edit);
       } else {
-        name.textContent = item.name + (item.kind === 'dir' && !item.hasSubpriorities ? '/' : '');
-        if (!item.hasSubpriorities) {
+        name.textContent = item.name;
+        name.classList.add('hover-outline-name');
+        if (item.kind === 'dir') {
+          name.classList.add('project-name-clickable');
+        }
+        if (item.kind === 'file') {
           name.classList.add('editable-name');
           name.addEventListener('click', function (event) {
             event.preventDefault();
@@ -1153,7 +1314,7 @@
         nameStack.appendChild(name);
       }
 
-      if (item.hasSubpriorities) {
+      if (item.kind === 'dir' && item.hasSubpriorities) {
         var nextActionText = getNextActionLabel(item.path);
         if (nextActionText) {
           var nextAction = document.createElement('span');
@@ -1170,7 +1331,7 @@
       var right = document.createElement('div');
       right.className = 'right';
 
-      if (item.hasSubpriorities) {
+      if (item.kind === 'dir') {
         var menuBtn = document.createElement('button');
         menuBtn.type = 'button';
         menuBtn.className = 'btn more';
@@ -1207,12 +1368,32 @@
             event.preventDefault();
             event.stopPropagation();
             state.openMenuPath = '';
-            actRemove(item.path);
+            actRemove(item);
           });
           menu.appendChild(deleteItem);
           right.appendChild(menu);
         }
       } else {
+        if (state.revealedMakeProjectPath === item.path || state.pendingMakeProjectPath === item.path) {
+          var makeProjectInline = document.createElement('button');
+          makeProjectInline.type = 'button';
+          makeProjectInline.className = 'make-project-inline';
+          makeProjectInline.textContent = 'Make project';
+          makeProjectInline.setAttribute('aria-label', 'Make project');
+          if (state.pendingMakeProjectPath === item.path) {
+            makeProjectInline.classList.add('loading');
+          } else {
+            makeProjectInline.classList.add('revealed');
+          }
+          makeProjectInline.disabled = !!state.pendingMakeProjectPath;
+          makeProjectInline.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            actMakeProject(item.path);
+          });
+          right.appendChild(makeProjectInline);
+        }
+
         var trash = document.createElement('button');
         trash.type = 'button';
         trash.className = 'btn trash';
@@ -1221,7 +1402,7 @@
         trash.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
-          actRemove(item.path);
+          actRemove(item);
         });
         right.appendChild(trash);
       }
@@ -1296,16 +1477,6 @@
       var left = document.createElement('div');
       left.className = 'left';
 
-      var spacer = document.createElement('span');
-      spacer.className = 'add-spacer';
-      spacer.setAttribute('aria-hidden', 'true');
-      left.appendChild(spacer);
-
-      var checkSpacer = document.createElement('span');
-      checkSpacer.className = 'add-check-spacer';
-      checkSpacer.setAttribute('aria-hidden', 'true');
-      left.appendChild(checkSpacer);
-
       var input = document.createElement('input');
       input.type = 'text';
       input.className = 'add-inline-input';
@@ -1351,28 +1522,6 @@
           input.focus();
         }
       });
-      return row;
-    }
-
-    function buildMakeProjectRevealRow(path, depth) {
-      var row = document.createElement('div');
-      row.className = 'row-reveal';
-      row.style.paddingLeft = indent(depth);
-
-      var button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'make-project-btn';
-      button.textContent = state.pendingMakeProjectPath === path ? '' : 'Make project';
-      if (state.pendingMakeProjectPath === path) {
-        button.classList.add('loading');
-      }
-      button.disabled = !!state.pendingMakeProjectPath;
-      button.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        actMakeProject(path);
-      });
-      row.appendChild(button);
       return row;
     }
 
@@ -1430,9 +1579,6 @@
         } else {
           container.appendChild(row);
         }
-        if (item.kind === 'file' && state.revealedMakeProjectPath === item.path) {
-          container.appendChild(buildMakeProjectRevealRow(item.path, depth));
-        }
         if (depth === 0 && !insertedAddRow && topEchelon >= 0) {
           var nextTop = i < items.length - 1 ? items[i + 1] : null;
           var shouldInsertAddHere = item.echelon === topEchelon && (!nextTop || nextTop.echelon !== topEchelon);
@@ -1447,7 +1593,8 @@
         }
         if (item.kind === 'dir' && state.expanded[item.path] && item.hasSubpriorities) {
           if (!(options && options.deferPendingExpandPath && options.deferPendingExpandPath === item.path)) {
-            await renderDir(container, item.path, depth + 1, options);
+            var childContainer = (depth === 0 && currentBlock) ? currentBlock : container;
+            await renderDir(childContainer, item.path, depth + 1, options);
           }
         }
       }
@@ -1486,6 +1633,7 @@
         } else {
           status('', false);
         }
+        scheduleAutoGrowWindowWidth();
       } catch (error) {
         status(String(error && error.message ? error.message : error), true);
       } finally {
@@ -1535,34 +1683,142 @@
         status(String(error && error.message ? error.message : error), true);
       } finally {
         state.busy = false;
+        processPrioritizeQueue();
       }
+    }
+
+    function processPrioritizeQueue() {
+      if (state.prioritizeQueueActive || state.busy || state.pendingPrioritizePath) {
+        return;
+      }
+      if (!state.prioritizeQueue.length) {
+        syncPrioritizeButtonsToQueue();
+        return;
+      }
+      state.prioritizeQueueActive = true;
+      (async function runQueue() {
+        try {
+          while (state.prioritizeQueue.length) {
+            if (state.busy || state.pendingPrioritizePath) {
+              break;
+            }
+            var next = state.prioritizeQueue.shift();
+            if (!next || !next.path) {
+              continue;
+            }
+            var path = next.path;
+            var parentDir = parentDirOfPath(path);
+            state.pendingPrioritizePath = path;
+            syncPrioritizeButtonsToQueue();
+            await runAction(function () {
+              return runBackend(['prioritize-quick', path]).then(function (result) {
+                var quick = parsePrioritizeQuickOutput(result && result.stdout);
+                if (applyPrioritizeQuickToCache(parentDir, path, quick)) {
+                  return;
+                }
+                return runBackend(['list', parentDir]).then(function (listResult) {
+                  hydrateCachedDirFromResult(parentDir, listResult);
+                });
+              }).catch(function () {
+                // Compatibility fallback for older backend copies that do not
+                // yet expose prioritize-quick.
+                return runBackend(['prioritize-fast', path]).then(function (fastResult) {
+                  hydrateCachedDirFromResult(parentDir, fastResult);
+                });
+              });
+            }, {
+              animateReorder: true,
+              suppressLoadingOverlay: true
+            });
+            state.pendingPrioritizePath = '';
+            syncPrioritizeButtonsToQueue();
+          }
+        } finally {
+          state.prioritizeQueueActive = false;
+          if (state.pendingPrioritizePath) {
+            state.pendingPrioritizePath = '';
+          }
+          syncPrioritizeButtonsToQueue();
+          if (state.prioritizeQueue.length && !state.busy) {
+            setTimeout(processPrioritizeQueue, 0);
+          }
+        }
+      })();
     }
 
     function actPrioritize(path, button) {
-      if (state.busy) {
+      if (!path) {
         return;
       }
-      var parentDir = parentDirOfPath(path);
-      state.pendingPrioritizePath = path;
-      setPrioritizeButtonBusy(button, true);
-      runAction(function () {
-        return runBackend(['prioritize-fast', path]).then(function (result) {
-          hydrateCachedDirFromResult(parentDir, result);
-        });
-      }, {
-        animateReorder: true
-      }).finally(function () {
-        state.pendingPrioritizePath = '';
-        setPrioritizeButtonBusy(findPrioritizeButtonForPath(path), false);
-      });
+      state.prioritizeQueue.push({ path: path });
+      syncPrioritizeButtonsToQueue();
+      processPrioritizeQueue();
+      if (button) {
+        button.blur();
+      }
     }
 
-    function actRemove(path) {
-      var parentDir = parentDirOfPath(path);
-      runAction(function () {
-        return runBackend(['remove-fast', path]).then(function (result) {
+    async function confirmDeleteIfNeeded(itemOrPath) {
+      if (!itemOrPath) {
+        return false;
+      }
+      var item = null;
+      if (typeof itemOrPath === 'string') {
+        item = {
+          path: itemOrPath,
+          kind: 'file',
+          hasSubpriorities: false
+        };
+      } else {
+        item = itemOrPath;
+      }
+      if (!item.path) {
+        return false;
+      }
+      if (item.kind !== 'dir') {
+        return true;
+      }
+
+      var taskCount = 0;
+      try {
+        var result = await runBackend(['descendant-count', item.path]);
+        taskCount = Number(String((result && result.stdout) || '').trim());
+      } catch (_) {
+        taskCount = 0;
+      }
+      if (!Number.isFinite(taskCount) || taskCount < 0) {
+        taskCount = 0;
+      }
+      if (taskCount <= 0) {
+        return true;
+      }
+
+      var message = taskCount === 1
+        ? 'Are you sure you want to delete this project and its task?'
+        : 'Are you sure you want to delete this project and its ' + taskCount + ' tasks?';
+      return window.confirm(message);
+    }
+
+    function actRemove(itemOrPath) {
+      if (!itemOrPath) {
+        return;
+      }
+      var path = typeof itemOrPath === 'string' ? itemOrPath : itemOrPath.path;
+      if (!path) {
+        return;
+      }
+      confirmDeleteIfNeeded(itemOrPath).then(function (ok) {
+        if (!ok) {
+          return;
+        }
+        var parentDir = parentDirOfPath(path);
+        return runAction(function () {
+          return runBackend(['remove-fast', path]).then(function (result) {
           hydrateCachedDirFromResult(parentDir, result);
         });
+        });
+      }).catch(function (error) {
+        status(String(error && error.message ? error.message : error), true);
       });
     }
 
@@ -1598,6 +1854,7 @@
         suppressLoadingOverlay: true
       }).finally(function () {
         state.pendingCheckPath = '';
+        render({ suppressLoadingOverlay: true, preserveInputSelection: true });
       });
     }
 
@@ -1606,6 +1863,7 @@
       if (!name || state.pendingAdd || state.busy) {
         return;
       }
+      var shouldRefocusAddInput = false;
       state.pendingAdd = true;
       render({ suppressLoadingOverlay: true });
       runAction(function () {
@@ -1616,9 +1874,14 @@
         suppressLoadingOverlay: true
       }).then(function () {
         state.pendingAddText = '';
+        shouldRefocusAddInput = true;
       }).finally(function () {
         state.pendingAdd = false;
-        render({ suppressLoadingOverlay: true });
+        render({ suppressLoadingOverlay: true }).then(function () {
+          if (shouldRefocusAddInput) {
+            focusNewPriorityInput();
+          }
+        });
       });
     }
 
@@ -1676,10 +1939,6 @@
 
     function setRootAndRefresh(options) {
       options = options || {};
-      if (state.previewRefreshTimer) {
-        clearTimeout(state.previewRefreshTimer);
-        state.previewRefreshTimer = null;
-      }
       state.root = rootInputValue();
       state.expanded = Object.create(null);
       state.expanded[state.root] = true;
@@ -1704,6 +1963,20 @@
       var value = rootInputValue();
       saveStorage('priorities.root', value);
       updateTitleFromRoot();
+    }
+
+    function focusNewPriorityInput() {
+      var input = document.querySelector('.add-inline-input');
+      if (!input || input.disabled) {
+        return false;
+      }
+      try {
+        input.focus();
+        input.select();
+      } catch (_) {
+        return false;
+      }
+      return true;
     }
 
     async function browseForFolder(setter) {
@@ -1754,6 +2027,9 @@
       state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
       applyTheme(state.activeTheme);
       applyTextScale(loadStorage(UI_SCALE_KEY) || loadStorage(TEXT_SCALE_KEY) || '1');
+      state.fontOptions = getPlatformFontOptions();
+      populateFontSelect();
+      applyFontFamily(loadStorage(FONT_KEY) || '');
 
       document.getElementById('settings-toggle').addEventListener('click', function () {
         toggleSettingsPanel();
@@ -1783,6 +2059,10 @@
         if (state.dockPollTimer) {
           clearInterval(state.dockPollTimer);
           state.dockPollTimer = null;
+        }
+        if (state.windowAutoGrowTimer) {
+          clearTimeout(state.windowAutoGrowTimer);
+          state.windowAutoGrowTimer = null;
         }
       });
       document.getElementById('refresh').addEventListener('click', setRootAndRefresh);
@@ -1831,7 +2111,8 @@
         }
       });
 
-      document.getElementById('theme-picker-btn').addEventListener('click', function () {
+      document.getElementById('theme-picker-btn').addEventListener('click', function (event) {
+        event.stopPropagation();
         state.themeHotkeysEnabled = true;
         if (isThemePickerOpen()) {
           closeThemePickerMenu();
@@ -1844,12 +2125,16 @@
         if (!button) {
           return;
         }
+        event.stopPropagation();
         applyTheme(button.getAttribute('data-theme-name'));
         closeThemePickerMenu();
       });
       document.getElementById('text-size-increase').addEventListener('click', increaseTextScale);
       document.getElementById('text-size-decrease').addEventListener('click', decreaseTextScale);
       document.getElementById('text-size-reset').addEventListener('click', resetTextScale);
+      document.getElementById('font-select').addEventListener('change', function (event) {
+        applyFontFamily(String(event.target && event.target.value ? event.target.value : ''));
+      });
 
       document.addEventListener('click', function (event) {
         var inThemePicker = event.target.closest('#theme-picker-menu') || event.target.closest('#theme-picker-btn');
@@ -1868,7 +2153,48 @@
       });
 
       document.addEventListener('keydown', function (event) {
+        var hasPrimaryMod = !!(event.metaKey || event.ctrlKey);
+        var target = event.target;
+        var isAddInputFocused = !!(target && target.classList && target.classList.contains('add-inline-input'));
+
+        if (hasPrimaryMod) {
+          if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            drillUp();
+            return;
+          }
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            dockWindow('left');
+            return;
+          }
+          if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            dockWindow('right');
+            return;
+          }
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            dockWindow('center');
+            return;
+          }
+        }
+
         if (event.key === 'Escape') {
+          if (isAddInputFocused) {
+            event.preventDefault();
+            try {
+              target.blur();
+            } catch (_) {
+              // Ignore blur failures.
+            }
+            return;
+          }
+          event.preventDefault();
+          if (state.drillStack && state.drillStack.length) {
+            drillUp();
+            return;
+          }
           closeThemePickerMenu();
           if (!document.getElementById('settings-panel').classList.contains('hidden')) {
             toggleSettingsPanel(false);
@@ -1877,6 +2203,13 @@
         }
 
         if (isTypingContext(event.target)) {
+          return;
+        }
+
+        if (event.key === 'Enter') {
+          if (focusNewPriorityInput()) {
+            event.preventDefault();
+          }
           return;
         }
 

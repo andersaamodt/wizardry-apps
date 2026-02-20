@@ -2604,7 +2604,7 @@ h2 {
 
 .queue-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
@@ -2619,6 +2619,43 @@ h2 {
   min-width: 0;
   display: grid;
   gap: 3px;
+}
+
+.queue-item-editing {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.queue-item-dragging {
+  opacity: 0.54;
+}
+
+.queue-item-drop-target {
+  outline: 1px dashed var(--accent);
+  outline-offset: -1px;
+}
+
+.queue-drag-handle {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  width: 22px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  line-height: 1;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.queue-drag-handle:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.queue-drag-handle:active {
+  cursor: grabbing;
 }
 
 .queue-item-text {
@@ -2673,7 +2710,7 @@ h2 {
 }
 
 .queue-edit-wrap {
-  grid-column: 1 / span 2;
+  grid-column: 1 / -1;
   display: grid;
   gap: 8px;
 }

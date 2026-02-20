@@ -192,6 +192,15 @@ body {
   line-height: 1;
 }
 
+.icon-glyph {
+  display: inline-block;
+  line-height: 1;
+}
+
+.icon-glyph-organize {
+  transform: translate(0px, -1.6px);
+}
+
 #open-create-workflow {
   font-size: 1rem;
   font-weight: 600;
@@ -201,7 +210,10 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transform: translate(1px, -1.5px);
+}
+
+.icon-glyph-create {
+  transform: translate(0.2px, -2.3px);
 }
 
 .icon-action.active {
@@ -522,6 +534,13 @@ body.settings-open #settings-panel {
 .footer-icon-btn.active {
   background: color-mix(in srgb, var(--accent-soft, #e6e3f4) 55%, transparent);
   color: var(--accent-strong);
+}
+
+.footer-icon-btn img {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: block;
+  filter: brightness(0) saturate(100%) opacity(0.8);
 }
 
 .footer-theme-anchor {
@@ -1430,10 +1449,15 @@ button:disabled {
 }
 
 .section-clear-btn {
-  padding: 0.2rem 0.52rem;
+  height: 1.24rem;
+  padding: 0 0.44rem;
+  line-height: 1;
   font-size: 0.72rem;
   border-radius: 8px;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   justify-self: end;
   border: 1px solid var(--section-border);
   background: color-mix(in srgb, var(--section-bg) 94%, transparent);
@@ -1475,7 +1499,7 @@ button:disabled {
 }
 
 .icon-editor {
-  margin-bottom: 0.76rem;
+  margin-bottom: 0.28rem;
   display: inline-grid;
   width: fit-content;
   max-width: 100%;

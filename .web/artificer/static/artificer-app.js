@@ -438,6 +438,12 @@
       draftText: "",
       saving: false
     },
+    queueDrag: {
+      active: false,
+      workspaceId: "",
+      conversationId: "",
+      itemId: ""
+    },
     runningWorkspaceId: "",
     runningConversationId: "",
     awaitingApprovalByConversation: {},
@@ -6222,7 +6228,7 @@
     var isLoading = !!state.queueItemsLoadingByConversation[queueKey];
     var fetchedAt = Number(state.queueItemsFetchedAtByConversation[queueKey] || 0);
     var staleMs = stats.running ? 900 : 1600;
-    if (!isLoading && (!fetchedAt || Date.now() - fetchedAt > staleMs)) {
+    if (!isLoading && !state.queueDrag.active && (!fetchedAt || Date.now() - fetchedAt > staleMs)) {
       loadQueueItems(wsId, convId, { minIntervalMs: staleMs }).then(function () {
         renderUi();
       }).catch(function () {
@@ -6244,7 +6250,7 @@
       var editingThis = isEditingHere && String(state.queueEdit.itemId || "") === itemId;
       if (editingThis) {
         var savingAttr = state.queueEdit.saving ? " disabled" : "";
-        html += "<div class='queue-item'>";
+        html += "<div class='queue-item queue-item-editing' data-queue-item-id='" + escAttr(itemId) + "'>";
         html += "<div class='queue-edit-wrap'>";
         html += "<p class='queue-item-meta'>" + escHtml(queueItemMetaLabel(queueItem, i)) + "</p>";
         html += "<textarea class='queue-edit-input' data-action='queue-edit-input' data-queue-item-id='" + escAttr(itemId) + "'>" + escHtml(state.queueEdit.draftText || "") + "</textarea>";
@@ -6255,7 +6261,8 @@
         html += "</div>";
         html += "</div>";
       } else {
-        html += "<div class='queue-item'>";
+        html += "<div class='queue-item' draggable='true' data-queue-item-id='" + escAttr(itemId) + "'>";
+        html += "<button type='button' class='queue-drag-handle' data-action='queue-drag-handle' data-queue-item-id='" + escAttr(itemId) + "' aria-label='Drag to reorder queued item' title='Drag to reorder queued item'>&#8942;&#8942;</button>";
         html += "<div class='queue-item-main'>";
         html += "<p class='queue-item-text'>" + escHtml(queueItemPreview(queueItem.prompt || "", 240)) + "</p>";
         html += "<p class='queue-item-meta'>" + escHtml(queueItemMetaLabel(queueItem, i)) + "</p>";
@@ -11190,6 +11197,31 @@
     });
   }
 
+  function reorderQueuedMessages(workspaceId, conversationId, orderedIds) {
+    var wsId = String(workspaceId || "");
+    var convId = String(conversationId || "");
+    var ids = Array.isArray(orderedIds) ? orderedIds : [];
+    if (!wsId || !convId || ids.length < 2) {
+      return Promise.resolve();
+    }
+    return apiPost("queue_reorder", {
+      workspace_id: wsId,
+      conversation_id: convId,
+      item_ids: ids.join(",")
+    }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not reorder queued messages");
+      }
+      applyQueueStateFromResponse(wsId, convId, response);
+      return loadQueueItems(wsId, convId, { force: true, minIntervalMs: 0 }).catch(function () {
+        return null;
+      }).then(function () {
+        renderUi();
+        return response;
+      });
+    });
+  }
+
   function stopConversationRun(workspaceId, conversationId, options) {
     var opts = options || {};
     var wsId = String(workspaceId || "");
@@ -15593,10 +15625,113 @@
     });
 
     if (el.queueTray) {
+      function clearQueueDragUi() {
+        if (!el.queueTrayList) {
+          return;
+        }
+        var rows = el.queueTrayList.querySelectorAll(".queue-item");
+        for (var i = 0; i < rows.length; i += 1) {
+          rows[i].classList.remove("queue-item-dragging");
+          rows[i].classList.remove("queue-item-drop-target");
+        }
+      }
+
+      function clearQueueDragState() {
+        state.queueDrag.active = false;
+        state.queueDrag.workspaceId = "";
+        state.queueDrag.conversationId = "";
+        state.queueDrag.itemId = "";
+        clearQueueDragUi();
+      }
+
+      on(el.queueTray, "dragstart", function (event) {
+        var handle = event.target.closest("[data-action='queue-drag-handle'][data-queue-item-id]");
+        if (!handle) {
+          event.preventDefault();
+          return;
+        }
+        var row = handle.closest(".queue-item[data-queue-item-id]");
+        var wsId = String(state.activeWorkspaceId || "");
+        var convId = String(state.activeConversationId || "");
+        var itemId = String(handle.getAttribute("data-queue-item-id") || "");
+        if (!row || !wsId || !convId || !itemId || state.queueEdit.itemId) {
+          event.preventDefault();
+          return;
+        }
+        state.queueDrag.active = true;
+        state.queueDrag.workspaceId = wsId;
+        state.queueDrag.conversationId = convId;
+        state.queueDrag.itemId = itemId;
+        row.classList.add("queue-item-dragging");
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", itemId);
+        }
+      });
+
+      on(el.queueTray, "dragover", function (event) {
+        if (!state.queueDrag.active || !el.queueTrayList) {
+          return;
+        }
+        var overRow = event.target.closest(".queue-item[data-queue-item-id]");
+        if (!overRow || overRow.classList.contains("queue-item-editing")) {
+          return;
+        }
+        var draggingId = String(state.queueDrag.itemId || "");
+        var overId = String(overRow.getAttribute("data-queue-item-id") || "");
+        if (!draggingId || !overId || draggingId === overId) {
+          return;
+        }
+        event.preventDefault();
+        clearQueueDragUi();
+        overRow.classList.add("queue-item-drop-target");
+        var dragRow = el.queueTrayList.querySelector(".queue-item[data-queue-item-id='" + escAttr(draggingId) + "']");
+        if (!dragRow || dragRow === overRow) {
+          return;
+        }
+        var rect = overRow.getBoundingClientRect();
+        var insertAfter = event.clientY > rect.top + (rect.height / 2);
+        if (insertAfter) {
+          if (overRow.nextSibling !== dragRow) {
+            el.queueTrayList.insertBefore(dragRow, overRow.nextSibling);
+          }
+        } else {
+          el.queueTrayList.insertBefore(dragRow, overRow);
+        }
+      });
+
+      on(el.queueTray, "drop", function (event) {
+        if (!state.queueDrag.active || !el.queueTrayList) {
+          return;
+        }
+        event.preventDefault();
+        var wsId = String(state.queueDrag.workspaceId || "");
+        var convId = String(state.queueDrag.conversationId || "");
+        var orderedIds = [];
+        var rows = el.queueTrayList.querySelectorAll(".queue-item[data-queue-item-id]:not(.queue-item-editing)");
+        for (var i = 0; i < rows.length; i += 1) {
+          orderedIds.push(String(rows[i].getAttribute("data-queue-item-id") || ""));
+        }
+        clearQueueDragState();
+        if (orderedIds.length > 1) {
+          reorderQueuedMessages(wsId, convId, orderedIds).catch(showError);
+        }
+      });
+
+      on(el.queueTray, "dragend", function () {
+        clearQueueDragState();
+      });
+
       on(el.queueTray, "click", function (event) {
         var wsId = String(state.activeWorkspaceId || "");
         var convId = String(state.activeConversationId || "");
         if (!wsId || !convId) {
+          return;
+        }
+
+        var dragHandle = event.target.closest("[data-action='queue-drag-handle'][data-queue-item-id]");
+        if (dragHandle) {
+          event.preventDefault();
           return;
         }
 

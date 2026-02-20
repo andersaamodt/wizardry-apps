@@ -79,7 +79,7 @@
           <div class="apps-list-head">
             <input id="builtin-search" type="text" placeholder="Filter" spellcheck="false">
             <div class="menu-anchor">
-              <button id="organize-btn" class="icon-action" type="button" aria-haspopup="menu" aria-expanded="false" title="Organize">☰</button>
+              <button id="organize-btn" class="icon-action" type="button" aria-haspopup="menu" aria-expanded="false" title="Organize"><span class="icon-glyph icon-glyph-organize" aria-hidden="true">☰</span></button>
               <div id="organize-menu" class="floating-menu organize-menu hidden" role="menu" aria-label="Organize apps">
                 <p class="organize-title">Show</p>
                 <button type="button" data-organize-show="both"><span>Built-in and user-created</span><span class="check" aria-hidden="true">&check;</span></button>
@@ -87,14 +87,14 @@
                 <button type="button" data-organize-show="workspace"><span>User-created only</span><span class="check" aria-hidden="true">&check;</span></button>
               </div>
             </div>
-            <button id="open-create-workflow" class="icon-action" type="button" title="Create App" aria-label="Create App">+</button>
+            <button id="open-create-workflow" class="icon-action" type="button" title="Create App" aria-label="Create App"><span class="icon-glyph icon-glyph-create" aria-hidden="true">+</span></button>
           </div>
           <div id="catalog-list" class="list catalog-list"></div>
         </section>
 
         <section class="card sidebar-footer">
           <div class="footer-bar">
-            <button id="toggle-settings-panel" type="button" class="footer-icon-btn" aria-label="Toggle settings panel" title="Settings">⚙︎</button>
+            <button id="toggle-settings-panel" type="button" class="footer-icon-btn" aria-label="Toggle settings panel" title="Settings"><img src="assets/settings-gear.svg" alt="Settings"></button>
             <div class="menu-anchor footer-theme-anchor">
               <button id="theme-picker-btn" class="footer-theme-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Select theme">Psionic</button>
               <div id="theme-picker-menu" class="floating-menu hidden" role="menu" aria-label="Theme selector">
@@ -125,7 +125,7 @@
           </div>
           <div class="toolbar-actions">
             <div class="toolbar-left">
-              <button id="action-build" type="button" class="action toolbar-btn primary" title="Build enabled publish targets">🛠 Build</button>
+              <button id="action-build" type="button" class="action toolbar-btn primary" title="Compile enabled publish targets">🛠 Build</button>
               <button id="action-run" type="button" class="action toolbar-btn" title="Run app">▶ Run</button>
               <button id="action-stage" type="button" class="action toolbar-btn" title="Stage mobile assets">📦 Stage</button>
             </div>
@@ -1099,7 +1099,7 @@
         }
         var entry = getTargetRuntime(selected.key, targetId);
         if (!entry || !entry.status) {
-          return '';
+          return 'enabled';
         }
         return entry.status;
       }
@@ -1110,6 +1110,26 @@
           return entry.path;
         }
         return '';
+      }
+
+      function isTargetSupportedForSelected(selected, targetId) {
+        if (!selected || !targetId) {
+          return false;
+        }
+        var projectType = projectTypeKeyForContext(selected.context);
+        var allowed = targetSpecs(projectType).map(function (item) { return item.id; });
+        if (allowed.indexOf(targetId) < 0) {
+          return false;
+        }
+        if (selected.kind === 'builtin') {
+          var app = state.apps.find(function (entry) {
+            return entry.id === selected.id;
+          });
+          if (app && app.exists === false) {
+            return false;
+          }
+        }
+        return true;
       }
 
       function isTargetRunnable(targetId) {
@@ -1920,6 +1940,8 @@
         var inactiveFragment = document.createDocumentFragment();
 
         function createTargetRow(spec, active) {
+          var supported = isTargetSupportedForSelected(selected, spec.id);
+          var openPathValue = targetOpenPath(selected, spec.id);
           var row = document.createElement('label');
           row.className = 'target-item target-row';
           var rowKey = selected.key + ':' + spec.id;
@@ -1933,8 +1955,15 @@
           var toggle = document.createElement('input');
           toggle.type = 'checkbox';
           toggle.checked = !!active;
-          toggle.disabled = false;
+          toggle.disabled = state.busy || !supported;
+          if (!supported) {
+            toggle.title = 'Target unavailable for this project';
+            toggle.setAttribute('aria-label', 'Target unavailable for this project');
+          }
           toggle.addEventListener('change', function () {
+            if (!supported) {
+              return;
+            }
             var checked = !!toggle.checked;
             perform('Update publish targets', function () {
               return setSelectedTargetEnabled(selected, spec.id, checked);
@@ -1971,14 +2000,21 @@
           var openBtn = document.createElement('button');
           openBtn.type = 'button';
           openBtn.className = 'row-mini row-open';
-          openBtn.title = 'Open target output';
+          if (!supported) {
+            openBtn.title = 'Target unavailable for this project';
+          } else if (!active) {
+            openBtn.title = 'Enable target first';
+          } else if (!openPathValue) {
+            openBtn.title = 'No output folder yet (build or run first)';
+          } else {
+            openBtn.title = 'Open target output';
+          }
           openBtn.setAttribute('aria-label', 'Open target output');
           openBtn.textContent = '📂';
-          openBtn.disabled = state.busy || !active || !targetOpenPath(selected, spec.id);
+          openBtn.disabled = state.busy || !active || !supported || !openPathValue;
           openBtn.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
-            var openPathValue = targetOpenPath(selected, spec.id);
             if (!openPathValue) {
               return;
             }
@@ -1993,7 +2029,7 @@
           runBtn.title = runnable ? 'Run' : 'Compile';
           runBtn.setAttribute('aria-label', runnable ? 'Run' : 'Compile');
           runBtn.textContent = runnable ? '▶' : '🛠';
-          runBtn.disabled = state.busy || !active;
+          runBtn.disabled = state.busy || !active || !supported;
           runBtn.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -2009,7 +2045,7 @@
             mobileBtn.title = isIos ? 'Build iOS Smoke' : 'Build Android Debug';
             mobileBtn.setAttribute('aria-label', mobileBtn.title);
             mobileBtn.textContent = isIos ? '📱' : '🤖';
-            mobileBtn.disabled = state.busy || !active;
+            mobileBtn.disabled = state.busy || !active || !supported;
             mobileBtn.addEventListener('click', function (event) {
               event.preventDefault();
               event.stopPropagation();
@@ -2074,6 +2110,9 @@
       }
 
       async function setSelectedTargetEnabled(selected, targetId, enabled) {
+        if (!isTargetSupportedForSelected(selected, targetId)) {
+          throw new Error('Target is unavailable for this project.');
+        }
         var projectType = projectTypeKeyForContext(selected.context);
         var current = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
         var next = current.filter(function (entry) { return entry !== targetId; });

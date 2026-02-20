@@ -540,4 +540,4 @@ pagetitle: "Artificer"
 </div>
 </div>
 
-<script src="/static/artificer-app.js?v=20260220-multi-agent-status-overlay1"></script>
+<script src="/static/artificer-app.js?v=20260220-queue-drag-reorder1"></script>
