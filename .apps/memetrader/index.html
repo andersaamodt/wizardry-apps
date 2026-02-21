@@ -5,32 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Memetrader</title>
   <style>
+    :root {
+      --memetrader-drag-band-h: 14px;
+    }
+
     html, body {
       margin: 0;
       width: 100%;
       height: 100%;
-      background: #0b121a;
+      background: #9ea5ae;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
+    #drag-band {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--memetrader-drag-band-h);
+      background: color-mix(in srgb, #9ea5ae 86%, #8f969f 14%);
+      -webkit-app-region: drag;
+      z-index: 2;
+    }
+
     #app {
+      position: fixed;
+      top: var(--memetrader-drag-band-h);
+      left: 0;
+      right: 0;
+      bottom: 0;
       width: 100%;
-      height: 100%;
+      height: calc(100% - var(--memetrader-drag-band-h));
       border: 0;
-      background: #0b121a;
+      background: #9ea5ae;
+      -webkit-app-region: no-drag;
     }
 
     #status {
       position: fixed;
-      inset: 0;
+      top: var(--memetrader-drag-band-h);
+      left: 0;
+      right: 0;
+      bottom: 0;
       display: grid;
       place-items: center;
-      background: #0b121a;
-      color: #9bb0c8;
-      font-size: 0.95rem;
+      background: color-mix(in srgb, #9ea5ae 82%, #8f969f 18%);
+      color: #2d3138;
+      font-size: 0.92rem;
       z-index: 10;
-      transition: opacity 120ms ease;
+      transition: opacity 180ms ease;
+      -webkit-app-region: no-drag;
     }
 
     #status.hidden {
@@ -38,16 +63,44 @@
       pointer-events: none;
     }
 
+    #status .status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 0.45rem 0.92rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, #6f7680 55%, transparent);
+      background: color-mix(in srgb, #d8dde3 52%, transparent);
+      color: #2f353d;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      box-shadow: 0 6px 16px rgba(45, 49, 56, 0.18);
+    }
+
     #status.error {
-      color: #ffb4b4;
+      color: #7a1f1f;
       white-space: pre-wrap;
       text-align: center;
       padding: 1rem;
     }
+
+    #status.error .status-pill {
+      border-color: color-mix(in srgb, #b45151 50%, transparent);
+      background: color-mix(in srgb, #f0c7c7 58%, transparent);
+      color: #651b1b;
+      border-radius: 12px;
+      white-space: pre-wrap;
+      text-align: center;
+      max-width: min(86vw, 700px);
+    }
   </style>
 </head>
 <body>
-  <div id="status">Starting Memetrader...</div>
+  <div id="drag-band" aria-hidden="true"></div>
+  <div id="status"><span class="status-pill">Loading...</span></div>
   <iframe id="app" src="about:blank" title="Memetrader"></iframe>
 
   <script>
@@ -96,18 +149,42 @@
       getPort: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
     };
 
+    var holdUntil = 0;
+    var appFrameLoaded = false;
+    var appInnerReady = false;
+    var hideFallbackTimer = null;
+
     function statusEl() {
       return document.getElementById('status');
     }
 
     function setStatus(text, isError) {
       var el = statusEl();
-      el.textContent = text;
+      var pill = el.querySelector('.status-pill');
+      if (!pill) {
+        pill = document.createElement('span');
+        pill.className = 'status-pill';
+        el.textContent = '';
+        el.appendChild(pill);
+      }
+      pill.textContent = text;
       el.className = isError ? 'error' : '';
     }
 
     function hideStatus() {
       statusEl().classList.add('hidden');
+    }
+
+    function requestHideStatus() {
+      var delay = Math.max(0, holdUntil - Date.now());
+      setTimeout(hideStatus, delay);
+    }
+
+    function maybeHideStatus() {
+      if (!appFrameLoaded || !appInnerReady) {
+        return;
+      }
+      requestHideStatus();
     }
 
     function hasBridge() {
@@ -193,18 +270,33 @@
       var iframe = document.getElementById('app');
       try {
         await waitForBridge(4000);
+        appFrameLoaded = false;
+        appInnerReady = false;
+        if (hideFallbackTimer) {
+          clearTimeout(hideFallbackTimer);
+          hideFallbackTimer = null;
+        }
 
-        setStatus('Syncing Memetrader...', false);
+        setStatus('Loading...', false);
         await ensureSiteIfNeeded();
 
         if (await isRunning()) {
           var hotPort = await resolvePort();
-          iframe.onload = hideStatus;
+          iframe.onload = function () {
+            appFrameLoaded = true;
+            maybeHideStatus();
+            if (!hideFallbackTimer) {
+              hideFallbackTimer = setTimeout(function () {
+                appInnerReady = true;
+                maybeHideStatus();
+              }, 9000);
+            }
+          };
           iframe.src = 'http://localhost:' + hotPort + entryPath + '?v=' + Date.now();
           return;
         }
 
-        setStatus('Starting Memetrader...', false);
+        setStatus('Loading...', false);
         try {
           await bridgeExec(commands.ensureUsablePort);
         } catch (_) {
@@ -213,7 +305,16 @@
         await startWithFallbackPort();
 
         var port = await resolvePort();
-        iframe.onload = hideStatus;
+        iframe.onload = function () {
+          appFrameLoaded = true;
+          maybeHideStatus();
+          if (!hideFallbackTimer) {
+            hideFallbackTimer = setTimeout(function () {
+              appInnerReady = true;
+              maybeHideStatus();
+            }, 9000);
+          }
+        };
         iframe.src = 'http://localhost:' + port + entryPath + '?v=' + Date.now();
       } catch (error) {
         iframe.src = 'about:blank';
@@ -221,7 +322,22 @@
       }
     }
 
+    window.addEventListener('message', function (event) {
+      var data = event && event.data;
+      if (!data || data.type !== 'memetrader-ready') {
+        return;
+      }
+      appInnerReady = true;
+      if (hideFallbackTimer) {
+        clearTimeout(hideFallbackTimer);
+        hideFallbackTimer = null;
+      }
+      maybeHideStatus();
+    });
+
     window.addEventListener('DOMContentLoaded', function () {
+      holdUntil = Date.now() + 550;
+      setStatus('Loading...', false);
       setTimeout(boot, 20);
     });
   </script>

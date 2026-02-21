@@ -169,11 +169,17 @@
                 <details class="pipeline-section" open>
                   <summary class="pipeline-section-head with-action">
                     <span>Log</span>
+                    <button id="copy-log" type="button" class="action section-clear-btn section-copy-btn" title="Copy log" aria-label="Copy log">
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M9 9h10v10H9z"></path>
+                        <path d="M5 15H4V5h10v1"></path>
+                      </svg>
+                    </button>
                     <button id="clear-log" type="button" class="action section-clear-btn">Clear</button>
                   </summary>
                   <div class="pipeline-section-body">
                     <div class="command-log-frame">
-                      <pre id="log" class="mono command-log" data-empty-message="Log is empty">Wizardry Forge ready.</pre>
+                      <pre id="log" class="mono command-log" data-empty-message="Log is empty" tabindex="0" role="textbox" aria-readonly="true" aria-label="Log output">Wizardry Forge ready.</pre>
                     </div>
                   </div>
                 </details>
@@ -308,7 +314,7 @@
         workspaces: [],
         organizeShow: loadStorage(ORGANIZE_SHOW_KEY) || 'both',
         themes: [
-          'adept', 'alchemist', 'archmage', 'chronomancer', 'conjurer', 'druid',
+          'adept', 'alchemist', 'archmage', 'athenian', 'chronomancer', 'conjurer', 'druid',
           'empath', 'enchanter', 'geomancer', 'hermeticist', 'hierophant', 'illusionist',
           'lich', 'necromancer', 'psionic', 'pyromancer', 'seer', 'shaman', 'sorcerer', 'sorceress',
           'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet', 'warlock', 'wizard'
@@ -386,14 +392,19 @@
       }
 
       function syncLogClearVisibility() {
-        if (!els.clearLog || !els.log) {
+        if (!els.log) {
           return;
         }
         var rawLog = (els.log.dataset && typeof els.log.dataset.rawLog === 'string')
           ? els.log.dataset.rawLog
           : (els.log.textContent || '');
         var hasContent = rawLog.trim().length > 0;
-        els.clearLog.classList.toggle('hidden', !hasContent);
+        if (els.clearLog) {
+          els.clearLog.classList.toggle('hidden', !hasContent);
+        }
+        if (els.copyLog) {
+          els.copyLog.classList.toggle('hidden', !hasContent);
+        }
       }
 
       function setLogContent(value) {
@@ -420,6 +431,20 @@
           next = next.slice(0, 36000);
         }
         setLogContent(next);
+      }
+
+      function selectLogText() {
+        if (!els.log || !window.getSelection || !document.createRange) {
+          return;
+        }
+        var selection = window.getSelection();
+        if (!selection) {
+          return;
+        }
+        var range = document.createRange();
+        range.selectNodeContents(els.log);
+        selection.removeAllRanges();
+        selection.addRange(range);
       }
 
       function setBridgeStatus(ok, msg) {
@@ -3287,11 +3312,41 @@
           });
         }
 
-        els.clearLog.addEventListener('click', function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          setLogContent('');
-        });
+        if (els.clearLog) {
+          els.clearLog.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setLogContent('');
+          });
+        }
+
+        if (els.copyLog) {
+          els.copyLog.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var rawLog = (els.log && els.log.dataset && typeof els.log.dataset.rawLog === 'string')
+              ? els.log.dataset.rawLog
+              : (els.log ? (els.log.textContent || '') : '');
+            if (!rawLog.trim()) {
+              toast('Log is empty', 'bad');
+              return;
+            }
+            copyTextToClipboard(rawLog).then(function (ok) {
+              toast(ok ? 'Log copied' : 'Could not copy log', ok ? 'ok' : 'bad');
+            });
+          });
+        }
+
+        if (els.log) {
+          els.log.addEventListener('keydown', function (event) {
+            var meta = event.metaKey || event.ctrlKey;
+            if (!meta || event.altKey || event.shiftKey || !event.key || event.key.toLowerCase() !== 'a') {
+              return;
+            }
+            event.preventDefault();
+            selectLogText();
+          });
+        }
 
         if (els.railDivider) {
           els.railDivider.addEventListener('pointerdown', function (event) {
@@ -3342,6 +3397,13 @@
           var target = event.target;
           var tag = target && target.tagName ? target.tagName.toLowerCase() : '';
           var meta = event.metaKey || event.ctrlKey;
+          var inLog = !!(els.log && target && (target === els.log || (typeof target.closest === 'function' && target.closest('#log'))));
+
+          if (meta && !event.altKey && !event.shiftKey && event.key && event.key.toLowerCase() === 'a' && inLog) {
+            event.preventDefault();
+            selectLogText();
+            return;
+          }
 
           if (meta && !event.altKey && !event.shiftKey && event.key && event.key.toLowerCase() === 'a') {
             if (tag === 'input' || tag === 'textarea') {
@@ -3544,6 +3606,7 @@
         els.qualityHelp = document.getElementById('quality-help');
 
         els.log = document.getElementById('log');
+        els.copyLog = document.getElementById('copy-log');
         els.clearLog = document.getElementById('clear-log');
 
         els.repoRoot = document.getElementById('repo-root');

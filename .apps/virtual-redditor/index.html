@@ -1,0 +1,1735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Redditor</title>
+  <link rel="stylesheet" href="style.css?v=vr20260221h">
+  <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
+</head>
+<body>
+  <div class="app-shell">
+    <div id="main-grid" class="main-grid">
+      <aside class="sidebar">
+        <section class="panel apps-list-card">
+          <div class="apps-list-head">
+            <button id="btn-create-profile" class="icon-action" type="button" title="Create Virtual Redditor" aria-label="Create Virtual Redditor">
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
+          <div id="profiles-summary" class="profiles-summary"></div>
+          <div id="profiles-list" class="list profiles-list"></div>
+          <div id="profiles-msg" class="error-line"></div>
+          <div class="apps-list-footer">
+            <div class="footer-bar">
+              <button id="toggle-settings-panel" type="button" class="footer-icon-btn" aria-label="Open persona settings" title="Settings">
+                <svg class="settings-gear-glyph" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+                  <path d="M14 8.3V5.73l-1.58-.264c-.117-.44-.292-.848-.496-1.2l.93-1.285-1.81-1.84-1.31.908c-.371-.205-.781-.38-1.187-.497L8.288 0H5.72l-.263 1.578c-.437.117-.816.293-1.196.497L2.979 1.17 1.141 2.98l.934 1.287c-.2.38-.376.79-.493 1.228L.004 5.73V8.3l1.575.264c.117.438.292.818.496 1.198l-.93 1.315 1.809 1.813 1.312-.938c.38.205.787.38 1.224.497l.26 1.55h2.566l.263-1.58c.408-.117.817-.293 1.196-.497l1.315.935 1.81-1.812-.935-1.315c.203-.38.38-.76.495-1.2L14 8.305zM7 9.704c-1.488 0-2.683-1.2-2.683-2.69S5.542 4.327 7 4.327s2.683 1.198 2.683 2.69c0 1.49-1.195 2.688-2.683 2.688z" fill="currentColor"/>
+                </svg>
+              </button>
+              <div class="menu-anchor footer-theme-anchor">
+                <button id="theme-picker-btn" class="footer-theme-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Select theme">Psionic</button>
+                <div id="theme-picker-menu" class="floating-menu hidden" role="menu" aria-label="Theme selector">
+                  <div id="theme-picker-list" class="menu-list"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <div id="rail-divider" class="rail-divider" role="separator" aria-orientation="vertical" aria-label="Resize virtual redditor list"></div>
+
+      <main class="content">
+        <section class="pane-toolbar" aria-label="Active bot controls">
+          <div class="pane-toolbar-left">
+            <label class="toolbar-field" for="title-username">
+              <span class="title-caption">Bot Username</span>
+              <input id="title-username" type="text" class="title-input" placeholder="u/your_bot_username" spellcheck="false" readonly>
+            </label>
+            <button id="btn-connect-reddit" class="menu-btn soft" type="button" title="Connect Reddit account for selected bot" aria-label="Connect Reddit account">Login…</button>
+            <button id="btn-change-username" class="menu-btn soft" type="button">Change…</button>
+          </div>
+          <div class="pane-toolbar-right">
+            <div class="daemon-menu" aria-label="Daemon controls">
+              <button id="btn-run-toggle" class="icon-btn run" type="button" aria-label="Start daemon" title="Start daemon">
+                <span id="run-toggle-icon" aria-hidden="true">▶</span>
+              </button>
+              <button id="btn-restart" class="icon-btn soft" type="button" aria-label="Restart daemon" title="Restart daemon">
+                <span aria-hidden="true">↻</span>
+              </button>
+              <button id="btn-run-once" class="menu-btn soft" type="button">Run Once</button>
+              <button id="btn-extract" class="menu-btn soft" type="button">Nightly Statute</button>
+            </div>
+            <div id="status-chip-row" class="status-chip-row">
+              <span class="status-chip">Checking...</span>
+            </div>
+          </div>
+        </section>
+
+        <nav class="tabbar" aria-label="Virtual Redditor panels">
+          <button type="button" class="tab-btn active" data-tab="persona">Persona</button>
+          <button type="button" class="tab-btn" data-tab="replies">Replies</button>
+          <button type="button" class="tab-btn" data-tab="actions">Enforcement</button>
+          <button type="button" class="tab-btn" data-tab="logs">Logs</button>
+        </nav>
+
+        <section class="tab-panel active persona-panel" id="panel-persona">
+          <div class="persona-layout">
+            <section class="persona-card settings-card">
+              <div id="create-profile-pane" class="create-profile-pane hidden">
+                <h3>Create Virtual Redditor</h3>
+                <div class="status-line">Start a new bot profile, then connect its Reddit account.</div>
+                <label for="new-profile-name">Name</label>
+                <input id="new-profile-name" type="text" placeholder="Example: Strict Judge" spellcheck="false">
+                <div class="control-row">
+                  <button id="btn-create-profile-confirm" type="button" class="primary">Create Virtual Redditor</button>
+                  <button id="btn-create-profile-cancel" type="button" class="soft">Cancel</button>
+                </div>
+                <div id="create-profile-msg" class="error-line"></div>
+              </div>
+
+              <h3>Virtual Redditor Settings</h3>
+              <div id="settings-msg" class="error-line"></div>
+
+              <label for="subreddit-input">Subreddit</label>
+              <input id="subreddit-input" type="text" placeholder="subreddit name (without r/)">
+
+              <label for="mode-dropdown-btn">Mode</label>
+              <input id="mode-select" type="hidden" value="mixed">
+              <div id="mode-dropdown" class="mode-dropdown">
+                <button id="mode-dropdown-btn" type="button" class="mode-dropdown-btn" aria-haspopup="menu" aria-expanded="false"></button>
+                <div id="mode-dropdown-menu" class="mode-dropdown-menu hidden" role="menu" aria-label="Mode options">
+                  <button type="button" class="mode-option" data-mode-option="judicial">
+                    <span class="mode-option-name">judicial</span>
+                    <span class="mode-option-desc">Bans only for explicit norm violations.</span>
+                  </button>
+                  <button type="button" class="mode-option" data-mode-option="capricious">
+                    <span class="mode-option-name">capricious</span>
+                    <span class="mode-option-desc">Bans only for vibes.</span>
+                  </button>
+                  <button type="button" class="mode-option" data-mode-option="mixed">
+                    <span class="mode-option-name">mixed</span>
+                    <span class="mode-option-desc">Bans for either norm violations or vibes.</span>
+                  </button>
+                </div>
+              </div>
+
+              <label for="patrol-mode-select">Patrol Mode</label>
+              <select id="patrol-mode-select">
+                <option value="full">full</option>
+                <option value="sample">sample</option>
+              </select>
+
+              <div class="inline-field-row">
+                <label for="sample-max-input" class="inline-field-label">Max samples:</label>
+                <span
+                  class="inline-help-tip"
+                  tabindex="0"
+                  role="img"
+                  aria-label="In sample patrol mode, this caps how many recent comments are checked in each pass. Lower is faster, higher is more thorough."
+                  data-tooltip="In sample patrol mode, this caps how many recent comments are checked in each pass. Lower is faster, higher is more thorough."
+                >?</span>
+                <input id="sample-max-input" type="number" min="1" step="1" value="20">
+              </div>
+
+              <div class="settings-block">
+                <h4>Custom Instructions</h4>
+                <div id="doctrine-msg" class="error-line"></div>
+                <label for="manifesto-input">manifesto.md</label>
+                <textarea id="manifesto-input" class="custom-instructions-input" spellcheck="false"></textarea>
+                <label for="norms-input">norms.jsonl</label>
+                <textarea id="norms-input" class="custom-instructions-input" spellcheck="false"></textarea>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-actions">
+          <div class="status-line" id="actions-line">No actions loaded yet.</div>
+          <div class="table-wrap">
+            <table class="table" id="actions-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Action</th>
+                  <th>User</th>
+                  <th>Why</th>
+                  <th>Status</th>
+                  <th>Controls</th>
+                </tr>
+              </thead>
+              <tbody id="actions-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-replies">
+          <div class="status-line" id="replies-line">No replies loaded yet.</div>
+          <div id="replies-list"></div>
+        </section>
+
+        <section class="tab-panel" id="panel-logs">
+          <div class="log-head-row">
+            <div class="status-line">Standard Output</div>
+            <button id="btn-log-clear-stdout" type="button" class="soft log-clear-btn">Clear</button>
+          </div>
+          <pre id="stdout-log" class="log-pane"></pre>
+          <div class="log-head-row with-top-margin">
+            <div class="status-line">Standard Error</div>
+            <button id="btn-log-clear-stderr" type="button" class="soft log-clear-btn">Clear</button>
+          </div>
+          <pre id="stderr-log" class="log-pane"></pre>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="oauth-modal" class="oauth-modal hidden" role="dialog" aria-modal="true" aria-labelledby="oauth-modal-title">
+    <div class="oauth-sheet">
+      <div class="oauth-head">
+        <h3 id="oauth-modal-title">Connect Reddit Account</h3>
+        <button id="btn-oauth-close" type="button" class="soft">Close</button>
+      </div>
+      <p class="oauth-subhead">Login happens in your browser for trust and security. This wizard will hold your hand all the way through app setup and OAuth loopback.</p>
+
+      <div class="oauth-steps">
+        <div class="oauth-step">
+          <h4>1. Sign in or create your Reddit account</h4>
+          <p>Open Reddit in your browser and sign in to the account this Virtual Redditor should use.</p>
+          <button id="btn-oauth-open-login" type="button" class="soft">Open Reddit Login</button>
+        </div>
+
+        <div class="oauth-step">
+          <h4>2. Create the Reddit app credentials</h4>
+          <p>In Reddit app preferences, create a <strong>script</strong> app and set this redirect URI exactly:</p>
+          <div class="oauth-inline-row">
+            <input id="oauth-redirect-uri" type="text" readonly value="http://127.0.0.1:8765/vr/callback">
+            <button id="btn-oauth-copy-redirect" type="button" class="soft">Copy</button>
+          </div>
+          <button id="btn-oauth-open-apps" type="button" class="soft">Open Reddit App Preferences</button>
+
+          <label for="oauth-client-id">Client ID (the short string under app name)</label>
+          <input id="oauth-client-id" type="text" placeholder="reddit client id" spellcheck="false">
+
+          <label for="oauth-client-secret">Client Secret</label>
+          <input id="oauth-client-secret" type="password" placeholder="reddit client secret" spellcheck="false">
+
+          <label for="oauth-subreddit">Subreddit for this bot (without r/)</label>
+          <input id="oauth-subreddit" type="text" placeholder="example: askscience" spellcheck="false">
+
+          <div class="oauth-actions">
+            <button id="btn-oauth-begin" type="button" class="primary">Start Browser Authorization</button>
+            <button id="btn-oauth-cancel" type="button" class="soft">Cancel Auth Flow</button>
+          </div>
+        </div>
+
+        <div class="oauth-step">
+          <h4>3. Finish callback and save tokens</h4>
+          <p>After you approve in browser, this wizard listens on localhost and captures the callback automatically.</p>
+          <div id="oauth-status-line" class="status-line">Waiting to start.</div>
+          <div id="oauth-error-line" class="error-line"></div>
+
+          <label for="oauth-callback-input">Fallback: paste callback URL here if auto-capture fails</label>
+          <div class="oauth-inline-row">
+            <input id="oauth-callback-input" type="text" placeholder="http://127.0.0.1:8765/vr/callback?state=...&code=...">
+            <button id="btn-oauth-submit-callback" type="button" class="soft">Use Pasted Callback</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function loadBridge() {
+      var candidates = [
+        './.host/shared/wizardry-bridge.js',
+        '../.host/shared/wizardry-bridge.js',
+        '../../.host/shared/wizardry-bridge.js'
+      ];
+      var idx = 0;
+      function next() {
+        if (idx >= candidates.length) return;
+        var script = document.createElement('script');
+        script.src = candidates[idx++];
+        script.onerror = next;
+        document.head.appendChild(script);
+      }
+      next();
+    })();
+  </script>
+
+  <script>
+    var MODE_DESCRIPTIONS = {
+      judicial: 'Bans only for explicit norm violations.',
+      capricious: 'Bans only for vibes.',
+      mixed: 'Bans for either norm violations or vibes.'
+    };
+
+    var THEME_KEY = 'wizardry.virtual_redditor.theme';
+    var LEFT_RAIL_WIDTH_KEY = 'wizardry.virtual_redditor.left_rail.width';
+    var THEME_ASSET_VERSION = 'vr20260221a';
+
+    var state = {
+      backendScriptPath: '',
+      status: null,
+      profiles: [],
+      activeProfile: '',
+      actions: [],
+      replies: [],
+      activeTab: 'persona',
+      pollTimer: null,
+      doctrineDirty: false,
+      doctrineSaving: false,
+      doctrineSaveQueued: false,
+      doctrineSaveTimer: null,
+      doctrineRemoteManifesto: '',
+      doctrineRemoteNorms: '',
+      settingsSaveTimer: null,
+      oauthPollTimer: null,
+      oauthFinishing: false,
+      oauthFlowActive: false,
+      previewMode: false,
+      themes: [
+        'adept', 'alchemist', 'archmage', 'athenian', 'chronomancer', 'conjurer', 'druid',
+        'empath', 'enchanter', 'geomancer', 'hermeticist', 'hierophant', 'illusionist',
+        'lich', 'necromancer', 'psionic', 'pyromancer', 'seer', 'shaman', 'sorcerer',
+        'sorceress', 'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet',
+        'warlock', 'wizard'
+      ],
+      activeTheme: 'psionic',
+      leftRailWidth: parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 320,
+      refreshInFlight: false,
+      statusRenderSig: '',
+      profilesRenderSig: '',
+      actionsRenderSig: '',
+      repliesRenderSig: ''
+    };
+
+    function loadStorage(key) {
+      try { return window.localStorage ? window.localStorage.getItem(key) : null; } catch (_) { return null; }
+    }
+
+    function saveStorage(key, value) {
+      try {
+        if (window.localStorage) {
+          if (value === null || value === undefined || value === '') window.localStorage.removeItem(key);
+          else window.localStorage.setItem(key, String(value));
+        }
+      } catch (_) {}
+    }
+
+    function themeLabel(name) {
+      return String(name || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    }
+
+    function renderThemePicker() {
+      var list = document.getElementById('theme-picker-list');
+      var button = document.getElementById('theme-picker-btn');
+      if (!list || !button) return;
+      var html = '';
+      for (var i = 0; i < state.themes.length; i += 1) {
+        var theme = state.themes[i];
+        var active = theme === state.activeTheme ? ' active' : '';
+        html += "<button type='button' class='theme-item" + active + "' data-theme-name='" + theme + "'>" + themeLabel(theme) + '</button>';
+      }
+      list.innerHTML = html;
+      button.textContent = themeLabel(state.activeTheme);
+    }
+
+    function applyTheme(themeName) {
+      var normalized = String(themeName || '').toLowerCase().trim();
+      if (!/^[a-z0-9_-]+$/.test(normalized) || state.themes.indexOf(normalized) < 0) return;
+      state.activeTheme = normalized;
+      var stylesheet = document.getElementById('vr-theme-stylesheet');
+      if (stylesheet) {
+        stylesheet.href = 'themes/' + normalized + '.css?v=' + THEME_ASSET_VERSION;
+      }
+      saveStorage(THEME_KEY, normalized);
+      renderThemePicker();
+    }
+
+    function cycleTheme(step) {
+      var total = state.themes.length;
+      if (!total) return;
+      var current = state.themes.indexOf(state.activeTheme);
+      if (current < 0) current = 0;
+      var next = (current + step + total) % total;
+      applyTheme(state.themes[next]);
+    }
+
+    function isThemeMenuOpen() {
+      var menu = document.getElementById('theme-picker-menu');
+      return !!(menu && !menu.classList.contains('hidden'));
+    }
+
+    function openThemeMenu() {
+      var menu = document.getElementById('theme-picker-menu');
+      var button = document.getElementById('theme-picker-btn');
+      if (!menu || !button) return;
+      menu.classList.remove('hidden');
+      button.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeThemeMenu() {
+      var menu = document.getElementById('theme-picker-menu');
+      var button = document.getElementById('theme-picker-btn');
+      if (!menu || !button) return;
+      menu.classList.add('hidden');
+      button.setAttribute('aria-expanded', 'false');
+    }
+
+    function openModeMenu() {
+      var menu = document.getElementById('mode-dropdown-menu');
+      var button = document.getElementById('mode-dropdown-btn');
+      if (!menu || !button) return;
+      menu.classList.remove('hidden');
+      button.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeModeMenu() {
+      var menu = document.getElementById('mode-dropdown-menu');
+      var button = document.getElementById('mode-dropdown-btn');
+      if (!menu || !button) return;
+      menu.classList.add('hidden');
+      button.setAttribute('aria-expanded', 'false');
+    }
+
+    function visibleProfileRows() {
+      return Array.prototype.slice.call(document.querySelectorAll('#profiles-list .profile-row'));
+    }
+
+    function setOauthStatus(msg, isError) {
+      var line = document.getElementById('oauth-status-line');
+      var err = document.getElementById('oauth-error-line');
+      if (line) line.textContent = msg || '';
+      if (err) {
+        err.textContent = isError ? (msg || '') : '';
+      }
+    }
+
+    function openOauthModal(autoMode) {
+      var modal = document.getElementById('oauth-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      var subredditInput = document.getElementById('oauth-subreddit');
+      var sourceSub = document.getElementById('subreddit-input');
+      if (subredditInput && sourceSub && sourceSub.value && !subredditInput.value) {
+        subredditInput.value = String(sourceSub.value || '').trim();
+      }
+      var username = normalizeUsername(document.getElementById('title-username').value);
+      if (autoMode) {
+        setOauthStatus('New Virtual Redditor created. Next: connect Reddit account in your browser.', false);
+      } else if (username) {
+        setOauthStatus('Ready to connect u/' + username + '.', false);
+      } else {
+        setOauthStatus('Ready to connect. Fill app credentials, then start authorization.', false);
+      }
+    }
+
+    async function resumeOauthFlowInModal() {
+      if (state.previewMode) return;
+      try {
+        var out = await backendJson('oauth-status', []);
+        var status = String(out.status || 'idle');
+        state.oauthFlowActive = (status !== 'idle');
+        if (status === 'waiting') {
+          setOauthStatus('Resuming pending authorization. Finish approval in browser…', false);
+          startOauthPolling();
+          return;
+        }
+        if (status === 'received') {
+          await finishOauthFlow();
+          return;
+        }
+        if (status === 'error') {
+          var result = out.result || {};
+          setOauthStatus(String(result.error_description || result.error || 'OAuth callback failed'), true);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    function closeOauthModal() {
+      var modal = document.getElementById('oauth-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+    }
+
+    async function openExternalUrl(url) {
+      var target = String(url || '').trim();
+      if (!target) return;
+      if (hasBridge()) {
+        try {
+          await bridgeExec(['open', target]);
+          return;
+        } catch (_) {}
+      }
+      try {
+        window.open(target, '_blank', 'noopener,noreferrer');
+      } catch (_) {}
+    }
+
+    function stopOauthPoll() {
+      if (state.oauthPollTimer) {
+        clearInterval(state.oauthPollTimer);
+        state.oauthPollTimer = null;
+      }
+    }
+
+    async function finishOauthFlow() {
+      if (state.oauthFinishing) return;
+      state.oauthFinishing = true;
+      try {
+        setOauthStatus('Exchanging code for refresh token and validating account…', false);
+        var out = await backendJson('oauth-finish', []);
+        var connectedUser = String(out.redditUsername || '').trim();
+        var connectedSub = String(out.subreddit || '').trim();
+        if (connectedUser) {
+          document.getElementById('title-username').value = connectedUser;
+        }
+        if (connectedSub) {
+          document.getElementById('subreddit-input').value = connectedSub;
+        }
+        setOauthStatus('Connected successfully' + (connectedUser ? ' as u/' + connectedUser : '') + '.', false);
+        setSettingsMessage('Reddit account connected and credentials saved.', false);
+        stopOauthPoll();
+        state.oauthFlowActive = false;
+        await refreshStatus();
+        setTimeout(function () {
+          closeOauthModal();
+        }, 900);
+      } catch (error) {
+        setOauthStatus(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.oauthFinishing = false;
+      }
+    }
+
+    async function pollOauthStatusOnce() {
+      if (!state.oauthFlowActive) return;
+      try {
+        var out = await backendJson('oauth-status', []);
+        var status = String(out.status || 'idle');
+        if (status === 'idle') {
+          setOauthStatus('OAuth flow is idle. Start Browser Authorization to begin.', false);
+          return;
+        }
+        if (status === 'waiting') {
+          setOauthStatus('Waiting for Reddit callback on localhost:8765…', false);
+          return;
+        }
+        if (status === 'received') {
+          await finishOauthFlow();
+          return;
+        }
+        if (status === 'error') {
+          var result = out.result || {};
+          var msg = String(result.error_description || result.error || 'OAuth callback failed');
+          setOauthStatus(msg, true);
+          return;
+        }
+      } catch (error) {
+        setOauthStatus(String(error && error.message ? error.message : error), true);
+      }
+    }
+
+    function startOauthPolling() {
+      stopOauthPoll();
+      state.oauthPollTimer = setInterval(function () {
+        pollOauthStatusOnce();
+      }, 1100);
+    }
+
+    async function beginOauthFlow() {
+      if (!hasBridge()) {
+        setOauthStatus('OAuth login is available in the desktop app.', false);
+        return;
+      }
+      if (state.previewMode) {
+        setOauthStatus('OAuth login is available in the desktop app.', false);
+        return;
+      }
+      var clientId = String(document.getElementById('oauth-client-id').value || '').trim();
+      var clientSecret = String(document.getElementById('oauth-client-secret').value || '').trim();
+      var subreddit = String(document.getElementById('oauth-subreddit').value || '').trim();
+      var usernameHint = normalizeUsername(document.getElementById('title-username').value || '');
+      if (!clientId || !clientSecret) {
+        setOauthStatus('Client ID and Client Secret are required.', true);
+        return;
+      }
+
+      try {
+        setOauthStatus('Preparing loopback listener and authorization URL…', false);
+        var out = await backendJson('oauth-begin', [clientId, clientSecret, subreddit, usernameHint]);
+        state.oauthFlowActive = true;
+        setOauthStatus('Browser authorization opened. Approve access, then return here.', false);
+        await openExternalUrl(out.authUrl);
+        startOauthPolling();
+      } catch (error) {
+        state.oauthFlowActive = false;
+        var msg = String(error && error.message ? error.message : error);
+        if (msg.toLowerCase().indexOf('native bridge unavailable') >= 0 || msg.toLowerCase().indexOf('wizardry bridge unavailable') >= 0 || msg.toLowerCase().indexOf('desktop bridge not ready') >= 0) {
+          setOauthStatus('OAuth login is available in the desktop app.', false);
+          return;
+        }
+        setOauthStatus(msg, true);
+      }
+    }
+
+    function railWidthBounds() {
+      var min = 240;
+      var max = Math.min(560, Math.max(min, (window.innerWidth || 1200) - 460));
+      return { min: min, max: max };
+    }
+
+    function setLeftRailWidth(width) {
+      var next = parseInt(width, 10);
+      if (isNaN(next)) next = 320;
+      var bounds = railWidthBounds();
+      if (next < bounds.min) next = bounds.min;
+      if (next > bounds.max) next = bounds.max;
+      state.leftRailWidth = next;
+      saveStorage(LEFT_RAIL_WIDTH_KEY, String(next));
+      var grid = document.getElementById('main-grid');
+      if (grid) grid.style.setProperty('--left-rail-width', next + 'px');
+    }
+
+    function normalizeUsername(value) {
+      var raw = String(value || '').trim();
+      if (!raw) return '';
+      return raw.replace(/^\/?u\//i, '');
+    }
+
+    function hasBridge() {
+      return !!(window.wizardry && typeof window.wizardry.rpc === 'function');
+    }
+
+    async function waitForBridge(timeoutMs) {
+      var start = Date.now();
+      while (!hasBridge()) {
+        if (Date.now() - start > (timeoutMs || 4000)) {
+          throw new Error('desktop bridge not ready');
+        }
+        await new Promise(function (resolve) { setTimeout(resolve, 50); });
+      }
+    }
+
+    async function bridgeExec(argv) {
+      try {
+        await waitForBridge(5000);
+      } catch (_) {
+        // Bridge can come up a moment late on desktop launch.
+        await new Promise(function (resolve) { setTimeout(resolve, 250); });
+        await waitForBridge(5000);
+      }
+      var res = await window.wizardry.rpc('bridge.exec', { argv: argv });
+      var code = Number(res && res.exit_code);
+      if (!Number.isFinite(code) || code === 0) return res || {};
+      var stderr = String((res && res.stderr) || '').trim();
+      var stdout = String((res && res.stdout) || '').trim();
+      throw new Error(stderr || stdout || ('exit ' + code));
+    }
+
+    function detectBackendScript() {
+      if (state.backendScriptPath) return state.backendScriptPath;
+      try {
+        var p = decodeURIComponent(String((window.location && window.location.pathname) || ''));
+        var marker = '/.apps/virtual-redditor/';
+        var idx = p.lastIndexOf(marker);
+        if (idx > 0) {
+          state.backendScriptPath = p.slice(0, idx) + '/.apps/virtual-redditor/scripts/virtual-redditor-backend.sh';
+          return state.backendScriptPath;
+        }
+      } catch (_) {
+        state.backendScriptPath = '';
+      }
+      return '';
+    }
+
+    async function runBackend(action, args) {
+      var argv;
+      args = Array.isArray(args) ? args : [];
+      var scriptPath = detectBackendScript();
+      if (scriptPath) {
+        argv = ['sh', scriptPath, action].concat(args);
+      } else {
+        argv = [
+          'sh',
+          '-c',
+          'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/.apps/virtual-redditor/scripts/virtual-redditor-backend.sh" "$@"',
+          'virtual-redditor-backend',
+          action
+        ].concat(args);
+      }
+      return bridgeExec(argv);
+    }
+
+    function parseJsonFromStdout(stdout) {
+      var raw = String(stdout || '').trim();
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch (_) {
+        var lines = raw.split('\n').filter(Boolean);
+        for (var i = lines.length - 1; i >= 0; i -= 1) {
+          var line = lines[i].trim();
+          if (!line || line.charAt(0) !== '{') continue;
+          try { return JSON.parse(line); } catch (_) {}
+        }
+      }
+      return null;
+    }
+
+    async function backendJson(action, args) {
+      var res = await runBackend(action, args || []);
+      var out = parseJsonFromStdout((res && res.stdout) || '');
+      if (!out) throw new Error('backend returned non-json output');
+      if (out.ok === false) throw new Error(String(out.error || 'backend action failed'));
+      return out;
+    }
+
+    function enablePreviewMode() {
+      state.previewMode = true;
+      state.status = {
+        launchd: { loaded: false },
+        settings: {
+          mode: 'mixed',
+          patrolMode: 'full',
+          patrolSampleMax: 20,
+          subreddit: 'virtualredditor',
+          redditUsername: 'preview_bot',
+          stateDir: '/preview/state/virtual-redditor',
+          paths: {
+            actions: '/preview/state/virtual-redditor/actions.jsonl',
+            bans: '/preview/state/virtual-redditor/bans.jsonl',
+            replies: '/preview/state/virtual-redditor/replies.jsonl',
+            manifesto: '/preview/state/virtual-redditor/manifesto.md',
+            norms: '/preview/state/virtual-redditor/norms.jsonl',
+            redditEnv: '/preview/state/virtual-redditor/reddit.env',
+            botEnv: '/preview/state/virtual-redditor/bot.env',
+            daemonLog: '/preview/state/virtual-redditor/daemon.log',
+            daemonErrorLog: '/preview/state/virtual-redditor/daemon.stderr.log'
+          }
+        },
+        metrics: {
+          counts: { actions: 0, replies: 0 },
+          runtime: { lastPollAt: 'n/a', processed: 0 }
+        },
+        profiles: {
+          activeProfile: 'preview',
+          profiles: [
+            { id: 'preview', name: 'Preview Bot', username: 'preview_bot', subreddit: 'virtualredditor', connected: true, selected: true },
+            { id: 'strict-judge', name: 'Strict Judge', username: 'strict_judge', subreddit: 'modsandbox', connected: false, selected: false }
+          ]
+        }
+      };
+      state.actions = [];
+      state.replies = [];
+      renderStatus();
+      renderActions();
+      renderReplies();
+      setControlMessage('', false);
+      setSettingsMessage('', false);
+      setDoctrineMessage('', false);
+      document.getElementById('manifesto-input').value = '# Virtual Redditor Manifesto\\n\\nPreview mode in Safari.';
+      document.getElementById('norms-input').value = '{\"id\":\"N-1\",\"text\":\"No harassment.\",\"severity\":\"high\"}\\n';
+    }
+
+    function setControlMessage(msg, isError) {
+      var el = document.getElementById('control-msg');
+      if (!el) return;
+      el.textContent = msg || '';
+      el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
+    }
+
+    function setSettingsMessage(msg, isError) {
+      var el = document.getElementById('settings-msg');
+      el.textContent = msg || '';
+      el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
+    }
+
+    function setDoctrineMessage(msg, isError) {
+      var el = document.getElementById('doctrine-msg');
+      el.textContent = msg || '';
+      el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
+    }
+
+    function setProfilesMessage(msg, isError) {
+      var el = document.getElementById('profiles-msg');
+      el.textContent = msg || '';
+      el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
+    }
+
+    function setCreateProfileMessage(msg, isError) {
+      var el = document.getElementById('create-profile-msg');
+      if (!el) return;
+      el.textContent = msg || '';
+      el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
+    }
+
+    function openCreateProfilePane() {
+      var pane = document.getElementById('create-profile-pane');
+      var input = document.getElementById('new-profile-name');
+      if (pane) pane.classList.remove('hidden');
+      if (input) input.value = '';
+      setCreateProfileMessage('', false);
+      setActiveTab('persona');
+      if (input && typeof input.focus === 'function') input.focus();
+    }
+
+    function closeCreateProfilePane() {
+      var pane = document.getElementById('create-profile-pane');
+      if (pane) pane.classList.add('hidden');
+      setCreateProfileMessage('', false);
+    }
+
+    function formatTs(ts) {
+      if (!ts) return '-';
+      var d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return String(ts);
+      return d.toLocaleString();
+    }
+
+    function statusChip(text, klass) {
+      return '<span class="status-chip ' + (klass || '') + '">' + text + '</span>';
+    }
+
+    function escapeHtml(input) {
+      return String(input || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function stableStringify(value) {
+      try { return JSON.stringify(value); } catch (_) { return ''; }
+    }
+
+    function updateModeDescriptions(mode) {
+      var normalized = String(mode || 'mixed');
+      if (!MODE_DESCRIPTIONS[normalized]) normalized = 'mixed';
+      var input = document.getElementById('mode-select');
+      if (input) input.value = normalized;
+      var button = document.getElementById('mode-dropdown-btn');
+      if (button) {
+        button.innerHTML = '<span class="mode-selected-name">' + escapeHtml(normalized) + '</span>' +
+          '<span class="mode-selected-desc">' + escapeHtml(MODE_DESCRIPTIONS[normalized]) + '</span>';
+      }
+      var rows = document.querySelectorAll('.mode-option');
+      for (var i = 0; i < rows.length; i += 1) {
+        rows[i].classList.toggle('active', rows[i].getAttribute('data-mode-option') === normalized);
+      }
+    }
+
+    function profileInitial(profile) {
+      var name = String(profile.name || profile.id || '?').trim();
+      return name ? name.charAt(0).toUpperCase() : '?';
+    }
+
+    function renderProfiles() {
+      var listEl = document.getElementById('profiles-list');
+      var summaryEl = document.getElementById('profiles-summary');
+      if (!listEl) return;
+      var profiles = Array.isArray(state.profiles) ? state.profiles.slice() : [];
+      var renderSig = stableStringify({
+        activeProfile: state.activeProfile,
+        profiles: profiles.map(function (p) {
+          return {
+            id: String(p.id || ''),
+            name: String(p.name || ''),
+            username: String(p.username || ''),
+            subreddit: String(p.subreddit || ''),
+            connected: !!p.connected,
+            selected: !!p.selected
+          };
+        })
+      });
+      if (renderSig && renderSig === state.profilesRenderSig) return;
+      state.profilesRenderSig = renderSig;
+      var filtered = profiles;
+      if (summaryEl) {
+        summaryEl.textContent = String(filtered.length) + ' shown' +
+          ' • total=' + String(profiles.length);
+      }
+      if (!filtered.length) {
+        listEl.innerHTML = '<div class="profiles-empty">No matching virtual redditors.</div>';
+        return;
+      }
+      listEl.innerHTML = filtered.map(function (profile) {
+        var id = escapeHtml(profile.id || '');
+        var name = escapeHtml(profile.name || profile.id || 'profile');
+        var uname = escapeHtml(profile.username || '');
+        var subreddit = escapeHtml(profile.subreddit || '');
+        var connected = !!profile.connected;
+        var selected = !!profile.selected;
+        var subtitle = [uname ? ('u/' + uname) : 'user unset', subreddit ? ('r/' + subreddit) : 'subreddit unset'].join(' • ');
+        return [
+          '<div class="profile-row' + (selected ? ' active' : '') + '" data-profile-id="' + id + '" role="button" tabindex="0" aria-label="' + name + '">',
+          '  <span class="profile-row-avatar" aria-hidden="true">' + escapeHtml(profileInitial(profile)) + '</span>',
+          '  <span class="profile-row-main">',
+          '    <span class="profile-row-topline"><span class="profile-row-title">' + name + '</span><span class="profile-status-badge ' + (connected ? 'connected' : 'needs-setup') + '">' + (connected ? 'connected' : 'needs setup') + '</span></span>',
+          '    <span class="profile-row-sub">' + escapeHtml(subtitle) + '</span>',
+          '  </span>',
+          '</div>'
+        ].join('');
+      }).join('');
+    }
+
+    function renderStatus() {
+      var row = document.getElementById('status-chip-row');
+      var runtimeLine = document.getElementById('runtime-line');
+      var paths = document.getElementById('paths');
+      var s = state.status;
+
+      if (!s) {
+        row.innerHTML = statusChip('Status unavailable', 'warn');
+        if (runtimeLine) runtimeLine.textContent = 'No status available yet.';
+        if (paths) paths.textContent = 'No paths loaded yet.';
+        return;
+      }
+
+      var launchd = s.launchd || {};
+      var settings = s.settings || {};
+      var metrics = s.metrics || {};
+      var profilesPayload = s.profiles || {};
+      var counts = metrics.counts || {};
+      var runtime = metrics.runtime || {};
+
+      var chips = [];
+      chips.push(statusChip(launchd.loaded ? 'running' : 'launchd stopped', launchd.loaded ? 'ok' : 'warn'));
+      chips.push(statusChip('actions ' + String(counts.actions || 0) + ' • replies ' + String(counts.replies || 0)));
+      row.innerHTML = chips.join('');
+
+      if (runtimeLine) {
+        runtimeLine.textContent = 'subreddit=' + String(settings.subreddit || '(unset)') +
+          ' | user=' + String(settings.redditUsername || '(unset)') +
+          ' | last poll=' + String(runtime.lastPollAt || 'n/a') +
+          ' | processed=' + String(runtime.processed || 0);
+      }
+
+      if (paths) {
+        var p = settings.paths || {};
+        paths.textContent = [
+          'stateDir: ' + String(settings.stateDir || ''),
+          'actions: ' + String(p.actions || ''),
+          'bans: ' + String(p.bans || ''),
+          'replies: ' + String(p.replies || ''),
+          'manifesto: ' + String(p.manifesto || ''),
+          'norms: ' + String(p.norms || ''),
+          'reddit.env: ' + String(p.redditEnv || ''),
+          'bot.env: ' + String(p.botEnv || ''),
+          'daemon.log: ' + String(p.daemonLog || ''),
+          'stderr: ' + String(p.daemonErrorLog || '')
+        ].join('\n');
+      }
+
+      var titleUsername = document.getElementById('title-username');
+      var modeSelect = document.getElementById('mode-select');
+      var patrolSelect = document.getElementById('patrol-mode-select');
+      var sampleInput = document.getElementById('sample-max-input');
+      var subredditInput = document.getElementById('subreddit-input');
+
+      if (titleUsername && document.activeElement !== titleUsername) titleUsername.value = String(settings.redditUsername || '');
+      if (modeSelect) modeSelect.value = String(settings.mode || 'mixed');
+      if (patrolSelect) patrolSelect.value = String(settings.patrolMode || 'full');
+      if (sampleInput && document.activeElement !== sampleInput) sampleInput.value = String(settings.patrolSampleMax || 20);
+      if (subredditInput && document.activeElement !== subredditInput) subredditInput.value = String(settings.subreddit || '');
+      updateModeDescriptions(String(settings.mode || 'mixed'));
+
+      state.profiles = Array.isArray(profilesPayload.profiles) ? profilesPayload.profiles : [];
+      state.activeProfile = String(profilesPayload.activeProfile || '');
+      renderProfiles();
+
+      var runToggle = document.getElementById('btn-run-toggle');
+      var runIcon = document.getElementById('run-toggle-icon');
+      if (runToggle && runIcon) {
+        var loaded = !!launchd.loaded;
+        runToggle.classList.toggle('run', !loaded);
+        runToggle.classList.toggle('stop', loaded);
+        runToggle.setAttribute('aria-label', loaded ? 'Stop daemon' : 'Start daemon');
+        runToggle.setAttribute('title', loaded ? 'Stop daemon' : 'Start daemon');
+        runIcon.textContent = loaded ? '■' : '▶';
+      }
+    }
+
+    function renderActions() {
+      var body = document.getElementById('actions-body');
+      var line = document.getElementById('actions-line');
+      var actions = Array.isArray(state.actions) ? state.actions : [];
+      var renderSig = stableStringify(actions);
+      if (renderSig && renderSig === state.actionsRenderSig) return;
+      state.actionsRenderSig = renderSig;
+      if (!actions.length) {
+        body.innerHTML = '<tr><td colspan="6">No enforcement actions yet.</td></tr>';
+        line.textContent = '0 actions';
+        return;
+      }
+      body.innerHTML = actions.map(function (action) {
+        var author = escapeHtml(action.comment_author || '-');
+        var mode = escapeHtml(action.mode || '-');
+        var pathway = escapeHtml(action.pathway || '-');
+        var reasoning = escapeHtml(action.reasoning || '');
+        var norm = escapeHtml(action.norm || '');
+        var feeling = escapeHtml(action.feeling || '');
+        var canUndo = action.status === 'active' && action.undoable;
+        var actionBadge = '<span class="badge ' + (action.type === 'ban' ? 'ban' : (action.type === 'remove' ? 'remove' : '')) + '">' + escapeHtml(action.type || 'action') + '</span>';
+        var statusBadge = '<span class="badge ' + (action.status === 'undone' ? 'undone' : (action.status === 'failed' ? 'ban' : '')) + '">' + escapeHtml(action.status || 'unknown') + '</span>';
+        return [
+          '<tr data-action-id="' + escapeHtml(action.action_id || '') + '">',
+          '<td><div>' + escapeHtml(formatTs(action.ts)) + '</div></td>',
+          '<td>' + actionBadge + '</td>',
+          '<td><div>' + author + '</div></td>',
+          '<td><div class="micro">' + mode + ' • ' + pathway + '</div><div class="micro">norm: ' + norm + '</div><div class="micro">vibes: ' + feeling + '</div><div class="context-text">' + reasoning + '</div></td>',
+          '<td>' + statusBadge + '</td>',
+          '<td><div class="row-actions compact"><button type="button" class="row-undo" ' + (canUndo ? '' : 'disabled') + '>Undo</button><button type="button" class="row-apologize soft">Apologize</button></div></td>',
+          '</tr>'
+        ].join('');
+      }).join('');
+      line.textContent = String(actions.length) + ' actions loaded';
+    }
+
+    function renderReplies() {
+      var list = document.getElementById('replies-list');
+      var line = document.getElementById('replies-line');
+      var replies = Array.isArray(state.replies) ? state.replies : [];
+      var renderSig = stableStringify(replies);
+      if (renderSig && renderSig === state.repliesRenderSig) return;
+      state.repliesRenderSig = renderSig;
+      if (!replies.length) {
+        list.innerHTML = '<div class="empty-note">No replies logged yet.</div>';
+        line.textContent = '';
+        return;
+      }
+      list.innerHTML = replies.map(function (item) {
+        return [
+          '<article class="reply-card">',
+          '<div class="head"><span>' + escapeHtml(formatTs(item.ts)) + '</span><span>category=' + escapeHtml(item.category || '-') + '</span><span>comment=' + escapeHtml(item.comment_id || '-') + '</span><span>reply=' + escapeHtml(item.reply_id || '-') + '</span></div>',
+          '<div class="body">' + escapeHtml(item.reply || '') + '</div>',
+          '</article>'
+        ].join('');
+      }).join('');
+      line.textContent = String(replies.length) + ' replies loaded';
+    }
+
+    async function refreshActions() {
+      var out = await backendJson('list-actions', ['120']);
+      state.actions = Array.isArray(out.actions) ? out.actions : [];
+      renderActions();
+    }
+
+    async function refreshReplies() {
+      var out = await backendJson('list-replies', ['120']);
+      state.replies = Array.isArray(out.replies) ? out.replies : [];
+      renderReplies();
+    }
+
+    async function refreshLogs() {
+      var out = await backendJson('tail-log', ['180']);
+      document.getElementById('stdout-log').textContent = String((((out.stdout || {}).tail) || '') || '(no stdout log)');
+      document.getElementById('stderr-log').textContent = String((((out.stderr || {}).tail) || '') || '(no stderr log)');
+    }
+
+    async function refreshDoctrine(force) {
+      if (!force && state.doctrineDirty) return;
+      var manifesto = await backendJson('read-file', ['manifesto']);
+      var norms = await backendJson('read-file', ['norms']);
+      state.doctrineRemoteManifesto = String(manifesto.content || '');
+      state.doctrineRemoteNorms = String(norms.content || '');
+      document.getElementById('manifesto-input').value = state.doctrineRemoteManifesto;
+      document.getElementById('norms-input').value = state.doctrineRemoteNorms;
+      state.doctrineDirty = false;
+    }
+
+    async function refreshStatus() {
+      var nextStatus = await backendJson('status');
+      var statusSig = stableStringify(nextStatus);
+      if (statusSig && statusSig === state.statusRenderSig) return;
+      state.statusRenderSig = statusSig;
+      state.status = nextStatus;
+      renderStatus();
+    }
+
+    async function fullRefresh(options) {
+      var opts = options || {};
+      var poll = !!opts.poll;
+      if (state.refreshInFlight) return;
+      state.refreshInFlight = true;
+      try {
+        await refreshStatus();
+        if (!poll) {
+          await refreshActions();
+          await refreshReplies();
+          if (state.activeTab === 'logs') await refreshLogs();
+          if (state.activeTab === 'persona' && !state.doctrineDirty) await refreshDoctrine(false);
+          return;
+        }
+        if (state.activeTab === 'actions') {
+          await refreshActions();
+        } else if (state.activeTab === 'replies') {
+          await refreshReplies();
+        } else if (state.activeTab === 'logs') {
+          await refreshLogs();
+        } else if (state.activeTab === 'persona' && !state.doctrineDirty) {
+          await refreshDoctrine(false);
+        }
+      } catch (error) {
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.refreshInFlight = false;
+      }
+    }
+
+    async function runControlAction(action, okMsg) {
+      if (state.previewMode) {
+        setControlMessage('', false);
+        return;
+      }
+      try {
+        setControlMessage('Working...', false);
+        await backendJson(action, []);
+        setControlMessage(okMsg || 'Done', false);
+        await fullRefresh();
+      } catch (error) {
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      }
+    }
+
+    async function saveSetting(key, value) {
+      if (state.previewMode) {
+        if (state.status && state.status.settings) {
+          if (key === 'MODE') state.status.settings.mode = String(value || 'mixed');
+          if (key === 'PATROL_MODE') state.status.settings.patrolMode = String(value || 'full');
+          if (key === 'PATROL_SAMPLE_MAX') state.status.settings.patrolSampleMax = Number(value || 20) || 20;
+          renderStatus();
+        }
+        setSettingsMessage('', false);
+        return;
+      }
+      try {
+        await backendJson('set-setting', [key, value]);
+        setSettingsMessage('Saved automatically.', false);
+        await refreshStatus();
+      } catch (error) {
+        setSettingsMessage(String(error && error.message ? error.message : error), true);
+      }
+    }
+
+    function scheduleSampleSave() {
+      if (state.settingsSaveTimer) clearTimeout(state.settingsSaveTimer);
+      state.settingsSaveTimer = setTimeout(function () {
+        var sample = String((document.getElementById('sample-max-input').value) || '').trim();
+        if (!/^\d+$/.test(sample) || Number(sample) < 1) {
+          setSettingsMessage('PATROL_SAMPLE_MAX must be a positive integer.', true);
+          return;
+        }
+        saveSetting('PATROL_SAMPLE_MAX', sample);
+      }, 350);
+    }
+
+    async function saveUsernameFromTitle() {
+      var input = document.getElementById('title-username');
+      var username = normalizeUsername(input.value);
+      if (!username) {
+        setSettingsMessage('Username is required.', true);
+        return;
+      }
+      if (state.previewMode) {
+        if (state.status && state.status.settings) {
+          state.status.settings.redditUsername = username;
+          renderStatus();
+        }
+        setSettingsMessage('', false);
+        return;
+      }
+      try {
+        await backendJson('set-reddit-setting', ['REDDIT_USERNAME', username]);
+        setSettingsMessage('Saved automatically.', false);
+        await refreshStatus();
+      } catch (error) {
+        setSettingsMessage(String(error && error.message ? error.message : error), true);
+      }
+    }
+
+    function promptAndSaveUsername() {
+      var input = document.getElementById('title-username');
+      if (!input) return;
+      var current = normalizeUsername(input.value || '');
+      var raw = window.prompt('Enter Reddit bot username (without u/):', current || '');
+      if (raw === null) return;
+      var next = normalizeUsername(raw);
+      if (!next) {
+        setSettingsMessage('Username is required.', true);
+        return;
+      }
+      if (next === current) {
+        setSettingsMessage('Username unchanged.', false);
+        return;
+      }
+      input.value = next;
+      setSettingsMessage('Saving...', false);
+      saveUsernameFromTitle();
+    }
+
+    async function createProfile() {
+      var input = document.getElementById('new-profile-name');
+      var raw = String((input && input.value) || '').trim();
+      if (!raw) {
+        setCreateProfileMessage('Type a name for this Virtual Redditor.', true);
+        return;
+      }
+      if (state.previewMode) {
+        var id = raw.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'profile';
+        state.profiles.push({ id: id, name: raw, username: '', subreddit: '', connected: false, selected: false });
+        if (input) input.value = '';
+        closeCreateProfilePane();
+        renderProfiles();
+        setProfilesMessage('', false);
+        openOauthModal(true);
+        return;
+      }
+      try {
+        setCreateProfileMessage('Creating...', false);
+        await backendJson('create-profile', [raw]);
+        if (input) input.value = '';
+        closeCreateProfilePane();
+        setProfilesMessage('Created. Next: connect Reddit account.', false);
+        await fullRefresh();
+        await refreshDoctrine(true);
+        openOauthModal(true);
+        resumeOauthFlowInModal();
+      } catch (error) {
+        setCreateProfileMessage(String(error && error.message ? error.message : error), true);
+      }
+    }
+
+    async function selectProfile(profileId) {
+      if (!profileId) return;
+      closeCreateProfilePane();
+      if (state.previewMode) {
+        for (var i = 0; i < state.profiles.length; i += 1) {
+          state.profiles[i].selected = (String(state.profiles[i].id || '') === profileId);
+        }
+        if (state.status && state.status.profiles) {
+          state.status.profiles.profiles = state.profiles;
+          state.status.profiles.activeProfile = profileId;
+        }
+        renderProfiles();
+        setProfilesMessage('', false);
+        return;
+      }
+      try {
+        setProfilesMessage('Switching...', false);
+        await backendJson('select-profile', [profileId]);
+        setProfilesMessage('', false);
+        await fullRefresh();
+        await refreshDoctrine(true);
+      } catch (error) {
+        setProfilesMessage(String(error && error.message ? error.message : error), true);
+      }
+    }
+
+    async function saveDoctrine() {
+      if (state.previewMode) {
+        state.doctrineDirty = false;
+        setDoctrineMessage('', false);
+        return;
+      }
+      if (!state.doctrineDirty) return;
+      if (state.doctrineSaving) {
+        state.doctrineSaveQueued = true;
+        return;
+      }
+      state.doctrineSaving = true;
+      var manifesto = document.getElementById('manifesto-input').value;
+      var norms = document.getElementById('norms-input').value;
+      try {
+        setDoctrineMessage('Saving...', false);
+        await backendJson('write-file', ['manifesto', manifesto]);
+        await backendJson('write-file', ['norms', norms]);
+        state.doctrineRemoteManifesto = manifesto;
+        state.doctrineRemoteNorms = norms;
+        state.doctrineDirty = false;
+        setDoctrineMessage('Saved automatically.', false);
+      } catch (error) {
+        setDoctrineMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.doctrineSaving = false;
+        if (state.doctrineSaveQueued) {
+          state.doctrineSaveQueued = false;
+          if (state.doctrineSaveTimer) clearTimeout(state.doctrineSaveTimer);
+          state.doctrineSaveTimer = setTimeout(function () { saveDoctrine(); }, 250);
+        }
+      }
+    }
+
+    function onDoctrineChanged() {
+      var manifesto = document.getElementById('manifesto-input').value;
+      var norms = document.getElementById('norms-input').value;
+      state.doctrineDirty = (manifesto !== state.doctrineRemoteManifesto || norms !== state.doctrineRemoteNorms);
+      if (!state.doctrineDirty) {
+        setDoctrineMessage('', false);
+        return;
+      }
+      setDoctrineMessage('Unsaved edits... autosaving.', false);
+      if (state.doctrineSaveTimer) clearTimeout(state.doctrineSaveTimer);
+      state.doctrineSaveTimer = setTimeout(function () { saveDoctrine(); }, 650);
+    }
+
+    function setActiveTab(tab) {
+      state.activeTab = tab;
+      var buttons = document.querySelectorAll('.tab-btn');
+      for (var i = 0; i < buttons.length; i += 1) {
+        buttons[i].classList.toggle('active', buttons[i].getAttribute('data-tab') === tab);
+      }
+      var panels = document.querySelectorAll('.tab-panel');
+      for (var j = 0; j < panels.length; j += 1) {
+        var panelId = panels[j].id.replace('panel-', '');
+        panels[j].classList.toggle('active', panelId === tab);
+      }
+      if (tab === 'logs') {
+        refreshLogs().catch(function (error) { setControlMessage(String(error && error.message ? error.message : error), true); });
+      }
+      if (tab === 'persona') {
+        refreshDoctrine(false).catch(function (error) { setDoctrineMessage(String(error && error.message ? error.message : error), true); });
+      }
+    }
+
+    function wireEvents() {
+      document.getElementById('btn-run-toggle').addEventListener('click', function () {
+        var loaded = !!(state.status && state.status.launchd && state.status.launchd.loaded);
+        runControlAction(loaded ? 'stop' : 'start', loaded ? 'Daemon stopped.' : 'Daemon started.');
+      });
+      document.getElementById('btn-restart').addEventListener('click', function () {
+        runControlAction('restart', 'Daemon restarted.');
+      });
+      document.getElementById('btn-run-once').addEventListener('click', function () {
+        runControlAction('run-once', 'Patrol pass complete.');
+      });
+      document.getElementById('btn-extract').addEventListener('click', function () {
+        runControlAction('extract-norms', 'Norm extraction complete.');
+      });
+
+      document.getElementById('toggle-settings-panel').addEventListener('click', function () {
+        setActiveTab('persona');
+        var mode = document.getElementById('mode-dropdown-btn');
+        if (mode && typeof mode.focus === 'function') mode.focus();
+      });
+
+      document.getElementById('btn-connect-reddit').addEventListener('click', function () {
+        openOauthModal(false);
+        resumeOauthFlowInModal();
+      });
+      document.getElementById('btn-oauth-close').addEventListener('click', function () {
+        stopOauthPoll();
+        closeOauthModal();
+      });
+      document.getElementById('btn-oauth-open-login').addEventListener('click', function () {
+        openExternalUrl('https://www.reddit.com/login/');
+      });
+      document.getElementById('btn-oauth-open-apps').addEventListener('click', function () {
+        openExternalUrl('https://www.reddit.com/prefs/apps');
+      });
+      document.getElementById('btn-oauth-copy-redirect').addEventListener('click', function () {
+        var redirectInput = document.getElementById('oauth-redirect-uri');
+        var value = String((redirectInput && redirectInput.value) || '').trim();
+        if (!value) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(value).then(function () {
+            setOauthStatus('Redirect URI copied. Paste it into Reddit app setup.', false);
+          }).catch(function () {
+            setOauthStatus('Could not copy automatically. Select and copy manually.', true);
+          });
+          return;
+        }
+        if (redirectInput && typeof redirectInput.select === 'function') {
+          redirectInput.select();
+          setOauthStatus('Redirect URI selected. Copy it manually.', false);
+        }
+      });
+      document.getElementById('btn-oauth-begin').addEventListener('click', function () {
+        beginOauthFlow();
+      });
+      document.getElementById('btn-oauth-cancel').addEventListener('click', async function () {
+        if (state.previewMode) {
+          stopOauthPoll();
+          state.oauthFlowActive = false;
+          setOauthStatus('', false);
+          return;
+        }
+        try {
+          await backendJson('oauth-cancel', []);
+          stopOauthPoll();
+          state.oauthFlowActive = false;
+          setOauthStatus('OAuth flow cancelled.', false);
+        } catch (error) {
+          setOauthStatus(String(error && error.message ? error.message : error), true);
+        }
+      });
+      document.getElementById('btn-oauth-submit-callback').addEventListener('click', async function () {
+        if (state.previewMode) {
+          setOauthStatus('OAuth callback capture is available in the desktop app.', false);
+          return;
+        }
+        var callback = String(document.getElementById('oauth-callback-input').value || '').trim();
+        if (!callback) {
+          setOauthStatus('Paste the callback URL first.', true);
+          return;
+        }
+        try {
+          await backendJson('oauth-submit-callback', [callback]);
+          state.oauthFlowActive = true;
+          await pollOauthStatusOnce();
+        } catch (error) {
+          setOauthStatus(String(error && error.message ? error.message : error), true);
+        }
+      });
+
+      document.getElementById('theme-picker-btn').addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var menu = document.getElementById('theme-picker-menu');
+        if (menu && menu.classList.contains('hidden')) openThemeMenu();
+        else closeThemeMenu();
+      });
+      document.getElementById('theme-picker-btn').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          if (isThemeMenuOpen()) closeThemeMenu();
+          else openThemeMenu();
+          return;
+        }
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          cycleTheme(1);
+          return;
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          cycleTheme(-1);
+          return;
+        }
+        if (event.key === 'Escape' && isThemeMenuOpen()) {
+          event.preventDefault();
+          closeThemeMenu();
+        }
+      });
+      document.getElementById('theme-picker-list').addEventListener('click', function (event) {
+        var button = event.target.closest('button[data-theme-name]');
+        if (!button) return;
+        applyTheme(button.getAttribute('data-theme-name'));
+        closeThemeMenu();
+      });
+      document.getElementById('theme-picker-list').addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeThemeMenu();
+          return;
+        }
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          cycleTheme(1);
+          return;
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          cycleTheme(-1);
+        }
+      });
+
+      var railDivider = document.getElementById('rail-divider');
+      if (railDivider) {
+        railDivider.addEventListener('dblclick', function () {
+          setLeftRailWidth(320);
+        });
+        railDivider.addEventListener('pointerdown', function (event) {
+          event.preventDefault();
+          var startX = event.clientX;
+          var startWidth = state.leftRailWidth;
+          document.body.classList.add('is-resizing');
+          if (railDivider.setPointerCapture) {
+            try { railDivider.setPointerCapture(event.pointerId); } catch (_) {}
+          }
+
+          function onMove(moveEvent) {
+            var delta = moveEvent.clientX - startX;
+            setLeftRailWidth(startWidth + delta);
+          }
+
+          function onUp(upEvent) {
+            document.body.classList.remove('is-resizing');
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            if (railDivider.releasePointerCapture) {
+              try { railDivider.releasePointerCapture(upEvent.pointerId); } catch (_) {}
+            }
+          }
+
+          window.addEventListener('pointermove', onMove);
+          window.addEventListener('pointerup', onUp);
+        });
+      }
+
+      document.getElementById('btn-change-username').addEventListener('click', function () {
+        promptAndSaveUsername();
+      });
+
+      document.getElementById('mode-dropdown-btn').addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var menu = document.getElementById('mode-dropdown-menu');
+        if (menu && menu.classList.contains('hidden')) openModeMenu();
+        else closeModeMenu();
+      });
+      document.getElementById('mode-dropdown-btn').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          var menu = document.getElementById('mode-dropdown-menu');
+          if (menu && menu.classList.contains('hidden')) openModeMenu();
+          else closeModeMenu();
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeModeMenu();
+        }
+      });
+      document.getElementById('mode-dropdown-menu').addEventListener('click', function (event) {
+        var option = event.target.closest('button[data-mode-option]');
+        if (!option) return;
+        var value = String(option.getAttribute('data-mode-option') || 'mixed');
+        updateModeDescriptions(value);
+        closeModeMenu();
+        saveSetting('MODE', value);
+      });
+      document.getElementById('patrol-mode-select').addEventListener('change', function (event) {
+        saveSetting('PATROL_MODE', String(event.target.value || 'full'));
+      });
+      document.getElementById('sample-max-input').addEventListener('input', function () {
+        setSettingsMessage('Saving...', false);
+        scheduleSampleSave();
+      });
+      document.getElementById('sample-max-input').addEventListener('blur', scheduleSampleSave);
+      document.getElementById('subreddit-input').addEventListener('input', function () {
+        setSettingsMessage('Saving...', false);
+      });
+      document.getElementById('subreddit-input').addEventListener('change', function (event) {
+        var value = String(event.target.value || '').trim();
+        if (state.previewMode) {
+          if (state.status && state.status.settings) {
+            state.status.settings.subreddit = value;
+            renderStatus();
+          }
+          setSettingsMessage('', false);
+          return;
+        }
+        backendJson('set-reddit-setting', ['SUBREDDIT', value]).then(function () {
+          setSettingsMessage('Saved automatically.', false);
+          refreshStatus();
+        }).catch(function (error) {
+          setSettingsMessage(String(error && error.message ? error.message : error), true);
+        });
+      });
+
+      document.getElementById('manifesto-input').addEventListener('input', onDoctrineChanged);
+      document.getElementById('norms-input').addEventListener('input', onDoctrineChanged);
+      document.getElementById('manifesto-input').addEventListener('blur', function () { if (state.doctrineDirty) saveDoctrine(); });
+      document.getElementById('norms-input').addEventListener('blur', function () { if (state.doctrineDirty) saveDoctrine(); });
+
+      var tabButtons = document.querySelectorAll('.tab-btn');
+      for (var i = 0; i < tabButtons.length; i += 1) {
+        tabButtons[i].addEventListener('click', function (event) {
+          setActiveTab(event.currentTarget.getAttribute('data-tab'));
+        });
+      }
+
+      document.getElementById('btn-create-profile').addEventListener('click', function () {
+        openCreateProfilePane();
+      });
+      document.getElementById('btn-create-profile-confirm').addEventListener('click', function () {
+        createProfile();
+      });
+      document.getElementById('btn-create-profile-cancel').addEventListener('click', function () {
+        closeCreateProfilePane();
+      });
+      document.getElementById('new-profile-name').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          createProfile();
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeCreateProfilePane();
+        }
+      });
+      document.getElementById('new-profile-name').addEventListener('input', function () {
+        setCreateProfileMessage('', false);
+      });
+      document.getElementById('profiles-list').addEventListener('click', function (event) {
+        var row = event.target && event.target.closest('.profile-row');
+        if (!row) return;
+        selectProfile(String(row.getAttribute('data-profile-id') || ''));
+      });
+      document.getElementById('profiles-list').addEventListener('keydown', function (event) {
+        var rows = visibleProfileRows();
+        if (!rows.length) return;
+        var current = event.target && event.target.closest('.profile-row');
+        var idx = rows.indexOf(current);
+        if (idx < 0) idx = 0;
+
+        function focusAndSelect(nextIdx) {
+          if (nextIdx < 0) nextIdx = 0;
+          if (nextIdx >= rows.length) nextIdx = rows.length - 1;
+          var row = rows[nextIdx];
+          if (!row) return;
+          if (typeof row.focus === 'function') row.focus();
+          selectProfile(String(row.getAttribute('data-profile-id') || ''));
+        }
+
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          focusAndSelect(idx + 1);
+          return;
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          focusAndSelect(idx - 1);
+          return;
+        }
+        if (event.key === 'Home') {
+          event.preventDefault();
+          focusAndSelect(0);
+          return;
+        }
+        if (event.key === 'End') {
+          event.preventDefault();
+          focusAndSelect(rows.length - 1);
+          return;
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          if (current) selectProfile(String(current.getAttribute('data-profile-id') || ''));
+        }
+      });
+
+      document.getElementById('btn-log-clear-stdout').addEventListener('click', function () {
+        document.getElementById('stdout-log').textContent = '';
+      });
+      document.getElementById('btn-log-clear-stderr').addEventListener('click', function () {
+        document.getElementById('stderr-log').textContent = '';
+      });
+
+      document.addEventListener('click', function (event) {
+        var inPicker = event.target.closest('#theme-picker-menu') || event.target.closest('#theme-picker-btn');
+        if (!inPicker) closeThemeMenu();
+        var inMode = event.target.closest('#mode-dropdown-menu') || event.target.closest('#mode-dropdown-btn');
+        if (!inMode) closeModeMenu();
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          closeThemeMenu();
+          closeModeMenu();
+          if (!document.getElementById('oauth-modal').classList.contains('hidden')) {
+            stopOauthPoll();
+            closeOauthModal();
+          }
+        }
+      });
+      window.addEventListener('resize', function () {
+        setLeftRailWidth(state.leftRailWidth);
+      });
+      document.getElementById('oauth-modal').addEventListener('click', function (event) {
+        if (event.target && event.target.id === 'oauth-modal') {
+          stopOauthPoll();
+          closeOauthModal();
+        }
+      });
+
+      document.getElementById('actions-body').addEventListener('click', async function (event) {
+        var target = event.target;
+        if (!target) return;
+        var row = target.closest('tr[data-action-id]');
+        if (!row) return;
+        var actionId = row.getAttribute('data-action-id') || '';
+        if (!actionId) return;
+
+        if (target.classList.contains('row-undo')) {
+          try {
+            target.disabled = true;
+            await backendJson('undo', [actionId]);
+            await refreshActions();
+            await refreshStatus();
+          } catch (error) {
+            setControlMessage(String(error && error.message ? error.message : error), true);
+          } finally {
+            target.disabled = false;
+          }
+          return;
+        }
+
+        if (target.classList.contains('row-apologize')) {
+          var msgInput = row.querySelector('.row-apology');
+          var message = msgInput ? String(msgInput.value || '') : '';
+          try {
+            target.disabled = true;
+            if (message) await backendJson('apologize', [actionId, message]);
+            else await backendJson('apologize', [actionId]);
+            if (msgInput) msgInput.value = '';
+            await refreshReplies();
+            await refreshStatus();
+          } catch (error) {
+            setControlMessage(String(error && error.message ? error.message : error), true);
+          } finally {
+            target.disabled = false;
+          }
+        }
+      });
+    }
+
+    async function boot() {
+      var storedTheme = (loadStorage(THEME_KEY) || '').toLowerCase();
+      if (state.themes.indexOf(storedTheme) >= 0) state.activeTheme = storedTheme;
+      renderThemePicker();
+      applyTheme(state.activeTheme);
+      setLeftRailWidth(state.leftRailWidth);
+      wireEvents();
+      setActiveTab('persona');
+      try {
+        await waitForBridge(6000);
+      } catch (_) {
+        // One more long attempt before falling back to preview.
+        try {
+          await waitForBridge(6000);
+        } catch (_) {
+          enablePreviewMode();
+          return;
+        }
+      }
+      try {
+        await backendJson('init', []);
+      } catch (error) {
+        var msg = String(error && error.message ? error.message : error).toLowerCase();
+        if (msg.indexOf('native bridge unavailable') >= 0 || msg.indexOf('wizardry bridge unavailable') >= 0 || msg.indexOf('desktop bridge not ready') >= 0) {
+          enablePreviewMode();
+          return;
+        }
+        throw error;
+      }
+      await fullRefresh();
+      await refreshDoctrine(true);
+      if (state.pollTimer) clearInterval(state.pollTimer);
+      state.pollTimer = setInterval(function () {
+        fullRefresh({ poll: true });
+      }, 6000);
+    }
+
+    window.addEventListener('DOMContentLoaded', function () {
+      boot().catch(function (error) {
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      });
+    });
+  </script>
+</body>
+</html>

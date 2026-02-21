@@ -1,0 +1,71 @@
+#!/bin/sh
+
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
+app_dir="$root/.apps/virtual-redditor"
+backend="$app_dir/scripts/virtual-redditor-backend.sh"
+daemon="$app_dir/scripts/virtual-redditor-daemon.sh"
+extractor="$app_dir/scripts/extract_norms.sh"
+
+[ -d "$app_dir" ]
+[ -f "$app_dir/index.html" ]
+[ -f "$app_dir/style.css" ]
+[ -f "$app_dir/README.md" ]
+[ -f "$app_dir/manifesto.md" ]
+[ -f "$app_dir/norms.jsonl" ]
+[ -x "$backend" ]
+[ -x "$daemon" ]
+[ -x "$extractor" ]
+
+grep -F "Virtual Redditor" "$app_dir/index.html" >/dev/null
+grep -F "virtual-redditor-backend.sh" "$app_dir/index.html" >/dev/null
+grep -F "bridge.exec" "$app_dir/index.html" >/dev/null
+
+grep -F "launchd-install" "$daemon" >/dev/null
+grep -F "reply -> randomized delay -> ban" "$app_dir/README.md" >/dev/null
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "skip: jq not installed" >&2
+  exit 0
+fi
+
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-virtual-redditor.XXXXXX")
+trap 'rm -rf "$scratch"' EXIT HUP INT TERM
+state_dir="$scratch/state"
+
+init_out=$(VR_STATE_DIR="$state_dir" "$backend" init)
+printf '%s' "$init_out" | jq -e '.ok == true and (.paths.manifesto | type == "string")' >/dev/null
+
+[ -f "$state_dir/reddit.env" ]
+[ -f "$state_dir/bot.env" ]
+[ -f "$state_dir/manifesto.md" ]
+[ -f "$state_dir/norms.jsonl" ]
+[ -f "$state_dir/last_seen.txt" ]
+
+status_out=$(VR_STATE_DIR="$state_dir" "$backend" status)
+printf '%s' "$status_out" | jq -e '.ok == true and .settings.ok == true and .metrics.ok == true and .launchd.ok == true' >/dev/null
+
+actions_out=$(VR_STATE_DIR="$state_dir" "$backend" list-actions 5)
+printf '%s' "$actions_out" | jq -e '.ok == true and (.actions | type == "array")' >/dev/null
+
+replies_out=$(VR_STATE_DIR="$state_dir" "$backend" list-replies 5)
+printf '%s' "$replies_out" | jq -e '.ok == true and (.replies | type == "array")' >/dev/null
+
+VR_STATE_DIR="$state_dir" "$backend" write-file manifesto "# Edited Manifesto" >/dev/null
+manifesto_out=$(VR_STATE_DIR="$state_dir" "$backend" read-file manifesto)
+printf '%s' "$manifesto_out" | jq -e '.ok == true and (.content | contains("Edited Manifesto"))' >/dev/null
+
+log_out=$(VR_STATE_DIR="$state_dir" "$backend" tail-log 10)
+printf '%s' "$log_out" | jq -e '.ok == true and .stdout.path != null and .stderr.path != null' >/dev/null
+
+oauth_begin=$(VR_STATE_DIR="$state_dir" "$backend" oauth-begin test_client_id test_client_secret testsub testuser)
+printf '%s' "$oauth_begin" | jq -e '.ok == true and (.status == "waiting" or .status == "error")' >/dev/null
+
+oauth_status=$(VR_STATE_DIR="$state_dir" "$backend" oauth-status)
+printf '%s' "$oauth_status" | jq -e '.ok == true and (.status == "waiting" or .status == "error")' >/dev/null
+
+oauth_cancel=$(VR_STATE_DIR="$state_dir" "$backend" oauth-cancel)
+printf '%s' "$oauth_cancel" | jq -e '.ok == true and .status == "cancelled"' >/dev/null
+
+printf '%s\n' "virtual redditor backend tests passed"

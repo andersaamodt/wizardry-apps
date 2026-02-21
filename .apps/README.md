@@ -243,6 +243,15 @@ See `.apps/forge/` for the flagship wizardry-apps desktop control plane that:
 - Exposes all actions through `.apps/forge/scripts/forge-backend.sh` for CLI parity
 - Supports checkout-local run (`./run-forge`) and user-local install (`./install-forge`)
 
+### virtual-redditor
+
+See `.apps/virtual-redditor/` for an autonomous moderation desktop app that:
+- Runs a persistent POSIX `sh` patrol daemon supervised by user-level `launchd`
+- Reads subreddit comment streams with OAuth refresh-token auth via `curl`
+- Builds adjudication context envelopes and asks Ollama for mode-aware decisions
+- Performs reply-first enforcement rituals with delay before bans
+- Logs actions/replies in JSONL and provides one-click Undo + optional Apologize
+
 ## Development Workflow
 
 1. Create app directory: `mkdir -p .apps/my-app`

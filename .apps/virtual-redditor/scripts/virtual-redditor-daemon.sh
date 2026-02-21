@@ -1,0 +1,1766 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: virtual-redditor-daemon.sh COMMAND [ARGS...]
+
+Commands:
+  bootstrap
+  settings
+  metrics
+  once
+  run
+  list-actions [LIMIT]
+  list-replies [LIMIT]
+  extract-norms
+  undo ACTION_ID
+  apologize ACTION_ID [MESSAGE]
+  launchd-status
+  launchd-install
+  launchd-start
+  launchd-stop
+  launchd-uninstall
+  set-setting KEY VALUE
+  set-reddit-setting KEY VALUE
+
+Environment overrides:
+  VR_STATE_DIR        Runtime/config directory (default: ~/.local/state/wizardry/virtual-redditor)
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
+STATE_DIR=${VR_STATE_DIR:-"${XDG_STATE_HOME:-$HOME/.local/state}/wizardry/virtual-redditor"}
+
+BANS_LOG="$STATE_DIR/bans.jsonl"
+REPLIES_LOG="$STATE_DIR/replies.jsonl"
+ACTIONS_LOG="$STATE_DIR/actions.jsonl"
+NORM_PROPOSALS_LOG="$STATE_DIR/norm-proposals.jsonl"
+LAST_SEEN_FILE="$STATE_DIR/last_seen.txt"
+LAST_STATUTE_SEEN_FILE="$STATE_DIR/last_statute_seen.txt"
+LAST_STATUTE_DAY_FILE="$STATE_DIR/last_statute_day.txt"
+TOKEN_FILE="$STATE_DIR/.token"
+TOKEN_EXP_FILE="$STATE_DIR/.token.exp"
+RUNTIME_FILE="$STATE_DIR/runtime.json"
+BOT_ENV_FILE="$STATE_DIR/bot.env"
+REDDIT_ENV_FILE="$STATE_DIR/reddit.env"
+MANIFESTO_FILE="$STATE_DIR/manifesto.md"
+NORMS_FILE="$STATE_DIR/norms.jsonl"
+DAEMON_STDOUT_LOG="$STATE_DIR/daemon.log"
+DAEMON_STDERR_LOG="$STATE_DIR/daemon-error.log"
+
+require_tool() {
+  tool=$1
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    printf '%s\n' "virtual-redditor-daemon: required tool missing: $tool" >&2
+    exit 1
+  fi
+}
+
+require_tools() {
+  require_tool curl
+  require_tool jq
+  require_tool awk
+  require_tool sed
+  require_tool date
+}
+
+now_epoch() {
+  date +%s
+}
+
+now_iso() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+to_int() {
+  raw=${1-}
+  fallback=${2-0}
+  case "$raw" in
+    ''|*[!0-9-]*)
+      printf '%s' "$fallback"
+      ;;
+    *)
+      sign=''
+      digits=$raw
+      case "$raw" in
+        -*)
+          sign='-'
+          digits=${raw#-}
+          ;;
+      esac
+      digits=$(printf '%s' "$digits" | sed 's/^0*//')
+      [ -z "$digits" ] && digits=0
+      if [ "$sign" = '-' ] && [ "$digits" = '0' ]; then
+        sign=''
+      fi
+      printf '%s%s' "$sign" "$digits"
+      ;;
+  esac
+}
+
+random_seed_u32() {
+  if command -v od >/dev/null 2>&1; then
+    od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' '
+  else
+    printf '%s' "$$"
+  fi
+}
+
+random_between() {
+  min=$(to_int "${1-}" 0)
+  max=$(to_int "${2-}" 0)
+  if [ "$max" -lt "$min" ]; then
+    tmp=$min
+    min=$max
+    max=$tmp
+  fi
+  span=$((max - min + 1))
+  if [ "$span" -le 1 ]; then
+    printf '%s' "$min"
+    return
+  fi
+  seed=$(random_seed_u32)
+  case "$seed" in
+    ''|*[!0-9]*) seed=$$ ;;
+  esac
+  printf '%s' $((min + (seed % span)))
+}
+
+new_event_id() {
+  prefix=$1
+  ts=$(now_epoch)
+  rand=$(random_between 100000 999999)
+  printf '%s-%s-%s' "$prefix" "$ts" "$rand"
+}
+
+emit_ok() {
+  payload=${1-'{"ok":true}'}
+  if [ -z "$payload" ]; then
+    payload='{"ok":true}'
+  fi
+  printf '%s\n' "$payload"
+}
+
+emit_error() {
+  message=${1-"unknown error"}
+  jq -cn --arg msg "$message" '{ok:false,error:$msg}'
+}
+
+append_jsonl() {
+  file=$1
+  json=$2
+  printf '%s\n' "$json" >> "$file"
+}
+
+bootstrap_state() {
+  mkdir -p "$STATE_DIR"
+  touch "$BANS_LOG" "$REPLIES_LOG" "$ACTIONS_LOG" "$NORM_PROPOSALS_LOG"
+
+  if [ ! -f "$LAST_SEEN_FILE" ]; then
+    printf '0\n' > "$LAST_SEEN_FILE"
+  fi
+  if [ ! -f "$LAST_STATUTE_SEEN_FILE" ]; then
+    printf '0\n' > "$LAST_STATUTE_SEEN_FILE"
+  fi
+
+  if [ ! -f "$MANIFESTO_FILE" ]; then
+    cp "$APP_DIR/manifesto.md" "$MANIFESTO_FILE" 2>/dev/null || printf '# Virtual Redditor Manifesto\n\nUse proportionate moderation.\n' > "$MANIFESTO_FILE"
+  fi
+
+  if [ ! -f "$NORMS_FILE" ]; then
+    cp "$APP_DIR/norms.jsonl" "$NORMS_FILE" 2>/dev/null || : > "$NORMS_FILE"
+  fi
+
+  if [ ! -f "$BOT_ENV_FILE" ]; then
+    cat > "$BOT_ENV_FILE" <<'BOTENV'
+MODE=mixed
+PATROL_MODE=full
+PATROL_SAMPLE_MAX=20
+PATROL_INTERVAL_MIN=35
+PATROL_INTERVAL_MAX=95
+SANCTION_DELAY_MIN=7
+SANCTION_DELAY_MAX=45
+SUMMONS_ENABLED=1
+NIGHTLY_STATUTE_ENABLED=1
+NIGHTLY_HOUR=03
+HIGH_SIGNAL_MIN_SCORE=6
+AUTO_ACCEPT_NORMS=1
+USER_HISTORY_LIMIT=40
+THREAD_SIBLING_LIMIT=20
+OLLAMA_MODEL=llama3.1:8b
+OLLAMA_URL=http://127.0.0.1:11434/api/generate
+BOTENV
+  fi
+
+  if [ ! -f "$REDDIT_ENV_FILE" ]; then
+    cat > "$REDDIT_ENV_FILE" <<'REDDITENV'
+# Fill in Reddit app credentials for your dedicated moderator account.
+REDDIT_CLIENT_ID=
+REDDIT_CLIENT_SECRET=
+REDDIT_REFRESH_TOKEN=
+REDDIT_USER_AGENT='virtual-redditor/0.1-by-u/replace_me'
+REDDIT_USERNAME=
+SUBREDDIT=
+REDDITENV
+  fi
+}
+
+load_bot_env() {
+  # shellcheck disable=SC1090
+  . "$BOT_ENV_FILE"
+
+  MODE=${MODE:-mixed}
+  PATROL_MODE=${PATROL_MODE:-full}
+  PATROL_SAMPLE_MAX=$(to_int "${PATROL_SAMPLE_MAX:-20}" 20)
+  PATROL_INTERVAL_MIN=$(to_int "${PATROL_INTERVAL_MIN:-35}" 35)
+  PATROL_INTERVAL_MAX=$(to_int "${PATROL_INTERVAL_MAX:-95}" 95)
+  SANCTION_DELAY_MIN=$(to_int "${SANCTION_DELAY_MIN:-7}" 7)
+  SANCTION_DELAY_MAX=$(to_int "${SANCTION_DELAY_MAX:-45}" 45)
+  SUMMONS_ENABLED=$(to_int "${SUMMONS_ENABLED:-1}" 1)
+  NIGHTLY_STATUTE_ENABLED=$(to_int "${NIGHTLY_STATUTE_ENABLED:-1}" 1)
+  NIGHTLY_HOUR=$(to_int "${NIGHTLY_HOUR:-3}" 3)
+  HIGH_SIGNAL_MIN_SCORE=$(to_int "${HIGH_SIGNAL_MIN_SCORE:-6}" 6)
+  AUTO_ACCEPT_NORMS=$(to_int "${AUTO_ACCEPT_NORMS:-1}" 1)
+  USER_HISTORY_LIMIT=$(to_int "${USER_HISTORY_LIMIT:-40}" 40)
+  THREAD_SIBLING_LIMIT=$(to_int "${THREAD_SIBLING_LIMIT:-20}" 20)
+  OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+  OLLAMA_URL=${OLLAMA_URL:-http://127.0.0.1:11434/api/generate}
+
+  case "$MODE" in
+    judicial|capricious|mixed) ;;
+    *) MODE=mixed ;;
+  esac
+
+  case "$PATROL_MODE" in
+    full|sample) ;;
+    *) PATROL_MODE=full ;;
+  esac
+
+  [ "$PATROL_SAMPLE_MAX" -lt 1 ] && PATROL_SAMPLE_MAX=1
+  [ "$PATROL_INTERVAL_MIN" -lt 3 ] && PATROL_INTERVAL_MIN=3
+  [ "$PATROL_INTERVAL_MAX" -lt "$PATROL_INTERVAL_MIN" ] && PATROL_INTERVAL_MAX=$PATROL_INTERVAL_MIN
+  [ "$SANCTION_DELAY_MIN" -lt 0 ] && SANCTION_DELAY_MIN=0
+  [ "$SANCTION_DELAY_MAX" -lt "$SANCTION_DELAY_MIN" ] && SANCTION_DELAY_MAX=$SANCTION_DELAY_MIN
+  [ "$USER_HISTORY_LIMIT" -lt 1 ] && USER_HISTORY_LIMIT=1
+  [ "$THREAD_SIBLING_LIMIT" -lt 1 ] && THREAD_SIBLING_LIMIT=1
+  return 0
+}
+
+require_env_value() {
+  var_name=$1
+  eval "var_value=\${$var_name-}"
+  if [ -z "$var_value" ]; then
+    printf '%s\n' "virtual-redditor-daemon: missing required $var_name in $REDDIT_ENV_FILE" >&2
+    return 1
+  fi
+  return 0
+}
+
+load_reddit_env() {
+  # shellcheck disable=SC1090
+  . "$REDDIT_ENV_FILE"
+
+  require_env_value REDDIT_CLIENT_ID || return 1
+  require_env_value REDDIT_CLIENT_SECRET || return 1
+  require_env_value REDDIT_REFRESH_TOKEN || return 1
+  require_env_value REDDIT_USER_AGENT || return 1
+  require_env_value REDDIT_USERNAME || return 1
+  require_env_value SUBREDDIT || return 1
+  return 0
+}
+
+load_reddit_env_optional() {
+  if [ -f "$REDDIT_ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    . "$REDDIT_ENV_FILE" >/dev/null 2>&1 || true
+  fi
+  REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID-}
+  REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET-}
+  REDDIT_REFRESH_TOKEN=${REDDIT_REFRESH_TOKEN-}
+  REDDIT_USER_AGENT=${REDDIT_USER_AGENT-}
+  REDDIT_USERNAME=${REDDIT_USERNAME-}
+  SUBREDDIT=${SUBREDDIT-}
+  return 0
+}
+
+shell_quote_env_value() {
+  raw=${1-}
+  escaped=$(printf '%s' "$raw" | sed "s/'/'\"'\"'/g")
+  printf "'%s'" "$escaped"
+}
+
+set_setting() {
+  key=$1
+  value=$2
+
+  case "$key" in
+    MODE|PATROL_MODE|PATROL_SAMPLE_MAX|PATROL_INTERVAL_MIN|PATROL_INTERVAL_MAX|SANCTION_DELAY_MIN|SANCTION_DELAY_MAX|SUMMONS_ENABLED|NIGHTLY_STATUTE_ENABLED|NIGHTLY_HOUR|HIGH_SIGNAL_MIN_SCORE|AUTO_ACCEPT_NORMS|USER_HISTORY_LIMIT|THREAD_SIBLING_LIMIT|OLLAMA_MODEL|OLLAMA_URL)
+      ;;
+    *)
+      emit_error "unsupported setting key: $key"
+      return 1
+      ;;
+  esac
+
+  tmp=$(mktemp "${TMPDIR:-/tmp}/vr-botenv.XXXXXX")
+  awk -F= -v k="$key" '$1 != k { print $0 }' "$BOT_ENV_FILE" > "$tmp"
+  printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  mv "$tmp" "$BOT_ENV_FILE"
+
+  load_bot_env
+  settings_json
+}
+
+set_reddit_setting() {
+  key=$1
+  value=$2
+
+  case "$key" in
+    REDDIT_USERNAME|SUBREDDIT|REDDIT_USER_AGENT)
+      ;;
+    *)
+      emit_error "unsupported reddit setting key: $key"
+      return 1
+      ;;
+  esac
+
+  tmp=$(mktemp "${TMPDIR:-/tmp}/vr-redditenv.XXXXXX")
+  awk -F= -v k="$key" '$1 != k { print $0 }' "$REDDIT_ENV_FILE" > "$tmp"
+  printf '%s=%s\n' "$key" "$(shell_quote_env_value "$value")" >> "$tmp"
+  mv "$tmp" "$REDDIT_ENV_FILE"
+
+  settings_json
+}
+
+settings_json() {
+  jq -cn \
+    --arg state_dir "$STATE_DIR" \
+    --arg mode "$MODE" \
+    --arg patrol_mode "$PATROL_MODE" \
+    --argjson patrol_sample_max "$PATROL_SAMPLE_MAX" \
+    --argjson patrol_interval_min "$PATROL_INTERVAL_MIN" \
+    --argjson patrol_interval_max "$PATROL_INTERVAL_MAX" \
+    --argjson sanction_delay_min "$SANCTION_DELAY_MIN" \
+    --argjson sanction_delay_max "$SANCTION_DELAY_MAX" \
+    --argjson summons_enabled "$SUMMONS_ENABLED" \
+    --argjson nightly_enabled "$NIGHTLY_STATUTE_ENABLED" \
+    --argjson nightly_hour "$NIGHTLY_HOUR" \
+    --argjson high_signal_min_score "$HIGH_SIGNAL_MIN_SCORE" \
+    --argjson auto_accept_norms "$AUTO_ACCEPT_NORMS" \
+    --argjson user_history_limit "$USER_HISTORY_LIMIT" \
+    --argjson thread_sibling_limit "$THREAD_SIBLING_LIMIT" \
+    --arg ollama_model "$OLLAMA_MODEL" \
+    --arg ollama_url "$OLLAMA_URL" \
+    --arg subreddit "${SUBREDDIT-}" \
+    --arg reddit_username "${REDDIT_USERNAME-}" \
+    --arg manifesto_path "$MANIFESTO_FILE" \
+    --arg norms_path "$NORMS_FILE" \
+    --arg reddit_env_path "$REDDIT_ENV_FILE" \
+    --arg bot_env_path "$BOT_ENV_FILE" \
+    --arg actions_path "$ACTIONS_LOG" \
+    --arg bans_path "$BANS_LOG" \
+    --arg replies_path "$REPLIES_LOG" \
+    --arg last_seen_path "$LAST_SEEN_FILE" \
+    --arg daemon_log_path "$DAEMON_STDOUT_LOG" \
+    --arg daemon_error_path "$DAEMON_STDERR_LOG" \
+    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
+}
+
+metrics_json() {
+  actions_count=$(jq -s 'length' "$ACTIONS_LOG" 2>/dev/null || printf '0')
+  bans_count=$(jq -s 'map(select((.type // "") == "ban" and (.event // "") == "enforce")) | length' "$BANS_LOG" 2>/dev/null || printf '0')
+  replies_count=$(jq -s 'length' "$REPLIES_LOG" 2>/dev/null || printf '0')
+  last_seen=$(to_int "$(cat "$LAST_SEEN_FILE" 2>/dev/null || printf '0')" 0)
+  runtime='{}'
+  if [ -f "$RUNTIME_FILE" ]; then
+    runtime=$(cat "$RUNTIME_FILE" 2>/dev/null || printf '{}')
+  fi
+
+  jq -cn \
+    --argjson actions_count "$(to_int "$actions_count" 0)" \
+    --argjson bans_count "$(to_int "$bans_count" 0)" \
+    --argjson replies_count "$(to_int "$replies_count" 0)" \
+    --argjson last_seen "$last_seen" \
+    --argjson runtime "$runtime" \
+    '{ok:true,counts:{actions:$actions_count,bans:$bans_count,replies:$replies_count},lastSeen:$last_seen,runtime:$runtime}'
+}
+
+reddit_refresh_token() {
+  response=$(curl -sS --fail \
+    -u "$REDDIT_CLIENT_ID:$REDDIT_CLIENT_SECRET" \
+    -H "User-Agent: $REDDIT_USER_AGENT" \
+    -d "grant_type=refresh_token" \
+    -d "refresh_token=$REDDIT_REFRESH_TOKEN" \
+    https://www.reddit.com/api/v1/access_token)
+
+  token=$(printf '%s' "$response" | jq -r '.access_token // empty')
+  expires_in=$(printf '%s' "$response" | jq -r '.expires_in // 3600')
+  expires_in=$(to_int "$expires_in" 3600)
+  [ "$expires_in" -lt 120 ] && expires_in=120
+
+  if [ -z "$token" ]; then
+    printf '%s\n' "virtual-redditor-daemon: failed to obtain reddit access token" >&2
+    return 1
+  fi
+
+  now=$(now_epoch)
+  exp=$((now + expires_in - 90))
+
+  printf '%s\n' "$token" > "$TOKEN_FILE"
+  printf '%s\n' "$exp" > "$TOKEN_EXP_FILE"
+  printf '%s' "$token"
+}
+
+reddit_access_token() {
+  now=$(now_epoch)
+  if [ -f "$TOKEN_FILE" ] && [ -f "$TOKEN_EXP_FILE" ]; then
+    exp=$(to_int "$(cat "$TOKEN_EXP_FILE" 2>/dev/null || printf '0')" 0)
+    if [ "$exp" -gt "$now" ]; then
+      token=$(cat "$TOKEN_FILE" 2>/dev/null || printf '')
+      if [ -n "$token" ]; then
+        printf '%s' "$token"
+        return 0
+      fi
+    fi
+  fi
+
+  reddit_refresh_token
+}
+
+reddit_get() {
+  endpoint=$1
+  token=$(reddit_access_token)
+
+  curl -sS --fail --retry 2 --retry-delay 1 \
+    -H "Authorization: bearer $token" \
+    -H "User-Agent: $REDDIT_USER_AGENT" \
+    "https://oauth.reddit.com$endpoint"
+}
+
+reddit_post() {
+  endpoint=$1
+  shift
+  token=$(reddit_access_token)
+
+  curl -sS --fail --retry 2 --retry-delay 1 \
+    -X POST \
+    -H "Authorization: bearer $token" \
+    -H "User-Agent: $REDDIT_USER_AGENT" \
+    "$@" \
+    "https://oauth.reddit.com$endpoint"
+}
+
+parse_launchctl_pid() {
+  file=$1
+  awk '
+    /pid =/ {
+      for (i=1; i<=NF; i++) {
+        if ($i == "=") {
+          print $(i+1)
+          exit
+        }
+      }
+    }
+  ' "$file" 2>/dev/null | tr -d ';'
+}
+
+subreddit_slug() {
+  raw=${SUBREDDIT-}
+  if [ -z "$raw" ]; then
+    printf '%s' "unknown"
+    return
+  fi
+  printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9_-]#-#g'
+}
+
+launchd_label() {
+  printf 'com.wizardry.virtualredditor.%s' "$(subreddit_slug)"
+}
+
+launchd_plist_path() {
+  printf '%s/Library/LaunchAgents/%s.plist' "$HOME" "$(launchd_label)"
+}
+
+launchd_status_json() {
+  label=$(launchd_label)
+  plist=$(launchd_plist_path)
+  uid=$(id -u)
+
+  if [ "$(uname -s 2>/dev/null || printf unknown)" != "Darwin" ] || ! command -v launchctl >/dev/null 2>&1; then
+    jq -cn \
+      --arg label "$label" \
+      --arg plist "$plist" \
+      '{ok:true,label:$label,plist:$plist,supported:false,installed:false,loaded:false,pid:null}'
+    return 0
+  fi
+
+  installed=0
+  loaded=0
+  pid=''
+
+  [ -f "$plist" ] && installed=1
+
+  out_file=$(mktemp "${TMPDIR:-/tmp}/vr-launchctl.XXXXXX")
+  if launchctl print "gui/$uid/$label" >"$out_file" 2>/dev/null; then
+    loaded=1
+    pid=$(parse_launchctl_pid "$out_file")
+  fi
+  rm -f "$out_file"
+
+  jq -cn \
+    --arg label "$label" \
+    --arg plist "$plist" \
+    --argjson installed "$installed" \
+    --argjson loaded "$loaded" \
+    --arg pid "$pid" \
+    '{ok:true,label:$label,plist:$plist,installed:($installed==1),loaded:($loaded==1),pid:(if $pid=="" then null else ($pid|tonumber? // $pid) end)}'
+}
+
+launchd_install() {
+  if [ "$(uname -s 2>/dev/null || printf unknown)" != "Darwin" ] || ! command -v launchctl >/dev/null 2>&1; then
+    emit_error "launchd-install requires macOS launchctl"
+    return 1
+  fi
+
+  label=$(launchd_label)
+  plist=$(launchd_plist_path)
+  uid=$(id -u)
+
+  mkdir -p "$HOME/Library/LaunchAgents" "$STATE_DIR"
+
+  cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$label</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>$SCRIPT_DIR/virtual-redditor-daemon.sh</string>
+    <string>run</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$STATE_DIR</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>VR_STATE_DIR</key>
+    <string>$STATE_DIR</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>$DAEMON_STDOUT_LOG</string>
+  <key>StandardErrorPath</key>
+  <string>$DAEMON_STDERR_LOG</string>
+</dict>
+</plist>
+PLIST
+
+  launchctl bootout "gui/$uid" "$plist" >/dev/null 2>&1 || true
+  launchctl bootstrap "gui/$uid" "$plist" >/dev/null 2>&1 || launchctl load "$plist" >/dev/null 2>&1 || true
+  launchctl enable "gui/$uid/$label" >/dev/null 2>&1 || true
+  launchctl kickstart -k "gui/$uid/$label" >/dev/null 2>&1 || launchctl start "$label" >/dev/null 2>&1 || true
+
+  launchd_status_json
+}
+
+launchd_start() {
+  if [ "$(uname -s 2>/dev/null || printf unknown)" != "Darwin" ] || ! command -v launchctl >/dev/null 2>&1; then
+    emit_error "launchd-start requires macOS launchctl"
+    return 1
+  fi
+
+  label=$(launchd_label)
+  plist=$(launchd_plist_path)
+  uid=$(id -u)
+
+  if [ ! -f "$plist" ]; then
+    launchd_install >/dev/null
+  else
+    launchctl bootstrap "gui/$uid" "$plist" >/dev/null 2>&1 || true
+    launchctl enable "gui/$uid/$label" >/dev/null 2>&1 || true
+    launchctl kickstart -k "gui/$uid/$label" >/dev/null 2>&1 || launchctl start "$label" >/dev/null 2>&1 || true
+  fi
+
+  launchd_status_json
+}
+
+launchd_stop() {
+  if [ "$(uname -s 2>/dev/null || printf unknown)" != "Darwin" ] || ! command -v launchctl >/dev/null 2>&1; then
+    emit_error "launchd-stop requires macOS launchctl"
+    return 1
+  fi
+
+  label=$(launchd_label)
+  plist=$(launchd_plist_path)
+  uid=$(id -u)
+
+  launchctl bootout "gui/$uid" "$plist" >/dev/null 2>&1 || launchctl remove "$label" >/dev/null 2>&1 || true
+  launchd_status_json
+}
+
+launchd_uninstall() {
+  if [ "$(uname -s 2>/dev/null || printf unknown)" != "Darwin" ] || ! command -v launchctl >/dev/null 2>&1; then
+    emit_error "launchd-uninstall requires macOS launchctl"
+    return 1
+  fi
+
+  plist=$(launchd_plist_path)
+
+  launchd_stop >/dev/null 2>&1 || true
+  rm -f "$plist"
+
+  launchd_status_json
+}
+
+json_bool() {
+  raw=${1-0}
+  case "$raw" in
+    1|true|TRUE|yes|YES) printf '%s' "true" ;;
+    *) printf '%s' "false" ;;
+  esac
+}
+
+is_summons_comment() {
+  comment_json=$1
+  if [ "$SUMMONS_ENABLED" -ne 1 ]; then
+    printf '%s' "0"
+    return
+  fi
+
+  uname=$(printf '%s' "$REDDIT_USERNAME" | tr '[:upper:]' '[:lower:]')
+  if [ -z "$uname" ]; then
+    printf '%s' "0"
+    return
+  fi
+
+  hit=$(printf '%s' "$comment_json" | jq -r --arg uname "$uname" '
+    ((.body // "") | ascii_downcase) as $b
+    | if ($b | contains("/u/" + $uname)) or ($b | contains("u/" + $uname)) then "1" else "0" end
+  ' 2>/dev/null || printf '0')
+
+  case "$hit" in
+    1) printf '%s' "1" ;;
+    *) printf '%s' "0" ;;
+  esac
+}
+
+cache_key_safe() {
+  printf '%s' "$1" | sed 's#[^A-Za-z0-9._-]#_#g'
+}
+
+cached_reddit_get() {
+  cache_dir=$1
+  key=$2
+  endpoint=$3
+  cache_file="$cache_dir/$(cache_key_safe "$key").json"
+
+  if [ ! -f "$cache_file" ]; then
+    if ! reddit_get "$endpoint" > "$cache_file" 2>/dev/null; then
+      printf '{}' > "$cache_file"
+    fi
+  fi
+
+  cat "$cache_file"
+}
+
+compose_context_envelope() {
+  cache_dir=$1
+  comment_json=$2
+
+  comment_name=$(printf '%s' "$comment_json" | jq -r '.name // empty')
+  parent_id=$(printf '%s' "$comment_json" | jq -r '.parent_id // empty')
+  link_id=$(printf '%s' "$comment_json" | jq -r '.link_id // empty')
+  author=$(printf '%s' "$comment_json" | jq -r '.author // empty')
+
+  parent_json='{}'
+  grandparent_json='{}'
+  siblings_json='[]'
+  author_recent_json='[]'
+  author_top_json='[]'
+  author_downvoted_json='[]'
+  author_subreddit_json='[]'
+  author_global_json='[]'
+
+  if [ -n "$parent_id" ]; then
+    parent_payload=$(cached_reddit_get "$cache_dir" "parent-$parent_id" "/api/info.json?id=$parent_id&raw_json=1")
+    parent_json=$(printf '%s' "$parent_payload" | jq -c '.data.children[0].data // {}' 2>/dev/null || printf '{}')
+
+    gp_id=$(printf '%s' "$parent_json" | jq -r '.parent_id // empty' 2>/dev/null || printf '')
+    case "$gp_id" in
+      t1_*)
+        gp_payload=$(cached_reddit_get "$cache_dir" "gp-$gp_id" "/api/info.json?id=$gp_id&raw_json=1")
+        grandparent_json=$(printf '%s' "$gp_payload" | jq -c '.data.children[0].data // {}' 2>/dev/null || printf '{}')
+        ;;
+    esac
+  fi
+
+  case "$link_id" in
+    t3_*)
+      post_id=${link_id#t3_}
+      thread_payload=$(cached_reddit_get "$cache_dir" "thread-$post_id" "/comments/$post_id/.json?limit=120&depth=5&raw_json=1&sort=new")
+      siblings_json=$(printf '%s' "$thread_payload" | jq -c --arg parent "$parent_id" --arg me "$comment_name" --argjson max "$THREAD_SIBLING_LIMIT" '
+        [.. | objects | select(.kind? == "t1") | .data
+          | select((.parent_id // "") == $parent and (.name // "") != $me)]
+        | sort_by(.created_utc // 0)
+        | if length > $max then .[length-$max:] else . end
+      ' 2>/dev/null || printf '[]')
+      ;;
+  esac
+
+  case "$author" in
+    ''|"[deleted]"|"AutoModerator")
+      :
+      ;;
+    *)
+      author_recent_payload=$(cached_reddit_get "$cache_dir" "u-recent-$author" "/user/$author/comments/.json?limit=$USER_HISTORY_LIMIT&raw_json=1&sort=new")
+      author_top_payload=$(cached_reddit_get "$cache_dir" "u-top-$author" "/user/$author/comments/.json?limit=$USER_HISTORY_LIMIT&raw_json=1&sort=top&t=month")
+
+      author_recent_json=$(printf '%s' "$author_recent_payload" | jq -c '[.data.children[].data]' 2>/dev/null || printf '[]')
+      author_top_json=$(printf '%s' "$author_top_payload" | jq -c '[.data.children[].data]' 2>/dev/null || printf '[]')
+      author_downvoted_json=$(printf '%s' "$author_recent_json" | jq -c '[.[] | select((.score // 0) < 0)]' 2>/dev/null || printf '[]')
+      author_subreddit_json=$(printf '%s' "$author_recent_json" | jq -c --arg sub "$SUBREDDIT" '[.[] | select(((.subreddit // "") | ascii_downcase) == ($sub | ascii_downcase))]' 2>/dev/null || printf '[]')
+      author_global_json=$(printf '%s' "$author_recent_json" | jq -c --arg sub "$SUBREDDIT" '[.[] | select(((.subreddit // "") | ascii_downcase) != ($sub | ascii_downcase))] | .[0:15]' 2>/dev/null || printf '[]')
+      ;;
+  esac
+
+  manifesto_text=$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
+  norms_json=$(jq -cs '[.[]]' "$NORMS_FILE" 2>/dev/null || printf '[]')
+
+  jq -cn \
+    --arg mode "$MODE" \
+    --arg subreddit "$SUBREDDIT" \
+    --arg comment "$comment_json" \
+    --arg parent "$parent_json" \
+    --arg grandparent "$grandparent_json" \
+    --arg siblings "$siblings_json" \
+    --arg author_recent "$author_recent_json" \
+    --arg author_top "$author_top_json" \
+    --arg author_down "$author_downvoted_json" \
+    --arg author_sub "$author_subreddit_json" \
+    --arg author_global "$author_global_json" \
+    --arg manifesto "$manifesto_text" \
+    --arg norms "$norms_json" \
+    '{
+      mode:$mode,
+      subreddit:$subreddit,
+      doctrine:{manifesto:$manifesto, norms:(($norms|fromjson?) // [])},
+      utterance:($comment|fromjson),
+      context:{
+        parent:($parent|fromjson),
+        grandparent:($grandparent|fromjson),
+        siblings:(($siblings|fromjson?) // []),
+        author:{
+          recent:(($author_recent|fromjson?) // []),
+          top:(($author_top|fromjson?) // []),
+          downvoted:(($author_down|fromjson?) // []),
+          subreddit:(($author_sub|fromjson?) // []),
+          global:(($author_global|fromjson?) // [])
+        }
+      }
+    }'
+}
+
+build_adjudication_prompt() {
+  envelope_json=$1
+  cat <<PROMPT
+You are Virtual Redditor, the autonomous moderator and participant for r/$SUBREDDIT.
+
+MODE: $MODE
+
+Constitutional doctrine (manifesto.md):
+$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
+
+Statutory doctrine (norms.jsonl):
+$(cat "$NORMS_FILE" 2>/dev/null || printf '')
+
+Required policy constraints:
+- Judicial mode: bans only for explicit norm violations.
+- Capricious mode: bans only for vibes (feeling string required).
+- Mixed mode: bans may come from either pathway.
+- If banning, include a reply first. The system performs reply->delay->ban ritual.
+- Reply text must be concise and sub-native in style.
+- Judicial bans: reply must clearly cite the violated norm.
+- Capricious bans: reply must include a feeling-string.
+- Mixed bans: reply should reflect whichever causal pathway fired.
+
+Return STRICT JSON only, no markdown, with this shape:
+{
+  "reply": "string",
+  "category": "playful|didactic|topical|obscure|enforcement",
+  "ban": {"type":"none|temporary|permanent","days":3},
+  "remove_comment": false,
+  "norm": "optional norm id or norm quote",
+  "feeling": "optional feeling-string",
+  "reasoning": "brief rationale"
+}
+
+Context envelope JSON:
+$envelope_json
+PROMPT
+}
+
+normalize_decision_json() {
+  raw_response=$1
+
+  raw_content=$(printf '%s' "$raw_response" | jq -r '.response // empty' 2>/dev/null || printf '')
+  if [ -z "$raw_content" ]; then
+    raw_content=$(printf '%s' "$raw_response")
+  fi
+
+  normalized=$(printf '%s' "$raw_content" | jq -c '
+    def text(v): if v == null then "" else (v|tostring) end;
+    def boolish(v):
+      if v == null then false
+      elif (v|type) == "boolean" then v
+      else ((v|tostring|ascii_downcase) | test("^(1|true|yes)$"))
+      end;
+    def ban_kind(v):
+      (text(v)|ascii_downcase) as $b
+      | if ($b|test("perm")) then "permanent"
+        elif ($b|test("temp|short|time")) then "temporary"
+        else "none" end;
+
+    {
+      reply: text(.reply // .message // .response),
+      category: text(.category // .tone // "playful"),
+      norm: text(.norm // .rule // .violation_norm),
+      feeling: text(.feeling // .affect // .emotion),
+      reasoning: text(.reasoning // .reason // .rationale),
+      remove_comment: boolish(.remove_comment // .remove // false),
+      ban: {
+        type: ban_kind(.ban.type // .ban // .ban_kind // .sanction),
+        days: ((.ban.days // .ban_days // .duration // 3) | tonumber? // 3)
+      }
+    }
+  ' 2>/dev/null || printf '{"reply":"","category":"playful","norm":"","feeling":"","reasoning":"","remove_comment":false,"ban":{"type":"none","days":3}}')
+
+  printf '%s' "$normalized"
+}
+
+apply_mode_policy() {
+  decision_json=$1
+
+  adjusted=$(printf '%s' "$decision_json" | jq -c --arg mode "$MODE" '
+    .ban.days = ((.ban.days | tonumber? // 3) | if . < 1 then 1 elif . > 3650 then 3650 else . end)
+    | .pathway = (if (.norm | length) > 0 then "norm" elif (.feeling | length) > 0 then "feeling" else "none" end)
+    | if $mode == "judicial" then
+        if .pathway == "norm" then . else .ban.type = "none" | .remove_comment = false end
+      elif $mode == "capricious" then
+        if .pathway == "feeling" then . else .ban.type = "none" | .remove_comment = false end
+      else
+        if .pathway == "none" then .ban.type = "none" | .remove_comment = false else . end
+      end
+    | if .ban.type != "none" then .remove_comment = false else . end
+    | .needs_enforcement = (.ban.type != "none" or .remove_comment == true)
+    | if (.needs_enforcement and (.reply | length) == 0) then
+        .reply = "Moderator notice: this comment triggered an enforcement action."
+      else . end
+    | if ($mode == "judicial" and .ban.type != "none" and (.norm | length) > 0 and ((.reply | ascii_downcase) | contains((.norm | ascii_downcase)) | not)) then
+        .reply = (.reply + " (Norm: " + .norm + ")")
+      else . end
+    | if ($mode == "capricious" and .ban.type != "none" and (.feeling | length) > 0 and ((.reply | ascii_downcase) | contains((.feeling | ascii_downcase)) | not)) then
+        .reply = (.reply + " [Feeling: " + .feeling + "]")
+      else . end
+    | if ($mode == "mixed" and .ban.type != "none") then
+        if (.pathway == "norm" and (.norm | length) > 0 and ((.reply | ascii_downcase) | contains((.norm | ascii_downcase)) | not)) then
+          .reply = (.reply + " (Norm: " + .norm + ")")
+        elif (.pathway == "feeling" and (.feeling | length) > 0 and ((.reply | ascii_downcase) | contains((.feeling | ascii_downcase)) | not)) then
+          .reply = (.reply + " [Feeling: " + .feeling + "]")
+        else . end
+      else . end
+  ')
+
+  printf '%s' "$adjusted"
+}
+
+ollama_generate() {
+  prompt=$1
+  payload=$(jq -cn --arg model "$OLLAMA_MODEL" --arg prompt "$prompt" '{model:$model,prompt:$prompt,stream:false,format:"json"}')
+  curl -sS --fail --retry 1 --retry-delay 1 \
+    -H 'Content-Type: application/json' \
+    -d "$payload" \
+    "$OLLAMA_URL"
+}
+
+truncate_reply() {
+  reply_text=$1
+  printf '%s' "$reply_text" | awk '{print substr($0,1,9500)}'
+}
+
+post_reply() {
+  thing_id=$1
+  reply_text=$2
+
+  response=$(reddit_post "/api/comment" \
+    --data-urlencode "api_type=json" \
+    --data-urlencode "thing_id=$thing_id" \
+    --data-urlencode "text=$reply_text") || return 1
+
+  errors=$(printf '%s' "$response" | jq -c '.json.errors // []' 2>/dev/null || printf '[]')
+  if [ "$errors" != "[]" ]; then
+    return 1
+  fi
+
+  reply_id=$(printf '%s' "$response" | jq -r '.json.data.things[0].data.name // empty' 2>/dev/null || printf '')
+  if [ -z "$reply_id" ]; then
+    return 1
+  fi
+
+  printf '%s' "$reply_id"
+}
+
+post_temp_or_perm_ban() {
+  username=$1
+  ban_type=$2
+  ban_days=$3
+  note=$4
+
+  if [ "$ban_type" = "temporary" ]; then
+    response=$(reddit_post "/r/$SUBREDDIT/api/friend" \
+      --data-urlencode "api_type=json" \
+      --data-urlencode "name=$username" \
+      --data-urlencode "type=banned" \
+      --data-urlencode "duration=$ban_days" \
+      --data-urlencode "ban_reason=Automated moderation" \
+      --data-urlencode "note=$note") || return 1
+  else
+    response=$(reddit_post "/r/$SUBREDDIT/api/friend" \
+      --data-urlencode "api_type=json" \
+      --data-urlencode "name=$username" \
+      --data-urlencode "type=banned" \
+      --data-urlencode "ban_reason=Automated moderation" \
+      --data-urlencode "note=$note") || return 1
+  fi
+
+  errors=$(printf '%s' "$response" | jq -c '.json.errors // []' 2>/dev/null || printf '[]')
+  [ "$errors" = "[]" ]
+}
+
+post_remove_comment() {
+  thing_id=$1
+  response=$(reddit_post "/api/remove" \
+    --data-urlencode "id=$thing_id" \
+    --data-urlencode "spam=false") || return 1
+
+  jq -e '.json.errors? // [] | length == 0' >/dev/null 2>&1 <<EOFJSON
+$response
+EOFJSON
+}
+
+check_already_replied() {
+  thing_id=$1
+  if [ ! -s "$REPLIES_LOG" ]; then
+    return 1
+  fi
+  jq -e --arg cid "$thing_id" 'select((.comment_id // "") == $cid)' "$REPLIES_LOG" >/dev/null 2>&1
+}
+
+record_reply_event() {
+  comment_json=$1
+  reply_id=$2
+  reply_text=$3
+  category=$4
+  decision_json=$5
+
+  ts=$(now_iso)
+  ts_epoch=$(now_epoch)
+  reply_event_id=$(new_event_id "reply")
+
+  event=$(jq -cn \
+    --arg event "reply" \
+    --arg reply_event_id "$reply_event_id" \
+    --arg ts "$ts" \
+    --argjson ts_epoch "$ts_epoch" \
+    --arg subreddit "$SUBREDDIT" \
+    --arg mode "$MODE" \
+    --arg comment "$comment_json" \
+    --arg reply_id "$reply_id" \
+    --arg reply_text "$reply_text" \
+    --arg category "$category" \
+    --arg decision "$decision_json" \
+    '{event:$event,reply_event_id:$reply_event_id,ts:$ts,ts_epoch:$ts_epoch,subreddit:$subreddit,mode:$mode,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),reply_id:$reply_id,reply:$reply_text,category:$category,decision:(($decision|fromjson? // {}))}')
+
+  append_jsonl "$REPLIES_LOG" "$event"
+}
+
+record_action_event() {
+  action_json=$1
+  append_jsonl "$ACTIONS_LOG" "$action_json"
+
+  action_type=$(printf '%s' "$action_json" | jq -r '.type // empty' 2>/dev/null || printf '')
+  if [ "$action_type" = "ban" ]; then
+    append_jsonl "$BANS_LOG" "$action_json"
+  fi
+}
+
+process_comment() {
+  cache_dir=$1
+  comment_json=$2
+
+  author=$(printf '%s' "$comment_json" | jq -r '.author // empty')
+  thing_id=$(printf '%s' "$comment_json" | jq -r '.name // empty')
+  comment_id=$(printf '%s' "$comment_json" | jq -r '.id // empty')
+
+  case "$thing_id" in
+    t1_*) ;;
+    *) return 0 ;;
+  esac
+
+  case "$author" in
+    ''|"[deleted]"|"[removed]") return 0 ;;
+  esac
+
+  if [ "$author" = "$REDDIT_USERNAME" ]; then
+    return 0
+  fi
+
+  if check_already_replied "$thing_id"; then
+    return 0
+  fi
+
+  envelope=$(compose_context_envelope "$cache_dir" "$comment_json")
+  prompt=$(build_adjudication_prompt "$envelope")
+
+  if ! model_response=$(ollama_generate "$prompt" 2>/dev/null); then
+    return 0
+  fi
+
+  decision=$(normalize_decision_json "$model_response")
+  decision=$(apply_mode_policy "$decision")
+
+  reply_text=$(printf '%s' "$decision" | jq -r '.reply // empty')
+  category=$(printf '%s' "$decision" | jq -r '.category // "playful"')
+  ban_type=$(printf '%s' "$decision" | jq -r '.ban.type // "none"')
+  ban_days=$(printf '%s' "$decision" | jq -r '.ban.days // 3')
+  remove_comment=$(printf '%s' "$decision" | jq -r '.remove_comment // false')
+  norm=$(printf '%s' "$decision" | jq -r '.norm // empty')
+  feeling=$(printf '%s' "$decision" | jq -r '.feeling // empty')
+  pathway=$(printf '%s' "$decision" | jq -r '.pathway // "none"')
+  needs_enforcement=$(printf '%s' "$decision" | jq -r '.needs_enforcement // false')
+
+  reply_id=''
+  if [ -n "$reply_text" ]; then
+    reply_text=$(truncate_reply "$reply_text")
+    if reply_id=$(post_reply "$thing_id" "$reply_text" 2>/dev/null); then
+      record_reply_event "$comment_json" "$reply_id" "$reply_text" "$category" "$decision"
+    else
+      reply_id=''
+    fi
+  fi
+
+  if [ "$needs_enforcement" != "true" ]; then
+    return 0
+  fi
+
+  action_id=$(new_event_id "action")
+  ts=$(now_iso)
+  ts_epoch=$(now_epoch)
+  permalink=$(printf '%s' "$comment_json" | jq -r '.permalink // empty')
+  reasoning=$(printf '%s' "$decision" | jq -r '.reasoning // empty')
+
+  if [ "$ban_type" != "none" ]; then
+    if [ -z "$reply_id" ]; then
+      action=$(jq -cn \
+        --arg event "enforce" \
+        --arg action_id "$action_id" \
+        --arg ts "$ts" \
+        --argjson ts_epoch "$ts_epoch" \
+        --arg status "failed" \
+        --arg error "ban blocked: no direct pre-ban reply" \
+        --arg type "ban" \
+        --arg ban_type "$ban_type" \
+        --argjson ban_days "$ban_days" \
+        --arg subreddit "$SUBREDDIT" \
+        --arg mode "$MODE" \
+        --arg pathway "$pathway" \
+        --arg norm "$norm" \
+        --arg feeling "$feeling" \
+        --arg reasoning "$reasoning" \
+        --arg comment "$comment_json" \
+        --arg permalink "$permalink" \
+        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,ban_type:$ban_type,ban_days:$ban_days,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:null,undoable:false}')
+      record_action_event "$action"
+      return 0
+    fi
+
+    delay=$(random_between "$SANCTION_DELAY_MIN" "$SANCTION_DELAY_MAX")
+    if [ "$delay" -gt 0 ]; then
+      sleep "$delay"
+    fi
+
+    ban_note=$(printf 'mode=%s pathway=%s norm=%s feeling=%s' "$MODE" "$pathway" "$norm" "$feeling")
+    if post_temp_or_perm_ban "$author" "$ban_type" "$ban_days" "$ban_note"; then
+      action=$(jq -cn \
+        --arg event "enforce" \
+        --arg action_id "$action_id" \
+        --arg ts "$ts" \
+        --argjson ts_epoch "$ts_epoch" \
+        --arg status "active" \
+        --arg type "ban" \
+        --arg ban_type "$ban_type" \
+        --argjson ban_days "$ban_days" \
+        --arg subreddit "$SUBREDDIT" \
+        --arg mode "$MODE" \
+        --arg pathway "$pathway" \
+        --arg norm "$norm" \
+        --arg feeling "$feeling" \
+        --arg reasoning "$reasoning" \
+        --arg comment "$comment_json" \
+        --arg permalink "$permalink" \
+        --arg reply_id "$reply_id" \
+        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,type:$type,ban_type:$ban_type,ban_days:$ban_days,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:true,undone_at:null}')
+    else
+      action=$(jq -cn \
+        --arg event "enforce" \
+        --arg action_id "$action_id" \
+        --arg ts "$ts" \
+        --argjson ts_epoch "$ts_epoch" \
+        --arg status "failed" \
+        --arg error "ban API request failed" \
+        --arg type "ban" \
+        --arg ban_type "$ban_type" \
+        --argjson ban_days "$ban_days" \
+        --arg subreddit "$SUBREDDIT" \
+        --arg mode "$MODE" \
+        --arg pathway "$pathway" \
+        --arg norm "$norm" \
+        --arg feeling "$feeling" \
+        --arg reasoning "$reasoning" \
+        --arg comment "$comment_json" \
+        --arg permalink "$permalink" \
+        --arg reply_id "$reply_id" \
+        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,ban_type:$ban_type,ban_days:$ban_days,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:false}')
+    fi
+
+    record_action_event "$action"
+    return 0
+  fi
+
+  if [ "$remove_comment" = "true" ]; then
+    if [ -z "$reply_id" ]; then
+      action=$(jq -cn \
+        --arg event "enforce" \
+        --arg action_id "$action_id" \
+        --arg ts "$ts" \
+        --argjson ts_epoch "$ts_epoch" \
+        --arg status "failed" \
+        --arg error "remove blocked: no direct pre-action reply" \
+        --arg type "remove" \
+        --arg subreddit "$SUBREDDIT" \
+        --arg mode "$MODE" \
+        --arg pathway "$pathway" \
+        --arg norm "$norm" \
+        --arg feeling "$feeling" \
+        --arg reasoning "$reasoning" \
+        --arg comment "$comment_json" \
+        --arg permalink "$permalink" \
+        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:null,undoable:false,removed:true}')
+      record_action_event "$action"
+      return 0
+    fi
+
+    if post_remove_comment "$thing_id"; then
+      action=$(jq -cn \
+        --arg event "enforce" \
+        --arg action_id "$action_id" \
+        --arg ts "$ts" \
+        --argjson ts_epoch "$ts_epoch" \
+        --arg status "active" \
+        --arg type "remove" \
+        --arg subreddit "$SUBREDDIT" \
+        --arg mode "$MODE" \
+        --arg pathway "$pathway" \
+        --arg norm "$norm" \
+        --arg feeling "$feeling" \
+        --arg reasoning "$reasoning" \
+        --arg comment "$comment_json" \
+        --arg permalink "$permalink" \
+        --arg reply_id "$reply_id" \
+        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:true,removed:true,undone_at:null}')
+    else
+      action=$(jq -cn \
+        --arg event "enforce" \
+        --arg action_id "$action_id" \
+        --arg ts "$ts" \
+        --argjson ts_epoch "$ts_epoch" \
+        --arg status "failed" \
+        --arg error "remove API request failed" \
+        --arg type "remove" \
+        --arg subreddit "$SUBREDDIT" \
+        --arg mode "$MODE" \
+        --arg pathway "$pathway" \
+        --arg norm "$norm" \
+        --arg feeling "$feeling" \
+        --arg reasoning "$reasoning" \
+        --arg comment "$comment_json" \
+        --arg permalink "$permalink" \
+        --arg reply_id "$reply_id" \
+        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:false,removed:true}')
+    fi
+
+    record_action_event "$action"
+  fi
+
+  # Per spec: never remove a comment after banning.
+  comment_id=$comment_id
+}
+
+merged_action_by_id() {
+  action_id=$1
+  jq -cs --arg aid "$action_id" '
+    reduce .[] as $row ({}; if ($row.action_id // "") == $aid then . + $row else . end)
+  ' "$ACTIONS_LOG" 2>/dev/null || printf '{}'
+}
+
+undo_action_now() {
+  action_id=$1
+  action=$(merged_action_by_id "$action_id")
+
+  found=$(printf '%s' "$action" | jq -r 'has("action_id")')
+  if [ "$found" != "true" ]; then
+    emit_error "action not found: $action_id"
+    return 1
+  fi
+
+  status=$(printf '%s' "$action" | jq -r '.status // ""')
+  if [ "$status" = "undone" ]; then
+    emit_error "action already undone"
+    return 1
+  fi
+  if [ "$status" != "active" ]; then
+    emit_error "only active actions can be undone"
+    return 1
+  fi
+
+  action_type=$(printf '%s' "$action" | jq -r '.type // ""')
+  comment_author=$(printf '%s' "$action" | jq -r '.comment_author // ""')
+  comment_id=$(printf '%s' "$action" | jq -r '.comment_id // ""')
+
+  ts=$(now_iso)
+  ts_epoch=$(now_epoch)
+
+  ok=0
+  case "$action_type" in
+    ban)
+      if reddit_post "/r/$SUBREDDIT/api/unfriend" \
+        --data-urlencode "api_type=json" \
+        --data-urlencode "name=$comment_author" \
+        --data-urlencode "type=banned" >/dev/null 2>&1; then
+        ok=1
+      fi
+      ;;
+    remove)
+      if reddit_post "/api/approve" \
+        --data-urlencode "id=$comment_id" >/dev/null 2>&1; then
+        ok=1
+      fi
+      ;;
+    *)
+      emit_error "unsupported undo type: $action_type"
+      return 1
+      ;;
+  esac
+
+  if [ "$ok" -eq 1 ]; then
+    undo_event=$(jq -cn \
+      --arg event "undo" \
+      --arg action_id "$action_id" \
+      --arg ts "$ts" \
+      --argjson ts_epoch "$ts_epoch" \
+      --arg status "undone" \
+      --arg undone_at "$ts" \
+      --arg undo_status "ok" \
+      '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,undone_at:$undone_at,undo_status:$undo_status}')
+    record_action_event "$undo_event"
+
+    merged=$(merged_action_by_id "$action_id")
+    jq -cn --argjson action "$merged" '{ok:true,action:$action}'
+  else
+    undo_event=$(jq -cn \
+      --arg event "undo" \
+      --arg action_id "$action_id" \
+      --arg ts "$ts" \
+      --argjson ts_epoch "$ts_epoch" \
+      --arg status "active" \
+      --arg undo_status "failed" \
+      --arg error "undo API failed" \
+      '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,undo_status:$undo_status,error:$error}')
+    record_action_event "$undo_event"
+
+    emit_error "undo API failed"
+    return 1
+  fi
+}
+
+autogen_apology_text() {
+  action_json=$1
+
+  action_type=$(printf '%s' "$action_json" | jq -r '.type // "enforcement"')
+  norm=$(printf '%s' "$action_json" | jq -r '.norm // empty')
+  feeling=$(printf '%s' "$action_json" | jq -r '.feeling // empty')
+
+  prompt=$(cat <<PROMPT
+Write a short apology reddit reply from an automated moderator.
+Context:
+- action_type: $action_type
+- mode: $MODE
+- norm: $norm
+- feeling: $feeling
+Constraints:
+- Keep under 320 characters.
+- Acknowledge possible mistake.
+- Promise that action has been undone.
+Return plain text only.
+PROMPT
+)
+
+  if response=$(ollama_generate "$prompt" 2>/dev/null); then
+    text=$(printf '%s' "$response" | jq -r '.response // empty' 2>/dev/null || printf '')
+    if [ -n "$text" ]; then
+      printf '%s' "$text"
+      return
+    fi
+  fi
+
+  printf '%s' "I made a moderation mistake earlier, and I have undone that action. Sorry for the disruption."
+}
+
+apologize_action_now() {
+  action_id=$1
+  custom_message=${2-}
+
+  action=$(merged_action_by_id "$action_id")
+  found=$(printf '%s' "$action" | jq -r 'has("action_id")')
+  if [ "$found" != "true" ]; then
+    emit_error "action not found: $action_id"
+    return 1
+  fi
+
+  thing_id=$(printf '%s' "$action" | jq -r '.comment_id // empty')
+  if [ -z "$thing_id" ]; then
+    emit_error "action missing comment_id"
+    return 1
+  fi
+
+  if [ -n "$custom_message" ]; then
+    apology=$custom_message
+    source="custom"
+  else
+    apology=$(autogen_apology_text "$action")
+    source="autogen"
+  fi
+
+  apology=$(truncate_reply "$apology")
+  if [ -z "$apology" ]; then
+    apology="I made a moderation mistake earlier and have undone that action."
+  fi
+
+  if reply_id=$(post_reply "$thing_id" "$apology" 2>/dev/null); then
+    ts=$(now_iso)
+    ts_epoch=$(now_epoch)
+    reply_event_id=$(new_event_id "apology")
+    event=$(jq -cn \
+      --arg event "apology" \
+      --arg reply_event_id "$reply_event_id" \
+      --arg ts "$ts" \
+      --argjson ts_epoch "$ts_epoch" \
+      --arg subreddit "$SUBREDDIT" \
+      --arg mode "$MODE" \
+      --arg action_id "$action_id" \
+      --arg comment_id "$thing_id" \
+      --arg reply_id "$reply_id" \
+      --arg reply "$apology" \
+      --arg source "$source" \
+      '{event:$event,reply_event_id:$reply_event_id,ts:$ts,ts_epoch:$ts_epoch,subreddit:$subreddit,mode:$mode,action_id:$action_id,comment_id:$comment_id,reply_id:$reply_id,reply:$reply,category:"apology",source:$source}')
+    append_jsonl "$REPLIES_LOG" "$event"
+
+    jq -cn --arg action_id "$action_id" --arg reply_id "$reply_id" --arg source "$source" '{ok:true,actionId:$action_id,replyId:$reply_id,source:$source}'
+  else
+    emit_error "failed to post apology"
+    return 1
+  fi
+}
+
+list_actions_json() {
+  limit=$(to_int "${1-80}" 80)
+  [ "$limit" -lt 1 ] && limit=1
+
+  jq -cs --argjson limit "$limit" '
+    reduce .[] as $row ({};
+      if ($row.action_id // "") == "" then .
+      else .[$row.action_id] = ((.[$row.action_id] // {}) + $row)
+      end
+    )
+    | [.[]]
+    | sort_by(.ts_epoch // 0)
+    | reverse
+    | .[0:$limit]
+    | {ok:true,actions:.}
+  ' "$ACTIONS_LOG" 2>/dev/null || jq -cn '{ok:true,actions:[]}'
+}
+
+list_replies_json() {
+  limit=$(to_int "${1-120}" 120)
+  [ "$limit" -lt 1 ] && limit=1
+
+  jq -cs --argjson limit "$limit" '
+    sort_by(.ts_epoch // 0)
+    | reverse
+    | .[0:$limit]
+    | {ok:true,replies:.}
+  ' "$REPLIES_LOG" 2>/dev/null || jq -cn '{ok:true,replies:[]}'
+}
+
+extract_norms_internal() {
+  cache_dir=$1
+
+  last_seen=$(to_int "$(cat "$LAST_STATUTE_SEEN_FILE" 2>/dev/null || printf '0')" 0)
+  feed=$(cached_reddit_get "$cache_dir" "high-signal" "/r/$SUBREDDIT/comments/.json?limit=150&raw_json=1&sort=new")
+
+  max_seen=$(printf '%s' "$feed" | jq '[.data.children[].data.created_utc // 0] | max // 0' 2>/dev/null || printf '0')
+  max_seen=$(to_int "$max_seen" 0)
+
+  candidates=$(printf '%s' "$feed" | jq -c --argjson last "$last_seen" --argjson min_score "$HIGH_SIGNAL_MIN_SCORE" '
+    [ .data.children[].data
+      | select((.created_utc // 0) > $last)
+      | select((.score // 0) >= $min_score or (.controversiality // 0) >= 1)
+      | {id:.name,author,body,score,permalink,created_utc}
+    ]
+    | sort_by(.score // 0)
+    | reverse
+    | .[0:40]
+  ' 2>/dev/null || printf '[]')
+
+  candidate_count=$(printf '%s' "$candidates" | jq 'length' 2>/dev/null || printf '0')
+
+  if [ "$max_seen" -gt "$last_seen" ]; then
+    printf '%s\n' "$max_seen" > "$LAST_STATUTE_SEEN_FILE"
+  fi
+
+  if [ "$candidate_count" -eq 0 ]; then
+    jq -cn '{ok:true,processed:0,accepted:0,proposed:0,message:"no high-signal discourse"}'
+    return 0
+  fi
+
+  prompt=$(cat <<PROMPT
+You are extracting candidate moderation norms for r/$SUBREDDIT.
+Using the discourse samples below, propose up to 5 concise norms.
+Return STRICT JSON only in this shape:
+{
+  "norms": [
+    {"id":"n-short-id","text":"rule text","rationale":"why","evidence_ids":["t1_x"],"severity":"low|medium|high"}
+  ]
+}
+
+Discourse:
+$candidates
+PROMPT
+)
+
+  if ! model_response=$(ollama_generate "$prompt" 2>/dev/null); then
+    emit_error "norm extraction failed: ollama unavailable"
+    return 1
+  fi
+
+  raw=$(printf '%s' "$model_response" | jq -r '.response // empty' 2>/dev/null || printf '')
+  if [ -z "$raw" ]; then
+    raw="$model_response"
+  fi
+
+  parsed=$(printf '%s' "$raw" | jq -c '(fromjson? // .)' 2>/dev/null || printf '{}')
+  norms=$(printf '%s' "$parsed" | jq -c 'if type=="array" then . elif (.norms? | type)=="array" then .norms else [] end' 2>/dev/null || printf '[]')
+
+  proposed=0
+  accepted=0
+
+  printf '%s' "$norms" | jq -c '.[]' 2>/dev/null | while IFS= read -r norm_row; do
+    proposed=$((proposed + 1))
+    norm_id=$(printf '%s' "$norm_row" | jq -r '.id // empty')
+    [ -z "$norm_id" ] && norm_id=$(new_event_id "norm")
+    norm_text=$(printf '%s' "$norm_row" | jq -r '.text // empty')
+    [ -z "$norm_text" ] && continue
+    severity=$(printf '%s' "$norm_row" | jq -r '.severity // "medium"')
+    rationale=$(printf '%s' "$norm_row" | jq -r '.rationale // empty')
+    evidence=$(printf '%s' "$norm_row" | jq -c '.evidence_ids // []')
+
+    line=$(jq -cn \
+      --arg id "$norm_id" \
+      --arg text "$norm_text" \
+      --arg severity "$severity" \
+      --arg rationale "$rationale" \
+      --arg source "nightly-extract" \
+      --arg ts "$(now_iso)" \
+      --argjson evidence "$evidence" \
+      '{id:$id,text:$text,severity:$severity,rationale:$rationale,source:$source,accepted_at:$ts,evidence_ids:$evidence}')
+
+    if [ "$AUTO_ACCEPT_NORMS" -eq 1 ]; then
+      append_jsonl "$NORMS_FILE" "$line"
+      accepted=$((accepted + 1))
+    else
+      append_jsonl "$NORM_PROPOSALS_LOG" "$line"
+    fi
+  done
+
+  # shell loop above runs in subshell with pipes; recompute counts deterministically.
+  proposed=$(printf '%s' "$norms" | jq 'length' 2>/dev/null || printf '0')
+  if [ "$AUTO_ACCEPT_NORMS" -eq 1 ]; then
+    accepted=$proposed
+  else
+    accepted=0
+  fi
+
+  jq -cn \
+    --argjson processed "$candidate_count" \
+    --argjson proposed "$proposed" \
+    --argjson accepted "$accepted" \
+    '{ok:true,processed:$processed,proposed:$proposed,accepted:$accepted}'
+}
+
+patrol_once() {
+  cache_dir=$(mktemp -d "${TMPDIR:-/tmp}/vr-patrol.XXXXXX")
+  cleanup_patrol() {
+    rm -rf "$cache_dir"
+  }
+  trap cleanup_patrol EXIT HUP INT TERM
+
+  last_seen=$(to_int "$(cat "$LAST_SEEN_FILE" 2>/dev/null || printf '0')" 0)
+  feed=$(cached_reddit_get "$cache_dir" "comments-feed" "/r/$SUBREDDIT/comments/.json?limit=120&raw_json=1&sort=new")
+
+  max_seen=$(printf '%s' "$feed" | jq '[.data.children[].data.created_utc // 0] | max // 0' 2>/dev/null || printf '0')
+  max_seen=$(to_int "$max_seen" 0)
+
+  new_comments_file="$cache_dir/new-comments.jsonl"
+  printf '%s' "$feed" | jq -c --argjson last "$last_seen" '
+    [.data.children[].data | select((.created_utc // 0) > $last)]
+    | sort_by(.created_utc // 0)
+    | .[]
+  ' 2>/dev/null > "$new_comments_file" || :
+
+  summons_file="$cache_dir/summons.jsonl"
+  others_file="$cache_dir/others.jsonl"
+  : > "$summons_file"
+  : > "$others_file"
+
+  while IFS= read -r comment_row; do
+    [ -z "$comment_row" ] && continue
+    if [ "$(is_summons_comment "$comment_row")" = "1" ]; then
+      printf '%s\n' "$comment_row" >> "$summons_file"
+    else
+      printf '%s\n' "$comment_row" >> "$others_file"
+    fi
+  done < "$new_comments_file"
+
+  selected_file="$cache_dir/selected.jsonl"
+  : > "$selected_file"
+
+  if [ "$PATROL_MODE" = "full" ]; then
+    cat "$summons_file" "$others_file" >> "$selected_file"
+  else
+    cat "$summons_file" >> "$selected_file"
+
+    summons_count=$(wc -l < "$summons_file" | tr -d ' ')
+    summons_count=$(to_int "$summons_count" 0)
+    slots=$((PATROL_SAMPLE_MAX - summons_count))
+    if [ "$slots" -gt 0 ]; then
+      awk 'BEGIN { srand(); } { print rand() "\t" $0; }' "$others_file" 2>/dev/null \
+        | sort -n \
+        | head -n "$slots" \
+        | cut -f2- >> "$selected_file"
+    fi
+  fi
+
+  ordered_file="$cache_dir/ordered.jsonl"
+  jq -cs 'sort_by(.created_utc // 0)[]' "$selected_file" 2>/dev/null > "$ordered_file" || : > "$ordered_file"
+
+  processed=0
+  while IFS= read -r comment_row; do
+    [ -z "$comment_row" ] && continue
+    if process_comment "$cache_dir" "$comment_row"; then
+      processed=$((processed + 1))
+    fi
+  done < "$ordered_file"
+
+  if [ "$max_seen" -gt "$last_seen" ]; then
+    printf '%s\n' "$max_seen" > "$LAST_SEEN_FILE"
+  fi
+
+  now_ts=$(now_iso)
+  runtime=$(jq -cn \
+    --arg ts "$now_ts" \
+    --argjson processed "$processed" \
+    --argjson max_seen "$max_seen" \
+    --argjson last_seen_prev "$last_seen" \
+    --arg mode "$MODE" \
+    --arg patrol_mode "$PATROL_MODE" \
+    '{lastPollAt:$ts,processed:$processed,maxSeen:$max_seen,lastSeenBefore:$last_seen_prev,mode:$mode,patrolMode:$patrol_mode}')
+  printf '%s\n' "$runtime" > "$RUNTIME_FILE"
+
+  jq -cn --argjson processed "$processed" --argjson max_seen "$max_seen" --argjson previous_last_seen "$last_seen" '{ok:true,processed:$processed,maxSeen:$max_seen,previousLastSeen:$previous_last_seen}'
+}
+
+maybe_run_nightly_statute_pass() {
+  if [ "$NIGHTLY_STATUTE_ENABLED" -ne 1 ]; then
+    return 0
+  fi
+
+  today=$(date '+%Y-%m-%d')
+  current_hour=$(to_int "$(date '+%H')" 0)
+  last_day=$(cat "$LAST_STATUTE_DAY_FILE" 2>/dev/null || printf '')
+
+  if [ "$today" = "$last_day" ]; then
+    return 0
+  fi
+
+  if [ "$current_hour" -lt "$NIGHTLY_HOUR" ]; then
+    return 0
+  fi
+
+  if extract_norms_internal "$STATE_DIR" >/dev/null 2>&1; then
+    printf '%s\n' "$today" > "$LAST_STATUTE_DAY_FILE"
+  fi
+}
+
+run_loop() {
+  while :; do
+    patrol_once >/dev/null 2>&1 || true
+    maybe_run_nightly_statute_pass || true
+    sleep_for=$(random_between "$PATROL_INTERVAL_MIN" "$PATROL_INTERVAL_MAX")
+    [ "$sleep_for" -lt 1 ] && sleep_for=1
+    sleep "$sleep_for"
+  done
+}
+
+main() {
+  command=${1-}
+  shift || true
+
+  require_tools
+  bootstrap_state
+  load_bot_env
+  load_reddit_env_optional
+
+  case "$command" in
+    bootstrap)
+      settings_json
+      ;;
+
+    settings)
+      settings_json
+      ;;
+
+    metrics)
+      metrics_json
+      ;;
+
+    once)
+      load_reddit_env
+      patrol_once
+      ;;
+
+    run)
+      load_reddit_env
+      run_loop
+      ;;
+
+    list-actions)
+      list_actions_json "${1-80}"
+      ;;
+
+    list-replies)
+      list_replies_json "${1-120}"
+      ;;
+
+    extract-norms)
+      load_reddit_env
+      extract_norms_internal "$STATE_DIR"
+      ;;
+
+    undo)
+      load_reddit_env
+      aid=${1-}
+      if [ -z "$aid" ]; then
+        emit_error "ACTION_ID required"
+        exit 2
+      fi
+      undo_action_now "$aid"
+      ;;
+
+    apologize)
+      load_reddit_env
+      aid=${1-}
+      shift || true
+      if [ -z "$aid" ]; then
+        emit_error "ACTION_ID required"
+        exit 2
+      fi
+      apologize_action_now "$aid" "${1-}"
+      ;;
+
+    launchd-status)
+      launchd_status_json
+      ;;
+
+    launchd-install)
+      load_reddit_env
+      launchd_install
+      ;;
+
+    launchd-start)
+      load_reddit_env
+      launchd_start
+      ;;
+
+    launchd-stop)
+      load_reddit_env
+      launchd_stop
+      ;;
+
+    launchd-uninstall)
+      launchd_uninstall
+      ;;
+
+    set-setting)
+      key=${1-}
+      value=${2-}
+      if [ -z "$key" ] || [ -z "$value" ]; then
+        emit_error "set-setting requires KEY VALUE"
+        exit 2
+      fi
+      set_setting "$key" "$value"
+      ;;
+
+    set-reddit-setting)
+      if [ "$#" -lt 2 ]; then
+        emit_error "set-reddit-setting requires KEY VALUE"
+        exit 2
+      fi
+      key=${1-}
+      value=${2-}
+      if [ -z "$key" ]; then
+        emit_error "set-reddit-setting requires KEY VALUE"
+        exit 2
+      fi
+      set_reddit_setting "$key" "$value"
+      ;;
+
+    *)
+      emit_error "unknown command: ${command:-<empty>}"
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"

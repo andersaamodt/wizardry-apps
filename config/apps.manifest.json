@@ -66,6 +66,17 @@
         "android": "com.wizardry.apps.memetrader.android"
       },
       "targets": "hosted-web,macos,linux,ios,android"
+    },
+    {
+      "slug": "virtual-redditor",
+      "name": "Virtual Redditor",
+      "production": false,
+      "bundleIds": {
+        "macos": "com.wizardry.apps.virtualredditor.macos",
+        "ios": "com.wizardry.apps.virtualredditor.ios",
+        "android": "com.wizardry.apps.virtualredditor.android"
+      },
+      "targets": "macos,linux"
     }
   ]
 }

@@ -303,6 +303,66 @@ ensure_linux_host() {
   printf '%s\n' "$host_bin"
 }
 
+workspace_field() {
+  conf=$1
+  key=$2
+  fallback=${3-}
+  if [ ! -f "$conf" ]; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+  value=$(awk -F= -v k="$key" '
+    $1 ~ /^[[:space:]]*#/ { next }
+    $1 ~ /^[[:space:]]*$/ { next }
+    {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+      if ($1 == k) {
+        v=$0
+        sub(/^[^=]*=/, "", v)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+        print v
+        exit
+      }
+    }
+  ' "$conf")
+  if [ -n "$value" ]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
+sanitize_bundle_component() {
+  raw=${1-}
+  cleaned=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//; s/--*/-/g')
+  if [ -z "$cleaned" ]; then
+    cleaned=workspace
+  fi
+  printf '%s\n' "$cleaned"
+}
+
+stop_host_instances_for_app() {
+  host_bin=${1-}
+  app_dir=${2-}
+
+  [ -n "$host_bin" ] || return 0
+  [ -n "$app_dir" ] || return 0
+  command -v pgrep >/dev/null 2>&1 || return 0
+
+  # Prevent stale hidden windows/processes from making desktop runs appear as no-op.
+  pids=$(pgrep -f "$host_bin $app_dir" 2>/dev/null || true)
+  [ -n "$pids" ] || return 0
+
+  # shellcheck disable=SC2086
+  kill $pids >/dev/null 2>&1 || true
+  sleep 0.12
+  still=$(pgrep -f "$host_bin $app_dir" 2>/dev/null || true)
+  if [ -n "$still" ]; then
+    # shellcheck disable=SC2086
+    kill -9 $still >/dev/null 2>&1 || true
+  fi
+}
+
 cmd_doctor() {
   root_hint=${1-}
   root=''
@@ -410,18 +470,6 @@ workspace_default_root() {
     return 0
   fi
   printf '%s\n' "$HOME/git"
-}
-
-workspace_field() {
-  file=$1
-  key=$2
-  fallback=${3-}
-  value=$(sed -n "s/^$key=//p" "$file" | head -n 1 | tr -d '\r')
-  if [ -n "$value" ]; then
-    printf '%s\n' "$value"
-  else
-    printf '%s\n' "$fallback"
-  fi
 }
 
 cmd_list_workspaces() {
@@ -784,6 +832,16 @@ cmd_run_desktop() {
   }
   validate_slug "$slug"
 
+  # Memetrader is currently iterated rapidly from source and should always run
+  # the live host entry instead of a previously compiled bundle snapshot.
+  if [ "$slug" = "memetrader" ]; then
+    run_mode=host
+    # Ensure stale host windows do not linger on old in-memory assets.
+    if command -v pkill >/dev/null 2>&1; then
+      pkill -f "wizardry-host.*[/.]apps/memetrader" >/dev/null 2>&1 || true
+    fi
+  fi
+
   app_dir="$root/.apps/$slug"
   [ -d "$app_dir" ] || {
     printf '%s\n' "forge-backend: app not found: $slug" >&2
@@ -846,6 +904,8 @@ cmd_run_desktop() {
   if [ "$slug" = "artificer" ]; then
     host_zoom=${WIZARDRY_ARTIFICER_PAGE_ZOOM:-0.92}
   fi
+
+  stop_host_instances_for_app "$host_bin" "$app_dir"
 
   if command -v nohup >/dev/null 2>&1; then
     if [ -n "$host_zoom" ]; then
@@ -966,6 +1026,75 @@ cmd_run_workspace() {
   log_dir="$root/_tmp/workbench/log"
   mkdir -p "$log_dir"
   log_path="$log_dir/workspace-$workspace_id-host.log"
+
+  workspace_conf="$workspace_path/wizardry.workspace.conf"
+  stop_host_instances_for_app "$host_bin" "$app_dir"
+
+  if [ "$os" = "darwin" ] && command -v open >/dev/null 2>&1; then
+    workspace_title=$(workspace_field "$workspace_conf" title "")
+    [ -n "$workspace_title" ] || workspace_title=$(workspace_field "$workspace_conf" name "")
+    [ -n "$workspace_title" ] || workspace_title=$(basename "$workspace_path")
+
+    workspace_slug=$(workspace_field "$workspace_conf" project_id "")
+    [ -n "$workspace_slug" ] || workspace_slug=$(workspace_field "$workspace_conf" slug "")
+    [ -n "$workspace_slug" ] || workspace_slug=$(basename "$workspace_path")
+    workspace_slug=$(sanitize_bundle_component "$workspace_slug")
+
+    bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
+    bundle="$bundle_root/$workspace_title.app"
+    rm -rf "$bundle"
+    mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
+
+    cat > "$bundle/Contents/MacOS/$workspace_slug" <<APP
+#!/bin/sh
+set -eu
+exec "$host_bin" "$app_dir"
+APP
+    chmod +x "$bundle/Contents/MacOS/$workspace_slug"
+
+    icon_source=''
+    if [ -f "$workspace_path/assets/forge-icon.png" ]; then
+      icon_source="$workspace_path/assets/forge-icon.png"
+    elif [ -f "$app_dir/assets/forge-icon.png" ]; then
+      icon_source="$app_dir/assets/forge-icon.png"
+    fi
+
+    icon_key=''
+    if [ -n "$icon_source" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+      iconset=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-ws-iconset.XXXXXX")
+      for size in 16 32 128 256 512; do
+        sips -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+        sips -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+      done
+      if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/forge.icns" >/dev/null 2>&1; then
+        icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
+      fi
+      rm -rf "$iconset"
+    fi
+
+    bundle_id="com.wizardry.workspace.$workspace_slug"
+    cat > "$bundle/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>$workspace_title</string>
+<key>CFBundleDisplayName</key><string>$workspace_title</string>
+<key>CFBundleIdentifier</key><string>$bundle_id</string>
+<key>CFBundleVersion</key><string>1.0</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleExecutable</key><string>$workspace_slug</string>
+$icon_key
+</dict></plist>
+PLIST
+
+    open -na "$bundle"
+    printf 'launched=1\n'
+    printf 'mode=bundle\n'
+    printf 'artifact=%s\n' "$bundle"
+    printf 'entry=%s\n' "$app_dir"
+    printf 'log=%s\n' "$log_path"
+    return 0
+  fi
 
   if command -v nohup >/dev/null 2>&1; then
     nohup "$host_bin" "$app_dir" >"$log_path" 2>&1 &

@@ -29,6 +29,7 @@
 @property (strong) NSString *appPath;
 @property (strong) NSImage *appIconImage;
 @property (assign) BOOL enableNativeViewMenu;
+@property (assign) BOOL prefersWideDragStrip;
 @end
 
 @implementation AppDelegate
@@ -122,6 +123,10 @@
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
+    (void)note;
+    // Ensure command-line launched hosts behave like regular foreground apps.
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
     // Get app directory from command line argument
     NSArray *args = [[NSProcessInfo processInfo] arguments];
     if (args.count < 2) {
@@ -133,6 +138,7 @@
     self.appPath = args[1];
     NSString *indexPath = [self.appPath stringByAppendingPathComponent:@"index.html"];
     NSString *customIconPath = [self.appPath stringByAppendingPathComponent:@"assets/forge-icon.png"];
+    NSString *parentIconPath = [[[self.appPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"assets"] stringByAppendingPathComponent:@"forge-icon.png"];
     
     // Check if index.html exists
     if (![[NSFileManager defaultManager] fileExistsAtPath:indexPath]) {
@@ -142,20 +148,35 @@
     }
     
     // Get app name from directory
-    NSString *appName = [[self.appPath lastPathComponent] 
-                         stringByReplacingOccurrencesOfString:@"-" withString:@" "];
+    NSString *appComponent = [self.appPath lastPathComponent];
+    if ([[appComponent lowercaseString] isEqualToString:@"app"]) {
+        NSString *parent = [[self.appPath stringByDeletingLastPathComponent] lastPathComponent];
+        if (parent.length > 0) {
+            appComponent = parent;
+        }
+    }
+    NSString *appName = [appComponent stringByReplacingOccurrencesOfString:@"-" withString:@" "];
     appName = [appName capitalizedString];
-    NSString *appSlug = [[self.appPath lastPathComponent] lowercaseString];
+    NSString *appSlug = [appComponent lowercaseString];
+    BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
+    BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
+    self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
 
     [self setupMainMenuWithAppName:appName];
-    if ([[NSFileManager defaultManager] fileExistsAtPath:customIconPath]) {
-        NSImage *iconImage = [[NSImage alloc] initWithContentsOfFile:customIconPath];
+    NSString *resolvedIconPath = customIconPath;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:resolvedIconPath] &&
+        [[NSFileManager defaultManager] fileExistsAtPath:parentIconPath]) {
+        resolvedIconPath = parentIconPath;
+    }
+    if ([[NSFileManager defaultManager] fileExistsAtPath:resolvedIconPath]) {
+        NSImage *iconImage = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
         if (iconImage) {
             self.appIconImage = iconImage;
             [NSApp setApplicationIconImage:self.appIconImage];
         }
     }
+    [NSApp unhide:nil];
     [NSApp activateIgnoringOtherApps:YES];
     
     // Create window
@@ -164,6 +185,22 @@
     if (self.enableNativeViewMenu) {
         // Priorities starts narrow and should remain resizable down to a compact width.
         minSize = NSMakeSize(340, 260);
+    } else if (prefersNarrowTallLayout) {
+        minSize = NSMakeSize(360, 420);
+        NSScreen *screen = [NSScreen mainScreen];
+        if (screen) {
+            NSRect visible = [screen visibleFrame];
+            CGFloat width = floor(visible.size.width / 3.0);
+            if (width < 420.0) {
+                width = 420.0;
+            } else if (width > 740.0) {
+                width = 740.0;
+            }
+            frame.size.width = width;
+            frame.size.height = visible.size.height;
+            frame.origin.x = NSMinX(visible) + floor((visible.size.width - width) / 2.0);
+            frame.origin.y = NSMinY(visible);
+        }
     }
     NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |
                                    NSWindowStyleMaskClosable |
@@ -176,11 +213,14 @@
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
     [self.window setMinSize:minSize];
-    [self.window center];
+    if (!prefersNarrowTallLayout) {
+        [self.window center];
+    }
     [self.window setTitle:[NSString stringWithFormat:@"Wizardry - %@", appName]];
     [self.window setTitlebarAppearsTransparent:YES];
     [self.window setTitleVisibility:NSWindowTitleHidden];
-    [self.window setMovableByWindowBackground:YES];
+    // Owl uses explicit side drag zones so tab clicks/drags never move the window.
+    [self.window setMovableByWindowBackground:!prefersSideDragZones];
     [self.window setBackgroundColor:[NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0]];
     if (@available(macOS 11.0, *)) {
         [self.window setToolbarStyle:NSWindowToolbarStyleUnified];
@@ -189,6 +229,20 @@
         [self.window setTitlebarSeparatorStyle:NSTitlebarSeparatorStyleNone];
     }
     [self.window makeKeyAndOrderFront:nil];
+    [self.window orderFrontRegardless];
+    // Re-activate after the window exists so workspace launches behave like
+    // regular desktop apps (not hidden/background-only processes).
+    NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
+    [currentApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
+    [NSApp unhide:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self.window makeMainWindow];
+        [self.window makeKeyAndOrderFront:nil];
+        [self.window orderFrontRegardless];
+        [NSApp unhide:nil];
+        [NSApp activateIgnoringOtherApps:YES];
+    });
     
     // Create WebView with message handler
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
@@ -214,20 +268,76 @@
     [self.webView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [rootView addSubview:self.webView];
 
-    // Keep the drag area centered around the title region, leaving side controls clickable.
-    CGFloat dragStripWidth = self.enableNativeViewMenu ? 140.0 : 320.0;
-    if (dragStripWidth > frame.size.width) {
-        dragStripWidth = frame.size.width;
+    // Keep title controls clickable while providing draggable regions that do
+    // not overlap interactive tab controls.
+    if (prefersSideDragZones) {
+        // Leave the center top area non-draggable for tab interactions.
+        CGFloat leftWidth = 96.0;
+        CGFloat rightWidth = 192.0;
+        if (leftWidth > frame.size.width) {
+            leftWidth = frame.size.width;
+        }
+        if (rightWidth > frame.size.width - leftWidth) {
+            rightWidth = MAX(0.0, frame.size.width - leftWidth);
+        }
+
+        NSRect leftStripFrame = NSMakeRect(0.0,
+                                           frame.size.height - dragStripHeight,
+                                           leftWidth,
+                                           dragStripHeight);
+        NSView *leftStrip = [[WizardryDragStripView alloc] initWithFrame:leftStripFrame];
+        [leftStrip setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+        [leftStrip setWantsLayer:YES];
+        leftStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:leftStrip];
+
+        NSRect rightStripFrame = NSMakeRect(frame.size.width - rightWidth,
+                                            frame.size.height - dragStripHeight,
+                                            rightWidth,
+                                            dragStripHeight);
+        NSView *rightStrip = [[WizardryDragStripView alloc] initWithFrame:rightStripFrame];
+        [rightStrip setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+        [rightStrip setWantsLayer:YES];
+        rightStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:rightStrip];
+    } else {
+        CGFloat stripX = 0.0;
+        CGFloat dragStripWidth = self.enableNativeViewMenu ? 140.0 : 320.0;
+        NSUInteger stripMask = (NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin);
+        if (self.prefersWideDragStrip) {
+            CGFloat leftReserved = 300.0;
+            CGFloat rightReserved = 150.0;
+            dragStripWidth = frame.size.width - leftReserved - rightReserved;
+            if (dragStripWidth < 220.0) {
+                dragStripWidth = frame.size.width * 0.36;
+            }
+            if (dragStripWidth > frame.size.width) {
+                dragStripWidth = frame.size.width;
+            }
+            stripX = leftReserved;
+            if (stripX + dragStripWidth > frame.size.width) {
+                stripX = frame.size.width - dragStripWidth;
+            }
+            if (stripX < 0.0) {
+                stripX = 0.0;
+            }
+            stripMask = (NSViewWidthSizable | NSViewMinYMargin);
+        } else {
+            if (dragStripWidth > frame.size.width) {
+                dragStripWidth = frame.size.width;
+            }
+            stripX = (frame.size.width - dragStripWidth) / 2.0;
+        }
+        NSRect stripFrame = NSMakeRect(stripX,
+                                       frame.size.height - dragStripHeight,
+                                       dragStripWidth,
+                                       dragStripHeight);
+        NSView *dragStrip = [[WizardryDragStripView alloc] initWithFrame:stripFrame];
+        [dragStrip setAutoresizingMask:stripMask];
+        [dragStrip setWantsLayer:YES];
+        dragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:dragStrip];
     }
-    NSRect stripFrame = NSMakeRect((frame.size.width - dragStripWidth) / 2.0,
-                                   frame.size.height - dragStripHeight,
-                                   dragStripWidth,
-                                   dragStripHeight);
-    NSView *dragStrip = [[WizardryDragStripView alloc] initWithFrame:stripFrame];
-    [dragStrip setAutoresizingMask:(NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin)];
-    [dragStrip setWantsLayer:YES];
-    dragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-    [rootView addSubview:dragStrip];
 
     [self.window setContentView:rootView];
     
