@@ -294,7 +294,6 @@
       var ORGANIZE_SHOW_KEY = 'wizardry.forge.organize.show';
       var THEME_KEY = 'wizardry.forge.theme';
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
-      var ICON_MAP_KEY = 'wizardry.forge.icon.map.v1';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
       var ASSET_VERSION = 'forge20260218a';
 
@@ -333,7 +332,7 @@
         leftRailWidth: parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240,
         targetRuntime: {},
         targetSectionByRow: {},
-        iconMap: loadJSONStorage(ICON_MAP_KEY, {}),
+        iconVersionByKey: {},
         themeTypeahead: '',
         themeTypeaheadTimer: null
       };
@@ -369,30 +368,6 @@
         state.selectedCatalog = value || '';
         if (/^(builtin|workspace):/.test(state.selectedCatalog)) {
           saveStorage(SELECTED_CATALOG_KEY, state.selectedCatalog);
-        }
-      }
-
-      function loadJSONStorage(key, fallback) {
-        var raw = loadStorage(key);
-        if (!raw) {
-          return fallback;
-        }
-        try {
-          var parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') {
-            return parsed;
-          }
-        } catch (_err) {
-          return fallback;
-        }
-        return fallback;
-      }
-
-      function saveJSONStorage(key, value) {
-        try {
-          localStorage.setItem(key, JSON.stringify(value || {}));
-        } catch (_err) {
-          return;
         }
       }
 
@@ -1551,13 +1526,7 @@
 
           var thumb = document.createElement('span');
           thumb.className = 'catalog-thumb';
-          var iconSrc = state.iconMap[item.key] || '';
-          if (iconSrc) {
-            var thumbImg = document.createElement('img');
-            thumbImg.src = iconSrc;
-            thumbImg.alt = '';
-            thumb.appendChild(thumbImg);
-          }
+          renderCatalogThumb(thumb, item);
 
           var line = document.createElement('div');
           line.className = 'catalog-line';
@@ -1812,6 +1781,82 @@
         return activeTargets.indexOf(hostTarget) >= 0;
       }
 
+      function pathToIconSrc(path) {
+        var value = String(path || '').trim();
+        if (!value) {
+          return '';
+        }
+        if (/^(data:|blob:|https?:|file:)/i.test(value)) {
+          return value;
+        }
+        if (value.charAt(0) === '/') {
+          return 'file://' + encodeURI(value);
+        }
+        return value;
+      }
+
+      function iconPathForItem(item) {
+        if (!item || !item.path) {
+          return '';
+        }
+        var base = String(item.path || '').replace(/\/+$/, '');
+        if (!base) {
+          return '';
+        }
+        return base + '/assets/forge-icon.png';
+      }
+
+      function iconSrcForItem(item) {
+        var iconPath = iconPathForItem(item);
+        if (!iconPath) {
+          return '';
+        }
+        var src = pathToIconSrc(iconPath);
+        var key = item && item.key ? item.key : '';
+        var version = key ? (state.iconVersionByKey[key] || '') : '';
+        if (!version) {
+          version = ASSET_VERSION;
+        }
+        return src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(String(version));
+      }
+
+      function setItemIconVersion(item) {
+        if (!item || !item.key) {
+          return;
+        }
+        state.iconVersionByKey[item.key] = Date.now();
+      }
+
+      function setImageSource(img, src, onMissing) {
+        if (!src) {
+          if (typeof onMissing === 'function') {
+            onMissing();
+          }
+          return;
+        }
+        img.onerror = function () {
+          if (typeof onMissing === 'function') {
+            onMissing();
+          }
+        };
+        img.src = src;
+      }
+
+      function renderCatalogThumb(thumb, item) {
+        var iconSrc = iconSrcForItem(item);
+        if (!iconSrc) {
+          return;
+        }
+        var thumbImg = document.createElement('img');
+        thumbImg.alt = '';
+        setImageSource(thumbImg, iconSrc, function () {
+          if (thumbImg.parentNode === thumb) {
+            thumb.removeChild(thumbImg);
+          }
+        });
+        thumb.appendChild(thumbImg);
+      }
+
       function syncStageActionVisibility(selected) {
         if (els.actionBuild) {
           var showBuild = !!selected && state.route === 'pipeline' && hasBuildAction(selected);
@@ -1839,13 +1884,17 @@
         if (!els.selectedIconPreview || !els.selectedIconPlaceholder || !els.selectedIconClear) {
           return;
         }
-        var key = selected && selected.key ? selected.key : '';
-        var src = key ? (state.iconMap[key] || '') : '';
-        if (src) {
-          els.selectedIconPreview.src = src;
+        var iconSrc = iconSrcForItem(selected);
+        if (iconSrc) {
           els.selectedIconPreview.classList.remove('hidden');
           els.selectedIconPlaceholder.classList.add('hidden');
           els.selectedIconClear.classList.remove('hidden');
+          setImageSource(els.selectedIconPreview, iconSrc, function () {
+            els.selectedIconPreview.removeAttribute('src');
+            els.selectedIconPreview.classList.add('hidden');
+            els.selectedIconPlaceholder.classList.remove('hidden');
+            els.selectedIconClear.classList.add('hidden');
+          });
           return;
         }
         els.selectedIconPreview.removeAttribute('src');
@@ -1854,17 +1903,26 @@
         els.selectedIconClear.classList.add('hidden');
       }
 
-      function applySelectedIconData(dataUrl) {
+      async function applySelectedIconData(dataUrl) {
         var selected = selectedCatalogItem();
         if (!selected || !selected.key) {
           return;
         }
-        if (dataUrl) {
-          state.iconMap[selected.key] = dataUrl;
-        } else {
-          delete state.iconMap[selected.key];
+        if (selected.draft) {
+          throw new Error('Create the project first, then set its icon.');
         }
-        saveJSONStorage(ICON_MAP_KEY, state.iconMap);
+        var iconPayload = dataUrl || '';
+        if (selected.kind === 'builtin') {
+          await backend('set-app-icon', [selected.id, iconPayload], { quiet: true });
+        } else if (selected.kind === 'workspace') {
+          if (!selected.path) {
+            throw new Error('Workspace path is missing; cannot update icon.');
+          }
+          await backend('set-workspace-icon', [selected.path, iconPayload], { quiet: true });
+        } else {
+          throw new Error('Unknown app type; cannot update icon.');
+        }
+        setItemIconVersion(selected);
         renderCatalogList();
         renderSelectedIconEditor(selected);
       }
@@ -3107,7 +3165,7 @@
               return;
             }
             readImageFileToDataUrl(file).then(function (dataUrl) {
-              applySelectedIconData(dataUrl);
+              return applySelectedIconData(dataUrl);
             }).catch(function (err) {
               toast(String(err && err.message ? err.message : err), 'bad');
             }).finally(function () {
@@ -3120,7 +3178,9 @@
           els.selectedIconClear.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
-            applySelectedIconData('');
+            applySelectedIconData('').catch(function (err) {
+              toast(String(err && err.message ? err.message : err), 'bad');
+            });
           });
         }
 
@@ -3156,7 +3216,7 @@
               return;
             }
             readImageFileToDataUrl(file).then(function (dataUrl) {
-              applySelectedIconData(dataUrl);
+              return applySelectedIconData(dataUrl);
             }).catch(function (err) {
               toast(String(err && err.message ? err.message : err), 'bad');
             });

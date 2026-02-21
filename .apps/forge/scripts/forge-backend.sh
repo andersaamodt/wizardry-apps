@@ -15,6 +15,8 @@ Commands:
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
   set-app-targets [ROOT_HINT] APP_SLUG TARGETS
   set-workspace-targets [ROOT_HINT] WORKSPACE_PATH TARGETS
+  set-app-icon [ROOT_HINT] APP_SLUG DATA_URL
+  set-workspace-icon [ROOT_HINT] WORKSPACE_PATH DATA_URL
   build-desktop [ROOT_HINT] APP_SLUG
   run-desktop [ROOT_HINT] APP_SLUG [RUN_MODE]
   run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
@@ -535,6 +537,110 @@ cmd_set_workspace_targets() {
   printf 'profile=%s\n' "$conf"
 }
 
+decode_base64_to_file() {
+  payload=$1
+  out_file=$2
+
+  if command -v base64 >/dev/null 2>&1; then
+    if printf '%s' "$payload" | base64 --decode >"$out_file" 2>/dev/null; then
+      return 0
+    fi
+    if printf '%s' "$payload" | base64 -D >"$out_file" 2>/dev/null; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+write_project_icon_from_data_url() {
+  project_dir=$1
+  data_url=$2
+
+  [ -d "$project_dir" ] || {
+    printf '%s\n' "forge-backend: project path not found: $project_dir" >&2
+    exit 1
+  }
+
+  icon_path="$project_dir/assets/forge-icon.png"
+  mkdir -p "$(dirname "$icon_path")"
+
+  if [ -z "$data_url" ]; then
+    rm -f "$icon_path"
+    printf 'icon=%s\n' "$icon_path"
+    printf 'status=cleared\n'
+    return 0
+  fi
+
+  case "$data_url" in
+    data:image/png\;base64,*)
+      payload=${data_url#data:image/png;base64,}
+      ;;
+    data:image/*\;base64,*)
+      payload=${data_url#data:image/}
+      payload=${payload#*;base64,}
+      ;;
+    *)
+      printf '%s\n' "forge-backend: icon payload must be a base64 image data URL" >&2
+      exit 2
+      ;;
+  esac
+
+  tmp_icon=$(mktemp "${TMPDIR:-/tmp}/wizardry-forge-icon.XXXXXX")
+  if ! decode_base64_to_file "$payload" "$tmp_icon"; then
+    rm -f "$tmp_icon"
+    printf '%s\n' "forge-backend: failed to decode icon payload (base64 tool missing or invalid payload)" >&2
+    exit 1
+  fi
+
+  if [ ! -s "$tmp_icon" ]; then
+    rm -f "$tmp_icon"
+    printf '%s\n' "forge-backend: decoded icon was empty" >&2
+    exit 1
+  fi
+
+  mv "$tmp_icon" "$icon_path"
+  printf 'icon=%s\n' "$icon_path"
+  printf 'status=updated\n'
+}
+
+cmd_set_app_icon() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  data_url=${3-}
+
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: set-app-icon requires APP_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  app_dir="$root/.apps/$slug"
+  [ -d "$app_dir" ] || {
+    printf '%s\n' "forge-backend: app not found: $slug" >&2
+    exit 1
+  }
+
+  write_project_icon_from_data_url "$app_dir" "$data_url"
+  printf 'slug=%s\n' "$slug"
+}
+
+cmd_set_workspace_icon() {
+  require_root "${1-}" >/dev/null
+  workspace_path=${2-}
+  data_url=${3-}
+
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: set-workspace-icon requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -d "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+
+  write_project_icon_from_data_url "$workspace_path" "$data_url"
+  printf 'workspace=%s\n' "$workspace_path"
+}
+
 cmd_build_desktop() {
   root=$(require_root "${1-}")
   slug=${2-}
@@ -581,10 +687,7 @@ APP
       chmod +x "$bundle/Contents/MacOS/$slug"
 
       icon_key=''
-      if [ -f "$app_dir/assets/forge.icns" ]; then
-        cp "$app_dir/assets/forge.icns" "$bundle/Contents/Resources/forge.icns"
-        icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
-      elif [ -f "$app_dir/assets/forge-icon.png" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+      if [ -f "$app_dir/assets/forge-icon.png" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
         iconset=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-iconset.XXXXXX")
         for size in 16 32 128 256 512; do
           sips -z "$size" "$size" "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
@@ -1668,6 +1771,12 @@ case "$cmd" in
     ;;
   set-workspace-targets)
     cmd_set_workspace_targets "${2-}" "${3-}" "${4-}"
+    ;;
+  set-app-icon)
+    cmd_set_app_icon "${2-}" "${3-}" "${4-}"
+    ;;
+  set-workspace-icon)
+    cmd_set_workspace_icon "${2-}" "${3-}" "${4-}"
     ;;
   build-desktop)
     cmd_build_desktop "${2-}" "${3-}"

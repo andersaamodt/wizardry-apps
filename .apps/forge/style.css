@@ -1382,6 +1382,8 @@ button:disabled {
   color: var(--section-text);
   font-size: 0.86rem;
   font-weight: 640;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   padding: 0.48rem 0.62rem;
   display: flex;
   align-items: center;

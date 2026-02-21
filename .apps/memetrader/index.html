@@ -4,102 +4,51 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Memetrader</title>
-  <link id="memetrader-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=memetrader20260220b">
-  <link rel="stylesheet" href="style.css">
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #0b121a;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #0b121a;
+    }
+
+    #status {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: #0b121a;
+      color: #9bb0c8;
+      font-size: 0.95rem;
+      z-index: 10;
+      transition: opacity 120ms ease;
+    }
+
+    #status.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #status.error {
+      color: #ffb4b4;
+      white-space: pre-wrap;
+      text-align: center;
+      padding: 1rem;
+    }
+  </style>
 </head>
 <body>
-  <main class="app">
-    <header class="hero">
-      <h1>Memetrader</h1>
-      <p>Local-first meme trading and curation. Hash identity, MSIG tagging, cluster draws, and trade journals.</p>
-      <div id="status" class="status">Initializing…</div>
-    </header>
-
-    <section class="panel grid-two">
-      <div>
-        <h2>Ingest</h2>
-        <label>File path</label>
-        <input id="ingest-path" type="text" placeholder="/absolute/path/to/meme.png" spellcheck="false">
-        <label>MSIG tags (comma separated)</label>
-        <input id="ingest-msig" type="text" placeholder="reaction,drift,vaporwave" spellcheck="false">
-        <label>Families (comma separated)</label>
-        <input id="ingest-families" type="text" placeholder="family:surreal,family:cats" spellcheck="false">
-        <button id="ingest-btn" type="button">Ingest Meme</button>
-      </div>
-      <div>
-        <h2>Actions</h2>
-        <div class="row">
-          <button id="refresh-btn" type="button">Refresh Gallery</button>
-          <button id="draw-btn" type="button">Uniform Cluster Draw</button>
-          <button id="draw-tilt-btn" type="button">Temperature Tilt Draw</button>
-        </div>
-        <label>Selected SHA256 Canon</label>
-        <input id="selected-sha" type="text" placeholder="select from gallery below" spellcheck="false">
-        <div class="row">
-          <button id="vote-up-btn" type="button">Daily Upvote</button>
-          <button id="vote-meh-btn" type="button">Meh</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel grid-two">
-      <div>
-        <h2>Tagging</h2>
-        <label>MSIG update</label>
-        <input id="tag-msig" type="text" placeholder="remix,contrast" spellcheck="false">
-        <label>Families update</label>
-        <input id="tag-families" type="text" placeholder="family:reaction" spellcheck="false">
-        <button id="tag-btn" type="button">Apply Tags</button>
-      </div>
-      <div>
-        <h2>Relations</h2>
-        <label>Relation type</label>
-        <select id="rel-type">
-          <option value="related">related</option>
-          <option value="contrast">contrast</option>
-          <option value="often-combined">often-combined</option>
-          <option value="visually-similar">visually-similar</option>
-        </select>
-        <label>Target SHA</label>
-        <input id="rel-target" type="text" placeholder="sha of related meme" spellcheck="false">
-        <button id="rel-btn" type="button">Add Relation</button>
-        <label>Lineage precursor SHA</label>
-        <input id="lineage-target" type="text" placeholder="precursor sha" spellcheck="false">
-        <button id="lineage-btn" type="button">Set Lineage Edge</button>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>Gallery</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>SHA</th>
-            <th>Name</th>
-            <th>Kind</th>
-            <th>Cluster</th>
-            <th>Temperature</th>
-            <th>MSIG</th>
-            <th>Families</th>
-          </tr>
-        </thead>
-        <tbody id="gallery"></tbody>
-      </table>
-    </section>
-
-    <section class="panel">
-      <h2>Log</h2>
-      <pre id="log"></pre>
-    </section>
-  </main>
-  <div class="theme-dock">
-    <div class="menu-anchor">
-      <button id="theme-picker-btn" type="button" class="theme-picker-btn" aria-haspopup="menu" aria-expanded="false">Psionic</button>
-      <div id="theme-picker-menu" class="floating-menu hidden" role="menu" aria-label="Theme selector">
-        <div id="theme-picker-list" class="menu-list"></div>
-      </div>
-    </div>
-  </div>
+  <div id="status">Starting Memetrader...</div>
+  <iframe id="app" src="about:blank" title="Memetrader"></iframe>
 
   <script>
     (function loadBridge() {
@@ -123,108 +72,42 @@
   </script>
 
   <script>
-    var THEME_KEY = 'wizardry.memetrader.theme';
-    var THEME_ASSET_VERSION = 'memetrader20260220b';
+    var siteName = 'memetrader';
+    var entryPath = '/pages/index.html';
 
-    var state = {
-      backendScriptPath: '',
-      themes: [
-        'adept', 'alchemist', 'archmage', 'chronomancer', 'conjurer', 'druid',
-        'empath', 'enchanter', 'geomancer', 'hermeticist', 'hierophant', 'illusionist',
-        'lich', 'necromancer', 'psionic', 'pyromancer', 'seer', 'shaman', 'sorcerer', 'sorceress',
-        'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet', 'warlock', 'wizard'
+    var commands = {
+      siteReady: [
+        'sh',
+        '-c',
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; built="$root/' + siteName + '/build/pages/index.html"; if [ -f "$cfg" ] && [ -f "$built" ]; then printf "yes"; else printf "no"; fi'
       ],
-      activeTheme: 'psionic'
+      ensureSite: [
+        'sh',
+        '-c',
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; if [ ! -f "$cfg" ]; then create-from-template ' + siteName + ' ' + siteName + '; fi; web-wizardry build ' + siteName
+      ],
+      startDetached: ['sh', '-c', 'web-wizardry serve ' + siteName + ' >/dev/null 2>&1 &'],
+      ensureUsablePort: [
+        'sh',
+        '-c',
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; pidf="$root/' + siteName + '/nginx/nginx.pid"; port=$(sed -n "s/^port=//p" "$cfg" 2>/dev/null | head -n 1); [ -n "$port" ] || port=8080; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "$port"; exit 0; fi; if command -v lsof >/dev/null 2>&1; then if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then printf "$port"; exit 0; fi; p=8081; while [ "$p" -le 8120 ]; do if ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then change-site-port ' + siteName + ' "$p" >/dev/null 2>&1 && printf "$p" && exit 0; fi; p=$((p+1)); done; exit 1; fi; printf "$port"; exit 0'
+      ],
+      isRunning: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; pidf="$root/' + siteName + '/nginx/nginx.pid"; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "yes"; else printf "no"; fi'],
+      getPort: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
     };
 
-    function el(id) {
-      return document.getElementById(id);
+    function statusEl() {
+      return document.getElementById('status');
     }
 
-    function loadStorage(key) {
-      try {
-        return window.localStorage.getItem(key) || '';
-      } catch (_) {
-        return '';
-      }
+    function setStatus(text, isError) {
+      var el = statusEl();
+      el.textContent = text;
+      el.className = isError ? 'error' : '';
     }
 
-    function saveStorage(key, value) {
-      try {
-        window.localStorage.setItem(key, value);
-      } catch (_) {
-        // Ignore storage failures.
-      }
-    }
-
-    function themeLabel(theme) {
-      var value = String(theme || '').trim();
-      if (!value) {
-        return 'Psionic';
-      }
-      return value.split('-').map(function (part) {
-        return part ? part.charAt(0).toUpperCase() + part.slice(1) : '';
-      }).join(' ');
-    }
-
-    function renderThemeMenu() {
-      var list = el('theme-picker-list');
-      var button = el('theme-picker-btn');
-      if (!list || !button) {
-        return;
-      }
-      list.textContent = '';
-      state.themes.forEach(function (theme) {
-        var item = document.createElement('button');
-        item.type = 'button';
-        item.setAttribute('data-theme', theme);
-        item.className = state.activeTheme === theme ? 'active' : '';
-        item.textContent = themeLabel(theme);
-        list.appendChild(item);
-      });
-      button.textContent = themeLabel(state.activeTheme);
-    }
-
-    function applyTheme(theme) {
-      var normalized = state.themes.indexOf(theme) >= 0 ? theme : 'psionic';
-      state.activeTheme = normalized;
-      saveStorage(THEME_KEY, normalized);
-      var sheet = el('memetrader-theme-stylesheet');
-      if (sheet) {
-        sheet.href = 'themes/' + normalized + '.css?v=' + THEME_ASSET_VERSION;
-      }
-      renderThemeMenu();
-    }
-
-    function hideThemeMenu() {
-      var menu = el('theme-picker-menu');
-      var button = el('theme-picker-btn');
-      if (!menu || !button) {
-        return;
-      }
-      menu.classList.add('hidden');
-      button.setAttribute('aria-expanded', 'false');
-    }
-
-    function toggleThemeMenu() {
-      var menu = el('theme-picker-menu');
-      var button = el('theme-picker-btn');
-      if (!menu || !button) {
-        return;
-      }
-      var hidden = menu.classList.toggle('hidden');
-      button.setAttribute('aria-expanded', hidden ? 'false' : 'true');
-    }
-
-    function logLine(text) {
-      var out = el('log');
-      out.textContent = '[' + new Date().toLocaleTimeString() + '] ' + text + '\n' + out.textContent;
-    }
-
-    function setStatus(text, isErr) {
-      var s = el('status');
-      s.textContent = text;
-      s.className = isErr ? 'status error' : 'status';
+    function hideStatus() {
+      statusEl().classList.add('hidden');
     }
 
     function hasBridge() {
@@ -232,12 +115,12 @@
     }
 
     async function waitForBridge(timeoutMs) {
-      var started = Date.now();
+      var start = Date.now();
       while (!hasBridge()) {
-        if (Date.now() - started > timeoutMs) {
-          throw new Error('wizardry bridge unavailable');
+        if (Date.now() - start > (timeoutMs || 4000)) {
+          throw new Error('wizardry bridge unavailable; run this app in native host');
         }
-        await new Promise(function (resolve) { setTimeout(resolve, 60); });
+        await new Promise(function (resolve) { setTimeout(resolve, 50); });
       }
     }
 
@@ -250,188 +133,96 @@
       }
       var stderr = String((res && res.stderr) || '').trim();
       var stdout = String((res && res.stdout) || '').trim();
-      throw new Error(stderr || stdout || ('exit ' + code));
+      var detail = stderr || stdout || ('exit ' + code);
+      throw new Error(detail);
     }
 
-    async function runBackend(args) {
-      var argv;
-      if (!state.backendScriptPath) {
+    async function resolvePort() {
+      var res = await bridgeExec(commands.getPort);
+      var raw = String((res && res.stdout) || '').trim();
+      if (!/^[0-9]+$/.test(raw)) {
+        throw new Error('unable to resolve Memetrader port from site.conf');
+      }
+      return raw;
+    }
+
+    async function isRunning() {
+      var res = await bridgeExec(commands.isRunning);
+      return String((res && res.stdout) || '').trim() === 'yes';
+    }
+
+    async function waitUntilRunning(timeoutMs) {
+      var start = Date.now();
+      while (Date.now() - start < timeoutMs) {
         try {
-          var pagePath = decodeURIComponent(String(window.location && window.location.pathname ? window.location.pathname : ''));
-          var marker = '/.apps/memetrader/';
-          var idx = pagePath.lastIndexOf(marker);
-          if (idx > 0) {
-            state.backendScriptPath = pagePath.slice(0, idx) + '/.apps/memetrader/scripts/memetrader-backend.sh';
+          if (await isRunning()) {
+            return true;
           }
         } catch (_) {
-          state.backendScriptPath = '';
+          // Keep polling.
         }
+        await new Promise(function (resolve) { setTimeout(resolve, 125); });
       }
-
-      if (state.backendScriptPath) {
-        argv = ['sh', state.backendScriptPath].concat(args);
-      } else {
-        argv = [
-          'sh',
-          '-c',
-          'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/.apps/memetrader/scripts/memetrader-backend.sh" "$@"',
-          'memetrader-backend'
-        ].concat(args);
-      }
-      var res = await bridgeExec(argv);
-      var out = String((res && res.stdout) || '').trim();
-      if (!out) {
-        return { ok: true };
-      }
-      var parsed = JSON.parse(out.split('\n').filter(Boolean).slice(-1)[0]);
-      if (!parsed.ok) {
-        throw new Error(parsed.error || 'backend error');
-      }
-      return parsed;
+      return false;
     }
 
-    function selectedSha() {
-      return String(el('selected-sha').value || '').trim();
-    }
-
-    function renderGallery(items) {
-      var tbody = el('gallery');
-      tbody.textContent = '';
-      (items || []).forEach(function (item) {
-        var tr = document.createElement('tr');
-        tr.innerHTML = [
-          '<td><code>' + item.sha + '</code></td>',
-          '<td>' + (item.name || '') + '</td>',
-          '<td>' + (item.kind || '') + '</td>',
-          '<td><span class="cluster">' + (item.cluster || '') + '</span></td>',
-          '<td><span class="temp temp-' + (item.temperature || 'cold') + '">' + (item.temperature || 'cold') + '</span></td>',
-          '<td>' + (item.msig || '') + '</td>',
-          '<td>' + (item.families || '') + '</td>'
-        ].join('');
-        tr.addEventListener('click', function () {
-          el('selected-sha').value = item.sha || '';
-        });
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function refresh() {
-      setStatus('Refreshing…', false);
-      var st = await runBackend(['status']);
-      var list = await runBackend(['list', '', '120']);
-      renderGallery(list.items || []);
-      setStatus('Ready - ' + st.total + ' memes (' + st.hot + ' hot, ' + st.warm + ' warm, ' + st.cold + ' cold)', false);
-    }
-
-    async function ingest() {
-      var path = String(el('ingest-path').value || '').trim();
-      if (!path) {
-        throw new Error('file path is required');
+    async function ensureSiteIfNeeded() {
+      var res = await bridgeExec(commands.siteReady);
+      var ready = String((res && res.stdout) || '').trim() === 'yes';
+      if (!ready) {
+        await bridgeExec(commands.ensureSite);
       }
-      var msig = String(el('ingest-msig').value || '').trim();
-      var families = String(el('ingest-families').value || '').trim();
-      var res = await runBackend(['ingest', '', path, msig, families, 'flat', '1']);
-      el('selected-sha').value = res.sha256_canon || '';
-      logLine('Ingested ' + (res.sha256_canon || 'unknown'));
-      await refresh();
     }
 
-    async function vote(v) {
-      var sha = selectedSha();
-      if (!sha) {
-        throw new Error('select a meme first');
+    async function startWithFallbackPort() {
+      await bridgeExec(commands.startDetached);
+      if (await waitUntilRunning(7000)) {
+        return;
       }
-      var res = await runBackend(['vote', '', sha, v]);
-      logLine('Vote ' + v + ' on ' + sha + ' => ' + res.temperature + ' (' + res.temp_score + ')');
-      await refresh();
+
+      await bridgeExec(commands.ensureUsablePort);
+      await bridgeExec(commands.startDetached);
+      if (await waitUntilRunning(5000)) {
+        return;
+      }
+
+      throw new Error('daemon start timed out');
     }
 
-    async function draw(tilt) {
-      var res = await runBackend(['draw', '', tilt ? '1' : '0']);
-      el('selected-sha').value = res.sha || '';
-      logLine('Draw selected ' + res.sha + ' from cluster ' + res.cluster + ' (' + res.temperature + ')');
-    }
-
-    async function applyTags() {
-      var sha = selectedSha();
-      if (!sha) {
-        throw new Error('select a meme first');
-      }
-      var msig = String(el('tag-msig').value || '').trim();
-      var families = String(el('tag-families').value || '').trim();
-      await runBackend(['tag', '', sha, msig, families]);
-      logLine('Updated tags for ' + sha);
-      await refresh();
-    }
-
-    async function applyRelation() {
-      var sha = selectedSha();
-      if (!sha) {
-        throw new Error('select a meme first');
-      }
-      var rel = String(el('rel-type').value || 'related');
-      var target = String(el('rel-target').value || '').trim();
-      if (!target) {
-        throw new Error('target sha is required');
-      }
-      await runBackend(['relate', '', sha, rel, target]);
-      logLine('Relation ' + rel + ' from ' + sha + ' -> ' + target);
-    }
-
-    async function applyLineage() {
-      var sha = selectedSha();
-      if (!sha) {
-        throw new Error('select a meme first');
-      }
-      var precursor = String(el('lineage-target').value || '').trim();
-      if (!precursor) {
-        throw new Error('precursor sha is required');
-      }
-      await runBackend(['lineage', '', sha, precursor]);
-      logLine('Lineage set: ' + precursor + ' -> ' + sha);
-    }
-
-    async function runAction(fn) {
+    async function boot() {
+      var iframe = document.getElementById('app');
       try {
-        setStatus('Working…', false);
-        await fn();
-        setStatus('Ready', false);
-      } catch (err) {
-        setStatus(String(err && err.message ? err.message : err), true);
-        logLine('Error: ' + String(err && err.message ? err.message : err));
+        await waitForBridge(4000);
+
+        setStatus('Syncing Memetrader...', false);
+        await ensureSiteIfNeeded();
+
+        if (await isRunning()) {
+          var hotPort = await resolvePort();
+          iframe.onload = hideStatus;
+          iframe.src = 'http://localhost:' + hotPort + entryPath + '?v=' + Date.now();
+          return;
+        }
+
+        setStatus('Starting Memetrader...', false);
+        try {
+          await bridgeExec(commands.ensureUsablePort);
+        } catch (_) {
+          // Non-fatal.
+        }
+        await startWithFallbackPort();
+
+        var port = await resolvePort();
+        iframe.onload = hideStatus;
+        iframe.src = 'http://localhost:' + port + entryPath + '?v=' + Date.now();
+      } catch (error) {
+        iframe.src = 'about:blank';
+        setStatus('Error: ' + String(error && error.message ? error.message : error), true);
       }
     }
 
     window.addEventListener('DOMContentLoaded', function () {
-      applyTheme(loadStorage(THEME_KEY) || 'psionic');
-      el('ingest-btn').addEventListener('click', function () { runAction(ingest); });
-      el('refresh-btn').addEventListener('click', function () { runAction(refresh); });
-      el('draw-btn').addEventListener('click', function () { runAction(function () { return draw(false); }); });
-      el('draw-tilt-btn').addEventListener('click', function () { runAction(function () { return draw(true); }); });
-      el('vote-up-btn').addEventListener('click', function () { runAction(function () { return vote('up'); }); });
-      el('vote-meh-btn').addEventListener('click', function () { runAction(function () { return vote('meh'); }); });
-      el('tag-btn').addEventListener('click', function () { runAction(applyTags); });
-      el('rel-btn').addEventListener('click', function () { runAction(applyRelation); });
-      el('lineage-btn').addEventListener('click', function () { runAction(applyLineage); });
-      el('theme-picker-btn').addEventListener('click', function (event) {
-        event.stopPropagation();
-        toggleThemeMenu();
-      });
-      el('theme-picker-list').addEventListener('click', function (event) {
-        var target = event.target.closest('button[data-theme]');
-        if (!target) {
-          return;
-        }
-        applyTheme(target.getAttribute('data-theme') || 'psionic');
-        hideThemeMenu();
-      });
-      document.addEventListener('click', function (event) {
-        if (event.target.closest('#theme-picker-btn') || event.target.closest('#theme-picker-menu')) {
-          return;
-        }
-        hideThemeMenu();
-      });
-      runAction(refresh);
+      setTimeout(boot, 20);
     });
   </script>
 </body>
