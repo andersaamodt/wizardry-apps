@@ -233,7 +233,9 @@
     
     // Load the app HTML
     NSURL *url = [NSURL fileURLWithPath:indexPath];
-    NSURL *allowDir = [NSURL fileURLWithPath:self.appPath];
+    // Forge renders app/workspace icons from absolute file paths (often outside the
+    // current app folder), so read access must include the broader filesystem tree.
+    NSURL *allowDir = [NSURL fileURLWithPath:@"/" isDirectory:YES];
     [self.webView loadFileURL:url allowingReadAccessToURL:allowDir];
 }
 
