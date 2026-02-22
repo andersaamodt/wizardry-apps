@@ -674,10 +674,6 @@ button:hover {
   position: relative;
 }
 
-.row.row-next-action-animating {
-  transition: height 220ms ease;
-}
-
 .row::before {
   content: "";
   position: absolute;
@@ -1032,18 +1028,21 @@ button:hover {
 }
 
 .next-action {
+  display: block;
   font-size: calc(12px * var(--ui-scale));
   color: #6a7180;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: calc(100vw - (150px * var(--ui-scale)));
+  max-height: calc(22px * var(--ui-scale));
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 220ms ease, transform 220ms ease;
+  transition: max-height 260ms ease, opacity 220ms ease, transform 220ms ease;
 }
 
 .next-action.next-action-entering {
+  max-height: 0;
   opacity: 0;
   transform: translateY(calc(-3px * var(--ui-scale)));
 }
