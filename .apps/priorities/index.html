@@ -882,6 +882,11 @@
 
     async function loadThemes() {
       var themes = [];
+      if (!hasBridge()) {
+        state.themes = normalizeThemes(themes);
+        ensureActiveThemeInList();
+        return;
+      }
       try {
         var result = await runBackend(['list-themes']);
         themes = parseThemeListOutput((result && result.stdout) || '');
