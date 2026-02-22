@@ -1410,7 +1410,8 @@ button:hover {
   padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale));
   font-size: calc(13px * var(--ui-scale));
   text-align: left;
-  color: var(--icon-neutral);
+  color: color-mix(in srgb, var(--text, #2a2e47) 86%, var(--icon-neutral, #5d6486) 14%);
+  font-weight: 560;
 }
 
 .row-menu-item svg {
@@ -1422,10 +1423,11 @@ button:hover {
 .row-menu-item:hover {
   border-color: color-mix(in srgb, var(--accent, #7782d6) 42%, var(--border, #d4d0e6) 58%);
   background: color-mix(in srgb, var(--accent, #7782d6) 18%, transparent);
+  color: color-mix(in srgb, var(--text, #2a2e47) 92%, #000 8%);
 }
 
 .row-menu-item.danger {
-  color: var(--danger, #a14d5b);
+  color: color-mix(in srgb, var(--danger, #a14d5b) 84%, var(--text, #2a2e47) 16%);
 }
 
 .startup-modal {
