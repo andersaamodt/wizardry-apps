@@ -365,7 +365,8 @@
         targetSectionByRow: {},
         iconVersionByKey: {},
         themeTypeahead: '',
-        themeTypeaheadTimer: null
+        themeTypeaheadTimer: null,
+        pathCompactTimer: null
       };
 
       var els = {};
@@ -1146,6 +1147,7 @@
         if (els.selectedPathRow) {
           els.selectedPathRow.classList.toggle('hidden', state.route === 'create');
         }
+        scheduleSelectedPathCompactSync();
         renderCatalogList();
         renderSelectedBuiltIn();
         scheduleWindowFit();
@@ -1153,6 +1155,31 @@
 
       function inferProjectTypeFromContext(ctx) {
         return ctx === 'godot' ? 'Game' : 'Application';
+      }
+
+      function syncSelectedPathCompactMode() {
+        if (!els.openSelectedPath) {
+          return;
+        }
+        var btn = els.openSelectedPath;
+        btn.classList.remove('is-compact');
+        if (btn.classList.contains('hidden') || !btn.dataset || !btn.dataset.path) {
+          return;
+        }
+        // Swap to an icon-only control when the label is too compressed to read.
+        if (btn.clientWidth > 0 && btn.clientWidth < 28) {
+          btn.classList.add('is-compact');
+        }
+      }
+
+      function scheduleSelectedPathCompactSync() {
+        if (state.pathCompactTimer) {
+          clearTimeout(state.pathCompactTimer);
+        }
+        state.pathCompactTimer = setTimeout(function () {
+          state.pathCompactTimer = null;
+          syncSelectedPathCompactMode();
+        }, 0);
       }
 
       function projectTypeKeyForContext(ctx) {
@@ -1898,6 +1925,7 @@
             text(els.openSelectedPath, '');
             els.openSelectedPath.title = 'Path (click to copy, double-click to open)';
             delete els.openSelectedPath.dataset.path;
+            els.openSelectedPath.classList.remove('is-compact');
             els.openSelectedPath.classList.add('hidden');
           }
           if (els.terminalSelectedPath) {
@@ -1941,11 +1969,14 @@
             text(els.openSelectedPath, folderName);
             els.openSelectedPath.title = selected.path + ' (click to copy, double-click to open)';
             els.openSelectedPath.dataset.path = selected.path;
+            els.openSelectedPath.classList.remove('is-compact');
             els.openSelectedPath.classList.remove('hidden');
+            scheduleSelectedPathCompactSync();
           } else {
             text(els.openSelectedPath, '');
             els.openSelectedPath.title = 'Path (click to copy, double-click to open)';
             delete els.openSelectedPath.dataset.path;
+            els.openSelectedPath.classList.remove('is-compact');
             els.openSelectedPath.classList.add('hidden');
           }
         }
@@ -4115,6 +4146,7 @@
         syncCreateUI();
         scheduleLayoutRecoveryCheck();
         window.addEventListener('resize', scheduleLayoutRecoveryCheck);
+        window.addEventListener('resize', scheduleSelectedPathCompactSync);
 
         if (state.rootHint) {
           setWorkspaceRoot(state.rootHint);
