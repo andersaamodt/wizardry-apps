@@ -257,7 +257,6 @@ h1 {
   width: auto;
   max-width: 560px;
   margin: 0;
-  margin-left: auto;
   z-index: 21;
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -564,7 +563,7 @@ button:hover {
 .tree {
   display: grid;
   gap: 0;
-  padding-left: calc(36px * var(--ui-scale));
+  padding-left: calc(30px * var(--ui-scale));
   padding-right: calc(8px * var(--ui-scale));
   justify-items: center;
 }
@@ -601,8 +600,8 @@ button:hover {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(-44px * var(--ui-scale));
-  width: calc(44px * var(--ui-scale));
+  left: calc(-38px * var(--ui-scale));
+  width: calc(38px * var(--ui-scale));
 }
 
 .row.row-expandable {
@@ -998,7 +997,7 @@ button:hover {
   width: calc(34px * var(--ui-scale));
   height: calc(34px * var(--ui-scale));
   position: absolute;
-  left: calc(-40px * var(--ui-scale));
+  left: calc(-34px * var(--ui-scale));
   top: 50%;
   transform: translateY(-50%);
   border-radius: calc(8px * var(--ui-scale));
