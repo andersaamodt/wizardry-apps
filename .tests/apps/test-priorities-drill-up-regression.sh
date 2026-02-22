@@ -15,7 +15,10 @@ grep -F "var nextRoot = parentNavPath(currentRoot);" "$app" >/dev/null
 grep -F "up.classList.toggle('hidden', !nextRoot || nextRoot === currentRoot);" "$app" >/dev/null
 
 # Regression guard: drill-in should navigate directly to the clicked path.
-grep -F "setRootAndRefresh({ persistRoot: false });" "$app" >/dev/null
+grep -F "setRootAndRefresh({ persistRoot: false, keepDrillStack: true });" "$app" >/dev/null
+
+# Regression guard: drill stack can force go-up visibility and deterministic return.
+grep -F "if (Array.isArray(state.drillStack) && state.drillStack.length > 0) {" "$app" >/dev/null
 
 # Regression guard: local parent navigation must support dot paths.
 grep -F "function parentNavPath(path) {" "$app" >/dev/null

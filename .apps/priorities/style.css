@@ -86,6 +86,7 @@ h1 {
 
 #title-folder {
   -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .topbar-main {
@@ -104,6 +105,7 @@ h1 {
   gap: calc(6px * var(--ui-scale));
   /* Keep title controls reliably clickable inside draggable header. */
   -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .topbar-main button,
@@ -113,6 +115,7 @@ h1 {
 .topbar-main a,
 .topbar-main [role="button"] {
   -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .settings-toggle,
@@ -245,6 +248,7 @@ h1 {
   background: transparent;
   color: var(--accent, #7782d6);
   -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .drill-up.hidden {

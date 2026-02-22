@@ -3597,6 +3597,10 @@
       if (!up) {
         return;
       }
+      if (Array.isArray(state.drillStack) && state.drillStack.length > 0) {
+        up.classList.remove('hidden');
+        return;
+      }
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
       var currentNormalized = normalizeRootPath(currentRoot);
       var ceiling = normalizeRootPath(state.rootCeiling || loadStorage(ROOT_KEY) || '');
@@ -3612,25 +3616,44 @@
       if (!path) {
         return;
       }
+      var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
+      var currentNormalized = normalizeRootPath(currentRoot);
+      var targetNormalized = normalizeRootPath(path);
+      if (currentNormalized && targetNormalized && currentNormalized !== targetNormalized) {
+        if (!Array.isArray(state.drillStack)) {
+          state.drillStack = [];
+        }
+        var last = state.drillStack.length ? String(state.drillStack[state.drillStack.length - 1] || '').trim() : '';
+        if (normalizeRootPath(last) !== currentNormalized) {
+          state.drillStack.push(currentRoot);
+        }
+      }
       document.getElementById('root-dir').value = path;
-      setRootAndRefresh({ persistRoot: false });
+      setRootAndRefresh({ persistRoot: false, keepDrillStack: true });
       updateDrillUpVisibility();
     }
 
     function drillUp() {
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
-      var ceiling = normalizeRootPath(state.rootCeiling || loadStorage(ROOT_KEY) || '');
-      if (ceiling && normalizeRootPath(currentRoot) === ceiling) {
-        updateDrillUpVisibility();
-        return;
+      var nextRoot = '';
+      if (Array.isArray(state.drillStack) && state.drillStack.length > 0) {
+        nextRoot = String(state.drillStack.pop() || '').trim();
       }
-      var nextRoot = parentNavPath(currentRoot);
+      if (!nextRoot) {
+        var ceiling = normalizeRootPath(state.rootCeiling || loadStorage(ROOT_KEY) || '');
+        if (ceiling && normalizeRootPath(currentRoot) === ceiling) {
+          updateDrillUpVisibility();
+          return;
+        }
+        nextRoot = parentNavPath(currentRoot);
+      }
+      var ceiling = normalizeRootPath(state.rootCeiling || loadStorage(ROOT_KEY) || '');
       if (!nextRoot || nextRoot === currentRoot) {
         updateDrillUpVisibility();
         return;
       }
       document.getElementById('root-dir').value = nextRoot;
-      setRootAndRefresh({ persistRoot: false });
+      setRootAndRefresh({ persistRoot: false, keepDrillStack: true });
       updateDrillUpVisibility();
     }
 
