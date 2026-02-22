@@ -12807,8 +12807,9 @@
 
     if (!jobId) {
       state.dictationInstallPendingCancel = true;
-      state.dictationInstallCancelling = false;
-      state.dictationInstallBusy = false;
+      state.dictationInstallCancelling = true;
+      state.dictationInstallBusy = true;
+      state.dictationInstallError = "";
       state.dictationInstallCancelRequestedAt = 0;
       state.dictationInstallCancelAttempts = 0;
       renderUi();
