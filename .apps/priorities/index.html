@@ -1087,11 +1087,28 @@
       if (!nameStack) {
         return;
       }
+      var leftBefore = nameStack.getBoundingClientRect().left;
       var existing = nameStack.querySelector('.next-action');
       var nextActionText = getNextActionLabel(path);
       if (!nextActionText) {
         if (existing) {
           existing.remove();
+          requestAnimationFrame(function () {
+            var leftAfterRemove = nameStack.getBoundingClientRect().left;
+            var deltaAfterRemove = leftBefore - leftAfterRemove;
+            if (!deltaAfterRemove) {
+              return;
+            }
+            nameStack.style.transition = 'none';
+            nameStack.style.transform = 'translateX(' + deltaAfterRemove + 'px)';
+            void nameStack.offsetWidth;
+            nameStack.style.transition = 'transform 240ms ease';
+            nameStack.style.transform = 'translateX(0)';
+            window.setTimeout(function () {
+              nameStack.style.transition = '';
+              nameStack.style.transform = '';
+            }, 260);
+          });
         }
         return;
       }
@@ -1104,6 +1121,19 @@
         existing.classList.add('next-action-entering');
         nameStack.appendChild(existing);
         existing.textContent = '➜ ' + nextActionText;
+        var leftAfterInsert = nameStack.getBoundingClientRect().left;
+        var deltaAfterInsert = leftBefore - leftAfterInsert;
+        if (deltaAfterInsert) {
+          nameStack.style.transition = 'none';
+          nameStack.style.transform = 'translateX(' + deltaAfterInsert + 'px)';
+          void nameStack.offsetWidth;
+          nameStack.style.transition = 'transform 240ms ease';
+          nameStack.style.transform = 'translateX(0)';
+          window.setTimeout(function () {
+            nameStack.style.transition = '';
+            nameStack.style.transform = '';
+          }, 260);
+        }
         requestAnimationFrame(function () {
           existing.classList.remove('next-action-entering');
         });
