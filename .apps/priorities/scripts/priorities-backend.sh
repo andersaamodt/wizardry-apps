@@ -8,6 +8,7 @@ case "${1-}" in
 Usage: priorities-backend.sh ACTION [ARGS...]
 
 Actions:
+  list-themes           List Wizardry theme names from global theme directory
   list [DIR]            List prioritized items in DIR (default: current dir)
   prioritize PATH       Promote PATH using the prioritize spell
   prioritize-quick PATH Promote PATH and print: echelon<tab>priority<tab>checked
@@ -25,6 +26,82 @@ USAGE
 esac
 
 set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+
+is_workspace_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  [ -f "$root/config/apps.manifest.json" ] || return 1
+  [ -d "$root/.apps" ] || return 1
+  [ -d "$root/.web" ] || return 1
+}
+
+find_root_from() {
+  start=${1-}
+  [ -n "$start" ] || return 1
+  dir=$start
+  while :; do
+    if is_workspace_root "$dir"; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    [ "$dir" = "/" ] && break
+    dir=$(dirname "$dir")
+  done
+  return 1
+}
+
+resolve_wizardry_root() {
+  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && is_workspace_root "$WIZARDRY_APPS_ROOT"; then
+    printf '%s\n' "$WIZARDRY_APPS_ROOT"
+    return 0
+  fi
+
+  if root=$(find_root_from "$SCRIPT_DIR" 2>/dev/null); then
+    printf '%s\n' "$root"
+    return 0
+  fi
+
+  if pwd_now=$(pwd -P 2>/dev/null); then
+    if root=$(find_root_from "$pwd_now" 2>/dev/null); then
+      printf '%s\n' "$root"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+theme_names_from_dir() {
+  dir=${1-}
+  [ -d "$dir" ] || return 0
+  find "$dir" -maxdepth 1 -type f -name '*.css' 2>/dev/null \
+    | awk -F/ '{ print $NF }' \
+    | sed 's/\.css$//' \
+    | awk '/^[a-z0-9_-]+$/' \
+    | sort -u
+}
+
+emit_theme_names() {
+  app_theme_dir="$SCRIPT_DIR/../themes"
+  theme_root=''
+  root=$(resolve_wizardry_root 2>/dev/null || true)
+  if [ -n "$root" ] && [ -d "$root/.web/.themes" ]; then
+    theme_root="$root/.web/.themes"
+    mkdir -p "$app_theme_dir"
+    cp -f "$theme_root"/*.css "$app_theme_dir/" 2>/dev/null || true
+  fi
+
+  themes=$(theme_names_from_dir "$theme_root" || true)
+  if [ -z "$themes" ]; then
+    themes=$(theme_names_from_dir "$app_theme_dir" || true)
+  fi
+
+  if [ -n "$themes" ]; then
+    printf '%s\n' "$themes"
+  fi
+}
 
 action=${1-}
 if [ -z "$action" ]; then
@@ -1194,6 +1271,10 @@ prioritize_emit_impl() {
 }
 
 case "$action" in
+  list-themes)
+    emit_theme_names
+    ;;
+
   list)
     emit_list "${1:-.}"
     ;;

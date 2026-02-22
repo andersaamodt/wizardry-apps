@@ -11,6 +11,7 @@ Commands:
   doctor [ROOT_HINT]
   list-apps [ROOT_HINT]
   list-templates [ROOT_HINT]
+  list-themes [ROOT_HINT]
   list-godot-tools [ROOT_HINT]
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
   set-app-targets [ROOT_HINT] APP_SLUG TARGETS
@@ -447,6 +448,36 @@ cmd_list_templates() {
     [ -d "$root/.web/$slug" ] && exists=1
     printf '%s\t%s\t%s\n' "$slug" "$publish" "$exists"
   done
+}
+
+theme_names_from_dir() {
+  dir=${1-}
+  [ -d "$dir" ] || return 0
+  find "$dir" -maxdepth 1 -type f -name '*.css' 2>/dev/null \
+    | awk -F/ '{ print $NF }' \
+    | sed 's/\.css$//' \
+    | awk '/^[a-z0-9_-]+$/' \
+    | sort -u
+}
+
+cmd_list_themes() {
+  root=$(require_root "${1-}")
+  theme_root="$root/.web/.themes"
+  app_theme_dir="$root/.apps/forge/themes"
+
+  if [ -d "$theme_root" ]; then
+    mkdir -p "$app_theme_dir"
+    cp -f "$theme_root"/*.css "$app_theme_dir/" 2>/dev/null || true
+  fi
+
+  themes=$(theme_names_from_dir "$theme_root" || true)
+  if [ -z "$themes" ]; then
+    themes=$(theme_names_from_dir "$app_theme_dir" || true)
+  fi
+
+  if [ -n "$themes" ]; then
+    printf '%s\n' "$themes"
+  fi
 }
 
 cmd_list_godot_tools() {
@@ -1888,6 +1919,9 @@ case "$cmd" in
     ;;
   list-templates)
     cmd_list_templates "${2-}"
+    ;;
+  list-themes)
+    cmd_list_themes "${2-}"
     ;;
   list-godot-tools)
     cmd_list_godot_tools "${2-}"

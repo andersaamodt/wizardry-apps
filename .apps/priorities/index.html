@@ -144,12 +144,7 @@
       uiScale: 1,
       drillStack: [],
       rowClickTimer: null,
-      themes: [
-        'adept', 'alchemist', 'archmage', 'athenian', 'chronomancer', 'conjurer', 'druid',
-        'empath', 'enchanter', 'geomancer', 'hermeticist', 'hierophant', 'illusionist',
-        'lich', 'necromancer', 'psionic', 'pyromancer', 'seer', 'shaman', 'sorcerer', 'sorceress',
-        'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet', 'warlock', 'wizard'
-      ],
+      themes: ['psionic'],
       activeTheme: '',
       activeFont: '',
       fontOptions: [],
@@ -833,12 +828,77 @@
       return value.charAt(0).toUpperCase() + value.slice(1);
     }
 
+    function normalizeThemes(list) {
+      var out = [];
+      var seen = Object.create(null);
+      var input = Array.isArray(list) ? list : [];
+      for (var i = 0; i < input.length; i += 1) {
+        var item = String(input[i] || '').toLowerCase().trim();
+        if (!item || !/^[a-z0-9_-]+$/.test(item) || seen[item]) {
+          continue;
+        }
+        seen[item] = true;
+        out.push(item);
+      }
+      if (!seen.psionic) {
+        out.unshift('psionic');
+      }
+      out.sort(function (a, b) {
+        if (a === 'psionic') {
+          return -1;
+        }
+        if (b === 'psionic') {
+          return 1;
+        }
+        return a.localeCompare(b);
+      });
+      return out;
+    }
+
+    function parseThemeListOutput(blob) {
+      var list = [];
+      String(blob || '').split('\n').forEach(function (line) {
+        var value = String(line || '').toLowerCase().trim();
+        if (!value) {
+          return;
+        }
+        list.push(value);
+      });
+      return list;
+    }
+
+    function ensureActiveThemeInList() {
+      if (!Array.isArray(state.themes) || !state.themes.length) {
+        state.themes = ['psionic'];
+      }
+      if (state.themes.indexOf(state.activeTheme) < 0) {
+        if (state.themes.indexOf('psionic') >= 0) {
+          state.activeTheme = 'psionic';
+        } else {
+          state.activeTheme = state.themes[0];
+        }
+      }
+    }
+
+    async function loadThemes() {
+      var themes = [];
+      try {
+        var result = await runBackend(['list-themes']);
+        themes = parseThemeListOutput((result && result.stdout) || '');
+      } catch (_) {
+        themes = [];
+      }
+      state.themes = normalizeThemes(themes);
+      ensureActiveThemeInList();
+    }
+
     function renderThemePicker() {
       var list = document.getElementById('theme-picker-list');
       var button = document.getElementById('theme-picker-btn');
       if (!list || !button) {
         return;
       }
+      ensureActiveThemeInList();
       var html = '';
       for (var i = 0; i < state.themes.length; i += 1) {
         var theme = state.themes[i];
@@ -852,7 +912,11 @@
     function applyTheme(themeName) {
       var normalized = String(themeName || '').toLowerCase().trim();
       if (!/^[a-z0-9_-]+$/.test(normalized) || state.themes.indexOf(normalized) < 0) {
-        normalized = 'psionic';
+        if (state.themes.indexOf('psionic') >= 0) {
+          normalized = 'psionic';
+        } else {
+          normalized = state.themes[0] || 'psionic';
+        }
       }
       state.activeTheme = normalized;
       saveStorage(THEME_KEY, normalized);
@@ -2041,9 +2105,10 @@
       }
     }
 
-    window.addEventListener('DOMContentLoaded', function () {
+    window.addEventListener('DOMContentLoaded', async function () {
       requestWindowShape();
-      state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
+      state.activeTheme = String(loadStorage(THEME_KEY) || 'psionic').toLowerCase().trim();
+      await loadThemes();
       applyTheme(state.activeTheme);
       applyTextScale(loadStorage(UI_SCALE_KEY) || loadStorage(TEXT_SCALE_KEY) || '1');
       state.fontOptions = getPlatformFontOptions();

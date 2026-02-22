@@ -313,12 +313,7 @@
         apps: [],
         workspaces: [],
         organizeShow: loadStorage(ORGANIZE_SHOW_KEY) || 'both',
-        themes: [
-          'adept', 'alchemist', 'archmage', 'athenian', 'chronomancer', 'conjurer', 'druid',
-          'empath', 'enchanter', 'geomancer', 'hermeticist', 'hierophant', 'illusionist',
-          'lich', 'necromancer', 'psionic', 'pyromancer', 'seer', 'shaman', 'sorcerer', 'sorceress',
-          'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet', 'warlock', 'wizard'
-        ],
+        themes: ['psionic'],
         activeTheme: loadStorage(THEME_KEY) || 'psionic',
         selectedBuiltIn: '',
         selectedWorkspace: '',
@@ -1206,10 +1201,79 @@
         return value.charAt(0).toUpperCase() + value.slice(1);
       }
 
+      function normalizeThemes(list) {
+        var out = [];
+        var seen = Object.create(null);
+        var input = Array.isArray(list) ? list : [];
+        for (var i = 0; i < input.length; i += 1) {
+          var item = String(input[i] || '').toLowerCase().trim();
+          if (!item || !/^[a-z0-9_-]+$/.test(item) || seen[item]) {
+            continue;
+          }
+          seen[item] = true;
+          out.push(item);
+        }
+        if (!seen.psionic) {
+          out.unshift('psionic');
+        }
+        out.sort(function (a, b) {
+          if (a === 'psionic') {
+            return -1;
+          }
+          if (b === 'psionic') {
+            return 1;
+          }
+          return a.localeCompare(b);
+        });
+        return out;
+      }
+
+      function parseThemeListOutput(blob) {
+        var list = [];
+        String(blob || '').split('\n').forEach(function (line) {
+          var value = String(line || '').toLowerCase().trim();
+          if (!value) {
+            return;
+          }
+          list.push(value);
+        });
+        return list;
+      }
+
+      function ensureActiveThemeInList() {
+        if (!Array.isArray(state.themes) || !state.themes.length) {
+          state.themes = ['psionic'];
+        }
+        if (state.themes.indexOf(state.activeTheme) < 0) {
+          if (state.themes.indexOf('psionic') >= 0) {
+            state.activeTheme = 'psionic';
+          } else {
+            state.activeTheme = state.themes[0];
+          }
+          saveStorage(THEME_KEY, state.activeTheme);
+        }
+      }
+
+      async function loadThemes() {
+        var themes = [];
+        try {
+          var result = await backend('list-themes', [], { quiet: true });
+          themes = parseThemeListOutput((result && result.stdout) || '');
+        } catch (_err) {
+          themes = [];
+        }
+        state.themes = normalizeThemes(themes);
+        ensureActiveThemeInList();
+      }
+
       function applyTheme(themeName) {
         var normalized = String(themeName || '').toLowerCase().trim();
-        if (!/^[a-z0-9_-]+$/.test(normalized)) {
-          normalized = 'psionic';
+        if (!/^[a-z0-9_-]+$/.test(normalized) || state.themes.indexOf(normalized) < 0) {
+          if (state.themes.indexOf('psionic') >= 0) {
+            normalized = 'psionic';
+          } else {
+            normalized = state.themes[0] || 'psionic';
+          }
         }
         state.activeTheme = normalized;
         saveStorage(THEME_KEY, normalized);
@@ -1239,6 +1303,7 @@
         if (!els.themePickerList) {
           return;
         }
+        ensureActiveThemeInList();
         var html = '';
         for (var i = 0; i < state.themes.length; i += 1) {
           var theme = state.themes[i];
@@ -3636,6 +3701,7 @@
         startAutoRefresh();
         setPanel('settings', false);
         setArtifacts([]);
+        await loadThemes();
         applyTheme(state.activeTheme);
         renderThemePicker();
         setOrganizeShow(state.organizeShow);
