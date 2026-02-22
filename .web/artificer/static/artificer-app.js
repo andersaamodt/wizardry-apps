@@ -4887,6 +4887,32 @@
     return trim(event.git_diff || "") !== "";
   }
 
+  function shouldAutoCollapseCompletedRunTrace(event) {
+    if (!event) {
+      return true;
+    }
+    var duration = runDurationSeconds(event.started_at, event.finished_at);
+    var streamEntries = splitRunStreamEntries(event.stream_text);
+    var commandCount = Array.isArray(event.commands) ? event.commands.length : 0;
+    var planLength = trim(String(event.plan || "")).length;
+    var failureLength = trim(String(event.failures || "")).length;
+    var sessionLength = trim(String(event.session_log || "")).length;
+    var diffLength = trim(String(event.git_diff || "")).length;
+    var streamLength = trim(String(event.stream_text || "")).length;
+    var complexityScore = 0;
+    if (duration >= 90) complexityScore += 2;
+    if (duration >= 180) complexityScore += 2;
+    if (streamEntries.length >= 20) complexityScore += 2;
+    if (streamEntries.length >= 50) complexityScore += 2;
+    if (commandCount >= 8) complexityScore += 1;
+    if (commandCount >= 18) complexityScore += 2;
+    if (planLength >= 800) complexityScore += 1;
+    if (failureLength >= 1000 || sessionLength >= 1800) complexityScore += 2;
+    if (diffLength >= 3000) complexityScore += 2;
+    if (streamLength >= 2400) complexityScore += 1;
+    return complexityScore >= 3;
+  }
+
   function formatRunTrace(event, options) {
     if (!event) {
       return "";
@@ -4959,6 +4985,7 @@
     }
 
     var status = event.status || "done";
+    var defaultCompletedTraceOpen = !shouldAutoCollapseCompletedRunTrace(event);
     var decisionHint = trim(String(event.decision_hint || ""));
     var runClass = "msg run " + escHtml(status);
     var html = "";
@@ -4976,7 +5003,7 @@
     if (status === "cancelled") {
       html = "<article class='" + runClass + "'>";
       html += "<p class='run-line subtle'>Run stopped.</p>";
-      html += formatRunTrace(event, { defaultOpen: false });
+      html += formatRunTrace(event, { defaultOpen: defaultCompletedTraceOpen });
       html += "</article>";
       return html;
     }
@@ -5003,7 +5030,7 @@
     if (status === "error") {
       html = "<article class='" + runClass + " run-narrative'>";
       html += "<p class='run-line error'>" + escHtml(friendlyRunErrorText(event)) + "</p>";
-      html += formatRunTrace(event, { defaultOpen: false });
+      html += formatRunTrace(event, { defaultOpen: defaultCompletedTraceOpen });
       html += formatRunChangesCard(event);
       html += "</article>";
       return html;
@@ -5056,7 +5083,7 @@
     } else if (runModelText) {
       html += "<p class='run-line subtle'>Model: " + escHtml(runModelText) + "</p>";
     }
-    html += formatRunTrace(event, { defaultOpen: false });
+    html += formatRunTrace(event, { defaultOpen: defaultCompletedTraceOpen });
     if (!queueRunning && queuePending < 1 && !queueAwaitingApproval && !queueAwaitingDecision) {
       html += formatRunChangesCard(event);
     }
