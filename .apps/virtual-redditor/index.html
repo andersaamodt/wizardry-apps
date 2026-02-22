@@ -24,7 +24,7 @@
           <div id="profiles-msg" class="error-line"></div>
           <div class="apps-list-footer">
             <div class="footer-bar">
-              <button id="toggle-settings-panel" type="button" class="footer-icon-btn no-drag" aria-label="Open persona settings" title="Settings">
+              <button id="toggle-settings-panel" type="button" class="footer-icon-btn no-drag" aria-label="Open app settings" title="Settings">
                 <svg class="settings-gear-glyph" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
                   <path d="M14 8.3V5.73l-1.58-.264c-.117-.44-.292-.848-.496-1.2l.93-1.285-1.81-1.84-1.31.908c-.371-.205-.781-.38-1.187-.497L8.288 0H5.72l-.263 1.578c-.437.117-.816.293-1.196.497L2.979 1.17 1.141 2.98l.934 1.287c-.2.38-.376.79-.493 1.228L.004 5.73V8.3l1.575.264c.117.438.292.818.496 1.198l-.93 1.315 1.809 1.813 1.312-.938c.38.205.787.38 1.224.497l.26 1.55h2.566l.263-1.58c.408-.117.817-.293 1.196-.497l1.315.935 1.81-1.812-.935-1.315c.203-.38.38-.76.495-1.2L14 8.305zM7 9.704c-1.488 0-2.683-1.2-2.683-2.69S5.542 4.327 7 4.327s2.683 1.198 2.683 2.69c0 1.49-1.195 2.688-2.683 2.688z" fill="currentColor"/>
                 </svg>
@@ -71,7 +71,6 @@
                 <span aria-hidden="true">↻</span>
               </button>
               <button id="btn-run-once" class="menu-btn soft" type="button">Run Once</button>
-              <button id="btn-extract" class="menu-btn soft" type="button" title="Extract social norms from recent activity">Extract Social Norms</button>
             </div>
           </div>
         </section>
@@ -170,6 +169,23 @@
                     title="The maximum number of new posts and comments read and responded to per cycle"
                   >Max comments:</label>
                   <input id="sample-max-input" type="number" min="1" step="1" value="20">
+                </div>
+              </div>
+
+              <div class="mode-field-row behavior-schedule-row">
+                <label for="passes-enabled" class="mode-field-label">Pass schedule</label>
+                <div class="schedule-controls">
+                  <label class="schedule-toggle">
+                    <input id="passes-enabled" type="checkbox">
+                    <span>Background passes</span>
+                  </label>
+                  <span class="schedule-inline">every</span>
+                  <input id="pass-interval-input" type="number" min="1" step="1" value="1" title="How often to run passes in background">
+                  <select id="pass-interval-unit" title="Pass interval units">
+                    <option value="minutes">minutes</option>
+                    <option value="hours">hours</option>
+                  </select>
+                  <button id="btn-extract-now" class="menu-btn soft" type="button" title="Extract social norms from recent activity">Extract norms now</button>
                 </div>
               </div>
 
@@ -313,12 +329,19 @@
         <h3 id="settings-modal-title">Settings</h3>
         <button id="btn-settings-close" type="button" class="soft settings-close-btn" aria-label="Close settings">✕</button>
       </div>
-      <p class="settings-subhead">Choose what you want to configure.</p>
-      <div class="settings-actions">
-        <button id="btn-settings-open-persona" type="button" class="soft">Bot settings</button>
-        <button id="btn-settings-open-theme" type="button" class="soft">Theme</button>
-        <button id="btn-settings-open-model" type="button" class="soft">Model</button>
+      <div class="settings-form-grid">
+        <div class="settings-launchd-row">
+          <span class="settings-label">Daemon status</span>
+          <span id="settings-daemon-pill" class="status-chip warn">Checking...</span>
+        </div>
       </div>
+      <div class="settings-actions">
+        <button id="btn-settings-install" type="button" class="soft">Install daemon</button>
+        <button id="btn-settings-uninstall" type="button" class="soft">Uninstall daemon</button>
+        <button id="btn-settings-start" type="button" class="soft">Start daemon</button>
+        <button id="btn-settings-stop" type="button" class="soft">Stop daemon</button>
+      </div>
+      <div id="settings-global-msg" class="status-line"></div>
     </div>
   </div>
 
@@ -398,6 +421,33 @@
       return PATROL_MODE_DESCRIPTIONS[mode] ? mode : 'full';
     }
 
+    function parseIntervalSecondsFromSettings(settings) {
+      var s = settings || {};
+      var minVal = Number(s.patrolIntervalMin || 0);
+      var maxVal = Number(s.patrolIntervalMax || 0);
+      if (!Number.isFinite(minVal) || minVal < 1) minVal = 35;
+      if (!Number.isFinite(maxVal) || maxVal < 1) maxVal = minVal;
+      var sec = Math.round((minVal + maxVal) / 2);
+      if (!Number.isFinite(sec) || sec < 1) sec = 60;
+      return sec;
+    }
+
+    function intervalUiFromSeconds(seconds) {
+      var sec = Number(seconds || 0);
+      if (!Number.isFinite(sec) || sec < 1) sec = 60;
+      if (sec % 3600 === 0) {
+        return { value: Math.max(1, Math.round(sec / 3600)), unit: 'hours' };
+      }
+      return { value: Math.max(1, Math.round(sec / 60)), unit: 'minutes' };
+    }
+
+    function intervalSecondsFromUi(value, unit) {
+      var n = Number(value || 0);
+      if (!Number.isFinite(n) || n < 1) n = 1;
+      var normalizedUnit = String(unit || '').toLowerCase() === 'hours' ? 'hours' : 'minutes';
+      return normalizedUnit === 'hours' ? (Math.round(n) * 3600) : (Math.round(n) * 60);
+    }
+
     var THEME_KEY = 'wizardry.virtual_redditor.theme';
     var MODEL_INSTALL_KEY = 'wizardry.virtual_redditor.models.installed';
     var LEFT_RAIL_WIDTH_KEY = 'wizardry.virtual_redditor.left_rail.width';
@@ -420,6 +470,7 @@
       doctrineRemoteManifesto: '',
       doctrineRemoteNorms: '',
       settingsSaveTimer: null,
+      passIntervalSaveTimer: null,
       usernameSaveTimer: null,
       usernameCheckReqId: 0,
       subredditCheckTimer: null,
@@ -449,6 +500,7 @@
       repliesRenderSig: '',
       logsAvailable: false,
       normRows: [],
+      doctrineCacheByProfile: {},
       usernameEditing: false,
       modelMenuCloseTimer: null,
       launchdStartState: '',
@@ -456,7 +508,8 @@
       launchdStartTimer: null,
       renameTargetId: '',
       profileSwitchLoading: false,
-      deleteTargetId: ''
+      deleteTargetId: '',
+      passesTogglePendingValue: null
     };
 
     function updateConditionalTabs() {
@@ -592,6 +645,15 @@
       }
       list.innerHTML = html;
       button.textContent = themeLabel(state.activeTheme);
+      var themeSelect = document.getElementById('settings-theme-select');
+      if (themeSelect) {
+        if (themeSelect.options.length !== state.themes.length) {
+          themeSelect.innerHTML = state.themes.map(function (name) {
+            return '<option value="' + escapeHtml(name) + '">' + escapeHtml(themeLabel(name)) + '</option>';
+          }).join('');
+        }
+        themeSelect.value = state.activeTheme;
+      }
     }
 
     function suggestedModelEntry(name) {
@@ -661,6 +723,13 @@
       list.innerHTML = html;
       var current = suggestedModelEntry(state.activeModel);
       button.textContent = current ? modelButtonLabel(current) : state.activeModel;
+      var modelSelect = document.getElementById('settings-model-select');
+      if (modelSelect) {
+        modelSelect.innerHTML = state.suggestedModels.map(function (model) {
+          return '<option value="' + escapeHtml(model.name) + '">' + escapeHtml(modelButtonLabel(model)) + '</option>';
+        }).join('');
+        modelSelect.value = state.activeModel;
+      }
     }
 
     function applyModel(modelName, persist) {
@@ -708,12 +777,18 @@
       button.setAttribute('aria-expanded', 'true');
     }
 
-    function closeThemeMenu() {
+    function closeThemeMenu(restoreFocus) {
       var menu = document.getElementById('theme-picker-menu');
       var button = document.getElementById('theme-picker-btn');
       if (!menu || !button) return;
+      var wasOpen = !menu.classList.contains('hidden');
       menu.classList.add('hidden');
       button.setAttribute('aria-expanded', 'false');
+      if (wasOpen && restoreFocus && typeof button.focus === 'function') {
+        requestAnimationFrame(function () {
+          button.focus();
+        });
+      }
     }
 
     function isModelMenuOpen() {
@@ -916,6 +991,7 @@
     function openSettingsModal() {
       var modal = document.getElementById('settings-modal');
       if (!modal) return;
+      renderGlobalSettingsModal();
       modal.classList.remove('hidden');
       var closeBtn = document.getElementById('btn-settings-close');
       if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
@@ -925,6 +1001,43 @@
       var modal = document.getElementById('settings-modal');
       if (!modal) return;
       modal.classList.add('hidden');
+    }
+
+    function setGlobalSettingsMessage(msg, isError) {
+      var line = document.getElementById('settings-global-msg');
+      if (!line) return;
+      line.textContent = msg || '';
+      line.classList.toggle('error-line', !!isError);
+      line.classList.toggle('status-line', !isError);
+    }
+
+    function renderGlobalSettingsModal() {
+      var pill = document.getElementById('settings-daemon-pill');
+      var installBtn = document.getElementById('btn-settings-install');
+      var uninstallBtn = document.getElementById('btn-settings-uninstall');
+      var startBtn = document.getElementById('btn-settings-start');
+      var stopBtn = document.getElementById('btn-settings-stop');
+      var launchd = (((state.status || {}).launchd) || {});
+      var installed = !!launchd.installed;
+      var loaded = !!launchd.loaded;
+
+      if (pill) {
+        if (loaded) {
+          pill.textContent = 'Running';
+          pill.className = 'status-chip ok';
+        } else if (installed) {
+          pill.textContent = 'Installed';
+          pill.className = 'status-chip warn';
+        } else {
+          pill.textContent = 'Not installed';
+          pill.className = 'status-chip';
+        }
+      }
+      if (installBtn) installBtn.disabled = installed;
+      if (uninstallBtn) uninstallBtn.disabled = !installed;
+      if (startBtn) startBtn.disabled = !installed || loaded;
+      if (stopBtn) stopBtn.disabled = !loaded;
+      setGlobalSettingsMessage('', false);
     }
 
     async function openExternalUrl(url) {
@@ -1361,7 +1474,7 @@
         loginBtn.title = usernameValue ? 'Connect Reddit account for selected bot' : 'Enter bot username first';
       }
 
-      var controlIds = ['btn-run-toggle', 'btn-restart', 'btn-run-once', 'btn-extract'];
+      var controlIds = ['btn-run-toggle', 'btn-restart', 'btn-run-once', 'btn-extract-now'];
       for (var i = 0; i < controlIds.length; i += 1) {
         var btn = document.getElementById(controlIds[i]);
         if (btn) btn.disabled = !connected;
@@ -1458,6 +1571,8 @@
           mode: 'judicial',
           patrolMode: 'full',
           patrolSampleMax: 20,
+          patrolIntervalMin: 300,
+          patrolIntervalMax: 300,
           ollamaModel: 'llama3.1:8b',
           subreddit: 'virtualredditor',
           redditUsername: 'preview_bot',
@@ -1636,6 +1751,23 @@
       if (!overlay) return;
       overlay.classList.toggle('hidden', !state.profileSwitchLoading);
       overlay.setAttribute('aria-hidden', state.profileSwitchLoading ? 'false' : 'true');
+    }
+
+    function applyDoctrineContent(manifesto, norms) {
+      var manifestoText = String(manifesto || '');
+      var normsText = String(norms || '');
+      state.doctrineRemoteManifesto = manifestoText;
+      state.doctrineRemoteNorms = normsText;
+      document.getElementById('manifesto-input').value = manifestoText;
+      document.getElementById('norms-input').value = normsText;
+      loadNormRowsFromTextarea();
+      renderNormsTable();
+      state.doctrineDirty = false;
+      setManifestoSaveIndicator('');
+      var activeId = String(state.activeProfile || '');
+      if (activeId) {
+        state.doctrineCacheByProfile[activeId] = { manifesto: manifestoText, norms: normsText };
+      }
     }
 
     function formatTs(ts) {
@@ -2130,6 +2262,9 @@
       var patrolSelect = document.getElementById('patrol-mode-select');
       var sampleInput = document.getElementById('sample-max-input');
       var subredditInput = document.getElementById('subreddit-input');
+      var passesEnabled = document.getElementById('passes-enabled');
+      var passIntervalInput = document.getElementById('pass-interval-input');
+      var passIntervalUnit = document.getElementById('pass-interval-unit');
 
       if (titleUsername && document.activeElement !== titleUsername && !state.usernameEditing) {
         titleUsername.value = String(settings.redditUsername || '');
@@ -2140,6 +2275,22 @@
       if (sampleInput && document.activeElement !== sampleInput) sampleInput.value = String(settings.patrolSampleMax || 20);
       if (subredditInput && document.activeElement !== subredditInput) subredditInput.value = String(settings.subreddit || '');
       if (subredditInput && document.activeElement !== subredditInput) scheduleSubredditCheck(0, false);
+      if (passesEnabled) {
+        if (typeof state.passesTogglePendingValue === 'boolean') {
+          passesEnabled.checked = state.passesTogglePendingValue;
+          passesEnabled.disabled = true;
+        } else {
+          passesEnabled.checked = !!launchd.loaded;
+          passesEnabled.disabled = false;
+        }
+      }
+      if (passIntervalInput && passIntervalUnit &&
+          document.activeElement !== passIntervalInput &&
+          document.activeElement !== passIntervalUnit) {
+        var intervalUi = intervalUiFromSeconds(parseIntervalSecondsFromSettings(settings));
+        passIntervalInput.value = String(intervalUi.value);
+        passIntervalUnit.value = intervalUi.unit;
+      }
       updateModeDescriptions(normalizeMode(settings.mode || 'judicial'));
       updatePatrolModeDescriptions(normalizePatrolMode(settings.patrolMode || 'full'));
       if (settings.ollamaModel) {
@@ -2270,16 +2421,17 @@
 
     async function refreshDoctrine(force) {
       if (!force && state.doctrineDirty) return;
-      var manifesto = await backendJson('read-file', ['manifesto']);
-      var norms = await backendJson('read-file', ['norms']);
-      state.doctrineRemoteManifesto = String(manifesto.content || '');
-      state.doctrineRemoteNorms = String(norms.content || '');
-      document.getElementById('manifesto-input').value = state.doctrineRemoteManifesto;
-      document.getElementById('norms-input').value = state.doctrineRemoteNorms;
-      loadNormRowsFromTextarea();
-      renderNormsTable();
-      state.doctrineDirty = false;
-      setManifestoSaveIndicator('');
+      try {
+        var bundle = await backendJson('read-doctrine', []);
+        applyDoctrineContent(
+          String(((bundle.manifesto || {}).content) || ''),
+          String(((bundle.norms || {}).content) || '')
+        );
+      } catch (_) {
+        var manifesto = await backendJson('read-file', ['manifesto']);
+        var norms = await backendJson('read-file', ['norms']);
+        applyDoctrineContent(String(manifesto.content || ''), String(norms.content || ''));
+      }
     }
 
     async function refreshStatus() {
@@ -2350,6 +2502,8 @@
           if (key === 'MODE') state.status.settings.mode = String(value || 'judicial');
           if (key === 'PATROL_MODE') state.status.settings.patrolMode = String(value || 'full');
           if (key === 'PATROL_SAMPLE_MAX') state.status.settings.patrolSampleMax = Number(value || 20) || 20;
+          if (key === 'PATROL_INTERVAL_MIN') state.status.settings.patrolIntervalMin = Number(value || 300) || 300;
+          if (key === 'PATROL_INTERVAL_MAX') state.status.settings.patrolIntervalMax = Number(value || 300) || 300;
           if (key === 'OLLAMA_MODEL') state.status.settings.ollamaModel = String(value || '');
           renderStatus();
         }
@@ -2375,6 +2529,79 @@
         }
         saveSetting('PATROL_SAMPLE_MAX', sample);
       }, 350);
+    }
+
+    function schedulePassIntervalSave() {
+      if (state.passIntervalSaveTimer) clearTimeout(state.passIntervalSaveTimer);
+      state.passIntervalSaveTimer = setTimeout(async function () {
+        var input = document.getElementById('pass-interval-input');
+        var unitSelect = document.getElementById('pass-interval-unit');
+        var rawValue = String((input && input.value) || '').trim();
+        if (!/^\d+$/.test(rawValue) || Number(rawValue) < 1) {
+          setSettingsMessage('Pass interval must be a positive integer.', true);
+          return;
+        }
+        var seconds = intervalSecondsFromUi(rawValue, (unitSelect && unitSelect.value) || 'minutes');
+        if (state.previewMode) {
+          if (state.status && state.status.settings) {
+            state.status.settings.patrolIntervalMin = seconds;
+            state.status.settings.patrolIntervalMax = seconds;
+            renderStatus();
+          }
+          setSettingsMessage('', false);
+          return;
+        }
+        try {
+          await backendJson('set-setting', ['PATROL_INTERVAL_MIN', String(seconds)]);
+          await backendJson('set-setting', ['PATROL_INTERVAL_MAX', String(seconds)]);
+          var loaded = !!(state.status && state.status.launchd && state.status.launchd.loaded);
+          if (loaded) {
+            await backendJson('restart', []);
+          }
+          setSettingsMessage('', false);
+          await refreshStatus();
+        } catch (error) {
+          setSettingsMessage(String(error && error.message ? error.message : error), true);
+        }
+      }, 300);
+    }
+
+    async function toggleBackgroundPasses(enabled) {
+      var shouldRun = !!enabled;
+      if (state.previewMode) {
+        if (state.status && state.status.launchd) {
+          state.status.launchd.loaded = shouldRun;
+          renderStatus();
+        }
+        return;
+      }
+      if (state.passesTogglePendingValue !== null) {
+        return;
+      }
+      try {
+        state.passesTogglePendingValue = shouldRun;
+        renderStatus();
+        setControlMessage(shouldRun ? 'Starting background passes...' : 'Stopping background passes...', false);
+        await backendJson(shouldRun ? 'start' : 'stop', []);
+        var settled = false;
+        for (var i = 0; i < 16; i += 1) {
+          await refreshStatus();
+          if (state.status && state.status.launchd && !!state.status.launchd.loaded === shouldRun) {
+            settled = true;
+            break;
+          }
+          await new Promise(function (resolve) { setTimeout(resolve, 250); });
+        }
+        if (!settled) {
+          await fullRefresh();
+        }
+        setControlMessage('', false);
+      } catch (error) {
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.passesTogglePendingValue = null;
+        renderStatus();
+      }
     }
 
     async function saveUsernameFromTitle() {
@@ -2500,6 +2727,11 @@
       renderProfiles();
       updateToolbarButtonStates();
       setProfilesMessage('', false);
+      var cachedDoctrine = state.doctrineCacheByProfile[targetId];
+      if (cachedDoctrine && typeof cachedDoctrine === 'object') {
+        applyDoctrineContent(cachedDoctrine.manifesto || '', cachedDoctrine.norms || '');
+        setProfileSwitchLoading(false);
+      }
 
       if (state.previewMode) {
         if (state.status && state.status.profiles) {
@@ -2508,11 +2740,13 @@
         }
         return;
       }
-      setProfileSwitchLoading(true);
+      if (!cachedDoctrine) setProfileSwitchLoading(true);
       try {
         await backendJson('select-profile', [targetId]);
-        await fullRefresh();
-        await refreshDoctrine(true);
+        await Promise.all([
+          refreshStatus(),
+          refreshDoctrine(true)
+        ]);
       } catch (error) {
         state.activeProfile = previousActive;
         for (var y = 0; y < state.profiles.length; y += 1) {
@@ -2647,7 +2881,7 @@
       document.getElementById('btn-run-once').addEventListener('click', function () {
         runControlAction('run-once', 'Patrol pass complete.');
       });
-      document.getElementById('btn-extract').addEventListener('click', function () {
+      document.getElementById('btn-extract-now').addEventListener('click', function () {
         runControlAction('extract-norms', 'Social norm extraction complete.');
       });
       document.getElementById('status-chip-row').addEventListener('click', function (event) {
@@ -2668,6 +2902,50 @@
       });
       document.getElementById('btn-settings-close').addEventListener('click', function () {
         closeSettingsModal();
+      });
+      document.getElementById('btn-settings-install').addEventListener('click', function () {
+        setGlobalSettingsMessage('Installing daemon...', false);
+        backendJson('install', []).then(function () {
+          return fullRefresh();
+        }).then(function () {
+          renderGlobalSettingsModal();
+          setGlobalSettingsMessage('Daemon installed.', false);
+        }).catch(function (error) {
+          setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+        });
+      });
+      document.getElementById('btn-settings-uninstall').addEventListener('click', function () {
+        setGlobalSettingsMessage('Uninstalling daemon...', false);
+        backendJson('uninstall', []).then(function () {
+          return fullRefresh();
+        }).then(function () {
+          renderGlobalSettingsModal();
+          setGlobalSettingsMessage('Daemon uninstalled.', false);
+        }).catch(function (error) {
+          setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+        });
+      });
+      document.getElementById('btn-settings-start').addEventListener('click', function () {
+        setGlobalSettingsMessage('Starting daemon...', false);
+        backendJson('start', []).then(function () {
+          return fullRefresh();
+        }).then(function () {
+          renderGlobalSettingsModal();
+          setGlobalSettingsMessage('Daemon started.', false);
+        }).catch(function (error) {
+          setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+        });
+      });
+      document.getElementById('btn-settings-stop').addEventListener('click', function () {
+        setGlobalSettingsMessage('Stopping daemon...', false);
+        backendJson('stop', []).then(function () {
+          return fullRefresh();
+        }).then(function () {
+          renderGlobalSettingsModal();
+          setGlobalSettingsMessage('Daemon stopped.', false);
+        }).catch(function (error) {
+          setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+        });
       });
       document.getElementById('btn-rename-close').addEventListener('click', function () {
         closeRenameModal();
@@ -2690,21 +2968,6 @@
           commitRenameFromModal();
         }
       });
-      document.getElementById('btn-settings-open-persona').addEventListener('click', function () {
-        closeSettingsModal();
-        setActiveTab('persona');
-        var mode = document.getElementById('mode-dropdown-btn');
-        if (mode && typeof mode.focus === 'function') mode.focus();
-      });
-      document.getElementById('btn-settings-open-theme').addEventListener('click', function () {
-        closeSettingsModal();
-        openThemeMenu();
-      });
-      document.getElementById('btn-settings-open-model').addEventListener('click', function () {
-        closeSettingsModal();
-        openModelMenu();
-      });
-
       document.getElementById('btn-connect-reddit').addEventListener('click', function () {
         if (this.disabled) return;
         if (!normalizeUsername((document.getElementById('title-username') || {}).value || '')) {
@@ -2770,12 +3033,12 @@
         closeModelMenu();
         var menu = document.getElementById('theme-picker-menu');
         if (menu && menu.classList.contains('hidden')) openThemeMenu();
-        else closeThemeMenu();
+        else closeThemeMenu(true);
       });
       document.getElementById('theme-picker-btn').addEventListener('keydown', function (event) {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          if (isThemeMenuOpen()) closeThemeMenu();
+          if (isThemeMenuOpen()) closeThemeMenu(true);
           else openThemeMenu();
           return;
         }
@@ -2791,19 +3054,19 @@
         }
         if (event.key === 'Escape' && isThemeMenuOpen()) {
           event.preventDefault();
-          closeThemeMenu();
+          closeThemeMenu(true);
         }
       });
       document.getElementById('theme-picker-list').addEventListener('click', function (event) {
         var button = event.target.closest('button[data-theme-name]');
         if (!button) return;
         applyTheme(button.getAttribute('data-theme-name'));
-        closeThemeMenu();
+        closeThemeMenu(true);
       });
       document.getElementById('theme-picker-list').addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
           event.preventDefault();
-          closeThemeMenu();
+          closeThemeMenu(true);
           return;
         }
         if (event.key === 'ArrowDown') {
@@ -2981,6 +3244,18 @@
         scheduleSampleSave();
       });
       document.getElementById('sample-max-input').addEventListener('blur', scheduleSampleSave);
+      document.getElementById('pass-interval-input').addEventListener('input', function () {
+        setSettingsMessage('Saving...', false);
+        schedulePassIntervalSave();
+      });
+      document.getElementById('pass-interval-input').addEventListener('blur', schedulePassIntervalSave);
+      document.getElementById('pass-interval-unit').addEventListener('change', function () {
+        setSettingsMessage('Saving...', false);
+        schedulePassIntervalSave();
+      });
+      document.getElementById('passes-enabled').addEventListener('change', function (event) {
+        toggleBackgroundPasses(!!(event && event.target && event.target.checked));
+      });
       document.getElementById('subreddit-input').addEventListener('input', function () {
         setSettingsMessage('', false);
         scheduleSubredditCheck(450, false);
@@ -3173,7 +3448,7 @@
             return;
           }
           closeProfileMenus();
-          closeThemeMenu();
+          closeThemeMenu(true);
           closeModelMenu();
           closeModeMenu();
           closePatrolModeMenu();
