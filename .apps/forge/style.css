@@ -1602,6 +1602,7 @@ button:disabled {
   object-fit: cover;
   border-radius: 8px;
   display: block;
+  pointer-events: none;
 }
 
 .icon-placeholder {
