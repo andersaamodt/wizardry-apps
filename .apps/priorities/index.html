@@ -184,6 +184,8 @@
       activeFont: '',
       fontOptions: [],
       themeHotkeysEnabled: false,
+      fontHotkeysEnabled: false,
+      arrowCycleTarget: 'theme',
       dockState: 'none',
       dockPollTimer: null,
       backendScriptPath: '',
@@ -2437,6 +2439,33 @@
       applyTheme(state.themes[next]);
     }
 
+    function cycleFont(step) {
+      var total = state.fontOptions.length;
+      if (!total) {
+        return;
+      }
+      var current = -1;
+      for (var i = 0; i < total; i += 1) {
+        if (String(state.fontOptions[i].value || '') === String(state.activeFont || '')) {
+          current = i;
+          break;
+        }
+      }
+      if (current < 0) {
+        current = 0;
+      }
+      var next = (current + step + total) % total;
+      var nextValue = String(state.fontOptions[next].value || '');
+      if (!nextValue) {
+        return;
+      }
+      applyFontFamily(nextValue);
+      var select = document.getElementById('font-select');
+      if (select && select.value !== nextValue) {
+        select.value = nextValue;
+      }
+    }
+
     function isThemePickerOpen() {
       var menu = document.getElementById('theme-picker-menu');
       return !!(menu && !menu.classList.contains('hidden'));
@@ -4127,6 +4156,7 @@
       document.getElementById('theme-picker-btn').addEventListener('click', function (event) {
         event.stopPropagation();
         state.themeHotkeysEnabled = true;
+        state.arrowCycleTarget = 'theme';
         if (isThemePickerOpen()) {
           closeThemePickerMenu();
         } else {
@@ -4139,6 +4169,8 @@
           return;
         }
         event.stopPropagation();
+        state.themeHotkeysEnabled = true;
+        state.arrowCycleTarget = 'theme';
         applyTheme(button.getAttribute('data-theme-name'));
         closeThemePickerMenu();
       });
@@ -4146,7 +4178,17 @@
       document.getElementById('text-size-decrease').addEventListener('click', decreaseTextScale);
       document.getElementById('text-size-reset').addEventListener('click', resetTextScale);
       document.getElementById('font-select').addEventListener('change', function (event) {
+        state.fontHotkeysEnabled = true;
+        state.arrowCycleTarget = 'font';
         applyFontFamily(String(event.target && event.target.value ? event.target.value : ''));
+      });
+      document.getElementById('font-select').addEventListener('focus', function () {
+        state.fontHotkeysEnabled = true;
+        state.arrowCycleTarget = 'font';
+      });
+      document.getElementById('font-select').addEventListener('click', function () {
+        state.fontHotkeysEnabled = true;
+        state.arrowCycleTarget = 'font';
       });
 
       document.addEventListener('click', function (event) {
@@ -4232,7 +4274,11 @@
         }
 
         if (isTypingContext(event.target)) {
-          return;
+          var targetId = String(event.target && event.target.id || '');
+          var isArrowKey = event.key === 'ArrowDown' || event.key === 'ArrowUp';
+          if (!(isArrowKey && targetId === 'font-select' && state.fontHotkeysEnabled)) {
+            return;
+          }
         }
 
         if (event.key === 'Enter') {
@@ -4243,6 +4289,11 @@
         }
 
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          if (state.arrowCycleTarget === 'font' && state.fontHotkeysEnabled) {
+            event.preventDefault();
+            cycleFont(event.key === 'ArrowDown' ? 1 : -1);
+            return;
+          }
           if (state.themeHotkeysEnabled) {
             event.preventDefault();
             cycleTheme(event.key === 'ArrowDown' ? 1 : -1);
