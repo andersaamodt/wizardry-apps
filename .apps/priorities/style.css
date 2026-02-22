@@ -1050,8 +1050,7 @@ button:hover {
   transition: opacity 120ms ease;
 }
 
-.row:hover .btn.pri,
-.row:focus-within .btn.pri {
+.row:hover .btn.pri {
   opacity: 1;
   pointer-events: auto;
 }
