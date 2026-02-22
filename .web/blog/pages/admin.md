@@ -6,6 +6,7 @@ title: Blog Admin
 
 <div id="admin-panel" class="admin-layout" style="display:none;">
 <aside class="admin-sidebar">
+<div class="admin-nav-title">Admin</div>
 <div class="admin-nav-list" role="tablist" aria-label="Admin sections">
 <button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true">Settings</button>
 <button type="button" class="admin-nav-item" data-admin-nav="compose" aria-selected="false">Compose</button>
@@ -354,6 +355,18 @@ body {
   border-radius: 0;
   overflow: visible;
   background: #ffffff;
+}
+
+.admin-nav-title {
+  display: block;
+  padding: 0.5rem 0.4rem;
+  border-bottom: 1px solid #d7e1f4;
+  background: #eef4ff;
+  color: #1b335f;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
 }
 
 .admin-nav-item {
