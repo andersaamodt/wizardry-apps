@@ -561,7 +561,7 @@ button:hover {
 }
 
 .tree {
-  --pri-lane: calc(32px * var(--ui-scale));
+  --pri-lane: calc(36px * var(--ui-scale));
   display: grid;
   gap: 0;
   padding-left: calc(8px * var(--ui-scale));
