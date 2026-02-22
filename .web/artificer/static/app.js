@@ -6748,7 +6748,10 @@
             el.dictationInstallStatus.classList.remove("error");
             el.dictationInstallStatus.classList.add("status-pending-spinner");
           }
-          cancelDictationInstall().catch(showError);
+          renderUi();
+          setTimeout(function () {
+            cancelDictationInstall().catch(showError);
+          }, 0);
           return;
         }
         toggleDictationSoftware().catch(showError);
