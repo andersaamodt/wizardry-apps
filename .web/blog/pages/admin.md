@@ -61,10 +61,13 @@ title: Blog Admin
 </select>
 </div>
 <div class="field-row checkbox-row">
-<label>
-<input type="checkbox" id="registration-enabled">
+<div class="setting-label">
 <strong>Enable User Registration</strong>
 <span class="inline-tip" tabindex="0" aria-label="Allow new users to register with MUD player SSH keys.">?</span>
+</div>
+<label class="checkbox-control" for="registration-enabled">
+<input type="checkbox" id="registration-enabled">
+<span>Enabled</span>
 </label>
 </div>
 </section>
@@ -87,11 +90,13 @@ title: Blog Admin
 <h4>Feeds</h4>
 <div class="grid-two">
 <div class="field-row checkbox-row">
-<label>
-<input type="checkbox" id="feed-full-text" checked>
+<div class="setting-label">
 <strong>Full Text RSS/Atom</strong>
+</div>
+<label class="checkbox-control" for="feed-full-text">
+<input type="checkbox" id="feed-full-text" checked>
+<span>Enabled</span>
 </label>
-<p class="muted">Include full post body in feeds when available.</p>
 </div>
 <div class="field-row">
 <label for="feed-items"><strong>Feed Item Count</strong></label>
@@ -459,10 +464,39 @@ body {
   letter-spacing: 0.01em;
 }
 
-.checkbox-row label {
-  display: flex;
-  gap: 0.5rem;
+[data-admin-section="settings"] .field-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, max-content) minmax(0, 1fr);
   align-items: center;
+  gap: 0.45rem 1rem;
+}
+
+[data-admin-section="settings"] .field-row > label {
+  margin-bottom: 0;
+}
+
+[data-admin-section="settings"] .field-row > input,
+[data-admin-section="settings"] .field-row > select {
+  justify-self: start;
+}
+
+[data-admin-section="settings"] .setting-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  color: #1f335f;
+  font-size: 0.87rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+[data-admin-section="settings"] .checkbox-row .checkbox-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.46rem;
+  color: #1d3566;
+  font-size: 0.87rem;
+  font-weight: 600;
 }
 
 .inline-tip {
@@ -565,7 +599,7 @@ body {
 }
 
 [data-admin-section="settings"] .grid-two {
-  grid-template-columns: repeat(2, minmax(14rem, max-content));
+  grid-template-columns: 1fr;
   justify-content: start;
 }
 
@@ -1045,6 +1079,11 @@ body {
 
   .grid-two {
     grid-template-columns: 1fr;
+  }
+
+  [data-admin-section="settings"] .field-row {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 
   .row-head,
