@@ -576,6 +576,8 @@ button:hover {
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
+  position: relative;
+  left: 1px;
 }
 
 .echelon-block + .echelon-block {
