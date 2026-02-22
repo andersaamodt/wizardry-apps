@@ -81,6 +81,13 @@ fi
 # Create additional required directories
 mkdir -p "$SITE_DIR/site/uploads"
 mkdir -p "$SITE_DIR/build"
+if [ "$template" = "blog" ]; then
+  mkdir -p "$SITE_DIR/site/nostr/state" "$SITE_DIR/site/nostr/events" "$SITE_DIR/site/nostr/derived"
+  : > "$SITE_DIR/site/nostr/state/authors.txt"
+  : > "$SITE_DIR/site/nostr/state/relays.txt"
+  : > "$SITE_DIR/site/nostr/state/blocklist.txt"
+  : > "$SITE_DIR/site/nostr/state/hidden_posts.txt"
+fi
 
 # Create site config
 cat > "$SITE_DIR/site.conf" <<EOF
@@ -92,6 +99,12 @@ port=8080
 domain=localhost
 https=false
 EOF
+
+if [ "$template" = "blog" ]; then
+  cat >> "$SITE_DIR/site.conf" <<'EOF'
+nostr_bridge_enabled=false
+EOF
+fi
 
 cat > "$SITE_DIR/site.allowlist" <<EOF
 # List additional absolute paths this site may access.

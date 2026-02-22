@@ -32,7 +32,9 @@
 @property (strong) NSColor *prioritiesBootBgColor;
 @property (strong) NSColor *prioritiesBootTextColor;
 @property (assign) BOOL enableNativeViewMenu;
+@property (assign) BOOL enableNativeBootSplash;
 @property (assign) BOOL prefersWideDragStrip;
+@property (assign) CGFloat bootSplashLogoSize;
 @end
 
 @implementation AppDelegate
@@ -156,6 +158,31 @@
     self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
 }
 
+- (void)loadForgeBootPalette {
+    NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
+    NSString *configFile = xdgConfig.length
+        ? [xdgConfig stringByAppendingPathComponent:@"wizardry-apps/forge-ui.conf"]
+        : [NSHomeDirectory() stringByAppendingPathComponent:@".config/wizardry-apps/forge-ui.conf"];
+
+    NSString *theme = [[self readConfigValueForKey:@"theme" fromFile:configFile] lowercaseString];
+    if (!theme.length) {
+        theme = @"psionic";
+    }
+    NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyz0123456789_-"];
+    if ([[theme stringByTrimmingCharactersInSet:allowed] length] > 0) {
+        theme = @"psionic";
+    }
+
+    NSString *themeFile = [[self.appPath stringByAppendingPathComponent:@"themes"] stringByAppendingPathComponent:[theme stringByAppendingString:@".css"]];
+    NSDictionary<NSString *, NSString *> *vars = [self readThemeVariablesFromFile:themeFile];
+    NSColor *bg = [self parseCSSColorToken:vars[@"bg"]];
+    NSColor *text = [self parseCSSColorToken:vars[@"text"]];
+    NSColor *muted = [self parseCSSColorToken:vars[@"light-text"]];
+
+    self.prioritiesBootBgColor = bg ?: [NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0];
+    self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
+}
+
 - (void)showNativeBootSplashInView:(NSView *)rootView {
     if (!rootView || self.nativeBootSplashView) {
         return;
@@ -188,9 +215,10 @@
     [stack addArrangedSubview:logoView];
 
     [overlay addSubview:stack];
+    CGFloat logoSize = self.bootSplashLogoSize > 0.0 ? self.bootSplashLogoSize : 192.0;
     [NSLayoutConstraint activateConstraints:@[
-        [logoView.widthAnchor constraintEqualToConstant:192.0],
-        [logoView.heightAnchor constraintEqualToConstant:192.0],
+        [logoView.widthAnchor constraintEqualToConstant:logoSize],
+        [logoView.heightAnchor constraintEqualToConstant:logoSize],
         [stack.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
         [stack.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor]
     ]];
@@ -335,9 +363,13 @@
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
+    self.enableNativeBootSplash = self.enableNativeViewMenu || [appSlug isEqualToString:@"forge"];
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
+    self.bootSplashLogoSize = [appSlug isEqualToString:@"forge"] ? 156.0 : 192.0;
     if (self.enableNativeViewMenu) {
         [self loadPrioritiesBootPalette];
+    } else if (self.enableNativeBootSplash) {
+        [self loadForgeBootPalette];
     }
 
     [self setupMainMenuWithAppName:appName];
@@ -405,7 +437,7 @@
     [self.window setTitleVisibility:NSWindowTitleHidden];
     // Owl uses explicit side drag zones so tab clicks/drags never move the window.
     [self.window setMovableByWindowBackground:!prefersSideDragZones];
-    if (self.enableNativeViewMenu && self.prioritiesBootBgColor) {
+    if (self.enableNativeBootSplash && self.prioritiesBootBgColor) {
         [self.window setBackgroundColor:self.prioritiesBootBgColor];
     } else {
         [self.window setBackgroundColor:[NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0]];
@@ -424,7 +456,7 @@
     
     NSView *rootView = [[NSView alloc] initWithFrame:frame];
     [rootView setAutoresizesSubviews:YES];
-    if (self.enableNativeViewMenu && self.prioritiesBootBgColor) {
+    if (self.enableNativeBootSplash && self.prioritiesBootBgColor) {
         [rootView setWantsLayer:YES];
         rootView.layer.backgroundColor = [self.prioritiesBootBgColor CGColor];
     }
@@ -540,7 +572,7 @@
         [rootView addSubview:dragStrip];
     }
 
-    if (self.enableNativeViewMenu) {
+    if (self.enableNativeBootSplash) {
         [self showNativeBootSplashInView:rootView];
     }
 

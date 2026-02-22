@@ -1,0 +1,29 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: copy-priorities [DIR] [--expanded]
+
+Copies priorities from DIR (default: current directory) as a markdown
+checklist to the system clipboard.
+
+Options:
+  --expanded   Expand all projects recursively in the copied markdown
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
+backend="${WIZARDRY_APPS_ROOT:-$repo_root}/.apps/priorities/scripts/priorities-backend.sh"
+
+if [ ! -x "$backend" ]; then
+  printf '%s\n' "copy-priorities: backend not found or not executable: $backend" >&2
+  exit 1
+fi
+
+exec "$backend" copy-priorities "$@"

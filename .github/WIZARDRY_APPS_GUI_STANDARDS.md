@@ -34,6 +34,14 @@
 - Gate sensitive actions behind explicit confirmation in the same interface.
 - Surface undo/revert actions when behavior is irreversible or high-impact.
 
+## Startup Boot Pattern
+- Desktop apps should avoid showing intermediate paints during startup.
+- Use a native host boot splash when first paint quality matters, centered on the app icon.
+- Match host window/root background to the active app theme background during boot.
+- Resolve boot palette from backend config/plaintext files, not browser `localStorage`.
+- Keep WebView background transparent while boot splash is active to avoid white/theme flashes.
+- Remove splash only after web UI signals readiness via a bridge hook (`__wizardry_host_boot_ready`).
+
 ## Feedback and Error Handling
 - Show command status, outcome, and stderr/stdout context in-app.
 - Keep status text factual and non-imperative.
@@ -64,6 +72,7 @@
 - Use semantic controls and keyboard-operable interactions.
 - Keep focus states visible and modal escape paths obvious.
 - Avoid click-only critical actions; support keyboard submission where practical.
+- Avoid defaulting buttons and short text-entry inputs to `width: 100%`; size them to content or a bounded width unless full-width is required by layout.
 - Keep motion subtle and meaningful, never required for comprehension.
 
 ## AI Agent Delivery Rules

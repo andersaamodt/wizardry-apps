@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# Mirror Nostr post/comment events for a blog site.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: blog-nostr-mirror SITENAME
+
+Mirrors Nostr events for a blog site using configured authors/relays,
+rebuilds local derived indexes, and triggers a site rebuild.
+
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+. env-clear
+
+site_name=${1-}
+if [ -z "$site_name" ]; then
+  die 2 "blog-nostr-mirror: SITENAME required"
+fi
+
+WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+SITE_DIR="$WEB_ROOT/$site_name"
+if [ ! -d "$SITE_DIR" ]; then
+  die "blog-nostr-mirror: site '$site_name' not found"
+fi
+
+template=$(config-get "$SITE_DIR/site.conf" template 2>/dev/null || printf '')
+if [ "$template" != "blog" ]; then
+  die "blog-nostr-mirror: site '$site_name' is not using the blog template"
+fi
+
+cgi_lib="$SITE_DIR/cgi/blog-lib.sh"
+if [ ! -f "$cgi_lib" ]; then
+  die "blog-nostr-mirror: missing blog-lib.sh in site CGI directory"
+fi
+
+WIZARDRY_SITES_DIR="$WEB_ROOT"
+WIZARDRY_SITE_NAME="$site_name"
+export WIZARDRY_SITES_DIR WIZARDRY_SITE_NAME
+
+# shellcheck source=/dev/null
+. "$cgi_lib"
+blog_init
+
+if ! blog_nostr_bridge_enabled; then
+  die "blog-nostr-mirror: nostr_bridge_enabled=false in site.conf"
+fi
+
+step "Mirroring Nostr events for $site_name..."
+if ! result=$(blog_nostr_mirror_all); then
+  die "blog-nostr-mirror: mirror failed"
+fi
+posts=${result%%|*}
+comments=${result#*|}
+case "$posts" in ''|*[!0-9]*) posts=0 ;; esac
+case "$comments" in ''|*[!0-9]*) comments=0 ;; esac
+
+success "Mirror complete. Posts: $posts, comments: $comments"
+
+if [ -x "$WIZARDRY_DIR/spells/web/build" ]; then
+  step "Rebuilding site..."
+  WEB_WIZARDRY_ROOT="$WEB_ROOT" "$WIZARDRY_DIR/spells/web/build" "$site_name" >/dev/null 2>&1 || true
+fi

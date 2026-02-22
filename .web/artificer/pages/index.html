@@ -25,7 +25,7 @@
     }
     .display.math{display: block; text-align: center; margin: 0.5rem auto;}
   </style>
-  <link rel="stylesheet" href="/static/style.css?v=20260222-runorder6" />
+  <link rel="stylesheet" href="/static/style.css?v=20260222-runorder7" />
   <script src="/static/js/htmx.min.js"></script>
   <script src="/static/js/idiomorph-ext.min.js"></script>
 </head>
@@ -310,6 +310,10 @@ aria-live="polite">
 <div class="composer-row">
 <button id="attach-btn" class="attach-btn" type="button" aria-label="Attach files" title="Attach files">
 +
+</button>
+<button id="dictate-btn" class="dictate-btn" type="button" aria-label="Dictate prompt" title="Dictate prompt">
+<span
+aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0"></path><path d="M12 17v4"></path><path d="M9 21h6"></path></svg></span>
 </button>
 <input id="attachment-picker" type="file" multiple hidden />
 <div class="menu-anchor model-anchor">
@@ -727,7 +731,7 @@ Settings
 </div>
 <div class="stack">
 <div class="info-row">
-<span>GitHub CLI</span><strong id="gh-auth-status">Checking…</strong>
+<span>Git</span><strong id="git-status">Checking…</strong>
 </div>
 <div class="info-row">
 <span>SSH key</span><strong id="ssh-key-status">Checking…</strong>
@@ -738,6 +742,16 @@ acceleration for LLMs </label>
 <p class="settings-hint">
 Applies to Ollama inference on macOS (Metal) and Linux (CUDA/ROCm when
 available).
+</p>
+<div class="modal-actions modal-actions-compact dictation-install-row">
+<button id="install-dictation-btn" type="button" class="ui-pending-spinner" disabled>
+Checking...
+</button>
+<p id="dictation-install-status" class="settings-hint hidden"></p>
+</div>
+<p class="settings-hint">
+Installs local dictation. On Apple Silicon macOS this uses MLX Whisper
+automatically.
 </p>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
@@ -983,7 +997,7 @@ Decision filters</label>
 </div>
 </div>
 </div>
-<script src="/static/artificer-app.js?v=20260222-runorder6"></script>
+<script src="/static/artificer-app.js?v=20260222-runorder15"></script>
 </div>
 </body>
 </html>

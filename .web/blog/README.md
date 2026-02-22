@@ -1,6 +1,6 @@
 # Personal Blog Template
 
-A single-author blog template for wizardry web, architected for future multi-author and Nostr integration.
+A single-author blog template for wizardry web with optional Nostr bridge support for post authorship, version selection, and local-first mirrored comments.
 
 ## Features
 
@@ -14,7 +14,7 @@ A single-author blog template for wizardry web, architected for future multi-aut
 - **Public discovery**: Index, tags, search, RSS, Atom, sitemap
 - **Archive index**: Month-grouped archive view with per-month counts
 - **Post context UX**: Read-time card, tags, and automatic older/newer links
-- **Passkey auth**: SSH identity + WebAuthn passkeys (challenge/response)
+- **Nostr-first auth**: Nostr challenge login, optional WebAuthn passkeys, optional SSH link
 
 ## Post Model
 
@@ -67,6 +67,10 @@ States are inferred from metadata and filesystem visibility.
 ```
 blog/
 ├── site/
+│   ├── nostr/
+│   │   ├── events/          # Canonical mirrored/signed event JSON files
+│   │   ├── derived/         # Disposable indexes generated from events
+│   │   └── state/           # Authors, relays, blocklist, hidden posts, key
 │   └── pages/
 │       ├── index.md         # Blog homepage
 │       ├── about.md         # About page
@@ -125,18 +129,24 @@ visibility: "public"  # Change from "draft"
 
 ## Interaction Model
 
-- Blog is **read-only**
-- No native comments, reactions, or annotations
-- All interaction deferred to Nostr (Phase 2)
+- Blog rendering is deterministic from local files only.
+- When the Nostr bridge is enabled, canonical post state is local Nostr event JSON under `site/nostr/events/`.
+- Comments are read from locally mirrored events only.
+- “Refresh comments” runs an explicit mirror action; render paths never perform live relay fetches.
 
-## Future: Nostr Integration (Phase 2)
+## Nostr Bridge (Phase 2)
 
-Architecture is designed for seamless Nostr integration:
-- Content hashes align with Nostr event IDs
-- Tags compatible with Nostr event tagging
-- Post model extensible to multi-author
-- Metadata prepared for Nostr event format
-- Revision lineage maps to Nostr event replacement
+- Posts publish as kind `30023` events with slug-only `d` identity.
+- Post markdown is stored directly in event `.content`.
+- Latest rendered version is selected by newest `created_at` per (`pubkey`, `kind`, `d`) with event-id tie-break.
+- Mirroring uses `nak`; signing/verification prefer `nostril` and fall back to `nak verify` when needed.
+- Relay and author allowlist are file-backed:
+  - `site/nostr/state/relays.txt`
+  - `site/nostr/state/authors.txt`
+- Local moderation and hide controls are file-backed:
+  - `site/nostr/state/blocklist.txt`
+  - `site/nostr/state/hidden_posts.txt`
+- Bridge enablement is explicit in `site.conf` via `nostr_bridge_enabled=true|false`.
 
 ## Quick Start
 
@@ -156,14 +166,21 @@ web-wizardry serve myblog
 
 Visit http://localhost:8080
 
-## MUD Integration & Authentication
+To enable Nostr bridge for a site, turn on “Enable Nostr Bridge” in `/pages/admin.html#settings`, then configure:
 
-The blog template integrates with the wizardry MUD player system to provide unified authentication and admin access control.
+- `site/nostr/state/secret.key` (hex private key for signing)
+- `site/nostr/state/authors.txt`
+- `site/nostr/state/relays.txt`
+
+## Authentication & MUD Integration
+
+The blog template now uses Nostr keys as primary account identity, with optional passkeys and optional SSH key linking for MUD compatibility.
 
 ### Key Features
 
-- **MUD Player Accounts**: Blog uses existing MUD player SSH keys
+- **Nostr Identity**: Accounts are anchored to a Nostr pubkey
 - **WebAuthn Authentication**: Passwordless login with biometrics/security keys
+- **Optional SSH Link**: Attach SSH public key to your account for terminal/MUD workflows
 - **UNIX Group Permissions**: Admin access via `blog-admin` group
 - **Admin Panel**: Compose, publish, and manage posts
 - **Markdown Editor**: Live preview for easy writing
@@ -172,11 +189,7 @@ The blog template integrates with the wizardry MUD player system to provide unif
 
 ### Quick Start for Admins
 
-1. **Create MUD Player** (on server as root):
-   ```sh
-   sudo add-player
-   # Enter player name and SSH public key
-   ```
+1. **Sign in with Nostr** using the Login button in site navigation.
 
 2. **Grant Admin Access**:
    ```sh
@@ -184,9 +197,7 @@ The blog template integrates with the wizardry MUD player system to provide unif
    sudo usermod -aG blog-admin <username>
    ```
 
-3. **Register on Blog**: Visit `/ssh-auth.html`, enter player name
-
-4. **Access Admin Panel**: Visit `/admin.html` to compose and publish
+3. **Access Admin Panel**: Visit `/admin.html` to compose and publish
 
 ### For Single-Author Blogs
 
@@ -214,28 +225,28 @@ This prevents new users from registering while keeping your access.
 ### Authentication Flow
 
 ```
-MUD Player (UNIX user with SSH key)
+Sign in with Nostr key (creates account if needed)
     ↓
-Register on blog (uses SSH fingerprint)
+Optional: bind WebAuthn passkey
     ↓
-Create WebAuthn credential (biometric, security key)
-    ↓
-Login with WebAuthn (no SSH needed)
+Optional: link SSH public key for MUD
     ↓
 Access admin panel (if in blog-admin group)
 ```
 
 ### Demo Pages
 
-- `/ssh-auth.html` - Authentication and registration
+- Login modal in site navigation - Authentication and account creation
 - `/admin.html` - Admin panel (requires admin permissions)
 
 ### CGI Scripts
 
 **Authentication:**
-- `ssh-auth-register-mud` - Register using MUD player account
-- `ssh-auth-register` - Manual SSH key registration (demo/testing)
-- `ssh-auth-bind-webauthn` - Bind WebAuthn credential to SSH fingerprint
+- `nostr-auth-login-begin` - Create Nostr login challenge
+- `nostr-auth-login-finish` - Verify signed Nostr event and create session
+- `nostr-auth-passkey-begin` - Start passkey binding for logged-in account
+- `nostr-auth-link-ssh` - Link SSH public key to logged-in Nostr account
+- `ssh-auth-bind-webauthn` - Store WebAuthn credential delegate
 - `ssh-auth-login-begin` - Start passkey login challenge
 - `ssh-auth-login-finish` - Verify signed assertion and create session
 - `ssh-auth-check-session` - Validate session and permissions
@@ -252,37 +263,51 @@ Access admin panel (if in blog-admin group)
 - `blog-delete-draft` - Delete draft
 - `blog-list-queue` - List scheduled + drip queue
 - `blog-run-scheduler` - Trigger scheduler tick
+- `blog-nostr-mirror` - Mirror Nostr posts/comments from configured relays
 - `blog-upload-media` - Upload images for markdown embedding
 - `blog-archive` - Render month-grouped archive listing
 - `blog-post-context` - Return post metadata + older/newer navigation context
+
+**Public Nostr Read/Refresh Endpoints:**
+- `blog-comments` - Return local mirrored comments for a post
+- `blog-refresh-comments` - Explicitly mirror latest comments for a post
+- `blog-submit-comment` - Store a signed Nostr comment event locally for a post
 
 ### Data Storage
 
 ```
 ~/sites/myblog/
 ├── site.conf                  # Site configuration
-├── data/
-│   └── ssh-auth/
-│       ├── users/
-│       │   └── alice/
-│       │       ├── ssh_fingerprint
-│       │       ├── is_admin
-│       │       └── delegates/
-│       └── sessions/
-└── site/
-    └── pages/
-        └── posts/
-            ├── 2024-02-04-my-post.md  # Published
-            └── 2024-02-04-draft.md    # Draft
+├── site/
+│   ├── nostr/
+│   │   ├── events/            # Canonical event store
+│   │   ├── derived/           # Rebuildable indexes
+│   │   └── state/
+│   │       ├── authors.txt
+│   │       ├── relays.txt
+│   │       ├── blocklist.txt
+│   │       ├── hidden_posts.txt
+│   │       └── secret.key     # Local signing key (not committed)
+│   └── pages/
+│       └── posts/
+│           ├── slug.md        # Generated/derived render projection
+│           └── slug-2.md
+└── .sitedata/
+    └── myblog/
+        ├── ssh-auth/
+        ├── blog/
+        │   └── drafts/
+        └── uploads/
 ```
 
 ### Security Model
 
-- **Root Identity**: SSH public key fingerprint (never changes)
+- **Root Identity**: Nostr pubkey (canonical account anchor)
 - **Delegates**: WebAuthn credentials (revocable, multi-device)
+- **Optional Link**: SSH public key for terminal/MUD interoperability
 - **Permissions**: UNIX group membership (`blog-admin`)
 - **Session Validation**: Every admin action checks permissions
-- **Phishing-Resistant**: WebAuthn bound to domain
+- **Phishing-Resistant**: WebAuthn and Nostr challenge signing
 
 See `.github/MUD_BLOG_INTEGRATION.md` for complete documentation.
 
@@ -292,7 +317,7 @@ See `.github/MUD_BLOG_INTEGRATION.md` for complete documentation.
 2. **Content-addressable**: Identity based on content hash
 3. **Append-only**: Edits create new versions, old versions preserved
 4. **UNIX permissions**: Visibility through filesystem semantics
-5. **Nostr-aligned**: Future-proofed for decentralized social layer
+5. **Nostr-aligned**: Optional decentralized social layer with local canonical event storage
 6. **Simple & transparent**: No hidden state, all data in files
 
 ## License

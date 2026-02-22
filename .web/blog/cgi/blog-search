@@ -26,7 +26,9 @@ fi
 
 posts_tmp=$(mktemp "${TMPDIR:-/tmp}/blog-search-posts.XXXXXX")
 res_tmp=$(mktemp "${TMPDIR:-/tmp}/blog-search-res.XXXXXX")
+comment_counts_tmp=$(mktemp "${TMPDIR:-/tmp}/blog-search-comment-counts.XXXXXX")
 blog_collect_public_posts "$posts_tmp"
+blog_nostr_comment_counts_build "$comment_counts_tmp"
 
 query_lc=$(printf '%s' "$query" | tr '[:upper:]' '[:lower:]')
 while IFS= read -r post_file; do
@@ -58,13 +60,22 @@ else
     tags_csv=$(printf '%s' "$tags_raw" | sed "s/^\[//;s/\]$//;s/\"//g;s/'//g")
     tags=$(blog_normalize_tags "$tags_csv")
     url=$(blog_rel_post_html_url "$post_file")
+    post_address=$(blog_post_nostr_address_for_file "$post_file")
+    comment_count=$(blog_nostr_comment_count_lookup "$comment_counts_tmp" "$post_address")
     pub_date=${published_at%%T*}
 
     printf '    <article class="post-item">\n'
     printf '      <h3 class="post-title"><a href="%s">%s</a></h3>\n' "$(blog_html_escape "$url")" "$(blog_html_escape "$title")"
+    printf '      <div class="post-meta">'
     if [ -n "$pub_date" ]; then
-      printf '      <div class="post-meta"><span class="post-date">%s</span></div>\n' "$(blog_html_escape "$pub_date")"
+      printf '<span class="post-date">%s</span>' "$(blog_html_escape "$pub_date")"
     fi
+    if [ "$comment_count" -gt 0 ]; then
+      printf ' <span class="post-comments-count">%s comments</span>' "$(blog_html_escape "$comment_count")"
+    else
+      printf ' <span class="post-comments-count">0 comments</span>'
+    fi
+    printf '</div>\n'
 
     if [ -n "$summary" ]; then
       printf '      <p class="post-summary">%s</p>\n' "$(blog_html_escape "$summary")"
@@ -86,4 +97,4 @@ else
 fi
 printf '</div>\n'
 
-rm -f "$posts_tmp" "$res_tmp"
+rm -f "$posts_tmp" "$res_tmp" "$comment_counts_tmp"

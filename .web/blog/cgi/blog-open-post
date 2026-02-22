@@ -36,6 +36,9 @@ case "$path" in
 esac
 
 md_file="$blog_posts_dir/$rel_md"
+if [ ! -f "$md_file" ] && blog_nostr_bridge_enabled; then
+  blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+fi
 if [ ! -f "$md_file" ]; then
   http-status 404 "Not Found"
   http-header "Content-Type" "text/plain; charset=utf-8"

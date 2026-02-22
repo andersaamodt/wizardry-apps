@@ -2,7 +2,7 @@
 title: ""
 pagetitle: "Artificer"
 ---
-<link rel="stylesheet" href="/static/style.css?v=20260222-runorder6" />
+<link rel="stylesheet" href="/static/style.css?v=20260222-runorder7" />
 <link id="artificer-theme-stylesheet" rel="stylesheet" href="/static/themes/psionic.css" />
 <div class="forge-shell" id="forge-shell">
 <aside class="workspace-sidebar" id="workspace-dropzone" tabindex="0">
@@ -164,6 +164,7 @@ pagetitle: "Artificer"
 </details>
 <div class="composer-row">
 <button id="attach-btn" class="attach-btn" type="button" aria-label="Attach files" title="Attach files">+</button>
+<button id="dictate-btn" class="dictate-btn" type="button" aria-label="Dictate prompt" title="Dictate prompt"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0"></path><path d="M12 17v4"></path><path d="M9 21h6"></path></svg></span></button>
 <input id="attachment-picker" type="file" multiple hidden />
 <div class="menu-anchor model-anchor">
 <button id="model-picker-btn" class="model-picker-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Select model">Select model</button>
@@ -381,12 +382,17 @@ pagetitle: "Artificer"
 <button id="settings-close-btn" class="icon-btn ghost" type="button" aria-label="Close settings">&times;</button>
 </div>
 <div class="stack">
-<div class="info-row"><span>GitHub CLI</span><strong id="gh-auth-status">Checking...</strong></div>
+<div class="info-row"><span>Git</span><strong id="git-status">Checking...</strong></div>
 <div class="info-row"><span>SSH key</span><strong id="ssh-key-status">Checking...</strong></div>
 <label class="toggle-row" title="Use Ollama GPU acceleration when available on this system">
 <input id="llm-use-gpu-toggle" type="checkbox" checked /> Use GPU acceleration for LLMs
 </label>
 <p class="settings-hint">Applies to Ollama inference on macOS (Metal) and Linux (CUDA/ROCm when available).</p>
+<div class="modal-actions modal-actions-compact dictation-install-row">
+<button id="install-dictation-btn" type="button" class="ui-pending-spinner" disabled>Checking...</button>
+<p id="dictation-install-status" class="settings-hint hidden"></p>
+</div>
+<p class="settings-hint">Installs local dictation. On Apple Silicon macOS this uses MLX Whisper automatically.</p>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
 <label for="ssh-email">SSH key email/comment (optional)</label>
@@ -548,4 +554,4 @@ pagetitle: "Artificer"
 </div>
 </div>
 
-<script src="/static/artificer-app.js?v=20260222-runorder6"></script>
+<script src="/static/artificer-app.js?v=20260222-runorder15"></script>

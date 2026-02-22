@@ -1159,6 +1159,8 @@ cmd_run_desktop() {
   root=$(require_root "${1-}")
   slug=${2-}
   run_mode=${3-auto}
+  bundle_artifact=''
+  bundle_build_out=''
   [ -n "$slug" ] || {
     printf '%s\n' "forge-backend: run-desktop requires APP_SLUG" >&2
     exit 2
@@ -1197,16 +1199,29 @@ cmd_run_desktop() {
     exit 1
   }
 
+  if [ "$run_mode" = "bundle" ]; then
+    bundle_build_out=$(cmd_build_desktop "$root" "$slug")
+    bundle_artifact=$(printf '%s\n' "$bundle_build_out" | kv_read artifact)
+    [ -n "$bundle_artifact" ] || {
+      printf '%s\n' "forge-backend: build-desktop did not return a bundle artifact" >&2
+      exit 1
+    }
+  fi
+
   os=$(os_id)
   host_bin=''
   case "$os" in
     darwin)
       app_name=$(app_name_from_manifest "$root" "$slug")
       stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
-      bundle="$root/_tmp/workbench/dist/macos/$app_name.app"
+      if [ -n "$bundle_artifact" ]; then
+        bundle=$bundle_artifact
+      else
+        bundle="$root/_tmp/workbench/dist/macos/$app_name.app"
+      fi
       if [ "$run_mode" = "bundle" ]; then
         [ -d "$bundle" ] || {
-          printf '%s\n' "forge-backend: desktop bundle not found, run Compile Desktop first" >&2
+          printf '%s\n' "forge-backend: built bundle artifact missing: $bundle" >&2
           exit 1
         }
         command -v open >/dev/null 2>&1 || {

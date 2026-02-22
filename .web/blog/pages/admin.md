@@ -64,7 +64,7 @@ title: Blog Admin
 <div class="field-row checkbox-row">
 <div class="setting-label">
 <strong>Enable User Registration</strong>
-<span class="inline-tip" tabindex="0" aria-label="Allow new users to register with MUD player SSH keys.">?</span>
+<span class="inline-tip" tabindex="0" aria-label="Allow new users to create accounts by signing in with a Nostr key.">?</span>
 </div>
 <label class="checkbox-control" for="registration-enabled">
 <input type="checkbox" id="registration-enabled">
@@ -104,6 +104,21 @@ title: Blog Admin
 <input type="number" id="feed-items" min="1" step="1" value="50">
 </div>
 </div>
+</section>
+
+<section class="sub-card">
+<h4>Nostr Bridge</h4>
+<div class="field-row checkbox-row">
+<div class="setting-label">
+<strong>Enable Nostr Bridge</strong>
+<span class="inline-tip" tabindex="0" aria-label="When enabled, published posts are signed as Nostr events and local render indexes are derived from mirrored events.">?</span>
+</div>
+<label class="checkbox-control" for="nostr-bridge-enabled">
+<input type="checkbox" id="nostr-bridge-enabled">
+<span>Enabled</span>
+</label>
+</div>
+<p class="muted">Configure authors, relays, and blocklist in <code>site/nostr/state/</code>. Bridge actions are explicit and never run during page render.</p>
 </section>
 </div>
 
@@ -273,6 +288,7 @@ title: Blog Admin
 </div>
 <div class="row-actions">
 <button id="btn-refresh-queue" type="button">Refresh</button>
+<button id="btn-mirror-nostr" type="button">Mirror Nostr</button>
 <button id="btn-run-scheduler" type="button" class="primary">Run Scheduler</button>
 </div>
 </div>
@@ -286,8 +302,13 @@ title: Blog Admin
 <div class="row-head">
 <div>
 <h3>Account</h3>
-<p class="muted">Update your player name shown in the blog UI.</p>
+<p class="muted">Your account is Nostr-based. You can bind a passkey and link an SSH key for MUD compatibility.</p>
 </div>
+</div>
+
+<div class="field-row">
+<label for="account-nostr-pubkey"><strong>Nostr Pubkey</strong></label>
+<input type="text" id="account-nostr-pubkey" readonly>
 </div>
 
 <div class="field-row">
@@ -296,6 +317,29 @@ title: Blog Admin
 <input type="text" id="account-player-name" placeholder="Your name">
 <button id="btn-save-account" type="button" class="primary">Save</button>
 </div>
+</div>
+
+<div class="field-row">
+<label><strong>Passkey</strong></label>
+<div class="account-row">
+<button id="btn-bind-passkey" type="button">Bind passkey</button>
+</div>
+</div>
+
+<details class="account-ssh-optional">
+<summary>Optional: SSH key for MUD and terminal login</summary>
+<div class="field-row">
+<label for="account-ssh-public-key"><strong>SSH Public Key</strong></label>
+<textarea id="account-ssh-public-key" rows="3" placeholder="ssh-ed25519 AAAA..."></textarea>
+<div class="account-row">
+<button id="btn-generate-ssh" type="button">Generate SSH Key Pair (Browser)</button>
+<button id="btn-link-ssh" type="button">Link SSH Key</button>
+</div>
+<p class="muted">When generated in-browser, private key download starts locally. Keep it secret and back it up.</p>
+</div>
+</details>
+
+<div class="field-row">
 <div id="output-account" class="output"></div>
 </div>
 </div>
@@ -695,6 +739,15 @@ body {
 
 [data-admin-section="account"] #account-player-name {
   inline-size: clamp(12rem, 22vw, 18rem);
+}
+
+[data-admin-section="account"] #account-nostr-pubkey,
+[data-admin-section="account"] #account-ssh-public-key {
+  inline-size: min(100%, 42rem);
+}
+
+.account-ssh-optional {
+  margin-top: 0.35rem;
 }
 
 .account-row {
