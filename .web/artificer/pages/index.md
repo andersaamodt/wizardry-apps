@@ -392,7 +392,6 @@ pagetitle: "Artificer"
 <button id="install-dictation-btn" type="button" class="ui-pending-spinner" disabled>Checking...</button>
 <p id="dictation-install-status" class="settings-hint hidden"></p>
 </div>
-<p class="settings-hint">Installs local dictation. On Apple Silicon macOS this uses MLX Whisper automatically.</p>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
 <label for="ssh-email">SSH key email/comment (optional)</label>

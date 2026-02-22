@@ -12269,17 +12269,33 @@
       return "Uninstalling dictation";
     }
     var phase = trim(String(job && job.phase ? job.phase : ""));
+    var backendLabel = dictationInstallBackendLabel(job);
     var pctText = dictationProgressPercentLabel(job && job.progress_pct, job);
     var sizeText = dictationDownloadAmountLabel(job);
     var isDownloadPhase = (phase === "downloading" || phase === "preparing" || phase === "fallback");
     var labelPrefix = isDownloadPhase ?
-      "Downloading dictation " :
-      "Installing dictation ";
+      "Downloading " + backendLabel + " " :
+      "Installing " + backendLabel + " ";
     var label = labelPrefix + pctText + "%";
     if (sizeText && isDownloadPhase) {
       label += " (" + sizeText + ")";
     }
     return label;
+  }
+
+  function dictationInstallBackendLabel(job) {
+    var label = trim(String(job && job.component_label ? job.component_label : ""));
+    if (label) {
+      return label;
+    }
+    var component = trim(String(job && job.component ? job.component : ""));
+    if (component) {
+      var mapped = dictationBackendLabel(component);
+      if (mapped) {
+        return mapped;
+      }
+    }
+    return "dictation";
   }
 
   function dictationProgressPercentLabel(rawValue, job) {
