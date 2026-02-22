@@ -533,7 +533,7 @@
         [centerGapStrip setWantsLayer:YES];
         centerGapStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
         [rootView addSubview:centerGapStrip];
-    } else {
+    } else if (!self.enableNativeViewMenu) {
         CGFloat stripX = 0.0;
         CGFloat dragStripWidth = self.enableNativeViewMenu ? 140.0 : 320.0;
         NSUInteger stripMask = (NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin);
@@ -570,6 +570,10 @@
         [dragStrip setWantsLayer:YES];
         dragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
         [rootView addSubview:dragStrip];
+    } else {
+        // Priorities uses explicit web header controls (folder title double-click
+        // and drill-up button). Avoid a native transparent drag strip over the
+        // center header so those controls always receive click/double-click.
     }
 
     if (self.enableNativeBootSplash) {
