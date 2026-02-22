@@ -12853,7 +12853,10 @@ EOF
       exit 0
     fi
 
-    backend_bin=$(resolve_voice_recognition_backend_bin || true)
+    fallback_bin=""
+    if [ "$install_component" != "$fallback_component" ]; then
+      fallback_bin=$(resolve_voice_recognition_install_bin "$fallback_component" || true)
+    fi
     force_macos_arm64_uname=0
     if [ "$install_component" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
       force_macos_arm64_uname=1
@@ -12893,9 +12896,10 @@ job_dir=$1
 log_file=$2
 component=$3
 component_bin=$4
-backend_bin=$5
-timeout_sec=$6
-force_macos_arm64_uname=$7
+fallback_component=$5
+fallback_bin=$6
+timeout_sec=$7
+force_macos_arm64_uname=$8
 
 run_with_timeout_compat() {
   duration=$1
@@ -12913,6 +12917,7 @@ run_with_timeout_compat() {
 
 install_rc=1
 installed_component=$component
+fallback_used=0
 
 printf '%s\n' "voice-recognition: starting $component install" >"$log_file"
 set +e
@@ -12929,11 +12934,24 @@ fi
 if [ "${install_rc-}" != "126" ]; then
   install_rc=$?
 fi
+
+if [ "$install_rc" -ne 0 ] && [ "$component" != "$fallback_component" ] && [ -n "$fallback_bin" ] && [ -x "$fallback_bin" ]; then
+  printf '%s\n' "voice-recognition: falling back to $fallback_component" >>"$log_file"
+  run_with_timeout_compat "$timeout_sec" "$fallback_bin" >>"$log_file" 2>&1
+  fallback_rc=$?
+  if [ "$fallback_rc" -eq 0 ]; then
+    install_rc=0
+    installed_component=$fallback_component
+    fallback_used=1
+  else
+    install_rc=$fallback_rc
+  fi
+fi
 set -e
 
 printf '%s\n' "$install_rc" > "$job_dir/exit_code"
 printf '%s\n' "$installed_component" > "$job_dir/installed_component"
-printf '%s\n' "0" > "$job_dir/fallback_used"
+printf '%s\n' "$fallback_used" > "$job_dir/fallback_used"
 
 selected_backend=$installed_component
 printf '%s\n' "$selected_backend" > "$job_dir/backend"
@@ -12947,7 +12965,7 @@ date +%s > "$job_dir/finished"
 EOF_RUNNER
     chmod +x "$runner_script"
 
-    install_pid=$(spawn_detached_job "$runner_script" "$job_dir" "$log_file" "$install_component" "$primary_bin" "$backend_bin" "1800" "$force_macos_arm64_uname")
+    install_pid=$(spawn_detached_job "$runner_script" "$job_dir" "$log_file" "$install_component" "$primary_bin" "$fallback_component" "$fallback_bin" "1800" "$force_macos_arm64_uname")
     printf '%s\n' "$install_pid" > "$job_dir/pid"
 
     printf '{"success":true,"job":{"id":"%s","status":"running","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
@@ -13051,8 +13069,14 @@ EOF_RUNNER
       exit 0
     fi
 
+    fallback_bin=""
+    if [ "$install_component" != "$fallback_component" ]; then
+      fallback_bin=$(resolve_voice_recognition_install_bin "$fallback_component" || true)
+    fi
+
     installed_component=$install_component
     install_output=""
+    fallback_used=false
 
     set +e
     if [ "$install_component" = "mlx-whisper" ]; then
@@ -13069,6 +13093,26 @@ EOF_RUNNER
     fi
     if [ "${install_rc-}" != "126" ]; then
       install_rc=$?
+    fi
+
+    if [ "$install_rc" -ne 0 ] && [ "$install_component" != "$fallback_component" ] && [ -n "$fallback_bin" ] && [ -x "$fallback_bin" ]; then
+      fallback_output=$(run_with_timeout 1800 "$fallback_bin" 2>&1)
+      fallback_rc=$?
+      if [ -n "$install_output" ]; then
+        install_output="$install_output
+voice-recognition: falling back to $fallback_component
+$fallback_output"
+      else
+        install_output="voice-recognition: falling back to $fallback_component
+$fallback_output"
+      fi
+      if [ "$fallback_rc" -eq 0 ]; then
+        install_rc=0
+        installed_component=$fallback_component
+        fallback_used=true
+      else
+        install_rc=$fallback_rc
+      fi
     fi
     set -e
 
@@ -13090,7 +13134,7 @@ EOF_RUNNER
     printf '{"success":true,"installed":"%s","backend":"%s","fallback":%s,"output":"%s"}\n' \
       "$(json_escape "$installed_component")" \
       "$(json_escape "$selected_backend")" \
-      "false" \
+      "$fallback_used" \
       "$(json_escape "$install_output")"
     exit 0
     ;;

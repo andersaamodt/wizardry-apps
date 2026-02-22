@@ -749,21 +749,16 @@ blog_nostr_verify_event_json() {
     return 1
   fi
 
-  if command -v nostril >/dev/null 2>&1; then
-    if printf '%s\n' "$event_json" | nostril verify >/dev/null 2>&1; then
-      return 0
-    fi
-    if printf '%s\n' "$event_json" | nostril --verify >/dev/null 2>&1; then
-      return 0
-    fi
+  if ! command -v nostril >/dev/null 2>&1; then
+    return 1
   fi
 
-  if command -v nak >/dev/null 2>&1; then
-    if printf '%s\n' "$event_json" | nak verify >/dev/null 2>&1; then
-      return 0
-    fi
+  if printf '%s\n' "$event_json" | nostril verify >/dev/null 2>&1; then
+    return 0
   fi
-
+  if printf '%s\n' "$event_json" | nostril --verify >/dev/null 2>&1; then
+    return 0
+  fi
   return 1
 }
 
@@ -846,26 +841,14 @@ blog_nostr_sign_post_event() {
 
   created_at=$(blog_now_epoch)
   d_tag=$(blog_slugify "$title")
-  content_file=$(mktemp "${TMPDIR:-/tmp}/blog-nostr-content.XXXXXX")
-  printf '%s' "$content" > "$content_file"
   tags_normalized=$(blog_normalize_tags "$tags_csv")
 
   sign_tmp=$(mktemp "${TMPDIR:-/tmp}/blog-nostr-sign.XXXXXX")
   event_json=''
 
   if command -v nostril >/dev/null 2>&1; then
-    set +e
-    nostril --sec "$secret" --kind 30023 --created-at "$created_at" --content "$content" --tag "d=$d_tag" --tag "title=$title" --tag "published_at=$published_iso" > "$sign_tmp" 2>/dev/null
-    nostril_status=$?
-    set -e
-    if [ "$nostril_status" -eq 0 ]; then
-      event_json=$(cat "$sign_tmp" 2>/dev/null || printf '')
-    fi
-  fi
-
-  if [ -z "$event_json" ] && command -v nak >/dev/null 2>&1; then
-    set +e
-    set -- nak event --sec "$secret" -k 30023 --created-at "$created_at" -d "$d_tag" -c "@$content_file" --tag "title=$title" --tag "published_at=$published_iso"
+    set -- nostril --sec "$secret" --kind 30023 --created-at "$created_at" --content "$content" \
+      --tag "d=$d_tag" --tag "title=$title" --tag "published_at=$published_iso"
     if [ -n "$summary" ]; then
       set -- "$@" --tag "summary=$summary"
     fi
@@ -878,16 +861,18 @@ blog_nostr_sign_post_event() {
       [ -n "$tag_line" ] || continue
       set -- "$@" --tag "t=$tag_line"
     done < "$sign_tmp.tags"
+
+    set +e
     "$@" > "$sign_tmp" 2>/dev/null
-    nak_status=$?
+    nostril_status=$?
     set -e
     rm -f "$sign_tmp.tags"
-    if [ "$nak_status" -eq 0 ]; then
+    if [ "$nostril_status" -eq 0 ]; then
       event_json=$(cat "$sign_tmp" 2>/dev/null || printf '')
     fi
   fi
 
-  rm -f "$content_file" "$sign_tmp"
+  rm -f "$sign_tmp"
   if [ -z "$event_json" ]; then
     return 1
   fi
