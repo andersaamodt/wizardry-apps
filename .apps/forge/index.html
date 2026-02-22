@@ -25,18 +25,18 @@
           <article class="card">
             <h3>Projects Root</h3>
             <label for="settings-projects-root">Default projects folder</label>
-            <div class="input-row">
+            <div class="input-row settings-save-row">
               <input id="settings-projects-root" type="text" placeholder="/Users/you/git" spellcheck="false">
-              <button id="apply-projects-root" type="button" class="action">Apply</button>
+              <button id="apply-projects-root" type="button" class="action settings-save-btn">Save</button>
             </div>
           </article>
 
           <article class="card">
             <h3>Repository Root</h3>
             <label for="repo-root">wizardry-apps root</label>
-            <div class="input-row">
+            <div class="input-row settings-save-row">
               <input id="repo-root" type="text" placeholder="/absolute/path/to/wizardry-apps" spellcheck="false">
-              <button id="apply-repo-root" type="button" class="action">Apply</button>
+              <button id="apply-repo-root" type="button" class="action settings-save-btn">Save</button>
             </div>
             <header class="route-head route-head-scope settings-quality-head">
               <div>
@@ -580,6 +580,7 @@
         document.querySelectorAll('.action, .row-play, .row-mini').forEach(function (btn) {
           btn.disabled = flag;
         });
+        syncSettingsSaveButtons();
       }
 
       async function perform(label, fn, opts) {
@@ -921,6 +922,7 @@
         saveStorage(ROOT_KEY, state.rootHint);
         text(els.workspaceRootDisplay, state.rootHint || 'Workspace root not resolved. Use the settings gear.');
         els.repoRoot.value = state.rootHint;
+        syncSettingsSaveButtons();
       }
 
       function setProjectsRoot(path) {
@@ -928,6 +930,22 @@
         saveStorage(PROJECTS_ROOT_KEY, state.projectsRoot);
         els.settingsProjectsRoot.value = state.projectsRoot;
         updateCreatePathPreview();
+        syncSettingsSaveButtons();
+      }
+
+      function normalizedSettingValue(value) {
+        return String(value || '').trim();
+      }
+
+      function syncSettingsSaveButtons() {
+        if (els.applyRepoRoot && els.repoRoot) {
+          var repoChanged = normalizedSettingValue(els.repoRoot.value) !== normalizedSettingValue(state.rootHint);
+          els.applyRepoRoot.disabled = !!state.busy || !repoChanged;
+        }
+        if (els.applyProjectsRoot && els.settingsProjectsRoot) {
+          var projectsChanged = normalizedSettingValue(els.settingsProjectsRoot.value) !== normalizedSettingValue(state.projectsRoot);
+          els.applyProjectsRoot.disabled = !!state.busy || !projectsChanged;
+        }
       }
 
       function setLeftRailWidth(width) {
@@ -3557,15 +3575,33 @@
           });
         }
 
+        if (els.repoRoot) {
+          els.repoRoot.addEventListener('input', syncSettingsSaveButtons);
+        }
+
+        if (els.settingsProjectsRoot) {
+          els.settingsProjectsRoot.addEventListener('input', syncSettingsSaveButtons);
+        }
+
         els.applyRepoRoot.addEventListener('click', function () {
-          setWorkspaceRoot(els.repoRoot.value.trim());
+          var nextRoot = normalizedSettingValue(els.repoRoot.value);
+          if (nextRoot === normalizedSettingValue(state.rootHint)) {
+            syncSettingsSaveButtons();
+            return;
+          }
+          setWorkspaceRoot(nextRoot);
           perform('Update workspace root', function () {
             return refreshWorkspace({ quiet: true });
           }, { noToast: true, swallow: true, keepResult: true });
         });
 
         els.applyProjectsRoot.addEventListener('click', function () {
-          setProjectsRoot(els.settingsProjectsRoot.value.trim());
+          var nextProjectsRoot = normalizedSettingValue(els.settingsProjectsRoot.value);
+          if (nextProjectsRoot === normalizedSettingValue(state.projectsRoot)) {
+            syncSettingsSaveButtons();
+            return;
+          }
+          setProjectsRoot(nextProjectsRoot);
           perform('Update projects root', function () {
             return refreshWorkspaces({ quiet: true });
           }, { noToast: true, swallow: true, keepResult: true });
@@ -3970,6 +4006,7 @@
         if (state.projectsRoot) {
           els.settingsProjectsRoot.value = state.projectsRoot;
         }
+        syncSettingsSaveButtons();
 
         renderResult({
           status: 'neutral',

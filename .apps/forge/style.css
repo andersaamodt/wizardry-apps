@@ -859,7 +859,7 @@ button:disabled {
 
 .row-play:hover {
   border-color: transparent;
-  background: color-mix(in srgb, var(--accent-soft, var(--accent)) 56%, transparent);
+  background: color-mix(in srgb, var(--toolbar-accent-soft, var(--accent-soft, var(--accent))) 78%, var(--toolbar-surface, var(--bg-panel, var(--panel-solid, #fff))));
   color: var(--accent-strong);
 }
 
@@ -1148,7 +1148,8 @@ button:disabled {
 
 #action-build,
 #action-run,
-#action-run-menu {
+#action-run-menu,
+#action-stage {
   border-color: transparent;
   background: transparent;
   box-shadow: none;
@@ -1159,7 +1160,9 @@ button:disabled {
 #action-run:hover,
 #action-run:focus-visible,
 #action-run-menu:hover,
-#action-run-menu:focus-visible {
+#action-run-menu:focus-visible,
+#action-stage:hover,
+#action-stage:focus-visible {
   border-color: transparent !important;
   background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
 }
@@ -1553,7 +1556,7 @@ button:disabled {
   outline-offset: 1px;
 }
 
-.section-clear-btn {
+.pipeline-sections .section-clear-btn {
   height: 1.24rem;
   padding: 0 0.44rem;
   line-height: 1;
@@ -2168,7 +2171,7 @@ button:disabled {
   margin-left: 0;
 }
 
-.row-mini {
+.pipeline-sections .row-mini {
   width: 1.4rem;
   height: 1.34rem;
   padding: 0;
@@ -2183,7 +2186,7 @@ button:disabled {
   box-shadow: none;
 }
 
-.row-mini:hover {
+.pipeline-sections .row-mini:hover {
   border-color: transparent;
   background: color-mix(in srgb, var(--section-accent-soft) 76%, transparent);
   box-shadow: none;
@@ -2260,6 +2263,19 @@ button:disabled {
   display: flex;
   gap: 0.46rem;
   align-items: center;
+}
+
+.settings-save-row > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-save-btn {
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  background: color-mix(in srgb, var(--panel-solid, #fff) 94%, transparent);
 }
 
 .artifact-list {
@@ -2377,6 +2393,11 @@ body.bridge-missing .status-pill {
   .input-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .settings-save-row {
+    flex-direction: row;
+    align-items: center;
   }
 
   .path-row {
