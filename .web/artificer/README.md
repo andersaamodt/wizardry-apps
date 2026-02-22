@@ -56,6 +56,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
 - `get_draft` (GET)
 - `save_draft` (POST)
 - `upload_attachment` (POST)
+- `dictate` (POST)
 - `queue_enqueue` (POST)
 - `queue_take` (POST)
 - `queue_finish` (POST)

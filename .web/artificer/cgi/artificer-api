@@ -4912,6 +4912,7 @@ kv_get() {
 
 ARTIFICER_GIT_BIN=${ARTIFICER_GIT_BIN:-$WIZARDRY_DIR/spells/.arcana/ai-dev/artificer-git}
 AI_DEV_DIR=${AI_DEV_DIR:-$WIZARDRY_DIR/spells/.arcana/ai-dev}
+DICTATE_BIN=${DICTATE_BIN:-$WIZARDRY_DIR/spells/psi/dictate}
 
 resolve_artificer_git_bin() {
   if [ -x "$ARTIFICER_GIT_BIN" ]; then
@@ -4953,6 +4954,43 @@ run_ai_dev_script() {
     return 1
   fi
   "$script_path" "$@"
+}
+
+resolve_dictate_bin() {
+  if [ -x "$DICTATE_BIN" ]; then
+    printf '%s' "$DICTATE_BIN"
+    return 0
+  fi
+  if command -v dictate >/dev/null 2>&1; then
+    DICTATE_BIN=$(command -v dictate)
+    printf '%s' "$DICTATE_BIN"
+    return 0
+  fi
+  return 1
+}
+
+run_with_timeout() {
+  timeout_sec=$1
+  shift
+
+  case "$timeout_sec" in
+    ""|*[!0-9]*)
+      timeout_sec=180
+      ;;
+  esac
+  if [ "$timeout_sec" -lt 1 ]; then
+    timeout_sec=1
+  fi
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_sec" "$@"
+    return $?
+  fi
+  if command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$timeout_sec" "$@"
+    return $?
+  fi
+  "$@"
 }
 
 safe_model_name() {
@@ -12311,6 +12349,88 @@ EOF
   git_clear_ssh_key)
     clear_selected_ssh_pub_path
     printf '{"success":true}\n'
+    exit 0
+    ;;
+
+  dictate)
+    dictate_bin=$(resolve_dictate_bin || true)
+    if [ -z "$dictate_bin" ]; then
+      emit_error "Voice recognition is unavailable because the dictate spell was not found."
+      exit 0
+    fi
+
+    duration=$(trim "$(param "duration")")
+    language=$(trim "$(param "language")")
+    model=$(trim "$(param "model")")
+    timeout_sec=$(trim "$(param "timeout_sec")")
+
+    if [ -n "$duration" ]; then
+      case "$duration" in
+        *[!0-9]*)
+          emit_error "invalid duration"
+          exit 0
+          ;;
+      esac
+      if [ "$duration" -lt 1 ] || [ "$duration" -gt 600 ]; then
+        emit_error "duration must be between 1 and 600 seconds"
+        exit 0
+      fi
+    fi
+
+    if [ -n "$language" ]; then
+      case "$language" in
+        *[!A-Za-z0-9_-]*)
+          emit_error "invalid language"
+          exit 0
+          ;;
+      esac
+    fi
+
+    if [ -n "$model" ] && ! safe_model_name "$model"; then
+      emit_error "invalid model"
+      exit 0
+    fi
+
+    if [ -z "$timeout_sec" ]; then
+      timeout_sec=180
+    fi
+
+    set -- "$dictate_bin"
+    if [ -n "$duration" ]; then
+      set -- "$@" "--duration" "$duration"
+    fi
+    if [ -n "$language" ]; then
+      set -- "$@" "--language" "$language"
+    fi
+    if [ -n "$model" ]; then
+      set -- "$@" "--model" "$model"
+    fi
+
+    dictate_output_file=$(mktemp)
+    dictate_error_file=$(mktemp)
+
+    set +e
+    run_with_timeout "$timeout_sec" "$@" > "$dictate_output_file" 2> "$dictate_error_file"
+    dictate_rc=$?
+    set -e
+
+    dictate_stdout=$(cat "$dictate_output_file" 2>/dev/null || true)
+    dictate_stderr=$(strip_terminal_noise "$(cat "$dictate_error_file" 2>/dev/null || true)")
+    rm -f "$dictate_output_file" "$dictate_error_file"
+
+    if [ "$dictate_rc" -ne 0 ]; then
+      if [ "$dictate_rc" -eq 124 ]; then
+        emit_error "Dictation timed out."
+      elif [ -n "$dictate_stderr" ]; then
+        emit_error "$dictate_stderr"
+      else
+        emit_error "Dictation failed."
+      fi
+      exit 0
+    fi
+
+    dictated_text=$(trim "$dictate_stdout")
+    printf '{"success":true,"text":"%s"}\n' "$(json_escape "$dictated_text")"
     exit 0
     ;;
 
