@@ -160,6 +160,7 @@
       busy: false,
       pendingPrioritizePath: '',
       lastPrioritizedPath: '',
+      reorderPrimaryPath: '',
       pendingCheckByPath: Object.create(null),
       pendingExpandPath: '',
       pendingDirRevalidate: Object.create(null),
@@ -1778,6 +1779,13 @@
       }
       var tree = treeEl();
       tree.classList.add('reordering');
+      var overlayLayer = document.createElement('div');
+      overlayLayer.className = 'row-reorder-overlay-layer';
+      overlayLayer.style.position = 'fixed';
+      overlayLayer.style.inset = '0';
+      overlayLayer.style.pointerEvents = 'none';
+      overlayLayer.style.zIndex = '2147483647';
+      document.body.appendChild(overlayLayer);
       var consumedAnimMatches = Object.create(null);
       var rows = treeEl().querySelectorAll('.row');
       for (var ri = 0; ri < rows.length; ri += 1) {
@@ -1795,6 +1803,14 @@
             }
             rows[rz]._reorderOverlayEl = null;
           }
+        }
+        if (overlayLayer) {
+          try {
+            overlayLayer.remove();
+          } catch (_) {
+            // Ignore overlay layer cleanup failures.
+          }
+          overlayLayer = null;
         }
       };
       var moved = [];
@@ -1844,7 +1860,7 @@
       var easing = 'cubic-bezier(0.2, 0.75, 0.2, 1)';
       var remaining = moved.length;
       var finished = false;
-      var activeReorderPath = String(state.pendingPrioritizePath || state.lastPrioritizedPath || '').trim();
+      var activeReorderPath = String(state.reorderPrimaryPath || state.pendingPrioritizePath || state.lastPrioritizedPath || '').trim();
 
       var finalizeOne = function (row) {
         row.style.transition = '';
@@ -1912,7 +1928,6 @@
           (function runRowAnimation(m) {
             var movedRow = m.row;
             var movedRowPath = String(movedRow.getAttribute('data-path') || '').trim();
-            var overlayZ = movedRowPath && activeReorderPath && movedRowPath === activeReorderPath ? '2147483647' : '2147483646';
             var rowScaleX = Number(m.scaleX) || 1;
             var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
             var overlayRect = movedRow.getBoundingClientRect();
@@ -1924,12 +1939,12 @@
             overlayRow.style.left = overlayRect.left + 'px';
             overlayRow.style.width = overlayRect.width + 'px';
             overlayRow.style.margin = '0';
-            overlayRow.style.zIndex = overlayZ;
+            overlayRow.style.zIndex = movedRowPath && activeReorderPath && movedRowPath === activeReorderPath ? '9999' : '1';
             overlayRow.style.pointerEvents = 'none';
             overlayRow.style.willChange = 'transform';
             overlayRow.style.backfaceVisibility = 'hidden';
             overlayRow.style.transformOrigin = 'top left';
-            document.body.appendChild(overlayRow);
+            overlayLayer.appendChild(overlayRow);
             movedRow._reorderOverlayEl = overlayRow;
             movedRow.style.visibility = 'hidden';
             movedRow.classList.add('row-moving');
@@ -3068,6 +3083,7 @@
         return;
       }
       state.lastPrioritizedPath = path;
+      state.reorderPrimaryPath = path;
       var parentDir = parentDirOfPath(path);
       var previousItems = applyOptimisticPrioritize(parentDir, path);
       state.pendingPrioritizePath = path;
@@ -3112,6 +3128,7 @@
         } finally {
           state.busy = false;
           state.pendingPrioritizePath = '';
+          state.reorderPrimaryPath = '';
           processPrioritizeQueue();
           syncPrioritizeButtonsToQueue();
         }
