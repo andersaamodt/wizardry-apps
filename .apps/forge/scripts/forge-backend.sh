@@ -422,18 +422,38 @@ stop_host_instances_for_app() {
   host_bin=${1-}
   app_dir=${2-}
 
-  [ -n "$host_bin" ] || return 0
   [ -n "$app_dir" ] || return 0
-  command -v pgrep >/dev/null 2>&1 || return 0
+  command -v ps >/dev/null 2>&1 || return 0
 
   # Prevent stale hidden windows/processes from making desktop runs appear as no-op.
-  pids=$(pgrep -f "$host_bin $app_dir" 2>/dev/null || true)
+  # Match by app_dir path + wizardry host command so we also catch launcher/bundle variants.
+  pids=$(
+    ps -axo pid=,command= 2>/dev/null \
+      | awk -v app="$app_dir" -v host="$host_bin" '
+          index($0, app) > 0 && (
+            index($0, "wizardry-host") > 0 ||
+            (length(host) > 0 && index($0, host) > 0)
+          ) { print $1 }
+        ' \
+      | tr '\n' ' ' \
+      | sed 's/[[:space:]]*$//'
+  )
   [ -n "$pids" ] || return 0
 
   # shellcheck disable=SC2086
   kill $pids >/dev/null 2>&1 || true
-  sleep 0.12
-  still=$(pgrep -f "$host_bin $app_dir" 2>/dev/null || true)
+  sleep 0.2
+  still=$(
+    ps -axo pid=,command= 2>/dev/null \
+      | awk -v app="$app_dir" -v host="$host_bin" '
+          index($0, app) > 0 && (
+            index($0, "wizardry-host") > 0 ||
+            (length(host) > 0 && index($0, host) > 0)
+          ) { print $1 }
+        ' \
+      | tr '\n' ' ' \
+      | sed 's/[[:space:]]*$//'
+  )
   if [ -n "$still" ]; then
     # shellcheck disable=SC2086
     kill -9 $still >/dev/null 2>&1 || true
