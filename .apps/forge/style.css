@@ -1548,9 +1548,6 @@ button:disabled {
 }
 
 .icon-dropzone:has(.icon-preview:not(.hidden)) {
-  border: 0;
-  background: transparent;
-  padding: 0;
   grid-template-columns: auto;
   gap: 0;
   max-width: none;
