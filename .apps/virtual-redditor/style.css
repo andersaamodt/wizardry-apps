@@ -234,12 +234,14 @@ textarea {
 
 .username-check.is-checking::before {
   content: '';
-  width: 0.82rem;
-  height: 0.82rem;
+  display: block;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
   border-radius: 999px;
-  border: 2px solid color-mix(in srgb, var(--line-strong) 60%, transparent);
-  border-top-color: color-mix(in srgb, var(--accent) 58%, var(--text-subtle) 42%);
-  animation: username-check-spin 0.75s linear infinite;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: username-check-spin 0.8s linear infinite;
 }
 
 .username-check.is-valid {
@@ -414,12 +416,15 @@ textarea {
 }
 
 .chip-inline-spinner {
-  width: 0.62rem;
-  height: 0.62rem;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
   border-radius: 999px;
-  border: 2px solid color-mix(in srgb, var(--line-strong) 60%, transparent);
+  border: 2px solid var(--line);
   border-top-color: currentColor;
-  animation: vr-loading-spin 0.75s linear infinite;
+  animation: vr-loading-spin 0.8s linear infinite;
 }
 
 .status-chip-action {
@@ -672,12 +677,15 @@ body.is-resizing [contenteditable='true'] {
 }
 
 .loading-spinner {
-  width: 0.78rem;
-  height: 0.78rem;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
   border-radius: 999px;
-  border: 2px solid color-mix(in srgb, var(--line-strong) 60%, transparent);
-  border-top-color: color-mix(in srgb, var(--accent) 58%, var(--text-subtle) 42%);
-  animation: vr-loading-spin 0.75s linear infinite;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: vr-loading-spin 0.8s linear infinite;
 }
 
 @keyframes vr-loading-spin {
@@ -1875,17 +1883,20 @@ label {
 }
 
 .manifesto-save-spinner {
-  width: 0.66rem;
-  height: 0.66rem;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
   border-radius: 999px;
-  border: 2px solid color-mix(in srgb, var(--line-strong) 60%, transparent);
-  border-top-color: color-mix(in srgb, var(--accent) 58%, var(--text-subtle) 42%);
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
   opacity: 0;
 }
 
 .manifesto-save-indicator.saving .manifesto-save-spinner {
   opacity: 1;
-  animation: vr-loading-spin 0.75s linear infinite;
+  animation: vr-loading-spin 0.8s linear infinite;
 }
 
 .manifesto-save-indicator.saved .manifesto-save-spinner {
