@@ -743,6 +743,25 @@ compute_highest_priority_xattr() {
   '
 }
 
+prepare_target_for_attrs() {
+  target=${1-}
+  [ -n "$target" ] || return 1
+
+  case "$ATTR_BACKEND" in
+    spell)
+      if ! hashchant "$target" >/dev/null 2>&1; then
+        printf '%s\n' "priorities-backend: hashchant failed: $target" >&2
+        return 1
+      fi
+      ;;
+    *)
+      # Non-spell backends read/write native attrs; hashchant is best-effort.
+      hashchant "$target" >/dev/null 2>&1 || true
+      ;;
+  esac
+  return 0
+}
+
 prioritize_impl() {
   target=$1
   auto_create=${2:-0}
@@ -763,10 +782,7 @@ prioritize_impl() {
     fi
   fi
 
-  if ! hashchant "$target" >/dev/null 2>&1; then
-    printf '%s\n' "priorities-backend: hashchant failed: $target" >&2
-    return 1
-  fi
+  prepare_target_for_attrs "$target" || return 1
 
   directory=$(dirname "$target")
   if [ "$directory" = "." ]; then
@@ -1282,10 +1298,7 @@ prioritize_emit_impl() {
     fi
   fi
 
-  if ! hashchant "$target" >/dev/null 2>&1; then
-    printf '%s\n' "priorities-backend: hashchant failed: $target" >&2
-    return 1
-  fi
+  prepare_target_for_attrs "$target" || return 1
 
   directory=$(dirname "$target")
   if [ "$directory" = "." ]; then
