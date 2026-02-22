@@ -1467,11 +1467,11 @@ input[type="checkbox"]:disabled {
 .route {
   display: none;
   gap: 0.72rem;
-  max-width: 980px;
+  max-width: none;
   min-height: 0;
   height: 100%;
   overflow: auto;
-  padding-right: 0.72rem;
+  padding-right: 0;
   align-content: start;
   width: 100%;
   -webkit-app-region: no-drag;
