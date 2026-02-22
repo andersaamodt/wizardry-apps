@@ -387,6 +387,7 @@ body {
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.01em;
+  text-align: center;
 }
 
 .admin-nav-item {
