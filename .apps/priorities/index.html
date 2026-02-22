@@ -2597,23 +2597,35 @@
       if (!name || state.pendingAdd || state.busy) {
         return;
       }
+      var targetDir = String(state.root || '.').trim() || '.';
       var shouldRefocusAddInput = false;
       state.pendingAdd = true;
-      render({ suppressLoadingOverlay: true });
-      runAction(function () {
-        return runMutationWithListFallback(
-          state.root,
-          ['add-fast', state.root, name],
-          ['add', state.root, name]
-        );
-      }, {
-        suppressLoadingOverlay: true
-      }).then(function () {
-        state.pendingAddText = '';
-        shouldRefocusAddInput = true;
-      }).finally(function () {
+      state.busy = true;
+      (async function () {
+        try {
+          await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+          await runMutationWithListFallback(
+            targetDir,
+            ['add-fast', targetDir, name],
+            ['add', targetDir, name]
+          );
+          // Force a post-mutation refresh so add reflects immediately even if
+          // backend fast output format or aliases differ.
+          var refreshed = await listDir(targetDir);
+          setCachedDirItems(targetDir, refreshed);
+          state.pendingAddText = '';
+          shouldRefocusAddInput = true;
+        } catch (error) {
+          var detail = String(error && error.message ? error.message : error).trim();
+          status(detail ? ('Add priority failed. ' + detail) : 'Add priority failed.', true);
+        } finally {
+          state.pendingAdd = false;
+          state.busy = false;
+          processPrioritizeQueue();
+        }
+      })().finally(function () {
         state.pendingAdd = false;
-        render({ suppressLoadingOverlay: true }).then(function () {
+        render({ suppressLoadingOverlay: true, preserveInputSelection: true }).then(function () {
           if (shouldRefocusAddInput) {
             focusNewPriorityInput();
           }
