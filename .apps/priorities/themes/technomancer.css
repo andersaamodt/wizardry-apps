@@ -23,7 +23,7 @@
 
 .theme-picker-btn:hover,
 .theme-picker-btn:focus-visible {
-  border-color: var(--border);
-  background: var(--nav-link-hover);
-  color: color-mix(in srgb, var(--heading-color) 86%, #d9ffe8 14%);
+  border-color: color-mix(in srgb, var(--border) 82%, #ffffff 18%);
+  background: color-mix(in srgb, var(--light-bg) 68%, var(--accent-soft) 32%);
+  color: color-mix(in srgb, var(--heading-color) 78%, #e8fff3 22%);
 }
