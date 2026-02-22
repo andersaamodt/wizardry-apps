@@ -384,16 +384,12 @@
       }
       var top = document.querySelector('.topbar-main');
       var tree = document.getElementById('tree');
-      var statusEl = document.getElementById('status');
       var contentWidth = 0;
       if (top) {
         contentWidth = Math.max(contentWidth, Math.ceil(top.scrollWidth));
       }
       if (tree) {
         contentWidth = Math.max(contentWidth, Math.ceil(tree.scrollWidth));
-      }
-      if (statusEl) {
-        contentWidth = Math.max(contentWidth, Math.ceil(statusEl.scrollWidth));
       }
       if (contentWidth <= 0) {
         return 0;
@@ -731,10 +727,16 @@
       if (!state.backendScriptPath) {
         try {
           var pagePath = decodeURIComponent(String(window.location && window.location.pathname ? window.location.pathname : ''));
-          var marker = '/.apps/priorities/';
-          var idx = pagePath.lastIndexOf(marker);
-          if (idx > 0) {
-            state.backendScriptPath = pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh';
+          var appMarker = '/priorities/index.html';
+          var appIdx = pagePath.lastIndexOf(appMarker);
+          if (appIdx > 0) {
+            state.backendScriptPath = pagePath.slice(0, appIdx) + '/priorities/scripts/priorities-backend.sh';
+          } else {
+            var marker = '/.apps/priorities/';
+            var idx = pagePath.lastIndexOf(marker);
+            if (idx > 0) {
+              state.backendScriptPath = pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh';
+            }
           }
         } catch (_) {
           state.backendScriptPath = '';
