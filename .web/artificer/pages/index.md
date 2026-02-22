@@ -2,6 +2,7 @@
 title: ""
 pagetitle: "Artificer"
 ---
+<link rel="stylesheet" href="/static/style.css?v=20260222-sendmenu1" />
 <link id="artificer-theme-stylesheet" rel="stylesheet" href="/static/themes/psionic.css" />
 <div class="forge-shell" id="forge-shell">
 <aside class="workspace-sidebar" id="workspace-dropzone" tabindex="0">
@@ -19,6 +20,7 @@ pagetitle: "Artificer"
 <button type="button" data-organize-show="relevant"><span>Relevant</span><span class="check" aria-hidden="true">&check;</span></button>
 <button type="button" data-organize-show="running"><span>Running</span><span class="check" aria-hidden="true">&check;</span></button>
 </div>
+<div class="workspace-drag-strip" aria-hidden="true"></div>
 <div class="workspace-tree-section-head workspace-tree-main-head">
 <span>Threads</span>
 <div class="workspace-head-actions">
@@ -206,7 +208,13 @@ pagetitle: "Artificer"
 <button type="button" data-compute-budget="until-complete"><span class="menu-icon compute-clock-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.6"></circle><path d="M8 4.9v3.4l2.2 1.4"></path></svg></span><span>Until Complete</span><span class="check" aria-hidden="true">&check;</span></button>
 </div>
 </div>
-<button id="run-btn" class="run-fab" type="submit" aria-label="Run agent" title="Send message"><span aria-hidden="true">&uarr;</span></button>
+<div class="menu-anchor send-menu-anchor">
+<button id="run-btn" class="run-fab" type="submit" aria-label="Run agent" title="Send message" aria-haspopup="menu" aria-expanded="false" data-tooltip="Send message. Right-click for Queue/Stop options."><span aria-hidden="true">&uarr;</span></button>
+<div id="send-menu" class="floating-menu hidden send-menu" role="menu" aria-label="Send options">
+<button id="send-menu-queue-btn" type="button" data-action="send-menu-queue"><span>Queue</span><span class="shortcut">Enter</span></button>
+<button id="send-menu-stop-btn" type="button" data-action="send-menu-stop"><span>Stop</span><span class="shortcut">&#8984;&#8679;Enter</span></button>
+</div>
+</div>
 </div>
 <div class="session-row">
 <div class="menu-anchor">
@@ -312,7 +320,7 @@ pagetitle: "Artificer"
 <form id="workspace-form" class="stack">
 <label for="workspace-path">Folder path</label>
 <div class="browse-row">
-<input id="workspace-path" name="workspace-path" placeholder="/absolute/path/to/project" required readonly />
+<input id="workspace-path" name="workspace-path" placeholder="/absolute/path/to/project" required />
 <button id="workspace-browse-btn" type="button">Browse</button>
 </div>
 <input id="workspace-dir-picker" type="file" webkitdirectory directory hidden />
@@ -540,4 +548,4 @@ pagetitle: "Artificer"
 </div>
 </div>
 
-<script src="/static/artificer-app.js?v=20260220-queue-drag-reorder1"></script>
+<script src="/static/artificer-app.js?v=20260222-runorder3"></script>

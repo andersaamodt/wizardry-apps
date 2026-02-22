@@ -6,6 +6,7 @@ case "${1-}" in
 Usage: virtual-redditor-backend.sh ACTION [ARGS...]
 
 Actions:
+  list-themes
   init
   status
   start
@@ -19,9 +20,12 @@ Actions:
   apologize ACTION_ID [MESSAGE]
   set-setting KEY VALUE
   set-reddit-setting KEY VALUE
+  check-subreddit NAME
   list-profiles
   create-profile NAME
   select-profile PROFILE_ID
+  rename-profile PROFILE_ID NAME
+  delete-profile PROFILE_ID
   oauth-begin CLIENT_ID CLIENT_SECRET [SUBREDDIT] [USERNAME_HINT]
   oauth-status
   oauth-submit-callback CALLBACK_URL_OR_QUERY
@@ -42,6 +46,80 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 DAEMON_SCRIPT="$SCRIPT_DIR/virtual-redditor-daemon.sh"
+
+is_workspace_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  [ -f "$root/config/apps.manifest.json" ] || return 1
+  [ -d "$root/.apps" ] || return 1
+  [ -d "$root/.web" ] || return 1
+}
+
+find_root_from() {
+  start=${1-}
+  [ -n "$start" ] || return 1
+  dir=$start
+  while :; do
+    if is_workspace_root "$dir"; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    [ "$dir" = "/" ] && break
+    dir=$(dirname "$dir")
+  done
+  return 1
+}
+
+resolve_wizardry_root() {
+  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && is_workspace_root "$WIZARDRY_APPS_ROOT"; then
+    printf '%s\n' "$WIZARDRY_APPS_ROOT"
+    return 0
+  fi
+
+  if root=$(find_root_from "$SCRIPT_DIR" 2>/dev/null); then
+    printf '%s\n' "$root"
+    return 0
+  fi
+
+  if pwd_now=$(pwd -P 2>/dev/null); then
+    if root=$(find_root_from "$pwd_now" 2>/dev/null); then
+      printf '%s\n' "$root"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+theme_names_from_dir() {
+  dir=${1-}
+  [ -d "$dir" ] || return 0
+  find "$dir" -maxdepth 1 -type f -name '*.css' 2>/dev/null \
+    | awk -F/ '{ print $NF }' \
+    | sed 's/\.css$//' \
+    | awk '/^[a-z0-9_-]+$/' \
+    | sort -u
+}
+
+emit_theme_names() {
+  app_theme_dir="$SCRIPT_DIR/../themes"
+  theme_root=''
+  root=$(resolve_wizardry_root 2>/dev/null || true)
+  if [ -n "$root" ] && [ -d "$root/.web/.themes" ]; then
+    theme_root="$root/.web/.themes"
+    mkdir -p "$app_theme_dir"
+    cp -f "$theme_root"/*.css "$app_theme_dir/" 2>/dev/null || true
+  fi
+
+  themes=$(theme_names_from_dir "$theme_root" || true)
+  if [ -z "$themes" ]; then
+    themes=$(theme_names_from_dir "$app_theme_dir" || true)
+  fi
+
+  if [ -n "$themes" ]; then
+    printf '%s\n' "$themes"
+  fi
+}
 
 if [ ! -x "$DAEMON_SCRIPT" ]; then
   jq -cn --arg err "backend missing daemon script at $DAEMON_SCRIPT" '{ok:false,error:$err}'
@@ -184,23 +262,68 @@ profile_connected_from_env() {
   client_id=$(read_env_var "$env_file" REDDIT_CLIENT_ID)
   refresh_token=$(read_env_var "$env_file" REDDIT_REFRESH_TOKEN)
   username=$(read_env_var "$env_file" REDDIT_USERNAME)
-  subreddit=$(read_env_var "$env_file" SUBREDDIT)
-  if [ -n "$client_id" ] && [ -n "$refresh_token" ] && [ -n "$username" ] && [ -n "$subreddit" ]; then
+  if [ -n "$client_id" ] && [ -n "$refresh_token" ] && [ -n "$username" ]; then
     printf '%s' "true"
   else
     printf '%s' "false"
   fi
 }
 
+normalize_name_for_compare() {
+  printf '%s' "${1-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]'
+}
+
+normalize_username_for_compare() {
+  printf '%s' "${1-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed 's#^/*u/##I' | tr '[:upper:]' '[:lower:]'
+}
+
+profile_name_conflicts() {
+  wanted=$(normalize_name_for_compare "${1-}")
+  except_id=${2-}
+  [ -z "$wanted" ] && return 1
+  [ "$MULTI_PROFILE" -eq 1 ] || return 1
+  ensure_multi_profile_root
+  for dir in "$PROFILES_DIR"/*; do
+    [ -d "$dir" ] || continue
+    id=$(basename "$dir")
+    [ -n "$except_id" ] && [ "$id" = "$except_id" ] && continue
+    existing=$(profile_name_from_fs "$id")
+    existing_norm=$(normalize_name_for_compare "$existing")
+    if [ -n "$existing_norm" ] && [ "$existing_norm" = "$wanted" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+profile_username_conflicts() {
+  wanted=$(normalize_username_for_compare "${1-}")
+  except_id=${2-}
+  [ -z "$wanted" ] && return 1
+  [ "$MULTI_PROFILE" -eq 1 ] || return 1
+  ensure_multi_profile_root
+  for dir in "$PROFILES_DIR"/*; do
+    [ -d "$dir" ] || continue
+    id=$(basename "$dir")
+    [ -n "$except_id" ] && [ "$id" = "$except_id" ] && continue
+    existing=$(profile_username_from_env "$id")
+    existing_norm=$(normalize_username_for_compare "$existing")
+    if [ -n "$existing_norm" ] && [ "$existing_norm" = "$wanted" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 list_profiles_json() {
   if [ "$MULTI_PROFILE" -eq 0 ]; then
     reddit_env="$CURRENT_STATE_DIR/reddit.env"
     username=$(read_env_var "$reddit_env" REDDIT_USERNAME)
-    subreddit=$(read_env_var "$reddit_env" SUBREDDIT)
     client_id=$(read_env_var "$reddit_env" REDDIT_CLIENT_ID)
     refresh_token=$(read_env_var "$reddit_env" REDDIT_REFRESH_TOKEN)
+    subreddit=$(read_env_var "$reddit_env" SUBREDDIT)
     connected=false
-    if [ -n "$client_id" ] && [ -n "$refresh_token" ] && [ -n "$username" ] && [ -n "$subreddit" ]; then
+    if [ -n "$client_id" ] && [ -n "$refresh_token" ] && [ -n "$username" ]; then
       connected=true
     fi
     jq -cn \
@@ -253,6 +376,11 @@ create_profile_json() {
   name=$(printf '%s' "$name" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
   [ -z "$name" ] && name="Virtual Redditor"
 
+  if profile_name_conflicts "$name" ""; then
+    jq -cn --arg err "local name already exists: $name" '{ok:false,error:$err}'
+    return 1
+  fi
+
   ensure_multi_profile_root
 
   base=$(slugify_profile_id "$name")
@@ -265,6 +393,20 @@ create_profile_json() {
 
   ensure_profile_runtime "$id"
   printf '%s\n' "$name" > "$(profile_name_file "$id")"
+  : > "$(profile_dir "$id")/manifesto.md"
+  : > "$(profile_dir "$id")/norms.jsonl"
+
+  # Drop placeholder default profile once a real profile is created.
+  if [ "$id" != "default" ]; then
+    default_dir=$(profile_dir default)
+    if [ -d "$default_dir" ]; then
+      default_user=$(read_env_var "$default_dir/reddit.env" REDDIT_USERNAME)
+      default_sub=$(read_env_var "$default_dir/reddit.env" SUBREDDIT)
+      if [ -z "$default_user" ] && [ -z "$default_sub" ]; then
+        rm -rf "$default_dir"
+      fi
+    fi
+  fi
 
   printf '%s\n' "$id" > "$ACTIVE_PROFILE_FILE"
   ACTIVE_PROFILE_ID=$id
@@ -295,6 +437,67 @@ select_profile_json() {
   run_daemon bootstrap >/dev/null 2>&1 || true
 
   jq -cn --arg active "$ACTIVE_PROFILE_ID" '{ok:true,activeProfile:$active}'
+}
+
+rename_profile_json() {
+  profile_id=${1-}
+  new_name=${2-}
+  if [ "$MULTI_PROFILE" -eq 0 ]; then
+    jq -cn '{ok:false,error:"rename-profile unavailable when VR_STATE_DIR is explicitly set"}'
+    return 1
+  fi
+  profile_id=$(slugify_profile_id "$profile_id")
+  dir=$(profile_dir "$profile_id")
+  if [ ! -d "$dir" ]; then
+    jq -cn --arg err "unknown profile: $profile_id" '{ok:false,error:$err}'
+    return 1
+  fi
+  new_name=$(printf '%s' "$new_name" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  [ -z "$new_name" ] && new_name="$profile_id"
+  if profile_name_conflicts "$new_name" "$profile_id"; then
+    jq -cn --arg err "local name already exists: $new_name" '{ok:false,error:$err}'
+    return 1
+  fi
+  printf '%s\n' "$new_name" > "$(profile_name_file "$profile_id")"
+  jq -cn --arg id "$profile_id" --arg name "$new_name" '{ok:true,profile:{id:$id,name:$name}}'
+}
+
+delete_profile_json() {
+  profile_id=${1-}
+  if [ "$MULTI_PROFILE" -eq 0 ]; then
+    jq -cn '{ok:false,error:"delete-profile unavailable when VR_STATE_DIR is explicitly set"}'
+    return 1
+  fi
+  profile_id=$(slugify_profile_id "$profile_id")
+  dir=$(profile_dir "$profile_id")
+  if [ ! -d "$dir" ]; then
+    jq -cn --arg err "unknown profile: $profile_id" '{ok:false,error:$err}'
+    return 1
+  fi
+
+  rm -rf "$dir"
+
+  next_active=''
+  for d in "$PROFILES_DIR"/*; do
+    [ -d "$d" ] || continue
+    next_active=$(basename "$d")
+    break
+  done
+  if [ -n "$next_active" ]; then
+    printf '%s\n' "$next_active" > "$ACTIVE_PROFILE_FILE"
+    ACTIVE_PROFILE_ID=$next_active
+    CURRENT_STATE_DIR=$(profile_dir "$next_active")
+    refresh_paths
+    run_daemon bootstrap >/dev/null 2>&1 || true
+  else
+    printf '%s\n' default > "$ACTIVE_PROFILE_FILE"
+    ensure_profile_runtime default
+    ACTIVE_PROFILE_ID=default
+    CURRENT_STATE_DIR=$(profile_dir default)
+    refresh_paths
+  fi
+
+  jq -cn --arg deleted "$profile_id" --arg active "$ACTIVE_PROFILE_ID" '{ok:true,deletedProfile:$deleted,activeProfile:$active}'
 }
 
 merge_status() {
@@ -756,6 +959,11 @@ oauth_finish_json() {
   [ -z "$reddit_username" ] && reddit_username=$(read_env_var "$REDDIT_ENV_FILE" REDDIT_USERNAME)
   [ -z "$user_agent" ] && user_agent=$(oauth_default_user_agent "$reddit_username")
 
+  if [ -n "$reddit_username" ] && profile_username_conflicts "$reddit_username" "$ACTIVE_PROFILE_ID"; then
+    jq -cn --arg err "reddit username already belongs to another virtual redditor: $reddit_username" '{ok:false,error:$err}'
+    return 1
+  fi
+
   oauth_env_upsert "$REDDIT_ENV_FILE" REDDIT_CLIENT_ID "$client_id"
   oauth_env_upsert "$REDDIT_ENV_FILE" REDDIT_CLIENT_SECRET "$client_secret"
   oauth_env_upsert "$REDDIT_ENV_FILE" REDDIT_REFRESH_TOKEN "$refresh_token"
@@ -780,6 +988,63 @@ oauth_cancel_json() {
   jq -cn '{ok:true,status:"cancelled"}'
 }
 
+format_epoch_month_year() {
+  epoch_raw=${1-0}
+  epoch_int=$(printf '%s' "$epoch_raw" | awk '{printf "%d", $1+0}')
+  if [ "$epoch_int" -le 0 ]; then
+    printf '%s' ''
+    return 0
+  fi
+  if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
+    date -r "$epoch_int" '+%b %Y' 2>/dev/null || printf '%s' ''
+    return 0
+  fi
+  date -d "@$epoch_int" '+%b %Y' 2>/dev/null || printf '%s' ''
+}
+
+check_subreddit_json() {
+  raw_name=${1-}
+  name=$(printf '%s' "$raw_name" | sed 's#^[[:space:]]*##; s#[[:space:]]*$##')
+  name=$(printf '%s' "$name" | sed -E 's#^https?://(www\.)?reddit\.com/##I; s#^/+##; s#^/?r/##I; s#/*$##')
+  if [ -z "$name" ]; then
+    jq -cn '{ok:true,exists:false,error:"Subreddit is required."}'
+    return 0
+  fi
+
+  url="https://www.reddit.com/r/$name/about.json"
+  body=$(curl -sS -A "virtual-redditor/0.1 subreddit-check" "$url" 2>/dev/null || printf '')
+  if [ -z "$body" ]; then
+    jq -cn --arg name "$name" '{ok:true,subreddit:$name,exists:false,error:"Could not verify subreddit right now."}'
+    return 0
+  fi
+
+  created_utc=$(printf '%s' "$body" | jq -r '.data.created_utc // empty' 2>/dev/null || printf '')
+  if [ -n "$created_utc" ]; then
+    display=$(printf '%s' "$body" | jq -r '.data.display_name // empty' 2>/dev/null || printf '')
+    [ -z "$display" ] && display=$name
+    month_year=$(format_epoch_month_year "$created_utc")
+    if [ -n "$month_year" ]; then
+      since="Community since $month_year"
+    else
+      since="Community found"
+    fi
+    jq -cn \
+      --arg name "$display" \
+      --argjson createdUtc "$(printf '%s' "$created_utc" | awk '{printf "%d", $1+0}')" \
+      --arg since "$since" \
+      '{ok:true,exists:true,subreddit:$name,createdUtc:$createdUtc,since:$since}'
+    return 0
+  fi
+
+  err_code=$(printf '%s' "$body" | jq -r '.error // empty' 2>/dev/null || printf '')
+  if [ "$err_code" = "404" ]; then
+    jq -cn --arg name "$name" '{ok:true,subreddit:$name,exists:false,error:"Subreddit not found."}'
+    return 0
+  fi
+
+  jq -cn --arg name "$name" '{ok:true,subreddit:$name,exists:false,error:"Could not verify subreddit right now."}'
+}
+
 main() {
   action=${1-}
   if [ -z "$action" ]; then
@@ -792,6 +1057,10 @@ main() {
   refresh_paths
 
   case "$action" in
+    list-themes)
+      emit_theme_names
+      ;;
+
     init)
       run_daemon bootstrap
       ;;
@@ -869,7 +1138,15 @@ main() {
         jq -cn '{ok:false,error:"set-reddit-setting requires KEY VALUE"}'
         exit 2
       fi
+      if [ "$key" = "REDDIT_USERNAME" ] && profile_username_conflicts "$value" "$ACTIVE_PROFILE_ID"; then
+        jq -cn --arg err "reddit username already belongs to another virtual redditor: $value" '{ok:false,error:$err}'
+        exit 1
+      fi
       run_daemon set-reddit-setting "$key" "$value"
+      ;;
+
+    check-subreddit)
+      check_subreddit_json "${1-}"
       ;;
 
     list-profiles)
@@ -887,6 +1164,25 @@ main() {
         exit 2
       fi
       select_profile_json "$profile_id"
+      ;;
+
+    rename-profile)
+      profile_id=${1-}
+      profile_name=${2-}
+      if [ -z "$profile_id" ] || [ -z "$profile_name" ]; then
+        jq -cn '{ok:false,error:"rename-profile requires PROFILE_ID NAME"}'
+        exit 2
+      fi
+      rename_profile_json "$profile_id" "$profile_name"
+      ;;
+
+    delete-profile)
+      profile_id=${1-}
+      if [ -z "$profile_id" ]; then
+        jq -cn '{ok:false,error:"delete-profile requires PROFILE_ID"}'
+        exit 2
+      fi
+      delete_profile_json "$profile_id"
       ;;
 
     oauth-begin)

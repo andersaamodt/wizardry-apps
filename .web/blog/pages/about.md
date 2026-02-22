@@ -2,8 +2,6 @@
 title: About
 ---
 
-# About
-
 ## About This Blog
 
 Welcome to my personal blog. This is a place where I share my thoughts, ideas, and experiences.

@@ -1,0 +1,34 @@
+#!/bin/sh
+# Get blog configuration.
+
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+. "$SCRIPT_DIR/blog-lib.sh"
+
+blog_init
+blog_send_json_headers
+
+registration_enabled=$(config-get "$blog_site_conf" registration_enabled 2>/dev/null || printf 'true')
+site_title=$(config-get "$blog_site_conf" site_title 2>/dev/null || printf 'My Blog')
+theme=$(config-get "$blog_site_conf" theme 2>/dev/null || printf 'archmage')
+drip_interval_hours=$(blog_drip_interval_hours)
+drip_interval_minutes=$(blog_drip_interval_minutes)
+drip_jitter=$(blog_drip_jitter_minutes)
+feed_full_text=$(config-get "$blog_site_conf" feed_full_text 2>/dev/null || printf 'true')
+feed_items=$(config-get "$blog_site_conf" feed_items 2>/dev/null || printf '50')
+
+case "$registration_enabled" in true|false) ;; *) registration_enabled=true ;; esac
+case "$feed_full_text" in true|false) ;; *) feed_full_text=true ;; esac
+case "$feed_items" in ''|*[!0-9]*) feed_items=50 ;; esac
+
+printf '{"success":true,'
+printf '"registration_enabled":%s,' "$registration_enabled"
+printf '"site_title":"%s",' "$(blog_json_escape "$site_title")"
+printf '"theme":"%s",' "$(blog_json_escape "$theme")"
+printf '"drip_interval_hours":%s,' "$drip_interval_hours"
+printf '"drip_interval_minutes":%s,' "$drip_interval_minutes"
+printf '"drip_jitter_minutes":%s,' "$drip_jitter"
+printf '"feed_full_text":%s,' "$feed_full_text"
+printf '"feed_items":%s' "$feed_items"
+printf '}\n'

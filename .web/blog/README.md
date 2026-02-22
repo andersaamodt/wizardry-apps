@@ -4,13 +4,17 @@ A single-author blog template for wizardry web, architected for future multi-aut
 
 ## Features
 
-- **Content-addressable posts**: Each post identified by content hash
-- **Version lineage**: Edits create new versions linked to prior versions
-- **Tag-based navigation**: Tags function as categories
-- **Chronological index**: Blog homepage with reverse-ordered post listing
-- **Lifecycle states**: Draft, published, replaced, deleted
-- **UNIX permissions**: Visibility enforced via filesystem permissions
-- **Nostr-ready**: Architecture aligned for future Nostr integration (Phase 2)
+- **Full admin panel**: Compose, edit, delete, schedule, drip-queue, and publish
+- **Smart Markdown editing**: Selection-aware toolbar + live preview
+- **Autosave drafts**: Debounced autosave with draft persistence
+- **Global drip queue**: Publish one queued post per global interval (optional jitter)
+- **Scheduled release**: Per-draft exact release datetime
+- **Media workflow**: Drag/drop image upload + markdown embed insertion
+- **Content-addressed posts**: SHA-256 hash per published post
+- **Public discovery**: Index, tags, search, RSS, Atom, sitemap
+- **Archive index**: Month-grouped archive view with per-month counts
+- **Post context UX**: Read-time card, tags, and automatic older/newer links
+- **Passkey auth**: SSH identity + WebAuthn passkeys (challenge/response)
 
 ## Post Model
 
@@ -77,6 +81,7 @@ blog/
 ## Navigation
 
 - **Homepage**: Chronological reverse-ordered post listing with pagination (10 posts per page)
+- **Archive page**: All posts grouped by month
 - **Tag index**: Global tag list with post counts
 - **Tag pages**: Posts filtered by tag
 - **Search**: Full-text search across titles, tags, summaries, and content
@@ -196,11 +201,15 @@ This prevents new users from registering while keeping your access.
 
 ### Admin Capabilities
 
-- **Compose Posts**: Markdown editor with live preview
-- **Publish**: Make posts public instantly
-- **Save Drafts**: Work on posts before publishing
-- **Manage Settings**: Site title, registration toggle
-- **View Drafts**: See all unpublished posts
+- **Compose & Edit**: Smart markdown toolbar + live preview
+- **Autosave**: Draft autosaving while typing
+- **Queue Scheduling**: Exact publish datetime or drip queue mode
+- **Publish Control**: Publish now, scheduled, or drip
+- **Draft CRUD**: Create/load/delete drafts from GUI
+- **Media Uploads**: Drag/drop images to upload + insert markdown embeds
+- **Global Queue Settings**: Drip interval + optional random jitter
+- **Feed Settings**: Full-text feeds toggle + feed item count
+- **Manage Settings**: Site title, registration toggle, themes
 
 ### Authentication Flow
 
@@ -227,8 +236,10 @@ Access admin panel (if in blog-admin group)
 - `ssh-auth-register-mud` - Register using MUD player account
 - `ssh-auth-register` - Manual SSH key registration (demo/testing)
 - `ssh-auth-bind-webauthn` - Bind WebAuthn credential to SSH fingerprint
-- `ssh-auth-login` - Authenticate using WebAuthn credential
+- `ssh-auth-login-begin` - Start passkey login challenge
+- `ssh-auth-login-finish` - Verify signed assertion and create session
 - `ssh-auth-check-session` - Validate session and permissions
+- `ssh-auth-logout` - Destroy current session
 - `ssh-auth-list-delegates` - List all WebAuthn delegates
 - `ssh-auth-revoke-delegate` - Revoke a WebAuthn delegate
 
@@ -236,7 +247,14 @@ Access admin panel (if in blog-admin group)
 - `blog-get-config` - Get site configuration
 - `blog-update-config` - Update site settings
 - `blog-list-drafts` - List draft posts
-- `blog-save-post` - Save or publish posts
+- `blog-get-draft` - Load draft content for editing
+- `blog-save-post` - Save/autosave/queue/publish posts
+- `blog-delete-draft` - Delete draft
+- `blog-list-queue` - List scheduled + drip queue
+- `blog-run-scheduler` - Trigger scheduler tick
+- `blog-upload-media` - Upload images for markdown embedding
+- `blog-archive` - Render month-grouped archive listing
+- `blog-post-context` - Return post metadata + older/newer navigation context
 
 ### Data Storage
 

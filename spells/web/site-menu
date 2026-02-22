@@ -305,7 +305,7 @@ while true; do
   # Always: Manage allowed dirs
   dirs_cmd_wrapped=$(wrap_cmd "Manage allowed dirs" \
     "manage-allowed-dirs \"$site_name\"")
-  
+
   # Always: Delete site
   delete_cmd_wrapped=$(wrap_cmd "Delete site" "delete-site \"$site_name\"")
   

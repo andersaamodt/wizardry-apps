@@ -174,6 +174,10 @@
       failures: clipTextForStorage(event.failures || "", 7000),
       session_log: clipTextForStorage(event.session_log || "", 7000)
     };
+    var anchorRaw = Number(event.message_anchor);
+    if (isFinite(anchorRaw) && anchorRaw >= 0) {
+      cleaned.message_anchor = Math.floor(anchorRaw);
+    }
     var taskStatus = normalizeRunTaskStatusSnapshot(event.task_status);
     if (taskStatus && taskStatus.total > 0) {
       cleaned.task_status = taskStatus;
@@ -386,6 +390,9 @@
     activeWorkspaceId: "",
     activeConversationId: "",
     activeConversation: null,
+    activeConversationLoading: false,
+    activeConversationLoadingKey: "",
+    activeConversationSelectedAt: 0,
     activeDraftWorkspaceId: "",
     draftTextByWorkspace: {},
     draftModelByWorkspace: {},
@@ -459,6 +466,7 @@
     pendingAttachments: [],
     composerDragDepth: 0,
     awaitingDirPicker: false,
+    modelDataLoading: true,
     modelLoadError: "",
     appIcons: {
       finder: "",
@@ -558,6 +566,8 @@
   var pendingCommandApproval = null;
   var approvalAnswerPending = false;
   var TOOLTIP_DELAY_MS = 520;
+  var stateGetInFlight = null;
+  var stateGetInFlightKey = "";
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -711,6 +721,9 @@
     queueControls: document.getElementById("queue-controls"),
     queueSteerBtn: document.getElementById("queue-steer-btn"),
     queueCancelBtn: document.getElementById("queue-cancel-btn"),
+    sendMenu: document.getElementById("send-menu"),
+    sendMenuQueueBtn: document.getElementById("send-menu-queue-btn"),
+    sendMenuStopBtn: document.getElementById("send-menu-stop-btn"),
     runBtn: document.getElementById("run-btn"),
 
     diffPanel: document.getElementById("diff-panel"),
@@ -869,6 +882,7 @@
     "run-mode-menu": el.runModeMenu,
     "reasoning-menu": el.reasoningMenu,
     "compute-menu": el.computeMenu,
+    "send-menu": el.sendMenu,
     "context-window-menu": el.contextWindowMenu,
     "models-pane": el.modelsPane
   };
@@ -1608,18 +1622,41 @@
 
   function apiGet(action, params, options) {
     var search = new URLSearchParams(params || {});
+    var stateRequestKey = "";
+    if (action === "state") {
+      var requestedLevel = trim(String(search.get("level") || ""));
+      if (!requestedLevel) {
+        requestedLevel = "light";
+        search.set("level", requestedLevel);
+      }
+      stateRequestKey = "state:" + requestedLevel;
+      if (stateGetInFlight && stateGetInFlightKey === stateRequestKey) {
+        return stateGetInFlight;
+      }
+    }
     search.set("action", action);
     search.set("_ts", String(Date.now()) + "-" + String(Math.floor(Math.random() * 1000000)));
     var timeoutMs = 30000;
     if (options && Number(options.timeoutMs) > 0) {
       timeoutMs = Number(options.timeoutMs);
     }
-    return requestJson("/cgi/artificer-api?" + search.toString(), {
+    var requestPromise = requestJson("/cgi/artificer-api?" + search.toString(), {
       method: "GET",
       headers: { Accept: "application/json" },
       cacheMode: "no-store",
       timeoutMs: timeoutMs
     });
+    if (action === "state") {
+      stateGetInFlightKey = stateRequestKey;
+      stateGetInFlight = requestPromise.finally(function () {
+        if (stateGetInFlightKey === stateRequestKey) {
+          stateGetInFlight = null;
+          stateGetInFlightKey = "";
+        }
+      });
+      return stateGetInFlight;
+    }
+    return requestPromise;
   }
 
   function apiPost(action, data, options) {
@@ -1785,6 +1822,24 @@
     return String(workspaceId || "") + "::" + String(conversationId || "");
   }
 
+  function setActiveConversationLoading(workspaceId, conversationId, loading) {
+    var key = conversationReadKey(workspaceId, conversationId);
+    if (!key) {
+      state.activeConversationLoading = false;
+      state.activeConversationLoadingKey = "";
+      return;
+    }
+    if (loading) {
+      state.activeConversationLoading = true;
+      state.activeConversationLoadingKey = key;
+      return;
+    }
+    if (state.activeConversationLoadingKey === key) {
+      state.activeConversationLoading = false;
+      state.activeConversationLoadingKey = "";
+    }
+  }
+
   function cloneConversationData(conversation) {
     if (!conversation || typeof conversation !== "object") {
       return null;
@@ -1826,6 +1881,135 @@
       return;
     }
     cacheConversationSnapshot(wsId, convId, state.activeConversation);
+  }
+
+  function conversationMessagesSnapshot(workspaceId, conversationId) {
+    var wsId = String(workspaceId || "");
+    var convId = String(conversationId || "");
+    if (!wsId || !convId) {
+      return [];
+    }
+    if (
+      state.activeConversation &&
+      String(state.activeWorkspaceId || "") === wsId &&
+      String(state.activeConversationId || "") === convId &&
+      Array.isArray(state.activeConversation.messages)
+    ) {
+      return state.activeConversation.messages;
+    }
+    var cacheKey = conversationReadKey(wsId, convId);
+    var cached = state.conversationCacheByKey[cacheKey];
+    if (cached && Array.isArray(cached.messages)) {
+      return cached.messages;
+    }
+    return [];
+  }
+
+  function conversationMessageCount(workspaceId, conversationId) {
+    var messages = conversationMessagesSnapshot(workspaceId, conversationId);
+    if (!Array.isArray(messages)) {
+      return 0;
+    }
+    return messages.length;
+  }
+
+  function runEventPromptHint(event) {
+    var sessionLog = String((event && event.session_log) || "");
+    if (sessionLog) {
+      var sessionMatch = sessionLog.match(/User request:\s*([\s\S]*?)(?:\n\nModel raw output:|$)/i);
+      if (sessionMatch && sessionMatch[1]) {
+        var sessionPrompt = trim(sessionMatch[1]);
+        if (sessionPrompt) {
+          return sessionPrompt;
+        }
+      }
+    }
+    var planText = String((event && event.plan) || "");
+    if (planText) {
+      var planMatch = planText.match(/Goal:\s*-\s*([^\n\r]+)/i);
+      if (planMatch && planMatch[1]) {
+        var planPrompt = trim(planMatch[1]);
+        if (planPrompt) {
+          return planPrompt;
+        }
+      }
+    }
+    return "";
+  }
+
+  function messageContentMatchesPrompt(contentText, promptText) {
+    var content = trim(String(contentText || ""));
+    var prompt = trim(String(promptText || ""));
+    if (!content || !prompt) {
+      return false;
+    }
+    if (content === prompt) {
+      return true;
+    }
+    if (content.indexOf(prompt + "\n\nAttached files:") === 0) {
+      return true;
+    }
+    return prompt.length >= 48 && content.indexOf(prompt) >= 0;
+  }
+
+  function inferMessageAnchorForPrompt(messages, promptText) {
+    var prompt = trim(String(promptText || ""));
+    var items = Array.isArray(messages) ? messages : [];
+    if (!prompt || !items.length) {
+      return -1;
+    }
+    for (var i = items.length - 1; i >= 0; i -= 1) {
+      var msg = items[i] || {};
+      if (String(msg.role || "") !== "user") {
+        continue;
+      }
+      if (messageContentMatchesPrompt(msg.content || "", prompt)) {
+        return i + 1;
+      }
+    }
+    return -1;
+  }
+
+  function backfillRunEventAnchorsFromMessages(conversationId, messages) {
+    var convId = String(conversationId || "");
+    var items = Array.isArray(messages) ? messages : [];
+    if (!convId || !items.length) {
+      return;
+    }
+    var events = state.runEventsByConversation[convId];
+    if (!Array.isArray(events) || !events.length) {
+      return;
+    }
+    var changed = false;
+    for (var i = 0; i < events.length; i += 1) {
+      var event = events[i] || {};
+      var promptHint = runEventPromptHint(event);
+      if (!promptHint) {
+        continue;
+      }
+      var currentAnchor = Number(event.message_anchor);
+      var currentMatches = false;
+      if (isFinite(currentAnchor) && currentAnchor >= 1) {
+        var currentIndex = Math.floor(currentAnchor) - 1;
+        if (currentIndex >= 0 && currentIndex < items.length) {
+          var currentMsg = items[currentIndex] || {};
+          if (String(currentMsg.role || "") === "user" && messageContentMatchesPrompt(currentMsg.content || "", promptHint)) {
+            currentMatches = true;
+          }
+        }
+      }
+      if (currentMatches) {
+        continue;
+      }
+      var inferredAnchor = inferMessageAnchorForPrompt(items, promptHint);
+      if (inferredAnchor >= 0 && (!isFinite(currentAnchor) || currentAnchor < 0 || Math.floor(currentAnchor) !== inferredAnchor)) {
+        event.message_anchor = inferredAnchor;
+        changed = true;
+      }
+    }
+    if (changed) {
+      persistRunEventsSoon();
+    }
   }
 
   function normalizeDecisionRequest(request) {
@@ -2696,6 +2880,12 @@
     return text || "Thread";
   }
 
+  function threadFolderPathTooltip(workspaceId) {
+    var workspace = getWorkspaceById(workspaceId);
+    var path = trim(workspace && workspace.path ? workspace.path : "");
+    return path;
+  }
+
   function archiveControlMarkup(workspaceId, conversationId) {
     var key = conversationReadKey(workspaceId, conversationId);
     var isArmed = key === state.pendingArchiveKey;
@@ -2868,6 +3058,9 @@
     }
     if (el.computeMenuBtn) {
       el.computeMenuBtn.setAttribute("aria-expanded", "false");
+    }
+    if (el.runBtn) {
+      el.runBtn.setAttribute("aria-expanded", "false");
     }
     if (el.organizeBtn) {
       el.organizeBtn.setAttribute("aria-expanded", "false");
@@ -3209,10 +3402,104 @@
         normalized.push(event);
       }
     }
+    normalized.sort(compareRunEventsChronological);
     if (normalized.length > 22) {
       normalized = normalized.slice(normalized.length - 22);
     }
     return normalized;
+  }
+
+  function runEventTimestampValue(event) {
+    var started = Date.parse(event && event.started_at || "");
+    if (isFinite(started) && started > 0) {
+      return started;
+    }
+    var finished = Date.parse(event && event.finished_at || "");
+    if (isFinite(finished) && finished > 0) {
+      return finished;
+    }
+    var idPrefix = Number(String((event && event.id) || "").split("-")[0]);
+    if (isFinite(idPrefix) && idPrefix > 0) {
+      return idPrefix;
+    }
+    return 0;
+  }
+
+  function compareRunEventsChronological(a, b) {
+    var at = runEventTimestampValue(a);
+    var bt = runEventTimestampValue(b);
+    if (at !== bt) {
+      return at - bt;
+    }
+    var aStatus = String((a && a.status) || "");
+    var bStatus = String((b && b.status) || "");
+    if (aStatus === "running" && bStatus !== "running") {
+      return 1;
+    }
+    if (bStatus === "running" && aStatus !== "running") {
+      return -1;
+    }
+    return String((a && a.id) || "").localeCompare(String((b && b.id) || ""));
+  }
+
+  function mergeRunEventMissingFields(primaryEvent, fallbackEvent) {
+    var primary = sanitizeRunEventForStorage(primaryEvent);
+    if (!primary) {
+      return sanitizeRunEventForStorage(fallbackEvent);
+    }
+    var fallback = sanitizeRunEventForStorage(fallbackEvent);
+    if (!fallback) {
+      return primary;
+    }
+    var merged = primary;
+    var primaryAnchor = Number(merged.message_anchor);
+    var fallbackAnchor = Number(fallback.message_anchor);
+    if ((!isFinite(primaryAnchor) || primaryAnchor < 0) && isFinite(fallbackAnchor) && fallbackAnchor >= 0) {
+      merged.message_anchor = Math.floor(fallbackAnchor);
+    }
+    if (!merged.started_at && fallback.started_at) {
+      merged.started_at = fallback.started_at;
+    }
+    if (!merged.finished_at && fallback.finished_at) {
+      merged.finished_at = fallback.finished_at;
+    }
+    if (!trim(merged.model || "") && trim(fallback.model || "")) {
+      merged.model = fallback.model;
+    }
+    if (!trim(merged.decision_hint || "") && trim(fallback.decision_hint || "")) {
+      merged.decision_hint = fallback.decision_hint;
+    }
+    if (!trim(merged.stream_text || "") && trim(fallback.stream_text || "")) {
+      merged.stream_text = fallback.stream_text;
+    }
+    if (!merged.task_status && fallback.task_status) {
+      merged.task_status = fallback.task_status;
+    }
+    if ((!Array.isArray(merged.commands) || !merged.commands.length) && Array.isArray(fallback.commands) && fallback.commands.length) {
+      merged.commands = fallback.commands.slice(0, 12);
+    }
+    if (!trim(merged.error || "") && trim(fallback.error || "")) {
+      merged.error = fallback.error;
+    }
+    if (!trim(merged.plan || "") && trim(fallback.plan || "")) {
+      merged.plan = fallback.plan;
+    }
+    if (!trim(merged.git_status || "") && trim(fallback.git_status || "")) {
+      merged.git_status = fallback.git_status;
+    }
+    if (!trim(merged.git_diff || "") && trim(fallback.git_diff || "")) {
+      merged.git_diff = fallback.git_diff;
+    }
+    if (!trim(merged.state || "") && trim(fallback.state || "")) {
+      merged.state = fallback.state;
+    }
+    if (!trim(merged.failures || "") && trim(fallback.failures || "")) {
+      merged.failures = fallback.failures;
+    }
+    if (!trim(merged.session_log || "") && trim(fallback.session_log || "")) {
+      merged.session_log = fallback.session_log;
+    }
+    return merged;
   }
 
   function mergeConversationRunEvents(conversationId, remoteEvents) {
@@ -3233,35 +3520,39 @@
     }
     var localList = normalizedRunEventsList(state.runEventsByConversation[convId]);
     var merged = [];
-    var seen = {};
+    var mergedById = {};
 
-    function pushEvent(event) {
-      if (!event) {
+    function pushEvent(event, allowNew) {
+      var sanitized = sanitizeRunEventForStorage(event);
+      if (!sanitized) {
         return;
       }
-      var key = String(event.id || "");
-      if (key && seen[key]) {
+      var key = String(sanitized.id || "");
+      if (key && Object.prototype.hasOwnProperty.call(mergedById, key)) {
+        var existingIndex = mergedById[key];
+        merged[existingIndex] = mergeRunEventMissingFields(merged[existingIndex], sanitized);
         return;
       }
+      if (allowNew === false) {
+        return;
+      }
+      merged.push(sanitized);
       if (key) {
-        seen[key] = 1;
+        mergedById[key] = merged.length - 1;
       }
-      merged.push(event);
     }
 
     for (var i = 0; i < remoteList.length; i += 1) {
-      pushEvent(remoteList[i]);
+      pushEvent(remoteList[i], true);
     }
     for (var j = 0; j < localList.length; j += 1) {
       var localEvent = localList[j] || {};
       var localStatus = String(localEvent.status || "");
-      if (localStatus === "running" && hasRemoteRunning) {
-        continue;
-      }
-      if (localStatus === "running" || localStatus === "approval_granted") {
-        pushEvent(localEvent);
-      }
+      var shouldAddLocal = localStatus === "approval_granted" || (localStatus === "running" && !hasRemoteRunning);
+      pushEvent(localEvent, shouldAddLocal);
     }
+
+    merged.sort(compareRunEventsChronological);
 
     if (merged.length > 22) {
       merged = merged.slice(merged.length - 22);
@@ -3731,7 +4022,7 @@
     var workspaceId = String(state.runningWorkspaceId || "");
     var conversationId = String(state.runningConversationId || "");
     runReconcileBusy = true;
-    loadState({ timeoutMs: 6000 })
+    loadState({ timeoutMs: 6000, fast: true })
       .then(function () {
         reconcileRunEventsFromQueueState();
         var hasQueuedOrRunning = hasAnyQueuedOrRunningConversation();
@@ -3821,7 +4112,7 @@
       }, 12500);
       var watchedWorkspaceId = String(state.runningWorkspaceId || state.activeWorkspaceId || "");
       var watchedConversationId = String(state.runningConversationId || state.activeConversationId || "");
-      loadState({ timeoutMs: 6000 })
+      loadState({ timeoutMs: 6000, fast: true })
         .then(function () {
           reconcileRunEventsFromQueueState();
 
@@ -3842,7 +4133,7 @@
           return null;
         })
         .catch(function () {
-          return apiGet("state", {}, { timeoutMs: 9000 })
+          return apiGet("state", {}, { timeoutMs: 15000 })
             .then(function (response) {
               if (!response || !response.success) {
                 return null;
@@ -4877,7 +5168,7 @@
     if (!state.workspaces.length) {
       var emptyMarkup = "";
       if (!state.initialLoadComplete) {
-        emptyMarkup = "<p class='empty-state'><span class='run-spinner' aria-hidden='true'></span> Loading projects...</p>";
+        emptyMarkup = "<p class='empty-state workspace-loading'>Loading projects...<span class='run-spinner' aria-hidden='true'></span></p>";
       } else {
         emptyMarkup = "<p class='empty-state'>Drop a folder here or click + to add a project.</p>";
       }
@@ -4963,7 +5254,9 @@
           html += "<div class='conversation-row chrono-row" + chronoActive + "' role='button' tabindex='0' title='Open thread' data-action='select-conversation' data-workspace-id='" + escHtml(entry.workspaceId) + "' data-conversation-id='" + escHtml(entry.conversation.id) + "'>";
           html += "<span class='" + chronoIndicatorClass + "' aria-hidden='true'></span>";
           var chronoStatusMarkup = conversationStatusPillMarkup(entry.workspaceId, entry.conversation, chronoRunning);
-          html += "<span class='conversation-title' title='" + escAttr(entry.workspaceName) + "'>" + escHtml(conversationDisplayTitle(entry.conversation.title)) + "</span>";
+          var chronoTooltip = threadFolderPathTooltip(entry.workspaceId);
+          var chronoTooltipAttr = chronoTooltip ? " data-tooltip='" + escAttr(chronoTooltip) + "'" : "";
+          html += "<span class='conversation-title'" + chronoTooltipAttr + ">" + escHtml(conversationDisplayTitle(entry.conversation.title)) + "</span>";
           html += chronoStatusMarkup;
           if (chronoPending > 0) {
             html += "<span class='queue-count'>" + chronoPending + "</span>";
@@ -5069,7 +5362,9 @@
           html += "<div class='conversation-row" + activeConv + "' role='button' tabindex='0' title='Open thread' data-action='select-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversation.id) + "'>";
           html += "<span class='" + indicatorClass + "' aria-hidden='true'></span>";
           var statusMarkup = conversationStatusPillMarkup(workspaceId, conversation, queueRunning);
-          html += "<span class='conversation-title'>" + escHtml(conversationDisplayTitle(conversation.title)) + "</span>";
+          var threadTooltip = threadFolderPathTooltip(workspaceId);
+          var threadTooltipAttr = threadTooltip ? " data-tooltip='" + escAttr(threadTooltip) + "'" : "";
+          html += "<span class='conversation-title'" + threadTooltipAttr + ">" + escHtml(conversationDisplayTitle(conversation.title)) + "</span>";
           html += statusMarkup;
           if (queuePending > 0) {
             html += "<span class='queue-count'>" + queuePending + "</span>";
@@ -5255,6 +5550,12 @@
           runningOtherCount += 1;
         }
       }
+    }
+
+    if (!installedCount && !downloadingCount && !installingCount && !runningOtherCount && state.modelDataLoading) {
+      el.modelStatusBtn.textContent = "Loading models...";
+      el.modelStatusBtn.title = "Loading Ollama models";
+      return;
     }
 
     if (!installedCount && !downloadingCount && !installingCount && !runningOtherCount) {
@@ -5789,14 +6090,22 @@
       state.activeConversationId &&
       state.runningWorkspaceId === state.activeWorkspaceId &&
       state.runningConversationId === state.activeConversationId;
+    var hasRunningTarget = !!runningConversationTarget();
 
     el.runBtn.disabled = !canRun;
+    el.runBtn.setAttribute("data-tooltip", "Send message. Right-click for Queue/Stop options.");
     if (runningHere) {
       el.runBtn.classList.add("running");
       el.runBtn.innerHTML = "<span aria-hidden='true'>...</span>";
     } else {
       el.runBtn.classList.remove("running");
       el.runBtn.innerHTML = "<span aria-hidden='true'>&uarr;</span>";
+    }
+    if (el.sendMenuQueueBtn) {
+      el.sendMenuQueueBtn.disabled = !canRun;
+    }
+    if (el.sendMenuStopBtn) {
+      el.sendMenuStopBtn.disabled = !hasRunningTarget;
     }
   }
 
@@ -6478,6 +6787,24 @@
     }
 
     el.chatTitle.textContent = "No thread";
+  }
+
+  function shouldRenderBlankRightPane() {
+    if (state.activeTriage) {
+      return false;
+    }
+    if (state.activeDraftWorkspaceId) {
+      return false;
+    }
+    return !state.activeConversationId;
+  }
+
+  function renderRightPaneChrome() {
+    if (!el.shell) {
+      return;
+    }
+    var blank = shouldRenderBlankRightPane();
+    el.shell.classList.toggle("right-pane-blank", blank);
   }
 
   function activeDecisionRequestInfo() {
@@ -7365,12 +7692,7 @@
     }
 
     if (!state.activeWorkspaceId) {
-      var emptyWorkspaceMarkup = "";
-      if (!state.initialLoadComplete) {
-        emptyWorkspaceMarkup = "<p class='empty-state'><span class='run-spinner' aria-hidden='true'></span> Loading threads...</p>";
-      } else {
-        emptyWorkspaceMarkup = "<p class='empty-state'>Select or add a project to begin.</p>";
-      }
+      var emptyWorkspaceMarkup = "<p class='empty-thread-hint'>Select a thread</p>";
       if (state.chatMarkupCache !== emptyWorkspaceMarkup) {
         el.chatLog.innerHTML = emptyWorkspaceMarkup;
         state.chatMarkupCache = emptyWorkspaceMarkup;
@@ -7408,8 +7730,8 @@
       return;
     }
 
-    if (!state.activeConversationId || !state.activeConversation) {
-      var noConversationMarkup = "<p class='empty-state'>Select a thread or click + beside a project to start a draft.</p>";
+    if (!state.activeConversationId) {
+      var noConversationMarkup = "<p class='empty-thread-hint'>Select a thread</p>";
       if (state.chatMarkupCache !== noConversationMarkup) {
         el.chatLog.innerHTML = noConversationMarkup;
         state.chatMarkupCache = noConversationMarkup;
@@ -7420,9 +7742,34 @@
       return;
     }
 
+    if (!state.activeConversation) {
+      var pendingConversationMarkup = "<p class='empty-state empty-state-loading'><span class='run-spinner' aria-hidden='true'></span> Loading messages...</p>";
+      if (state.chatMarkupCache !== pendingConversationMarkup) {
+        el.chatLog.innerHTML = pendingConversationMarkup;
+        state.chatMarkupCache = pendingConversationMarkup;
+      }
+      state.chatAutoScroll = true;
+      state.chatLastKey = conversationKey;
+      updateChatJumpButton();
+      return;
+    }
+
+    if (state.activeConversationLoading) {
+      var loadingMessagesMarkup = "<p class='empty-state empty-state-loading'><span class='run-spinner' aria-hidden='true'></span> Loading messages...</p>";
+      if (state.chatMarkupCache !== loadingMessagesMarkup) {
+        el.chatLog.innerHTML = loadingMessagesMarkup;
+        state.chatMarkupCache = loadingMessagesMarkup;
+      }
+      state.chatAutoScroll = true;
+      state.chatLastKey = conversationKey;
+      updateChatJumpButton();
+      return;
+    }
+
     var messages = Array.isArray(state.activeConversation.messages) ? state.activeConversation.messages : [];
     healRunningEventsForConversationFromSummary(state.activeWorkspaceId, state.activeConversationId);
-    var events = runEventsForConversation(state.activeConversationId);
+    backfillRunEventAnchorsFromMessages(state.activeConversationId, messages);
+    var events = runEventsForConversation(state.activeConversationId).slice().sort(compareRunEventsChronological);
 
     if (!messages.length && !events.length && !pendingOutgoing.length) {
       var queueStats = activeConversationQueueStats();
@@ -7435,12 +7782,19 @@
           String(state.runningConversationId || "") === String(state.activeConversationId || "")
         )
       );
-      if (runIsActiveHere) {
-        var runningOnlyMarkup = "<article class='run-line-only'><p class='run-line running'><span class='run-spinner' aria-hidden='true'></span> <span class='meta-glimmer'>Thinking</span></p>";
-        if (state.activeWorkspaceId && state.activeConversationId) {
-          runningOnlyMarkup += "<p class='run-line subtle'>Working in this thread. Stream details will appear as events arrive.</p>";
+      var selectedAt = Number(state.activeConversationSelectedAt || 0);
+      var recentlySelected = selectedAt > 0 && Date.now() - selectedAt < 12000;
+      if (runIsActiveHere || recentlySelected) {
+        var runningOnlyMarkup = "";
+        if (runIsActiveHere) {
+          runningOnlyMarkup = "<article class='run-line-only'><p class='run-line running'><span class='run-spinner' aria-hidden='true'></span> <span class='meta-glimmer'>Thinking</span></p>";
+          if (state.activeWorkspaceId && state.activeConversationId) {
+            runningOnlyMarkup += "<p class='run-line subtle'>Working in this thread. Stream details will appear as events arrive.</p>";
+          }
+          runningOnlyMarkup += "</article>";
+        } else {
+          runningOnlyMarkup = "<p class='empty-state empty-state-loading'><span class='run-spinner' aria-hidden='true'></span> Loading messages...</p>";
         }
-        runningOnlyMarkup += "</article>";
         if (state.chatMarkupCache !== runningOnlyMarkup) {
           el.chatLog.innerHTML = runningOnlyMarkup;
           state.chatMarkupCache = runningOnlyMarkup;
@@ -7470,7 +7824,12 @@
       var queuedEvent = events[e] || {};
       var eventStatus = String(queuedEvent.status || "");
       var anchorRaw = Number(queuedEvent.message_anchor);
-      if (eventStatus === "approval_granted" && isFinite(anchorRaw)) {
+      var hasAnchor = isFinite(anchorRaw) && anchorRaw >= 0;
+      if (!hasAnchor && eventStatus === "approval_granted") {
+        anchorRaw = messages.length;
+        hasAnchor = true;
+      }
+      if (hasAnchor) {
         var anchorIndex = Math.max(0, Math.min(messages.length, Math.floor(anchorRaw)));
         if (!anchoredEventsByIndex[anchorIndex]) {
           anchoredEventsByIndex[anchorIndex] = [];
@@ -7479,6 +7838,17 @@
       } else {
         tailEvents.push(queuedEvent);
       }
+    }
+
+    var anchorKeys = Object.keys(anchoredEventsByIndex);
+    for (var ak = 0; ak < anchorKeys.length; ak += 1) {
+      var anchorBucket = anchoredEventsByIndex[anchorKeys[ak]];
+      if (Array.isArray(anchorBucket) && anchorBucket.length > 1) {
+        anchorBucket.sort(compareRunEventsChronological);
+      }
+    }
+    if (tailEvents.length > 1) {
+      tailEvents.sort(compareRunEventsChronological);
     }
 
     function renderAnchoredEventsAt(index) {
@@ -7633,7 +8003,7 @@
   }
 
   function clampThreadsPaneWidth(width) {
-    var minWidth = 220;
+    var minWidth = 250;
     var maxWidth = Math.min(620, Math.max(300, Math.floor(window.innerWidth * 0.66)));
     var value = Number(width || 0);
     if (!isFinite(value) || value <= 0) {
@@ -7839,6 +8209,7 @@
     safeStep("renderContextWindowStatus", renderContextWindowStatus);
     safeStep("renderToolbarGit", renderToolbarGit);
     safeStep("renderBranchMenu", renderBranchMenu);
+    safeStep("renderRightPaneChrome", renderRightPaneChrome);
     safeStep("renderChatHeader", renderChatHeader);
     safeStep("renderDecisionRequestInline", renderDecisionRequestInline);
     safeStep("renderCommandApprovalInline", renderCommandApprovalInline);
@@ -8637,10 +9008,14 @@
 
   function loadState(options) {
     var requestOptions = null;
+    var requestParams = { level: "light" };
     if (options && Number(options.timeoutMs) > 0) {
       requestOptions = { timeoutMs: Number(options.timeoutMs) };
     }
-    return apiGet("state", {}, requestOptions).then(function (response) {
+    if (options && options.full) {
+      requestParams.level = "full";
+    }
+    return apiGet("state", requestParams, requestOptions).then(function (response) {
       if (!response.success) {
         throw new Error(response.error || "Failed to load state");
       }
@@ -8951,11 +9326,23 @@
     var workspaceId = explicitWorkspaceId || state.activeWorkspaceId;
     var conversationId = explicitConversationId || state.activeConversationId;
     var isExplicitTarget = !!(explicitWorkspaceId || explicitConversationId);
+    var shouldShowLoading = !!opts.showLoading;
     if (!workspaceId || !conversationId) {
       if (!isExplicitTarget) {
         state.activeConversation = null;
+        state.activeConversationSelectedAt = 0;
+        setActiveConversationLoading("", "", false);
       }
       return Promise.resolve();
+    }
+    var targetLoadingKey = conversationReadKey(workspaceId, conversationId);
+    var isCurrentActiveTarget = !isExplicitTarget || (
+      state.activeWorkspaceId === workspaceId &&
+      state.activeConversationId === conversationId
+    );
+    if (shouldShowLoading && isCurrentActiveTarget) {
+      setActiveConversationLoading(workspaceId, conversationId, true);
+      renderUi();
     }
 
     var requestOptions = null;
@@ -8979,12 +9366,17 @@
         conversation.approval_request = normalizeApprovalRequest(conversation.approval_request);
         if (Array.isArray(conversation.run_events)) {
           mergeConversationRunEvents(conversationId, conversation.run_events);
+          backfillRunEventAnchorsFromMessages(
+            conversationId,
+            Array.isArray(conversation.messages) ? conversation.messages : []
+          );
         }
         cacheConversationSnapshot(workspaceId, conversationId, conversation);
       }
       var isActiveTarget = state.activeWorkspaceId === workspaceId && state.activeConversationId === conversationId;
       if (isActiveTarget) {
         state.activeConversation = conversation;
+        setActiveConversationLoading(workspaceId, conversationId, false);
         if (state.activeConversation) {
           finalizeStaleRunningEventsForConversation(workspaceId, state.activeConversation);
           reconcilePendingOutgoingFromConversation(workspaceId, conversationId, state.activeConversation);
@@ -9002,8 +9394,19 @@
         if (opts.markSeen !== false) {
           markConversationSeen(workspaceId, conversationId, conversation);
         }
+        if (opts.renderOnUpdate !== false) {
+          renderUi();
+        }
       }
       return conversation;
+    }).finally(function () {
+      if (
+        shouldShowLoading &&
+        targetLoadingKey &&
+        state.activeConversationLoadingKey === targetLoadingKey
+      ) {
+        setActiveConversationLoading(workspaceId, conversationId, false);
+      }
     });
   }
 
@@ -9161,68 +9564,85 @@
   }
 
   function refreshAll() {
-    var modelsPromise = runWithRetry(loadModels, 3, 220).catch(function (err) {
-      state.models = [];
-      state.modelLoadError = err && err.message ? err.message : "Model check failed";
-      return null;
-    });
-    var modelCatalogPromise = runWithRetry(loadModelCatalog, 2, 180).catch(function () {
-      state.modelCatalog = [];
-      state.modelInstalls = [];
-      return null;
-    });
-    var appIconsPromise = runWithRetry(loadAppIcons, 2, 180).catch(function () {
-      state.appIcons = { finder: "", textmate: "" };
-      return null;
-    });
-    var themesPromise = runWithRetry(loadThemes, 2, 120).catch(function () {
-      state.themes = normalizeThemes(themeNameListFallback());
-      ensureActiveThemeInList();
-      applyTheme(state.activeTheme);
-      return null;
-    });
-
-    var sideDataPromise = Promise.all([
-      modelsPromise,
-      modelCatalogPromise,
-      appIconsPromise,
-      themesPromise
-    ]).then(function () {
-      syncModelInstallPollingFromCatalog();
-      modelAutoRefreshLastAt = Date.now();
-      renderUi();
-    });
-
-    return runWithRetry(loadState, 3, 220)
+    return runWithRetry(function () {
+      return loadState({ fast: true });
+    }, 3, 220)
       .then(function () {
-        renderUi();
-      })
-      .then(loadConversation)
-      .then(function () {
-        return syncCommandExecModeForWorkspace(state.activeWorkspaceId);
-      })
-      .then(function () {
-        return refreshGitStatus().catch(function () {
-          return null;
-        });
-      })
-      .then(function () {
-        return refreshBranches().catch(function () {
-          return null;
-        });
-      })
-      .then(function () {
-        if (state.diffOpen) {
-          return refreshDiff().catch(function () {
-            return null;
-          });
-        }
-        return null;
-      })
-      .then(function () {
+        // Show projects/threads as soon as lightweight state arrives.
         state.initialLoadComplete = true;
         renderUi();
-        return sideDataPromise;
+      })
+      .then(function () {
+        var shouldShowLoading = !!(state.activeWorkspaceId && state.activeConversationId);
+        loadConversation({ showLoading: shouldShowLoading })
+          .then(function () {
+            renderUi();
+          })
+          .catch(function () {
+            return null;
+          });
+
+        syncCommandExecModeForWorkspace(state.activeWorkspaceId).catch(function () {
+          return null;
+        });
+
+        refreshGitStatus()
+          .then(function () {
+            return refreshBranches().catch(function () {
+              return null;
+            });
+          })
+          .catch(function () {
+            return null;
+          })
+          .then(function () {
+            if (state.diffOpen) {
+              return refreshDiff().catch(function () {
+                return null;
+              });
+            }
+            return null;
+          })
+          .then(function () {
+            renderUi();
+          });
+
+        state.modelDataLoading = true;
+        renderUi();
+        Promise.all([
+          runWithRetry(loadModels, 3, 220).catch(function (err) {
+            state.models = [];
+            state.modelLoadError = err && err.message ? err.message : "Model check failed";
+            return null;
+          }),
+          runWithRetry(loadModelCatalog, 2, 180).catch(function () {
+            state.modelCatalog = [];
+            state.modelInstalls = [];
+            return null;
+          }),
+          runWithRetry(loadAppIcons, 2, 180).catch(function () {
+            state.appIcons = { finder: "", textmate: "" };
+            return null;
+          }),
+          runWithRetry(loadThemes, 2, 120).catch(function () {
+            state.themes = normalizeThemes(themeNameListFallback());
+            ensureActiveThemeInList();
+            applyTheme(state.activeTheme);
+            return null;
+          })
+        ])
+          .then(function () {
+            syncModelInstallPollingFromCatalog();
+            modelAutoRefreshLastAt = Date.now();
+          })
+          .catch(function () {
+            return null;
+          })
+          .finally(function () {
+            state.modelDataLoading = false;
+            renderUi();
+          });
+        return null;
       });
   }
 
@@ -9288,12 +9708,12 @@
       path: path,
       name: name,
       command_exec_mode: state.commandExecMode
-    }).then(function (response) {
+    }, { timeoutMs: 12000 }).then(function (response) {
       if (!response.success) {
         throw new Error(response.error || "Could not add project");
       }
 
-      return loadState().then(function () {
+      return loadState({ fast: true, timeoutMs: 8000 }).then(function () {
         if (response.workspace && response.workspace.id) {
           state.activeWorkspaceId = response.workspace.id;
           state.activeConversationId = "";
@@ -9439,6 +9859,7 @@
     var conversations = getSortedConversations(workspace);
     if (conversations.length > 0) {
       state.activeConversationId = conversations[0].id;
+      state.activeConversationSelectedAt = Date.now();
       syncSelectionUrl(false);
       return loadConversation()
         .then(function () {
@@ -9485,6 +9906,7 @@
     }
 
     state.activeConversationId = "";
+    state.activeConversationSelectedAt = 0;
     syncSelectionUrl(false);
     if (workspace.draft_exists === "1") {
       return selectDraft(workspaceId);
@@ -9544,21 +9966,35 @@
         };
       }
     }
+    var hasCachedMessages = !!(
+      cachedConversation &&
+      Array.isArray(cachedConversation.messages) &&
+      cachedConversation.messages.length
+    );
     state.activeConversation = cachedConversation;
+    state.activeConversationSelectedAt = Date.now();
+    setActiveConversationLoading(workspaceId, conversationId, !hasCachedMessages);
     state.activeDraftWorkspaceId = "";
     state.openWorkspaceMenuWorkspaceId = "";
     state.expandedWorkspaceIds[workspaceId] = true;
     syncSelectionUrl(false);
     renderUi();
 
-    return loadConversation()
+    return loadConversation({ showLoading: !hasCachedMessages })
       .catch(function (firstErr) {
-        return loadState()
+        if (!hasCachedMessages) {
+          setActiveConversationLoading(workspaceId, conversationId, true);
+          renderUi();
+        }
+        return loadState({ fast: true })
           .then(function () {
             if (state.activeWorkspaceId !== workspaceId || state.activeConversationId !== conversationId) {
               return null;
             }
-            return loadConversation();
+            if (!hasCachedMessages) {
+              setActiveConversationLoading(workspaceId, conversationId, true);
+            }
+            return loadConversation({ showLoading: !hasCachedMessages });
           })
           .catch(function () {
             throw firstErr;
@@ -9694,7 +10130,7 @@
       workspace_id: workspaceId,
       title: title,
       model: model
-    }).then(function (response) {
+    }, { timeoutMs: 60000 }).then(function (response) {
       if (!response.success || !response.conversation || !response.conversation.id) {
         throw new Error(response.error || "Failed to create thread from draft");
       }
@@ -10045,20 +10481,10 @@
     }
 
     var pendingEvent = runOptions.pendingEvent || null;
+    var runAnchor = 0;
     var preferredEventId = "";
     if (queueItemId && /^[A-Za-z0-9._-]+$/.test(queueItemId)) {
       preferredEventId = "run-" + queueItemId;
-    }
-    if (!pendingEvent) {
-      pendingEvent = pushRunEvent(conversationId, {
-        id: preferredEventId,
-        status: "running",
-        started_at: new Date().toISOString(),
-        stream_text: ""
-      });
-    } else if (preferredEventId && String(pendingEvent.id || "") !== preferredEventId) {
-      pendingEvent.id = preferredEventId;
-      persistRunEventsSoon();
     }
 
     if (
@@ -10078,6 +10504,39 @@
       }
       state.activeConversation.messages.push({ role: "user", content: userContent });
       cacheActiveConversationSnapshot(workspaceId, conversationId);
+    }
+
+    runAnchor = conversationMessageCount(workspaceId, conversationId);
+    if (queueItemId && !approvalRetry) {
+      var anchorMessages = conversationMessagesSnapshot(workspaceId, conversationId);
+      var promptAnchor = inferMessageAnchorForPrompt(anchorMessages, promptText);
+      if (promptAnchor < 0 && promptForRun !== promptText) {
+        promptAnchor = inferMessageAnchorForPrompt(anchorMessages, promptForRun);
+      }
+      if (promptAnchor >= 0) {
+        runAnchor = promptAnchor;
+      } else {
+        runAnchor = Math.max(1, runAnchor + 1);
+      }
+    }
+
+    if (!pendingEvent) {
+      pendingEvent = pushRunEvent(conversationId, {
+        id: preferredEventId,
+        status: "running",
+        started_at: new Date().toISOString(),
+        stream_text: "",
+        message_anchor: runAnchor
+      });
+    } else {
+      if (preferredEventId && String(pendingEvent.id || "") !== preferredEventId) {
+        pendingEvent.id = preferredEventId;
+      }
+      var pendingAnchor = Number(pendingEvent.message_anchor);
+      if (!isFinite(pendingAnchor) || pendingAnchor < 0) {
+        pendingEvent.message_anchor = runAnchor;
+      }
+      persistRunEventsSoon();
     }
 
     renderUi();
@@ -10140,7 +10599,7 @@
         conversation_id: conversationId,
         stream_session: streamSession,
         offset: String(streamOffset)
-      }, { timeoutMs: 1200 })
+      }, { timeoutMs: 12000 })
         .then(function (response) {
           if (!response || !response.success) {
             return;
@@ -10167,7 +10626,7 @@
         });
     }
 
-    runStreamPollTimers[streamTimerKey] = setInterval(pollStreamOnce, 700);
+    runStreamPollTimers[streamTimerKey] = setInterval(pollStreamOnce, 6000);
     pollStreamOnce();
 
     return apiPost("run", {
@@ -10283,7 +10742,10 @@
         }
         renderUi();
 
-        return loadState()
+        return loadState({ fast: true, timeoutMs: 20000 })
+          .catch(function () {
+            return null;
+          })
           .then(function () {
             if (!preserveSelection) {
               state.activeWorkspaceId = workspaceId;
@@ -10293,7 +10755,7 @@
             return loadConversation({
               workspaceId: workspaceId,
               conversationId: conversationId,
-              timeoutMs: 9000,
+              timeoutMs: 15000,
               markSeen: false
             }).catch(function () {
               if (
@@ -10467,7 +10929,7 @@
       permission_mode: normalizedPermissionMode,
       command_exec_mode: normalizedCommandExecMode,
       explicit_skill_ids: normalizedSkillIds.join(",")
-    }).then(function (response) {
+    }, { timeoutMs: 90000 }).then(function (response) {
       if (!response.success) {
         throw new Error(response.error || "Could not queue message");
       }
@@ -10490,7 +10952,7 @@
       item_id: itemId || "",
       status: status || "done",
       error: errorText || ""
-    }).then(function (response) {
+    }, { timeoutMs: 60000 }).then(function (response) {
       if (!response.success) {
         throw new Error(response.error || "Could not finalize queue item");
       }
@@ -10549,7 +11011,7 @@
           return;
         }
         inFlight = true;
-        apiGet("state", {}, { timeoutMs: 12000 })
+        apiGet("state", {}, { timeoutMs: 18000 })
           .then(function (response) {
             if (!active) {
               return;
@@ -10602,14 +11064,6 @@
           })
           .catch(function () {
             pollFailures += 1;
-            if (pollFailures >= 5) {
-              finish({
-                lastStatus: "error",
-                pending: 0,
-                firstId: "",
-                decisionRequest: undefined
-              });
-            }
             return null;
           })
           .finally(function () {
@@ -10617,8 +11071,8 @@
           });
       }
 
-      pollTimer = setInterval(checkOnce, 2400);
-      setTimeout(checkOnce, 900);
+      pollTimer = setInterval(checkOnce, 6000);
+      setTimeout(checkOnce, 1200);
       setTimeout(function () {
         finish({
           lastStatus: "error",
@@ -10869,7 +11323,7 @@
     return apiPost("queue_take", {
       workspace_id: target.workspaceId,
       conversation_id: target.conversationId
-    }).then(function (response) {
+    }, { timeoutMs: 60000 }).then(function (response) {
       if (!response.success) {
         throw new Error(response.error || "Could not fetch queued message");
       }
@@ -10903,7 +11357,7 @@
     if (!state.busy) {
       return Promise.resolve(false);
     }
-    return apiGet("state", {}, { timeoutMs: 9000 })
+    return apiGet("state", {}, { timeoutMs: 18000 })
       .then(function (response) {
         var workspaces = response && Array.isArray(response.workspaces) ? response.workspaces : [];
         var hasQueueRunning = false;
@@ -10966,7 +11420,7 @@
       }
 
       approvalResumeWatchBusy = true;
-      apiGet("state", {}, { timeoutMs: 9000 })
+      apiGet("state", {}, { timeoutMs: 18000 })
         .then(function (response) {
           if (approvalResumeWatchKey !== watchKey) {
             return;
@@ -11023,7 +11477,7 @@
         });
     }
 
-    approvalResumeWatchTimer = setInterval(tick, 1200);
+    approvalResumeWatchTimer = setInterval(tick, 4000);
     tick();
   }
 
@@ -11046,7 +11500,7 @@
     return apiPost("queue_take", {
       workspace_id: wsId,
       conversation_id: convId
-    }).then(function (response) {
+    }, { timeoutMs: 60000 }).then(function (response) {
       if (!response || !response.success) {
         throw new Error((response && response.error) || "Could not resume queued run");
       }
@@ -13568,31 +14022,60 @@
     openAttachmentPreview(attachmentId);
   }
 
+  function updateWorkspaceNamePlaceholderFromPath(pathValue) {
+    if (!el.workspaceName) {
+      return;
+    }
+    var fallback = "my project";
+    var path = trim(pathValue || "");
+    var folderName = path ? basename(path) : "";
+    el.workspaceName.placeholder = folderName || fallback;
+  }
+
   function onWorkspaceBrowseClick() {
     if (state.pickingWorkspace) {
       return Promise.resolve();
     }
+    function openDirPickerFallback() {
+      if (!el.workspaceDirPicker) {
+        return false;
+      }
+      state.awaitingDirPicker = true;
+      el.workspaceDirPicker.value = "";
+      el.workspaceDirPicker.click();
+      return true;
+    }
+
+    var browseStartedAt = Date.now();
     state.pickingWorkspace = true;
     state.awaitingDirPicker = false;
     return apiGet("pick_workspace")
       .then(function (picked) {
         if (picked.success && picked.cancelled) {
+          var elapsedMs = Date.now() - browseStartedAt;
+          if (elapsedMs < 300 && openDirPickerFallback()) {
+            return;
+          }
           return;
         }
 
         if (picked.success && picked.path) {
           el.workspacePath.value = picked.path;
+          updateWorkspaceNamePlaceholderFromPath(picked.path);
           return;
         }
 
-        if (el.workspaceDirPicker) {
-          state.awaitingDirPicker = true;
-          el.workspaceDirPicker.value = "";
-          el.workspaceDirPicker.click();
+        if (openDirPickerFallback()) {
           return;
         }
 
         throw new Error(picked.error || "Could not open folder picker.");
+      })
+      .catch(function (error) {
+        if (openDirPickerFallback()) {
+          return;
+        }
+        throw error;
       })
       .finally(function () {
         if (!state.awaitingDirPicker) {
@@ -13623,6 +14106,7 @@
     }
 
     el.workspacePath.value = pickedPath;
+    updateWorkspaceNamePlaceholderFromPath(pickedPath);
     state.awaitingDirPicker = false;
     state.pickingWorkspace = false;
     return Promise.resolve();
@@ -13639,8 +14123,11 @@
     return addWorkspaceByPath(path, name).then(function () {
       el.workspacePath.value = "";
       el.workspaceName.value = "";
+      updateWorkspaceNamePlaceholderFromPath("");
       closeModal(el.workspaceModal);
-      return refreshAll();
+      renderUi();
+      refreshAll().catch(showError);
+      return null;
     });
   }
 
@@ -13656,6 +14143,7 @@
 
     el.workspacePath.value = "";
     el.workspaceName.value = "";
+    updateWorkspaceNamePlaceholderFromPath("");
     openModal(el.workspaceModal);
     return onWorkspaceBrowseClick().then(function () {
       var pickedPath = trim(el.workspacePath.value);
@@ -13666,8 +14154,11 @@
       return addWorkspaceByPath(pickedPath, trim(el.workspaceName.value)).then(function () {
         el.workspacePath.value = "";
         el.workspaceName.value = "";
+        updateWorkspaceNamePlaceholderFromPath("");
         closeModal(el.workspaceModal);
-        return refreshAll();
+        renderUi();
+        refreshAll().catch(showError);
+        return null;
       });
     });
   }
@@ -13768,6 +14259,8 @@
 
     clearDraftAutosaveTimer();
 
+    var queueSubmissionAccepted = false;
+
     ensureConversationFromDraft(queuedPrompt)
       .then(function (conversationId) {
         var workspaceId = state.activeWorkspaceId;
@@ -13797,7 +14290,10 @@
             state.permissionMode,
             state.commandExecMode
           ).then(function () {
+            queueSubmissionAccepted = true;
             resetComposerAttachments();
+            // Start draining immediately; do not wait on follow-up UI fetches.
+            kickQueueWorker();
           });
         }).then(function () {
           state.activeWorkspaceId = workspaceId;
@@ -13811,16 +14307,51 @@
       })
       .then(function () {
         renderUi();
-        kickQueueWorker();
       })
       .catch(function (err) {
         removePendingOutgoing(pendingKey, pendingId);
-        el.runPrompt.value = queuedPrompt;
+        if (!queueSubmissionAccepted) {
+          el.runPrompt.value = queuedPrompt;
+        } else {
+          kickQueueWorker();
+        }
         showError(err);
       })
       .finally(function () {
         renderUi();
       });
+  }
+
+  function runningConversationTarget() {
+    var workspaceId = trim(state.runningWorkspaceId || "");
+    var conversationId = trim(state.runningConversationId || "");
+    if (workspaceId && conversationId) {
+      return {
+        workspaceId: workspaceId,
+        conversationId: conversationId
+      };
+    }
+    workspaceId = trim(state.activeWorkspaceId || "");
+    conversationId = trim(state.activeConversationId || "");
+    if (!workspaceId || !conversationId) {
+      return null;
+    }
+    var activeStats = activeConversationQueueStats();
+    if (!activeStats || !activeStats.running) {
+      return null;
+    }
+    return {
+      workspaceId: workspaceId,
+      conversationId: conversationId
+    };
+  }
+
+  function stopRunFromComposer() {
+    var target = runningConversationTarget();
+    if (!target) {
+      return Promise.reject(new Error("No active run to stop."));
+    }
+    return stopConversationRun(target.workspaceId, target.conversationId);
   }
 
   function onCommitContinue() {
@@ -14191,6 +14722,7 @@
     });
 
     on(el.workspaceForm, "submit", function (event) {
+      event.preventDefault();
       var submitter = event.submitter || (el.workspaceForm && el.workspaceForm.querySelector("button[type='submit']"));
       runWithControlPending(submitter, function () {
         return onWorkspaceModalSubmit(event);
@@ -14201,6 +14733,10 @@
       runWithControlPending(el.workspaceBrowseBtn, function () {
         return onWorkspaceBrowseClick();
       }).catch(showError);
+    });
+
+    on(el.workspacePath, "input", function () {
+      updateWorkspaceNamePlaceholderFromPath(el.workspacePath.value);
     });
 
     on(el.workspaceDirPicker, "change", function (event) {
@@ -15444,6 +15980,44 @@
     on(el.runForm, "submit", function (event) {
       onRunSubmit(event);
     });
+    on(el.runBtn, "click", function (event) {
+      if (!el.runForm || (el.runBtn && el.runBtn.disabled)) {
+        return;
+      }
+      event.preventDefault();
+      if (typeof el.runForm.requestSubmit === "function") {
+        el.runForm.requestSubmit(el.runBtn);
+      } else {
+        onRunSubmit(event);
+      }
+    });
+    on(el.runBtn, "contextmenu", function (event) {
+      event.preventDefault();
+      toggleMenu("send-menu", el.runBtn);
+    });
+    if (el.sendMenuQueueBtn) {
+      on(el.sendMenuQueueBtn, "click", function (event) {
+        event.preventDefault();
+        closeAllMenus();
+        if (!el.runForm || (el.runBtn && el.runBtn.disabled)) {
+          return;
+        }
+        if (typeof el.runForm.requestSubmit === "function") {
+          el.runForm.requestSubmit(el.runBtn);
+        } else {
+          onRunSubmit(event);
+        }
+      });
+    }
+    if (el.sendMenuStopBtn) {
+      on(el.sendMenuStopBtn, "click", function (event) {
+        event.preventDefault();
+        closeAllMenus();
+        runWithControlPending(el.sendMenuStopBtn, function () {
+          return stopRunFromComposer();
+        }).catch(showError);
+      });
+    }
 
     on(el.decisionRequestInlineClose, "click", function () {
       var info = activeDecisionRequestInfo();
@@ -15966,6 +16540,11 @@
       if (event.key !== "Enter") {
         return;
       }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey) {
+        event.preventDefault();
+        stopRunFromComposer().catch(showError);
+        return;
+      }
       if (event.shiftKey || event.altKey) {
         return;
       }
@@ -15985,6 +16564,17 @@
         onRunSubmit(event);
       }
     });
+
+    function isKeyboardEditableTarget(target) {
+      var node = target && target.nodeType === 3 ? target.parentElement : target;
+      if (!node || typeof node.closest !== "function") {
+        return false;
+      }
+      if (node.closest("textarea, input, [contenteditable='true']")) {
+        return true;
+      }
+      return false;
+    }
 
     document.addEventListener("click", function (event) {
       if (Date.now() < suppressMenuCloseUntilMs) {
@@ -16019,8 +16609,35 @@
     });
 
     document.addEventListener("keydown", function (event) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        String(event.key || "").toLowerCase() === "a"
+      ) {
+        if (!isKeyboardEditableTarget(event.target)) {
+          event.preventDefault();
+          if (window.getSelection) {
+            var selectAll = window.getSelection();
+            if (selectAll && !selectAll.isCollapsed) {
+              selectAll.removeAllRanges();
+            }
+          }
+        }
+        return;
+      }
+
       if (event.key !== "Escape") {
         return;
+      }
+
+      if (window.getSelection) {
+        var selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          event.preventDefault();
+          selection.removeAllRanges();
+          return;
+        }
       }
 
       if (state.pickingWorkspace) {

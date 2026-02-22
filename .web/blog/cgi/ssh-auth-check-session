@@ -1,0 +1,31 @@
+#!/bin/sh
+# Validate session and return user/admin context.
+
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+. "$SCRIPT_DIR/ssh-auth-lib.sh"
+
+blog_init
+blog_read_request_body
+blog_send_json_headers
+
+token=$(blog_param session_token)
+if ! blog_load_session "$token"; then
+  printf '{"success":false,"authenticated":false}\n'
+  exit 0
+fi
+
+# Dynamic admin check.
+if blog_user_is_admin "$BLOG_SESSION_USERNAME"; then
+  BLOG_SESSION_IS_ADMIN=true
+fi
+blog_extend_session
+
+printf '{"success":true,'
+printf '"authenticated":true,'
+printf '"username":"%s",' "$(blog_json_escape "$BLOG_SESSION_USERNAME")"
+printf '"fingerprint":"%s",' "$(blog_json_escape "$BLOG_SESSION_FINGERPRINT")"
+printf '"is_admin":%s,' "$BLOG_SESSION_IS_ADMIN"
+printf '"csrf_token":"%s"' "$(blog_json_escape "$BLOG_SESSION_CSRF")"
+printf '}\n'

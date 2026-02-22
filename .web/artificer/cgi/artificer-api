@@ -3101,10 +3101,25 @@ conversation_dir_for() {
 }
 
 mode_runtime_lib_file="$ARTIFICER_SCRIPT_DIR/mode-runtime-lib.sh"
+mode_runtime_lib_loaded=0
+mode_runtime_bootstrapped=0
 if [ -f "$mode_runtime_lib_file" ]; then
   . "$mode_runtime_lib_file"
-  mode_runtime_bootstrap
+  mode_runtime_lib_loaded=1
 fi
+
+ensure_mode_runtime_bootstrap() {
+  if [ "$mode_runtime_bootstrapped" = "1" ]; then
+    return 0
+  fi
+  if [ "$mode_runtime_lib_loaded" != "1" ]; then
+    return 0
+  fi
+  if command -v mode_runtime_bootstrap >/dev/null 2>&1; then
+    mode_runtime_bootstrap
+  fi
+  mode_runtime_bootstrapped=1
+}
 
 multi_agent_lib_file="$ARTIFICER_SCRIPT_DIR/multi-agent-lib.sh"
 if [ ! -f "$multi_agent_lib_file" ]; then
@@ -5643,6 +5658,7 @@ normalize_assistant_mode_id() {
     printf '%s' ""
     return 0
   fi
+  ensure_mode_runtime_bootstrap
   if command -v mr_mode_exists >/dev/null 2>&1; then
     if ! mr_mode_exists "$mode_id"; then
       printf '%s' ""
@@ -5760,6 +5776,22 @@ compute_budget_stale_timeout_sec() {
     stale_timeout_sec=172800
   fi
   printf '%s' "$stale_timeout_sec"
+}
+
+queue_missing_pid_grace_sec() {
+  grace_sec=${ARTIFICER_QUEUE_MISSING_PID_GRACE_SEC:-45}
+  case "$grace_sec" in
+    ""|*[!0-9]*)
+      grace_sec=45
+      ;;
+  esac
+  if [ "$grace_sec" -lt 5 ]; then
+    grace_sec=5
+  fi
+  if [ "$grace_sec" -gt 600 ]; then
+    grace_sec=600
+  fi
+  printf '%s' "$grace_sec"
 }
 
 run_mode_from_slash_tag() {
@@ -9003,6 +9035,12 @@ promote_scratch_files() {
 
 emit_state() {
   # Keep the primary state endpoint fast; mode runtime has dedicated endpoints.
+  state_level=$(trim "$(param "level")")
+  state_light=0
+  if [ "$state_level" = "light" ]; then
+    state_light=1
+  fi
+
   printf '{"success":true,"workspaces":['
   first_ws=1
 
@@ -9012,8 +9050,14 @@ emit_state() {
     ws_name=$(read_file_line "$ws_dir/name" "$ws_id")
     ws_path=$(read_file_line "$ws_dir/path" "")
     ws_path_exists=0
-    if [ -n "$ws_path" ] && [ -d "$ws_path" ]; then
-      ws_path_exists=1
+    if [ "$state_light" = "1" ]; then
+      if [ -n "$ws_path" ]; then
+        ws_path_exists=1
+      fi
+    else
+      if [ -n "$ws_path" ] && [ -d "$ws_path" ]; then
+        ws_path_exists=1
+      fi
     fi
     draft_file="$ws_dir/draft-first-message.txt"
     draft_exists=0
@@ -9036,7 +9080,7 @@ emit_state() {
     ws_residents_json='[]'
     ws_unratified_json='[]'
     ws_toggles_json='{"context_sharing":1,"dilemma_surfacing":1,"amendments":1,"interpretation_log":1,"commitments":1,"attention_policies":1}'
-    if command -v ma_workspace_init >/dev/null 2>&1; then
+    if [ "$state_light" != "1" ] && command -v ma_workspace_init >/dev/null 2>&1; then
       ma_workspace_init "$ws_id"
       ws_bg_residents=$(ma_workspace_background_resident_count "$ws_id")
       ws_residents_json=$(ma_residents_json_for_workspace "$ws_id")
@@ -9060,91 +9104,119 @@ EOF_TOG
         conv_model=$(read_file_line "$conv_dir/model" "")
         conv_created=$(read_file_line "$conv_dir/created" "0")
         conv_updated=$(read_file_line "$conv_dir/updated" "0")
-        queue_info=$(queue_state_for_conversation "$conv_dir")
-        queue_pending=$(kv_get "pending" "$queue_info")
-        queue_running=$(kv_get "running" "$queue_info")
-        queue_done=$(kv_get "done" "$queue_info")
-        queue_last_status=$(kv_get "last_status" "$queue_info")
-        queue_first_id=$(kv_get "first_id" "$queue_info")
-        clear_stale_running=0
-        stale_error_message=""
-        if [ "$queue_running" = "1" ]; then
-          queue_dir=$(conversation_queue_dir_for "$conv_dir")
-          running_meta_file=$(queue_running_meta_file_for "$conv_dir")
-          running_pid=$(read_file_line "$queue_dir/running.pid" "")
-          running_started=$(read_file_line "$queue_dir/running.started" "0")
-          running_compute_budget=$(queue_meta_compute_budget_from_file "$running_meta_file")
-          running_compute_budget=$(normalize_compute_budget "$running_compute_budget")
-          stale_timeout_sec=${ARTIFICER_QUEUE_STALE_TIMEOUT_SEC:-0}
-          case "$stale_timeout_sec" in
-            ""|*[!0-9]*)
-              stale_timeout_sec=0
-              ;;
-          esac
-          if [ "$stale_timeout_sec" -le 0 ]; then
-            run_budget_hint=${ARTIFICER_RUN_TIME_BUDGET_SEC:-900}
-            case "$run_budget_hint" in
-              ""|*[!0-9]*)
-                run_budget_hint=900
-                ;;
-            esac
-            stale_timeout_sec=$(compute_budget_stale_timeout_sec "$running_compute_budget" "$run_budget_hint")
-          fi
-          if [ -n "$running_pid" ] && ! kill -0 "$running_pid" 2>/dev/null; then
-            clear_stale_running=1
-            stale_error_message="run process is no longer active"
-          fi
-          case "$running_started" in
-            ""|*[!0-9]*)
-              running_started=0
-              ;;
-          esac
-          if [ "$running_started" -gt 0 ]; then
-            running_now=$(date +%s)
-            running_age=$((running_now - running_started))
-            if [ "$running_age" -gt "$stale_timeout_sec" ]; then
-              clear_stale_running=1
-              stale_error_message="run exceeded stale timeout (${stale_timeout_sec}s)"
-            fi
-          fi
-          if [ "$queue_last_status" = "error" ] && [ "$queue_pending" = "0" ]; then
-            clear_stale_running=1
-            stale_error_message="run state became stale after error"
-          fi
-        fi
-        if [ "$ws_path_exists" != "1" ] && [ "$queue_running" = "1" ]; then
-          clear_stale_running=1
-          stale_error_message="workspace path is missing or unavailable"
-        fi
-        if [ "$clear_stale_running" = "1" ]; then
-          requeued_running=$(queue_requeue_running_state "$conv_dir")
-          queue_dir=$(conversation_queue_dir_for "$conv_dir")
-          if [ "$requeued_running" = "1" ]; then
-            printf '%s\n' "queued" > "$queue_dir/last_status"
-            printf '%s\n' "stale run was requeued for retry" > "$queue_dir/last_error"
-            date +%s > "$queue_dir/last_done"
-          else
-            case "$queue_last_status" in
-              ""|running|queued)
-                printf '%s\n' "error" > "$queue_dir/last_status"
-                printf '%s\n' "${stale_error_message:-run state became stale}" > "$queue_dir/last_error"
-                date +%s > "$queue_dir/last_done"
-                ;;
-            esac
-          fi
+        if [ "$state_light" = "1" ]; then
           queue_info=$(queue_state_for_conversation "$conv_dir")
           queue_pending=$(kv_get "pending" "$queue_info")
           queue_running=$(kv_get "running" "$queue_info")
           queue_done=$(kv_get "done" "$queue_info")
           queue_last_status=$(kv_get "last_status" "$queue_info")
           queue_first_id=$(kv_get "first_id" "$queue_info")
-        fi
-        decision_request_json=$(decision_request_json_for_conversation "$conv_dir")
-        approval_request_json=$(approval_request_json_for_conversation "$conv_dir")
+          [ -n "$queue_pending" ] || queue_pending=0
+          [ -n "$queue_running" ] || queue_running=0
+          [ -n "$queue_done" ] || queue_done=0
+          decision_request_json='null'
+          approval_request_json='null'
+        else
+          queue_info=$(queue_state_for_conversation "$conv_dir")
+          queue_pending=$(kv_get "pending" "$queue_info")
+          queue_running=$(kv_get "running" "$queue_info")
+          queue_done=$(kv_get "done" "$queue_info")
+          queue_last_status=$(kv_get "last_status" "$queue_info")
+          queue_first_id=$(kv_get "first_id" "$queue_info")
+          clear_stale_running=0
+          stale_error_message=""
+          if [ "$queue_running" = "1" ]; then
+            queue_dir=$(conversation_queue_dir_for "$conv_dir")
+            running_meta_file=$(queue_running_meta_file_for "$conv_dir")
+            running_pid=$(read_file_line "$queue_dir/running.pid" "")
+            running_started=$(read_file_line "$queue_dir/running.started" "0")
+            running_compute_budget=$(queue_meta_compute_budget_from_file "$running_meta_file")
+            running_compute_budget=$(normalize_compute_budget "$running_compute_budget")
+            stale_timeout_sec=${ARTIFICER_QUEUE_STALE_TIMEOUT_SEC:-0}
+            case "$stale_timeout_sec" in
+              ""|*[!0-9]*)
+                stale_timeout_sec=0
+                ;;
+            esac
+            if [ "$stale_timeout_sec" -le 0 ]; then
+              run_budget_hint=${ARTIFICER_RUN_TIME_BUDGET_SEC:-900}
+              case "$run_budget_hint" in
+                ""|*[!0-9]*)
+                  run_budget_hint=900
+                  ;;
+              esac
+              stale_timeout_sec=$(compute_budget_stale_timeout_sec "$running_compute_budget" "$run_budget_hint")
+            fi
+            if [ -n "$running_pid" ] && ! kill -0 "$running_pid" 2>/dev/null; then
+              clear_stale_running=1
+              stale_error_message="run process is no longer active"
+            fi
+            case "$running_started" in
+              ""|*[!0-9]*)
+                running_started=0
+                ;;
+            esac
+            if [ -z "$running_pid" ] && [ "$clear_stale_running" -ne 1 ]; then
+              missing_pid_grace=$(queue_missing_pid_grace_sec)
+              if [ "$running_started" -le 0 ]; then
+                clear_stale_running=1
+                stale_error_message="run lock has no worker pid"
+              else
+                running_now=$(date +%s)
+                running_age=$((running_now - running_started))
+                if [ "$running_age" -gt "$missing_pid_grace" ]; then
+                  clear_stale_running=1
+                  stale_error_message="run lock has no worker pid (>${missing_pid_grace}s)"
+                fi
+              fi
+            fi
+            if [ "$running_started" -gt 0 ]; then
+              running_now=$(date +%s)
+              running_age=$((running_now - running_started))
+              if [ "$running_age" -gt "$stale_timeout_sec" ]; then
+                clear_stale_running=1
+                stale_error_message="run exceeded stale timeout (${stale_timeout_sec}s)"
+              fi
+            fi
+            if [ "$queue_last_status" = "error" ] && [ "$queue_pending" = "0" ]; then
+              clear_stale_running=1
+              stale_error_message="run state became stale after error"
+            fi
+          fi
+          if [ "$ws_path_exists" != "1" ] && [ "$queue_running" = "1" ]; then
+            clear_stale_running=1
+            stale_error_message="workspace path is missing or unavailable"
+          fi
+          if [ "$clear_stale_running" = "1" ]; then
+            requeued_running=$(queue_requeue_running_state "$conv_dir")
+            queue_dir=$(conversation_queue_dir_for "$conv_dir")
+            if [ "$requeued_running" = "1" ]; then
+              printf '%s\n' "queued" > "$queue_dir/last_status"
+              printf '%s\n' "stale run was requeued for retry" > "$queue_dir/last_error"
+              date +%s > "$queue_dir/last_done"
+            else
+              case "$queue_last_status" in
+                ""|running|queued)
+                  printf '%s\n' "error" > "$queue_dir/last_status"
+                  printf '%s\n' "${stale_error_message:-run state became stale}" > "$queue_dir/last_error"
+                  date +%s > "$queue_dir/last_done"
+                  ;;
+              esac
+            fi
+            queue_info=$(queue_state_for_conversation "$conv_dir")
+            queue_pending=$(kv_get "pending" "$queue_info")
+            queue_running=$(kv_get "running" "$queue_info")
+            queue_done=$(kv_get "done" "$queue_info")
+            queue_last_status=$(kv_get "last_status" "$queue_info")
+            queue_first_id=$(kv_get "first_id" "$queue_info")
+          fi
+          decision_request_json=$(decision_request_json_for_conversation "$conv_dir")
+          approval_request_json=$(approval_request_json_for_conversation "$conv_dir")
 
-        [ -n "$queue_pending" ] || queue_pending=0
-        [ -n "$queue_running" ] || queue_running=0
-        [ -n "$queue_done" ] || queue_done=0
+          [ -n "$queue_pending" ] || queue_pending=0
+          [ -n "$queue_running" ] || queue_running=0
+          [ -n "$queue_done" ] || queue_done=0
+        fi
 
         conv_id_json=$(json_escape "$conv_id")
         conv_title_json=$(json_escape "$conv_title")
@@ -9170,7 +9242,10 @@ EOF_TOG
   done
 
   printf ']'
-  if command -v ma_triage_cards_json >/dev/null 2>&1; then
+  if [ "$state_light" = "1" ]; then
+    printf ',"triage":{"count":"0","cards":[]}'
+    printf ',"multi_agent_catalog":{"curated_residents":[],"target_types":[],"escalation_classes":[]}'
+  elif command -v ma_triage_cards_json >/dev/null 2>&1; then
     triage_cards_json=$(ma_triage_cards_json)
     triage_count=$(printf '%s\n' "$triage_cards_json" | perl -MJSON::PP -e 'use strict; use warnings; local $/; my $raw=<STDIN>; my $data = eval { decode_json($raw) }; if ($@ || ref($data) ne "ARRAY") { print 0; exit 0; } print scalar(@$data);' 2>/dev/null || printf '0')
     printf ',"triage":{"count":"%s","cards":%s}' "$(json_escape "$triage_count")" "$triage_cards_json"
@@ -9413,7 +9488,7 @@ case "$action" in
 
   mode_runtime_state)
     if command -v mr_mode_runtime_state_response >/dev/null 2>&1; then
-      mode_runtime_bootstrap
+      ensure_mode_runtime_bootstrap
       mr_mode_runtime_state_response
     else
       emit_error "mode runtime is unavailable"
@@ -9423,7 +9498,7 @@ case "$action" in
 
   mode_runtime_update)
     if command -v mr_mode_update_json >/dev/null 2>&1; then
-      mode_runtime_bootstrap
+      ensure_mode_runtime_bootstrap
       mr_mode_update_json
       printf '\n'
     else
@@ -9434,7 +9509,7 @@ case "$action" in
 
   mode_runtime_tick)
     if command -v mr_mode_runtime_tick_response >/dev/null 2>&1; then
-      mode_runtime_bootstrap
+      ensure_mode_runtime_bootstrap
       mr_mode_runtime_tick_response
     else
       emit_error "mode runtime is unavailable"
@@ -9444,7 +9519,7 @@ case "$action" in
 
   mode_runtime_skill_invoke)
     if command -v mr_mode_runtime_skill_invoke_response >/dev/null 2>&1; then
-      mode_runtime_bootstrap
+      ensure_mode_runtime_bootstrap
       mr_mode_runtime_skill_invoke_response
     else
       emit_error "mode runtime is unavailable"
@@ -9454,7 +9529,7 @@ case "$action" in
 
   mode_runtime_skill_create)
     if command -v mr_mode_runtime_skill_create_response >/dev/null 2>&1; then
-      mode_runtime_bootstrap
+      ensure_mode_runtime_bootstrap
       mr_mode_runtime_skill_create_response
     else
       emit_error "mode runtime is unavailable"
@@ -9464,7 +9539,7 @@ case "$action" in
 
   mode_runtime_skill_install)
     if command -v mr_mode_runtime_skill_install_response >/dev/null 2>&1; then
-      mode_runtime_bootstrap
+      ensure_mode_runtime_bootstrap
       mr_mode_runtime_skill_install_response
     else
       emit_error "mode runtime is unavailable"
@@ -11165,6 +11240,18 @@ EOF
           running_started=0
           ;;
       esac
+      if [ -z "$running_pid" ] && [ "$running_stale" -ne 1 ]; then
+        missing_pid_grace=$(queue_missing_pid_grace_sec)
+        if [ "$running_started" -le 0 ]; then
+          running_stale=1
+        else
+          running_now=$(date +%s)
+          running_age=$((running_now - running_started))
+          if [ "$running_age" -gt "$missing_pid_grace" ]; then
+            running_stale=1
+          fi
+        fi
+      fi
       if [ "$running_started" -gt 0 ]; then
         running_now=$(date +%s)
         running_age=$((running_now - running_started))
@@ -13060,6 +13147,7 @@ EOF
     explicit_skill_context_text=""
     explicit_skill_invocation_count=0
     if [ -n "$explicit_skill_ids_csv" ]; then
+      ensure_mode_runtime_bootstrap
       stream_emit_line "$stream_output_file" "Explicit skill tags detected: $explicit_skill_ids_csv"
       skill_invoke_mode="assistant"
       if [ "$run_mode" = "assistant" ] && [ -n "$assistant_mode_id" ]; then
@@ -13402,6 +13490,7 @@ $explicit_skill_context_text"
         ;;
     esac
 
+    ensure_mode_runtime_bootstrap
     if [ "$run_mode" = "assistant" ] && [ -n "$assistant_mode_id" ] && command -v mr_mode_exists >/dev/null 2>&1 && mr_mode_exists "$assistant_mode_id"; then
       assistant_manifest_file=$(mr_mode_manifest_file "$assistant_mode_id")
       assistant_policy_file=$(mr_mode_policy_file "$assistant_mode_id")

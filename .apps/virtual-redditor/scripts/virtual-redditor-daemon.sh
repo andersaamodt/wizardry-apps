@@ -179,7 +179,7 @@ bootstrap_state() {
 
   if [ ! -f "$BOT_ENV_FILE" ]; then
     cat > "$BOT_ENV_FILE" <<'BOTENV'
-MODE=mixed
+MODE=judicial
 PATROL_MODE=full
 PATROL_SAMPLE_MAX=20
 PATROL_INTERVAL_MIN=35
@@ -215,7 +215,7 @@ load_bot_env() {
   # shellcheck disable=SC1090
   . "$BOT_ENV_FILE"
 
-  MODE=${MODE:-mixed}
+  MODE=${MODE:-judicial}
   PATROL_MODE=${PATROL_MODE:-full}
   PATROL_SAMPLE_MAX=$(to_int "${PATROL_SAMPLE_MAX:-20}" 20)
   PATROL_INTERVAL_MIN=$(to_int "${PATROL_INTERVAL_MIN:-35}" 35)
@@ -234,7 +234,7 @@ load_bot_env() {
 
   case "$MODE" in
     judicial|capricious|mixed) ;;
-    *) MODE=mixed ;;
+    *) MODE=judicial ;;
   esac
 
   case "$PATROL_MODE" in

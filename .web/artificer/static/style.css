@@ -129,14 +129,15 @@ h2 {
   position: relative;
   height: 100dvh;
   display: grid;
-  grid-template-columns: var(--threads-width, 308px) minmax(0, 1fr) minmax(0, 0px);
+  --threads-width-clamped: clamp(250px, var(--threads-width, 308px), 620px);
+  grid-template-columns: var(--threads-width-clamped) minmax(0, 1fr) minmax(0, 0px);
   background: var(--bg-panel);
   --terminal-offset: 0px;
   transition: grid-template-columns 220ms ease;
 }
 
 .forge-shell.diff-open {
-  grid-template-columns: var(--threads-width, 308px) minmax(0, 1fr) minmax(0, var(--diff-width, 300px));
+  grid-template-columns: var(--threads-width-clamped) minmax(0, 1fr) minmax(0, var(--diff-width, 300px));
 }
 
 .forge-shell.terminal-open {
@@ -147,9 +148,16 @@ h2 {
   position: relative;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   border-right: 1px solid var(--line-strong);
   background: var(--bg-panel);
+}
+
+.workspace-drag-strip {
+  height: 28px;
+  min-height: 28px;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .pane-resizer {
@@ -163,7 +171,7 @@ h2 {
 .threads-resizer {
   top: 0;
   bottom: 0;
-  left: calc(var(--threads-width, 308px) - 5px);
+  left: calc(var(--threads-width-clamped) - 5px);
 }
 
 .threads-resizer::before,
@@ -232,6 +240,16 @@ h2 {
 
 .workspace-tree .empty-state {
   padding: 12px 10px;
+}
+
+.workspace-tree .empty-state.workspace-loading {
+  font-size: 0.84rem;
+}
+
+.workspace-tree .empty-state.workspace-loading .run-spinner {
+  margin-left: 6px;
+  margin-right: 0;
+  vertical-align: -1px;
 }
 
 .empty-state .run-spinner {
@@ -771,6 +789,37 @@ h2 {
   background: var(--bg-panel);
   padding-bottom: var(--terminal-offset);
   transition: padding-bottom 190ms ease;
+}
+
+.forge-shell.right-pane-blank .main-shell {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.forge-shell.right-pane-blank .main-shell > .toolbar,
+.forge-shell.right-pane-blank .main-shell > .chat-shell > .command-approval-inline,
+.forge-shell.right-pane-blank .main-shell > .chat-shell > .decision-request-inline,
+.forge-shell.right-pane-blank .main-shell > .chat-shell > #chat-jump-bottom-btn,
+.forge-shell.right-pane-blank .main-shell > .chat-shell > .run-form {
+  display: none !important;
+}
+
+.forge-shell.right-pane-blank .main-shell > .chat-shell > .chat-log {
+  padding: 0;
+}
+
+.empty-thread-hint,
+#empty-right-hint {
+  position: absolute;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  color: #6a728f !important;
+  font-style: italic !important;
+  font-size: 0.84rem !important;
+  pointer-events: none !important;
 }
 
 .toolbar {
@@ -1835,6 +1884,7 @@ h2 {
   display: grid;
   align-content: start;
   gap: 9px;
+  position: relative;
 }
 
 .chat-jump-bottom {
@@ -2338,6 +2388,21 @@ h2 {
 .empty-state {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.empty-state-loading {
+  position: absolute;
+  left: 50%;
+  top: 25%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  font-size: 0.84rem;
+  font-style: normal;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .empty-state.subtle-empty {
@@ -3234,6 +3299,36 @@ h2 {
   cursor: pointer;
 }
 
+.send-menu-anchor .floating-menu {
+  left: auto;
+  right: 0;
+  top: auto;
+  bottom: calc(100% + 7px);
+}
+
+.send-menu {
+  min-width: 132px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.send-menu button {
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 0.84rem;
+}
+
+.send-menu .shortcut {
+  color: var(--menu-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+}
+
+.send-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .composer-reasoning-anchor {
   margin-left: 6px;
 }
@@ -3299,6 +3394,8 @@ h2 {
 }
 
 .run-spinner {
+  display: inline-block;
+  flex-shrink: 0;
   width: 12px;
   height: 12px;
   border: 2px solid var(--line);
@@ -3463,7 +3560,7 @@ textarea::-webkit-scrollbar-thumb {
 
 .terminal-panel {
   position: absolute;
-  left: var(--threads-width, 308px);
+  left: var(--threads-width-clamped);
   right: 0;
   bottom: 0;
   height: var(--terminal-height);
@@ -3611,8 +3708,10 @@ textarea::-webkit-scrollbar-thumb {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 8px 8px 6px 10px;
+  margin: 4px 8px 6px 10px;
   color: color-mix(in srgb, var(--text-muted) 90%, var(--bg-panel));
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .workspace-tree-main-head .workspace-head-actions {
@@ -3626,6 +3725,8 @@ textarea::-webkit-scrollbar-thumb {
   border-radius: 7px;
   background: transparent;
   color: var(--text);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .workspace-tree-main-head .workspace-head-actions .icon-btn:hover {
@@ -4837,6 +4938,11 @@ select:focus {
   color: var(--success);
 }
 
+#workspace-add-submit {
+  justify-self: start;
+  width: auto;
+}
+
 .ghost {
   background: var(--surface-hover);
   color: var(--text-muted);
@@ -4868,11 +4974,12 @@ select:focus {
 
 @media (max-width: 1080px) {
   .forge-shell {
-    grid-template-columns: var(--threads-width, 290px) minmax(0, 1fr) minmax(0, 0px);
+    --threads-width-clamped: clamp(250px, var(--threads-width, 290px), 560px);
+    grid-template-columns: var(--threads-width-clamped) minmax(0, 1fr) minmax(0, 0px);
   }
 
   .forge-shell.diff-open {
-    grid-template-columns: var(--threads-width, 290px) minmax(0, 1fr) minmax(0, var(--diff-width, 300px));
+    grid-template-columns: var(--threads-width-clamped) minmax(0, 1fr) minmax(0, var(--diff-width, 300px));
   }
 
   .diff-panel {

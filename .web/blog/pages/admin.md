@@ -2,382 +2,470 @@
 title: Blog Admin
 ---
 
-# Blog Admin Panel
+<div id="admin-access-message" class="admin-access-message" hidden></div>
 
-<div id="auth-status" style="padding: 1rem; margin-bottom: 1rem; border-radius: 4px;"></div>
+<div id="admin-panel" class="admin-layout" style="display:none;">
+<aside class="admin-sidebar">
+<h2>Admin</h2>
+<div class="admin-nav-list" role="tablist" aria-label="Admin sections">
+<button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true">Settings</button>
+<button type="button" class="admin-nav-item" data-admin-nav="compose" aria-selected="false">Compose</button>
+<button type="button" class="admin-nav-item" data-admin-nav="drafts" aria-selected="false">Drafts</button>
+<button type="button" class="admin-nav-item" data-admin-nav="queue" aria-selected="false">Queue</button>
+</div>
+</aside>
 
-<div id="admin-panel" style="display: none;">
+<div class="admin-content">
+  <section class="admin-section is-active" data-admin-section="settings">
+  <div class="demo-box">
+  <h3>Site Configuration</h3>
 
-## Settings
-
-<div class="demo-box">
-<h3>Site Configuration</h3>
-
-<div style="margin-bottom: 1rem;">
-<label style="display: block; margin-bottom: 0.5rem;"><strong>Site Title:</strong></label>
-<input type="text" id="site-title" style="width: 100%; padding: 0.5rem; border: 2px solid #ddd; border-radius: 4px;">
+<div class="field-row">
+<label for="site-title"><strong>Site Title</strong></label>
+<input type="text" id="site-title" placeholder="My Blog">
 </div>
 
-<div style="margin-bottom: 1rem;">
-<label style="display: flex; align-items: center; gap: 0.5rem;">
+<div class="field-row">
+<label for="admin-theme"><strong>Theme</strong></label>
+<select id="admin-theme">
+<option value="adept">Adept</option>
+<option value="alchemist">Alchemist</option>
+<option value="archmage">Archmage</option>
+<option value="chronomancer">Chronomancer</option>
+<option value="conjurer">Conjurer</option>
+<option value="druid">Druid</option>
+<option value="empath">Empath</option>
+<option value="enchanter">Enchanter</option>
+<option value="geomancer">Geomancer</option>
+<option value="hermeticist">Hermeticist</option>
+<option value="hierophant">Hierophant</option>
+<option value="illusionist">Illusionist</option>
+<option value="lich">Lich</option>
+<option value="necromancer">Necromancer</option>
+<option value="pyromancer">Pyromancer</option>
+<option value="seer">Seer</option>
+<option value="shaman">Shaman</option>
+<option value="sorcerer">Sorcerer</option>
+<option value="sorceress">Sorceress</option>
+<option value="technomancer">Technomancer</option>
+<option value="thaumaturge">Thaumaturge</option>
+<option value="thelemite">Thelemite</option>
+<option value="theurgist">Theurgist</option>
+<option value="wadjet">Wadjet</option>
+<option value="warlock">Warlock</option>
+<option value="wizard">Wizard</option>
+</select>
+<p class="muted">Theme selection moved here under Blog Settings.</p>
+</div>
+
+<div class="field-row checkbox-row">
+<label>
 <input type="checkbox" id="registration-enabled">
 <strong>Enable User Registration</strong>
 </label>
-<p style="font-size: 0.9rem; color: #666; margin: 0.5rem 0 0 1.5rem;">
-Allow new users to register with their MUD player SSH keys
-</p>
+<p class="muted">Allow new users to register with MUD player SSH keys.</p>
 </div>
 
-<button id="btn-save-config" style="padding: 0.75rem 1.5rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">💾 Save Settings</button>
-
-<div id="output-config" class="output"></div>
+<div class="grid-two">
+<div class="field-row">
+<label for="drip-interval"><strong>Drip Interval (hours)</strong></label>
+<input type="number" id="drip-interval" min="0.1" step="0.1" value="4">
+</div>
+<div class="field-row">
+<label for="drip-jitter"><strong>Drip Random Jitter (minutes)</strong></label>
+<input type="number" id="drip-jitter" min="0" step="1" value="0">
+</div>
 </div>
 
-## Compose New Post
+<div class="grid-two">
+<div class="field-row checkbox-row">
+<label>
+<input type="checkbox" id="feed-full-text" checked>
+<strong>Full Text RSS/Atom</strong>
+</label>
+<p class="muted">Include full post body in feeds when available.</p>
+</div>
+<div class="field-row">
+<label for="feed-items"><strong>Feed Item Count</strong></label>
+<input type="number" id="feed-items" min="1" step="1" value="50">
+</div>
+</div>
 
-<div class="demo-box">
-<h3>✍️ Markdown Composer</h3>
+  <button id="btn-save-config" class="primary">Save Settings</button>
+  <div id="output-config" class="output"></div>
+  </div>
+  </section>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+  <section class="admin-section" data-admin-section="compose" hidden>
+  <div class="demo-box">
+  <div class="composer-head">
+  <h3>Markdown Composer</h3>
+  <div id="current-draft-label" class="muted">New draft</div>
+  </div>
 
+<div class="grid-two composer-grid">
 <div>
-<h4 style="margin-top: 0;">Editor</h4>
-
-<div style="margin-bottom: 1rem;">
-<label style="display: block; margin-bottom: 0.5rem;"><strong>Post Title:</strong></label>
-<input type="text" id="post-title" placeholder="My Amazing Post" style="width: 100%; padding: 0.5rem; border: 2px solid #ddd; border-radius: 4px;">
+<div class="field-row">
+<label for="post-title"><strong>Post Title</strong></label>
+<input type="text" id="post-title" placeholder="My amazing post">
 </div>
 
-<div style="margin-bottom: 1rem;">
-<label style="display: block; margin-bottom: 0.5rem;"><strong>Tags (comma-separated):</strong></label>
-<input type="text" id="post-tags" placeholder="tech, tutorial, wizardry" style="width: 100%; padding: 0.5rem; border: 2px solid #ddd; border-radius: 4px;">
+<div class="field-row">
+<label for="post-tags"><strong>Tags (comma-separated)</strong></label>
+<input type="text" id="post-tags" placeholder="tech, tutorial, notes">
 </div>
 
-<div style="margin-bottom: 1rem;">
-<label style="display: block; margin-bottom: 0.5rem;"><strong>Summary:</strong></label>
-<input type="text" id="post-summary" placeholder="A brief description" style="width: 100%; padding: 0.5rem; border: 2px solid #ddd; border-radius: 4px;">
+<div class="field-row">
+<label for="post-summary"><strong>Summary</strong></label>
+<input type="text" id="post-summary" placeholder="Short description for index + feeds">
 </div>
 
-<div style="margin-bottom: 1rem;">
-<label style="display: block; margin-bottom: 0.5rem;"><strong>Content (Markdown):</strong></label>
-<textarea id="post-content" rows="15" placeholder="# Your post content here&#10;&#10;Write in **Markdown**!&#10;&#10;- Lists work&#10;- Code blocks too&#10;&#10;```sh&#10;echo 'Hello, World!'&#10;```" style="width: 100%; padding: 0.75rem; border: 2px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 0.9rem;"></textarea>
+<div class="field-row">
+<strong>Release Mode</strong>
+<div class="mode-row">
+<label><input type="radio" name="publish-mode" value="draft" checked> Draft</label>
+<label><input type="radio" name="publish-mode" value="scheduled"> Scheduled Date</label>
+<label><input type="radio" name="publish-mode" value="drip"> Drip Queue</label>
+</div>
 </div>
 
-<div style="display: flex; gap: 0.5rem;">
-<button id="btn-save-draft" style="padding: 0.75rem 1.5rem; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer;">💾 Save as Draft</button>
-<button id="btn-publish" style="padding: 0.75rem 1.5rem; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;">🚀 Publish</button>
+<div class="field-row">
+<label for="post-scheduled-at"><strong>Scheduled Release Date/Time</strong></label>
+<input type="datetime-local" id="post-scheduled-at">
 </div>
 
+<div class="toolbar">
+<button type="button" data-toolbar="bold"><strong>B</strong></button>
+<button type="button" data-toolbar="italic"><em>I</em></button>
+<button type="button" data-toolbar="h2">H2</button>
+<button type="button" data-toolbar="h3">H3</button>
+<button type="button" data-toolbar="code">Code</button>
+<button type="button" data-toolbar="link">Link</button>
+<button type="button" data-toolbar="quote">Quote</button>
+<button type="button" data-toolbar="ul">UL</button>
+<button type="button" data-toolbar="ol">OL</button>
+<button type="button" data-toolbar="image">Image</button>
+</div>
+
+<div class="field-row">
+<label for="post-content"><strong>Content</strong></label>
+<textarea id="post-content" rows="16" placeholder="# Write in Markdown\n\nDrop images anywhere on this page to upload + insert."></textarea>
+</div>
+
+<input type="file" id="image-picker" accept="image/*" multiple style="display:none;">
+
+<div class="button-row">
+<button id="btn-new-draft" type="button">New</button>
+<button id="btn-save-draft" type="button">Save Draft</button>
+<button id="btn-queue-scheduled" type="button">Queue Scheduled</button>
+<button id="btn-queue-drip" type="button">Queue Drip</button>
+<button id="btn-publish-now" type="button" class="primary">Publish Now</button>
+<button id="btn-delete-current" type="button" class="danger">Delete Draft</button>
+</div>
+
+<div id="autosave-status" class="muted">Autosave idle</div>
 <div id="output-compose" class="output"></div>
 </div>
 
 <div>
-<h4 style="margin-top: 0;">Live Preview</h4>
-<div id="markdown-preview" style="border: 2px solid #ddd; border-radius: 4px; padding: 1rem; min-height: 400px; background: white; overflow-y: auto; max-height: 600px;">
-<p style="color: #999; font-style: italic;">Preview will appear here...</p>
+<h4 style="margin-top:0;">Live Preview</h4>
+<div id="markdown-preview" class="preview-box">
+<p class="placeholder">Preview will appear here...</p>
+</div>
+</div>
+  </div>
+  </div>
+  </section>
+
+  <section class="admin-section" data-admin-section="drafts" hidden>
+  <div class="demo-box">
+  <div class="row-head">
+  <h3>Draft Manager</h3>
+  <button id="btn-refresh-drafts" type="button">Refresh</button>
+  </div>
+  <div id="drafts-list"></div>
+  </div>
+  </section>
+
+  <section class="admin-section" data-admin-section="queue" hidden>
+  <div class="demo-box">
+  <div class="row-head">
+  <h3>Publish Queue</h3>
+  <div>
+  <button id="btn-refresh-queue" type="button">Refresh</button>
+  <button id="btn-run-scheduler" type="button" class="primary">Run Scheduler</button>
+  </div>
+  </div>
+  <div id="queue-list"></div>
+  <div id="output-queue" class="output"></div>
+  </div>
+  </section>
 </div>
 </div>
 
-</div>
-</div>
-
-## Manage Drafts
-
-<div class="demo-box">
-<h3>📝 Draft Posts</h3>
-
-<button id="btn-refresh-drafts" style="padding: 0.5rem 1rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 1rem;">🔄 Refresh</button>
-
-<div id="drafts-list" style="margin-top: 1rem;"></div>
-</div>
-
-</div>
+<div id="drop-overlay" class="drop-overlay">Drop images to upload and insert into your draft</div>
 
 <script src="https://cdn.jsdelivr.net/npm/marked@11.0.0/marked.min.js"></script>
-<script>
-(function() {
-  const authStatus = document.getElementById('auth-status');
-  const adminPanel = document.getElementById('admin-panel');
-  let sessionToken = localStorage.getItem('session_token');
-  let isAdmin = false;
-  let username = '';
-  
-  // Check authentication status
-  async function checkAuth() {
-    if (!sessionToken) {
-      showAuthMessage('Not logged in. Please <a href="ssh-auth.html">login</a> first.', 'error');
-      return;
-    }
-    
-    try {
-      const response = await fetch('/cgi/ssh-auth-check-session?session_token=' + encodeURIComponent(sessionToken));
-      const data = await response.json();
-      
-      if (data.authenticated && data.is_admin) {
-        isAdmin = true;
-        username = data.username;
-        showAuthMessage('Logged in as: <strong>' + username + '</strong> (Admin)', 'success');
-        adminPanel.style.display = 'block';
-        loadConfig();
-        loadDrafts();
-      } else if (data.authenticated) {
-        showAuthMessage('Logged in as: <strong>' + data.username + '</strong> (No admin permissions)', 'warning');
-      } else {
-        showAuthMessage('Session expired. Please <a href="ssh-auth.html">login</a> again.', 'error');
-        localStorage.removeItem('session_token');
-      }
-    } catch (error) {
-      showAuthMessage('Error checking authentication: ' + error.message, 'error');
-    }
-  }
-  
-  function showAuthMessage(message, type) {
-    const colors = {
-      success: '#e8f5e9',
-      error: '#ffebee',
-      warning: '#fff3e0'
-    };
-    const borderColors = {
-      success: '#4caf50',
-      error: '#f44336',
-      warning: '#ff9800'
-    };
-    authStatus.style.background = colors[type] || '#f5f5f5';
-    authStatus.style.border = '1px solid ' + (borderColors[type] || '#ddd');
-    authStatus.innerHTML = message;
-  }
-  
-  // Load configuration
-  async function loadConfig() {
-    try {
-      const response = await fetch('/cgi/blog-get-config');
-      const data = await response.json();
-      
-      if (data.success) {
-        document.getElementById('site-title').value = data.site_title || 'My Blog';
-        document.getElementById('registration-enabled').checked = data.registration_enabled !== 'false';
-      }
-    } catch (error) {
-      console.error('Error loading config:', error);
-    }
-  }
-  
-  // Save configuration
-  document.getElementById('btn-save-config').addEventListener('click', async () => {
-    const output = document.getElementById('output-config');
-    const siteTitle = document.getElementById('site-title').value;
-    const regEnabled = document.getElementById('registration-enabled').checked ? 'true' : 'false';
-    
-    try {
-      const params = new URLSearchParams({
-        session_token: sessionToken,
-        site_title: siteTitle,
-        registration_enabled: regEnabled
-      });
-      
-      const response = await fetch('/cgi/blog-update-config?' + params.toString());
-      const data = await response.json();
-      
-      if (data.success) {
-        output.innerHTML = '<div style="background: #e8f5e9; padding: 1rem; border-radius: 4px; border: 1px solid #4caf50; margin-top: 1rem;"><strong>✅ Settings saved!</strong></div>';
-      } else {
-        output.innerHTML = '<div style="background: #ffebee; padding: 1rem; border-radius: 4px; border: 1px solid #f44336; margin-top: 1rem;"><strong>❌ Error:</strong> ' + (data.error || 'Unknown error') + '</div>';
-      }
-    } catch (error) {
-      output.innerHTML = '<div style="background: #ffebee; padding: 1rem; border-radius: 4px; border: 1px solid #f44336; margin-top: 1rem;"><strong>❌ Error:</strong> ' + error.message + '</div>';
-    }
-  });
-  
-  // Live markdown preview
-  const contentArea = document.getElementById('post-content');
-  const previewArea = document.getElementById('markdown-preview');
-  
-  function updatePreview() {
-    const markdown = contentArea.value;
-    if (markdown.trim()) {
-      previewArea.innerHTML = marked.parse(markdown);
-    } else {
-      previewArea.innerHTML = '<p style="color: #999; font-style: italic;">Preview will appear here...</p>';
-    }
-  }
-  
-  contentArea.addEventListener('input', updatePreview);
-  
-  // Load drafts
-  async function loadDrafts() {
-    const draftsList = document.getElementById('drafts-list');
-    draftsList.innerHTML = '<p style="color: #666;">Loading drafts...</p>';
-    
-    try {
-      const response = await fetch('/cgi/blog-list-drafts?session_token=' + encodeURIComponent(sessionToken));
-      const data = await response.json();
-      
-      if (data.success) {
-        if (data.drafts && data.drafts.length > 0) {
-          let html = '<div style="display: grid; gap: 0.5rem;">';
-          data.drafts.forEach(draft => {
-            html += '<div style="border: 1px solid #ddd; border-radius: 4px; padding: 0.75rem; background: #f9f9f9;">';
-            html += '<strong>' + draft.title + '</strong>';
-            html += '<br><span style="font-size: 0.85rem; color: #666;">' + draft.filename + '</span>';
-            html += '</div>';
-          });
-          html += '</div>';
-          draftsList.innerHTML = html;
-        } else {
-          draftsList.innerHTML = '<p style="color: #666;">No drafts found.</p>';
-        }
-      } else {
-        draftsList.innerHTML = '<p style="color: #f44336;">Error loading drafts: ' + (data.error || 'Unknown error') + '</p>';
-      }
-    } catch (error) {
-      draftsList.innerHTML = '<p style="color: #f44336;">Error: ' + error.message + '</p>';
-    }
-  }
-  
-  document.getElementById('btn-refresh-drafts').addEventListener('click', loadDrafts);
-  
-  // Save draft
-  document.getElementById('btn-save-draft').addEventListener('click', async () => {
-    const output = document.getElementById('output-compose');
-    const title = document.getElementById('post-title').value.trim();
-    const tags = document.getElementById('post-tags').value.trim();
-    const summary = document.getElementById('post-summary').value.trim();
-    const content = document.getElementById('post-content').value.trim();
-    
-    if (!title || !content) {
-      output.innerHTML = '<div style="background: #ffebee; padding: 1rem; border-radius: 4px; border: 1px solid #f44336; margin-top: 1rem;"><strong>❌ Error:</strong> Title and content are required</div>';
-      return;
-    }
-    
-    output.innerHTML = '<p style="color: #2980b9; margin-top: 1rem;">💾 Saving draft...</p>';
-    
-    try {
-      const params = new URLSearchParams({
-        session_token: sessionToken,
-        title: title,
-        tags: tags,
-        summary: summary,
-        content: content,
-        visibility: 'draft'
-      });
-      
-      const response = await fetch('/cgi/blog-save-post?' + params.toString());
-      const data = await response.json();
-      
-      if (data.success) {
-        output.innerHTML = '<div style="background: #e8f5e9; padding: 1rem; border-radius: 4px; border: 1px solid #4caf50; margin-top: 1rem;"><strong>✅ ' + data.message + '!</strong><br>File: ' + data.filename + '</div>';
-        loadDrafts();  // Refresh draft list
-      } else {
-        output.innerHTML = '<div style="background: #ffebee; padding: 1rem; border-radius: 4px; border: 1px solid #f44336; margin-top: 1rem;"><strong>❌ Error:</strong> ' + (data.error || 'Unknown error') + '</div>';
-      }
-    } catch (error) {
-      output.innerHTML = '<div style="background: #ffebee; padding: 1rem; border-radius: 4px; border: 1px solid #f44336; margin-top: 1rem;"><strong>❌ Error:</strong> ' + error.message + '</div>';
-    }
-  });
-  
-  // Publish post
-  document.getElementById('btn-publish').addEventListener('click', async () => {
-    const output = document.getElementById('output-compose');
-    const title = document.getElementById('post-title').value.trim();
-    const tags = document.getElementById('post-tags').value.trim();
-    const summary = document.getElementById('post-summary').value.trim();
-    const content = document.getElementById('post-content').value.trim();
-    
-    if (!title || !content) {
-      output.innerHTML = '<div style="background: #ffebee; padding: 1rem; border-radius: 4px; border: 1px solid #f44336; margin-top: 1rem;"><strong>❌ Error:</strong> Title and content are required</div>';
-      return;
-    }
-    
-    output.innerHTML = '<p style="color: #2980b9; margin-top: 1rem;">🚀 Publishing post...</p>';
-    
-    try {
-      const params = new URLSearchParams({
-        session_token: sessionToken,
-        title: title,
-        tags: tags,
-        summary: summary,
-        content: content,
-        visibility: 'public'
-      });
-      
-      const response = await fetch('/cgi/blog-save-post?' + params.toString());
-      const data = await response.json();
-      
-      if (data.success) {
-        output.innerHTML = '<div style="background: #e8f5e9; padding: 1rem; border-radius: 4px; border: 1px solid #4caf50; margin-top: 1rem;"><strong>✅ ' + data.message + '!</strong><br>File: ' + data.filename + '<br><br><a href="/pages/' + data.filename.replace('.md', '.html') + '" target="_blank" style="color: #27ae60; font-weight: bold;">View Published Post →</a></div>';
-        // Clear form
-        document.getElementById('post-title').value = '';
-        document.getElementById('post-tags').value = '';
-        document.getElementById('post-summary').value = '';
-        document.getElementById('post-content').value = '';
-        document.getElementById('markdown-preview').innerHTML = '<p style="color: #999; font-style: italic;">Preview will appear here...</p>';
-      } else {
-        output.innerHTML = '<div style="background: #ffebee; padding: 1rem; border-radius: 4px; border: 1px solid #f44336; margin-top: 1rem;"><strong>❌ Error:</strong> ' + (data.error || 'Unknown error') + '</div>';
-      }
-    } catch (error) {
-      output.innerHTML = '<div style="background: #ffebee; padding: 1rem; border-radius: 4px; border: 1px solid #f44336; margin-top: 1rem;"><strong>❌ Error:</strong> ' + error.message + '</div>';
-    }
-  });
-  
-  // Initialize
-  checkAuth();
-})();
-</script>
+<script src="/static/admin.js"></script>
 
 <style>
-.demo-box {
-  background: #f5f7fa;
-  border: 2px solid #3498db;
+.admin-access-message {
+  margin-bottom: 0.8rem;
+  padding: 0.55rem 0.75rem;
   border-radius: 8px;
-  padding: 1.5rem;
-  margin: 2rem 0;
+  border: 1px solid #d9dee8;
+  font-size: 0.92rem;
+}
+
+.admin-access-message.is-warn {
+  background: #fff8e1;
+  border-color: #f9a825;
+  color: #7c5a00;
+}
+
+.admin-access-message.is-error {
+  background: #ffebee;
+  border-color: #e53935;
+  color: #8f1316;
+}
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1.15rem;
+  align-items: start;
+}
+
+.admin-sidebar {
+  border: 1px solid #d4dbe7;
+  border-radius: 12px;
+  background: #f3f6fb;
+  padding: 0.8rem;
+  position: sticky;
+  top: 0.9rem;
+}
+
+.admin-sidebar h2 {
+  margin: 0 0 0.6rem;
+  padding: 0 0 0.45rem;
+  font-size: 1rem;
+  border-bottom: 1px solid #d7deea;
+}
+
+.admin-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.admin-nav-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #1e293b;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.admin-nav-item:hover {
+  background: #e8eef8;
+  border-color: #cfdae9;
+}
+
+.admin-nav-item.is-active {
+  background: #dbe7ff;
+  border-color: #7f9fe8;
+  color: #163d86;
+}
+
+.admin-content {
+  min-width: 0;
+}
+
+.admin-section {
+  display: none;
+}
+
+.admin-section.is-active {
+  display: block;
+}
+
+.demo-box {
+  background: #f6f8fb;
+  border: 2px solid #3498db;
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin: 0;
+}
+
+.field-row {
+  margin-bottom: 0.9rem;
+}
+
+.field-row label {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.checkbox-row label {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.composer-grid {
+  align-items: start;
+}
+
+.mode-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.mode-row label {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+
+.toolbar button {
+  min-width: 44px;
+  padding: 0.45rem 0.6rem;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.primary {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.danger {
+  background: #c62828;
+  color: #fff;
+}
+
+.notice {
+  border: 1px solid;
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  margin-top: 0.65rem;
 }
 
 .output {
-  min-height: 20px;
+  min-height: 14px;
 }
 
-button:hover {
-  opacity: 0.9;
-}
-
-button:active {
-  opacity: 0.8;
-}
-
-#markdown-preview h1, #markdown-preview h2, #markdown-preview h3 {
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-#markdown-preview p {
-  margin: 0.5rem 0;
-}
-
-#markdown-preview code {
-  background: #f4f4f4;
-  padding: 0.2rem 0.4rem;
-  border-radius: 3px;
-  font-family: monospace;
-}
-
-#markdown-preview pre {
-  background: #2c3e50;
-  color: #ecf0f1;
+.preview-box {
+  min-height: 420px;
+  border: 2px solid #d9dfe8;
+  border-radius: 8px;
   padding: 1rem;
-  border-radius: 4px;
-  overflow-x: auto;
+  background: #fff;
+  overflow: auto;
+  max-height: 700px;
 }
 
-#markdown-preview pre code {
-  background: none;
-  padding: 0;
-  color: inherit;
+.placeholder,
+.muted {
+  color: #6d7680;
+  font-size: 0.92rem;
 }
 
-@media (max-width: 768px) {
-  .demo-box > div > div {
-    grid-template-columns: 1fr !important;
+.row-head,
+.composer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.draft-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+.draft-card {
+  border: 1px solid #d8dde8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+.draft-card-head {
+  margin-bottom: 0.25rem;
+}
+
+.draft-actions {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  color: #fff;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  z-index: 9999;
+  text-align: center;
+  padding: 2rem;
+}
+
+.drop-overlay.show {
+  display: flex;
+}
+
+@media (max-width: 700px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: static;
+  }
+
+  .admin-nav-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .admin-nav-item {
+    width: auto;
+  }
+
+  .grid-two {
+    grid-template-columns: 1fr;
   }
 }
 </style>

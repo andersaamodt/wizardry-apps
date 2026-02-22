@@ -34,15 +34,22 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$out_file" ]; then
-  printf 'pandoc stub: missing --output\n' >&2
-  exit 2
+  # Fragment mode (used for feed generation): echo input as minimal HTML.
+  if [ -n "$in_file" ] && [ -f "$in_file" ]; then
+    cat "$in_file"
+  else
+    cat
+  fi
+  exit 0
 fi
 
 title=${in_file##*/}
 title=${title%.md}
 cat > "$out_file" <<HTML
 <!doctype html>
-<html><body><h1>$title</h1></body></html>
+<html><body><h1>$title</h1>
+$(cat "$in_file")
+</body></html>
 HTML
 EOF
 
@@ -88,14 +95,14 @@ test_build_generates_html_for_every_template() {
     site_name="build-${template}"
     site_dir="$test_web_root/$site_name"
 
-    WEB_WIZARDRY_ROOT="$test_web_root" run_spell spells/web/create-from-template "$site_name" "$template"
+    WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template "$site_name" "$template"
     if [ "$STATUS" -ne 0 ]; then
       TEST_FAILURE_REASON="failed to create test site for template '$template'"
       rm -rf "$test_web_root" "$stub_dir"
       return 1
     fi
 
-    PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" run_spell spells/web/build "$site_name" --full
+    PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/build "$site_name" --full
     if [ "$STATUS" -ne 0 ]; then
       TEST_FAILURE_REASON="build failed for template '$template'"
       rm -rf "$test_web_root" "$stub_dir"
@@ -118,8 +125,8 @@ test_build_generates_html_for_every_template() {
       return 1
     }
 
-    md_count=$(find "$site_dir/site/pages" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l | tr -d '[:space:]')
-    html_count=$(find "$site_dir/build/pages" -maxdepth 1 -name "*.html" -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+    md_count=$(find "$site_dir/site/pages" -name "*.md" -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+    html_count=$(find "$site_dir/build/pages" -name "*.html" -type f 2>/dev/null | wc -l | tr -d '[:space:]')
     if [ "${md_count:-0}" -gt 0 ] && [ "${html_count:-0}" -lt "${md_count:-0}" ]; then
       TEST_FAILURE_REASON="template '$template' built too few pages ($html_count/$md_count)"
       rm -rf "$test_web_root" "$stub_dir"
@@ -136,6 +143,102 @@ test_build_generates_html_for_every_template() {
   rm -rf "$test_web_root" "$stub_dir"
 }
 
+test_build_blog_generates_posts_and_feeds() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-build-root)
+  stub_dir=$(make_build_stub_dir)
+  site_name="build-blog"
+  site_dir="$test_web_root/$site_name"
+
+  WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template "$site_name" blog
+  assert_success
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/build "$site_name" --full
+  assert_success
+
+  source_posts=$(find "$site_dir/site/pages/posts" -name "*.md" -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+  built_posts=$(find "$site_dir/build/pages/posts" -name "*.html" -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+  if [ "${source_posts:-0}" -ne "${built_posts:-0}" ]; then
+    TEST_FAILURE_REASON="blog build should render nested post pages ($built_posts/$source_posts)"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+
+  [ -f "$site_dir/build/rss.xml" ] || {
+    TEST_FAILURE_REASON="blog build should generate rss.xml"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+  [ -f "$site_dir/build/atom.xml" ] || {
+    TEST_FAILURE_REASON="blog build should generate atom.xml"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+  [ -f "$site_dir/build/sitemap.xml" ] || {
+    TEST_FAILURE_REASON="blog build should generate sitemap.xml"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+  [ -f "$site_dir/build/robots.txt" ] || {
+    TEST_FAILURE_REASON="blog build should generate robots.txt"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+  [ -f "$site_dir/build/pages/archive.html" ] || {
+    TEST_FAILURE_REASON="blog build should generate archive.html"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+  [ -f "$site_dir/build/static/post-context.js" ] || {
+    TEST_FAILURE_REASON="blog build should include post-context.js"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+  if ! grep -q 'href="/rss.xml"' "$site_dir/build/pages/index.html"; then
+    TEST_FAILURE_REASON="blog index should include RSS footer link"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+  if ! grep -q 'href="/atom.xml"' "$site_dir/build/pages/index.html"; then
+    TEST_FAILURE_REASON="blog index should include Atom footer link"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+  if grep -q 'hx-get="/cgi/blog-index"' "$site_dir/build/pages/index.html"; then
+    TEST_FAILURE_REASON="blog index should prerender posts without htmx load placeholder"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+  if grep -q 'Loading posts...' "$site_dir/build/pages/index.html"; then
+    TEST_FAILURE_REASON="blog index should not show loading placeholder in static build"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+  if ! grep -q 'class="post-list"' "$site_dir/build/pages/index.html"; then
+    TEST_FAILURE_REASON="blog index should include rendered post-list HTML"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+  if grep -q 'hx-get="/cgi/blog-tags"' "$site_dir/build/pages/tags.html"; then
+    TEST_FAILURE_REASON="categories page should prerender tags without htmx load placeholder"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+  if grep -q 'Loading tags...' "$site_dir/build/pages/tags.html"; then
+    TEST_FAILURE_REASON="categories page should not show loading placeholder in static build"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+  if ! grep -q 'class="tag-cloud"' "$site_dir/build/pages/tags.html"; then
+    TEST_FAILURE_REASON="categories page should include rendered tag-cloud HTML"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  fi
+
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
 test_build_cache_falls_back_to_site_data_only() {
   skip-if-compiled || return $?
 
@@ -144,11 +247,11 @@ test_build_cache_falls_back_to_site_data_only() {
   blocked_cache_path="$test_web_root/blocked-cache-path"
   : > "$blocked_cache_path"
 
-  WEB_WIZARDRY_ROOT="$test_web_root" run_spell spells/web/create-from-template cachetest demo
+  WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template cachetest demo
   assert_success
 
   PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
-    WIZARDRY_WEB_JS_DIR="$blocked_cache_path" run_spell spells/web/build cachetest --full
+    WIZARDRY_WEB_JS_DIR="$blocked_cache_path" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/build cachetest --full
   assert_success
 
   fallback_lib_dir="$test_web_root/.sitedata/cachetest/.web-libs/js"
@@ -175,5 +278,6 @@ test_build_cache_falls_back_to_site_data_only() {
 run_test_case "build --help works" test_build_help
 run_test_case "build generates output for every template" test_build_generates_html_for_every_template
 run_test_case "build cache falls back to site data cache" test_build_cache_falls_back_to_site_data_only
+run_test_case "blog build renders nested posts and feeds" test_build_blog_generates_posts_and_feeds
 
 finish_tests

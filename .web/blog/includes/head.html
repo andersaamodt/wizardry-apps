@@ -1,1 +1,98 @@
 <link id="theme-stylesheet" rel="stylesheet" href="/cgi/blog-theme.css" />
+<script defer src="/static/post-context.js"></script>
+<link rel="alternate" type="application/rss+xml" title="RSS Feed" href="/rss.xml" />
+<link rel="alternate" type="application/atom+xml" title="Atom Feed" href="/atom.xml" />
+<meta name="description" content="Personal blog built with wizardry web" />
+<meta property="og:site_name" content="Wizardry Blog" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<style id="critical-pointer-cursors">
+  a[href],
+  button,
+  [role="button"],
+  [onclick],
+  summary,
+  select,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  .tag,
+  .feed-link,
+  .footer-feed-link {
+    cursor: pointer !important;
+  }
+
+  button[disabled],
+  select[disabled],
+  input[disabled],
+  [aria-disabled="true"] {
+    cursor: not-allowed !important;
+  }
+</style>
+<script>
+(function () {
+  var pointerSelector = [
+    'a[href]',
+    'button',
+    '[role="button"]',
+    '[onclick]',
+    'summary',
+    'select',
+    'input[type="button"]',
+    'input[type="submit"]',
+    'input[type="reset"]',
+    '.tag',
+    '.feed-link',
+    '.footer-feed-link'
+  ].join(',');
+
+  function applyPointerCursor(node) {
+    if (!node || !node.querySelectorAll) {
+      return;
+    }
+    if (node.matches && node.matches(pointerSelector)) {
+      node.style.cursor = 'pointer';
+    }
+    var items = node.querySelectorAll(pointerSelector);
+    for (var i = 0; i < items.length; i += 1) {
+      var el = items[i];
+      if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') {
+        el.style.cursor = 'not-allowed';
+      } else {
+        el.style.cursor = 'pointer';
+      }
+    }
+  }
+
+  var canonical = document.createElement('link');
+  canonical.rel = 'canonical';
+  canonical.href = window.location.origin + window.location.pathname;
+  document.head.appendChild(canonical);
+
+  var ogUrl = document.createElement('meta');
+  ogUrl.setAttribute('property', 'og:url');
+  ogUrl.setAttribute('content', canonical.href);
+  document.head.appendChild(ogUrl);
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var firstHeading = document.querySelector('h1[id]') || document.querySelector('h1');
+    if (firstHeading && !firstHeading.id) {
+      firstHeading.id = 'main-content';
+    }
+    applyPointerCursor(document);
+
+    var observer = new MutationObserver(function (mutations) {
+      for (var i = 0; i < mutations.length; i += 1) {
+        var added = mutations[i].addedNodes || [];
+        for (var j = 0; j < added.length; j += 1) {
+          var n = added[j];
+          if (n && n.nodeType === 1) {
+            applyPointerCursor(n);
+          }
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+})();
+</script>

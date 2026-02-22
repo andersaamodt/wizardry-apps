@@ -18,7 +18,7 @@ test_blog_template_has_sample_posts() {
   test_web_root=$(temp-dir web-wizardry-test)
   export WEB_WIZARDRY_ROOT="$test_web_root"
 
-  run_spell spells/web/create-from-template mytestblog blog
+  WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template mytestblog blog
   assert_success
 
   post_count=$(find "$test_web_root/mytestblog/site/pages/posts" -name "*.md" -type f | wc -l)
@@ -50,7 +50,7 @@ test_all_web_templates_create_expected_structure() {
     site_name="tmpl-${template}"
     site_dir="$test_web_root/$site_name"
 
-    run_spell spells/web/create-from-template "$site_name" "$template"
+    WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template "$site_name" "$template"
     if [ "$STATUS" -ne 0 ]; then
       TEST_FAILURE_REASON="failed to create template '$template'"
       rm -rf "$test_web_root"

@@ -1,0 +1,126 @@
+#!/bin/sh
+# Save draft / queue / publish post (admin only).
+
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+. "$SCRIPT_DIR/blog-lib.sh"
+
+blog_init
+blog_read_request_body
+blog_send_json_headers
+
+if ! blog_require_session true; then
+  exit 0
+fi
+
+action=$(blog_param action)
+draft_id=$(blog_param draft_id)
+title=$(blog_param title)
+tags=$(blog_param tags)
+summary=$(blog_param summary)
+content=$(blog_param content)
+publish_mode=$(blog_param publish_mode)
+scheduled_at=$(blog_param scheduled_at)
+visibility=$(blog_param visibility)
+
+if [ -z "$action" ]; then
+  case "$visibility" in
+    public) action=publish_now ;;
+    *) action=save_draft ;;
+  esac
+fi
+
+if [ -z "$publish_mode" ]; then
+  case "$action" in
+    queue_scheduled) publish_mode=scheduled ;;
+    queue_drip) publish_mode=drip ;;
+    publish_now) publish_mode=immediate ;;
+    *) publish_mode=draft ;;
+  esac
+fi
+
+if [ -n "$draft_id" ] && blog_draft_exists "$draft_id"; then
+  meta=$(blog_draft_meta_path "$draft_id")
+  body_file=$(blog_draft_content_path "$draft_id")
+  if [ -z "$title" ]; then
+    title=$(config-get "$meta" title 2>/dev/null || printf '')
+  fi
+  if [ -z "$tags" ]; then
+    tags=$(config-get "$meta" tags 2>/dev/null || printf '')
+  fi
+  if [ -z "$summary" ]; then
+    summary=$(config-get "$meta" summary 2>/dev/null || printf '')
+  fi
+  if [ -z "$content" ] && [ -f "$body_file" ]; then
+    content=$(cat "$body_file" 2>/dev/null || printf '')
+  fi
+  if [ -z "$scheduled_at" ]; then
+    scheduled_at=$(config-get "$meta" scheduled_at 2>/dev/null || printf '')
+  fi
+fi
+
+if [ -z "$title" ]; then
+  title="Untitled Draft"
+fi
+if [ -z "$draft_id" ]; then
+  draft_id=$(blog_new_draft_id)
+fi
+
+normalized_tags=$(blog_normalize_tags "$tags")
+
+case "$action" in
+  publish_now)
+    if [ -z "$content" ]; then
+      blog_json_error "Content is required to publish" "content_required"
+      exit 0
+    fi
+
+    filename=$(blog_publish_content "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" "$draft_id" immediate "")
+    if blog_draft_exists "$draft_id"; then
+      blog_delete_draft "$draft_id"
+    fi
+    blog_run_build_async
+    printf '{"success":true,"message":"Post published","filename":"%s","draft_id":"%s"}\n' \
+      "$(blog_json_escape "$filename")" "$(blog_json_escape "$draft_id")"
+    ;;
+
+  queue_scheduled)
+    if [ -z "$scheduled_at" ]; then
+      blog_json_error "scheduled_at is required for scheduled posts" "scheduled_at_required"
+      exit 0
+    fi
+    if [ -z "$content" ]; then
+      blog_json_error "Content is required" "content_required"
+      exit 0
+    fi
+    blog_save_draft "$draft_id" "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" scheduled "$scheduled_at" scheduled
+    printf '{"success":true,"message":"Draft scheduled","draft_id":"%s","status":"scheduled"}\n' "$(blog_json_escape "$draft_id")"
+    ;;
+
+  queue_drip)
+    if [ -z "$content" ]; then
+      blog_json_error "Content is required" "content_required"
+      exit 0
+    fi
+    blog_save_draft "$draft_id" "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" drip "" queued
+    printf '{"success":true,"message":"Draft queued for drip","draft_id":"%s","status":"queued"}\n' "$(blog_json_escape "$draft_id")"
+    ;;
+
+  autosave|save_draft|save)
+    status=draft
+    if [ "$publish_mode" = "scheduled" ]; then
+      status=scheduled
+    fi
+    if [ "$publish_mode" = "drip" ]; then
+      status=queued
+    fi
+    blog_save_draft "$draft_id" "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" "$publish_mode" "$scheduled_at" "$status"
+    printf '{"success":true,"message":"Draft saved","draft_id":"%s","status":"%s","autosaved":%s}\n' \
+      "$(blog_json_escape "$draft_id")" "$status" "$( [ "$action" = "autosave" ] && printf true || printf false )"
+    ;;
+
+  *)
+    blog_json_error "Unknown action" "invalid_action"
+    ;;
+esac

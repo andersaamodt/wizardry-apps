@@ -20,7 +20,7 @@ test_updates_from_template() {
   export WEB_WIZARDRY_ROOT="$test_web_root"
   
   # Create a test site from demo template
-  run_spell spells/web/create-from-template mytestsite demo
+  WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template mytestsite demo
   assert_success
   
   # Modify a template file to simulate customization
@@ -33,7 +33,7 @@ test_updates_from_template() {
   }
   
   # Update from template with --force flag
-  run_spell spells/web/update-from-template mytestsite --force
+  WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/update-from-template mytestsite --force
   assert_success
   
   # Verify customization was overwritten (file should be back to original)
@@ -66,14 +66,14 @@ test_preserves_uploads() {
   export WEB_WIZARDRY_ROOT="$test_web_root"
   
   # Create a test site
-  run_spell spells/web/create-from-template mytestsite demo
+  WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template mytestsite demo
   assert_success
   
   # Add a file to uploads
   echo "test upload content" > "$test_web_root/mytestsite/site/uploads/test-file.txt"
   
   # Update from template
-  run_spell spells/web/update-from-template mytestsite --force
+  WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/update-from-template mytestsite --force
   assert_success
   
   # Verify upload is still there
@@ -94,7 +94,7 @@ test_fails_for_nonexistent_site() {
   export WEB_WIZARDRY_ROOT="$test_web_root"
   
   # Try to update a nonexistent site
-  run_spell spells/web/update-from-template nonexistent --force
+  WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/update-from-template nonexistent --force
   assert_failure
   assert_output_contains "not found"
   
