@@ -1737,6 +1737,7 @@
       if (!previousPositions || !previousPositions.byPath) {
         return;
       }
+      treeEl().classList.add('reordering');
       var consumedAnimMatches = Object.create(null);
       var rows = treeEl().querySelectorAll('.row[data-path]');
       var moved = [];
@@ -1763,17 +1764,22 @@
         var nextRect = row.getBoundingClientRect();
         var deltaY = prev.top - nextRect.top;
         var deltaX = prev.left - nextRect.left;
-        var scaleX = nextRect.width > 0 ? (prev.width / nextRect.width) : 1;
-        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1 && Math.abs(scaleX - 1) < 0.01) {
+        var widthDelta = prev.width - nextRect.width;
+        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1 && Math.abs(widthDelta) < 0.5) {
           continue;
         }
-        row.style.willChange = 'transform';
+        row.style.willChange = 'transform,width';
         row.style.transition = 'none';
-        row.style.transformOrigin = 'top left';
-        row.style.transform = 'translate(' + deltaX + 'px,' + deltaY + 'px) scaleX(' + scaleX + ')';
+        row.style.backfaceVisibility = 'hidden';
+        row.style.transform = 'translate3d(' + deltaX + 'px,' + deltaY + 'px,0)';
+        if (Math.abs(widthDelta) >= 0.5 && prev.width > 0) {
+          row.style.width = prev.width + 'px';
+        }
+        row.dataset.reorderTargetWidth = nextRect.width > 0 ? String(nextRect.width) : '';
         moved.push(row);
       }
       if (!moved.length) {
+        treeEl().classList.remove('reordering');
         return;
       }
       // Force styles to apply before transitioning back to natural position.
@@ -1782,13 +1788,18 @@
         requestAnimationFrame(function () {
           for (var j = 0; j < moved.length; j += 1) {
             var movedRow = moved[j];
-            movedRow.style.transition = 'transform 340ms cubic-bezier(0.2, 0.75, 0.2, 1)';
-            movedRow.style.transform = 'translate(0,0) scaleX(1)';
+            movedRow.style.transition = 'transform 300ms cubic-bezier(0.2, 0.75, 0.2, 1), width 300ms cubic-bezier(0.2, 0.75, 0.2, 1)';
+            movedRow.style.transform = 'translate3d(0,0,0)';
+            if (movedRow.dataset.reorderTargetWidth) {
+              movedRow.style.width = movedRow.dataset.reorderTargetWidth + 'px';
+            }
             movedRow.addEventListener('transitionend', function onEnd() {
               this.style.transition = '';
               this.style.transform = '';
-              this.style.transformOrigin = '';
               this.style.willChange = '';
+              this.style.width = '';
+              this.style.backfaceVisibility = '';
+              delete this.dataset.reorderTargetWidth;
               this.removeEventListener('transitionend', onEnd);
             });
           }
@@ -1799,10 +1810,13 @@
           var movedRow = moved[k];
           movedRow.style.transition = '';
           movedRow.style.transform = '';
-          movedRow.style.transformOrigin = '';
           movedRow.style.willChange = '';
+          movedRow.style.width = '';
+          movedRow.style.backfaceVisibility = '';
+          delete movedRow.dataset.reorderTargetWidth;
         }
-      }, 460);
+        treeEl().classList.remove('reordering');
+      }, 420);
     }
 
     function themeLabel(name) {
