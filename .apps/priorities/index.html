@@ -2873,7 +2873,9 @@
             hydrateCachedDirFromResult(parentDir, listResult);
           }
           if (!previousItems || listFingerprint(previousItems) !== listFingerprint(getCachedDirItems(parentDir))) {
-            await render({ animateReorder: true, suppressLoadingOverlay: true });
+            // Reconcile quietly after the optimistic animated move to avoid
+            // double-animation artifacts on rows crossing echelon boundaries.
+            await render({ suppressLoadingOverlay: true });
           }
         } catch (error) {
           if (previousItems) {
