@@ -1410,6 +1410,7 @@ button:hover {
   padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale));
   font-size: calc(13px * var(--ui-scale));
   text-align: left;
+  color: var(--icon-neutral);
 }
 
 .row-menu-item svg {
@@ -1424,7 +1425,7 @@ button:hover {
 }
 
 .row-menu-item.danger {
-  color: var(--accent, #7782d6);
+  color: var(--icon-neutral);
 }
 
 .startup-modal {
