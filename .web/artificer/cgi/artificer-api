@@ -5580,6 +5580,31 @@ infer_dictation_install_phase_progress() {
   printf '%s|%s\n' "$phase" "$progress"
 }
 
+dictation_phase_rank() {
+  phase=$1
+  case "$phase" in
+    downloading) printf '%s' "10" ;;
+    fallback) printf '%s' "15" ;;
+    preparing) printf '%s' "20" ;;
+    installing) printf '%s' "30" ;;
+    finalizing) printf '%s' "40" ;;
+    done) printf '%s' "100" ;;
+    *) printf '%s' "0" ;;
+  esac
+}
+
+dictation_phase_progressive() {
+  previous_phase=$1
+  next_phase=$2
+  prev_rank=$(dictation_phase_rank "$previous_phase")
+  next_rank=$(dictation_phase_rank "$next_phase")
+  if [ "$next_rank" -lt "$prev_rank" ] 2>/dev/null; then
+    printf '%s\n' "$previous_phase"
+    return 0
+  fi
+  printf '%s\n' "$next_phase"
+}
+
 OLLAMA_BIN=""
 
 resolve_ollama_bin() {
@@ -13236,6 +13261,7 @@ EOF_RUNNER
     fallback_used=$(read_file_line "$job_dir/fallback_used" "0")
     download_size_bytes=$(read_file_line "$job_dir/download_size_bytes" "")
     download_bytes_start=$(read_file_line "$job_dir/download_bytes_start" "")
+    phase_previous=$(read_file_line "$job_dir/phase_last" "")
     if [ -z "$download_bytes_start" ]; then
       download_bytes_start=$(read_file_line "$job_dir/runtime_bytes_start" "0")
     fi
@@ -13289,9 +13315,10 @@ EOF_RUNNER
       progress_pct=""
     else
       parse_result=$(infer_dictation_install_phase_progress "$log_tail")
-      phase=$(printf '%s\n' "$parse_result" | cut -d'|' -f1)
+      phase_candidate=$(printf '%s\n' "$parse_result" | cut -d'|' -f1)
       parsed_progress_pct=$(printf '%s\n' "$parse_result" | cut -d'|' -f2)
-      [ -n "$phase" ] || phase="downloading"
+      [ -n "$phase_candidate" ] || phase_candidate="downloading"
+      phase=$(dictation_phase_progressive "$phase_previous" "$phase_candidate")
       case "$download_size_bytes:$downloaded_bytes" in
         *[!0-9]*:*|*:*[!0-9]*|*:)
           progress_pct=$parsed_progress_pct
@@ -13305,6 +13332,8 @@ EOF_RUNNER
           ;;
       esac
     fi
+
+    printf '%s\n' "$phase" > "$job_dir/phase_last"
 
     fallback_json=false
     if [ "$fallback_used" = "1" ]; then

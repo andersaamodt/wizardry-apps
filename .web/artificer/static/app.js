@@ -4953,19 +4953,24 @@
       return "Uninstalling dictation";
     }
     var phase = trim(String(job && job.phase ? job.phase : ""));
-    var pctText = dictationProgressPercentLabel(job && job.progress_pct);
+    var pctText = dictationProgressPercentLabel(job && job.progress_pct, job);
     var sizeText = dictationDownloadAmountLabel(job);
-    var labelPrefix = (phase === "downloading" || phase === "fallback") ?
+    var isDownloadPhase = (phase === "downloading" || phase === "preparing" || phase === "fallback");
+    var labelPrefix = isDownloadPhase ?
       "Downloading dictation " :
       "Installing dictation ";
     var label = labelPrefix + pctText + "%";
-    if (sizeText && (phase === "downloading" || phase === "fallback")) {
+    if (sizeText && isDownloadPhase) {
       label += " (" + sizeText + ")";
     }
     return label;
   }
 
-  function dictationProgressPercentLabel(rawValue) {
+  function dictationProgressPercentLabel(rawValue, job) {
+    var fromBytes = dictationProgressFromBytes(job);
+    if (fromBytes >= 0) {
+      return fromBytes.toFixed(1);
+    }
     var parsed = Number(rawValue);
     if (!isFinite(parsed)) {
       parsed = 0;
@@ -4977,6 +4982,25 @@
       parsed = 100;
     }
     return parsed.toFixed(1);
+  }
+
+  function dictationProgressFromBytes(job) {
+    var totalBytes = dictationWholeNumber(job && job.download_size_bytes);
+    var downloadedBytes = dictationWholeNumber(job && job.downloaded_bytes);
+    if (totalBytes <= 0 || downloadedBytes < 0) {
+      return -1;
+    }
+    if (downloadedBytes > totalBytes) {
+      downloadedBytes = totalBytes;
+    }
+    var pct = (downloadedBytes * 100) / totalBytes;
+    if (!isFinite(pct) || pct < 0) {
+      return 0;
+    }
+    if (pct > 100) {
+      pct = 100;
+    }
+    return pct;
   }
 
   function dictationDownloadAmountLabel(job) {
@@ -5004,7 +5028,7 @@
     if (downloadedBytes > totalBytes) {
       downloadedBytes = totalBytes;
     }
-    return dictationGigabytesLabel(downloadedBytes) + " of " + dictationGigabytesLabel(totalBytes) + " GB";
+    return dictationGigabytesLabel(downloadedBytes, 2) + " of " + dictationGigabytesLabel(totalBytes, 2) + " GB";
   }
 
   function dictationWholeNumber(rawValue) {
@@ -5019,12 +5043,19 @@
     return Math.round(parsed);
   }
 
-  function dictationGigabytesLabel(byteCount) {
+  function dictationGigabytesLabel(byteCount, decimals) {
     var bytes = Number(byteCount);
     if (!isFinite(bytes) || bytes < 0) {
       bytes = 0;
     }
-    return (bytes / 1000000000).toFixed(1);
+    var places = Number(decimals);
+    if (!isFinite(places) || places < 0) {
+      places = 1;
+    }
+    if (places > 3) {
+      places = 3;
+    }
+    return (bytes / 1000000000).toFixed(places);
   }
 
   function clampProgressPercent(rawValue) {
