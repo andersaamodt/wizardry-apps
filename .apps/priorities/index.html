@@ -1765,16 +1765,15 @@
         var nextRect = row.getBoundingClientRect();
         var deltaY = prev.top - nextRect.top;
         var deltaX = prev.left - nextRect.left;
-        var widthDelta = prev.width - nextRect.width;
-        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1 && Math.abs(widthDelta) < 0.5) {
+        var scaleX = nextRect.width > 0 ? (prev.width / nextRect.width) : 1;
+        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1 && Math.abs(scaleX - 1) < 0.01) {
           continue;
         }
         moved.push({
           row: row,
           deltaX: deltaX,
           deltaY: deltaY,
-          fromWidth: prev.width,
-          toWidth: nextRect.width
+          scaleX: scaleX
         });
       }
       if (!moved.length) {
@@ -1790,9 +1789,19 @@
       var finalizeOne = function (row) {
         row.style.transition = '';
         row.style.transform = '';
+        row.style.transformOrigin = '';
         row.style.willChange = '';
-        row.style.width = '';
         row.style.backfaceVisibility = '';
+        if (row._reorderTextAnimationTargets && row._reorderTextAnimationTargets.length) {
+          for (var r = 0; r < row._reorderTextAnimationTargets.length; r += 1) {
+            var textTarget = row._reorderTextAnimationTargets[r];
+            textTarget.style.transition = '';
+            textTarget.style.transform = '';
+            textTarget.style.transformOrigin = '';
+            textTarget.style.willChange = '';
+          }
+        }
+        row._reorderTextAnimationTargets = null;
         row._reorderAnimation = null;
         remaining -= 1;
         if (remaining <= 0 && !finished) {
@@ -1828,8 +1837,11 @@
         for (var j = 0; j < moved.length; j += 1) {
           (function runRowAnimation(m) {
             var movedRow = m.row;
-            movedRow.style.willChange = 'transform,width';
+            var rowScaleX = Number(m.scaleX) || 1;
+            var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
+            movedRow.style.willChange = 'transform';
             movedRow.style.backfaceVisibility = 'hidden';
+            movedRow.style.transformOrigin = 'top left';
             if (movedRow._reorderAnimation) {
               try {
                 movedRow._reorderAnimation.cancel();
@@ -1840,14 +1852,31 @@
             }
             if (supportsWAAPI) {
               var fromFrame = {
-                transform: 'translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)'
+                transform: useWidthScale
+                  ? ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0) scaleX(' + rowScaleX + ')')
+                  : ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)')
               };
               var toFrame = {
                 transform: 'translate3d(0,0,0)'
               };
-              if (Math.abs(m.fromWidth - m.toWidth) >= 0.5 && m.fromWidth > 0 && m.toWidth > 0) {
-                fromFrame.width = m.fromWidth + 'px';
-                toFrame.width = m.toWidth + 'px';
+              var textTargets = movedRow.querySelectorAll('.name-stack');
+              movedRow._reorderTextAnimationTargets = [];
+              if (useWidthScale && textTargets.length) {
+                var inverse = rowScaleX !== 0 ? (1 / rowScaleX) : 1;
+                for (var t = 0; t < textTargets.length; t += 1) {
+                  var textEl = textTargets[t];
+                  textEl.style.transformOrigin = 'left top';
+                  textEl.style.willChange = 'transform';
+                  movedRow._reorderTextAnimationTargets.push(textEl);
+                  textEl.animate([
+                    { transform: 'scaleX(' + inverse + ')' },
+                    { transform: 'scaleX(1)' }
+                  ], {
+                    duration: durationMs,
+                    easing: easing,
+                    fill: 'both'
+                  });
+                }
               }
               var anim = movedRow.animate([fromFrame, toFrame], {
                 duration: durationMs,
@@ -1868,15 +1897,27 @@
               };
             } else {
               movedRow.style.transition = 'none';
-              movedRow.style.transform = 'translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)';
-              if (Math.abs(m.fromWidth - m.toWidth) >= 0.5 && m.fromWidth > 0) {
-                movedRow.style.width = m.fromWidth + 'px';
-              }
+              movedRow.style.transform = useWidthScale
+                ? ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0) scaleX(' + rowScaleX + ')')
+                : ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)');
               movedRow.getBoundingClientRect();
-              movedRow.style.transition = 'transform ' + durationMs + 'ms ' + easing + ', width ' + durationMs + 'ms ' + easing;
+              movedRow.style.transition = 'transform ' + durationMs + 'ms ' + easing;
               movedRow.style.transform = 'translate3d(0,0,0)';
-              if (Math.abs(m.fromWidth - m.toWidth) >= 0.5 && m.toWidth > 0) {
-                movedRow.style.width = m.toWidth + 'px';
+              var fallbackTextTargets = movedRow.querySelectorAll('.name-stack');
+              movedRow._reorderTextAnimationTargets = [];
+              if (useWidthScale && fallbackTextTargets.length) {
+                var fallbackInverse = rowScaleX !== 0 ? (1 / rowScaleX) : 1;
+                for (var ft = 0; ft < fallbackTextTargets.length; ft += 1) {
+                  var fallbackTextEl = fallbackTextTargets[ft];
+                  fallbackTextEl.style.transformOrigin = 'left top';
+                  fallbackTextEl.style.willChange = 'transform';
+                  fallbackTextEl.style.transition = 'none';
+                  fallbackTextEl.style.transform = 'scaleX(' + fallbackInverse + ')';
+                  movedRow._reorderTextAnimationTargets.push(fallbackTextEl);
+                  fallbackTextEl.getBoundingClientRect();
+                  fallbackTextEl.style.transition = 'transform ' + durationMs + 'ms ' + easing;
+                  fallbackTextEl.style.transform = 'scaleX(1)';
+                }
               }
               movedRow.addEventListener('transitionend', function onEnd() {
                 movedRow.removeEventListener('transitionend', onEnd);
