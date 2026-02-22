@@ -1362,6 +1362,7 @@ input[type="checkbox"]:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 1.28rem;
+  margin-right: 0.22rem;
   cursor: pointer;
 }
 
@@ -1376,6 +1377,7 @@ input[type="checkbox"]:disabled {
   width: 1.28rem;
   min-width: 1.28rem;
   max-width: 1.28rem;
+  margin-right: 0.22rem;
   padding: 0;
   display: inline-flex;
   align-items: center;
