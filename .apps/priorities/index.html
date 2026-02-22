@@ -2878,11 +2878,12 @@
       var currentChecked = readCachedCheckedValue(path);
       var nextChecked = currentChecked === 1 ? 0 : 1;
       var optimisticTouches = applyOptimisticChecked(path, nextChecked);
+      var hadOptimisticTouch = optimisticTouches.length > 0;
       state.pendingCheckPath = path;
       state.busy = true;
       (async function () {
         try {
-          if (optimisticTouches.length) {
+          if (hadOptimisticTouch) {
             await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
           }
           await runMutationWithListFallback(
@@ -2892,7 +2893,11 @@
           );
           state.pendingCheckPath = '';
           state.busy = false;
-          await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+          // Avoid a second full rerender when optimistic UI already matches the
+          // successful backend result; this prevents row-control flicker.
+          if (!hadOptimisticTouch) {
+            await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+          }
         } catch (error) {
           rollbackOptimisticChecked(optimisticTouches);
           await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
