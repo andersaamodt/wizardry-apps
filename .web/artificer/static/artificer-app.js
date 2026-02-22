@@ -16624,6 +16624,8 @@
           activeJob &&
           activeJobAction !== "uninstall" &&
           (activeJobStatus === "running" || (!activeJobStatus && state.dictationInstallBusy));
+        var buttonText = trim(String((el.installDictationBtn && el.installDictationBtn.textContent) || "")).toLowerCase();
+        var cancelIntent = state.dictationInstallBusy || runningInstallVisible || buttonText.indexOf("cancel") === 0;
 
         if (state.dictationInstallCancelling) {
           showTransientNotice("Cancelling dictation download...");
@@ -16631,7 +16633,7 @@
         }
 
         // Flip to cancelling visuals immediately on click, before async work.
-        if (state.dictationInstallBusy || runningInstallVisible) {
+        if (cancelIntent) {
           state.dictationInstallCancelling = true;
           state.dictationInstallPendingCancel = false;
           if (el.installDictationBtn) {
