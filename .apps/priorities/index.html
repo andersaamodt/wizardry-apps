@@ -1795,6 +1795,20 @@
       render({ suppressLoadingOverlay: true, preserveInputSelection: true });
     }
 
+    function toggleExpanded(path) {
+      if (!path) {
+        return;
+      }
+      var wasOpen = !!state.expanded[path];
+      var willOpen = !wasOpen;
+      if (willOpen && !getCachedDirItems(path)) {
+        expandWithSpinner(path);
+        return;
+      }
+      state.expanded[path] = willOpen;
+      render({ suppressLoadingOverlay: true });
+    }
+
     function buildRow(item, depth, edgeClass, options) {
       options = options || {};
       var row = document.createElement('div');
@@ -1825,7 +1839,6 @@
       row.style.paddingLeft = indent(depth);
 
       var prioritizeBtn = makeButton('⬆', 'btn pri', function (event) {
-        event.preventDefault();
         event.stopPropagation();
         actPrioritize(item.path, prioritizeBtn);
       }, 'Prioritize');
@@ -1864,8 +1877,9 @@
           expPlaceholderNoChildren.setAttribute('aria-hidden', 'true');
           left.appendChild(expPlaceholderNoChildren);
         } else {
-          var expand = makeButton(open ? '▾' : '▸', 'btn exp', function () {
-            // Row click handles toggling; this keeps the symbol as a visual affordance.
+          var expand = makeButton(open ? '▾' : '▸', 'btn exp', function (event) {
+            event.stopPropagation();
+            toggleExpanded(item.path);
           }, 'Expand/collapse');
           if (expandLoading) {
             setExpandButtonBusy(expand, true);
@@ -2089,6 +2103,9 @@
           if (event.target.closest('.btn.pri')) {
             return;
           }
+          if (event.target.closest('.btn.exp')) {
+            return;
+          }
           if (event.target.closest('.chk')) {
             return;
           }
@@ -2106,14 +2123,7 @@
             state.rowClickTimer = null;
           }
           state.rowClickTimer = setTimeout(function () {
-            var wasOpen = !!state.expanded[item.path];
-            var willOpen = !wasOpen;
-            if (willOpen && !getCachedDirItems(item.path)) {
-              expandWithSpinner(item.path);
-            } else {
-              state.expanded[item.path] = willOpen;
-              render();
-            }
+            toggleExpanded(item.path);
             state.rowClickTimer = null;
           }, 220);
         });
