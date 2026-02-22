@@ -1751,7 +1751,7 @@
         requestAnimationFrame(function () {
           for (var j = 0; j < moved.length; j += 1) {
             var movedRow = moved[j];
-            movedRow.style.transition = 'transform 260ms cubic-bezier(0.2, 0.75, 0.2, 1)';
+            movedRow.style.transition = 'transform 340ms cubic-bezier(0.2, 0.75, 0.2, 1)';
             movedRow.style.transform = 'translate(0,0)';
             movedRow.addEventListener('transitionend', function onEnd() {
               this.style.transition = '';
@@ -1769,7 +1769,7 @@
           movedRow.style.transform = '';
           movedRow.style.willChange = '';
         }
-      }, 360);
+      }, 460);
     }
 
     function themeLabel(name) {
@@ -2773,7 +2773,8 @@
 
         if (options.animateReorder) {
           animateRowReorder(previousPositions);
-          animateEchelonBlockResize(previousBlockMetrics);
+          // Disable block scale animation during reorder to avoid vertical
+          // squish artifacts on project rows.
         }
         if (!tree.childNodes.length) {
           status('No priorities found.', false);
