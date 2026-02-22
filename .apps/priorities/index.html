@@ -3285,6 +3285,13 @@
       syncPrioritizeButtonsToQueue();
     }
 
+    function syncCheckboxDisabledState() {
+      var checkboxes = document.querySelectorAll('.chk');
+      for (var i = 0; i < checkboxes.length; i += 1) {
+        checkboxes[i].disabled = !!state.busy;
+      }
+    }
+
     function lockPrioritizeHover(ms) {
       var duration = Number(ms);
       if (!Number.isFinite(duration) || duration < 0) {
@@ -3354,6 +3361,7 @@
       var previousItems = applyOptimisticPrioritize(parentDir, path);
       state.pendingPrioritizePath = path;
       state.busy = true;
+      syncCheckboxDisabledState();
       syncPrioritizeButtonsToQueue();
       if (button) {
         button.blur();
@@ -3393,6 +3401,7 @@
           status(String(error && error.message ? error.message : error), true);
         } finally {
           state.busy = false;
+          syncCheckboxDisabledState();
           state.pendingPrioritizePath = '';
           state.reorderPrimaryPath = '';
           lockPrioritizeHover(220);
