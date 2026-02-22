@@ -1612,9 +1612,7 @@
         checkbox.disabled = true;
       }
       checkbox.addEventListener('click', function (event) {
-        event.stopPropagation();
-      });
-      checkbox.addEventListener('change', function (event) {
+        event.preventDefault();
         event.stopPropagation();
         actToggleChecked(item.path);
       });
@@ -2247,7 +2245,7 @@
     }
 
     function actToggleChecked(path) {
-      if (state.busy) {
+      if (state.busy || state.pendingCheckPath === path) {
         return;
       }
       var parentDir = parentDirOfPath(path);
@@ -2260,7 +2258,6 @@
         suppressLoadingOverlay: true
       }).finally(function () {
         state.pendingCheckPath = '';
-        render({ suppressLoadingOverlay: true, preserveInputSelection: true });
       });
     }
 
