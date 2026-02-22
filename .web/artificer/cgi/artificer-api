@@ -5151,7 +5151,7 @@ voice_component_download_size_bytes() {
   component=$1
   case "$component" in
     mlx-whisper)
-      printf '%s' "1400000000"
+      printf '%s' "480000000"
       ;;
     parakeet)
       printf '%s' "6200000000"

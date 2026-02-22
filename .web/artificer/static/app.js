@@ -173,7 +173,7 @@
   var tooltipShowTimer = null;
   var tooltipPendingTarget = null;
   var TOOLTIP_DELAY_MS = 520;
-  var DICTATION_PREINSTALL_SIZE_BYTES = 1400000000;
+  var DICTATION_PREINSTALL_SIZE_BYTES = 480000000;
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";

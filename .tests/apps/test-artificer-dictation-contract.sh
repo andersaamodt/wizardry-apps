@@ -81,7 +81,7 @@ assert_contains "$ui_js" "safeStep(\"renderDictateButton\", renderDictateButton)
 assert_contains "$ui_js" "safeStep(\"renderDictationInstallSettings\", renderDictationInstallSettings);"
 assert_contains "$ui_js" 'dictationInstallReady: false,'
 assert_contains "$ui_js" 'dictationInstalled: false,'
-assert_contains "$ui_js" "var DICTATION_PREINSTALL_SIZE_BYTES = 1400000000;"
+assert_contains "$ui_js" "var DICTATION_PREINSTALL_SIZE_BYTES = 480000000;"
 assert_contains "$ui_js" "function dictationPreinstallSizeLabel()"
 assert_contains "$ui_js" "var info = state.dictationInstallInfo || null;"
 assert_contains "$ui_js" 'return "Install dictation";'
@@ -116,7 +116,7 @@ assert_contains "$ui_js_source" "apiPost(\"dictate\", { duration: \"20\" }, { ti
 assert_contains "$ui_js_source" 'dictationInstallStatus: document.getElementById("dictation-install-status"),'
 assert_contains "$ui_js_source" 'dictationInstallReady: false,'
 assert_contains "$ui_js_source" 'dictationInstalled: false,'
-assert_contains "$ui_js_source" "var DICTATION_PREINSTALL_SIZE_BYTES = 1400000000;"
+assert_contains "$ui_js_source" "var DICTATION_PREINSTALL_SIZE_BYTES = 480000000;"
 assert_contains "$ui_js_source" "function dictationPreinstallSizeLabel()"
 assert_contains "$ui_js_source" "var info = state.dictationInstallInfo || null;"
 assert_contains "$ui_js_source" 'return "Install dictation";'
