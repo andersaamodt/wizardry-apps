@@ -109,7 +109,7 @@
       </div>
     </div>
 
-    <div id="status" class="status"></div>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite" aria-hidden="true"></div>
     <div id="tree" class="tree" aria-live="polite"></div>
   </main>
 
@@ -492,9 +492,45 @@
     }
 
     function status(text, isError) {
-      var el = document.getElementById('status');
-      el.textContent = text;
+      var el = document.getElementById('toast');
+      if (!el) {
+        return;
+      }
+      var message = String(text || '').trim();
+      if (el._hideTimer) {
+        clearTimeout(el._hideTimer);
+        el._hideTimer = null;
+      }
+      if (el._clearTimer) {
+        clearTimeout(el._clearTimer);
+        el._clearTimer = null;
+      }
+      if (!message) {
+        el.classList.remove('visible', 'fading-out', 'error', 'success');
+        el.classList.add('hidden');
+        el.textContent = '';
+        el.setAttribute('aria-hidden', 'true');
+        return;
+      }
+      el.textContent = message;
       el.classList.toggle('error', !!isError);
+      el.classList.toggle('success', !isError);
+      el.classList.remove('hidden', 'fading-out', 'visible');
+      void el.offsetWidth;
+      el.classList.add('visible');
+      el.setAttribute('aria-hidden', 'false');
+      el._hideTimer = setTimeout(function () {
+        el._hideTimer = null;
+        el.classList.remove('visible');
+        el.classList.add('fading-out');
+        el.setAttribute('aria-hidden', 'true');
+        el._clearTimer = setTimeout(function () {
+          el._clearTimer = null;
+          el.classList.add('hidden');
+          el.classList.remove('fading-out', 'error', 'success');
+          el.textContent = '';
+        }, 210);
+      }, 3000);
     }
 
     function setLoadingOverlay(visible) {
@@ -594,12 +630,6 @@
         }
       }
 
-      var statusEl = document.getElementById('status');
-      if (statusEl) {
-        statusEl.textContent = String(payload.statusText || '');
-        statusEl.classList.toggle('error', payload.statusError === true);
-      }
-
       state.startupSnapshotRestored = true;
       return true;
     }
@@ -615,12 +645,9 @@
         if (!tree || !root || !tree.childNodes || !tree.childNodes.length) {
           return;
         }
-        var statusEl = document.getElementById('status');
         var payload = {
           root: root,
           title: String((document.getElementById('title-folder') || {}).textContent || ''),
-          statusText: String((statusEl || {}).textContent || ''),
-          statusError: !!(statusEl && statusEl.classList && statusEl.classList.contains('error')),
           treeHtml: tree.innerHTML,
           savedAt: Date.now()
         };
