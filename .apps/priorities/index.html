@@ -1775,40 +1775,6 @@
       if (!previousPositions || !previousPositions.byPath) {
         return;
       }
-      function isTransparentColor(value) {
-        var color = String(value || '').trim().toLowerCase();
-        if (!color || color === 'transparent') {
-          return true;
-        }
-        var rgbaMatch = color.match(/^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([0-9.]+)\s*\)$/);
-        if (rgbaMatch) {
-          return Number(rgbaMatch[1]) === 0;
-        }
-        return false;
-      }
-
-      function resolveOpaqueAnimationBackground(row, tree) {
-        var direct = window.getComputedStyle(row).backgroundColor;
-        if (!isTransparentColor(direct)) {
-          return direct;
-        }
-        var hostBlock = row.closest('.echelon-block');
-        if (hostBlock) {
-          var projectRow = hostBlock.querySelector('.row.row-project');
-          if (projectRow) {
-            var projectColor = window.getComputedStyle(projectRow).backgroundColor;
-            if (!isTransparentColor(projectColor)) {
-              return projectColor;
-            }
-          }
-        }
-        var treeColor = window.getComputedStyle(tree).backgroundColor;
-        if (!isTransparentColor(treeColor)) {
-          return treeColor;
-        }
-        return window.getComputedStyle(document.body).backgroundColor;
-      }
-
       var tree = treeEl();
       tree.classList.add('reordering');
       var consumedAnimMatches = Object.create(null);
@@ -1876,7 +1842,6 @@
         row.style.willChange = '';
         row.style.backfaceVisibility = '';
         row.style.zIndex = '';
-        row.style.backgroundColor = '';
         if (row._reorderHostBlock) {
           var hostBlock = row._reorderHostBlock;
           var liftCount = Number(hostBlock._reorderLiftCount) || 0;
@@ -1942,7 +1907,6 @@
             movedRow.style.backfaceVisibility = 'hidden';
             movedRow.style.transformOrigin = 'top left';
             movedRow.style.zIndex = '2147483647';
-            movedRow.style.backgroundColor = resolveOpaqueAnimationBackground(movedRow, tree);
             var reorderHostBlock = movedRow.closest('.echelon-block');
             if (reorderHostBlock) {
               var hostLiftCount = Number(reorderHostBlock._reorderLiftCount) || 0;
