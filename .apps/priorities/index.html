@@ -122,6 +122,12 @@
     var UI_SCALE_KEY = 'wizardry.priorities.uiScale';
     var TEXT_SCALE_KEY = 'wizardry.priorities.textScale';
     var THEME_ASSET_VERSION = 'priorities20260220a';
+    var DEFAULT_THEMES = [
+      'adept', 'alchemist', 'archmage', 'athenian', 'chronomancer', 'conjurer', 'druid',
+      'empath', 'enchanter', 'geomancer', 'hermeticist', 'hierophant', 'illusionist',
+      'lich', 'necromancer', 'psionic', 'pyromancer', 'seer', 'shaman', 'sorcerer', 'sorceress',
+      'technomancer', 'thaumaturge', 'thelemite', 'theurgist', 'wadjet', 'warlock', 'wizard'
+    ];
 
     var state = {
       root: '.',
@@ -881,17 +887,17 @@
     }
 
     async function loadThemes() {
-      var themes = [];
-      if (!hasBridge()) {
-        state.themes = normalizeThemes(themes);
-        ensureActiveThemeInList();
-        return;
-      }
-      try {
-        var result = await runBackend(['list-themes']);
-        themes = parseThemeListOutput((result && result.stdout) || '');
-      } catch (_) {
-        themes = [];
+      var themes = DEFAULT_THEMES.slice();
+      if (hasBridge()) {
+        try {
+          var result = await runBackend(['list-themes']);
+          var loaded = parseThemeListOutput((result && result.stdout) || '');
+          if (loaded.length) {
+            themes = loaded;
+          }
+        } catch (_) {
+          // Keep default catalog if backend theme load fails.
+        }
       }
       state.themes = normalizeThemes(themes);
       ensureActiveThemeInList();
