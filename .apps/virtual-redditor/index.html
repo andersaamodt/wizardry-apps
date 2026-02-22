@@ -3984,11 +3984,13 @@
         }, 6000);
       } finally {
         setProfileSwitchLoading(false);
+        setBootLoading(false);
       }
     }
 
     window.addEventListener('DOMContentLoaded', function () {
       boot().catch(function (error) {
+        setBootLoading(false);
         setControlMessage(String(error && error.message ? error.message : error), true);
       });
     });
