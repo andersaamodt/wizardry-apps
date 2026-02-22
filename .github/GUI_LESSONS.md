@@ -5,3 +5,8 @@
 - When drag and click compete, tune strip geometry incrementally with small width changes and verify in the live app, not just by static code review.
 - If a top control must support both drag-nearby and click-on-control, position drag strips around it rather than above it.
 - Regression tests should guard known host-geometry contracts so drag-strip refactors do not silently reintroduce click interception.
+- For dynamic header text, compute drag-hole geometry from live DOM bounds and send it to the native host instead of hardcoding static hole widths.
+- A small debounced sync from web UI to host keeps drag zones stable while avoiding excessive bridge traffic during rapid layout changes.
+- Recompute native drag-strip frames on every window resize so drag/click boundaries stay aligned with the current viewport.
+- Observe title cluster, drill-up button, and right controls with `ResizeObserver` so drag-hole geometry follows text-length and visibility changes automatically.
+- Keep a dedicated right-controls reserved width in host geometry to guarantee snap/settings buttons stay reliably clickable.
