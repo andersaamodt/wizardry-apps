@@ -586,15 +586,25 @@
 
         CGFloat headerBandY = frame.size.height - dragStripHeight;
         CGFloat headerBandHeight = dragStripHeight;
-        // Keep only a narrow click-safe window around title/up controls so the
-        // surrounding header remains draggable.
-        CGFloat titleHoleWidth = 120.0;
+        // Keep a left-biased click-safe window around title/up controls so the
+        // right side of the title remains mostly draggable.
+        CGFloat titleHoleLeftWidth = 104.0;
+        CGFloat titleHoleRightWidth = 30.0;
         CGFloat rightControlsReservedWidth = 168.0;
-        CGFloat leftStripWidth = floor((frame.size.width - titleHoleWidth) / 2.0);
+        CGFloat centerX = floor(frame.size.width / 2.0);
+        CGFloat holeStartX = centerX - titleHoleLeftWidth;
+        CGFloat holeEndX = centerX + titleHoleRightWidth;
+        if (holeStartX < 0.0) {
+            holeStartX = 0.0;
+        }
+        if (holeEndX > frame.size.width) {
+            holeEndX = frame.size.width;
+        }
+        CGFloat leftStripWidth = holeStartX;
         if (leftStripWidth < 0.0) {
             leftStripWidth = 0.0;
         }
-        CGFloat rightStripX = leftStripWidth + titleHoleWidth;
+        CGFloat rightStripX = holeEndX;
         CGFloat rightStripWidth = frame.size.width - rightStripX - rightControlsReservedWidth;
         if (rightStripWidth < 0.0) {
             rightStripWidth = 0.0;
