@@ -168,7 +168,7 @@
     overlay.layer.backgroundColor = [bg CGColor];
 
     NSImage *logoImage = self.appIconImage;
-    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 12, 12)];
+    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 8, 8)];
     logoView.imageAlignment = NSImageAlignCenter;
     logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
     logoView.wantsLayer = YES;
@@ -200,8 +200,14 @@
     if (!self.nativeBootSplashView) {
         return;
     }
-    [self.nativeBootSplashView removeFromSuperview];
+    NSView *overlay = self.nativeBootSplashView;
     self.nativeBootSplashView = nil;
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        context.duration = 0.16;
+        overlay.animator.alphaValue = 0.0;
+    } completionHandler:^{
+        [overlay removeFromSuperview];
+    }];
 }
 
 - (void)setupMainMenuWithAppName:(NSString *)appName {
