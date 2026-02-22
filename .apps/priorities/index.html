@@ -3166,13 +3166,13 @@
         setHoveredPrioritizePath('');
         return;
       }
-      var btn = target.closest('.btn.pri');
-      if (!btn) {
+      var row = target.closest('.row[data-path]');
+      if (!row) {
         setHoveredPrioritizePath('');
         return;
       }
-      var row = btn.closest('.row[data-path]');
-      if (!row) {
+      var btn = row.querySelector('.btn.pri');
+      if (!btn) {
         setHoveredPrioritizePath('');
         return;
       }
