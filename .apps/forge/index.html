@@ -130,7 +130,7 @@
               <div class="selected-path-row">
                 <button id="open-selected-path" type="button" class="path-link hidden" title="Open folder" aria-label="Open folder"></button>
                 <button id="terminal-selected-path" type="button" class="terminal-icon hidden" title="Open in terminal" aria-label="Open in terminal">
-                  <img src="assets/terminal-icon.png" alt="Terminal">
+                  <img src="assets/terminal-icon.png" alt="Terminal" onerror="this.style.display='none'; this.parentNode.classList.add('icon-fallback');">
                 </button>
               </div>
             </div>
