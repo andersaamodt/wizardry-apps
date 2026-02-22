@@ -1101,6 +1101,70 @@
       }
     }
 
+    function joinChildPath(dir, name) {
+      var base = String(dir || '').replace(/\/+$/, '');
+      var child = String(name || '').trim();
+      if (!base || base === '.') {
+        return child;
+      }
+      if (base === '/') {
+        return '/' + child;
+      }
+      return base + '/' + child;
+    }
+
+    function applyOptimisticAdd(dir, name) {
+      var items = getCachedDirItems(dir);
+      if (!Array.isArray(items)) {
+        return null;
+      }
+      var newPath = joinChildPath(dir, name);
+      for (var i = 0; i < items.length; i += 1) {
+        if (items[i] && items[i].path === newPath) {
+          return { dir: dir, path: newPath, inserted: false };
+        }
+      }
+
+      var highestEchelon = 0;
+      var highestPriority = 0;
+      for (var j = 0; j < items.length; j += 1) {
+        var item = items[j];
+        if (!item) {
+          continue;
+        }
+        var e = Number(item.echelon) || 0;
+        var p = Number(item.priority) || 0;
+        if (e > highestEchelon) {
+          highestEchelon = e;
+          highestPriority = 0;
+        }
+        if (e === highestEchelon && p > highestPriority) {
+          highestPriority = p;
+        }
+      }
+
+      var optimisticItem = {
+        path: newPath,
+        name: String(name),
+        kind: 'file',
+        echelon: highestEchelon > 0 ? highestEchelon : 1,
+        priority: highestPriority + 1,
+        checked: 0,
+        upvotes: 0,
+        hasSubpriorities: false
+      };
+      items.push(optimisticItem);
+      items.sort(comparePriorityItems);
+      return { dir: dir, path: newPath, inserted: true };
+    }
+
+    function rollbackOptimisticAdd(touch) {
+      if (!touch || !touch.inserted || !touch.dir || !touch.path) {
+        return;
+      }
+      removeCachedItemByPath(touch.dir, touch.path);
+    }
+
     async function runMutationWithListFallback(parentDir, fastArgs, fallbackMutationArgs) {
       var result = null;
       try {
@@ -2680,8 +2744,11 @@
         return;
       }
       var targetDir = String(state.root || '.').trim() || '.';
+      var optimisticAdd = applyOptimisticAdd(targetDir, name);
       var shouldRefocusAddInput = false;
+      var previousAddText = state.pendingAddText;
       state.pendingAdd = true;
+      state.pendingAddText = '';
       state.busy = true;
       (async function () {
         try {
@@ -2695,11 +2762,12 @@
           // backend fast output format or aliases differ.
           var refreshed = await listDir(targetDir);
           setCachedDirItems(targetDir, refreshed);
-          state.pendingAddText = '';
           shouldRefocusAddInput = true;
         } catch (error) {
+          rollbackOptimisticAdd(optimisticAdd);
+          state.pendingAddText = previousAddText || name;
           var detail = String(error && error.message ? error.message : error).trim();
-          status(detail ? ('Add priority failed. ' + detail) : 'Add priority failed.', true);
+          status(detail ? ('Add priority failed; reverted. ' + detail) : 'Add priority failed; reverted.', true);
         } finally {
           state.pendingAdd = false;
           state.busy = false;
