@@ -5090,11 +5090,30 @@ voice_needs_macos_arm64_uname_override() {
   return 0
 }
 
+voice_can_run_arch_arm64() {
+  if ! command -v arch >/dev/null 2>&1; then
+    return 1
+  fi
+  arch -arm64 /usr/bin/true >/dev/null 2>&1
+}
+
+run_with_macos_arm64_context() {
+  if voice_needs_macos_arm64_uname_override; then
+    if voice_can_run_arch_arm64; then
+      arch -arm64 "$@"
+      return $?
+    fi
+    WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$@"
+    return $?
+  fi
+  "$@"
+}
+
 run_voice_component_command() {
   component=$1
   shift
   if [ "$component" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
-    WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$@"
+    run_with_macos_arm64_context "$@"
     return $?
   fi
   "$@"
@@ -5104,7 +5123,7 @@ run_voice_backend_command() {
   backend_bin=$1
   shift
   if voice_needs_macos_arm64_uname_override; then
-    WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$backend_bin" "$@"
+    run_with_macos_arm64_context "$backend_bin" "$@"
     return $?
   fi
   "$backend_bin" "$@"
@@ -12658,8 +12677,8 @@ EOF
       fi
 
       set +e
-      if [ "$component" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
-        uninstall_output=$(env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$uninstall_bin" 2>&1)
+      if [ "$component" = "mlx-whisper" ]; then
+        uninstall_output=$(run_with_macos_arm64_context "$uninstall_bin" 2>&1)
       else
         uninstall_output=$("$uninstall_bin" 2>&1)
       fi
@@ -12890,7 +12909,11 @@ installed_component=$component
 printf '%s\n' "voice-recognition: starting $component install" >"$log_file"
 set +e
 if [ "$force_macos_arm64_uname" = "1" ] && [ "$component" = "mlx-whisper" ]; then
-  run_with_timeout_compat "$timeout_sec" env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$component_bin" >>"$log_file" 2>&1
+  if command -v arch >/dev/null 2>&1 && arch -arm64 /usr/bin/true >/dev/null 2>&1; then
+    run_with_timeout_compat "$timeout_sec" arch -arm64 "$component_bin" >>"$log_file" 2>&1
+  else
+    run_with_timeout_compat "$timeout_sec" env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$component_bin" >>"$log_file" 2>&1
+  fi
 else
   run_with_timeout_compat "$timeout_sec" "$component_bin" >>"$log_file" 2>&1
 fi
@@ -13021,8 +13044,14 @@ EOF_RUNNER
     install_output=""
 
     set +e
-    if [ "$install_component" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
-      install_output=$(run_with_timeout 1800 env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$install_bin" 2>&1)
+    if [ "$install_component" = "mlx-whisper" ]; then
+      if voice_needs_macos_arm64_uname_override && voice_can_run_arch_arm64; then
+        install_output=$(run_with_timeout 1800 arch -arm64 "$install_bin" 2>&1)
+      elif voice_needs_macos_arm64_uname_override; then
+        install_output=$(run_with_timeout 1800 env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$install_bin" 2>&1)
+      else
+        install_output=$(run_with_timeout 1800 "$install_bin" 2>&1)
+      fi
     else
       install_output=$(run_with_timeout 1800 "$install_bin" 2>&1)
     fi
