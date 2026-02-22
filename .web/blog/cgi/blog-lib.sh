@@ -12,6 +12,7 @@ blog_posts_dir="$blog_site_root/site/pages/posts"
 blog_auth_dir="$blog_site_data/ssh-auth"
 blog_users_dir="$blog_auth_dir/users"
 blog_sessions_dir="$blog_auth_dir/sessions"
+blog_nostr_login_requests_dir="$blog_auth_dir/nostr-login-requests"
 blog_state_dir="$blog_site_data/blog"
 blog_drafts_dir="$blog_state_dir/drafts"
 blog_uploads_dir="$blog_site_data/uploads"
@@ -37,7 +38,7 @@ BLOG_SESSION_TOKEN=${BLOG_SESSION_TOKEN-}
 BLOG_SESSION_CSRF=${BLOG_SESSION_CSRF-}
 
 blog_init() {
-  mkdir -p "$blog_auth_dir" "$blog_users_dir" "$blog_sessions_dir" "$blog_state_dir" "$blog_drafts_dir" "$blog_uploads_dir"
+  mkdir -p "$blog_auth_dir" "$blog_users_dir" "$blog_sessions_dir" "$blog_nostr_login_requests_dir" "$blog_state_dir" "$blog_drafts_dir" "$blog_uploads_dir"
   mkdir -p "$blog_posts_dir"
   mkdir -p "$blog_nostr_state_dir" "$blog_nostr_events_dir" "$blog_nostr_derived_dir"
   [ -f "$blog_nostr_authors_file" ] || : > "$blog_nostr_authors_file"
@@ -445,12 +446,96 @@ blog_validate_player_name() {
   printf '%s\n' "$name" | grep -Eq '^[A-Za-z0-9._ -]+$'
 }
 
+blog_validate_nostr_pubkey() {
+  pubkey=$(printf '%s' "${1-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+  case "$pubkey" in
+    [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
+      if [ "${#pubkey}" -eq 64 ]; then
+        printf '%s\n' "$pubkey"
+        return 0
+      fi
+      ;;
+  esac
+  return 1
+}
+
 blog_user_dir() {
   printf '%s/%s\n' "$blog_users_dir" "$1"
 }
 
 blog_user_profile() {
   printf '%s/profile.conf\n' "$(blog_user_dir "$1")"
+}
+
+blog_get_nostr_pubkey() {
+  username=${1-}
+  [ -n "$username" ] || return 1
+  profile=$(blog_user_profile "$username")
+  [ -f "$profile" ] || return 1
+  pubkey=$(config-get "$profile" nostr_pubkey 2>/dev/null || printf '')
+  pubkey=$(blog_validate_nostr_pubkey "$pubkey" 2>/dev/null || printf '')
+  [ -n "$pubkey" ] || return 1
+  printf '%s\n' "$pubkey"
+}
+
+blog_find_username_by_nostr_pubkey() {
+  pubkey=$(blog_validate_nostr_pubkey "${1-}" 2>/dev/null || printf '')
+  if [ -z "$pubkey" ] || [ ! -d "$blog_users_dir" ]; then
+    return 1
+  fi
+  find "$blog_users_dir" -mindepth 2 -maxdepth 2 -type f -name profile.conf 2>/dev/null | while IFS= read -r profile; do
+    [ -n "$profile" ] || continue
+    saved_pubkey=$(config-get "$profile" nostr_pubkey 2>/dev/null || printf '')
+    saved_pubkey=$(blog_validate_nostr_pubkey "$saved_pubkey" 2>/dev/null || printf '')
+    if [ "$saved_pubkey" = "$pubkey" ]; then
+      saved_user=$(config-get "$profile" username 2>/dev/null || printf '')
+      if [ -n "$saved_user" ]; then
+        printf '%s\n' "$saved_user"
+        exit 0
+      fi
+    fi
+  done
+}
+
+blog_suggest_username_from_nostr_pubkey() {
+  pubkey=$(blog_validate_nostr_pubkey "${1-}" 2>/dev/null || printf '')
+  [ -n "$pubkey" ] || return 1
+  base="nostr-$(printf '%s' "$pubkey" | cut -c1-12)"
+  candidate=$base
+  n=1
+  while [ -e "$(blog_user_profile "$candidate")" ]; do
+    n=$((n + 1))
+    candidate="$base-$n"
+  done
+  printf '%s\n' "$candidate"
+}
+
+blog_set_nostr_pubkey() {
+  username=${1-}
+  pubkey=$(blog_validate_nostr_pubkey "${2-}" 2>/dev/null || printf '')
+  [ -n "$username" ] || return 1
+  [ -n "$pubkey" ] || return 1
+  dir=$(blog_user_dir "$username")
+  profile="$dir/profile.conf"
+  mkdir -p "$dir/delegates"
+  config-set "$profile" username "$username"
+  config-set "$profile" nostr_pubkey "$pubkey"
+  config-set "$profile" updated_at "$(blog_now_iso)"
+}
+
+blog_set_user_ssh_key() {
+  username=${1-}
+  ssh_public_key=${2-}
+  ssh_fingerprint=${3-}
+  [ -n "$username" ] || return 1
+  [ -n "$ssh_public_key" ] || return 1
+  dir=$(blog_user_dir "$username")
+  profile="$dir/profile.conf"
+  mkdir -p "$dir/delegates"
+  config-set "$profile" username "$username"
+  config-set "$profile" ssh_public_key "$ssh_public_key"
+  config-set "$profile" ssh_fingerprint "$ssh_fingerprint"
+  config-set "$profile" updated_at "$(blog_now_iso)"
 }
 
 blog_get_player_name() {
@@ -579,6 +664,47 @@ blog_save_user_profile() {
 
 blog_session_path() {
   printf '%s/%s.conf\n' "$blog_sessions_dir" "$1"
+}
+
+blog_nostr_login_request_path() {
+  request_id=${1-}
+  printf '%s/%s.conf\n' "$blog_nostr_login_requests_dir" "$request_id"
+}
+
+blog_create_nostr_login_request() {
+  pubkey=$(blog_validate_nostr_pubkey "${1-}" 2>/dev/null || printf '')
+  [ -n "$pubkey" ] || return 1
+  request_id=$(blog_random_token 16)
+  challenge=$(blog_random_token 24)
+  now=$(blog_now_epoch)
+  request_path=$(blog_nostr_login_request_path "$request_id")
+  config-set "$request_path" pubkey "$pubkey"
+  config-set "$request_path" challenge "$challenge"
+  config-set "$request_path" created_at "$now"
+  printf '%s;%s\n' "$request_id" "$challenge"
+}
+
+blog_get_nostr_login_request() {
+  request_id=${1-}
+  request_path=$(blog_nostr_login_request_path "$request_id")
+  [ -f "$request_path" ] || return 1
+  pubkey=$(config-get "$request_path" pubkey 2>/dev/null || printf '')
+  challenge=$(config-get "$request_path" challenge 2>/dev/null || printf '')
+  created_at=$(config-get "$request_path" created_at 2>/dev/null || printf '0')
+  pubkey=$(blog_validate_nostr_pubkey "$pubkey" 2>/dev/null || printf '')
+  case "$created_at" in ''|*[!0-9]*) created_at=0 ;; esac
+  now=$(blog_now_epoch)
+  if [ -z "$pubkey" ] || [ -z "$challenge" ] || [ "$((now - created_at))" -gt 600 ]; then
+    rm -f "$request_path"
+    return 1
+  fi
+  printf '%s;%s\n' "$pubkey" "$challenge"
+}
+
+blog_clear_nostr_login_request() {
+  request_id=${1-}
+  [ -n "$request_id" ] || return 0
+  rm -f "$(blog_nostr_login_request_path "$request_id")"
 }
 
 blog_create_session() {

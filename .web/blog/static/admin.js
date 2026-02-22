@@ -4,6 +4,8 @@
     csrfToken: localStorage.getItem('csrf_token') || '',
     username: '',
     playerName: '',
+    nostrPubkey: '',
+    sshFingerprint: '',
     isAdmin: false,
     composeTags: [],
     currentDraftId: '',
@@ -44,9 +46,14 @@
     queueList: document.getElementById('queue-list'),
     currentDraftLabel: document.getElementById('current-draft-label'),
     accountPlayerName: document.getElementById('account-player-name'),
+    accountNostrPubkey: document.getElementById('account-nostr-pubkey'),
+    accountSshPublicKey: document.getElementById('account-ssh-public-key'),
     autosaveStatus: document.getElementById('autosave-status'),
     publishNowButton: document.getElementById('btn-publish-now'),
     mirrorNostrButton: document.getElementById('btn-mirror-nostr'),
+    bindPasskeyButton: document.getElementById('btn-bind-passkey'),
+    generateSshButton: document.getElementById('btn-generate-ssh'),
+    linkSshButton: document.getElementById('btn-link-ssh'),
     imagePicker: document.getElementById('image-picker'),
     dropOverlay: document.getElementById('drop-overlay'),
     sectionButtons: Array.from(document.querySelectorAll('[data-admin-nav]')),
@@ -165,6 +172,24 @@
       throw new Error('Invalid JSON response');
     }
     return data;
+  }
+
+  function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  function base64ToArrayBuffer(base64) {
+    const binary = atob(String(base64 || ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
   }
 
   function buildAuthPayload(data) {
@@ -490,7 +515,7 @@
 
   async function checkAuth() {
     if (!state.sessionToken) {
-      setAuthMessage('Not logged in. Use the Login button in the top navigation to sign in with passkey.', 'error');
+      setAuthMessage('Not logged in. Use the Login button in the top navigation to sign in with Nostr or passkey.', 'error');
       return;
     }
 
@@ -505,6 +530,8 @@
 
       state.username = data.username;
       state.playerName = data.player_name || data.username || '';
+      state.nostrPubkey = data.nostr_pubkey || '';
+      state.sshFingerprint = data.ssh_fingerprint || '';
       state.isAdmin = !!data.is_admin;
       state.csrfToken = data.csrf_token || state.csrfToken;
       localStorage.setItem('csrf_token', state.csrfToken || '');
@@ -512,6 +539,14 @@
       els.adminPanel.style.display = 'grid';
       if (els.accountPlayerName) {
         els.accountPlayerName.value = state.playerName;
+      }
+      if (els.accountNostrPubkey) {
+        els.accountNostrPubkey.value = state.nostrPubkey;
+      }
+      if (els.accountSshPublicKey) {
+        els.accountSshPublicKey.placeholder = state.sshFingerprint
+          ? ('SSH linked (' + state.sshFingerprint.slice(0, 16) + '...)')
+          : 'ssh-ed25519 AAAA...';
       }
 
       if (!state.isAdmin) {
@@ -610,6 +645,173 @@
     } catch (err) {
       setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
     }
+  }
+
+  function concatUint8Arrays(parts) {
+    let total = 0;
+    parts.forEach(function (part) { total += part.length; });
+    const out = new Uint8Array(total);
+    let offset = 0;
+    parts.forEach(function (part) {
+      out.set(part, offset);
+      offset += part.length;
+    });
+    return out;
+  }
+
+  function u32be(value) {
+    return new Uint8Array([
+      (value >>> 24) & 0xff,
+      (value >>> 16) & 0xff,
+      (value >>> 8) & 0xff,
+      value & 0xff
+    ]);
+  }
+
+  function packSshString(bytes) {
+    return concatUint8Arrays([u32be(bytes.length), bytes]);
+  }
+
+  function normalizeMpint(bytes) {
+    let start = 0;
+    while (start < bytes.length - 1 && bytes[start] === 0) {
+      start += 1;
+    }
+    let out = bytes.slice(start);
+    if (!out.length) {
+      out = new Uint8Array([0]);
+    }
+    if (out[0] & 0x80) {
+      const prefixed = new Uint8Array(out.length + 1);
+      prefixed[0] = 0;
+      prefixed.set(out, 1);
+      out = prefixed;
+    }
+    return out;
+  }
+
+  function base64urlToBytes(input) {
+    const normalized = String(input || '').replace(/-/g, '+').replace(/_/g, '/');
+    const padLen = (4 - (normalized.length % 4)) % 4;
+    const binary = atob(normalized + '='.repeat(padLen));
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      out[i] = binary.charCodeAt(i);
+    }
+    return out;
+  }
+
+  function pemEncode(label, buffer) {
+    const b64 = arrayBufferToBase64(buffer);
+    const chunks = b64.match(/.{1,64}/g) || [];
+    return '-----BEGIN ' + label + '-----\n' + chunks.join('\n') + '\n-----END ' + label + '-----\n';
+  }
+
+  function triggerTextDownload(filename, content) {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  async function generateBrowserSshKeyPair() {
+    if (!window.crypto || !window.crypto.subtle) {
+      throw new Error('Web Crypto API is unavailable in this browser.');
+    }
+    const keyPair = await window.crypto.subtle.generateKey({
+      name: 'RSASSA-PKCS1-v1_5',
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: 'SHA-256'
+    }, true, ['sign', 'verify']);
+
+    const jwk = await window.crypto.subtle.exportKey('jwk', keyPair.publicKey);
+    const pkcs8 = await window.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+    const nBytes = normalizeMpint(base64urlToBytes(jwk.n || ''));
+    const eBytes = normalizeMpint(base64urlToBytes(jwk.e || ''));
+    const algo = new TextEncoder().encode('ssh-rsa');
+    const blob = concatUint8Arrays([
+      packSshString(algo),
+      packSshString(eBytes),
+      packSshString(nBytes)
+    ]);
+    const comment = (state.username || 'player') + '@wizardry';
+    const publicKey = 'ssh-rsa ' + arrayBufferToBase64(blob.buffer) + ' ' + comment;
+    const privateKeyPem = pemEncode('PRIVATE KEY', pkcs8);
+    return {
+      publicKey: publicKey,
+      privateKeyPem: privateKeyPem
+    };
+  }
+
+  function createPasskeyOptions(username, fingerprint, challengeB64) {
+    return {
+      publicKey: {
+        challenge: base64ToArrayBuffer(challengeB64),
+        rp: {
+          name: 'Wizardry Blog',
+          id: window.location.hostname
+        },
+        user: {
+          id: new TextEncoder().encode(fingerprint),
+          name: username,
+          displayName: username
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7 },
+          { type: 'public-key', alg: -257 }
+        ],
+        authenticatorSelection: {
+          userVerification: 'preferred'
+        },
+        timeout: 60000,
+        attestation: 'none'
+      }
+    };
+  }
+
+  async function bindPasskeyForAccount() {
+    if (!window.PublicKeyCredential) {
+      throw new Error('WebAuthn is not supported in this browser.');
+    }
+    const begin = await apiPost('/cgi/nostr-auth-passkey-begin', {}, true);
+    if (!begin.success) {
+      throw new Error(begin.error || 'Unable to start passkey binding.');
+    }
+    const credential = await navigator.credentials.create(createPasskeyOptions(begin.username, begin.fingerprint, begin.challenge));
+    const publicKey = credential.response.getPublicKey ? credential.response.getPublicKey() : null;
+    if (!publicKey) {
+      throw new Error('Passkey registration requires a newer browser.');
+    }
+    const finish = await apiPost('/cgi/ssh-auth-bind-webauthn', {
+      username: begin.username,
+      fingerprint: begin.fingerprint,
+      credential_id: credential.id,
+      public_key: arrayBufferToBase64(publicKey),
+      client_data_json: arrayBufferToBase64(credential.response.clientDataJSON)
+    }, false);
+    if (!finish.success) {
+      throw new Error(finish.error || 'Passkey bind failed.');
+    }
+  }
+
+  async function linkSshForAccount() {
+    const raw = els.accountSshPublicKey ? String(els.accountSshPublicKey.value || '').trim() : '';
+    if (!raw) {
+      throw new Error('Enter or generate an SSH public key first.');
+    }
+    const data = await apiPost('/cgi/nostr-auth-link-ssh', {
+      ssh_public_key: raw
+    }, true);
+    if (!data.success) {
+      throw new Error(data.error || 'SSH link failed.');
+    }
+    state.sshFingerprint = data.ssh_fingerprint || '';
   }
 
   function renderDraftList(drafts) {
@@ -956,6 +1158,44 @@
     const saveAccountBtn = document.getElementById('btn-save-account');
     if (saveAccountBtn) {
       saveAccountBtn.addEventListener('click', saveAccount);
+    }
+    if (els.bindPasskeyButton) {
+      els.bindPasskeyButton.addEventListener('click', function () {
+        bindPasskeyForAccount()
+          .then(function () {
+            setOutput(els.outputAccount, 'Passkey bound to your Nostr account.', 'ok');
+          })
+          .catch(function (err) {
+            setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
+          });
+      });
+    }
+    if (els.generateSshButton) {
+      els.generateSshButton.addEventListener('click', function () {
+        generateBrowserSshKeyPair()
+          .then(function (keyPair) {
+            if (els.accountSshPublicKey) {
+              els.accountSshPublicKey.value = keyPair.publicKey;
+            }
+            triggerTextDownload('id_rsa', keyPair.privateKeyPem);
+            triggerTextDownload('id_rsa.pub', keyPair.publicKey + '\n');
+            setOutput(els.outputAccount, 'SSH keypair generated in-browser and downloaded. Private key was never sent to the server.', 'ok');
+          })
+          .catch(function (err) {
+            setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
+          });
+      });
+    }
+    if (els.linkSshButton) {
+      els.linkSshButton.addEventListener('click', function () {
+        linkSshForAccount()
+          .then(function () {
+            setOutput(els.outputAccount, 'SSH key linked to your Nostr account.', 'ok');
+          })
+          .catch(function (err) {
+            setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
+          });
+      });
     }
 
     document.querySelectorAll('[data-toolbar]').forEach(function (btn) {

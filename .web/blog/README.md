@@ -14,7 +14,7 @@ A single-author blog template for wizardry web with optional Nostr bridge suppor
 - **Public discovery**: Index, tags, search, RSS, Atom, sitemap
 - **Archive index**: Month-grouped archive view with per-month counts
 - **Post context UX**: Read-time card, tags, and automatic older/newer links
-- **Passkey auth**: SSH identity + WebAuthn passkeys (challenge/response)
+- **Nostr-first auth**: Nostr challenge login, optional WebAuthn passkeys, optional SSH link
 
 ## Post Model
 
@@ -172,14 +172,15 @@ To enable Nostr bridge for a site, turn on “Enable Nostr Bridge” in `/pages/
 - `site/nostr/state/authors.txt`
 - `site/nostr/state/relays.txt`
 
-## MUD Integration & Authentication
+## Authentication & MUD Integration
 
-The blog template integrates with the wizardry MUD player system to provide unified authentication and admin access control.
+The blog template now uses Nostr keys as primary account identity, with optional passkeys and optional SSH key linking for MUD compatibility.
 
 ### Key Features
 
-- **MUD Player Accounts**: Blog uses existing MUD player SSH keys
+- **Nostr Identity**: Accounts are anchored to a Nostr pubkey
 - **WebAuthn Authentication**: Passwordless login with biometrics/security keys
+- **Optional SSH Link**: Attach SSH public key to your account for terminal/MUD workflows
 - **UNIX Group Permissions**: Admin access via `blog-admin` group
 - **Admin Panel**: Compose, publish, and manage posts
 - **Markdown Editor**: Live preview for easy writing
@@ -188,11 +189,7 @@ The blog template integrates with the wizardry MUD player system to provide unif
 
 ### Quick Start for Admins
 
-1. **Create MUD Player** (on server as root):
-   ```sh
-   sudo add-player
-   # Enter player name and SSH public key
-   ```
+1. **Sign in with Nostr** using the Login button in site navigation.
 
 2. **Grant Admin Access**:
    ```sh
@@ -200,9 +197,7 @@ The blog template integrates with the wizardry MUD player system to provide unif
    sudo usermod -aG blog-admin <username>
    ```
 
-3. **Register on Blog**: Visit `/ssh-auth.html`, enter player name
-
-4. **Access Admin Panel**: Visit `/admin.html` to compose and publish
+3. **Access Admin Panel**: Visit `/admin.html` to compose and publish
 
 ### For Single-Author Blogs
 
@@ -230,28 +225,28 @@ This prevents new users from registering while keeping your access.
 ### Authentication Flow
 
 ```
-MUD Player (UNIX user with SSH key)
+Sign in with Nostr key (creates account if needed)
     ↓
-Register on blog (uses SSH fingerprint)
+Optional: bind WebAuthn passkey
     ↓
-Create WebAuthn credential (biometric, security key)
-    ↓
-Login with WebAuthn (no SSH needed)
+Optional: link SSH public key for MUD
     ↓
 Access admin panel (if in blog-admin group)
 ```
 
 ### Demo Pages
 
-- `/ssh-auth.html` - Authentication and registration
+- Login modal in site navigation - Authentication and account creation
 - `/admin.html` - Admin panel (requires admin permissions)
 
 ### CGI Scripts
 
 **Authentication:**
-- `ssh-auth-register-mud` - Register using MUD player account
-- `ssh-auth-register` - Manual SSH key registration (demo/testing)
-- `ssh-auth-bind-webauthn` - Bind WebAuthn credential to SSH fingerprint
+- `nostr-auth-login-begin` - Create Nostr login challenge
+- `nostr-auth-login-finish` - Verify signed Nostr event and create session
+- `nostr-auth-passkey-begin` - Start passkey binding for logged-in account
+- `nostr-auth-link-ssh` - Link SSH public key to logged-in Nostr account
+- `ssh-auth-bind-webauthn` - Store WebAuthn credential delegate
 - `ssh-auth-login-begin` - Start passkey login challenge
 - `ssh-auth-login-finish` - Verify signed assertion and create session
 - `ssh-auth-check-session` - Validate session and permissions
@@ -307,11 +302,12 @@ Access admin panel (if in blog-admin group)
 
 ### Security Model
 
-- **Root Identity**: SSH public key fingerprint (never changes)
+- **Root Identity**: Nostr pubkey (canonical account anchor)
 - **Delegates**: WebAuthn credentials (revocable, multi-device)
+- **Optional Link**: SSH public key for terminal/MUD interoperability
 - **Permissions**: UNIX group membership (`blog-admin`)
 - **Session Validation**: Every admin action checks permissions
-- **Phishing-Resistant**: WebAuthn bound to domain
+- **Phishing-Resistant**: WebAuthn and Nostr challenge signing
 
 See `.github/MUD_BLOG_INTEGRATION.md` for complete documentation.
 

@@ -302,8 +302,13 @@ title: Blog Admin
 <div class="row-head">
 <div>
 <h3>Account</h3>
-<p class="muted">Update your player name shown in the blog UI.</p>
+<p class="muted">Your account is Nostr-based. You can bind a passkey and link an SSH key for MUD compatibility.</p>
 </div>
+</div>
+
+<div class="field-row">
+<label for="account-nostr-pubkey"><strong>Nostr Pubkey</strong></label>
+<input type="text" id="account-nostr-pubkey" readonly>
 </div>
 
 <div class="field-row">
@@ -312,6 +317,26 @@ title: Blog Admin
 <input type="text" id="account-player-name" placeholder="Your name">
 <button id="btn-save-account" type="button" class="primary">Save</button>
 </div>
+</div>
+
+<div class="field-row">
+<label><strong>Passkey</strong></label>
+<div class="account-row">
+<button id="btn-bind-passkey" type="button">Bind passkey</button>
+</div>
+</div>
+
+<div class="field-row">
+<label for="account-ssh-public-key"><strong>SSH Public Key (optional)</strong></label>
+<textarea id="account-ssh-public-key" rows="3" placeholder="ssh-ed25519 AAAA..."></textarea>
+<div class="account-row">
+<button id="btn-generate-ssh" type="button">Generate SSH Key Pair (Browser)</button>
+<button id="btn-link-ssh" type="button">Link SSH Key</button>
+</div>
+<p class="muted">When generated in-browser, private key download starts locally. Keep it secret and back it up.</p>
+</div>
+
+<div class="field-row">
 <div id="output-account" class="output"></div>
 </div>
 </div>
@@ -711,6 +736,11 @@ body {
 
 [data-admin-section="account"] #account-player-name {
   inline-size: clamp(12rem, 22vw, 18rem);
+}
+
+[data-admin-section="account"] #account-nostr-pubkey,
+[data-admin-section="account"] #account-ssh-public-key {
+  inline-size: min(100%, 42rem);
 }
 
 .account-row {

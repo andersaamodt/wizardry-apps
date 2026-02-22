@@ -687,6 +687,42 @@ test_blog_submit_comment_endpoint_graceful_failure() {
   teardown_blog_fixture
 }
 
+test_blog_nostr_auth_endpoints_require_identity() {
+  setup_blog_fixture || return $?
+
+  run_cgi_post "$cgi_dir/nostr-auth-login-begin" "pubkey=bad"
+  case "$CGI_BODY" in
+    *'invalid_pubkey'*|*'nostril_required'*) ;;
+    *)
+      TEST_FAILURE_REASON="nostr-auth-login-begin should reject invalid pubkey with structured error"
+      teardown_blog_fixture
+      return 1
+      ;;
+  esac
+
+  run_cgi_post "$cgi_dir/nostr-auth-passkey-begin" ""
+  case "$CGI_BODY" in
+    *'auth_required'*) ;;
+    *)
+      TEST_FAILURE_REASON="nostr-auth-passkey-begin should require an authenticated session"
+      teardown_blog_fixture
+      return 1
+      ;;
+  esac
+
+  run_cgi_post "$cgi_dir/nostr-auth-link-ssh" ""
+  case "$CGI_BODY" in
+    *'auth_required'*) ;;
+    *)
+      TEST_FAILURE_REASON="nostr-auth-link-ssh should require an authenticated session"
+      teardown_blog_fixture
+      return 1
+      ;;
+  esac
+
+  teardown_blog_fixture
+}
+
 test_blog_open_post_redirects() {
   setup_blog_fixture || return $?
 
@@ -786,6 +822,7 @@ run_test_case "blog archive endpoint renders grouped posts" test_blog_archive_en
 run_test_case "blog post-context endpoint returns post metadata" test_blog_post_context_endpoint
 run_test_case "blog nostr bridge projects events and filters comments" test_blog_nostr_bridge_projection_and_comments
 run_test_case "blog submit-comment endpoint returns structured errors" test_blog_submit_comment_endpoint_graceful_failure
+run_test_case "blog nostr auth endpoints enforce identity requirements" test_blog_nostr_auth_endpoints_require_identity
 run_test_case "blog open-post redirects to post html" test_blog_open_post_redirects
 run_test_case "blog account update persists player name" test_blog_account_update_and_player_name
 
