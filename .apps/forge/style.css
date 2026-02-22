@@ -1552,6 +1552,31 @@ button:disabled {
   letter-spacing: normal;
 }
 
+.icon-dropzone:has(.icon-preview:not(.hidden)) {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  grid-template-columns: auto;
+  gap: 0;
+  max-width: none;
+}
+
+.icon-dropzone:has(.icon-preview:not(.hidden)) .icon-drop-copy {
+  display: none;
+}
+
+.icon-dropzone:has(.icon-preview:not(.hidden)) .icon-preview-wrap {
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+}
+
+.icon-dropzone:has(.icon-preview:not(.hidden)) .icon-preview {
+  border-radius: 10px;
+}
+
 .icon-dropzone.drag-over {
   border-color: color-mix(in srgb, var(--accent) 48%, var(--section-border));
   background: color-mix(in srgb, var(--section-accent-soft) 58%, transparent);
