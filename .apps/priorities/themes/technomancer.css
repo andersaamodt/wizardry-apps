@@ -2,6 +2,7 @@
   --primary: #0a0f0d;
   --accent: #22c55e;
   --accent-dark: #16a34a;
+  --accent-soft: #163426;
   --teal: #00bfff;
   --green: #22c55e;
   --purple: #0f172a;
@@ -18,4 +19,11 @@
   --nav-link-hover: #183e2b;
   --nav-link-active: #22c55e;
   --nav-icon: #00bfff;
+}
+
+.theme-picker-btn:hover,
+.theme-picker-btn:focus-visible {
+  border-color: var(--border);
+  background: var(--nav-link-hover);
+  color: color-mix(in srgb, var(--heading-color) 86%, #d9ffe8 14%);
 }
