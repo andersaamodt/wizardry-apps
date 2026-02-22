@@ -186,6 +186,12 @@
         // Priorities starts narrow and should remain resizable down to a compact width.
         frame = NSMakeRect(0, 0, 420, 640);
         minSize = NSMakeSize(340, 260);
+        NSScreen *screen = [NSScreen mainScreen];
+        if (screen) {
+            NSRect visible = [screen visibleFrame];
+            frame.origin.x = NSMinX(visible) + floor((visible.size.width - frame.size.width) / 2.0);
+            frame.origin.y = NSMaxY(visible) - frame.size.height;
+        }
     } else if (prefersNarrowTallLayout) {
         minSize = NSMakeSize(360, 420);
         NSScreen *screen = [NSScreen mainScreen];
@@ -214,7 +220,7 @@
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
     [self.window setMinSize:minSize];
-    if (!prefersNarrowTallLayout) {
+    if (!prefersNarrowTallLayout && !self.enableNativeViewMenu) {
         [self.window center];
     }
     [self.window setTitle:[NSString stringWithFormat:@"Wizardry - %@", appName]];
