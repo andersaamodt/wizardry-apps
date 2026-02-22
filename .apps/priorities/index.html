@@ -1897,12 +1897,6 @@
       if (state.busy) {
         checkbox.disabled = true;
       }
-      if (state.pendingCheckPath === item.path) {
-        checkbox.classList.add('loading');
-        checkbox.setAttribute('aria-busy', 'true');
-        checkSlot.classList.add('loading');
-        checkbox.disabled = true;
-      }
       checkbox.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -2220,14 +2214,6 @@
       var currentBlockEchelon = null;
       for (var i = 0; i < items.length; i += 1) {
         var item = items[i];
-        if (depth === 0 && options && options.preloadNextActions && item.kind === 'dir' && item.hasSubpriorities && !getCachedDirItems(item.path)) {
-          try {
-            var preloadItems = await listDir(item.path);
-            setCachedDirItems(item.path, preloadItems);
-          } catch (_) {
-            // Ignore preload failures so startup still completes.
-          }
-        }
         var edgeClass = '';
         if (depth === 0) {
           var prevItem = i > 0 ? items[i - 1] : null;
@@ -2701,10 +2687,7 @@
         state.drillStack = [];
       }
       updateDrillUpVisibility();
-      return render({
-        suppressLoadingOverlay: !!options.suppressLoadingOverlay,
-        preloadNextActions: options.preloadNextActions === true
-      });
+      return render({ suppressLoadingOverlay: !!options.suppressLoadingOverlay });
     }
 
     function schedulePersistRootPref(value) {
@@ -2760,10 +2743,7 @@
       if (saved) {
         document.getElementById('root-dir').value = saved;
         updateTitleFromRoot();
-        return setRootAndRefresh({
-          suppressLoadingOverlay: !!state.startupSnapshotRestored,
-          preloadNextActions: true
-        });
+        return setRootAndRefresh({ suppressLoadingOverlay: !!state.startupSnapshotRestored });
       }
 
       updateTitleFromRoot();
