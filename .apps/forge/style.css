@@ -772,7 +772,6 @@ button:disabled {
 
 .catalog-thumb:empty {
   background: transparent;
-  border-color: transparent;
 }
 
 .catalog-thumb img {
