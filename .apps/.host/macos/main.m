@@ -34,6 +34,7 @@
 @property (assign) BOOL enableNativeViewMenu;
 @property (assign) BOOL enableNativeBootSplash;
 @property (assign) BOOL prefersWideDragStrip;
+@property (assign) CGFloat bootSplashLogoSize;
 @end
 
 @implementation AppDelegate
@@ -214,9 +215,10 @@
     [stack addArrangedSubview:logoView];
 
     [overlay addSubview:stack];
+    CGFloat logoSize = self.bootSplashLogoSize > 0.0 ? self.bootSplashLogoSize : 192.0;
     [NSLayoutConstraint activateConstraints:@[
-        [logoView.widthAnchor constraintEqualToConstant:192.0],
-        [logoView.heightAnchor constraintEqualToConstant:192.0],
+        [logoView.widthAnchor constraintEqualToConstant:logoSize],
+        [logoView.heightAnchor constraintEqualToConstant:logoSize],
         [stack.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
         [stack.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor]
     ]];
@@ -363,6 +365,7 @@
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.enableNativeBootSplash = self.enableNativeViewMenu || [appSlug isEqualToString:@"forge"];
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
+    self.bootSplashLogoSize = [appSlug isEqualToString:@"forge"] ? 156.0 : 192.0;
     if (self.enableNativeViewMenu) {
         [self loadPrioritiesBootPalette];
     } else if (self.enableNativeBootSplash) {
