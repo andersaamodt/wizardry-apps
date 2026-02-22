@@ -563,8 +563,8 @@ button:hover {
 .tree {
   display: grid;
   gap: 0;
-  padding-left: calc(8px * var(--ui-scale));
-  padding-right: calc(8px * var(--ui-scale));
+  padding-left: calc(14px * var(--ui-scale));
+  padding-right: calc(14px * var(--ui-scale));
   justify-items: center;
 }
 
@@ -600,8 +600,8 @@ button:hover {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(-32px * var(--ui-scale));
-  width: calc(32px * var(--ui-scale));
+  left: calc(-36px * var(--ui-scale));
+  width: calc(36px * var(--ui-scale));
 }
 
 .row.row-expandable {
@@ -679,7 +679,7 @@ button:hover {
   width: calc(28px * var(--ui-scale));
   height: calc(28px * var(--ui-scale));
   font-size: calc(18px * var(--ui-scale));
-  left: calc(-28px * var(--ui-scale));
+  left: calc(-31px * var(--ui-scale));
 }
 
 .row-subtask .btn.exp {
@@ -997,7 +997,7 @@ button:hover {
   width: calc(34px * var(--ui-scale));
   height: calc(34px * var(--ui-scale));
   position: absolute;
-  left: calc(-28px * var(--ui-scale));
+  left: calc(-34px * var(--ui-scale));
   top: 50%;
   transform: translateY(-50%);
   border-radius: calc(8px * var(--ui-scale));
