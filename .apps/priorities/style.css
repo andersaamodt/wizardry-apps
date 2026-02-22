@@ -102,7 +102,9 @@ h1 {
 .title-cluster {
   display: inline-flex;
   align-items: center;
-  gap: calc(6px * var(--ui-scale));
+  justify-content: center;
+  position: relative;
+  min-width: 0;
   /* Keep title controls reliably clickable inside draggable header. */
   -webkit-app-region: no-drag;
   app-region: no-drag;
@@ -243,7 +245,10 @@ h1 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  position: static;
+  position: absolute;
+  right: calc(100% + 6px * var(--ui-scale));
+  top: 50%;
+  transform: translateY(-50%);
   border: 0;
   background: transparent;
   color: var(--accent, #7782d6);
