@@ -17,10 +17,9 @@
 </button>
 </form>
 <a href="/pages/admin.html#compose" class="nav-compose nav-compose-icon" style="display:none;" aria-label="Compose post" title="Compose post">
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-<path d="M8 3.75H16L20 7.75V19.25C20 20.0784 19.3284 20.75 18.5 20.75H8.5C7.67157 20.75 7 20.0784 7 19.25V5.25C7 4.42157 7.67157 3.75 8.5 3.75Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-<path d="M16 3.75V7.75H20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M9.75 15.25L14.75 10.25C15.1642 9.83579 15.8358 9.83579 16.25 10.25C16.6642 10.6642 16.6642 11.3358 16.25 11.75L11.25 16.75L9.25 17.25L9.75 15.25Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Font Awesome Free "pen-to-square" (Icons: CC BY 4.0): https://fontawesome.com/icons/pen-to-square -->
+<svg width="21" height="21" viewBox="0 0 512 512" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<path fill="currentColor" d="M471.6 21.7c-21.9-21.9-57.3-21.9-79.2 0L362.3 51.7l97.9 97.9 30.1-30.1c21.9-21.9 21.9-57.3 0-79.2L471.6 21.7zm-299.2 220c-6.1 6.1-10.8 13.6-13.5 21.9l-29.6 88.8c-2.9 8.6-.6 18.1 5.8 24.6s15.9 8.7 24.6 5.8l88.8-29.6c8.2-2.7 15.7-7.4 21.9-13.5L437.7 172.3 339.7 74.3 172.4 241.7zM96 64C43 64 0 107 0 160L0 416c0 53 43 96 96 96l256 0c53 0 96-43 96-96l0-96c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7-14.3 32-32 32L96 448c-17.7 0-32-14.3-32-32l0-256c0-17.7 14.3-32 32-32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L96 64z"/>
 </svg>
 </a>
 <span id="nav-user-name" class="nav-username" style="display:none;"></span>
