@@ -119,6 +119,7 @@ set -eu
 APPDIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
 ROOT_FILE="$APPDIR/Resources/wizardry-apps-root.txt"
 USER_ROOT_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/forge-root"
+APP_ENTRY="$APPDIR/Resources/forge"
 
 if [ -z "${WIZARDRY_APPS_ROOT-}" ]; then
   if [ -f "$ROOT_FILE" ]; then
@@ -135,7 +136,11 @@ if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -d "$WIZARDRY_APPS_ROOT" ]; then
   cd "$WIZARDRY_APPS_ROOT"
 fi
 
-exec "$APPDIR/MacOS/wizardry-host" "$APPDIR/Resources/forge"
+if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -f "$WIZARDRY_APPS_ROOT/.apps/forge/index.html" ] && [ -x "$WIZARDRY_APPS_ROOT/.apps/forge/scripts/forge-backend.sh" ]; then
+  APP_ENTRY="$WIZARDRY_APPS_ROOT/.apps/forge"
+fi
+
+exec "$APPDIR/MacOS/wizardry-host" "$APP_ENTRY"
 APP
 chmod +x "$macos_dir/app-forge"
 

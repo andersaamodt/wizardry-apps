@@ -48,6 +48,7 @@ case "$os" in
     sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$mac_build_out" >/tmp/forge-mac-build.log
     [ -x "$mac_build_out/Contents/MacOS/wizardry-host" ]
     [ -x "$mac_build_out/Contents/MacOS/app-forge" ]
+    grep -F 'APP_ENTRY="$WIZARDRY_APPS_ROOT/.apps/forge"' "$mac_build_out/Contents/MacOS/app-forge" >/dev/null
     [ -f "$mac_build_out/Contents/Resources/forge/index.html" ]
     [ -f "$mac_build_out/Contents/Resources/forge/.host/shared/wizardry-bridge.js" ]
     [ -f "$mac_build_out/Contents/Resources/wizardry-apps-root.txt" ]
