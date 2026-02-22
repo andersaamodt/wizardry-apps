@@ -285,6 +285,8 @@ h1 {
   display: block;
   stroke: currentColor;
   opacity: 1;
+  transform: rotate(180deg);
+  transform-origin: center;
 }
 
 .settings-toggle:hover .settings-gear-glyph,
