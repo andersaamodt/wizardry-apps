@@ -685,7 +685,7 @@ button:hover {
   width: calc(28px * var(--ui-scale));
   height: calc(28px * var(--ui-scale));
   font-size: calc(18px * var(--ui-scale));
-  left: calc((var(--pri-lane) + (28px * var(--ui-scale))) / -2);
+  left: calc((var(--pri-lane) + (28px * var(--ui-scale))) / -2 - 1px);
 }
 
 .row-subtask .btn.exp {
@@ -1003,7 +1003,7 @@ button:hover {
   width: calc(34px * var(--ui-scale));
   height: calc(34px * var(--ui-scale));
   position: absolute;
-  left: calc((var(--pri-lane) + (34px * var(--ui-scale))) / -2);
+  left: calc((var(--pri-lane) + (34px * var(--ui-scale))) / -2 - 1px);
   top: 50%;
   transform: translateY(-50%);
   border-radius: calc(8px * var(--ui-scale));
