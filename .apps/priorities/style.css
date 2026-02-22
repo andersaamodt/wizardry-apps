@@ -404,8 +404,9 @@ h1 {
 #theme-picker-menu {
   left: 0;
   right: auto;
-  width: 100%;
-  min-width: 100%;
+  width: fit-content;
+  min-width: calc(14ch * var(--ui-scale));
+  max-width: min(280px, 74vw);
 }
 
 .floating-menu.hidden {
