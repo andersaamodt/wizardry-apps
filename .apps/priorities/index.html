@@ -1686,7 +1686,13 @@
           width: rect.width,
           path: '',
           animKey: '',
+          rowStyle: null,
           nextActionStyle: null
+        };
+        var rowComputed = window.getComputedStyle(row);
+        metrics.rowStyle = {
+          backgroundColor: rowComputed.backgroundColor,
+          borderColor: rowComputed.borderColor
         };
         var nextActionEl = row.querySelector('.next-action');
         if (nextActionEl) {
@@ -1890,6 +1896,8 @@
         row.style.pointerEvents = '';
         row.style.zIndex = '';
         row.style.visibility = '';
+        row.style.backgroundColor = '';
+        row.style.borderColor = '';
         row.classList.remove('row-moving');
         if (row._reorderOverlayEl) {
           try {
@@ -1922,6 +1930,7 @@
         }
         row._reorderTextAnimationTargets = null;
         row._reorderNextActionColorTargets = null;
+        row._reorderRowColorTween = null;
         row._reorderAnimation = null;
         remaining -= 1;
         if (remaining <= 0 && !finished) {
@@ -1993,6 +2002,28 @@
             movedRow.style.backfaceVisibility = 'hidden';
             movedRow.style.pointerEvents = 'none';
             movedRow.style.transformOrigin = 'top left';
+            movedRow._reorderRowColorTween = null;
+            if (m.prev && m.prev.rowStyle) {
+              var prevRowStyle = m.prev.rowStyle;
+              var currentRowStyle = window.getComputedStyle(movedRow);
+              var rowTargetBackgroundColor = currentRowStyle.backgroundColor;
+              var rowTargetBorderColor = currentRowStyle.borderColor;
+              var rowBgChanged = prevRowStyle.backgroundColor !== rowTargetBackgroundColor;
+              var rowBorderChanged = prevRowStyle.borderColor !== rowTargetBorderColor;
+              if (rowBgChanged || rowBorderChanged) {
+                movedRow._reorderRowColorTween = {
+                  targetBackgroundColor: rowTargetBackgroundColor,
+                  targetBorderColor: rowTargetBorderColor
+                };
+                movedRow.style.transition = 'none';
+                movedRow.style.backgroundColor = prevRowStyle.backgroundColor;
+                movedRow.style.borderColor = prevRowStyle.borderColor;
+                movedRow.getBoundingClientRect();
+                movedRow.style.transition = 'background-color ' + durationMs + 'ms ' + easing + ', border-color ' + durationMs + 'ms ' + easing;
+                movedRow.style.backgroundColor = rowTargetBackgroundColor;
+                movedRow.style.borderColor = rowTargetBorderColor;
+              }
+            }
             movedRow._reorderNextActionColorTargets = [];
             if (m.prev && m.prev.nextActionStyle) {
               var prevNextActionStyle = m.prev.nextActionStyle;
@@ -2096,7 +2127,11 @@
                 ? ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0) scaleX(' + rowScaleX + ')')
                 : ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)');
               movedRow.getBoundingClientRect();
-              movedRow.style.transition = 'transform ' + durationMs + 'ms ' + easing;
+              if (movedRow._reorderRowColorTween) {
+                movedRow.style.transition = 'transform ' + durationMs + 'ms ' + easing + ', background-color ' + durationMs + 'ms ' + easing + ', border-color ' + durationMs + 'ms ' + easing;
+              } else {
+                movedRow.style.transition = 'transform ' + durationMs + 'ms ' + easing;
+              }
               movedRow.style.transform = 'translate3d(0,0,0)';
               var fallbackTextTargets = movedRow.querySelectorAll('.name-stack');
               movedRow._reorderTextAnimationTargets = [];
