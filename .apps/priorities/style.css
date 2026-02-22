@@ -1252,6 +1252,13 @@ button:hover {
   background: color-mix(in srgb, var(--bg-panel-2, var(--light-bg, #f8f7fc)) 82%, var(--accent, #7782d6) 18%);
 }
 
+.add-inline-btn:disabled,
+.add-inline-btn:disabled:hover {
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--icon-neutral) 64%, transparent);
+}
+
 .add-inline-btn.loading {
   position: relative;
   color: transparent;
