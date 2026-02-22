@@ -5022,7 +5022,7 @@
     if (downloadedBytes > totalBytes) {
       downloadedBytes = totalBytes;
     }
-    return dictationGigabytesLabel(downloadedBytes, 2) + " of " + dictationGigabytesLabel(totalBytes, 2) + " GB";
+    return dictationGigabytesLabel(downloadedBytes, 1) + " of " + dictationGigabytesLabel(totalBytes, 1) + " GB";
   }
 
   function dictationWholeNumber(rawValue) {
