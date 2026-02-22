@@ -16,26 +16,15 @@
 </svg>
 </button>
 </form>
-<a href="/pages/admin.html#settings" class="nav-settings nav-settings-icon" style="display:none;" aria-label="Settings" title="Settings">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-<path d="M12 8.8C10.23 8.8 8.8 10.23 8.8 12C8.8 13.77 10.23 15.2 12 15.2C13.77 15.2 15.2 13.77 15.2 12C15.2 10.23 13.77 8.8 12 8.8Z" stroke="currentColor" stroke-width="1.8"/>
-<path d="M19.4 13.2V10.8L17.54 10.29C17.4 9.9 17.24 9.52 17.03 9.17L17.99 7.49L16.31 5.81L14.63 6.77C14.28 6.56 13.9 6.4 13.51 6.26L13 4.4H10.6L10.09 6.26C9.7 6.4 9.32 6.56 8.97 6.77L7.29 5.81L5.61 7.49L6.57 9.17C6.36 9.52 6.2 9.9 6.06 10.29L4.2 10.8V13.2L6.06 13.71C6.2 14.1 6.36 14.48 6.57 14.83L5.61 16.51L7.29 18.19L8.97 17.23C9.32 17.44 9.7 17.6 10.09 17.74L10.6 19.6H13L13.51 17.74C13.9 17.6 14.28 17.44 14.63 17.23L16.31 18.19L17.99 16.51L17.03 14.83C17.24 14.48 17.4 14.1 17.54 13.71L19.4 13.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-</svg>
-</a>
 <a href="/pages/admin.html#compose" class="nav-compose nav-compose-icon" style="display:none;" aria-label="Compose post" title="Compose post">
-<!-- Compose icon adapted from "File Pen 2" by Streamline (CC BY 4.0). -->
-<svg width="24" height="24" viewBox="0 0 32 32" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-<path d="M20.6472 14.7518L17.7605 15.8436L12.4726 23.5025L8.52618 24.3865L9.93872 20.6376L17.4563 15.1603L18.5477 12.3734M20.6472 14.7518L24.0976 11.2008M20.6472 14.7518L18.5477 12.3734M24.0976 11.2008L25.1255 10.1431C25.7078 9.5438 25.6941 8.58295 25.0947 8.00061L24.4132 7.33832C23.8138 6.75598 22.853 6.7697 22.2706 7.36907L21.1748 8.49717M24.0976 11.2008L21.1748 8.49717M18.5477 12.3734L21.1748 8.49717M8.7998 18.1538V8.94444C8.7998 7.31883 10.1186 6 11.7442 6H19.9435C20.7222 6 21.469 6.30811 22.0209 6.85653L24.8764 9.69389C25.4294 10.2434 25.7408 10.9912 25.7427 11.7709L25.7544 17.6111" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 3.75H16L20 7.75V19.25C20 20.0784 19.3284 20.75 18.5 20.75H8.5C7.67157 20.75 7 20.0784 7 19.25V5.25C7 4.42157 7.67157 3.75 8.5 3.75Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M16 3.75V7.75H20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M9.75 15.25L14.75 10.25C15.1642 9.83579 15.8358 9.83579 16.25 10.25C16.6642 10.6642 16.6642 11.3358 16.25 11.75L11.25 16.75L9.25 17.25L9.75 15.25Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 </a>
+<a href="/pages/admin.html" class="nav-admin" style="display:none;">Admin</a>
 <span id="nav-user-name" class="nav-username" style="display:none;"></span>
-<div class="nav-user-menu" id="nav-user-menu" style="display:none;">
-  <button class="nav-menu-btn" id="nav-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="User menu">...</button>
-  <div class="nav-menu-panel" id="nav-menu-panel" role="menu" hidden>
-    <a id="nav-menu-primary-link" class="nav-menu-item" href="/pages/admin.html" role="menuitem">Admin</a>
-    <button id="nav-menu-logout" class="nav-menu-item nav-menu-item-danger" type="button" role="menuitem">Logout</button>
-  </div>
-</div>
 <button class="btn-login" id="login-btn" type="button">Login</button>
 </div>
 </nav>
@@ -74,12 +63,7 @@
 (function () {
   var loginBtn = document.getElementById('login-btn');
   var composeLink = document.querySelector('.nav-compose');
-  var settingsLink = document.querySelector('.nav-settings');
-  var userMenu = document.getElementById('nav-user-menu');
-  var menuBtn = document.getElementById('nav-menu-btn');
-  var menuPanel = document.getElementById('nav-menu-panel');
-  var menuPrimaryLink = document.getElementById('nav-menu-primary-link');
-  var menuLogoutBtn = document.getElementById('nav-menu-logout');
+  var adminLink = document.querySelector('.nav-admin');
   var userName = document.getElementById('nav-user-name');
   var authModal = document.getElementById('auth-modal');
   var authPasskeyBtn = document.getElementById('auth-passkey-btn');
@@ -205,51 +189,16 @@
     authPasskeyBtn.setAttribute('aria-disabled', isEnabled ? 'false' : 'true');
   }
 
-  function closeUserMenu() {
-    if (!menuPanel || !menuBtn) {
-      return;
-    }
-    menuPanel.hidden = true;
-    menuBtn.setAttribute('aria-expanded', 'false');
-  }
-
-  function openUserMenu() {
-    if (!menuPanel || !menuBtn) {
-      return;
-    }
-    menuPanel.hidden = false;
-    menuBtn.setAttribute('aria-expanded', 'true');
-  }
-
-  function configureUserMenu(isAdmin) {
-    if (!menuPrimaryLink) {
-      return;
-    }
-    if (isAdmin) {
-      menuPrimaryLink.textContent = 'Admin';
-      menuPrimaryLink.href = '/pages/admin.html';
-    } else {
-      menuPrimaryLink.textContent = 'Account';
-      menuPrimaryLink.href = '/pages/admin.html#account';
-    }
-  }
-
-  function setLoggedInUI(isLoggedIn, isAdmin, username, playerName) {
-    var displayName = playerName || username || '';
+  function setLoggedInUI(isLoggedIn, isAdmin, username) {
+    var displayName = username || '';
     isAuthenticated = !!isLoggedIn;
     if (isLoggedIn) {
       loginBtn.textContent = 'Logout';
-      loginBtn.style.display = 'none';
       if (composeLink) {
         composeLink.style.display = isAdmin ? 'inline-block' : 'none';
       }
-      if (settingsLink) {
-        settingsLink.style.display = 'inline-flex';
-        settingsLink.href = isAdmin ? '/pages/admin.html#settings' : '/pages/admin.html#account';
-      }
-      if (userMenu) {
-        configureUserMenu(isAdmin);
-        userMenu.style.display = 'inline-flex';
+      if (adminLink) {
+        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
       }
       if (userName) {
         userName.style.display = 'inline-block';
@@ -257,16 +206,11 @@
       }
     } else {
       loginBtn.textContent = 'Login';
-      loginBtn.style.display = 'inline-block';
       if (composeLink) {
         composeLink.style.display = 'none';
       }
-      if (settingsLink) {
-        settingsLink.style.display = 'none';
-      }
-      if (userMenu) {
-        userMenu.style.display = 'none';
-        closeUserMenu();
+      if (adminLink) {
+        adminLink.style.display = 'none';
       }
       if (userName) {
         userName.style.display = 'none';
@@ -294,7 +238,7 @@
         if (data.csrf_token) {
           localStorage.setItem('csrf_token', data.csrf_token);
         }
-        setLoggedInUI(true, !!data.is_admin, data.username || '', data.player_name || '');
+        setLoggedInUI(true, !!data.is_admin, data.username || '');
       })
       .catch(function () {
         setLoggedInUI(false, false, '');
@@ -614,32 +558,6 @@
         });
     });
 
-    if (menuBtn && menuPanel) {
-      menuBtn.addEventListener('click', function (event) {
-        event.stopPropagation();
-        if (menuPanel.hidden) {
-          openUserMenu();
-        } else {
-          closeUserMenu();
-        }
-      });
-      document.addEventListener('click', function (event) {
-        if (!userMenu || !menuPanel || !menuBtn) {
-          return;
-        }
-        if (!userMenu.contains(event.target)) {
-          closeUserMenu();
-        }
-      });
-    }
-
-    if (menuLogoutBtn) {
-      menuLogoutBtn.addEventListener('click', function () {
-        closeUserMenu();
-        logout();
-      });
-    }
-
     if (authModal) {
       authModal.addEventListener('click', function (event) {
         if (event.target && event.target.hasAttribute('data-close-auth-modal')) {
@@ -649,9 +567,6 @@
     }
 
     document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') {
-        closeUserMenu();
-      }
       if (event.key === 'Escape' && authModal && !authModal.hidden) {
         hideAuthModal();
       }
