@@ -2258,6 +2258,30 @@ label {
   gap: 8px;
 }
 
+.settings-global-instructions-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.settings-global-instructions {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+}
+
+.settings-global-instructions-note {
+  font-size: 0.74rem;
+  color: var(--text-subtle);
+}
+
+.settings-global-instructions-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .settings-label {
   font-size: 0.78rem;
   color: var(--text-subtle);

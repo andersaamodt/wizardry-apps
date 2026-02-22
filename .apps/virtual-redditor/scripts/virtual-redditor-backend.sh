@@ -40,7 +40,7 @@ Actions:
   tail-log [LINES]
 
 TARGET values for read-file:
-  manifesto | norms | bot-env | reddit-env | daemon-log | daemon-error-log
+  manifesto | norms | global-instructions | bot-env | reddit-env | daemon-log | daemon-error-log
 USAGE
   exit 0
   ;;
@@ -179,6 +179,10 @@ ensure_multi_profile_root() {
   mkdir -p "$PROFILES_DIR"
 }
 
+runtime_state_dir() {
+  printf '%s/.runtime' "$STATE_ROOT"
+}
+
 force_delete_dir() {
   target=${1-}
   [ -n "$target" ] || return 1
@@ -212,21 +216,38 @@ resolve_current_state() {
   fi
 
   ensure_multi_profile_root
-
   active=''
   if [ -f "$ACTIVE_PROFILE_FILE" ]; then
     active=$(head -n 1 "$ACTIVE_PROFILE_FILE" 2>/dev/null | tr -d '\r')
   fi
-  if [ -z "$active" ]; then
-    active=default
+  active=$(slugify_profile_id "$active")
+
+  # Keep app functional even with zero profiles, without auto-creating "default".
+  if [ -n "$active" ] && [ -d "$(profile_dir "$active")" ]; then
+    ACTIVE_PROFILE_ID=$active
+    CURRENT_STATE_DIR=$(profile_dir "$active")
+    return 0
   fi
 
-  active=$(slugify_profile_id "$active")
-  ensure_profile_runtime "$active"
-  printf '%s\n' "$active" > "$ACTIVE_PROFILE_FILE"
+  next_active=''
+  for d in "$PROFILES_DIR"/*; do
+    [ -d "$d" ] || continue
+    next_active=$(basename "$d")
+    break
+  done
 
-  ACTIVE_PROFILE_ID=$active
-  CURRENT_STATE_DIR=$(profile_dir "$active")
+  if [ -n "$next_active" ]; then
+    ACTIVE_PROFILE_ID=$next_active
+    CURRENT_STATE_DIR=$(profile_dir "$next_active")
+    printf '%s\n' "$next_active" > "$ACTIVE_PROFILE_FILE"
+    return 0
+  fi
+
+  ACTIVE_PROFILE_ID=''
+  CURRENT_STATE_DIR=$(runtime_state_dir)
+  mkdir -p "$CURRENT_STATE_DIR"
+  printf '%s\n' '' > "$ACTIVE_PROFILE_FILE"
+  VR_STATE_DIR="$CURRENT_STATE_DIR" "$DAEMON_SCRIPT" bootstrap >/dev/null 2>&1 || true
   return 0
 }
 
@@ -240,13 +261,43 @@ refresh_paths() {
   REDDIT_ENV_FILE="$CURRENT_STATE_DIR/reddit.env"
   DAEMON_STDOUT_LOG="$CURRENT_STATE_DIR/daemon.log"
   DAEMON_STDERR_LOG="$CURRENT_STATE_DIR/daemon-error.log"
+  if [ "$MULTI_PROFILE" -eq 1 ]; then
+    GLOBAL_DEFAULT_INSTRUCTIONS_FILE="$STATE_ROOT/global-default-instructions.md"
+  else
+    GLOBAL_DEFAULT_INSTRUCTIONS_FILE="$CURRENT_STATE_DIR/global-default-instructions.md"
+  fi
   OAUTH_PENDING_FILE="$CURRENT_STATE_DIR/.oauth-pending.json"
   OAUTH_RESULT_FILE="$CURRENT_STATE_DIR/.oauth-result.json"
   OAUTH_LISTENER_PID_FILE="$CURRENT_STATE_DIR/.oauth-listener.pid"
 }
 
 run_daemon() {
-  VR_STATE_DIR="$CURRENT_STATE_DIR" "$DAEMON_SCRIPT" "$@"
+  VR_STATE_DIR="$CURRENT_STATE_DIR" \
+  VR_GLOBAL_INSTRUCTIONS_FILE="$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" \
+  "$DAEMON_SCRIPT" "$@"
+}
+
+ensure_global_default_instructions_file() {
+  mkdir -p "$(dirname "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE")"
+  if [ -f "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" ]; then
+    return 0
+  fi
+  app_default="$SCRIPT_DIR/../manifesto.md"
+  if [ -f "$app_default" ]; then
+    cp "$app_default" "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" 2>/dev/null || cat "$app_default" > "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE"
+  else
+    cat > "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" <<'DEFAULTS'
+# Global Default Instructions
+
+1. Protect discourse continuity over rhetorical purity.
+2. Prefer specific correction to vague condemnation.
+3. Keep sanctions legible unless mode doctrine permits opacity.
+4. Never punish without first speaking directly to the triggering utterance.
+5. Treat repeat behavior as context, not destiny.
+6. Separate playful persona from enforcement authority when possible.
+7. Keep reversible records for every enforcement action.
+DEFAULTS
+  fi
 }
 
 profile_name_from_fs() {
@@ -367,12 +418,21 @@ list_profiles_json() {
 
   ensure_multi_profile_root
 
-  if ! find "$PROFILES_DIR" -mindepth 1 -maxdepth 1 -type d >/dev/null 2>&1; then
-    ensure_profile_runtime default
-    printf '%s\n' default > "$ACTIVE_PROFILE_FILE"
-    ACTIVE_PROFILE_ID=default
-    CURRENT_STATE_DIR=$(profile_dir default)
-    refresh_paths
+  # Clean up legacy placeholder default profile from older builds.
+  default_dir=$(profile_dir default)
+  if [ -d "$default_dir" ]; then
+    count_dirs=$(find "$PROFILES_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+    default_user=$(read_env_var "$default_dir/reddit.env" REDDIT_USERNAME)
+    default_sub=$(read_env_var "$default_dir/reddit.env" SUBREDDIT)
+    default_client=$(read_env_var "$default_dir/reddit.env" REDDIT_CLIENT_ID)
+    default_refresh=$(read_env_var "$default_dir/reddit.env" REDDIT_REFRESH_TOKEN)
+    if [ "$count_dirs" = "1" ] && [ -z "$default_user" ] && [ -z "$default_sub" ] && [ -z "$default_client" ] && [ -z "$default_refresh" ]; then
+      force_delete_dir "$default_dir" >/dev/null 2>&1 || true
+      if [ "$ACTIVE_PROFILE_ID" = "default" ]; then
+        ACTIVE_PROFILE_ID=''
+        printf '%s\n' '' > "$ACTIVE_PROFILE_FILE"
+      fi
+    fi
   fi
 
   list_json='[]'
@@ -392,6 +452,10 @@ list_profiles_json() {
   done
 
   sorted=$(printf '%s' "$list_json" | jq -c 'sort_by(.name, .id)')
+  if ! printf '%s' "$sorted" | jq -e --arg active "$ACTIVE_PROFILE_ID" 'map(.id) | index($active) != null' >/dev/null 2>&1; then
+    ACTIVE_PROFILE_ID=''
+    printf '%s\n' '' > "$ACTIVE_PROFILE_FILE"
+  fi
   jq -cn --argjson profiles "$sorted" --arg active "$ACTIVE_PROFILE_ID" '{ok:true,multiProfile:true,activeProfile:$active,profiles:$profiles}'
 }
 
@@ -424,18 +488,6 @@ create_profile_json() {
   printf '%s\n' "$name" > "$(profile_name_file "$id")"
   : > "$(profile_dir "$id")/manifesto.md"
   : > "$(profile_dir "$id")/norms.jsonl"
-
-  # Drop placeholder default profile once a real profile is created.
-  if [ "$id" != "default" ]; then
-    default_dir=$(profile_dir default)
-    if [ -d "$default_dir" ]; then
-      default_user=$(read_env_var "$default_dir/reddit.env" REDDIT_USERNAME)
-      default_sub=$(read_env_var "$default_dir/reddit.env" SUBREDDIT)
-      if [ -z "$default_user" ] && [ -z "$default_sub" ]; then
-        force_delete_dir "$default_dir" >/dev/null 2>&1 || true
-      fi
-    fi
-  fi
 
   printf '%s\n' "$id" > "$ACTIVE_PROFILE_FILE"
   ACTIVE_PROFILE_ID=$id
@@ -532,11 +584,12 @@ delete_profile_json() {
     refresh_paths
     run_daemon bootstrap >/dev/null 2>&1 || true
   else
-    printf '%s\n' default > "$ACTIVE_PROFILE_FILE"
-    ensure_profile_runtime default
-    ACTIVE_PROFILE_ID=default
-    CURRENT_STATE_DIR=$(profile_dir default)
+    printf '%s\n' '' > "$ACTIVE_PROFILE_FILE"
+    ACTIVE_PROFILE_ID=''
+    CURRENT_STATE_DIR=$(runtime_state_dir)
+    mkdir -p "$CURRENT_STATE_DIR"
     refresh_paths
+    run_daemon bootstrap >/dev/null 2>&1 || true
   fi
 
   jq -cn --arg deleted "$profile_id" --arg active "$ACTIVE_PROFILE_ID" '{ok:true,deletedProfile:$deleted,activeProfile:$active}'
@@ -567,6 +620,7 @@ read_file_json() {
   case "$target" in
     manifesto) file="$MANIFESTO_FILE" ;;
     norms) file="$NORMS_FILE" ;;
+    global-instructions) file="$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" ;;
     bot-env) file="$BOT_ENV_FILE" ;;
     reddit-env) file="$REDDIT_ENV_FILE" ;;
     daemon-log) file="$DAEMON_STDOUT_LOG" ;;
@@ -606,6 +660,7 @@ write_file_json() {
   case "$target" in
     manifesto) file="$MANIFESTO_FILE" ;;
     norms) file="$NORMS_FILE" ;;
+    global-instructions) file="$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" ;;
     bot-env) file="$BOT_ENV_FILE" ;;
     reddit-env) file="$REDDIT_ENV_FILE" ;;
     *)
@@ -1110,6 +1165,7 @@ main() {
 
   resolve_current_state
   refresh_paths
+  ensure_global_default_instructions_file
 
   case "$action" in
     list-themes)
@@ -1308,13 +1364,14 @@ main() {
         --arg replies "$REPLIES_LOG" \
         --arg manifesto "$MANIFESTO_FILE" \
         --arg norms "$NORMS_FILE" \
+        --arg global_instructions "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" \
         --arg reddit_env "$REDDIT_ENV_FILE" \
         --arg bot_env "$BOT_ENV_FILE" \
         --arg daemon_log "$DAEMON_STDOUT_LOG" \
         --arg daemon_error_log "$DAEMON_STDERR_LOG" \
         --arg active_profile "$ACTIVE_PROFILE_ID" \
         --argjson multi_profile "$MULTI_PROFILE" \
-        '{ok:true,stateRoot:$root,stateDir:$state,activeProfile:$active_profile,multiProfile:($multi_profile==1),paths:{actions:$actions,bans:$bans,replies:$replies,manifesto:$manifesto,norms:$norms,redditEnv:$reddit_env,botEnv:$bot_env,daemonLog:$daemon_log,daemonErrorLog:$daemon_error_log}}'
+        '{ok:true,stateRoot:$root,stateDir:$state,activeProfile:$active_profile,multiProfile:($multi_profile==1),paths:{actions:$actions,bans:$bans,replies:$replies,manifesto:$manifesto,norms:$norms,globalInstructions:$global_instructions,redditEnv:$reddit_env,botEnv:$bot_env,daemonLog:$daemon_log,daemonErrorLog:$daemon_error_log}}'
       ;;
 
     *)

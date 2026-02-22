@@ -36,6 +36,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 STATE_DIR=${VR_STATE_DIR:-"${XDG_STATE_HOME:-$HOME/.local/state}/wizardry/virtual-redditor"}
+GLOBAL_INSTRUCTIONS_FILE=${VR_GLOBAL_INSTRUCTIONS_FILE:-"$STATE_DIR/global-default-instructions.md"}
 
 BANS_LOG="$STATE_DIR/bans.jsonl"
 REPLIES_LOG="$STATE_DIR/replies.jsonl"
@@ -170,7 +171,7 @@ bootstrap_state() {
   fi
 
   if [ ! -f "$MANIFESTO_FILE" ]; then
-    cp "$APP_DIR/manifesto.md" "$MANIFESTO_FILE" 2>/dev/null || printf '# Virtual Redditor Manifesto\n\nUse proportionate moderation.\n' > "$MANIFESTO_FILE"
+    : > "$MANIFESTO_FILE"
   fi
 
   if [ ! -f "$NORMS_FILE" ]; then
@@ -208,6 +209,15 @@ REDDIT_USER_AGENT='virtual-redditor/0.1-by-u/replace_me'
 REDDIT_USERNAME=
 SUBREDDIT=
 REDDITENV
+  fi
+
+  if [ ! -f "$GLOBAL_INSTRUCTIONS_FILE" ]; then
+    mkdir -p "$(dirname "$GLOBAL_INSTRUCTIONS_FILE")"
+    if [ -f "$APP_DIR/manifesto.md" ]; then
+      cp "$APP_DIR/manifesto.md" "$GLOBAL_INSTRUCTIONS_FILE" 2>/dev/null || cat "$APP_DIR/manifesto.md" > "$GLOBAL_INSTRUCTIONS_FILE"
+    else
+      : > "$GLOBAL_INSTRUCTIONS_FILE"
+    fi
   fi
 }
 
@@ -737,6 +747,7 @@ compose_context_envelope() {
   esac
 
   manifesto_text=$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
+  global_instructions_text=$(cat "$GLOBAL_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
   norms_json=$(jq -cs '[.[]]' "$NORMS_FILE" 2>/dev/null || printf '[]')
 
   jq -cn \
@@ -752,11 +763,12 @@ compose_context_envelope() {
     --arg author_sub "$author_subreddit_json" \
     --arg author_global "$author_global_json" \
     --arg manifesto "$manifesto_text" \
+    --arg global_instructions "$global_instructions_text" \
     --arg norms "$norms_json" \
     '{
       mode:$mode,
       subreddit:$subreddit,
-      doctrine:{manifesto:$manifesto, norms:(($norms|fromjson?) // [])},
+      doctrine:{global_instructions:$global_instructions, manifesto:$manifesto, norms:(($norms|fromjson?) // [])},
       utterance:($comment|fromjson),
       context:{
         parent:($parent|fromjson),
@@ -780,7 +792,10 @@ You are Virtual Redditor, the autonomous moderator and participant for r/$SUBRED
 
 MODE: $MODE
 
-Constitutional doctrine (manifesto.md):
+Global default instructions (all virtual redditors):
+$(cat "$GLOBAL_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+
+Per-redditor instructions (manifesto.md):
 $(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
 
 Statutory doctrine (norms.jsonl):

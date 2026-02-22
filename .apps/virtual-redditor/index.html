@@ -337,6 +337,14 @@
           <span class="settings-label">Daemon status</span>
           <span id="settings-daemon-pill" class="status-chip warn">Checking...</span>
         </div>
+        <div class="settings-global-instructions-row">
+          <label for="settings-global-instructions">Global default instructions</label>
+          <textarea id="settings-global-instructions" class="settings-global-instructions" spellcheck="false" placeholder="Used for every virtual Redditor unless you customize it."></textarea>
+          <div class="settings-global-instructions-note">Applied to all virtual Redditors as baseline doctrine. Stored once and shared across profiles.</div>
+          <div class="settings-global-instructions-actions">
+            <button id="btn-settings-save-global-instructions" type="button" class="soft">Save global instructions</button>
+          </div>
+        </div>
       </div>
       <div class="settings-actions">
         <button id="btn-settings-install" type="button" class="soft">Install daemon</button>
@@ -456,6 +464,16 @@
     var LEFT_RAIL_WIDTH_KEY = 'wizardry.virtual_redditor.left_rail.width';
     var PROFILES_CACHE_KEY = 'wizardry.virtual_redditor.profiles.cache';
     var THEME_ASSET_VERSION = 'vr20260221a';
+    var DEFAULT_GLOBAL_INSTRUCTIONS = (
+      '# Virtual Redditor Manifesto\n\n' +
+      '1. Protect discourse continuity over rhetorical purity.\n' +
+      '2. Prefer specific correction to vague condemnation.\n' +
+      '3. Keep sanctions legible unless mode doctrine permits opacity.\n' +
+      '4. Never punish without first speaking directly to the triggering utterance.\n' +
+      '5. Treat repeat behavior as context, not destiny.\n' +
+      '6. Separate playful persona from enforcement authority when possible.\n' +
+      '7. Keep reversible records for every enforcement action.\n'
+    );
 
     var state = {
       backendScriptPath: '',
@@ -512,7 +530,10 @@
       renameTargetId: '',
       profileSwitchLoading: false,
       deleteTargetId: '',
-      passesTogglePendingValue: null
+      passesTogglePendingValue: null,
+      globalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS,
+      globalInstructionsRemote: DEFAULT_GLOBAL_INSTRUCTIONS,
+      globalInstructionsSaving: false
     };
 
     function updateConditionalTabs() {
@@ -995,6 +1016,8 @@
       var modal = document.getElementById('settings-modal');
       if (!modal) return;
       renderGlobalSettingsModal();
+      setGlobalSettingsMessage('', false);
+      refreshGlobalInstructionsEditor();
       modal.classList.remove('hidden');
       var closeBtn = document.getElementById('btn-settings-close');
       if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
@@ -1040,7 +1063,76 @@
       if (uninstallBtn) uninstallBtn.disabled = !installed;
       if (startBtn) startBtn.disabled = !installed || loaded;
       if (stopBtn) stopBtn.disabled = !loaded;
-      setGlobalSettingsMessage('', false);
+      var saveGlobalInstructionsBtn = document.getElementById('btn-settings-save-global-instructions');
+      if (saveGlobalInstructionsBtn) {
+        saveGlobalInstructionsBtn.disabled = !!state.globalInstructionsSaving || (state.globalInstructions === state.globalInstructionsRemote);
+      }
+    }
+
+    async function refreshGlobalInstructionsEditor() {
+      var textarea = document.getElementById('settings-global-instructions');
+      if (!textarea) {
+        return;
+      }
+      if (state.previewMode) {
+        state.globalInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
+        state.globalInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
+        textarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
+        renderGlobalSettingsModal();
+        return;
+      }
+      try {
+        var out = await backendJson('read-file', ['global-instructions']);
+        var content = String((out && out.content) || '');
+        if (!content.trim()) {
+          content = DEFAULT_GLOBAL_INSTRUCTIONS;
+        }
+        state.globalInstructions = content;
+        state.globalInstructionsRemote = content;
+        textarea.value = content;
+      } catch (error) {
+        state.globalInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
+        state.globalInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
+        textarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
+        setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        renderGlobalSettingsModal();
+      }
+    }
+
+    async function saveGlobalInstructions() {
+      if (state.globalInstructionsSaving) {
+        return;
+      }
+      var textarea = document.getElementById('settings-global-instructions');
+      if (!textarea) {
+        return;
+      }
+      var next = String(textarea.value || '');
+      state.globalInstructions = next;
+      if (next === state.globalInstructionsRemote) {
+        renderGlobalSettingsModal();
+        return;
+      }
+      if (state.previewMode) {
+        state.globalInstructionsRemote = next;
+        setGlobalSettingsMessage('Saved (preview mode).', false);
+        renderGlobalSettingsModal();
+        return;
+      }
+      state.globalInstructionsSaving = true;
+      renderGlobalSettingsModal();
+      setGlobalSettingsMessage('Saving global instructions...', false);
+      try {
+        await backendJson('write-file', ['global-instructions', next]);
+        state.globalInstructionsRemote = next;
+        setGlobalSettingsMessage('Global instructions saved.', false);
+      } catch (error) {
+        setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.globalInstructionsSaving = false;
+        renderGlobalSettingsModal();
+      }
     }
 
     async function openExternalUrl(url) {
@@ -2129,14 +2221,31 @@
         closeDeleteModal();
         return;
       }
-      try {
-        await backendJson('delete-profile', [String(profileId)]);
-        closeDeleteModal();
-        await fullRefresh();
-        await refreshDoctrine(true);
-      } catch (error) {
-        if (msg) msg.textContent = normalizeUiErrorMessage(String(error && error.message ? error.message : error));
+      var previousProfiles = Array.isArray(state.profiles) ? state.profiles.slice() : [];
+      var previousActive = String(state.activeProfile || '');
+      state.profiles = previousProfiles.filter(function (p) {
+        return String((p || {}).id || '') !== String(profileId);
+      });
+      if (previousActive === profileId) {
+        state.activeProfile = String(((state.profiles[0] || {}).id) || '');
       }
+      renderProfiles();
+      updateToolbarButtonStates();
+      closeDeleteModal();
+
+      backendJson('delete-profile', [String(profileId)]).then(function () {
+        return fullRefresh();
+      }).then(function () {
+        return refreshDoctrine(true);
+      }).catch(function (error) {
+        state.profiles = previousProfiles;
+        state.activeProfile = previousActive;
+        renderProfiles();
+        updateToolbarButtonStates();
+        var text = normalizeUiErrorMessage(String(error && error.message ? error.message : error));
+        showToast(text || 'Delete failed.', true);
+        if (msg) msg.textContent = text;
+      });
     }
 
     function renderProfiles() {
@@ -2911,6 +3020,13 @@
       });
       document.getElementById('btn-settings-close').addEventListener('click', function () {
         closeSettingsModal();
+      });
+      document.getElementById('settings-global-instructions').addEventListener('input', function (event) {
+        state.globalInstructions = String((event && event.target && event.target.value) || '');
+        renderGlobalSettingsModal();
+      });
+      document.getElementById('btn-settings-save-global-instructions').addEventListener('click', function () {
+        saveGlobalInstructions();
       });
       document.getElementById('btn-settings-install').addEventListener('click', function () {
         setGlobalSettingsMessage('Installing daemon...', false);
