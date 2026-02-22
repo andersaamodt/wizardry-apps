@@ -1785,6 +1785,15 @@
       var clearReorderClasses = function () {
         for (var rz = 0; rz < rows.length; rz += 1) {
           rows[rz].classList.remove('row-moving');
+          rows[rz].style.visibility = '';
+          if (rows[rz]._reorderOverlayEl) {
+            try {
+              rows[rz]._reorderOverlayEl.remove();
+            } catch (_) {
+              // Ignore cleanup failures.
+            }
+            rows[rz]._reorderOverlayEl = null;
+          }
         }
         var liftedBlocks = tree.querySelectorAll('.echelon-block.reorder-host');
         for (var lb = 0; lb < liftedBlocks.length; lb += 1) {
@@ -1845,7 +1854,16 @@
         row.style.transformOrigin = '';
         row.style.willChange = '';
         row.style.backfaceVisibility = '';
+        row.style.visibility = '';
         row.classList.remove('row-moving');
+        if (row._reorderOverlayEl) {
+          try {
+            row._reorderOverlayEl.remove();
+          } catch (_) {
+            // Ignore overlay cleanup failures.
+          }
+          row._reorderOverlayEl = null;
+        }
         if (row._reorderHostBlock) {
           var hostBlock = row._reorderHostBlock;
           var liftCount = Number(hostBlock._reorderLiftCount) || 0;
@@ -1907,9 +1925,23 @@
             var movedRow = m.row;
             var rowScaleX = Number(m.scaleX) || 1;
             var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
-            movedRow.style.willChange = 'transform';
-            movedRow.style.backfaceVisibility = 'hidden';
-            movedRow.style.transformOrigin = 'top left';
+            var overlayRect = movedRow.getBoundingClientRect();
+            var overlayRow = movedRow.cloneNode(true);
+            overlayRow.classList.add('row-moving');
+            overlayRow.classList.add('row-moving-overlay');
+            overlayRow.style.position = 'fixed';
+            overlayRow.style.top = overlayRect.top + 'px';
+            overlayRow.style.left = overlayRect.left + 'px';
+            overlayRow.style.width = overlayRect.width + 'px';
+            overlayRow.style.margin = '0';
+            overlayRow.style.zIndex = '2147483647';
+            overlayRow.style.pointerEvents = 'none';
+            overlayRow.style.willChange = 'transform';
+            overlayRow.style.backfaceVisibility = 'hidden';
+            overlayRow.style.transformOrigin = 'top left';
+            document.body.appendChild(overlayRow);
+            movedRow._reorderOverlayEl = overlayRow;
+            movedRow.style.visibility = 'hidden';
             movedRow.classList.add('row-moving');
             var reorderHostBlock = movedRow.closest('.echelon-block');
             if (reorderHostBlock) {
@@ -1936,7 +1968,7 @@
               var toFrame = {
                 transform: 'translate3d(0,0,0)'
               };
-              var textTargets = movedRow.querySelectorAll('.name-stack');
+              var textTargets = overlayRow.querySelectorAll('.name-stack');
               movedRow._reorderTextAnimationTargets = [];
               if (useWidthScale && textTargets.length) {
                 var inverse = rowScaleX !== 0 ? (1 / rowScaleX) : 1;
@@ -1955,7 +1987,7 @@
                   });
                 }
               }
-              var anim = movedRow.animate([fromFrame, toFrame], {
+              var anim = overlayRow.animate([fromFrame, toFrame], {
                 duration: durationMs,
                 easing: easing,
                 fill: 'both'
@@ -1974,14 +2006,14 @@
                 finalizeOne(movedRow);
               };
             } else {
-              movedRow.style.transition = 'none';
-              movedRow.style.transform = useWidthScale
+              overlayRow.style.transition = 'none';
+              overlayRow.style.transform = useWidthScale
                 ? ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0) scaleX(' + rowScaleX + ')')
                 : ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)');
-              movedRow.getBoundingClientRect();
-              movedRow.style.transition = 'transform ' + durationMs + 'ms ' + easing;
-              movedRow.style.transform = 'translate3d(0,0,0)';
-              var fallbackTextTargets = movedRow.querySelectorAll('.name-stack');
+              overlayRow.getBoundingClientRect();
+              overlayRow.style.transition = 'transform ' + durationMs + 'ms ' + easing;
+              overlayRow.style.transform = 'translate3d(0,0,0)';
+              var fallbackTextTargets = overlayRow.querySelectorAll('.name-stack');
               movedRow._reorderTextAnimationTargets = [];
               if (useWidthScale && fallbackTextTargets.length) {
                 var fallbackInverse = rowScaleX !== 0 ? (1 / rowScaleX) : 1;
@@ -1997,8 +2029,8 @@
                   fallbackTextEl.style.transform = 'scaleX(1)';
                 }
               }
-              movedRow.addEventListener('transitionend', function onEnd() {
-                movedRow.removeEventListener('transitionend', onEnd);
+              overlayRow.addEventListener('transitionend', function onEnd() {
+                overlayRow.removeEventListener('transitionend', onEnd);
                 finalizeOne(movedRow);
                 if (remaining <= 0 && !finished) {
                   finished = true;
