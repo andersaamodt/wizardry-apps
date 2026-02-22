@@ -126,7 +126,13 @@
           <div class="toolbar-actions">
             <div class="toolbar-left">
               <button id="action-build" type="button" class="action toolbar-btn primary" title="Compile enabled publish targets">🛠 Build</button>
-              <button id="action-run" type="button" class="action toolbar-btn" title="Run app">▶ Run</button>
+              <div class="menu-anchor run-split">
+                <button id="action-run" type="button" class="action toolbar-btn" title="Run app">▶ Run</button>
+                <button id="action-run-menu" type="button" class="action toolbar-btn menu-toggle" aria-haspopup="menu" aria-expanded="false" title="Run options" aria-label="Run options">▾</button>
+                <div id="run-menu" class="floating-menu hidden" role="menu" aria-label="Run options">
+                  <button id="action-run-webhost" type="button">Serve web host</button>
+                </div>
+              </div>
               <button id="action-stage" type="button" class="action toolbar-btn" title="Stage mobile assets">📦 Stage</button>
             </div>
           </div>
@@ -1107,6 +1113,20 @@
         return '';
       }
 
+      function hostedWebEntryPathForSelected(selected) {
+        if (!selected || !selected.path) {
+          return '';
+        }
+        var base = String(selected.path || '').replace(/\/+$/, '');
+        if (!base) {
+          return '';
+        }
+        if (selected.kind === 'workspace') {
+          return base + '/app/index.html';
+        }
+        return base + '/index.html';
+      }
+
       function targetOpenDestination(targetId, path) {
         if (!path) {
           return '';
@@ -1143,7 +1163,7 @@
 
       function isTargetRunnable(targetId) {
         if (targetId === 'hosted-web') {
-          return false;
+          return true;
         }
         if (targetId === 'macos') {
           return state.os === 'darwin';
@@ -1514,6 +1534,9 @@
         if (els.buildMenu) {
           els.buildMenu.classList.add('hidden');
         }
+        if (els.runMenu) {
+          els.runMenu.classList.add('hidden');
+        }
         if (els.organizeBtn) {
           els.organizeBtn.setAttribute('aria-expanded', 'false');
         }
@@ -1522,6 +1545,9 @@
         }
         if (els.actionBuildMenu) {
           els.actionBuildMenu.setAttribute('aria-expanded', 'false');
+        }
+        if (els.actionRunMenu) {
+          els.actionRunMenu.setAttribute('aria-expanded', 'false');
         }
         clearThemeTypeahead();
       }
@@ -1871,6 +1897,15 @@
         return activeTargets.indexOf(hostTarget) >= 0;
       }
 
+      function hasEnabledHostedWebTarget(selected) {
+        if (!selected) {
+          return false;
+        }
+        var projectType = projectTypeKeyForContext(selected.context);
+        var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
+        return activeTargets.indexOf('hosted-web') >= 0;
+      }
+
       function pathToIconSrc(path) {
         var value = String(path || '').trim();
         if (!value) {
@@ -1952,13 +1987,29 @@
           var showBuild = !!selected && state.route === 'pipeline' && hasBuildAction(selected);
           els.actionBuild.classList.toggle('hidden', !showBuild);
         }
+        var showRunSplit = !!selected && state.route === 'pipeline' && hasMeaningfulRun(selected);
+        var runTargetName = state.os === 'darwin' ? 'macOS' : (state.os === 'linux' ? 'Linux' : 'desktop');
+        var canRunHost = showRunSplit && hasEnabledHostRunTarget(selected);
+        var canServeWebHost = showRunSplit && hasEnabledHostedWebTarget(selected);
         if (els.actionRun) {
-          var showRun = !!selected && state.route === 'pipeline' && hasMeaningfulRun(selected) && hasEnabledHostRunTarget(selected);
-          els.actionRun.classList.toggle('hidden', !showRun);
-          var runTargetName = state.os === 'darwin' ? 'macOS' : (state.os === 'linux' ? 'Linux' : 'desktop');
-          var runTitle = 'Run ' + runTargetName + ' app';
+          els.actionRun.classList.toggle('hidden', !showRunSplit);
+          var runTitle = canRunHost
+            ? ('Run ' + runTargetName + ' app')
+            : ('Enable ' + runTargetName + ' target to run native app');
           els.actionRun.title = runTitle;
           els.actionRun.setAttribute('aria-label', runTitle);
+        }
+        if (els.actionRunMenu) {
+          els.actionRunMenu.classList.toggle('hidden', !showRunSplit);
+          els.actionRunMenu.disabled = !canServeWebHost;
+          els.actionRunMenu.title = canServeWebHost ? 'Run options' : 'Enable Hosted Web target to serve web host';
+          els.actionRunMenu.setAttribute('aria-label', canServeWebHost ? 'Run options' : 'Enable Hosted Web target to serve web host');
+          if (els.runMenu) {
+            var webHostButton = document.getElementById('action-run-webhost');
+            if (webHostButton) {
+              webHostButton.disabled = !canServeWebHost;
+            }
+          }
         }
         if (!els.actionStage) {
           return;
@@ -2319,7 +2370,23 @@
             return;
           }
           if (targetId === 'hosted-web') {
-            throw new Error('Hosted Web target is build/deploy oriented and is not runnable from desktop.');
+            var hostedPath = hostedWebEntryPathForSelected(selected);
+            if (!hostedPath) {
+              throw new Error('Hosted Web entry path not found.');
+            }
+            await openPath(hostedPath, false);
+            setTargetRuntime(selected.key, 'hosted-web', 'running', hostedPath);
+            renderSelectedTargetsEditor(selectedCatalogItem());
+            renderResult({
+              status: 'ok',
+              summary: selected.title + ' hosted web entry opened.',
+              paths: [{ label: 'Hosted web entry', path: hostedPath, canReveal: true }],
+              help: {
+                title: 'Hosted Web run',
+                body: 'Opened the web entry in your default browser.'
+              }
+            });
+            return;
           }
           if (targetId === 'macos') {
             if (state.os === 'darwin') {
@@ -2349,8 +2416,27 @@
           renderSelectedTargetsEditor(selectedCatalogItem());
           return;
         }
-        if (targetId === 'ios' || targetId === 'android' || targetId === 'hosted-web') {
+        if (targetId === 'ios' || targetId === 'android') {
           throw new Error('This target cannot be run directly from the current desktop host.');
+        }
+        if (targetId === 'hosted-web') {
+          var workspaceHostedPath = hostedWebEntryPathForSelected(selected);
+          if (!workspaceHostedPath) {
+            throw new Error('Hosted Web entry path not found.');
+          }
+          await openPath(workspaceHostedPath, false);
+          setTargetRuntime(selected.key, 'hosted-web', 'running', workspaceHostedPath);
+          renderSelectedTargetsEditor(selectedCatalogItem());
+          renderResult({
+            status: 'ok',
+            summary: selected.title + ' hosted web entry opened.',
+            paths: [{ label: 'Hosted web entry', path: workspaceHostedPath, canReveal: true }],
+            help: {
+              title: 'Hosted Web run',
+              body: 'Opened the web entry in your default browser.'
+            }
+          });
+          return;
         }
         if (targetId === 'macos' && state.os !== 'darwin') {
           throw new Error('macOS target can only be run on macOS.');
@@ -2752,6 +2838,10 @@
         if (!selected) {
           throw new Error('Select an app first');
         }
+        if (kind === 'serve-web-host') {
+          await runTargetAction(selected, 'hosted-web');
+          return;
+        }
         if (selected.kind === 'workspace' || (selected.kind !== 'builtin' && !!selected.path)) {
           return runWorkspacePipelineAction(kind, selected);
         }
@@ -2809,14 +2899,13 @@
             'built',
             desktopBuildOut.artifact || desktopBuildOut.zip || desktopBuildOut.host || ''
           );
-          // Prefer auto so updated app sources launch immediately when bundles are stale.
-          var runModeRequest = 'auto';
+          var runModeRequest = 'bundle';
           var run = await backend('run-desktop', [app.id, runModeRequest]);
           var runOut = kv(run.stdout || '');
-          var runMode = runOut.mode || 'host';
+          var runMode = runOut.mode || 'bundle';
           var runSummary = runMode === 'bundle'
-            ? app.title + ' built the desktop target and launched from the compiled app bundle.'
-            : app.title + ' built the desktop target and launched in native host.';
+            ? app.title + ' built and launched from the compiled desktop app bundle.'
+            : app.title + ' launched in native host.';
 
           renderResult({
             status: 'ok',
@@ -2828,7 +2917,7 @@
             ].filter(Boolean),
             help: {
               title: 'Launch details',
-              body: 'Mode: ' + runMode + '\nPID: ' + (runOut.pid || '(managed by OS)') + '\nIf the app window is behind others, use Dock or Mission Control to focus it.'
+              body: 'Mode: ' + runMode + '\nPID: ' + (runOut.pid || '(managed by OS)') + '\nRun builds and launches the native desktop executable for this platform.'
             }
           });
           setTargetRuntime(projectKey, nativeTarget, 'running', runOut.artifact || runOut.entry || '');
@@ -3089,6 +3178,28 @@
           });
         }
 
+        if (els.actionRunMenu) {
+          els.actionRunMenu.addEventListener('click', function () {
+            if (els.actionRunMenu.disabled) {
+              return;
+            }
+            toggleFloatingMenu(els.runMenu, els.actionRunMenu);
+          });
+        }
+
+        if (els.runMenu) {
+          els.runMenu.addEventListener('click', function (event) {
+            var actionButton = event.target.closest('button[id]');
+            if (!actionButton) {
+              return;
+            }
+            closeFloatingMenus();
+            if (actionButton.id === 'action-run-webhost') {
+              perform('Serve web host', function () { return runPipelineAction('serve-web-host'); }, { swallow: true });
+            }
+          });
+        }
+
         els.themePickerList.addEventListener('click', function (event) {
           var button = event.target.closest('button[data-theme-name]');
           if (!button) {
@@ -3131,7 +3242,9 @@
             event.target.closest('#theme-picker-menu') ||
             event.target.closest('#theme-picker-btn') ||
             event.target.closest('#build-menu') ||
-            event.target.closest('#action-build-menu')
+            event.target.closest('#action-build-menu') ||
+            event.target.closest('#run-menu') ||
+            event.target.closest('#action-run-menu')
           ) {
             return;
           }
@@ -3159,6 +3272,19 @@
 
         els.actionRun.addEventListener('click', function () {
           if (state.route === 'create') {
+            return;
+          }
+          var selected = selectedCatalogItem();
+          if (!selected) {
+            return;
+          }
+          if (!hasEnabledHostRunTarget(selected)) {
+            if (hasEnabledHostedWebTarget(selected) && els.actionRunMenu && !els.actionRunMenu.disabled) {
+              toggleFloatingMenu(els.runMenu, els.actionRunMenu);
+              return;
+            }
+            var runTargetName = state.os === 'darwin' ? 'macOS' : (state.os === 'linux' ? 'Linux' : 'desktop');
+            toast('Enable ' + runTargetName + ' target to run native app.', 'bad');
             return;
           }
           perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
@@ -3620,6 +3746,8 @@
         els.themePickerList = document.getElementById('theme-picker-list');
         els.actionBuildMenu = document.getElementById('action-build-menu');
         els.buildMenu = document.getElementById('build-menu');
+        els.actionRunMenu = document.getElementById('action-run-menu');
+        els.runMenu = document.getElementById('run-menu');
         els.themeStylesheet = document.getElementById('forge-theme-stylesheet');
         els.stage = document.querySelector('.stage');
         els.stageTools = document.getElementById('stage-tools');
