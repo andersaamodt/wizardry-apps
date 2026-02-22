@@ -165,7 +165,6 @@
     overlay.autoresizingMask = (NSViewWidthSizable | NSViewHeightSizable);
     overlay.wantsLayer = YES;
     NSColor *bg = self.prioritiesBootBgColor ?: [NSColor whiteColor];
-    NSColor *textColor = self.prioritiesBootTextColor ?: [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
     overlay.layer.backgroundColor = [bg CGColor];
 
     NSImage *logoImage = self.appIconImage;
@@ -180,24 +179,12 @@
         logoView.image = nil;
     }
 
-    NSTextField *label = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    label.editable = NO;
-    label.bezeled = NO;
-    label.drawsBackground = NO;
-    label.selectable = NO;
-    label.alignment = NSTextAlignmentCenter;
-    label.stringValue = @"Loading...";
-    label.textColor = textColor;
-    label.font = [NSFont systemFontOfSize:14 weight:NSFontWeightMedium];
-    [label sizeToFit];
-
     NSStackView *stack = [[NSStackView alloc] initWithFrame:NSZeroRect];
     stack.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     stack.alignment = NSLayoutAttributeCenterY;
-    stack.spacing = 8.0;
+    stack.spacing = 0.0;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
     [stack addArrangedSubview:logoView];
-    [stack addArrangedSubview:label];
 
     [overlay addSubview:stack];
     [NSLayoutConstraint activateConstraints:@[
