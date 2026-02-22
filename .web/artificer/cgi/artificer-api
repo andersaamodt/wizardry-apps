@@ -5308,6 +5308,28 @@ voice_component_cache_slug() {
   printf '%s' "models--$repo_slug"
 }
 
+dictation_cleanup_trash_dir() {
+  printf '%s/.cleanup-trash' "$dictation_installs_dir"
+}
+
+quarantine_path_for_async_delete() {
+  source_path=$1
+  label=$2
+  if [ ! -e "$source_path" ]; then
+    return 0
+  fi
+
+  trash_root=$(dictation_cleanup_trash_dir)
+  mkdir -p "$trash_root" 2>/dev/null || return 1
+  ts=$(date +%s 2>/dev/null || printf '0')
+  nonce=$(new_id)
+  target_path="$trash_root/$ts-$nonce-$label"
+
+  mv "$source_path" "$target_path" 2>/dev/null || return 1
+  spawn_detached_job rm -rf "$target_path" >/dev/null 2>&1 || true
+  return 0
+}
+
 remove_voice_component_artifacts() {
   component=$1
   root=$(voice_runtime_root_path 2>/dev/null || true)
@@ -5321,8 +5343,8 @@ remove_voice_component_artifacts() {
   component_dir="$root/$component"
   case "$component_dir" in
     "$root"/*)
-      if [ -d "$component_dir" ]; then
-        rm -rf "$component_dir" 2>/dev/null || return 1
+      if [ -e "$component_dir" ]; then
+        quarantine_path_for_async_delete "$component_dir" "${component}-runtime" || return 1
       fi
       ;;
   esac
@@ -5332,13 +5354,13 @@ remove_voice_component_artifacts() {
     hf_hub_dir="$root/huggingface/hub"
     for entry in "$hf_hub_dir/$cache_slug" "$hf_hub_dir/$cache_slug".* "$hf_hub_dir/$cache_slug"-*; do
       if [ -e "$entry" ]; then
-        rm -rf "$entry" 2>/dev/null || return 1
+        quarantine_path_for_async_delete "$entry" "${component}-hub" || return 1
       fi
     done
     hf_locks_dir="$root/huggingface/.locks"
     for lock_entry in "$hf_locks_dir/$cache_slug" "$hf_locks_dir/$cache_slug".* "$hf_locks_dir/$cache_slug"-*; do
       if [ -e "$lock_entry" ]; then
-        rm -rf "$lock_entry" 2>/dev/null || return 1
+        quarantine_path_for_async_delete "$lock_entry" "${component}-lock" || return 1
       fi
     done
   fi
