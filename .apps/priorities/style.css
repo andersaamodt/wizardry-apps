@@ -1389,9 +1389,9 @@ button:hover {
   right: calc(4px * var(--ui-scale));
   top: calc(100% + 2px);
   min-width: calc(128px * var(--ui-scale));
-  border: 1px solid color-mix(in srgb, var(--border, #d4d0e6) 74%, #fff 26%);
+  border: 1px solid var(--border, #d4d0e6);
   border-radius: calc(8px * var(--ui-scale));
-  background: color-mix(in srgb, var(--light-bg, #f8f7fc) 26%, #fff 74%);
+  background: color-mix(in srgb, var(--light-bg, #f8f7fc) 92%, #fff 8%);
   box-shadow: 0 10px 24px var(--shadow, rgba(27, 22, 56, 0.12));
   padding: calc(4px * var(--ui-scale));
   z-index: 4;
@@ -1410,8 +1410,6 @@ button:hover {
   padding: calc(6px * var(--ui-scale)) calc(8px * var(--ui-scale));
   font-size: calc(13px * var(--ui-scale));
   text-align: left;
-  color: color-mix(in srgb, var(--text, #2a2e47) 86%, var(--icon-neutral, #5d6486) 14%);
-  font-weight: 560;
 }
 
 .row-menu-item svg {
@@ -1423,11 +1421,10 @@ button:hover {
 .row-menu-item:hover {
   border-color: color-mix(in srgb, var(--accent, #7782d6) 42%, var(--border, #d4d0e6) 58%);
   background: color-mix(in srgb, var(--accent, #7782d6) 18%, transparent);
-  color: color-mix(in srgb, var(--text, #2a2e47) 92%, #000 8%);
 }
 
 .row-menu-item.danger {
-  color: color-mix(in srgb, var(--danger, #a14d5b) 84%, var(--text, #2a2e47) 16%);
+  color: var(--accent, #7782d6);
 }
 
 .startup-modal {
