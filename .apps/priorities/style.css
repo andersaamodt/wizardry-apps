@@ -688,7 +688,6 @@ button:hover {
   -webkit-user-select: text;
 }
 
-.tree.reordering .row,
 .tree.reordering .name-stack {
   transition-property: none !important;
 }
