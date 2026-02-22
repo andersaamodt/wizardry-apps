@@ -342,6 +342,14 @@ h1 {
   color: var(--light-text, #5d6486);
 }
 
+#folder-settings-row.root-dirty label::after {
+  content: " pending";
+  margin-left: calc(4px * var(--ui-scale));
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: color-mix(in srgb, var(--accent, #7782d6) 74%, var(--light-text, #5d6486) 26%);
+}
+
 .settings-note {
   margin: 2px 0 0;
   font-size: calc(12px * var(--ui-scale));
@@ -514,6 +522,16 @@ input {
 
 #root-dir {
   flex: 1;
+}
+
+#root-dir.root-dirty-input {
+  border-color: color-mix(in srgb, var(--accent, #7782d6) 58%, var(--border, #d4d0e6) 42%);
+  background: color-mix(in srgb, var(--accent-soft, #e6e3f4) 30%, var(--light-bg, #f8f7fc) 70%);
+}
+
+#refresh.root-dirty-button {
+  border-color: color-mix(in srgb, var(--accent, #7782d6) 58%, var(--border, #d4d0e6) 42%);
+  background: color-mix(in srgb, var(--accent-soft, #e6e3f4) 36%, var(--light-bg, #f8f7fc) 64%);
 }
 
 button {

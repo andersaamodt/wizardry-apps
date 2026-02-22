@@ -68,7 +68,7 @@
     </header>
 
     <section id="settings-panel" class="settings-panel hidden popover" aria-label="Settings">
-      <div class="settings-row">
+      <div id="folder-settings-row" class="settings-row">
         <label for="root-dir">Folder</label>
         <div class="root-row">
           <input id="root-dir" type="text" value="." spellcheck="false">
@@ -752,6 +752,23 @@
       return String(document.getElementById('root-dir').value || '.').trim() || '.';
     }
 
+    function syncRootDirtyState() {
+      var row = document.getElementById('folder-settings-row');
+      var input = document.getElementById('root-dir');
+      var refreshBtn = document.getElementById('refresh');
+      if (!row || !input) {
+        return;
+      }
+      var typed = normalizeRootPath(rootInputValue());
+      var applied = normalizeRootPath(String(state.root || '').trim());
+      var dirty = !!typed && !!applied && typed !== applied;
+      row.classList.toggle('root-dirty', dirty);
+      input.classList.toggle('root-dirty-input', dirty);
+      if (refreshBtn) {
+        refreshBtn.classList.toggle('root-dirty-button', dirty);
+      }
+    }
+
     function normalizeRootPath(path) {
       var raw = String(path || '').trim();
       if (!raw) {
@@ -977,6 +994,7 @@
         return;
       }
       el.textContent = folderNameFromPath(rootInputValue());
+      syncRootDirtyState();
       scheduleHostPrioritiesDragHoleSync();
     }
 
@@ -3754,6 +3772,7 @@
       options = options || {};
       clearDomTextSelection();
       state.root = rootInputValue();
+      syncRootDirtyState();
       state.expanded = Object.create(null);
       state.expanded[state.root] = true;
       state.cache = Object.create(null);
@@ -3836,6 +3855,7 @@
       state.rootCeiling = normalizeRootPath(value);
       updateTitleFromRoot();
       updateDrillUpVisibility();
+      syncRootDirtyState();
     }
 
     function focusNewPriorityInput() {
