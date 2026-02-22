@@ -588,8 +588,8 @@
         CGFloat headerBandHeight = dragStripHeight;
         // Keep a left-biased click-safe window around title/up controls so the
         // right side of the title remains mostly draggable.
-        CGFloat titleHoleLeftWidth = 68.0;
-        CGFloat titleHoleRightWidth = 22.0;
+        CGFloat titleHoleLeftWidth = 36.0;
+        CGFloat titleHoleRightWidth = 10.0;
         CGFloat rightControlsReservedWidth = 168.0;
         CGFloat centerX = floor(frame.size.width / 2.0);
         CGFloat holeStartX = centerX - titleHoleLeftWidth;
