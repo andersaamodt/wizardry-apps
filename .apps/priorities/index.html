@@ -1794,6 +1794,8 @@
       overlayLayer.style.pointerEvents = 'none';
       overlayLayer.style.zIndex = '2147483647';
       overlayLayer.style.isolation = 'isolate';
+      overlayLayer.style.color = window.getComputedStyle(tree).color;
+      overlayLayer.style.font = window.getComputedStyle(tree).font;
       if (typeof overlayLayer.showPopover === 'function') {
         overlayLayer.setAttribute('popover', 'manual');
       }
@@ -1963,6 +1965,7 @@
             var rowScaleX = Number(m.scaleX) || 1;
             var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
             var overlayRect = movedRow.getBoundingClientRect();
+            var movedRowComputedStyle = window.getComputedStyle(movedRow);
             var overlayRow = movedRow.cloneNode(true);
             var isPrimaryRow = false;
             if (movedRowPath && activeReorderPath && movedRowPath === activeReorderPath) {
@@ -1984,6 +1987,11 @@
             overlayRow.style.willChange = 'transform';
             overlayRow.style.backfaceVisibility = 'hidden';
             overlayRow.style.transformOrigin = 'top left';
+            overlayRow.style.opacity = '1';
+            overlayRow.style.backgroundColor = movedRowComputedStyle.backgroundColor;
+            overlayRow.style.backgroundImage = movedRowComputedStyle.backgroundImage;
+            overlayRow.style.borderColor = movedRowComputedStyle.borderColor;
+            overlayRow.style.color = movedRowComputedStyle.color;
             overlayLayer.appendChild(overlayRow);
             movedRow._reorderOverlayEl = overlayRow;
             movedRow.style.visibility = 'hidden';
