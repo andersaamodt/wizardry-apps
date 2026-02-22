@@ -1334,7 +1334,7 @@ input[type="checkbox"]:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   max-width: min(14rem, 34vw);
-  column-gap: 0.3rem;
+  column-gap: 0.38rem;
   margin-top: 0;
   margin-left: auto;
   min-width: 0;
@@ -1386,8 +1386,17 @@ input[type="checkbox"]:disabled {
 
 .path-link.is-compact::before {
   content: "📂";
-  font-size: 0.82rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
   line-height: 1;
+}
+
+.selected-path-row .terminal-icon {
+  margin-left: 0.08rem;
 }
 
 .terminal-icon {
