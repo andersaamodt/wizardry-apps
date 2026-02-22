@@ -1052,15 +1052,11 @@ button:disabled {
   background: var(--toolbar-surface);
 }
 
-.toolbar-btn:hover {
-  border-color: var(--toolbar-accent);
-  background: var(--toolbar-accent-soft);
-  box-shadow: none;
-}
-
+.toolbar-btn:hover,
 .toolbar-btn.primary:hover {
-  border-color: var(--toolbar-accent);
-  background: var(--toolbar-accent-soft);
+  border-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
+  background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
+  box-shadow: none;
 }
 
 .build-split {
@@ -1085,6 +1081,7 @@ button:disabled {
   border: 0;
   border-radius: 0;
   transform: none;
+  background: transparent;
 }
 
 .run-split #action-run {
@@ -1105,6 +1102,21 @@ button:disabled {
   justify-content: center;
   border-left: 1px solid var(--toolbar-line);
   border-radius: 0 8px 8px 0;
+}
+
+.run-split:hover {
+  border-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
+  background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
+}
+
+.run-split:hover .menu-toggle {
+  border-left-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
+}
+
+.run-split .toolbar-btn:hover,
+.run-split .toolbar-btn.primary:hover {
+  border-color: transparent;
+  background: transparent;
 }
 
 .build-split .floating-menu {
