@@ -173,7 +173,6 @@
   var tooltipShowTimer = null;
   var tooltipPendingTarget = null;
   var TOOLTIP_DELAY_MS = 520;
-  var DICTATION_INSTALL_SIZE_LABEL = "1.4 GB";
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -4927,7 +4926,25 @@
     if (state.dictationInstalled) {
       return "Uninstall dictation";
     }
-    return "Install dictation (" + DICTATION_INSTALL_SIZE_LABEL + ")";
+    var sizeLabel = dictationInstallSizeLabel();
+    if (!sizeLabel) {
+      return "Install dictation";
+    }
+    return "Install dictation (" + sizeLabel + ")";
+  }
+
+  function dictationInstallSizeLabel() {
+    var info = state.dictationInstallInfo || null;
+    var infoBytes = dictationWholeNumber(info && info.download_size_bytes);
+    if (infoBytes > 0) {
+      return dictationGigabytesLabel(infoBytes) + " GB";
+    }
+    var job = state.dictationInstallJob || null;
+    var jobBytes = dictationWholeNumber(job && job.download_size_bytes);
+    if (jobBytes > 0) {
+      return dictationGigabytesLabel(jobBytes) + " GB";
+    }
+    return "";
   }
 
   function dictationInstallRunningButtonLabel(job) {
