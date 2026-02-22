@@ -613,12 +613,15 @@ compute_highest_priority_xattr() {
 prioritize_impl() {
   target=$1
   auto_create=${2:-0}
+  target_existed=0
   if [ -z "$target" ]; then
     printf '%s\n' "priorities-backend: path required for prioritize-fast" >&2
     return 2
   fi
 
-  if [ ! -e "$target" ]; then
+  if [ -e "$target" ]; then
+    target_existed=1
+  else
     if [ "$auto_create" = "1" ]; then
       touch "$target"
     else
@@ -705,6 +708,12 @@ EOF
   fi
 
   if [ "$current_echelon" -eq "$highest_echelon" ] && [ "$current_echelon" -gt 0 ]; then
+    if [ "$auto_create" = "1" ] && [ "$target_existed" -eq 1 ]; then
+      new_priority=$((highest_priority_in_echelon + 1))
+      set_user_attr "$target" echelon "$highest_echelon"
+      set_user_attr "$target" priority "$new_priority"
+      return 0
+    fi
     new_echelon=$((highest_echelon + 1))
     set_user_attr "$target" echelon "$new_echelon"
     set_user_attr "$target" priority 1
@@ -1071,12 +1080,15 @@ emit_list() {
 prioritize_emit_impl() {
   target=$1
   auto_create=${2:-0}
+  target_existed=0
   if [ -z "$target" ]; then
     printf '%s\n' "priorities-backend: path required for prioritize-fast" >&2
     return 2
   fi
 
-  if [ ! -e "$target" ]; then
+  if [ -e "$target" ]; then
+    target_existed=1
+  else
     if [ "$auto_create" = "1" ]; then
       touch "$target"
     else
@@ -1226,8 +1238,13 @@ prioritize_emit_impl() {
     new_echelon=1
     new_priority=1
   elif [ "$current_echelon" -eq "$highest_echelon" ] && [ "$current_echelon" -gt 0 ]; then
-    new_echelon=$((highest_echelon + 1))
-    new_priority=1
+    if [ "$auto_create" = "1" ] && [ "$target_existed" -eq 1 ]; then
+      new_echelon=$highest_echelon
+      new_priority=$((highest_priority_in_echelon + 1))
+    else
+      new_echelon=$((highest_echelon + 1))
+      new_priority=1
+    fi
   else
     new_echelon=$highest_echelon
     new_priority=$((highest_priority_in_echelon + 1))
