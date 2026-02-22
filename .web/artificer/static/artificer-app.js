@@ -4339,7 +4339,7 @@
   function runTraceSummaryLabel(event, isRunning) {
     var duration = thoughtDurationLabel(event && event.started_at, isRunning ? "" : (event && event.finished_at));
     if (isRunning) {
-      return "Working for " + (duration || "0s");
+      return "Thinking... " + (duration || "0s");
     }
     if (duration) {
       return "Worked for " + duration;
@@ -4723,7 +4723,8 @@
       added: 0,
       deleted: 0,
       files: [],
-      hasDiff: false
+      hasDiff: false,
+      perFile: {}
     };
     var fileMap = {};
     var diffText = String((event && event.git_diff) || "");
@@ -4740,12 +4741,29 @@
             fileMap[diffPath] = true;
             summary.files.push(diffPath);
           }
+          if (diffPath && !summary.perFile[diffPath]) {
+            summary.perFile[diffPath] = { add: 0, del: 0 };
+          }
           continue;
         }
         if (/^\+/.test(line) && !/^\+\+\+/.test(line)) {
           summary.added += 1;
+          if (summary.files.length) {
+            var plusPath = summary.files[summary.files.length - 1];
+            if (!summary.perFile[plusPath]) {
+              summary.perFile[plusPath] = { add: 0, del: 0 };
+            }
+            summary.perFile[plusPath].add += 1;
+          }
         } else if (/^-/.test(line) && !/^---/.test(line)) {
           summary.deleted += 1;
+          if (summary.files.length) {
+            var minusPath = summary.files[summary.files.length - 1];
+            if (!summary.perFile[minusPath]) {
+              summary.perFile[minusPath] = { add: 0, del: 0 };
+            }
+            summary.perFile[minusPath].del += 1;
+          }
         }
       }
     }
@@ -4785,15 +4803,26 @@
     }
     var fileCount = summary.files.length;
     var html = "<div class='run-changes-card'>";
+    html += "<p class='run-changes-title'>Changes made this run</p>";
     html += "<p class='run-changes-head'>" + escHtml(String(fileCount)) + " file" + (fileCount === 1 ? "" : "s") + " changed";
     html += " <span class='run-delta add'>+" + escHtml(String(summary.added)) + "</span>";
-    html += " <span class='run-delta del'>-" + escHtml(String(summary.deleted)) + "</span>";
-    html += "</p>";
+    html += " <span class='run-delta del'>-" + escHtml(String(summary.deleted)) + "</span></p>";
     if (fileCount > 0) {
-      html += "<div class='run-changes-list'>";
+      html += "<div class='run-changes-table'>";
       var shown = Math.min(6, fileCount);
       for (var i = 0; i < shown; i += 1) {
-        html += "<code>" + escHtml(summary.files[i] || "") + "</code>";
+        var path = String(summary.files[i] || "");
+        var perFile = summary.perFile[path] || { add: 0, del: 0 };
+        var addCount = Number(perFile.add || 0);
+        var delCount = Number(perFile.del || 0);
+        var largeLine = (addCount + delCount) >= 260;
+        html += "<div class='run-changes-row'>";
+        html += "<code class='run-changes-path'>" + escHtml(path) + "</code>";
+        html += "<span class='run-changes-stats'><span class='run-delta add'>+" + escHtml(String(addCount)) + "</span> <span class='run-delta del'>-" + escHtml(String(delCount)) + "</span></span>";
+        if (largeLine) {
+          html += "<span class='run-changes-note'>Too large to render inline</span>";
+        }
+        html += "</div>";
       }
       if (fileCount > shown) {
         html += "<p class='run-line subtle'>+" + escHtml(String(fileCount - shown)) + " more files</p>";
@@ -4884,7 +4913,7 @@
     var summaryLabel = runTraceSummaryLabel(event, isRunning);
     var summaryInner = "";
     if (isRunning) {
-      summaryInner = "<span class='run-summary-label meta-glimmer'>" + escHtml(summaryLabel) + "</span>";
+      summaryInner = "<span class='run-spinner' aria-hidden='true'></span><span class='run-summary-label meta-glimmer'>" + escHtml(summaryLabel) + "</span>";
     } else {
       summaryInner = "<span class='run-rollup-line' aria-hidden='true'></span><span class='run-summary-label'>" + escHtml(summaryLabel) + "</span><span class='run-rollup-line' aria-hidden='true'></span>";
     }
@@ -4936,19 +4965,10 @@
 
     if (status === "running") {
       html = "<article class='" + runClass + " run-narrative'>";
-      var startedAt = Date.parse(event.started_at || "");
-      var elapsed = 0;
-      if (isFinite(startedAt) && startedAt > 0) {
-        elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-      }
-      html += "<p class='run-line running' data-started-at='" + escAttr(event.started_at || "") + "'><span class='run-spinner' aria-hidden='true'></span> <span class='meta-glimmer'>Thinking</span>";
-      html += " <span class='run-elapsed'>" + (elapsed > 0 ? elapsed + "s" : "") + "</span>";
       if (workspaceId && conversationId) {
-        html += "<button type='button' class='run-stop-btn' aria-label='Stop run' title='Stop run' data-action='stop-run' data-workspace-id='" + escAttr(workspaceId) + "' data-conversation-id='" + escAttr(conversationId) + "'><span class='run-stop-square' aria-hidden='true'>&#9632;</span></button>";
+        html += "<p class='run-line running'><button type='button' class='run-stop-btn' aria-label='Stop run' title='Stop run' data-action='stop-run' data-workspace-id='" + escAttr(workspaceId) + "' data-conversation-id='" + escAttr(conversationId) + "'><span class='run-stop-square' aria-hidden='true'>&#9632;</span></button></p>";
       }
-      html += "</p>";
-      html += formatRunInlineTimeline(event, true, 8);
-      html += formatRunTrace(event, { isRunning: true, defaultOpen: false });
+      html += formatRunTrace(event, { isRunning: true, defaultOpen: true });
       html += "</article>";
       return html;
     }
@@ -4983,7 +5003,6 @@
     if (status === "error") {
       html = "<article class='" + runClass + " run-narrative'>";
       html += "<p class='run-line error'>" + escHtml(friendlyRunErrorText(event)) + "</p>";
-      html += formatRunInlineTimeline(event, false, 12);
       html += formatRunTrace(event, { defaultOpen: false });
       html += formatRunChangesCard(event);
       html += "</article>";
@@ -5037,7 +5056,6 @@
     } else if (runModelText) {
       html += "<p class='run-line subtle'>Model: " + escHtml(runModelText) + "</p>";
     }
-    html += formatRunInlineTimeline(event, false, 12);
     html += formatRunTrace(event, { defaultOpen: false });
     if (!queueRunning && queuePending < 1 && !queueAwaitingApproval && !queueAwaitingDecision) {
       html += formatRunChangesCard(event);
@@ -5073,21 +5091,20 @@
       return;
     }
     var lines = el.chatLog.querySelectorAll(".run-line.running[data-started-at]");
-    if (!lines || !lines.length) {
-      return;
-    }
     var nowMs = Date.now();
-    for (var i = 0; i < lines.length; i += 1) {
-      var line = lines[i];
-      var startedRaw = line.getAttribute("data-started-at") || "";
-      var startedMs = Date.parse(startedRaw);
-      if (!isFinite(startedMs) || startedMs <= 0) {
-        continue;
-      }
-      var elapsed = Math.max(0, Math.floor((nowMs - startedMs) / 1000));
-      var badge = line.querySelector(".run-elapsed");
-      if (badge) {
-        badge.textContent = elapsed > 0 ? String(elapsed) + "s" : "";
+    if (lines && lines.length) {
+      for (var i = 0; i < lines.length; i += 1) {
+        var line = lines[i];
+        var startedRaw = line.getAttribute("data-started-at") || "";
+        var startedMs = Date.parse(startedRaw);
+        if (!isFinite(startedMs) || startedMs <= 0) {
+          continue;
+        }
+        var elapsed = Math.max(0, Math.floor((nowMs - startedMs) / 1000));
+        var badge = line.querySelector(".run-elapsed");
+        if (badge) {
+          badge.textContent = elapsed > 0 ? String(elapsed) + "s" : "";
+        }
       }
     }
 
@@ -5102,9 +5119,9 @@
       var duration = thoughtDurationLabel(started, "");
       var summaryLabel = summary.querySelector(".run-summary-label");
       if (summaryLabel) {
-        summaryLabel.textContent = "Working for " + (duration || "0s");
+        summaryLabel.textContent = "Thinking... " + (duration || "0s");
       } else {
-        summary.textContent = "Working for " + (duration || "0s");
+        summary.textContent = "Thinking... " + (duration || "0s");
       }
     }
   }
