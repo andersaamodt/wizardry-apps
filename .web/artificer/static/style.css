@@ -5098,8 +5098,8 @@ select:focus {
 .ui-notice {
   position: fixed;
   left: 50%;
-  bottom: 24px;
-  transform: translate(-50%, 8px);
+  top: 24px;
+  transform: translate(-50%, -8px);
   z-index: 2100;
   max-width: min(44ch, calc(100vw - 24px));
   padding: 7px 12px;

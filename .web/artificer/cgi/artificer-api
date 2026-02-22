@@ -5296,6 +5296,55 @@ voice_component_download_usage_bytes() {
   voice_usage_bytes_for_path "$cache_path"
 }
 
+voice_component_cache_slug() {
+  component=$1
+  repo_id=$(voice_component_hf_repo_id "$component")
+  if [ -z "$repo_id" ]; then
+    printf '%s' ""
+    return 0
+  fi
+  # Hugging Face hub cache directories use models--org--repo naming.
+  repo_slug=$(printf '%s' "$repo_id" | sed 's#/#--#g')
+  printf '%s' "models--$repo_slug"
+}
+
+remove_voice_component_artifacts() {
+  component=$1
+  root=$(voice_runtime_root_path 2>/dev/null || true)
+  if [ -z "$root" ]; then
+    return 1
+  fi
+  if [ ! -d "$root" ]; then
+    return 0
+  fi
+
+  component_dir="$root/$component"
+  case "$component_dir" in
+    "$root"/*)
+      if [ -d "$component_dir" ]; then
+        rm -rf "$component_dir" 2>/dev/null || return 1
+      fi
+      ;;
+  esac
+
+  cache_slug=$(voice_component_cache_slug "$component")
+  if [ -n "$cache_slug" ]; then
+    hf_hub_dir="$root/huggingface/hub"
+    for entry in "$hf_hub_dir/$cache_slug" "$hf_hub_dir/$cache_slug".* "$hf_hub_dir/$cache_slug"-*; do
+      if [ -e "$entry" ]; then
+        rm -rf "$entry" 2>/dev/null || return 1
+      fi
+    done
+    hf_locks_dir="$root/huggingface/.locks"
+    for lock_entry in "$hf_locks_dir/$cache_slug" "$hf_locks_dir/$cache_slug".* "$hf_locks_dir/$cache_slug"-*; do
+      if [ -e "$lock_entry" ]; then
+        rm -rf "$lock_entry" 2>/dev/null || return 1
+      fi
+    done
+  fi
+  return 0
+}
+
 progress_pct_max() {
   current=$1
   candidate=$2
@@ -13336,6 +13385,8 @@ EOF_RUNNER
 
     status=$(read_file_line "$job_dir/status" "")
     install_pid=$(read_file_line "$job_dir/pid" "")
+    component=$(read_file_line "$job_dir/component" "")
+    fallback_component=$(read_file_line "$job_dir/fallback_component" "ctranslate2-whisper")
 
     if [ "$status" = "done" ] || [ "$status" = "failed" ] || [ "$status" = "cancelled" ]; then
       printf '{"success":true,"job":{"id":"%s","status":"%s","action":"install"}}\n' \
@@ -13344,14 +13395,26 @@ EOF_RUNNER
       exit 0
     fi
 
+    # Mark cancelled immediately so new installs never reattach to this job.
+    printf '%s\n' "130" > "$job_dir/exit_code"
+    printf '%s\n' "cancelled" > "$job_dir/status"
+    [ -f "$job_dir/finished" ] || date +%s > "$job_dir/finished"
+
     if [ -n "$install_pid" ] && ! stop_process_tree_by_pid "$install_pid"; then
       emit_error "Could not cancel dictation install process."
       exit 0
     fi
 
-    printf '%s\n' "130" > "$job_dir/exit_code"
-    printf '%s\n' "cancelled" > "$job_dir/status"
-    [ -f "$job_dir/finished" ] || date +%s > "$job_dir/finished"
+    if [ -n "$component" ] && ! remove_voice_component_artifacts "$component"; then
+      emit_error "Cancelled install, but could not remove partial dictation files."
+      exit 0
+    fi
+    if [ -n "$fallback_component" ] && [ "$fallback_component" != "$component" ]; then
+      if ! remove_voice_component_artifacts "$fallback_component"; then
+        emit_error "Cancelled install, but could not remove fallback dictation files."
+        exit 0
+      fi
+    fi
     printf '%s\n' "voice-recognition: install cancelled" >> "$job_dir/log"
 
     printf '{"success":true,"job":{"id":"%s","status":"cancelled","action":"install"}}\n' \
