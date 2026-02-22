@@ -504,6 +504,12 @@
     var MODEL_INSTALL_KEY = 'wizardry.virtual_redditor.models.installed';
     var LEFT_RAIL_WIDTH_KEY = 'wizardry.virtual_redditor.left_rail.width';
     var PROFILES_CACHE_KEY = 'wizardry.virtual_redditor.profiles.cache';
+    var UI_PREF_MAP = {
+      'wizardry.virtual_redditor.theme': 'theme',
+      'wizardry.virtual_redditor.models.installed': 'models_installed',
+      'wizardry.virtual_redditor.left_rail.width': 'left_rail_width',
+      'wizardry.virtual_redditor.profiles.cache': 'profiles_cache'
+    };
     var THEME_ASSET_VERSION = 'vr20260221a';
     var DEFAULT_GLOBAL_INSTRUCTIONS = (
       '# Virtual Redditor Manifesto\n\n' +
@@ -555,7 +561,8 @@
       installedModels: {},
       activeModel: 'llama3.1:8b',
       activeTheme: 'psionic',
-      leftRailWidth: parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 320,
+      leftRailWidth: 320,
+      uiPrefs: {},
       refreshInFlight: false,
       statusRenderSig: '',
       profilesRenderSig: '',
@@ -604,17 +611,64 @@
       if (!isTabVisible(state.activeTab)) setActiveTab('persona');
     }
 
+    function prefNameForStorageKey(key) {
+      return UI_PREF_MAP[key] || '';
+    }
+
+    function parseKeyValueText(blob) {
+      var out = {};
+      String(blob || '').split('\n').forEach(function (line) {
+        if (!line) return;
+        var idx = line.indexOf('=');
+        if (idx <= 0) return;
+        out[line.slice(0, idx)] = line.slice(idx + 1);
+      });
+      return out;
+    }
+
+    function prefValue(name, fallback) {
+      var value = state.uiPrefs[name];
+      if (typeof value === 'string' && value !== '') {
+        return value;
+      }
+      return fallback === undefined ? null : fallback;
+    }
+
     function loadStorage(key) {
-      try { return window.localStorage ? window.localStorage.getItem(key) : null; } catch (_) { return null; }
+      var prefName = prefNameForStorageKey(key);
+      if (!prefName) return null;
+      return prefValue(prefName, null);
+    }
+
+    async function persistUiPref(prefName, value) {
+      if (!prefName || !hasBridge()) {
+        return;
+      }
+      try {
+        await runBackend('set-ui-pref', [prefName, String(value || '')]);
+      } catch (_) {
+        return;
+      }
     }
 
     function saveStorage(key, value) {
+      var prefName = prefNameForStorageKey(key);
+      if (!prefName) return;
+      state.uiPrefs[prefName] = String(value || '');
+      persistUiPref(prefName, state.uiPrefs[prefName]);
+    }
+
+    async function loadUiPrefs() {
+      if (!hasBridge()) {
+        state.uiPrefs = {};
+        return;
+      }
       try {
-        if (window.localStorage) {
-          if (value === null || value === undefined || value === '') window.localStorage.removeItem(key);
-          else window.localStorage.setItem(key, String(value));
-        }
-      } catch (_) {}
+        var result = await runBackend('get-ui-prefs', []);
+        state.uiPrefs = parseKeyValueText((result && result.stdout) || '');
+      } catch (_) {
+        state.uiPrefs = {};
+      }
     }
 
     function loadProfilesCache() {
@@ -3867,6 +3921,11 @@
     }
 
     async function boot() {
+      await loadUiPrefs();
+      var savedLeftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10);
+      if (Number.isFinite(savedLeftRailWidth) && savedLeftRailWidth > 0) {
+        state.leftRailWidth = savedLeftRailWidth;
+      }
       var storedTheme = (loadStorage(THEME_KEY) || '').toLowerCase();
       if (/^[a-z0-9_-]+$/.test(storedTheme)) state.activeTheme = storedTheme;
       ensureActiveThemeInList();

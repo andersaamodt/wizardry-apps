@@ -9,6 +9,8 @@ Usage: priorities-backend.sh ACTION [ARGS...]
 
 Actions:
   list-themes           List Wizardry theme names from global theme directory
+  get-ui-prefs          Print UI preferences as key=value lines
+  set-ui-pref KEY VALUE Persist a UI preference key=value
   list [DIR]            List prioritized items in DIR (default: current dir)
   prioritize PATH       Promote PATH using the prioritize spell
   prioritize-quick PATH Promote PATH and print: echelon<tab>priority<tab>checked
@@ -101,6 +103,58 @@ emit_theme_names() {
   if [ -n "$themes" ]; then
     printf '%s\n' "$themes"
   fi
+}
+
+priorities_ui_config_file() {
+  base="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/priorities"
+  mkdir -p "$base"
+  printf '%s\n' "$base/config"
+}
+
+validate_ui_pref_key() {
+  key=${1-}
+  case "$key" in
+    [a-z0-9][a-z0-9._-]*)
+      ;;
+    *)
+      printf '%s\n' "priorities-backend: invalid UI pref key: $key" >&2
+      exit 2
+      ;;
+  esac
+}
+
+sanitize_ui_pref_value() {
+  value=${1-}
+  printf '%s' "$value" | tr '\r\n' ' '
+}
+
+write_key_value_file() {
+  file=$1
+  key=$2
+  value=$3
+
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/priorities-kv.XXXXXX")
+  found=0
+  if [ -f "$file" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+        "$key="*)
+          if [ "$found" -eq 0 ]; then
+            printf '%s=%s\n' "$key" "$value" >>"$tmp_file"
+            found=1
+          fi
+          ;;
+        *)
+          printf '%s\n' "$line" >>"$tmp_file"
+          ;;
+      esac
+    done <"$file"
+  fi
+
+  if [ "$found" -eq 0 ]; then
+    printf '%s=%s\n' "$key" "$value" >>"$tmp_file"
+  fi
+  mv "$tmp_file" "$file"
 }
 
 expand_home_path() {
@@ -1316,6 +1370,27 @@ prioritize_emit_impl() {
 case "$action" in
   list-themes)
     emit_theme_names
+    ;;
+
+  get-ui-prefs)
+    cfg=$(priorities_ui_config_file)
+    [ -f "$cfg" ] && cat "$cfg"
+    ;;
+
+  set-ui-pref)
+    key=${1-}
+    value=${2-}
+    if [ -z "$key" ]; then
+      printf '%s\n' "priorities-backend: set-ui-pref requires KEY VALUE" >&2
+      exit 2
+    fi
+    validate_ui_pref_key "$key"
+    value=$(sanitize_ui_pref_value "$value")
+    cfg=$(priorities_ui_config_file)
+    [ -f "$cfg" ] || : >"$cfg"
+    write_key_value_file "$cfg" "$key" "$value"
+    printf 'key=%s\n' "$key"
+    printf 'value=%s\n' "$value"
     ;;
 
   list)

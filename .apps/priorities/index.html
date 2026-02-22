@@ -121,6 +121,7 @@
     var FONT_KEY = 'wizardry.priorities.font';
     var UI_SCALE_KEY = 'wizardry.priorities.uiScale';
     var TEXT_SCALE_KEY = 'wizardry.priorities.textScale';
+    var ROOT_KEY = 'priorities.root';
     var THEME_ASSET_VERSION = 'priorities20260220a';
     var DEFAULT_THEMES = [
       'adept', 'alchemist', 'archmage', 'athenian', 'chronomancer', 'conjurer', 'druid',
@@ -162,23 +163,81 @@
       windowWidthRequested: 0,
       windowHeightRequested: 640,
       windowAutoGrowTimer: null,
-      windowSizingReady: false
+      windowSizingReady: false,
+      uiPrefs: {},
+      rootPrefSaveTimer: null
     };
 
-    function loadStorage(key) {
+    function parseKeyValueText(blob) {
+      var out = {};
+      String(blob || '').split('\n').forEach(function (line) {
+        if (!line) {
+          return;
+        }
+        var idx = line.indexOf('=');
+        if (idx <= 0) {
+          return;
+        }
+        out[line.slice(0, idx)] = line.slice(idx + 1);
+      });
+      return out;
+    }
+
+    function prefNameForStorageKey(storageKey) {
+      if (storageKey === THEME_KEY) return 'theme';
+      if (storageKey === FONT_KEY) return 'font';
+      if (storageKey === UI_SCALE_KEY || storageKey === TEXT_SCALE_KEY) return 'ui_scale';
+      if (storageKey === ROOT_KEY) return 'root';
+      return '';
+    }
+
+    function prefValue(prefName, fallback) {
+      var value = state.uiPrefs[prefName];
+      if (typeof value === 'string' && value !== '') {
+        return value;
+      }
+      return fallback || '';
+    }
+
+    async function persistUiPref(prefName, value) {
+      if (!prefName || !hasBridge()) {
+        return;
+      }
       try {
-        return window.localStorage.getItem(key) || '';
+        await runBackend(['set-ui-pref', prefName, String(value || '')]);
       } catch (_) {
-        return '';
+        return;
       }
     }
 
-    function saveStorage(key, value) {
-      try {
-        window.localStorage.setItem(key, value);
-      } catch (_) {
-        // Ignore storage failures.
+    async function loadUiPrefs() {
+      if (!hasBridge()) {
+        state.uiPrefs = {};
+        return;
       }
+      try {
+        var result = await runBackend(['get-ui-prefs']);
+        state.uiPrefs = parseKeyValueText((result && result.stdout) || '');
+      } catch (_) {
+        state.uiPrefs = {};
+      }
+    }
+
+    function saveStorage(storageKey, value) {
+      var prefName = prefNameForStorageKey(storageKey);
+      if (!prefName) {
+        return;
+      }
+      state.uiPrefs[prefName] = String(value || '');
+      persistUiPref(prefName, state.uiPrefs[prefName]);
+    }
+
+    function loadStorage(storageKey) {
+      var prefName = prefNameForStorageKey(storageKey);
+      if (!prefName) {
+        return '';
+      }
+      return prefValue(prefName, '');
     }
 
     function clampTextScale(value) {
@@ -2068,7 +2127,7 @@
       }
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
       var currentNormalized = normalizeRootPath(currentRoot);
-      var ceiling = normalizeRootPath(state.rootCeiling || loadStorage('priorities.root') || '');
+      var ceiling = normalizeRootPath(state.rootCeiling || loadStorage(ROOT_KEY) || '');
       if (ceiling && currentNormalized === ceiling) {
         up.classList.add('hidden');
         return;
@@ -2088,7 +2147,7 @@
 
     function drillUp() {
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
-      var ceiling = normalizeRootPath(state.rootCeiling || loadStorage('priorities.root') || '');
+      var ceiling = normalizeRootPath(state.rootCeiling || loadStorage(ROOT_KEY) || '');
       if (ceiling && normalizeRootPath(currentRoot) === ceiling) {
         updateDrillUpVisibility();
         return;
@@ -2115,7 +2174,7 @@
       state.editingPath = '';
       state.pendingRenamePath = '';
       if (options.persistRoot !== false) {
-        saveStorage('priorities.root', state.root);
+        saveStorage(ROOT_KEY, state.root);
         state.rootCeiling = normalizeRootPath(state.root);
       }
       updateTitleFromRoot();
@@ -2126,9 +2185,19 @@
       return render();
     }
 
+    function schedulePersistRootPref(value) {
+      if (state.rootPrefSaveTimer) {
+        clearTimeout(state.rootPrefSaveTimer);
+      }
+      state.rootPrefSaveTimer = setTimeout(function () {
+        state.rootPrefSaveTimer = null;
+        saveStorage(ROOT_KEY, value);
+      }, 220);
+    }
+
     function persistRootInputOnly() {
       var value = rootInputValue();
-      saveStorage('priorities.root', value);
+      schedulePersistRootPref(value);
       state.rootCeiling = normalizeRootPath(value);
       updateTitleFromRoot();
       updateDrillUpVisibility();
@@ -2163,7 +2232,7 @@
     function showStartupIfNeeded() {
       var modal = document.getElementById('startup-modal');
       var startupPath = document.getElementById('startup-path');
-      var saved = loadStorage('priorities.root');
+      var saved = loadStorage(ROOT_KEY);
       state.rootCeiling = normalizeRootPath(saved || '');
 
       if (saved) {
@@ -2195,6 +2264,7 @@
 
     window.addEventListener('DOMContentLoaded', async function () {
       requestWindowShape();
+      await loadUiPrefs();
       state.activeTheme = String(loadStorage(THEME_KEY) || 'psionic').toLowerCase().trim();
       await loadThemes();
       applyTheme(state.activeTheme);
@@ -2235,6 +2305,10 @@
         if (state.windowAutoGrowTimer) {
           clearTimeout(state.windowAutoGrowTimer);
           state.windowAutoGrowTimer = null;
+        }
+        if (state.rootPrefSaveTimer) {
+          clearTimeout(state.rootPrefSaveTimer);
+          state.rootPrefSaveTimer = null;
         }
       });
       document.getElementById('refresh').addEventListener('click', setRootAndRefresh);

@@ -7,6 +7,8 @@ Usage: virtual-redditor-backend.sh ACTION [ARGS...]
 
 Actions:
   list-themes
+  get-ui-prefs
+  set-ui-pref KEY VALUE
   init
   status
   install
@@ -298,6 +300,57 @@ ensure_global_default_instructions_file() {
 7. Keep reversible records for every enforcement action.
 DEFAULTS
   fi
+}
+
+ui_config_file() {
+  base="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/virtual-redditor"
+  mkdir -p "$base"
+  printf '%s\n' "$base/config"
+}
+
+validate_ui_pref_key() {
+  key=${1-}
+  case "$key" in
+    [a-z0-9][a-z0-9._-]*)
+      ;;
+    *)
+      jq -cn --arg err "invalid ui pref key: $key" '{ok:false,error:$err}'
+      exit 2
+      ;;
+  esac
+}
+
+sanitize_ui_pref_value() {
+  value=${1-}
+  printf '%s' "$value" | tr '\r\n' ' '
+}
+
+write_key_value_file() {
+  file=$1
+  key=$2
+  value=$3
+
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/vr-ui-kv.XXXXXX")
+  found=0
+  if [ -f "$file" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+        "$key="*)
+          if [ "$found" -eq 0 ]; then
+            printf '%s=%s\n' "$key" "$value" >>"$tmp_file"
+            found=1
+          fi
+          ;;
+        *)
+          printf '%s\n' "$line" >>"$tmp_file"
+          ;;
+      esac
+    done <"$file"
+  fi
+  if [ "$found" -eq 0 ]; then
+    printf '%s=%s\n' "$key" "$value" >>"$tmp_file"
+  fi
+  mv "$tmp_file" "$file"
 }
 
 profile_name_from_fs() {
@@ -1170,6 +1223,27 @@ main() {
   case "$action" in
     list-themes)
       emit_theme_names
+      ;;
+
+    get-ui-prefs)
+      cfg=$(ui_config_file)
+      [ -f "$cfg" ] && cat "$cfg"
+      ;;
+
+    set-ui-pref)
+      key=${1-}
+      value=${2-}
+      if [ -z "$key" ]; then
+        jq -cn '{ok:false,error:"set-ui-pref requires KEY VALUE"}'
+        exit 2
+      fi
+      validate_ui_pref_key "$key"
+      value=$(sanitize_ui_pref_value "$value")
+      cfg=$(ui_config_file)
+      [ -f "$cfg" ] || : >"$cfg"
+      write_key_value_file "$cfg" "$key" "$value"
+      printf 'key=%s\n' "$key"
+      printf 'value=%s\n' "$value"
       ;;
 
     init)

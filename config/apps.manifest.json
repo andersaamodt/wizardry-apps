@@ -54,7 +54,7 @@
         "ios": "com.wizardry.apps.priorities.ios",
         "android": "com.wizardry.apps.priorities.android"
       },
-      "targets": "hosted-web,macos,linux,ios,android"
+      "targets": "hosted-web,linux,ios,android,macos"
     },
     {
       "slug": "memetrader",
