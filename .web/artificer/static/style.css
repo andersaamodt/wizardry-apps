@@ -4636,6 +4636,12 @@ select:focus {
   justify-self: start;
 }
 
+.modal-actions.modal-actions-compact.dictation-install-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
 .modal-actions button,
 .link-btn {
   border: 1px solid var(--btn-border);
@@ -4656,6 +4662,11 @@ select:focus {
   cursor: not-allowed;
   pointer-events: none;
   box-shadow: none;
+}
+
+#dictation-install-status {
+  margin: 0;
+  min-width: 0;
 }
 
 .settings-hint {

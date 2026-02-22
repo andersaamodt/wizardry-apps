@@ -12548,6 +12548,7 @@
       pollDictationInstallStatus(id).catch(function (error) {
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
+        state.dictationInstallCancelling = false;
         state.dictationInstallError = error && error.message ? error.message : "Dictation install failed";
         showTransientNotice(state.dictationInstallError);
         renderUi();
@@ -12565,6 +12566,7 @@
     }
 
     state.dictationInstallBusy = true;
+    state.dictationInstallCancelling = false;
     state.dictationInstallError = "";
     state.dictationInstallJob = {
       status: "running",
@@ -12585,14 +12587,65 @@
       return pollDictationInstallStatus(String(response.job.id || "")).catch(function (error) {
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
+        state.dictationInstallCancelling = false;
         renderUi();
         throw error;
       });
     }).catch(function (error) {
       stopDictationInstallPolling();
       state.dictationInstallBusy = false;
+      state.dictationInstallCancelling = false;
       state.dictationInstallJob = null;
       state.dictationInstallError = error && error.message ? error.message : "Dictation install failed";
+      showTransientNotice(state.dictationInstallError);
+      renderUi();
+      throw error;
+    });
+  }
+
+  function cancelDictationInstall() {
+    if (!state.dictationInstallBusy) {
+      return Promise.resolve(null);
+    }
+    if (state.dictationInstallCancelling) {
+      return Promise.resolve(null);
+    }
+    var job = state.dictationInstallJob || null;
+    var action = trim(String(job && job.action ? job.action : ""));
+    var status = trim(String(job && job.status ? job.status : ""));
+    if (action === "uninstall" || (status && status !== "running")) {
+      return Promise.resolve(null);
+    }
+    var jobId = trim(String(job && job.id ? job.id : ""));
+    if (!jobId) {
+      stopDictationInstallPolling();
+      state.dictationInstallBusy = false;
+      state.dictationInstallCancelling = false;
+      state.dictationInstallJob = null;
+      renderUi();
+      return Promise.resolve(null);
+    }
+
+    state.dictationInstallCancelling = true;
+    state.dictationInstallError = "";
+    renderUi();
+    return apiPost("dictation_install_cancel", { job_id: jobId }, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not cancel dictation install");
+      }
+      stopDictationInstallPolling();
+      state.dictationInstallBusy = false;
+      state.dictationInstallCancelling = false;
+      state.dictationInstallJob = null;
+      state.dictationInstallError = "";
+      return loadDictationStatus({ silent: true }).then(function () {
+        showTransientNotice("Dictation install cancelled");
+        renderUi();
+        return response;
+      });
+    }).catch(function (error) {
+      state.dictationInstallCancelling = false;
+      state.dictationInstallError = error && error.message ? error.message : "Could not cancel dictation install";
       showTransientNotice(state.dictationInstallError);
       renderUi();
       throw error;
@@ -12608,6 +12661,7 @@
     }
 
     state.dictationInstallBusy = true;
+    state.dictationInstallCancelling = false;
     state.dictationInstallError = "";
     state.dictationInstallJob = {
       status: "running",
@@ -12621,6 +12675,7 @@
         throw new Error((response && response.error) || "Dictation uninstall failed");
       }
       state.dictationInstallBusy = false;
+      state.dictationInstallCancelling = false;
       state.dictationInstallJob = null;
       state.dictationInstalled = false;
       state.dictationBackend = "";
@@ -12634,6 +12689,7 @@
       });
     }).catch(function (error) {
       state.dictationInstallBusy = false;
+      state.dictationInstallCancelling = false;
       state.dictationInstallJob = null;
       state.dictationInstallError = error && error.message ? error.message : "Dictation uninstall failed";
       showTransientNotice(state.dictationInstallError);
@@ -12646,6 +12702,9 @@
   }
 
   function toggleDictationSoftware() {
+    if (state.dictationInstallBusy) {
+      return cancelDictationInstall();
+    }
     if (state.dictationInstalled) {
       return uninstallDictationSoftware();
     }
