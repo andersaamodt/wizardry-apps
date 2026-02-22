@@ -163,7 +163,7 @@ textarea {
 }
 
 .username-prefix {
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   color: var(--text-subtle);
   white-space: nowrap;
 }
@@ -284,6 +284,7 @@ textarea {
   margin: 0;
   min-height: 30px;
   line-height: 1;
+  font-size: 0.78rem;
 }
 
 .daemon-menu {
@@ -1262,6 +1263,17 @@ label {
   border-bottom: 0;
   padding: 6px 12px 0;
   background: color-mix(in srgb, var(--bg-soft) 86%, var(--bg-main) 14%);
+  position: relative;
+}
+
+.tabbar::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 58%, var(--line));
+  pointer-events: none;
 }
 
 .tab-btn {
@@ -1281,6 +1293,17 @@ label {
   background: var(--bg-main);
   color: var(--accent-strong);
   z-index: 2;
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--bg-main);
+  pointer-events: none;
 }
 
 .tab-btn:not(.active) {
@@ -1368,7 +1391,7 @@ label {
 
 #panel-persona #subreddit-input {
   width: 210px;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
 }
 
 #panel-persona #new-profile-name {
@@ -1489,6 +1512,10 @@ label {
   margin-bottom: 8px;
 }
 
+.behavior-schedule-row {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
 .mode-field-label {
   margin: 7px 0 0;
   font-size: 0.78rem;
@@ -1544,6 +1571,52 @@ label {
   color: var(--text-subtle);
 }
 
+.schedule-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 30px;
+}
+
+.schedule-interval-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text);
+  user-select: none;
+}
+
+.schedule-toggle input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.schedule-inline {
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+}
+
+#pass-interval-input {
+  width: 76px;
+  font-size: 0.84rem;
+  font-family: inherit;
+}
+
+#pass-interval-unit {
+  width: auto;
+  min-width: 84px;
+  font-size: 0.84rem;
+}
+
 .subreddit-field-row {
   display: inline-flex;
   align-items: center;
@@ -1574,9 +1647,15 @@ label {
 }
 
 .subreddit-prefix {
-  font-size: 0.76rem;
+  font-size: 0.84rem;
   color: var(--text-subtle);
   white-space: nowrap;
+}
+
+.subreddit-field .title-caption {
+  align-items: flex-start;
+  min-height: 0;
+  margin-top: 6px;
 }
 
 .inline-help-tip {
@@ -1668,9 +1747,9 @@ label {
   left: 0;
   right: auto;
   transform: translateX(var(--menu-shift-x));
-  min-width: max-content;
-  width: max-content;
-  max-width: min(420px, calc(100vw - 16px));
+  min-width: 230px;
+  width: auto;
+  max-width: min(320px, calc(100vw - 24px));
   z-index: 25;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -2161,6 +2240,34 @@ label {
   padding: 14px;
 }
 
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.settings-launchd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-label {
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+}
+
+.settings-form-grid label {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+}
+
+.settings-select {
+  width: min(320px, 100%);
+}
+
 .rename-sheet {
   width: min(430px, calc(100vw - 24px));
 }
@@ -2212,6 +2319,12 @@ label {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 10px;
+}
+
+#settings-global-msg {
+  margin-top: 8px;
+  min-height: 1.1rem;
 }
 
 .oauth-sheet {
