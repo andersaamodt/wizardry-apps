@@ -1,9 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="priorities-booting">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Priorities</title>
+  <style>
+    html.priorities-booting,
+    html.priorities-booting body {
+      visibility: hidden;
+    }
+
+    html.priorities-booting {
+      background: #eceaf4;
+    }
+  </style>
   <link rel="stylesheet" href="style.css">
   <link id="priorities-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=priorities20260220a">
 </head>
@@ -122,6 +132,7 @@
     var UI_SCALE_KEY = 'wizardry.priorities.uiScale';
     var TEXT_SCALE_KEY = 'wizardry.priorities.textScale';
     var ROOT_KEY = 'priorities.root';
+    var SNAPSHOT_PREF = 'startup_snapshot';
     var THEME_ASSET_VERSION = 'priorities20260220a';
     var DEFAULT_THEMES = [
       'adept', 'alchemist', 'archmage', 'athenian', 'chronomancer', 'conjurer', 'druid',
@@ -165,7 +176,9 @@
       windowAutoGrowTimer: null,
       windowSizingReady: false,
       uiPrefs: {},
-      rootPrefSaveTimer: null
+      rootPrefSaveTimer: null,
+      snapshotPrefSaveTimer: null,
+      startupSnapshotRestored: false
     };
 
     function parseKeyValueText(blob) {
@@ -188,6 +201,7 @@
       if (storageKey === FONT_KEY) return 'font';
       if (storageKey === UI_SCALE_KEY || storageKey === TEXT_SCALE_KEY) return 'ui_scale';
       if (storageKey === ROOT_KEY) return 'root';
+      if (storageKey === SNAPSHOT_PREF) return SNAPSHOT_PREF;
       return '';
     }
 
@@ -501,6 +515,99 @@
         el.classList.remove('fading-out');
         el._hideTimer = null;
       }, 220);
+    }
+
+    function revealBootUi() {
+      document.documentElement.classList.remove('priorities-booting');
+    }
+
+    function decodeSnapshotPayload(encoded) {
+      var raw = String(encoded || '').trim();
+      if (!raw) {
+        return null;
+      }
+      try {
+        return JSON.parse(decodeURIComponent(escape(window.atob(raw))));
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function encodeSnapshotPayload(payload) {
+      try {
+        return window.btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function restoreStartupSnapshotFromPrefs() {
+      var payload = decodeSnapshotPayload(prefValue(SNAPSHOT_PREF, ''));
+      if (!payload || typeof payload !== 'object') {
+        return false;
+      }
+      var root = String(payload.root || '').trim();
+      var treeHtml = typeof payload.treeHtml === 'string' ? payload.treeHtml : '';
+      if (!root || !treeHtml) {
+        return false;
+      }
+
+      var tree = treeEl();
+      var rootInput = document.getElementById('root-dir');
+      if (!tree || !rootInput) {
+        return false;
+      }
+
+      rootInput.value = root;
+      state.root = root;
+      state.expanded = Object.create(null);
+      state.expanded[root] = true;
+      tree.innerHTML = treeHtml;
+
+      var title = String(payload.title || '').trim();
+      if (title) {
+        var titleEl = document.getElementById('title-folder');
+        if (titleEl) {
+          titleEl.textContent = title;
+        }
+      }
+
+      var statusEl = document.getElementById('status');
+      if (statusEl) {
+        statusEl.textContent = String(payload.statusText || '');
+        statusEl.classList.toggle('error', payload.statusError === true);
+      }
+
+      state.startupSnapshotRestored = true;
+      return true;
+    }
+
+    function saveStartupSnapshot() {
+      var tree = treeEl();
+      var root = String(state.root || '').trim();
+      if (!tree || !root || !tree.childNodes || !tree.childNodes.length) {
+        return;
+      }
+      var statusEl = document.getElementById('status');
+      var payload = {
+        root: root,
+        title: String((document.getElementById('title-folder') || {}).textContent || ''),
+        statusText: String((statusEl || {}).textContent || ''),
+        statusError: !!(statusEl && statusEl.classList && statusEl.classList.contains('error')),
+        treeHtml: tree.innerHTML,
+        savedAt: Date.now()
+      };
+      var encoded = encodeSnapshotPayload(payload);
+      if (!encoded) {
+        return;
+      }
+      if (state.snapshotPrefSaveTimer) {
+        clearTimeout(state.snapshotPrefSaveTimer);
+      }
+      state.snapshotPrefSaveTimer = setTimeout(function () {
+        state.snapshotPrefSaveTimer = null;
+        saveStorage(SNAPSHOT_PREF, encoded);
+      }, 180);
     }
 
     function rootInputValue() {
@@ -1830,6 +1937,7 @@
           status('No priorities found.', false);
         } else {
           status('', false);
+          saveStartupSnapshot();
         }
         scheduleAutoGrowWindowWidth();
       } catch (error) {
@@ -2178,7 +2286,7 @@
         state.drillStack = [];
       }
       updateDrillUpVisibility();
-      return render();
+      return render({ suppressLoadingOverlay: !!options.suppressLoadingOverlay });
     }
 
     function schedulePersistRootPref(value) {
@@ -2234,7 +2342,7 @@
       if (saved) {
         document.getElementById('root-dir').value = saved;
         updateTitleFromRoot();
-        return setRootAndRefresh();
+        return setRootAndRefresh({ suppressLoadingOverlay: !!state.startupSnapshotRestored });
       }
 
       updateTitleFromRoot();
@@ -2260,6 +2368,7 @@
 
     window.addEventListener('DOMContentLoaded', async function () {
       requestWindowShape();
+      var bootRevealTimer = setTimeout(revealBootUi, 2500);
       await loadUiPrefs();
       state.activeTheme = String(loadStorage(THEME_KEY) || 'psionic').toLowerCase().trim();
       await loadThemes();
@@ -2268,6 +2377,10 @@
       state.fontOptions = getPlatformFontOptions();
       populateFontSelect();
       applyFontFamily(loadStorage(FONT_KEY) || '');
+      var restoredSnapshot = restoreStartupSnapshotFromPrefs();
+      if (restoredSnapshot) {
+        revealBootUi();
+      }
 
       document.getElementById('settings-toggle').addEventListener('click', function () {
         toggleSettingsPanel();
@@ -2305,6 +2418,10 @@
         if (state.rootPrefSaveTimer) {
           clearTimeout(state.rootPrefSaveTimer);
           state.rootPrefSaveTimer = null;
+        }
+        if (state.snapshotPrefSaveTimer) {
+          clearTimeout(state.snapshotPrefSaveTimer);
+          state.snapshotPrefSaveTimer = null;
         }
       });
       document.getElementById('refresh').addEventListener('click', setRootAndRefresh);
@@ -2480,6 +2597,8 @@
       };
 
       await showStartupIfNeeded();
+      clearTimeout(bootRevealTimer);
+      revealBootUi();
       state.windowSizingReady = true;
       updateDrillUpVisibility();
     });
