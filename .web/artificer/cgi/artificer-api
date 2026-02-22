@@ -5182,6 +5182,82 @@ voice_component_installed() {
   [ -f "$state_file" ] && [ -x "$python_bin" ]
 }
 
+voice_usage_bytes_for_path() {
+  target_path=$1
+  if [ ! -d "$target_path" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+  usage_kb=$(du -sk "$target_path" 2>/dev/null | awk 'NR==1 { print $1 + 0 }')
+  if [ -z "$usage_kb" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+  awk -v kb="$usage_kb" 'BEGIN { printf "%.0f", kb * 1024 }'
+}
+
+voice_runtime_usage_bytes() {
+  root=$(voice_runtime_root_path 2>/dev/null || true)
+  if [ -z "$root" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+  voice_usage_bytes_for_path "$root"
+}
+
+progress_pct_max() {
+  current=$1
+  candidate=$2
+  if [ -z "$candidate" ]; then
+    printf '%s' "$current"
+    return 0
+  fi
+  if [ -z "$current" ]; then
+    current="0"
+  fi
+  printf '%s %s\n' "$current" "$candidate" | awk '
+    {
+      a = $1 + 0
+      b = $2 + 0
+      if (b > a) a = b
+      if (a < 0) a = 0
+      if (a > 100) a = 100
+      printf "%.1f", a
+    }
+  '
+}
+
+progress_pct_from_bytes() {
+  delta_bytes=$1
+  total_bytes=$2
+  case "$delta_bytes" in
+    *[!0-9]*|"")
+      printf '%s' ""
+      return 0
+      ;;
+  esac
+  case "$total_bytes" in
+    *[!0-9]*|"")
+      printf '%s' ""
+      return 0
+      ;;
+  esac
+  awk -v delta="$delta_bytes" -v total="$total_bytes" '
+    BEGIN {
+      d = delta + 0
+      t = total + 0
+      if (t <= 0) {
+        exit 1
+      }
+      if (d < 0) d = 0
+      p = (d * 100.0) / t
+      if (p < 0) p = 0
+      if (p > 99.9) p = 99.9
+      printf "%.1f", p
+    }
+  ' 2>/dev/null || printf '%s' ""
+}
+
 voice_runtime_root_path() {
   root=$VOICE_RECOGNITION_ROOT_DIR
   root=$(trim "$root")
@@ -12939,6 +13015,7 @@ EOF
     printf '%s\n' "$install_component" > "$job_dir/component"
     printf '%s\n' "$fallback_component" > "$job_dir/fallback_component"
     printf '%s\n' "$download_size_bytes" > "$job_dir/download_size_bytes"
+    printf '%s\n' "$(voice_runtime_usage_bytes)" > "$job_dir/runtime_bytes_start"
     printf '%s\n' "running" > "$job_dir/status"
     date +%s > "$job_dir/started"
 
@@ -13054,6 +13131,7 @@ EOF_RUNNER
     selected_backend=$(read_file_line "$job_dir/backend" "$installed_component")
     fallback_used=$(read_file_line "$job_dir/fallback_used" "0")
     download_size_bytes=$(read_file_line "$job_dir/download_size_bytes" "")
+    runtime_bytes_start=$(read_file_line "$job_dir/runtime_bytes_start" "0")
     status_reason=""
 
     if [ "$status" = "running" ] && [ -n "$install_pid" ]; then
@@ -13083,6 +13161,27 @@ EOF_RUNNER
       phase=$(printf '%s\n' "$parse_result" | cut -d'|' -f1)
       progress_pct=$(printf '%s\n' "$parse_result" | cut -d'|' -f2)
       [ -n "$phase" ] || phase="downloading"
+      case "$download_size_bytes:$runtime_bytes_start" in
+        *[!0-9]*:*|*:*[!0-9]*)
+          :
+          ;;
+        *)
+          if [ "$download_size_bytes" -gt 0 ] 2>/dev/null; then
+            runtime_bytes_now=$(voice_runtime_usage_bytes)
+            case "$runtime_bytes_now" in
+              *[!0-9]*|"")
+                runtime_bytes_now=0
+                ;;
+            esac
+            runtime_bytes_delta=$((runtime_bytes_now - runtime_bytes_start))
+            if [ "$runtime_bytes_delta" -lt 0 ] 2>/dev/null; then
+              runtime_bytes_delta=0
+            fi
+            bytes_progress_pct=$(progress_pct_from_bytes "$runtime_bytes_delta" "$download_size_bytes")
+            progress_pct=$(progress_pct_max "$progress_pct" "$bytes_progress_pct")
+          fi
+          ;;
+      esac
     fi
 
     fallback_json=false
