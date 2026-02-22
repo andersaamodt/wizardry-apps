@@ -16,7 +16,10 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: radial-gradient(circle at top right, var(--light-bg, #f8f7fc), var(--bg, #eceaf4) 42%);
+  background-color: var(--bg, #eceaf4);
+  background-image: radial-gradient(circle at top right, var(--light-bg, #f8f7fc), var(--bg, #eceaf4) 42%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text, #2a2e47);
   font-family: var(--app-font-family, "Avenir Next", "Segoe UI", sans-serif);
   font-size: calc(16px * var(--ui-scale));
@@ -57,6 +60,7 @@ textarea {
   width: 100%;
   margin: 0 auto;
   min-height: 100vh;
+  background-color: var(--bg, #eceaf4);
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
