@@ -275,38 +275,39 @@
     [self.webView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [rootView addSubview:self.webView];
 
-    // Keep title controls clickable while providing draggable regions that do
-    // not overlap interactive tab controls.
+    // Keep interactive controls clickable while exposing explicit drag-only areas.
     if (prefersSideDragZones) {
-        // Leave the center top area non-draggable for tab interactions.
-        CGFloat leftWidth = 96.0;
-        CGFloat rightWidth = 192.0;
-        if (leftWidth > frame.size.width) {
-            leftWidth = frame.size.width;
-        }
-        if (rightWidth > frame.size.width - leftWidth) {
-            rightWidth = MAX(0.0, frame.size.width - leftWidth);
-        }
+        // 1) Thin top strip: draggable above controls.
+        CGFloat topStripHeight = 12.0;
+        NSRect topStripFrame = NSMakeRect(0.0,
+                                          frame.size.height - topStripHeight,
+                                          frame.size.width,
+                                          topStripHeight);
+        NSView *topStrip = [[WizardryDragStripView alloc] initWithFrame:topStripFrame];
+        [topStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [topStrip setWantsLayer:YES];
+        topStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:topStrip];
 
-        NSRect leftStripFrame = NSMakeRect(0.0,
+        // 2) Header center gap: draggable between tabs and right-side controls.
+        CGFloat leftReserved = 380.0;
+        CGFloat rightReserved = 210.0;
+        CGFloat gapWidth = frame.size.width - leftReserved - rightReserved;
+        if (gapWidth < 32.0) {
+            gapWidth = 32.0;
+        }
+        if (leftReserved + gapWidth > frame.size.width) {
+            gapWidth = MAX(0.0, frame.size.width - leftReserved);
+        }
+        NSRect centerGapFrame = NSMakeRect(leftReserved,
                                            frame.size.height - dragStripHeight,
-                                           leftWidth,
+                                           gapWidth,
                                            dragStripHeight);
-        NSView *leftStrip = [[WizardryDragStripView alloc] initWithFrame:leftStripFrame];
-        [leftStrip setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-        [leftStrip setWantsLayer:YES];
-        leftStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-        [rootView addSubview:leftStrip];
-
-        NSRect rightStripFrame = NSMakeRect(frame.size.width - rightWidth,
-                                            frame.size.height - dragStripHeight,
-                                            rightWidth,
-                                            dragStripHeight);
-        NSView *rightStrip = [[WizardryDragStripView alloc] initWithFrame:rightStripFrame];
-        [rightStrip setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
-        [rightStrip setWantsLayer:YES];
-        rightStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-        [rootView addSubview:rightStrip];
+        NSView *centerGapStrip = [[WizardryDragStripView alloc] initWithFrame:centerGapFrame];
+        [centerGapStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [centerGapStrip setWantsLayer:YES];
+        centerGapStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:centerGapStrip];
     } else {
         CGFloat stripX = 0.0;
         CGFloat dragStripWidth = self.enableNativeViewMenu ? 140.0 : 320.0;
