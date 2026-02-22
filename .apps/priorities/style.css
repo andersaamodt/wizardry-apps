@@ -682,6 +682,22 @@ button:hover {
   -webkit-user-select: none;
 }
 
+.tree.reordering .echelon-block {
+  z-index: 0;
+}
+
+.tree.reordering .echelon-block.reorder-host {
+  z-index: 2;
+}
+
+.tree.reordering .row[data-path] {
+  z-index: 0;
+}
+
+.tree.reordering .row[data-path].row-moving {
+  z-index: 3 !important;
+}
+
 .row .name,
 .row .name-edit {
   user-select: text;

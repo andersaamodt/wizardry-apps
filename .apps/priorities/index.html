@@ -1780,11 +1780,15 @@
       var consumedAnimMatches = Object.create(null);
       var rows = treeEl().querySelectorAll('.row[data-path]');
       for (var ri = 0; ri < rows.length; ri += 1) {
-        rows[ri].style.zIndex = '1';
+        rows[ri].classList.remove('row-moving');
       }
-      var clearRowZIndexes = function () {
+      var clearReorderClasses = function () {
         for (var rz = 0; rz < rows.length; rz += 1) {
-          rows[rz].style.zIndex = '';
+          rows[rz].classList.remove('row-moving');
+        }
+        var liftedBlocks = tree.querySelectorAll('.echelon-block.reorder-host');
+        for (var lb = 0; lb < liftedBlocks.length; lb += 1) {
+          liftedBlocks[lb].classList.remove('reorder-host');
         }
       };
       var moved = [];
@@ -1823,7 +1827,7 @@
         });
       }
       if (!moved.length) {
-        clearRowZIndexes();
+        clearReorderClasses();
         tree.classList.remove('reordering');
         endReorderAnimationBarrier();
         return;
@@ -1834,7 +1838,6 @@
       var easing = 'cubic-bezier(0.2, 0.75, 0.2, 1)';
       var remaining = moved.length;
       var finished = false;
-      var activeReorderPath = String(state.pendingPrioritizePath || '').trim();
 
       var finalizeOne = function (row) {
         row.style.transition = '';
@@ -1842,14 +1845,14 @@
         row.style.transformOrigin = '';
         row.style.willChange = '';
         row.style.backfaceVisibility = '';
-        row.style.zIndex = '';
+        row.classList.remove('row-moving');
         if (row._reorderHostBlock) {
           var hostBlock = row._reorderHostBlock;
           var liftCount = Number(hostBlock._reorderLiftCount) || 0;
           liftCount = liftCount > 0 ? (liftCount - 1) : 0;
           hostBlock._reorderLiftCount = liftCount;
           if (liftCount === 0) {
-            hostBlock.style.zIndex = '';
+            hostBlock.classList.remove('reorder-host');
           }
           row._reorderHostBlock = null;
         }
@@ -1868,7 +1871,7 @@
         if (remaining <= 0 && !finished) {
           finished = true;
           clearTimeout(safetyTimer);
-          clearRowZIndexes();
+          clearReorderClasses();
           tree.classList.remove('reordering');
           endReorderAnimationBarrier();
         }
@@ -1893,7 +1896,7 @@
           }
           finalizeOne(safetyRow);
         }
-        clearRowZIndexes();
+        clearReorderClasses();
         tree.classList.remove('reordering');
         endReorderAnimationBarrier();
       }, durationMs + 220);
@@ -1902,20 +1905,18 @@
         for (var j = 0; j < moved.length; j += 1) {
           (function runRowAnimation(m) {
             var movedRow = m.row;
-            var movedRowPath = String(movedRow.getAttribute('data-path') || '').trim();
-            var movingZ = movedRowPath && activeReorderPath && movedRowPath === activeReorderPath ? '2147483647' : '2147483646';
             var rowScaleX = Number(m.scaleX) || 1;
             var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
             movedRow.style.willChange = 'transform';
             movedRow.style.backfaceVisibility = 'hidden';
             movedRow.style.transformOrigin = 'top left';
-            movedRow.style.zIndex = movingZ;
+            movedRow.classList.add('row-moving');
             var reorderHostBlock = movedRow.closest('.echelon-block');
             if (reorderHostBlock) {
               var hostLiftCount = Number(reorderHostBlock._reorderLiftCount) || 0;
               hostLiftCount += 1;
               reorderHostBlock._reorderLiftCount = hostLiftCount;
-              reorderHostBlock.style.zIndex = '2147483645';
+              reorderHostBlock.classList.add('reorder-host');
               movedRow._reorderHostBlock = reorderHostBlock;
             }
             if (movedRow._reorderAnimation) {
