@@ -21,7 +21,7 @@ last_drip=$(config-get "$state" last_drip_epoch 2>/dev/null || printf '0')
 interval_hours=$(blog_drip_interval_hours)
 interval_minutes=$(blog_drip_interval_minutes)
 interval_seconds=$(blog_drip_interval_seconds)
-jitter=$(blog_drip_jitter_minutes)
+randomness=$(blog_drip_randomness_minutes)
 case "$last_drip" in ''|*[!0-9]*) last_drip=0 ;; esac
 
 next_drip_epoch=$((last_drip + interval_seconds))
@@ -55,7 +55,8 @@ tab=$(printf '\t')
 printf '{"success":true,'
 printf '"drip_interval_hours":%s,' "$interval_hours"
 printf '"drip_interval_minutes":%s,' "$interval_minutes"
-printf '"drip_jitter_minutes":%s,' "$jitter"
+printf '"drip_randomness_minutes":%s,' "$randomness"
+printf '"drip_jitter_minutes":%s,' "$randomness"
 printf '"next_drip_epoch":%s,' "$next_drip_epoch"
 printf '"queue":['
 

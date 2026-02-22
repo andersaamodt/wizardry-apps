@@ -200,7 +200,7 @@ test_blog_drip_interval_enforced() {
   setup_blog_fixture || return $?
 
   config-set "$site_dir/site.conf" drip_interval_hours 0.5
-  config-set "$site_dir/site.conf" drip_jitter_minutes 0
+  config-set "$site_dir/site.conf" drip_randomness_minutes 0
 
   run_cgi_post "$cgi_dir/blog-save-post" "$(auth_body_prefix)&action=queue_drip&title=Drip+A&content=First"
   case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="queue_drip A failed"; teardown_blog_fixture; return 1 ;; esac
@@ -293,14 +293,14 @@ test_blog_public_index_hides_drafts() {
 test_blog_config_and_queue_metadata() {
   setup_blog_fixture || return $?
 
-  run_cgi_post "$cgi_dir/blog-update-config" "$(auth_body_prefix)&site_title=Spec+Blog&drip_interval_hours=0.25&drip_jitter_minutes=2&feed_full_text=false&feed_items=7"
+  run_cgi_post "$cgi_dir/blog-update-config" "$(auth_body_prefix)&site_title=Spec+Blog&drip_interval_hours=0.25&drip_randomness_minutes=2&feed_full_text=false&feed_items=7"
   case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="blog-update-config should succeed"; teardown_blog_fixture; return 1 ;; esac
 
   run_cgi_get "$cgi_dir/blog-get-config" ""
   case "$CGI_BODY" in *'"site_title":"Spec Blog"'*) ;; *) TEST_FAILURE_REASON="site_title should update in config"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *'"drip_interval_hours":0.25'*) ;; *) TEST_FAILURE_REASON="drip interval hours should be 0.25"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *'"drip_interval_minutes":15'*) ;; *) TEST_FAILURE_REASON="drip interval should be 15"; teardown_blog_fixture; return 1 ;; esac
-  case "$CGI_BODY" in *'"drip_jitter_minutes":2'*) ;; *) TEST_FAILURE_REASON="drip jitter should be 2"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *'"drip_randomness_minutes":2'*) ;; *) TEST_FAILURE_REASON="drip randomness should be 2"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *'"feed_full_text":false'*) ;; *) TEST_FAILURE_REASON="feed_full_text should be false"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *'"feed_items":7'*) ;; *) TEST_FAILURE_REASON="feed_items should be 7"; teardown_blog_fixture; return 1 ;; esac
 
@@ -311,7 +311,7 @@ test_blog_config_and_queue_metadata() {
   run_cgi_post "$cgi_dir/blog-list-queue" "$(auth_body_prefix)"
   case "$CGI_BODY" in *'"drip_interval_hours":0.25'*) ;; *) TEST_FAILURE_REASON="queue response should include updated drip interval hours"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *'"drip_interval_minutes":15'*) ;; *) TEST_FAILURE_REASON="queue response should include updated drip interval"; teardown_blog_fixture; return 1 ;; esac
-  case "$CGI_BODY" in *'"drip_jitter_minutes":2'*) ;; *) TEST_FAILURE_REASON="queue response should include updated drip jitter"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *'"drip_randomness_minutes":2'*) ;; *) TEST_FAILURE_REASON="queue response should include updated drip randomness"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *"$queued_id"*) ;; *) TEST_FAILURE_REASON="queued draft should appear in queue listing"; teardown_blog_fixture; return 1 ;; esac
 
   teardown_blog_fixture
@@ -641,6 +641,48 @@ test_blog_open_post_redirects() {
   teardown_blog_fixture
 }
 
+test_blog_account_update_and_player_name() {
+  setup_blog_fixture || return $?
+
+  mkdir -p "$data_dir/ssh-auth/users/testuser/delegates"
+  user_profile="$data_dir/ssh-auth/users/testuser/profile.conf"
+  config-set "$user_profile" username testuser
+  config-set "$user_profile" fingerprint user-fingerprint
+  config-set "$user_profile" is_admin false
+
+  user_token="test-user-session-token"
+  user_csrf="test-user-csrf-token"
+  user_session_file="$data_dir/ssh-auth/sessions/$user_token.conf"
+  now_epoch=$(date +%s)
+  config-set "$user_session_file" username testuser
+  config-set "$user_session_file" fingerprint user-fingerprint
+  config-set "$user_session_file" csrf_token "$user_csrf"
+  config-set "$user_session_file" created_at "$now_epoch"
+  config-set "$user_session_file" expires_at "$((now_epoch + 3600))"
+  config-set "$user_session_file" is_admin false
+
+  run_cgi_post "$cgi_dir/blog-update-account" "session_token=$user_token&csrf_token=$user_csrf&player_name=Test+User"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="blog-update-account should save player_name for authenticated user"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *'"player_name":"Test User"'*) ;; *) TEST_FAILURE_REASON="blog-update-account should echo saved player_name"; teardown_blog_fixture; return 1 ;; esac
+
+  saved_name=$(config-get "$user_profile" player_name 2>/dev/null || printf '')
+  if [ "$saved_name" != "Test User" ]; then
+    TEST_FAILURE_REASON="player_name should be stored in profile"
+    teardown_blog_fixture
+    return 1
+  fi
+
+  run_cgi_get "$cgi_dir/ssh-auth-check-session" "session_token=$user_token"
+  case "$CGI_BODY" in *'"authenticated":true'*) ;; *) TEST_FAILURE_REASON="check-session should authenticate user session"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *'"player_name":"Test User"'*) ;; *) TEST_FAILURE_REASON="check-session should include updated player_name"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *'"is_admin":false'*) ;; *) TEST_FAILURE_REASON="non-admin session should remain non-admin"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-update-account" "session_token=$user_token&csrf_token=$user_csrf&player_name=%21bad"
+  case "$CGI_BODY" in *'invalid_player_name'*) ;; *) TEST_FAILURE_REASON="blog-update-account should reject invalid player_name"; teardown_blog_fixture; return 1 ;; esac
+
+  teardown_blog_fixture
+}
+
 run_test_case "blog scheduler publishes due scheduled drafts" test_blog_draft_scheduler_flow
 run_test_case "blog drip interval is global and enforced" test_blog_drip_interval_enforced
 run_test_case "blog media upload works and csrf is enforced" test_blog_media_upload_and_auth_csrf
@@ -655,5 +697,6 @@ run_test_case "blog passkey register resolves stable username" test_blog_passkey
 run_test_case "blog archive endpoint renders grouped posts" test_blog_archive_endpoint_renders_posts
 run_test_case "blog post-context endpoint returns post metadata" test_blog_post_context_endpoint
 run_test_case "blog open-post redirects to post html" test_blog_open_post_redirects
+run_test_case "blog account update persists player name" test_blog_account_update_and_player_name
 
 finish_tests

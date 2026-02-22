@@ -19,6 +19,7 @@ Commands:
   set-app-icon [ROOT_HINT] APP_SLUG DATA_URL
   set-workspace-icon [ROOT_HINT] WORKSPACE_PATH DATA_URL
   build-desktop [ROOT_HINT] APP_SLUG
+  install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID] [LINUX_INSTALL_MODE]
   run-desktop [ROOT_HINT] APP_SLUG [RUN_MODE]
   run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
   serve-hosted-web [ROOT_HINT] MODE REF
@@ -361,6 +362,29 @@ config_field() {
   else
     printf '%s\n' "$fallback"
   fi
+}
+
+kv_read() {
+  key=$1
+  awk -F= -v k="$key" '
+    $1 == k {
+      sub(/^[^=]*=/, "", $0)
+      print
+      exit
+    }
+  '
+}
+
+normalize_linux_install_mode() {
+  value=${1-}
+  case "$value" in
+    appimage-local-bin|appdir-local-share)
+      printf '%s\n' "$value"
+      ;;
+    *)
+      printf '%s\n' "appdir-local-share"
+      ;;
+  esac
 }
 
 sanitize_bundle_component() {
@@ -894,12 +918,143 @@ APP
 
       printf 'app_name=%s\n' "$slug"
       printf 'host=%s\n' "$host_bin"
+      printf 'appdir=%s\n' "$appdir"
       printf 'artifact=%s\n' "$artifact"
       ;;
 
     *)
       printf '%s\n' "forge-backend: unsupported desktop OS: $os" >&2
       exit 1
+      ;;
+  esac
+}
+
+cmd_install_desktop() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  target_id=${3-}
+  linux_install_mode=$(normalize_linux_install_mode "${4-}")
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: install-desktop requires APP_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+
+  os=$(os_id)
+  case "$os" in
+    darwin)
+      expected_target=macos
+      ;;
+    linux)
+      expected_target=linux
+      ;;
+    *)
+      printf '%s\n' "forge-backend: install-desktop is only supported on macOS and Linux hosts" >&2
+      exit 1
+      ;;
+  esac
+
+  if [ -n "$target_id" ] && [ "$target_id" != "$expected_target" ]; then
+    printf '%s\n' "forge-backend: install-desktop target '$target_id' does not match current host '$expected_target'" >&2
+    exit 2
+  fi
+
+  build_out=$(cmd_build_desktop "$root" "$slug")
+  artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
+  app_name=$(printf '%s\n' "$build_out" | kv_read app_name)
+  appdir=$(printf '%s\n' "$build_out" | kv_read appdir)
+  [ -n "$artifact" ] || {
+    printf '%s\n' "forge-backend: build-desktop did not return an artifact path" >&2
+    exit 1
+  }
+
+  case "$os" in
+    darwin)
+      [ -d "$artifact" ] || {
+        printf '%s\n' "forge-backend: expected macOS app bundle artifact, got: $artifact" >&2
+        exit 1
+      }
+      bundle_name=$(basename "$artifact")
+      install_path="/Applications/$bundle_name"
+      rm -rf "$install_path"
+      if command -v ditto >/dev/null 2>&1; then
+        ditto "$artifact" "$install_path"
+      else
+        cp -R "$artifact" "$install_path"
+      fi
+
+      printf 'status=ok\n'
+      printf 'target=macos\n'
+      printf 'install_mode=system-applications\n'
+      printf 'artifact=%s\n' "$artifact"
+      printf 'installed=%s\n' "$install_path"
+      printf 'app_name=%s\n' "$app_name"
+      ;;
+
+    linux)
+      launcher_dir="$HOME/.local/bin"
+      launcher_path="$launcher_dir/wizardry-$slug"
+      mkdir -p "$launcher_dir"
+
+      case "$linux_install_mode" in
+        appimage-local-bin)
+          case "$artifact" in
+            *.AppImage) ;;
+            *)
+              printf '%s\n' "forge-backend: Linux install mode appimage-local-bin requires appimagetool (artifact was: $artifact)" >&2
+              exit 1
+              ;;
+          esac
+          cp "$artifact" "$launcher_path"
+          chmod +x "$launcher_path"
+          install_path="$launcher_path"
+          ;;
+
+        appdir-local-share)
+          [ -n "$appdir" ] || {
+            printf '%s\n' "forge-backend: build-desktop did not return an AppDir path for Linux install" >&2
+            exit 1
+          }
+          [ -d "$appdir" ] || {
+            printf '%s\n' "forge-backend: Linux AppDir not found: $appdir" >&2
+            exit 1
+          }
+          install_root="$HOME/.local/share/wizardry-apps/$slug"
+          rm -rf "$install_root"
+          mkdir -p "$(dirname "$install_root")"
+          cp -R "$appdir" "$install_root"
+          cat > "$launcher_path" <<LAUNCHER
+#!/bin/sh
+set -eu
+exec "$install_root/AppRun" "\$@"
+LAUNCHER
+          chmod +x "$launcher_path"
+          install_path="$install_root"
+
+          desktop_dir="$HOME/.local/share/applications"
+          desktop_file="$desktop_dir/wizardry-$slug.desktop"
+          mkdir -p "$desktop_dir"
+          icon_path="$install_root/usr/share/$slug/assets/forge-icon.png"
+          cat > "$desktop_file" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=$app_name
+Exec=$launcher_path
+Terminal=false
+Categories=Development;
+Icon=$icon_path
+DESKTOP
+          ;;
+      esac
+
+      printf 'status=ok\n'
+      printf 'target=linux\n'
+      printf 'install_mode=%s\n' "$linux_install_mode"
+      printf 'artifact=%s\n' "$artifact"
+      printf 'launcher=%s\n' "$launcher_path"
+      printf 'installed=%s\n' "$install_path"
+      [ -n "${install_root-}" ] && printf 'install_root=%s\n' "$install_root"
+      [ -n "${desktop_file-}" ] && printf 'desktop_entry=%s\n' "$desktop_file"
       ;;
   esac
 }
@@ -2077,6 +2232,9 @@ case "$cmd" in
     ;;
   run-desktop)
     cmd_run_desktop "${2-}" "${3-}" "${4-}"
+    ;;
+  install-desktop)
+    cmd_install_desktop "${2-}" "${3-}" "${4-}" "${5-}"
     ;;
   run-workspace)
     cmd_run_workspace "${2-}" "${3-}" "${4-}"

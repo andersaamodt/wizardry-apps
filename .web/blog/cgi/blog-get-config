@@ -14,7 +14,7 @@ site_title=$(config-get "$blog_site_conf" site_title 2>/dev/null || printf 'My B
 theme=$(config-get "$blog_site_conf" theme 2>/dev/null || printf 'archmage')
 drip_interval_hours=$(blog_drip_interval_hours)
 drip_interval_minutes=$(blog_drip_interval_minutes)
-drip_jitter=$(blog_drip_jitter_minutes)
+drip_randomness=$(blog_drip_randomness_minutes)
 feed_full_text=$(config-get "$blog_site_conf" feed_full_text 2>/dev/null || printf 'true')
 feed_items=$(config-get "$blog_site_conf" feed_items 2>/dev/null || printf '50')
 
@@ -28,7 +28,8 @@ printf '"site_title":"%s",' "$(blog_json_escape "$site_title")"
 printf '"theme":"%s",' "$(blog_json_escape "$theme")"
 printf '"drip_interval_hours":%s,' "$drip_interval_hours"
 printf '"drip_interval_minutes":%s,' "$drip_interval_minutes"
-printf '"drip_jitter_minutes":%s,' "$drip_jitter"
+printf '"drip_randomness_minutes":%s,' "$drip_randomness"
+printf '"drip_jitter_minutes":%s,' "$drip_randomness"
 printf '"feed_full_text":%s,' "$feed_full_text"
 printf '"feed_items":%s' "$feed_items"
 printf '}\n'

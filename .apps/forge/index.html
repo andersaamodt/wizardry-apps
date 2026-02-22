@@ -66,6 +66,18 @@
             <pre id="toolchain-summary" class="mono">Waiting for workspace check.</pre>
           </article>
 
+          <article id="linux-install-card" class="card hidden">
+            <h3>Linux Install</h3>
+            <p class="sub">Choose what Install does for Linux desktop targets on this machine.</p>
+            <label for="settings-linux-install-mode">Install behavior</label>
+            <div class="input-row">
+              <select id="settings-linux-install-mode">
+                <option value="appdir-local-share">AppDir in ~/.local/share + launcher</option>
+                <option value="appimage-local-bin">AppImage in ~/.local/bin launcher</option>
+              </select>
+            </div>
+          </article>
+
           <article class="card">
             <h3>Debug Info</h3>
             <pre id="doctor" class="mono">Waiting for workspace check.</pre>
@@ -305,6 +317,7 @@
       var PROJECTS_ROOT_KEY = 'wizardry.forge.projects.root';
       var ORGANIZE_SHOW_KEY = 'wizardry.forge.organize.show';
       var THEME_KEY = 'wizardry.forge.theme';
+      var LINUX_INSTALL_MODE_KEY = 'wizardry.forge.linux.install.mode';
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
       var ASSET_VERSION = 'forge20260218a';
@@ -319,6 +332,7 @@
         apps: [],
         workspaces: [],
         organizeShow: loadStorage(ORGANIZE_SHOW_KEY) || 'both',
+        linuxInstallMode: normalizeLinuxInstallMode(loadStorage(LINUX_INSTALL_MODE_KEY)),
         themes: ['psionic'],
         activeTheme: loadStorage(THEME_KEY) || 'psionic',
         selectedBuiltIn: '',
@@ -376,6 +390,13 @@
         if (/^(builtin|workspace):/.test(state.selectedCatalog)) {
           saveStorage(SELECTED_CATALOG_KEY, state.selectedCatalog);
         }
+      }
+
+      function normalizeLinuxInstallMode(value) {
+        if (value === 'appimage-local-bin' || value === 'appdir-local-share') {
+          return value;
+        }
+        return 'appdir-local-share';
       }
 
       function backendScript() {
@@ -1870,6 +1891,24 @@
         return state.os === 'darwin' ? 'macos' : (state.os === 'linux' ? 'linux' : '');
       }
 
+      function linuxInstallModeLabel(mode) {
+        if (mode === 'appimage-local-bin') {
+          return 'AppImage in ~/.local/bin';
+        }
+        return 'AppDir in ~/.local/share + launcher';
+      }
+
+      function syncLinuxInstallSettingsUI() {
+        var isLinux = state.os === 'linux';
+        if (els.linuxInstallCard) {
+          els.linuxInstallCard.classList.toggle('hidden', !isLinux);
+        }
+        if (!els.settingsLinuxInstallMode) {
+          return;
+        }
+        els.settingsLinuxInstallMode.value = normalizeLinuxInstallMode(state.linuxInstallMode);
+      }
+
       function hasEnabledHostRunTarget(selected) {
         if (!selected) {
           return false;
@@ -2244,6 +2283,34 @@
           });
           rowActions.appendChild(runBtn);
 
+          var hostTarget = hostTargetId();
+          var canInstall = (
+            selected.kind === 'builtin' &&
+            active &&
+            supported &&
+            !!hostTarget &&
+            spec.id === hostTarget
+          );
+          if (canInstall) {
+            var installBtn = document.createElement('button');
+            installBtn.type = 'button';
+            installBtn.className = 'row-mini row-install';
+            if (spec.id === 'macos') {
+              installBtn.title = 'Install into /Applications';
+            } else {
+              installBtn.title = 'Install (' + linuxInstallModeLabel(normalizeLinuxInstallMode(state.linuxInstallMode)) + ')';
+            }
+            installBtn.setAttribute('aria-label', installBtn.title);
+            installBtn.textContent = 'Install';
+            installBtn.disabled = state.busy;
+            installBtn.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              perform('Install target', function () { return installTargetAction(selected, spec.id); }, { swallow: true, keepResult: true });
+            });
+            rowActions.appendChild(installBtn);
+          }
+
           if (spec.id === 'ios' || spec.id === 'android') {
             var mobileBtn = document.createElement('button');
             mobileBtn.type = 'button';
@@ -2443,6 +2510,57 @@
         await runWorkspaceItem(selected);
       }
 
+      async function installTargetAction(selected, targetId) {
+        if (!selected) {
+          throw new Error('Select an app first');
+        }
+        if (selected.kind !== 'builtin') {
+          throw new Error('Install is currently available for built-in apps only.');
+        }
+        var hostTarget = hostTargetId();
+        if (!hostTarget) {
+          throw new Error('Install is only available on macOS and Linux hosts.');
+        }
+        if (targetId !== hostTarget) {
+          throw new Error('Install is only available for the current platform target.');
+        }
+        var enabled = activeTargetIds(selected);
+        if (enabled.indexOf(targetId) < 0) {
+          throw new Error('Enable this target before installing.');
+        }
+
+        var args = [selected.id, targetId];
+        if (state.os === 'linux') {
+          args.push(normalizeLinuxInstallMode(state.linuxInstallMode));
+        }
+        var res = await backend('install-desktop', args);
+        var out = kv(res.stdout || '');
+        var installPath = String(out.installed || '').trim();
+        var launcherPath = String(out.launcher || '').trim();
+        var projectKey = selected.key || ('builtin:' + selected.id);
+        setTargetRuntime(projectKey, targetId, 'installed', installPath || launcherPath || '');
+        renderSelectedTargetsEditor(selectedCatalogItem());
+
+        var summary = selected.title + ' installed for ' + (targetId === 'macos' ? 'macOS' : 'Linux') + '.';
+        var installHelp = targetId === 'macos'
+          ? 'Install copies the .app bundle into /Applications.'
+          : ('Install mode: ' + linuxInstallModeLabel(normalizeLinuxInstallMode(state.linuxInstallMode)) + '.');
+        renderResult({
+          status: 'ok',
+          summary: summary,
+          paths: [
+            out.artifact ? { label: 'Built artifact', path: out.artifact, canReveal: true } : null,
+            installPath ? { label: 'Installed path', path: installPath, canReveal: true } : null,
+            launcherPath ? { label: 'Launcher', path: launcherPath, canReveal: true } : null,
+            out.desktop_entry ? { label: 'Desktop entry', path: out.desktop_entry, canReveal: true } : null
+          ].filter(Boolean),
+          help: {
+            title: 'Install details',
+            body: installHelp
+          }
+        });
+      }
+
       function setArtifacts(_lines) {
         return;
       }
@@ -2575,6 +2693,7 @@
         state.homeDir = info.home || '';
         state.tools = info;
         syncToolchainUI();
+        syncLinuxInstallSettingsUI();
 
         if (info.root) {
           setWorkspaceRoot(info.root);
@@ -3496,6 +3615,15 @@
           });
         }
 
+        if (els.settingsLinuxInstallMode) {
+          els.settingsLinuxInstallMode.addEventListener('change', function () {
+            state.linuxInstallMode = normalizeLinuxInstallMode(els.settingsLinuxInstallMode.value);
+            saveStorage(LINUX_INSTALL_MODE_KEY, state.linuxInstallMode);
+            syncLinuxInstallSettingsUI();
+            toast('Linux install behavior updated', 'ok');
+          });
+        }
+
         if (els.clearLog) {
           els.clearLog.addEventListener('click', function (event) {
             event.preventDefault();
@@ -3805,6 +3933,8 @@
         els.installXcodeClt = document.getElementById('install-xcode-clt');
         els.refreshToolchain = document.getElementById('refresh-toolchain');
         els.toolchainSummary = document.getElementById('toolchain-summary');
+        els.linuxInstallCard = document.getElementById('linux-install-card');
+        els.settingsLinuxInstallMode = document.getElementById('settings-linux-install-mode');
         els.doctor = document.getElementById('doctor');
 
         els.toast = document.getElementById('toast');
@@ -3816,6 +3946,7 @@
         document.body.classList.remove('layout-recovery');
         cacheElements();
         syncToolchainUI();
+        syncLinuxInstallSettingsUI();
         syncLogClearVisibility();
         bindButtons();
         bindKeyboardShortcuts();

@@ -294,12 +294,50 @@ blog_validate_username() {
   esac
 }
 
+blog_validate_player_name() {
+  name=$(printf '%s' "${1-}" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')
+  [ -n "$name" ] || return 1
+  len=$(printf '%s' "$name" | wc -c | tr -d ' ')
+  [ "$len" -le 40 ] || return 1
+  printf '%s\n' "$name" | grep -Eq '^[A-Za-z0-9._ -]+$'
+}
+
 blog_user_dir() {
   printf '%s/%s\n' "$blog_users_dir" "$1"
 }
 
 blog_user_profile() {
   printf '%s/profile.conf\n' "$(blog_user_dir "$1")"
+}
+
+blog_get_player_name() {
+  username=${1-}
+  if [ -z "$username" ]; then
+    return 1
+  fi
+  profile=$(blog_user_profile "$username")
+  player_name=""
+  if [ -f "$profile" ]; then
+    player_name=$(config-get "$profile" player_name 2>/dev/null || printf '')
+  fi
+  if [ -z "$player_name" ]; then
+    player_name=$username
+  fi
+  printf '%s\n' "$player_name"
+}
+
+blog_set_player_name() {
+  username=${1-}
+  player_name=${2-}
+  if [ -z "$username" ] || [ -z "$player_name" ]; then
+    return 1
+  fi
+  dir=$(blog_user_dir "$username")
+  profile=$(blog_user_profile "$username")
+  mkdir -p "$dir/delegates"
+  config-set "$profile" username "$username"
+  config-set "$profile" player_name "$player_name"
+  config-set "$profile" updated_at "$(blog_now_iso)"
 }
 
 blog_find_username_by_fingerprint() {
@@ -794,13 +832,20 @@ blog_drip_interval_seconds() {
   printf '%s\n' $((interval_minutes * 60))
 }
 
-blog_drip_jitter_minutes() {
-  jitter=$(config-get "$blog_site_conf" drip_jitter_minutes 2>/dev/null || printf '0')
-  case "$jitter" in ''|*[!0-9]*) jitter=0 ;; esac
-  if [ "$jitter" -lt 0 ]; then
-    jitter=0
+blog_drip_randomness_minutes() {
+  randomness=$(config-get "$blog_site_conf" drip_randomness_minutes 2>/dev/null || printf '')
+  if [ -z "$randomness" ]; then
+    randomness=$(config-get "$blog_site_conf" drip_jitter_minutes 2>/dev/null || printf '0')
   fi
-  printf '%s\n' "$jitter"
+  case "$randomness" in ''|*[!0-9]*) randomness=0 ;; esac
+  if [ "$randomness" -lt 0 ]; then
+    randomness=0
+  fi
+  printf '%s\n' "$randomness"
+}
+
+blog_drip_jitter_minutes() {
+  blog_drip_randomness_minutes
 }
 
 blog_run_scheduler() {
@@ -816,7 +861,7 @@ blog_run_scheduler() {
   state=$(blog_scheduler_state)
 
   interval_seconds=$(blog_drip_interval_seconds)
-  jitter=$(blog_drip_jitter_minutes)
+  randomness=$(blog_drip_randomness_minutes)
 
   last_drip=$(config-get "$state" last_drip_epoch 2>/dev/null || printf '0')
   case "$last_drip" in ''|*[!0-9]*) last_drip=0 ;; esac
@@ -894,8 +939,8 @@ blog_run_scheduler() {
         if [ -n "$published_file" ]; then
           blog_delete_draft "$draft_id"
           drip_published=1
-          jitter_minutes=$(blog_random_int "$jitter")
-          config-set "$state" last_drip_epoch "$((now_epoch + jitter_minutes * 60))"
+          randomness_minutes=$(blog_random_int "$randomness")
+          config-set "$state" last_drip_epoch "$((now_epoch + randomness_minutes * 60))"
         fi
       fi
     fi
