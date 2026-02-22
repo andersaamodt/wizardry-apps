@@ -17,9 +17,7 @@ body {
   margin: 0;
   padding: 0;
   background-color: var(--bg, #eceaf4);
-  background-image: radial-gradient(circle at top right, var(--light-bg, #f8f7fc), var(--bg, #eceaf4) 42%);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-image: none;
   color: var(--text, #2a2e47);
   font-family: var(--app-font-family, "Avenir Next", "Segoe UI", sans-serif);
   font-size: calc(16px * var(--ui-scale));
