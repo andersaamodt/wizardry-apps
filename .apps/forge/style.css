@@ -1385,6 +1385,15 @@ input[type="checkbox"]:disabled {
   cursor: pointer;
 }
 
+.path-link::before {
+  content: "📂";
+  display: inline-block;
+  width: 0.95rem;
+  margin-right: 0.24rem;
+  text-align: center;
+  line-height: 1;
+}
+
 .path-link:hover {
   color: var(--toolbar-text);
   border-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
@@ -1409,6 +1418,7 @@ input[type="checkbox"]:disabled {
   content: "📂";
   width: 0.95rem;
   height: 0.95rem;
+  margin-right: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
