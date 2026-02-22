@@ -2307,7 +2307,11 @@
                 }
               }
 
-              resolve(output || String(reader.result || ''));
+              if (output && output.length <= maxArgChars) {
+                resolve(output);
+                return;
+              }
+              reject(new Error('Icon is too large/complex to process. Try a simpler image or SVG.'));
             };
             img.onerror = function () {
               resolve(String(reader.result || ''));
