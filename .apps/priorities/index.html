@@ -1593,6 +1593,9 @@
           checkSlot.classList.add('project-open');
         }
       }
+      checkSlot.addEventListener('click', function (event) {
+        event.stopPropagation();
+      });
 
       var checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -1798,6 +1801,9 @@
           if (event.target.closest('.chk')) {
             return;
           }
+          if (event.target.closest('.check-slot')) {
+            return;
+          }
           if (event.target.closest('.btn.more') || event.target.closest('.btn.trash') || event.target.closest('.row-menu')) {
             return;
           }
@@ -1822,6 +1828,9 @@
         });
         row.addEventListener('dblclick', function (event) {
           if (event.target.closest('.btn')) {
+            return;
+          }
+          if (event.target.closest('.check-slot')) {
             return;
           }
           if (state.rowClickTimer) {
