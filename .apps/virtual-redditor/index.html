@@ -356,10 +356,8 @@
         </div>
       </div>
       <div class="settings-actions">
-        <button id="btn-settings-install" type="button" class="soft">Install daemon</button>
-        <button id="btn-settings-uninstall" type="button" class="soft">Uninstall daemon</button>
-        <button id="btn-settings-start" type="button" class="soft">Start daemon</button>
-        <button id="btn-settings-stop" type="button" class="soft">Stop daemon</button>
+        <button id="btn-settings-install-toggle" type="button" class="soft">Install daemon</button>
+        <button id="btn-settings-run-toggle" type="button" class="soft">Start daemon</button>
       </div>
       <div id="settings-global-msg" class="status-line"></div>
     </div>
@@ -1145,10 +1143,8 @@
 
     function renderGlobalSettingsModal() {
       var pill = document.getElementById('settings-daemon-pill');
-      var installBtn = document.getElementById('btn-settings-install');
-      var uninstallBtn = document.getElementById('btn-settings-uninstall');
-      var startBtn = document.getElementById('btn-settings-start');
-      var stopBtn = document.getElementById('btn-settings-stop');
+      var installBtn = document.getElementById('btn-settings-install-toggle');
+      var runBtn = document.getElementById('btn-settings-run-toggle');
       var launchd = (((state.status || {}).launchd) || {});
       var installed = !!launchd.installed;
       var loaded = !!launchd.loaded;
@@ -1165,10 +1161,14 @@
           pill.className = 'status-chip';
         }
       }
-      if (installBtn) installBtn.disabled = installed;
-      if (uninstallBtn) uninstallBtn.disabled = !installed;
-      if (startBtn) startBtn.disabled = !installed || loaded;
-      if (stopBtn) stopBtn.disabled = !loaded;
+      if (installBtn) {
+        installBtn.textContent = installed ? 'Uninstall daemon' : 'Install daemon';
+        installBtn.disabled = false;
+      }
+      if (runBtn) {
+        runBtn.textContent = loaded ? 'Stop daemon' : 'Start daemon';
+        runBtn.disabled = !installed;
+      }
       var saveGlobalInstructionsBtn = document.getElementById('btn-settings-save-global-instructions');
       if (saveGlobalInstructionsBtn) {
         saveGlobalInstructionsBtn.disabled = !!state.globalInstructionsSaving || (state.globalInstructions === state.globalInstructionsRemote);
@@ -3198,46 +3198,34 @@
       document.getElementById('btn-settings-save-global-instructions').addEventListener('click', function () {
         saveGlobalInstructions();
       });
-      document.getElementById('btn-settings-install').addEventListener('click', function () {
-        setGlobalSettingsMessage('Installing daemon...', false);
-        backendJson('install', []).then(function () {
+      document.getElementById('btn-settings-install-toggle').addEventListener('click', function () {
+        var launchd = (((state.status || {}).launchd) || {});
+        var installed = !!launchd.installed;
+        var action = installed ? 'uninstall' : 'install';
+        var pendingMsg = installed ? 'Uninstalling daemon...' : 'Installing daemon...';
+        var doneMsg = installed ? 'Daemon uninstalled.' : 'Daemon installed.';
+        setGlobalSettingsMessage(pendingMsg, false);
+        backendJson(action, []).then(function () {
           return fullRefresh();
         }).then(function () {
           renderGlobalSettingsModal();
-          setGlobalSettingsMessage('Daemon installed.', false);
+          setGlobalSettingsMessage(doneMsg, false);
         }).catch(function (error) {
           setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
         });
       });
-      document.getElementById('btn-settings-uninstall').addEventListener('click', function () {
-        setGlobalSettingsMessage('Uninstalling daemon...', false);
-        backendJson('uninstall', []).then(function () {
+      document.getElementById('btn-settings-run-toggle').addEventListener('click', function () {
+        var launchd = (((state.status || {}).launchd) || {});
+        var loaded = !!launchd.loaded;
+        var action = loaded ? 'stop' : 'start';
+        var pendingMsg = loaded ? 'Stopping daemon...' : 'Starting daemon...';
+        var doneMsg = loaded ? 'Daemon stopped.' : 'Daemon started.';
+        setGlobalSettingsMessage(pendingMsg, false);
+        backendJson(action, []).then(function () {
           return fullRefresh();
         }).then(function () {
           renderGlobalSettingsModal();
-          setGlobalSettingsMessage('Daemon uninstalled.', false);
-        }).catch(function (error) {
-          setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
-        });
-      });
-      document.getElementById('btn-settings-start').addEventListener('click', function () {
-        setGlobalSettingsMessage('Starting daemon...', false);
-        backendJson('start', []).then(function () {
-          return fullRefresh();
-        }).then(function () {
-          renderGlobalSettingsModal();
-          setGlobalSettingsMessage('Daemon started.', false);
-        }).catch(function (error) {
-          setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
-        });
-      });
-      document.getElementById('btn-settings-stop').addEventListener('click', function () {
-        setGlobalSettingsMessage('Stopping daemon...', false);
-        backendJson('stop', []).then(function () {
-          return fullRefresh();
-        }).then(function () {
-          renderGlobalSettingsModal();
-          setGlobalSettingsMessage('Daemon stopped.', false);
+          setGlobalSettingsMessage(doneMsg, false);
         }).catch(function (error) {
           setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
         });
