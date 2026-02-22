@@ -153,6 +153,7 @@
       root: '.',
       expanded: Object.create(null),
       cache: Object.create(null),
+      cacheAliases: Object.create(null),
       pendingNextAction: Object.create(null),
       busy: false,
       pendingPrioritizePath: '',
@@ -902,11 +903,63 @@
       return 0;
     }
 
+    function cacheKeyForDir(dir) {
+      var key = normalizeRootPath(dir);
+      return key || '.';
+    }
+
+    function cacheAliasForDir(dir) {
+      var key = cacheKeyForDir(dir);
+      return state.cacheAliases[key] || '';
+    }
+
+    function rememberDirAlias(dir, items) {
+      if (!items || !items.length) {
+        return;
+      }
+      var key = cacheKeyForDir(dir);
+      var parentFromItems = parentDirOfPath(items[0] && items[0].path);
+      var absKey = cacheKeyForDir(parentFromItems);
+      if (!key || !absKey || key === absKey) {
+        return;
+      }
+      state.cacheAliases[key] = absKey;
+      state.cacheAliases[absKey] = absKey;
+    }
+
+    function getCachedDirItems(dir) {
+      var key = cacheKeyForDir(dir);
+      var alias = cacheAliasForDir(dir);
+      if (state.cache[key]) {
+        return state.cache[key];
+      }
+      if (alias && state.cache[alias]) {
+        return state.cache[alias];
+      }
+      if (state.cache[dir]) {
+        return state.cache[dir];
+      }
+      return null;
+    }
+
+    function setCachedDirItems(dir, items) {
+      var key = cacheKeyForDir(dir);
+      state.cache[key] = items;
+      if (dir !== key) {
+        state.cache[dir] = items;
+      }
+      rememberDirAlias(dir, items);
+      var alias = cacheAliasForDir(dir);
+      if (alias && alias !== key) {
+        state.cache[alias] = items;
+      }
+    }
+
     function applyPrioritizeQuickToCache(dir, path, quickData) {
       if (!dir || !path || !quickData) {
         return false;
       }
-      var items = state.cache[dir];
+      var items = getCachedDirItems(dir);
       if (!items || !items.length) {
         return false;
       }
@@ -936,14 +989,14 @@
       if (!dir) {
         return;
       }
-      state.cache[dir] = parseListOutput(result && result.stdout);
+      setCachedDirItems(dir, parseListOutput(result && result.stdout));
     }
 
     function removeCachedItemByPath(dir, path) {
       if (!dir || !path) {
         return false;
       }
-      var items = state.cache[dir];
+      var items = getCachedDirItems(dir);
       if (!Array.isArray(items) || !items.length) {
         return false;
       }
@@ -973,11 +1026,11 @@
         var listResult = await runBackend(['list', parentDir]);
         parsed = parseListOutput(listResult && listResult.stdout);
       }
-      state.cache[parentDir] = parsed;
+      setCachedDirItems(parentDir, parsed);
     }
 
     function getNextActionLabel(path) {
-      var items = state.cache[path];
+      var items = getCachedDirItems(path);
       if (!items || !items.length) {
         return '';
       }
@@ -1028,12 +1081,12 @@
     }
 
     function prefetchNextAction(path) {
-      if (!path || state.cache[path] || state.pendingNextAction[path]) {
+      if (!path || getCachedDirItems(path) || state.pendingNextAction[path]) {
         return;
       }
       state.pendingNextAction[path] = true;
       listDir(path).then(function (items) {
-        state.cache[path] = items;
+        setCachedDirItems(path, items);
         upsertNextActionForPath(path);
       }).catch(function () {
         // Ignore preview prefetch failures.
@@ -1167,7 +1220,13 @@
         if (!dir) {
           continue;
         }
+        var key = cacheKeyForDir(dir);
+        var alias = state.cacheAliases[key];
         delete state.cache[dir];
+        delete state.cache[key];
+        if (alias) {
+          delete state.cache[alias];
+        }
       }
     }
 
@@ -1798,7 +1857,7 @@
 
       left.appendChild(checkSlot);
 
-      if (item.kind === 'dir' && item.hasSubpriorities && !state.cache[item.path] && !state.pendingNextAction[item.path]) {
+      if (item.kind === 'dir' && item.hasSubpriorities && !getCachedDirItems(item.path) && !state.pendingNextAction[item.path]) {
         prefetchNextAction(item.path);
       }
 
@@ -1993,7 +2052,7 @@
           state.rowClickTimer = setTimeout(function () {
             var wasOpen = !!state.expanded[item.path];
             var willOpen = !wasOpen;
-            if (willOpen && !state.cache[item.path]) {
+            if (willOpen && !getCachedDirItems(item.path)) {
               expandWithSpinner(item.path);
             } else {
               state.expanded[item.path] = willOpen;
@@ -2094,10 +2153,10 @@
     }
 
     async function renderDir(container, dir, depth, options) {
-      var items = state.cache[dir];
+      var items = getCachedDirItems(dir);
       if (!items) {
         items = await listDir(dir);
-        state.cache[dir] = items;
+        setCachedDirItems(dir, items);
       }
 
       var insertedAddRow = false;
@@ -2220,7 +2279,7 @@
       try {
         await render({ suppressLoadingOverlay: true, deferPendingExpandPath: path });
         var items = await listDir(path);
-        state.cache[path] = items;
+        setCachedDirItems(path, items);
       } catch (error) {
         state.expanded[path] = false;
         status(String(error && error.message ? error.message : error), true);
@@ -2240,6 +2299,7 @@
         await fn();
         if (options.invalidateAllCache) {
           state.cache = Object.create(null);
+          state.cacheAliases = Object.create(null);
         } else {
           invalidateCachedDirs(options.invalidateDirs || []);
         }
@@ -2380,7 +2440,8 @@
           return;
         }
         var parentDir = parentDirOfPath(path);
-        var previousItems = Array.isArray(state.cache[parentDir]) ? state.cache[parentDir].slice() : null;
+        var cachedParentItems = getCachedDirItems(parentDir);
+        var previousItems = Array.isArray(cachedParentItems) ? cachedParentItems.slice() : null;
         var removedOptimistically = removeCachedItemByPath(parentDir, path);
         if (removedOptimistically) {
           render({ suppressLoadingOverlay: true, preserveInputSelection: true });
@@ -2392,7 +2453,7 @@
             ['remove', path]
           ).catch(function (error) {
             if (removedOptimistically && previousItems) {
-              state.cache[parentDir] = previousItems;
+              setCachedDirItems(parentDir, previousItems);
               render({ suppressLoadingOverlay: true, preserveInputSelection: true });
             }
             throw error;
@@ -2553,6 +2614,7 @@
       state.expanded = Object.create(null);
       state.expanded[state.root] = true;
       state.cache = Object.create(null);
+      state.cacheAliases = Object.create(null);
       state.revealedMakeProjectPath = '';
       state.pendingMakeProjectPath = '';
       state.openMenuPath = '';
