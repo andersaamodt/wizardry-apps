@@ -930,11 +930,11 @@
     function getCachedDirItems(dir) {
       var key = cacheKeyForDir(dir);
       var alias = cacheAliasForDir(dir);
-      if (state.cache[key]) {
-        return state.cache[key];
-      }
       if (alias && state.cache[alias]) {
         return state.cache[alias];
+      }
+      if (state.cache[key]) {
+        return state.cache[key];
       }
       if (state.cache[dir]) {
         return state.cache[dir];
