@@ -2420,8 +2420,17 @@
       input.value = state.pendingAddText;
       input.disabled = !!state.pendingAdd;
       bindStandardTextboxBehavior(input);
+      var addBtn = null;
+      var updateAddButtonDisabled = function () {
+        if (!addBtn) {
+          return;
+        }
+        var hasName = String(input.value || '').trim().length > 0;
+        addBtn.disabled = !!state.pendingAdd || !hasName;
+      };
       input.addEventListener('input', function () {
         state.pendingAddText = input.value;
+        updateAddButtonDisabled();
       });
       input.addEventListener('keydown', function (event) {
         if ((event.metaKey || event.ctrlKey) && String(event.key || '').toLowerCase() === 'a') {
@@ -2437,14 +2446,14 @@
       var right = document.createElement('div');
       right.className = 'right';
 
-      var addBtn = document.createElement('button');
+      addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'add-inline-btn';
       addBtn.textContent = state.pendingAdd ? '' : '+';
       if (state.pendingAdd) {
         addBtn.classList.add('loading');
       }
-      addBtn.disabled = !!state.pendingAdd;
+      updateAddButtonDisabled();
       addBtn.title = 'Add priority';
       addBtn.addEventListener('click', function () {
         addAtRoot(input.value);
