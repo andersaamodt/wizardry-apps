@@ -749,37 +749,73 @@
       el.textContent = folderNameFromPath(rootInputValue());
     }
 
+    function detectBackendScriptCandidates() {
+      var out = [];
+      try {
+        var pagePath = decodeURIComponent(String(window.location && window.location.pathname ? window.location.pathname : ''));
+        var appMarker = '/priorities/index.html';
+        var appIdx = pagePath.lastIndexOf(appMarker);
+        if (appIdx > 0) {
+          out.push(pagePath.slice(0, appIdx) + '/priorities/scripts/priorities-backend.sh');
+        }
+        var marker = '/.apps/priorities/';
+        var idx = pagePath.lastIndexOf(marker);
+        if (idx > 0) {
+          out.push(pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh');
+        }
+      } catch (_) {
+        // Ignore detection failures.
+      }
+      var deduped = [];
+      for (var i = 0; i < out.length; i += 1) {
+        var candidate = String(out[i] || '').trim();
+        if (!candidate) {
+          continue;
+        }
+        if (deduped.indexOf(candidate) >= 0) {
+          continue;
+        }
+        deduped.push(candidate);
+      }
+      return deduped;
+    }
+
+    function isMissingBackendScriptError(error) {
+      var msg = String(error && error.message ? error.message : error).toLowerCase();
+      return msg.indexOf('priorities-backend.sh') >= 0
+        && (msg.indexOf('no such file') >= 0 || msg.indexOf('cannot open') >= 0 || msg.indexOf('not found') >= 0);
+    }
+
     async function runBackend(args) {
-      var argv;
-      if (!state.backendScriptPath) {
-        try {
-          var pagePath = decodeURIComponent(String(window.location && window.location.pathname ? window.location.pathname : ''));
-          var appMarker = '/priorities/index.html';
-          var appIdx = pagePath.lastIndexOf(appMarker);
-          if (appIdx > 0) {
-            state.backendScriptPath = pagePath.slice(0, appIdx) + '/priorities/scripts/priorities-backend.sh';
-          } else {
-            var marker = '/.apps/priorities/';
-            var idx = pagePath.lastIndexOf(marker);
-            if (idx > 0) {
-              state.backendScriptPath = pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh';
-            }
-          }
-        } catch (_) {
-          state.backendScriptPath = '';
+      var candidates = [];
+      if (state.backendScriptPath) {
+        candidates.push(state.backendScriptPath);
+      }
+      var detected = detectBackendScriptCandidates();
+      for (var i = 0; i < detected.length; i += 1) {
+        if (candidates.indexOf(detected[i]) < 0) {
+          candidates.push(detected[i]);
         }
       }
-      if (state.backendScriptPath) {
-        argv = ['sh', state.backendScriptPath].concat(args);
-      } else {
-        argv = [
-          'sh',
-          '-c',
-          'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/.apps/priorities/scripts/priorities-backend.sh" "$@"',
-          'priorities-backend'
-        ].concat(args);
+      for (var c = 0; c < candidates.length; c += 1) {
+        var scriptPath = candidates[c];
+        try {
+          var byPathResult = await bridgeExec(['sh', scriptPath].concat(args));
+          state.backendScriptPath = scriptPath;
+          return byPathResult;
+        } catch (error) {
+          if (!isMissingBackendScriptError(error)) {
+            throw error;
+          }
+        }
       }
-      return bridgeExec(argv);
+      state.backendScriptPath = '';
+      return bridgeExec([
+        'sh',
+        '-c',
+        'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/.apps/priorities/scripts/priorities-backend.sh" "$@"',
+        'priorities-backend'
+      ].concat(args));
     }
 
     function parseListOutput(text) {
@@ -1696,14 +1732,17 @@
           expPlaceholderProject.className = 'exp-placeholder exp-placeholder-collapsed';
           expPlaceholderProject.setAttribute('aria-hidden', 'true');
           left.appendChild(expPlaceholderProject);
+        } else if (!hasChildren) {
+          var expPlaceholderNoChildren = document.createElement('span');
+          expPlaceholderNoChildren.className = 'exp-placeholder exp-placeholder-collapsed';
+          expPlaceholderNoChildren.setAttribute('aria-hidden', 'true');
+          left.appendChild(expPlaceholderNoChildren);
         } else {
-          var expand = makeButton(hasChildren ? (open ? '▾' : '▸') : '·', 'btn exp', function () {
+          var expand = makeButton(open ? '▾' : '▸', 'btn exp', function () {
             // Row click handles toggling; this keeps the symbol as a visual affordance.
-          }, hasChildren ? 'Expand/collapse' : '');
+          }, 'Expand/collapse');
           if (expandLoading) {
             setExpandButtonBusy(expand, true);
-          } else if (!hasChildren) {
-            expand.disabled = true;
           }
           left.appendChild(expand);
         }
@@ -2153,7 +2192,6 @@
           status('', false);
           saveStartupSnapshot();
         }
-        scheduleAutoGrowWindowWidth();
       } catch (error) {
         status(String(error && error.message ? error.message : error), true);
       } finally {

@@ -23,9 +23,11 @@ assert_contains() {
 }
 
 # Backend resolution must support bundled app path and workspace path.
+assert_contains "function detectBackendScriptCandidates()"
 assert_contains "var appMarker = '/priorities/index.html';"
-assert_contains "state.backendScriptPath = pagePath.slice(0, appIdx) + '/priorities/scripts/priorities-backend.sh';"
-assert_contains "state.backendScriptPath = pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh';"
+assert_contains "out.push(pagePath.slice(0, appIdx) + '/priorities/scripts/priorities-backend.sh');"
+assert_contains "out.push(pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh');"
+assert_contains "function isMissingBackendScriptError(error)"
 
 # Copy button contract.
 assert_contains "id=\"copy-markdown\""
