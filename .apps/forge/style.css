@@ -1334,7 +1334,7 @@ input[type="checkbox"]:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   max-width: min(14rem, 34vw);
-  column-gap: 0.38rem;
+  column-gap: 0.5rem;
   margin-top: 0;
   margin-left: auto;
   min-width: 0;
@@ -1361,8 +1361,8 @@ input[type="checkbox"]:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 1.28rem;
-  margin-right: 0.42rem;
+  min-width: 1.45rem;
+  margin-right: 0.56rem;
   cursor: pointer;
 }
 
@@ -1374,10 +1374,10 @@ input[type="checkbox"]:disabled {
 }
 
 .path-link.is-compact {
-  width: 1.28rem;
-  min-width: 1.28rem;
-  max-width: 1.28rem;
-  margin-right: 0.42rem;
+  width: 1.45rem;
+  min-width: 1.45rem;
+  max-width: 1.45rem;
+  margin-right: 0.56rem;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -1388,25 +1388,25 @@ input[type="checkbox"]:disabled {
 
 .path-link.is-compact::before {
   content: "📂";
-  width: 0.8rem;
-  height: 0.8rem;
+  width: 0.95rem;
+  height: 0.95rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: 0.84rem;
   line-height: 1;
 }
 
 .selected-path-row .terminal-icon {
-  margin-left: 0.08rem;
+  margin-left: 0.14rem;
 }
 
 .terminal-icon {
-  width: 1.28rem;
-  height: 1.28rem;
-  min-width: 1.28rem;
-  min-height: 1.28rem;
-  flex: 0 0 1.28rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  min-width: 1.45rem;
+  min-height: 1.45rem;
+  flex: 0 0 1.45rem;
   flex-shrink: 0;
   border: 0;
   border-radius: 4px;
@@ -1423,10 +1423,10 @@ input[type="checkbox"]:disabled {
 }
 
 .terminal-icon img {
-  width: 0.9rem;
-  height: 0.9rem;
-  min-width: 0.9rem;
-  min-height: 0.9rem;
+  width: 1.02rem;
+  height: 1.02rem;
+  min-width: 1.02rem;
+  min-height: 1.02rem;
   object-fit: contain;
   display: block;
 }
