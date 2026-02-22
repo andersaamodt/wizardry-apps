@@ -6669,7 +6669,28 @@
     });
 
     if (el.installDictationBtn) {
-      on(el.installDictationBtn, "click", function () {
+      on(el.installDictationBtn, "click", function (event) {
+        if (event) {
+          event.preventDefault();
+        }
+        // Flip to cancelling visuals immediately on click, before async work.
+        if (state.dictationInstallBusy && !state.dictationInstallCancelling) {
+          state.dictationInstallCancelling = true;
+          state.dictationInstallPendingCancel = false;
+          if (el.installDictationBtn) {
+            el.installDictationBtn.textContent = "Cancelling...";
+            el.installDictationBtn.disabled = true;
+            el.installDictationBtn.classList.add("ui-pending-spinner");
+          }
+          if (el.dictationInstallStatus) {
+            el.dictationInstallStatus.textContent = "Cancelling dictation download...";
+            el.dictationInstallStatus.classList.remove("hidden");
+            el.dictationInstallStatus.classList.remove("error");
+            el.dictationInstallStatus.classList.add("status-pending-spinner");
+          }
+          cancelDictationInstall().catch(showError);
+          return;
+        }
         toggleDictationSoftware().catch(showError);
       });
     }
