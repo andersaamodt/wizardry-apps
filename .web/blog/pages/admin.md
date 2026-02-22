@@ -135,16 +135,46 @@ title: Blog Admin
 <label for="post-content"><strong>Content</strong></label>
 <div class="editor-shell">
 <div class="toolbar" aria-label="Markdown toolbar">
-<button type="button" data-toolbar="bold" aria-label="Bold"><strong>B</strong></button>
-<button type="button" data-toolbar="italic" aria-label="Italic"><em>I</em></button>
-<button type="button" data-toolbar="h2" aria-label="Heading 2">H2</button>
-<button type="button" data-toolbar="h3" aria-label="Heading 3">H3</button>
-<button type="button" data-toolbar="code" aria-label="Inline code">Code</button>
-<button type="button" data-toolbar="link" aria-label="Insert link">Link</button>
-<button type="button" data-toolbar="quote" aria-label="Quote">Quote</button>
-<button type="button" data-toolbar="ul" aria-label="Bullet list">UL</button>
-<button type="button" data-toolbar="ol" aria-label="Numbered list">OL</button>
-<button type="button" data-toolbar="image" aria-label="Insert image">Image</button>
+<button type="button" data-toolbar="bold" aria-label="Bold" title="Bold">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M8 5H13.2C15.3 5 17 6.7 17 8.8C17 10.9 15.3 12.6 13.2 12.6H8V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 12.4H14.1C16.3 12.4 18 14.1 18 16.3C18 18.4 16.3 20 14.1 20H8V12.4Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+<span class="sr-only">Bold</span>
+</button>
+<button type="button" data-toolbar="italic" aria-label="Italic" title="Italic">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M14 4H10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 20H8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 4L10 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+<span class="sr-only">Italic</span>
+</button>
+<button type="button" data-toolbar="h2" aria-label="Heading 2" title="Heading 2">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M3 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><text x="14.2" y="16.4" font-size="9.5" font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">2</text></svg>
+<span class="sr-only">Heading 2</span>
+</button>
+<button type="button" data-toolbar="h3" aria-label="Heading 3" title="Heading 3">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M3 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 6V18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><text x="14.2" y="16.4" font-size="9.5" font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">3</text></svg>
+<span class="sr-only">Heading 3</span>
+</button>
+<button type="button" data-toolbar="code" aria-label="Inline code" title="Inline code">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M9 7L4 12L9 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7L20 12L15 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<span class="sr-only">Inline code</span>
+</button>
+<button type="button" data-toolbar="link" aria-label="Insert link" title="Insert link">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M9.4 14.6L7.2 16.8C5.5 18.5 2.8 18.5 1.2 16.8C-0.5 15.2 -0.5 12.5 1.2 10.8L3.4 8.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" transform="translate(3 0)"/><path d="M14.6 9.4L16.8 7.2C18.5 5.5 21.2 5.5 22.8 7.2C24.5 8.8 24.5 11.5 22.8 13.2L20.6 15.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" transform="translate(-3 0)"/><path d="M8.5 15.5L15.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+<span class="sr-only">Insert link</span>
+</button>
+<button type="button" data-toolbar="quote" aria-label="Quote" title="Quote">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M6 9H10V13H7V16H10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 9H18V13H15V16H18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<span class="sr-only">Quote</span>
+</button>
+<button type="button" data-toolbar="ul" aria-label="Bullet list" title="Bullet list">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="7" r="1.5" fill="currentColor"/><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="5" cy="17" r="1.5" fill="currentColor"/><path d="M10 7H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 12H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+<span class="sr-only">Bullet list</span>
+</button>
+<button type="button" data-toolbar="ol" aria-label="Numbered list" title="Numbered list">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><text x="2.4" y="9.2" font-size="7.3" font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">1</text><text x="2.2" y="18.2" font-size="7.3" font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">2</text><path d="M10 7H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+<span class="sr-only">Numbered list</span>
+</button>
+<button type="button" data-toolbar="image" aria-label="Insert image" title="Insert image">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="1.6" fill="currentColor"/><path d="M5.5 17L11.5 11L14.5 14L17.5 11L20.5 14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<span class="sr-only">Insert image</span>
+</button>
 </div>
 <textarea id="post-content" rows="16" placeholder="# Write in Markdown\n\nDrop images anywhere on this page to upload + insert."></textarea>
 </div>
@@ -678,27 +708,31 @@ body {
 
 .toolbar {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.18rem;
   flex-wrap: wrap;
   margin-bottom: 0;
-  padding: 0.38rem 0.44rem;
+  padding: 0.28rem 0.34rem;
   border: 0;
   border-bottom: 1px solid #d4e0f5;
   border-radius: 0;
-  background: transparent;
+  background: linear-gradient(180deg, #f9fbff 0%, #f2f6ff 100%);
 }
 
 .toolbar button {
-  min-width: 36px;
-  height: 30px;
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: #1e396e;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 650;
-  padding: 0 0.44rem;
+  padding: 0;
   box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toolbar button:hover {
@@ -710,6 +744,25 @@ body {
   outline: 0;
   background: #e8f0ff;
   box-shadow: inset 0 0 0 1px #a9c1f0;
+}
+
+.toolbar .tb-icon {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+  flex: 0 0 auto;
+}
+
+.toolbar .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .editor-shell #post-content {
@@ -1111,9 +1164,10 @@ body {
   }
 
   .toolbar button {
-    min-width: 37px;
-    height: 32px;
-    padding: 0 0.36rem;
+    width: 1.95rem;
+    min-width: 1.95rem;
+    height: 1.95rem;
+    padding: 0;
   }
 
   .compose-actions #btn-publish-now {
