@@ -1,0 +1,7 @@
+- This file is a list of atomic GUI lessons learned in Wizardry Apps, with each bullet kept brief at about one line and roughly no more than 1.5 sentences.
+- In the macOS host, transparent native drag-strip overlays can steal clicks from WebView controls even when CSS uses `no-drag`.
+- Keep drag behavior in native-host geometry, and keep click behavior in WebView controls, instead of relying on CSS alone to arbitrate both.
+- For header interactions, reserve click-safe holes only over truly interactive controls and make drag strips fill the remaining top-band area.
+- When drag and click compete, tune strip geometry incrementally with small width changes and verify in the live app, not just by static code review.
+- If a top control must support both drag-nearby and click-on-control, position drag strips around it rather than above it.
+- Regression tests should guard known host-geometry contracts so drag-strip refactors do not silently reintroduce click interception.

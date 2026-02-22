@@ -588,7 +588,7 @@
         CGFloat headerBandHeight = dragStripHeight;
         // Keep only a narrow click-safe window around title/up controls so the
         // surrounding header remains draggable.
-        CGFloat titleHoleWidth = 140.0;
+        CGFloat titleHoleWidth = 120.0;
         CGFloat rightControlsReservedWidth = 168.0;
         CGFloat leftStripWidth = floor((frame.size.width - titleHoleWidth) / 2.0);
         if (leftStripWidth < 0.0) {
