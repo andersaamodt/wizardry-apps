@@ -4651,6 +4651,13 @@ select:focus {
   justify-self: start;
 }
 
+#install-dictation-btn:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
+}
+
 .settings-hint {
   margin: 2px 0 0;
   font-size: 0.79rem;
@@ -5089,7 +5096,7 @@ select:focus {
   box-shadow: none;
 }
 
-.modal-actions button:hover,
+.modal-actions button:hover:not(:disabled),
 .link-btn:hover {
   background: var(--btn-hover-bg);
 }

@@ -5363,10 +5363,6 @@ infer_dictation_install_phase_progress() {
   phase="downloading"
   progress="0.0"
   if [ -n "$log_text" ]; then
-    if printf '%s\n' "$log_text" | grep -Eiq 'installing (ctranslate2-whisper|mlx-whisper|parakeet)'; then
-      phase="installing"
-      progress="4.0"
-    fi
     if printf '%s\n' "$log_text" | grep -Eiq 'creating virtual environment'; then
       phase="preparing"
       progress="18.0"

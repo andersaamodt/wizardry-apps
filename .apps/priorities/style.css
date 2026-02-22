@@ -686,16 +686,18 @@ button:hover {
   z-index: 0;
 }
 
-.tree.reordering .echelon-block.reorder-host {
-  z-index: 2;
+.echelon-block.reorder-host {
+  position: relative;
+  z-index: 2147483646 !important;
 }
 
 .tree.reordering .row[data-path] {
   z-index: 0;
 }
 
-.tree.reordering .row[data-path].row-moving {
-  z-index: 3 !important;
+.row[data-path].row-moving {
+  position: relative;
+  z-index: 2147483647 !important;
 }
 
 .row .name,
