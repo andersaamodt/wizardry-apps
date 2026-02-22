@@ -1737,7 +1737,8 @@
       if (!previousPositions || !previousPositions.byPath) {
         return;
       }
-      treeEl().classList.add('reordering');
+      var tree = treeEl();
+      tree.classList.add('reordering');
       var consumedAnimMatches = Object.create(null);
       var rows = treeEl().querySelectorAll('.row[data-path]');
       var moved = [];
@@ -1768,55 +1769,128 @@
         if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1 && Math.abs(widthDelta) < 0.5) {
           continue;
         }
-        row.style.willChange = 'transform,width';
-        row.style.transition = 'none';
-        row.style.backfaceVisibility = 'hidden';
-        row.style.transform = 'translate3d(' + deltaX + 'px,' + deltaY + 'px,0)';
-        if (Math.abs(widthDelta) >= 0.5 && prev.width > 0) {
-          row.style.width = prev.width + 'px';
-        }
-        row.dataset.reorderTargetWidth = nextRect.width > 0 ? String(nextRect.width) : '';
-        moved.push(row);
+        moved.push({
+          row: row,
+          deltaX: deltaX,
+          deltaY: deltaY,
+          fromWidth: prev.width,
+          toWidth: nextRect.width
+        });
       }
       if (!moved.length) {
-        treeEl().classList.remove('reordering');
+        tree.classList.remove('reordering');
         return;
       }
-      // Force styles to apply before transitioning back to natural position.
-      treeEl().getBoundingClientRect();
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-          for (var j = 0; j < moved.length; j += 1) {
-            var movedRow = moved[j];
-            movedRow.style.transition = 'transform 300ms cubic-bezier(0.2, 0.75, 0.2, 1), width 300ms cubic-bezier(0.2, 0.75, 0.2, 1)';
-            movedRow.style.transform = 'translate3d(0,0,0)';
-            if (movedRow.dataset.reorderTargetWidth) {
-              movedRow.style.width = movedRow.dataset.reorderTargetWidth + 'px';
-            }
-            movedRow.addEventListener('transitionend', function onEnd() {
-              this.style.transition = '';
-              this.style.transform = '';
-              this.style.willChange = '';
-              this.style.width = '';
-              this.style.backfaceVisibility = '';
-              delete this.dataset.reorderTargetWidth;
-              this.removeEventListener('transitionend', onEnd);
-            });
-          }
-        });
-      });
-      setTimeout(function () {
-        for (var k = 0; k < moved.length; k += 1) {
-          var movedRow = moved[k];
-          movedRow.style.transition = '';
-          movedRow.style.transform = '';
-          movedRow.style.willChange = '';
-          movedRow.style.width = '';
-          movedRow.style.backfaceVisibility = '';
-          delete movedRow.dataset.reorderTargetWidth;
+      var supportsWAAPI = !!(window.Element && Element.prototype && typeof Element.prototype.animate === 'function');
+      var durationMs = 280;
+      var easing = 'cubic-bezier(0.2, 0.75, 0.2, 1)';
+      var remaining = moved.length;
+      var finished = false;
+
+      var finalizeOne = function (row) {
+        row.style.transition = '';
+        row.style.transform = '';
+        row.style.willChange = '';
+        row.style.width = '';
+        row.style.backfaceVisibility = '';
+        row._reorderAnimation = null;
+        remaining -= 1;
+        if (remaining <= 0 && !finished) {
+          finished = true;
+          clearTimeout(safetyTimer);
+          tree.classList.remove('reordering');
         }
-        treeEl().classList.remove('reordering');
-      }, 420);
+      };
+
+      var safetyTimer = setTimeout(function () {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        for (var s = 0; s < moved.length; s += 1) {
+          var safetyRow = moved[s].row;
+          if (safetyRow._reorderAnimation) {
+            try {
+              safetyRow._reorderAnimation.onfinish = null;
+              safetyRow._reorderAnimation.oncancel = null;
+              safetyRow._reorderAnimation.cancel();
+            } catch (_) {
+              // Ignore cleanup failures.
+            }
+            safetyRow._reorderAnimation = null;
+          }
+          finalizeOne(safetyRow);
+        }
+        tree.classList.remove('reordering');
+      }, durationMs + 220);
+
+      requestAnimationFrame(function () {
+        for (var j = 0; j < moved.length; j += 1) {
+          (function runRowAnimation(m) {
+            var movedRow = m.row;
+            movedRow.style.willChange = 'transform,width';
+            movedRow.style.backfaceVisibility = 'hidden';
+            if (movedRow._reorderAnimation) {
+              try {
+                movedRow._reorderAnimation.cancel();
+              } catch (_) {
+                // Ignore.
+              }
+              movedRow._reorderAnimation = null;
+            }
+            if (supportsWAAPI) {
+              var fromFrame = {
+                transform: 'translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)'
+              };
+              var toFrame = {
+                transform: 'translate3d(0,0,0)'
+              };
+              if (Math.abs(m.fromWidth - m.toWidth) >= 0.5 && m.fromWidth > 0 && m.toWidth > 0) {
+                fromFrame.width = m.fromWidth + 'px';
+                toFrame.width = m.toWidth + 'px';
+              }
+              var anim = movedRow.animate([fromFrame, toFrame], {
+                duration: durationMs,
+                easing: easing,
+                fill: 'both'
+              });
+              movedRow._reorderAnimation = anim;
+              anim.onfinish = function () {
+                finalizeOne(movedRow);
+                if (remaining <= 0 && !finished) {
+                  finished = true;
+                  clearTimeout(safetyTimer);
+                  tree.classList.remove('reordering');
+                }
+              };
+              anim.oncancel = function () {
+                finalizeOne(movedRow);
+              };
+            } else {
+              movedRow.style.transition = 'none';
+              movedRow.style.transform = 'translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)';
+              if (Math.abs(m.fromWidth - m.toWidth) >= 0.5 && m.fromWidth > 0) {
+                movedRow.style.width = m.fromWidth + 'px';
+              }
+              movedRow.getBoundingClientRect();
+              movedRow.style.transition = 'transform ' + durationMs + 'ms ' + easing + ', width ' + durationMs + 'ms ' + easing;
+              movedRow.style.transform = 'translate3d(0,0,0)';
+              if (Math.abs(m.fromWidth - m.toWidth) >= 0.5 && m.toWidth > 0) {
+                movedRow.style.width = m.toWidth + 'px';
+              }
+              movedRow.addEventListener('transitionend', function onEnd() {
+                movedRow.removeEventListener('transitionend', onEnd);
+                finalizeOne(movedRow);
+                if (remaining <= 0 && !finished) {
+                  finished = true;
+                  clearTimeout(safetyTimer);
+                  tree.classList.remove('reordering');
+                }
+              });
+            }
+          })(moved[j]);
+        }
+      });
     }
 
     function themeLabel(name) {
