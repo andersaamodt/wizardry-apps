@@ -1685,8 +1685,18 @@
           left: rect.left,
           width: rect.width,
           path: '',
-          animKey: ''
+          animKey: '',
+          nextActionStyle: null
         };
+        var nextActionEl = row.querySelector('.next-action');
+        if (nextActionEl) {
+          var nextActionComputed = window.getComputedStyle(nextActionEl);
+          metrics.nextActionStyle = {
+            color: nextActionComputed.color,
+            backgroundColor: nextActionComputed.backgroundColor,
+            borderColor: nextActionComputed.borderColor
+          };
+        }
         var pathKey = String(row.getAttribute('data-path') || '').trim();
         if (pathKey) {
           metrics.path = pathKey;
@@ -1898,7 +1908,20 @@
             textTarget.style.willChange = '';
           }
         }
+        if (row._reorderNextActionColorTargets && row._reorderNextActionColorTargets.length) {
+          for (var n = 0; n < row._reorderNextActionColorTargets.length; n += 1) {
+            var nextActionTarget = row._reorderNextActionColorTargets[n];
+            if (!nextActionTarget) {
+              continue;
+            }
+            nextActionTarget.style.transition = '';
+            nextActionTarget.style.color = '';
+            nextActionTarget.style.backgroundColor = '';
+            nextActionTarget.style.borderColor = '';
+          }
+        }
         row._reorderTextAnimationTargets = null;
+        row._reorderNextActionColorTargets = null;
         row._reorderAnimation = null;
         remaining -= 1;
         if (remaining <= 0 && !finished) {
@@ -1970,6 +1993,34 @@
             movedRow.style.backfaceVisibility = 'hidden';
             movedRow.style.pointerEvents = 'none';
             movedRow.style.transformOrigin = 'top left';
+            movedRow._reorderNextActionColorTargets = [];
+            if (m.prev && m.prev.nextActionStyle) {
+              var prevNextActionStyle = m.prev.nextActionStyle;
+              var nextActionTargets = movedRow.querySelectorAll('.next-action');
+              for (var na = 0; na < nextActionTargets.length; na += 1) {
+                var nextActionEl = nextActionTargets[na];
+                var nextActionCurrent = window.getComputedStyle(nextActionEl);
+                var targetColor = nextActionCurrent.color;
+                var targetBackgroundColor = nextActionCurrent.backgroundColor;
+                var targetBorderColor = nextActionCurrent.borderColor;
+                var colorChanged = prevNextActionStyle.color !== targetColor;
+                var backgroundChanged = prevNextActionStyle.backgroundColor !== targetBackgroundColor;
+                var borderChanged = prevNextActionStyle.borderColor !== targetBorderColor;
+                if (!colorChanged && !backgroundChanged && !borderChanged) {
+                  continue;
+                }
+                nextActionEl.style.transition = 'none';
+                nextActionEl.style.color = prevNextActionStyle.color;
+                nextActionEl.style.backgroundColor = prevNextActionStyle.backgroundColor;
+                nextActionEl.style.borderColor = prevNextActionStyle.borderColor;
+                movedRow._reorderNextActionColorTargets.push(nextActionEl);
+                nextActionEl.getBoundingClientRect();
+                nextActionEl.style.transition = 'color ' + durationMs + 'ms ' + easing + ', background-color ' + durationMs + 'ms ' + easing + ', border-color ' + durationMs + 'ms ' + easing;
+                nextActionEl.style.color = targetColor;
+                nextActionEl.style.backgroundColor = targetBackgroundColor;
+                nextActionEl.style.borderColor = targetBorderColor;
+              }
+            }
             var rowBlock = movedRow.closest('.echelon-block');
             if (rowBlock) {
               var blockTargetZ = isPrimaryRow ? 2147483647 : 2147483646;
