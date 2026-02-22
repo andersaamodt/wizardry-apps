@@ -12,6 +12,8 @@ Actions:
   get-ui-prefs          Print UI preferences as key=value lines
   set-ui-pref KEY VALUE Persist a UI preference key=value
   list [DIR]            List prioritized items in DIR (default: current dir)
+  copy-priorities [DIR] [--expanded]
+                        Copy priorities as markdown checklist to clipboard
   prioritize PATH       Promote PATH using the prioritize spell
   prioritize-quick PATH Promote PATH and print: echelon<tab>priority<tab>checked
   check-toggle PATH     Toggle checked state using check/uncheck spells
@@ -1207,6 +1209,58 @@ emit_list() {
   emit_sorted_rows "$tmp_file"
 }
 
+markdown_lines_for_dir() {
+  dir=${1-}
+  depth=${2-0}
+  expanded=${3-0}
+  tab=$(printf '\t')
+
+  list_blob=$(emit_list "$dir")
+  [ -n "$list_blob" ] || return 0
+
+  printf '%s\n' "$list_blob" | while IFS="$tab" read -r path name kind echelon priority checked upvotes has_subpriorities; do
+    [ -n "$path" ] || continue
+    case "$checked" in
+      1) mark='x' ;;
+      *) mark=' ' ;;
+    esac
+    clean_name=$(printf '%s' "$name" | tr '\r\n' '  ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')
+    indent=''
+    i=0
+    while [ "$i" -lt "$depth" ]; do
+      indent="${indent}  "
+      i=$((i + 1))
+    done
+    printf '%s- [%s] %s\n' "$indent" "$mark" "$clean_name"
+
+    if [ "$expanded" = "1" ] && [ "$kind" = "dir" ] && [ "$has_subpriorities" = "1" ]; then
+      markdown_lines_for_dir "$path" $((depth + 1)) "$expanded"
+    fi
+  done
+}
+
+copy_text_to_clipboard() {
+  text=${1-}
+
+  if command -v pbcopy >/dev/null 2>&1; then
+    printf '%s' "$text" | pbcopy
+    return 0
+  fi
+  if command -v wl-copy >/dev/null 2>&1; then
+    printf '%s' "$text" | wl-copy
+    return 0
+  fi
+  if command -v xclip >/dev/null 2>&1; then
+    printf '%s' "$text" | xclip -selection clipboard
+    return 0
+  fi
+  if command -v xsel >/dev/null 2>&1; then
+    printf '%s' "$text" | xsel --clipboard --input
+    return 0
+  fi
+  return 1
+}
+
 prioritize_emit_impl() {
   target=$1
   auto_create=${2:-0}
@@ -1471,6 +1525,48 @@ case "$action" in
 
   list)
     emit_list "$(expand_home_path "${1:-.}")"
+    ;;
+
+  copy-priorities)
+    copy_dir='.'
+    copy_dir_set=0
+    expanded=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --expanded)
+          expanded=1
+          ;;
+        --help|--usage|-h)
+          printf '%s\n' "Usage: priorities-backend.sh copy-priorities [DIR] [--expanded]"
+          exit 0
+          ;;
+        -*)
+          printf '%s\n' "priorities-backend: unknown option for copy-priorities: $1" >&2
+          exit 2
+          ;;
+        *)
+          if [ "$copy_dir_set" = "1" ]; then
+            printf '%s\n' "priorities-backend: copy-priorities accepts at most one DIR argument" >&2
+            exit 2
+          fi
+          copy_dir=$1
+          copy_dir_set=1
+          ;;
+      esac
+      shift
+    done
+
+    copy_dir=$(expand_home_path "$copy_dir")
+    markdown=$(markdown_lines_for_dir "$copy_dir" 0 "$expanded")
+    if [ -z "$markdown" ]; then
+      printf '%s\n' "priorities-backend: no priorities found to copy in $copy_dir" >&2
+      exit 0
+    fi
+    if ! copy_text_to_clipboard "$markdown"; then
+      printf '%s\n' "priorities-backend: no clipboard command found (pbcopy, wl-copy, xclip, xsel)" >&2
+      exit 1
+    fi
+    printf '%s\n' "$markdown"
     ;;
 
   prioritize)

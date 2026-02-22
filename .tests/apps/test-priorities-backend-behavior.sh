@@ -118,6 +118,39 @@ children=$("$backend" list "$scratch/task one")
 child_row=$(row_by_name "$children" "child note")
 assert_nonempty "$child_row" "child note should exist inside converted project"
 
+copy_root="$scratch/copy-root"
+mkdir -p "$copy_root"
+"$backend" add-fast "$copy_root" "alpha" >/dev/null
+"$backend" add-fast "$copy_root" "beta" >/dev/null
+"$backend" check-toggle-fast "$copy_root/beta" >/dev/null
+"$backend" make-project "$copy_root/alpha" >/dev/null
+"$backend" add-fast "$copy_root/alpha" "alpha child" >/dev/null
+
+cat > "$fake_bin/pbcopy" <<'EOF'
+#!/bin/sh
+set -eu
+cat > "${COPY_CAPTURE_PATH:?}"
+EOF
+chmod +x "$fake_bin/pbcopy"
+
+COPY_CAPTURE_PATH="$scratch/clipboard-default.md" PATH="$fake_bin:$PATH" "$backend" copy-priorities "$copy_root" > "$scratch/stdout-default.md"
+default_md=$(cat "$scratch/stdout-default.md")
+default_clip=$(cat "$scratch/clipboard-default.md")
+assert_eq "$default_md" "$default_clip" "copy-priorities should write the same markdown to stdout and clipboard"
+printf '%s\n' "$default_md" | grep -F -- "- [ ] alpha" >/dev/null || fail "default copy should include top-level alpha"
+printf '%s\n' "$default_md" | grep -F -- "- [x] beta" >/dev/null || fail "default copy should include checked beta"
+if printf '%s\n' "$default_md" | grep -F -- "alpha child" >/dev/null; then
+  fail "default copy should not include nested child without --expanded"
+fi
+
+COPY_CAPTURE_PATH="$scratch/clipboard-expanded.md" PATH="$fake_bin:$PATH" "$backend" copy-priorities --expanded "$copy_root" > "$scratch/stdout-expanded.md"
+expanded_md=$(cat "$scratch/stdout-expanded.md")
+expanded_clip=$(cat "$scratch/clipboard-expanded.md")
+assert_eq "$expanded_md" "$expanded_clip" "expanded copy should write the same markdown to stdout and clipboard"
+printf '%s\n' "$expanded_md" | grep -F -- "- [ ] alpha" >/dev/null || fail "expanded copy should include top-level alpha"
+printf '%s\n' "$expanded_md" | grep -F -- "  - [ ] alpha child" >/dev/null || fail "expanded copy should include indented alpha child"
+printf '%s\n' "$expanded_md" | grep -F -- "- [x] beta" >/dev/null || fail "expanded copy should include checked beta"
+
 desc=$("$backend" descendant-count "$scratch/task one")
 case "$desc" in
   ''|*[!0-9]*) fail "descendant-count should return a numeric value" ;;
