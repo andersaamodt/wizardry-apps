@@ -9,6 +9,9 @@
 - A GUI action should map to one explicit backend action whenever possible.
 - Keep flows legible: users should understand what action just ran and what changed.
 - Keep startup resilient: detect bridge readiness and retry gracefully before failing hard.
+- Build GUIs with care and polish; avoid rushed or placeholder-feeling interfaces.
+- Never ship half-ass GUI work; finish layout, spacing, and state feedback details.
+- Always use app theme colors/tokens instead of ad-hoc hardcoded color choices.
 
 ## Command and Bridge Rules
 - Bridge calls use explicit argv arrays passed to `wizardry.rpc('bridge.exec', { argv })`.
