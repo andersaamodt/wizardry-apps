@@ -4935,10 +4935,14 @@
     if (action === "uninstall") {
       return "Uninstalling dictation";
     }
+    var phase = trim(String(job && job.phase ? job.phase : ""));
     var pctText = dictationProgressPercentLabel(job && job.progress_pct);
     var sizeText = dictationDownloadAmountLabel(job);
-    var label = "Downloading dictation " + pctText + "%";
-    if (sizeText) {
+    var labelPrefix = (phase === "downloading" || phase === "fallback") ?
+      "Downloading dictation " :
+      "Installing dictation ";
+    var label = labelPrefix + pctText + "%";
+    if (sizeText && (phase === "downloading" || phase === "fallback")) {
       label += " (" + sizeText + ")";
     }
     return label;
@@ -5085,7 +5089,7 @@
         el.dictationInstallStatus.textContent = "";
         el.dictationInstallStatus.classList.add("hidden");
       }
-      el.dictationInstallStatus.classList.toggle("ui-pending-spinner", statusPending);
+      el.dictationInstallStatus.classList.toggle("status-pending-spinner", statusPending);
       if (isError) {
         el.dictationInstallStatus.classList.add("error");
       } else {
