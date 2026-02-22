@@ -103,6 +103,29 @@ emit_theme_names() {
   fi
 }
 
+expand_home_path() {
+  path=${1-}
+  case "$path" in
+    "~")
+      if [ -n "${HOME-}" ]; then
+        printf '%s\n' "$HOME"
+      else
+        printf '%s\n' "$path"
+      fi
+      ;;
+    "~/"*)
+      if [ -n "${HOME-}" ]; then
+        printf '%s/%s\n' "$HOME" "${path#\~/}"
+      else
+        printf '%s\n' "$path"
+      fi
+      ;;
+    *)
+      printf '%s\n' "$path"
+      ;;
+  esac
+}
+
 action=${1-}
 if [ -z "$action" ]; then
   printf '%s\n' "priorities-backend: action required" >&2
@@ -1276,7 +1299,7 @@ case "$action" in
     ;;
 
   list)
-    emit_list "${1:-.}"
+    emit_list "$(expand_home_path "${1:-.}")"
     ;;
 
   prioritize)
@@ -1285,6 +1308,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for prioritize" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     prioritize_impl "$target" 0
     ;;
 
@@ -1294,6 +1318,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for prioritize-fast" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     prioritize_emit_impl "$target" 0
     ;;
 
@@ -1303,6 +1328,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for prioritize-quick" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     prioritize_quick_impl "$target" 0
     ;;
 
@@ -1312,6 +1338,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for check-toggle" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     check_toggle_impl "$target"
     ;;
 
@@ -1321,6 +1348,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for check-toggle-fast" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     check_toggle_impl "$target"
     emit_list "$(dirname "$target")"
     ;;
@@ -1331,6 +1359,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for make-project" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     file-to-folder "$target" >/dev/null
     printf '%s\n' "$target"
     ;;
@@ -1342,6 +1371,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: rename requires PATH and NAME" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     case "$new_name" in
       */*|*\\*)
         printf '%s\n' "priorities-backend: rename name must not include path separators" >&2
@@ -1365,6 +1395,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: rename-fast requires PATH and NAME" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     case "$new_name" in
       */*|*\\*)
         printf '%s\n' "priorities-backend: rename name must not include path separators" >&2
@@ -1388,6 +1419,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: add requires DIR and NAME" >&2
       exit 2
     fi
+    dir=$(expand_home_path "$dir")
     target=$dir/$name
     prioritize_impl "$target" 1
     ;;
@@ -1399,6 +1431,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: add-fast requires DIR and NAME" >&2
       exit 2
     fi
+    dir=$(expand_home_path "$dir")
     target=$dir/$name
     prioritize_emit_impl "$target" 1
     ;;
@@ -1409,6 +1442,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for remove" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     safe_trash_impl "$target"
     ;;
 
@@ -1418,6 +1452,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for remove-fast" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     safe_trash_impl "$target"
     emit_list "$(dirname "$target")"
     ;;
@@ -1428,6 +1463,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: path required for descendant-count" >&2
       exit 2
     fi
+    target=$(expand_home_path "$target")
     descendant_count_impl "$target"
     ;;
 
@@ -1458,6 +1494,7 @@ case "$action" in
       printf '%s\n' "priorities-backend: parent requires DIR" >&2
       exit 2
     fi
+    dir=$(expand_home_path "$dir")
     if [ ! -d "$dir" ]; then
       printf '%s\n' "priorities-backend: directory not found: $dir" >&2
       exit 1
