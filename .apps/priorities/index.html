@@ -1834,6 +1834,7 @@
       var easing = 'cubic-bezier(0.2, 0.75, 0.2, 1)';
       var remaining = moved.length;
       var finished = false;
+      var activeReorderPath = String(state.pendingPrioritizePath || '').trim();
 
       var finalizeOne = function (row) {
         row.style.transition = '';
@@ -1901,18 +1902,20 @@
         for (var j = 0; j < moved.length; j += 1) {
           (function runRowAnimation(m) {
             var movedRow = m.row;
+            var movedRowPath = String(movedRow.getAttribute('data-path') || '').trim();
+            var movingZ = movedRowPath && activeReorderPath && movedRowPath === activeReorderPath ? '2147483647' : '2147483646';
             var rowScaleX = Number(m.scaleX) || 1;
             var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
             movedRow.style.willChange = 'transform';
             movedRow.style.backfaceVisibility = 'hidden';
             movedRow.style.transformOrigin = 'top left';
-            movedRow.style.zIndex = '2147483647';
+            movedRow.style.zIndex = movingZ;
             var reorderHostBlock = movedRow.closest('.echelon-block');
             if (reorderHostBlock) {
               var hostLiftCount = Number(reorderHostBlock._reorderLiftCount) || 0;
               hostLiftCount += 1;
               reorderHostBlock._reorderLiftCount = hostLiftCount;
-              reorderHostBlock.style.zIndex = '2147483646';
+              reorderHostBlock.style.zIndex = '2147483645';
               movedRow._reorderHostBlock = reorderHostBlock;
             }
             if (movedRow._reorderAnimation) {
