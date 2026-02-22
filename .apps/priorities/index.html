@@ -1792,6 +1792,7 @@
         row.style.transformOrigin = '';
         row.style.willChange = '';
         row.style.backfaceVisibility = '';
+        row.style.zIndex = '';
         if (row._reorderTextAnimationTargets && row._reorderTextAnimationTargets.length) {
           for (var r = 0; r < row._reorderTextAnimationTargets.length; r += 1) {
             var textTarget = row._reorderTextAnimationTargets[r];
@@ -1842,6 +1843,7 @@
             movedRow.style.willChange = 'transform';
             movedRow.style.backfaceVisibility = 'hidden';
             movedRow.style.transformOrigin = 'top left';
+            movedRow.style.zIndex = '60';
             if (movedRow._reorderAnimation) {
               try {
                 movedRow._reorderAnimation.cancel();

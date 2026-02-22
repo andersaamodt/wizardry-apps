@@ -5103,8 +5103,8 @@ run_with_macos_arm64_context() {
       arch -arm64 "$@"
       return $?
     fi
-    WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$@"
-    return $?
+    printf '%s\n' "voice-recognition: native arm64 execution is unavailable" >&2
+    return 126
   fi
   "$@"
 }
@@ -5361,27 +5361,35 @@ infer_model_install_phase_progress() {
 infer_dictation_install_phase_progress() {
   log_text=$1
   phase="downloading"
-  progress="0"
+  progress="0.0"
   if [ -n "$log_text" ]; then
+    if printf '%s\n' "$log_text" | grep -Eiq 'installing (ctranslate2-whisper|mlx-whisper|parakeet)'; then
+      phase="installing"
+      progress="4.0"
+    fi
     if printf '%s\n' "$log_text" | grep -Eiq 'creating virtual environment'; then
       phase="preparing"
-      progress="18"
+      progress="18.0"
     fi
     if printf '%s\n' "$log_text" | grep -Eiq 'installing [a-z0-9-]+ packages'; then
       phase="installing"
-      progress="52"
+      progress="52.0"
     fi
     if printf '%s\n' "$log_text" | grep -Eiq 'preparing local model cache'; then
       phase="downloading"
-      progress="82"
+      progress="82.0"
     fi
     if printf '%s\n' "$log_text" | grep -Eiq 'falling back to ctranslate2-whisper'; then
       phase="fallback"
-      progress="70"
+      progress="70.0"
     fi
     if printf '%s\n' "$log_text" | grep -Eiq 'installed (ctranslate2-whisper|mlx-whisper|parakeet)'; then
       phase="finalizing"
-      progress="96"
+      progress="96.0"
+    fi
+    if printf '%s\n' "$log_text" | grep -Eiq 'already installed'; then
+      phase="finalizing"
+      progress="99.0"
     fi
   fi
   printf '%s|%s\n' "$phase" "$progress"
@@ -12912,12 +12920,15 @@ if [ "$force_macos_arm64_uname" = "1" ] && [ "$component" = "mlx-whisper" ]; the
   if command -v arch >/dev/null 2>&1 && arch -arm64 /usr/bin/true >/dev/null 2>&1; then
     run_with_timeout_compat "$timeout_sec" arch -arm64 "$component_bin" >>"$log_file" 2>&1
   else
-    run_with_timeout_compat "$timeout_sec" env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$component_bin" >>"$log_file" 2>&1
+    printf '%s\n' "voice-recognition: native arm64 execution is unavailable" >>"$log_file"
+    install_rc=126
   fi
 else
   run_with_timeout_compat "$timeout_sec" "$component_bin" >>"$log_file" 2>&1
 fi
-install_rc=$?
+if [ "${install_rc-}" != "126" ]; then
+  install_rc=$?
+fi
 set -e
 
 printf '%s\n' "$install_rc" > "$job_dir/exit_code"
@@ -13048,14 +13059,17 @@ EOF_RUNNER
       if voice_needs_macos_arm64_uname_override && voice_can_run_arch_arm64; then
         install_output=$(run_with_timeout 1800 arch -arm64 "$install_bin" 2>&1)
       elif voice_needs_macos_arm64_uname_override; then
-        install_output=$(run_with_timeout 1800 env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$install_bin" 2>&1)
+        install_output="voice-recognition: native arm64 execution is unavailable"
+        install_rc=126
       else
         install_output=$(run_with_timeout 1800 "$install_bin" 2>&1)
       fi
     else
       install_output=$(run_with_timeout 1800 "$install_bin" 2>&1)
     fi
-    install_rc=$?
+    if [ "${install_rc-}" != "126" ]; then
+      install_rc=$?
+    fi
     set -e
 
     if [ "$install_rc" -ne 0 ]; then

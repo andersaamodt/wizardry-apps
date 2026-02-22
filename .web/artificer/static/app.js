@@ -4891,20 +4891,6 @@
     state.dictationInstallReady = false;
     state.dictationInstallError = "";
     renderDictationInstallSettings();
-    var dictationReadySettled = false;
-    var dictationReadyTimer = null;
-    function markDictationReady() {
-      if (dictationReadySettled) {
-        return;
-      }
-      dictationReadySettled = true;
-      state.dictationInstallReady = true;
-      renderDictationInstallSettings();
-    }
-    dictationReadyTimer = setTimeout(function () {
-      markDictationReady();
-      dictationReadyTimer = null;
-    }, 1800);
     return Promise.all([
       loadAuthStatus().catch(function () {
         return null;
@@ -4913,11 +4899,8 @@
         return null;
       })
     ]).finally(function () {
-      if (dictationReadyTimer) {
-        clearTimeout(dictationReadyTimer);
-        dictationReadyTimer = null;
-      }
-      markDictationReady();
+      state.dictationInstallReady = true;
+      renderDictationInstallSettings();
     });
   }
 
@@ -4950,14 +4933,22 @@
     if (action === "uninstall") {
       return "Uninstalling dictation";
     }
-    var pct = clampProgressPercent(job && job.progress_pct);
-    if (pct < 0) {
-      pct = 0;
+    var pctText = dictationProgressPercentLabel(job && job.progress_pct);
+    return "Downloading dictation " + pctText + "%";
+  }
+
+  function dictationProgressPercentLabel(rawValue) {
+    var parsed = Number(rawValue);
+    if (!isFinite(parsed)) {
+      parsed = 0;
     }
-    if (pct > 100) {
-      pct = 100;
+    if (parsed < 0) {
+      parsed = 0;
     }
-    return "Downloading dictation " + String(pct) + "%";
+    if (parsed > 100) {
+      parsed = 100;
+    }
+    return parsed.toFixed(1);
   }
 
   function clampProgressPercent(rawValue) {
@@ -4981,7 +4972,6 @@
     }
 
     var job = state.dictationInstallJob || null;
-    var loading = !!state.dictationInstallInfoLoading;
     var busy = !!state.dictationInstallBusy;
     var status = String(job && job.status ? job.status : "");
     var showRunning = busy || status === "running";
@@ -4991,15 +4981,12 @@
     }
 
     el.installDictationBtn.textContent = buttonLabel;
-    el.installDictationBtn.disabled = !state.dictationInstallReady || busy;
-    el.installDictationBtn.classList.remove("ui-pending-spinner");
+    el.installDictationBtn.disabled = !state.dictationInstallReady || state.dictationInstallInfoLoading || busy;
+    el.installDictationBtn.classList.toggle("ui-pending-spinner", showRunning);
 
     if (el.dictationInstallStatus) {
       var statusText = trim(String(state.dictationInstallError || ""));
       var isError = !!statusText;
-      if (!statusText && !state.dictationInstallReady) {
-        statusText = "Preparing installer...";
-      }
       if (!statusText && state.dictationInstalled) {
         var installedLabel = dictationBackendLabel(state.dictationBackend || "");
         if (installedLabel) {
@@ -5095,8 +5082,13 @@
           if (expectedBackend && activeBackend && activeBackend !== expectedBackend && !response.job.fallback) {
             throw new Error("Dictation install finished, but " + dictationBackendLabel(expectedBackend) + " is not active.");
           }
+          var alreadyInstalled = String(response.job.log || "").toLowerCase().indexOf("already installed") >= 0;
           var backendLabel = dictationBackendLabel(activeBackend);
-          if (response.job.fallback && backendLabel) {
+          if (alreadyInstalled && backendLabel) {
+            showTransientNotice("Dictation already installed (" + backendLabel + ")");
+          } else if (alreadyInstalled) {
+            showTransientNotice("Dictation already installed");
+          } else if (response.job.fallback && backendLabel) {
             showTransientNotice("Dictation installed (" + backendLabel + " fallback)");
           } else if (backendLabel) {
             showTransientNotice("Dictation installed (" + backendLabel + ")");
@@ -5153,7 +5145,6 @@
 
   function installDictationSoftware() {
     if (!state.dictationInstallReady) {
-      showTransientNotice("Preparing installer...");
       return Promise.resolve(null);
     }
     if (state.dictationInstallBusy) {
@@ -5197,7 +5188,6 @@
 
   function uninstallDictationSoftware() {
     if (!state.dictationInstallReady) {
-      showTransientNotice("Preparing installer...");
       return Promise.resolve(null);
     }
     if (state.dictationInstallBusy) {
