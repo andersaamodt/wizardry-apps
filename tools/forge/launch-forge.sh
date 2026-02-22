@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Launch Wizardry Forge from a wizardry-apps checkout.
+# Launch App Forge from a wizardry-apps checkout.
 
 set -eu
 
@@ -15,7 +15,7 @@ while [ "$#" -gt 0 ]; do
       cat <<'USAGE'
 Usage: launch-forge.sh [--root ROOT_DIR]
 
-Launches the Wizardry Forge desktop app from this repository.
+Launches the App Forge desktop app from this repository.
 USAGE
       exit 0
       ;;
@@ -51,15 +51,15 @@ if [ "$os" = "Darwin" ]; then
   is_valid_app_bundle() {
     bundle=$1
     [ -d "$bundle" ] || return 1
-    [ -x "$bundle/Contents/MacOS/wizardry-forge" ] || return 1
+    [ -x "$bundle/Contents/MacOS/app-forge" ] || return 1
     [ -x "$bundle/Contents/MacOS/wizardry-host" ] || return 1
     return 0
   }
 
   app_path=''
   for candidate in \
-    "/Applications/Wizardry Forge.app" \
-    "$HOME/Applications/Wizardry Forge.app"; do
+    "/Applications/App Forge.app" \
+    "$HOME/Applications/App Forge.app"; do
     if is_valid_app_bundle "$candidate"; then
       app_path=$candidate
       break
@@ -67,7 +67,7 @@ if [ "$os" = "Darwin" ]; then
   done
 
   if [ -z "$app_path" ]; then
-    dev_app="$root/_tmp/workbench/dist/macos/Wizardry Forge.app"
+    dev_app="$root/_tmp/workbench/dist/macos/App Forge.app"
     sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$dev_app" >/dev/null
     app_path=$dev_app
   fi
@@ -80,12 +80,12 @@ if [ "$os" = "Darwin" ]; then
 
   if command -v open >/dev/null 2>&1; then
     if open -a "$app_path" >/dev/null 2>&1; then
-      printf '%s\n' "Wizardry Forge launched: $app_path"
+      printf '%s\n' "App Forge launched: $app_path"
       exit 0
     fi
   fi
 
-  exec "$app_path/Contents/MacOS/wizardry-forge"
+  exec "$app_path/Contents/MacOS/app-forge"
 fi
 
 state_dir=${WIZARDRY_APPS_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps}
@@ -106,5 +106,5 @@ if [ "$status" -ne 0 ]; then
 fi
 
 pid=$(printf '%s\n' "$out" | sed -n 's/^pid=//p' | head -n 1)
-printf '%s\n' "Wizardry Forge launched${pid:+ (pid $pid)}"
+printf '%s\n' "App Forge launched${pid:+ (pid $pid)}"
 printf '%s\n' "Launch log: $log_file"

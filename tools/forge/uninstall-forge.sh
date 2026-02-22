@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Remove launchers for Wizardry Forge.
+# Remove launchers for App Forge.
 
 set -eu
 
@@ -15,8 +15,8 @@ Usage: uninstall-forge.sh [--home HOME_DIR] [--system|--user] [--app-dir APP_PAT
 Removes launchers created by install-forge.sh.
 
 Defaults on macOS:
-  - Removes /Applications/Wizardry Forge.app when possible
-  - Also removes ~/Applications/Wizardry Forge.app
+  - Removes /Applications/App Forge.app when possible
+  - Also removes ~/Applications/App Forge.app
 USAGE
 }
 
@@ -57,8 +57,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-rm -f "$home_dir/.local/bin/wizardry-forge"
-rm -f "$home_dir/.local/share/applications/wizardry-forge.desktop"
+rm -f "$home_dir/.local/bin/app-forge"
+rm -f "$home_dir/.local/share/applications/app-forge.desktop"
 rm -f "$home_dir/.config/wizardry-apps/forge-root"
 
 remove_path() {
@@ -82,19 +82,19 @@ if [ "$os" = "Darwin" ]; then
   else
     case "$scope" in
       system)
-        remove_path "/Applications/Wizardry Forge.app"
+        remove_path "/Applications/App Forge.app"
         ;;
       user)
-        remove_path "$home_dir/Applications/Wizardry Forge.app"
+        remove_path "$home_dir/Applications/App Forge.app"
         ;;
       auto)
-        remove_path "/Applications/Wizardry Forge.app"
-        remove_path "$home_dir/Applications/Wizardry Forge.app"
+        remove_path "/Applications/App Forge.app"
+        remove_path "$home_dir/Applications/App Forge.app"
         ;;
     esac
   fi
 else
-  remove_path "$home_dir/Applications/Wizardry Forge.app"
+  remove_path "$home_dir/Applications/App Forge.app"
 fi
 
 printf '%s\n' "removed_user_launcher_paths_from=$home_dir"

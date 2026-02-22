@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Install launchers for Wizardry Forge.
+# Install launchers for App Forge.
 
 set -eu
 
@@ -17,12 +17,12 @@ print_usage() {
   cat <<'USAGE'
 Usage: install-forge.sh [--root ROOT_DIR] [--home HOME_DIR] [--system|--user] [--app-dir APP_PATH]
 
-Installs launchers for Wizardry Forge.
+Installs launchers for App Forge.
 
 Defaults:
   - macOS: installs app bundle to /Applications (first-class desktop app)
   - Linux: installs desktop entry to ~/.local/share/applications
-  - all platforms: installs command shim at ~/.local/bin/wizardry-forge
+  - all platforms: installs command shim at ~/.local/bin/app-forge
 
 Options:
   --system   Prefer system-wide app location on macOS (/Applications)
@@ -90,7 +90,7 @@ fi
 }
 
 mkdir -p "$home_dir/.local/bin"
-shim="$home_dir/.local/bin/wizardry-forge"
+shim="$home_dir/.local/bin/app-forge"
 config_root="$home_dir/.config/wizardry-apps"
 config_file="$config_root/forge-root"
 
@@ -108,8 +108,8 @@ os=$(uname -s 2>/dev/null || printf unknown)
 
 install_macos_bundle() {
   target=$1
-  stage_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-forge-app.XXXXXX")
-  stage_bundle="$stage_root/Wizardry Forge.app"
+  stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-app.XXXXXX")
+  stage_bundle="$stage_root/App Forge.app"
   if ! sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$stage_bundle" >/dev/null 2>&1; then
     rm -rf "$stage_root"
     return 1
@@ -154,23 +154,23 @@ case "$os" in
     else
       case "$scope" in
         system)
-          target_app="/Applications/Wizardry Forge.app"
+          target_app="/Applications/App Forge.app"
           ;;
         user)
-          target_app="$home_dir/Applications/Wizardry Forge.app"
+          target_app="$home_dir/Applications/App Forge.app"
           ;;
         auto)
           if [ "$home_explicit" -eq 1 ]; then
-            target_app="$home_dir/Applications/Wizardry Forge.app"
+            target_app="$home_dir/Applications/App Forge.app"
           else
-            target_app="/Applications/Wizardry Forge.app"
+            target_app="/Applications/App Forge.app"
           fi
           ;;
       esac
     fi
 
     if ! installed_app=$(install_macos_bundle "$target_app"); then
-      fallback_target="$home_dir/Applications/Wizardry Forge.app"
+      fallback_target="$home_dir/Applications/App Forge.app"
       installed_app=$(install_macos_bundle "$fallback_target") || {
         printf '%s\n' "install-forge: failed to install macOS app bundle" >&2
         exit 1
@@ -188,7 +188,7 @@ case "$os" in
 
   Linux)
     apps_dir="$home_dir/.local/share/applications"
-    desktop_file="$apps_dir/wizardry-forge.desktop"
+    desktop_file="$apps_dir/app-forge.desktop"
 
     mkdir -p "$apps_dir"
 
@@ -196,7 +196,7 @@ case "$os" in
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Wizardry Forge
+Name=App Forge
 Comment=Desktop control plane for wizardry-apps
 Exec=/bin/sh "$shim"
 Terminal=false

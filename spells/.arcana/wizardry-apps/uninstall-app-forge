@@ -3,9 +3,9 @@
 case "${1-}" in
 --help|--usage|-h)
   cat <<'USAGE'
-Usage: uninstall-wizardry-forge
+Usage: uninstall-app-forge
 
-Removes user-local launchers for Wizardry Forge.
+Removes user-local launchers for App Forge.
 USAGE
   exit 0
   ;;

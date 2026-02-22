@@ -77,7 +77,7 @@ spells/.arcana/wizardry-apps/wizardry-apps mobile-admin
 ## Flagship Desktop App
 
 ```sh
-# Wizardry Forge (desktop control plane)
+# App Forge (desktop control plane)
 # Download-and-run from this repository:
 ./run-forge
 
@@ -98,8 +98,8 @@ sh .apps/forge/scripts/forge-backend.sh --help
 ```
 
 After `./install-forge`:
-- macOS: launch `/Applications/Wizardry Forge.app` (falls back to `~/Applications` if needed)
-- Linux: launch `Wizardry Forge` from your desktop app menu (or run `~/.local/bin/wizardry-forge`)
+- macOS: launch `/Applications/App Forge.app` (falls back to `~/Applications` if needed)
+- Linux: launch `App Forge` from your desktop app menu (or run `~/.local/bin/app-forge`)
 
 The macOS app bundle is first-class:
 - embedded native host binary

@@ -8,7 +8,7 @@ name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer)
 [ "$name" = "Artificer" ]
 
 forge_name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" forge)
-[ "$forge_name" = "Wizardry Forge" ]
+[ "$forge_name" = "App Forge" ]
 
 bundle_id=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer)
 printf '%s' "$bundle_id" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'

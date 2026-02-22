@@ -1,13 +1,13 @@
 #!/bin/sh
 
-# Build Wizardry Forge macOS app bundle.
+# Build App Forge macOS app bundle.
 
 case "${1-}" in
 --help|--usage|-h)
   cat <<'USAGE'
 Usage: build-forge-macos-app.sh [--root ROOT_DIR] [--out APP_BUNDLE] [--bundle-id BUNDLE_ID]
 
-Builds a self-contained Wizardry Forge .app bundle with:
+Builds a self-contained App Forge .app bundle with:
 - native WebKit host binary
 - Forge app assets
 - shared bridge assets
@@ -24,7 +24,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 DEFAULT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)
 
 root=$DEFAULT_ROOT
-out_bundle="$root/_tmp/workbench/dist/macos/Wizardry Forge.app"
+out_bundle="$root/_tmp/workbench/dist/macos/App Forge.app"
 bundle_id="com.wizardry.apps.forge.local"
 
 while [ "$#" -gt 0 ]; do
@@ -92,8 +92,8 @@ if [ ! -x "$host_bin" ] || [ "$host_src" -nt "$host_bin" ]; then
     clang -O2 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit
 fi
 
-stage_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-forge-build.XXXXXX")
-stage_bundle="$stage_root/Wizardry Forge.app"
+stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-build.XXXXXX")
+stage_bundle="$stage_root/App Forge.app"
 macos_dir="$stage_bundle/Contents/MacOS"
 resources_dir="$stage_bundle/Contents/Resources"
 plist="$stage_bundle/Contents/Info.plist"
@@ -113,7 +113,7 @@ cp -R "$root/core/include" "$resources_dir/wizardry-apps/core/"
 cp -R "$root/core/src" "$resources_dir/wizardry-apps/core/"
 printf '%s\n' "$root" > "$resources_dir/wizardry-apps-root.txt"
 
-cat > "$macos_dir/wizardry-forge" <<'APP'
+cat > "$macos_dir/app-forge" <<'APP'
 #!/bin/sh
 set -eu
 APPDIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd -P)
@@ -137,7 +137,7 @@ fi
 
 exec "$APPDIR/MacOS/wizardry-host" "$APPDIR/Resources/forge"
 APP
-chmod +x "$macos_dir/wizardry-forge"
+chmod +x "$macos_dir/app-forge"
 
 icon_key=''
 if [ -x "$root/tools/forge/build-forge-icon.sh" ]; then
@@ -150,12 +150,12 @@ cat > "$plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>Wizardry Forge</string>
-<key>CFBundleDisplayName</key><string>Wizardry Forge</string>
+<key>CFBundleName</key><string>App Forge</string>
+<key>CFBundleDisplayName</key><string>App Forge</string>
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
 <key>CFBundleVersion</key><string>1.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleExecutable</key><string>wizardry-forge</string>
+<key>CFBundleExecutable</key><string>app-forge</string>
 $icon_key
 </dict></plist>
 PLIST

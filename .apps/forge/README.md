@@ -1,6 +1,6 @@
-# Wizardry Forge
+# App Forge
 
-Wizardry Forge is the flagship wizardry-apps desktop control plane.
+App Forge is the flagship wizardry-apps desktop control plane.
 
 It provides a native WebView UI backed by POSIX shell scripts for:
 - building and running built-in wizardry apps
@@ -48,8 +48,8 @@ From repository root:
 ```
 
 After install:
-- macOS: open `/Applications/Wizardry Forge.app` (falls back to `~/Applications` when needed)
-- Linux: open `Wizardry Forge` from the desktop menu, or run `~/.local/bin/wizardry-forge`
+- macOS: open `/Applications/App Forge.app` (falls back to `~/Applications` when needed)
+- Linux: open `App Forge` from the desktop menu, or run `~/.local/bin/app-forge`
 
 macOS install is a real app bundle with:
 - native host binary embedded in the `.app`

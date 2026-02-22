@@ -3,9 +3,9 @@
 case "${1-}" in
 --help|--usage|-h)
   cat <<'USAGE'
-Usage: install-wizardry-forge [ROOT_DIR]
+Usage: launch-app-forge [ROOT_DIR]
 
-Installs user-local launchers for Wizardry Forge.
+Launches App Forge for the specified wizardry-apps root.
 Default root is the current repository.
 USAGE
   exit 0
@@ -21,4 +21,4 @@ script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
 root=${1:-$repo_root}
 
-exec sh "$repo_root/tools/forge/install-forge.sh" --root "$root"
+exec sh "$repo_root/tools/forge/launch-forge.sh" --root "$root"

@@ -29,11 +29,11 @@ printf '%s\n' "$apps" | grep -E '^forge\t' >/dev/null
 templates=$("$backend" list-templates "$test_root")
 printf '%s\n' "$templates" | grep -E '^demo\t' >/dev/null
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-forge-backend.XXXXXX")
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-backend.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
-bundle_scripts="$scratch/Wizardry Forge.app/Contents/Resources/forge/scripts"
-bundle_root_file="$scratch/Wizardry Forge.app/Contents/Resources/wizardry-apps-root.txt"
+bundle_scripts="$scratch/App Forge.app/Contents/Resources/forge/scripts"
+bundle_root_file="$scratch/App Forge.app/Contents/Resources/wizardry-apps-root.txt"
 mkdir -p "$bundle_scripts"
 cp "$backend" "$bundle_scripts/forge-backend.sh"
 chmod +x "$bundle_scripts/forge-backend.sh"

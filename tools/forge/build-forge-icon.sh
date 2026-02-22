@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Resolve/build a macOS .icns file for Wizardry Forge.
+# Resolve/build a macOS .icns file for App Forge.
 
 case "${1-}" in
 --help|--usage|-h)
@@ -62,7 +62,7 @@ fi
 
 png_icon="$root/.apps/forge/assets/forge-icon.png"
 if [ -f "$png_icon" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-  iconset=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-forge-iconset.XXXXXX")
+  iconset=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
   trap 'rm -rf "$iconset"' EXIT INT TERM
   for size in 16 32 128 256 512; do
     sips -z "$size" "$size" "$png_icon" --out "$iconset/icon_${size}x${size}.png" >/dev/null

@@ -33,23 +33,23 @@ test_desktop_admin_contains_forge_entries() {
     return 1
   }
 
-  grep -q "Wizardry Forge doctor%" "$tmp/menu.log" || {
-    TEST_FAILURE_REASON="missing Wizardry Forge doctor entry"
+  grep -q "App Forge doctor%" "$tmp/menu.log" || {
+    TEST_FAILURE_REASON="missing App Forge doctor entry"
     return 1
   }
 
-  grep -q "Run Wizardry Forge%" "$tmp/menu.log" || {
-    TEST_FAILURE_REASON="missing Run Wizardry Forge entry"
+  grep -q "Run App Forge%" "$tmp/menu.log" || {
+    TEST_FAILURE_REASON="missing Run App Forge entry"
     return 1
   }
 
-  grep -q "Install Wizardry Forge launcher%" "$tmp/menu.log" || {
-    TEST_FAILURE_REASON="missing Install Wizardry Forge launcher entry"
+  grep -q "Install App Forge launcher%" "$tmp/menu.log" || {
+    TEST_FAILURE_REASON="missing Install App Forge launcher entry"
     return 1
   }
 
-  grep -q "Uninstall Wizardry Forge launcher%" "$tmp/menu.log" || {
-    TEST_FAILURE_REASON="missing Uninstall Wizardry Forge launcher entry"
+  grep -q "Uninstall App Forge launcher%" "$tmp/menu.log" || {
+    TEST_FAILURE_REASON="missing Uninstall App Forge launcher entry"
     return 1
   }
 }

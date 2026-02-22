@@ -25,7 +25,7 @@
     },
     {
       "slug": "forge",
-      "name": "Wizardry Forge",
+      "name": "App Forge",
       "production": true,
       "bundleIds": {
         "macos": "com.wizardry.apps.forge.macos",
@@ -54,7 +54,7 @@
         "ios": "com.wizardry.apps.priorities.ios",
         "android": "com.wizardry.apps.priorities.android"
       },
-      "targets": "hosted-web,linux,ios,android,macos"
+      "targets": "linux,ios,android,macos"
     },
     {
       "slug": "memetrader",

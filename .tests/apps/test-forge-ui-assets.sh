@@ -18,7 +18,7 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 [ -x "$root/install-forge" ]
 [ -x "$root/uninstall-forge" ]
 
-grep -F "Wizardry Forge" "$root/.apps/forge/index.html" >/dev/null
+grep -F "App Forge" "$root/.apps/forge/index.html" >/dev/null
 grep -F "forge-backend.sh" "$root/.apps/forge/index.html" >/dev/null
 grep -F "window.wizardry.rpc('bridge.exec'" "$root/.apps/forge/index.html" >/dev/null
 grep -F 'id="toggle-settings-panel"' "$root/.apps/forge/index.html" >/dev/null
