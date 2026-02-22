@@ -141,6 +141,7 @@
     var TEXT_SCALE_KEY = 'wizardry.priorities.textScale';
     var ROOT_KEY = 'priorities.root';
     var SNAPSHOT_PREF = 'startup_snapshot';
+    var NEXT_ACTION_CACHE_KEY = 'wizardry.priorities.nextActionCache';
     var THEME_ASSET_VERSION = 'priorities20260220a';
     var DEFAULT_THEMES = [
       'adept', 'alchemist', 'archmage', 'athenian', 'chronomancer', 'conjurer', 'druid',
@@ -188,6 +189,7 @@
       uiPrefs: {},
       rootPrefSaveTimer: null,
       snapshotPrefSaveTimer: null,
+      nextActionCacheSaveTimer: null,
       startupSnapshotRestored: false,
       hostBootReadySent: false,
       snapshotLastSerialized: ''
@@ -214,6 +216,7 @@
       if (storageKey === UI_SCALE_KEY || storageKey === TEXT_SCALE_KEY) return 'ui_scale';
       if (storageKey === ROOT_KEY) return 'root';
       if (storageKey === SNAPSHOT_PREF) return SNAPSHOT_PREF;
+      if (storageKey === NEXT_ACTION_CACHE_KEY) return 'next_action_cache';
       return '';
     }
 
@@ -709,6 +712,108 @@
       }
       state.nextActionLabelCache[toKey] = state.nextActionLabelCache[fromKey];
       delete state.nextActionLabelCache[fromKey];
+      schedulePersistNextActionLabelCache();
+    }
+
+    function normalizeNextActionLabelCache(raw) {
+      var parsed = null;
+      try {
+        parsed = JSON.parse(String(raw || ''));
+      } catch (_) {
+        parsed = null;
+      }
+      var out = Object.create(null);
+      if (!parsed || typeof parsed !== 'object') {
+        return out;
+      }
+      var keys = Object.keys(parsed);
+      var maxEntries = 600;
+      for (var i = 0; i < keys.length && i < maxEntries; i += 1) {
+        var key = String(keys[i] || '').trim();
+        if (!key) {
+          continue;
+        }
+        var value = parsed[key];
+        var label = '';
+        var checked = 0;
+        if (typeof value === 'string') {
+          label = value;
+        } else if (value && typeof value === 'object') {
+          label = String(value.label || '');
+          checked = Number(value.checked) === 1 ? 1 : 0;
+        }
+        label = label.replace(/\r?\n/g, ' ').trim();
+        if (!label) {
+          continue;
+        }
+        if (label.length > 220) {
+          label = label.slice(0, 220);
+        }
+        out[key] = { label: label, checked: checked };
+      }
+      return out;
+    }
+
+    function loadNextActionLabelCacheFromPrefs() {
+      state.nextActionLabelCache = normalizeNextActionLabelCache(loadStorage(NEXT_ACTION_CACHE_KEY) || '');
+    }
+
+    function schedulePersistNextActionLabelCache() {
+      if (state.nextActionCacheSaveTimer) {
+        clearTimeout(state.nextActionCacheSaveTimer);
+      }
+      state.nextActionCacheSaveTimer = setTimeout(function () {
+        state.nextActionCacheSaveTimer = null;
+        var payload = Object.create(null);
+        var keys = Object.keys(state.nextActionLabelCache || {});
+        var maxEntries = 600;
+        var count = 0;
+        for (var i = 0; i < keys.length && count < maxEntries; i += 1) {
+          var path = String(keys[i] || '').trim();
+          if (!path) {
+            continue;
+          }
+          var entry = state.nextActionLabelCache[path];
+          if (!entry || typeof entry !== 'object') {
+            continue;
+          }
+          var label = String(entry.label || '').trim();
+          if (!label) {
+            continue;
+          }
+          payload[path] = {
+            label: label,
+            checked: Number(entry.checked) === 1 ? 1 : 0
+          };
+          count += 1;
+        }
+        saveStorage(NEXT_ACTION_CACHE_KEY, JSON.stringify(payload));
+      }, 180);
+    }
+
+    function setCachedNextActionLabel(path, label, checked) {
+      var key = String(path || '').trim();
+      if (!key) {
+        return;
+      }
+      var text = String(label || '').replace(/\r?\n/g, ' ').trim();
+      if (!text) {
+        if (Object.prototype.hasOwnProperty.call(state.nextActionLabelCache, key)) {
+          delete state.nextActionLabelCache[key];
+          schedulePersistNextActionLabelCache();
+        }
+        return;
+      }
+      var normalizedChecked = Number(checked) === 1 ? 1 : 0;
+      var existing = state.nextActionLabelCache[key];
+      if (existing && existing.label === text && Number(existing.checked) === normalizedChecked) {
+        return;
+      }
+      state.nextActionLabelCache[key] = {
+        label: text,
+        checked: normalizedChecked
+      };
+      schedulePersistNextActionLabelCache();
     }
 
     function parentNavPath(path) {
@@ -1188,16 +1293,17 @@
     function getNextActionLabel(path) {
       var items = getCachedDirItems(path);
       if (!items || !items.length) {
-        return String(state.nextActionLabelCache[path] || '');
+        var cachedEntry = state.nextActionLabelCache[path];
+        return String((cachedEntry && cachedEntry.label) || '');
       }
       for (var i = 0; i < items.length; i += 1) {
         if (items[i].checked !== 1) {
           var liveLabel = items[i].name + (items[i].kind === 'dir' ? '/' : '');
-          state.nextActionLabelCache[path] = liveLabel;
+          setCachedNextActionLabel(path, liveLabel, 0);
           return liveLabel;
         }
       }
-      state.nextActionLabelCache[path] = '';
+      setCachedNextActionLabel(path, '', 1);
       return '';
     }
 
@@ -1223,6 +1329,10 @@
       var leftBefore = nameStack.getBoundingClientRect().left;
       var existing = nameStack.querySelector('.next-action');
       var nextActionText = getNextActionLabel(path);
+      var desiredText = nextActionText ? ('➜ ' + nextActionText) : '';
+      if (existing && existing.textContent === desiredText) {
+        return;
+      }
       if (!nextActionText) {
         if (existing) {
           existing.remove();
@@ -1253,7 +1363,7 @@
         }
         existing.classList.add('next-action-entering');
         nameStack.appendChild(existing);
-        existing.textContent = '➜ ' + nextActionText;
+        existing.textContent = desiredText;
         var leftAfterInsert = nameStack.getBoundingClientRect().left;
         var deltaAfterInsert = leftBefore - leftAfterInsert;
         if (deltaAfterInsert) {
@@ -1272,7 +1382,7 @@
         });
         return;
       }
-      existing.textContent = '➜ ' + nextActionText;
+      existing.textContent = desiredText;
     }
 
     function prefetchNextAction(path) {
@@ -2852,7 +2962,6 @@
       state.expanded[state.root] = true;
       state.cache = Object.create(null);
       state.cacheAliases = Object.create(null);
-      state.nextActionLabelCache = Object.create(null);
       state.revealedMakeProjectPath = '';
       state.pendingMakeProjectPath = '';
       state.openMenuPath = '';
@@ -3008,6 +3117,7 @@
       requestWindowShape();
       var bootRevealTimer = setTimeout(revealBootUi, 8000);
       await loadUiPrefs();
+      loadNextActionLabelCacheFromPrefs();
       state.activeTheme = String(loadStorage(THEME_KEY) || 'psionic').toLowerCase().trim();
       await loadThemes();
       applyTheme(state.activeTheme);
@@ -3069,6 +3179,10 @@
         if (state.snapshotPrefSaveTimer) {
           clearTimeout(state.snapshotPrefSaveTimer);
           state.snapshotPrefSaveTimer = null;
+        }
+        if (state.nextActionCacheSaveTimer) {
+          clearTimeout(state.nextActionCacheSaveTimer);
+          state.nextActionCacheSaveTimer = null;
         }
       });
       document.getElementById('refresh').addEventListener('click', setRootAndRefresh);
