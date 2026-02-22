@@ -846,7 +846,7 @@ button:disabled {
 }
 
 .row-play {
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
   border-radius: 8px;
   background: transparent;
   color: color-mix(in srgb, var(--text) 78%, var(--muted));
@@ -858,8 +858,8 @@ button:disabled {
 }
 
 .row-play:hover {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--toolbar-accent-soft, var(--accent-soft, var(--accent))) 52%, var(--toolbar-surface, var(--bg-panel, var(--panel-solid, #fff))));
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  background: color-mix(in srgb, var(--toolbar-accent-soft, var(--accent-soft, var(--bg-panel, var(--panel-solid, #fff)))) 78%, var(--toolbar-surface, var(--bg-panel, var(--panel-solid, #fff))));
   color: color-mix(in srgb, var(--text) 78%, var(--muted));
 }
 
@@ -2187,7 +2187,7 @@ button:disabled {
   height: 1.34rem;
   padding: 0;
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--section-border) 86%, transparent);
   background: transparent;
   color: var(--section-text);
   font-size: 0.74rem;
@@ -2198,8 +2198,8 @@ button:disabled {
 }
 
 .pipeline-sections .row-mini:hover {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--section-accent-soft) 74%, var(--section-bg));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--section-border));
+  background: color-mix(in srgb, var(--toolbar-accent-soft, var(--accent-soft, var(--section-bg))) 78%, var(--toolbar-surface, var(--section-bg)));
   box-shadow: none;
 }
 
@@ -2208,14 +2208,6 @@ button:disabled {
 .pipeline-sections .section-clear-btn:disabled {
   opacity: 0.5;
   color: color-mix(in srgb, var(--section-muted) 88%, transparent);
-  border-color: transparent;
-}
-
-.row-mini.row-open {
-  border-color: transparent;
-}
-
-.row-mini.row-open:hover {
   border-color: transparent;
 }
 
