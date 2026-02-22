@@ -11021,6 +11021,13 @@ EOF_WRAPPER
         esac
       fi
     fi
+
+    if [ "$status" = "done" ] && ! voice_component_installed "$installed_component"; then
+      status="failed"
+      if [ -z "$status_reason" ]; then
+        status_reason="Dictation installer reported success, but backend files are missing."
+      fi
+    fi
     log_tail=$(tail -n 160 "$job_dir/log" 2>/dev/null || true)
     install_phase="running"
     install_progress=""
@@ -13225,6 +13232,7 @@ fallback_component=$5
 fallback_bin=$6
 timeout_sec=$7
 force_macos_arm64_uname=$8
+voice_root_dir=$9
 
 run_with_timeout_compat() {
   duration=$1
@@ -13238,6 +13246,17 @@ run_with_timeout_compat() {
     return $?
   fi
   "$@"
+}
+
+component_install_state_ok() {
+  root_dir=$1
+  component_name=$2
+  if [ -z "$root_dir" ] || [ -z "$component_name" ]; then
+    return 1
+  fi
+  state_file="$root_dir/$component_name/installed"
+  python_bin="$root_dir/$component_name/venv/bin/python"
+  [ -f "$state_file" ] && [ -x "$python_bin" ]
 }
 
 install_rc=1
@@ -13274,6 +13293,13 @@ if [ "$install_rc" -ne 0 ] && [ "$component" != "$fallback_component" ] && [ -n 
 fi
 set -e
 
+if [ "$install_rc" -eq 0 ]; then
+  if ! component_install_state_ok "$voice_root_dir" "$installed_component"; then
+    printf '%s\n' "voice-recognition: install verification failed for $installed_component" >>"$log_file"
+    install_rc=1
+  fi
+fi
+
 current_status=$(cat "$job_dir/status" 2>/dev/null || printf '')
 if [ "$current_status" = "cancelled" ]; then
   [ -f "$job_dir/finished" ] || date +%s > "$job_dir/finished"
@@ -13296,7 +13322,7 @@ date +%s > "$job_dir/finished"
 EOF_RUNNER
     chmod +x "$runner_script"
 
-    install_pid=$(spawn_detached_job "$runner_script" "$job_dir" "$log_file" "$install_component" "$primary_bin" "$fallback_component" "$fallback_bin" "1800" "$force_macos_arm64_uname")
+    install_pid=$(spawn_detached_job "$runner_script" "$job_dir" "$log_file" "$install_component" "$primary_bin" "$fallback_component" "$fallback_bin" "1800" "$force_macos_arm64_uname" "$VOICE_RECOGNITION_ROOT_DIR")
     printf '%s\n' "$install_pid" > "$job_dir/pid"
 
     printf '{"success":true,"job":{"id":"%s","status":"running","action":"install","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
