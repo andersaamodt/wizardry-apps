@@ -23,8 +23,14 @@
 <path d="M9.75 15.25L14.75 10.25C15.1642 9.83579 15.8358 9.83579 16.25 10.25C16.6642 10.6642 16.6642 11.3358 16.25 11.75L11.25 16.75L9.25 17.25L9.75 15.25Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 </a>
-<a href="/pages/admin.html" class="nav-admin" style="display:none;">Admin</a>
 <span id="nav-user-name" class="nav-username" style="display:none;"></span>
+<div class="nav-user-menu" id="nav-user-menu" style="display:none;">
+  <button class="nav-menu-btn" id="nav-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="User menu">...</button>
+  <div class="nav-menu-panel" id="nav-menu-panel" role="menu" hidden>
+    <a id="nav-menu-primary-link" class="nav-menu-item" href="/pages/admin.html" role="menuitem">Admin</a>
+    <button id="nav-menu-logout" class="nav-menu-item nav-menu-item-danger" type="button" role="menuitem">Logout</button>
+  </div>
+</div>
 <button class="btn-login" id="login-btn" type="button">Login</button>
 </div>
 </nav>
@@ -63,7 +69,11 @@
 (function () {
   var loginBtn = document.getElementById('login-btn');
   var composeLink = document.querySelector('.nav-compose');
-  var adminLink = document.querySelector('.nav-admin');
+  var userMenu = document.getElementById('nav-user-menu');
+  var menuBtn = document.getElementById('nav-menu-btn');
+  var menuPanel = document.getElementById('nav-menu-panel');
+  var menuPrimaryLink = document.getElementById('nav-menu-primary-link');
+  var menuLogoutBtn = document.getElementById('nav-menu-logout');
   var userName = document.getElementById('nav-user-name');
   var authModal = document.getElementById('auth-modal');
   var authPasskeyBtn = document.getElementById('auth-passkey-btn');
@@ -189,16 +199,47 @@
     authPasskeyBtn.setAttribute('aria-disabled', isEnabled ? 'false' : 'true');
   }
 
+  function closeUserMenu() {
+    if (!menuPanel || !menuBtn) {
+      return;
+    }
+    menuPanel.hidden = true;
+    menuBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function openUserMenu() {
+    if (!menuPanel || !menuBtn) {
+      return;
+    }
+    menuPanel.hidden = false;
+    menuBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function configureUserMenu(isAdmin) {
+    if (!menuPrimaryLink) {
+      return;
+    }
+    if (isAdmin) {
+      menuPrimaryLink.textContent = 'Admin';
+      menuPrimaryLink.href = '/pages/admin.html';
+    } else {
+      menuPrimaryLink.textContent = 'Account';
+      menuPrimaryLink.href = '/pages/admin.html#account';
+    }
+  }
+
   function setLoggedInUI(isLoggedIn, isAdmin, username) {
     var displayName = username || '';
     isAuthenticated = !!isLoggedIn;
     if (isLoggedIn) {
-      loginBtn.textContent = 'Logout';
+      loginBtn.textContent = 'Login';
+      loginBtn.style.display = 'none';
       if (composeLink) {
         composeLink.style.display = isAdmin ? 'inline-block' : 'none';
       }
-      if (adminLink) {
-        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
+      if (userMenu) {
+        configureUserMenu(isAdmin);
+        userMenu.style.display = 'inline-flex';
       }
       if (userName) {
         userName.style.display = 'inline-block';
@@ -206,11 +247,13 @@
       }
     } else {
       loginBtn.textContent = 'Login';
+      loginBtn.style.display = 'inline-block';
       if (composeLink) {
         composeLink.style.display = 'none';
       }
-      if (adminLink) {
-        adminLink.style.display = 'none';
+      if (userMenu) {
+        userMenu.style.display = 'none';
+        closeUserMenu();
       }
       if (userName) {
         userName.style.display = 'none';
@@ -539,10 +582,6 @@
       if (loginInFlight) {
         return;
       }
-      if (isAuthenticated) {
-        logout();
-        return;
-      }
 
       localStorage.removeItem('session_token');
       localStorage.removeItem('csrf_token');
@@ -565,6 +604,34 @@
         }
       });
     }
+
+    if (menuBtn && menuPanel) {
+      menuBtn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (menuPanel.hidden) {
+          openUserMenu();
+        } else {
+          closeUserMenu();
+        }
+      });
+    }
+
+    if (menuLogoutBtn) {
+      menuLogoutBtn.addEventListener('click', function () {
+        closeUserMenu();
+        logout();
+      });
+    }
+
+    document.addEventListener('click', function (event) {
+      if (!userMenu || userMenu.style.display === 'none') {
+        return;
+      }
+      if (!userMenu.contains(event.target)) {
+        closeUserMenu();
+      }
+    });
 
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && authModal && !authModal.hidden) {
