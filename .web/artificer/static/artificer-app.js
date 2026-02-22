@@ -9008,12 +9008,15 @@
 
   function loadState(options) {
     var requestOptions = null;
-    var requestParams = { level: "light" };
+    var requestParams = { level: "light", cached: "1" };
     if (options && Number(options.timeoutMs) > 0) {
       requestOptions = { timeoutMs: Number(options.timeoutMs) };
     }
     if (options && options.full) {
       requestParams.level = "full";
+    }
+    if (options && options.fresh) {
+      requestParams.cached = "0";
     }
     return apiGet("state", requestParams, requestOptions).then(function (response) {
       if (!response.success) {
@@ -9573,6 +9576,15 @@
         renderUi();
       })
       .then(function () {
+        // Refresh from disk in the background so startup can render instantly from cache.
+        loadState({ fast: true, fresh: true, timeoutMs: 30000 })
+          .then(function () {
+            renderUi();
+          })
+          .catch(function () {
+            return null;
+          });
+
         var shouldShowLoading = !!(state.activeWorkspaceId && state.activeConversationId);
         loadConversation({ showLoading: shouldShowLoading })
           .then(function () {

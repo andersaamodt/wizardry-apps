@@ -25,6 +25,7 @@ terminal_sessions_root="$data_root/terminal-sessions"
 mode_runtime_root="$data_root/mode-runtime"
 llm_settings_dir="$data_root/llm-settings"
 llm_use_gpu_file="$llm_settings_dir/use-gpu"
+state_light_cache_file="$data_root/state-light-cache.json"
 ALLOW_NETWORK=0
 ALLOW_WEB=0
 
@@ -4428,6 +4429,36 @@ queue_state_for_conversation() {
   done=0
   if [ "$running" -eq 0 ] && [ "$pending_count" -eq 0 ] && [ "$last_status" = "done" ]; then
     done=1
+  fi
+
+  printf 'pending=%s\n' "$pending_count"
+  printf 'running=%s\n' "$running"
+  printf 'done=%s\n' "$done"
+  printf 'last_status=%s\n' "$last_status"
+  printf 'first_id=%s\n' "$first_id"
+}
+
+queue_state_for_conversation_light() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  running_file="$queue_dir/running.txt"
+  last_status=$(read_file_line "$queue_dir/last_status" "")
+  running_id=$(read_file_line "$queue_dir/running.id" "")
+
+  running=0
+  if [ -f "$running_file" ]; then
+    running=1
+  fi
+
+  pending_count=0
+  done=0
+  if [ "$running" -eq 0 ] && [ "$pending_count" -eq 0 ] && [ "$last_status" = "done" ]; then
+    done=1
+  fi
+
+  first_id=""
+  if [ "$running" -eq 1 ] && [ -n "$running_id" ]; then
+    first_id=$running_id
   fi
 
   printf 'pending=%s\n' "$pending_count"
@@ -9036,9 +9067,26 @@ promote_scratch_files() {
 emit_state() {
   # Keep the primary state endpoint fast; mode runtime has dedicated endpoints.
   state_level=$(trim "$(param "level")")
+  cached_pref=$(trim "$(param "cached")")
+  case "$cached_pref" in
+    ""|*[!0-9]*)
+      cached_pref=1
+      ;;
+  esac
   state_light=0
   if [ "$state_level" = "light" ]; then
     state_light=1
+  fi
+  if [ "$state_light" = "1" ] && [ "$cached_pref" -ne 0 ] && [ -s "$state_light_cache_file" ]; then
+    cat "$state_light_cache_file"
+    return
+  fi
+
+  state_cache_tmp=""
+  if [ "$state_light" = "1" ]; then
+    state_cache_tmp=$(mktemp "${TMPDIR:-/tmp}/artificer-state-light.XXXXXX")
+    exec 3>&1
+    exec > "$state_cache_tmp"
   fi
 
   printf '{"success":true,"workspaces":['
@@ -9105,7 +9153,7 @@ EOF_TOG
         conv_created=$(read_file_line "$conv_dir/created" "0")
         conv_updated=$(read_file_line "$conv_dir/updated" "0")
         if [ "$state_light" = "1" ]; then
-          queue_info=$(queue_state_for_conversation "$conv_dir")
+          queue_info=$(queue_state_for_conversation_light "$conv_dir")
           queue_pending=$(kv_get "pending" "$queue_info")
           queue_running=$(kv_get "running" "$queue_info")
           queue_done=$(kv_get "done" "$queue_info")
@@ -9255,6 +9303,16 @@ EOF_TOG
       "$(ma_escalation_class_enum_json)"
   fi
   printf '}\n'
+
+  if [ "$state_light" = "1" ] && [ -n "$state_cache_tmp" ]; then
+    exec >&3
+    exec 3>&-
+    cat "$state_cache_tmp"
+    mv "$state_cache_tmp" "$state_light_cache_file" 2>/dev/null || {
+      cp "$state_cache_tmp" "$state_light_cache_file" 2>/dev/null || true
+      rm -f "$state_cache_tmp"
+    }
+  fi
 }
 
 emit_models() {

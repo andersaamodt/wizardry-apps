@@ -548,4 +548,4 @@ pagetitle: "Artificer"
 </div>
 </div>
 
-<script src="/static/artificer-app.js?v=20260222-runorder3"></script>
+<script src="/static/artificer-app.js?v=20260222-runorder4"></script>
