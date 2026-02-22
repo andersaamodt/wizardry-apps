@@ -8,11 +8,11 @@ title: Blog Admin
 <aside class="admin-sidebar">
 <div class="admin-nav-title">Admin</div>
 <div class="admin-nav-list" role="tablist" aria-label="Admin sections">
+<button type="button" class="admin-nav-item" data-admin-nav="account" aria-selected="false">Account</button>
 <button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true">Settings</button>
 <button type="button" class="admin-nav-item" data-admin-nav="compose" aria-selected="false">Compose</button>
 <button type="button" class="admin-nav-item" data-admin-nav="drafts" aria-selected="false">Drafts</button>
 <button type="button" class="admin-nav-item" data-admin-nav="queue" aria-selected="false">Queue</button>
-<button type="button" class="admin-nav-item" data-admin-nav="account" aria-selected="false">Account</button>
 </div>
 </aside>
 
