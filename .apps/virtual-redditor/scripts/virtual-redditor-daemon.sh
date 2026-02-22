@@ -1728,7 +1728,7 @@ main() {
       ;;
 
     run)
-      load_reddit_env
+      load_reddit_env_optional
       run_loop
       ;;
 
@@ -1771,17 +1771,14 @@ main() {
       ;;
 
     launchd-install)
-      load_reddit_env
       launchd_install
       ;;
 
     launchd-start)
-      load_reddit_env
       launchd_start
       ;;
 
     launchd-stop)
-      load_reddit_env
       launchd_stop
       ;;
 
