@@ -248,7 +248,7 @@ h1 {
   right: calc(14px * var(--ui-scale));
   bottom: calc(52px * var(--ui-scale));
   top: auto;
-  width: min(560px, calc(100vw - 24px));
+  width: min(560px, calc(100vw - (28px * var(--ui-scale))));
   margin: 0;
   z-index: 21;
 }
