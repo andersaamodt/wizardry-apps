@@ -3,9 +3,13 @@
     sessionToken: localStorage.getItem('session_token') || '',
     csrfToken: localStorage.getItem('csrf_token') || '',
     username: '',
+    playerName: '',
+    isAdmin: false,
+    composeTags: [],
     currentDraftId: '',
     autosaveTimer: null,
-    suspendAutosave: false
+    suspendAutosave: false,
+    previewVisible: localStorage.getItem('blog_admin_preview_hidden') !== '1'
   };
 
   const els = {
@@ -14,23 +18,32 @@
     outputConfig: document.getElementById('output-config'),
     outputCompose: document.getElementById('output-compose'),
     outputQueue: document.getElementById('output-queue'),
+    outputAccount: document.getElementById('output-account'),
     siteTitle: document.getElementById('site-title'),
     adminTheme: document.getElementById('admin-theme'),
     registrationEnabled: document.getElementById('registration-enabled'),
     dripInterval: document.getElementById('drip-interval'),
-    dripJitter: document.getElementById('drip-jitter'),
+    dripRandomness: document.getElementById('drip-randomness'),
     feedFullText: document.getElementById('feed-full-text'),
     feedItems: document.getElementById('feed-items'),
     postTitle: document.getElementById('post-title'),
     postTags: document.getElementById('post-tags'),
+    postTagsInput: document.getElementById('post-tags-input'),
+    postTagsEditor: document.getElementById('post-tags-editor'),
+    postTagsPills: document.getElementById('post-tags-pills'),
     postSummary: document.getElementById('post-summary'),
     postContent: document.getElementById('post-content'),
     postScheduleAt: document.getElementById('post-scheduled-at'),
+    scheduledRow: document.getElementById('scheduled-row'),
     markdownPreview: document.getElementById('markdown-preview'),
+    composeShell: document.querySelector('.compose-shell'),
+    togglePreviewButton: document.getElementById('btn-toggle-preview'),
     draftsList: document.getElementById('drafts-list'),
     queueList: document.getElementById('queue-list'),
     currentDraftLabel: document.getElementById('current-draft-label'),
+    accountPlayerName: document.getElementById('account-player-name'),
     autosaveStatus: document.getElementById('autosave-status'),
+    publishNowButton: document.getElementById('btn-publish-now'),
     imagePicker: document.getElementById('image-picker'),
     dropOverlay: document.getElementById('drop-overlay'),
     sectionButtons: Array.from(document.querySelectorAll('[data-admin-nav]')),
@@ -60,16 +73,22 @@
   function getSectionFromHash() {
     const name = (window.location.hash || '').replace(/^#/, '');
     if (!name) {
-      return 'settings';
+      return state.isAdmin ? 'settings' : 'account';
     }
     const known = els.sections.some(function (section) {
       return section.getAttribute('data-admin-section') === name;
     });
-    return known ? name : 'settings';
+    if (!known) {
+      return state.isAdmin ? 'settings' : 'account';
+    }
+    if (!state.isAdmin && name !== 'account') {
+      return 'account';
+    }
+    return name;
   }
 
   function activateSection(name, updateHash) {
-    const sectionName = name || 'settings';
+    const sectionName = (!state.isAdmin ? 'account' : (name || 'settings'));
     els.sectionButtons.forEach(function (button) {
       const active = button.getAttribute('data-admin-nav') === sectionName;
       button.classList.toggle('is-active', active);
@@ -102,10 +121,35 @@
     });
   }
 
+  function setAccountOnlyMode(enabled) {
+    if (!els.adminPanel) {
+      return;
+    }
+    els.adminPanel.classList.toggle('account-only', !!enabled);
+    els.sectionButtons.forEach(function (button) {
+      const section = button.getAttribute('data-admin-nav') || '';
+      const visible = !enabled || section === 'account';
+      button.hidden = !visible;
+      button.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    });
+  }
+
   function setOutput(target, message, kind) {
     const bg = kind === 'ok' ? '#e8f5e9' : (kind === 'warn' ? '#fff8e1' : '#ffebee');
     const border = kind === 'ok' ? '#4caf50' : (kind === 'warn' ? '#f9a825' : '#e53935');
     target.innerHTML = '<div class="notice" style="background:' + bg + ';border-color:' + border + ';">' + message + '</div>';
+  }
+
+  function applyThemePreview(theme) {
+    const pickedTheme = (theme || '').trim() || 'adept';
+    const themeLink = document.getElementById('theme-stylesheet');
+    if (themeLink) {
+      themeLink.href = '/static/themes/' + encodeURIComponent(pickedTheme) + '.css';
+    }
+    const navThemeSelect = document.getElementById('theme-select');
+    if (navThemeSelect && navThemeSelect.value !== pickedTheme) {
+      navThemeSelect.value = pickedTheme;
+    }
   }
 
   async function fetchJson(url, options) {
@@ -146,6 +190,46 @@
     publishModeInputs.forEach(function (input) {
       input.checked = input.value === mode;
     });
+    updatePrimaryPublishButton(mode);
+    updateScheduledRowVisibility(mode);
+  }
+
+  function updatePrimaryPublishButton(mode) {
+    if (!els.publishNowButton) {
+      return;
+    }
+    const picked = mode || getPublishMode();
+    if (picked === 'scheduled') {
+      els.publishNowButton.textContent = 'Schedule Post';
+      return;
+    }
+    if (picked === 'drip') {
+      els.publishNowButton.textContent = 'In Queue Post';
+      return;
+    }
+    els.publishNowButton.textContent = 'Publish Now';
+  }
+
+  function updateScheduledRowVisibility(mode) {
+    if (!els.scheduledRow) {
+      return;
+    }
+    const picked = mode || getPublishMode();
+    els.scheduledRow.classList.toggle('is-hidden', picked !== 'scheduled');
+  }
+
+  function setPreviewVisibility(visible) {
+    state.previewVisible = !!visible;
+    if (els.composeShell) {
+      els.composeShell.classList.toggle('preview-hidden', !state.previewVisible);
+    }
+    if (els.togglePreviewButton) {
+      const label = state.previewVisible ? 'Hide preview' : 'Show preview';
+      els.togglePreviewButton.setAttribute('aria-pressed', state.previewVisible ? 'true' : 'false');
+      els.togglePreviewButton.setAttribute('aria-label', label);
+      els.togglePreviewButton.setAttribute('title', label);
+    }
+    localStorage.setItem('blog_admin_preview_hidden', state.previewVisible ? '0' : '1');
   }
 
   function localToIso(value) {
@@ -172,6 +256,7 @@
   }
 
   function readComposer() {
+    commitTagInput();
     return {
       draft_id: state.currentDraftId,
       title: els.postTitle.value.trim(),
@@ -187,7 +272,7 @@
     state.suspendAutosave = true;
     state.currentDraftId = draft.draft_id || '';
     els.postTitle.value = draft.title || '';
-    els.postTags.value = draft.tags || '';
+    setComposeTagsFromString(draft.tags || '');
     els.postSummary.value = draft.summary || '';
     els.postContent.value = draft.content || '';
     setPublishMode(draft.publish_mode || 'draft');
@@ -202,7 +287,7 @@
   function resetComposer() {
     state.currentDraftId = '';
     els.postTitle.value = '';
-    els.postTags.value = '';
+    setComposeTags([]);
     els.postSummary.value = '';
     els.postContent.value = '';
     els.postScheduleAt.value = '';
@@ -212,11 +297,105 @@
   }
 
   function refreshDraftLabel() {
+    if (!els.currentDraftLabel) {
+      return;
+    }
     if (state.currentDraftId) {
       els.currentDraftLabel.textContent = 'Editing draft: ' + state.currentDraftId;
     } else {
       els.currentDraftLabel.textContent = 'New draft';
     }
+  }
+
+  function syncComposeTagsField() {
+    if (!els.postTags) {
+      return;
+    }
+    els.postTags.value = state.composeTags.join(', ');
+  }
+
+  function escapeAttr(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function renderComposeTags() {
+    if (!els.postTagsPills) {
+      return;
+    }
+    if (!state.composeTags.length) {
+      els.postTagsPills.innerHTML = '';
+      return;
+    }
+    let html = '';
+    state.composeTags.forEach(function (tag) {
+      html += '<span class="tag-pill">';
+      html += '<span>' + escapeHtml(tag) + '</span>';
+      html += '<button type="button" class="tag-pill-remove" data-remove-tag="' + escapeAttr(tag) + '" aria-label="Remove tag ' + escapeAttr(tag) + '">×</button>';
+      html += '</span>';
+    });
+    els.postTagsPills.innerHTML = html;
+  }
+
+  function normalizeTagValue(tag) {
+    return String(tag || '').trim().replace(/\s+/g, '-');
+  }
+
+  function setComposeTags(tags) {
+    const list = Array.from(tags || [])
+      .map(normalizeTagValue)
+      .filter(function (tag) { return !!tag; });
+    state.composeTags = list.filter(function (tag, idx) {
+      return list.indexOf(tag) === idx;
+    });
+    syncComposeTagsField();
+    renderComposeTags();
+  }
+
+  function setComposeTagsFromString(tagsValue) {
+    const list = String(tagsValue || '')
+      .split(',')
+      .map(normalizeTagValue)
+      .filter(function (tag) { return !!tag; });
+    setComposeTags(list);
+  }
+
+  function addComposeTag(rawTag) {
+    const tag = normalizeTagValue(rawTag);
+    if (!tag) {
+      return false;
+    }
+    if (state.composeTags.indexOf(tag) !== -1) {
+      return false;
+    }
+    state.composeTags.push(tag);
+    syncComposeTagsField();
+    renderComposeTags();
+    return true;
+  }
+
+  function removeComposeTag(tag) {
+    const next = state.composeTags.filter(function (item) { return item !== tag; });
+    setComposeTags(next);
+  }
+
+  function commitTagInput() {
+    if (!els.postTagsInput) {
+      return false;
+    }
+    const raw = els.postTagsInput.value || '';
+    const parts = raw.split(',');
+    let changed = false;
+    parts.forEach(function (part) {
+      if (addComposeTag(part)) {
+        changed = true;
+      }
+    });
+    els.postTagsInput.value = '';
+    return changed;
   }
 
   function renderPreview() {
@@ -244,7 +423,7 @@
     textarea.value = prefix + updated.text + suffix;
     placeCursor(textarea, start + updated.cursorStart, start + updated.cursorEnd);
     renderPreview();
-    queueAutosave();
+    queueAutosave('saving');
   }
 
   function toggleWrap(left, right) {
@@ -321,16 +500,24 @@
         return;
       }
 
-      if (!data.is_admin) {
-        setAuthMessage('Logged in as <strong>' + data.username + '</strong>, but no admin permissions.', 'warn');
-        return;
-      }
-
       state.username = data.username;
+      state.playerName = data.player_name || data.username || '';
+      state.isAdmin = !!data.is_admin;
       state.csrfToken = data.csrf_token || state.csrfToken;
       localStorage.setItem('csrf_token', state.csrfToken || '');
       setAuthMessage('', '');
-      els.adminPanel.style.display = 'block';
+      els.adminPanel.style.display = 'grid';
+      if (els.accountPlayerName) {
+        els.accountPlayerName.value = state.playerName;
+      }
+
+      if (!state.isAdmin) {
+        setAccountOnlyMode(true);
+        activateSection('account', true);
+        return;
+      }
+
+      setAccountOnlyMode(false);
 
       await Promise.all([loadConfig(), loadDrafts(), loadQueue()]);
       renderPreview();
@@ -348,6 +535,9 @@
     if (els.adminTheme && data.theme) {
       els.adminTheme.value = data.theme;
     }
+    if (els.adminTheme) {
+      applyThemePreview(els.adminTheme.value);
+    }
     els.registrationEnabled.checked = data.registration_enabled !== false;
     if (typeof data.drip_interval_hours !== 'undefined') {
       els.dripInterval.value = String(data.drip_interval_hours);
@@ -355,7 +545,11 @@
       const legacyMinutes = Number(data.drip_interval_minutes || 240);
       els.dripInterval.value = String(Math.max(legacyMinutes / 60, 1 / 60));
     }
-    els.dripJitter.value = String(data.drip_jitter_minutes || 0);
+    if (typeof data.drip_randomness_minutes !== 'undefined') {
+      els.dripRandomness.value = String(data.drip_randomness_minutes || 0);
+    } else {
+      els.dripRandomness.value = String(data.drip_jitter_minutes || 0);
+    }
     els.feedFullText.checked = data.feed_full_text !== false;
     els.feedItems.value = String(data.feed_items || 50);
   }
@@ -367,7 +561,7 @@
         theme: els.adminTheme ? els.adminTheme.value : '',
         registration_enabled: els.registrationEnabled.checked ? 'true' : 'false',
         drip_interval_hours: els.dripInterval.value.trim(),
-        drip_jitter_minutes: els.dripJitter.value.trim(),
+        drip_randomness_minutes: els.dripRandomness.value.trim(),
         feed_full_text: els.feedFullText.checked ? 'true' : 'false',
         feed_items: els.feedItems.value.trim()
       }, true);
@@ -378,6 +572,28 @@
       await loadQueue();
     } catch (err) {
       setOutput(els.outputConfig, 'Error: ' + err.message, 'error');
+    }
+  }
+
+  async function saveAccount() {
+    if (!els.accountPlayerName) {
+      return;
+    }
+    try {
+      const data = await apiPost('/cgi/blog-update-account', {
+        player_name: els.accountPlayerName.value.trim()
+      }, true);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to save account');
+      }
+      state.playerName = data.player_name || state.username;
+      const navName = document.getElementById('nav-user-name');
+      if (navName) {
+        navName.textContent = state.playerName;
+      }
+      setOutput(els.outputAccount, 'Account updated.', 'ok');
+    } catch (err) {
+      setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
     }
   }
 
@@ -420,7 +636,10 @@
     const intervalHours = typeof data.drip_interval_hours !== 'undefined'
       ? data.drip_interval_hours
       : (Number(data.drip_interval_minutes || 240) / 60);
-    let html = '<p class="muted">Global drip: every ' + escapeHtml(String(intervalHours)) + ' hour(s), jitter up to ' + escapeHtml(String(data.drip_jitter_minutes)) + ' min. Next drip: ' + escapeHtml(nextDripText) + '</p>';
+    const randomnessMinutes = typeof data.drip_randomness_minutes !== 'undefined'
+      ? data.drip_randomness_minutes
+      : data.drip_jitter_minutes;
+    let html = '<p class="muted">Global drip: every ' + escapeHtml(String(intervalHours)) + ' hour(s), randomness up to ' + escapeHtml(String(randomnessMinutes || 0)) + ' min. Next drip: ' + escapeHtml(nextDripText) + '</p>';
     html += '<div class="draft-grid">';
     queue.forEach(function (item) {
       html += '<div class="draft-card">';
@@ -538,14 +757,14 @@
     }
   }
 
-  function queueAutosave() {
+  function queueAutosave(reason) {
     if (state.suspendAutosave) {
       return;
     }
     if (state.autosaveTimer) {
       clearTimeout(state.autosaveTimer);
     }
-    els.autosaveStatus.textContent = 'Typing...';
+    els.autosaveStatus.textContent = reason === 'typing' ? 'Typing...' : 'Saving...';
     state.autosaveTimer = setTimeout(autosave, 1500);
   }
 
@@ -615,15 +834,61 @@
 
   function bindEvents() {
     document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+    if (els.adminTheme) {
+      els.adminTheme.addEventListener('change', function () {
+        applyThemePreview(els.adminTheme.value);
+      });
+    }
 
-    document.getElementById('btn-new-draft').addEventListener('click', function () {
-      resetComposer();
-      els.autosaveStatus.textContent = 'New draft';
+    if (els.postTagsInput) {
+      els.postTagsInput.addEventListener('keydown', function (event) {
+        if (event.key === ',' || event.key === 'Enter') {
+          event.preventDefault();
+          if (commitTagInput()) {
+            queueAutosave('saving');
+          }
+          return;
+        }
+        if (event.key === 'Backspace' && !els.postTagsInput.value && state.composeTags.length) {
+          removeComposeTag(state.composeTags[state.composeTags.length - 1]);
+          queueAutosave('saving');
+        }
+      });
+
+      els.postTagsInput.addEventListener('blur', function () {
+        if (commitTagInput()) {
+          queueAutosave('saving');
+        }
+      });
+    }
+
+    if (els.postTagsPills) {
+      els.postTagsPills.addEventListener('click', function (event) {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        const tag = target.getAttribute('data-remove-tag');
+        if (!tag) {
+          return;
+        }
+        removeComposeTag(tag);
+        queueAutosave('saving');
+      });
+    }
+
+    document.getElementById('btn-publish-now').addEventListener('click', function () {
+      const mode = getPublishMode();
+      if (mode === 'scheduled') {
+        saveComposer('queue_scheduled');
+        return;
+      }
+      if (mode === 'drip') {
+        saveComposer('queue_drip');
+        return;
+      }
+      saveComposer('publish_now');
     });
-    document.getElementById('btn-save-draft').addEventListener('click', function () { saveComposer('save_draft'); });
-    document.getElementById('btn-queue-scheduled').addEventListener('click', function () { saveComposer('queue_scheduled'); });
-    document.getElementById('btn-queue-drip').addEventListener('click', function () { saveComposer('queue_drip'); });
-    document.getElementById('btn-publish-now').addEventListener('click', function () { saveComposer('publish_now'); });
     document.getElementById('btn-delete-current').addEventListener('click', function () {
       if (!state.currentDraftId) {
         setOutput(els.outputCompose, 'No current draft selected.', 'warn');
@@ -633,6 +898,11 @@
         setOutput(els.outputCompose, 'Error: ' + err.message, 'error');
       });
     });
+    if (els.togglePreviewButton) {
+      els.togglePreviewButton.addEventListener('click', function () {
+        setPreviewVisibility(!state.previewVisible);
+      });
+    }
 
     document.getElementById('btn-refresh-drafts').addEventListener('click', function () {
       loadDrafts().catch(function (err) {
@@ -647,6 +917,10 @@
     });
 
     document.getElementById('btn-run-scheduler').addEventListener('click', runSchedulerNow);
+    const saveAccountBtn = document.getElementById('btn-save-account');
+    if (saveAccountBtn) {
+      saveAccountBtn.addEventListener('click', saveAccount);
+    }
 
     document.querySelectorAll('[data-toolbar]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -672,15 +946,19 @@
       }
     });
 
-    [els.postTitle, els.postTags, els.postSummary, els.postContent, els.postScheduleAt].forEach(function (el) {
+    [els.postTitle, els.postSummary, els.postContent, els.postScheduleAt].forEach(function (el) {
       el.addEventListener('input', function () {
         renderPreview();
-        queueAutosave();
+        const typing = (el === els.postTitle || el === els.postSummary || el === els.postContent);
+        queueAutosave(typing ? 'typing' : 'saving');
       });
     });
 
     publishModeInputs.forEach(function (input) {
-      input.addEventListener('change', queueAutosave);
+      input.addEventListener('change', function () {
+        updatePrimaryPublishButton();
+        queueAutosave('saving');
+      });
     });
 
     els.draftsList.addEventListener('click', function (event) {
@@ -740,5 +1018,8 @@
   initSectionNavigation();
   checkAuth();
   refreshDraftLabel();
+  updatePrimaryPublishButton();
+  updateScheduledRowVisibility();
+  setPreviewVisibility(state.previewVisible);
   renderPreview();
 })();

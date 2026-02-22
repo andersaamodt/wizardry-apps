@@ -121,7 +121,19 @@ title: Blog Admin
 <h3>Compose</h3>
 </div>
 <div class="composer-head-actions">
-<button type="button" id="btn-toggle-preview" class="quiet-toggle" aria-pressed="true">Hide Preview</button>
+<button type="button" id="btn-toggle-preview" class="quiet-toggle" aria-pressed="true" aria-label="Hide preview" title="Hide preview">
+<svg class="preview-icon preview-icon-visible" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+<path d="M2.5 12C4.7 8 8.1 6 12 6C15.9 6 19.3 8 21.5 12C19.3 16 15.9 18 12 18C8.1 18 4.7 16 2.5 12Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/>
+</svg>
+<svg class="preview-icon preview-icon-hidden" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+<path d="M3.2 4.2L20.8 19.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+<path d="M9.9 6.4C10.6 6.1 11.3 6 12 6C15.9 6 19.3 8 21.5 12C20.8 13.3 19.9 14.5 18.9 15.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M14.1 17.6C13.4 17.9 12.7 18 12 18C8.1 18 4.7 16 2.5 12C3.2 10.7 4.1 9.5 5.1 8.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 9C13.7 9 15 10.3 15 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
+<span class="sr-only">Toggle preview</span>
+</button>
 </div>
 </div>
 
@@ -1063,19 +1075,41 @@ body {
 }
 
 #admin-panel button.quiet-toggle {
-  border: 1px solid #c4d4f1;
-  border-radius: 999px;
-  background: #f4f8ff;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: #29457f;
   font-size: 0.8rem;
   font-weight: 620;
-  padding: 0.28rem 0.62rem;
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #admin-panel button.quiet-toggle:hover {
   background: #e9f1ff;
-  border-color: #a8c0ea;
   color: #1e3f7b;
+}
+
+#admin-panel button.quiet-toggle .preview-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+#admin-panel button.quiet-toggle .preview-icon-hidden {
+  display: none;
+}
+
+#admin-panel button.quiet-toggle[aria-pressed="false"] .preview-icon-visible {
+  display: none;
+}
+
+#admin-panel button.quiet-toggle[aria-pressed="false"] .preview-icon-hidden {
+  display: block;
 }
 
 .row-actions {
