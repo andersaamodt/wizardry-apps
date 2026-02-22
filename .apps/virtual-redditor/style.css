@@ -2426,6 +2426,12 @@ label {
   margin-top: 10px;
 }
 
+.settings-global-instructions-actions button,
+.settings-actions button {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
 #settings-global-msg {
   margin-top: 8px;
   min-height: 1.1rem;
