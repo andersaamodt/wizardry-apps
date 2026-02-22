@@ -81,9 +81,10 @@ assert_contains "$ui_js" "safeStep(\"renderDictateButton\", renderDictateButton)
 assert_contains "$ui_js" "safeStep(\"renderDictationInstallSettings\", renderDictationInstallSettings);"
 assert_contains "$ui_js" 'dictationInstallReady: false,'
 assert_contains "$ui_js" 'dictationInstalled: false,'
-assert_contains "$ui_js" "function dictationInstallSizeLabel()"
+assert_contains "$ui_js" "var DICTATION_PREINSTALL_SIZE_BYTES = 1400000000;"
+assert_contains "$ui_js" "function dictationPreinstallSizeLabel()"
 assert_contains "$ui_js" "var info = state.dictationInstallInfo || null;"
-assert_contains "$ui_js" 'return "Install dictation (" + sizeLabel + ")";'
+assert_contains "$ui_js" 'return "Install dictation";'
 assert_contains "$ui_js" "function dictationInstallRunningButtonLabel(job)"
 assert_contains "$ui_js" "function dictationDownloadAmountLabel(job)"
 assert_contains "$ui_js" "label += \" (\" + sizeText + \")\";"
@@ -94,6 +95,7 @@ assert_contains "$ui_js" "state.dictationInstallReady = false;"
 assert_contains "$ui_js" "state.dictationInstallReady = true;"
 assert_contains "$ui_js" "function loadDictationStatus(options)"
 assert_contains "$ui_js" "apiGet(\"dictation_status\", {}, { timeoutMs: 12000 })"
+assert_contains "$ui_js" "apiGet(\"dictation_install_info\", {}, { timeoutMs: 12000 })"
 assert_contains "$ui_js" "function onDictateClick(event)"
 assert_contains "$ui_js" "apiPost(\"dictate\", { duration: \"20\" }, { timeoutMs: 220000 })"
 assert_contains "$ui_js" "function installDictationSoftware()"
@@ -114,9 +116,10 @@ assert_contains "$ui_js_source" "apiPost(\"dictate\", { duration: \"20\" }, { ti
 assert_contains "$ui_js_source" 'dictationInstallStatus: document.getElementById("dictation-install-status"),'
 assert_contains "$ui_js_source" 'dictationInstallReady: false,'
 assert_contains "$ui_js_source" 'dictationInstalled: false,'
-assert_contains "$ui_js_source" "function dictationInstallSizeLabel()"
+assert_contains "$ui_js_source" "var DICTATION_PREINSTALL_SIZE_BYTES = 1400000000;"
+assert_contains "$ui_js_source" "function dictationPreinstallSizeLabel()"
 assert_contains "$ui_js_source" "var info = state.dictationInstallInfo || null;"
-assert_contains "$ui_js_source" 'return "Install dictation (" + sizeLabel + ")";'
+assert_contains "$ui_js_source" 'return "Install dictation";'
 assert_contains "$ui_js_source" "function dictationDownloadAmountLabel(job)"
 assert_contains "$ui_js_source" "label += \" (\" + sizeText + \")\";"
 assert_contains "$ui_js_source" "(busy && (!runningInstall || state.dictationInstallCancelling));"
@@ -124,6 +127,7 @@ assert_contains "$ui_js_source" "buttonLabel = \"Checking...\";"
 assert_contains "$ui_js_source" "el.installDictationBtn.classList.toggle(\"ui-pending-spinner\", showPending);"
 assert_contains "$ui_js_source" "function loadDictationStatus(options)"
 assert_contains "$ui_js_source" "apiGet(\"dictation_status\", {}, { timeoutMs: 12000 })"
+assert_contains "$ui_js_source" "apiGet(\"dictation_install_info\", {}, { timeoutMs: 12000 })"
 assert_contains "$ui_js_source" "apiPost(\"dictation_install_start\", {}, { timeoutMs: 12000 })"
 assert_contains "$ui_js_source" "apiPost(\"dictation_install_cancel\", { job_id: jobId }, { timeoutMs: 12000 })"
 assert_contains "$ui_js_source" "apiPost(\"dictation_uninstall\", {}, { timeoutMs: 12000 })"

@@ -578,6 +578,7 @@
   var pendingCommandApproval = null;
   var approvalAnswerPending = false;
   var TOOLTIP_DELAY_MS = 520;
+  var DICTATION_PREINSTALL_SIZE_BYTES = 1400000000;
   var stateGetInFlight = null;
   var stateGetInFlightKey = "";
 
@@ -12250,25 +12251,16 @@
     if (state.dictationInstalled) {
       return "Uninstall dictation";
     }
-    var sizeLabel = dictationInstallSizeLabel();
-    if (!sizeLabel) {
-      return "Install dictation";
-    }
-    return "Install dictation (" + sizeLabel + ")";
+    return "Install dictation";
   }
 
-  function dictationInstallSizeLabel() {
+  function dictationPreinstallSizeLabel() {
     var info = state.dictationInstallInfo || null;
     var infoBytes = dictationWholeNumber(info && info.download_size_bytes);
     if (infoBytes > 0) {
-      return dictationGigabytesLabel(infoBytes) + " GB";
+      return dictationGigabytesLabel(infoBytes, 1) + " GB";
     }
-    var job = state.dictationInstallJob || null;
-    var jobBytes = dictationWholeNumber(job && job.download_size_bytes);
-    if (jobBytes > 0) {
-      return dictationGigabytesLabel(jobBytes) + " GB";
-    }
-    return "";
+    return dictationGigabytesLabel(DICTATION_PREINSTALL_SIZE_BYTES, 1) + " GB";
   }
 
   function dictationInstallRunningButtonLabel(job) {
@@ -12387,19 +12379,32 @@
     var silent = !!opts.silent;
     state.dictationInstallInfoLoading = true;
     renderDictationInstallSettings();
-    return apiGet("dictation_status", {}, { timeoutMs: 12000 }).then(function (response) {
-      if (!response || !response.success) {
-        throw new Error((response && response.error) || "Could not load dictation status");
+    return Promise.all([
+      apiGet("dictation_status", {}, { timeoutMs: 12000 }),
+      apiGet("dictation_install_info", {}, { timeoutMs: 12000 }).catch(function () {
+        return null;
+      })
+    ]).then(function (results) {
+      var statusResponse = results[0] || null;
+      var infoResponse = results[1] || null;
+      if (!statusResponse || !statusResponse.success) {
+        throw new Error((statusResponse && statusResponse.error) || "Could not load dictation status");
       }
-      var backend = trim(String(response.backend || ""));
-      var preferred = trim(String(response.preferred || ""));
-      var installed = response.installed === true;
-      state.dictationInstallInfo = response;
+      var backend = trim(String(statusResponse.backend || ""));
+      var preferred = trim(String(statusResponse.preferred || ""));
+      var installed = statusResponse.installed === true;
+      var combined = statusResponse;
+      if (infoResponse && infoResponse.success && infoResponse.download_size_bytes) {
+        combined = Object.assign({}, statusResponse, {
+          download_size_bytes: infoResponse.download_size_bytes
+        });
+      }
+      state.dictationInstallInfo = combined;
       state.dictationInstalled = installed;
       state.dictationBackend = backend;
       state.dictationPreferredBackend = preferred;
       state.dictationInstallError = "";
-      return response;
+      return combined;
     }).catch(function (error) {
       state.dictationInstallInfo = null;
       state.dictationInstallError = error && error.message ? error.message : "Could not load dictation status";
@@ -12475,6 +12480,8 @@
         } else {
           statusText = "Dictation is installed.";
         }
+      } else if (!statusText && !state.dictationInstalled && !showChecking) {
+        statusText = dictationPreinstallSizeLabel();
       }
       if (statusText) {
         el.dictationInstallStatus.textContent = statusText;

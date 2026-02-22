@@ -5165,6 +5165,75 @@ voice_component_download_size_bytes() {
   esac
 }
 
+voice_component_hf_repo_id() {
+  component=$1
+  case "$component" in
+    mlx-whisper)
+      printf '%s' "mlx-community/whisper-small-mlx"
+      ;;
+    parakeet)
+      printf '%s' "nvidia/parakeet-tdt-0.6b-v2"
+      ;;
+    *)
+      printf '%s' ""
+      ;;
+  esac
+}
+
+voice_component_download_size_bytes_from_web() {
+  component=$1
+  repo_id=$(voice_component_hf_repo_id "$component")
+  if [ -z "$repo_id" ] || ! command -v curl >/dev/null 2>&1; then
+    printf '%s' ""
+    return 0
+  fi
+
+  api_url="https://huggingface.co/api/models/$repo_id/tree/main?recursive=1"
+  set +e
+  if command -v timeout >/dev/null 2>&1; then
+    model_json=$(timeout 12 curl -fsSL --max-time 10 "$api_url" 2>/dev/null)
+    fetch_rc=$?
+  elif command -v gtimeout >/dev/null 2>&1; then
+    model_json=$(gtimeout 12 curl -fsSL --max-time 10 "$api_url" 2>/dev/null)
+    fetch_rc=$?
+  else
+    model_json=$(curl -fsSL --max-time 10 "$api_url" 2>/dev/null)
+    fetch_rc=$?
+  fi
+  set -e
+
+  if [ "$fetch_rc" -ne 0 ] || [ -z "$model_json" ]; then
+    printf '%s' ""
+    return 0
+  fi
+
+  size_bytes=$(printf '%s' "$model_json" \
+    | tr -d '\n' \
+    | sed 's/},{"type":"file"/\
+{"type":"file"/g' \
+    | awk '
+      {
+        if (match($0, /"size":[0-9]+/)) {
+          token = substr($0, RSTART, RLENGTH)
+          gsub(/[^0-9]/, "", token)
+          if (token != "") sum += (token + 0)
+        }
+      }
+      END {
+        if (sum > 0) printf "%.0f", sum
+      }
+    ')
+
+  case "$size_bytes" in
+    *[!0-9]*|"")
+      printf '%s' ""
+      ;;
+    *)
+      printf '%s' "$size_bytes"
+      ;;
+  esac
+}
+
 voice_component_state_file() {
   component=$1
   printf '%s/%s/installed\n' "$VOICE_RECOGNITION_ROOT_DIR" "$component"
@@ -13125,6 +13194,17 @@ EOF
     mkdir -p "$job_dir"
     log_file="$job_dir/log"
     download_size_bytes=$(voice_component_download_size_bytes "$install_component")
+    live_download_size_bytes=$(voice_component_download_size_bytes_from_web "$install_component")
+    case "$live_download_size_bytes" in
+      *[!0-9]*|"")
+        :
+        ;;
+      *)
+        if [ "$live_download_size_bytes" -gt 0 ] 2>/dev/null; then
+          download_size_bytes=$live_download_size_bytes
+        fi
+        ;;
+    esac
 
     printf '%s\n' "$install_component" > "$job_dir/component"
     printf '%s\n' "$fallback_component" > "$job_dir/fallback_component"
