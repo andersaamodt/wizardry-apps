@@ -3344,6 +3344,11 @@
         if (!inSettings && !document.getElementById('settings-panel').classList.contains('hidden')) {
           toggleSettingsPanel(false);
         }
+        var inMakeProject = event.target.closest('.make-project-inline');
+        if (!inMakeProject && state.revealedMakeProjectPath && !state.pendingMakeProjectPath) {
+          state.revealedMakeProjectPath = '';
+          render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        }
       });
 
       document.addEventListener('keydown', function (event) {
