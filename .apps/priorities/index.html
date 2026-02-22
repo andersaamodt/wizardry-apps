@@ -15,49 +15,11 @@
       visibility: hidden;
     }
 
-    #boot-loading {
-      display: none;
-    }
-
-    html.priorities-booting #boot-loading {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      font-family: "Avenir Next", "Segoe UI", sans-serif;
-      font-size: 15px;
-      color: #6b7280;
-      letter-spacing: 0.01em;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-
-    #boot-loading .boot-spinner {
-      width: 14px;
-      height: 14px;
-      border-radius: 999px;
-      border: 2px solid rgba(107, 114, 128, 0.22);
-      border-top-color: rgba(107, 114, 128, 0.85);
-      animation: priorities-boot-spin 0.7s linear infinite;
-    }
-
-    @keyframes priorities-boot-spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
   </style>
   <link rel="stylesheet" href="style.css">
   <link id="priorities-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=priorities20260220a">
 </head>
 <body>
-  <div id="boot-loading" aria-live="polite" aria-label="Loading">
-    <span class="boot-spinner" aria-hidden="true"></span>
-    <span>Loading...</span>
-  </div>
   <div id="startup-modal" class="startup-modal hidden" role="dialog" aria-modal="true" aria-labelledby="startup-title">
     <div class="startup-card">
       <h2 id="startup-title">Choose Priorities Folder</h2>
