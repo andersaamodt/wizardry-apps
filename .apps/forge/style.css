@@ -1145,6 +1145,11 @@ button:disabled {
   border-left-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
 }
 
+#action-run-menu:hover,
+#action-run-menu:focus-visible {
+  background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
+}
+
 #action-build,
 #action-run,
 #action-run-menu,
@@ -2205,7 +2210,7 @@ button:disabled {
 
 .pipeline-sections .row-mini:hover {
   border-color: transparent;
-  background: color-mix(in srgb, var(--section-accent-soft) 74%, var(--section-bg));
+  background: color-mix(in srgb, var(--accent-soft, var(--section-bg)) 82%, var(--section-bg));
   box-shadow: none;
 }
 
