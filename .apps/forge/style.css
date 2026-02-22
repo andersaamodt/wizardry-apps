@@ -1231,8 +1231,9 @@ input[type="checkbox"]:disabled {
 .selected-title-row {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 0.46rem;
+  row-gap: 0.2rem;
   min-height: 1.7rem;
   min-width: 0;
   overflow: hidden;
@@ -1334,12 +1335,12 @@ input[type="checkbox"]:disabled {
   display: inline-grid;
   grid-template-columns: minmax(1.45rem, 1fr) auto;
   align-items: center;
-  max-width: min(14rem, 34vw);
+  max-width: min(14rem, 100%);
   column-gap: 0.62rem;
   margin-top: 0;
-  margin-left: auto;
+  margin-left: 0;
   min-width: calc(1.45rem + 1.45rem + 0.62rem);
-  flex: 0 0 auto;
+  flex: 0 0 100%;
   overflow: hidden;
   -webkit-app-region: no-drag;
 }
