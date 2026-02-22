@@ -50,6 +50,7 @@ assert_contains "$api" "  dictation_install)"
 assert_contains "$api" "run_with_timeout \"\$timeout_sec\" \"\$@\" > \"\$dictate_output_file\" 2> \"\$dictate_error_file\""
 assert_contains "$api" "printf '{\"success\":true,\"text\":\"%s\"}\\n' \"\$(json_escape \"\$dictated_text\")\""
 assert_contains "$api" "preferred_voice_component_for_host()"
+assert_contains "$api" "\"downloaded_bytes\":\"%s\""
 assert_contains "$api" "run_with_timeout 1800 \"\$install_bin\" 2>&1"
 
 dictate_block=$(awk '
@@ -81,7 +82,8 @@ assert_contains "$ui_js" 'dictationInstalled: false,'
 assert_contains "$ui_js" 'var DICTATION_INSTALL_SIZE_LABEL = "1.4 GB";'
 assert_contains "$ui_js" 'return "Install dictation (" + DICTATION_INSTALL_SIZE_LABEL + ")";'
 assert_contains "$ui_js" "function dictationInstallRunningButtonLabel(job)"
-assert_contains "$ui_js" "return \"Downloading dictation \" + pctText + \"%\";"
+assert_contains "$ui_js" "function dictationDownloadAmountLabel(job)"
+assert_contains "$ui_js" "label += \" (\" + sizeText + \")\";"
 assert_contains "$ui_js" "el.installDictationBtn.disabled = !state.dictationInstallReady || state.dictationInstallInfoLoading || busy;"
 assert_contains "$ui_js" "buttonLabel = \"Checking...\";"
 assert_contains "$ui_js" "el.installDictationBtn.classList.toggle(\"ui-pending-spinner\", showPending);"
@@ -107,6 +109,8 @@ assert_contains "$ui_js_source" 'dictationInstallReady: false,'
 assert_contains "$ui_js_source" 'dictationInstalled: false,'
 assert_contains "$ui_js_source" 'var DICTATION_INSTALL_SIZE_LABEL = "1.4 GB";'
 assert_contains "$ui_js_source" 'return "Install dictation (" + DICTATION_INSTALL_SIZE_LABEL + ")";'
+assert_contains "$ui_js_source" "function dictationDownloadAmountLabel(job)"
+assert_contains "$ui_js_source" "label += \" (\" + sizeText + \")\";"
 assert_contains "$ui_js_source" "el.installDictationBtn.disabled = !state.dictationInstallReady || state.dictationInstallInfoLoading || busy;"
 assert_contains "$ui_js_source" "buttonLabel = \"Checking...\";"
 assert_contains "$ui_js_source" "el.installDictationBtn.classList.toggle(\"ui-pending-spinner\", showPending);"

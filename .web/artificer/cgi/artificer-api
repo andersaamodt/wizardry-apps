@@ -13132,6 +13132,7 @@ EOF_RUNNER
     fallback_used=$(read_file_line "$job_dir/fallback_used" "0")
     download_size_bytes=$(read_file_line "$job_dir/download_size_bytes" "")
     runtime_bytes_start=$(read_file_line "$job_dir/runtime_bytes_start" "0")
+    downloaded_bytes=""
     status_reason=""
 
     if [ "$status" = "running" ] && [ -n "$install_pid" ]; then
@@ -13148,6 +13149,25 @@ EOF_RUNNER
     if [ "$status" = "failed" ] && [ -z "$log_tail" ] && [ -n "$status_reason" ]; then
       log_tail=$status_reason
     fi
+
+    runtime_bytes_now=$(voice_runtime_usage_bytes)
+    case "$runtime_bytes_now" in
+      *[!0-9]*|"")
+        runtime_bytes_now=""
+        ;;
+    esac
+    case "$runtime_bytes_start:$runtime_bytes_now" in
+      *[!0-9]*:*|*:*[!0-9]*)
+        downloaded_bytes=""
+        ;;
+      *)
+        downloaded_bytes=$((runtime_bytes_now - runtime_bytes_start))
+        if [ "$downloaded_bytes" -lt 0 ] 2>/dev/null; then
+          downloaded_bytes=0
+        fi
+        ;;
+    esac
+
     phase="downloading"
     progress_pct="0"
     if [ "$status" = "done" ]; then
@@ -13161,23 +13181,13 @@ EOF_RUNNER
       phase=$(printf '%s\n' "$parse_result" | cut -d'|' -f1)
       progress_pct=$(printf '%s\n' "$parse_result" | cut -d'|' -f2)
       [ -n "$phase" ] || phase="downloading"
-      case "$download_size_bytes:$runtime_bytes_start" in
-        *[!0-9]*:*|*:*[!0-9]*)
+      case "$download_size_bytes:$downloaded_bytes" in
+        *[!0-9]*:*|*:*[!0-9]*|*:)
           :
           ;;
         *)
           if [ "$download_size_bytes" -gt 0 ] 2>/dev/null; then
-            runtime_bytes_now=$(voice_runtime_usage_bytes)
-            case "$runtime_bytes_now" in
-              *[!0-9]*|"")
-                runtime_bytes_now=0
-                ;;
-            esac
-            runtime_bytes_delta=$((runtime_bytes_now - runtime_bytes_start))
-            if [ "$runtime_bytes_delta" -lt 0 ] 2>/dev/null; then
-              runtime_bytes_delta=0
-            fi
-            bytes_progress_pct=$(progress_pct_from_bytes "$runtime_bytes_delta" "$download_size_bytes")
+            bytes_progress_pct=$(progress_pct_from_bytes "$downloaded_bytes" "$download_size_bytes")
             progress_pct=$(progress_pct_max "$progress_pct" "$bytes_progress_pct")
           fi
           ;;
@@ -13189,11 +13199,12 @@ EOF_RUNNER
       fallback_json=true
     fi
 
-    printf '{"success":true,"job":{"id":"%s","status":"%s","phase":"%s","progress_pct":"%s","component":"%s","component_label":"%s","installed":"%s","backend":"%s","fallback_component":"%s","fallback":%s,"download_size_bytes":"%s","started":"%s","finished":"%s","exit_code":"%s","log":"%s"}}\n' \
+    printf '{"success":true,"job":{"id":"%s","status":"%s","phase":"%s","progress_pct":"%s","downloaded_bytes":"%s","component":"%s","component_label":"%s","installed":"%s","backend":"%s","fallback_component":"%s","fallback":%s,"download_size_bytes":"%s","started":"%s","finished":"%s","exit_code":"%s","log":"%s"}}\n' \
       "$(json_escape "$job_id")" \
       "$(json_escape "$status")" \
       "$(json_escape "$phase")" \
       "$(json_escape "$progress_pct")" \
+      "$(json_escape "$downloaded_bytes")" \
       "$(json_escape "$component")" \
       "$(json_escape "$(voice_component_label "$component")")" \
       "$(json_escape "$installed_component")" \

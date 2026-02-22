@@ -136,10 +136,6 @@ if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -d "$WIZARDRY_APPS_ROOT" ]; then
   cd "$WIZARDRY_APPS_ROOT"
 fi
 
-if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -f "$WIZARDRY_APPS_ROOT/.apps/forge/index.html" ] && [ -x "$WIZARDRY_APPS_ROOT/.apps/forge/scripts/forge-backend.sh" ]; then
-  APP_ENTRY="$WIZARDRY_APPS_ROOT/.apps/forge"
-fi
-
 exec "$APPDIR/MacOS/wizardry-host" "$APP_ENTRY"
 APP
 chmod +x "$macos_dir/app-forge"
