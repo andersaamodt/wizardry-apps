@@ -194,6 +194,7 @@
       windowHeightRequested: 640,
       windowAutoGrowTimer: null,
       windowSizingReady: false,
+      autoWindowGrowEnabled: false,
       uiPrefs: {},
       rootPrefSaveTimer: null,
       snapshotPrefSaveTimer: null,
@@ -545,6 +546,9 @@
     }
 
     function scheduleAutoGrowWindowWidth() {
+      if (!state.autoWindowGrowEnabled) {
+        return;
+      }
       if (!state.windowSizingReady) {
         return;
       }
