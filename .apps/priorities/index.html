@@ -1913,58 +1913,46 @@
         return;
       }
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
+      if (currentRoot === '.') {
+        up.classList.remove('hidden');
+        return;
+      }
       var parent = parentDirOfPath(currentRoot);
       var hasParent = !!parent && parent !== currentRoot;
-      up.classList.toggle('hidden', state.drillStack.length === 0 && !hasParent);
+      up.classList.toggle('hidden', !hasParent);
     }
 
     function drillInto(path) {
       if (!path) {
         return;
       }
-      var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
-      state.drillStack.push(currentRoot);
       document.getElementById('root-dir').value = path;
-      setRootAndRefresh({ keepDrillStack: true, persistRoot: false });
+      setRootAndRefresh({ persistRoot: false });
       updateDrillUpVisibility();
     }
 
     async function drillUp() {
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
-      var previous = '';
-      while (state.drillStack.length && !previous) {
-        var candidate = String(state.drillStack.pop() || '').trim();
-        if (!candidate || candidate === currentRoot) {
-          continue;
+      var nextRoot = '';
+      try {
+        var parentResult = await runBackend(['parent', currentRoot]);
+        var backendParent = String((parentResult && parentResult.stdout) || '').trim();
+        if (backendParent && backendParent !== currentRoot) {
+          nextRoot = backendParent;
         }
-        try {
-          await runBackend(['parent', candidate]);
-          previous = candidate;
-        } catch (_) {
-          // Ignore stale entries and continue checking older stack values.
-        }
+      } catch (_) {
+        // Fall through to local parent fallback.
       }
-      if (!previous) {
-        try {
-          var parentResult = await runBackend(['parent', currentRoot]);
-          var backendParent = String((parentResult && parentResult.stdout) || '').trim();
-          if (backendParent && backendParent !== currentRoot) {
-            previous = backendParent;
-          }
-        } catch (_) {
-          // Fall through to local parent fallback.
-        }
-      }
-      if (!previous) {
+      if (!nextRoot) {
         var parent = parentDirOfPath(currentRoot);
         if (!parent || parent === currentRoot) {
           updateDrillUpVisibility();
           return;
         }
-        previous = parent;
+        nextRoot = parent;
       }
-      document.getElementById('root-dir').value = previous;
-      setRootAndRefresh({ keepDrillStack: true, persistRoot: false });
+      document.getElementById('root-dir').value = nextRoot;
+      setRootAndRefresh({ persistRoot: false });
       updateDrillUpVisibility();
     }
 
@@ -2222,7 +2210,8 @@
             return;
           }
           event.preventDefault();
-          if (state.drillStack && state.drillStack.length) {
+          var drillUpButton = document.getElementById('drill-up');
+          if (drillUpButton && !drillUpButton.classList.contains('hidden')) {
             drillUp();
             return;
           }
