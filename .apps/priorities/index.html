@@ -196,8 +196,46 @@
       nextActionCacheSaveTimer: null,
       startupSnapshotRestored: false,
       hostBootReadySent: false,
-      snapshotLastSerialized: ''
+      snapshotLastSerialized: '',
+      reorderAnimationPromise: null,
+      reorderAnimationResolve: null
     };
+
+    function beginReorderAnimationBarrier() {
+      if (typeof state.reorderAnimationResolve === 'function') {
+        try {
+          state.reorderAnimationResolve();
+        } catch (_) {
+          // Ignore stale resolver failures.
+        }
+      }
+      state.reorderAnimationPromise = new Promise(function (resolve) {
+        state.reorderAnimationResolve = resolve;
+      });
+    }
+
+    function endReorderAnimationBarrier() {
+      if (typeof state.reorderAnimationResolve === 'function') {
+        try {
+          state.reorderAnimationResolve();
+        } catch (_) {
+          // Ignore resolver failures.
+        }
+      }
+      state.reorderAnimationResolve = null;
+      state.reorderAnimationPromise = null;
+    }
+
+    async function waitForReorderAnimationBarrier() {
+      if (!state.reorderAnimationPromise) {
+        return;
+      }
+      try {
+        await state.reorderAnimationPromise;
+      } catch (_) {
+        // Ignore barrier wait failures.
+      }
+    }
 
     function parseKeyValueText(blob) {
       var out = {};
@@ -1778,8 +1816,10 @@
       }
       if (!moved.length) {
         tree.classList.remove('reordering');
+        endReorderAnimationBarrier();
         return;
       }
+      beginReorderAnimationBarrier();
       var supportsWAAPI = !!(window.Element && Element.prototype && typeof Element.prototype.animate === 'function');
       var durationMs = 3200;
       var easing = 'cubic-bezier(0.2, 0.75, 0.2, 1)';
@@ -1809,6 +1849,7 @@
           finished = true;
           clearTimeout(safetyTimer);
           tree.classList.remove('reordering');
+          endReorderAnimationBarrier();
         }
       };
 
@@ -1832,6 +1873,7 @@
           finalizeOne(safetyRow);
         }
         tree.classList.remove('reordering');
+        endReorderAnimationBarrier();
       }, durationMs + 220);
 
       requestAnimationFrame(function () {
@@ -1843,7 +1885,7 @@
             movedRow.style.willChange = 'transform';
             movedRow.style.backfaceVisibility = 'hidden';
             movedRow.style.transformOrigin = 'top left';
-            movedRow.style.zIndex = '60';
+            movedRow.style.zIndex = '2147483647';
             if (movedRow._reorderAnimation) {
               try {
                 movedRow._reorderAnimation.cancel();
@@ -1892,6 +1934,7 @@
                   finished = true;
                   clearTimeout(safetyTimer);
                   tree.classList.remove('reordering');
+                  endReorderAnimationBarrier();
                 }
               };
               anim.oncancel = function () {
@@ -1928,6 +1971,7 @@
                   finished = true;
                   clearTimeout(safetyTimer);
                   tree.classList.remove('reordering');
+                  endReorderAnimationBarrier();
                 }
               });
             }
@@ -3007,6 +3051,7 @@
           if (!previousItems || listFingerprint(previousItems) !== listFingerprint(getCachedDirItems(parentDir))) {
             // Reconcile quietly after the optimistic animated move to avoid
             // double-animation artifacts on rows crossing echelon boundaries.
+            await waitForReorderAnimationBarrier();
             await render({ suppressLoadingOverlay: true });
           }
         } catch (error) {
