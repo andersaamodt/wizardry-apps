@@ -277,8 +277,8 @@
 
     // Keep interactive controls clickable while exposing explicit drag-only areas.
     if (prefersSideDragZones) {
-        // 1) Thin top strip: draggable above controls.
-        CGFloat topStripHeight = 12.0;
+        // 1) Broad top strip: draggable above controls across the whole window.
+        CGFloat topStripHeight = 24.0;
         NSRect topStripFrame = NSMakeRect(0.0,
                                           frame.size.height - topStripHeight,
                                           frame.size.width,
@@ -289,20 +289,34 @@
         topStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
         [rootView addSubview:topStrip];
 
-        // 2) Header center gap: draggable between tabs and right-side controls.
-        CGFloat leftReserved = 380.0;
-        CGFloat rightReserved = 210.0;
-        CGFloat gapWidth = frame.size.width - leftReserved - rightReserved;
-        if (gapWidth < 32.0) {
-            gapWidth = 32.0;
+        // 2) Left header gutter: draggable to the left of tabs.
+        CGFloat headerBandHeight = dragStripHeight;
+        CGFloat leftGutterWidth = 84.0;
+        NSRect leftHeaderGutterFrame = NSMakeRect(0.0,
+                                                  frame.size.height - headerBandHeight,
+                                                  leftGutterWidth,
+                                                  headerBandHeight);
+        NSView *leftHeaderGutter = [[WizardryDragStripView alloc] initWithFrame:leftHeaderGutterFrame];
+        [leftHeaderGutter setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+        [leftHeaderGutter setWantsLayer:YES];
+        leftHeaderGutter.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:leftHeaderGutter];
+
+        // 3) Header center gap: draggable between tabs and right-side controls.
+        CGFloat tabsReservedWidth = 350.0;
+        CGFloat rightControlsReservedWidth = 190.0;
+        CGFloat centerGapX = leftGutterWidth + tabsReservedWidth;
+        CGFloat centerGapWidth = frame.size.width - centerGapX - rightControlsReservedWidth;
+        if (centerGapWidth < 72.0) {
+            centerGapWidth = 72.0;
         }
-        if (leftReserved + gapWidth > frame.size.width) {
-            gapWidth = MAX(0.0, frame.size.width - leftReserved);
+        if (centerGapX + centerGapWidth > frame.size.width) {
+            centerGapWidth = MAX(0.0, frame.size.width - centerGapX);
         }
-        NSRect centerGapFrame = NSMakeRect(leftReserved,
-                                           frame.size.height - dragStripHeight,
-                                           gapWidth,
-                                           dragStripHeight);
+        NSRect centerGapFrame = NSMakeRect(centerGapX,
+                                           frame.size.height - headerBandHeight,
+                                           centerGapWidth,
+                                           headerBandHeight);
         NSView *centerGapStrip = [[WizardryDragStripView alloc] initWithFrame:centerGapFrame];
         [centerGapStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
         [centerGapStrip setWantsLayer:YES];
