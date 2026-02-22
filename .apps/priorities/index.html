@@ -200,6 +200,7 @@
       hostBootReadySent: false,
       snapshotLastSerialized: '',
       hoveredPrioritizePath: '',
+      prioritizeHoverLockUntil: 0,
       pointerClientX: null,
       pointerClientY: null,
       reorderAnimationPromise: null,
@@ -1906,6 +1907,13 @@
           clearReorderClasses();
           tree.classList.remove('reordering');
           endReorderAnimationBarrier();
+          lockPrioritizeHover(220);
+          requestAnimationFrame(function () {
+            updateHoveredPrioritizePathFromPointer();
+            requestAnimationFrame(function () {
+              updateHoveredPrioritizePathFromPointer();
+            });
+          });
         }
       };
 
@@ -1931,6 +1939,13 @@
         clearReorderClasses();
         tree.classList.remove('reordering');
         endReorderAnimationBarrier();
+        lockPrioritizeHover(220);
+        requestAnimationFrame(function () {
+          updateHoveredPrioritizePathFromPointer();
+          requestAnimationFrame(function () {
+            updateHoveredPrioritizePathFromPointer();
+          });
+        });
       }, durationMs + 220);
 
       requestAnimationFrame(function () {
@@ -3105,6 +3120,14 @@
       syncPrioritizeButtonsToQueue();
     }
 
+    function lockPrioritizeHover(ms) {
+      var duration = Number(ms);
+      if (!Number.isFinite(duration) || duration < 0) {
+        duration = 0;
+      }
+      state.prioritizeHoverLockUntil = Date.now() + duration;
+    }
+
     function syncHoveredPrioritizeRow() {
       var tree = treeEl();
       if (!tree) {
@@ -3124,6 +3147,9 @@
 
     function setHoveredPrioritizePath(path) {
       var normalized = String(path || '').trim();
+      if (!normalized && Date.now() < Number(state.prioritizeHoverLockUntil || 0)) {
+        return;
+      }
       if (state.hoveredPrioritizePath === normalized) {
         return;
       }
@@ -3204,7 +3230,11 @@
           state.busy = false;
           state.pendingPrioritizePath = '';
           state.reorderPrimaryPath = '';
+          lockPrioritizeHover(220);
           processPrioritizeQueue();
+          requestAnimationFrame(function () {
+            updateHoveredPrioritizePathFromPointer();
+          });
         }
       })();
     }

@@ -1153,6 +1153,7 @@ button:hover {
 .row.row-pri-hover-proxy .btn.pri {
   opacity: 1;
   pointer-events: auto;
+  transition: none;
 }
 
 .btn.pri:active {
