@@ -2142,6 +2142,7 @@ button:disabled {
   letter-spacing: normal;
   color: var(--section-text);
   font-size: 0.83rem;
+  cursor: default;
 }
 
 .target-row {
@@ -2159,6 +2160,7 @@ button:disabled {
   white-space: nowrap;
   width: 9.6rem;
   max-width: 9.6rem;
+  cursor: default;
 }
 
 .target-status {
@@ -2250,6 +2252,7 @@ button:disabled {
   justify-content: center;
   font-size: 0.98rem;
   line-height: 1;
+  cursor: default;
 }
 
 .target-icon img {
@@ -2262,6 +2265,11 @@ button:disabled {
 .target-item input {
   width: auto;
   margin: 0;
+  cursor: pointer;
+}
+
+.target-item button {
+  cursor: pointer;
 }
 
 .target-item.hidden {
