@@ -7,7 +7,13 @@
   <link rel="stylesheet" href="style.css?v=vr20260221h">
   <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
 </head>
-<body>
+<body class="is-booting">
+  <div id="app-boot-overlay" class="app-boot-overlay" aria-live="polite" aria-busy="true">
+    <div class="app-boot-overlay-card">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <span>Loading...</span>
+    </div>
+  </div>
   <div class="app-shell">
     <div id="main-grid" class="main-grid">
       <aside class="sidebar">
@@ -1988,6 +1994,13 @@
       overlay.setAttribute('aria-hidden', state.profileSwitchLoading ? 'false' : 'true');
     }
 
+    function setBootLoading(loading) {
+      var show = !!loading;
+      document.body.classList.toggle('is-booting', show);
+      var overlay = document.getElementById('app-boot-overlay');
+      if (overlay) overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+    }
+
     function applyDoctrineContent(manifesto, norms) {
       var manifestoText = String(manifesto || '');
       var normsText = String(norms || '');
@@ -3028,6 +3041,7 @@
         setProfilesMessage(String(error && error.message ? error.message : error), true);
       } finally {
         setProfileSwitchLoading(false);
+        setBootLoading(false);
       }
     }
 
