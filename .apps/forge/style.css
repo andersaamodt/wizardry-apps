@@ -1163,6 +1163,10 @@ button:disabled {
   border-color: var(--toolbar-line);
 }
 
+#action-stage {
+  border-color: var(--toolbar-line);
+}
+
 #action-build:hover,
 #action-build:focus-visible,
 #action-run:hover,
