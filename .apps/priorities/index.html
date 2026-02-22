@@ -159,8 +159,7 @@
       pendingNextAction: Object.create(null),
       busy: false,
       pendingPrioritizePath: '',
-      pendingCheckPath: '',
-      pendingCheckQueuedToggles: 0,
+      pendingCheckByPath: Object.create(null),
       pendingExpandPath: '',
       pendingDirRevalidate: Object.create(null),
       pendingAdd: false,
@@ -3227,7 +3226,7 @@
     }
 
     function actToggleChecked(path) {
-      if (state.pendingCheckPath && state.pendingCheckPath !== path) {
+      if (!path) {
         return;
       }
       var parentDir = parentDirOfPath(path);
@@ -3235,15 +3234,18 @@
       var nextChecked = currentChecked === 1 ? 0 : 1;
       var optimisticTouches = applyOptimisticChecked(path, nextChecked);
       var hadOptimisticTouch = optimisticTouches.length > 0;
-      if (state.pendingCheckPath === path) {
-        state.pendingCheckQueuedToggles = (Number(state.pendingCheckQueuedToggles) || 0) + 1;
+      var pendingEntry = state.pendingCheckByPath[path];
+      if (pendingEntry && pendingEntry.inflight) {
+        pendingEntry.queued = (Number(pendingEntry.queued) || 0) + 1;
         if (hadOptimisticTouch) {
           render({ suppressLoadingOverlay: true, preserveInputSelection: true });
         }
         return;
       }
-      state.pendingCheckPath = path;
-      state.pendingCheckQueuedToggles = 0;
+      state.pendingCheckByPath[path] = {
+        inflight: true,
+        queued: 0
+      };
       (async function () {
         try {
           if (hadOptimisticTouch) {
@@ -3255,13 +3257,13 @@
               ['check-toggle-fast', path],
               ['check-toggle', path]
             );
-            var queued = Number(state.pendingCheckQueuedToggles) || 0;
+            var entry = state.pendingCheckByPath[path];
+            var queued = Number(entry && entry.queued) || 0;
             if (queued <= 0) {
               break;
             }
-            state.pendingCheckQueuedToggles = queued - 1;
+            entry.queued = queued - 1;
           }
-          state.pendingCheckPath = '';
           // Avoid a second full rerender when optimistic UI already matches the
           // successful backend result; this prevents row-control flicker.
           if (!hadOptimisticTouch) {
@@ -3278,10 +3280,7 @@
           var detail = String(error && error.message ? error.message : error).trim();
           status(detail ? ('Checkbox update failed; reverted. ' + detail) : 'Checkbox update failed; reverted.', true);
         } finally {
-          if (state.pendingCheckPath === path) {
-            state.pendingCheckPath = '';
-          }
-          state.pendingCheckQueuedToggles = 0;
+          delete state.pendingCheckByPath[path];
           processPrioritizeQueue();
         }
       })();
