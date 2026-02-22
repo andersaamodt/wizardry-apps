@@ -1552,6 +1552,85 @@
       return map;
     }
 
+    function captureEchelonBlockMetrics() {
+      var map = {};
+      var blocks = treeEl().querySelectorAll('.echelon-block[data-echelon-key]');
+      for (var i = 0; i < blocks.length; i += 1) {
+        var block = blocks[i];
+        var key = String(block.getAttribute('data-echelon-key') || '').trim();
+        if (!key) {
+          continue;
+        }
+        var rect = block.getBoundingClientRect();
+        map[key] = {
+          top: rect.top,
+          left: rect.left,
+          height: rect.height
+        };
+      }
+      return map;
+    }
+
+    function animateEchelonBlockResize(previousMetrics) {
+      if (!previousMetrics) {
+        return;
+      }
+      var blocks = treeEl().querySelectorAll('.echelon-block[data-echelon-key]');
+      var moved = [];
+      for (var i = 0; i < blocks.length; i += 1) {
+        var block = blocks[i];
+        var key = String(block.getAttribute('data-echelon-key') || '').trim();
+        var prev = previousMetrics[key];
+        if (!key || !prev || typeof prev.top !== 'number' || typeof prev.left !== 'number' || typeof prev.height !== 'number') {
+          continue;
+        }
+        var rect = block.getBoundingClientRect();
+        if (rect.height <= 0) {
+          continue;
+        }
+        var deltaY = prev.top - rect.top;
+        var deltaX = prev.left - rect.left;
+        var scaleY = prev.height > 0 ? (prev.height / rect.height) : 1;
+        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1 && Math.abs(scaleY - 1) < 0.01) {
+          continue;
+        }
+        block.style.willChange = 'transform';
+        block.style.transition = 'none';
+        block.style.transformOrigin = 'top center';
+        block.style.transform = 'translate(' + deltaX + 'px,' + deltaY + 'px) scaleY(' + scaleY + ')';
+        moved.push(block);
+      }
+      if (!moved.length) {
+        return;
+      }
+      treeEl().getBoundingClientRect();
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          for (var j = 0; j < moved.length; j += 1) {
+            var block = moved[j];
+            block.style.transition = 'transform 280ms cubic-bezier(0.2, 0.75, 0.2, 1)';
+            block.style.transform = 'translate(0,0) scaleY(1)';
+            block.addEventListener('transitionend', function onEnd() {
+              this.style.transition = '';
+              this.style.transform = '';
+              this.style.transformOrigin = '';
+              this.style.willChange = '';
+              this.removeEventListener('transitionend', onEnd);
+            });
+          }
+        });
+      });
+      setTimeout(function () {
+        for (var k = 0; k < moved.length; k += 1) {
+          var block = moved[k];
+          block.style.transition = '';
+          block.style.transform = '';
+          block.style.transformOrigin = '';
+          block.style.willChange = '';
+        }
+      }, 380);
+    }
+
     function animateRowReorder(previousPositions) {
       if (!previousPositions) {
         return;
@@ -1586,7 +1665,7 @@
           for (var j = 0; j < moved.length; j += 1) {
             var movedRow = moved[j];
             movedRow.style.transition = 'transform 260ms cubic-bezier(0.2, 0.75, 0.2, 1)';
-            movedRow.style.transform = 'translateY(0)';
+            movedRow.style.transform = 'translate(0,0)';
             movedRow.addEventListener('transitionend', function onEnd() {
               this.style.transition = '';
               this.style.transform = '';
@@ -2515,6 +2594,7 @@
           if (currentBlockEchelon !== item.echelon) {
             currentBlock = document.createElement('div');
             currentBlock.className = 'echelon-block';
+            currentBlock.setAttribute('data-echelon-key', String(depth) + ':' + String(item.echelon));
             container.appendChild(currentBlock);
             currentBlockEchelon = item.echelon;
           }
@@ -2559,10 +2639,12 @@
       options = options || {};
       var tree = treeEl();
       var previousPositions = null;
+      var previousBlockMetrics = null;
       var showOverlay = !options.animateReorder && !options.suppressLoadingOverlay;
       var selectionSnapshot = options.preserveInputSelection ? captureTreeInputSelection() : null;
       if (options.animateReorder) {
         previousPositions = captureRowPositions();
+        previousBlockMetrics = captureEchelonBlockMetrics();
       }
 
       try {
@@ -2578,6 +2660,7 @@
 
         if (options.animateReorder) {
           animateRowReorder(previousPositions);
+          animateEchelonBlockResize(previousBlockMetrics);
         }
         if (!tree.childNodes.length) {
           status('No priorities found.', false);
