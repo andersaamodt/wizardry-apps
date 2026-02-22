@@ -1929,13 +1929,33 @@
       updateDrillUpVisibility();
     }
 
-    function drillUp() {
+    async function drillUp() {
+      var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
       var previous = '';
-      if (state.drillStack.length) {
-        previous = String(state.drillStack.pop() || '').trim();
+      while (state.drillStack.length && !previous) {
+        var candidate = String(state.drillStack.pop() || '').trim();
+        if (!candidate || candidate === currentRoot) {
+          continue;
+        }
+        try {
+          await runBackend(['parent', candidate]);
+          previous = candidate;
+        } catch (_) {
+          // Ignore stale entries and continue checking older stack values.
+        }
       }
       if (!previous) {
-        var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
+        try {
+          var parentResult = await runBackend(['parent', currentRoot]);
+          var backendParent = String((parentResult && parentResult.stdout) || '').trim();
+          if (backendParent && backendParent !== currentRoot) {
+            previous = backendParent;
+          }
+        } catch (_) {
+          // Fall through to local parent fallback.
+        }
+      }
+      if (!previous) {
         var parent = parentDirOfPath(currentRoot);
         if (!parent || parent === currentRoot) {
           updateDrillUpVisibility();

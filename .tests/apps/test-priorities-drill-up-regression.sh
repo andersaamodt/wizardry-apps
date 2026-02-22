@@ -21,4 +21,10 @@ grep -F "var parent = parentDirOfPath(currentRoot);" "$app" >/dev/null
 grep -F "if (!parent || parent === currentRoot) {" "$app" >/dev/null
 grep -F "previous = parent;" "$app" >/dev/null
 
+# Regression guard: stale stack entries matching current root should be skipped.
+grep -F "if (!candidate || candidate === currentRoot) {" "$app" >/dev/null
+
+# Regression guard: drill-up should ask backend for canonical parent first.
+grep -F "await runBackend(['parent', currentRoot]);" "$app" >/dev/null
+
 printf '%s\n' "priorities drill-up regression tests passed"
