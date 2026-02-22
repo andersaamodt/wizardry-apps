@@ -250,11 +250,14 @@ h1 {
 
 .settings-panel.popover {
   position: fixed;
+  left: calc(14px * var(--ui-scale));
   right: calc(14px * var(--ui-scale));
   bottom: calc(52px * var(--ui-scale));
   top: auto;
-  width: min(560px, calc(100vw - (28px * var(--ui-scale))));
+  width: auto;
+  max-width: 560px;
   margin: 0;
+  margin-left: auto;
   z-index: 21;
   opacity: 1;
   transform: translateY(0) scale(1);
