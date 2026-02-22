@@ -891,6 +891,26 @@
       return false;
     }
 
+    async function runMutationWithListFallback(parentDir, fastArgs, fallbackMutationArgs) {
+      var result = null;
+      try {
+        result = await runBackend(fastArgs);
+      } catch (error) {
+        if (!fallbackMutationArgs || !fallbackMutationArgs.length) {
+          throw error;
+        }
+        await runBackend(fallbackMutationArgs);
+        result = await runBackend(['list', parentDir]);
+      }
+
+      var parsed = parseListOutput(result && result.stdout);
+      if (!parsed.length) {
+        var listResult = await runBackend(['list', parentDir]);
+        parsed = parseListOutput(listResult && listResult.stdout);
+      }
+      state.cache[parentDir] = parsed;
+    }
+
     function getNextActionLabel(path) {
       var items = state.cache[path];
       if (!items || !items.length) {
@@ -2289,9 +2309,11 @@
           render({ suppressLoadingOverlay: true, preserveInputSelection: true });
         }
         return runAction(function () {
-          return runBackend(['remove-fast', path]).then(function (result) {
-            hydrateCachedDirFromResult(parentDir, result);
-          }).catch(function (error) {
+          return runMutationWithListFallback(
+            parentDir,
+            ['remove-fast', path],
+            ['remove', path]
+          ).catch(function (error) {
             if (removedOptimistically && previousItems) {
               state.cache[parentDir] = previousItems;
               render({ suppressLoadingOverlay: true, preserveInputSelection: true });
@@ -2313,9 +2335,11 @@
       state.pendingRenamePath = path;
       runAction(function () {
         var parentDir = parentDirOfPath(path);
-        return runBackend(['rename-fast', path, nextName]).then(function (result) {
-          hydrateCachedDirFromResult(parentDir, result);
-        });
+        return runMutationWithListFallback(
+          parentDir,
+          ['rename-fast', path, nextName],
+          ['rename', path, nextName]
+        );
       }, {
         suppressLoadingOverlay: true
       }).finally(function () {
@@ -2331,9 +2355,11 @@
       var parentDir = parentDirOfPath(path);
       state.pendingCheckPath = path;
       runAction(function () {
-        return runBackend(['check-toggle-fast', path]).then(function (result) {
-          hydrateCachedDirFromResult(parentDir, result);
-        });
+        return runMutationWithListFallback(
+          parentDir,
+          ['check-toggle-fast', path],
+          ['check-toggle', path]
+        );
       }, {
         suppressLoadingOverlay: true
       }).finally(function () {
@@ -2351,9 +2377,11 @@
       state.pendingAdd = true;
       render({ suppressLoadingOverlay: true });
       runAction(function () {
-        return runBackend(['add-fast', state.root, name]).then(function (result) {
-          hydrateCachedDirFromResult(state.root, result);
-        });
+        return runMutationWithListFallback(
+          state.root,
+          ['add-fast', state.root, name],
+          ['add', state.root, name]
+        );
       }, {
         suppressLoadingOverlay: true
       }).then(function () {
