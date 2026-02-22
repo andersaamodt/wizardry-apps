@@ -158,6 +158,7 @@
       dockState: 'none',
       dockPollTimer: null,
       backendScriptPath: '',
+      rootCeiling: '',
       windowWidthRequested: 0,
       windowHeightRequested: 640,
       windowAutoGrowTimer: null
@@ -448,6 +449,18 @@
       return String(document.getElementById('root-dir').value || '.').trim() || '.';
     }
 
+    function normalizeRootPath(path) {
+      var raw = String(path || '').trim();
+      if (!raw) {
+        return '';
+      }
+      if (raw === '/') {
+        return '/';
+      }
+      var normalized = raw.replace(/\/+$/, '');
+      return normalized || '/';
+    }
+
     function folderNameFromPath(path) {
       var p = String(path || '').replace(/\/+$/, '');
       if (!p || p === '.') {
@@ -479,6 +492,38 @@
         return '/';
       }
       return p.slice(0, slash);
+    }
+
+    function parentNavPath(path) {
+      var raw = String(path || '').trim();
+      if (!raw) {
+        return '.';
+      }
+      var p = raw.replace(/\/+$/, '');
+      if (!p) {
+        return '/';
+      }
+      if (p === '/') {
+        return '/';
+      }
+      if (p === '.') {
+        return '..';
+      }
+      if (p === '..') {
+        return '../..';
+      }
+      var slash = p.lastIndexOf('/');
+      if (slash < 0) {
+        return '.';
+      }
+      if (slash === 0) {
+        return '/';
+      }
+      var parent = p.slice(0, slash);
+      if (parent !== '/') {
+        parent = parent.replace(/\/+$/, '');
+      }
+      return parent || '.';
     }
 
     function updateTitleFromRoot() {
@@ -1988,13 +2033,14 @@
         return;
       }
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
-      if (currentRoot === '.') {
-        up.classList.remove('hidden');
+      var currentNormalized = normalizeRootPath(currentRoot);
+      var ceiling = normalizeRootPath(state.rootCeiling || loadStorage('priorities.root') || '');
+      if (ceiling && currentNormalized === ceiling) {
+        up.classList.add('hidden');
         return;
       }
-      var parent = parentDirOfPath(currentRoot);
-      var hasParent = !!parent && parent !== currentRoot;
-      up.classList.toggle('hidden', !hasParent);
+      var nextRoot = parentNavPath(currentRoot);
+      up.classList.toggle('hidden', !nextRoot || nextRoot === currentRoot);
     }
 
     function drillInto(path) {
@@ -2006,25 +2052,17 @@
       updateDrillUpVisibility();
     }
 
-    async function drillUp() {
+    function drillUp() {
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
-      var nextRoot = '';
-      try {
-        var parentResult = await runBackend(['parent', currentRoot]);
-        var backendParent = String((parentResult && parentResult.stdout) || '').trim();
-        if (backendParent && backendParent !== currentRoot) {
-          nextRoot = backendParent;
-        }
-      } catch (_) {
-        // Fall through to local parent fallback.
+      var ceiling = normalizeRootPath(state.rootCeiling || loadStorage('priorities.root') || '');
+      if (ceiling && normalizeRootPath(currentRoot) === ceiling) {
+        updateDrillUpVisibility();
+        return;
       }
-      if (!nextRoot) {
-        var parent = parentDirOfPath(currentRoot);
-        if (!parent || parent === currentRoot) {
-          updateDrillUpVisibility();
-          return;
-        }
-        nextRoot = parent;
+      var nextRoot = parentNavPath(currentRoot);
+      if (!nextRoot || nextRoot === currentRoot) {
+        updateDrillUpVisibility();
+        return;
       }
       document.getElementById('root-dir').value = nextRoot;
       setRootAndRefresh({ persistRoot: false });
@@ -2044,6 +2082,7 @@
       state.pendingRenamePath = '';
       if (options.persistRoot !== false) {
         saveStorage('priorities.root', state.root);
+        state.rootCeiling = normalizeRootPath(state.root);
       }
       updateTitleFromRoot();
       if (!options.keepDrillStack) {
@@ -2056,7 +2095,9 @@
     function persistRootInputOnly() {
       var value = rootInputValue();
       saveStorage('priorities.root', value);
+      state.rootCeiling = normalizeRootPath(value);
       updateTitleFromRoot();
+      updateDrillUpVisibility();
     }
 
     function focusNewPriorityInput() {
@@ -2089,6 +2130,7 @@
       var modal = document.getElementById('startup-modal');
       var startupPath = document.getElementById('startup-path');
       var saved = loadStorage('priorities.root');
+      state.rootCeiling = normalizeRootPath(saved || '');
 
       if (saved) {
         document.getElementById('root-dir').value = saved;
