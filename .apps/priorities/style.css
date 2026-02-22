@@ -693,7 +693,6 @@ button:hover {
   cursor: default;
 }
 
-.row:hover,
 .row:focus-within {
   background: var(--nav-link-hover, color-mix(in srgb, var(--accent-soft, #e6e3f4) 34%, var(--light-bg, #f8f7fc)));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, #7782d6) 36%, var(--border, #d4d0e6));
@@ -709,7 +708,6 @@ button:hover {
   min-height: calc(27px * var(--ui-scale));
 }
 
-.row-subtask:hover,
 .row-subtask:focus-within {
   background: var(--nav-link-hover, color-mix(in srgb, var(--accent-soft, #e6e3f4) 20%, transparent));
 }
