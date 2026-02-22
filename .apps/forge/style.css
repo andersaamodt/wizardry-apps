@@ -1068,8 +1068,23 @@ button:disabled {
   align-items: center;
 }
 
+.run-split {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--toolbar-line);
+  border-radius: 8px;
+  background: var(--toolbar-surface);
+  overflow: hidden;
+}
+
 .build-split .toolbar-btn {
   border-radius: 8px 0 0 8px;
+}
+
+.run-split .toolbar-btn {
+  border: 0;
+  border-radius: 0;
+  transform: none;
 }
 
 .build-split .menu-toggle {
@@ -1079,10 +1094,25 @@ button:disabled {
   border-left: 0;
 }
 
+.run-split .menu-toggle {
+  min-width: 1.45rem;
+  width: 1.45rem;
+  padding: 0;
+  justify-content: center;
+  border-left: 1px solid var(--toolbar-line);
+}
+
 .build-split .floating-menu {
   left: 0;
   right: auto;
   min-width: 220px;
+}
+
+.run-split .floating-menu {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+  max-width: min(280px, calc(100vw - 0.85rem));
 }
 
 .selected-head {
