@@ -799,7 +799,10 @@ detect_trash_backend() {
   kernel=$(uname -s 2>/dev/null || printf 'unknown')
   case "$kernel" in
     Darwin)
-      if command -v osascript >/dev/null 2>&1; then
+      # Prefer CLI trash on macOS to avoid Finder Automation permission prompts.
+      if command -v trash >/dev/null 2>&1; then
+        TRASH_BACKEND=spell
+      elif command -v osascript >/dev/null 2>&1; then
         TRASH_BACKEND=osascript
       fi
       ;;
@@ -867,7 +870,7 @@ safe_trash_impl() {
     return 0
   fi
 
-  for backend in osascript gio trash-put kioclient5 spell; do
+  for backend in spell osascript gio trash-put kioclient5; do
     if [ "$backend" = "$TRASH_BACKEND" ]; then
       continue
     fi
