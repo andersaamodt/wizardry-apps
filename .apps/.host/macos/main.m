@@ -29,11 +29,122 @@
 @property (strong) NSString *appPath;
 @property (strong) NSImage *appIconImage;
 @property (strong) NSView *nativeBootSplashView;
+@property (strong) NSColor *prioritiesBootBgColor;
+@property (strong) NSColor *prioritiesBootTextColor;
 @property (assign) BOOL enableNativeViewMenu;
 @property (assign) BOOL prefersWideDragStrip;
 @end
 
 @implementation AppDelegate
+
+- (NSString *)readConfigValueForKey:(NSString *)key fromFile:(NSString *)filePath {
+    if (!key.length || !filePath.length) {
+        return @"";
+    }
+    NSError *error = nil;
+    NSString *content = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:&error];
+    if (!content.length || error) {
+        return @"";
+    }
+    NSArray<NSString *> *lines = [content componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    NSString *prefix = [key stringByAppendingString:@"="];
+    for (NSString *line in lines) {
+        if ([line hasPrefix:prefix]) {
+            return [line substringFromIndex:prefix.length];
+        }
+    }
+    return @"";
+}
+
+- (NSColor *)parseCSSColorToken:(NSString *)token {
+    NSString *raw = [[token ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lowercaseString];
+    if (!raw.length) {
+        return nil;
+    }
+
+    if ([raw hasPrefix:@"#"]) {
+        NSString *hex = [raw substringFromIndex:1];
+        unsigned int value = 0;
+        if (hex.length == 3) {
+            NSString *expanded = [NSString stringWithFormat:@"%C%C%C%C%C%C",
+                                  [hex characterAtIndex:0], [hex characterAtIndex:0],
+                                  [hex characterAtIndex:1], [hex characterAtIndex:1],
+                                  [hex characterAtIndex:2], [hex characterAtIndex:2]];
+            hex = expanded;
+        }
+        if (hex.length == 6 && [[NSScanner scannerWithString:hex] scanHexInt:&value]) {
+            CGFloat r = ((value >> 16) & 0xFF) / 255.0;
+            CGFloat g = ((value >> 8) & 0xFF) / 255.0;
+            CGFloat b = (value & 0xFF) / 255.0;
+            return [NSColor colorWithSRGBRed:r green:g blue:b alpha:1.0];
+        }
+        return nil;
+    }
+
+    NSRange rgbOpen = [raw rangeOfString:@"rgb("];
+    if (rgbOpen.location == 0 && [raw hasSuffix:@")"]) {
+        NSString *inside = [raw substringWithRange:NSMakeRange(4, raw.length - 5)];
+        NSArray<NSString *> *parts = [inside componentsSeparatedByString:@","];
+        if (parts.count == 3) {
+            CGFloat r = [[parts[0] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] doubleValue] / 255.0;
+            CGFloat g = [[parts[1] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] doubleValue] / 255.0;
+            CGFloat b = [[parts[2] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] doubleValue] / 255.0;
+            return [NSColor colorWithSRGBRed:MAX(0.0, MIN(1.0, r))
+                                       green:MAX(0.0, MIN(1.0, g))
+                                        blue:MAX(0.0, MIN(1.0, b))
+                                       alpha:1.0];
+        }
+    }
+
+    return nil;
+}
+
+- (NSString *)readCSSVariable:(NSString *)name fromThemeFile:(NSString *)themeFile {
+    if (!name.length || !themeFile.length) {
+        return @"";
+    }
+    NSError *error = nil;
+    NSString *css = [NSString stringWithContentsOfFile:themeFile encoding:NSUTF8StringEncoding error:&error];
+    if (!css.length || error) {
+        return @"";
+    }
+    NSString *pattern = [NSString stringWithFormat:@"--%@\\s*:\\s*([^;]+);", name];
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:nil];
+    NSTextCheckingResult *match = [regex firstMatchInString:css options:0 range:NSMakeRange(0, css.length)];
+    if (!match || match.numberOfRanges < 2) {
+        return @"";
+    }
+    NSRange valueRange = [match rangeAtIndex:1];
+    if (valueRange.location == NSNotFound || valueRange.length == 0) {
+        return @"";
+    }
+    return [[css substringWithRange:valueRange] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+}
+
+- (void)loadPrioritiesBootPalette {
+    NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
+    NSString *configDir = xdgConfig.length
+        ? [xdgConfig stringByAppendingPathComponent:@"wizardry-apps/priorities"]
+        : [NSHomeDirectory() stringByAppendingPathComponent:@".config/wizardry-apps/priorities"];
+    NSString *configFile = [configDir stringByAppendingPathComponent:@"config"];
+
+    NSString *theme = [[self readConfigValueForKey:@"theme" fromFile:configFile] lowercaseString];
+    if (!theme.length) {
+        theme = @"psionic";
+    }
+    NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyz0123456789_-"];
+    if ([[theme stringByTrimmingCharactersInSet:allowed] length] > 0) {
+        theme = @"psionic";
+    }
+
+    NSString *themeFile = [[self.appPath stringByAppendingPathComponent:@"themes"] stringByAppendingPathComponent:[theme stringByAppendingString:@".css"]];
+    NSColor *bg = [self parseCSSColorToken:[self readCSSVariable:@"bg" fromThemeFile:themeFile]];
+    NSColor *text = [self parseCSSColorToken:[self readCSSVariable:@"text" fromThemeFile:themeFile]];
+    NSColor *muted = [self parseCSSColorToken:[self readCSSVariable:@"light-text" fromThemeFile:themeFile]];
+
+    self.prioritiesBootBgColor = bg ?: [NSColor whiteColor];
+    self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
+}
 
 - (void)showNativeBootSplashInView:(NSView *)rootView {
     if (!rootView || self.nativeBootSplashView) {
@@ -43,13 +154,21 @@
     NSView *overlay = [[NSView alloc] initWithFrame:rootView.bounds];
     overlay.autoresizingMask = (NSViewWidthSizable | NSViewHeightSizable);
     overlay.wantsLayer = YES;
-    overlay.layer.backgroundColor = [[NSColor whiteColor] CGColor];
+    NSColor *bg = self.prioritiesBootBgColor ?: [NSColor whiteColor];
+    NSColor *textColor = self.prioritiesBootTextColor ?: [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
+    overlay.layer.backgroundColor = [bg CGColor];
 
-    NSProgressIndicator *spinner = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(0, 0, 16, 16)];
-    spinner.style = NSProgressIndicatorStyleSpinning;
-    spinner.displayedWhenStopped = YES;
-    spinner.controlSize = NSControlSizeSmall;
-    [spinner startAnimation:nil];
+    NSImage *logoImage = self.appIconImage;
+    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 24, 24)];
+    logoView.imageAlignment = NSImageAlignCenter;
+    logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
+    logoView.wantsLayer = YES;
+    logoView.layer.cornerRadius = 4.0;
+    if (logoImage) {
+        logoView.image = logoImage;
+    } else {
+        logoView.image = nil;
+    }
 
     NSTextField *label = [[NSTextField alloc] initWithFrame:NSZeroRect];
     label.editable = NO;
@@ -58,7 +177,7 @@
     label.selectable = NO;
     label.alignment = NSTextAlignmentCenter;
     label.stringValue = @"Loading...";
-    label.textColor = [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
+    label.textColor = textColor;
     label.font = [NSFont systemFontOfSize:14 weight:NSFontWeightMedium];
     [label sizeToFit];
 
@@ -67,7 +186,7 @@
     stack.alignment = NSLayoutAttributeCenterY;
     stack.spacing = 8.0;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
-    [stack addArrangedSubview:spinner];
+    [stack addArrangedSubview:logoView];
     [stack addArrangedSubview:label];
 
     [overlay addSubview:stack];
@@ -216,6 +335,9 @@
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
+    if (self.enableNativeViewMenu) {
+        [self loadPrioritiesBootPalette];
+    }
 
     [self setupMainMenuWithAppName:appName];
     NSString *resolvedIconPath = customIconPath;
@@ -282,7 +404,11 @@
     [self.window setTitleVisibility:NSWindowTitleHidden];
     // Owl uses explicit side drag zones so tab clicks/drags never move the window.
     [self.window setMovableByWindowBackground:!prefersSideDragZones];
-    [self.window setBackgroundColor:[NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0]];
+    if (self.enableNativeViewMenu && self.prioritiesBootBgColor) {
+        [self.window setBackgroundColor:self.prioritiesBootBgColor];
+    } else {
+        [self.window setBackgroundColor:[NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0]];
+    }
     if (@available(macOS 11.0, *)) {
         [self.window setToolbarStyle:NSWindowToolbarStyleUnified];
     }
