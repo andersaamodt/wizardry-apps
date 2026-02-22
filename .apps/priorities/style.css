@@ -109,7 +109,8 @@ h1 {
   -webkit-app-region: no-drag;
 }
 
-.settings-toggle {
+.settings-toggle,
+.copy-markdown-toggle {
   width: calc(34px * var(--ui-scale));
   height: calc(34px * var(--ui-scale));
   padding: 0;
@@ -127,7 +128,18 @@ h1 {
   color: var(--icon-neutral);
 }
 
-.settings-toggle:hover {
+.settings-toggle {
+  right: calc(14px * var(--ui-scale));
+  left: auto;
+}
+
+.copy-markdown-toggle {
+  left: calc(14px * var(--ui-scale));
+  right: auto;
+}
+
+.settings-toggle:hover,
+.copy-markdown-toggle:hover {
   background: color-mix(in srgb, var(--light-bg, #f8f7fc) 56%, #fff 44%);
   color: color-mix(in srgb, var(--light-text, #5d6486) 64%, var(--text, #2a2e47) 36%);
 }
@@ -252,7 +264,16 @@ h1 {
   opacity: 1;
 }
 
-.settings-toggle:hover .settings-gear-glyph {
+.copy-markdown-glyph {
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
+  display: block;
+  stroke: currentColor;
+  opacity: 1;
+}
+
+.settings-toggle:hover .settings-gear-glyph,
+.copy-markdown-toggle:hover .copy-markdown-glyph {
   opacity: 1;
 }
 

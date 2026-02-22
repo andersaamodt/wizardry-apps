@@ -57,6 +57,12 @@
               <path d="M14 8.3V5.73l-1.58-.264c-.117-.44-.292-.848-.496-1.2l.93-1.285-1.81-1.84-1.31.908c-.371-.205-.781-.38-1.187-.497L8.288 0H5.72l-.263 1.578c-.437.117-.816.293-1.196.497L2.979 1.17 1.141 2.98l.934 1.287c-.2.38-.376.79-.493 1.228L.004 5.73V8.3l1.575.264c.117.438.292.818.496 1.198l-.93 1.315 1.809 1.813 1.312-.938c.38.205.787.38 1.224.497l.26 1.55h2.566l.263-1.58c.408-.117.817-.293 1.196-.497l1.315.935 1.81-1.812-.935-1.315c.203-.38.38-.76.495-1.2L14 8.305zM7 9.704c-1.488 0-2.683-1.2-2.683-2.69S5.542 4.327 7 4.327s2.683 1.198 2.683 2.69c0 1.49-1.195 2.688-2.683 2.688z" fill="currentColor"/>
             </svg>
           </button>
+          <button id="copy-markdown" class="copy-markdown-toggle" type="button" title="Copy visible priorities as markdown">
+            <svg class="copy-markdown-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 4h9a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="M5 8H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         </div>
       </div>
     </header>
@@ -994,6 +1000,79 @@
       return document.getElementById('tree');
     }
 
+    function normalizeMarkdownLineText(text) {
+      return String(text || '').replace(/\r?\n/g, ' ').trim();
+    }
+
+    function getVisiblePrioritiesMarkdown() {
+      var rows = treeEl().querySelectorAll('.row[data-path]');
+      var lines = [];
+      for (var i = 0; i < rows.length; i += 1) {
+        var row = rows[i];
+        var depth = Number(row.getAttribute('data-depth'));
+        if (!Number.isFinite(depth) || depth < 0) {
+          depth = 0;
+        }
+        var checkbox = row.querySelector('.chk');
+        var checked = checkbox && checkbox.checked ? 'x' : ' ';
+        var edit = row.querySelector('.name-edit');
+        var nameEl = row.querySelector('.name');
+        var name = edit ? edit.value : (nameEl ? nameEl.textContent : '');
+        name = normalizeMarkdownLineText(name);
+        if (!name) {
+          continue;
+        }
+        lines.push(new Array(depth + 1).join('  ') + '- [' + checked + '] ' + name);
+      }
+      return lines.join('\n');
+    }
+
+    async function copyTextToClipboard(text) {
+      var value = String(text || '');
+      if (!value) {
+        return false;
+      }
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(value);
+          return true;
+        }
+      } catch (_) {
+        // Fall through to legacy copy path.
+      }
+      try {
+        var helper = document.createElement('textarea');
+        helper.value = value;
+        helper.setAttribute('readonly', 'readonly');
+        helper.style.position = 'fixed';
+        helper.style.opacity = '0';
+        helper.style.left = '-9999px';
+        helper.style.top = '0';
+        document.body.appendChild(helper);
+        helper.focus();
+        helper.select();
+        var copied = document.execCommand('copy');
+        document.body.removeChild(helper);
+        return copied;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function copyVisiblePrioritiesAsMarkdown() {
+      var markdown = getVisiblePrioritiesMarkdown();
+      if (!markdown) {
+        status('No visible priorities to copy.', false);
+        return;
+      }
+      var copied = await copyTextToClipboard(markdown);
+      if (copied) {
+        status('Copied visible priorities as markdown.', false);
+      } else {
+        status('Could not copy priorities to clipboard.', true);
+      }
+    }
+
     function invalidateCachedDirs(dirs) {
       if (!dirs || !dirs.length) {
         return;
@@ -1536,6 +1615,7 @@
       }
       row.setAttribute('data-path', item.path);
       row.setAttribute('data-echelon', String(item.echelon));
+      row.setAttribute('data-depth', String(depth));
       row.style.paddingLeft = indent(depth);
 
       var prioritizeBtn = makeButton('⬆', 'btn pri', function (event) {
@@ -2469,6 +2549,9 @@
 
       document.getElementById('settings-toggle').addEventListener('click', function () {
         toggleSettingsPanel();
+      });
+      document.getElementById('copy-markdown').addEventListener('click', function () {
+        copyVisiblePrioritiesAsMarkdown();
       });
       document.getElementById('dock-left').addEventListener('click', function () {
         dockWindow('left');
