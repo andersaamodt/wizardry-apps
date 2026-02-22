@@ -893,7 +893,9 @@ APP
         cp "$app_dir/assets/forge.icns" "$bundle/Contents/Resources/forge.icns"
         icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
       elif [ -f "$app_dir/assets/forge-icon.png" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-        iconset=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-iconset.XXXXXX")
+        iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-iconset.XXXXXX")
+        iconset="${iconset_tmp}.iconset"
+        mv "$iconset_tmp" "$iconset"
         for size in 16 32 128 256 512; do
           sips -z "$size" "$size" "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
           sips -z $((size * 2)) $((size * 2)) "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
@@ -1354,7 +1356,9 @@ APP
 
     icon_key=''
     if [ -n "$icon_source" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-      iconset=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-ws-iconset.XXXXXX")
+      iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-ws-iconset.XXXXXX")
+      iconset="${iconset_tmp}.iconset"
+      mv "$iconset_tmp" "$iconset"
       for size in 16 32 128 256 512; do
         sips -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
         sips -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
