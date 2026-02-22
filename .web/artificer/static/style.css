@@ -156,6 +156,18 @@ h2 {
 .workspace-drag-strip {
   height: 28px;
   min-height: 28px;
+  position: relative;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.workspace-drag-strip::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 58px;
+  right: 0;
   -webkit-app-region: drag;
   app-region: drag;
 }
