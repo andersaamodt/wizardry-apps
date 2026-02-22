@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="priorities-booting">
+<html lang="en" class="priorities-booting" style="background:#eceaf4;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="style.css">
   <link id="priorities-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=priorities20260220a">
 </head>
-<body>
+<body style="background:transparent;">
   <div id="startup-modal" class="startup-modal hidden" role="dialog" aria-modal="true" aria-labelledby="startup-title">
     <div class="startup-card">
       <h2 id="startup-title">Choose Priorities Folder</h2>
@@ -1158,6 +1158,50 @@
         stylesheet.href = 'themes/' + normalized + '.css?v=' + THEME_ASSET_VERSION;
       }
       renderThemePicker();
+    }
+
+    function waitForThemeStylesheet(themeName, timeoutMs) {
+      return new Promise(function (resolve) {
+        var stylesheet = document.getElementById('priorities-theme-stylesheet');
+        if (!stylesheet) {
+          resolve();
+          return;
+        }
+        var expected = 'themes/' + String(themeName || '').toLowerCase().trim() + '.css?v=' + THEME_ASSET_VERSION;
+        var hrefAttr = String(stylesheet.getAttribute('href') || '');
+        if (hrefAttr !== expected && hrefAttr.indexOf('/' + String(themeName || '').toLowerCase().trim() + '.css') < 0) {
+          resolve();
+          return;
+        }
+        if (stylesheet.sheet) {
+          resolve();
+          return;
+        }
+        var done = false;
+        var timer = setTimeout(function () {
+          if (done) {
+            return;
+          }
+          done = true;
+          cleanup();
+          resolve();
+        }, Math.max(200, Number(timeoutMs) || 1200));
+        function cleanup() {
+          stylesheet.removeEventListener('load', onDone);
+          stylesheet.removeEventListener('error', onDone);
+          clearTimeout(timer);
+        }
+        function onDone() {
+          if (done) {
+            return;
+          }
+          done = true;
+          cleanup();
+          resolve();
+        }
+        stylesheet.addEventListener('load', onDone);
+        stylesheet.addEventListener('error', onDone);
+      });
     }
 
     function cycleTheme(step) {
@@ -2368,11 +2412,12 @@
 
     window.addEventListener('DOMContentLoaded', async function () {
       requestWindowShape();
-      var bootRevealTimer = setTimeout(revealBootUi, 2500);
+      var bootRevealTimer = setTimeout(revealBootUi, 8000);
       await loadUiPrefs();
       state.activeTheme = String(loadStorage(THEME_KEY) || 'psionic').toLowerCase().trim();
       await loadThemes();
       applyTheme(state.activeTheme);
+      await waitForThemeStylesheet(state.activeTheme, 1400);
       applyTextScale(loadStorage(UI_SCALE_KEY) || loadStorage(TEXT_SCALE_KEY) || '1');
       state.fontOptions = getPlatformFontOptions();
       populateFontSelect();
