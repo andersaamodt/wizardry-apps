@@ -383,6 +383,8 @@ body {
   background: #cfdfff;
   color: #153878;
   box-shadow: none;
+  cursor: default;
+  pointer-events: none;
 }
 
 #admin-panel .admin-nav-list .admin-nav-item {
