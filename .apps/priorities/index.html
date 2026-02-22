@@ -1543,7 +1543,11 @@
       var rows = treeEl().querySelectorAll('.row[data-path]');
       for (var i = 0; i < rows.length; i += 1) {
         var row = rows[i];
-        map[row.getAttribute('data-path')] = row.getBoundingClientRect().top;
+        var rect = row.getBoundingClientRect();
+        map[row.getAttribute('data-path')] = {
+          top: rect.top,
+          left: rect.left
+        };
       }
       return map;
     }
@@ -1557,17 +1561,19 @@
       for (var i = 0; i < rows.length; i += 1) {
         var row = rows[i];
         var key = row.getAttribute('data-path');
-        if (!key || typeof previousPositions[key] !== 'number') {
+        var prev = previousPositions[key];
+        if (!key || !prev || typeof prev.top !== 'number' || typeof prev.left !== 'number') {
           continue;
         }
-        var nextTop = row.getBoundingClientRect().top;
-        var deltaY = previousPositions[key] - nextTop;
-        if (Math.abs(deltaY) < 1) {
+        var nextRect = row.getBoundingClientRect();
+        var deltaY = prev.top - nextRect.top;
+        var deltaX = prev.left - nextRect.left;
+        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1) {
           continue;
         }
         row.style.willChange = 'transform';
         row.style.transition = 'none';
-        row.style.transform = 'translateY(' + deltaY + 'px)';
+        row.style.transform = 'translate(' + deltaX + 'px,' + deltaY + 'px)';
         moved.push(row);
       }
       if (!moved.length) {
@@ -2396,7 +2402,7 @@
           event.preventDefault();
           event.stopPropagation();
           state.revealedMakeProjectPath = (state.revealedMakeProjectPath === item.path) ? '' : item.path;
-          render({ suppressLoadingOverlay: true });
+          render({ suppressLoadingOverlay: true, animateReorder: true });
         });
       }
 
@@ -3347,7 +3353,7 @@
         var inMakeProject = event.target.closest('.make-project-inline');
         if (!inMakeProject && state.revealedMakeProjectPath && !state.pendingMakeProjectPath) {
           state.revealedMakeProjectPath = '';
-          render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+          render({ suppressLoadingOverlay: true, preserveInputSelection: true, animateReorder: true });
         }
       });
 
