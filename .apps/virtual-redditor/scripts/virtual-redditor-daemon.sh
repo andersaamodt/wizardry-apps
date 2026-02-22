@@ -13,7 +13,7 @@ Commands:
   run
   list-actions [LIMIT]
   list-replies [LIMIT]
-  extract-norms
+  extract-norms [full]
   undo ACTION_ID
   apologize ACTION_ID [MESSAGE]
   launchd-status
@@ -1426,27 +1426,63 @@ list_replies_json() {
 
 extract_norms_internal() {
   cache_dir=$1
+  mode=${2-incremental}
 
   last_seen=$(to_int "$(cat "$LAST_STATUTE_SEEN_FILE" 2>/dev/null || printf '0')" 0)
-  feed=$(cached_reddit_get "$cache_dir" "high-signal" "/r/$SUBREDDIT/comments/.json?limit=150&raw_json=1&sort=new")
+  max_seen=0
+  candidates='[]'
 
-  max_seen=$(printf '%s' "$feed" | jq '[.data.children[].data.created_utc // 0] | max // 0' 2>/dev/null || printf '0')
-  max_seen=$(to_int "$max_seen" 0)
-
-  candidates=$(printf '%s' "$feed" | jq -c --argjson last "$last_seen" --argjson min_score "$HIGH_SIGNAL_MIN_SCORE" '
-    [ .data.children[].data
-      | select((.created_utc // 0) > $last)
-      | select((.score // 0) >= $min_score or (.controversiality // 0) >= 1)
-      | {id:.name,author,body,score,permalink,created_utc}
-    ]
-    | sort_by(.score // 0)
-    | reverse
-    | .[0:40]
-  ' 2>/dev/null || printf '[]')
+  case "$mode" in
+    full)
+      # Initial bootstrap pass: scan several pages to sample broad subreddit discourse.
+      after=''
+      page=0
+      max_pages=10
+      combined='[]'
+      while [ "$page" -lt "$max_pages" ]; do
+        path="/r/$SUBREDDIT/comments/.json?limit=100&raw_json=1&sort=new"
+        if [ -n "$after" ]; then
+          path="$path&after=$after"
+        fi
+        feed=$(cached_reddit_get "$cache_dir" "high-signal-full-$page" "$path")
+        page_batch=$(printf '%s' "$feed" | jq -c --argjson min_score "$HIGH_SIGNAL_MIN_SCORE" '
+          [ .data.children[].data
+            | select((.score // 0) >= $min_score or (.controversiality // 0) >= 1)
+            | {id:.name,author,body,score,permalink,created_utc}
+          ]
+        ' 2>/dev/null || printf '[]')
+        combined=$(printf '%s\n%s\n' "$combined" "$page_batch" | jq -s 'add' 2>/dev/null || printf '[]')
+        next_after=$(printf '%s' "$feed" | jq -r '.data.after // empty' 2>/dev/null || printf '')
+        [ -n "$next_after" ] || break
+        after=$next_after
+        page=$((page + 1))
+      done
+      candidates=$(printf '%s' "$combined" | jq -c '
+        sort_by(.score // 0)
+        | reverse
+        | .[0:120]
+      ' 2>/dev/null || printf '[]')
+      ;;
+    *)
+      feed=$(cached_reddit_get "$cache_dir" "high-signal" "/r/$SUBREDDIT/comments/.json?limit=150&raw_json=1&sort=new")
+      max_seen=$(printf '%s' "$feed" | jq '[.data.children[].data.created_utc // 0] | max // 0' 2>/dev/null || printf '0')
+      max_seen=$(to_int "$max_seen" 0)
+      candidates=$(printf '%s' "$feed" | jq -c --argjson last "$last_seen" --argjson min_score "$HIGH_SIGNAL_MIN_SCORE" '
+        [ .data.children[].data
+          | select((.created_utc // 0) > $last)
+          | select((.score // 0) >= $min_score or (.controversiality // 0) >= 1)
+          | {id:.name,author,body,score,permalink,created_utc}
+        ]
+        | sort_by(.score // 0)
+        | reverse
+        | .[0:40]
+      ' 2>/dev/null || printf '[]')
+      ;;
+  esac
 
   candidate_count=$(printf '%s' "$candidates" | jq 'length' 2>/dev/null || printf '0')
 
-  if [ "$max_seen" -gt "$last_seen" ]; then
+  if [ "$mode" != "full" ] && [ "$max_seen" -gt "$last_seen" ]; then
     printf '%s\n' "$max_seen" > "$LAST_STATUTE_SEEN_FILE"
   fi
 
@@ -1501,7 +1537,7 @@ PROMPT
       --arg text "$norm_text" \
       --arg severity "$severity" \
       --arg rationale "$rationale" \
-      --arg source "nightly-extract" \
+      --arg source "$( [ "$mode" = "full" ] && printf '%s' "full-subreddit-bootstrap" || printf '%s' "nightly-extract" )" \
       --arg ts "$(now_iso)" \
       --argjson evidence "$evidence" \
       '{id:$id,text:$text,severity:$severity,rationale:$rationale,source:$source,accepted_at:$ts,evidence_ids:$evidence}')
@@ -1526,7 +1562,8 @@ PROMPT
     --argjson processed "$candidate_count" \
     --argjson proposed "$proposed" \
     --argjson accepted "$accepted" \
-    '{ok:true,processed:$processed,proposed:$proposed,accepted:$accepted}'
+    --arg mode "$mode" \
+    '{ok:true,mode:$mode,processed:$processed,proposed:$proposed,accepted:$accepted}'
 }
 
 patrol_once() {
@@ -1685,7 +1722,7 @@ main() {
 
     extract-norms)
       load_reddit_env
-      extract_norms_internal "$STATE_DIR"
+      extract_norms_internal "$STATE_DIR" "${1-incremental}"
       ;;
 
     undo)

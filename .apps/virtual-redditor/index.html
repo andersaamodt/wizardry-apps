@@ -187,8 +187,9 @@
                       <option value="hours" selected>hours</option>
                     </select>
                   </div>
-                  <button id="btn-extract-now" class="menu-btn soft" type="button" title="Extract social norms from recent activity">Extract norms now</button>
+                  <button id="btn-extract-now" class="menu-btn soft" type="button" title="Scan subreddit comments and append proposed norms into the Social Norms list">Initialize norms from subreddit</button>
                 </div>
+                <div class="title-caption norms-extract-caption">One-time bootstrap: scans broad subreddit discourse and appends proposals into this profile's Social Norms list.</div>
               </div>
 
               <div class="settings-block">
@@ -198,9 +199,9 @@
                   <button id="btn-norm-add" type="button" class="norm-add-btn" title="Add norm" aria-label="Add norm">+</button>
                 </div>
                 <div id="norms-head-row" class="norms-head-row">
+                  <span></span>
                   <span>Social Norm</span>
                   <span>Severity</span>
-                  <span></span>
                 </div>
                 <div id="norms-table" class="norms-table" role="table" aria-label="Social norms editor"></div>
                 <div class="manifesto-head">
@@ -1964,15 +1965,15 @@
       table.innerHTML = state.normRows.map(function (row, idx) {
         return [
           '<div class="norm-row" data-norm-idx="' + String(idx) + '">',
+          '  <div class="norm-actions">',
+          '    <button type="button" class="norm-action-btn" data-norm-action="delete" title="Delete row" aria-label="Delete row">✕</button>',
+          '  </div>',
           '  <input type="text" class="norm-cell norm-text" data-field="text" value="' + escapeHtml(row.text) + '" spellcheck="false" />',
           '  <select class="norm-cell norm-severity" data-field="severity">',
           '    <option value="low"' + (row.severity === 'low' ? ' selected' : '') + '>low</option>',
           '    <option value="medium"' + (row.severity === 'medium' ? ' selected' : '') + '>medium</option>',
           '    <option value="high"' + (row.severity === 'high' ? ' selected' : '') + '>high</option>',
           '  </select>',
-          '  <div class="norm-actions">',
-          '    <button type="button" class="norm-action-btn" data-norm-action="delete" title="Delete row" aria-label="Delete row">✕</button>',
-          '  </div>',
           '</div>'
         ].join('');
       }).join('');
@@ -2888,7 +2889,9 @@
         runControlAction('run-once', 'Patrol pass complete.');
       });
       document.getElementById('btn-extract-now').addEventListener('click', function () {
-        runControlAction('extract-norms', 'Social norm extraction complete.');
+        var ok = window.confirm('Bootstrap Social Norms from subreddit discourse now? This appends proposed norms to the current profile\'s Social Norms list.');
+        if (!ok) return;
+        runControlAction('extract-norms-full', 'Norm bootstrap complete. Proposed norms were appended to Social Norms.');
       });
       document.getElementById('status-chip-row').addEventListener('click', function (event) {
         var btn = event.target && event.target.closest('[data-status-action]');

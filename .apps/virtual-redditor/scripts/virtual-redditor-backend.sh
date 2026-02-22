@@ -9,11 +9,14 @@ Actions:
   list-themes
   init
   status
+  install
+  uninstall
   start
   stop
   restart
   run-once
   extract-norms
+  extract-norms-full
   list-actions [LIMIT]
   list-replies [LIMIT]
   undo ACTION_ID
@@ -32,6 +35,7 @@ Actions:
   oauth-finish
   oauth-cancel
   read-file TARGET
+  read-doctrine
   write-file TARGET CONTENT
   tail-log [LINES]
 
@@ -173,6 +177,31 @@ ensure_profile_runtime() {
 ensure_multi_profile_root() {
   [ "$MULTI_PROFILE" -eq 1 ] || return 0
   mkdir -p "$PROFILES_DIR"
+}
+
+force_delete_dir() {
+  target=${1-}
+  [ -n "$target" ] || return 1
+  [ -d "$target" ] || return 0
+
+  chmod -R u+w "$target" >/dev/null 2>&1 || true
+  rm -rf "$target" >/dev/null 2>&1 || true
+
+  if [ ! -d "$target" ]; then
+    return 0
+  fi
+
+  # Retry briefly for files still being closed/flushed by background processes.
+  i=0
+  while [ $i -lt 10 ]; do
+    sleep 0.08
+    chmod -R u+w "$target" >/dev/null 2>&1 || true
+    rm -rf "$target" >/dev/null 2>&1 || true
+    [ -d "$target" ] || return 0
+    i=$((i + 1))
+  done
+
+  return 1
 }
 
 resolve_current_state() {
@@ -403,7 +432,7 @@ create_profile_json() {
       default_user=$(read_env_var "$default_dir/reddit.env" REDDIT_USERNAME)
       default_sub=$(read_env_var "$default_dir/reddit.env" SUBREDDIT)
       if [ -z "$default_user" ] && [ -z "$default_sub" ]; then
-        rm -rf "$default_dir"
+        force_delete_dir "$default_dir" >/dev/null 2>&1 || true
       fi
     fi
   fi
@@ -475,7 +504,20 @@ delete_profile_json() {
     return 1
   fi
 
-  rm -rf "$dir"
+  trash_root="$STATE_ROOT/.trash"
+  mkdir -p "$trash_root"
+  trash_target="$trash_root/${profile_id}-$(date +%s)-$$"
+  if ! mv "$dir" "$trash_target" 2>/dev/null; then
+    # Fallback for edge cases where atomic move fails.
+    if ! force_delete_dir "$dir"; then
+      jq -cn --arg err "could not delete profile directory: $dir" '{ok:false,error:$err}'
+      return 1
+    fi
+  else
+    (
+      force_delete_dir "$trash_target" >/dev/null 2>&1 || true
+    ) &
+  fi
 
   next_active=''
   for d in "$PROFILES_DIR"/*; do
@@ -541,6 +583,19 @@ read_file_json() {
   fi
 
   jq -cn --arg target "$target" --arg path "$file" --rawfile content "$file" '{ok:true,target:$target,path:$path,content:$content}'
+}
+
+read_doctrine_json() {
+  manifesto_content=''
+  norms_content=''
+  [ -f "$MANIFESTO_FILE" ] && manifesto_content=$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
+  [ -f "$NORMS_FILE" ] && norms_content=$(cat "$NORMS_FILE" 2>/dev/null || printf '')
+  jq -cn \
+    --arg manifesto_path "$MANIFESTO_FILE" \
+    --arg norms_path "$NORMS_FILE" \
+    --arg manifesto "$manifesto_content" \
+    --arg norms "$norms_content" \
+    '{ok:true,manifesto:{path:$manifesto_path,content:$manifesto},norms:{path:$norms_path,content:$norms}}'
 }
 
 write_file_json() {
@@ -1069,6 +1124,14 @@ main() {
       merge_status
       ;;
 
+    install)
+      run_daemon launchd-install
+      ;;
+
+    uninstall)
+      run_daemon launchd-uninstall
+      ;;
+
     start)
       run_daemon launchd-start
       ;;
@@ -1088,6 +1151,10 @@ main() {
 
     extract-norms)
       run_daemon extract-norms
+      ;;
+
+    extract-norms-full)
+      run_daemon extract-norms full
       ;;
 
     list-actions)
@@ -1212,6 +1279,10 @@ main() {
         exit 2
       fi
       read_file_json "$target"
+      ;;
+
+    read-doctrine)
+      read_doctrine_json
       ;;
 
     write-file)
