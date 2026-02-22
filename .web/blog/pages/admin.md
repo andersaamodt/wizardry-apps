@@ -310,7 +310,8 @@ title: Blog Admin
 
 <style>
 body {
-  max-width: 1240px;
+  max-width: none;
+  margin: 0;
   padding: 0 0 2rem;
 }
 
@@ -1167,8 +1168,9 @@ body {
 
 @media (max-width: 1180px) {
   body {
-    max-width: 1080px;
-    padding: 0 1rem 2rem;
+    max-width: none;
+    margin: 0;
+    padding: 0 0 2rem;
   }
 
   .composer-grid {
@@ -1203,7 +1205,8 @@ body {
 
 @media (max-width: 520px) {
   body {
-    padding: 0 0.84rem 1.6rem;
+    margin: 0;
+    padding: 0 0 1.6rem;
   }
 
   .grid-two {
