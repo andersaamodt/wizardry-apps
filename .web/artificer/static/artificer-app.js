@@ -16617,8 +16617,21 @@
         if (event) {
           event.preventDefault();
         }
+        var activeJob = state.dictationInstallJob || null;
+        var activeJobStatus = trim(String(activeJob && activeJob.status ? activeJob.status : ""));
+        var activeJobAction = trim(String(activeJob && activeJob.action ? activeJob.action : ""));
+        var runningInstallVisible =
+          activeJob &&
+          activeJobAction !== "uninstall" &&
+          (activeJobStatus === "running" || (!activeJobStatus && state.dictationInstallBusy));
+
+        if (state.dictationInstallCancelling) {
+          showTransientNotice("Cancelling dictation download...");
+          return;
+        }
+
         // Flip to cancelling visuals immediately on click, before async work.
-        if (state.dictationInstallBusy && !state.dictationInstallCancelling) {
+        if (state.dictationInstallBusy || runningInstallVisible) {
           state.dictationInstallCancelling = true;
           state.dictationInstallPendingCancel = false;
           if (el.installDictationBtn) {
