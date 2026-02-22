@@ -2210,7 +2210,7 @@ button:disabled {
 
 .pipeline-sections .row-mini:hover {
   border-color: transparent;
-  background: color-mix(in srgb, var(--accent-soft, var(--section-bg)) 82%, var(--section-bg));
+  background: color-mix(in srgb, var(--accent) 16%, var(--section-bg));
   box-shadow: none;
 }
 
