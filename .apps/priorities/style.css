@@ -689,6 +689,10 @@ button:hover {
   z-index: 0;
 }
 
+.tree.reordering .row.add-inline {
+  z-index: -1 !important;
+}
+
 .tree.reordering .echelon-block {
   z-index: 0;
   isolation: isolate;
