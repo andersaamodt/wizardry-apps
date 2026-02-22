@@ -691,11 +691,11 @@ button:hover {
   z-index: 2147483646 !important;
 }
 
-.tree.reordering .row[data-path] {
+.tree.reordering .row {
   z-index: 0;
 }
 
-.row[data-path].row-moving {
+.row.row-moving {
   position: relative;
   z-index: 2147483647 !important;
 }

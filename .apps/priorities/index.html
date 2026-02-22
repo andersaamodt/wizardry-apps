@@ -1670,7 +1670,7 @@
         byPath: {},
         byAnimKey: {}
       };
-      var rows = treeEl().querySelectorAll('.row[data-path]');
+      var rows = treeEl().querySelectorAll('.row');
       for (var i = 0; i < rows.length; i += 1) {
         var row = rows[i];
         var rect = row.getBoundingClientRect();
@@ -1778,7 +1778,7 @@
       var tree = treeEl();
       tree.classList.add('reordering');
       var consumedAnimMatches = Object.create(null);
-      var rows = treeEl().querySelectorAll('.row[data-path]');
+      var rows = treeEl().querySelectorAll('.row');
       for (var ri = 0; ri < rows.length; ri += 1) {
         rows[ri].classList.remove('row-moving');
       }
@@ -1809,7 +1809,7 @@
             }
           }
         }
-        if (!key || !prev || typeof prev.top !== 'number' || typeof prev.left !== 'number' || typeof prev.width !== 'number') {
+        if (!prev || typeof prev.top !== 'number' || typeof prev.left !== 'number' || typeof prev.width !== 'number') {
           continue;
         }
         var nextRect = row.getBoundingClientRect();
@@ -2813,6 +2813,7 @@
     function buildInlineAddRow(depth, edgeClass) {
       var row = document.createElement('div');
       row.className = 'row add-inline';
+      row.setAttribute('data-anim-key', 'add-inline-row');
       if (edgeClass) {
         row.classList.add(edgeClass);
       }
