@@ -164,6 +164,7 @@ pagetitle: "Artificer"
 </details>
 <div class="composer-row">
 <button id="attach-btn" class="attach-btn" type="button" aria-label="Attach files" title="Attach files">+</button>
+<button id="dictate-btn" class="dictate-btn" type="button" aria-label="Dictate prompt" title="Dictate prompt"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0"></path><path d="M12 17v4"></path><path d="M9 21h6"></path></svg></span></button>
 <input id="attachment-picker" type="file" multiple hidden />
 <div class="menu-anchor model-anchor">
 <button id="model-picker-btn" class="model-picker-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Select model">Select model</button>

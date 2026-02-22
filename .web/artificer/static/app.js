@@ -126,6 +126,7 @@
     pendingArchiveKey: "",
     pendingArchiveReadyAt: 0,
     pendingAttachments: [],
+    dictateBusy: false,
     composerDragDepth: 0,
     awaitingDirPicker: false,
     conversationLoadSeq: 0,
@@ -237,6 +238,7 @@
     runForm: document.getElementById("run-form"),
     runPrompt: document.getElementById("run-prompt"),
     attachBtn: document.getElementById("attach-btn"),
+    dictateBtn: document.getElementById("dictate-btn"),
     attachmentPicker: document.getElementById("attachment-picker"),
     attachmentStrip: document.getElementById("attachment-strip"),
     modelPickerBtn: document.getElementById("model-picker-btn"),
@@ -2353,6 +2355,18 @@
     }
   }
 
+  function renderDictateButton() {
+    if (!el.dictateBtn) {
+      return;
+    }
+    var busy = !!state.dictateBusy;
+    el.dictateBtn.disabled = busy;
+    el.dictateBtn.classList.toggle("recording", busy);
+    el.dictateBtn.setAttribute("aria-pressed", busy ? "true" : "false");
+    el.dictateBtn.setAttribute("aria-label", busy ? "Listening for dictation" : "Dictate prompt");
+    el.dictateBtn.title = busy ? "Listening..." : "Dictate prompt";
+  }
+
   function renderQueueControls() {
     if (!el.queueControls || !el.queueSteerBtn || !el.queueCancelBtn) {
       return;
@@ -3058,6 +3072,7 @@
     safeStep("renderOrganizeMenu", renderOrganizeMenu);
     safeStep("renderModelPickerButton", renderModelPickerButton);
     safeStep("renderRunControls", renderRunControls);
+    safeStep("renderDictateButton", renderDictateButton);
     safeStep("renderRunButton", renderRunButton);
     safeStep("renderQueueControls", renderQueueControls);
     safeStep("renderOpenButton", renderOpenButton);
@@ -5189,6 +5204,94 @@
     addComposerFiles(clipboard.files);
   }
 
+  function insertTextAtCursor(inputEl, text) {
+    if (!inputEl) {
+      return;
+    }
+    var insertion = trim(String(text || ""));
+    if (!insertion) {
+      return;
+    }
+
+    var current = String(inputEl.value || "");
+    var start = Number(inputEl.selectionStart);
+    var end = Number(inputEl.selectionEnd);
+    if (!isFinite(start) || start < 0) {
+      start = current.length;
+    }
+    if (!isFinite(end) || end < start) {
+      end = start;
+    }
+
+    var before = current.slice(0, start);
+    var after = current.slice(end);
+    var prefix = before && !/\s$/.test(before) ? " " : "";
+    var suffix = after && !/^\s/.test(after) ? " " : "";
+    var nextText = before + prefix + insertion + suffix + after;
+    inputEl.value = nextText;
+
+    var caret = (before + prefix + insertion).length;
+    if (typeof inputEl.setSelectionRange === "function") {
+      inputEl.setSelectionRange(caret, caret);
+    }
+  }
+
+  function dispatchInputEvent(inputEl) {
+    if (!inputEl || typeof inputEl.dispatchEvent !== "function") {
+      return;
+    }
+    var nextEvent = null;
+    if (typeof Event === "function") {
+      try {
+        nextEvent = new Event("input", { bubbles: true });
+      } catch (_err) {
+        nextEvent = null;
+      }
+    }
+    if (!nextEvent && typeof document !== "undefined" && document && typeof document.createEvent === "function") {
+      nextEvent = document.createEvent("Event");
+      nextEvent.initEvent("input", true, true);
+    }
+    if (nextEvent) {
+      inputEl.dispatchEvent(nextEvent);
+    }
+  }
+
+  function onDictateClick(event) {
+    if (event && typeof event.preventDefault === "function") {
+      event.preventDefault();
+    }
+    if (state.dictateBusy) {
+      return Promise.resolve();
+    }
+    if (!el.runPrompt) {
+      return Promise.resolve();
+    }
+
+    state.dictateBusy = true;
+    renderUi();
+
+    return apiPost("dictate", { duration: "20" }, { timeoutMs: 220000 })
+      .then(function (response) {
+        if (!response.success) {
+          throw new Error(response.error || "Dictation failed");
+        }
+        var dictatedText = trim(String(response.text || ""));
+        if (!dictatedText) {
+          return;
+        }
+        insertTextAtCursor(el.runPrompt, dictatedText);
+        dispatchInputEvent(el.runPrompt);
+        if (typeof el.runPrompt.focus === "function") {
+          el.runPrompt.focus();
+        }
+      })
+      .finally(function () {
+        state.dictateBusy = false;
+        renderUi();
+      });
+  }
+
   function onRunSubmit(event) {
     event.preventDefault();
 
@@ -5997,6 +6100,12 @@
         } catch (error) {
           showError(error);
         }
+      });
+    }
+
+    if (el.dictateBtn) {
+      on(el.dictateBtn, "click", function (event) {
+        onDictateClick(event).catch(showError);
       });
     }
 
