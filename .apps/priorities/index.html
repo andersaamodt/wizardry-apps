@@ -161,7 +161,8 @@
       rootCeiling: '',
       windowWidthRequested: 0,
       windowHeightRequested: 640,
-      windowAutoGrowTimer: null
+      windowAutoGrowTimer: null,
+      windowSizingReady: false
     };
 
     function loadStorage(key) {
@@ -257,11 +258,10 @@
 
     async function requestWindowShape() {
       try {
-        var width = 300;
+        var width = clampAutoWindowWidth(Number(window.innerWidth) || 420);
         var height = state.windowHeightRequested || 640;
         state.windowWidthRequested = width;
         state.windowHeightRequested = height;
-        await bridgeExec(['__wizardry_host_resize', String(width), String(height)]);
         await bridgeExec(['__wizardry_host_pin_top']);
         await bridgeExec(['__wizardry_host_center_x']);
         await refreshDockState();
@@ -348,6 +348,9 @@
     }
 
     function scheduleAutoGrowWindowWidth() {
+      if (!state.windowSizingReady) {
+        return;
+      }
       if (state.windowAutoGrowTimer) {
         clearTimeout(state.windowAutoGrowTimer);
       }
@@ -2120,7 +2123,7 @@
         state.drillStack = [];
       }
       updateDrillUpVisibility();
-      render();
+      return render();
     }
 
     function persistRootInputOnly() {
@@ -2166,13 +2169,13 @@
       if (saved) {
         document.getElementById('root-dir').value = saved;
         updateTitleFromRoot();
-        setRootAndRefresh();
-        return;
+        return setRootAndRefresh();
       }
 
       updateTitleFromRoot();
       modal.classList.remove('hidden');
       startupPath.focus();
+      return Promise.resolve();
     }
 
     function toggleSettingsPanel(forceOpen) {
@@ -2405,7 +2408,8 @@
         }
       };
 
-      showStartupIfNeeded();
+      await showStartupIfNeeded();
+      state.windowSizingReady = true;
       updateDrillUpVisibility();
     });
   </script>

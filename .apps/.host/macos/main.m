@@ -184,6 +184,7 @@
     NSSize minSize = NSMakeSize(860, 620);
     if (self.enableNativeViewMenu) {
         // Priorities starts narrow and should remain resizable down to a compact width.
+        frame = NSMakeRect(0, 0, 420, 640);
         minSize = NSMakeSize(340, 260);
     } else if (prefersNarrowTallLayout) {
         minSize = NSMakeSize(360, 420);
