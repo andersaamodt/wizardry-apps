@@ -33,6 +33,9 @@ case "$requested_path" in
 esac
 
 current_file="$blog_posts_dir/$rel_md"
+if [ ! -f "$current_file" ] && blog_nostr_bridge_enabled; then
+  blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+fi
 if [ ! -f "$current_file" ]; then
   blog_json_error "Post not found" "not_found"
   exit 0
@@ -62,6 +65,18 @@ post_json() {
   tags_csv=$(printf '%s' "$tags_raw" | sed "s/^\[//;s/\]$//;s/\"//g;s/'//g")
   tags_norm=$(blog_normalize_tags "$tags_csv")
   tags_json=$(blog_tags_to_json_array "$tags_norm")
+  nostr_event_id=$(blog_read_front_matter_value "$file" nostr_event_id 2>/dev/null || printf '')
+  nostr_pubkey=$(blog_read_front_matter_value "$file" nostr_pubkey 2>/dev/null || printf '')
+  nostr_kind=$(blog_read_front_matter_value "$file" nostr_kind 2>/dev/null || printf '')
+  nostr_d=$(blog_read_front_matter_value "$file" nostr_d 2>/dev/null || printf '')
+  nostr_uri=$(blog_read_front_matter_value "$file" nostr_uri 2>/dev/null || printf '')
+  nostr_address=''
+  if [ -n "$nostr_pubkey" ] && [ -n "$nostr_kind" ] && [ -n "$nostr_d" ]; then
+    nostr_address=$(blog_nostr_event_address "$nostr_kind" "$nostr_pubkey" "$nostr_d")
+  fi
+  if [ -z "$nostr_uri" ] && [ -n "$nostr_address" ]; then
+    nostr_uri="nostr:$nostr_address"
+  fi
   body=$(blog_read_markdown_body "$file")
   word_count=$(blog_word_count "$body")
   reading_minutes=$(blog_estimated_read_minutes "$word_count")
@@ -78,7 +93,19 @@ post_json() {
   printf '"summary":"%s",' "$(blog_json_escape "$summary")"
   printf '"word_count":%s,' "$word_count"
   printf '"reading_minutes":%s,' "$reading_minutes"
-  printf '"tags":%s' "$tags_json"
+  printf '"tags":%s,' "$tags_json"
+  if [ -n "$nostr_event_id$nostr_pubkey$nostr_kind$nostr_d$nostr_uri" ]; then
+    printf '"nostr":{'
+    printf '"id":"%s",' "$(blog_json_escape "$nostr_event_id")"
+    printf '"pubkey":"%s",' "$(blog_json_escape "$nostr_pubkey")"
+    printf '"kind":"%s",' "$(blog_json_escape "$nostr_kind")"
+    printf '"d":"%s",' "$(blog_json_escape "$nostr_d")"
+    printf '"address":"%s",' "$(blog_json_escape "$nostr_address")"
+    printf '"uri":"%s"' "$(blog_json_escape "$nostr_uri")"
+    printf '}'
+  else
+    printf '"nostr":null'
+  fi
   printf '}'
 }
 

@@ -32,15 +32,13 @@ This blog is built with [wizardry web](https://github.com/andersaamodt/wizardry)
 - **Tags**: Flat tag system compatible with Nostr
 - **Visibility**: Controlled via UNIX file permissions
 
-### Future: Nostr Integration
+### Optional Nostr Bridge
 
-This blog is architected for future integration with [Nostr](https://nostr.com), a decentralized social protocol:
-- Post metadata aligned with Nostr event format
-- Content hashes compatible with Nostr event IDs
-- Tag system matches Nostr event tagging
-- Multi-author extensibility built-in
-
-For now, the blog is read-only. Social interaction will be added when Nostr integration is implemented (Phase 2).
+This blog can optionally enable a local-first Nostr bridge:
+- Published posts are signed as kind `30023` events with slug-only `d` identity.
+- Event JSON files are canonical and stored in `site/nostr/events/`.
+- Render projections and indexes are rebuilt from local events.
+- Comments are mirrored locally and never fetched live during page render.
 
 ## Content License
 

@@ -76,7 +76,14 @@ case "$action" in
       exit 0
     fi
 
-    filename=$(blog_publish_content "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" "$draft_id" immediate "")
+    if ! filename=$(blog_publish_content "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" "$draft_id" immediate ""); then
+      if blog_nostr_bridge_enabled; then
+        blog_json_error "Publish failed. Check Nostr bridge key/relay configuration." "nostr_publish_failed"
+      else
+        blog_json_error "Publish failed." "publish_failed"
+      fi
+      exit 0
+    fi
     if blog_draft_exists "$draft_id"; then
       blog_delete_draft "$draft_id"
     fi

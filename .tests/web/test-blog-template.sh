@@ -599,6 +599,75 @@ test_blog_post_context_endpoint() {
   teardown_blog_fixture
 }
 
+test_blog_nostr_bridge_projection_and_comments() {
+  setup_blog_fixture || return $?
+
+  config-set "$site_dir/site.conf" nostr_bridge_enabled true
+
+  post_pubkey="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  post_event_old="1111111111111111111111111111111111111111111111111111111111111111"
+  post_event_new="2222222222222222222222222222222222222222222222222222222222222222"
+  post_addr="30023:$post_pubkey:nostr-post"
+
+  post_event_dir="$site_dir/site/nostr/events/$post_pubkey/30023"
+  mkdir -p "$post_event_dir"
+  cat > "$post_event_dir/$post_event_old.json" <<EOF
+{"id":"$post_event_old","pubkey":"$post_pubkey","created_at":1700000000,"kind":30023,"tags":[["d","nostr-post"],["title","Old Bridge Title"],["summary","old summary"],["published_at","2024-01-01T00:00:00Z"],["t","nostr"]],"content":"# Old\\nold content","sig":"legacy"}
+EOF
+  cat > "$post_event_dir/$post_event_new.json" <<EOF
+{"id":"$post_event_new","pubkey":"$post_pubkey","created_at":1700000500,"kind":30023,"tags":[["d","nostr-post"],["title","Fresh Bridge Title"],["summary","fresh summary"],["published_at","2024-01-02T00:00:00Z"],["t","nostr"],["t","bridge"]],"content":"# Fresh\\nlatest content","sig":"latest"}
+EOF
+
+  allowed_comment_pubkey="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  blocked_comment_pubkey="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  comment_dir_allowed="$site_dir/site/nostr/events/$allowed_comment_pubkey/1"
+  comment_dir_blocked="$site_dir/site/nostr/events/$blocked_comment_pubkey/1"
+  mkdir -p "$comment_dir_allowed" "$comment_dir_blocked"
+  cat > "$comment_dir_allowed/3333333333333333333333333333333333333333333333333333333333333333.json" <<EOF
+{"id":"3333333333333333333333333333333333333333333333333333333333333333","pubkey":"$allowed_comment_pubkey","created_at":1700000600,"kind":1,"tags":[["a","$post_addr"]],"content":"Allowed comment","sig":"ok"}
+EOF
+  cat > "$comment_dir_blocked/4444444444444444444444444444444444444444444444444444444444444444.json" <<EOF
+{"id":"4444444444444444444444444444444444444444444444444444444444444444","pubkey":"$blocked_comment_pubkey","created_at":1700000700,"kind":1,"tags":[["a","$post_addr"]],"content":"Blocked comment","sig":"nope"}
+EOF
+
+  printf '%s\n' "$blocked_comment_pubkey" > "$site_dir/site/nostr/state/blocklist.txt"
+
+  run_cgi_get "$cgi_dir/blog-index" ""
+  case "$CGI_BODY" in *"Fresh Bridge Title"*) ;; *) TEST_FAILURE_REASON="nostr projection should render latest event title"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in
+    *"Old Bridge Title"*)
+      TEST_FAILURE_REASON="older replaceable event version should not be rendered"
+      teardown_blog_fixture
+      return 1
+      ;;
+    *) ;;
+  esac
+
+  if [ ! -f "$site_dir/site/pages/posts/nostr-post.md" ]; then
+    TEST_FAILURE_REASON="nostr projection should generate markdown render file"
+    teardown_blog_fixture
+    return 1
+  fi
+
+  run_cgi_get "$cgi_dir/blog-post-context" "path=nostr-post.html"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="post context should resolve projected nostr post"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *'"nostr":{"id":"'"$post_event_new"*) ;; *) TEST_FAILURE_REASON="post context should expose nostr proof metadata"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_get "$cgi_dir/blog-comments" "path=nostr-post.html"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="blog-comments should return success"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *"Allowed comment"*) ;; *) TEST_FAILURE_REASON="allowed mirrored comment should be visible"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in
+    *"Blocked comment"*)
+      TEST_FAILURE_REASON="blocklisted comment should be filtered from local comments index"
+      teardown_blog_fixture
+      return 1
+      ;;
+    *) ;;
+  esac
+
+  teardown_blog_fixture
+}
+
 test_blog_open_post_redirects() {
   setup_blog_fixture || return $?
 
@@ -696,6 +765,7 @@ run_test_case "blog passkey register normalizes multiline keys" test_blog_passke
 run_test_case "blog passkey register resolves stable username" test_blog_passkey_register_resolves_stable_username
 run_test_case "blog archive endpoint renders grouped posts" test_blog_archive_endpoint_renders_posts
 run_test_case "blog post-context endpoint returns post metadata" test_blog_post_context_endpoint
+run_test_case "blog nostr bridge projects events and filters comments" test_blog_nostr_bridge_projection_and_comments
 run_test_case "blog open-post redirects to post html" test_blog_open_post_redirects
 run_test_case "blog account update persists player name" test_blog_account_update_and_player_name
 

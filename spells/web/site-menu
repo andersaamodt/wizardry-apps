@@ -55,6 +55,7 @@ fi
 SITES_DIR="$WEB_ROOT"
 SITE_DIR="$SITES_DIR/$site_name"
 SITE_DATA_DIR="$SITES_DIR/.sitedata/$site_name"
+site_template=$(config-get "$SITE_DIR/site.conf" template 2>/dev/null || printf '')
 
 if [ ! -d "$SITE_DIR" ]; then
   die "site-menu: site '$site_name' not found"
@@ -208,6 +209,13 @@ while true; do
   # Always: Update from template
   update_template_cmd_wrapped=$(wrap_cmd "Update from template" \
     "update-from-template \"$site_name\"")
+
+  mirror_nostr_option=""
+  if [ "$site_template" = "blog" ]; then
+    mirror_nostr_cmd_wrapped=$(wrap_cmd "Mirror Nostr events" \
+      "blog-nostr-mirror \"$site_name\"")
+    mirror_nostr_option="Mirror Nostr events%$mirror_nostr_cmd_wrapped"
+  fi
   
   # Conditional: Copy .onion address
   if [ -n "$copy_site_onion" ]; then
@@ -316,6 +324,7 @@ while true; do
   set -- \
     ${open_browser_option:+"$open_browser_option"} \
     "Build all & restart server%$build_restart_cmd_wrapped" \
+    ${mirror_nostr_option:+"$mirror_nostr_option"} \
     "Update from template%$update_template_cmd_wrapped" \
     ${copy_site_onion:+"$copy_site_onion"} \
     "Open site directory%$open_dir_cmd_wrapped" \

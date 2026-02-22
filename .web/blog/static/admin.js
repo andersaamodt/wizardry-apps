@@ -9,7 +9,8 @@
     currentDraftId: '',
     autosaveTimer: null,
     suspendAutosave: false,
-    previewVisible: localStorage.getItem('blog_admin_preview_hidden') !== '1'
+    previewVisible: localStorage.getItem('blog_admin_preview_hidden') !== '1',
+    nostrBridgeEnabled: false
   };
 
   const els = {
@@ -26,6 +27,7 @@
     dripRandomness: document.getElementById('drip-randomness'),
     feedFullText: document.getElementById('feed-full-text'),
     feedItems: document.getElementById('feed-items'),
+    nostrBridgeEnabled: document.getElementById('nostr-bridge-enabled'),
     postTitle: document.getElementById('post-title'),
     postTags: document.getElementById('post-tags'),
     postTagsInput: document.getElementById('post-tags-input'),
@@ -44,6 +46,7 @@
     accountPlayerName: document.getElementById('account-player-name'),
     autosaveStatus: document.getElementById('autosave-status'),
     publishNowButton: document.getElementById('btn-publish-now'),
+    mirrorNostrButton: document.getElementById('btn-mirror-nostr'),
     imagePicker: document.getElementById('image-picker'),
     dropOverlay: document.getElementById('drop-overlay'),
     sectionButtons: Array.from(document.querySelectorAll('[data-admin-nav]')),
@@ -552,6 +555,13 @@
     }
     els.feedFullText.checked = data.feed_full_text !== false;
     els.feedItems.value = String(data.feed_items || 50);
+    state.nostrBridgeEnabled = !!data.nostr_bridge_enabled;
+    if (els.nostrBridgeEnabled) {
+      els.nostrBridgeEnabled.checked = state.nostrBridgeEnabled;
+    }
+    if (els.mirrorNostrButton) {
+      els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
+    }
   }
 
   async function saveConfig() {
@@ -563,10 +573,15 @@
         drip_interval_hours: els.dripInterval.value.trim(),
         drip_randomness_minutes: els.dripRandomness.value.trim(),
         feed_full_text: els.feedFullText.checked ? 'true' : 'false',
-        feed_items: els.feedItems.value.trim()
+        feed_items: els.feedItems.value.trim(),
+        nostr_bridge_enabled: (els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked) ? 'true' : 'false'
       }, true);
       if (!data.success) {
         throw new Error(data.error || 'Failed to save config');
+      }
+      state.nostrBridgeEnabled = !!(els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked);
+      if (els.mirrorNostrButton) {
+        els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
       }
       setOutput(els.outputConfig, 'Settings saved.', 'ok');
       await loadQueue();
@@ -781,6 +796,24 @@
     }
   }
 
+  async function runNostrMirror() {
+    try {
+      const data = await apiPost('/cgi/blog-nostr-mirror', {}, true);
+      if (!data.success) {
+        throw new Error(data.error || 'Nostr mirror failed');
+      }
+      await Promise.all([loadDrafts(), loadQueue()]);
+      setOutput(
+        els.outputQueue,
+        'Nostr mirror complete. Posts mirrored: ' + String(data.posts_mirrored || 0) +
+          ', comments mirrored: ' + String(data.comments_mirrored || 0) + '.',
+        'ok'
+      );
+    } catch (err) {
+      setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
+    }
+  }
+
   async function uploadImageFile(file) {
     const dataUrl = await readFileAsDataUrl(file);
     const data = await apiPost('/cgi/blog-upload-media', {
@@ -917,6 +950,9 @@
     });
 
     document.getElementById('btn-run-scheduler').addEventListener('click', runSchedulerNow);
+    if (els.mirrorNostrButton) {
+      els.mirrorNostrButton.addEventListener('click', runNostrMirror);
+    }
     const saveAccountBtn = document.getElementById('btn-save-account');
     if (saveAccountBtn) {
       saveAccountBtn.addEventListener('click', saveAccount);

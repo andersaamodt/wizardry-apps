@@ -13029,7 +13029,7 @@
       loadModeRuntimeState().catch(function () {
         return null;
       })
-    });
+    ]);
     return Promise.all([dictationBootstrap, settingsBootstrap]).finally(function () {
       if (dictationReadyTimer) {
         clearTimeout(dictationReadyTimer);

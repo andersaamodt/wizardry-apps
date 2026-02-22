@@ -23,6 +23,7 @@ drip_randomness=$(blog_param drip_randomness_minutes)
 drip_jitter_legacy=$(blog_param drip_jitter_minutes)
 feed_full_text=$(blog_param feed_full_text)
 feed_items=$(blog_param feed_items)
+nostr_bridge_enabled=$(blog_param nostr_bridge_enabled)
 
 if [ -n "$registration_enabled" ]; then
   case "$registration_enabled" in
@@ -97,6 +98,17 @@ if [ -n "$feed_items" ]; then
         feed_items=1
       fi
       config-set "$blog_site_conf" feed_items "$feed_items"
+      ;;
+  esac
+fi
+
+if [ -n "$nostr_bridge_enabled" ]; then
+  case "$nostr_bridge_enabled" in
+    true|false)
+      config-set "$blog_site_conf" nostr_bridge_enabled "$nostr_bridge_enabled"
+      if [ "$nostr_bridge_enabled" = "true" ]; then
+        blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+      fi
       ;;
   esac
 fi

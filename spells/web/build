@@ -446,6 +446,12 @@ build_site() {
   shared_theme_dir="$WIZARDRY_DIR/.web/.themes"
   site_template=$(config-get "$SITE_DIR/site.conf" template 2>/dev/null || printf '')
 
+  if [ "$site_template" = "blog" ] && [ -x "$SITE_DIR/cgi/blog-nostr-rebuild" ]; then
+    if ! WIZARDRY_SITES_DIR="$SITES_DIR" WIZARDRY_SITE_NAME="$site_name" "$SITE_DIR/cgi/blog-nostr-rebuild" >/dev/null 2>&1; then
+      warn "build: blog Nostr derived rebuild failed; continuing with existing local files"
+    fi
+  fi
+
   mkdir -p "$SITE_DIR/build/pages"
   mkdir -p "$SITE_DIR/build/static"
   mkdir -p "$SITE_DIR/build/static/js"

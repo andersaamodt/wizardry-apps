@@ -1,4 +1,6 @@
 (function () {
+  var currentRelPath = '';
+
   function isPostPage(pathname) {
     return /^\/pages\/posts\/.+\.html$/.test(pathname || '');
   }
@@ -62,6 +64,21 @@
       '</section>';
   }
 
+  function renderNostrProof(nostr) {
+    if (!nostr || !nostr.id) {
+      return '';
+    }
+    return '<section class="post-nostr-proof">' +
+      '<h3>Nostr Proof</h3>' +
+      '<dl class="post-nostr-proof-list">' +
+      '<div><dt>ID</dt><dd><code>' + escapeHtml(nostr.id || '') + '</code></dd></div>' +
+      '<div><dt>Pubkey</dt><dd><code>' + escapeHtml(nostr.pubkey || '') + '</code></dd></div>' +
+      '<div><dt>Kind</dt><dd><code>' + escapeHtml(String(nostr.kind || '')) + '</code></dd></div>' +
+      '<div><dt>URI</dt><dd><code>' + escapeHtml(nostr.uri || '') + '</code></dd></div>' +
+      '</dl>' +
+      '</section>';
+  }
+
   function renderPostEndTags(tags) {
     var content = renderTags(tags);
     if (!content) {
@@ -90,6 +107,106 @@
       '</nav>';
   }
 
+  function renderCommentRow(comment) {
+    var created = comment.created_at_iso ? escapeHtml(comment.created_at_iso.replace('T', ' ').replace('Z', ' UTC')) : '';
+    var pubkey = escapeHtml(String(comment.pubkey || '').slice(0, 16));
+    var body = escapeHtml(comment.content || '').replace(/\n/g, '<br>');
+    return '<article class="post-comment">' +
+      '<header><span class="post-comment-author">' + pubkey + '</span>' + (created ? ' <span class="post-comment-time">' + created + '</span>' : '') + '</header>' +
+      '<p>' + body + '</p>' +
+      '</article>';
+  }
+
+  function renderComments(comments) {
+    var list = Array.isArray(comments) ? comments : [];
+    var container = document.getElementById('post-comments-list');
+    if (!container) {
+      return;
+    }
+    if (!list.length) {
+      container.innerHTML = '<p class="placeholder">No comments mirrored yet.</p>';
+      return;
+    }
+    container.innerHTML = list.map(renderCommentRow).join('');
+  }
+
+  function setCommentStatus(message, kind) {
+    var status = document.getElementById('post-comments-status');
+    if (!status) {
+      return;
+    }
+    status.className = 'post-comments-status';
+    if (kind) {
+      status.classList.add('is-' + kind);
+    }
+    status.textContent = message || '';
+  }
+
+  function loadComments() {
+    if (!currentRelPath) {
+      return;
+    }
+    fetch('/cgi/blog-comments?path=' + encodeURIComponent(currentRelPath), { credentials: 'same-origin' })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data || !data.success) {
+          return;
+        }
+        renderComments(data.comments || []);
+        setCommentStatus('', '');
+      })
+      .catch(function () {
+        setCommentStatus('Failed to load mirrored comments.', 'warn');
+      });
+  }
+
+  function refreshComments() {
+    if (!currentRelPath) {
+      return;
+    }
+    setCommentStatus('Refreshing comments from relays...', 'info');
+    fetch('/cgi/blog-refresh-comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'path=' + encodeURIComponent(currentRelPath),
+      credentials: 'same-origin'
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data || !data.success) {
+          var msg = (data && data.error) ? data.error : 'Comment refresh failed.';
+          setCommentStatus(msg, 'warn');
+          return;
+        }
+        loadComments();
+        setCommentStatus('Comments refreshed.', 'ok');
+      })
+      .catch(function () {
+        setCommentStatus('Comment refresh failed.', 'warn');
+      });
+  }
+
+  function ensureCommentShell() {
+    if (document.querySelector('.post-comments-shell')) {
+      return;
+    }
+    var anchor = document.querySelector('#main-content') || document.body;
+    anchor.insertAdjacentHTML('beforeend',
+      '<section class="post-comments-shell">' +
+      '<div class="post-comments-head">' +
+      '<h3>Comments</h3>' +
+      '<button type="button" id="post-comments-refresh">Refresh comments</button>' +
+      '</div>' +
+      '<p id="post-comments-status" class="post-comments-status"></p>' +
+      '<div id="post-comments-list" class="post-comments-list"><p class="placeholder">No comments mirrored yet.</p></div>' +
+      '</section>'
+    );
+    var refreshButton = document.getElementById('post-comments-refresh');
+    if (refreshButton) {
+      refreshButton.addEventListener('click', refreshComments);
+    }
+  }
+
   function applyEnhancements(payload) {
     if (!payload || !payload.current || document.querySelector('.post-context-card')) {
       return;
@@ -115,6 +232,16 @@
       anchor.insertAdjacentHTML('beforeend', renderPostNav(payload));
     }
 
+    if (payload.current.nostr && !document.querySelector('.post-nostr-proof')) {
+      var proof = renderNostrProof(payload.current.nostr);
+      if (proof) {
+        var proofAnchor = document.querySelector('#main-content') || document.body;
+        proofAnchor.insertAdjacentHTML('beforeend', proof);
+      }
+      ensureCommentShell();
+      loadComments();
+    }
+
     ensureMeta('description', payload.current.summary || '', 'name');
     ensureMeta('og:description', payload.current.summary || '', 'property');
     ensureMeta('article:published_time', payload.current.published_at || '', 'property');
@@ -126,8 +253,8 @@
       return;
     }
 
-    var relPath = window.location.pathname.replace(/^\/pages\/posts\//, '');
-    fetch('/cgi/blog-post-context?path=' + encodeURIComponent(relPath), { credentials: 'same-origin' })
+    currentRelPath = window.location.pathname.replace(/^\/pages\/posts\//, '');
+    fetch('/cgi/blog-post-context?path=' + encodeURIComponent(currentRelPath), { credentials: 'same-origin' })
       .then(function (res) { return res.json(); })
       .then(function (data) {
         if (!data || !data.success) {

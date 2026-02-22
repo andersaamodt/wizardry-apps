@@ -17,6 +17,7 @@ Commands:
   stop SITENAME      Stop serving a website
   status [SITENAME]  Show website status
   configure SITENAME Configure website settings
+  nostr-mirror SITENAME  Mirror Nostr events for a blog site
 
 Without arguments, opens an interactive menu.
 
@@ -117,6 +118,14 @@ case "$cmd" in
     fi
     shift 2
     configure-nginx "$site_name" "$@"
+    exit 0
+    ;;
+  nostr-mirror)
+    site_name=${2-}
+    if [ -z "$site_name" ]; then
+      die 2 "web-wizardry: nostr-mirror requires SITENAME argument"
+    fi
+    blog-nostr-mirror "$site_name"
     exit 0
     ;;
   '')

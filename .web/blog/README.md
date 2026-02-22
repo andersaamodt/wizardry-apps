@@ -1,6 +1,6 @@
 # Personal Blog Template
 
-A single-author blog template for wizardry web, architected for future multi-author and Nostr integration.
+A single-author blog template for wizardry web with optional Nostr bridge support for post authorship, version selection, and local-first mirrored comments.
 
 ## Features
 
@@ -67,6 +67,10 @@ States are inferred from metadata and filesystem visibility.
 ```
 blog/
 ├── site/
+│   ├── nostr/
+│   │   ├── events/          # Canonical mirrored/signed event JSON files
+│   │   ├── derived/         # Disposable indexes generated from events
+│   │   └── state/           # Authors, relays, blocklist, hidden posts, key
 │   └── pages/
 │       ├── index.md         # Blog homepage
 │       ├── about.md         # About page
@@ -125,18 +129,24 @@ visibility: "public"  # Change from "draft"
 
 ## Interaction Model
 
-- Blog is **read-only**
-- No native comments, reactions, or annotations
-- All interaction deferred to Nostr (Phase 2)
+- Blog rendering is deterministic from local files only.
+- When the Nostr bridge is enabled, canonical post state is local Nostr event JSON under `site/nostr/events/`.
+- Comments are read from locally mirrored events only.
+- “Refresh comments” runs an explicit mirror action; render paths never perform live relay fetches.
 
-## Future: Nostr Integration (Phase 2)
+## Nostr Bridge (Phase 2)
 
-Architecture is designed for seamless Nostr integration:
-- Content hashes align with Nostr event IDs
-- Tags compatible with Nostr event tagging
-- Post model extensible to multi-author
-- Metadata prepared for Nostr event format
-- Revision lineage maps to Nostr event replacement
+- Posts publish as kind `30023` events with slug-only `d` identity.
+- Post markdown is stored directly in event `.content`.
+- Latest rendered version is selected by newest `created_at` per (`pubkey`, `kind`, `d`) with event-id tie-break.
+- Mirroring uses `nak`; signing/verification prefer `nostril` and fall back to `nak verify` when needed.
+- Relay and author allowlist are file-backed:
+  - `site/nostr/state/relays.txt`
+  - `site/nostr/state/authors.txt`
+- Local moderation and hide controls are file-backed:
+  - `site/nostr/state/blocklist.txt`
+  - `site/nostr/state/hidden_posts.txt`
+- Bridge enablement is explicit in `site.conf` via `nostr_bridge_enabled=true|false`.
 
 ## Quick Start
 
@@ -155,6 +165,12 @@ web-wizardry serve myblog
 ```
 
 Visit http://localhost:8080
+
+To enable Nostr bridge for a site, turn on “Enable Nostr Bridge” in `/pages/admin.html#settings`, then configure:
+
+- `site/nostr/state/secret.key` (hex private key for signing)
+- `site/nostr/state/authors.txt`
+- `site/nostr/state/relays.txt`
 
 ## MUD Integration & Authentication
 
@@ -252,28 +268,40 @@ Access admin panel (if in blog-admin group)
 - `blog-delete-draft` - Delete draft
 - `blog-list-queue` - List scheduled + drip queue
 - `blog-run-scheduler` - Trigger scheduler tick
+- `blog-nostr-mirror` - Mirror Nostr posts/comments from configured relays
 - `blog-upload-media` - Upload images for markdown embedding
 - `blog-archive` - Render month-grouped archive listing
 - `blog-post-context` - Return post metadata + older/newer navigation context
+
+**Public Nostr Read/Refresh Endpoints:**
+- `blog-comments` - Return local mirrored comments for a post
+- `blog-refresh-comments` - Explicitly mirror latest comments for a post
 
 ### Data Storage
 
 ```
 ~/sites/myblog/
 ├── site.conf                  # Site configuration
-├── data/
-│   └── ssh-auth/
-│       ├── users/
-│       │   └── alice/
-│       │       ├── ssh_fingerprint
-│       │       ├── is_admin
-│       │       └── delegates/
-│       └── sessions/
-└── site/
-    └── pages/
-        └── posts/
-            ├── 2024-02-04-my-post.md  # Published
-            └── 2024-02-04-draft.md    # Draft
+├── site/
+│   ├── nostr/
+│   │   ├── events/            # Canonical event store
+│   │   ├── derived/           # Rebuildable indexes
+│   │   └── state/
+│   │       ├── authors.txt
+│   │       ├── relays.txt
+│   │       ├── blocklist.txt
+│   │       ├── hidden_posts.txt
+│   │       └── secret.key     # Local signing key (not committed)
+│   └── pages/
+│       └── posts/
+│           ├── slug.md        # Generated/derived render projection
+│           └── slug-2.md
+└── .sitedata/
+    └── myblog/
+        ├── ssh-auth/
+        ├── blog/
+        │   └── drafts/
+        └── uploads/
 ```
 
 ### Security Model
@@ -292,7 +320,7 @@ See `.github/MUD_BLOG_INTEGRATION.md` for complete documentation.
 2. **Content-addressable**: Identity based on content hash
 3. **Append-only**: Edits create new versions, old versions preserved
 4. **UNIX permissions**: Visibility through filesystem semantics
-5. **Nostr-aligned**: Future-proofed for decentralized social layer
+5. **Nostr-aligned**: Optional decentralized social layer with local canonical event storage
 6. **Simple & transparent**: No hidden state, all data in files
 
 ## License

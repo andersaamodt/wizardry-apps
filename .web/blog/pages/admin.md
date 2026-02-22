@@ -105,6 +105,21 @@ title: Blog Admin
 </div>
 </div>
 </section>
+
+<section class="sub-card">
+<h4>Nostr Bridge</h4>
+<div class="field-row checkbox-row">
+<div class="setting-label">
+<strong>Enable Nostr Bridge</strong>
+<span class="inline-tip" tabindex="0" aria-label="When enabled, published posts are signed as Nostr events and local render indexes are derived from mirrored events.">?</span>
+</div>
+<label class="checkbox-control" for="nostr-bridge-enabled">
+<input type="checkbox" id="nostr-bridge-enabled">
+<span>Enabled</span>
+</label>
+</div>
+<p class="muted">Configure authors, relays, and blocklist in <code>site/nostr/state/</code>. Bridge actions are explicit and never run during page render.</p>
+</section>
 </div>
 
 <div class="section-actions">
@@ -273,6 +288,7 @@ title: Blog Admin
 </div>
 <div class="row-actions">
 <button id="btn-refresh-queue" type="button">Refresh</button>
+<button id="btn-mirror-nostr" type="button">Mirror Nostr</button>
 <button id="btn-run-scheduler" type="button" class="primary">Run Scheduler</button>
 </div>
 </div>
