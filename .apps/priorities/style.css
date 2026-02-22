@@ -682,15 +682,6 @@ button:hover {
   -webkit-user-select: none;
 }
 
-.tree.reordering .echelon-block {
-  z-index: 0;
-}
-
-.echelon-block.reorder-host {
-  position: relative;
-  z-index: 2147483646 !important;
-}
-
 .tree.reordering .row {
   z-index: 0;
 }

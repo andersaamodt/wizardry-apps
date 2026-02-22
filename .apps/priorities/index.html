@@ -159,6 +159,7 @@
       pendingNextAction: Object.create(null),
       busy: false,
       pendingPrioritizePath: '',
+      lastPrioritizedPath: '',
       pendingCheckByPath: Object.create(null),
       pendingExpandPath: '',
       pendingDirRevalidate: Object.create(null),
@@ -1795,10 +1796,6 @@
             rows[rz]._reorderOverlayEl = null;
           }
         }
-        var liftedBlocks = tree.querySelectorAll('.echelon-block.reorder-host');
-        for (var lb = 0; lb < liftedBlocks.length; lb += 1) {
-          liftedBlocks[lb].classList.remove('reorder-host');
-        }
       };
       var moved = [];
       for (var i = 0; i < rows.length; i += 1) {
@@ -1847,7 +1844,7 @@
       var easing = 'cubic-bezier(0.2, 0.75, 0.2, 1)';
       var remaining = moved.length;
       var finished = false;
-      var activeReorderPath = String(state.pendingPrioritizePath || '').trim();
+      var activeReorderPath = String(state.pendingPrioritizePath || state.lastPrioritizedPath || '').trim();
 
       var finalizeOne = function (row) {
         row.style.transition = '';
@@ -1864,16 +1861,6 @@
             // Ignore overlay cleanup failures.
           }
           row._reorderOverlayEl = null;
-        }
-        if (row._reorderHostBlock) {
-          var hostBlock = row._reorderHostBlock;
-          var liftCount = Number(hostBlock._reorderLiftCount) || 0;
-          liftCount = liftCount > 0 ? (liftCount - 1) : 0;
-          hostBlock._reorderLiftCount = liftCount;
-          if (liftCount === 0) {
-            hostBlock.classList.remove('reorder-host');
-          }
-          row._reorderHostBlock = null;
         }
         if (row._reorderTextAnimationTargets && row._reorderTextAnimationTargets.length) {
           for (var r = 0; r < row._reorderTextAnimationTargets.length; r += 1) {
@@ -1946,14 +1933,6 @@
             movedRow._reorderOverlayEl = overlayRow;
             movedRow.style.visibility = 'hidden';
             movedRow.classList.add('row-moving');
-            var reorderHostBlock = movedRow.closest('.echelon-block');
-            if (reorderHostBlock) {
-              var hostLiftCount = Number(reorderHostBlock._reorderLiftCount) || 0;
-              hostLiftCount += 1;
-              reorderHostBlock._reorderLiftCount = hostLiftCount;
-              reorderHostBlock.classList.add('reorder-host');
-              movedRow._reorderHostBlock = reorderHostBlock;
-            }
             if (movedRow._reorderAnimation) {
               try {
                 movedRow._reorderAnimation.cancel();
@@ -3088,6 +3067,7 @@
       if (!path || state.busy || state.pendingPrioritizePath) {
         return;
       }
+      state.lastPrioritizedPath = path;
       var parentDir = parentDirOfPath(path);
       var previousItems = applyOptimisticPrioritize(parentDir, path);
       state.pendingPrioritizePath = path;
