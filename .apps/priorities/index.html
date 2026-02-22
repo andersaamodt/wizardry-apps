@@ -1679,14 +1679,18 @@
         var metrics = {
           top: rect.top,
           left: rect.left,
-          width: rect.width
+          width: rect.width,
+          path: '',
+          animKey: ''
         };
         var pathKey = String(row.getAttribute('data-path') || '').trim();
         if (pathKey) {
+          metrics.path = pathKey;
           map.byPath[pathKey] = metrics;
         }
         var animKey = String(row.getAttribute('data-anim-key') || '').trim();
         if (animKey) {
+          metrics.animKey = animKey;
           if (!map.byAnimKey[animKey]) {
             map.byAnimKey[animKey] = [];
           }
@@ -1845,7 +1849,8 @@
           row: row,
           deltaX: deltaX,
           deltaY: deltaY,
-          scaleX: scaleX
+          scaleX: scaleX,
+          prev: prev
         });
       }
       if (!moved.length) {
@@ -1861,6 +1866,10 @@
       var remaining = moved.length;
       var finished = false;
       var activeReorderPath = String(state.reorderPrimaryPath || state.pendingPrioritizePath || state.lastPrioritizedPath || '').trim();
+      var activeReorderAnimKey = '';
+      if (activeReorderPath && previousPositions.byPath[activeReorderPath]) {
+        activeReorderAnimKey = String(previousPositions.byPath[activeReorderPath].animKey || '').trim();
+      }
 
       var finalizeOne = function (row) {
         row.style.transition = '';
@@ -1928,10 +1937,19 @@
           (function runRowAnimation(m) {
             var movedRow = m.row;
             var movedRowPath = String(movedRow.getAttribute('data-path') || '').trim();
+            var movedRowAnimKey = String(movedRow.getAttribute('data-anim-key') || '').trim();
             var rowScaleX = Number(m.scaleX) || 1;
             var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
             var overlayRect = movedRow.getBoundingClientRect();
             var overlayRow = movedRow.cloneNode(true);
+            var isPrimaryRow = false;
+            if (movedRowPath && activeReorderPath && movedRowPath === activeReorderPath) {
+              isPrimaryRow = true;
+            } else if (m.prev && activeReorderPath && String(m.prev.path || '').trim() === activeReorderPath) {
+              isPrimaryRow = true;
+            } else if (activeReorderAnimKey && movedRowAnimKey && movedRowAnimKey === activeReorderAnimKey) {
+              isPrimaryRow = true;
+            }
             overlayRow.classList.add('row-moving');
             overlayRow.classList.add('row-moving-overlay');
             overlayRow.style.position = 'fixed';
@@ -1939,7 +1957,7 @@
             overlayRow.style.left = overlayRect.left + 'px';
             overlayRow.style.width = overlayRect.width + 'px';
             overlayRow.style.margin = '0';
-            overlayRow.style.zIndex = movedRowPath && activeReorderPath && movedRowPath === activeReorderPath ? '9999' : '1';
+            overlayRow.style.zIndex = isPrimaryRow ? '2147483647' : '2147483646';
             overlayRow.style.pointerEvents = 'none';
             overlayRow.style.willChange = 'transform';
             overlayRow.style.backfaceVisibility = 'hidden';
