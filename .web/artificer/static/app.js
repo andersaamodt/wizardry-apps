@@ -132,6 +132,8 @@
     dictationInstallInfoLoading: false,
     dictationInstallBusy: false,
     dictationInstallCancelling: false,
+    dictationInstallPendingCancel: false,
+    dictationInstallCancelJobId: "",
     dictationInstallJob: null,
     dictationInstallError: "",
     dictationInstalled: false,
@@ -4893,6 +4895,8 @@
     openModal(el.settingsModal);
     state.dictationInstallReady = false;
     state.dictationInstallCancelling = false;
+    state.dictationInstallPendingCancel = false;
+    state.dictationInstallCancelJobId = "";
     state.dictationInstallError = "";
     renderDictationInstallSettings();
     return Promise.all([
@@ -5236,6 +5240,12 @@
       if (!response || !response.success || !response.job) {
         throw new Error((response && response.error) || "Could not load dictation install status");
       }
+      var responseJobId = trim(String(response.job.id || ""));
+      var cancelJobId = trim(String(state.dictationInstallCancelJobId || ""));
+      var responseStatus = String(response.job.status || "");
+      if (cancelJobId && responseJobId === cancelJobId && responseStatus === "running") {
+        return null;
+      }
       var previousJob = state.dictationInstallJob || null;
       var previousAction = trim(String(previousJob && previousJob.action ? previousJob.action : ""));
       state.dictationInstallJob = response.job;
@@ -5250,6 +5260,10 @@
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
         state.dictationInstallCancelling = false;
+        state.dictationInstallPendingCancel = false;
+        if (cancelJobId && responseJobId === cancelJobId) {
+          state.dictationInstallCancelJobId = "";
+        }
         var installedBackend = trim(String(response.job.installed || response.job.component || response.job.backend || ""));
         state.dictationInstalled = true;
         state.dictationBackend = installedBackend;
@@ -5285,6 +5299,10 @@
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
         state.dictationInstallCancelling = false;
+        state.dictationInstallPendingCancel = false;
+        if (cancelJobId && responseJobId === cancelJobId) {
+          state.dictationInstallCancelJobId = "";
+        }
         state.dictationInstallJob = null;
         renderUi();
         var logText = trim(String(response.job.log || ""));
@@ -5307,6 +5325,10 @@
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
         state.dictationInstallCancelling = false;
+        state.dictationInstallPendingCancel = false;
+        if (cancelJobId && responseJobId === cancelJobId) {
+          state.dictationInstallCancelJobId = "";
+        }
         state.dictationInstallJob = null;
         state.dictationInstallError = "";
         return loadDictationStatus({ silent: true }).then(function () {
@@ -5349,6 +5371,8 @@
 
     state.dictationInstallBusy = true;
     state.dictationInstallCancelling = false;
+    state.dictationInstallPendingCancel = false;
+    state.dictationInstallCancelJobId = "";
     state.dictationInstallError = "";
     state.dictationInstallJob = {
       status: "running",
@@ -5364,6 +5388,10 @@
       }
       state.dictationInstallJob = response.job;
       state.dictationInstallJob.action = "install";
+      if (state.dictationInstallPendingCancel) {
+        state.dictationInstallPendingCancel = false;
+        return cancelDictationInstall();
+      }
       startDictationInstallPolling(String(response.job.id || ""));
       renderUi();
       return pollDictationInstallStatus(String(response.job.id || "")).catch(function (error) {
@@ -5377,6 +5405,8 @@
       stopDictationInstallPolling();
       state.dictationInstallBusy = false;
       state.dictationInstallCancelling = false;
+      state.dictationInstallPendingCancel = false;
+      state.dictationInstallCancelJobId = "";
       state.dictationInstallJob = null;
       state.dictationInstallError = error && error.message ? error.message : "Dictation install failed";
       showTransientNotice(state.dictationInstallError);
@@ -5403,6 +5433,7 @@
       stopDictationInstallPolling();
       state.dictationInstallBusy = false;
       state.dictationInstallCancelling = false;
+      state.dictationInstallPendingCancel = true;
       state.dictationInstallJob = null;
       renderUi();
       return Promise.resolve(null);
@@ -5411,6 +5442,8 @@
     stopDictationInstallPolling();
     state.dictationInstallBusy = false;
     state.dictationInstallCancelling = true;
+    state.dictationInstallPendingCancel = false;
+    state.dictationInstallCancelJobId = jobId;
     state.dictationInstallError = "";
     state.dictationInstallJob = null;
     renderUi();
@@ -5419,6 +5452,8 @@
         throw new Error((response && response.error) || "Could not cancel dictation install");
       }
       state.dictationInstallCancelling = false;
+      state.dictationInstallPendingCancel = false;
+      state.dictationInstallCancelJobId = "";
       state.dictationInstallError = "";
       return loadDictationStatus({ silent: true }).then(function () {
         showTransientNotice("Dictation install cancelled");
@@ -5427,6 +5462,7 @@
       });
     }).catch(function (error) {
       state.dictationInstallCancelling = false;
+      state.dictationInstallPendingCancel = false;
       return loadDictationStatus({ silent: true }).then(function () {
         state.dictationInstallError = "";
         renderUi();
