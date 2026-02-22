@@ -535,6 +535,7 @@
       subredditCheckTimer: null,
       subredditCheckReqId: 0,
       subredditCheckedValue: '',
+      subredditCheckStatus: 'idle',
       createProfileInFlight: false,
       createProfileMode: false,
       oauthPollTimer: null,
@@ -1080,10 +1081,7 @@
       var runBtn = document.getElementById('btn-extract-norms-run');
       var confirmBox = document.getElementById('extract-norms-confirm');
       if (!runBtn || !confirmBox) return;
-      var settings = ((state.status || {}).settings) || {};
-      var connected = selectedProfileConnected();
-      var subreddit = normalizeSubreddit(settings.subreddit || '');
-      runBtn.disabled = state.extractNormsBusy || !connected || !subreddit || !confirmBox.checked;
+      runBtn.disabled = state.extractNormsBusy || !hasVerifiedSubreddit() || !confirmBox.checked;
     }
 
     function openExtractNormsModal() {
@@ -1094,13 +1092,11 @@
       scope.value = 'full';
       confirmBox.checked = false;
       state.extractNormsBusy = false;
-      var settings = ((state.status || {}).settings) || {};
-      var connected = selectedProfileConnected();
-      var subreddit = normalizeSubreddit(settings.subreddit || '');
-      if (!connected) {
-        setExtractNormsMessage('Connect the Reddit account for this virtual Redditor before extracting social norms.', true);
-      } else if (!subreddit) {
+      var subreddit = normalizeSubreddit((document.getElementById('subreddit-input') || {}).value || '');
+      if (!subreddit) {
         setExtractNormsMessage('Set a subreddit first, then extract social norms.', true);
+      } else if (!hasVerifiedSubreddit()) {
+        setExtractNormsMessage('Enter a valid subreddit name first.', true);
       } else {
         setExtractNormsMessage('This will analyze r/' + subreddit + ' and append proposed norms.', false);
       }
@@ -1519,6 +1515,9 @@
         el.textContent = '';
         el.title = '';
         meta.classList.add('hidden');
+        state.subredditCheckStatus = 'idle';
+        updateToolbarButtonStates();
+        updateExtractNormsRunEnabled();
         return;
       }
       if (s === 'checking') {
@@ -1539,6 +1538,9 @@
         meta.classList.add('hidden');
       }
       el.title = text || '';
+      state.subredditCheckStatus = s;
+      updateToolbarButtonStates();
+      updateExtractNormsRunEnabled();
     }
 
     async function validateSubredditExists(subreddit) {
@@ -1655,6 +1657,12 @@
       return !!profiles[0].connected;
     }
 
+    function hasVerifiedSubreddit() {
+      var current = normalizeSubreddit((document.getElementById('subreddit-input') || {}).value || '');
+      if (!current) return false;
+      return state.subredditCheckStatus === 'valid' && current === String(state.subredditCheckedValue || '');
+    }
+
     function setUsernameEditing(editing) {
       var input = document.getElementById('title-username');
       var display = document.getElementById('title-username-display');
@@ -1680,6 +1688,7 @@
     function updateToolbarButtonStates() {
       var usernameValue = normalizeUsername((document.getElementById('title-username') || {}).value || '');
       var connected = selectedProfileConnected();
+      var validSubreddit = hasVerifiedSubreddit();
 
       var loginBtn = document.getElementById('btn-connect-reddit');
       if (loginBtn) {
@@ -1687,11 +1696,13 @@
         loginBtn.title = usernameValue ? 'Connect Reddit account for selected bot' : 'Enter bot username first';
       }
 
-      var controlIds = ['btn-run-toggle', 'btn-restart', 'btn-run-once', 'btn-extract-now'];
+      var controlIds = ['btn-run-toggle', 'btn-restart', 'btn-run-once'];
       for (var i = 0; i < controlIds.length; i += 1) {
         var btn = document.getElementById(controlIds[i]);
         if (btn) btn.disabled = !connected;
       }
+      var extractBtn = document.getElementById('btn-extract-now');
+      if (extractBtn) extractBtn.disabled = !validSubreddit;
     }
 
     function hasBridge() {
