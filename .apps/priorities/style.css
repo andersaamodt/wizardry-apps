@@ -1209,12 +1209,12 @@ button:hover {
 
 .exp-placeholder {
   display: inline-block;
-  width: calc(8px * var(--ui-scale));
+  width: var(--expand-slot);
   height: var(--expand-slot);
 }
 
 .exp-placeholder-collapsed {
-  width: calc(8px * var(--ui-scale));
+  width: var(--expand-slot);
   height: var(--expand-slot);
 }
 

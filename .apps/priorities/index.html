@@ -3226,7 +3226,7 @@
     }
 
     function actToggleChecked(path) {
-      if (state.busy || state.pendingCheckPath) {
+      if (state.pendingCheckPath) {
         return;
       }
       var parentDir = parentDirOfPath(path);
@@ -3235,7 +3235,6 @@
       var optimisticTouches = applyOptimisticChecked(path, nextChecked);
       var hadOptimisticTouch = optimisticTouches.length > 0;
       state.pendingCheckPath = path;
-      state.busy = true;
       (async function () {
         try {
           if (hadOptimisticTouch) {
@@ -3247,7 +3246,6 @@
             ['check-toggle', path]
           );
           state.pendingCheckPath = '';
-          state.busy = false;
           // Avoid a second full rerender when optimistic UI already matches the
           // successful backend result; this prevents row-control flicker.
           if (!hadOptimisticTouch) {
@@ -3261,9 +3259,6 @@
         } finally {
           if (state.pendingCheckPath === path) {
             state.pendingCheckPath = '';
-          }
-          if (state.busy) {
-            state.busy = false;
           }
           processPrioritizeQueue();
         }
