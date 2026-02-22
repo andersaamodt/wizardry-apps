@@ -704,17 +704,12 @@
       if (!items || !items.length) {
         return '';
       }
-      var next = null;
       for (var i = 0; i < items.length; i += 1) {
         if (items[i].checked !== 1) {
-          next = items[i];
-          break;
+          return items[i].name + (items[i].kind === 'dir' ? '/' : '');
         }
       }
-      if (!next) {
-        next = items[0];
-      }
-      return next ? (next.name + (next.kind === 'dir' ? '/' : '')) : '';
+      return '';
     }
 
     function upsertNextActionForPath(path) {
