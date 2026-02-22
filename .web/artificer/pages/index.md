@@ -2,7 +2,7 @@
 title: ""
 pagetitle: "Artificer"
 ---
-<link rel="stylesheet" href="/static/style.css?v=20260222-runorder6" />
+<link rel="stylesheet" href="/static/style.css?v=20260222-runorder7" />
 <link id="artificer-theme-stylesheet" rel="stylesheet" href="/static/themes/psionic.css" />
 <div class="forge-shell" id="forge-shell">
 <aside class="workspace-sidebar" id="workspace-dropzone" tabindex="0">
