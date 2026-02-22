@@ -763,15 +763,10 @@ button:disabled {
   height: 1.58rem;
   border-radius: 6px;
   flex: 0 0 auto;
-  background: rgba(150, 165, 184, 0.14);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-}
-
-.catalog-thumb:empty {
-  background: transparent;
 }
 
 .catalog-thumb img {
