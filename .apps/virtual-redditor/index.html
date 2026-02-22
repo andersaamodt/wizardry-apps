@@ -191,6 +191,15 @@
                 </div>
                 <div class="title-caption norms-extract-caption">One-time bootstrap: scans broad subreddit discourse and appends proposals into this profile's Social Norms list.</div>
               </div>
+              <div class="mode-field-row behavior-schedule-row">
+                <label class="mode-field-label">Policy</label>
+                <div class="schedule-controls">
+                  <label class="schedule-toggle" title="The virtual Redditor will obey anything admins say that is relevant to them.">
+                    <input id="obey-admins" type="checkbox">
+                    <span>Obey Admins</span>
+                  </label>
+                </div>
+              </div>
 
               <div class="settings-block">
                 <div id="doctrine-msg" class="error-line"></div>
@@ -2378,6 +2387,7 @@
       var passIntervalControls = document.getElementById('pass-interval-controls');
       var passIntervalInput = document.getElementById('pass-interval-input');
       var passIntervalUnit = document.getElementById('pass-interval-unit');
+      var obeyAdmins = document.getElementById('obey-admins');
 
       if (titleUsername && document.activeElement !== titleUsername && !state.usernameEditing) {
         titleUsername.value = String(settings.redditUsername || '');
@@ -2406,6 +2416,9 @@
         var intervalUi = intervalUiFromSeconds(parseIntervalSecondsFromSettings(settings));
         passIntervalInput.value = String(intervalUi.value);
         passIntervalUnit.value = intervalUi.unit;
+      }
+      if (obeyAdmins) {
+        obeyAdmins.checked = !!settings.obeyAdmins;
       }
       updateModeDescriptions(normalizeMode(settings.mode || 'judicial'));
       updatePatrolModeDescriptions(normalizePatrolMode(settings.patrolMode || 'full'));
@@ -2620,6 +2633,7 @@
           if (key === 'PATROL_SAMPLE_MAX') state.status.settings.patrolSampleMax = Number(value || 20) || 20;
           if (key === 'PATROL_INTERVAL_MIN') state.status.settings.patrolIntervalMin = Number(value || 86400) || 86400;
           if (key === 'PATROL_INTERVAL_MAX') state.status.settings.patrolIntervalMax = Number(value || 86400) || 86400;
+          if (key === 'OBEY_ADMINS') state.status.settings.obeyAdmins = (String(value || '0') === '1');
           if (key === 'OLLAMA_MODEL') state.status.settings.ollamaModel = String(value || '');
           renderStatus();
         }
@@ -3380,6 +3394,10 @@
       });
       document.getElementById('passes-enabled').addEventListener('change', function (event) {
         toggleBackgroundPasses(!!(event && event.target && event.target.checked));
+      });
+      document.getElementById('obey-admins').addEventListener('change', function (event) {
+        var enabled = !!(event && event.target && event.target.checked);
+        saveSetting('OBEY_ADMINS', enabled ? '1' : '0');
       });
       document.getElementById('subreddit-input').addEventListener('input', function () {
         setSettingsMessage('', false);

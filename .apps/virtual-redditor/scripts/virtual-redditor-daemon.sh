@@ -194,6 +194,7 @@ HIGH_SIGNAL_MIN_SCORE=6
 AUTO_ACCEPT_NORMS=1
 USER_HISTORY_LIMIT=40
 THREAD_SIBLING_LIMIT=20
+OBEY_ADMINS=0
 OLLAMA_MODEL=llama3.1:8b
 OLLAMA_URL=http://127.0.0.1:11434/api/generate
 BOTENV
@@ -239,6 +240,7 @@ load_bot_env() {
   AUTO_ACCEPT_NORMS=$(to_int "${AUTO_ACCEPT_NORMS:-1}" 1)
   USER_HISTORY_LIMIT=$(to_int "${USER_HISTORY_LIMIT:-40}" 40)
   THREAD_SIBLING_LIMIT=$(to_int "${THREAD_SIBLING_LIMIT:-20}" 20)
+  OBEY_ADMINS=$(to_int "${OBEY_ADMINS:-0}" 0)
   OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
   OLLAMA_URL=${OLLAMA_URL:-http://127.0.0.1:11434/api/generate}
 
@@ -259,6 +261,7 @@ load_bot_env() {
   [ "$SANCTION_DELAY_MAX" -lt "$SANCTION_DELAY_MIN" ] && SANCTION_DELAY_MAX=$SANCTION_DELAY_MIN
   [ "$USER_HISTORY_LIMIT" -lt 1 ] && USER_HISTORY_LIMIT=1
   [ "$THREAD_SIBLING_LIMIT" -lt 1 ] && THREAD_SIBLING_LIMIT=1
+  [ "$OBEY_ADMINS" -ne 1 ] && OBEY_ADMINS=0
   return 0
 }
 
@@ -310,7 +313,7 @@ set_setting() {
   value=$2
 
   case "$key" in
-    MODE|PATROL_MODE|PATROL_SAMPLE_MAX|PATROL_INTERVAL_MIN|PATROL_INTERVAL_MAX|SANCTION_DELAY_MIN|SANCTION_DELAY_MAX|SUMMONS_ENABLED|NIGHTLY_STATUTE_ENABLED|NIGHTLY_HOUR|HIGH_SIGNAL_MIN_SCORE|AUTO_ACCEPT_NORMS|USER_HISTORY_LIMIT|THREAD_SIBLING_LIMIT|OLLAMA_MODEL|OLLAMA_URL)
+    MODE|PATROL_MODE|PATROL_SAMPLE_MAX|PATROL_INTERVAL_MIN|PATROL_INTERVAL_MAX|SANCTION_DELAY_MIN|SANCTION_DELAY_MAX|SUMMONS_ENABLED|NIGHTLY_STATUTE_ENABLED|NIGHTLY_HOUR|HIGH_SIGNAL_MIN_SCORE|AUTO_ACCEPT_NORMS|USER_HISTORY_LIMIT|THREAD_SIBLING_LIMIT|OBEY_ADMINS|OLLAMA_MODEL|OLLAMA_URL)
       ;;
     *)
       emit_error "unsupported setting key: $key"
@@ -365,6 +368,7 @@ settings_json() {
     --argjson auto_accept_norms "$AUTO_ACCEPT_NORMS" \
     --argjson user_history_limit "$USER_HISTORY_LIMIT" \
     --argjson thread_sibling_limit "$THREAD_SIBLING_LIMIT" \
+    --argjson obey_admins "$OBEY_ADMINS" \
     --arg ollama_model "$OLLAMA_MODEL" \
     --arg ollama_url "$OLLAMA_URL" \
     --arg subreddit "${SUBREDDIT-}" \
@@ -379,7 +383,7 @@ settings_json() {
     --arg last_seen_path "$LAST_SEEN_FILE" \
     --arg daemon_log_path "$DAEMON_STDOUT_LOG" \
     --arg daemon_error_path "$DAEMON_STDERR_LOG" \
-    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
+    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
 }
 
 metrics_json() {
@@ -805,6 +809,7 @@ Required policy constraints:
 - Judicial mode: bans only for explicit norm violations.
 - Capricious mode: bans only for vibes (feeling string required).
 - Mixed mode: bans may come from either pathway.
+- Obey-admins mode: $(if [ "$OBEY_ADMINS" -eq 1 ]; then printf 'enabled. If subreddit admins issue a relevant instruction in context, follow it unless impossible or unsafe.'; else printf 'disabled.'; fi)
 - If banning, include a reply first. The system performs reply->delay->ban ritual.
 - Reply text must be concise and sub-native in style.
 - Judicial bans: reply must clearly cite the violated norm.
