@@ -21,7 +21,6 @@
           <div id="profiles-list" class="list profiles-list">
             <div class="profiles-loading"><span class="loading-spinner" aria-hidden="true"></span><span>Loading...</span></div>
           </div>
-          <div id="profiles-msg" class="error-line"></div>
           <div class="apps-list-footer">
             <div class="footer-bar">
               <button id="toggle-settings-panel" type="button" class="footer-icon-btn no-drag" aria-label="Open app settings" title="Settings">
@@ -187,9 +186,7 @@
                       <option value="hours" selected>hours</option>
                     </select>
                   </div>
-                  <button id="btn-extract-now" class="menu-btn soft" type="button" title="Scan subreddit comments and append proposed norms into the Social Norms list">Initialize norms from subreddit</button>
                 </div>
-                <div class="title-caption norms-extract-caption">One-time bootstrap: scans broad subreddit discourse and appends proposals into this profile's Social Norms list.</div>
               </div>
               <div class="mode-field-row behavior-schedule-row">
                 <label class="mode-field-label">Policy</label>
@@ -205,7 +202,10 @@
                 <div id="doctrine-msg" class="error-line"></div>
                 <div class="norms-title-row">
                   <div class="manifesto-title norms-title">Social Norms</div>
-                  <button id="btn-norm-add" type="button" class="norm-add-btn" title="Add norm" aria-label="Add norm">+</button>
+                  <div class="norms-title-actions">
+                    <button id="btn-extract-now" type="button" class="menu-btn soft norm-extract-btn" title="Reads subreddit discourse and appends proposed social norms for your review. Can take several minutes.">Extract social norms</button>
+                    <button id="btn-norm-add" type="button" class="norm-add-btn" title="Add norm" aria-label="Add norm">+</button>
+                  </div>
                 </div>
                 <div id="norms-head-row" class="norms-head-row">
                   <span></span>
@@ -399,6 +399,35 @@
     </div>
   </div>
 
+  <div id="extract-norms-modal" class="settings-modal hidden" role="dialog" aria-modal="true" aria-labelledby="extract-norms-title">
+    <div class="settings-sheet extract-norms-sheet">
+      <div class="settings-head">
+        <h3 id="extract-norms-title">Extract social norms</h3>
+        <button id="btn-extract-norms-close" type="button" class="soft settings-close-btn" aria-label="Close extract social norms dialog">✕</button>
+      </div>
+      <p class="settings-subhead">
+        This reads subreddit posts and comments, then appends proposed social norms for your review.
+        It does not delete your existing norms.
+      </p>
+      <div class="settings-form-grid">
+        <label for="extract-norms-scope">Scope</label>
+        <select id="extract-norms-scope" class="settings-select">
+          <option value="recent">Recent activity (faster)</option>
+          <option value="full" selected>Broad subreddit scan (slower, more tokens)</option>
+        </select>
+        <label class="schedule-toggle extract-norms-confirm-row">
+          <input id="extract-norms-confirm" type="checkbox">
+          <span>I understand this may take several minutes.</span>
+        </label>
+      </div>
+      <div id="extract-norms-msg" class="status-line"></div>
+      <div class="settings-actions extract-actions">
+        <button id="btn-extract-norms-run" type="button" class="primary" disabled>Start extraction</button>
+        <button id="btn-extract-norms-cancel" type="button" class="soft">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
 
   <script>
@@ -536,6 +565,7 @@
       launchdStartState: '',
       launchdStartError: '',
       launchdStartTimer: null,
+      extractNormsBusy: false,
       renameTargetId: '',
       profileSwitchLoading: false,
       deleteTargetId: '',
@@ -1038,6 +1068,77 @@
       modal.classList.add('hidden');
     }
 
+    function setExtractNormsMessage(msg, isError) {
+      var line = document.getElementById('extract-norms-msg');
+      if (!line) return;
+      line.textContent = msg || '';
+      line.classList.toggle('error-line', !!isError);
+      line.classList.toggle('status-line', !isError);
+    }
+
+    function updateExtractNormsRunEnabled() {
+      var runBtn = document.getElementById('btn-extract-norms-run');
+      var confirmBox = document.getElementById('extract-norms-confirm');
+      if (!runBtn || !confirmBox) return;
+      var settings = ((state.status || {}).settings) || {};
+      var connected = selectedProfileConnected();
+      var subreddit = normalizeSubreddit(settings.subreddit || '');
+      runBtn.disabled = state.extractNormsBusy || !connected || !subreddit || !confirmBox.checked;
+    }
+
+    function openExtractNormsModal() {
+      var modal = document.getElementById('extract-norms-modal');
+      var confirmBox = document.getElementById('extract-norms-confirm');
+      var scope = document.getElementById('extract-norms-scope');
+      if (!modal || !confirmBox || !scope) return;
+      scope.value = 'full';
+      confirmBox.checked = false;
+      state.extractNormsBusy = false;
+      var settings = ((state.status || {}).settings) || {};
+      var connected = selectedProfileConnected();
+      var subreddit = normalizeSubreddit(settings.subreddit || '');
+      if (!connected) {
+        setExtractNormsMessage('Connect the Reddit account for this virtual Redditor before extracting social norms.', true);
+      } else if (!subreddit) {
+        setExtractNormsMessage('Set a subreddit first, then extract social norms.', true);
+      } else {
+        setExtractNormsMessage('This will analyze r/' + subreddit + ' and append proposed norms.', false);
+      }
+      updateExtractNormsRunEnabled();
+      modal.classList.remove('hidden');
+      var closeBtn = document.getElementById('btn-extract-norms-close');
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+    }
+
+    function closeExtractNormsModal() {
+      var modal = document.getElementById('extract-norms-modal');
+      if (!modal) return;
+      state.extractNormsBusy = false;
+      modal.classList.add('hidden');
+      setExtractNormsMessage('', false);
+    }
+
+    async function runExtractNormsWorkflow() {
+      if (state.extractNormsBusy) return;
+      var scope = document.getElementById('extract-norms-scope');
+      var action = (scope && scope.value === 'recent') ? 'extract-norms' : 'extract-norms-full';
+      state.extractNormsBusy = true;
+      updateExtractNormsRunEnabled();
+      setExtractNormsMessage(action === 'extract-norms-full' ? 'Starting broad scan...' : 'Starting extraction from recent activity...', false);
+      try {
+        await backendJson(action, []);
+        closeExtractNormsModal();
+        setControlMessage('Social norm extraction complete.', false);
+        await fullRefresh();
+        await refreshDoctrine(true);
+        showToast('Social norm extraction complete.', false);
+      } catch (error) {
+        state.extractNormsBusy = false;
+        updateExtractNormsRunEnabled();
+        setExtractNormsMessage(normalizeUiErrorMessage(String(error && error.message ? error.message : error)), true);
+      }
+    }
+
     function setGlobalSettingsMessage(msg, isError) {
       var line = document.getElementById('settings-global-msg');
       if (!line) return;
@@ -1216,8 +1317,14 @@
         stopOauthPoll();
         state.oauthFlowActive = false;
         await refreshStatus();
+        var shouldPromptExtract = !!connectedSub && Array.isArray(state.normRows) && state.normRows.length === 0;
         setTimeout(function () {
           closeOauthModal();
+          if (shouldPromptExtract) {
+            setTimeout(function () {
+              openExtractNormsModal();
+            }, 180);
+          }
         }, 900);
       } catch (error) {
         setOauthStatus(String(error && error.message ? error.message : error), true);
@@ -1589,6 +1696,18 @@
       return !!(window.wizardry && typeof window.wizardry.rpc === 'function');
     }
 
+    function isEditableTarget(node) {
+      if (!node || node.nodeType !== 1) return false;
+      var tag = String(node.tagName || '').toLowerCase();
+      if (tag === 'textarea') return !node.readOnly && !node.disabled;
+      if (tag === 'input') {
+        if (node.disabled || node.readOnly) return false;
+        var type = String(node.type || 'text').toLowerCase();
+        return ['text', 'search', 'url', 'tel', 'email', 'password', 'number'].indexOf(type) >= 0;
+      }
+      return !!(node.isContentEditable || node.closest('[contenteditable="true"]'));
+    }
+
     async function waitForBridge(timeoutMs) {
       var start = Date.now();
       while (!hasBridge()) {
@@ -1783,9 +1902,9 @@
     }
 
     function setProfilesMessage(msg, isError) {
-      var el = document.getElementById('profiles-msg');
-      el.textContent = isError ? normalizeUiErrorMessage(msg) : (msg || '');
-      el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
+      var text = isError ? normalizeUiErrorMessage(msg) : String(msg || '');
+      if (!text) return;
+      showToast(text, !!isError);
     }
 
     function setCreateProfileMessage(msg, isError) {
@@ -1915,6 +2034,9 @@
       el.className = 'toast' + (isError ? ' error' : '');
       el.textContent = String(message || '');
       root.appendChild(el);
+      requestAnimationFrame(function () {
+        el.classList.add('show');
+      });
       setTimeout(function () {
         el.classList.add('hide');
         setTimeout(function () {
@@ -2279,8 +2401,12 @@
       state.profilesRenderSig = renderSig;
       var filtered = profiles;
       if (summaryEl) {
-        summaryEl.textContent = String(filtered.length) + ' shown' +
-          ' • total=' + String(profiles.length);
+        if (!profiles.length) {
+          summaryEl.textContent = '';
+        } else {
+          summaryEl.textContent = String(filtered.length) + ' shown' +
+            ' • total=' + String(profiles.length);
+        }
       }
       if (!filtered.length) {
         listEl.innerHTML = '<div class="profiles-empty">No virtual redditors yet. Add one with +.</div>';
@@ -2820,12 +2946,8 @@
         await backendJson('set-reddit-setting', ['REDDIT_USERNAME', uname]);
         closeCreateProfilePane();
         setUsernameEditing(false);
-        setProfilesMessage('Created. Next: connect Reddit account.', false);
         setSettingsMessage('', false);
-        await fullRefresh();
-        await refreshDoctrine(true);
-        openOauthModal(true);
-        resumeOauthFlowInModal();
+        await refreshStatus();
       } catch (error) {
         setSettingsMessage(String(error && error.message ? error.message : error), true);
       } finally {
@@ -3012,9 +3134,30 @@
         runControlAction('run-once', 'Patrol pass complete.');
       });
       document.getElementById('btn-extract-now').addEventListener('click', function () {
-        var ok = window.confirm('Bootstrap Social Norms from subreddit discourse now? This appends proposed norms to the current profile\'s Social Norms list.');
-        if (!ok) return;
-        runControlAction('extract-norms-full', 'Norm bootstrap complete. Proposed norms were appended to Social Norms.');
+        openExtractNormsModal();
+      });
+      document.getElementById('btn-extract-norms-close').addEventListener('click', function () {
+        closeExtractNormsModal();
+      });
+      document.getElementById('btn-extract-norms-cancel').addEventListener('click', function () {
+        closeExtractNormsModal();
+      });
+      document.getElementById('extract-norms-confirm').addEventListener('change', function () {
+        updateExtractNormsRunEnabled();
+      });
+      document.getElementById('extract-norms-scope').addEventListener('change', function () {
+        var settings = ((state.status || {}).settings) || {};
+        var subreddit = normalizeSubreddit(settings.subreddit || '');
+        if (subreddit) {
+          var value = String((document.getElementById('extract-norms-scope') || {}).value || 'full');
+          var msg = value === 'recent'
+            ? ('This will scan recent activity from r/' + subreddit + ' and append proposals.')
+            : ('This will run a broader scan of r/' + subreddit + ' and append proposals.');
+          setExtractNormsMessage(msg, false);
+        }
+      });
+      document.getElementById('btn-extract-norms-run').addEventListener('click', function () {
+        runExtractNormsWorkflow();
       });
       document.getElementById('status-chip-row').addEventListener('click', function (event) {
         var btn = event.target && event.target.closest('[data-status-action]');
@@ -3270,22 +3413,32 @@
             try { railDivider.setPointerCapture(event.pointerId); } catch (_) {}
           }
 
+          function cleanupResize(upEvent) {
+            document.body.classList.remove('is-resizing');
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onCancel);
+            if (railDivider.releasePointerCapture && upEvent && typeof upEvent.pointerId !== 'undefined') {
+              try { railDivider.releasePointerCapture(upEvent.pointerId); } catch (_) {}
+            }
+          }
+
           function onMove(moveEvent) {
             var delta = moveEvent.clientX - startX;
             setLeftRailWidth(startWidth + delta);
           }
 
           function onUp(upEvent) {
-            document.body.classList.remove('is-resizing');
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
-            if (railDivider.releasePointerCapture) {
-              try { railDivider.releasePointerCapture(upEvent.pointerId); } catch (_) {}
-            }
+            cleanupResize(upEvent);
+          }
+
+          function onCancel(cancelEvent) {
+            cleanupResize(cancelEvent);
           }
 
           window.addEventListener('pointermove', onMove);
           window.addEventListener('pointerup', onUp);
+          window.addEventListener('pointercancel', onCancel);
         });
       }
 
@@ -3295,7 +3448,7 @@
       document.getElementById('title-username').addEventListener('input', function () {
         this.value = normalizeUsername(this.value || '');
         syncUsernameDisplay();
-        setUsernameCheck('checking', 'Waiting to validate...');
+        setUsernameCheck('idle', '');
         scheduleUsernameSave();
         updateToolbarButtonStates();
       });
@@ -3577,6 +3730,11 @@
         if (!inProfileMenu) closeProfileMenus();
       });
       document.addEventListener('keydown', function (event) {
+        if ((event.metaKey || event.ctrlKey) && isEditableTarget(event.target)) {
+          // Preserve native text-edit shortcuts in all text fields.
+          event.stopPropagation();
+          return;
+        }
         if (event.key === 'Escape') {
           if (!document.getElementById('settings-modal').classList.contains('hidden')) {
             closeSettingsModal();
@@ -3588,6 +3746,10 @@
           }
           if (!document.getElementById('delete-modal').classList.contains('hidden')) {
             closeDeleteModal();
+            return;
+          }
+          if (!document.getElementById('extract-norms-modal').classList.contains('hidden')) {
+            closeExtractNormsModal();
             return;
           }
           closeProfileMenus();
@@ -3605,6 +3767,9 @@
       window.addEventListener('resize', positionModeMenus);
       window.addEventListener('resize', function () {
         setLeftRailWidth(state.leftRailWidth);
+      });
+      window.addEventListener('blur', function () {
+        document.body.classList.remove('is-resizing');
       });
       document.getElementById('oauth-modal').addEventListener('click', function (event) {
         if (event.target && event.target.id === 'oauth-modal') {
@@ -3625,6 +3790,11 @@
       document.getElementById('delete-modal').addEventListener('click', function (event) {
         if (event.target && event.target.id === 'delete-modal') {
           closeDeleteModal();
+        }
+      });
+      document.getElementById('extract-norms-modal').addEventListener('click', function (event) {
+        if (event.target && event.target.id === 'extract-norms-modal') {
+          closeExtractNormsModal();
         }
       });
 

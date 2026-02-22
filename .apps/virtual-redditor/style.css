@@ -434,11 +434,13 @@ textarea {
 
 .toast-root {
   position: fixed;
-  right: 14px;
-  bottom: 14px;
+  top: 42px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 180;
   display: grid;
   gap: 8px;
+  justify-items: center;
   pointer-events: none;
 }
 
@@ -452,9 +454,14 @@ textarea {
   box-shadow: var(--shadow);
   font-size: 0.8rem;
   line-height: 1.35;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast.show {
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 180ms ease, transform 180ms ease;
 }
 
 .toast.error {
@@ -513,6 +520,12 @@ body.is-resizing,
 body.is-resizing * {
   cursor: col-resize !important;
   user-select: none !important;
+}
+
+body.is-resizing input,
+body.is-resizing textarea,
+body.is-resizing [contenteditable='true'] {
+  user-select: text !important;
 }
 
 .panel {
@@ -640,10 +653,10 @@ body.is-resizing * {
 .profiles-empty {
   font-size: 0.8rem;
   color: var(--text-subtle);
-  padding: 8px;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
+  padding: 8px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-style: italic;
   text-align: center;
 }
@@ -1466,6 +1479,23 @@ label {
   margin-bottom: 2px;
 }
 
+.norms-title-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.norm-extract-btn {
+  max-width: none;
+  height: 1.9rem;
+  padding: 0 0.72rem;
+  font-size: 0.74rem;
+}
+
+.extract-norms-sheet {
+  width: min(540px, 94vw);
+}
+
 .reveal-file-btn {
   border: 0;
   background: transparent;
@@ -1514,11 +1544,6 @@ label {
 
 .behavior-schedule-row {
   grid-template-columns: 96px minmax(0, 1fr);
-}
-
-.norms-extract-caption {
-  margin-top: 4px;
-  max-width: 72ch;
 }
 
 .mode-field-label {
@@ -1582,6 +1607,14 @@ label {
   gap: 8px;
   flex-wrap: wrap;
   min-height: 30px;
+}
+
+.extract-norms-confirm-row {
+  margin-top: 2px;
+}
+
+#extract-norms-msg {
+  min-height: 1.1rem;
 }
 
 .schedule-interval-controls {
@@ -2306,8 +2339,15 @@ label {
 }
 
 .rename-actions {
+  display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-top: 8px;
+}
+
+.extract-actions {
+  justify-content: flex-end;
 }
 
 .settings-head {
