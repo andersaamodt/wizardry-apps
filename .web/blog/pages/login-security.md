@@ -57,4 +57,4 @@ Your public key is then typically at:
 ~/.ssh/id_ed25519.pub
 ```
 
-Use that `.pub` content for registration.
+Use that `.pub` content when linking SSH in Account settings.

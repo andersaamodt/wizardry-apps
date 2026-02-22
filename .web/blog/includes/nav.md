@@ -42,8 +42,8 @@
     <p class="auth-modal-help">Use your Nostr key, or use passkey if you already bound one to your account. <a class="auth-inline-link" href="/pages/login-security.html">Learn more</a>.</p>
 
     <div class="auth-actions">
-      <button id="auth-nostr-btn" class="auth-secondary-btn" type="button">Use Nostr key</button>
-      <button id="auth-passkey-btn" class="auth-primary-btn" type="button">Use passkey</button>
+      <button id="auth-nostr-btn" class="auth-primary-btn" type="button">Use Nostr key</button>
+      <button id="auth-passkey-btn" class="auth-secondary-btn" type="button">Use passkey (optional)</button>
       <span id="auth-passkey-inline-message" class="auth-passkey-inline-message" aria-live="polite"></span>
     </div>
 
@@ -82,7 +82,6 @@
   var noPasskeyMessage = 'No passkey is registered yet. Use your Nostr key and then bind a passkey in Account.';
   var defaultTheme = 'archmage';
   var currentTheme = defaultTheme;
-  var loginInFlight = false;
   var isAuthenticated = false;
 
   function getSessionToken() {
@@ -91,10 +90,6 @@
 
   function getCsrfToken() {
     return localStorage.getItem('csrf_token') || '';
-  }
-
-  function getLastAuthUsername() {
-    return localStorage.getItem('last_auth_username') || '';
   }
 
   function fromBase64(base64) {
@@ -323,7 +318,9 @@
     });
     document.body.classList.add('auth-modal-open');
     setPasskeyButtonEnabled(true);
-    if (authPasskeyBtn) {
+    if (authNostrBtn) {
+      authNostrBtn.focus();
+    } else if (authPasskeyBtn) {
       authPasskeyBtn.focus();
     }
   }
@@ -345,49 +342,6 @@
       }
       authModalHideTimer = null;
     }, 210);
-  }
-
-  function createPasskey(username, fingerprint, challenge) {
-    var userId = new TextEncoder().encode(fingerprint);
-    function createOptions(preferSecurityKey) {
-      var publicKey = {
-        challenge: fromBase64(challenge),
-        rp: {
-          name: 'Wizardry Blog',
-          id: window.location.hostname
-        },
-        user: {
-          id: userId,
-          name: username,
-          displayName: username
-        },
-        pubKeyCredParams: [
-          { type: 'public-key', alg: -7 },
-          { type: 'public-key', alg: -257 }
-        ],
-        authenticatorSelection: {
-          userVerification: 'preferred'
-        },
-        timeout: 60000,
-        attestation: 'none'
-      };
-
-      if (preferSecurityKey) {
-        publicKey.authenticatorSelection.authenticatorAttachment = 'cross-platform';
-        publicKey.authenticatorSelection.residentKey = 'discouraged';
-        publicKey.authenticatorSelection.requireResidentKey = false;
-        publicKey.hints = ['security-key'];
-      }
-
-      return { publicKey: publicKey };
-    }
-
-    return navigator.credentials.create(createOptions(true)).catch(function (err) {
-      if (err && (err.name === 'NotSupportedError' || err.name === 'ConstraintError')) {
-        return navigator.credentials.create(createOptions(false));
-      }
-      throw err;
-    });
   }
 
   function browserNostr() {
@@ -542,12 +496,7 @@
       });
   }
 
-  function normalizeSshPublicKeyInput(raw) {
-    return String(raw || '').replace(/\r/g, ' ').replace(/\n+/g, ' ').replace(/\t+/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  function registerAndBind(sshKey) {
-    void sshKey;
+  function registerWithNostr() {
     setRegisterInlineMessage('Signing Nostr login challenge...', 'warn');
     return loginWithNostr(true).then(function () {
       setRegisterInlineMessage('Signed in with Nostr.', 'ok');
@@ -556,74 +505,13 @@
     });
   }
 
-  function droppedKeyLooksPrivate(fileName, keyText) {
-    var name = String(fileName || '').toLowerCase();
-    var text = String(keyText || '').trim();
-    var upper = text.toUpperCase();
-    var privateNameHints = [
-      'id_rsa', 'id_ed25519', 'id_ecdsa', 'id_dsa', 'identity'
-    ];
-    var privateMarkers = [
-      '-----BEGIN OPENSSH PRIVATE KEY-----',
-      '-----BEGIN RSA PRIVATE KEY-----',
-      '-----BEGIN EC PRIVATE KEY-----',
-      '-----BEGIN DSA PRIVATE KEY-----',
-      '-----BEGIN PRIVATE KEY-----',
-      'PUTTY-USER-KEY-FILE-'
-    ];
-
-    if (name && !name.endsWith('.pub')) {
-      for (var i = 0; i < privateNameHints.length; i += 1) {
-        if (name === privateNameHints[i] || name.endsWith('/' + privateNameHints[i])) {
-          return true;
-        }
-      }
-    }
-
-    for (var j = 0; j < privateMarkers.length; j += 1) {
-      if (upper.indexOf(privateMarkers[j]) !== -1) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  function droppedKeyLooksPublic(keyText) {
-    var text = String(keyText || '').trim();
-    return /^(ssh-(ed25519|rsa|dss)|ecdsa-sha2-|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-)/.test(text);
-  }
-
   function bindLoginButton() {
     if (!loginBtn) {
       return;
     }
 
-    function setLoginBusy(isBusy) {
-      if (isBusy) {
-        loginBtn.disabled = true;
-      } else {
-        loginBtn.disabled = false;
-      }
-    }
-
     loginBtn.addEventListener('click', function () {
-      if (loginInFlight) {
-        return;
-      }
-
-      localStorage.removeItem('session_token');
-      localStorage.removeItem('csrf_token');
-      loginInFlight = true;
-      setLoginBusy(true);
-      loginWithPasskey(true)
-        .catch(function () {
-          // Error is surfaced in modal when needed.
-        })
-        .finally(function () {
-          loginInFlight = false;
-          setLoginBusy(false);
-        });
+      showAuthModal();
     });
 
     if (authModal) {
@@ -689,7 +577,7 @@
     if (authRegisterBtn) {
       authRegisterBtn.addEventListener('click', function () {
         setRegisterInlineMessage('', '');
-        registerAndBind('');
+        registerWithNostr();
       });
     }
   }

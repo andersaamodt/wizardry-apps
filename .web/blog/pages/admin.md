@@ -64,7 +64,7 @@ title: Blog Admin
 <div class="field-row checkbox-row">
 <div class="setting-label">
 <strong>Enable User Registration</strong>
-<span class="inline-tip" tabindex="0" aria-label="Allow new users to register with MUD player SSH keys.">?</span>
+<span class="inline-tip" tabindex="0" aria-label="Allow new users to create accounts by signing in with a Nostr key.">?</span>
 </div>
 <label class="checkbox-control" for="registration-enabled">
 <input type="checkbox" id="registration-enabled">
@@ -326,8 +326,10 @@ title: Blog Admin
 </div>
 </div>
 
+<details class="account-ssh-optional">
+<summary>Optional: SSH key for MUD and terminal login</summary>
 <div class="field-row">
-<label for="account-ssh-public-key"><strong>SSH Public Key (optional)</strong></label>
+<label for="account-ssh-public-key"><strong>SSH Public Key</strong></label>
 <textarea id="account-ssh-public-key" rows="3" placeholder="ssh-ed25519 AAAA..."></textarea>
 <div class="account-row">
 <button id="btn-generate-ssh" type="button">Generate SSH Key Pair (Browser)</button>
@@ -335,6 +337,7 @@ title: Blog Admin
 </div>
 <p class="muted">When generated in-browser, private key download starts locally. Keep it secret and back it up.</p>
 </div>
+</details>
 
 <div class="field-row">
 <div id="output-account" class="output"></div>
@@ -741,6 +744,10 @@ body {
 [data-admin-section="account"] #account-nostr-pubkey,
 [data-admin-section="account"] #account-ssh-public-key {
   inline-size: min(100%, 42rem);
+}
+
+.account-ssh-optional {
+  margin-top: 0.35rem;
 }
 
 .account-row {
