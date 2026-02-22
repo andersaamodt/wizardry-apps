@@ -4077,7 +4077,7 @@
       document.getElementById('browse').addEventListener('click', function () {
         browseForFolder(function (path) {
           document.getElementById('root-dir').value = path;
-          persistRootInputOnly();
+          setRootAndRefresh();
         });
       });
 
