@@ -5350,24 +5350,16 @@
     if (!id) {
       return Promise.resolve(null);
     }
-    return apiGet("dictation_install_status", { job_id: id }, { timeoutMs: 12000 }).then(function (response) {
-      if (!response || !response.success || !response.job) {
-        return null;
-      }
-      var status = trim(String(response.job.status || ""));
-      if (status === "running") {
-        state.dictationInstallBusy = true;
-        state.dictationInstallCancelling = false;
-        state.dictationInstallPendingCancel = false;
-        state.dictationInstallJob = response.job;
-        state.dictationInstallJob.action = "install";
-        startDictationInstallPolling(id);
-        renderUi();
-      }
-      return response.job;
-    }).catch(function () {
-      return null;
-    });
+    state.dictationInstallBusy = true;
+    state.dictationInstallCancelling = true;
+    state.dictationInstallPendingCancel = false;
+    state.dictationInstallError = "";
+    if (!state.dictationInstallCancelJobId) {
+      state.dictationInstallCancelJobId = id;
+    }
+    startDictationInstallPolling(id);
+    renderUi();
+    return Promise.resolve(null);
   }
 
   function startDictationInstallPolling(jobId) {
@@ -5497,14 +5489,8 @@
       return response;
     }).catch(function (error) {
       var message = error && error.message ? error.message : "";
-      state.dictationInstallBusy = false;
-      state.dictationInstallCancelling = false;
       state.dictationInstallPendingCancel = false;
-      if (state.dictationInstallCancelJobId === jobId) {
-        state.dictationInstallCancelJobId = "";
-      }
       state.dictationInstallError = "";
-      renderUi();
       if (/timed out/i.test(message)) {
         showTransientNotice("Cancel requested. Checking status...");
       } else {
