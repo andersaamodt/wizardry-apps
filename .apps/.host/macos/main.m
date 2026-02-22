@@ -23,7 +23,7 @@
 }
 @end
 
-@interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler, NSWindowDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler, NSWindowDelegate, WKUIDelegate>
 @property (strong) NSWindow *window;
 @property (strong) WKWebView *webView;
 @property (strong) NSView *hostRootView;
@@ -45,6 +45,48 @@
 @end
 
 @implementation AppDelegate
+
+- (void)webView:(WKWebView *)webView
+runJavaScriptAlertPanelWithMessage:(NSString *)message
+initiatedByFrame:(WKFrameInfo *)frame
+completionHandler:(void (^)(void))completionHandler {
+    (void)webView;
+    (void)frame;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAlert *alert = [[NSAlert alloc] init];
+        [alert setAlertStyle:NSAlertStyleInformational];
+        [alert setMessageText:@"Priorities"];
+        [alert setInformativeText:(message.length ? message : @" ")];
+        [alert addButtonWithTitle:@"OK"];
+        [alert beginSheetModalForWindow:self.window completionHandler:^(__unused NSModalResponse returnCode) {
+            if (completionHandler) {
+                completionHandler();
+            }
+        }];
+    });
+}
+
+- (void)webView:(WKWebView *)webView
+runJavaScriptConfirmPanelWithMessage:(NSString *)message
+initiatedByFrame:(WKFrameInfo *)frame
+completionHandler:(void (^)(BOOL result))completionHandler {
+    (void)webView;
+    (void)frame;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSAlert *alert = [[NSAlert alloc] init];
+        [alert setAlertStyle:NSAlertStyleWarning];
+        [alert setMessageText:@"Confirm"];
+        [alert setInformativeText:(message.length ? message : @"Are you sure?")];
+        [alert addButtonWithTitle:@"OK"];
+        [alert addButtonWithTitle:@"Cancel"];
+        [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
+            BOOL confirmed = (returnCode == NSAlertFirstButtonReturn);
+            if (completionHandler) {
+                completionHandler(confirmed);
+            }
+        }];
+    });
+}
 
 - (void)windowDidResize:(NSNotification *)notification {
     (void)notification;
@@ -530,6 +572,7 @@
     CGFloat dragStripHeight = 44.0;
     NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
     self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
+    self.webView.UIDelegate = self;
     @try {
         // Avoid white intermediate paint by letting the themed host window color
         // show through until page styles apply.
