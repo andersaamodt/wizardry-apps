@@ -13463,6 +13463,36 @@ EOF_RUNNER
         *)
           if [ "$download_size_bytes" -gt 0 ] 2>/dev/null; then
             progress_pct=$(progress_pct_from_bytes "$downloaded_bytes" "$download_size_bytes")
+            # If byte delta is still zero but parser has non-zero progress,
+            # use parsed progress to avoid a stuck 0.0% display (for example when
+            # byte accounting misses initial transfer activity).
+            use_parsed_progress=$(awk -v parsed="$parsed_progress_pct" -v bytes="$progress_pct" '
+              BEGIN {
+                p = parsed + 0
+                b = bytes + 0
+                if (p > 0 && b <= 0.0) {
+                  print 1
+                } else {
+                  print 0
+                }
+              }
+            ')
+            if [ "$use_parsed_progress" = "1" ]; then
+              progress_pct=$parsed_progress_pct
+              downloaded_bytes=$(awk -v pct="$parsed_progress_pct" -v total="$download_size_bytes" '
+                BEGIN {
+                  p = pct + 0
+                  t = total + 0
+                  if (p < 0) p = 0
+                  if (p > 100) p = 100
+                  if (t <= 0) {
+                    print 0
+                    exit
+                  }
+                  printf "%.0f", (p / 100.0) * t
+                }
+              ')
+            fi
           else
             progress_pct=$parsed_progress_pct
           fi
