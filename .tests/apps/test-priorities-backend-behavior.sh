@@ -151,6 +151,17 @@ printf '%s\n' "$expanded_md" | grep -F -- "- [ ] alpha" >/dev/null || fail "expa
 printf '%s\n' "$expanded_md" | grep -F -- "  - [ ] alpha child" >/dev/null || fail "expanded copy should include indented alpha child"
 printf '%s\n' "$expanded_md" | grep -F -- "- [x] beta" >/dev/null || fail "expanded copy should include checked beta"
 
+cat > "$fake_bin/open" <<'EOF'
+#!/bin/sh
+set -eu
+printf '%s\n' "${1-}" > "${OPEN_CAPTURE_PATH:?}"
+EOF
+chmod +x "$fake_bin/open"
+OPEN_CAPTURE_PATH="$scratch/open-dir-path.txt" PATH="$fake_bin:$PATH" "$backend" open-dir "$copy_root" >/dev/null
+opened_path=$(cat "$scratch/open-dir-path.txt")
+copy_root_abs=$(CDPATH= cd -- "$copy_root" && pwd -P)
+assert_eq "$opened_path" "$copy_root_abs" "open-dir should invoke OS opener with absolute directory path"
+
 desc=$("$backend" descendant-count "$scratch/task one")
 case "$desc" in
   ''|*[!0-9]*) fail "descendant-count should return a numeric value" ;;

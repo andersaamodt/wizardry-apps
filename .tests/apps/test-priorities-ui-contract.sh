@@ -38,6 +38,38 @@ assert_contains "lines.push(new Array(depth + 1).join('  ') + '- [' + checked + 
 assert_contains "function actToggleChecked(path)"
 assert_contains "['check-toggle-fast', path]"
 assert_contains "['check-toggle', path]"
+assert_contains "var hadOptimisticTouch = optimisticTouches.length > 0;"
+assert_contains "if (!hadOptimisticTouch) {"
+assert_contains "Avoid a second full rerender when optimistic UI already matches"
+
+# Add queue contract (no spinner lockstep with save).
+assert_contains "addQueue: []"
+assert_contains "addQueueActive: false"
+assert_contains "function processAddQueue()"
+assert_contains "state.addQueue.push({"
+assert_contains "addBtn.textContent = '+';"
+assert_contains "var hasName = String(input.value || '').trim().length > 0;"
+assert_contains "addBtn.disabled = !hasName;"
+
+# Next action startup cache contract.
+assert_contains "var NEXT_ACTION_CACHE_KEY = 'wizardry.priorities.nextActionCache';"
+assert_contains "function loadNextActionLabelCacheFromPrefs()"
+assert_contains "function schedulePersistNextActionLabelCache()"
+assert_contains "function setCachedNextActionLabel(path, label, checked)"
+assert_contains "loadNextActionLabelCacheFromPrefs();"
+assert_contains "return String((cachedEntry && cachedEntry.label) || '');"
+
+# Make Project reveal behavior contract.
+assert_contains "state.revealedMakeProjectPath = (state.revealedMakeProjectPath === item.path) ? '' : item.path;"
+assert_contains "render({ suppressLoadingOverlay: true, animateReorder: true });"
+assert_contains "var inMakeProject = event.target.closest('.make-project-inline');"
+assert_contains "if (!inMakeProject && state.revealedMakeProjectPath && !state.pendingMakeProjectPath) {"
+
+# Title double-click hidden open-folder action contract.
+assert_contains "function openCurrentRootInFileBrowser()"
+assert_contains "await runBackend(['open-dir', currentRoot]);"
+assert_contains "titleFolder.addEventListener('dblclick', openTitleFolderIfDouble);"
+assert_contains "titleFolder.addEventListener('mouseup', function (event) {"
 
 # Width auto-grow should not read status text width.
 if sed -n '/function computeAutoWindowWidthFromContent()/,/^    }/p' "$app" | grep -F "statusEl" >/dev/null 2>&1; then
