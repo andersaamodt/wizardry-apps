@@ -926,7 +926,7 @@ button:hover {
   position: relative;
   width: var(--check-slot);
   height: var(--check-slot);
-  margin: 0 calc(2px * var(--ui-scale)) 0 calc(1px * var(--ui-scale));
+  margin: 0 calc(2px * var(--ui-scale)) 0 calc(8px * var(--ui-scale));
   display: inline-flex;
   align-items: center;
   justify-content: center;
