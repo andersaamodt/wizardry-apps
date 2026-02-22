@@ -1009,6 +1009,61 @@
       return false;
     }
 
+    function readCachedCheckedValue(path) {
+      if (!path) {
+        return 0;
+      }
+      var keys = Object.keys(state.cache || {});
+      for (var i = 0; i < keys.length; i += 1) {
+        var items = state.cache[keys[i]];
+        if (!Array.isArray(items)) {
+          continue;
+        }
+        for (var j = 0; j < items.length; j += 1) {
+          if (items[j] && items[j].path === path) {
+            return Number(items[j].checked) === 1 ? 1 : 0;
+          }
+        }
+      }
+      return 0;
+    }
+
+    function applyOptimisticChecked(path, nextChecked) {
+      var touched = [];
+      if (!path) {
+        return touched;
+      }
+      var keys = Object.keys(state.cache || {});
+      for (var i = 0; i < keys.length; i += 1) {
+        var items = state.cache[keys[i]];
+        if (!Array.isArray(items)) {
+          continue;
+        }
+        for (var j = 0; j < items.length; j += 1) {
+          var item = items[j];
+          if (!item || item.path !== path) {
+            continue;
+          }
+          touched.push({ item: item, prev: Number(item.checked) === 1 ? 1 : 0 });
+          item.checked = nextChecked;
+        }
+      }
+      return touched;
+    }
+
+    function rollbackOptimisticChecked(touched) {
+      if (!touched || !touched.length) {
+        return;
+      }
+      for (var i = 0; i < touched.length; i += 1) {
+        var entry = touched[i];
+        if (!entry || !entry.item) {
+          continue;
+        }
+        entry.item.checked = entry.prev;
+      }
+    }
+
     async function runMutationWithListFallback(parentDir, fastArgs, fallbackMutationArgs) {
       var result = null;
       try {
@@ -2165,6 +2220,14 @@
       var currentBlockEchelon = null;
       for (var i = 0; i < items.length; i += 1) {
         var item = items[i];
+        if (depth === 0 && options && options.preloadNextActions && item.kind === 'dir' && item.hasSubpriorities && !getCachedDirItems(item.path)) {
+          try {
+            var preloadItems = await listDir(item.path);
+            setCachedDirItems(item.path, preloadItems);
+          } catch (_) {
+            // Ignore preload failures so startup still completes.
+          }
+        }
         var edgeClass = '';
         if (depth === 0) {
           var prevItem = i > 0 ? items[i - 1] : null;
@@ -2491,10 +2554,16 @@
         return;
       }
       var parentDir = parentDirOfPath(path);
+      var currentChecked = readCachedCheckedValue(path);
+      var nextChecked = currentChecked === 1 ? 0 : 1;
+      var optimisticTouches = applyOptimisticChecked(path, nextChecked);
       state.pendingCheckPath = path;
       state.busy = true;
       (async function () {
         try {
+          if (optimisticTouches.length) {
+            await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+          }
           await runMutationWithListFallback(
             parentDir,
             ['check-toggle-fast', path],
@@ -2504,7 +2573,10 @@
           state.busy = false;
           await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
         } catch (error) {
-          status(String(error && error.message ? error.message : error), true);
+          rollbackOptimisticChecked(optimisticTouches);
+          await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+          var detail = String(error && error.message ? error.message : error).trim();
+          status(detail ? ('Checkbox update failed; reverted. ' + detail) : 'Checkbox update failed; reverted.', true);
         } finally {
           if (state.pendingCheckPath === path) {
             state.pendingCheckPath = '';
@@ -2629,7 +2701,10 @@
         state.drillStack = [];
       }
       updateDrillUpVisibility();
-      return render({ suppressLoadingOverlay: !!options.suppressLoadingOverlay });
+      return render({
+        suppressLoadingOverlay: !!options.suppressLoadingOverlay,
+        preloadNextActions: options.preloadNextActions === true
+      });
     }
 
     function schedulePersistRootPref(value) {
@@ -2685,7 +2760,10 @@
       if (saved) {
         document.getElementById('root-dir').value = saved;
         updateTitleFromRoot();
-        return setRootAndRefresh({ suppressLoadingOverlay: !!state.startupSnapshotRestored });
+        return setRootAndRefresh({
+          suppressLoadingOverlay: !!state.startupSnapshotRestored,
+          preloadNextActions: true
+        });
       }
 
       updateTitleFromRoot();
