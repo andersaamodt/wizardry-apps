@@ -21,6 +21,7 @@ Commands:
   build-desktop [ROOT_HINT] APP_SLUG
   run-desktop [ROOT_HINT] APP_SLUG [RUN_MODE]
   run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
+  serve-hosted-web [ROOT_HINT] MODE REF
   stage-mobile [ROOT_HINT] APP_SLUG
   build-ios-smoke [ROOT_HINT] APP_SLUG
   build-android-debug [ROOT_HINT] APP_SLUG
@@ -333,6 +334,35 @@ workspace_field() {
   fi
 }
 
+config_field() {
+  file=$1
+  key=$2
+  fallback=${3-}
+  if [ ! -f "$file" ]; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+  value=$(awk -F= -v k="$key" '
+    $1 ~ /^[[:space:]]*#/ { next }
+    $1 ~ /^[[:space:]]*$/ { next }
+    {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+      if ($1 == k) {
+        v=$0
+        sub(/^[^=]*=/, "", v)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+        print v
+        exit
+      }
+    }
+  ' "$file")
+  if [ -n "$value" ]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$fallback"
+  fi
+}
+
 sanitize_bundle_component() {
   raw=${1-}
   cleaned=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//; s/--*/-/g')
@@ -362,6 +392,101 @@ stop_host_instances_for_app() {
     # shellcheck disable=SC2086
     kill -9 $still >/dev/null 2>&1 || true
   fi
+}
+
+stop_desktop_instances_for_slug() {
+  root=${1-}
+  slug=${2-}
+  app_name=${3-}
+  os_name=${4-}
+
+  [ -n "$slug" ] || return 0
+
+  if [ "$os_name" = "darwin" ] && [ -n "$app_name" ] && command -v osascript >/dev/null 2>&1; then
+    osascript -e "tell application \"$app_name\" to quit" >/dev/null 2>&1 || true
+  fi
+
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -f "wizardry-host.*[/.]apps/$slug" >/dev/null 2>&1 || true
+    pkill -f "wizardry-host.*/Resources/$slug" >/dev/null 2>&1 || true
+    if [ -n "$root" ]; then
+      pkill -f "wizardry-host.*$root/_tmp/workbench/dist/.*/$slug" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+pick_free_port() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+    return 0
+  fi
+  printf '%s\n' "8030"
+}
+
+serve_static_dir() {
+  root=$1
+  key=$2
+  dir=$3
+  entry_path=${4-/}
+
+  [ -d "$dir" ] || {
+    printf '%s\n' "forge-backend: static serve directory not found: $dir" >&2
+    exit 1
+  }
+  command -v python3 >/dev/null 2>&1 || {
+    printf '%s\n' "forge-backend: python3 is required for static hosted web fallback" >&2
+    exit 1
+  }
+
+  safe_key=$(printf '%s' "$key" | tr -cs 'A-Za-z0-9._-' '-')
+  run_dir="$root/_tmp/workbench/run/hosted-web"
+  log_dir="$root/_tmp/workbench/log/hosted-web"
+  mkdir -p "$run_dir" "$log_dir"
+  pid_file="$run_dir/$safe_key.pid"
+  port_file="$run_dir/$safe_key.port"
+  log_file="$log_dir/$safe_key.log"
+
+  pid=''
+  port=''
+  if [ -f "$pid_file" ]; then
+    pid=$(cat "$pid_file" 2>/dev/null || true)
+  fi
+  if [ -f "$port_file" ]; then
+    port=$(cat "$port_file" 2>/dev/null || true)
+  fi
+
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && [ -n "$port" ]; then
+    :
+  else
+    rm -f "$pid_file" "$port_file"
+    port=$(pick_free_port)
+    if command -v nohup >/dev/null 2>&1; then
+      nohup python3 -m http.server "$port" --bind 127.0.0.1 --directory "$dir" >"$log_file" 2>&1 &
+    else
+      python3 -m http.server "$port" --bind 127.0.0.1 --directory "$dir" >"$log_file" 2>&1 &
+    fi
+    pid=$!
+    printf '%s\n' "$pid" >"$pid_file"
+    printf '%s\n' "$port" >"$port_file"
+  fi
+
+  case "$entry_path" in
+    '') entry_path='/' ;;
+    /*) ;;
+    *) entry_path="/$entry_path" ;;
+  esac
+
+  printf 'mode=static\n'
+  printf 'entry=%s\n' "$dir"
+  printf 'pid=%s\n' "$pid"
+  printf 'log=%s\n' "$log_file"
+  printf 'url=%s\n' "http://127.0.0.1:$port$entry_path"
 }
 
 cmd_doctor() {
@@ -862,15 +987,31 @@ cmd_run_desktop() {
     exit 2
   }
   validate_slug "$slug"
+  case "$run_mode" in
+    ''|auto)
+      # Run should favor live source to avoid stale bundle confusion.
+      run_mode=host
+      ;;
+    host|bundle)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: run-desktop RUN_MODE must be host|bundle|auto" >&2
+      exit 2
+      ;;
+  esac
 
   # Memetrader is currently iterated rapidly from source and should always run
   # the live host entry instead of a previously compiled bundle snapshot.
-  if [ "$slug" = "memetrader" ]; then
+  if [ "$slug" = "memetrader" ] && [ "$run_mode" != "bundle" ]; then
     run_mode=host
     # Ensure stale host windows do not linger on old in-memory assets.
     if command -v pkill >/dev/null 2>&1; then
       pkill -f "wizardry-host.*[/.]apps/memetrader" >/dev/null 2>&1 || true
     fi
+  fi
+  # Priorities is actively iterated and should run from the live source folder.
+  if [ "$slug" = "priorities" ] && [ "$run_mode" != "bundle" ]; then
+    run_mode=host
   fi
 
   app_dir="$root/.apps/$slug"
@@ -884,6 +1025,7 @@ cmd_run_desktop() {
   case "$os" in
     darwin)
       app_name=$(app_name_from_manifest "$root" "$slug")
+      stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
       bundle="$root/_tmp/workbench/dist/macos/$app_name.app"
       if [ "$run_mode" = "bundle" ]; then
         [ -d "$bundle" ] || {
@@ -900,25 +1042,10 @@ cmd_run_desktop() {
         printf 'artifact=%s\n' "$bundle"
         exit 0
       fi
-      if [ "$run_mode" != "host" ] && [ -d "$bundle" ] && command -v open >/dev/null 2>&1; then
-        stale_bundle=0
-        if find "$app_dir" -type f -newer "$bundle" | grep -q . 2>/dev/null; then
-          stale_bundle=1
-        fi
-        if [ "$stale_bundle" -eq 0 ] && find "$root/.apps/.host/shared" -type f -newer "$bundle" | grep -q . 2>/dev/null; then
-          stale_bundle=1
-        fi
-        if [ "$stale_bundle" -eq 0 ]; then
-          open -na "$bundle"
-          printf 'launched=1\n'
-          printf 'mode=bundle\n'
-          printf 'artifact=%s\n' "$bundle"
-          exit 0
-        fi
-      fi
       host_bin=$(ensure_macos_host "$root")
       ;;
     linux)
+      stop_desktop_instances_for_slug "$root" "$slug" "" "$os"
       host_bin=$(ensure_linux_host "$root")
       ;;
     *)
@@ -1139,6 +1266,105 @@ PLIST
   printf 'entry=%s\n' "$app_dir"
   printf 'pid=%s\n' "$pid"
   printf 'log=%s\n' "$log_path"
+}
+
+cmd_serve_hosted_web() {
+  root=$(require_root "${1-}")
+  mode=${2-}
+  ref=${3-}
+
+  [ -n "$mode" ] || {
+    printf '%s\n' "forge-backend: serve-hosted-web requires MODE (builtin|workspace)" >&2
+    exit 2
+  }
+  [ -n "$ref" ] || {
+    printf '%s\n' "forge-backend: serve-hosted-web requires REF (APP_SLUG or WORKSPACE_PATH)" >&2
+    exit 2
+  }
+
+  case "$mode" in
+    builtin)
+      slug=$ref
+      validate_slug "$slug"
+      template_dir="$root/.web/$slug"
+      [ -d "$template_dir" ] || {
+        printf '%s\n' "forge-backend: hosted web template not found for app: $slug" >&2
+        exit 1
+      }
+
+      web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+      site_name="forge-$slug"
+      site_dir="$web_root/$site_name"
+      web_log="$root/_tmp/workbench/log/hosted-web/$site_name-web-wizardry.log"
+      mkdir -p "$(dirname "$web_log")"
+
+      if command -v web-wizardry >/dev/null 2>&1 && command -v create-from-template >/dev/null 2>&1; then
+        if (
+          if [ ! -d "$site_dir" ]; then
+            WIZARDRY_DIR="$root" create-from-template "$site_name" "$slug"
+          fi
+          WIZARDRY_DIR="$root" web-wizardry build "$site_name"
+          WIZARDRY_DIR="$root" web-wizardry serve "$site_name"
+        ) >"$web_log" 2>&1; then
+          site_conf="$site_dir/site.conf"
+          domain=$(config_field "$site_conf" domain "localhost")
+          port=$(config_field "$site_conf" port "8080")
+          https=$(config_field "$site_conf" https "false")
+          scheme=http
+          if [ "$https" = "true" ]; then
+            scheme=https
+          fi
+
+          printf 'mode=web-wizardry\n'
+          printf 'site=%s\n' "$site_name"
+          printf 'entry=%s\n' "$site_dir"
+          printf 'url=%s\n' "$scheme://$domain:$port"
+          printf 'log=%s\n' "$web_log"
+          exit 0
+        fi
+      fi
+
+      entry='/'
+      if [ -f "$template_dir/pages/index.html" ]; then
+        entry='/pages/index.html'
+      elif [ -f "$template_dir/index.html" ]; then
+        entry='/index.html'
+      fi
+      serve_static_dir "$root" "builtin-$slug" "$template_dir" "$entry"
+      printf 'site=%s\n' "$slug"
+      if [ -f "$web_log" ]; then
+        printf 'fallback_log=%s\n' "$web_log"
+      fi
+      ;;
+
+    workspace)
+      workspace_path=$ref
+      [ -d "$workspace_path" ] || {
+        printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+        exit 1
+      }
+
+      serve_dir="$workspace_path"
+      if [ -f "$workspace_path/app/index.html" ]; then
+        serve_dir="$workspace_path/app"
+      fi
+      entry='/'
+      if [ -f "$serve_dir/index.html" ]; then
+        entry='/index.html'
+      elif [ -f "$serve_dir/pages/index.html" ]; then
+        entry='/pages/index.html'
+      fi
+
+      workspace_id=$(basename "$workspace_path")
+      serve_static_dir "$root" "workspace-$workspace_id" "$serve_dir" "$entry"
+      printf 'workspace=%s\n' "$workspace_path"
+      ;;
+
+    *)
+      printf '%s\n' "forge-backend: serve-hosted-web MODE must be builtin|workspace" >&2
+      exit 2
+      ;;
+  esac
 }
 
 cmd_stage_mobile() {
@@ -1945,10 +2171,13 @@ case "$cmd" in
     cmd_build_desktop "${2-}" "${3-}"
     ;;
   run-desktop)
-    cmd_run_desktop "${2-}" "${3-}"
+    cmd_run_desktop "${2-}" "${3-}" "${4-}"
     ;;
   run-workspace)
     cmd_run_workspace "${2-}" "${3-}" "${4-}"
+    ;;
+  serve-hosted-web)
+    cmd_serve_hosted_web "${2-}" "${3-}" "${4-}"
     ;;
   stage-mobile)
     cmd_stage_mobile "${2-}" "${3-}"

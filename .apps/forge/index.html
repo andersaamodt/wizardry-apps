@@ -1113,20 +1113,6 @@
         return '';
       }
 
-      function hostedWebEntryPathForSelected(selected) {
-        if (!selected || !selected.path) {
-          return '';
-        }
-        var base = String(selected.path || '').replace(/\/+$/, '');
-        if (!base) {
-          return '';
-        }
-        if (selected.kind === 'workspace') {
-          return base + '/app/index.html';
-        }
-        return base + '/index.html';
-      }
-
       function targetOpenDestination(targetId, path) {
         if (!path) {
           return '';
@@ -2356,6 +2342,39 @@
         scheduleWindowFit();
       }
 
+      async function serveHostedWebTarget(selected) {
+        if (!selected) {
+          throw new Error('Select an app first');
+        }
+        var mode = selected.kind === 'builtin' ? 'builtin' : 'workspace';
+        var ref = mode === 'builtin' ? selected.id : selected.path;
+        if (!ref) {
+          throw new Error('Hosted Web reference path is missing.');
+        }
+        var res = await backend('serve-hosted-web', [mode, ref]);
+        var out = kv(res.stdout || '');
+        var url = String(out.url || '').trim();
+        if (!url) {
+          throw new Error('Hosted Web serve did not return a URL.');
+        }
+        await openPath(url, false);
+        setTargetRuntime(selected.key, 'hosted-web', 'running', url);
+        renderSelectedTargetsEditor(selectedCatalogItem());
+        renderResult({
+          status: 'ok',
+          summary: selected.title + ' hosted web entry opened.',
+          paths: [
+            { label: 'Hosted web URL', path: url, canReveal: false },
+            out.entry ? { label: 'Hosted web source', path: out.entry, canReveal: true } : null,
+            out.log ? { label: 'Hosted web log', path: out.log, canReveal: true } : null
+          ].filter(Boolean),
+          help: {
+            title: 'Hosted Web run',
+            body: 'Mode: ' + (out.mode || 'hosted') + '\nURL: ' + url
+          }
+        });
+      }
+
       async function runTargetAction(selected, targetId) {
         if (!selected) {
           throw new Error('Select an app first');
@@ -2371,22 +2390,7 @@
             return;
           }
           if (targetId === 'hosted-web') {
-            var hostedPath = hostedWebEntryPathForSelected(selected);
-            if (!hostedPath) {
-              throw new Error('Hosted Web entry path not found.');
-            }
-            await openPath(hostedPath, false);
-            setTargetRuntime(selected.key, 'hosted-web', 'running', hostedPath);
-            renderSelectedTargetsEditor(selectedCatalogItem());
-            renderResult({
-              status: 'ok',
-              summary: selected.title + ' hosted web entry opened.',
-              paths: [{ label: 'Hosted web entry', path: hostedPath, canReveal: true }],
-              help: {
-                title: 'Hosted Web run',
-                body: 'Opened the web entry in your default browser.'
-              }
-            });
+            await serveHostedWebTarget(selected);
             return;
           }
           if (targetId === 'macos') {
@@ -2421,22 +2425,7 @@
           throw new Error('This target cannot be run directly from the current desktop host.');
         }
         if (targetId === 'hosted-web') {
-          var workspaceHostedPath = hostedWebEntryPathForSelected(selected);
-          if (!workspaceHostedPath) {
-            throw new Error('Hosted Web entry path not found.');
-          }
-          await openPath(workspaceHostedPath, false);
-          setTargetRuntime(selected.key, 'hosted-web', 'running', workspaceHostedPath);
-          renderSelectedTargetsEditor(selectedCatalogItem());
-          renderResult({
-            status: 'ok',
-            summary: selected.title + ' hosted web entry opened.',
-            paths: [{ label: 'Hosted web entry', path: workspaceHostedPath, canReveal: true }],
-            help: {
-              title: 'Hosted Web run',
-              body: 'Opened the web entry in your default browser.'
-            }
-          });
+          await serveHostedWebTarget(selected);
           return;
         }
         if (targetId === 'macos' && state.os !== 'darwin') {
