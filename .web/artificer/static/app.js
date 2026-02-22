@@ -5021,12 +5021,9 @@
       }
       var backend = trim(String(response.backend || ""));
       var preferred = trim(String(response.preferred || ""));
-      var preferredInstalled = response.installed === true;
-      if (preferred && backend && backend !== preferred) {
-        preferredInstalled = false;
-      }
+      var installed = response.installed === true;
       state.dictationInstallInfo = response;
-      state.dictationInstalled = preferredInstalled;
+      state.dictationInstalled = installed;
       state.dictationBackend = backend;
       state.dictationPreferredBackend = preferred;
       state.dictationInstallError = "";
@@ -5157,7 +5154,7 @@
       status: "running",
       action: "install",
       phase: "downloading",
-      progress_pct: "0"
+      progress_pct: "0.0"
     };
     renderUi();
 
