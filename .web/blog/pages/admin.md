@@ -451,7 +451,7 @@ body {
 }
 
 .section-head {
-  margin-bottom: 0.95rem;
+  margin-bottom: 0.6rem;
 }
 
 .demo-box h3 {
@@ -462,7 +462,7 @@ body {
 }
 
 .demo-box h4 {
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.4rem;
   font-size: 0.96rem;
   line-height: 1.25;
   color: #273f74;
@@ -471,23 +471,27 @@ body {
 
 .settings-stack {
   display: grid;
-  gap: 0.88rem;
+  gap: 0.56rem;
 }
 
 .sub-card {
   border: 1px solid #d1ddf5;
   border-radius: 14px;
   background: #ffffff;
-  padding: 0.86rem 0.88rem;
+  padding: 0.6rem 0.72rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .section-actions {
-  margin-top: 1rem;
+  margin-top: 0.65rem;
 }
 
 .field-row {
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.55rem;
+}
+
+.field-row:last-child {
+  margin-bottom: 0;
 }
 
 .field-row label {
@@ -503,7 +507,7 @@ body {
   display: grid;
   grid-template-columns: minmax(12rem, max-content) minmax(0, 1fr);
   align-items: center;
-  gap: 0.45rem 1rem;
+  gap: 0.25rem 0.75rem;
 }
 
 [data-admin-section="settings"] .field-row > label {
@@ -626,7 +630,7 @@ body {
 .grid-two {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.86rem 0.96rem;
+  gap: 0.55rem 0.75rem;
 }
 
 .settings-inline {
