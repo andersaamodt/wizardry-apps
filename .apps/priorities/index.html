@@ -531,8 +531,12 @@
       }
       state.hostBootReadySent = true;
       if (hasBridge()) {
-        bridgeExec(['__wizardry_host_boot_ready']).catch(function () {
-          return;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            bridgeExec(['__wizardry_host_boot_ready']).catch(function () {
+              return;
+            });
+          });
         });
       }
     }

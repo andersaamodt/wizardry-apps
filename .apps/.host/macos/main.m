@@ -424,6 +424,10 @@
     
     NSView *rootView = [[NSView alloc] initWithFrame:frame];
     [rootView setAutoresizesSubviews:YES];
+    if (self.enableNativeViewMenu && self.prioritiesBootBgColor) {
+        [rootView setWantsLayer:YES];
+        rootView.layer.backgroundColor = [self.prioritiesBootBgColor CGColor];
+    }
 
     CGFloat dragStripHeight = 44.0;
     NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
