@@ -759,12 +759,11 @@ button:disabled {
 }
 
 .catalog-thumb {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.58rem;
+  height: 1.58rem;
   border-radius: 6px;
   flex: 0 0 auto;
   background: rgba(150, 165, 184, 0.14);
-  border: 1px solid rgba(150, 165, 184, 0.2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
