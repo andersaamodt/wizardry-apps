@@ -2278,7 +2278,9 @@
           reader.onload = function () {
             var img = new Image();
             img.onload = function () {
-              var size = 96;
+              // Preserve icon fidelity for packaged app icons (Dock/taskbar/alt-tab)
+              // by rasterizing uploads to a high-resolution square source.
+              var size = 1024;
               var canvas = document.createElement('canvas');
               canvas.width = size;
               canvas.height = size;
@@ -2288,7 +2290,7 @@
                 return;
               }
               ctx.clearRect(0, 0, size, size);
-              var scale = Math.min(size / img.width, size / img.height);
+              var scale = Math.min(size / img.width, size / img.height, 1);
               var w = Math.max(1, Math.round(img.width * scale));
               var h = Math.max(1, Math.round(img.height * scale));
               var x = Math.floor((size - w) / 2);
