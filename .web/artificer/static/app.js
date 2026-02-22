@@ -134,6 +134,8 @@
     dictationInstallCancelling: false,
     dictationInstallPendingCancel: false,
     dictationInstallCancelJobId: "",
+    dictationInstallCancelRequestedAt: 0,
+    dictationInstallCancelAttempts: 0,
     dictationInstallJob: null,
     dictationInstallError: "",
     dictationInstalled: false,
@@ -5248,8 +5250,30 @@
       var responseJobId = trim(String(response.job.id || ""));
       var cancelJobId = trim(String(state.dictationInstallCancelJobId || ""));
       var responseStatus = String(response.job.status || "");
-      if (cancelJobId && responseJobId === cancelJobId && responseStatus === "running") {
-        return null;
+      if (cancelJobId && responseJobId === cancelJobId && responseStatus === "running" && state.dictationInstallCancelling) {
+        var nowMs = Date.now();
+        var startedAtMs = Number(state.dictationInstallCancelRequestedAt || 0);
+        if (!isFinite(startedAtMs) || startedAtMs <= 0) {
+          startedAtMs = nowMs;
+          state.dictationInstallCancelRequestedAt = startedAtMs;
+        }
+        var elapsedMs = nowMs - startedAtMs;
+        if (elapsedMs >= 15000 && Number(state.dictationInstallCancelAttempts || 0) < 2) {
+          state.dictationInstallCancelAttempts = 2;
+          apiPost("dictation_install_cancel", { job_id: cancelJobId }, { timeoutMs: 12000 }).catch(function () {
+            return null;
+          });
+        }
+        if (elapsedMs < 45000) {
+          return null;
+        }
+        state.dictationInstallCancelling = false;
+        state.dictationInstallPendingCancel = false;
+        state.dictationInstallCancelJobId = "";
+        state.dictationInstallCancelRequestedAt = 0;
+        state.dictationInstallCancelAttempts = 0;
+        state.dictationInstallError = "";
+        showTransientNotice("Cancel timed out. Download is still running.");
       }
       var previousJob = state.dictationInstallJob || null;
       var previousAction = trim(String(previousJob && previousJob.action ? previousJob.action : ""));
@@ -5269,6 +5293,8 @@
         if (cancelJobId && responseJobId === cancelJobId) {
           state.dictationInstallCancelJobId = "";
         }
+        state.dictationInstallCancelRequestedAt = 0;
+        state.dictationInstallCancelAttempts = 0;
         var installedBackend = trim(String(response.job.installed || response.job.component || response.job.backend || ""));
         state.dictationInstalled = true;
         state.dictationBackend = installedBackend;
@@ -5308,6 +5334,8 @@
         if (cancelJobId && responseJobId === cancelJobId) {
           state.dictationInstallCancelJobId = "";
         }
+        state.dictationInstallCancelRequestedAt = 0;
+        state.dictationInstallCancelAttempts = 0;
         state.dictationInstallJob = null;
         renderUi();
         var logText = trim(String(response.job.log || ""));
@@ -5334,6 +5362,8 @@
         if (cancelJobId && responseJobId === cancelJobId) {
           state.dictationInstallCancelJobId = "";
         }
+        state.dictationInstallCancelRequestedAt = 0;
+        state.dictationInstallCancelAttempts = 0;
         state.dictationInstallJob = null;
         state.dictationInstallError = "";
         showTransientNotice("Dictation install cancelled");
@@ -5357,6 +5387,10 @@
     if (!state.dictationInstallCancelJobId) {
       state.dictationInstallCancelJobId = id;
     }
+    if (!state.dictationInstallCancelRequestedAt) {
+      state.dictationInstallCancelRequestedAt = Date.now();
+    }
+    state.dictationInstallCancelAttempts = Math.max(1, Number(state.dictationInstallCancelAttempts || 0));
     startDictationInstallPolling(id);
     renderUi();
     return Promise.resolve(null);
@@ -5393,6 +5427,8 @@
     state.dictationInstallCancelling = false;
     state.dictationInstallPendingCancel = false;
     state.dictationInstallCancelJobId = "";
+    state.dictationInstallCancelRequestedAt = 0;
+    state.dictationInstallCancelAttempts = 0;
     state.dictationInstallError = "";
     state.dictationInstallJob = {
       status: "running",
@@ -5426,6 +5462,8 @@
       state.dictationInstallCancelling = false;
       state.dictationInstallPendingCancel = false;
       state.dictationInstallCancelJobId = "";
+      state.dictationInstallCancelRequestedAt = 0;
+      state.dictationInstallCancelAttempts = 0;
       state.dictationInstallJob = null;
       state.dictationInstallError = error && error.message ? error.message : "Dictation install failed";
       showTransientNotice(state.dictationInstallError);
@@ -5442,7 +5480,7 @@
     if (!state.dictationInstallBusy && !state.dictationInstallPendingCancel && !jobId) {
       return Promise.resolve(null);
     }
-    if (state.dictationInstallCancelling) {
+    if (state.dictationInstallCancelling && jobId && trim(String(state.dictationInstallCancelJobId || "")) === jobId) {
       return Promise.resolve(null);
     }
     if (action === "uninstall" || (status && status !== "running")) {
@@ -5466,12 +5504,16 @@
       state.dictationInstallPendingCancel = true;
       state.dictationInstallCancelling = false;
       state.dictationInstallBusy = false;
+      state.dictationInstallCancelRequestedAt = 0;
+      state.dictationInstallCancelAttempts = 0;
       renderUi();
       return Promise.resolve(null);
     }
 
     state.dictationInstallPendingCancel = false;
     state.dictationInstallCancelJobId = jobId;
+    state.dictationInstallCancelRequestedAt = Date.now();
+    state.dictationInstallCancelAttempts = Math.max(1, Number(state.dictationInstallCancelAttempts || 0));
     return apiPost("dictation_install_cancel", { job_id: jobId }, { timeoutMs: 12000 }).then(function (response) {
       if (!response || !response.success) {
         throw new Error((response && response.error) || "Could not cancel dictation install");
@@ -5482,6 +5524,8 @@
       if (state.dictationInstallCancelJobId === jobId) {
         state.dictationInstallCancelJobId = "";
       }
+      state.dictationInstallCancelRequestedAt = 0;
+      state.dictationInstallCancelAttempts = 0;
       state.dictationInstallError = "";
       state.dictationInstallJob = null;
       renderUi();
@@ -5491,6 +5535,7 @@
       var message = error && error.message ? error.message : "";
       state.dictationInstallPendingCancel = false;
       state.dictationInstallError = "";
+      state.dictationInstallCancelAttempts = Math.max(1, Number(state.dictationInstallCancelAttempts || 0));
       if (/timed out/i.test(message)) {
         showTransientNotice("Cancel requested. Checking status...");
       } else {
