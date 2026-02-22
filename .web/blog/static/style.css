@@ -60,53 +60,22 @@ body.auth-modal-open {
 a[href],
 button,
 input[type="button"],
-input[type="submit"] {
+input[type="submit"],
+input[type="reset"],
+[role="button"],
+summary,
+.tag,
+.feed-link,
+.footer-feed-link,
+.btn-login {
   cursor: pointer;
 }
 
-:where(
-  a[href],
-  button,
-  [role="button"],
-  [onclick],
-  summary,
-  select,
-  input[type="button"],
-  input[type="submit"],
-  input[type="reset"],
-  .tag,
-  .feed-link,
-  .footer-feed-link
-) {
-  cursor: pointer !important;
-}
-
-:where(button[disabled], input[disabled], select[disabled], [aria-disabled="true"]) {
-  cursor: not-allowed !important;
-}
-
-html body a[href],
-html body button,
-html body [role="button"],
-html body [onclick],
-html body summary,
-html body select,
-html body input[type="button"],
-html body input[type="submit"],
-html body input[type="reset"],
-html body .tag,
-html body .feed-link,
-html body .footer-feed-link,
-html body .nav-center a,
-html body .btn-login {
-  cursor: pointer !important;
-}
-
-html body button[disabled],
-html body input[disabled],
-html body select[disabled],
-html body [aria-disabled="true"] {
-  cursor: not-allowed !important;
+button:disabled,
+input:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
 }
 
 body > h1:first-of-type {
@@ -286,7 +255,6 @@ header h1 {
   border-color: var(--nav-button-hover-border);
 }
 
-.nav-admin,
 .nav-compose {
   color: var(--text);
   text-decoration: none;
@@ -301,21 +269,83 @@ header h1 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.1rem;
-  height: 2.1rem;
+  width: 2.55rem;
+  height: 2.3rem;
   padding: 0;
+  border-radius: 9px;
 }
 
 .nav-compose-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 21px;
+  height: 21px;
 }
 
-.nav-admin:hover,
 .nav-compose:hover {
   background-color: var(--light-bg);
   color: var(--accent);
   text-decoration: none;
+}
+
+.nav-user-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-menu-btn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 0.35rem 0.6rem 0.5rem;
+  min-width: 2.25rem;
+  height: 2.15rem;
+}
+
+.nav-menu-btn:hover {
+  background: var(--light-bg);
+  color: var(--accent);
+}
+
+.nav-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 10rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.15);
+  padding: 0.28rem;
+  z-index: 40;
+}
+
+.nav-menu-item {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-decoration: none;
+  text-align: left;
+  padding: 0.45rem 0.58rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.nav-menu-item:hover {
+  background: var(--light-bg);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.nav-menu-item-danger {
+  color: #b91c1c;
 }
 
 .nav-username {
@@ -645,7 +675,7 @@ header h1 {
   margin-left: calc(auto - 80px);
 }
 
-.nav-right.slide-left .nav-admin {
+.nav-right.slide-left .nav-user-menu {
   transform: translateX(-80px);
 }
 
@@ -1829,7 +1859,8 @@ nav.site-nav {
   }
 
   .btn-login,
-  .nav-admin,
+  .nav-user-menu,
+  .nav-menu-btn,
   .nav-compose,
   .nav-username {
     flex: 0 0 auto;
@@ -1897,7 +1928,8 @@ nav.site-nav {
 
   nav.site-nav .nav-search button,
   nav.site-nav .btn-login,
-  nav.site-nav .nav-admin,
+  nav.site-nav .nav-user-menu,
+  nav.site-nav .nav-menu-btn,
   nav.site-nav .nav-compose,
   nav.site-nav .nav-username,
   .tag-cloud .tag {
