@@ -270,11 +270,11 @@
               <summary class="pipeline-section-head">Publishing Targets</summary>
               <div class="pipeline-section-body">
                 <div class="target-grid">
-                  <label class="target-item" data-target-groups="application"><input id="target-hosted-web" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-hosted-web.svg" alt=""></span>Hosted Web</label>
-                  <label class="target-item" data-target-groups="application,game"><input id="target-macos" type="checkbox" checked><span class="target-icon" aria-hidden="true"></span>macOS Desktop</label>
-                  <label class="target-item" data-target-groups="application,game"><input id="target-linux" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-linux.svg" alt=""></span>Linux Desktop</label>
-                  <label class="target-item" data-target-groups="application,game"><input id="target-ios" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-ios.svg" alt=""></span>iOS</label>
-                  <label class="target-item" data-target-groups="application,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</label>
+                  <div class="target-item" data-target-groups="application"><input id="target-hosted-web" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-hosted-web.svg" alt=""></span>Hosted Web</div>
+                  <div class="target-item" data-target-groups="application,game"><input id="target-macos" type="checkbox" checked><span class="target-icon" aria-hidden="true"></span>macOS Desktop</div>
+                  <div class="target-item" data-target-groups="application,game"><input id="target-linux" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-linux.svg" alt=""></span>Linux Desktop</div>
+                  <div class="target-item" data-target-groups="application,game"><input id="target-ios" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-ios.svg" alt=""></span>iOS</div>
+                  <div class="target-item" data-target-groups="application,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</div>
                 </div>
                 <p class="sub target-grid-note">You can change this later.</p>
                 <button id="create-submit" type="button" class="action primary">Create Project</button>
@@ -2333,7 +2333,7 @@
         function createTargetRow(spec, active) {
           var supported = isTargetSupportedForSelected(selected, spec.id);
           var openPathValue = targetOpenPath(selected, spec.id);
-          var row = document.createElement('label');
+          var row = document.createElement('div');
           row.className = 'target-item target-row';
           var rowKey = selected.key + ':' + spec.id;
           row.setAttribute('data-row-key', rowKey);
