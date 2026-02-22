@@ -181,7 +181,8 @@
       rootPrefSaveTimer: null,
       snapshotPrefSaveTimer: null,
       startupSnapshotRestored: false,
-      hostBootReadySent: false
+      hostBootReadySent: false,
+      snapshotLastSerialized: ''
     };
 
     function parseKeyValueText(blob) {
@@ -241,8 +242,12 @@
       if (!prefName) {
         return;
       }
-      state.uiPrefs[prefName] = String(value || '');
-      persistUiPref(prefName, state.uiPrefs[prefName]);
+      var normalized = String(value || '');
+      if (state.uiPrefs[prefName] === normalized) {
+        return;
+      }
+      state.uiPrefs[prefName] = normalized;
+      persistUiPref(prefName, normalized);
     }
 
     function loadStorage(storageKey) {
@@ -283,7 +288,6 @@
     function applyTextScale(nextScale) {
       state.uiScale = clampTextScale(nextScale);
       saveStorage(UI_SCALE_KEY, String(state.uiScale));
-      saveStorage(TEXT_SCALE_KEY, String(state.uiScale));
       document.documentElement.style.setProperty('--ui-scale', String(state.uiScale));
       document.documentElement.style.setProperty('--text-scale', String(state.uiScale));
       updateTextSizeDisplays();
@@ -595,29 +599,30 @@
     }
 
     function saveStartupSnapshot() {
-      var tree = treeEl();
-      var root = String(state.root || '').trim();
-      if (!tree || !root || !tree.childNodes || !tree.childNodes.length) {
-        return;
-      }
-      var statusEl = document.getElementById('status');
-      var payload = {
-        root: root,
-        title: String((document.getElementById('title-folder') || {}).textContent || ''),
-        statusText: String((statusEl || {}).textContent || ''),
-        statusError: !!(statusEl && statusEl.classList && statusEl.classList.contains('error')),
-        treeHtml: tree.innerHTML,
-        savedAt: Date.now()
-      };
-      var encoded = encodeSnapshotPayload(payload);
-      if (!encoded) {
-        return;
-      }
       if (state.snapshotPrefSaveTimer) {
         clearTimeout(state.snapshotPrefSaveTimer);
       }
       state.snapshotPrefSaveTimer = setTimeout(function () {
         state.snapshotPrefSaveTimer = null;
+        var tree = treeEl();
+        var root = String(state.root || '').trim();
+        if (!tree || !root || !tree.childNodes || !tree.childNodes.length) {
+          return;
+        }
+        var statusEl = document.getElementById('status');
+        var payload = {
+          root: root,
+          title: String((document.getElementById('title-folder') || {}).textContent || ''),
+          statusText: String((statusEl || {}).textContent || ''),
+          statusError: !!(statusEl && statusEl.classList && statusEl.classList.contains('error')),
+          treeHtml: tree.innerHTML,
+          savedAt: Date.now()
+        };
+        var encoded = encodeSnapshotPayload(payload);
+        if (!encoded || state.snapshotLastSerialized === encoded) {
+          return;
+        }
+        state.snapshotLastSerialized = encoded;
         saveStorage(SNAPSHOT_PREF, encoded);
       }, 180);
     }
@@ -1163,11 +1168,17 @@
           normalized = state.themes[0] || 'psionic';
         }
       }
+      var themeChanged = state.activeTheme !== normalized;
       state.activeTheme = normalized;
-      saveStorage(THEME_KEY, normalized);
+      if (themeChanged) {
+        saveStorage(THEME_KEY, normalized);
+      }
       var stylesheet = document.getElementById('priorities-theme-stylesheet');
       if (stylesheet) {
-        stylesheet.href = 'themes/' + normalized + '.css?v=' + THEME_ASSET_VERSION;
+        var nextHref = 'themes/' + normalized + '.css?v=' + THEME_ASSET_VERSION;
+        if (String(stylesheet.getAttribute('href') || '') !== nextHref) {
+          stylesheet.href = nextHref;
+        }
       }
       renderThemePicker();
     }
@@ -1343,6 +1354,13 @@
         normalized = state.fontOptions[0].value;
       }
       if (!normalized) {
+        return;
+      }
+      if (state.activeFont === normalized) {
+        var existingSelect = document.getElementById('font-select');
+        if (existingSelect && existingSelect.value !== normalized) {
+          existingSelect.value = normalized;
+        }
         return;
       }
       state.activeFont = normalized;

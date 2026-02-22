@@ -99,26 +99,35 @@
     return nil;
 }
 
-- (NSString *)readCSSVariable:(NSString *)name fromThemeFile:(NSString *)themeFile {
-    if (!name.length || !themeFile.length) {
-        return @"";
+- (NSDictionary<NSString *, NSString *> *)readThemeVariablesFromFile:(NSString *)themeFile {
+    if (!themeFile.length) {
+        return @{};
     }
     NSError *error = nil;
     NSString *css = [NSString stringWithContentsOfFile:themeFile encoding:NSUTF8StringEncoding error:&error];
     if (!css.length || error) {
-        return @"";
+        return @{};
     }
-    NSString *pattern = [NSString stringWithFormat:@"--%@\\s*:\\s*([^;]+);", name];
-    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:nil];
-    NSTextCheckingResult *match = [regex firstMatchInString:css options:0 range:NSMakeRange(0, css.length)];
-    if (!match || match.numberOfRanges < 2) {
-        return @"";
+
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"--([a-z0-9_-]+)\\s*:\\s*([^;]+);" options:NSRegularExpressionCaseInsensitive error:nil];
+    NSArray<NSTextCheckingResult *> *matches = [regex matchesInString:css options:0 range:NSMakeRange(0, css.length)];
+    NSMutableDictionary<NSString *, NSString *> *out = [NSMutableDictionary dictionaryWithCapacity:matches.count];
+    for (NSTextCheckingResult *match in matches) {
+        if (match.numberOfRanges < 3) {
+            continue;
+        }
+        NSRange keyRange = [match rangeAtIndex:1];
+        NSRange valueRange = [match rangeAtIndex:2];
+        if (keyRange.location == NSNotFound || valueRange.location == NSNotFound) {
+            continue;
+        }
+        NSString *key = [[css substringWithRange:keyRange] lowercaseString];
+        NSString *value = [[css substringWithRange:valueRange] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (key.length && value.length) {
+            out[key] = value;
+        }
     }
-    NSRange valueRange = [match rangeAtIndex:1];
-    if (valueRange.location == NSNotFound || valueRange.length == 0) {
-        return @"";
-    }
-    return [[css substringWithRange:valueRange] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return out;
 }
 
 - (void)loadPrioritiesBootPalette {
@@ -138,9 +147,10 @@
     }
 
     NSString *themeFile = [[self.appPath stringByAppendingPathComponent:@"themes"] stringByAppendingPathComponent:[theme stringByAppendingString:@".css"]];
-    NSColor *bg = [self parseCSSColorToken:[self readCSSVariable:@"bg" fromThemeFile:themeFile]];
-    NSColor *text = [self parseCSSColorToken:[self readCSSVariable:@"text" fromThemeFile:themeFile]];
-    NSColor *muted = [self parseCSSColorToken:[self readCSSVariable:@"light-text" fromThemeFile:themeFile]];
+    NSDictionary<NSString *, NSString *> *vars = [self readThemeVariablesFromFile:themeFile];
+    NSColor *bg = [self parseCSSColorToken:vars[@"bg"]];
+    NSColor *text = [self parseCSSColorToken:vars[@"text"]];
+    NSColor *muted = [self parseCSSColorToken:vars[@"light-text"]];
 
     self.prioritiesBootBgColor = bg ?: [NSColor whiteColor];
     self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
