@@ -164,6 +164,20 @@ body {
   line-height: 1.45;
 }
 
+/* Keep a stable boot backdrop so theme background swaps do not flash onscreen. */
+body.forge-booting {
+  background: #edf2fa !important;
+}
+
+body.forge-booting::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: #edf2fa;
+  pointer-events: none;
+}
+
 /* Hide the full shell until startup has selected theme + initial state. */
 body.forge-booting .forge-shell {
   visibility: hidden;
