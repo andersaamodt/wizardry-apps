@@ -28,11 +28,65 @@
 @property (strong) WKWebView *webView;
 @property (strong) NSString *appPath;
 @property (strong) NSImage *appIconImage;
+@property (strong) NSView *nativeBootSplashView;
 @property (assign) BOOL enableNativeViewMenu;
 @property (assign) BOOL prefersWideDragStrip;
 @end
 
 @implementation AppDelegate
+
+- (void)showNativeBootSplashInView:(NSView *)rootView {
+    if (!rootView || self.nativeBootSplashView) {
+        return;
+    }
+
+    NSView *overlay = [[NSView alloc] initWithFrame:rootView.bounds];
+    overlay.autoresizingMask = (NSViewWidthSizable | NSViewHeightSizable);
+    overlay.wantsLayer = YES;
+    overlay.layer.backgroundColor = [[NSColor whiteColor] CGColor];
+
+    NSProgressIndicator *spinner = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(0, 0, 16, 16)];
+    spinner.style = NSProgressIndicatorStyleSpinning;
+    spinner.displayedWhenStopped = YES;
+    spinner.controlSize = NSControlSizeSmall;
+    [spinner startAnimation:nil];
+
+    NSTextField *label = [[NSTextField alloc] initWithFrame:NSZeroRect];
+    label.editable = NO;
+    label.bezeled = NO;
+    label.drawsBackground = NO;
+    label.selectable = NO;
+    label.alignment = NSTextAlignmentCenter;
+    label.stringValue = @"Loading...";
+    label.textColor = [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
+    label.font = [NSFont systemFontOfSize:14 weight:NSFontWeightMedium];
+    [label sizeToFit];
+
+    NSStackView *stack = [[NSStackView alloc] initWithFrame:NSZeroRect];
+    stack.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+    stack.alignment = NSLayoutAttributeCenterY;
+    stack.spacing = 8.0;
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [stack addArrangedSubview:spinner];
+    [stack addArrangedSubview:label];
+
+    [overlay addSubview:stack];
+    [NSLayoutConstraint activateConstraints:@[
+        [stack.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
+        [stack.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor]
+    ]];
+
+    [rootView addSubview:overlay];
+    self.nativeBootSplashView = overlay;
+}
+
+- (void)hideNativeBootSplash {
+    if (!self.nativeBootSplashView) {
+        return;
+    }
+    [self.nativeBootSplashView removeFromSuperview];
+    self.nativeBootSplashView = nil;
+}
 
 - (void)setupMainMenuWithAppName:(NSString *)appName {
     NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
@@ -235,22 +289,6 @@
     if (@available(macOS 11.0, *)) {
         [self.window setTitlebarSeparatorStyle:NSTitlebarSeparatorStyleNone];
     }
-    [self.window makeKeyAndOrderFront:nil];
-    [self.window orderFrontRegardless];
-    // Re-activate after the window exists so workspace launches behave like
-    // regular desktop apps (not hidden/background-only processes).
-    NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
-    [currentApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
-    [NSApp unhide:nil];
-    [NSApp activateIgnoringOtherApps:YES];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self.window makeMainWindow];
-        [self.window makeKeyAndOrderFront:nil];
-        [self.window orderFrontRegardless];
-        [NSApp unhide:nil];
-        [NSApp activateIgnoringOtherApps:YES];
-    });
-    
     // Create WebView with message handler
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
     WKUserContentController *contentController = [[WKUserContentController alloc] init];
@@ -361,7 +399,27 @@
         [rootView addSubview:dragStrip];
     }
 
+    if (self.enableNativeViewMenu) {
+        [self showNativeBootSplashInView:rootView];
+    }
+
     [self.window setContentView:rootView];
+
+    [self.window makeKeyAndOrderFront:nil];
+    [self.window orderFrontRegardless];
+    // Re-activate after the window exists so workspace launches behave like
+    // regular desktop apps (not hidden/background-only processes).
+    NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
+    [currentApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
+    [NSApp unhide:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self.window makeMainWindow];
+        [self.window makeKeyAndOrderFront:nil];
+        [self.window orderFrontRegardless];
+        [NSApp unhide:nil];
+        [NSApp activateIgnoringOtherApps:YES];
+    });
     
     // Load the app HTML
     NSURL *url = [NSURL fileURLWithPath:indexPath];
@@ -528,6 +586,14 @@
                     }
                 }
                 [self sendResult:messageIdCopy stdout:snapState stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_boot_ready"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self hideNativeBootSplash];
+                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }

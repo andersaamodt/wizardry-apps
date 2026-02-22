@@ -180,7 +180,8 @@
       uiPrefs: {},
       rootPrefSaveTimer: null,
       snapshotPrefSaveTimer: null,
-      startupSnapshotRestored: false
+      startupSnapshotRestored: false,
+      hostBootReadySent: false
     };
 
     function parseKeyValueText(blob) {
@@ -521,6 +522,15 @@
 
     function revealBootUi() {
       document.documentElement.classList.remove('priorities-booting');
+      if (state.hostBootReadySent) {
+        return;
+      }
+      state.hostBootReadySent = true;
+      if (hasBridge()) {
+        bridgeExec(['__wizardry_host_boot_ready']).catch(function () {
+          return;
+        });
+      }
     }
 
     function decodeSnapshotPayload(encoded) {
