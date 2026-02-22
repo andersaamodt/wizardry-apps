@@ -366,7 +366,8 @@
         iconVersionByKey: {},
         themeTypeahead: '',
         themeTypeaheadTimer: null,
-        pathCompactTimer: null
+        pathCompactTimer: null,
+        hostBootReadySent: false
       };
 
       var els = {};
@@ -555,6 +556,24 @@
 
       function bridgeAvailable() {
         return !!(window.wizardry && window.wizardry.rpc);
+      }
+
+      function revealBootUi() {
+        document.body.classList.remove('forge-booting');
+        if (state.hostBootReadySent) {
+          return;
+        }
+        state.hostBootReadySent = true;
+        if (!bridgeAvailable()) {
+          return;
+        }
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            execArgv(['__wizardry_host_boot_ready']).catch(function () {
+              return;
+            });
+          });
+        });
       }
 
       function summarizeExecFailure(stderr, stdout, exitCode) {
@@ -4261,7 +4280,7 @@
             scheduleWindowFit();
           }, 250);
         } finally {
-          document.body.classList.remove('forge-booting');
+          revealBootUi();
         }
       }
 
