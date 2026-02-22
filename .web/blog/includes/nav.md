@@ -700,6 +700,7 @@
 
   function highlightCurrentPage() {
     var currentPath = window.location.pathname;
+    var currentHash = window.location.hash || '';
     var navLinks = document.querySelectorAll('.nav-center a[data-page]');
     navLinks.forEach(function (link) {
       var href = link.getAttribute('href');
@@ -709,6 +710,17 @@
         link.classList.add('active');
       }
     });
+
+    if (composeLink) {
+      var onCompose = currentPath.indexOf('/pages/admin.html') !== -1 && currentHash === '#compose';
+      composeLink.classList.toggle('active', onCompose);
+      composeLink.setAttribute('aria-disabled', onCompose ? 'true' : 'false');
+      if (onCompose) {
+        composeLink.setAttribute('tabindex', '-1');
+      } else {
+        composeLink.removeAttribute('tabindex');
+      }
+    }
   }
 
   function updateThemeSelect() {
@@ -781,6 +793,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     highlightCurrentPage();
+    window.addEventListener('hashchange', highlightCurrentPage);
     bindLoginButton();
     bindThemeSelect();
     loadTheme();

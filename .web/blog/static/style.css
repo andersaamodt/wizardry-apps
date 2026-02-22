@@ -286,6 +286,13 @@ header h1 {
   text-decoration: none;
 }
 
+.nav-compose.active {
+  background-color: var(--nav-link-hover);
+  color: var(--accent);
+  cursor: default;
+  pointer-events: none;
+}
+
 .nav-user-menu {
   position: relative;
   display: inline-flex;
