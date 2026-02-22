@@ -6,64 +6,8 @@
 <meta property="og:site_name" content="Wizardry Blog" />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary_large_image" />
-<style id="critical-pointer-cursors">
-  a[href],
-  button,
-  [role="button"],
-  [onclick],
-  summary,
-  select,
-  input[type="button"],
-  input[type="submit"],
-  input[type="reset"],
-  .tag,
-  .feed-link,
-  .footer-feed-link {
-    cursor: pointer !important;
-  }
-
-  button[disabled],
-  select[disabled],
-  input[disabled],
-  [aria-disabled="true"] {
-    cursor: not-allowed !important;
-  }
-</style>
 <script>
 (function () {
-  var pointerSelector = [
-    'a[href]',
-    'button',
-    '[role="button"]',
-    '[onclick]',
-    'summary',
-    'select',
-    'input[type="button"]',
-    'input[type="submit"]',
-    'input[type="reset"]',
-    '.tag',
-    '.feed-link',
-    '.footer-feed-link'
-  ].join(',');
-
-  function applyPointerCursor(node) {
-    if (!node || !node.querySelectorAll) {
-      return;
-    }
-    if (node.matches && node.matches(pointerSelector)) {
-      node.style.cursor = 'pointer';
-    }
-    var items = node.querySelectorAll(pointerSelector);
-    for (var i = 0; i < items.length; i += 1) {
-      var el = items[i];
-      if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') {
-        el.style.cursor = 'not-allowed';
-      } else {
-        el.style.cursor = 'pointer';
-      }
-    }
-  }
-
   var canonical = document.createElement('link');
   canonical.rel = 'canonical';
   canonical.href = window.location.origin + window.location.pathname;
@@ -79,20 +23,6 @@
     if (firstHeading && !firstHeading.id) {
       firstHeading.id = 'main-content';
     }
-    applyPointerCursor(document);
-
-    var observer = new MutationObserver(function (mutations) {
-      for (var i = 0; i < mutations.length; i += 1) {
-        var added = mutations[i].addedNodes || [];
-        for (var j = 0; j < added.length; j += 1) {
-          var n = added[j];
-          if (n && n.nodeType === 1) {
-            applyPointerCursor(n);
-          }
-        }
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
   });
 })();
 </script>
