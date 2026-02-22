@@ -305,7 +305,7 @@ body {
   border: 0;
   border-right: 1px solid #c7d6f3;
   border-radius: 0;
-  background: #e9eef7;
+  background: #ffffff;
   box-shadow: none;
   padding: 0;
   display: flex;
@@ -321,7 +321,7 @@ body {
   border: 0;
   border-radius: 0;
   overflow: visible;
-  background: #e9eef7;
+  background: #ffffff;
 }
 
 .admin-nav-item {
