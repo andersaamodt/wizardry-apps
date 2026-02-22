@@ -5118,10 +5118,19 @@
       }
       if (!statusText && state.dictationInstalled) {
         var installedLabel = dictationBackendLabel(state.dictationBackend || "");
+        var installedSizeLabel = dictationPreinstallSizeLabel();
         if (installedLabel) {
-          statusText = "Installed backend: " + installedLabel + ".";
+          if (installedSizeLabel) {
+            statusText = "Installed backend: " + installedLabel + " (" + installedSizeLabel + ").";
+          } else {
+            statusText = "Installed backend: " + installedLabel + ".";
+          }
         } else {
-          statusText = "Dictation is installed.";
+          if (installedSizeLabel) {
+            statusText = "Dictation is installed (" + installedSizeLabel + ").";
+          } else {
+            statusText = "Dictation is installed.";
+          }
         }
       } else if (!statusText && !state.dictationInstalled && !showChecking) {
         statusText = dictationPreinstallSizeLabel();
