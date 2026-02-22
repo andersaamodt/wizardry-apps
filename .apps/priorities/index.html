@@ -110,6 +110,8 @@
     </div>
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite" aria-hidden="true"></div>
+    <button id="trash-icon-cycle" class="trash-icon-cycle" type="button" title="Cycle trash icon variants">Cycle Trash</button>
+    <div id="trash-icon-current" class="trash-icon-current" aria-live="polite"></div>
     <div id="tree" class="tree" aria-live="polite"></div>
   </main>
 
@@ -204,6 +206,8 @@
       snapshotLastSerialized: '',
       dragHoleSyncTimer: null,
       dragHoleResizeObserver: null,
+      trashIconVariantIndex: 0,
+      trashIconSvgByName: Object.create(null),
       hoveredPrioritizePath: '',
       prioritizeHoverLockUntil: 0,
       pointerClientX: null,
@@ -1752,6 +1756,129 @@
       }
     }
 
+    function originalTrashIconSvg() {
+      return '<svg class="trash-icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.35 9m-4.78 0L9.26 9m9.97-3.21c.34.05.68.1 1.02.16M4.77 5.79c.34-.06.68-.11 1.02-.16m0 0L6.85 19.67A2 2 0 0 0 8.84 21h6.32a2 2 0 0 0 1.99-1.83l1.06-13.54M5.79 5.63A48.1 48.1 0 0 1 12 5c2.12 0 4.2.14 6.21.41m-9.13 0V4.04A2 2 0 0 1 11.08 2h1.84a2 2 0 0 1 2 2.04v1.37"/></svg>';
+    }
+
+    function trashIconVariantDefs() {
+      return [
+        { name: 'original_inline', inlineSvg: originalTrashIconSvg() },
+        { name: 'akar-icons_trash-can', file: 'akar-icons_trash-can.svg' },
+        { name: 'bi_trash', file: 'bi_trash.svg' },
+        { name: 'bi_trash3', file: 'bi_trash3.svg' },
+        { name: 'fluent_delete-24-regular', file: 'fluent_delete-24-regular.svg' },
+        { name: 'heroicons-outline_trash', file: 'heroicons-outline_trash.svg' },
+        { name: 'ion_trash-outline', file: 'ion_trash-outline.svg' },
+        { name: 'lucide_trash-2', file: 'lucide_trash-2.svg' },
+        { name: 'lucide_trash', file: 'lucide_trash.svg' },
+        { name: 'mdi_delete-outline', file: 'mdi_delete-outline.svg' },
+        { name: 'mdi_trash-can-outline', file: 'mdi_trash-can-outline.svg' },
+        { name: 'mingcute_delete-2-line', file: 'mingcute_delete-2-line.svg' },
+        { name: 'ri_delete-bin-6-line', file: 'ri_delete-bin-6-line.svg' },
+        { name: 'ri_delete-bin-line', file: 'ri_delete-bin-line.svg' },
+        { name: 'tabler_trash', file: 'tabler_trash.svg' }
+      ];
+    }
+
+    function normalizeTrashIconSvg(raw) {
+      var svg = String(raw || '').trim();
+      if (!svg) {
+        return '';
+      }
+      svg = svg.replace(/^\uFEFF/, '');
+      svg = svg.replace(/<\?xml[^>]*>\s*/i, '');
+      svg = svg.replace(/<!DOCTYPE[^>]*>\s*/i, '');
+      if (svg.indexOf('<svg') < 0) {
+        return '';
+      }
+      svg = svg.replace(/<svg\b([^>]*)>/i, function (_match, attrs) {
+        var nextAttrs = String(attrs || '');
+        if (/\bclass\s*=/.test(nextAttrs)) {
+          nextAttrs = nextAttrs.replace(/\bclass\s*=\s*(['"])(.*?)\1/i, function (_m, q, classes) {
+            return 'class=' + q + classes + ' trash-icon-svg' + q;
+          });
+        } else {
+          nextAttrs += ' class="trash-icon-svg"';
+        }
+        if (!/\baria-hidden\s*=/.test(nextAttrs)) {
+          nextAttrs += ' aria-hidden="true"';
+        }
+        if (!/\bfocusable\s*=/.test(nextAttrs)) {
+          nextAttrs += ' focusable="false"';
+        }
+        return '<svg' + nextAttrs + '>';
+      });
+      return svg;
+    }
+
+    function currentTrashIconVariant() {
+      var variants = trashIconVariantDefs();
+      var index = Number(state.trashIconVariantIndex) || 0;
+      if (index < 0 || index >= variants.length) {
+        index = 0;
+      }
+      return variants[index];
+    }
+
+    function currentTrashIconSvg() {
+      var variant = currentTrashIconVariant();
+      if (!variant) {
+        return originalTrashIconSvg();
+      }
+      if (variant.inlineSvg) {
+        return variant.inlineSvg;
+      }
+      var cached = state.trashIconSvgByName[variant.name];
+      if (cached) {
+        return cached;
+      }
+      return originalTrashIconSvg();
+    }
+
+    function updateTrashIconDisplayLabel() {
+      var label = document.getElementById('trash-icon-current');
+      if (!label) {
+        return;
+      }
+      var variant = currentTrashIconVariant();
+      label.textContent = variant ? ('trash icon: ' + variant.name) : 'trash icon: original_inline';
+    }
+
+    async function loadTrashIconVariantSvg(variant) {
+      if (!variant || !variant.file) {
+        return;
+      }
+      if (state.trashIconSvgByName[variant.name]) {
+        return;
+      }
+      try {
+        var response = await fetch('assets/trash-icons/' + variant.file);
+        if (!response || !response.ok) {
+          return;
+        }
+        var raw = await response.text();
+        var normalized = normalizeTrashIconSvg(raw);
+        if (normalized) {
+          state.trashIconSvgByName[variant.name] = normalized;
+        }
+      } catch (_) {
+        // Ignore temporary trash icon fetch failures.
+      }
+    }
+
+    async function cycleTrashIconVariant() {
+      var variants = trashIconVariantDefs();
+      if (!variants.length) {
+        return;
+      }
+      var nextIndex = (Number(state.trashIconVariantIndex) + 1 + variants.length) % variants.length;
+      state.trashIconVariantIndex = nextIndex;
+      var nextVariant = variants[nextIndex];
+      await loadTrashIconVariantSvg(nextVariant);
+      updateTrashIconDisplayLabel();
+      render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+    }
+
     function pulseCopyButton() {
       var btn = document.getElementById('copy-markdown');
       if (!btn) {
@@ -3012,7 +3139,7 @@
           var deleteItem = document.createElement('button');
           deleteItem.type = 'button';
           deleteItem.className = 'row-menu-item danger';
-          deleteItem.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.74 9l-.35 9m-4.78 0L9.26 9m9.97-3.21c.34.05.68.1 1.02.16M4.77 5.79c.34-.06.68-.11 1.02-.16m0 0L6.85 19.67A2 2 0 0 0 8.84 21h6.32a2 2 0 0 0 1.99-1.83l1.06-13.54M5.79 5.63A48.1 48.1 0 0 1 12 5c2.12 0 4.2.14 6.21.41m-9.13 0V4.04A2 2 0 0 1 11.08 2h1.84a2 2 0 0 1 2 2.04v1.37" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Delete...</span>';
+          deleteItem.innerHTML = currentTrashIconSvg() + '<span>Delete...</span>';
           deleteItem.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -3047,7 +3174,7 @@
         trash.type = 'button';
         trash.className = 'btn trash';
         trash.title = 'Delete';
-        trash.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.35 9m-4.78 0L9.26 9m9.97-3.21c.34.05.68.1 1.02.16M4.77 5.79c.34-.06.68-.11 1.02-.16m0 0L6.85 19.67A2 2 0 0 0 8.84 21h6.32a2 2 0 0 0 1.99-1.83l1.06-13.54M5.79 5.63A48.1 48.1 0 0 1 12 5c2.12 0 4.2.14 6.21.41m-9.13 0V4.04A2 2 0 0 1 11.08 2h1.84a2 2 0 0 1 2 2.04v1.37"/></svg>';
+        trash.innerHTML = currentTrashIconSvg();
         trash.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
@@ -4028,6 +4155,21 @@
       document.getElementById('copy-markdown').addEventListener('click', function () {
         copyVisiblePrioritiesAsMarkdown();
       });
+      var trashCycleBtn = document.getElementById('trash-icon-cycle');
+      if (trashCycleBtn) {
+        trashCycleBtn.addEventListener('click', function () {
+          cycleTrashIconVariant();
+        });
+      }
+      updateTrashIconDisplayLabel();
+      (function preloadTrashIcons() {
+        var variants = trashIconVariantDefs();
+        for (var i = 0; i < variants.length; i += 1) {
+          if (variants[i].file) {
+            loadTrashIconVariantSvg(variants[i]);
+          }
+        }
+      })();
       var titleFolder = document.getElementById('title-folder');
       var titleCluster = document.querySelector('.title-cluster');
       var titleLastOpenAt = 0;
