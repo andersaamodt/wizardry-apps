@@ -5389,17 +5389,17 @@
       return Promise.resolve(null);
     }
 
+    stopDictationInstallPolling();
+    state.dictationInstallBusy = false;
     state.dictationInstallCancelling = true;
     state.dictationInstallError = "";
+    state.dictationInstallJob = null;
     renderUi();
-    return apiPost("dictation_install_cancel", { job_id: jobId }, { timeoutMs: 12000 }).then(function (response) {
+    return apiPost("dictation_install_cancel", { job_id: jobId }, { timeoutMs: 4000 }).then(function (response) {
       if (!response || !response.success) {
         throw new Error((response && response.error) || "Could not cancel dictation install");
       }
-      stopDictationInstallPolling();
-      state.dictationInstallBusy = false;
       state.dictationInstallCancelling = false;
-      state.dictationInstallJob = null;
       state.dictationInstallError = "";
       return loadDictationStatus({ silent: true }).then(function () {
         showTransientNotice("Dictation install cancelled");
@@ -5408,10 +5408,12 @@
       });
     }).catch(function (error) {
       state.dictationInstallCancelling = false;
-      state.dictationInstallError = error && error.message ? error.message : "Could not cancel dictation install";
-      showTransientNotice(state.dictationInstallError);
-      renderUi();
-      throw error;
+      return loadDictationStatus({ silent: true }).then(function () {
+        state.dictationInstallError = "";
+        renderUi();
+        showTransientNotice("Cancel request sent");
+        return null;
+      });
     });
   }
 
