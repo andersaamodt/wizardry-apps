@@ -13187,8 +13187,10 @@ EOF
       running_status=$(read_file_line "$existing_job/status" "")
       running_pid=$(read_file_line "$existing_job/pid" "")
       if [ "$running_status" = "running" ] && [ -n "$running_pid" ] && kill -0 "$running_pid" 2>/dev/null; then
-        printf '{"success":true,"job":{"id":"%s","status":"running","action":"install","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
+        running_phase=$(read_file_line "$existing_job/phase_last" "downloading")
+        printf '{"success":true,"job":{"id":"%s","status":"running","action":"install","phase":"%s","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
           "$(json_escape "$(basename "$existing_job")")" \
+          "$(json_escape "$running_phase")" \
           "$(json_escape "$(read_file_line "$existing_job/component" "$install_component")")" \
           "$(json_escape "$(read_file_line "$existing_job/fallback_component" "$fallback_component")")" \
           "$(json_escape "$(read_file_line "$existing_job/download_size_bytes" "")")"
@@ -13325,7 +13327,7 @@ EOF_RUNNER
     install_pid=$(spawn_detached_job "$runner_script" "$job_dir" "$log_file" "$install_component" "$primary_bin" "$fallback_component" "$fallback_bin" "1800" "$force_macos_arm64_uname" "$VOICE_RECOGNITION_ROOT_DIR")
     printf '%s\n' "$install_pid" > "$job_dir/pid"
 
-    printf '{"success":true,"job":{"id":"%s","status":"running","action":"install","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
+    printf '{"success":true,"job":{"id":"%s","status":"running","action":"install","phase":"downloading","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
       "$(json_escape "$job_id")" \
       "$(json_escape "$install_component")" \
       "$(json_escape "$fallback_component")" \

@@ -12442,6 +12442,9 @@
       buttonLabel = "Cancelling...";
     } else if (runningInstall) {
       var phase = trim(String(job && job.phase ? job.phase : ""));
+      if (!phase) {
+        phase = "downloading";
+      }
       if (phase === "downloading" || phase === "preparing" || phase === "fallback") {
         buttonLabel = "Cancel download";
       } else {
