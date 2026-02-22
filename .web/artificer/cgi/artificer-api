@@ -5182,6 +5182,29 @@ voice_component_installed() {
   [ -f "$state_file" ] && [ -x "$python_bin" ]
 }
 
+voice_runtime_root_path() {
+  root=$VOICE_RECOGNITION_ROOT_DIR
+  root=$(trim "$root")
+  case "$root" in
+    ""|"/"|".")
+      return 1
+      ;;
+  esac
+  printf '%s' "$root"
+}
+
+remove_voice_runtime_root() {
+  root=$(voice_runtime_root_path 2>/dev/null || true)
+  if [ -z "$root" ]; then
+    return 1
+  fi
+  if [ ! -d "$root" ]; then
+    return 0
+  fi
+  rm -rf "$root" 2>/dev/null || return 1
+  return 0
+}
+
 preferred_voice_component_for_host() {
   if voice_host_is_macos_arm64; then
     printf '%s' "mlx-whisper"
@@ -12705,6 +12728,11 @@ EOF
       removed_any=1
       removed_json="$removed_json\"$(json_escape "$component")\""
     done
+
+    if ! remove_voice_runtime_root; then
+      emit_error "Dictation uninstall could not remove local voice-recognition data."
+      exit 0
+    fi
 
     backend_after=$(installed_voice_backend_for_host || true)
 
