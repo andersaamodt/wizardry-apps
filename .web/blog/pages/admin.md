@@ -298,7 +298,7 @@ title: Blog Admin
 <style>
 body {
   max-width: 1240px;
-  padding: 0 1.15rem 2rem;
+  padding: 0 0 2rem;
 }
 
 .admin-access-message {
@@ -325,7 +325,7 @@ body {
 .admin-layout {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
-  gap: 1.25rem;
+  gap: 0;
   align-items: stretch;
   min-height: calc(100vh - 3.25rem);
 }
@@ -348,6 +348,8 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+  margin: 0;
+  padding: 0;
   border: 0;
   border-radius: 0;
   overflow: visible;
@@ -365,7 +367,7 @@ body {
   border-bottom: 0;
   background: transparent;
   color: #1e2d4e;
-  padding: 0.56rem 0.64rem;
+  padding: 0.56rem 0.4rem;
   font-size: 0.93rem;
   font-weight: 650;
   line-height: 1.25;
@@ -402,6 +404,7 @@ body {
 
 .admin-content {
   min-width: 0;
+  padding-left: 1.25rem;
 }
 
 #admin-panel.account-only {
@@ -1130,6 +1133,10 @@ body {
     position: static;
     min-height: 0;
     border-right: 0;
+  }
+
+  .admin-content {
+    padding-left: 0;
   }
 }
 
