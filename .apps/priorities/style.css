@@ -16,7 +16,6 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  scrollbar-gutter: stable both-edges;
   background: radial-gradient(circle at top right, var(--light-bg, #f8f7fc), var(--bg, #eceaf4) 42%);
   color: var(--text, #2a2e47);
   font-family: var(--app-font-family, "Avenir Next", "Segoe UI", sans-serif);
