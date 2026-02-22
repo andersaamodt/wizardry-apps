@@ -1231,15 +1231,15 @@ input[type="checkbox"]:disabled {
 .selected-title-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.46rem;
-  row-gap: 0.2rem;
   min-height: 1.7rem;
   min-width: 0;
   overflow: hidden;
 }
 
 #selected-title {
+  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   white-space: nowrap;
@@ -1250,6 +1250,8 @@ input[type="checkbox"]:disabled {
 .suite-badge {
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: 0.32rem;
   border: 1px solid var(--pill-purple-border);
   border-radius: 999px;
@@ -1286,6 +1288,8 @@ input[type="checkbox"]:disabled {
 .type-badge {
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: 0.32rem;
   border: 1px solid var(--pill-blue-border);
   border-radius: 999px;
@@ -1335,14 +1339,47 @@ input[type="checkbox"]:disabled {
   display: inline-grid;
   grid-template-columns: minmax(1.45rem, 1fr) auto;
   align-items: center;
-  max-width: min(14rem, 100%);
+  max-width: min(14rem, 34vw);
   column-gap: 0.62rem;
   margin-top: 0;
-  margin-left: 0;
+  margin-left: auto;
   min-width: calc(1.45rem + 1.45rem + 0.62rem);
-  flex: 0 0 100%;
+  flex: 0 0 auto;
   overflow: hidden;
   -webkit-app-region: no-drag;
+}
+
+.selected-title-row.badges-compact .type-badge,
+.selected-title-row.badges-compact .suite-badge {
+  width: 0.95rem;
+  min-width: 0.95rem;
+  height: 0.95rem;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+}
+
+.selected-title-row.badges-compact .type-badge > span,
+.selected-title-row.badges-compact .suite-badge > span {
+  display: none;
+}
+
+.selected-title-row.badges-compact .type-badge::before,
+.selected-title-row.badges-compact .suite-badge::before {
+  content: "";
+  width: 0.46rem;
+  height: 0.46rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.92;
+}
+
+.selected-title-row.badges-hide-suite .suite-badge {
+  display: none;
+}
+
+.selected-title-row.badges-hide-all .type-badge {
+  display: none;
 }
 
 .path-link {

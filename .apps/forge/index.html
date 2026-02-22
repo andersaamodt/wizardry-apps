@@ -1172,6 +1172,29 @@
         }
       }
 
+      function syncSelectedHeaderCompactMode() {
+        if (!els.selectedTitleRow) {
+          return;
+        }
+        var row = els.selectedTitleRow;
+        row.classList.remove('badges-compact', 'badges-hide-suite', 'badges-hide-all');
+        if (row.classList.contains('hidden')) {
+          return;
+        }
+        if (row.scrollWidth <= row.clientWidth + 1) {
+          return;
+        }
+        row.classList.add('badges-compact');
+        if (row.scrollWidth <= row.clientWidth + 1) {
+          return;
+        }
+        row.classList.add('badges-hide-suite');
+        if (row.scrollWidth <= row.clientWidth + 1) {
+          return;
+        }
+        row.classList.add('badges-hide-all');
+      }
+
       function scheduleSelectedPathCompactSync() {
         if (state.pathCompactTimer) {
           clearTimeout(state.pathCompactTimer);
@@ -1179,6 +1202,7 @@
         state.pathCompactTimer = setTimeout(function () {
           state.pathCompactTimer = null;
           syncSelectedPathCompactMode();
+          syncSelectedHeaderCompactMode();
         }, 0);
       }
 
@@ -1934,6 +1958,7 @@
           if (els.selectedTargetsEditor) {
             els.selectedTargetsEditor.classList.add('hidden');
           }
+          scheduleSelectedPathCompactSync();
           renderSelectedIconEditor(null);
           return;
         }
@@ -1971,7 +1996,6 @@
             els.openSelectedPath.dataset.path = selected.path;
             els.openSelectedPath.classList.remove('is-compact');
             els.openSelectedPath.classList.remove('hidden');
-            scheduleSelectedPathCompactSync();
           } else {
             text(els.openSelectedPath, '');
             els.openSelectedPath.title = 'Path (click to copy, double-click to open)';
@@ -1983,6 +2007,7 @@
         if (els.terminalSelectedPath) {
           els.terminalSelectedPath.classList.toggle('hidden', !selected.path);
         }
+        scheduleSelectedPathCompactSync();
         renderSelectedTargetsEditor(selected);
         renderSelectedIconEditor(selected);
         scheduleWindowFit();
@@ -4078,6 +4103,7 @@
 
         els.selectedAppGrid = document.getElementById('selected-app-grid');
         els.selectedTitle = document.getElementById('selected-title');
+        els.selectedTitleRow = document.querySelector('#stage-tools .selected-title-row');
         els.selectedTypeBadge = document.getElementById('selected-type-badge');
         els.selectedSuiteBadge = document.getElementById('selected-suite-badge');
         els.selectedPathRow = document.querySelector('#stage-tools .selected-path-row');
