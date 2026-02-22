@@ -2,6 +2,15 @@
 title: ""
 pagetitle: "Artificer"
 ---
+<style>
+html,
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  max-width: none;
+}
+</style>
 <link rel="stylesheet" href="/static/style.css?v=20260222-runorder5" />
 <link id="artificer-theme-stylesheet" rel="stylesheet" href="/static/themes/psionic.css" />
 <div class="forge-shell" id="forge-shell">
