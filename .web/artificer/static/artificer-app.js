@@ -12777,6 +12777,9 @@
 
     if (!jobId) {
       state.dictationInstallPendingCancel = true;
+      state.dictationInstallCancelling = false;
+      state.dictationInstallBusy = false;
+      renderUi();
       return Promise.resolve(null);
     }
 
