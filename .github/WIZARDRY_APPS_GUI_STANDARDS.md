@@ -1,0 +1,70 @@
+# Wizardry Apps GUI Standards (AI-Facing)
+
+## Scope
+- This file defines GUI implementation standards for Wizardry desktop and hosted app surfaces.
+- Use this with `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_ETHOS.md`.
+
+## Core GUI Posture
+- GUIs are operational consoles, not decorative wrappers detached from backend truth.
+- A GUI action should map to one explicit backend action whenever possible.
+- Keep flows legible: users should understand what action just ran and what changed.
+- Keep startup resilient: detect bridge readiness and retry gracefully before failing hard.
+
+## Command and Bridge Rules
+- Bridge calls use explicit argv arrays passed to `wizardry.rpc('bridge.exec', { argv })`.
+- Commands are selected from code-defined allowlists, not free-form user text.
+- Avoid building shell fragments from user input; prefer positional args.
+- Keep backend entrypoints in `scripts/*-backend.sh` and expose stable action names.
+- Return machine-readable output for structured UI paths and plain text for logs.
+
+## Storage Rules
+- Desktop persistence goes through backend `get-ui-prefs` and `set-ui-pref` style actions.
+- Persisted values live in plaintext key-value files under XDG config/state roots.
+- Browser `localStorage` is not a desktop durability layer.
+- In hosted-web-first apps, `localStorage` use can be acceptable when documented.
+- Cache values in memory first, then sync to backend on change.
+
+## Workflow Design Rules
+- Replace “go do X and come back” with in-app guided workflows.
+- Multi-step flows should expose current step, next step, and completion criteria.
+- If an external action is required, pair instruction with immediate verification control.
+- Gate sensitive actions behind explicit confirmation in the same interface.
+- Surface undo/revert actions when behavior is irreversible or high-impact.
+
+## Feedback and Error Handling
+- Show command status, outcome, and stderr/stdout context in-app.
+- Keep status text factual and non-imperative.
+- Prefer progress + result messaging over silent background work.
+- Use short toasts for confirmation and durable panels for actionable errors.
+- Keep logs inspectable and copyable from the GUI.
+
+## Discoverability and Navigation
+- Keep primary actions visible without deep nesting.
+- Group actions by user intent, not by internal implementation layers.
+- Keep settings easy to find and clearly separate global vs project state.
+- Use consistent labels for repeated concepts across apps.
+- Prefer one-screen comprehension over hidden routes and modal mazes.
+
+## Port and Runtime Safety
+- Never hardcode a fixed localhost port for embedded site URLs.
+- Resolve runtime port from canonical config files like `site.conf`.
+- Handle port conflicts by selecting safe alternatives through backend actions.
+- Show the resolved runtime endpoint in the UI when it matters.
+
+## File and Path Conventions
+- Keep app entrypoint at `.apps/<slug>/index.html`.
+- Keep app backend at `.apps/<slug>/scripts/<slug>-backend.sh` when backend logic exists.
+- Keep app-scoped docs in `.apps/<slug>/README.md` for runtime paths and operator notes.
+- Keep naming consistent with hyphenated app slugs.
+
+## Accessibility and Input Ergonomics
+- Use semantic controls and keyboard-operable interactions.
+- Keep focus states visible and modal escape paths obvious.
+- Avoid click-only critical actions; support keyboard submission where practical.
+- Keep motion subtle and meaningful, never required for comprehension.
+
+## AI Agent Delivery Rules
+- Prefer surgical edits that preserve each app’s existing visual language.
+- Extend shared patterns already present in Forge/Priorities/Virtual Redditor first.
+- When introducing a new pattern, document it in this file within the same change.
+- Avoid speculative frameworks or architectural rewrites without explicit user request.
