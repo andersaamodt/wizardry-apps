@@ -561,10 +561,11 @@ button:hover {
 }
 
 .tree {
+  --pri-lane: calc(28px * var(--ui-scale));
   display: grid;
   gap: 0;
-  padding-left: calc(14px * var(--ui-scale));
-  padding-right: calc(14px * var(--ui-scale));
+  padding-left: calc(8px * var(--ui-scale));
+  padding-right: calc(8px * var(--ui-scale));
   justify-items: center;
 }
 
@@ -600,8 +601,8 @@ button:hover {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(-36px * var(--ui-scale));
-  width: calc(36px * var(--ui-scale));
+  left: calc(-1 * var(--pri-lane));
+  width: var(--pri-lane);
 }
 
 .row.row-expandable {
@@ -679,7 +680,7 @@ button:hover {
   width: calc(28px * var(--ui-scale));
   height: calc(28px * var(--ui-scale));
   font-size: calc(18px * var(--ui-scale));
-  left: calc(-31px * var(--ui-scale));
+  left: calc((var(--pri-lane) + (28px * var(--ui-scale))) / -2);
 }
 
 .row-subtask .btn.exp {
@@ -916,7 +917,7 @@ button:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: calc(100vw - (170px * var(--ui-scale)));
+  max-width: calc(100vw - (150px * var(--ui-scale)));
   cursor: text;
 }
 
@@ -954,7 +955,7 @@ button:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: calc(100vw - (170px * var(--ui-scale)));
+  max-width: calc(100vw - (150px * var(--ui-scale)));
 }
 
 .next-action.next-action-first-pill {
@@ -997,7 +998,7 @@ button:hover {
   width: calc(34px * var(--ui-scale));
   height: calc(34px * var(--ui-scale));
   position: absolute;
-  left: calc(-34px * var(--ui-scale));
+  left: calc((var(--pri-lane) + (34px * var(--ui-scale))) / -2);
   top: 50%;
   transform: translateY(-50%);
   border-radius: calc(8px * var(--ui-scale));
