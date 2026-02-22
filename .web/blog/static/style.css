@@ -57,6 +57,23 @@ body.auth-modal-open {
   overflow: hidden;
 }
 
+/* In desktop frameless shells, explicitly mark page UI as non-draggable. */
+html,
+body,
+nav,
+nav *,
+main,
+main *,
+button,
+a,
+input,
+select,
+textarea,
+summary,
+[role="button"] {
+  -webkit-app-region: no-drag;
+}
+
 a[href],
 button,
 input[type="button"],
@@ -263,6 +280,37 @@ header h1 {
   padding: 0.5rem 1rem;
   border-radius: 6px;
   transition: background-color 0.2s ease, color 0.2s ease, transform 0.3s ease;
+}
+
+.nav-settings {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.3s ease;
+}
+
+.nav-settings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border-radius: 9px;
+}
+
+.nav-settings-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.nav-settings:hover {
+  background-color: var(--light-bg);
+  color: var(--accent);
+  text-decoration: none;
 }
 
 .nav-compose-icon {
@@ -1871,6 +1919,7 @@ nav.site-nav {
   .btn-login,
   .nav-user-menu,
   .nav-menu-btn,
+  .nav-settings,
   .nav-compose,
   .nav-username {
     flex: 0 0 auto;
@@ -1940,6 +1989,7 @@ nav.site-nav {
   nav.site-nav .btn-login,
   nav.site-nav .nav-user-menu,
   nav.site-nav .nav-menu-btn,
+  nav.site-nav .nav-settings,
   nav.site-nav .nav-compose,
   nav.site-nav .nav-username,
   .tag-cloud .tag {
