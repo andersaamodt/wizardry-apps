@@ -200,7 +200,7 @@
     }
 
     async function persistUiPref(prefName, value) {
-      if (!prefName || !hasBridge()) {
+      if (!prefName) {
         return;
       }
       try {
@@ -211,10 +211,6 @@
     }
 
     async function loadUiPrefs() {
-      if (!hasBridge()) {
-        state.uiPrefs = {};
-        return;
-      }
       try {
         var result = await runBackend(['get-ui-prefs']);
         state.uiPrefs = parseKeyValueText((result && result.stdout) || '');
