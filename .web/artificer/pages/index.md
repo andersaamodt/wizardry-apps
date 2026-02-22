@@ -388,6 +388,11 @@ pagetitle: "Artificer"
 <input id="llm-use-gpu-toggle" type="checkbox" checked /> Use GPU acceleration for LLMs
 </label>
 <p class="settings-hint">Applies to Ollama inference on macOS (Metal) and Linux (CUDA/ROCm when available).</p>
+<div class="modal-actions modal-actions-compact">
+<button id="install-dictation-btn" type="button">Install dictation (1.4 GB)</button>
+</div>
+<p class="settings-hint">Installs local dictation. On Apple Silicon macOS this uses MLX Whisper automatically.</p>
+<p id="dictation-install-status" class="settings-hint hidden"></p>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
 <label for="ssh-email">SSH key email/comment (optional)</label>
@@ -549,4 +554,4 @@ pagetitle: "Artificer"
 </div>
 </div>
 
-<script src="/static/artificer-app.js?v=20260222-runorder6"></script>
+<script src="/static/artificer-app.js?v=20260222-runorder12"></script>

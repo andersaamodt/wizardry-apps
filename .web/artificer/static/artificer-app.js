@@ -465,6 +465,15 @@
     pendingArchiveSubmittingKey: "",
     pendingAttachments: [],
     dictateBusy: false,
+    dictationInstallReady: false,
+    dictationInstallInfo: null,
+    dictationInstallInfoLoading: false,
+    dictationInstallBusy: false,
+    dictationInstallJob: null,
+    dictationInstallError: "",
+    dictationInstalled: false,
+    dictationBackend: "",
+    dictationPreferredBackend: "",
     composerDragDepth: 0,
     awaitingDirPicker: false,
     modelDataLoading: true,
@@ -536,6 +545,7 @@
   var liveRunTickTimer = null;
   var runStreamPollTimers = {};
   var modelInstallPollTimer = null;
+  var dictationInstallPollTimer = null;
   var modelAutoRefreshTimer = null;
   var modelAutoRefreshBusy = false;
   var modelAutoRefreshLastAt = 0;
@@ -567,6 +577,7 @@
   var pendingCommandApproval = null;
   var approvalAnswerPending = false;
   var TOOLTIP_DELAY_MS = 520;
+  var DICTATION_INSTALL_SIZE_LABEL = "1.4 GB";
   var stateGetInFlight = null;
   var stateGetInFlightKey = "";
 
@@ -801,6 +812,8 @@
     githubUsername: document.getElementById("github-username"),
     sshEmail: document.getElementById("ssh-email"),
     refreshAuthBtn: document.getElementById("refresh-auth-btn"),
+    installDictationBtn: document.getElementById("install-dictation-btn"),
+    dictationInstallStatus: document.getElementById("dictation-install-status"),
     generateSshBtn: document.getElementById("generate-ssh-btn"),
     chooseSshBtn: document.getElementById("choose-ssh-btn"),
     clearSshBtn: document.getElementById("clear-ssh-btn"),
@@ -8311,6 +8324,7 @@
     safeStep("renderRunTodoMonitor", renderRunTodoMonitor);
     safeStep("renderQueueTray", renderQueueTray);
     safeStep("renderRunTerminalMonitor", renderRunTerminalMonitor);
+    safeStep("renderDictationInstallSettings", renderDictationInstallSettings);
     safeStep("renderCommandRulesSettings", renderCommandRulesSettings);
     safeStep("renderModeRuntimeSettings", renderModeRuntimeSettings);
     safeStep("renderMultiAgentModal", renderMultiAgentModal);
@@ -12213,6 +12227,319 @@
     });
   }
 
+  function dictationBackendLabel(backendName) {
+    var backend = trim(String(backendName || ""));
+    if (!backend) {
+      return "";
+    }
+    if (backend === "mlx-whisper") {
+      return "MLX Whisper";
+    }
+    if (backend === "parakeet") {
+      return "Parakeet";
+    }
+    if (backend === "ctranslate2-whisper") {
+      return "CTranslate2 Whisper";
+    }
+    return backend;
+  }
+
+  function dictationInstallButtonLabel() {
+    if (state.dictationInstalled) {
+      return "Uninstall dictation";
+    }
+    return "Install dictation (" + DICTATION_INSTALL_SIZE_LABEL + ")";
+  }
+
+  function dictationInstallRunningButtonLabel(job) {
+    var action = trim(String(job && job.action ? job.action : ""));
+    if (action === "uninstall") {
+      return "Uninstalling dictation";
+    }
+    var pct = numericProgressPercent(job && job.progress_pct);
+    if (pct < 0) {
+      pct = 0;
+    }
+    if (pct > 100) {
+      pct = 100;
+    }
+    return "Downloading dictation " + String(pct) + "%";
+  }
+
+  function loadDictationStatus(options) {
+    var opts = options && typeof options === "object" ? options : {};
+    var silent = !!opts.silent;
+    state.dictationInstallInfoLoading = true;
+    renderDictationInstallSettings();
+    return apiGet("dictation_status", {}, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not load dictation status");
+      }
+      var backend = trim(String(response.backend || ""));
+      var preferred = trim(String(response.preferred || ""));
+      var preferredInstalled = response.installed === true;
+      if (preferred && backend && backend !== preferred) {
+        preferredInstalled = false;
+      }
+      state.dictationInstallInfo = response;
+      state.dictationInstalled = preferredInstalled;
+      state.dictationBackend = backend;
+      state.dictationPreferredBackend = preferred;
+      state.dictationInstallError = "";
+      return response;
+    }).catch(function (error) {
+      state.dictationInstallInfo = null;
+      state.dictationInstallError = error && error.message ? error.message : "Could not load dictation status";
+      if (silent) {
+        return null;
+      }
+      state.dictationInstalled = false;
+      state.dictationBackend = "";
+      state.dictationPreferredBackend = "";
+      throw error;
+    }).finally(function () {
+      state.dictationInstallInfoLoading = false;
+      renderDictationInstallSettings();
+    });
+  }
+
+  function renderDictationInstallSettings() {
+    if (!el.installDictationBtn) {
+      return;
+    }
+
+    var job = state.dictationInstallJob || null;
+    var loading = !!state.dictationInstallInfoLoading;
+    var busy = !!state.dictationInstallBusy;
+    var status = String(job && job.status ? job.status : "");
+    var showRunning = busy || status === "running";
+    var buttonLabel = dictationInstallButtonLabel();
+    if (showRunning) {
+      buttonLabel = dictationInstallRunningButtonLabel(job);
+    }
+
+    el.installDictationBtn.textContent = buttonLabel;
+    el.installDictationBtn.disabled = !state.dictationInstallReady || busy;
+    el.installDictationBtn.classList.remove("ui-pending-spinner");
+
+    if (el.dictationInstallStatus) {
+      var statusText = trim(String(state.dictationInstallError || ""));
+      var isError = !!statusText;
+      if (!statusText && !state.dictationInstallReady) {
+        statusText = "Preparing installer...";
+      }
+      if (!statusText && state.dictationInstalled) {
+        var installedLabel = dictationBackendLabel(state.dictationBackend || "");
+        if (installedLabel) {
+          statusText = "Installed backend: " + installedLabel + ".";
+        } else {
+          statusText = "Dictation is installed.";
+        }
+      }
+      if (statusText) {
+        el.dictationInstallStatus.textContent = statusText;
+        el.dictationInstallStatus.classList.remove("hidden");
+      } else {
+        el.dictationInstallStatus.textContent = "";
+        el.dictationInstallStatus.classList.add("hidden");
+      }
+      if (isError) {
+        el.dictationInstallStatus.classList.add("error");
+      } else {
+        el.dictationInstallStatus.classList.remove("error");
+      }
+    }
+  }
+
+  function stopDictationInstallPolling() {
+    if (dictationInstallPollTimer) {
+      clearInterval(dictationInstallPollTimer);
+      dictationInstallPollTimer = null;
+    }
+  }
+
+  function pollDictationInstallStatus(jobId) {
+    var id = trim(String(jobId || ""));
+    if (!id) {
+      return Promise.resolve(null);
+    }
+    return apiGet("dictation_install_status", { job_id: id }, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success || !response.job) {
+        throw new Error((response && response.error) || "Could not load dictation install status");
+      }
+      state.dictationInstallJob = response.job;
+      var status = String(response.job.status || "");
+      if (status === "done") {
+        stopDictationInstallPolling();
+        state.dictationInstallBusy = false;
+        var installedBackend = trim(String(response.job.installed || response.job.component || response.job.backend || ""));
+        state.dictationInstalled = true;
+        state.dictationBackend = installedBackend;
+        state.dictationInstallJob = null;
+        state.dictationInstallError = "";
+        return loadDictationStatus().then(function (statusResponse) {
+          if (!state.dictationInstalled) {
+            throw new Error("Dictation install did not complete.");
+          }
+          var expectedBackend = trim(String(response.job.installed || response.job.component || installedBackend));
+          var activeBackend = trim(String((statusResponse && statusResponse.backend) || state.dictationBackend || installedBackend));
+          if (expectedBackend && activeBackend && activeBackend !== expectedBackend && !response.job.fallback) {
+            throw new Error("Dictation install finished, but " + dictationBackendLabel(expectedBackend) + " is not active.");
+          }
+          var backendLabel = dictationBackendLabel(activeBackend);
+          if (response.job.fallback && backendLabel) {
+            showTransientNotice("Dictation installed (" + backendLabel + " fallback)");
+          } else if (backendLabel) {
+            showTransientNotice("Dictation installed (" + backendLabel + ")");
+          } else {
+            showTransientNotice("Dictation installed");
+          }
+          renderUi();
+          return response.job;
+        });
+      }
+      if (status === "failed") {
+        stopDictationInstallPolling();
+        state.dictationInstallBusy = false;
+        state.dictationInstallJob = null;
+        renderUi();
+        var logText = trim(String(response.job.log || ""));
+        var tailLine = "";
+        if (logText) {
+          var logLines = logText.split("\n");
+          for (var i = logLines.length - 1; i >= 0; i -= 1) {
+            var candidate = trim(logLines[i] || "");
+            if (candidate) {
+              tailLine = candidate;
+              break;
+            }
+          }
+        }
+        state.dictationInstallError = tailLine || "Dictation install failed";
+        showTransientNotice(state.dictationInstallError);
+        throw new Error(state.dictationInstallError);
+      }
+      renderDictationInstallSettings();
+      return response.job;
+    });
+  }
+
+  function startDictationInstallPolling(jobId) {
+    var id = trim(String(jobId || ""));
+    if (!id) {
+      return;
+    }
+    stopDictationInstallPolling();
+    dictationInstallPollTimer = setInterval(function () {
+      pollDictationInstallStatus(id).catch(function (error) {
+        stopDictationInstallPolling();
+        state.dictationInstallBusy = false;
+        state.dictationInstallError = error && error.message ? error.message : "Dictation install failed";
+        showTransientNotice(state.dictationInstallError);
+        renderUi();
+        showError(error);
+      });
+    }, 1200);
+  }
+
+  function installDictationSoftware() {
+    if (!state.dictationInstallReady) {
+      showTransientNotice("Preparing installer...");
+      return Promise.resolve(null);
+    }
+    if (state.dictationInstallBusy) {
+      return Promise.resolve(null);
+    }
+
+    state.dictationInstallBusy = true;
+    state.dictationInstallError = "";
+    state.dictationInstallJob = {
+      status: "running",
+      action: "install",
+      phase: "downloading",
+      progress_pct: "0"
+    };
+    renderUi();
+
+    return apiPost("dictation_install_start", {}, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success || !response.job || !response.job.id) {
+        throw new Error((response && response.error) || "Dictation install failed to start");
+      }
+      state.dictationInstallJob = response.job;
+      state.dictationInstallJob.action = "install";
+      startDictationInstallPolling(String(response.job.id || ""));
+      renderUi();
+      return pollDictationInstallStatus(String(response.job.id || "")).catch(function (error) {
+        stopDictationInstallPolling();
+        state.dictationInstallBusy = false;
+        renderUi();
+        throw error;
+      });
+    }).catch(function (error) {
+      stopDictationInstallPolling();
+      state.dictationInstallBusy = false;
+      state.dictationInstallJob = null;
+      state.dictationInstallError = error && error.message ? error.message : "Dictation install failed";
+      showTransientNotice(state.dictationInstallError);
+      renderUi();
+      throw error;
+    });
+  }
+
+  function uninstallDictationSoftware() {
+    if (!state.dictationInstallReady) {
+      showTransientNotice("Preparing installer...");
+      return Promise.resolve(null);
+    }
+    if (state.dictationInstallBusy) {
+      return Promise.resolve(null);
+    }
+
+    state.dictationInstallBusy = true;
+    state.dictationInstallError = "";
+    state.dictationInstallJob = {
+      status: "running",
+      action: "uninstall",
+      progress_pct: ""
+    };
+    renderUi();
+
+    return apiPost("dictation_uninstall", {}, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Dictation uninstall failed");
+      }
+      state.dictationInstallBusy = false;
+      state.dictationInstallJob = null;
+      state.dictationInstalled = false;
+      state.dictationBackend = "";
+      state.dictationPreferredBackend = "";
+      state.dictationInstallError = "";
+      renderUi();
+      showTransientNotice("Dictation uninstalled");
+      return loadDictationStatus({ silent: true }).then(function () {
+        renderUi();
+        return response;
+      });
+    }).catch(function (error) {
+      state.dictationInstallBusy = false;
+      state.dictationInstallJob = null;
+      state.dictationInstallError = error && error.message ? error.message : "Dictation uninstall failed";
+      showTransientNotice(state.dictationInstallError);
+      renderUi();
+      return loadDictationStatus({ silent: true }).then(function () {
+        renderUi();
+        throw error;
+      });
+    });
+  }
+
+  function toggleDictationSoftware() {
+    if (state.dictationInstalled) {
+      return uninstallDictationSoftware();
+    }
+    return installDictationSoftware();
+  }
+
   function loadModeRuntimeState() {
     state.modeRuntimeLoading = true;
     return apiGet("mode_runtime_state", {}, { timeoutMs: 12000 })
@@ -12653,16 +12980,46 @@
 
   function openSettingsModal() {
     openModal(el.settingsModal);
+    state.dictationInstallReady = false;
+    state.dictationInstallError = "";
     var preferredWorkspace = String(state.commandRulesWorkspaceId || state.activeWorkspaceId || "");
     if (!preferredWorkspace && state.workspaces.length) {
       preferredWorkspace = String((state.workspaces[0] && state.workspaces[0].id) || "");
     }
     state.commandRulesWorkspaceId = preferredWorkspace;
     renderCommandRulesSettings();
-    return Promise.all([
+    renderDictationInstallSettings();
+    var dictationReadySettled = false;
+    var dictationReadyTimer = null;
+    function markDictationReady() {
+      if (dictationReadySettled) {
+        return;
+      }
+      dictationReadySettled = true;
+      state.dictationInstallReady = true;
+      renderDictationInstallSettings();
+    }
+    dictationReadyTimer = setTimeout(function () {
+      markDictationReady();
+      dictationReadyTimer = null;
+    }, 1800);
+
+    var dictationBootstrap = Promise.all([
       loadAuthStatus().catch(function () {
         return null;
       }),
+      loadDictationStatus({ silent: true }).catch(function () {
+        return null;
+      })
+    ]).finally(function () {
+      if (dictationReadyTimer) {
+        clearTimeout(dictationReadyTimer);
+        dictationReadyTimer = null;
+      }
+      markDictationReady();
+    });
+
+    var settingsBootstrap = Promise.all([
       loadLlmRuntimeSettings().catch(function () {
         return null;
       }),
@@ -12672,7 +13029,14 @@
       loadModeRuntimeState().catch(function () {
         return null;
       })
-    ]);
+    });
+    return Promise.all([dictationBootstrap, settingsBootstrap]).finally(function () {
+      if (dictationReadyTimer) {
+        clearTimeout(dictationReadyTimer);
+        dictationReadyTimer = null;
+      }
+      markDictationReady();
+    });
   }
 
   function commandRuleDecisionLabel(decision) {
@@ -15899,6 +16263,12 @@
         return loadAuthStatus();
       }).catch(showError);
     });
+
+    if (el.installDictationBtn) {
+      on(el.installDictationBtn, "click", function () {
+        toggleDictationSoftware().catch(showError);
+      });
+    }
 
     if (el.modeRuntimeTickBtn) {
       on(el.modeRuntimeTickBtn, "click", function () {

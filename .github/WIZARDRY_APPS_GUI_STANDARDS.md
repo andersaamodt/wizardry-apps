@@ -72,6 +72,7 @@
 - Use semantic controls and keyboard-operable interactions.
 - Keep focus states visible and modal escape paths obvious.
 - Avoid click-only critical actions; support keyboard submission where practical.
+- Avoid defaulting buttons and short text-entry inputs to `width: 100%`; size them to content or a bounded width unless full-width is required by layout.
 - Keep motion subtle and meaningful, never required for comprehension.
 
 ## AI Agent Delivery Rules

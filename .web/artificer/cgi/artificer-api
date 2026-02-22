@@ -20,6 +20,7 @@ workspaces_dir="$data_root/workspaces"
 git_settings_dir="$data_root/git"
 selected_ssh_pub_file="$git_settings_dir/selected_ssh_pub"
 model_installs_dir="$data_root/model-installs"
+dictation_installs_dir="$data_root/dictation-installs"
 command_policy_root="$data_root/command-policy"
 terminal_sessions_root="$data_root/terminal-sessions"
 mode_runtime_root="$data_root/mode-runtime"
@@ -31,6 +32,7 @@ ALLOW_WEB=0
 
 mkdir -p "$workspaces_dir"
 mkdir -p "$model_installs_dir"
+mkdir -p "$dictation_installs_dir"
 mkdir -p "$command_policy_root"
 mkdir -p "$terminal_sessions_root"
 mkdir -p "$mode_runtime_root"
@@ -4913,6 +4915,14 @@ kv_get() {
 ARTIFICER_GIT_BIN=${ARTIFICER_GIT_BIN:-$WIZARDRY_DIR/spells/.arcana/ai-dev/artificer-git}
 AI_DEV_DIR=${AI_DEV_DIR:-$WIZARDRY_DIR/spells/.arcana/ai-dev}
 DICTATE_BIN=${DICTATE_BIN:-$WIZARDRY_DIR/spells/psi/dictate}
+VOICE_RECOGNITION_ROOT_DIR=${VOICE_RECOGNITION_ROOT_DIR:-$HOME/.wizardry/voice-recognition}
+VOICE_RECOGNITION_INSTALL_CTRANSLATE2_BIN=${VOICE_RECOGNITION_INSTALL_CTRANSLATE2_BIN:-$WIZARDRY_DIR/spells/.arcana/voice-recognition/install-ctranslate2-whisper}
+VOICE_RECOGNITION_INSTALL_MLX_BIN=${VOICE_RECOGNITION_INSTALL_MLX_BIN:-$WIZARDRY_DIR/spells/.arcana/voice-recognition/install-mlx-whisper}
+VOICE_RECOGNITION_INSTALL_PARAKEET_BIN=${VOICE_RECOGNITION_INSTALL_PARAKEET_BIN:-$WIZARDRY_DIR/spells/.arcana/voice-recognition/install-parakeet}
+VOICE_RECOGNITION_UNINSTALL_CTRANSLATE2_BIN=${VOICE_RECOGNITION_UNINSTALL_CTRANSLATE2_BIN:-$WIZARDRY_DIR/spells/.arcana/voice-recognition/uninstall-ctranslate2-whisper}
+VOICE_RECOGNITION_UNINSTALL_MLX_BIN=${VOICE_RECOGNITION_UNINSTALL_MLX_BIN:-$WIZARDRY_DIR/spells/.arcana/voice-recognition/uninstall-mlx-whisper}
+VOICE_RECOGNITION_UNINSTALL_PARAKEET_BIN=${VOICE_RECOGNITION_UNINSTALL_PARAKEET_BIN:-$WIZARDRY_DIR/spells/.arcana/voice-recognition/uninstall-parakeet}
+VOICE_RECOGNITION_BACKEND_BIN=${VOICE_RECOGNITION_BACKEND_BIN:-$WIZARDRY_DIR/spells/.arcana/voice-recognition/voice-recognition-backend}
 
 resolve_artificer_git_bin() {
   if [ -x "$ARTIFICER_GIT_BIN" ]; then
@@ -4969,6 +4979,221 @@ resolve_dictate_bin() {
   return 1
 }
 
+resolve_voice_recognition_install_bin() {
+  component=$1
+  configured_bin=""
+  command_name=""
+  case "$component" in
+    ctranslate2-whisper)
+      configured_bin=$VOICE_RECOGNITION_INSTALL_CTRANSLATE2_BIN
+      command_name="install-ctranslate2-whisper"
+      ;;
+    mlx-whisper)
+      configured_bin=$VOICE_RECOGNITION_INSTALL_MLX_BIN
+      command_name="install-mlx-whisper"
+      ;;
+    parakeet)
+      configured_bin=$VOICE_RECOGNITION_INSTALL_PARAKEET_BIN
+      command_name="install-parakeet"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  if [ -n "$configured_bin" ] && [ -x "$configured_bin" ]; then
+    printf '%s' "$configured_bin"
+    return 0
+  fi
+
+  if [ -n "$command_name" ] && command -v "$command_name" >/dev/null 2>&1; then
+    printf '%s' "$(command -v "$command_name")"
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_voice_recognition_uninstall_bin() {
+  component=$1
+  configured_bin=""
+  command_name=""
+  case "$component" in
+    ctranslate2-whisper)
+      configured_bin=$VOICE_RECOGNITION_UNINSTALL_CTRANSLATE2_BIN
+      command_name="uninstall-ctranslate2-whisper"
+      ;;
+    mlx-whisper)
+      configured_bin=$VOICE_RECOGNITION_UNINSTALL_MLX_BIN
+      command_name="uninstall-mlx-whisper"
+      ;;
+    parakeet)
+      configured_bin=$VOICE_RECOGNITION_UNINSTALL_PARAKEET_BIN
+      command_name="uninstall-parakeet"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  if [ -n "$configured_bin" ] && [ -x "$configured_bin" ]; then
+    printf '%s' "$configured_bin"
+    return 0
+  fi
+
+  if [ -n "$command_name" ] && command -v "$command_name" >/dev/null 2>&1; then
+    printf '%s' "$(command -v "$command_name")"
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_voice_recognition_backend_bin() {
+  if [ -x "$VOICE_RECOGNITION_BACKEND_BIN" ]; then
+    printf '%s' "$VOICE_RECOGNITION_BACKEND_BIN"
+    return 0
+  fi
+  if command -v voice-recognition-backend >/dev/null 2>&1; then
+    VOICE_RECOGNITION_BACKEND_BIN=$(command -v voice-recognition-backend)
+    printf '%s' "$VOICE_RECOGNITION_BACKEND_BIN"
+    return 0
+  fi
+  return 1
+}
+
+voice_host_is_macos_arm64() {
+  host_os=$(uname -s 2>/dev/null || printf 'unknown')
+  [ "$host_os" = "Darwin" ] || return 1
+
+  host_arch=$(uname -m 2>/dev/null || printf 'unknown')
+  case "$host_arch" in
+    arm64|aarch64)
+      return 0
+      ;;
+  esac
+
+  if command -v sysctl >/dev/null 2>&1; then
+    arm64_flag=$(sysctl -in hw.optional.arm64 2>/dev/null || printf '0')
+    [ "$arm64_flag" = "1" ] && return 0
+  fi
+
+  return 1
+}
+
+voice_needs_macos_arm64_uname_override() {
+  voice_host_is_macos_arm64 || return 1
+  host_arch=$(uname -m 2>/dev/null || printf 'unknown')
+  case "$host_arch" in
+    arm64|aarch64) return 1 ;;
+  esac
+  return 0
+}
+
+run_voice_component_command() {
+  component=$1
+  shift
+  if [ "$component" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
+    WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$@"
+    return $?
+  fi
+  "$@"
+}
+
+run_voice_backend_command() {
+  backend_bin=$1
+  shift
+  if voice_needs_macos_arm64_uname_override; then
+    WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$backend_bin" "$@"
+    return $?
+  fi
+  "$backend_bin" "$@"
+}
+
+voice_component_label() {
+  component=$1
+  case "$component" in
+    mlx-whisper)
+      printf '%s' "MLX Whisper"
+      ;;
+    parakeet)
+      printf '%s' "Parakeet"
+      ;;
+    ctranslate2-whisper)
+      printf '%s' "CTranslate2 Whisper"
+      ;;
+    *)
+      printf '%s' "$component"
+      ;;
+  esac
+}
+
+voice_component_download_size_bytes() {
+  component=$1
+  case "$component" in
+    mlx-whisper)
+      printf '%s' "1400000000"
+      ;;
+    parakeet)
+      printf '%s' "6200000000"
+      ;;
+    ctranslate2-whisper)
+      printf '%s' "1500000000"
+      ;;
+    *)
+      printf '%s' ""
+      ;;
+  esac
+}
+
+voice_component_state_file() {
+  component=$1
+  printf '%s/%s/installed\n' "$VOICE_RECOGNITION_ROOT_DIR" "$component"
+}
+
+voice_component_python_bin() {
+  component=$1
+  printf '%s/%s/venv/bin/python\n' "$VOICE_RECOGNITION_ROOT_DIR" "$component"
+}
+
+voice_component_installed() {
+  component=$1
+  state_file=$(voice_component_state_file "$component")
+  python_bin=$(voice_component_python_bin "$component")
+  [ -f "$state_file" ] && [ -x "$python_bin" ]
+}
+
+preferred_voice_component_for_host() {
+  if voice_host_is_macos_arm64; then
+    printf '%s' "mlx-whisper"
+    return 0
+  fi
+
+  host_os=$(uname -s 2>/dev/null || printf 'unknown')
+  if [ "$host_os" = "Linux" ] && command -v nvidia-smi >/dev/null 2>&1; then
+    if nvidia-smi -L >/dev/null 2>&1; then
+      printf '%s' "parakeet"
+      return 0
+    fi
+  fi
+
+  printf '%s' "ctranslate2-whisper"
+}
+
+installed_voice_backend_for_host() {
+  preferred_component=$(preferred_voice_component_for_host)
+
+  for component in "$preferred_component" ctranslate2-whisper mlx-whisper parakeet; do
+    [ -n "$component" ] || continue
+    if voice_component_installed "$component"; then
+      printf '%s' "$component"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 run_with_timeout() {
   timeout_sec=$1
   shift
@@ -4991,6 +5216,29 @@ run_with_timeout() {
     return $?
   fi
   "$@"
+}
+
+spawn_detached_job() {
+  if command -v setsid >/dev/null 2>&1; then
+    setsid "$@" >/dev/null 2>&1 < /dev/null &
+    printf '%s\n' "$!"
+    return 0
+  fi
+
+  if command -v perl >/dev/null 2>&1; then
+    perl -MPOSIX -e 'POSIX::setsid() or die "setsid failed: $!"; exec @ARGV or die "exec failed: $!";' "$@" >/dev/null 2>&1 < /dev/null &
+    printf '%s\n' "$!"
+    return 0
+  fi
+
+  if command -v nohup >/dev/null 2>&1; then
+    nohup "$@" >/dev/null 2>&1 < /dev/null &
+    printf '%s\n' "$!"
+    return 0
+  fi
+
+  "$@" >/dev/null 2>&1 < /dev/null &
+  printf '%s\n' "$!"
 }
 
 safe_model_name() {
@@ -5086,6 +5334,35 @@ infer_model_install_phase_progress() {
       if [ "$progress" -ge 100 ] 2>/dev/null; then
         phase="installing"
       fi
+    fi
+  fi
+  printf '%s|%s\n' "$phase" "$progress"
+}
+
+infer_dictation_install_phase_progress() {
+  log_text=$1
+  phase="downloading"
+  progress="0"
+  if [ -n "$log_text" ]; then
+    if printf '%s\n' "$log_text" | grep -Eiq 'creating virtual environment'; then
+      phase="preparing"
+      progress="18"
+    fi
+    if printf '%s\n' "$log_text" | grep -Eiq 'installing [a-z0-9-]+ packages'; then
+      phase="installing"
+      progress="52"
+    fi
+    if printf '%s\n' "$log_text" | grep -Eiq 'preparing local model cache'; then
+      phase="downloading"
+      progress="82"
+    fi
+    if printf '%s\n' "$log_text" | grep -Eiq 'falling back to ctranslate2-whisper'; then
+      phase="fallback"
+      progress="70"
+    fi
+    if printf '%s\n' "$log_text" | grep -Eiq 'installed (ctranslate2-whisper|mlx-whisper|parakeet)'; then
+      phase="finalizing"
+      progress="96"
     fi
   fi
   printf '%s|%s\n' "$phase" "$progress"
@@ -10402,12 +10679,7 @@ fi
 EOF_WRAPPER
     chmod +x "$run_ai_dev_wrapper"
 
-    if command -v setsid >/dev/null 2>&1; then
-      setsid "$runner_script" "$job_dir" "$model_name" "$log_file" "$run_ai_dev_wrapper" >/dev/null 2>&1 &
-    else
-      nohup "$runner_script" "$job_dir" "$model_name" "$log_file" "$run_ai_dev_wrapper" >/dev/null 2>&1 &
-    fi
-    install_pid=$!
+    install_pid=$(spawn_detached_job "$runner_script" "$job_dir" "$model_name" "$log_file" "$run_ai_dev_wrapper")
     printf '%s\n' "$install_pid" > "$job_dir/pid"
 
     printf '{"success":true,"job":{"id":"%s","model":"%s","status":"running"}}\n' \
@@ -12352,6 +12624,73 @@ EOF
     exit 0
     ;;
 
+  dictation_status)
+    preferred_component=$(preferred_voice_component_for_host)
+    selected_backend=$(installed_voice_backend_for_host || true)
+
+    installed_json=false
+    if [ -n "$selected_backend" ]; then
+      installed_json=true
+    fi
+
+    printf '{"success":true,"installed":%s,"backend":"%s","backend_label":"%s","preferred":"%s","preferred_label":"%s"}\n' \
+      "$installed_json" \
+      "$(json_escape "$selected_backend")" \
+      "$(json_escape "$(voice_component_label "$selected_backend")")" \
+      "$(json_escape "$preferred_component")" \
+      "$(json_escape "$(voice_component_label "$preferred_component")")"
+    exit 0
+    ;;
+
+  dictation_uninstall)
+    removed_any=0
+    removed_json=""
+    backend_after=""
+    for component in mlx-whisper parakeet ctranslate2-whisper; do
+      if ! voice_component_installed "$component"; then
+        continue
+      fi
+
+      uninstall_bin=$(resolve_voice_recognition_uninstall_bin "$component" || true)
+      if [ -z "$uninstall_bin" ]; then
+        emit_error "Voice recognition uninstall tool is unavailable."
+        exit 0
+      fi
+
+      set +e
+      if [ "$component" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
+        uninstall_output=$(env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$uninstall_bin" 2>&1)
+      else
+        uninstall_output=$("$uninstall_bin" 2>&1)
+      fi
+      uninstall_rc=$?
+      set -e
+
+      if [ "$uninstall_rc" -ne 0 ]; then
+        uninstall_output=$(strip_terminal_noise "$uninstall_output")
+        if [ -n "$uninstall_output" ]; then
+          emit_error "$uninstall_output"
+        else
+          emit_error "Dictation uninstall failed."
+        fi
+        exit 0
+      fi
+
+      if [ "$removed_any" -eq 1 ]; then
+        removed_json="$removed_json,"
+      fi
+      removed_any=1
+      removed_json="$removed_json\"$(json_escape "$component")\""
+    done
+
+    backend_after=$(installed_voice_backend_for_host || true)
+
+    printf '{"success":true,"removed":[%s],"backend":"%s"}\n' \
+      "$removed_json" \
+      "$(json_escape "$backend_after")"
+    exit 0
+    ;;
+
   dictate)
     dictate_bin=$(resolve_dictate_bin || true)
     if [ -z "$dictate_bin" ]; then
@@ -12431,6 +12770,285 @@ EOF
 
     dictated_text=$(trim "$dictate_stdout")
     printf '{"success":true,"text":"%s"}\n' "$(json_escape "$dictated_text")"
+    exit 0
+    ;;
+
+  dictation_install_info)
+    preferred_component=$(preferred_voice_component_for_host)
+    fallback_component="ctranslate2-whisper"
+    install_component=$preferred_component
+    install_bin=$(resolve_voice_recognition_install_bin "$install_component" || true)
+    if [ -z "$install_bin" ]; then
+      install_component=$fallback_component
+      install_bin=$(resolve_voice_recognition_install_bin "$install_component" || true)
+    fi
+    if [ -z "$install_bin" ]; then
+      emit_error "Voice recognition installer is unavailable."
+      exit 0
+    fi
+
+    installed_json=false
+    if voice_component_installed "$install_component"; then
+      installed_json=true
+    fi
+
+    fallback_json=false
+    if [ "$install_component" != "$preferred_component" ]; then
+      fallback_json=true
+    fi
+
+    selected_backend=$(installed_voice_backend_for_host || true)
+
+    printf '{"success":true,"preferred":"%s","preferred_label":"%s","install_target":"%s","install_target_label":"%s","fallback_component":"%s","fallback":%s,"download_size_bytes":"%s","already_installed":%s,"backend":"%s"}\n' \
+      "$(json_escape "$preferred_component")" \
+      "$(json_escape "$(voice_component_label "$preferred_component")")" \
+      "$(json_escape "$install_component")" \
+      "$(json_escape "$(voice_component_label "$install_component")")" \
+      "$(json_escape "$fallback_component")" \
+      "$fallback_json" \
+      "$(json_escape "$(voice_component_download_size_bytes "$install_component")")" \
+      "$installed_json" \
+      "$(json_escape "$selected_backend")"
+    exit 0
+    ;;
+
+  dictation_install_start)
+    preferred_component=$(preferred_voice_component_for_host)
+    fallback_component="ctranslate2-whisper"
+    install_component=$preferred_component
+    primary_bin=$(resolve_voice_recognition_install_bin "$install_component" || true)
+    if [ -z "$primary_bin" ]; then
+      install_component=$fallback_component
+      primary_bin=$(resolve_voice_recognition_install_bin "$install_component" || true)
+    fi
+    if [ -z "$primary_bin" ]; then
+      emit_error "Voice recognition installer is unavailable."
+      exit 0
+    fi
+
+    backend_bin=$(resolve_voice_recognition_backend_bin || true)
+    force_macos_arm64_uname=0
+    if [ "$install_component" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
+      force_macos_arm64_uname=1
+    fi
+
+    for existing_job in "$dictation_installs_dir"/*; do
+      [ -d "$existing_job" ] || continue
+      running_status=$(read_file_line "$existing_job/status" "")
+      running_pid=$(read_file_line "$existing_job/pid" "")
+      if [ "$running_status" = "running" ] && [ -n "$running_pid" ] && kill -0 "$running_pid" 2>/dev/null; then
+        printf '{"success":true,"job":{"id":"%s","status":"running","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
+          "$(json_escape "$(basename "$existing_job")")" \
+          "$(json_escape "$(read_file_line "$existing_job/component" "$install_component")")" \
+          "$(json_escape "$(read_file_line "$existing_job/fallback_component" "$fallback_component")")" \
+          "$(json_escape "$(read_file_line "$existing_job/download_size_bytes" "")")"
+        exit 0
+      fi
+    done
+
+    job_id=$(new_id)
+    job_dir="$dictation_installs_dir/$job_id"
+    mkdir -p "$job_dir"
+    log_file="$job_dir/log"
+    download_size_bytes=$(voice_component_download_size_bytes "$install_component")
+
+    printf '%s\n' "$install_component" > "$job_dir/component"
+    printf '%s\n' "$fallback_component" > "$job_dir/fallback_component"
+    printf '%s\n' "$download_size_bytes" > "$job_dir/download_size_bytes"
+    printf '%s\n' "running" > "$job_dir/status"
+    date +%s > "$job_dir/started"
+
+    runner_script="$job_dir/run-install.sh"
+    cat >"$runner_script" <<'EOF_RUNNER'
+#!/bin/sh
+set -eu
+job_dir=$1
+log_file=$2
+component=$3
+component_bin=$4
+backend_bin=$5
+timeout_sec=$6
+force_macos_arm64_uname=$7
+
+run_with_timeout_compat() {
+  duration=$1
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$duration" "$@"
+    return $?
+  fi
+  if command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$duration" "$@"
+    return $?
+  fi
+  "$@"
+}
+
+install_rc=1
+installed_component=$component
+
+printf '%s\n' "voice-recognition: starting $component install" >"$log_file"
+set +e
+if [ "$force_macos_arm64_uname" = "1" ] && [ "$component" = "mlx-whisper" ]; then
+  run_with_timeout_compat "$timeout_sec" env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$component_bin" >>"$log_file" 2>&1
+else
+  run_with_timeout_compat "$timeout_sec" "$component_bin" >>"$log_file" 2>&1
+fi
+install_rc=$?
+set -e
+
+printf '%s\n' "$install_rc" > "$job_dir/exit_code"
+printf '%s\n' "$installed_component" > "$job_dir/installed_component"
+printf '%s\n' "0" > "$job_dir/fallback_used"
+
+selected_backend=$installed_component
+printf '%s\n' "$selected_backend" > "$job_dir/backend"
+
+if [ "$install_rc" -eq 0 ]; then
+  printf '%s\n' "done" > "$job_dir/status"
+else
+  printf '%s\n' "failed" > "$job_dir/status"
+fi
+date +%s > "$job_dir/finished"
+EOF_RUNNER
+    chmod +x "$runner_script"
+
+    install_pid=$(spawn_detached_job "$runner_script" "$job_dir" "$log_file" "$install_component" "$primary_bin" "$backend_bin" "1800" "$force_macos_arm64_uname")
+    printf '%s\n' "$install_pid" > "$job_dir/pid"
+
+    printf '{"success":true,"job":{"id":"%s","status":"running","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
+      "$(json_escape "$job_id")" \
+      "$(json_escape "$install_component")" \
+      "$(json_escape "$fallback_component")" \
+      "$(json_escape "$download_size_bytes")"
+    exit 0
+    ;;
+
+  dictation_install_status)
+    job_id=$(trim "$(param "job_id")")
+    if ! valid_id "$job_id"; then
+      emit_error "invalid job_id"
+      exit 0
+    fi
+
+    job_dir="$dictation_installs_dir/$job_id"
+    if [ ! -d "$job_dir" ]; then
+      emit_error "dictation install job not found"
+      exit 0
+    fi
+
+    status=$(read_file_line "$job_dir/status" "running")
+    started=$(read_file_line "$job_dir/started" "0")
+    finished=$(read_file_line "$job_dir/finished" "0")
+    install_pid=$(read_file_line "$job_dir/pid" "")
+    exit_code=$(read_file_line "$job_dir/exit_code" "")
+    component=$(read_file_line "$job_dir/component" "")
+    fallback_component=$(read_file_line "$job_dir/fallback_component" "ctranslate2-whisper")
+    installed_component=$(read_file_line "$job_dir/installed_component" "$component")
+    selected_backend=$(read_file_line "$job_dir/backend" "$installed_component")
+    fallback_used=$(read_file_line "$job_dir/fallback_used" "0")
+    download_size_bytes=$(read_file_line "$job_dir/download_size_bytes" "")
+    status_reason=""
+
+    if [ "$status" = "running" ] && [ -n "$install_pid" ]; then
+      if ! kill -0 "$install_pid" 2>/dev/null; then
+        status="failed"
+        case "$exit_code" in
+          0) status="done" ;;
+          "") status_reason="Dictation installer stopped before producing output." ;;
+        esac
+      fi
+    fi
+
+    log_tail=$(tail -n 220 "$job_dir/log" 2>/dev/null || true)
+    if [ "$status" = "failed" ] && [ -z "$log_tail" ] && [ -n "$status_reason" ]; then
+      log_tail=$status_reason
+    fi
+    phase="downloading"
+    progress_pct="0"
+    if [ "$status" = "done" ]; then
+      phase="done"
+      progress_pct="100"
+    elif [ "$status" = "failed" ]; then
+      phase="failed"
+      progress_pct=""
+    else
+      parse_result=$(infer_dictation_install_phase_progress "$log_tail")
+      phase=$(printf '%s\n' "$parse_result" | cut -d'|' -f1)
+      progress_pct=$(printf '%s\n' "$parse_result" | cut -d'|' -f2)
+      [ -n "$phase" ] || phase="downloading"
+    fi
+
+    fallback_json=false
+    if [ "$fallback_used" = "1" ]; then
+      fallback_json=true
+    fi
+
+    printf '{"success":true,"job":{"id":"%s","status":"%s","phase":"%s","progress_pct":"%s","component":"%s","component_label":"%s","installed":"%s","backend":"%s","fallback_component":"%s","fallback":%s,"download_size_bytes":"%s","started":"%s","finished":"%s","exit_code":"%s","log":"%s"}}\n' \
+      "$(json_escape "$job_id")" \
+      "$(json_escape "$status")" \
+      "$(json_escape "$phase")" \
+      "$(json_escape "$progress_pct")" \
+      "$(json_escape "$component")" \
+      "$(json_escape "$(voice_component_label "$component")")" \
+      "$(json_escape "$installed_component")" \
+      "$(json_escape "$selected_backend")" \
+      "$(json_escape "$fallback_component")" \
+      "$fallback_json" \
+      "$(json_escape "$download_size_bytes")" \
+      "$(json_escape "$started")" \
+      "$(json_escape "$finished")" \
+      "$(json_escape "$exit_code")" \
+      "$(json_escape "$(strip_terminal_noise "$log_tail")")"
+    exit 0
+    ;;
+
+  dictation_install)
+    preferred_component=$(preferred_voice_component_for_host)
+    fallback_component="ctranslate2-whisper"
+    install_component=$preferred_component
+    install_bin=$(resolve_voice_recognition_install_bin "$install_component" || true)
+    if [ -z "$install_bin" ]; then
+      install_component=$fallback_component
+      install_bin=$(resolve_voice_recognition_install_bin "$install_component" || true)
+    fi
+    if [ -z "$install_bin" ]; then
+      emit_error "Voice recognition installer is unavailable."
+      exit 0
+    fi
+
+    installed_component=$install_component
+    install_output=""
+
+    set +e
+    if [ "$install_component" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
+      install_output=$(run_with_timeout 1800 env WIZARDRY_VOICE_UNAME_S=Darwin WIZARDRY_VOICE_UNAME_M=arm64 "$install_bin" 2>&1)
+    else
+      install_output=$(run_with_timeout 1800 "$install_bin" 2>&1)
+    fi
+    install_rc=$?
+    set -e
+
+    if [ "$install_rc" -ne 0 ]; then
+      install_output=$(strip_terminal_noise "$install_output")
+      if [ "$install_rc" -eq 124 ]; then
+        emit_error "Dictation install timed out."
+      elif [ -n "$install_output" ]; then
+        emit_error "$install_output"
+      else
+        emit_error "Dictation install failed."
+      fi
+      exit 0
+    fi
+
+    selected_backend=$installed_component
+
+    install_output=$(strip_terminal_noise "$install_output")
+    printf '{"success":true,"installed":"%s","backend":"%s","fallback":%s,"output":"%s"}\n' \
+      "$(json_escape "$installed_component")" \
+      "$(json_escape "$selected_backend")" \
+      "false" \
+      "$(json_escape "$install_output")"
     exit 0
     ;;
 

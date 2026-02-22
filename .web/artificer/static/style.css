@@ -4626,6 +4626,16 @@ select:focus {
   padding: 0;
 }
 
+.modal-actions.modal-actions-compact {
+  grid-template-columns: auto;
+  border-top: 0;
+  padding: 0;
+}
+
+.modal-actions.modal-actions-compact button {
+  justify-self: start;
+}
+
 .modal-actions button,
 .link-btn {
   border: 1px solid var(--btn-border);
@@ -4637,10 +4647,18 @@ select:focus {
   text-align: center;
 }
 
+#install-dictation-btn {
+  justify-self: start;
+}
+
 .settings-hint {
   margin: 2px 0 0;
   font-size: 0.79rem;
   color: var(--text-muted);
+}
+
+#dictation-install-status.error {
+  color: var(--danger);
 }
 
 .settings-links {
