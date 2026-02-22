@@ -1326,12 +1326,13 @@ button:disabled {
 }
 
 .selected-path-row {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  max-width: min(22rem, 100%);
-  gap: 0.3rem;
+  max-width: min(14rem, 34vw);
+  column-gap: 0.3rem;
   margin-top: 0;
-  margin-left: 0.18rem;
+  margin-left: auto;
   min-width: 0;
   flex: 0 1 auto;
   overflow: hidden;
@@ -1352,7 +1353,7 @@ button:disabled {
   line-height: 1.25;
   display: inline-block;
   flex: 1 1 auto;
-  max-width: min(16rem, 42vw);
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
