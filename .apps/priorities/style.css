@@ -678,6 +678,14 @@ button:hover {
   cursor: default;
   transition: background-color 140ms ease, box-shadow 140ms ease;
   position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.row .name,
+.row .name-edit {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .row::before {
