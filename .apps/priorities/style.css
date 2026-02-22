@@ -979,10 +979,6 @@ button:hover {
   opacity: 1;
 }
 
-.row-project .chk:not(:checked):not(.loading) {
-  opacity: 1;
-}
-
 .check-slot.project-slot::before {
   content: "▸";
   position: absolute;
@@ -1002,18 +998,22 @@ button:hover {
   content: "▾";
 }
 
-.row-project-unchecked:hover .check-slot.project-slot::before,
-.row-project-unchecked:focus-within .check-slot.project-slot::before,
+.row-project-unchecked .check-slot.project-slot::before,
 .check-slot.project-slot.loading::before {
   opacity: 1;
 }
 
-.row-project-unchecked .check-slot.project-slot::before {
+.row-project-unchecked:hover .check-slot.project-slot::before,
+.row-project-unchecked:focus-within .check-slot.project-slot::before {
   opacity: 0;
 }
 
 .row-project-unchecked:hover .chk:not(:checked):not(.loading),
 .row-project-unchecked:focus-within .chk:not(:checked):not(.loading) {
+  opacity: 1;
+}
+
+.row-project-unchecked .chk:not(:checked):not(.loading) {
   opacity: 0;
 }
 
