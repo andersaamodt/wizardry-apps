@@ -1035,6 +1035,42 @@
       }
     }
 
+    function applyOptimisticRename(path, nextName) {
+      var touched = [];
+      if (!path || !nextName) {
+        return touched;
+      }
+      var keys = Object.keys(state.cache || {});
+      for (var i = 0; i < keys.length; i += 1) {
+        var items = state.cache[keys[i]];
+        if (!Array.isArray(items)) {
+          continue;
+        }
+        for (var j = 0; j < items.length; j += 1) {
+          var item = items[j];
+          if (!item || item.path !== path) {
+            continue;
+          }
+          touched.push({ item: item, prevName: String(item.name || '') });
+          item.name = nextName;
+        }
+      }
+      return touched;
+    }
+
+    function rollbackOptimisticRename(touched) {
+      if (!touched || !touched.length) {
+        return;
+      }
+      for (var i = 0; i < touched.length; i += 1) {
+        var entry = touched[i];
+        if (!entry || !entry.item) {
+          continue;
+        }
+        entry.item.name = entry.prevName;
+      }
+    }
+
     async function runMutationWithListFallback(parentDir, fastArgs, fallbackMutationArgs) {
       var result = null;
       try {
@@ -2536,20 +2572,31 @@
       if (!path || !nextName || state.pendingRenamePath) {
         return;
       }
+      var parentDir = parentDirOfPath(path);
+      var optimisticTouches = applyOptimisticRename(path, nextName);
       state.pendingRenamePath = path;
-      runAction(function () {
-        var parentDir = parentDirOfPath(path);
-        return runMutationWithListFallback(
-          parentDir,
-          ['rename-fast', path, nextName],
-          ['rename', path, nextName]
-        );
-      }, {
-        suppressLoadingOverlay: true
-      }).finally(function () {
-        state.pendingRenamePath = '';
-        state.editingPath = '';
-      });
+      state.editingPath = '';
+      (async function () {
+        try {
+          if (optimisticTouches.length) {
+            await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+          }
+          await runMutationWithListFallback(
+            parentDir,
+            ['rename-fast', path, nextName],
+            ['rename', path, nextName]
+          );
+          await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        } catch (error) {
+          rollbackOptimisticRename(optimisticTouches);
+          await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+          var detail = String(error && error.message ? error.message : error).trim();
+          status(detail ? ('Rename failed; reverted. ' + detail) : 'Rename failed; reverted.', true);
+        } finally {
+          state.pendingRenamePath = '';
+          state.editingPath = '';
+        }
+      })();
     }
 
     function actToggleChecked(path) {
