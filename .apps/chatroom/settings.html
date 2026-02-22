@@ -267,7 +267,8 @@
     };
     
     // Hardcoded commands for security - these are executed via native bridge
-    const chatUrlKey = 'wizardry.chatroom.url';
+    const MODE_KEY = 'mode';
+    const CHAT_URL_KEY = 'chat_url';
     const chatPath = '/pages/chat.html';
 
     const commands = {
@@ -284,9 +285,55 @@
     let serverPort = '';
     let currentMode = 'client'; // default to client mode
     
-    // Initialize mode from localStorage
-    function initMode() {
-      const savedMode = localStorage.getItem('chatroomMode') || 'client';
+    function backendScriptPath() {
+      const p = decodeURIComponent(window.location.pathname || '');
+      return p.replace(/\/settings\.html$/, '/scripts/chatroom-backend.sh');
+    }
+
+    function parseKeyValue(text) {
+      const out = {};
+      String(text || '').split('\n').forEach((line) => {
+        if (!line) return;
+        const idx = line.indexOf('=');
+        if (idx <= 0) return;
+        out[line.slice(0, idx)] = line.slice(idx + 1);
+      });
+      return out;
+    }
+
+    async function backendExec(action, args = []) {
+      if (!window.wizardry || !window.wizardry.exec) {
+        return '';
+      }
+      const argv = ['sh', backendScriptPath(), action].concat(args);
+      const result = await window.wizardry.exec(argv);
+      if (typeof result.exit_code !== 'undefined' && result.exit_code !== 0) {
+        throw new Error((result.stderr || result.stdout || 'backend error').trim());
+      }
+      return String((result && result.stdout) || '');
+    }
+
+    async function loadPrefs() {
+      try {
+        const text = await backendExec('get-ui-prefs');
+        return parseKeyValue(text);
+      } catch (_err) {
+        return {};
+      }
+    }
+
+    async function setPref(key, value) {
+      try {
+        await backendExec('set-ui-pref', [key, String(value || '')]);
+      } catch (_err) {
+        return;
+      }
+    }
+
+    // Initialize mode from config
+    async function initMode() {
+      const prefs = await loadPrefs();
+      const savedMode = String(prefs[MODE_KEY] || 'client').trim() || 'client';
       currentMode = savedMode;
       const radioButton = document.querySelector(`input[name="mode"][value="${savedMode}"]`);
       if (radioButton) {
@@ -296,9 +343,9 @@
     }
     
     // Set mode (client or host)
-    function setMode(mode) {
+    async function setMode(mode) {
       currentMode = mode;
-      localStorage.setItem('chatroomMode', mode);
+      await setPref(MODE_KEY, mode);
       updateModeUI();
       
       if (mode === 'host') {
@@ -330,18 +377,14 @@
       return `http://localhost:${serverPort}${chatPath}`;
     }
 
-    function saveChatUrl(url) {
-      if (url) {
-        localStorage.setItem(chatUrlKey, url);
-      } else {
-        localStorage.removeItem(chatUrlKey);
-      }
+    async function saveChatUrl(url) {
+      await setPref(CHAT_URL_KEY, url || '');
     }
 
     async function loadPort() {
       if (!window.wizardry || !window.wizardry.exec) {
         serverPort = '';
-        saveChatUrl('');
+        await saveChatUrl('');
         updateConnectionURL();
         return;
       }
@@ -354,7 +397,7 @@
         serverPort = '';
       }
 
-      saveChatUrl(localChatUrl());
+      await saveChatUrl(localChatUrl());
       updateConnectionURL();
     }
 
@@ -593,8 +636,8 @@
     }
     
     // Load on page load
-    window.addEventListener('DOMContentLoaded', () => {
-      initMode();
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initMode();
       if (currentMode === 'host') {
         checkServerStatus();
       }

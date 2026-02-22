@@ -81,15 +81,57 @@
   </div>
 
   <script>
-    const chatUrlKey = 'wizardry.chatroom.url';
+    const CHAT_URL_KEY = 'chat_url';
     let iframeCheckInterval;
+    let chatUrlCache = '';
+
+    function backendScriptPath() {
+      const p = decodeURIComponent(window.location.pathname || '');
+      return p.replace(/\/index\.html$/, '/scripts/chatroom-backend.sh');
+    }
+
+    function parseKeyValue(text) {
+      const out = {};
+      String(text || '').split('\n').forEach((line) => {
+        if (!line) return;
+        const idx = line.indexOf('=');
+        if (idx <= 0) return;
+        out[line.slice(0, idx)] = line.slice(idx + 1);
+      });
+      return out;
+    }
+
+    function hasBridge() {
+      return !!(window.wizardry && window.wizardry.exec);
+    }
+
+    async function backendExec(action, args = []) {
+      if (!hasBridge()) return '';
+      const argv = ['sh', backendScriptPath(), action].concat(args);
+      const result = await window.wizardry.exec(argv);
+      if (typeof result.exit_code !== 'undefined' && result.exit_code !== 0) {
+        throw new Error((result.stderr || result.stdout || 'backend error').trim());
+      }
+      return String((result && result.stdout) || '');
+    }
+
+    async function refreshChatUrlPref() {
+      try {
+        const text = await backendExec('get-ui-prefs');
+        const prefs = parseKeyValue(text);
+        const value = String(prefs[CHAT_URL_KEY] || '').trim();
+        chatUrlCache = /^https?:\/\/[^ ]+\/pages\/chat\.html$/.test(value) ? value : '';
+      } catch (_err) {
+        chatUrlCache = '';
+      }
+    }
 
     function configuredChatUrl() {
-      const saved = localStorage.getItem(chatUrlKey) || '';
-      return /^https?:\/\/[^ ]+\/pages\/chat\.html$/.test(saved) ? saved : '';
+      return chatUrlCache;
     }
     
-    function checkIframeLoaded() {
+    async function checkIframeLoaded() {
+      await refreshChatUrlPref();
       const iframe = document.getElementById('chat-frame');
       const errorMsg = document.getElementById('error-message');
       const url = configuredChatUrl();
@@ -151,10 +193,10 @@
     }
     
     // Check on page load
-    window.addEventListener('DOMContentLoaded', () => {
-      checkIframeLoaded();
+    window.addEventListener('DOMContentLoaded', async () => {
+      await checkIframeLoaded();
       // Recheck every 5 seconds in case server starts
-      iframeCheckInterval = setInterval(checkIframeLoaded, 5000);
+      iframeCheckInterval = setInterval(() => { checkIframeLoaded(); }, 5000);
     });
   </script>
 </body>

@@ -333,20 +333,20 @@
 
       var state = {
         appDir: inferAppDir(),
-        rootHint: loadStorage(ROOT_KEY),
-        projectsRoot: loadStorage(PROJECTS_ROOT_KEY),
+        rootHint: '',
+        projectsRoot: '',
         homeDir: '',
         os: '',
         tools: {},
         apps: [],
         workspaces: [],
-        organizeShow: loadStorage(ORGANIZE_SHOW_KEY) || 'both',
-        linuxInstallMode: normalizeLinuxInstallMode(loadStorage(LINUX_INSTALL_MODE_KEY)),
+        organizeShow: 'both',
+        linuxInstallMode: 'appdir-local-share',
         themes: ['psionic'],
-        activeTheme: loadStorage(THEME_KEY) || 'psionic',
+        activeTheme: 'psionic',
         selectedBuiltIn: '',
         selectedWorkspace: '',
-        selectedCatalog: loadStorage(SELECTED_CATALOG_KEY),
+        selectedCatalog: '',
         route: 'pipeline',
         busy: false,
         toastTimer: null,
@@ -359,7 +359,8 @@
         lastWindowFitHeight: 0,
         windowFitInFlight: false,
         createDraftActive: false,
-        leftRailWidth: parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240,
+        leftRailWidth: 240,
+        uiPrefs: {},
         targetRuntime: {},
         targetSectionByRow: {},
         iconVersionByKey: {},
@@ -375,23 +376,19 @@
       }
 
       function loadStorage(key) {
-        try {
-          return localStorage.getItem(key) || '';
-        } catch (_err) {
+        var pref = persistedPrefNameForStorageKey(key);
+        if (!pref) {
           return '';
         }
+        return String(state.uiPrefs[pref] || '');
       }
 
       function saveStorage(key, value) {
-        try {
-          if (value) {
-            localStorage.setItem(key, value);
-          } else {
-            localStorage.removeItem(key);
-          }
-        } catch (_err) {
+        var pref = persistedPrefNameForStorageKey(key);
+        if (!pref) {
           return;
         }
+        state.uiPrefs[pref] = String(value || '');
         persistStorageKeyToBackend(key, value);
       }
 
@@ -414,29 +411,16 @@
         }
       }
 
-      function mergePrefsIntoStorage(prefs) {
+      function mergePrefsIntoState(prefs) {
         if (!prefs) {
           return;
         }
-        var prefByStorage = {};
         Object.keys(BACKEND_PREF_BY_STORAGE_KEY).forEach(function (storageKey) {
-          prefByStorage[BACKEND_PREF_BY_STORAGE_KEY[storageKey]] = storageKey;
-        });
-        Object.keys(prefByStorage).forEach(function (prefKey) {
-          var storageKey = prefByStorage[prefKey];
+          var prefKey = BACKEND_PREF_BY_STORAGE_KEY[storageKey];
           if (!Object.prototype.hasOwnProperty.call(prefs, prefKey)) {
             return;
           }
-          var value = String(prefs[prefKey] || '');
-          try {
-            if (value) {
-              localStorage.setItem(storageKey, value);
-            } else {
-              localStorage.removeItem(storageKey);
-            }
-          } catch (_err) {
-            return;
-          }
+          state.uiPrefs[prefKey] = String(prefs[prefKey] || '');
         });
       }
 
@@ -447,7 +431,7 @@
         try {
           var res = await backend('get-ui-prefs', [], { quiet: true });
           var prefs = kv((res && res.stdout) || '');
-          mergePrefsIntoStorage(prefs);
+          mergePrefsIntoState(prefs);
         } catch (_err) {
           return;
         }
