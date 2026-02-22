@@ -1140,6 +1140,11 @@ button:disabled {
   background: transparent;
 }
 
+.run-split .menu-toggle:hover,
+.run-split .menu-toggle:focus-visible {
+  border-left-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
+}
+
 .build-split .floating-menu {
   left: 0;
   right: auto;
