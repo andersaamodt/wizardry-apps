@@ -208,15 +208,10 @@
     }
     NSView *overlay = self.nativeBootSplashView;
     self.nativeBootSplashView = nil;
-    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
-        context.duration = 0.36;
-        if (self.webView && self.webView.alphaValue < 1.0) {
-            self.webView.animator.alphaValue = 1.0;
-        }
-        overlay.animator.alphaValue = 0.0;
-    } completionHandler:^{
-        [overlay removeFromSuperview];
-    }];
+    if (self.webView && self.webView.alphaValue < 1.0) {
+        self.webView.alphaValue = 1.0;
+    }
+    [overlay removeFromSuperview];
 }
 
 - (void)setupMainMenuWithAppName:(NSString *)appName {
