@@ -715,6 +715,17 @@
       return p.slice(slash + 1) || '/';
     }
 
+    function clearDomTextSelection() {
+      try {
+        var selection = window.getSelection ? window.getSelection() : null;
+        if (selection && selection.rangeCount > 0) {
+          selection.removeAllRanges();
+        }
+      } catch (_) {
+        // Ignore selection clearing failures.
+      }
+    }
+
     function parentDirOfPath(path) {
       var p = String(path || '').replace(/\/+$/, '');
       if (!p || p === '.') {
@@ -3616,6 +3627,7 @@
       if (!path) {
         return;
       }
+      clearDomTextSelection();
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
       var currentNormalized = normalizeRootPath(currentRoot);
       var targetNormalized = normalizeRootPath(path);
@@ -3634,6 +3646,7 @@
     }
 
     function drillUp() {
+      clearDomTextSelection();
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
       var nextRoot = '';
       if (Array.isArray(state.drillStack) && state.drillStack.length > 0) {
@@ -3659,6 +3672,7 @@
 
     function setRootAndRefresh(options) {
       options = options || {};
+      clearDomTextSelection();
       state.root = rootInputValue();
       state.expanded = Object.create(null);
       state.expanded[state.root] = true;
