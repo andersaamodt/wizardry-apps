@@ -634,6 +634,7 @@ EOF
 
   run_cgi_get "$cgi_dir/blog-index" ""
   case "$CGI_BODY" in *"Fresh Bridge Title"*) ;; *) TEST_FAILURE_REASON="nostr projection should render latest event title"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *"1 comments"*) ;; *) TEST_FAILURE_REASON="index should show mirrored comment count before opening post"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in
     *"Old Bridge Title"*)
       TEST_FAILURE_REASON="older replaceable event version should not be rendered"
@@ -663,6 +664,24 @@ EOF
       return 1
       ;;
     *) ;;
+  esac
+
+  teardown_blog_fixture
+}
+
+test_blog_submit_comment_endpoint_graceful_failure() {
+  setup_blog_fixture || return $?
+
+  config-set "$site_dir/site.conf" nostr_bridge_enabled true
+  run_cgi_post "$cgi_dir/blog-submit-comment" "path=2024-01-15-welcome.html&event_json=%7B%7D"
+  case "$CGI_BODY" in
+    *'nostril_required'*|*'invalid_kind'*|*'invalid_signature'*|*'missing_post_reference'*)
+      ;;
+    *)
+      TEST_FAILURE_REASON="blog-submit-comment should fail gracefully with a structured error"
+      teardown_blog_fixture
+      return 1
+      ;;
   esac
 
   teardown_blog_fixture
@@ -766,6 +785,7 @@ run_test_case "blog passkey register resolves stable username" test_blog_passkey
 run_test_case "blog archive endpoint renders grouped posts" test_blog_archive_endpoint_renders_posts
 run_test_case "blog post-context endpoint returns post metadata" test_blog_post_context_endpoint
 run_test_case "blog nostr bridge projects events and filters comments" test_blog_nostr_bridge_projection_and_comments
+run_test_case "blog submit-comment endpoint returns structured errors" test_blog_submit_comment_endpoint_graceful_failure
 run_test_case "blog open-post redirects to post html" test_blog_open_post_redirects
 run_test_case "blog account update persists player name" test_blog_account_update_and_player_name
 

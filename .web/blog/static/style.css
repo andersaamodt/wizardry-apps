@@ -2038,11 +2038,41 @@ nav.site-nav {
   margin: 0;
 }
 
+.post-comments-count {
+  font-weight: 700;
+}
+
 #post-comments-refresh {
   border-radius: 999px;
   border: 1px solid var(--color-border);
   padding: 0.32rem 0.78rem;
   background: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+}
+
+.post-comments-compose {
+  margin-top: 0.55rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+#post-comment-input {
+  width: 100%;
+  min-height: 84px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.58rem;
+  resize: vertical;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+#post-comment-submit {
+  justify-self: start;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  padding: 0.34rem 0.9rem;
+  background: rgba(255, 255, 255, 0.88);
   cursor: pointer;
 }
 
@@ -2106,5 +2136,9 @@ nav.site-nav {
   .post-comments-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  #post-comment-submit {
+    width: auto;
   }
 }

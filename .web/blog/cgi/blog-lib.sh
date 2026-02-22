@@ -367,6 +367,68 @@ blog_nostr_event_address() {
   printf '%s:%s:%s\n' "$kind" "$pubkey" "$dtag"
 }
 
+blog_post_nostr_address_for_file() {
+  file=${1-}
+  if [ -z "$file" ] || [ ! -f "$file" ]; then
+    printf '\n'
+    return 0
+  fi
+
+  addr=$(blog_read_front_matter_value "$file" nostr_address 2>/dev/null || printf '')
+  if [ -n "$addr" ]; then
+    printf '%s\n' "$addr"
+    return 0
+  fi
+
+  pubkey=$(blog_read_front_matter_value "$file" nostr_pubkey 2>/dev/null || printf '')
+  kind=$(blog_read_front_matter_value "$file" nostr_kind 2>/dev/null || printf '')
+  dtag=$(blog_read_front_matter_value "$file" nostr_d 2>/dev/null || printf '')
+  if [ -n "$pubkey" ] && [ -n "$kind" ] && [ -n "$dtag" ]; then
+    blog_nostr_event_address "$kind" "$pubkey" "$dtag"
+    return 0
+  fi
+
+  if [ -f "$blog_nostr_posts_index" ]; then
+    rel=${file#"$blog_site_root/site/pages/"}
+    idx_addr=$(jq -r --arg rel "$rel" '.[] | select(.md_path == $rel) | .address' "$blog_nostr_posts_index" 2>/dev/null | head -n 1)
+    if [ -n "$idx_addr" ]; then
+      printf '%s\n' "$idx_addr"
+      return 0
+    fi
+  fi
+
+  printf '\n'
+}
+
+blog_nostr_comment_counts_build() {
+  out_file=${1-}
+  [ -n "$out_file" ] || return 1
+  : > "$out_file"
+  if ! blog_nostr_bridge_enabled; then
+    return 0
+  fi
+  if [ ! -f "$blog_nostr_comments_index" ]; then
+    blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+  fi
+  if [ ! -f "$blog_nostr_comments_index" ]; then
+    return 0
+  fi
+
+  jq -r '.[] | (.a_refs // [])[]?' "$blog_nostr_comments_index" 2>/dev/null | awk 'NF' | sort | uniq -c | awk '{c=$1; $1=""; sub(/^ +/, "", $0); printf "%s\t%s\n", $0, c }' > "$out_file"
+}
+
+blog_nostr_comment_count_lookup() {
+  counts_file=${1-}
+  address=${2-}
+  if [ -z "$counts_file" ] || [ -z "$address" ] || [ ! -f "$counts_file" ]; then
+    printf '0\n'
+    return 0
+  fi
+  count=$(awk -F'\t' -v addr="$address" '$1==addr {print $2; exit}' "$counts_file" 2>/dev/null || printf '')
+  case "$count" in ''|*[!0-9]*) count=0 ;; esac
+  printf '%s\n' "$count"
+}
+
 blog_validate_username() {
   name=${1-}
   case "$name" in
@@ -941,6 +1003,7 @@ blog_nostr_write_projection_posts() {
       printf 'nostr_pubkey: "%s"\n' "$(blog_yaml_escape "$pubkey")"
       printf 'nostr_kind: "%s"\n' "$(blog_yaml_escape "$event_kind")"
       printf 'nostr_d: "%s"\n' "$(blog_yaml_escape "$d_tag")"
+      printf 'nostr_address: "%s"\n' "$(blog_yaml_escape "$event_kind:$pubkey:$d_tag")"
       printf 'nostr_uri: "%s"\n' "$(blog_yaml_escape "$uri")"
       printf '%s\n\n' '---'
       printf '%s\n' "$content"

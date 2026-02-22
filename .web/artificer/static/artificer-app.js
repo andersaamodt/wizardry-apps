@@ -469,6 +469,7 @@
     dictationInstallInfo: null,
     dictationInstallInfoLoading: false,
     dictationInstallBusy: false,
+    dictationInstallCancelling: false,
     dictationInstallJob: null,
     dictationInstallError: "",
     dictationInstalled: false,
@@ -12357,6 +12358,9 @@
       throw error;
     }).finally(function () {
       state.dictationInstallInfoLoading = false;
+      if (!state.dictationInstallBusy) {
+        state.dictationInstallCancelling = false;
+      }
       renderDictationInstallSettings();
     });
   }
@@ -12369,23 +12373,47 @@
     var job = state.dictationInstallJob || null;
     var busy = !!state.dictationInstallBusy;
     var status = String(job && job.status ? job.status : "");
+    var action = trim(String(job && job.action ? job.action : ""));
     var showRunning = busy || status === "running";
+    var runningInstall = showRunning && action !== "uninstall";
     var showChecking = !showRunning && (!state.dictationInstallReady || state.dictationInstallInfoLoading);
-    var showPending = showRunning || showChecking;
+    var showPending = showChecking || !!state.dictationInstallCancelling;
     var buttonLabel = dictationInstallButtonLabel();
-    if (showRunning) {
+    if (state.dictationInstallCancelling) {
+      buttonLabel = "Cancelling...";
+    } else if (runningInstall) {
+      var phase = trim(String(job && job.phase ? job.phase : ""));
+      if (phase === "downloading" || phase === "preparing" || phase === "fallback") {
+        buttonLabel = "Cancel download";
+      } else {
+        buttonLabel = "Cancel install";
+      }
+    } else if (showRunning) {
       buttonLabel = dictationInstallRunningButtonLabel(job);
     } else if (showChecking) {
       buttonLabel = "Checking...";
     }
 
     el.installDictationBtn.textContent = buttonLabel;
-    el.installDictationBtn.disabled = !state.dictationInstallReady || state.dictationInstallInfoLoading || busy;
+    el.installDictationBtn.disabled =
+      !state.dictationInstallReady ||
+      state.dictationInstallInfoLoading ||
+      (busy && (!runningInstall || state.dictationInstallCancelling));
     el.installDictationBtn.classList.toggle("ui-pending-spinner", showPending);
 
     if (el.dictationInstallStatus) {
       var statusText = trim(String(state.dictationInstallError || ""));
       var isError = !!statusText;
+      var statusPending = false;
+      if (!statusText && showRunning) {
+        if (runningInstall) {
+          statusText = dictationInstallRunningButtonLabel(job);
+          statusPending = true;
+        } else if (action === "uninstall") {
+          statusText = "Uninstalling dictation";
+          statusPending = true;
+        }
+      }
       if (!statusText && state.dictationInstalled) {
         var installedLabel = dictationBackendLabel(state.dictationBackend || "");
         if (installedLabel) {
@@ -12401,6 +12429,7 @@
         el.dictationInstallStatus.textContent = "";
         el.dictationInstallStatus.classList.add("hidden");
       }
+      el.dictationInstallStatus.classList.toggle("ui-pending-spinner", statusPending);
       if (isError) {
         el.dictationInstallStatus.classList.add("error");
       } else {
@@ -12425,11 +12454,20 @@
       if (!response || !response.success || !response.job) {
         throw new Error((response && response.error) || "Could not load dictation install status");
       }
+      var previousJob = state.dictationInstallJob || null;
+      var previousAction = trim(String(previousJob && previousJob.action ? previousJob.action : ""));
       state.dictationInstallJob = response.job;
+      if (!state.dictationInstallJob.action && previousAction) {
+        state.dictationInstallJob.action = previousAction;
+      }
+      if (!state.dictationInstallJob.action) {
+        state.dictationInstallJob.action = "install";
+      }
       var status = String(response.job.status || "");
       if (status === "done") {
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
+        state.dictationInstallCancelling = false;
         var installedBackend = trim(String(response.job.installed || response.job.component || response.job.backend || ""));
         state.dictationInstalled = true;
         state.dictationBackend = installedBackend;
@@ -12464,6 +12502,7 @@
       if (status === "failed") {
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
+        state.dictationInstallCancelling = false;
         state.dictationInstallJob = null;
         renderUi();
         var logText = trim(String(response.job.log || ""));
@@ -12481,6 +12520,18 @@
         state.dictationInstallError = tailLine || "Dictation install failed";
         showTransientNotice(state.dictationInstallError);
         throw new Error(state.dictationInstallError);
+      }
+      if (status === "cancelled") {
+        stopDictationInstallPolling();
+        state.dictationInstallBusy = false;
+        state.dictationInstallCancelling = false;
+        state.dictationInstallJob = null;
+        state.dictationInstallError = "";
+        return loadDictationStatus({ silent: true }).then(function () {
+          showTransientNotice("Dictation install cancelled");
+          renderUi();
+          return response.job;
+        });
       }
       renderDictationInstallSettings();
       return response.job;
@@ -13042,6 +13093,7 @@
   function openSettingsModal() {
     openModal(el.settingsModal);
     state.dictationInstallReady = false;
+    state.dictationInstallCancelling = false;
     state.dictationInstallError = "";
     var preferredWorkspace = String(state.commandRulesWorkspaceId || state.activeWorkspaceId || "");
     if (!preferredWorkspace && state.workspaces.length) {

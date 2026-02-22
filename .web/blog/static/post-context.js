@@ -1,5 +1,7 @@
 (function () {
   var currentRelPath = '';
+  var currentNostrAddress = '';
+  var currentNostrEventId = '';
 
   function isPostPage(pathname) {
     return /^\/pages\/posts\/.+\.html$/.test(pathname || '');
@@ -130,6 +132,18 @@
     container.innerHTML = list.map(renderCommentRow).join('');
   }
 
+  function setCommentCount(count) {
+    var badge = document.getElementById('post-comments-count');
+    if (!badge) {
+      return;
+    }
+    var n = Number(count || 0);
+    if (!Number.isFinite(n) || n < 0) {
+      n = 0;
+    }
+    badge.textContent = String(n);
+  }
+
   function setCommentStatus(message, kind) {
     var status = document.getElementById('post-comments-status');
     if (!status) {
@@ -152,7 +166,9 @@
         if (!data || !data.success) {
           return;
         }
-        renderComments(data.comments || []);
+        var list = data.comments || [];
+        renderComments(list);
+        setCommentCount(list.length || 0);
         setCommentStatus('', '');
       })
       .catch(function () {
@@ -186,6 +202,83 @@
       });
   }
 
+  function parseEventJson(raw) {
+    try {
+      return JSON.parse(String(raw || ''));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function signCommentEvent(payload) {
+    if (!window.nostr) {
+      return Promise.reject(new Error('No browser Nostr signer detected. Install a NIP-07 extension.'));
+    }
+    if (typeof window.nostr.signEvent === 'function') {
+      return Promise.resolve(window.nostr.signEvent(payload));
+    }
+    return Promise.reject(new Error('Browser signer does not expose signEvent.'));
+  }
+
+  function submitComment() {
+    var textarea = document.getElementById('post-comment-input');
+    if (!textarea) {
+      return;
+    }
+    var content = String(textarea.value || '').trim();
+    if (!content) {
+      setCommentStatus('Comment text is required.', 'warn');
+      return;
+    }
+    if (!currentNostrAddress || !currentNostrEventId) {
+      setCommentStatus('Post Nostr metadata is missing for comment submit.', 'warn');
+      return;
+    }
+
+    var createdAt = Math.floor(Date.now() / 1000);
+    var draftEvent = {
+      kind: 1,
+      created_at: createdAt,
+      tags: [
+        ['a', currentNostrAddress],
+        ['e', currentNostrEventId, '', 'reply']
+      ],
+      content: content
+    };
+
+    setCommentStatus('Signing comment event...', 'info');
+    signCommentEvent(draftEvent)
+      .then(function (signed) {
+        var signedEvent = signed;
+        if (typeof signedEvent === 'string') {
+          signedEvent = parseEventJson(signedEvent);
+        }
+        if (!signedEvent || typeof signedEvent !== 'object') {
+          throw new Error('Signer returned an invalid event payload.');
+        }
+        setCommentStatus('Submitting signed comment...', 'info');
+        return fetch('/cgi/blog-submit-comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'path=' + encodeURIComponent(currentRelPath) + '&event_json=' + encodeURIComponent(JSON.stringify(signedEvent)),
+          credentials: 'same-origin'
+        });
+      })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (!data || !data.success) {
+          var msg = (data && data.error) ? data.error : 'Comment submit failed.';
+          throw new Error(msg);
+        }
+        textarea.value = '';
+        setCommentStatus('Comment stored locally. Refreshing comments...', 'ok');
+        loadComments();
+      })
+      .catch(function (err) {
+        setCommentStatus(err.message || 'Comment submit failed.', 'warn');
+      });
+  }
+
   function ensureCommentShell() {
     if (document.querySelector('.post-comments-shell')) {
       return;
@@ -194,8 +287,12 @@
     anchor.insertAdjacentHTML('beforeend',
       '<section class="post-comments-shell">' +
       '<div class="post-comments-head">' +
-      '<h3>Comments</h3>' +
+      '<h3>Comments (<span id="post-comments-count">0</span>)</h3>' +
       '<button type="button" id="post-comments-refresh">Refresh comments</button>' +
+      '</div>' +
+      '<div class="post-comments-compose">' +
+      '<textarea id="post-comment-input" rows="3" placeholder="Write a Nostr-signed reply..."></textarea>' +
+      '<button type="button" id="post-comment-submit">Post comment</button>' +
       '</div>' +
       '<p id="post-comments-status" class="post-comments-status"></p>' +
       '<div id="post-comments-list" class="post-comments-list"><p class="placeholder">No comments mirrored yet.</p></div>' +
@@ -204,6 +301,10 @@
     var refreshButton = document.getElementById('post-comments-refresh');
     if (refreshButton) {
       refreshButton.addEventListener('click', refreshComments);
+    }
+    var submitButton = document.getElementById('post-comment-submit');
+    if (submitButton) {
+      submitButton.addEventListener('click', submitComment);
     }
   }
 
@@ -233,6 +334,8 @@
     }
 
     if (payload.current.nostr && !document.querySelector('.post-nostr-proof')) {
+      currentNostrAddress = payload.current.nostr.address || '';
+      currentNostrEventId = payload.current.nostr.id || '';
       var proof = renderNostrProof(payload.current.nostr);
       if (proof) {
         var proofAnchor = document.querySelector('#main-content') || document.body;

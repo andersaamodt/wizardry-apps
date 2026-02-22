@@ -276,6 +276,7 @@ Access admin panel (if in blog-admin group)
 **Public Nostr Read/Refresh Endpoints:**
 - `blog-comments` - Return local mirrored comments for a post
 - `blog-refresh-comments` - Explicitly mirror latest comments for a post
+- `blog-submit-comment` - Store a signed Nostr comment event locally for a post
 
 ### Data Storage
 

@@ -5281,6 +5281,44 @@ remove_voice_runtime_root() {
   return 0
 }
 
+stop_process_tree_by_pid() {
+  target_pid=$1
+  case "$target_pid" in
+    ""|*[!0-9]*)
+      return 1
+      ;;
+  esac
+
+  if ! kill -0 "$target_pid" 2>/dev/null; then
+    return 0
+  fi
+
+  kill -TERM "$target_pid" 2>/dev/null || true
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -TERM -P "$target_pid" 2>/dev/null || true
+  fi
+
+  waited=0
+  while [ "$waited" -lt 50 ]; do
+    if ! kill -0 "$target_pid" 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -KILL -P "$target_pid" 2>/dev/null || true
+  fi
+  kill -KILL "$target_pid" 2>/dev/null || true
+  sleep 0.1
+
+  if kill -0 "$target_pid" 2>/dev/null; then
+    return 1
+  fi
+  return 0
+}
+
 preferred_voice_component_for_host() {
   if voice_host_is_macos_arm64; then
     printf '%s' "mlx-whisper"
@@ -12997,7 +13035,7 @@ EOF
       running_status=$(read_file_line "$existing_job/status" "")
       running_pid=$(read_file_line "$existing_job/pid" "")
       if [ "$running_status" = "running" ] && [ -n "$running_pid" ] && kill -0 "$running_pid" 2>/dev/null; then
-        printf '{"success":true,"job":{"id":"%s","status":"running","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
+        printf '{"success":true,"job":{"id":"%s","status":"running","action":"install","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
           "$(json_escape "$(basename "$existing_job")")" \
           "$(json_escape "$(read_file_line "$existing_job/component" "$install_component")")" \
           "$(json_escape "$(read_file_line "$existing_job/fallback_component" "$fallback_component")")" \
@@ -13080,6 +13118,12 @@ if [ "$install_rc" -ne 0 ] && [ "$component" != "$fallback_component" ] && [ -n 
 fi
 set -e
 
+current_status=$(cat "$job_dir/status" 2>/dev/null || printf '')
+if [ "$current_status" = "cancelled" ]; then
+  [ -f "$job_dir/finished" ] || date +%s > "$job_dir/finished"
+  exit 0
+fi
+
 printf '%s\n' "$install_rc" > "$job_dir/exit_code"
 printf '%s\n' "$installed_component" > "$job_dir/installed_component"
 printf '%s\n' "$fallback_used" > "$job_dir/fallback_used"
@@ -13099,11 +13143,49 @@ EOF_RUNNER
     install_pid=$(spawn_detached_job "$runner_script" "$job_dir" "$log_file" "$install_component" "$primary_bin" "$fallback_component" "$fallback_bin" "1800" "$force_macos_arm64_uname")
     printf '%s\n' "$install_pid" > "$job_dir/pid"
 
-    printf '{"success":true,"job":{"id":"%s","status":"running","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
+    printf '{"success":true,"job":{"id":"%s","status":"running","action":"install","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
       "$(json_escape "$job_id")" \
       "$(json_escape "$install_component")" \
       "$(json_escape "$fallback_component")" \
       "$(json_escape "$download_size_bytes")"
+    exit 0
+    ;;
+
+  dictation_install_cancel)
+    job_id=$(trim "$(param "job_id")")
+    if ! valid_id "$job_id"; then
+      emit_error "invalid job_id"
+      exit 0
+    fi
+
+    job_dir="$dictation_installs_dir/$job_id"
+    if [ ! -d "$job_dir" ]; then
+      emit_error "dictation install job not found"
+      exit 0
+    fi
+
+    status=$(read_file_line "$job_dir/status" "")
+    install_pid=$(read_file_line "$job_dir/pid" "")
+
+    if [ "$status" = "done" ] || [ "$status" = "failed" ] || [ "$status" = "cancelled" ]; then
+      printf '{"success":true,"job":{"id":"%s","status":"%s","action":"install"}}\n' \
+        "$(json_escape "$job_id")" \
+        "$(json_escape "$status")"
+      exit 0
+    fi
+
+    if [ -n "$install_pid" ] && ! stop_process_tree_by_pid "$install_pid"; then
+      emit_error "Could not cancel dictation install process."
+      exit 0
+    fi
+
+    printf '%s\n' "130" > "$job_dir/exit_code"
+    printf '%s\n' "cancelled" > "$job_dir/status"
+    [ -f "$job_dir/finished" ] || date +%s > "$job_dir/finished"
+    printf '%s\n' "voice-recognition: install cancelled" >> "$job_dir/log"
+
+    printf '{"success":true,"job":{"id":"%s","status":"cancelled","action":"install"}}\n' \
+      "$(json_escape "$job_id")"
     exit 0
     ;;
 
@@ -13140,6 +13222,7 @@ EOF_RUNNER
         status="failed"
         case "$exit_code" in
           0) status="done" ;;
+          130|143) status="cancelled" ;;
           "") status_reason="Dictation installer stopped before producing output." ;;
         esac
       fi
@@ -13173,6 +13256,9 @@ EOF_RUNNER
     if [ "$status" = "done" ]; then
       phase="done"
       progress_pct="100"
+    elif [ "$status" = "cancelled" ]; then
+      phase="cancelled"
+      progress_pct=""
     elif [ "$status" = "failed" ]; then
       phase="failed"
       progress_pct=""
@@ -13199,7 +13285,7 @@ EOF_RUNNER
       fallback_json=true
     fi
 
-    printf '{"success":true,"job":{"id":"%s","status":"%s","phase":"%s","progress_pct":"%s","downloaded_bytes":"%s","component":"%s","component_label":"%s","installed":"%s","backend":"%s","fallback_component":"%s","fallback":%s,"download_size_bytes":"%s","started":"%s","finished":"%s","exit_code":"%s","log":"%s"}}\n' \
+    printf '{"success":true,"job":{"id":"%s","status":"%s","action":"install","phase":"%s","progress_pct":"%s","downloaded_bytes":"%s","component":"%s","component_label":"%s","installed":"%s","backend":"%s","fallback_component":"%s","fallback":%s,"download_size_bytes":"%s","started":"%s","finished":"%s","exit_code":"%s","log":"%s"}}\n' \
       "$(json_escape "$job_id")" \
       "$(json_escape "$status")" \
       "$(json_escape "$phase")" \

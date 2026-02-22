@@ -716,7 +716,7 @@ button:hover {
 }
 
 .row-subtask {
-  background: var(--theme_blue_bg, color-mix(in srgb, var(--theme_blue, #3b82f6) 14%, var(--light-bg, #f8f7fc) 86%));
+  background: color-mix(in srgb, var(--theme_blue, #3b82f6) 14%, var(--light-bg, #f8f7fc) 86%);
   border-left: 0;
   border-right: 0;
   border-bottom: 0;
@@ -730,8 +730,8 @@ button:hover {
 }
 
 .row.row-project {
-  background: var(--theme_blue_bg, color-mix(in srgb, var(--theme_blue, #3b82f6) 16%, var(--light-bg, #f8f7fc) 84%));
-  border-color: var(--theme_blue_border, color-mix(in srgb, var(--theme_blue, #3b82f6) 38%, var(--border, #d4d0e6)));
+  background: color-mix(in srgb, var(--theme_blue, #3b82f6) 16%, var(--light-bg, #f8f7fc) 84%);
+  border-color: color-mix(in srgb, var(--theme_blue, #3b82f6) 38%, var(--border, #d4d0e6));
   min-height: calc(38px * var(--ui-scale));
   padding-top: calc(6px * var(--ui-scale));
   padding-bottom: calc(6px * var(--ui-scale));
