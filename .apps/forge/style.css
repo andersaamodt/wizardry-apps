@@ -1015,6 +1015,7 @@ input[type="checkbox"]:disabled {
   grid-row: 1;
   border-bottom: 0;
   overflow: hidden;
+  padding-right: 0.78rem;
 }
 
 .toolbar-actions {
@@ -1336,7 +1337,7 @@ input[type="checkbox"]:disabled {
   max-width: min(14rem, 34vw);
   column-gap: 0.62rem;
   margin-top: 0;
-  margin-left: auto;
+  margin-left: 0.18rem;
   min-width: 0;
   flex: 0 1 auto;
   overflow: hidden;
