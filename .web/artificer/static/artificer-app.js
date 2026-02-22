@@ -806,7 +806,7 @@
 
     settingsModal: document.getElementById("settings-modal"),
     settingsCloseBtn: document.getElementById("settings-close-btn"),
-    ghAuthStatus: document.getElementById("gh-auth-status"),
+    gitStatus: document.getElementById("git-status"),
     sshKeyStatus: document.getElementById("ssh-key-status"),
     llmUseGpuToggle: document.getElementById("llm-use-gpu-toggle"),
     githubUsername: document.getElementById("github-username"),
@@ -12139,8 +12139,8 @@
   }
 
   function loadAuthStatus() {
-    if (el.ghAuthStatus) {
-      el.ghAuthStatus.textContent = "Checking...";
+    if (el.gitStatus) {
+      el.gitStatus.textContent = "Checking...";
     }
     if (el.sshKeyStatus) {
       el.sshKeyStatus.textContent = "Checking...";
@@ -12151,10 +12151,12 @@
         throw new Error(response.error || "Failed to load auth status");
       }
 
-      if (response.has_gh) {
-        el.ghAuthStatus.textContent = response.gh_authenticated ? "Authenticated" : "Not authenticated";
-      } else {
-        el.ghAuthStatus.textContent = "GitHub CLI not installed";
+      if (el.gitStatus) {
+        if (response.has_git) {
+          el.gitStatus.textContent = "Installed";
+        } else {
+          el.gitStatus.textContent = "Not installed";
+        }
       }
 
       if (response.ssh_pub_exists) {
@@ -12174,8 +12176,8 @@
         }
       }
     }).catch(function (error) {
-      if (el.ghAuthStatus) {
-        el.ghAuthStatus.textContent = "Unavailable";
+      if (el.gitStatus) {
+        el.gitStatus.textContent = "Unavailable";
       }
       if (el.sshKeyStatus) {
         el.sshKeyStatus.textContent = "Unavailable";

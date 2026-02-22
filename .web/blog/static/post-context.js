@@ -234,6 +234,12 @@
       setCommentStatus('Post Nostr metadata is missing for comment submit.', 'warn');
       return;
     }
+    var sessionToken = localStorage.getItem('session_token') || '';
+    var csrfToken = localStorage.getItem('csrf_token') || '';
+    if (!sessionToken || !csrfToken) {
+      setCommentStatus('Sign in first to post comments.', 'warn');
+      return;
+    }
 
     var createdAt = Math.floor(Date.now() / 1000);
     var draftEvent = {
@@ -260,7 +266,10 @@
         return fetch('/cgi/blog-submit-comment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: 'path=' + encodeURIComponent(currentRelPath) + '&event_json=' + encodeURIComponent(JSON.stringify(signedEvent)),
+          body: 'session_token=' + encodeURIComponent(sessionToken) +
+            '&csrf_token=' + encodeURIComponent(csrfToken) +
+            '&path=' + encodeURIComponent(currentRelPath) +
+            '&event_json=' + encodeURIComponent(JSON.stringify(signedEvent)),
           credentials: 'same-origin'
         });
       })

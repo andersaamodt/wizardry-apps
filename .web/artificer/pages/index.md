@@ -382,7 +382,7 @@ pagetitle: "Artificer"
 <button id="settings-close-btn" class="icon-btn ghost" type="button" aria-label="Close settings">&times;</button>
 </div>
 <div class="stack">
-<div class="info-row"><span>GitHub CLI</span><strong id="gh-auth-status">Checking...</strong></div>
+<div class="info-row"><span>Git</span><strong id="git-status">Checking...</strong></div>
 <div class="info-row"><span>SSH key</span><strong id="ssh-key-status">Checking...</strong></div>
 <label class="toggle-row" title="Use Ollama GPU acceleration when available on this system">
 <input id="llm-use-gpu-toggle" type="checkbox" checked /> Use GPU acceleration for LLMs

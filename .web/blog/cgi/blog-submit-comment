@@ -14,6 +14,9 @@ if ! blog_nostr_bridge_enabled; then
   blog_nostr_bridge_disabled_json
   exit 0
 fi
+if ! blog_require_session false; then
+  exit 0
+fi
 
 if ! command -v nostril >/dev/null 2>&1; then
   blog_json_error "Comment signing verification requires nostril on the server" "nostril_required"
@@ -70,6 +73,16 @@ if [ -z "$content" ]; then
 fi
 if [ -z "$pubkey" ]; then
   blog_json_error "Comment event pubkey is required" "missing_pubkey"
+  exit 0
+fi
+
+account_pubkey=$(blog_get_nostr_pubkey "$BLOG_SESSION_USERNAME" 2>/dev/null || printf '')
+if [ -z "$account_pubkey" ]; then
+  blog_json_error "Your account does not have a bound Nostr pubkey" "nostr_identity_required"
+  exit 0
+fi
+if [ "$pubkey" != "$account_pubkey" ]; then
+  blog_json_error "Comment pubkey does not match your signed-in account" "pubkey_mismatch"
   exit 0
 fi
 if blog_nostr_list_file_lines "$blog_nostr_blocklist_file" | grep -Fqx "$pubkey"; then
