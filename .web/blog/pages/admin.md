@@ -343,6 +343,8 @@ body {
   flex-direction: column;
   min-height: calc(100vh - 3.25rem);
   align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-nav-list {
@@ -355,14 +357,19 @@ body {
   border-radius: 0;
   overflow: visible;
   background: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-nav-title {
   display: block;
-  padding: 0.5rem 0.4rem;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.5rem 0.22rem;
   border-bottom: 1px solid #d7e1f4;
-  background: #eef4ff;
-  color: #1b335f;
+  background: #f4f6fa;
+  color: #2a3650;
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.2;
@@ -380,7 +387,8 @@ body {
   border-bottom: 0;
   background: transparent;
   color: #1e2d4e;
-  padding: 0.56rem 0.4rem;
+  margin: 0;
+  padding: 0.56rem 0.22rem;
   font-size: 0.93rem;
   font-weight: 650;
   line-height: 1.25;
