@@ -201,16 +201,10 @@
 
 - (void)hideNativeBootSplash {
     if (!self.nativeBootSplashView) {
-        if (self.webView && self.webView.alphaValue < 1.0) {
-            self.webView.alphaValue = 1.0;
-        }
         return;
     }
     NSView *overlay = self.nativeBootSplashView;
     self.nativeBootSplashView = nil;
-    if (self.webView && self.webView.alphaValue < 1.0) {
-        self.webView.alphaValue = 1.0;
-    }
     [overlay removeFromSuperview];
 }
 
@@ -434,8 +428,15 @@
     CGFloat dragStripHeight = 44.0;
     NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
     self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
-    if (self.enableNativeViewMenu) {
-        self.webView.alphaValue = 0.0;
+    @try {
+        // Avoid white intermediate paint by letting the themed host window color
+        // show through until page styles apply.
+        [self.webView setValue:@NO forKey:@"drawsBackground"];
+    } @catch (NSException *exception) {
+        (void)exception;
+    }
+    if (@available(macOS 11.0, *)) {
+        self.webView.underPageBackgroundColor = [NSColor clearColor];
     }
     NSString *pageZoomEnv = [[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_PAGE_ZOOM"];
     if (pageZoomEnv) {
