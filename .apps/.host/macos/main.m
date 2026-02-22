@@ -189,8 +189,8 @@
 
     [overlay addSubview:stack];
     [NSLayoutConstraint activateConstraints:@[
-        [logoView.widthAnchor constraintEqualToConstant:64.0],
-        [logoView.heightAnchor constraintEqualToConstant:64.0],
+        [logoView.widthAnchor constraintEqualToConstant:192.0],
+        [logoView.heightAnchor constraintEqualToConstant:192.0],
         [stack.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
         [stack.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor]
     ]];
