@@ -5421,6 +5421,76 @@ remove_voice_runtime_root() {
   return 0
 }
 
+dictation_job_lock_path() {
+  printf '%s/.job-lock' "$dictation_installs_dir"
+}
+
+acquire_dictation_job_lock() {
+  max_wait_ms=$1
+  case "$max_wait_ms" in
+    ""|*[!0-9]*)
+      max_wait_ms=1500
+      ;;
+  esac
+
+  lock_dir=$(dictation_job_lock_path)
+  waited_ms=0
+
+  while :; do
+    if mkdir "$lock_dir" 2>/dev/null; then
+      printf '%s\n' "$$" > "$lock_dir/pid" 2>/dev/null || true
+      date +%s > "$lock_dir/started" 2>/dev/null || true
+      return 0
+    fi
+
+    lock_pid=$(read_file_line "$lock_dir/pid" "")
+    lock_started=$(read_file_line "$lock_dir/started" "0")
+    lock_stale=0
+
+    case "$lock_pid" in
+      ""|*[!0-9]*)
+        lock_stale=1
+        ;;
+      *)
+        if ! kill -0 "$lock_pid" 2>/dev/null; then
+          lock_stale=1
+        fi
+        ;;
+    esac
+
+    if [ "$lock_stale" -eq 0 ]; then
+      now_epoch=$(date +%s 2>/dev/null || printf '0')
+      case "$now_epoch:$lock_started" in
+        *[!0-9]*:*|*:*[!0-9]*)
+          :
+          ;;
+        *)
+          lock_age=$((now_epoch - lock_started))
+          if [ "$lock_age" -gt 120 ] 2>/dev/null; then
+            lock_stale=1
+          fi
+          ;;
+      esac
+    fi
+
+    if [ "$lock_stale" -eq 1 ]; then
+      rm -rf "$lock_dir" 2>/dev/null || true
+      continue
+    fi
+
+    if [ "$waited_ms" -ge "$max_wait_ms" ] 2>/dev/null; then
+      return 1
+    fi
+    sleep 0.05
+    waited_ms=$((waited_ms + 50))
+  done
+}
+
+release_dictation_job_lock() {
+  lock_dir=$(dictation_job_lock_path)
+  rm -rf "$lock_dir" 2>/dev/null || true
+}
+
 stop_process_tree_by_pid() {
   target_pid=$1
   case "$target_pid" in
@@ -13195,6 +13265,10 @@ EOF
     ;;
 
   dictation_install_start)
+    if ! acquire_dictation_job_lock "2000"; then
+      emit_error "Dictation install is busy. Try again."
+      exit 0
+    fi
     preferred_component=$(preferred_voice_component_for_host)
     fallback_component="ctranslate2-whisper"
     install_component=$preferred_component
@@ -13204,6 +13278,7 @@ EOF
       primary_bin=$(resolve_voice_recognition_install_bin "$install_component" || true)
     fi
     if [ -z "$primary_bin" ]; then
+      release_dictation_job_lock
       emit_error "Voice recognition installer is unavailable."
       exit 0
     fi
@@ -13223,6 +13298,7 @@ EOF
       running_pid=$(read_file_line "$existing_job/pid" "")
       if [ "$running_status" = "running" ] && [ -n "$running_pid" ] && kill -0 "$running_pid" 2>/dev/null; then
         running_phase=$(read_file_line "$existing_job/phase_last" "downloading")
+        release_dictation_job_lock
         printf '{"success":true,"job":{"id":"%s","status":"running","action":"install","phase":"%s","component":"%s","fallback_component":"%s","download_size_bytes":"%s"}}\n' \
           "$(json_escape "$(basename "$existing_job")")" \
           "$(json_escape "$running_phase")" \
@@ -13367,18 +13443,25 @@ EOF_RUNNER
       "$(json_escape "$install_component")" \
       "$(json_escape "$fallback_component")" \
       "$(json_escape "$download_size_bytes")"
+    release_dictation_job_lock
     exit 0
     ;;
 
   dictation_install_cancel)
+    if ! acquire_dictation_job_lock "2000"; then
+      emit_error "Dictation install is busy. Try again."
+      exit 0
+    fi
     job_id=$(trim "$(param "job_id")")
     if ! valid_id "$job_id"; then
+      release_dictation_job_lock
       emit_error "invalid job_id"
       exit 0
     fi
 
     job_dir="$dictation_installs_dir/$job_id"
     if [ ! -d "$job_dir" ]; then
+      release_dictation_job_lock
       emit_error "dictation install job not found"
       exit 0
     fi
@@ -13389,6 +13472,7 @@ EOF_RUNNER
     fallback_component=$(read_file_line "$job_dir/fallback_component" "ctranslate2-whisper")
 
     if [ "$status" = "done" ] || [ "$status" = "failed" ] || [ "$status" = "cancelled" ]; then
+      release_dictation_job_lock
       printf '{"success":true,"job":{"id":"%s","status":"%s","action":"install"}}\n' \
         "$(json_escape "$job_id")" \
         "$(json_escape "$status")"
@@ -13401,22 +13485,26 @@ EOF_RUNNER
     [ -f "$job_dir/finished" ] || date +%s > "$job_dir/finished"
 
     if [ -n "$install_pid" ] && ! stop_process_tree_by_pid "$install_pid"; then
+      release_dictation_job_lock
       emit_error "Could not cancel dictation install process."
       exit 0
     fi
 
     if [ -n "$component" ] && ! remove_voice_component_artifacts "$component"; then
+      release_dictation_job_lock
       emit_error "Cancelled install, but could not remove partial dictation files."
       exit 0
     fi
     if [ -n "$fallback_component" ] && [ "$fallback_component" != "$component" ]; then
       if ! remove_voice_component_artifacts "$fallback_component"; then
+        release_dictation_job_lock
         emit_error "Cancelled install, but could not remove fallback dictation files."
         exit 0
       fi
     fi
     printf '%s\n' "voice-recognition: install cancelled" >> "$job_dir/log"
 
+    release_dictation_job_lock
     printf '{"success":true,"job":{"id":"%s","status":"cancelled","action":"install"}}\n' \
       "$(json_escape "$job_id")"
     exit 0
