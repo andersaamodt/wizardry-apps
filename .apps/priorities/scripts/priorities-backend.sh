@@ -22,6 +22,7 @@ Actions:
   add DIR NAME          Add NAME in DIR and prioritize it
   remove PATH           Move PATH to system trash
   descendant-count PATH Count nested items beneath PATH
+  open-dir [DIR]        Open DIR in the system file browser
   pick-dir              Open a native folder picker (prints selected path)
   parent DIR            Print parent directory path
 USAGE
@@ -1753,6 +1754,30 @@ case "$action" in
     fi
     target=$(expand_home_path "$target")
     descendant_count_impl "$target"
+    ;;
+
+  open-dir)
+    dir=${1:-.}
+    dir=$(expand_home_path "$dir")
+    if [ ! -d "$dir" ]; then
+      printf '%s\n' "priorities-backend: directory not found: $dir" >&2
+      exit 1
+    fi
+    abs=$(CDPATH= cd -- "$dir" && pwd -P)
+    if command -v open >/dev/null 2>&1; then
+      open "$abs" >/dev/null 2>&1
+      exit 0
+    fi
+    if command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "$abs" >/dev/null 2>&1
+      exit 0
+    fi
+    if command -v explorer.exe >/dev/null 2>&1; then
+      explorer.exe "$abs" >/dev/null 2>&1
+      exit 0
+    fi
+    printf '%s\n' "priorities-backend: no file browser opener found (open, xdg-open, explorer.exe)" >&2
+    exit 1
     ;;
 
   pick-dir)

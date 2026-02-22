@@ -2959,6 +2959,15 @@
       }
     }
 
+    async function openCurrentRootInFileBrowser() {
+      var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
+      try {
+        await runBackend(['open-dir', currentRoot]);
+      } catch (_) {
+        // Easter egg action is intentionally silent.
+      }
+    }
+
     function showStartupIfNeeded() {
       var modal = document.getElementById('startup-modal');
       var startupPath = document.getElementById('startup-path');
@@ -3017,6 +3026,11 @@
       });
       document.getElementById('copy-markdown').addEventListener('click', function () {
         copyVisiblePrioritiesAsMarkdown();
+      });
+      document.getElementById('title-folder').addEventListener('dblclick', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        openCurrentRootInFileBrowser();
       });
       document.getElementById('dock-left').addEventListener('click', function () {
         dockWindow('left');

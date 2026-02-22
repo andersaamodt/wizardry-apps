@@ -84,6 +84,10 @@ h1 {
   -webkit-app-region: drag;
 }
 
+#title-folder {
+  -webkit-app-region: no-drag;
+}
+
 .topbar-main {
   display: flex;
   align-items: center;
