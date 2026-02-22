@@ -1447,7 +1447,7 @@ input[type="checkbox"]:disabled {
 }
 
 .terminal-icon:hover {
-  border-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
+  border-color: transparent;
   background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
   box-shadow: none;
 }
