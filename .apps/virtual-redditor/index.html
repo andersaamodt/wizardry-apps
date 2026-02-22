@@ -1578,10 +1578,12 @@
       }
     }
 
+    var SUBREDDIT_CHECK_DEBOUNCE_MS = 500;
+
     function scheduleSubredditCheck(delayMs, force) {
       if (state.subredditCheckTimer) clearTimeout(state.subredditCheckTimer);
       var delay = Number(delayMs);
-      if (!Number.isFinite(delay) || delay < 0) delay = 450;
+      if (!Number.isFinite(delay) || delay < 0) delay = SUBREDDIT_CHECK_DEBOUNCE_MS;
       state.subredditCheckTimer = setTimeout(function () {
         runSubredditCheck(!!force);
       }, delay);
@@ -3554,7 +3556,7 @@
       });
       document.getElementById('subreddit-input').addEventListener('input', function () {
         setSettingsMessage('', false);
-        scheduleSubredditCheck(450, false);
+        scheduleSubredditCheck(SUBREDDIT_CHECK_DEBOUNCE_MS, false);
       });
       document.getElementById('subreddit-input').addEventListener('change', function (event) {
         var value = normalizeSubreddit(event.target.value || '');
