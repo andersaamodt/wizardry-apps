@@ -201,12 +201,18 @@
 
 - (void)hideNativeBootSplash {
     if (!self.nativeBootSplashView) {
+        if (self.webView && self.webView.alphaValue < 1.0) {
+            self.webView.alphaValue = 1.0;
+        }
         return;
     }
     NSView *overlay = self.nativeBootSplashView;
     self.nativeBootSplashView = nil;
     [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
         context.duration = 0.45;
+        if (self.webView && self.webView.alphaValue < 1.0) {
+            self.webView.animator.alphaValue = 1.0;
+        }
         overlay.animator.alphaValue = 0.0;
     } completionHandler:^{
         [overlay removeFromSuperview];
@@ -433,6 +439,9 @@
     CGFloat dragStripHeight = 44.0;
     NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
     self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
+    if (self.enableNativeViewMenu) {
+        self.webView.alphaValue = 0.0;
+    }
     NSString *pageZoomEnv = [[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_PAGE_ZOOM"];
     if (pageZoomEnv) {
         if (@available(macOS 11.0, *)) {
