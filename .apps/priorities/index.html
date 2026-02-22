@@ -3081,6 +3081,25 @@
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
       try {
         await runBackend(['open-dir', currentRoot]);
+        return;
+      } catch (_) {
+        // Fall through to direct opener commands for compatibility with
+        // backend copies that do not yet expose open-dir.
+      }
+      try {
+        await bridgeExec(['open', currentRoot]);
+        return;
+      } catch (_) {
+        // Continue fallbacks.
+      }
+      try {
+        await bridgeExec(['xdg-open', currentRoot]);
+        return;
+      } catch (_) {
+        // Continue fallbacks.
+      }
+      try {
+        await bridgeExec(['explorer.exe', currentRoot]);
       } catch (_) {
         // Easter egg action is intentionally silent.
       }
@@ -3146,10 +3165,23 @@
       document.getElementById('copy-markdown').addEventListener('click', function () {
         copyVisiblePrioritiesAsMarkdown();
       });
-      document.getElementById('title-folder').addEventListener('dblclick', function (event) {
+      var titleFolder = document.getElementById('title-folder');
+      var titleLastOpenAt = 0;
+      var openTitleFolderIfDouble = function (event) {
         event.preventDefault();
         event.stopPropagation();
+        var now = Date.now();
+        if (now - titleLastOpenAt < 420) {
+          return;
+        }
+        titleLastOpenAt = now;
         openCurrentRootInFileBrowser();
+      };
+      titleFolder.addEventListener('dblclick', openTitleFolderIfDouble);
+      titleFolder.addEventListener('mouseup', function (event) {
+        if (event.detail === 2) {
+          openTitleFolderIfDouble(event);
+        }
       });
       document.getElementById('dock-left').addEventListener('click', function () {
         dockWindow('left');
