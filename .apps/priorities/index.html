@@ -2660,43 +2660,49 @@
       updateDrillUpVisibility();
       var preloadStartupData = async function () {
         if (!options.preloadStartupData) {
-          return;
+          return null;
         }
         var rootItems = await listDir(state.root);
         setCachedDirItems(state.root, rootItems);
-        var preloadTargets = [];
-        for (var i = 0; i < rootItems.length; i += 1) {
-          var item = rootItems[i];
-          if (item && item.kind === 'dir' && item.hasSubpriorities) {
-            preloadTargets.push(item.path);
-          }
-        }
-        if (!preloadTargets.length) {
-          return;
-        }
-        var deadline = Date.now() + 1200;
-        var idx = 0;
-        var workerCount = Math.min(4, preloadTargets.length);
-        var workers = [];
-        var worker = async function () {
-          while (idx < preloadTargets.length && Date.now() < deadline) {
-            var path = preloadTargets[idx];
-            idx += 1;
-            try {
-              var childItems = await listDir(path);
-              setCachedDirItems(path, childItems);
-            } catch (_) {
-              // Ignore preload errors; normal lazy load still applies.
-            }
-          }
-        };
-        for (var w = 0; w < workerCount; w += 1) {
-          workers.push(worker());
-        }
-        await Promise.all(workers);
+        return rootItems;
       };
-      return preloadStartupData().then(function () {
-        return render({ suppressLoadingOverlay: !!options.suppressLoadingOverlay });
+      return preloadStartupData().then(function (rootItems) {
+        return render({ suppressLoadingOverlay: !!options.suppressLoadingOverlay }).then(function () {
+          if (!options.preloadStartupData || !Array.isArray(rootItems) || !rootItems.length) {
+            return;
+          }
+          // Warm next-action caches after first paint to keep startup snappy.
+          setTimeout(function () {
+            var preloadTargets = [];
+            for (var i = 0; i < rootItems.length; i += 1) {
+              var item = rootItems[i];
+              if (item && item.kind === 'dir' && item.hasSubpriorities) {
+                preloadTargets.push(item.path);
+              }
+            }
+            if (!preloadTargets.length) {
+              return;
+            }
+            var idx = 0;
+            var workerCount = Math.min(3, preloadTargets.length);
+            var worker = async function () {
+              while (idx < preloadTargets.length) {
+                var path = preloadTargets[idx];
+                idx += 1;
+                try {
+                  var childItems = await listDir(path);
+                  setCachedDirItems(path, childItems);
+                  upsertNextActionForPath(path);
+                } catch (_) {
+                  // Ignore warm-cache failures; normal lazy load still applies.
+                }
+              }
+            };
+            for (var w = 0; w < workerCount; w += 1) {
+              worker();
+            }
+          }, 0);
+        });
       });
     }
 
