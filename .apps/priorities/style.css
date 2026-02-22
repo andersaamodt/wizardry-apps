@@ -1389,9 +1389,9 @@ button:hover {
   right: calc(4px * var(--ui-scale));
   top: calc(100% + 2px);
   min-width: calc(128px * var(--ui-scale));
-  border: 1px solid var(--border, #d4d0e6);
+  border: 1px solid color-mix(in srgb, var(--border, #d4d0e6) 74%, #fff 26%);
   border-radius: calc(8px * var(--ui-scale));
-  background: color-mix(in srgb, var(--light-bg, #f8f7fc) 92%, #fff 8%);
+  background: color-mix(in srgb, var(--light-bg, #f8f7fc) 26%, #fff 74%);
   box-shadow: 0 10px 24px var(--shadow, rgba(27, 22, 56, 0.12));
   padding: calc(4px * var(--ui-scale));
   z-index: 4;
