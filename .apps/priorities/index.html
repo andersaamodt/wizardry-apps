@@ -1799,6 +1799,7 @@
           rows[rz].style.transformOrigin = '';
           rows[rz].style.willChange = '';
           rows[rz].style.backfaceVisibility = '';
+          rows[rz].style.pointerEvents = '';
           if (rows[rz]._reorderOverlayEl) {
             try {
               rows[rz]._reorderOverlayEl.remove();
@@ -1872,6 +1873,7 @@
         row.style.transformOrigin = '';
         row.style.willChange = '';
         row.style.backfaceVisibility = '';
+        row.style.pointerEvents = '';
         row.style.zIndex = '';
         row.style.visibility = '';
         row.classList.remove('row-moving');
@@ -1948,6 +1950,7 @@
             movedRow.style.zIndex = isPrimaryRow ? '2147483647' : '2147483646';
             movedRow.style.willChange = 'transform';
             movedRow.style.backfaceVisibility = 'hidden';
+            movedRow.style.pointerEvents = 'none';
             movedRow.style.transformOrigin = 'top left';
             var rowBlock = movedRow.closest('.echelon-block');
             if (rowBlock) {
@@ -2410,11 +2413,11 @@
       }
       if (busy) {
         button.classList.remove('queued');
-        button.classList.add('loading');
+        button.classList.remove('loading');
         button.setAttribute('aria-busy', 'true');
         button.setAttribute('aria-label', 'Prioritizing');
         button.disabled = true;
-        button.textContent = '';
+        button.textContent = '⬆';
       } else {
         button.classList.remove('queued');
         button.classList.remove('loading');
@@ -3149,7 +3152,6 @@
           state.pendingPrioritizePath = '';
           state.reorderPrimaryPath = '';
           processPrioritizeQueue();
-          syncPrioritizeButtonsToQueue();
         }
       })();
     }
