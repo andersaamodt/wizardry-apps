@@ -682,6 +682,10 @@ button:disabled {
   box-shadow: none;
 }
 
+input[type="checkbox"]:disabled {
+  cursor: default;
+}
+
 .list {
   border: 0;
   border-radius: 10px;
