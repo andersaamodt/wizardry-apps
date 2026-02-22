@@ -1779,6 +1779,14 @@
       tree.classList.add('reordering');
       var consumedAnimMatches = Object.create(null);
       var rows = treeEl().querySelectorAll('.row[data-path]');
+      for (var ri = 0; ri < rows.length; ri += 1) {
+        rows[ri].style.zIndex = '1';
+      }
+      var clearRowZIndexes = function () {
+        for (var rz = 0; rz < rows.length; rz += 1) {
+          rows[rz].style.zIndex = '';
+        }
+      };
       var moved = [];
       for (var i = 0; i < rows.length; i += 1) {
         var row = rows[i];
@@ -1815,6 +1823,7 @@
         });
       }
       if (!moved.length) {
+        clearRowZIndexes();
         tree.classList.remove('reordering');
         endReorderAnimationBarrier();
         return;
@@ -1858,6 +1867,7 @@
         if (remaining <= 0 && !finished) {
           finished = true;
           clearTimeout(safetyTimer);
+          clearRowZIndexes();
           tree.classList.remove('reordering');
           endReorderAnimationBarrier();
         }
@@ -1882,6 +1892,7 @@
           }
           finalizeOne(safetyRow);
         }
+        clearRowZIndexes();
         tree.classList.remove('reordering');
         endReorderAnimationBarrier();
       }, durationMs + 220);

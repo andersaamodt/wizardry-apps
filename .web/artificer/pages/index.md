@@ -389,7 +389,7 @@ pagetitle: "Artificer"
 </label>
 <p class="settings-hint">Applies to Ollama inference on macOS (Metal) and Linux (CUDA/ROCm when available).</p>
 <div class="modal-actions modal-actions-compact">
-<button id="install-dictation-btn" type="button">Install dictation (1.4 GB)</button>
+<button id="install-dictation-btn" type="button" disabled>Install dictation (1.4 GB)</button>
 </div>
 <p class="settings-hint">Installs local dictation. On Apple Silicon macOS this uses MLX Whisper automatically.</p>
 <p id="dictation-install-status" class="settings-hint hidden"></p>
