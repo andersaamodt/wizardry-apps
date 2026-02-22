@@ -1912,27 +1912,36 @@
       if (!up) {
         return;
       }
-      up.classList.toggle('hidden', state.drillStack.length === 0);
+      var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
+      var parent = parentDirOfPath(currentRoot);
+      var hasParent = !!parent && parent !== currentRoot;
+      up.classList.toggle('hidden', state.drillStack.length === 0 && !hasParent);
     }
 
     function drillInto(path) {
       if (!path) {
         return;
       }
-      state.drillStack.push(rootInputValue());
+      var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
+      state.drillStack.push(currentRoot);
       document.getElementById('root-dir').value = path;
       setRootAndRefresh({ keepDrillStack: true, persistRoot: false });
       updateDrillUpVisibility();
     }
 
     function drillUp() {
-      if (!state.drillStack.length) {
-        return;
+      var previous = '';
+      if (state.drillStack.length) {
+        previous = String(state.drillStack.pop() || '').trim();
       }
-      var previous = state.drillStack.pop();
       if (!previous) {
-        updateDrillUpVisibility();
-        return;
+        var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
+        var parent = parentDirOfPath(currentRoot);
+        if (!parent || parent === currentRoot) {
+          updateDrillUpVisibility();
+          return;
+        }
+        previous = parent;
       }
       document.getElementById('root-dir').value = previous;
       setRootAndRefresh({ keepDrillStack: true, persistRoot: false });
