@@ -2001,13 +2001,14 @@
         }
         if (els.actionRunMenu) {
           els.actionRunMenu.classList.toggle('hidden', !showRunSplit);
-          els.actionRunMenu.disabled = !canServeWebHost;
-          els.actionRunMenu.title = canServeWebHost ? 'Run options' : 'Enable Hosted Web target to serve web host';
-          els.actionRunMenu.setAttribute('aria-label', canServeWebHost ? 'Run options' : 'Enable Hosted Web target to serve web host');
+          els.actionRunMenu.disabled = false;
+          els.actionRunMenu.title = 'Run options';
+          els.actionRunMenu.setAttribute('aria-label', 'Run options');
           if (els.runMenu) {
             var webHostButton = document.getElementById('action-run-webhost');
             if (webHostButton) {
               webHostButton.disabled = !canServeWebHost;
+              webHostButton.title = canServeWebHost ? 'Serve web host' : 'Enable Hosted Web target to serve web host';
             }
           }
         }
@@ -3180,9 +3181,6 @@
 
         if (els.actionRunMenu) {
           els.actionRunMenu.addEventListener('click', function () {
-            if (els.actionRunMenu.disabled) {
-              return;
-            }
             toggleFloatingMenu(els.runMenu, els.actionRunMenu);
           });
         }

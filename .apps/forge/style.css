@@ -1074,7 +1074,7 @@ button:disabled {
   border: 1px solid var(--toolbar-line);
   border-radius: 8px;
   background: var(--toolbar-surface);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .build-split .toolbar-btn {
@@ -1085,6 +1085,10 @@ button:disabled {
   border: 0;
   border-radius: 0;
   transform: none;
+}
+
+.run-split #action-run {
+  border-radius: 8px 0 0 8px;
 }
 
 .build-split .menu-toggle {
@@ -1100,6 +1104,7 @@ button:disabled {
   padding: 0;
   justify-content: center;
   border-left: 1px solid var(--toolbar-line);
+  border-radius: 0 8px 8px 0;
 }
 
 .build-split .floating-menu {
