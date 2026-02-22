@@ -161,6 +161,7 @@
       pendingPrioritizePath: '',
       pendingCheckPath: '',
       pendingExpandPath: '',
+      pendingDirRevalidate: Object.create(null),
       pendingAdd: false,
       pendingAddSave: false,
       pendingMakeProjectPath: '',
@@ -1087,6 +1088,94 @@
       target.checked = Number(quickData.checked) || 0;
       items.sort(comparePriorityItems);
       return true;
+    }
+
+    function cloneDirItems(items) {
+      if (!Array.isArray(items)) {
+        return [];
+      }
+      var out = [];
+      for (var i = 0; i < items.length; i += 1) {
+        var item = items[i] || {};
+        out.push({
+          path: item.path,
+          name: item.name,
+          kind: item.kind,
+          echelon: Number(item.echelon) || 0,
+          priority: Number(item.priority) || 0,
+          checked: Number(item.checked) || 0,
+          upvotes: Number(item.upvotes) || 0,
+          hasSubpriorities: !!item.hasSubpriorities
+        });
+      }
+      return out;
+    }
+
+    function listFingerprint(items) {
+      if (!Array.isArray(items) || !items.length) {
+        return '';
+      }
+      var out = [];
+      for (var i = 0; i < items.length; i += 1) {
+        var item = items[i] || {};
+        out.push([
+          String(item.path || ''),
+          String(item.name || ''),
+          String(item.kind || ''),
+          String(Number(item.echelon) || 0),
+          String(Number(item.priority) || 0),
+          String(Number(item.checked) || 0),
+          String(Number(item.upvotes) || 0),
+          item.hasSubpriorities ? '1' : '0'
+        ].join('\u0001'));
+      }
+      return out.join('\u0002');
+    }
+
+    function applyOptimisticPrioritize(dir, path) {
+      var items = getCachedDirItems(dir);
+      if (!Array.isArray(items) || !items.length) {
+        return null;
+      }
+      var target = null;
+      var highestEchelon = 0;
+      var highestPriorityInEchelon = 0;
+      for (var i = 0; i < items.length; i += 1) {
+        var item = items[i];
+        if (!item) {
+          continue;
+        }
+        if (item.path === path) {
+          target = item;
+        }
+        var e = Number(item.echelon) || 0;
+        var p = Number(item.priority) || 0;
+        if (e > highestEchelon) {
+          highestEchelon = e;
+          highestPriorityInEchelon = 0;
+        }
+        if (e === highestEchelon && p > highestPriorityInEchelon) {
+          highestPriorityInEchelon = p;
+        }
+      }
+      if (!target) {
+        return null;
+      }
+      var previousItems = cloneDirItems(items);
+      var currentEchelon = Number(target.echelon) || 0;
+      target.checked = 0;
+      if (highestEchelon <= 0) {
+        target.echelon = 1;
+        target.priority = 1;
+      } else if (currentEchelon === highestEchelon && currentEchelon > 0) {
+        target.echelon = highestEchelon + 1;
+        target.priority = 1;
+      } else {
+        target.echelon = highestEchelon;
+        target.priority = highestPriorityInEchelon + 1;
+      }
+      items.sort(comparePriorityItems);
+      return previousItems;
     }
 
     async function listDir(dir) {
@@ -2136,6 +2225,32 @@
       }
       state.expanded[path] = willOpen;
       render({ suppressLoadingOverlay: true });
+      if (willOpen) {
+        revalidateDirInBackground(path);
+      }
+    }
+
+    function revalidateDirInBackground(path) {
+      var key = String(path || '').trim();
+      if (!key || state.pendingDirRevalidate[key]) {
+        return;
+      }
+      state.pendingDirRevalidate[key] = true;
+      listDir(key).then(function (freshItems) {
+        var cachedItems = getCachedDirItems(key);
+        if (listFingerprint(cachedItems) === listFingerprint(freshItems)) {
+          return;
+        }
+        setCachedDirItems(key, freshItems);
+        upsertNextActionForPath(key);
+        if (state.expanded[key]) {
+          render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        }
+      }).catch(function () {
+        // Ignore background revalidation failures.
+      }).finally(function () {
+        delete state.pendingDirRevalidate[key];
+      });
     }
 
     function buildRow(item, depth, edgeClass, options) {
@@ -2721,74 +2836,58 @@
     }
 
     function processPrioritizeQueue() {
-      if (state.prioritizeQueueActive || state.busy || state.pendingPrioritizePath) {
-        return;
-      }
-      if (!state.prioritizeQueue.length) {
-        syncPrioritizeButtonsToQueue();
-        return;
-      }
-      state.prioritizeQueueActive = true;
-      (async function runQueue() {
-        try {
-          while (state.prioritizeQueue.length) {
-            if (state.busy || state.pendingPrioritizePath) {
-              break;
-            }
-            var next = state.prioritizeQueue.shift();
-            if (!next || !next.path) {
-              continue;
-            }
-            var path = next.path;
-            var parentDir = parentDirOfPath(path);
-            state.pendingPrioritizePath = path;
-            syncPrioritizeButtonsToQueue();
-            await runAction(function () {
-              return runBackend(['prioritize-quick', path]).then(function (result) {
-                var quick = parsePrioritizeQuickOutput(result && result.stdout);
-                if (applyPrioritizeQuickToCache(parentDir, path, quick)) {
-                  return;
-                }
-                return runBackend(['list', parentDir]).then(function (listResult) {
-                  hydrateCachedDirFromResult(parentDir, listResult);
-                });
-              }).catch(function () {
-                // Compatibility fallback for older backend copies that do not
-                // yet expose prioritize-quick.
-                return runBackend(['prioritize-fast', path]).then(function (fastResult) {
-                  hydrateCachedDirFromResult(parentDir, fastResult);
-                });
-              });
-            }, {
-              animateReorder: true,
-              suppressLoadingOverlay: true
-            });
-            state.pendingPrioritizePath = '';
-            syncPrioritizeButtonsToQueue();
-          }
-        } finally {
-          state.prioritizeQueueActive = false;
-          if (state.pendingPrioritizePath) {
-            state.pendingPrioritizePath = '';
-          }
-          syncPrioritizeButtonsToQueue();
-          if (state.prioritizeQueue.length && !state.busy) {
-            setTimeout(processPrioritizeQueue, 0);
-          }
-        }
-      })();
+      syncPrioritizeButtonsToQueue();
     }
 
     function actPrioritize(path, button) {
-      if (!path) {
+      if (!path || state.busy || state.pendingPrioritizePath) {
         return;
       }
-      state.prioritizeQueue.push({ path: path });
+      var parentDir = parentDirOfPath(path);
+      var previousItems = applyOptimisticPrioritize(parentDir, path);
+      state.pendingPrioritizePath = path;
+      state.busy = true;
       syncPrioritizeButtonsToQueue();
-      processPrioritizeQueue();
       if (button) {
         button.blur();
       }
+      (async function () {
+        try {
+          if (previousItems) {
+            await render({ animateReorder: true, suppressLoadingOverlay: true });
+          }
+          var appliedQuick = false;
+          try {
+            var result = await runBackend(['prioritize-quick', path]);
+            var quick = parsePrioritizeQuickOutput(result && result.stdout);
+            appliedQuick = applyPrioritizeQuickToCache(parentDir, path, quick);
+          } catch (_) {
+            // Compatibility fallback for older backend copies that do not yet
+            // expose prioritize-quick.
+            var fastResult = await runBackend(['prioritize-fast', path]);
+            hydrateCachedDirFromResult(parentDir, fastResult);
+            appliedQuick = true;
+          }
+          if (!appliedQuick) {
+            var listResult = await runBackend(['list', parentDir]);
+            hydrateCachedDirFromResult(parentDir, listResult);
+          }
+          if (!previousItems || listFingerprint(previousItems) !== listFingerprint(getCachedDirItems(parentDir))) {
+            await render({ animateReorder: true, suppressLoadingOverlay: true });
+          }
+        } catch (error) {
+          if (previousItems) {
+            setCachedDirItems(parentDir, previousItems);
+            await render({ animateReorder: true, suppressLoadingOverlay: true });
+          }
+          status(String(error && error.message ? error.message : error), true);
+        } finally {
+          state.busy = false;
+          state.pendingPrioritizePath = '';
+          processPrioritizeQueue();
+          syncPrioritizeButtonsToQueue();
+        }
+      })();
     }
 
     function processAddQueue() {
