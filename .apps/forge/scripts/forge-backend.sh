@@ -287,10 +287,30 @@ ensure_macos_host() {
   module_cache="$root/_tmp/workbench/clang-module-cache"
 
   mkdir -p "$(dirname "$host_bin")"
+  needs_rebuild=0
   if [ ! -x "$host_bin" ] || [ "$host_src" -nt "$host_bin" ]; then
+    needs_rebuild=1
+  elif command -v lipo >/dev/null 2>&1; then
+    archs=$(lipo -archs "$host_bin" 2>/dev/null || true)
+    if ! printf '%s\n' "$archs" | grep -qw 'arm64'; then
+      needs_rebuild=1
+    fi
+    if ! printf '%s\n' "$archs" | grep -qw 'x86_64'; then
+      needs_rebuild=1
+    fi
+  fi
+
+  if [ "$needs_rebuild" -eq 1 ]; then
     mkdir -p "$module_cache"
     CLANG_MODULE_CACHE_PATH="$module_cache" \
-      clang -O2 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit
+      clang -O2 -fobjc-arc -fmodules -arch arm64 -arch x86_64 "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit
+    if command -v lipo >/dev/null 2>&1; then
+      archs=$(lipo -archs "$host_bin" 2>/dev/null || true)
+      if ! printf '%s\n' "$archs" | grep -qw 'arm64' || ! printf '%s\n' "$archs" | grep -qw 'x86_64'; then
+        printf '%s\n' "forge-backend: failed to produce universal macOS host binary (got: ${archs:-unknown})" >&2
+        exit 1
+      fi
+    fi
   fi
   printf '%s\n' "$host_bin"
 }
