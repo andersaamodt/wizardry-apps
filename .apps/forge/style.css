@@ -1250,8 +1250,7 @@ input[type="checkbox"]:disabled {
 .suite-badge {
   display: inline-flex;
   align-items: center;
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   gap: 0.32rem;
   border: 1px solid var(--pill-purple-border);
   border-radius: 999px;
@@ -1288,8 +1287,7 @@ input[type="checkbox"]:disabled {
 .type-badge {
   display: inline-flex;
   align-items: center;
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   gap: 0.32rem;
   border: 1px solid var(--pill-blue-border);
   border-radius: 999px;
@@ -1339,7 +1337,7 @@ input[type="checkbox"]:disabled {
   display: inline-grid;
   grid-template-columns: minmax(1.45rem, 1fr) auto;
   align-items: center;
-  max-width: min(14rem, 34vw);
+  max-width: min(11rem, 28vw);
   column-gap: 0.62rem;
   margin-top: 0;
   margin-left: auto;
@@ -1349,36 +1347,18 @@ input[type="checkbox"]:disabled {
   -webkit-app-region: no-drag;
 }
 
-.selected-title-row.badges-compact .type-badge,
-.selected-title-row.badges-compact .suite-badge {
-  width: 0.95rem;
-  min-width: 0.95rem;
-  height: 0.95rem;
-  padding: 0;
-  gap: 0;
-  justify-content: center;
+.selected-title-row.path-overflow-hide-link .selected-path-row {
+  grid-template-columns: auto;
+  min-width: 1.45rem;
+  max-width: 1.45rem;
+  column-gap: 0;
 }
 
-.selected-title-row.badges-compact .type-badge > span,
-.selected-title-row.badges-compact .suite-badge > span {
+.selected-title-row.path-overflow-hide-link .selected-path-row .path-link {
   display: none;
 }
 
-.selected-title-row.badges-compact .type-badge::before,
-.selected-title-row.badges-compact .suite-badge::before {
-  content: "";
-  width: 0.46rem;
-  height: 0.46rem;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0.92;
-}
-
-.selected-title-row.badges-hide-suite .suite-badge {
-  display: none;
-}
-
-.selected-title-row.badges-hide-all .type-badge {
+.selected-title-row.path-overflow-hide-row .selected-path-row {
   display: none;
 }
 

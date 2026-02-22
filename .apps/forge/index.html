@@ -1166,33 +1166,29 @@
         if (btn.classList.contains('hidden') || !btn.dataset || !btn.dataset.path) {
           return;
         }
+        var rowOverflowing = !!(els.selectedTitleRow && els.selectedTitleRow.scrollWidth > els.selectedTitleRow.clientWidth + 1);
         // Swap to an icon-only control when the label is too compressed to read.
-        if (btn.clientWidth > 0 && btn.clientWidth < 56) {
+        if ((btn.clientWidth > 0 && btn.clientWidth < 56) || rowOverflowing) {
           btn.classList.add('is-compact');
         }
       }
 
-      function syncSelectedHeaderCompactMode() {
+      function syncSelectedHeaderPathOverflowMode() {
         if (!els.selectedTitleRow) {
           return;
         }
         var row = els.selectedTitleRow;
-        row.classList.remove('badges-compact', 'badges-hide-suite', 'badges-hide-all');
+        row.classList.remove('path-overflow-hide-link', 'path-overflow-hide-row');
         if (row.classList.contains('hidden')) {
           return;
         }
         if (row.scrollWidth <= row.clientWidth + 1) {
           return;
         }
-        row.classList.add('badges-compact');
-        if (row.scrollWidth <= row.clientWidth + 1) {
-          return;
+        row.classList.add('path-overflow-hide-link');
+        if (row.scrollWidth > row.clientWidth + 1) {
+          row.classList.add('path-overflow-hide-row');
         }
-        row.classList.add('badges-hide-suite');
-        if (row.scrollWidth <= row.clientWidth + 1) {
-          return;
-        }
-        row.classList.add('badges-hide-all');
       }
 
       function scheduleSelectedPathCompactSync() {
@@ -1202,7 +1198,7 @@
         state.pathCompactTimer = setTimeout(function () {
           state.pathCompactTimer = null;
           syncSelectedPathCompactMode();
-          syncSelectedHeaderCompactMode();
+          syncSelectedHeaderPathOverflowMode();
         }, 0);
       }
 
