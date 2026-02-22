@@ -1783,30 +1783,6 @@
       }
       var tree = treeEl();
       tree.classList.add('reordering');
-      var overlayLayer = document.createElement('div');
-      overlayLayer.className = 'row-reorder-overlay-layer';
-      overlayLayer.style.margin = '0';
-      overlayLayer.style.padding = '0';
-      overlayLayer.style.border = '0';
-      overlayLayer.style.background = 'transparent';
-      overlayLayer.style.position = 'fixed';
-      overlayLayer.style.inset = '0';
-      overlayLayer.style.pointerEvents = 'none';
-      overlayLayer.style.zIndex = '2147483647';
-      overlayLayer.style.isolation = 'isolate';
-      overlayLayer.style.color = window.getComputedStyle(tree).color;
-      overlayLayer.style.font = window.getComputedStyle(tree).font;
-      if (typeof overlayLayer.showPopover === 'function') {
-        overlayLayer.setAttribute('popover', 'manual');
-      }
-      document.body.appendChild(overlayLayer);
-      if (typeof overlayLayer.showPopover === 'function') {
-        try {
-          overlayLayer.showPopover();
-        } catch (_) {
-          // Popover API may reject if not supported by host engine.
-        }
-      }
       var consumedAnimMatches = Object.create(null);
       var rows = treeEl().querySelectorAll('.row');
       for (var ri = 0; ri < rows.length; ri += 1) {
@@ -1816,6 +1792,12 @@
         for (var rz = 0; rz < rows.length; rz += 1) {
           rows[rz].classList.remove('row-moving');
           rows[rz].style.visibility = '';
+          rows[rz].style.zIndex = '';
+          rows[rz].style.transition = '';
+          rows[rz].style.transform = '';
+          rows[rz].style.transformOrigin = '';
+          rows[rz].style.willChange = '';
+          rows[rz].style.backfaceVisibility = '';
           if (rows[rz]._reorderOverlayEl) {
             try {
               rows[rz]._reorderOverlayEl.remove();
@@ -1824,21 +1806,6 @@
             }
             rows[rz]._reorderOverlayEl = null;
           }
-        }
-        if (overlayLayer) {
-          if (typeof overlayLayer.hidePopover === 'function') {
-            try {
-              overlayLayer.hidePopover();
-            } catch (_) {
-              // Ignore popover cleanup failures.
-            }
-          }
-          try {
-            overlayLayer.remove();
-          } catch (_) {
-            // Ignore overlay layer cleanup failures.
-          }
-          overlayLayer = null;
         }
       };
       var moved = [];
@@ -1901,6 +1868,7 @@
         row.style.transformOrigin = '';
         row.style.willChange = '';
         row.style.backfaceVisibility = '';
+        row.style.zIndex = '';
         row.style.visibility = '';
         row.classList.remove('row-moving');
         if (row._reorderOverlayEl) {
@@ -1964,9 +1932,6 @@
             var movedRowAnimKey = String(movedRow.getAttribute('data-anim-key') || '').trim();
             var rowScaleX = Number(m.scaleX) || 1;
             var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
-            var overlayRect = movedRow.getBoundingClientRect();
-            var movedRowComputedStyle = window.getComputedStyle(movedRow);
-            var overlayRow = movedRow.cloneNode(true);
             var isPrimaryRow = false;
             if (movedRowPath && activeReorderPath && movedRowPath === activeReorderPath) {
               isPrimaryRow = true;
@@ -1975,27 +1940,11 @@
             } else if (activeReorderAnimKey && movedRowAnimKey && movedRowAnimKey === activeReorderAnimKey) {
               isPrimaryRow = true;
             }
-            overlayRow.classList.add('row-moving');
-            overlayRow.classList.add('row-moving-overlay');
-            overlayRow.style.position = 'fixed';
-            overlayRow.style.top = overlayRect.top + 'px';
-            overlayRow.style.left = overlayRect.left + 'px';
-            overlayRow.style.width = overlayRect.width + 'px';
-            overlayRow.style.margin = '0';
-            overlayRow.style.zIndex = isPrimaryRow ? '2147483647' : '2147483646';
-            overlayRow.style.pointerEvents = 'none';
-            overlayRow.style.willChange = 'transform';
-            overlayRow.style.backfaceVisibility = 'hidden';
-            overlayRow.style.transformOrigin = 'top left';
-            overlayRow.style.opacity = '1';
-            overlayRow.style.backgroundColor = movedRowComputedStyle.backgroundColor;
-            overlayRow.style.backgroundImage = movedRowComputedStyle.backgroundImage;
-            overlayRow.style.borderColor = movedRowComputedStyle.borderColor;
-            overlayRow.style.color = movedRowComputedStyle.color;
-            overlayLayer.appendChild(overlayRow);
-            movedRow._reorderOverlayEl = overlayRow;
-            movedRow.style.visibility = 'hidden';
             movedRow.classList.add('row-moving');
+            movedRow.style.zIndex = isPrimaryRow ? '2147483647' : '2147483646';
+            movedRow.style.willChange = 'transform';
+            movedRow.style.backfaceVisibility = 'hidden';
+            movedRow.style.transformOrigin = 'top left';
             if (movedRow._reorderAnimation) {
               try {
                 movedRow._reorderAnimation.cancel();
@@ -2013,7 +1962,7 @@
               var toFrame = {
                 transform: 'translate3d(0,0,0)'
               };
-              var textTargets = overlayRow.querySelectorAll('.name-stack');
+              var textTargets = movedRow.querySelectorAll('.name-stack');
               movedRow._reorderTextAnimationTargets = [];
               if (useWidthScale && textTargets.length) {
                 var inverse = rowScaleX !== 0 ? (1 / rowScaleX) : 1;
@@ -2032,11 +1981,15 @@
                   });
                 }
               }
-              var anim = overlayRow.animate([fromFrame, toFrame], {
+              var anim = movedRow.animate([fromFrame, toFrame], {
                 duration: durationMs,
                 easing: easing,
                 fill: 'both'
               });
+              if (!anim) {
+                finalizeOne(movedRow);
+                return;
+              }
               movedRow._reorderAnimation = anim;
               anim.onfinish = function () {
                 finalizeOne(movedRow);
@@ -2051,14 +2004,14 @@
                 finalizeOne(movedRow);
               };
             } else {
-              overlayRow.style.transition = 'none';
-              overlayRow.style.transform = useWidthScale
+              movedRow.style.transition = 'none';
+              movedRow.style.transform = useWidthScale
                 ? ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0) scaleX(' + rowScaleX + ')')
                 : ('translate3d(' + m.deltaX + 'px,' + m.deltaY + 'px,0)');
-              overlayRow.getBoundingClientRect();
-              overlayRow.style.transition = 'transform ' + durationMs + 'ms ' + easing;
-              overlayRow.style.transform = 'translate3d(0,0,0)';
-              var fallbackTextTargets = overlayRow.querySelectorAll('.name-stack');
+              movedRow.getBoundingClientRect();
+              movedRow.style.transition = 'transform ' + durationMs + 'ms ' + easing;
+              movedRow.style.transform = 'translate3d(0,0,0)';
+              var fallbackTextTargets = movedRow.querySelectorAll('.name-stack');
               movedRow._reorderTextAnimationTargets = [];
               if (useWidthScale && fallbackTextTargets.length) {
                 var fallbackInverse = rowScaleX !== 0 ? (1 / rowScaleX) : 1;
@@ -2074,8 +2027,11 @@
                   fallbackTextEl.style.transform = 'scaleX(1)';
                 }
               }
-              overlayRow.addEventListener('transitionend', function onEnd() {
-                overlayRow.removeEventListener('transitionend', onEnd);
+              movedRow.addEventListener('transitionend', function onEnd(event) {
+                if (event && event.target !== movedRow) {
+                  return;
+                }
+                movedRow.removeEventListener('transitionend', onEnd);
                 finalizeOne(movedRow);
                 if (remaining <= 0 && !finished) {
                   finished = true;
