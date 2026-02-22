@@ -2465,46 +2465,9 @@
       var left = document.createElement('div');
       left.className = 'left';
 
-      if (item.kind === 'dir') {
-        var hasChildren = item.hasSubpriorities;
-        var open = !!state.expanded[item.path];
-        var useProjectSlotTriangle = item.checked !== 1;
-        var expandLoading = state.pendingExpandPath === item.path;
-        if (useProjectSlotTriangle) {
-          var expPlaceholderProject = document.createElement('span');
-          expPlaceholderProject.className = 'exp-placeholder exp-placeholder-collapsed';
-          expPlaceholderProject.setAttribute('aria-hidden', 'true');
-          expPlaceholderProject.addEventListener('click', function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            actToggleChecked(item.path);
-          });
-          left.appendChild(expPlaceholderProject);
-        } else if (!hasChildren) {
-          var expPlaceholderNoChildren = document.createElement('span');
-          expPlaceholderNoChildren.className = 'exp-placeholder exp-placeholder-collapsed';
-          expPlaceholderNoChildren.setAttribute('aria-hidden', 'true');
-          left.appendChild(expPlaceholderNoChildren);
-        } else {
-          var expand = makeButton(open ? '▾' : '▸', 'btn exp', function (event) {
-            event.stopPropagation();
-            toggleExpanded(item.path);
-          }, 'Expand/collapse');
-          if (expandLoading) {
-            setExpandButtonBusy(expand, true);
-          }
-          left.appendChild(expand);
-        }
-      } else {
-        var expPlaceholder = document.createElement('span');
-        expPlaceholder.className = 'exp-placeholder';
-        expPlaceholder.setAttribute('aria-hidden', 'true');
-        left.appendChild(expPlaceholder);
-      }
-
       var checkSlot = document.createElement('span');
       checkSlot.className = 'check-slot';
-      if (item.hasSubpriorities) {
+      if (item.kind === 'dir' && depth === 0 && item.hasSubpriorities) {
         checkSlot.classList.add('project-slot');
         if (state.expanded[item.path]) {
           checkSlot.classList.add('project-open');
