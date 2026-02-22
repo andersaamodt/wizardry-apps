@@ -1467,9 +1467,11 @@
         ensureActiveThemeInList();
       }
 
-      function applyTheme(themeName) {
+      function applyTheme(themeName, options) {
+        options = options || {};
         var normalized = String(themeName || '').toLowerCase().trim();
-        if (!/^[a-z0-9_-]+$/.test(normalized) || state.themes.indexOf(normalized) < 0) {
+        var allowUnlisted = !!options.allowUnlisted;
+        if (!/^[a-z0-9_-]+$/.test(normalized) || (!allowUnlisted && state.themes.indexOf(normalized) < 0)) {
           if (state.themes.indexOf('psionic') >= 0) {
             normalized = 'psionic';
           } else {
@@ -4176,88 +4178,91 @@
 
       async function boot() {
         document.body.classList.add('forge-booting');
-        document.body.classList.remove('settings-open', 'activity-open');
-        state.settingsOpen = false;
-        document.body.classList.remove('layout-recovery');
-        cacheElements();
-        syncToolchainUI();
-        syncLinuxInstallSettingsUI();
-        syncLogClearVisibility();
-        bindButtons();
-        bindKeyboardShortcuts();
-        startAutoRefresh();
-        setPanel('settings', false);
-        setArtifacts([]);
-        await hydratePrefsFromBackend();
-        refreshStateFromStorage();
-        await loadThemes();
-        applyTheme(state.activeTheme);
-        renderThemePicker();
-        setOrganizeShow(state.organizeShow);
-        setLeftRailWidth(state.leftRailWidth);
-        setWorkflowMode(state.route);
-        closeFloatingMenus();
-        syncCreateUI();
-        scheduleLayoutRecoveryCheck();
-        window.addEventListener('resize', scheduleLayoutRecoveryCheck);
-        window.addEventListener('resize', scheduleSelectedPathCompactSync);
+        try {
+          document.body.classList.remove('settings-open', 'activity-open');
+          state.settingsOpen = false;
+          document.body.classList.remove('layout-recovery');
+          cacheElements();
+          syncToolchainUI();
+          syncLinuxInstallSettingsUI();
+          syncLogClearVisibility();
+          bindButtons();
+          bindKeyboardShortcuts();
+          startAutoRefresh();
+          setPanel('settings', false);
+          setArtifacts([]);
+          await hydratePrefsFromBackend();
+          refreshStateFromStorage();
+          applyTheme(state.activeTheme, { allowUnlisted: true });
+          await loadThemes();
+          applyTheme(state.activeTheme);
+          renderThemePicker();
+          setOrganizeShow(state.organizeShow);
+          setLeftRailWidth(state.leftRailWidth);
+          setWorkflowMode(state.route);
+          closeFloatingMenus();
+          syncCreateUI();
+          scheduleLayoutRecoveryCheck();
+          window.addEventListener('resize', scheduleLayoutRecoveryCheck);
+          window.addEventListener('resize', scheduleSelectedPathCompactSync);
 
-        if (state.rootHint) {
-          setWorkspaceRoot(state.rootHint);
-        }
-        if (state.projectsRoot) {
-          els.settingsProjectsRoot.value = state.projectsRoot;
-        }
-        syncSettingsSaveButtons();
-
-        renderResult({
-          status: 'neutral',
-          summary: 'Run an action to see structured results and next steps.',
-          paths: [],
-          help: null
-        });
-
-        if (bridgeAvailable()) {
-          setBridgeStatus(true, 'Bridge: connected');
-          setActivity('ready', 'Ready');
-          try {
-            await refreshWorkspace({ quiet: true });
-          } catch (err) {
-            appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
+          if (state.rootHint) {
+            setWorkspaceRoot(state.rootHint);
           }
-          document.body.classList.remove('forge-booting');
-          text(els.qualityScope, 'Global checks for repository: ' + (state.rootHint || '(not set)'));
-          text(els.qualityHelp, 'These checks run against the repository and pipeline tooling, not one selected app.');
-          scheduleWindowFit();
-          return;
-        }
+          if (state.projectsRoot) {
+            els.settingsProjectsRoot.value = state.projectsRoot;
+          }
+          syncSettingsSaveButtons();
 
-        document.body.classList.remove('forge-booting');
-        document.body.classList.add('bridge-missing');
-        setBridgeStatus(false, 'Bridge: unavailable (open in native host)');
-        setActivity('idle', 'Waiting');
-        appendLog('Native bridge unavailable in browser preview mode.');
+          renderResult({
+            status: 'neutral',
+            summary: 'Run an action to see structured results and next steps.',
+            paths: [],
+            help: null
+          });
 
-        var retries = 0;
-        var maxRetries = 20;
-        var timer = setInterval(function () {
-          retries += 1;
-          if (!bridgeAvailable()) {
-            if (retries >= maxRetries) {
-              clearInterval(timer);
+          if (bridgeAvailable()) {
+            setBridgeStatus(true, 'Bridge: connected');
+            setActivity('ready', 'Ready');
+            try {
+              await refreshWorkspace({ quiet: true });
+            } catch (err) {
+              appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
             }
+            text(els.qualityScope, 'Global checks for repository: ' + (state.rootHint || '(not set)'));
+            text(els.qualityHelp, 'These checks run against the repository and pipeline tooling, not one selected app.');
+            scheduleWindowFit();
             return;
           }
 
-          clearInterval(timer);
-          document.body.classList.remove('bridge-missing');
-          setBridgeStatus(true, 'Bridge: connected');
-          setActivity('ready', 'Ready');
-          refreshWorkspace({ quiet: true }).catch(function (err) {
-            appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
-          });
-          scheduleWindowFit();
-        }, 250);
+          document.body.classList.add('bridge-missing');
+          setBridgeStatus(false, 'Bridge: unavailable (open in native host)');
+          setActivity('idle', 'Waiting');
+          appendLog('Native bridge unavailable in browser preview mode.');
+
+          var retries = 0;
+          var maxRetries = 20;
+          var timer = setInterval(function () {
+            retries += 1;
+            if (!bridgeAvailable()) {
+              if (retries >= maxRetries) {
+                clearInterval(timer);
+              }
+              return;
+            }
+
+            clearInterval(timer);
+            document.body.classList.remove('bridge-missing');
+            setBridgeStatus(true, 'Bridge: connected');
+            setActivity('ready', 'Ready');
+            refreshWorkspace({ quiet: true }).catch(function (err) {
+              appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
+            });
+            scheduleWindowFit();
+          }, 250);
+        } finally {
+          document.body.classList.remove('forge-booting');
+        }
       }
 
       window.addEventListener('load', boot);
