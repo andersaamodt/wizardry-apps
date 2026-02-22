@@ -571,9 +571,50 @@
         dragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
         [rootView addSubview:dragStrip];
     } else {
-        // Priorities uses explicit web header controls (folder title double-click
-        // and drill-up button). Avoid a native transparent drag strip over the
-        // center header so those controls always receive click/double-click.
+        // Priorities needs broad drag affordance in the top band, but interactive
+        // controls (up button/title/snap buttons) must remain clickable.
+        CGFloat topStripHeight = 18.0;
+        NSRect topStripFrame = NSMakeRect(0.0,
+                                          frame.size.height - topStripHeight,
+                                          frame.size.width,
+                                          topStripHeight);
+        NSView *topStrip = [[WizardryDragStripView alloc] initWithFrame:topStripFrame];
+        [topStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [topStrip setWantsLayer:YES];
+        topStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:topStrip];
+
+        CGFloat headerBandY = frame.size.height - dragStripHeight;
+        CGFloat headerBandHeight = dragStripHeight;
+        CGFloat titleHoleWidth = 260.0;
+        CGFloat rightControlsReservedWidth = 168.0;
+        CGFloat leftStripWidth = floor((frame.size.width - titleHoleWidth) / 2.0);
+        if (leftStripWidth < 0.0) {
+            leftStripWidth = 0.0;
+        }
+        CGFloat rightStripX = leftStripWidth + titleHoleWidth;
+        CGFloat rightStripWidth = frame.size.width - rightStripX - rightControlsReservedWidth;
+        if (rightStripWidth < 0.0) {
+            rightStripWidth = 0.0;
+        }
+
+        if (leftStripWidth > 0.0) {
+            NSRect leftHeaderFrame = NSMakeRect(0.0, headerBandY, leftStripWidth, headerBandHeight);
+            NSView *leftHeaderStrip = [[WizardryDragStripView alloc] initWithFrame:leftHeaderFrame];
+            [leftHeaderStrip setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+            [leftHeaderStrip setWantsLayer:YES];
+            leftHeaderStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+            [rootView addSubview:leftHeaderStrip];
+        }
+
+        if (rightStripWidth > 0.0) {
+            NSRect rightHeaderFrame = NSMakeRect(rightStripX, headerBandY, rightStripWidth, headerBandHeight);
+            NSView *rightHeaderStrip = [[WizardryDragStripView alloc] initWithFrame:rightHeaderFrame];
+            [rightHeaderStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+            [rightHeaderStrip setWantsLayer:YES];
+            rightHeaderStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+            [rootView addSubview:rightHeaderStrip];
+        }
     }
 
     if (self.enableNativeBootSplash) {
