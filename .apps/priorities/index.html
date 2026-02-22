@@ -1731,6 +1731,11 @@
           var expPlaceholderProject = document.createElement('span');
           expPlaceholderProject.className = 'exp-placeholder exp-placeholder-collapsed';
           expPlaceholderProject.setAttribute('aria-hidden', 'true');
+          expPlaceholderProject.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            actToggleChecked(item.path);
+          });
           left.appendChild(expPlaceholderProject);
         } else if (!hasChildren) {
           var expPlaceholderNoChildren = document.createElement('span');
@@ -1762,7 +1767,12 @@
         }
       }
       checkSlot.addEventListener('click', function (event) {
+        event.preventDefault();
         event.stopPropagation();
+        if (event.target && event.target.closest && event.target.closest('.chk')) {
+          return;
+        }
+        actToggleChecked(item.path);
       });
 
       var checkbox = document.createElement('input');
@@ -2416,23 +2426,34 @@
     }
 
     function actToggleChecked(path) {
-      if (state.busy || state.pendingCheckPath === path) {
+      if (state.busy || state.pendingCheckPath) {
         return;
       }
       var parentDir = parentDirOfPath(path);
       state.pendingCheckPath = path;
-      runAction(function () {
-        return runMutationWithListFallback(
-          parentDir,
-          ['check-toggle-fast', path],
-          ['check-toggle', path]
-        );
-      }, {
-        suppressLoadingOverlay: true
-      }).finally(function () {
-        state.pendingCheckPath = '';
-        render({ suppressLoadingOverlay: true, preserveInputSelection: true });
-      });
+      state.busy = true;
+      (async function () {
+        try {
+          await runMutationWithListFallback(
+            parentDir,
+            ['check-toggle-fast', path],
+            ['check-toggle', path]
+          );
+          state.pendingCheckPath = '';
+          state.busy = false;
+          await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        } catch (error) {
+          status(String(error && error.message ? error.message : error), true);
+        } finally {
+          if (state.pendingCheckPath === path) {
+            state.pendingCheckPath = '';
+          }
+          if (state.busy) {
+            state.busy = false;
+          }
+          processPrioritizeQueue();
+        }
+      })();
     }
 
     function addAtRoot(rawValue) {
