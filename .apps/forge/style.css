@@ -1316,6 +1316,7 @@ button:disabled {
   margin-top: 0;
   margin-left: 0.18rem;
   min-width: 0;
+  -webkit-app-region: no-drag;
 }
 
 .path-link {
@@ -1336,7 +1337,7 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  cursor: default;
+  cursor: pointer;
 }
 
 .path-link:hover {

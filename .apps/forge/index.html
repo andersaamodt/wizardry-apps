@@ -1873,6 +1873,7 @@
           if (els.openSelectedPath) {
             text(els.openSelectedPath, '');
             els.openSelectedPath.title = 'Path (click to copy, double-click to open)';
+            delete els.openSelectedPath.dataset.path;
             els.openSelectedPath.classList.add('hidden');
           }
           if (els.terminalSelectedPath) {
@@ -1915,10 +1916,12 @@
             var folderName = pathParts.length ? pathParts[pathParts.length - 1] : normalizedPath;
             text(els.openSelectedPath, folderName);
             els.openSelectedPath.title = selected.path + ' (click to copy, double-click to open)';
+            els.openSelectedPath.dataset.path = selected.path;
             els.openSelectedPath.classList.remove('hidden');
           } else {
             text(els.openSelectedPath, '');
             els.openSelectedPath.title = 'Path (click to copy, double-click to open)';
+            delete els.openSelectedPath.dataset.path;
             els.openSelectedPath.classList.add('hidden');
           }
         }
@@ -3525,14 +3528,10 @@
         els.openSelectedPath.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
-          if (state.route === 'create') {
+          var pathValue = (els.openSelectedPath.dataset && els.openSelectedPath.dataset.path) || '';
+          if (!pathValue) {
             return;
           }
-          var selected = selectedCatalogItem();
-          if (!selected || !selected.path) {
-            return;
-          }
-          var pathValue = selected.path;
           if (pathClickTimer) {
             clearTimeout(pathClickTimer);
           }
@@ -3551,14 +3550,11 @@
             clearTimeout(pathClickTimer);
             pathClickTimer = null;
           }
-          if (state.route === 'create') {
+          var pathValue = (els.openSelectedPath.dataset && els.openSelectedPath.dataset.path) || '';
+          if (!pathValue) {
             return;
           }
-          var selected = selectedCatalogItem();
-          if (!selected || !selected.path) {
-            return;
-          }
-          perform('Open folder', function () { return openPath(selected.path, false); }, { swallow: true, noToast: true });
+          perform('Open folder', function () { return openPath(pathValue, false); }, { swallow: true, noToast: true });
         });
 
         els.terminalSelectedPath.addEventListener('click', function () {
