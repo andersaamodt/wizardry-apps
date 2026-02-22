@@ -83,7 +83,8 @@ assert_contains "$ui_js" 'return "Install dictation (" + DICTATION_INSTALL_SIZE_
 assert_contains "$ui_js" "function dictationInstallRunningButtonLabel(job)"
 assert_contains "$ui_js" "return \"Downloading dictation \" + pctText + \"%\";"
 assert_contains "$ui_js" "el.installDictationBtn.disabled = !state.dictationInstallReady || state.dictationInstallInfoLoading || busy;"
-assert_contains "$ui_js" "el.installDictationBtn.classList.toggle(\"ui-pending-spinner\", showRunning);"
+assert_contains "$ui_js" "buttonLabel = \"Checking...\";"
+assert_contains "$ui_js" "el.installDictationBtn.classList.toggle(\"ui-pending-spinner\", showPending);"
 assert_contains "$ui_js" "state.dictationInstallReady = false;"
 assert_contains "$ui_js" "state.dictationInstallReady = true;"
 assert_contains "$ui_js" "function loadDictationStatus(options)"
@@ -107,7 +108,8 @@ assert_contains "$ui_js_source" 'dictationInstalled: false,'
 assert_contains "$ui_js_source" 'var DICTATION_INSTALL_SIZE_LABEL = "1.4 GB";'
 assert_contains "$ui_js_source" 'return "Install dictation (" + DICTATION_INSTALL_SIZE_LABEL + ")";'
 assert_contains "$ui_js_source" "el.installDictationBtn.disabled = !state.dictationInstallReady || state.dictationInstallInfoLoading || busy;"
-assert_contains "$ui_js_source" "el.installDictationBtn.classList.toggle(\"ui-pending-spinner\", showRunning);"
+assert_contains "$ui_js_source" "buttonLabel = \"Checking...\";"
+assert_contains "$ui_js_source" "el.installDictationBtn.classList.toggle(\"ui-pending-spinner\", showPending);"
 assert_contains "$ui_js_source" "function loadDictationStatus(options)"
 assert_contains "$ui_js_source" "apiGet(\"dictation_status\", {}, { timeoutMs: 12000 })"
 assert_contains "$ui_js_source" "apiPost(\"dictation_install_start\", {}, { timeoutMs: 12000 })"

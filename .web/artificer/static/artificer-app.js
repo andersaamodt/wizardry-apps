@@ -12317,14 +12317,18 @@
     var busy = !!state.dictationInstallBusy;
     var status = String(job && job.status ? job.status : "");
     var showRunning = busy || status === "running";
+    var showChecking = !showRunning && (!state.dictationInstallReady || state.dictationInstallInfoLoading);
+    var showPending = showRunning || showChecking;
     var buttonLabel = dictationInstallButtonLabel();
     if (showRunning) {
       buttonLabel = dictationInstallRunningButtonLabel(job);
+    } else if (showChecking) {
+      buttonLabel = "Checking...";
     }
 
     el.installDictationBtn.textContent = buttonLabel;
     el.installDictationBtn.disabled = !state.dictationInstallReady || state.dictationInstallInfoLoading || busy;
-    el.installDictationBtn.classList.toggle("ui-pending-spinner", showRunning);
+    el.installDictationBtn.classList.toggle("ui-pending-spinner", showPending);
 
     if (el.dictationInstallStatus) {
       var statusText = trim(String(state.dictationInstallError || ""));
