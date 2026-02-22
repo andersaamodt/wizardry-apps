@@ -486,7 +486,7 @@ button {
   color: var(--text, #2a2e47);
   border-radius: calc(8px * var(--ui-scale));
   padding: calc(8px * var(--ui-scale)) calc(10px * var(--ui-scale));
-  cursor: pointer;
+  cursor: default;
 }
 
 button:hover {
@@ -628,7 +628,7 @@ button:hover {
 }
 
 .row.row-expandable {
-  cursor: pointer;
+  cursor: default;
 }
 
 .row:hover,
@@ -836,7 +836,7 @@ button:hover {
   background: color-mix(in srgb, var(--light-bg, #f8f7fc) 90%, #fff 10%);
   display: inline-block;
   position: relative;
-  cursor: pointer;
+  cursor: default;
   flex: 0 0 calc(18px * var(--ui-scale));
   outline: none;
 }
@@ -905,7 +905,7 @@ button:hover {
 
 .chk.loading {
   opacity: 1;
-  cursor: wait;
+  cursor: default;
 }
 
 .check-slot.loading .chk {
@@ -959,7 +959,7 @@ button:hover {
 }
 
 .name.project-name-clickable {
-  cursor: pointer;
+  cursor: default;
 }
 
 .name-edit {
@@ -1016,7 +1016,7 @@ button:hover {
   font-size: calc(22px * var(--ui-scale));
   line-height: 1;
   letter-spacing: calc(-1px * var(--ui-scale));
-  cursor: pointer;
+  cursor: default;
   width: calc(34px * var(--ui-scale));
   height: calc(34px * var(--ui-scale));
   position: absolute;
@@ -1036,7 +1036,7 @@ button:hover {
 }
 
 .btn.pri:active {
-  cursor: pointer;
+  cursor: default;
   filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent, #7782d6) 28%, transparent));
 }
 
@@ -1155,7 +1155,7 @@ button:hover {
 
 .add-inline-input:disabled {
   opacity: 0.72;
-  cursor: wait;
+  cursor: default;
 }
 
 .add-inline-btn {
