@@ -222,7 +222,7 @@
                   </button>
                 </div>
                 <div class="manifesto-editor-wrap">
-                  <textarea id="manifesto-input" class="custom-instructions-input" spellcheck="false"></textarea>
+                  <textarea id="manifesto-input" class="custom-instructions-input" spellcheck="false" placeholder="No instructions yet. See Settings for shared instructions."></textarea>
                   <div id="manifesto-save-indicator" class="manifesto-save-indicator hidden" aria-live="polite">
                     <span class="manifesto-save-spinner" aria-hidden="true"></span>
                     <span id="manifesto-save-text">Saving</span>
@@ -347,11 +347,11 @@
           <span id="settings-daemon-pill" class="status-chip warn">Checking...</span>
         </div>
         <div class="settings-global-instructions-row">
-          <label for="settings-global-instructions">Global default instructions</label>
+          <label for="settings-global-instructions">Shared Instructions</label>
           <textarea id="settings-global-instructions" class="settings-global-instructions" spellcheck="false" placeholder="Used for every virtual Redditor unless you customize it."></textarea>
-          <div class="settings-global-instructions-note">Applied to all virtual Redditors as baseline doctrine. Stored once and shared across profiles.</div>
+          <div class="settings-global-instructions-note">Applied to all virtual Redditors as baseline guidance. Stored once and shared across profiles.</div>
           <div class="settings-global-instructions-actions">
-            <button id="btn-settings-save-global-instructions" type="button" class="soft">Save global instructions</button>
+            <button id="btn-settings-save-global-instructions" type="button" class="soft">Save shared instructions</button>
           </div>
         </div>
       </div>
