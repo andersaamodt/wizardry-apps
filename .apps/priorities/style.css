@@ -689,6 +689,11 @@ button:hover {
   z-index: 0;
 }
 
+.tree.reordering .echelon-block {
+  z-index: 0;
+  isolation: isolate;
+}
+
 .row.row-moving {
   position: relative;
   z-index: 2147483647 !important;

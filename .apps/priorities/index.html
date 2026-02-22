@@ -1788,6 +1788,7 @@
       for (var ri = 0; ri < rows.length; ri += 1) {
         rows[ri].classList.remove('row-moving');
       }
+      var blocks = treeEl().querySelectorAll('.echelon-block');
       var clearReorderClasses = function () {
         for (var rz = 0; rz < rows.length; rz += 1) {
           rows[rz].classList.remove('row-moving');
@@ -1806,6 +1807,9 @@
             }
             rows[rz]._reorderOverlayEl = null;
           }
+        }
+        for (var bz = 0; bz < blocks.length; bz += 1) {
+          blocks[bz].style.zIndex = '';
         }
       };
       var moved = [];
@@ -1945,6 +1949,17 @@
             movedRow.style.willChange = 'transform';
             movedRow.style.backfaceVisibility = 'hidden';
             movedRow.style.transformOrigin = 'top left';
+            var rowBlock = movedRow.closest('.echelon-block');
+            if (rowBlock) {
+              var blockTargetZ = isPrimaryRow ? 2147483647 : 2147483646;
+              var existingBlockZ = Number(rowBlock.style.zIndex || 0);
+              if (!Number.isFinite(existingBlockZ)) {
+                existingBlockZ = 0;
+              }
+              if (existingBlockZ < blockTargetZ) {
+                rowBlock.style.zIndex = String(blockTargetZ);
+              }
+            }
             if (movedRow._reorderAnimation) {
               try {
                 movedRow._reorderAnimation.cancel();
