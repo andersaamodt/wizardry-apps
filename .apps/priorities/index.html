@@ -682,6 +682,23 @@
       state.cache[dir] = parseListOutput(result && result.stdout);
     }
 
+    function removeCachedItemByPath(dir, path) {
+      if (!dir || !path) {
+        return false;
+      }
+      var items = state.cache[dir];
+      if (!Array.isArray(items) || !items.length) {
+        return false;
+      }
+      for (var i = 0; i < items.length; i += 1) {
+        if (items[i] && items[i].path === path) {
+          items.splice(i, 1);
+          return true;
+        }
+      }
+      return false;
+    }
+
     function getNextActionLabel(path) {
       var items = state.cache[path];
       if (!items || !items.length) {
@@ -1928,7 +1945,7 @@
     }
 
     function actRemove(itemOrPath) {
-      if (!itemOrPath) {
+      if (!itemOrPath || state.busy) {
         return;
       }
       var path = typeof itemOrPath === 'string' ? itemOrPath : itemOrPath.path;
@@ -1940,10 +1957,23 @@
           return;
         }
         var parentDir = parentDirOfPath(path);
+        var previousItems = Array.isArray(state.cache[parentDir]) ? state.cache[parentDir].slice() : null;
+        var removedOptimistically = removeCachedItemByPath(parentDir, path);
+        if (removedOptimistically) {
+          render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        }
         return runAction(function () {
           return runBackend(['remove-fast', path]).then(function (result) {
-          hydrateCachedDirFromResult(parentDir, result);
-        });
+            hydrateCachedDirFromResult(parentDir, result);
+          }).catch(function (error) {
+            if (removedOptimistically && previousItems) {
+              state.cache[parentDir] = previousItems;
+              render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+            }
+            throw error;
+          });
+        }, {
+          suppressLoadingOverlay: true
         });
       }).catch(function (error) {
         status(String(error && error.message ? error.message : error), true);
