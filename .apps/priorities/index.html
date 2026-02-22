@@ -199,6 +199,8 @@
       startupSnapshotRestored: false,
       hostBootReadySent: false,
       snapshotLastSerialized: '',
+      dragHoleSyncTimer: null,
+      dragHoleResizeObserver: null,
       hoveredPrioritizePath: '',
       prioritizeHoverLockUntil: 0,
       pointerClientX: null,
@@ -351,6 +353,7 @@
       document.documentElement.style.setProperty('--text-scale', String(state.uiScale));
       updateTextSizeDisplays();
       scheduleAutoGrowWindowWidth();
+      scheduleHostPrioritiesDragHoleSync();
     }
 
     function increaseTextScale() {
@@ -389,6 +392,67 @@
       var stderr = String((res && res.stderr) || '').trim();
       var stdout = String((res && res.stdout) || '').trim();
       throw new Error(stderr || stdout || ('exit ' + code));
+    }
+
+    async function syncHostPrioritiesDragHole() {
+      if (!hasBridge()) {
+        return;
+      }
+      var title = document.getElementById('title-folder');
+      var cluster = document.querySelector('.title-cluster');
+      if (!title || !cluster) {
+        return;
+      }
+      var centerX = Number(window.innerWidth) / 2;
+      if (!Number.isFinite(centerX) || centerX <= 0) {
+        return;
+      }
+      var titleRect = title.getBoundingClientRect();
+      var clusterRect = cluster.getBoundingClientRect();
+      var left = titleRect.left;
+      var right = titleRect.right;
+      var drill = document.getElementById('drill-up');
+      if (drill && !drill.classList.contains('hidden')) {
+        var drillRect = drill.getBoundingClientRect();
+        left = Math.min(left, drillRect.left);
+        right = Math.max(right, drillRect.right);
+      } else {
+        left = Math.min(left, clusterRect.left);
+        right = Math.max(right, clusterRect.right);
+      }
+      var pad = 6;
+      var holeLeft = Math.max(0, Math.round((centerX - left) + pad));
+      var holeRight = Math.max(0, Math.round((right - centerX) + pad));
+
+      var rightReserved = 168;
+      var rightTools = document.querySelector('.right-tools');
+      if (rightTools) {
+        var rtRect = rightTools.getBoundingClientRect();
+        var calcReserved = Math.ceil(Math.max(0, window.innerWidth - rtRect.left + 8));
+        if (Number.isFinite(calcReserved) && calcReserved > 0) {
+          rightReserved = calcReserved;
+        }
+      }
+      try {
+        await bridgeExec([
+          '__wizardry_host_priorities_drag_hole',
+          String(holeLeft),
+          String(holeRight),
+          String(rightReserved)
+        ]);
+      } catch (_) {
+        // Ignore hosts that do not support dynamic drag-hole updates.
+      }
+    }
+
+    function scheduleHostPrioritiesDragHoleSync() {
+      if (state.dragHoleSyncTimer) {
+        clearTimeout(state.dragHoleSyncTimer);
+      }
+      state.dragHoleSyncTimer = setTimeout(function () {
+        state.dragHoleSyncTimer = null;
+        syncHostPrioritiesDragHole();
+      }, 36);
     }
 
     async function requestWindowShape() {
@@ -913,6 +977,7 @@
         return;
       }
       el.textContent = folderNameFromPath(rootInputValue());
+      scheduleHostPrioritiesDragHoleSync();
     }
 
     function detectBackendScriptCandidates() {
@@ -2475,6 +2540,7 @@
         if (existingSelect && existingSelect.value !== normalized) {
           existingSelect.value = normalized;
         }
+        scheduleHostPrioritiesDragHoleSync();
         return;
       }
       state.activeFont = normalized;
@@ -2485,6 +2551,7 @@
         select.value = normalized;
       }
       scheduleAutoGrowWindowWidth();
+      scheduleHostPrioritiesDragHoleSync();
     }
 
     function bindStandardTextboxBehavior(input) {
@@ -3159,6 +3226,7 @@
           status('', false);
           saveStartupSnapshot();
         }
+        scheduleHostPrioritiesDragHoleSync();
       } catch (error) {
         status(String(error && error.message ? error.message : error), true);
       } finally {
@@ -3610,6 +3678,7 @@
       }
       if (Array.isArray(state.drillStack) && state.drillStack.length > 0) {
         up.classList.remove('hidden');
+        scheduleHostPrioritiesDragHoleSync();
         return;
       }
       var currentRoot = String(state.root || rootInputValue() || '.').trim() || '.';
@@ -3617,10 +3686,12 @@
       var ceiling = normalizeRootPath(state.rootCeiling || loadStorage(ROOT_KEY) || '');
       if (ceiling && currentNormalized === ceiling) {
         up.classList.add('hidden');
+        scheduleHostPrioritiesDragHoleSync();
         return;
       }
       var nextRoot = parentNavPath(currentRoot);
       up.classList.toggle('hidden', !nextRoot || nextRoot === currentRoot);
+      scheduleHostPrioritiesDragHoleSync();
     }
 
     function drillInto(path) {
@@ -3964,7 +4035,20 @@
           clearTimeout(state.nextActionCacheSaveTimer);
           state.nextActionCacheSaveTimer = null;
         }
+        if (state.dragHoleSyncTimer) {
+          clearTimeout(state.dragHoleSyncTimer);
+          state.dragHoleSyncTimer = null;
+        }
+        if (state.dragHoleResizeObserver) {
+          try {
+            state.dragHoleResizeObserver.disconnect();
+          } catch (_) {
+            // Ignore observer shutdown failures.
+          }
+          state.dragHoleResizeObserver = null;
+        }
       });
+      window.addEventListener('resize', scheduleHostPrioritiesDragHoleSync, { passive: true });
       document.getElementById('refresh').addEventListener('click', setRootAndRefresh);
       document.getElementById('drill-up').addEventListener('click', drillUp);
       var rootDirInput = document.getElementById('root-dir');
@@ -4157,6 +4241,27 @@
       revealBootUi();
       state.windowSizingReady = true;
       updateDrillUpVisibility();
+      if (typeof ResizeObserver === 'function') {
+        try {
+          var tracked = [
+            document.getElementById('title-folder'),
+            document.getElementById('drill-up'),
+            document.querySelector('.title-cluster'),
+            document.querySelector('.right-tools')
+          ];
+          state.dragHoleResizeObserver = new ResizeObserver(function () {
+            scheduleHostPrioritiesDragHoleSync();
+          });
+          for (var i = 0; i < tracked.length; i += 1) {
+            if (tracked[i]) {
+              state.dragHoleResizeObserver.observe(tracked[i]);
+            }
+          }
+        } catch (_) {
+          state.dragHoleResizeObserver = null;
+        }
+      }
+      scheduleHostPrioritiesDragHoleSync();
     });
   </script>
 </body>

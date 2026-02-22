@@ -23,9 +23,10 @@
 }
 @end
 
-@interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler>
+@interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler, NSWindowDelegate>
 @property (strong) NSWindow *window;
 @property (strong) WKWebView *webView;
+@property (strong) NSView *hostRootView;
 @property (strong) NSString *appPath;
 @property (strong) NSImage *appIconImage;
 @property (strong) NSView *nativeBootSplashView;
@@ -35,9 +36,72 @@
 @property (assign) BOOL enableNativeBootSplash;
 @property (assign) BOOL prefersWideDragStrip;
 @property (assign) CGFloat bootSplashLogoSize;
+@property (strong) NSView *prioritiesTopDragStrip;
+@property (strong) NSView *prioritiesLeftHeaderDragStrip;
+@property (strong) NSView *prioritiesRightHeaderDragStrip;
+@property (assign) CGFloat prioritiesTitleHoleLeftWidth;
+@property (assign) CGFloat prioritiesTitleHoleRightWidth;
+@property (assign) CGFloat prioritiesRightControlsReservedWidth;
 @end
 
 @implementation AppDelegate
+
+- (void)windowDidResize:(NSNotification *)notification {
+    (void)notification;
+    [self layoutPrioritiesDragStrips];
+}
+
+- (void)layoutPrioritiesDragStrips {
+    if (!self.enableNativeViewMenu || !self.hostRootView || !self.window) {
+        return;
+    }
+    NSRect frame = [self.window frame];
+    CGFloat dragStripHeight = 44.0;
+    CGFloat topStripHeight = 18.0;
+    CGFloat titleHoleLeftWidth = self.prioritiesTitleHoleLeftWidth > 0.0 ? self.prioritiesTitleHoleLeftWidth : 36.0;
+    CGFloat titleHoleRightWidth = self.prioritiesTitleHoleRightWidth > 0.0 ? self.prioritiesTitleHoleRightWidth : 10.0;
+    CGFloat rightControlsReservedWidth = self.prioritiesRightControlsReservedWidth > 0.0 ? self.prioritiesRightControlsReservedWidth : 168.0;
+
+    CGFloat centerX = floor(frame.size.width / 2.0);
+    CGFloat holeStartX = centerX - titleHoleLeftWidth;
+    CGFloat holeEndX = centerX + titleHoleRightWidth;
+    if (holeStartX < 0.0) {
+        holeStartX = 0.0;
+    }
+    if (holeEndX > frame.size.width) {
+        holeEndX = frame.size.width;
+    }
+    CGFloat leftStripWidth = holeStartX;
+    if (leftStripWidth < 0.0) {
+        leftStripWidth = 0.0;
+    }
+    CGFloat rightStripX = holeEndX;
+    CGFloat rightStripWidth = frame.size.width - rightStripX - rightControlsReservedWidth;
+    if (rightStripWidth < 0.0) {
+        rightStripWidth = 0.0;
+    }
+
+    if (self.prioritiesTopDragStrip) {
+        [self.prioritiesTopDragStrip setFrame:NSMakeRect(0.0,
+                                                         frame.size.height - topStripHeight,
+                                                         frame.size.width,
+                                                         topStripHeight)];
+    }
+    if (self.prioritiesLeftHeaderDragStrip) {
+        [self.prioritiesLeftHeaderDragStrip setFrame:NSMakeRect(0.0,
+                                                                frame.size.height - dragStripHeight,
+                                                                leftStripWidth,
+                                                                dragStripHeight)];
+        [self.prioritiesLeftHeaderDragStrip setHidden:(leftStripWidth <= 0.0)];
+    }
+    if (self.prioritiesRightHeaderDragStrip) {
+        [self.prioritiesRightHeaderDragStrip setFrame:NSMakeRect(rightStripX,
+                                                                 frame.size.height - dragStripHeight,
+                                                                 rightStripWidth,
+                                                                 dragStripHeight)];
+        [self.prioritiesRightHeaderDragStrip setHidden:(rightStripWidth <= 0.0)];
+    }
+}
 
 - (NSString *)readConfigValueForKey:(NSString *)key fromFile:(NSString *)filePath {
     if (!key.length || !filePath.length) {
@@ -428,6 +492,7 @@
                                               styleMask:styleMask
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
+    self.window.delegate = self;
     [self.window setMinSize:minSize];
     if (!prefersNarrowTallLayout && !self.enableNativeViewMenu) {
         [self.window center];
@@ -455,6 +520,7 @@
     config.userContentController = contentController;
     
     NSView *rootView = [[NSView alloc] initWithFrame:frame];
+    self.hostRootView = rootView;
     [rootView setAutoresizesSubviews:YES];
     if (self.enableNativeBootSplash && self.prioritiesBootBgColor) {
         [rootView setWantsLayer:YES];
@@ -573,60 +639,29 @@
     } else {
         // Priorities needs broad drag affordance in the top band, but interactive
         // controls (up button/title/snap buttons) must remain clickable.
-        CGFloat topStripHeight = 18.0;
-        NSRect topStripFrame = NSMakeRect(0.0,
-                                          frame.size.height - topStripHeight,
-                                          frame.size.width,
-                                          topStripHeight);
-        NSView *topStrip = [[WizardryDragStripView alloc] initWithFrame:topStripFrame];
-        [topStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
-        [topStrip setWantsLayer:YES];
-        topStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-        [rootView addSubview:topStrip];
+        self.prioritiesTitleHoleLeftWidth = 36.0;
+        self.prioritiesTitleHoleRightWidth = 10.0;
+        self.prioritiesRightControlsReservedWidth = 168.0;
 
-        CGFloat headerBandY = frame.size.height - dragStripHeight;
-        CGFloat headerBandHeight = dragStripHeight;
-        // Keep a left-biased click-safe window around title/up controls so the
-        // right side of the title remains mostly draggable.
-        CGFloat titleHoleLeftWidth = 36.0;
-        CGFloat titleHoleRightWidth = 10.0;
-        CGFloat rightControlsReservedWidth = 168.0;
-        CGFloat centerX = floor(frame.size.width / 2.0);
-        CGFloat holeStartX = centerX - titleHoleLeftWidth;
-        CGFloat holeEndX = centerX + titleHoleRightWidth;
-        if (holeStartX < 0.0) {
-            holeStartX = 0.0;
-        }
-        if (holeEndX > frame.size.width) {
-            holeEndX = frame.size.width;
-        }
-        CGFloat leftStripWidth = holeStartX;
-        if (leftStripWidth < 0.0) {
-            leftStripWidth = 0.0;
-        }
-        CGFloat rightStripX = holeEndX;
-        CGFloat rightStripWidth = frame.size.width - rightStripX - rightControlsReservedWidth;
-        if (rightStripWidth < 0.0) {
-            rightStripWidth = 0.0;
-        }
+        self.prioritiesTopDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
+        [self.prioritiesTopDragStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [self.prioritiesTopDragStrip setWantsLayer:YES];
+        self.prioritiesTopDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:self.prioritiesTopDragStrip];
 
-        if (leftStripWidth > 0.0) {
-            NSRect leftHeaderFrame = NSMakeRect(0.0, headerBandY, leftStripWidth, headerBandHeight);
-            NSView *leftHeaderStrip = [[WizardryDragStripView alloc] initWithFrame:leftHeaderFrame];
-            [leftHeaderStrip setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-            [leftHeaderStrip setWantsLayer:YES];
-            leftHeaderStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-            [rootView addSubview:leftHeaderStrip];
-        }
+        self.prioritiesLeftHeaderDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
+        [self.prioritiesLeftHeaderDragStrip setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+        [self.prioritiesLeftHeaderDragStrip setWantsLayer:YES];
+        self.prioritiesLeftHeaderDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:self.prioritiesLeftHeaderDragStrip];
 
-        if (rightStripWidth > 0.0) {
-            NSRect rightHeaderFrame = NSMakeRect(rightStripX, headerBandY, rightStripWidth, headerBandHeight);
-            NSView *rightHeaderStrip = [[WizardryDragStripView alloc] initWithFrame:rightHeaderFrame];
-            [rightHeaderStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
-            [rightHeaderStrip setWantsLayer:YES];
-            rightHeaderStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-            [rootView addSubview:rightHeaderStrip];
-        }
+        self.prioritiesRightHeaderDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
+        [self.prioritiesRightHeaderDragStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [self.prioritiesRightHeaderDragStrip setWantsLayer:YES];
+        self.prioritiesRightHeaderDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:self.prioritiesRightHeaderDragStrip];
+
+        [self layoutPrioritiesDragStrips];
     }
 
     if (self.enableNativeBootSplash) {
@@ -707,6 +742,7 @@
                     newFrame.size.width = width;
                     newFrame.size.height = height;
                     [self.window setFrame:newFrame display:YES animate:NO];
+                    [self layoutPrioritiesDragStrips];
                 }
                 [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
@@ -823,6 +859,29 @@
         if ([program isEqualToString:@"__wizardry_host_boot_ready"]) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self hideNativeBootSplash];
+                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_priorities_drag_hole"]) {
+            CGFloat holeLeft = self.prioritiesTitleHoleLeftWidth;
+            CGFloat holeRight = self.prioritiesTitleHoleRightWidth;
+            CGFloat rightReserved = self.prioritiesRightControlsReservedWidth;
+            if (args.count >= 1) {
+                holeLeft = MAX(0.0, [args[0] doubleValue]);
+            }
+            if (args.count >= 2) {
+                holeRight = MAX(0.0, [args[1] doubleValue]);
+            }
+            if (args.count >= 3) {
+                rightReserved = MAX(0.0, [args[2] doubleValue]);
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.prioritiesTitleHoleLeftWidth = holeLeft;
+                self.prioritiesTitleHoleRightWidth = holeRight;
+                self.prioritiesRightControlsReservedWidth = rightReserved;
+                [self layoutPrioritiesDragStrips];
                 [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
