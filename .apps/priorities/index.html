@@ -2187,6 +2187,7 @@
       }
       panel.classList.toggle('hidden', !open);
       button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      button.classList.toggle('active', open);
       if (!open) {
         closeThemePickerMenu();
       }

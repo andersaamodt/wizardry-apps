@@ -132,6 +132,11 @@ h1 {
   color: color-mix(in srgb, var(--light-text, #5d6486) 64%, var(--text, #2a2e47) 36%);
 }
 
+.settings-toggle.active {
+  background: color-mix(in srgb, var(--accent-soft, #e6e3f4) 62%, #fff 38%);
+  color: color-mix(in srgb, var(--accent, #7782d6) 82%, var(--text, #2a2e47) 18%);
+}
+
 .right-tools {
   position: fixed;
   right: calc(14px * var(--ui-scale));
@@ -251,10 +256,18 @@ h1 {
   width: min(560px, calc(100vw - (28px * var(--ui-scale))));
   margin: 0;
   z-index: 21;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  visibility: visible;
+  transition: opacity 170ms ease, transform 170ms ease, visibility 0s linear 0s;
 }
 
 .settings-panel.hidden {
-  display: none;
+  opacity: 0;
+  transform: translateY(calc(6px * var(--ui-scale))) scale(0.985);
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 170ms ease, transform 170ms ease, visibility 0s linear 170ms;
 }
 
 .settings-row {
