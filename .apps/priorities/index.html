@@ -1847,6 +1847,7 @@
       var easing = 'cubic-bezier(0.2, 0.75, 0.2, 1)';
       var remaining = moved.length;
       var finished = false;
+      var activeReorderPath = String(state.pendingPrioritizePath || '').trim();
 
       var finalizeOne = function (row) {
         row.style.transition = '';
@@ -1923,6 +1924,8 @@
         for (var j = 0; j < moved.length; j += 1) {
           (function runRowAnimation(m) {
             var movedRow = m.row;
+            var movedRowPath = String(movedRow.getAttribute('data-path') || '').trim();
+            var overlayZ = movedRowPath && activeReorderPath && movedRowPath === activeReorderPath ? '2147483647' : '2147483646';
             var rowScaleX = Number(m.scaleX) || 1;
             var useWidthScale = Math.abs(rowScaleX - 1) >= 0.01;
             var overlayRect = movedRow.getBoundingClientRect();
@@ -1934,7 +1937,7 @@
             overlayRow.style.left = overlayRect.left + 'px';
             overlayRow.style.width = overlayRect.width + 'px';
             overlayRow.style.margin = '0';
-            overlayRow.style.zIndex = '2147483647';
+            overlayRow.style.zIndex = overlayZ;
             overlayRow.style.pointerEvents = 'none';
             overlayRow.style.willChange = 'transform';
             overlayRow.style.backfaceVisibility = 'hidden';
