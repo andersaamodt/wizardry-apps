@@ -321,6 +321,15 @@
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
       var ASSET_VERSION = 'forge20260218a';
+      var BACKEND_PREF_BY_STORAGE_KEY = {
+        'wizardry.forge.root': 'root',
+        'wizardry.forge.projects.root': 'projects_root',
+        'wizardry.forge.organize.show': 'organize_show',
+        'wizardry.forge.theme': 'theme',
+        'wizardry.forge.left_rail.width': 'left_rail_width',
+        'wizardry.forge.selected.catalog.v1': 'selected_catalog',
+        'wizardry.forge.linux.install.mode': 'linux_install_mode'
+      };
 
       var state = {
         appDir: inferAppDir(),
@@ -380,6 +389,65 @@
           } else {
             localStorage.removeItem(key);
           }
+        } catch (_err) {
+          return;
+        }
+        persistStorageKeyToBackend(key, value);
+      }
+
+      function persistedPrefNameForStorageKey(storageKey) {
+        return BACKEND_PREF_BY_STORAGE_KEY[storageKey] || '';
+      }
+
+      async function persistStorageKeyToBackend(storageKey, value) {
+        if (!bridgeAvailable()) {
+          return;
+        }
+        var pref = persistedPrefNameForStorageKey(storageKey);
+        if (!pref) {
+          return;
+        }
+        try {
+          await backend('set-ui-pref', [pref, String(value || '')], { quiet: true });
+        } catch (_err) {
+          return;
+        }
+      }
+
+      function mergePrefsIntoStorage(prefs) {
+        if (!prefs) {
+          return;
+        }
+        var prefByStorage = {};
+        Object.keys(BACKEND_PREF_BY_STORAGE_KEY).forEach(function (storageKey) {
+          prefByStorage[BACKEND_PREF_BY_STORAGE_KEY[storageKey]] = storageKey;
+        });
+        Object.keys(prefByStorage).forEach(function (prefKey) {
+          var storageKey = prefByStorage[prefKey];
+          if (!Object.prototype.hasOwnProperty.call(prefs, prefKey)) {
+            return;
+          }
+          var value = String(prefs[prefKey] || '');
+          try {
+            if (value) {
+              localStorage.setItem(storageKey, value);
+            } else {
+              localStorage.removeItem(storageKey);
+            }
+          } catch (_err) {
+            return;
+          }
+        });
+      }
+
+      async function hydratePrefsFromBackend() {
+        if (!bridgeAvailable()) {
+          return;
+        }
+        try {
+          var res = await backend('get-ui-prefs', [], { quiet: true });
+          var prefs = kv((res && res.stdout) || '');
+          mergePrefsIntoStorage(prefs);
         } catch (_err) {
           return;
         }
@@ -788,7 +856,14 @@
         }
 
         if (state.os === 'linux') {
-          await execArgv(['xdg-open', path]);
+          var targetPath = path;
+          if (reveal) {
+            targetPath = path.replace(/\/+$/, '');
+            if (targetPath && targetPath.lastIndexOf('/') > 0) {
+              targetPath = targetPath.slice(0, targetPath.lastIndexOf('/'));
+            }
+          }
+          await execArgv(['xdg-open', targetPath]);
           return;
         }
 
@@ -935,6 +1010,16 @@
 
       function normalizedSettingValue(value) {
         return String(value || '').trim();
+      }
+
+      function refreshStateFromStorage() {
+        state.rootHint = loadStorage(ROOT_KEY);
+        state.projectsRoot = loadStorage(PROJECTS_ROOT_KEY);
+        state.organizeShow = loadStorage(ORGANIZE_SHOW_KEY) || 'both';
+        state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
+        state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
+        state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
+        state.linuxInstallMode = normalizeLinuxInstallMode(loadStorage(LINUX_INSTALL_MODE_KEY));
       }
 
       function syncSettingsSaveButtons() {
@@ -2314,9 +2399,9 @@
             installBtn.type = 'button';
             installBtn.className = 'row-mini row-install';
             if (spec.id === 'macos') {
-              installBtn.title = 'Install into /Applications';
+              installBtn.title = 'Install (auto-build latest) into /Applications';
             } else {
-              installBtn.title = 'Install (' + linuxInstallModeLabel(normalizeLinuxInstallMode(state.linuxInstallMode)) + ')';
+              installBtn.title = 'Install (auto-build latest, ' + linuxInstallModeLabel(normalizeLinuxInstallMode(state.linuxInstallMode)) + ')';
             }
             installBtn.setAttribute('aria-label', installBtn.title);
             installBtn.textContent = 'Install';
@@ -2561,8 +2646,8 @@
 
         var summary = selected.title + ' installed for ' + (targetId === 'macos' ? 'macOS' : 'Linux') + '.';
         var installHelp = targetId === 'macos'
-          ? 'Install copies the .app bundle into /Applications.'
-          : ('Install mode: ' + linuxInstallModeLabel(normalizeLinuxInstallMode(state.linuxInstallMode)) + '.');
+          ? 'Install auto-builds latest output, then copies the .app bundle into /Applications.'
+          : ('Install auto-builds latest output.\nMode: ' + linuxInstallModeLabel(normalizeLinuxInstallMode(state.linuxInstallMode)) + '.');
         renderResult({
           status: 'ok',
           summary: summary,
@@ -2577,6 +2662,15 @@
             body: installHelp
           }
         });
+
+        var revealPath = installPath || launcherPath;
+        if (revealPath) {
+          try {
+            await openPath(revealPath, true);
+          } catch (err) {
+            appendLog('warning: install succeeded, but reveal failed: ' + String(err && err.message ? err.message : err));
+          }
+        }
       }
 
       function setArtifacts(_lines) {
@@ -3989,6 +4083,8 @@
         startAutoRefresh();
         setPanel('settings', false);
         setArtifacts([]);
+        await hydratePrefsFromBackend();
+        refreshStateFromStorage();
         await loadThemes();
         applyTheme(state.activeTheme);
         renderThemePicker();

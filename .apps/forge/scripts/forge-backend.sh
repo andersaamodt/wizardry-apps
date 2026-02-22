@@ -14,6 +14,8 @@ Commands:
   list-themes [ROOT_HINT]
   list-godot-tools [ROOT_HINT]
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
+  get-ui-prefs [ROOT_HINT]
+  set-ui-pref [ROOT_HINT] KEY VALUE
   set-app-targets [ROOT_HINT] APP_SLUG TARGETS
   set-workspace-targets [ROOT_HINT] WORKSPACE_PATH TARGETS
   set-app-icon [ROOT_HINT] APP_SLUG DATA_URL
@@ -576,6 +578,52 @@ workspace_default_root() {
     return 0
   fi
   printf '%s\n' "$HOME/git"
+}
+
+forge_ui_prefs_file() {
+  base="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps"
+  mkdir -p "$base"
+  printf '%s\n' "$base/forge-ui.conf"
+}
+
+validate_ui_pref_key() {
+  key=${1-}
+  case "$key" in
+    [a-z0-9][a-z0-9._-]*)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: invalid UI pref key: $key" >&2
+      exit 2
+      ;;
+  esac
+}
+
+sanitize_ui_pref_value() {
+  value=${1-}
+  printf '%s' "$value" | tr '\r\n' ' '
+}
+
+cmd_get_ui_prefs() {
+  prefs_file=$(forge_ui_prefs_file)
+  [ -f "$prefs_file" ] || exit 0
+  cat "$prefs_file"
+}
+
+cmd_set_ui_pref() {
+  key=${2-}
+  value=${3-}
+  [ -n "$key" ] || {
+    printf '%s\n' "forge-backend: set-ui-pref requires KEY" >&2
+    exit 2
+  }
+  validate_ui_pref_key "$key"
+  prefs_file=$(forge_ui_prefs_file)
+  [ -f "$prefs_file" ] || : > "$prefs_file"
+  value=$(sanitize_ui_pref_value "$value")
+  write_key_value_file "$prefs_file" "$key" "$value"
+  printf 'key=%s\n' "$key"
+  printf 'value=%s\n' "$value"
+  printf 'file=%s\n' "$prefs_file"
 }
 
 cmd_list_workspaces() {
@@ -2214,6 +2262,12 @@ case "$cmd" in
     ;;
   list-workspaces)
     cmd_list_workspaces "${2-}" "${3-}"
+    ;;
+  get-ui-prefs)
+    cmd_get_ui_prefs "${2-}"
+    ;;
+  set-ui-pref)
+    cmd_set_ui_pref "${2-}" "${3-}" "${4-}"
     ;;
   set-app-targets)
     cmd_set_app_targets "${2-}" "${3-}" "${4-}"
