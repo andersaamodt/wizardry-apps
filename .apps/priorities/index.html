@@ -1785,11 +1785,26 @@
       tree.classList.add('reordering');
       var overlayLayer = document.createElement('div');
       overlayLayer.className = 'row-reorder-overlay-layer';
+      overlayLayer.style.margin = '0';
+      overlayLayer.style.padding = '0';
+      overlayLayer.style.border = '0';
+      overlayLayer.style.background = 'transparent';
       overlayLayer.style.position = 'fixed';
       overlayLayer.style.inset = '0';
       overlayLayer.style.pointerEvents = 'none';
       overlayLayer.style.zIndex = '2147483647';
+      overlayLayer.style.isolation = 'isolate';
+      if (typeof overlayLayer.showPopover === 'function') {
+        overlayLayer.setAttribute('popover', 'manual');
+      }
       document.body.appendChild(overlayLayer);
+      if (typeof overlayLayer.showPopover === 'function') {
+        try {
+          overlayLayer.showPopover();
+        } catch (_) {
+          // Popover API may reject if not supported by host engine.
+        }
+      }
       var consumedAnimMatches = Object.create(null);
       var rows = treeEl().querySelectorAll('.row');
       for (var ri = 0; ri < rows.length; ri += 1) {
@@ -1809,6 +1824,13 @@
           }
         }
         if (overlayLayer) {
+          if (typeof overlayLayer.hidePopover === 'function') {
+            try {
+              overlayLayer.hidePopover();
+            } catch (_) {
+              // Ignore popover cleanup failures.
+            }
+          }
           try {
             overlayLayer.remove();
           } catch (_) {
