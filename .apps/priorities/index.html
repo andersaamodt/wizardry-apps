@@ -199,6 +199,9 @@
       startupSnapshotRestored: false,
       hostBootReadySent: false,
       snapshotLastSerialized: '',
+      hoveredPrioritizePath: '',
+      pointerClientX: null,
+      pointerClientY: null,
       reorderAnimationPromise: null,
       reorderAnimationResolve: null
     };
@@ -3030,6 +3033,8 @@
         if (selectionSnapshot) {
           restoreTreeInputSelection(selectionSnapshot);
         }
+        syncHoveredPrioritizeRow();
+        updateHoveredPrioritizePathFromPointer();
 
         if (options.animateReorder) {
           animateRowReorder(previousPositions);
@@ -3098,6 +3103,54 @@
 
     function processPrioritizeQueue() {
       syncPrioritizeButtonsToQueue();
+    }
+
+    function syncHoveredPrioritizeRow() {
+      var tree = treeEl();
+      if (!tree) {
+        return;
+      }
+      var hoverPath = String(state.hoveredPrioritizePath || '').trim();
+      var rows = tree.querySelectorAll('.row[data-path]');
+      for (var i = 0; i < rows.length; i += 1) {
+        var row = rows[i];
+        if (hoverPath && row.getAttribute('data-path') === hoverPath) {
+          row.classList.add('row-pri-hover-proxy');
+        } else {
+          row.classList.remove('row-pri-hover-proxy');
+        }
+      }
+    }
+
+    function setHoveredPrioritizePath(path) {
+      var normalized = String(path || '').trim();
+      if (state.hoveredPrioritizePath === normalized) {
+        return;
+      }
+      state.hoveredPrioritizePath = normalized;
+      syncHoveredPrioritizeRow();
+    }
+
+    function updateHoveredPrioritizePathFromPointer() {
+      if (!Number.isFinite(state.pointerClientX) || !Number.isFinite(state.pointerClientY)) {
+        return;
+      }
+      var target = document.elementFromPoint(state.pointerClientX, state.pointerClientY);
+      if (!target || !target.closest) {
+        setHoveredPrioritizePath('');
+        return;
+      }
+      var btn = target.closest('.btn.pri');
+      if (!btn) {
+        setHoveredPrioritizePath('');
+        return;
+      }
+      var row = btn.closest('.row[data-path]');
+      if (!row) {
+        setHoveredPrioritizePath('');
+        return;
+      }
+      setHoveredPrioritizePath(row.getAttribute('data-path') || '');
     }
 
     function actPrioritize(path, button) {
@@ -3849,6 +3902,16 @@
           state.revealedMakeProjectPath = '';
           render({ suppressLoadingOverlay: true, preserveInputSelection: true, animateReorder: true });
         }
+      });
+
+      document.addEventListener('pointermove', function (event) {
+        state.pointerClientX = Number(event && event.clientX);
+        state.pointerClientY = Number(event && event.clientY);
+        updateHoveredPrioritizePathFromPointer();
+      }, { passive: true });
+
+      window.addEventListener('blur', function () {
+        setHoveredPrioritizePath('');
       });
 
       document.addEventListener('keydown', function (event) {

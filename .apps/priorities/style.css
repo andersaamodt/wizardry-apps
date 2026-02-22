@@ -1150,6 +1150,11 @@ button:hover {
   pointer-events: auto;
 }
 
+.row.row-pri-hover-proxy .btn.pri {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .btn.pri:active {
   cursor: default;
   filter: drop-shadow(0 0 2px color-mix(in srgb, var(--accent, #7782d6) 28%, transparent));
