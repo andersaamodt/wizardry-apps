@@ -197,6 +197,23 @@ h1 {
   pointer-events: none;
 }
 
+/* Keep action controls from becoming text-selectable during rapid clicks/drags. */
+.corner-dock,
+.btn.pri,
+.btn.exp,
+.add-inline-btn,
+.add-inline-input,
+#browse,
+#refresh,
+#theme-picker-btn,
+#font-select,
+.scale-stepper,
+.scale-btn,
+.scale-reset {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .drill-up {
   width: calc(34px * var(--ui-scale));
   height: calc(34px * var(--ui-scale));
