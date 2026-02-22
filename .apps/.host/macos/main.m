@@ -209,7 +209,7 @@
     NSView *overlay = self.nativeBootSplashView;
     self.nativeBootSplashView = nil;
     [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
-        context.duration = 0.45;
+        context.duration = 0.32;
         if (self.webView && self.webView.alphaValue < 1.0) {
             self.webView.animator.alphaValue = 1.0;
         }
