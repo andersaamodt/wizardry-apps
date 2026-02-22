@@ -1628,15 +1628,30 @@
     }
 
     function captureRowPositions() {
-      var map = {};
+      var map = {
+        byPath: {},
+        byAnimKey: {}
+      };
       var rows = treeEl().querySelectorAll('.row[data-path]');
       for (var i = 0; i < rows.length; i += 1) {
         var row = rows[i];
         var rect = row.getBoundingClientRect();
-        map[row.getAttribute('data-path')] = {
+        var metrics = {
           top: rect.top,
-          left: rect.left
+          left: rect.left,
+          width: rect.width
         };
+        var pathKey = String(row.getAttribute('data-path') || '').trim();
+        if (pathKey) {
+          map.byPath[pathKey] = metrics;
+        }
+        var animKey = String(row.getAttribute('data-anim-key') || '').trim();
+        if (animKey) {
+          if (!map.byAnimKey[animKey]) {
+            map.byAnimKey[animKey] = [];
+          }
+          map.byAnimKey[animKey].push(metrics);
+        }
       }
       return map;
     }
@@ -1719,27 +1734,43 @@
     }
 
     function animateRowReorder(previousPositions) {
-      if (!previousPositions) {
+      if (!previousPositions || !previousPositions.byPath) {
         return;
       }
+      var consumedAnimMatches = Object.create(null);
       var rows = treeEl().querySelectorAll('.row[data-path]');
       var moved = [];
       for (var i = 0; i < rows.length; i += 1) {
         var row = rows[i];
-        var key = row.getAttribute('data-path');
-        var prev = previousPositions[key];
-        if (!key || !prev || typeof prev.top !== 'number' || typeof prev.left !== 'number') {
+        var key = String(row.getAttribute('data-path') || '').trim();
+        var prev = previousPositions.byPath[key];
+        if (!prev) {
+          var animKey = String(row.getAttribute('data-anim-key') || '').trim();
+          if (animKey) {
+            var candidates = previousPositions.byAnimKey[animKey];
+            if (candidates && candidates.length) {
+              var consumed = consumedAnimMatches[animKey] || 0;
+              if (consumed < candidates.length) {
+                prev = candidates[consumed];
+                consumedAnimMatches[animKey] = consumed + 1;
+              }
+            }
+          }
+        }
+        if (!key || !prev || typeof prev.top !== 'number' || typeof prev.left !== 'number' || typeof prev.width !== 'number') {
           continue;
         }
         var nextRect = row.getBoundingClientRect();
         var deltaY = prev.top - nextRect.top;
         var deltaX = prev.left - nextRect.left;
-        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1) {
+        var scaleX = nextRect.width > 0 ? (prev.width / nextRect.width) : 1;
+        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1 && Math.abs(scaleX - 1) < 0.01) {
           continue;
         }
         row.style.willChange = 'transform';
         row.style.transition = 'none';
-        row.style.transform = 'translate(' + deltaX + 'px,' + deltaY + 'px)';
+        row.style.transformOrigin = 'top left';
+        row.style.transform = 'translate(' + deltaX + 'px,' + deltaY + 'px) scaleX(' + scaleX + ')';
         moved.push(row);
       }
       if (!moved.length) {
@@ -1752,10 +1783,11 @@
           for (var j = 0; j < moved.length; j += 1) {
             var movedRow = moved[j];
             movedRow.style.transition = 'transform 340ms cubic-bezier(0.2, 0.75, 0.2, 1)';
-            movedRow.style.transform = 'translate(0,0)';
+            movedRow.style.transform = 'translate(0,0) scaleX(1)';
             movedRow.addEventListener('transitionend', function onEnd() {
               this.style.transition = '';
               this.style.transform = '';
+              this.style.transformOrigin = '';
               this.style.willChange = '';
               this.removeEventListener('transitionend', onEnd);
             });
@@ -1767,6 +1799,7 @@
           var movedRow = moved[k];
           movedRow.style.transition = '';
           movedRow.style.transform = '';
+          movedRow.style.transformOrigin = '';
           movedRow.style.willChange = '';
         }
       }, 460);
@@ -2278,6 +2311,7 @@
         row.classList.add('row-project-unchecked');
       }
       row.setAttribute('data-path', item.path);
+      row.setAttribute('data-anim-key', item.kind + '|' + item.name);
       row.setAttribute('data-echelon', String(item.echelon));
       row.setAttribute('data-depth', String(depth));
       row.style.paddingLeft = indent(depth);
