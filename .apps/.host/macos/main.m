@@ -168,7 +168,7 @@
     overlay.layer.backgroundColor = [bg CGColor];
 
     NSImage *logoImage = self.appIconImage;
-    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 24, 24)];
+    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 12, 12)];
     logoView.imageAlignment = NSImageAlignCenter;
     logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
     logoView.wantsLayer = YES;
