@@ -168,9 +168,10 @@
     overlay.layer.backgroundColor = [bg CGColor];
 
     NSImage *logoImage = self.appIconImage;
-    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 8, 8)];
+    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSZeroRect];
     logoView.imageAlignment = NSImageAlignCenter;
     logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
+    logoView.translatesAutoresizingMaskIntoConstraints = NO;
     logoView.wantsLayer = YES;
     logoView.layer.cornerRadius = 4.0;
     if (logoImage) {
@@ -188,6 +189,8 @@
 
     [overlay addSubview:stack];
     [NSLayoutConstraint activateConstraints:@[
+        [logoView.widthAnchor constraintEqualToConstant:64.0],
+        [logoView.heightAnchor constraintEqualToConstant:64.0],
         [stack.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
         [stack.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor]
     ]];
@@ -203,7 +206,7 @@
     NSView *overlay = self.nativeBootSplashView;
     self.nativeBootSplashView = nil;
     [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
-        context.duration = 0.16;
+        context.duration = 0.45;
         overlay.animator.alphaValue = 0.0;
     } completionHandler:^{
         [overlay removeFromSuperview];
