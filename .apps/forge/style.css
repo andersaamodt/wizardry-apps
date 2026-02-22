@@ -1155,8 +1155,14 @@ button:disabled {
   left: auto;
   right: 0;
   min-width: 0;
-  width: min(220px, calc(100vw - 0.85rem));
+  width: max-content;
   max-width: calc(100vw - 0.85rem);
+}
+
+.run-split .floating-menu button {
+  width: auto;
+  min-width: 100%;
+  white-space: nowrap;
 }
 
 .selected-head {
