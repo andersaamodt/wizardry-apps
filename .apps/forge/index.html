@@ -1167,7 +1167,7 @@
           return;
         }
         // Swap to an icon-only control when the label is too compressed to read.
-        if (btn.clientWidth > 0 && btn.clientWidth < 28) {
+        if (btn.clientWidth > 0 && btn.clientWidth < 56) {
           btn.classList.add('is-compact');
         }
       }
@@ -2278,25 +2278,36 @@
           reader.onload = function () {
             var img = new Image();
             img.onload = function () {
-              // Preserve icon fidelity for packaged app icons (Dock/taskbar/alt-tab)
-              // by rasterizing uploads to a high-resolution square source.
-              var size = 1024;
               var canvas = document.createElement('canvas');
-              canvas.width = size;
-              canvas.height = size;
               var ctx = canvas.getContext('2d');
               if (!ctx) {
                 resolve(String(reader.result || ''));
                 return;
               }
-              ctx.clearRect(0, 0, size, size);
-              var scale = Math.min(size / img.width, size / img.height, 1);
-              var w = Math.max(1, Math.round(img.width * scale));
-              var h = Math.max(1, Math.round(img.height * scale));
-              var x = Math.floor((size - w) / 2);
-              var y = Math.floor((size - h) / 2);
-              ctx.drawImage(img, x, y, w, h);
-              resolve(canvas.toDataURL('image/png'));
+              // Keep icon fidelity high while respecting backend argv limits.
+              var maxArgChars = 180000;
+              var sizes = [1024, 768, 640, 512, 384, 256, 192, 128, 96];
+              var output = '';
+
+              for (var i = 0; i < sizes.length; i += 1) {
+                var size = sizes[i];
+                canvas.width = size;
+                canvas.height = size;
+                ctx.clearRect(0, 0, size, size);
+                var scale = Math.min(size / img.width, size / img.height);
+                var w = Math.max(1, Math.round(img.width * scale));
+                var h = Math.max(1, Math.round(img.height * scale));
+                var x = Math.floor((size - w) / 2);
+                var y = Math.floor((size - h) / 2);
+                ctx.drawImage(img, x, y, w, h);
+                output = canvas.toDataURL('image/png');
+                if (output.length <= maxArgChars) {
+                  resolve(output);
+                  return;
+                }
+              }
+
+              resolve(output || String(reader.result || ''));
             };
             img.onerror = function () {
               resolve(String(reader.result || ''));

@@ -1357,7 +1357,7 @@ button:disabled {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
+  min-width: 1.28rem;
   cursor: pointer;
 }
 
