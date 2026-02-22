@@ -1331,10 +1331,10 @@ input[type="checkbox"]:disabled {
 
 .selected-path-row {
   display: inline-grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(1.45rem, 1fr) auto;
   align-items: center;
   max-width: min(14rem, 34vw);
-  column-gap: 0.5rem;
+  column-gap: 0.62rem;
   margin-top: 0;
   margin-left: auto;
   min-width: 0;
@@ -1362,7 +1362,7 @@ input[type="checkbox"]:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 1.45rem;
-  margin-right: 0.56rem;
+  margin-right: 0;
   cursor: pointer;
 }
 
@@ -1377,7 +1377,7 @@ input[type="checkbox"]:disabled {
   width: 1.45rem;
   min-width: 1.45rem;
   max-width: 1.45rem;
-  margin-right: 0.56rem;
+  margin-right: 0;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -1398,7 +1398,7 @@ input[type="checkbox"]:disabled {
 }
 
 .selected-path-row .terminal-icon {
-  margin-left: 0.14rem;
+  margin-left: 0;
 }
 
 .terminal-icon {
