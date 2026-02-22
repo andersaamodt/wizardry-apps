@@ -5384,20 +5384,6 @@ stop_process_tree_by_pid() {
     return 0
   fi
 
-  kill -TERM "$target_pid" 2>/dev/null || true
-  if command -v pkill >/dev/null 2>&1; then
-    pkill -TERM -P "$target_pid" 2>/dev/null || true
-  fi
-
-  waited=0
-  while [ "$waited" -lt 10 ]; do
-    if ! kill -0 "$target_pid" 2>/dev/null; then
-      return 0
-    fi
-    sleep 0.1
-    waited=$((waited + 1))
-  done
-
   if command -v pkill >/dev/null 2>&1; then
     pkill -KILL -P "$target_pid" 2>/dev/null || true
   fi
