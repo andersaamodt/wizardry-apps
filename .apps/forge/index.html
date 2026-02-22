@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wizardry Forge</title>
-  <link rel="stylesheet" href="style.css?v=forge20260222b">
+  <link rel="stylesheet" href="style.css?v=forge20260222c">
   <link id="forge-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=forge20260218b">
 </head>
 <body>
@@ -1986,16 +1986,22 @@
           els.actionRun.setAttribute('aria-label', runTitle);
         }
         if (els.actionRunMenu) {
-          els.actionRunMenu.classList.toggle('hidden', !showRunSplit);
-          els.actionRunMenu.disabled = false;
-          els.actionRunMenu.title = 'Run options';
-          els.actionRunMenu.setAttribute('aria-label', 'Run options');
+          els.actionRunMenu.classList.toggle('hidden', !canServeWebHost);
+          els.actionRunMenu.disabled = !canServeWebHost;
+          els.actionRunMenu.title = canServeWebHost ? 'Run options' : 'Run options unavailable';
+          els.actionRunMenu.setAttribute('aria-label', canServeWebHost ? 'Run options' : 'Run options unavailable');
           if (els.runMenu) {
             var webHostButton = document.getElementById('action-run-webhost');
             if (webHostButton) {
               webHostButton.disabled = !canServeWebHost;
               webHostButton.title = canServeWebHost ? 'Serve web host' : 'Enable Hosted Web target to serve web host';
             }
+          }
+        }
+        if (els.actionRun && els.actionRun.closest) {
+          var runSplit = els.actionRun.closest('.run-split');
+          if (runSplit) {
+            runSplit.classList.toggle('single', !canServeWebHost);
           }
         }
         if (!els.actionStage) {

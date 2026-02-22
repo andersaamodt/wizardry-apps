@@ -1088,6 +1088,27 @@ button:disabled {
   border-radius: 8px 0 0 8px;
 }
 
+.run-split.single {
+  border: 0;
+  background: transparent;
+}
+
+.run-split.single #action-run {
+  border: 1px solid var(--toolbar-line);
+  border-radius: 8px;
+  background: var(--toolbar-surface);
+}
+
+.run-split.single:hover {
+  border-color: transparent;
+  background: transparent;
+}
+
+.run-split.single:hover #action-run {
+  border-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
+  background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
+}
+
 .build-split .menu-toggle {
   border-radius: 0 8px 8px 0;
   min-width: 2rem;

@@ -415,80 +415,6 @@ stop_desktop_instances_for_slug() {
   fi
 }
 
-pick_free_port() {
-  if command -v python3 >/dev/null 2>&1; then
-    python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
-PY
-    return 0
-  fi
-  printf '%s\n' "8030"
-}
-
-serve_static_dir() {
-  root=$1
-  key=$2
-  dir=$3
-  entry_path=${4-/}
-
-  [ -d "$dir" ] || {
-    printf '%s\n' "forge-backend: static serve directory not found: $dir" >&2
-    exit 1
-  }
-  command -v python3 >/dev/null 2>&1 || {
-    printf '%s\n' "forge-backend: python3 is required for static hosted web fallback" >&2
-    exit 1
-  }
-
-  safe_key=$(printf '%s' "$key" | tr -cs 'A-Za-z0-9._-' '-')
-  run_dir="$root/_tmp/workbench/run/hosted-web"
-  log_dir="$root/_tmp/workbench/log/hosted-web"
-  mkdir -p "$run_dir" "$log_dir"
-  pid_file="$run_dir/$safe_key.pid"
-  port_file="$run_dir/$safe_key.port"
-  log_file="$log_dir/$safe_key.log"
-
-  pid=''
-  port=''
-  if [ -f "$pid_file" ]; then
-    pid=$(cat "$pid_file" 2>/dev/null || true)
-  fi
-  if [ -f "$port_file" ]; then
-    port=$(cat "$port_file" 2>/dev/null || true)
-  fi
-
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && [ -n "$port" ]; then
-    :
-  else
-    rm -f "$pid_file" "$port_file"
-    port=$(pick_free_port)
-    if command -v nohup >/dev/null 2>&1; then
-      nohup python3 -m http.server "$port" --bind 127.0.0.1 --directory "$dir" >"$log_file" 2>&1 &
-    else
-      python3 -m http.server "$port" --bind 127.0.0.1 --directory "$dir" >"$log_file" 2>&1 &
-    fi
-    pid=$!
-    printf '%s\n' "$pid" >"$pid_file"
-    printf '%s\n' "$port" >"$port_file"
-  fi
-
-  case "$entry_path" in
-    '') entry_path='/' ;;
-    /*) ;;
-    *) entry_path="/$entry_path" ;;
-  esac
-
-  printf 'mode=static\n'
-  printf 'entry=%s\n' "$dir"
-  printf 'pid=%s\n' "$pid"
-  printf 'log=%s\n' "$log_file"
-  printf 'url=%s\n' "http://127.0.0.1:$port$entry_path"
-}
-
 cmd_doctor() {
   root_hint=${1-}
   root=''
@@ -1298,66 +1224,45 @@ cmd_serve_hosted_web() {
       web_log="$root/_tmp/workbench/log/hosted-web/$site_name-web-wizardry.log"
       mkdir -p "$(dirname "$web_log")"
 
-      if command -v web-wizardry >/dev/null 2>&1 && command -v create-from-template >/dev/null 2>&1; then
-        if (
-          if [ ! -d "$site_dir" ]; then
-            WIZARDRY_DIR="$root" create-from-template "$site_name" "$slug"
-          fi
-          WIZARDRY_DIR="$root" web-wizardry build "$site_name"
-          WIZARDRY_DIR="$root" web-wizardry serve "$site_name"
-        ) >"$web_log" 2>&1; then
-          site_conf="$site_dir/site.conf"
-          domain=$(config_field "$site_conf" domain "localhost")
-          port=$(config_field "$site_conf" port "8080")
-          https=$(config_field "$site_conf" https "false")
-          scheme=http
-          if [ "$https" = "true" ]; then
-            scheme=https
-          fi
-
-          printf 'mode=web-wizardry\n'
-          printf 'site=%s\n' "$site_name"
-          printf 'entry=%s\n' "$site_dir"
-          printf 'url=%s\n' "$scheme://$domain:$port"
-          printf 'log=%s\n' "$web_log"
-          exit 0
-        fi
-      fi
-
-      entry='/'
-      if [ -f "$template_dir/pages/index.html" ]; then
-        entry='/pages/index.html'
-      elif [ -f "$template_dir/index.html" ]; then
-        entry='/index.html'
-      fi
-      serve_static_dir "$root" "builtin-$slug" "$template_dir" "$entry"
-      printf 'site=%s\n' "$slug"
-      if [ -f "$web_log" ]; then
-        printf 'fallback_log=%s\n' "$web_log"
-      fi
-      ;;
-
-    workspace)
-      workspace_path=$ref
-      [ -d "$workspace_path" ] || {
-        printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+      command -v web-wizardry >/dev/null 2>&1 || {
+        printf '%s\n' "forge-backend: web-wizardry is required to serve hosted web targets" >&2
+        exit 1
+      }
+      command -v create-from-template >/dev/null 2>&1 || {
+        printf '%s\n' "forge-backend: create-from-template is required to serve hosted web targets" >&2
         exit 1
       }
 
-      serve_dir="$workspace_path"
-      if [ -f "$workspace_path/app/index.html" ]; then
-        serve_dir="$workspace_path/app"
-      fi
-      entry='/'
-      if [ -f "$serve_dir/index.html" ]; then
-        entry='/index.html'
-      elif [ -f "$serve_dir/pages/index.html" ]; then
-        entry='/pages/index.html'
+      if ! (
+        if [ ! -d "$site_dir" ]; then
+          WIZARDRY_DIR="$root" create-from-template "$site_name" "$slug"
+        fi
+        WIZARDRY_DIR="$root" web-wizardry build "$site_name"
+        WIZARDRY_DIR="$root" web-wizardry serve "$site_name"
+      ) >"$web_log" 2>&1; then
+        printf '%s\n' "forge-backend: hosted web serve failed (see log: $web_log)" >&2
+        exit 1
       fi
 
-      workspace_id=$(basename "$workspace_path")
-      serve_static_dir "$root" "workspace-$workspace_id" "$serve_dir" "$entry"
-      printf 'workspace=%s\n' "$workspace_path"
+      site_conf="$site_dir/site.conf"
+      domain=$(config_field "$site_conf" domain "localhost")
+      port=$(config_field "$site_conf" port "8080")
+      https=$(config_field "$site_conf" https "false")
+      scheme=http
+      if [ "$https" = "true" ]; then
+        scheme=https
+      fi
+
+      printf 'mode=web-wizardry\n'
+      printf 'site=%s\n' "$site_name"
+      printf 'entry=%s\n' "$site_dir"
+      printf 'url=%s\n' "$scheme://$domain:$port"
+      printf 'log=%s\n' "$web_log"
+      ;;
+
+    workspace)
+      printf '%s\n' "forge-backend: hosted web serve currently supports built-in app templates only" >&2
+      exit 1
       ;;
 
     *)
