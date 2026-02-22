@@ -2282,20 +2282,22 @@
       row.setAttribute('data-depth', String(depth));
       row.style.paddingLeft = indent(depth);
 
-      var prioritizeBtn = makeButton('⬆', 'btn pri', function (event) {
-        event.stopPropagation();
-        actPrioritize(item.path, prioritizeBtn);
-      }, 'Prioritize');
-      prioritizeBtn.setAttribute('aria-label', 'Prioritize');
-      if (state.pendingPrioritizePath === item.path) {
-        setPrioritizeButtonBusy(prioritizeBtn, true);
-      } else {
-        var queuePosition = getPrioritizeQueuePosition(item.path);
-        if (queuePosition > 0) {
-          setPrioritizeButtonQueued(prioritizeBtn, queuePosition);
+      if (!options.hidePrioritizeButton) {
+        var prioritizeBtn = makeButton('⬆', 'btn pri', function (event) {
+          event.stopPropagation();
+          actPrioritize(item.path, prioritizeBtn);
+        }, 'Prioritize');
+        prioritizeBtn.setAttribute('aria-label', 'Prioritize');
+        if (state.pendingPrioritizePath === item.path) {
+          setPrioritizeButtonBusy(prioritizeBtn, true);
+        } else {
+          var queuePosition = getPrioritizeQueuePosition(item.path);
+          if (queuePosition > 0) {
+            setPrioritizeButtonQueued(prioritizeBtn, queuePosition);
+          }
         }
+        row.appendChild(prioritizeBtn);
       }
-      row.appendChild(prioritizeBtn);
 
       var left = document.createElement('div');
       left.className = 'left';
@@ -2716,7 +2718,8 @@
         var firstRootItem = depth === 0 && i === 0;
         var row = buildRow(item, depth, edgeClass, {
           highlightFirstRow: firstRootItem,
-          highlightFirstNextActionPill: firstRootItem && !!item.hasSubpriorities
+          highlightFirstNextActionPill: firstRootItem && !!item.hasSubpriorities,
+          hidePrioritizeButton: firstRootItem
         });
         if (depth === 0 && currentBlock) {
           currentBlock.appendChild(row);
