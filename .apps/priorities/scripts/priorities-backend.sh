@@ -435,6 +435,44 @@ collect_prioritized_rows_xattr() {
   # shellcheck disable=SC2039
   set -- "$dir"/*
   [ -e "${1-}" ] || return 0
+  if [ "$#" -eq 1 ]; then
+    single_path=$1
+    read_item_attrs "$single_path"
+    single_echelon=$attr_echelon
+    single_priority=$attr_priority
+    single_checked=$attr_checked
+    single_upvotes=$attr_upvotes
+    case "$single_echelon" in
+      ''|*Error*|*[!0-9]*) return 0 ;;
+    esac
+    case "$single_priority" in
+      ''|*Error*|*[!0-9]*) single_priority=0 ;;
+    esac
+    case "$single_checked" in
+      ''|*Error*|*[!0-9]*) single_checked=0 ;;
+    esac
+    case "$single_upvotes" in
+      ''|*Error*|*[!0-9]*) single_upvotes=0 ;;
+    esac
+    has_sub=0
+    if [ -d "$single_path" ]; then
+      for child in "$single_path"/*; do
+        [ -e "$child" ] || continue
+        if child_has_echelon "$child"; then
+          has_sub=1
+          break
+        fi
+      done
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$single_path" \
+      "$single_echelon" \
+      "$single_priority" \
+      "$single_checked" \
+      "$single_upvotes" \
+      "$has_sub" > "$out_file"
+    return 0
+  fi
 
   tmp_e=$(mktemp "${TMPDIR:-/tmp}/priorities-e.XXXXXX")
   tmp_p=$(mktemp "${TMPDIR:-/tmp}/priorities-p.XXXXXX")
@@ -524,6 +562,44 @@ collect_prioritized_rows_getfattr() {
   # shellcheck disable=SC2039
   set -- "$dir"/*
   [ -e "${1-}" ] || return 0
+  if [ "$#" -eq 1 ]; then
+    single_path=$1
+    read_item_attrs "$single_path"
+    single_echelon=$attr_echelon
+    single_priority=$attr_priority
+    single_checked=$attr_checked
+    single_upvotes=$attr_upvotes
+    case "$single_echelon" in
+      ''|*Error*|*[!0-9]*) return 0 ;;
+    esac
+    case "$single_priority" in
+      ''|*Error*|*[!0-9]*) single_priority=0 ;;
+    esac
+    case "$single_checked" in
+      ''|*Error*|*[!0-9]*) single_checked=0 ;;
+    esac
+    case "$single_upvotes" in
+      ''|*Error*|*[!0-9]*) single_upvotes=0 ;;
+    esac
+    has_sub=0
+    if [ -d "$single_path" ]; then
+      for child in "$single_path"/*; do
+        [ -e "$child" ] || continue
+        if child_has_echelon "$child"; then
+          has_sub=1
+          break
+        fi
+      done
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$single_path" \
+      "$single_echelon" \
+      "$single_priority" \
+      "$single_checked" \
+      "$single_upvotes" \
+      "$has_sub" > "$out_file"
+    return 0
+  fi
 
   tmp_e=$(mktemp "${TMPDIR:-/tmp}/priorities-e.XXXXXX")
   tmp_p=$(mktemp "${TMPDIR:-/tmp}/priorities-p.XXXXXX")
@@ -1455,7 +1531,28 @@ case "$action" in
       exit 2
     fi
     target=$(expand_home_path "$target")
+    read_item_attrs "$target"
+    preserve_echelon=$attr_echelon
+    preserve_priority=$attr_priority
+    preserve_checked=$attr_checked
+    preserve_upvotes=$attr_upvotes
     file-to-folder "$target" >/dev/null
+    case "$preserve_echelon" in
+      ''|*Error*|*[!0-9]*) ;;
+      *) set_user_attr "$target" echelon "$preserve_echelon" ;;
+    esac
+    case "$preserve_priority" in
+      ''|*Error*|*[!0-9]*) ;;
+      *) set_user_attr "$target" priority "$preserve_priority" ;;
+    esac
+    case "$preserve_checked" in
+      ''|*Error*|*[!0-9]*) ;;
+      *) set_user_attr "$target" checked "$preserve_checked" ;;
+    esac
+    case "$preserve_upvotes" in
+      ''|*Error*|*[!0-9]*) ;;
+      *) set_user_attr "$target" upvotes "$preserve_upvotes" ;;
+    esac
     printf '%s\n' "$target"
     ;;
 
