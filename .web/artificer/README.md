@@ -32,7 +32,8 @@ When this template is installed into a site:
 
 - `site/pages/index.md` - main app page
 - `site/static/style.css` - app styling
-- `site/static/app.js` - frontend app logic
+- `site/static/artificer-app.js` - frontend app logic (canonical bundle)
+- `site/static/app.js` - compatibility alias to `artificer-app.js`
 - `cgi/artificer-api` - backend API endpoint
 
 ## API
