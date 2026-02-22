@@ -4471,7 +4471,7 @@ queue_state_for_conversation_light() {
 queue_clear_running_state() {
   conv_dir=$1
   queue_dir=$(conversation_queue_dir_for "$conv_dir")
-  rm -f "$queue_dir/running.txt" "$queue_dir/running.id" "$queue_dir/running.started" "$queue_dir/running.started_iso" "$queue_dir/running.stream_session" "$queue_dir/running.meta" "$queue_dir/running.pid" "$queue_dir/running.stop"
+  rm -f "$queue_dir/running.txt" "$queue_dir/running.id" "$queue_dir/running.anchor" "$queue_dir/running.started" "$queue_dir/running.started_iso" "$queue_dir/running.stream_session" "$queue_dir/running.event_id" "$queue_dir/running.meta" "$queue_dir/running.pid" "$queue_dir/running.stop"
 }
 
 queue_requeue_running_state() {
@@ -5423,6 +5423,18 @@ queue_running_stream_session_file_for() {
   printf '%s/running.stream_session' "$queue_dir"
 }
 
+queue_running_event_id_file_for() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  printf '%s/running.event_id' "$queue_dir"
+}
+
+queue_running_anchor_file_for() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  printf '%s/running.anchor' "$queue_dir"
+}
+
 queue_running_started_iso_file_for() {
   conv_dir=$1
   queue_dir=$(conversation_queue_dir_for "$conv_dir")
@@ -5564,6 +5576,8 @@ active_run_event_json_for_conversation() {
   running_marker="$queue_dir/running.txt"
   running_pid=$(trim "$(read_file_line "$queue_dir/running.pid" "")")
   running_item_id=$(trim "$(read_file_line "$queue_dir/running.id" "")")
+  running_event_id=$(trim "$(read_file_line "$(queue_running_event_id_file_for "$conv_dir")" "")")
+  running_anchor=$(trim "$(read_file_line "$(queue_running_anchor_file_for "$conv_dir")" "")")
   running_started_epoch=$(trim "$(read_file_line "$queue_dir/running.started" "0")")
   running_started_iso=$(trim "$(read_file_line "$(queue_running_started_iso_file_for "$conv_dir")" "")")
 
@@ -5591,8 +5605,17 @@ active_run_event_json_for_conversation() {
   fi
 
   run_event_id="run-live"
-  if [ -n "$running_item_id" ] && valid_id "$running_item_id"; then
-    run_event_id="run-${running_item_id}"
+  if [ -n "$running_event_id" ] && valid_id "$running_event_id"; then
+    run_event_id=$running_event_id
+  elif [ -n "$running_item_id" ] && valid_id "$running_item_id"; then
+    case "$running_item_id" in
+      run-*)
+        run_event_id=$running_item_id
+        ;;
+      *)
+        run_event_id="run-${running_item_id}"
+        ;;
+    esac
   elif [ -n "$running_pid" ]; then
     run_event_id="run-pid-${running_pid}"
   fi
@@ -5602,12 +5625,21 @@ active_run_event_json_for_conversation() {
   tasks_dir=$(tasks_dir_for_conversation "$conv_dir")
   state_preview=$(sed -n '1,60p' "$conv_dir/agent/.state" 2>/dev/null || true)
   task_status_json=$(task_status_json_from_tasks_dir "$tasks_dir" "running" "$state_preview")
+  message_anchor_json=""
+  case "$running_anchor" in
+    ""|*[!0-9]*)
+      ;;
+    *)
+      message_anchor_json=",\"message_anchor\":$running_anchor"
+      ;;
+  esac
 
-  printf '{"id":"%s","status":"running","started_at":"%s","finished_at":"","model":"%s","plan":"","commands":[],"stream_text":"%s","failures":"","session_log":"","state":"","git_status":"","git_diff":"","error":"","decision_hint":"","task_status":%s}' \
+  printf '{"id":"%s","status":"running","started_at":"%s","finished_at":"","model":"%s","plan":"","commands":[],"stream_text":"%s","failures":"","session_log":"","state":"","git_status":"","git_diff":"","error":"","decision_hint":""%s,"task_status":%s}' \
     "$(json_escape "$run_event_id")" \
     "$(json_escape "$running_started_iso")" \
     "$(json_escape "$model_name")" \
     "$(json_escape "$stream_preview")" \
+    "$message_anchor_json" \
     "$task_status_json"
 }
 
@@ -5884,6 +5916,7 @@ build_run_event_json() {
   decision_hint_text=${14}
   event_id_override=${15}
   task_status_json_override=${16}
+  message_anchor_override=${17}
 
   safe_plan=$(clip_for_run_event "$plan_text" 220 9000)
   safe_stream=$(clip_for_run_event "$stream_text" 260 9000)
@@ -5915,6 +5948,14 @@ build_run_event_json() {
   if [ -z "$event_id" ] || ! valid_id "$event_id"; then
     event_id=$(new_id)
   fi
+  message_anchor_json=""
+  case "$message_anchor_override" in
+    ""|*[!0-9]*)
+      ;;
+    *)
+      message_anchor_json=",\"message_anchor\":$message_anchor_override"
+      ;;
+  esac
   event_id_json=$(json_escape "$event_id")
   status_json=$(json_escape "$run_status")
   started_json=$(json_escape "$started_at")
@@ -5930,8 +5971,8 @@ build_run_event_json() {
   error_json=$(json_escape "$safe_error")
   hint_json=$(json_escape "$safe_hint")
 
-  printf '{"id":"%s","status":"%s","started_at":"%s","finished_at":"%s","model":"%s","plan":"%s","commands":%s,"stream_text":"%s","failures":"%s","session_log":"%s","state":"%s","git_status":"%s","git_diff":"%s","error":"%s","decision_hint":"%s","task_status":%s}' \
-    "$event_id_json" "$status_json" "$started_json" "$finished_json" "$model_json" "$plan_json" "$commands_json" "$stream_json" "$failures_json" "$session_json" "$state_json" "$git_status_json" "$git_diff_json" "$error_json" "$hint_json" "$task_status_json"
+  printf '{"id":"%s","status":"%s","started_at":"%s","finished_at":"%s","model":"%s","plan":"%s","commands":%s,"stream_text":"%s","failures":"%s","session_log":"%s","state":"%s","git_status":"%s","git_diff":"%s","error":"%s","decision_hint":"%s"%s,"task_status":%s}' \
+    "$event_id_json" "$status_json" "$started_json" "$finished_json" "$model_json" "$plan_json" "$commands_json" "$stream_json" "$failures_json" "$session_json" "$state_json" "$git_status_json" "$git_diff_json" "$error_json" "$hint_json" "$message_anchor_json" "$task_status_json"
 }
 
 append_run_event_json() {
@@ -12514,6 +12555,8 @@ EOF
     reasoning_effort_raw=$(trim "$(param "reasoning_effort")")
     max_iterations_raw=$(trim "$(param "max_iterations")")
     stream_session=$(trim "$(param "stream_session")")
+    run_event_id_param=$(trim "$(param "run_event_id")")
+    run_message_anchor_raw=$(trim "$(param "run_message_anchor")")
     stream_output_file=""
     run_mode="auto"
     assistant_mode_id=""
@@ -12529,6 +12572,7 @@ EOF
     run_started_iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     run_finished_iso=""
     run_event_id=""
+    run_message_anchor=""
 
     if ! valid_id "$workspace_id"; then
       emit_error "invalid workspace_id"
@@ -12543,6 +12587,15 @@ EOF
       emit_error "prompt is required"
       exit 0
     fi
+
+    case "$run_message_anchor_raw" in
+      ""|*[!0-9]*)
+        run_message_anchor=""
+        ;;
+      *)
+        run_message_anchor=$run_message_anchor_raw
+        ;;
+    esac
 
     case "$(printf '%s' "$approval_retry_raw" | tr '[:upper:]' '[:lower:]')" in
       1|true|yes|on)
@@ -12770,11 +12823,31 @@ EOF
     queue_dir=$(conversation_queue_dir_for "$conv_dir")
     if [ -n "$queue_item_id" ] && valid_id "$queue_item_id"; then
       run_event_id="run-${queue_item_id}"
+    elif [ -n "$run_event_id_param" ] && valid_id "$run_event_id_param"; then
+      run_event_id=$run_event_id_param
     fi
     running_pid_file="$queue_dir/running.pid"
     running_stop_file="$queue_dir/running.stop"
+    running_event_id_file=$(queue_running_event_id_file_for "$conv_dir")
+    running_anchor_file=$(queue_running_anchor_file_for "$conv_dir")
     rm -f "$running_stop_file"
     printf '%s\n' "$$" > "$running_pid_file"
+    rm -f "$running_event_id_file"
+    rm -f "$running_anchor_file"
+    if [ -n "$run_event_id" ] && valid_id "$run_event_id"; then
+      printf '%s\n' "$run_event_id" > "$running_event_id_file"
+    fi
+    if [ -n "$run_message_anchor" ]; then
+      printf '%s\n' "$run_message_anchor" > "$running_anchor_file"
+    fi
+    run_runtime_cleanup() {
+      rm -f "$running_pid_file" \
+        "$running_anchor_file" \
+        "$(queue_running_started_iso_file_for "$conv_dir")" \
+        "$(queue_running_stream_session_file_for "$conv_dir")" \
+        "$running_event_id_file"
+    }
+    trap run_runtime_cleanup EXIT
 
     if [ "$append_user_message" = "1" ]; then
       clear_decision_request "$conv_dir"
@@ -13044,7 +13117,8 @@ EOF
         "$run_error_text" \
         "$run_decision_hint" \
         "$run_event_id" \
-        "$hello_task_status_json")
+        "$hello_task_status_json" \
+        "$run_message_anchor")
       append_run_event_json "$conv_dir" "$hello_event_json"
       session_json=$(json_escape "$session_log")
       state_json=$(json_escape "mode=DONE")
@@ -13493,7 +13567,8 @@ $explicit_skill_context_text"
         "$run_error_text" \
         "" \
         "$run_event_id" \
-        "$quick_task_status_json")
+        "$quick_task_status_json" \
+        "$run_message_anchor")
       append_run_event_json "$conv_dir" "$quick_event_json"
       printf '{"success":true,"model":"%s","plan":"%s","assistant":"%s","git_status":"%s","git_diff":"%s","commands":[],"blocked_commands":%s,"decision_request":null,"failures":"","session_log":"%s","state":"%s","task_status":%s}\n' \
         "$model_json" "$plan_json" "$assistant_json" "$git_status_json" "$git_diff_json" "$blocked_commands_json" "$quick_session_json" "$state_json" "$quick_task_status_json"
@@ -15306,7 +15381,8 @@ EOF
       "$run_error_text" \
       "" \
       "$run_event_id" \
-      "$final_task_status_json")
+      "$final_task_status_json" \
+      "$run_message_anchor")
     append_run_event_json "$conv_dir" "$agent_event_json"
 
     printf '{"success":true,"model":"%s","plan":"%s","assistant":"%s","git_status":"%s","git_diff":"%s","commands":[%s],"blocked_commands":%s,"decision_request":%s,"failures":"%s","session_log":"%s","state":"%s","task_status":%s}\n' \

@@ -3789,6 +3789,10 @@
       event.status = "done";
     }
     event.finished_at = finishedAt || new Date().toISOString();
+    if (event.id) {
+      delete state.runDetailsOpenByEventId[String(event.id)];
+      delete state.runDigestOpenByEventId[String(event.id)];
+    }
     persistRunEventsSoon();
   }
 
@@ -4664,6 +4668,36 @@
     return html;
   }
 
+  function formatRunInlineTimeline(event, isRunning, maxItems) {
+    var entries = splitRunStreamEntries(event && event.stream_text);
+    if (!entries.length) {
+      return "";
+    }
+    var limit = Number(maxItems || 0);
+    if (!isFinite(limit) || limit < 1) {
+      limit = isRunning ? 7 : 10;
+    }
+    var clippedCount = 0;
+    if (entries.length > limit) {
+      clippedCount = entries.length - limit;
+      entries = entries.slice(clippedCount);
+    }
+    var html = "<div class='run-inline-feed'>";
+    if (clippedCount > 0) {
+      html += "<p class='run-inline-clip'>+" + escHtml(String(clippedCount)) + " earlier step" + (clippedCount === 1 ? "" : "s") + "</p>";
+    }
+    for (var i = 0; i < entries.length; i += 1) {
+      var entry = entries[i] || {};
+      var tone = runStepTone(entry.text);
+      html += "<p class='run-inline-step " + escHtml(tone) + "'>";
+      html += "<span class='run-inline-time'>" + escHtml(entry.time || "step") + "</span>";
+      html += "<span class='run-inline-text'>" + escHtml(entry.text || "") + "</span>";
+      html += "</p>";
+    }
+    html += "</div>";
+    return html;
+  }
+
   function formatRunNarrativeSection(title, rawText) {
     var text = normalizeRunNarrativeText(rawText);
     if (!text) {
@@ -4772,6 +4806,9 @@
 
   function formatRunAdvancedTrace(event) {
     var sections = "";
+    if (event && event.commands && event.commands.length) {
+      sections += "<div class='run-trace-block'><p class='run-trace-title'>Command runs</p>" + formatRunCommands(event.commands || []) + "</div>";
+    }
     if (trim(event && event.state)) {
       sections += "<div class='run-trace-block'><p class='run-trace-title'>Mode State</p><pre class='run-code-block'>" + escHtml(event.state || "") + "</pre></div>";
     }
@@ -4831,9 +4868,6 @@
     sections += formatRunActivityDigest(event, isRunning);
     sections += "<div class='run-trace-block run-trace-stream'><p class='run-trace-title'>" + (isRunning ? "Live steps" : "Step timeline") + "</p>" + formatRunStreamFeed(event, isRunning) + "</div>";
     sections += formatRunNarrativeSection("Plan", event.plan || "");
-    if (event.commands && event.commands.length) {
-      sections += "<div class='run-trace-block'><p class='run-trace-title'>Command runs</p>" + formatRunCommands(event.commands || []) + "</div>";
-    }
     var advanced = formatRunAdvancedTrace(event);
     if (advanced) {
       sections += advanced;
@@ -4901,7 +4935,7 @@
     var html = "";
 
     if (status === "running") {
-      html = "<article class='" + runClass + "'>";
+      html = "<article class='" + runClass + " run-narrative'>";
       var startedAt = Date.parse(event.started_at || "");
       var elapsed = 0;
       if (isFinite(startedAt) && startedAt > 0) {
@@ -4913,7 +4947,8 @@
         html += "<button type='button' class='run-stop-btn' aria-label='Stop run' title='Stop run' data-action='stop-run' data-workspace-id='" + escAttr(workspaceId) + "' data-conversation-id='" + escAttr(conversationId) + "'><span class='run-stop-square' aria-hidden='true'>&#9632;</span></button>";
       }
       html += "</p>";
-      html += formatRunTrace(event, { isRunning: true, defaultOpen: true });
+      html += formatRunInlineTimeline(event, true, 8);
+      html += formatRunTrace(event, { isRunning: true, defaultOpen: false });
       html += "</article>";
       return html;
     }
@@ -4946,9 +4981,10 @@
     }
 
     if (status === "error") {
-      html = "<article class='" + runClass + "'>";
+      html = "<article class='" + runClass + " run-narrative'>";
       html += "<p class='run-line error'>" + escHtml(friendlyRunErrorText(event)) + "</p>";
-      html += formatRunTrace(event, { defaultOpen: true });
+      html += formatRunInlineTimeline(event, false, 12);
+      html += formatRunTrace(event, { defaultOpen: false });
       html += formatRunChangesCard(event);
       html += "</article>";
       return html;
@@ -4991,19 +5027,17 @@
       !!conversationApprovalRequest(conversation)
     );
     var queueAwaitingDecision = queueLastStatus === "awaiting_decision" || !!normalizeDecisionRequest(conversation && conversation.decision_request);
-    html = "<article class='" + runClass + "'>";
+    html = "<article class='" + runClass + " run-narrative'>";
     if (queueRunning || queuePending > 0) {
-      html = "<article class='" + runClass + " run-narrative'>";
       html += "<p class='run-line subtle'>Run step complete. Continuing...</p>";
     } else if (queueAwaitingApproval) {
-      html = "<article class='" + runClass + " run-narrative'>";
       html += "<p class='run-line subtle'>Run paused. Awaiting command approval.</p>";
     } else if (queueAwaitingDecision) {
-      html = "<article class='" + runClass + " run-narrative'>";
       html += "<p class='run-line subtle'>Run paused. Awaiting your decision.</p>";
     } else if (runModelText) {
       html += "<p class='run-line subtle'>Model: " + escHtml(runModelText) + "</p>";
     }
+    html += formatRunInlineTimeline(event, false, 12);
     html += formatRunTrace(event, { defaultOpen: false });
     if (!queueRunning && queuePending < 1 && !queueAwaitingApproval && !queueAwaitingDecision) {
       html += formatRunChangesCard(event);
@@ -10598,7 +10632,7 @@
       streamRenderTimer = setTimeout(function () {
         streamRenderTimer = null;
         renderUi();
-      }, 260);
+      }, 120);
     }
 
     function pollStreamOnce() {
@@ -10638,7 +10672,7 @@
         });
     }
 
-    runStreamPollTimers[streamTimerKey] = setInterval(pollStreamOnce, 6000);
+    runStreamPollTimers[streamTimerKey] = setInterval(pollStreamOnce, 1200);
     pollStreamOnce();
 
     return apiPost("run", {
@@ -10659,7 +10693,9 @@
       explicit_skill_ids: explicitSkillIdsForRun.join(","),
       reasoning_effort: runProfile.reasoning,
       max_iterations: String(selectedIterations),
-      stream_session: streamSession
+      stream_session: streamSession,
+      run_event_id: pendingEvent && pendingEvent.id ? String(pendingEvent.id) : "",
+      run_message_anchor: String(Math.max(0, Math.floor(Number(runAnchor || 0))))
     })
       .then(function (response) {
         stopStreamPoll();
@@ -10750,6 +10786,10 @@
           pendingEvent.task_status = normalizeRunTaskStatusSnapshot(response.task_status);
           pendingEvent.finished_at = new Date().toISOString();
           pendingEvent.decision_hint = trim(String(response.decision_hint || ""));
+          if (pendingEvent.id) {
+            delete state.runDetailsOpenByEventId[String(pendingEvent.id)];
+            delete state.runDigestOpenByEventId[String(pendingEvent.id)];
+          }
           persistRunEventsSoon();
         }
         renderUi();
@@ -10822,6 +10862,10 @@
           pendingEvent.status = "error";
           pendingEvent.error = err && err.message ? err.message : String(err);
           pendingEvent.finished_at = new Date().toISOString();
+          if (pendingEvent.id) {
+            delete state.runDetailsOpenByEventId[String(pendingEvent.id)];
+            delete state.runDigestOpenByEventId[String(pendingEvent.id)];
+          }
           persistRunEventsSoon();
         }
         renderUi();

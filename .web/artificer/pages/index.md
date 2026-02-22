@@ -2,7 +2,7 @@
 title: ""
 pagetitle: "Artificer"
 ---
-<link rel="stylesheet" href="/static/style.css?v=20260222-sendmenu1" />
+<link rel="stylesheet" href="/static/style.css?v=20260222-runorder5" />
 <link id="artificer-theme-stylesheet" rel="stylesheet" href="/static/themes/psionic.css" />
 <div class="forge-shell" id="forge-shell">
 <aside class="workspace-sidebar" id="workspace-dropzone" tabindex="0">
@@ -548,4 +548,4 @@ pagetitle: "Artificer"
 </div>
 </div>
 
-<script src="/static/artificer-app.js?v=20260222-runorder4"></script>
+<script src="/static/artificer-app.js?v=20260222-runorder5"></script>

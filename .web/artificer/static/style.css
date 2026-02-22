@@ -2049,6 +2049,56 @@ h2 {
   font-weight: 600;
 }
 
+.run-inline-feed {
+  margin-top: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.run-inline-clip {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.run-inline-step {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.run-inline-time {
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--surface-2) 12%);
+}
+
+.run-inline-text {
+  font-size: 0.79rem;
+  line-height: 1.34;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.run-inline-step.mode .run-inline-text {
+  color: var(--accent-strong);
+}
+
+.run-inline-step.warn .run-inline-text {
+  color: color-mix(in srgb, var(--danger) 55%, var(--text) 45%);
+}
+
+.run-inline-step.error .run-inline-text {
+  color: var(--danger);
+}
+
+.run-inline-step.success .run-inline-text {
+  color: var(--success);
+}
+
 .meta-glimmer {
   display: inline-block;
   background-image: linear-gradient(
