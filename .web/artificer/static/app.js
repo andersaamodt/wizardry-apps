@@ -4936,9 +4936,9 @@
     var info = state.dictationInstallInfo || null;
     var infoBytes = dictationWholeNumber(info && info.download_size_bytes);
     if (infoBytes > 0) {
-      return dictationGigabytesLabel(infoBytes, 1) + " GB";
+      return dictationGigabytesLabel(infoBytes, 2) + " GB";
     }
-    return dictationGigabytesLabel(DICTATION_PREINSTALL_SIZE_BYTES, 1) + " GB";
+    return dictationGigabytesLabel(DICTATION_PREINSTALL_SIZE_BYTES, 2) + " GB";
   }
 
   function dictationInstallRunningButtonLabel(job) {
@@ -5022,7 +5022,7 @@
     if (downloadedBytes > totalBytes) {
       downloadedBytes = totalBytes;
     }
-    return dictationGigabytesLabel(downloadedBytes, 1) + " of " + dictationGigabytesLabel(totalBytes, 1) + " GB";
+    return dictationGigabytesLabel(downloadedBytes, 2) + " of " + dictationGigabytesLabel(totalBytes, 2) + " GB";
   }
 
   function dictationWholeNumber(rawValue) {
@@ -5044,7 +5044,7 @@
     }
     var places = Number(decimals);
     if (!isFinite(places) || places < 0) {
-      places = 1;
+      places = 2;
     }
     if (places > 3) {
       places = 3;
