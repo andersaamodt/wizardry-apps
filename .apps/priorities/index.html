@@ -154,6 +154,7 @@
       expanded: Object.create(null),
       cache: Object.create(null),
       cacheAliases: Object.create(null),
+      nextActionLabelCache: Object.create(null),
       pendingNextAction: Object.create(null),
       busy: false,
       pendingPrioritizePath: '',
@@ -681,6 +682,35 @@
       return p.slice(0, slash);
     }
 
+    function renamedSiblingPath(path, nextName) {
+      var p = String(path || '').replace(/\/+$/, '');
+      var name = String(nextName || '').trim();
+      if (!p || !name) {
+        return p || name;
+      }
+      var slash = p.lastIndexOf('/');
+      if (slash < 0) {
+        return name;
+      }
+      if (slash === 0) {
+        return '/' + name;
+      }
+      return p.slice(0, slash + 1) + name;
+    }
+
+    function moveNextActionLabelCache(fromPath, toPath) {
+      var fromKey = String(fromPath || '').trim();
+      var toKey = String(toPath || '').trim();
+      if (!fromKey || !toKey || fromKey === toKey) {
+        return;
+      }
+      if (!state.nextActionLabelCache || !Object.prototype.hasOwnProperty.call(state.nextActionLabelCache, fromKey)) {
+        return;
+      }
+      state.nextActionLabelCache[toKey] = state.nextActionLabelCache[fromKey];
+      delete state.nextActionLabelCache[fromKey];
+    }
+
     function parentNavPath(path) {
       var raw = String(path || '').trim();
       if (!raw) {
@@ -1094,13 +1124,16 @@
     function getNextActionLabel(path) {
       var items = getCachedDirItems(path);
       if (!items || !items.length) {
-        return '';
+        return String(state.nextActionLabelCache[path] || '');
       }
       for (var i = 0; i < items.length; i += 1) {
         if (items[i].checked !== 1) {
-          return items[i].name + (items[i].kind === 'dir' ? '/' : '');
+          var liveLabel = items[i].name + (items[i].kind === 'dir' ? '/' : '');
+          state.nextActionLabelCache[path] = liveLabel;
+          return liveLabel;
         }
       }
+      state.nextActionLabelCache[path] = '';
       return '';
     }
 
@@ -2573,6 +2606,7 @@
         return;
       }
       var parentDir = parentDirOfPath(path);
+      var renamedPath = renamedSiblingPath(path, nextName);
       var optimisticTouches = applyOptimisticRename(path, nextName);
       state.pendingRenamePath = path;
       state.editingPath = '';
@@ -2586,6 +2620,7 @@
             ['rename-fast', path, nextName],
             ['rename', path, nextName]
           );
+          moveNextActionLabelCache(path, renamedPath);
           await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
         } catch (error) {
           rollbackOptimisticRename(optimisticTouches);
@@ -2749,6 +2784,7 @@
       state.expanded[state.root] = true;
       state.cache = Object.create(null);
       state.cacheAliases = Object.create(null);
+      state.nextActionLabelCache = Object.create(null);
       state.revealedMakeProjectPath = '';
       state.pendingMakeProjectPath = '';
       state.openMenuPath = '';
