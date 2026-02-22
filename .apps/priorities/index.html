@@ -162,12 +162,15 @@
       pendingCheckPath: '',
       pendingExpandPath: '',
       pendingAdd: false,
+      pendingAddSave: false,
       pendingMakeProjectPath: '',
       revealedMakeProjectPath: '',
       openMenuPath: '',
       editingPath: '',
       pendingRenamePath: '',
       pendingAddText: '',
+      addQueue: [],
+      addQueueActive: false,
       prioritizeQueue: [],
       prioritizeQueueActive: false,
       uiScale: 1,
@@ -2418,7 +2421,7 @@
       input.className = 'add-inline-input';
       input.placeholder = 'New priority';
       input.value = state.pendingAddText;
-      input.disabled = !!state.pendingAdd;
+      input.disabled = false;
       bindStandardTextboxBehavior(input);
       var addBtn = null;
       var updateAddButtonDisabled = function () {
@@ -2426,7 +2429,7 @@
           return;
         }
         var hasName = String(input.value || '').trim().length > 0;
-        addBtn.disabled = !!state.pendingAdd || !hasName;
+        addBtn.disabled = !hasName;
       };
       input.addEventListener('input', function () {
         state.pendingAddText = input.value;
@@ -2449,10 +2452,7 @@
       addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'add-inline-btn';
-      addBtn.textContent = state.pendingAdd ? '' : '+';
-      if (state.pendingAdd) {
-        addBtn.classList.add('loading');
-      }
+      addBtn.textContent = '+';
       updateAddButtonDisabled();
       addBtn.title = 'Add priority';
       addBtn.addEventListener('click', function () {
@@ -2463,7 +2463,7 @@
       row.appendChild(left);
       row.appendChild(right);
       row.addEventListener('click', function (event) {
-        if (!state.pendingAdd && !event.target.closest('button')) {
+        if (!event.target.closest('button')) {
           input.focus();
         }
       });
@@ -2704,6 +2704,59 @@
       }
     }
 
+    function processAddQueue() {
+      if (state.addQueueActive) {
+        return;
+      }
+      if (!state.addQueue.length) {
+        state.pendingAddSave = false;
+        return;
+      }
+      state.addQueueActive = true;
+      state.pendingAddSave = true;
+      (async function runQueue() {
+        try {
+          while (state.addQueue.length) {
+            if (state.busy) {
+              await new Promise(function (resolve) { setTimeout(resolve, 40); });
+              continue;
+            }
+            var entry = state.addQueue.shift();
+            if (!entry || !entry.dir || !entry.name) {
+              continue;
+            }
+            state.busy = true;
+            try {
+              await runMutationWithListFallback(
+                entry.dir,
+                ['add-fast', entry.dir, entry.name],
+                ['add', entry.dir, entry.name]
+              );
+              var refreshed = await listDir(entry.dir);
+              setCachedDirItems(entry.dir, refreshed);
+            } catch (error) {
+              rollbackOptimisticAdd(entry.optimisticAdd);
+              if (!String(state.pendingAddText || '').trim()) {
+                state.pendingAddText = entry.name;
+              }
+              var detail = String(error && error.message ? error.message : error).trim();
+              status(detail ? ('Add priority failed; reverted. ' + detail) : 'Add priority failed; reverted.', true);
+            } finally {
+              state.busy = false;
+              processPrioritizeQueue();
+              await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+            }
+          }
+        } finally {
+          state.addQueueActive = false;
+          state.pendingAddSave = false;
+          if (state.addQueue.length) {
+            setTimeout(processAddQueue, 0);
+          }
+        }
+      })();
+    }
+
     async function confirmDeleteIfNeeded(itemOrPath) {
       if (!itemOrPath) {
         return false;
@@ -2859,47 +2912,22 @@
 
     function addAtRoot(rawValue) {
       var name = String(rawValue || '').trim();
-      if (!name || state.pendingAdd || state.busy) {
+      if (!name) {
         return;
       }
       var targetDir = String(state.root || '.').trim() || '.';
       var optimisticAdd = applyOptimisticAdd(targetDir, name);
-      var shouldRefocusAddInput = false;
-      var previousAddText = state.pendingAddText;
-      state.pendingAdd = true;
       state.pendingAddText = '';
-      state.busy = true;
-      (async function () {
-        try {
-          await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
-          await runMutationWithListFallback(
-            targetDir,
-            ['add-fast', targetDir, name],
-            ['add', targetDir, name]
-          );
-          // Force a post-mutation refresh so add reflects immediately even if
-          // backend fast output format or aliases differ.
-          var refreshed = await listDir(targetDir);
-          setCachedDirItems(targetDir, refreshed);
-          shouldRefocusAddInput = true;
-        } catch (error) {
-          rollbackOptimisticAdd(optimisticAdd);
-          state.pendingAddText = previousAddText || name;
-          var detail = String(error && error.message ? error.message : error).trim();
-          status(detail ? ('Add priority failed; reverted. ' + detail) : 'Add priority failed; reverted.', true);
-        } finally {
-          state.pendingAdd = false;
-          state.busy = false;
-          processPrioritizeQueue();
-        }
-      })().finally(function () {
-        state.pendingAdd = false;
-        render({ suppressLoadingOverlay: true, preserveInputSelection: true }).then(function () {
-          if (shouldRefocusAddInput) {
-            focusNewPriorityInput();
-          }
-        });
+      state.pendingAdd = false;
+      render({ suppressLoadingOverlay: true, preserveInputSelection: true }).then(function () {
+        focusNewPriorityInput();
       });
+      state.addQueue.push({
+        dir: targetDir,
+        name: name,
+        optimisticAdd: optimisticAdd
+      });
+      processAddQueue();
     }
 
     function actMakeProject(path) {
