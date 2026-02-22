@@ -1096,12 +1096,37 @@
         return;
       }
       if (!existing) {
+        var beforeHeight = row.getBoundingClientRect().height;
         existing = document.createElement('span');
         existing.className = 'next-action';
         if (row.classList.contains('row-first-task')) {
           existing.classList.add('next-action-first-pill');
         }
+        existing.classList.add('next-action-entering');
         nameStack.appendChild(existing);
+        existing.textContent = '➜ ' + nextActionText;
+
+        var afterHeight = row.getBoundingClientRect().height;
+        if (afterHeight > beforeHeight + 0.5) {
+          row.classList.add('row-next-action-animating');
+          row.style.height = String(beforeHeight) + 'px';
+          row.style.overflow = 'hidden';
+          requestAnimationFrame(function () {
+            row.style.height = String(afterHeight) + 'px';
+          });
+          var cleanup = function () {
+            row.classList.remove('row-next-action-animating');
+            row.style.height = '';
+            row.style.overflow = '';
+            row.removeEventListener('transitionend', cleanup);
+          };
+          row.addEventListener('transitionend', cleanup);
+          setTimeout(cleanup, 280);
+        }
+        requestAnimationFrame(function () {
+          existing.classList.remove('next-action-entering');
+        });
+        return;
       }
       existing.textContent = '➜ ' + nextActionText;
     }

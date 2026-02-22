@@ -674,6 +674,10 @@ button:hover {
   position: relative;
 }
 
+.row.row-next-action-animating {
+  transition: height 220ms ease;
+}
+
 .row::before {
   content: "";
   position: absolute;
@@ -1034,6 +1038,14 @@ button:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: calc(100vw - (150px * var(--ui-scale)));
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.next-action.next-action-entering {
+  opacity: 0;
+  transform: translateY(calc(-3px * var(--ui-scale)));
 }
 
 .next-action.next-action-first-pill {
