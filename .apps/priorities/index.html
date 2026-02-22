@@ -1588,16 +1588,14 @@
         if (rect.height <= 0) {
           continue;
         }
-        var deltaY = prev.top - rect.top;
-        var deltaX = prev.left - rect.left;
         var scaleY = prev.height > 0 ? (prev.height / rect.height) : 1;
-        if (Math.abs(deltaY) < 1 && Math.abs(deltaX) < 1 && Math.abs(scaleY - 1) < 0.01) {
+        if (Math.abs(scaleY - 1) < 0.01) {
           continue;
         }
         block.style.willChange = 'transform';
         block.style.transition = 'none';
-        block.style.transformOrigin = 'top center';
-        block.style.transform = 'translate(' + deltaX + 'px,' + deltaY + 'px) scaleY(' + scaleY + ')';
+        block.style.transformOrigin = 'top';
+        block.style.transform = 'scaleY(' + scaleY + ')';
         moved.push(block);
       }
       if (!moved.length) {
@@ -1609,7 +1607,7 @@
           for (var j = 0; j < moved.length; j += 1) {
             var block = moved[j];
             block.style.transition = 'transform 280ms cubic-bezier(0.2, 0.75, 0.2, 1)';
-            block.style.transform = 'translate(0,0) scaleY(1)';
+            block.style.transform = 'scaleY(1)';
             block.addEventListener('transitionend', function onEnd() {
               this.style.transition = '';
               this.style.transform = '';
