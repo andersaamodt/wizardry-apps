@@ -1337,9 +1337,9 @@ input[type="checkbox"]:disabled {
   max-width: min(14rem, 34vw);
   column-gap: 0.62rem;
   margin-top: 0;
-  margin-left: 0.18rem;
-  min-width: 0;
-  flex: 0 1 auto;
+  margin-left: auto;
+  min-width: calc(1.45rem + 1.45rem + 0.62rem);
+  flex: 0 0 auto;
   overflow: hidden;
   -webkit-app-region: no-drag;
 }
