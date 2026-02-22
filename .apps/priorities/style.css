@@ -155,6 +155,22 @@ h1 {
   color: color-mix(in srgb, var(--light-text, #5d6486) 64%, var(--text, #2a2e47) 36%);
 }
 
+.copy-markdown-toggle.copy-shortcut-pulse {
+  animation: copy-shortcut-pulse 190ms ease-out;
+}
+
+@keyframes copy-shortcut-pulse {
+  0% {
+    background: color-mix(in srgb, var(--accent-soft, #e6e3f4) 34%, var(--light-bg, #f8f7fc) 66%);
+  }
+  45% {
+    background: color-mix(in srgb, var(--accent-soft, #e6e3f4) 58%, #fff 42%);
+  }
+  100% {
+    background: color-mix(in srgb, var(--light-bg, #f8f7fc) 72%, #fff 28%);
+  }
+}
+
 .settings-toggle.active {
   background: color-mix(in srgb, var(--accent-soft, #e6e3f4) 62%, #fff 38%);
   color: color-mix(in srgb, var(--accent, #7782d6) 82%, var(--text, #2a2e47) 18%);

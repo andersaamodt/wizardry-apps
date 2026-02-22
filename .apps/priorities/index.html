@@ -1752,6 +1752,29 @@
       }
     }
 
+    function pulseCopyButton() {
+      var btn = document.getElementById('copy-markdown');
+      if (!btn) {
+        return;
+      }
+      btn.classList.remove('copy-shortcut-pulse');
+      // Force reflow so rapid repeated shortcuts retrigger animation.
+      void btn.offsetWidth;
+      btn.classList.add('copy-shortcut-pulse');
+      setTimeout(function () {
+        btn.classList.remove('copy-shortcut-pulse');
+      }, 220);
+    }
+
+    function triggerCopyFromShortcut(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      pulseCopyButton();
+      copyVisiblePrioritiesAsMarkdown();
+    }
+
     function invalidateCachedDirs(dirs) {
       if (!dirs || !dirs.length) {
         return;
@@ -4228,10 +4251,17 @@
 
       document.addEventListener('keydown', function (event) {
         var hasPrimaryMod = !!(event.metaKey || event.ctrlKey);
+        var key = String(event.key || '').toLowerCase();
         var target = event.target;
         var isAddInputFocused = !!(target && target.classList && target.classList.contains('add-inline-input'));
 
         if (hasPrimaryMod) {
+          if (key === 'a' || key === 'c') {
+            if (!isTypingContext(event.target)) {
+              triggerCopyFromShortcut(event);
+              return;
+            }
+          }
           if (event.key === 'ArrowUp') {
             event.preventDefault();
             drillUp();
