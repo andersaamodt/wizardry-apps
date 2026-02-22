@@ -933,6 +933,11 @@ button:hover {
   flex: 0 0 auto;
 }
 
+.row.row-project .check-slot.project-slot {
+  margin-left: calc(-1 * var(--expand-slot) + calc(1px * var(--ui-scale)));
+  z-index: 1;
+}
+
 .chk:not(:checked):not(.loading) {
   opacity: 0;
 }

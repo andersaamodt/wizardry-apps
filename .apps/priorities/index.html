@@ -160,6 +160,7 @@
       busy: false,
       pendingPrioritizePath: '',
       pendingCheckPath: '',
+      pendingCheckQueuedToggles: 0,
       pendingExpandPath: '',
       pendingDirRevalidate: Object.create(null),
       pendingAdd: false,
@@ -3226,7 +3227,7 @@
     }
 
     function actToggleChecked(path) {
-      if (state.pendingCheckPath) {
+      if (state.pendingCheckPath && state.pendingCheckPath !== path) {
         return;
       }
       var parentDir = parentDirOfPath(path);
@@ -3234,17 +3235,32 @@
       var nextChecked = currentChecked === 1 ? 0 : 1;
       var optimisticTouches = applyOptimisticChecked(path, nextChecked);
       var hadOptimisticTouch = optimisticTouches.length > 0;
+      if (state.pendingCheckPath === path) {
+        state.pendingCheckQueuedToggles = (Number(state.pendingCheckQueuedToggles) || 0) + 1;
+        if (hadOptimisticTouch) {
+          render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        }
+        return;
+      }
       state.pendingCheckPath = path;
+      state.pendingCheckQueuedToggles = 0;
       (async function () {
         try {
           if (hadOptimisticTouch) {
             await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
           }
-          await runMutationWithListFallback(
-            parentDir,
-            ['check-toggle-fast', path],
-            ['check-toggle', path]
-          );
+          while (true) {
+            await runMutationWithListFallback(
+              parentDir,
+              ['check-toggle-fast', path],
+              ['check-toggle', path]
+            );
+            var queued = Number(state.pendingCheckQueuedToggles) || 0;
+            if (queued <= 0) {
+              break;
+            }
+            state.pendingCheckQueuedToggles = queued - 1;
+          }
           state.pendingCheckPath = '';
           // Avoid a second full rerender when optimistic UI already matches the
           // successful backend result; this prevents row-control flicker.
@@ -3252,7 +3268,12 @@
             await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
           }
         } catch (error) {
-          rollbackOptimisticChecked(optimisticTouches);
+          try {
+            var listResult = await runBackend(['list', parentDir]);
+            hydrateCachedDirFromResult(parentDir, listResult);
+          } catch (_) {
+            rollbackOptimisticChecked(optimisticTouches);
+          }
           await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
           var detail = String(error && error.message ? error.message : error).trim();
           status(detail ? ('Checkbox update failed; reverted. ' + detail) : 'Checkbox update failed; reverted.', true);
@@ -3260,6 +3281,7 @@
           if (state.pendingCheckPath === path) {
             state.pendingCheckPath = '';
           }
+          state.pendingCheckQueuedToggles = 0;
           processPrioritizeQueue();
         }
       })();
