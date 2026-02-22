@@ -186,7 +186,7 @@ title: Blog Admin
 <input type="hidden" id="post-tags" value="">
 <div id="post-tags-editor" class="tag-editor" role="group" aria-label="Post tags">
 <div id="post-tags-pills" class="tag-editor-pills"></div>
-<input type="text" id="post-tags-input" class="tag-editor-input" placeholder="type tag, press comma">
+<input type="text" id="post-tags-input" class="tag-editor-input" placeholder="tag, tag, tag">
 </div>
 </div>
 <div class="field-row">
@@ -785,15 +785,17 @@ body {
 
 .tag-editor {
   inline-size: min(100%, 24rem);
-  min-height: 2.25rem;
+  min-height: 2.2rem;
+  height: 2.2rem;
   border: 1px solid #b8caeb;
   border-radius: 11px;
   background: #fff;
-  padding: 0.3rem 0.38rem;
+  padding: 0.18rem 0.38rem;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.34rem;
+  overflow: hidden;
 }
 
 .tag-editor:focus-within {
@@ -804,8 +806,10 @@ body {
 .tag-editor-pills {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 0.3rem;
+  max-width: 65%;
 }
 
 .tag-pill {
@@ -844,9 +848,11 @@ body {
 .tag-editor-input {
   border: 0 !important;
   box-shadow: none !important;
-  padding: 0.2rem 0.16rem !important;
-  min-width: 8rem;
-  inline-size: 9rem !important;
+  padding: 0.12rem 0.16rem !important;
+  min-width: 0;
+  inline-size: auto !important;
+  flex: 1 1 auto;
+  width: 100% !important;
   background: transparent !important;
 }
 
@@ -866,9 +872,11 @@ body {
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  padding: 0.2rem 0.16rem !important;
-  inline-size: 9rem !important;
-  min-width: 8rem !important;
+  padding: 0.12rem 0.16rem !important;
+  inline-size: auto !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  flex: 1 1 auto !important;
 }
 
 .button-row {
