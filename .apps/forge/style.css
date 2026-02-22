@@ -846,9 +846,9 @@ button:disabled {
 }
 
 .row-play {
-  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--panel-solid, #fff) 92%, transparent);
+  background: transparent;
   color: color-mix(in srgb, var(--text) 78%, var(--muted));
   font-size: 0.72rem;
   line-height: 1;
@@ -858,7 +858,8 @@ button:disabled {
 }
 
 .row-play:hover {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent-soft, var(--accent)) 56%, transparent);
   color: var(--accent-strong);
 }
 
@@ -1067,9 +1068,9 @@ button:disabled {
 .run-split {
   display: inline-flex;
   align-items: stretch;
-  border: 1px solid var(--toolbar-line);
+  border: 0;
   border-radius: 8px;
-  background: var(--toolbar-surface);
+  background: transparent;
   overflow: visible;
 }
 
@@ -1126,8 +1127,8 @@ button:disabled {
 }
 
 .run-split:hover {
-  border-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
-  background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
+  border-color: transparent;
+  background: transparent;
 }
 
 .run-split:hover .menu-toggle {
@@ -1136,13 +1137,37 @@ button:disabled {
 
 .run-split .toolbar-btn:hover,
 .run-split .toolbar-btn.primary:hover {
-  border-color: transparent;
-  background: transparent;
+  border-color: transparent !important;
+  background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
 }
 
 .run-split .menu-toggle:hover,
 .run-split .menu-toggle:focus-visible {
   border-left-color: color-mix(in srgb, var(--toolbar-accent) 34%, var(--toolbar-line));
+}
+
+#action-build,
+#action-run,
+#action-run-menu {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+#action-build:hover,
+#action-build:focus-visible,
+#action-run:hover,
+#action-run:focus-visible,
+#action-run-menu:hover,
+#action-run-menu:focus-visible {
+  border-color: transparent !important;
+  background: color-mix(in srgb, var(--toolbar-accent-soft) 78%, var(--toolbar-surface));
+}
+
+.run-split.single #action-run,
+.run-split.single:hover #action-run {
+  border-color: transparent;
+  background: transparent;
 }
 
 .build-split .floating-menu {
@@ -1539,9 +1564,18 @@ button:disabled {
   align-items: center;
   justify-content: center;
   justify-self: end;
-  border: 1px solid var(--section-border);
-  background: color-mix(in srgb, var(--section-bg) 94%, transparent);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--section-text);
+}
+
+#copy-log:hover,
+#copy-log:focus-visible,
+#clear-log:hover,
+#clear-log:focus-visible {
+  border-color: transparent !important;
+  background: color-mix(in srgb, var(--section-accent-soft) 76%, transparent);
+  box-shadow: none;
 }
 
 .section-copy-btn {
@@ -2139,8 +2173,8 @@ button:disabled {
   height: 1.34rem;
   padding: 0;
   border-radius: 8px;
-  border: 1px solid var(--section-border);
-  background: color-mix(in srgb, var(--section-bg) 92%, transparent);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--section-text);
   font-size: 0.74rem;
   display: inline-flex;
@@ -2150,7 +2184,7 @@ button:disabled {
 }
 
 .row-mini:hover {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--section-border));
+  border-color: transparent;
   background: color-mix(in srgb, var(--section-accent-soft) 76%, transparent);
   box-shadow: none;
 }
@@ -2160,7 +2194,7 @@ button:disabled {
 .pipeline-sections .section-clear-btn:disabled {
   opacity: 0.5;
   color: color-mix(in srgb, var(--section-muted) 88%, transparent);
-  border-color: color-mix(in srgb, var(--section-border) 90%, transparent);
+  border-color: transparent;
 }
 
 .row-mini.row-open {
