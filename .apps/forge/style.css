@@ -164,6 +164,12 @@ body {
   line-height: 1.45;
 }
 
+/* Hide the stage detail pane until startup data has been hydrated. */
+body.forge-booting #stage-tools,
+body.forge-booting #route-pipeline .details-card {
+  visibility: hidden;
+}
+
 .forge-shell {
   width: 100vw;
   height: 100%;

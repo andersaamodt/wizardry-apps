@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css?v=forge20260222c">
   <link id="forge-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=forge20260218b">
 </head>
-<body>
+<body class="forge-booting">
   <div class="forge-shell">
     <header class="topbar topbar-minimal"></header>
 
@@ -2894,6 +2894,7 @@
       async function refreshWorkspace(options) {
         options = options || {};
         var quiet = !!options.quiet;
+        var shouldRender = options.render !== false;
         var res = await backend('doctor', [], { quiet: quiet });
         var info = kv(res.stdout || '');
 
@@ -2938,18 +2939,26 @@
         if (!info.root) {
           state.apps = [];
           state.workspaces = [];
-          renderCatalogList();
-          renderSelectedBuiltIn();
+          if (shouldRender) {
+            renderCatalogList();
+            renderSelectedBuiltIn();
+          }
           return;
         }
 
-        await refreshApps({ quiet: quiet });
-        await refreshWorkspaces({ quiet: quiet });
-        scheduleWindowFit();
+        // Load both catalogs before rendering to avoid startup pane flicker.
+        await refreshApps({ quiet: quiet, render: false });
+        await refreshWorkspaces({ quiet: quiet, render: false });
+        if (shouldRender) {
+          renderCatalogList();
+          renderSelectedBuiltIn();
+          scheduleWindowFit();
+        }
       }
 
       async function refreshApps(options) {
         options = options || {};
+        var shouldRender = options.render !== false;
         var res = await backend('list-apps', [], { quiet: !!options.quiet });
         var rows = parseTSV(res.stdout || '', 6);
         state.apps = rows.map(function (row) {
@@ -2967,8 +2976,10 @@
           state.selectedBuiltIn = state.apps[0].id;
         }
 
-        renderCatalogList();
-        renderSelectedBuiltIn();
+        if (shouldRender) {
+          renderCatalogList();
+          renderSelectedBuiltIn();
+        }
         els.starterApplicationSelect.innerHTML = '';
         [
           { value: 'minimal', label: 'Blank application project' },
@@ -2989,6 +3000,7 @@
 
       async function refreshWorkspaces(options) {
         options = options || {};
+        var shouldRender = options.render !== false;
         var res = await backend('list-workspaces', [state.projectsRoot], { quiet: !!options.quiet });
         var rows = parseTSV(res.stdout || '', 6);
         state.workspaces = rows.map(function (row) {
@@ -3002,7 +3014,9 @@
           };
         });
 
-        renderCatalogList();
+        if (shouldRender) {
+          renderCatalogList();
+        }
         els.starterGameSelect.innerHTML = '';
         var blank = document.createElement('option');
         blank.value = 'blank';
@@ -4161,6 +4175,7 @@
       }
 
       async function boot() {
+        document.body.classList.add('forge-booting');
         document.body.classList.remove('settings-open', 'activity-open');
         state.settingsOpen = false;
         document.body.classList.remove('layout-recovery');
@@ -4210,12 +4225,14 @@
           } catch (err) {
             appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
           }
+          document.body.classList.remove('forge-booting');
           text(els.qualityScope, 'Global checks for repository: ' + (state.rootHint || '(not set)'));
           text(els.qualityHelp, 'These checks run against the repository and pipeline tooling, not one selected app.');
           scheduleWindowFit();
           return;
         }
 
+        document.body.classList.remove('forge-booting');
         document.body.classList.add('bridge-missing');
         setBridgeStatus(false, 'Bridge: unavailable (open in native host)');
         setActivity('idle', 'Waiting');
