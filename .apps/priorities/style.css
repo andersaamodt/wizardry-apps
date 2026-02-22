@@ -1327,9 +1327,4 @@ button:hover {
   .add-row {
     flex-wrap: wrap;
   }
-
-  .name,
-  .next-action {
-    max-width: calc(100vw - (140px * var(--ui-scale)));
-  }
 }
