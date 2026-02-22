@@ -572,6 +572,36 @@
         return !!(window.wizardry && window.wizardry.rpc);
       }
 
+      function summarizeExecFailure(stderr, stdout, exitCode) {
+        var combined = String(stderr || stdout || 'command failed').trim();
+        var lines = combined.split('\n').map(function (line) {
+          return String(line || '').trim();
+        }).filter(Boolean);
+
+        var summary = '';
+        for (var i = lines.length - 1; i >= 0; i -= 1) {
+          if (lines[i].indexOf('forge-backend:') >= 0) {
+            summary = lines[i];
+            break;
+          }
+        }
+        if (!summary) {
+          for (var j = lines.length - 1; j >= 0; j -= 1) {
+            if (/\berror\b/i.test(lines[j])) {
+              summary = lines[j];
+              break;
+            }
+          }
+        }
+        if (!summary) {
+          summary = lines.length ? lines[lines.length - 1] : 'command failed';
+        }
+        if (summary.length > 220) {
+          summary = summary.slice(0, 217) + '...';
+        }
+        return summary + ' (exit ' + exitCode + ')';
+      }
+
       async function execArgv(argv) {
         if (!bridgeAvailable()) {
           throw new Error('wizardry bridge unavailable; run this app in the native host');
@@ -583,8 +613,12 @@
         }
 
         if (result.exit_code !== 0) {
-          var message = (result.stderr || result.stdout || 'command failed').trim();
-          throw new Error(message + ' (exit ' + result.exit_code + ')');
+          var rawStderr = String((result && result.stderr) || '');
+          var rawStdout = String((result && result.stdout) || '');
+          var error = new Error(summarizeExecFailure(rawStderr, rawStdout, result.exit_code));
+          error.fullStderr = rawStderr;
+          error.fullStdout = rawStdout;
+          throw error;
         }
 
         return result;
@@ -679,6 +713,12 @@
           }
         } catch (err) {
           var message = String(err && err.message ? err.message : err);
+          if (err && err.fullStderr) {
+            appendLog('[stderr] ' + String(err.fullStderr).trim());
+          }
+          if (err && err.fullStdout) {
+            appendLog('[stdout] ' + String(err.fullStdout).trim());
+          }
           var logPath = extractLogPath(message);
           var help = actionableHelp(message);
           appendLog('error: ' + message);
