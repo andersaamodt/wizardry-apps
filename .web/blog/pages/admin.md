@@ -489,7 +489,9 @@ body {
 
 .admin-content {
   min-width: 0;
-  padding: 0.45rem 0 0 0.7rem;
+  min-height: calc(100vh - 3.25rem);
+  padding: 0.45rem 0.72rem 0.95rem 0.7rem;
+  background: #f4f7fd;
 }
 
 #admin-panel.account-only {
@@ -1274,7 +1276,8 @@ body {
   }
 
   .admin-content {
-    padding-left: 0;
+    min-height: 0;
+    padding: 0.4rem 0.5rem 0.75rem;
   }
 }
 
