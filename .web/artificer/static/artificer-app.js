@@ -12705,7 +12705,7 @@
         renderUi();
         showError(error);
       });
-    }, 600);
+    }, 1200);
   }
 
   function installDictationSoftware() {
