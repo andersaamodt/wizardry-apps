@@ -905,7 +905,7 @@ button.tag,
   background: #f6f8ff;
   border-color: #e2e8f8;
   color: #6f7fae;
-  filter: blur(1.4px);
+  filter: blur(2.8px);
   transition: filter 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
 
