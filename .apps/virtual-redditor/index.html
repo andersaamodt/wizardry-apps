@@ -319,23 +319,25 @@
         <section class="tab-panel" id="panel-modes">
           <div class="status-line" id="modes-line">Modes not loaded yet.</div>
           <div id="modes-conflict-banner" class="modes-conflict-banner" aria-live="polite" hidden></div>
-          <div id="modes-layout-card" class="settings-card subpanel-card modes-layout-card">
-            <div class="modes-main-pane">
-              <div class="persona-section-title">Mode Defaults</div>
-              <div class="mode-fields-inline modes-grid">
-                <div class="mode-field-row">
-                  <label for="modes-starting-mode" class="mode-field-label">Starting mode</label>
-                  <select id="modes-starting-mode"></select>
+          <div id="modes-workarea" class="modes-workarea">
+            <div id="modes-layout-card" class="settings-card subpanel-card modes-layout-card">
+              <div class="modes-main-pane">
+                <div class="persona-section-title">Mode Defaults</div>
+                <div class="mode-fields-inline modes-grid">
+                  <div class="mode-field-row">
+                    <label for="modes-starting-mode" class="mode-field-label">Starting mode</label>
+                    <select id="modes-starting-mode"></select>
+                  </div>
+                  <div class="mode-field-row">
+                    <label for="modes-default-decay-mode" class="mode-field-label">Default decay mode</label>
+                    <select id="modes-default-decay-mode"></select>
+                  </div>
                 </div>
-                <div class="mode-field-row">
-                  <label for="modes-default-decay-mode" class="mode-field-label">Default decay mode</label>
-                  <select id="modes-default-decay-mode"></select>
+                <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
+                <div id="modes-list" class="modes-list"></div>
+                <div class="settings-actions modes-save-actions">
+                  <button id="btn-save-modes" type="button" class="primary">Save modes</button>
                 </div>
-              </div>
-              <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
-              <div id="modes-list" class="modes-list"></div>
-              <div class="settings-actions modes-save-actions">
-                <button id="btn-save-modes" type="button" class="primary">Save modes</button>
               </div>
             </div>
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
@@ -3393,12 +3395,12 @@
       if (!state.modeDrawerModeId) return;
       state.modeDrawerModeId = '';
       var drawer = document.getElementById('mode-detail-drawer');
-      var layoutCard = document.getElementById('modes-layout-card');
+      var workarea = document.getElementById('modes-workarea');
       if (drawer) {
         drawer.classList.remove('open');
         drawer.setAttribute('aria-hidden', 'true');
       }
-      if (layoutCard) layoutCard.classList.remove('drawer-open');
+      if (workarea) workarea.classList.remove('drawer-open');
       if (!skipRender) renderModesPanel();
     }
 
@@ -3447,7 +3449,7 @@
 
     function renderModeDrawer(cfg, actionChoices) {
       var drawer = document.getElementById('mode-detail-drawer');
-      var layoutCard = document.getElementById('modes-layout-card');
+      var workarea = document.getElementById('modes-workarea');
       var title = document.getElementById('mode-detail-drawer-title');
       var body = document.getElementById('mode-detail-drawer-body');
       if (!drawer || !title || !body) return;
@@ -3457,7 +3459,7 @@
       if (!mode) {
         state.modeDrawerModeId = '';
         drawer.classList.remove('open');
-        if (layoutCard) layoutCard.classList.remove('drawer-open');
+        if (workarea) workarea.classList.remove('drawer-open');
         drawer.setAttribute('aria-hidden', 'true');
         title.textContent = 'Mode details';
         body.innerHTML = '';
@@ -3560,7 +3562,7 @@
         '</div>'
       ].join('');
       drawer.classList.add('open');
-      if (layoutCard) layoutCard.classList.add('drawer-open');
+      if (workarea) workarea.classList.add('drawer-open');
       drawer.setAttribute('aria-hidden', 'false');
     }
 
