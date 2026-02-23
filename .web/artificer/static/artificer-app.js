@@ -15545,7 +15545,7 @@
         state.dictateStartedAt = Date.now();
         state.dictateElapsedMs = 0;
         setDictationPhase("recording");
-        if (opts.fromHotkey && !state.dictateHotkeyHoldIntent) {
+    if (opts.fromHotkey && opts.holdShortcut && !state.dictateHotkeyHoldIntent) {
           stopAfterStart = true;
         }
         return true;
@@ -15631,7 +15631,7 @@
     if (state.dictateRecording) {
       return;
     }
-    startDictationCapture({ fromHotkey: true }).then(function (started) {
+    startDictationCapture({ fromHotkey: true, holdShortcut: true }).then(function (started) {
       if (started) {
         state.dictateHotkeyHoldActive = true;
       }
@@ -15720,7 +15720,7 @@
         holdStarted: false,
         timer: null
       };
-      toggleDictationCapture({ fromHotkey: true }).catch(showError);
+      toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
       }
@@ -15748,7 +15748,7 @@
       if (holdStarted) {
         endDictationHotkeyHold(trigger);
       } else if (elapsed <= DICTATION_SHORTCUT_TAP_MS) {
-        toggleDictationCapture({ fromHotkey: true }).catch(showError);
+        toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
       }
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
