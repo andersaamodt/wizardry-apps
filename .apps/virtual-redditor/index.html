@@ -259,19 +259,22 @@
             <div class="persona-section-title">Behavior Policy</div>
             <div class="mode-fields-inline modes-grid">
               <div class="mode-field-row">
-                <label for="behavior-mirror-tone" class="mode-field-label">Mirror tone</label>
+                <label for="behavior-mirror-tone" class="mode-field-label">Tone</label>
                 <select id="behavior-mirror-tone">
                   <option value="mirror_or_less">Mirror or less</option>
                   <option value="deescalate_only">Always de-escalate</option>
                   <option value="mirror_exact">Mirror exactly</option>
+                  <option value="escalate_when_appropriate">Escalate when appropriate</option>
                 </select>
               </div>
               <div class="mode-field-row">
                 <label for="behavior-humor" class="mode-field-label">Humor</label>
                 <select id="behavior-humor">
-                  <option value="measured">Measured</option>
-                  <option value="dry">Dry</option>
-                  <option value="none">None</option>
+                  <option value="none">None (straight)</option>
+                  <option value="dry">Dry wit</option>
+                  <option value="measured">Measured light humor</option>
+                  <option value="joker">Joker (frequent quips)</option>
+                  <option value="absurdist">Absurdist (max playful)</option>
                 </select>
               </div>
               <div class="mode-field-row">
@@ -283,10 +286,10 @@
                 </select>
               </div>
               <div class="mode-field-row">
-                <label for="behavior-summonable" class="mode-field-label">Summonable</label>
+                <label for="behavior-summonable" class="mode-field-label">Mentions</label>
                 <label class="schedule-toggle">
                   <input id="behavior-summonable" type="checkbox">
-                  <span>Enable summon command responses</span>
+                  <span>Respond to mentions by appearing and replying</span>
                 </label>
               </div>
             </div>
@@ -309,9 +312,6 @@
                   <span class="schedule-inline">sec</span>
                 </div>
               </div>
-            </div>
-            <div class="settings-actions modes-save-actions">
-              <button id="btn-save-behaviors" type="button" class="primary">Save behaviors</button>
             </div>
           </div>
         </section>
@@ -799,6 +799,9 @@
       doctrineRemoteManifesto: '',
       doctrineRemoteNorms: '',
       settingsSaveTimer: null,
+      behaviorSaveTimer: null,
+      behaviorSaveInFlight: false,
+      behaviorSaveQueued: false,
       passIntervalSaveTimer: null,
       threadInitiateSaveTimer: null,
       usernameSaveTimer: null,
@@ -3786,6 +3789,35 @@
       renderModesPanel();
     }
 
+    async function runBehaviorAutosave() {
+      if (state.behaviorSaveInFlight) {
+        state.behaviorSaveQueued = true;
+        return;
+      }
+      state.behaviorSaveInFlight = true;
+      try {
+        await saveModesConfigWithFeedback('Behaviors saved.');
+        var summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
+        await saveSetting('SUMMONS_ENABLED', summonable ? '1' : '0');
+      } catch (error) {
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.behaviorSaveInFlight = false;
+        if (state.behaviorSaveQueued) {
+          state.behaviorSaveQueued = false;
+          queueBehaviorAutosave(120);
+        }
+      }
+    }
+
+    function queueBehaviorAutosave(delayMs) {
+      if (state.behaviorSaveTimer) clearTimeout(state.behaviorSaveTimer);
+      state.behaviorSaveTimer = setTimeout(function () {
+        state.behaviorSaveTimer = null;
+        runBehaviorAutosave();
+      }, Math.max(0, parseInt(delayMs, 10) || 480));
+    }
+
     function addModeSwitchRuleRow() {
       mutateModesConfigFromUi(function (cfg) {
         var idx = (cfg.switchRules || []).length + 1;
@@ -4411,15 +4443,28 @@
       document.getElementById('btn-extract-norms-run').addEventListener('click', function () {
         runExtractNormsWorkflow();
       });
-      document.getElementById('btn-save-behaviors').addEventListener('click', async function () {
-        try {
-          await saveModesConfigWithFeedback('Behaviors saved.');
-          var summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
-          await saveSetting('SUMMONS_ENABLED', summonable ? '1' : '0');
-        } catch (error) {
-          setControlMessage(String(error && error.message ? error.message : error), true);
+      var behaviorAutoSaveFields = [
+        'behavior-mirror-tone',
+        'behavior-humor',
+        'behavior-citations',
+        'behavior-summonable',
+        'behavior-latency-min',
+        'behavior-latency-max',
+        'behavior-ban-min',
+        'behavior-ban-max'
+      ];
+      for (var bi = 0; bi < behaviorAutoSaveFields.length; bi += 1) {
+        var behaviorEl = document.getElementById(behaviorAutoSaveFields[bi]);
+        if (!behaviorEl) continue;
+        behaviorEl.addEventListener('change', function () {
+          queueBehaviorAutosave(120);
+        });
+        if (behaviorEl.tagName === 'INPUT' && behaviorEl.type === 'number') {
+          behaviorEl.addEventListener('input', function () {
+            queueBehaviorAutosave(520);
+          });
         }
-      });
+      }
       document.getElementById('btn-save-modes').addEventListener('click', function () {
         saveModesConfigWithFeedback('Modes saved.').catch(function (error) {
           setControlMessage(String(error && error.message ? error.message : error), true);

@@ -2252,6 +2252,15 @@ label {
   color: var(--text-subtle);
 }
 
+#behavior-latency-min,
+#behavior-latency-max,
+#behavior-ban-min,
+#behavior-ban-max {
+  width: 56px;
+  min-width: 56px;
+  font-size: 0.82rem;
+}
+
 #pass-interval-input {
   width: 76px;
   font-size: 0.84rem;
