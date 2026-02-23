@@ -9359,7 +9359,7 @@
       pollModelInstallStatus(jobId).catch(function () {
         return null;
       });
-    }, 1200);
+    }, 600);
   }
 
   function syncModelInstallPollingFromCatalog() {
