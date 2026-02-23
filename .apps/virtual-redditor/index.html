@@ -3001,7 +3001,7 @@
         startingMode: 'SHADE',
         defaultDecayMode: 'SHADE',
         actionCatalog: [
-          'Reply', 'Initiate', 'Warn', 'Mention', 'Quote', 'Followup', 'Cross-thread Reply',
+          'Reply to Comments', 'Reply to Posts', 'Initiate', 'Warn', 'Mention', 'Quote', 'Followup', 'Cross-thread Reply',
           'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban',
           'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice'
         ],
@@ -3068,6 +3068,7 @@
       var actionCatalog = base.actionCatalog.slice();
       for (var i = 0; i < savedCatalog.length; i += 1) {
         var actionName = String(savedCatalog[i] || '').trim();
+        if (actionName === 'Reply') continue;
         if (!actionName || actionCatalog.indexOf(actionName) >= 0) continue;
         actionCatalog.push(actionName);
       }
@@ -3097,7 +3098,7 @@
             label: 'Cordial Conversationalist',
             enabled: true,
             defaultExpiryHours: 0,
-            allow: allowMap(['Reply', 'Initiate', 'Mention', 'Followup', 'Cross-thread Reply']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Initiate', 'Mention', 'Followup', 'Cross-thread Reply']),
             constraints: { maxRepliesPerUserThread24h: 4, noFollowup: false, noMention: false, noQuote: true }
           },
           {
@@ -3105,7 +3106,7 @@
             label: 'Direct Speaker',
             enabled: true,
             defaultExpiryHours: 0,
-            allow: allowMap(['Reply', 'Initiate', 'Warn', 'Mention', 'Quote', 'Followup', 'Cross-thread Reply']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Initiate', 'Warn', 'Mention', 'Quote', 'Followup', 'Cross-thread Reply']),
             constraints: { maxRepliesPerUserThread24h: 5, noFollowup: false, noMention: false, noQuote: false }
           },
           {
@@ -3113,7 +3114,7 @@
             label: 'Verbal Corrector',
             enabled: true,
             defaultExpiryHours: 24,
-            allow: allowMap(['Reply', 'Warn', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Post Neutral Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 2, noFollowup: true, noMention: true, noQuote: true }
           },
           {
@@ -3121,7 +3122,7 @@
             label: 'Watchful Referee',
             enabled: true,
             defaultExpiryHours: 72,
-            allow: allowMap(['Reply', 'Warn', 'Short Ban', 'Remove Content', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Remove Content', 'Post Neutral Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
           },
           {
@@ -3129,7 +3130,7 @@
             label: 'Explicit Enforcer',
             enabled: true,
             defaultExpiryHours: 168,
-            allow: allowMap(['Reply', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Neutral Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
           },
           {
@@ -3145,7 +3146,7 @@
             label: 'Active Moderator',
             enabled: true,
             defaultExpiryHours: 336,
-            allow: allowMap(['Reply', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
           }
         ];
@@ -3181,6 +3182,9 @@
         next.id = String(next.id || '');
         next.label = String(next.label || next.id);
         next.allow = Object.assign({}, next.allow || {});
+        if (next.allow.Reply && !next.allow['Reply to Comments']) next.allow['Reply to Comments'] = true;
+        if (next.allow.Reply && !next.allow['Reply to Posts']) next.allow['Reply to Posts'] = true;
+        delete next.allow.Reply;
         next.constraints = Object.assign({
           maxRepliesPerUserThread24h: 4,
           noFollowup: false,
@@ -3212,6 +3216,10 @@
 
       var normalizedTransitions = {};
       var transitionSource = out.postActionTransitions || {};
+      if (transitionSource.Reply && !transitionSource['Reply to Comments']) {
+        transitionSource['Reply to Comments'] = transitionSource.Reply;
+      }
+      delete transitionSource.Reply;
       var transitionKeys = Object.keys(transitionSource);
       for (var t = 0; t < transitionKeys.length; t += 1) {
         var key = String(transitionKeys[t] || '').trim();
@@ -3313,6 +3321,38 @@
         if (String((modes[i] || {}).id || '') === wanted) return modes[i];
       }
       return null;
+    }
+
+    function banActionNames() {
+      return ['Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban'];
+    }
+
+    function isBanActionName(actionName) {
+      return banActionNames().indexOf(String(actionName || '')) >= 0;
+    }
+
+    function actionMeaning(actionName) {
+      var key = String(actionName || '');
+      var map = {
+        'Reply to Comments': 'Can reply to user comments.',
+        'Reply to Posts': 'Can reply to user posts.',
+        'Initiate': 'Can start a new exchange without a summon.',
+        'Warn': 'Can post a warning/correction message.',
+        'Mention': 'Can @mention users in replies.',
+        'Quote': 'Can quote user text directly.',
+        'Followup': 'Can send follow-up replies in the same thread.',
+        'Cross-thread Reply': 'Can continue with the same user across threads.',
+        'Short Ban': 'Can issue a short ban.',
+        'Medium Ban': 'Can issue a medium ban.',
+        'Long Ban': 'Can issue a long ban.',
+        'Extended Ban': 'Can issue an extended ban.',
+        'Year Ban': 'Can issue a one-year ban.',
+        'Permanent Ban': 'Can issue a permanent ban.',
+        'Remove Content': 'Can remove offending posts/comments.',
+        'Lock Thread': 'Can lock threads from further replies.',
+        'Post Neutral Ban Notice': 'Can post a neutral ban notice.'
+      };
+      return map[key] || 'Action permission for this mode.';
     }
 
     function validateModesConfigConflicts(cfg) {
@@ -3427,11 +3467,43 @@
 
       if (target.hasAttribute('data-mode-drawer-default-expiry')) {
         mode.defaultExpiryHours = Math.max(0, parseInt(target.value || '0', 10) || 0);
+      } else if (target.hasAttribute('data-mode-drawer-ban-master')) {
+        var banNames = banActionNames();
+        var allowBan = !!target.checked;
+        mode.allow = Object.assign({}, mode.allow || {});
+        for (var bi = 0; bi < banNames.length; bi += 1) {
+          mode.allow[banNames[bi]] = allowBan;
+        }
+        var row = target.closest('[data-ban-group-row]');
+        if (row) row.classList.toggle('ban-group-enabled', allowBan);
+        if (row) {
+          var subRows = row.querySelectorAll('[data-action-transition-row]');
+          for (var sri = 0; sri < subRows.length; sri += 1) {
+            var actionId = String(subRows[sri].getAttribute('data-action-transition-row') || '');
+            if (!isBanActionName(actionId)) continue;
+            var allowToggle = subRows[sri].querySelector('[data-mode-drawer-allow]');
+            if (allowToggle) allowToggle.checked = allowBan;
+          }
+        }
       } else if (target.hasAttribute('data-mode-drawer-allow')) {
         var actionName = String(target.getAttribute('data-mode-drawer-allow') || '');
         if (!actionName) return;
         mode.allow = Object.assign({}, mode.allow || {});
         mode.allow[actionName] = !!target.checked;
+        if (isBanActionName(actionName)) {
+          var banRow = target.closest('[data-ban-group-row]');
+          var banEnabled = false;
+          var banNamesSync = banActionNames();
+          for (var bs = 0; bs < banNamesSync.length; bs += 1) {
+            if (mode.allow[banNamesSync[bs]]) {
+              banEnabled = true;
+              break;
+            }
+          }
+          if (banRow) banRow.classList.toggle('ban-group-enabled', banEnabled);
+          var banMaster = banRow ? banRow.querySelector('[data-mode-drawer-ban-master]') : null;
+          if (banMaster) banMaster.checked = banEnabled;
+        }
       } else if (target.hasAttribute('data-mode-drawer-constraint')) {
         var key = String(target.getAttribute('data-mode-drawer-constraint') || '');
         if (!key) return;
@@ -3477,7 +3549,11 @@
       var transitionSource = (cfg && cfg.postActionTransitions && typeof cfg.postActionTransitions === 'object')
         ? cfg.postActionTransitions
         : {};
-      var actionRows = (Array.isArray(actionChoices) ? actionChoices : []).map(function (actionName) {
+      var actionRowsSource = Array.isArray(actionChoices) ? actionChoices : [];
+      var banNames = banActionNames();
+      var nonBanActionRows = actionRowsSource.filter(function (actionName) {
+        return !isBanActionName(actionName);
+      }).map(function (actionName) {
         var allowChecked = mode.allow && mode.allow[actionName] ? ' checked' : '';
         var transition = transitionSource[actionName] || null;
         var transitionEnabled = !!transition;
@@ -3491,6 +3567,7 @@
           '    <label class="mini-toggle" title="Allow this action while in this mode"><input type="checkbox" data-mode-drawer-allow="' + escapeHtml(actionName) + '"' + allowChecked + '><span>' + escapeHtml(actionName) + '</span></label>',
           '    <label class="mini-toggle action-transition-enable" title="Enable a mode switch after this action runs"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + '><span>After-action switch</span></label>',
           '  </div>',
+          '  <div class="action-meaning">' + escapeHtml(actionMeaning(actionName)) + '</div>',
           '  <div class="action-transition-controls">',
           '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
           '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode">',
@@ -3500,6 +3577,49 @@
           '</div>'
         ].join('');
       }).join('');
+
+      var banMasterEnabled = false;
+      for (var b = 0; b < banNames.length; b += 1) {
+        if (mode.allow && mode.allow[banNames[b]]) {
+          banMasterEnabled = true;
+          break;
+        }
+      }
+
+      var banRows = banNames.map(function (actionName) {
+        var allowChecked = mode.allow && mode.allow[actionName] ? ' checked' : '';
+        var transition = transitionSource[actionName] || null;
+        var transitionEnabled = !!transition;
+        var toModeValue = transitionEnabled ? String(transition.toMode || '') : String(cfg.defaultDecayMode || cfg.startingMode || '');
+        var durationValue = transitionEnabled ? Math.max(0, parseInt(transition.durationHours, 10) || 0) : 0;
+        var decayValue = transitionEnabled ? String(transition.decayTo || '') : '';
+        var announceChecked = (transitionEnabled && transition.announce) ? ' checked' : '';
+        return [
+          '<div class="action-transition-row ban-sub-row' + (transitionEnabled ? ' transition-enabled' : '') + '" data-action-transition-row="' + escapeHtml(actionName) + '">',
+          '  <div class="action-transition-row-top">',
+          '    <label class="mini-toggle" title="Allow this ban action while in this mode"><input type="checkbox" data-mode-drawer-allow="' + escapeHtml(actionName) + '"' + allowChecked + '><span>' + escapeHtml(actionName) + '</span></label>',
+          '    <label class="mini-toggle action-transition-enable" title="Enable a mode switch after this action runs"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + '><span>After-action switch</span></label>',
+          '  </div>',
+          '  <div class="action-meaning">' + escapeHtml(actionMeaning(actionName)) + '</div>',
+          '  <div class="action-transition-controls">',
+          '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
+          '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode">',
+          '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '" title="Mode to decay to when transition duration expires">' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
+          '    <label class="mini-toggle" title="Post a notice when this transition applies"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
+          '  </div>',
+          '</div>'
+        ].join('');
+      }).join('');
+
+      var groupedActionRows = nonBanActionRows + [
+        '<div class="action-transition-row ban-group-row' + (banMasterEnabled ? ' ban-group-enabled' : '') + '" data-ban-group-row>',
+        '  <div class="action-transition-row-top">',
+        '    <label class="mini-toggle" title="Enable or disable ban actions for this mode"><input type="checkbox" data-mode-drawer-ban-master' + (banMasterEnabled ? ' checked' : '') + '><span>Ban</span></label>',
+        '  </div>',
+        '  <div class="action-meaning">Allow ban actions. Expand to configure each ban level separately.</div>',
+        '  <div class="ban-sub-list">' + banRows + '</div>',
+        '</div>'
+      ].join('');
       var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
       var switchRuleRows = switchRules.map(function (rule, idx) {
         var toModeHtml = modeOptionsHtml(modeOpts, String(rule.toMode || ''), false, '');
@@ -3537,7 +3657,7 @@
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Actions and Post-Action Decorators</div>',
         '  <div class="mode-drawer-helper">Transitions are global decorators on actions and run after the action executes.</div>',
-        '  <div class="mode-drawer-actions-list">' + actionRows + '</div>',
+        '  <div class="mode-drawer-actions-list">' + groupedActionRows + '</div>',
         '</div>',
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Constraints</div>',

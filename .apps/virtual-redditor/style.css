@@ -1785,6 +1785,12 @@ label {
   white-space: nowrap;
 }
 
+.action-meaning {
+  margin-top: 4px;
+  font-size: 0.62rem;
+  color: var(--text-subtle);
+}
+
 .action-transition-controls {
   margin-top: 6px;
   display: none;
@@ -1815,6 +1821,20 @@ label {
 
 .mode-drawer-optin-row {
   margin-top: 6px;
+}
+
+.ban-group-row .ban-sub-list {
+  margin-top: 6px;
+  display: none;
+  gap: 6px;
+}
+
+.ban-group-row.ban-group-enabled .ban-sub-list {
+  display: grid;
+}
+
+.ban-sub-row {
+  border-style: dashed;
 }
 
 .mode-detail-drawer .mode-fields-inline,

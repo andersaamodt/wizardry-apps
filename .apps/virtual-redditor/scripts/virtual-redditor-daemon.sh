@@ -721,7 +721,16 @@ mode_allows_action() {
   read_modes_config_json | jq -r --arg mode "$mode_id" --arg action "$action_name" '
     (.modes // [])
     | map(select((.id // "") == $mode and (.enabled // true)))
-    | if length == 0 then "false" else ((.[0].allow[$action] // false) | if . then "true" else "false" end) end
+    | if length == 0 then "false"
+      else (
+        if $action == "Reply" then
+          ((.[0].allow[$action] // .[0].allow["Reply to Comments"] // false))
+        else
+          (.[0].allow[$action] // false)
+        end
+        | if . then "true" else "false" end
+      )
+      end
   ' 2>/dev/null || printf 'false'
 }
 
@@ -813,6 +822,8 @@ action_severity_score() {
     "Mention") printf '%s' '25' ;;
     "Quote") printf '%s' '20' ;;
     "Initiate") printf '%s' '18' ;;
+    "Reply to Comments") printf '%s' '16' ;;
+    "Reply to Posts") printf '%s' '16' ;;
     "Reply") printf '%s' '16' ;;
     *) printf '%s' '0' ;;
   esac
@@ -847,7 +858,12 @@ resolve_post_action_transition() {
       | if $idx == null then 9999 else $idx end;
     map({
       action: .,
-      transition: (($cfg.postActionTransitions // {})[.] // null),
+      transition: (
+        if . == "Reply"
+        then (($cfg.postActionTransitions // {})["Reply"] // ($cfg.postActionTransitions // {})["Reply to Comments"] // null)
+        else (($cfg.postActionTransitions // {})[.] // null)
+        end
+      ),
       score: severity(.)
     })
     | map(select(.transition != null and (.transition.toMode // "") != ""))
