@@ -4816,7 +4816,8 @@ select:focus {
 
 .dictation-shortcut-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: max-content max-content;
+  justify-content: flex-start;
   gap: 10px;
   margin-top: -2px;
 }
@@ -4833,8 +4834,9 @@ select:focus {
 }
 
 .dictation-shortcut-field select {
-  width: 100%;
-  min-width: 0;
+  width: auto;
+  min-width: max-content;
+  max-width: 100%;
 }
 
 .settings-links {
