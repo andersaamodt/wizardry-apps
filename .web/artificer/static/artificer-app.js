@@ -12276,7 +12276,7 @@
     var backendLabel = dictationInstallBackendLabel(job);
     var pctText = dictationProgressPercentLabel(job && job.progress_pct, job);
     var sizeText = dictationDownloadAmountLabel(job);
-    var isDownloadPhase = (phase === "downloading" || phase === "fallback");
+    var isDownloadPhase = (phase === "downloading" || phase === "preparing" || phase === "fallback");
     var labelPrefix = isDownloadPhase ?
       "Downloading " + backendLabel + " " :
       "Installing " + backendLabel + " ";
@@ -12307,17 +12307,12 @@
     if (fromBytes >= 0) {
       return fromBytes.toFixed(1);
     }
-    var parsed = Number(rawValue);
-    if (!isFinite(parsed)) {
-      parsed = 0;
+    var status = trim(String(job && job.status ? job.status : ""));
+    var phase = trim(String(job && job.phase ? job.phase : ""));
+    if (status === "done" || phase === "done") {
+      return "100.0";
     }
-    if (parsed < 0) {
-      parsed = 0;
-    }
-    if (parsed > 100) {
-      parsed = 100;
-    }
-    return parsed.toFixed(1);
+    return "0.0";
   }
 
   function dictationProgressFromBytes(job) {
@@ -12452,7 +12447,7 @@
       if (!phase) {
         phase = "downloading";
       }
-      if (phase === "downloading" || phase === "fallback" || phase === "running") {
+      if (phase === "downloading" || phase === "preparing" || phase === "fallback" || phase === "running") {
         buttonLabel = "Cancel download";
       } else {
         buttonLabel = "Cancel install";

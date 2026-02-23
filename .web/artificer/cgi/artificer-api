@@ -13614,34 +13614,17 @@ EOF_RUNNER
     else
       parse_result=$(infer_dictation_install_phase_progress "$log_tail")
       phase_candidate=$(printf '%s\n' "$parse_result" | cut -d'|' -f1)
-      parsed_progress_pct=$(printf '%s\n' "$parse_result" | cut -d'|' -f2)
       [ -n "$phase_candidate" ] || phase_candidate="downloading"
       phase=$(dictation_phase_progressive "$phase_previous" "$phase_candidate")
       case "$download_size_bytes:$downloaded_bytes" in
         *[!0-9]*:*|*:*[!0-9]*|*:)
-          progress_pct=$parsed_progress_pct
+          progress_pct=""
           ;;
         *)
           if [ "$download_size_bytes" -gt 0 ] 2>/dev/null; then
             progress_pct=$(progress_pct_from_bytes "$downloaded_bytes" "$download_size_bytes")
-            # If byte delta is still zero but parser has non-zero progress,
-            # use parsed progress to avoid a stuck 0.0% display.
-            use_parsed_progress=$(awk -v parsed="$parsed_progress_pct" -v bytes="$progress_pct" '
-              BEGIN {
-                p = parsed + 0
-                b = bytes + 0
-                if (p > 0 && b <= 0.0) {
-                  print 1
-                } else {
-                  print 0
-                }
-              }
-            ')
-            if [ "$use_parsed_progress" = "1" ]; then
-              progress_pct=$parsed_progress_pct
-            fi
           else
-            progress_pct=$parsed_progress_pct
+            progress_pct=""
           fi
           ;;
       esac
