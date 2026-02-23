@@ -325,12 +325,12 @@
                 <div class="persona-section-title">Mode Defaults</div>
                 <div class="mode-fields-inline modes-grid">
                   <div class="mode-field-row">
-                    <label for="modes-starting-mode" class="mode-field-label">Starting mode</label>
-                    <select id="modes-starting-mode"></select>
+                    <label for="modes-starting-mode" class="mode-field-label" title="Mode assigned to users with no existing relationship">Starting mode</label>
+                    <select id="modes-starting-mode" title="Mode assigned to users with no existing relationship"></select>
                   </div>
                   <div class="mode-field-row">
-                    <label for="modes-default-decay-mode" class="mode-field-label">Default decay mode</label>
-                    <select id="modes-default-decay-mode"></select>
+                    <label for="modes-default-decay-mode" class="mode-field-label" title="Fallback mode used when a transition/rule has no explicit decay target">Default decay mode</label>
+                    <select id="modes-default-decay-mode" title="Fallback mode used when a transition/rule has no explicit decay target"></select>
                   </div>
                 </div>
                 <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
@@ -343,7 +343,10 @@
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div id="mode-detail-drawer-title" class="mode-detail-drawer-title">Mode details</div>
-                <button id="btn-mode-drawer-close" type="button" class="mode-detail-drawer-close" aria-label="Close mode details">✕</button>
+                <div class="mode-detail-drawer-head-right">
+                  <span id="mode-detail-drawer-state" class="mode-detail-drawer-state" title="Whether this mode is currently enabled from the mode list">Enabled</span>
+                  <button id="btn-mode-drawer-close" type="button" class="mode-detail-drawer-close" aria-label="Close mode details" title="Close mode details">✕</button>
+                </div>
               </div>
               <div id="mode-detail-drawer-body" class="mode-detail-drawer-body"></div>
             </aside>
@@ -3422,9 +3425,7 @@
       var mode = findModeById(cfg, modeId);
       if (!mode) return;
 
-      if (target.hasAttribute('data-mode-drawer-enabled')) {
-        mode.enabled = !!target.checked;
-      } else if (target.hasAttribute('data-mode-drawer-default-expiry')) {
+      if (target.hasAttribute('data-mode-drawer-default-expiry')) {
         mode.defaultExpiryHours = Math.max(0, parseInt(target.value || '0', 10) || 0);
       } else if (target.hasAttribute('data-mode-drawer-allow')) {
         var actionName = String(target.getAttribute('data-mode-drawer-allow') || '');
@@ -3451,6 +3452,7 @@
       var drawer = document.getElementById('mode-detail-drawer');
       var workarea = document.getElementById('modes-workarea');
       var title = document.getElementById('mode-detail-drawer-title');
+      var statePill = document.getElementById('mode-detail-drawer-state');
       var body = document.getElementById('mode-detail-drawer-body');
       if (!drawer || !title || !body) return;
 
@@ -3462,6 +3464,10 @@
         if (workarea) workarea.classList.remove('drawer-open');
         drawer.setAttribute('aria-hidden', 'true');
         title.textContent = 'Mode details';
+        if (statePill) {
+          statePill.textContent = '';
+          statePill.classList.remove('disabled');
+        }
         body.innerHTML = '';
         return;
       }
@@ -3482,14 +3488,14 @@
         return [
           '<div class="action-transition-row' + (transitionEnabled ? ' transition-enabled' : '') + '" data-action-transition-row="' + escapeHtml(actionName) + '">',
           '  <div class="action-transition-row-top">',
-          '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-allow="' + escapeHtml(actionName) + '"' + allowChecked + '><span>' + escapeHtml(actionName) + '</span></label>',
-          '    <label class="mini-toggle action-transition-enable"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + '><span>After-action switch</span></label>',
+          '    <label class="mini-toggle" title="Allow this action while in this mode"><input type="checkbox" data-mode-drawer-allow="' + escapeHtml(actionName) + '"' + allowChecked + '><span>' + escapeHtml(actionName) + '</span></label>',
+          '    <label class="mini-toggle action-transition-enable" title="Enable a mode switch after this action runs"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + '><span>After-action switch</span></label>',
           '  </div>',
           '  <div class="action-transition-controls">',
-          '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
-          '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '">',
-          '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '">' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
-          '    <label class="mini-toggle"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
+          '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
+          '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode">',
+          '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '" title="Mode to decay to when transition duration expires">' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
+          '    <label class="mini-toggle" title="Post a notice when this transition applies"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
           '  </div>',
           '</div>'
         ].join('');
@@ -3501,24 +3507,31 @@
         var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
         return [
           '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '" data-rule-id="' + escapeHtml(String(rule.id || '')) + '">',
-          '  <input type="text" class="rule-label-input" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '">',
-          '  <input type="text" class="rule-match-input" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '">',
-          '  <select class="rule-mode-select" data-rule-to-mode>' + toModeHtml + '</select>',
-          '  <input type="number" class="rule-duration-input" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '">',
-          '  <select class="rule-decay-select" data-rule-decay-to>' + decayModeHtml + '</select>',
-          '  <input type="text" class="rule-template-input" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '">',
-          '  <label class="mini-toggle rule-announce-toggle"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
-          '  <button type="button" class="soft mini-remove-btn rule-remove-btn" data-remove-rule>Remove</button>',
+          '  <input type="text" class="rule-label-input" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this switch rule">',
+          '  <input type="text" class="rule-match-input" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '" title="Comma-separated phrases that trigger this rule">',
+          '  <select class="rule-mode-select" data-rule-to-mode title="Mode to switch to when this rule matches">' + toModeHtml + '</select>',
+          '  <input type="number" class="rule-duration-input" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the switched mode">',
+          '  <select class="rule-decay-select" data-rule-decay-to title="Mode to decay to after rule duration expires">' + decayModeHtml + '</select>',
+          '  <input type="text" class="rule-template-input" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '" title="Optional notice template posted when the rule triggers">',
+          '  <label class="mini-toggle rule-announce-toggle" title="Post a notice when this rule triggers"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+          '  <button type="button" class="soft mini-remove-btn rule-remove-btn" data-remove-rule title="Remove this switch rule">Remove</button>',
           '</div>'
         ].join('');
       }).join('');
 
       title.textContent = String(mode.id || 'Mode') + ' details';
+      if (statePill) {
+        var modeEnabled = (mode.enabled !== false);
+        statePill.textContent = modeEnabled ? 'Enabled' : 'Disabled';
+        statePill.classList.toggle('disabled', !modeEnabled);
+        statePill.title = modeEnabled
+          ? 'This mode is enabled from the mode list'
+          : 'This mode is disabled from the mode list';
+      }
       body.innerHTML = [
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-inline">',
-        '    <label class="schedule-toggle"><input type="checkbox" data-mode-drawer-enabled ' + ((mode.enabled === false) ? '' : 'checked') + '><span>Enabled</span></label>',
-        '    <label class="mini-input mode-expiry-input">Default expiry (h)<input type="number" min="0" step="1" data-mode-drawer-default-expiry value="' + escapeHtml(String(mode.defaultExpiryHours || 0)) + '"></label>',
+        '    <label class="mini-input mode-expiry-input" title="Default number of hours this mode remains active when duration is needed">Default expiry (h)<input type="number" min="0" step="1" data-mode-drawer-default-expiry value="' + escapeHtml(String(mode.defaultExpiryHours || 0)) + '" title="Default number of hours this mode remains active when duration is needed"></label>',
         '  </div>',
         '</div>',
         '<div class="mode-drawer-block">',
@@ -3529,10 +3542,10 @@
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Constraints</div>',
         '  <div class="mode-constraints-grid mode-drawer-constraints">',
-        '    <label class="mini-input">Max replies/user/thread per 24h<input type="number" min="0" step="1" data-mode-drawer-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '"></label>',
-        '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-constraint="noFollowup" ' + (constraints.noFollowup ? 'checked' : '') + '><span>No followup</span></label>',
-        '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-constraint="noMention" ' + (constraints.noMention ? 'checked' : '') + '><span>No mention</span></label>',
-        '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-constraint="noQuote" ' + (constraints.noQuote ? 'checked' : '') + '><span>No quote</span></label>',
+        '    <label class="mini-input" title="Limit replies to the same user in the same thread over 24 hours">Max replies/user/thread per 24h<input type="number" min="0" step="1" data-mode-drawer-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '" title="Limit replies to the same user in the same thread over 24 hours"></label>',
+        '    <label class="mini-toggle" title="Do not send follow-up replies in this mode"><input type="checkbox" data-mode-drawer-constraint="noFollowup" ' + (constraints.noFollowup ? 'checked' : '') + '><span>No followup</span></label>',
+        '    <label class="mini-toggle" title="Do not @mention users in this mode"><input type="checkbox" data-mode-drawer-constraint="noMention" ' + (constraints.noMention ? 'checked' : '') + '><span>No mention</span></label>',
+        '    <label class="mini-toggle" title="Do not quote user text in this mode"><input type="checkbox" data-mode-drawer-constraint="noQuote" ' + (constraints.noQuote ? 'checked' : '') + '><span>No quote</span></label>',
         '  </div>',
         '</div>',
         '<div class="mode-drawer-block">',
@@ -3540,13 +3553,13 @@
         '  <div class="mode-drawer-helper">Switch rules are trigger decorators that can change relationship mode when matching phrases are detected.</div>',
         '  <div class="mode-fields-inline mode-drawer-optin-row">',
         '    <div class="mode-field-row modes-wide-field">',
-        '      <label for="modes-opt-in-commands" class="mode-field-label">Opt-in commands</label>',
-        '      <input id="modes-opt-in-commands" type="text" placeholder="!summon, !engage, /u/botname" value="' + escapeHtml((cfg.optInCommands || []).join(', ')) + '">',
+        '      <label for="modes-opt-in-commands" class="mode-field-label" title="Commands users can use to explicitly opt in to replies">Opt-in commands</label>',
+        '      <input id="modes-opt-in-commands" type="text" placeholder="!summon, !engage, /u/botname" value="' + escapeHtml((cfg.optInCommands || []).join(', ')) + '" title="Comma-separated commands users can use to explicitly opt in to replies">',
         '    </div>',
         '  </div>',
         '  <div class="modes-section-head mode-drawer-rule-head">',
         '    <div class="persona-section-title">Rules</div>',
-        '    <button type="button" class="soft mini-add-btn" data-add-switch-rule>Add rule</button>',
+        '    <button type="button" class="soft mini-add-btn" data-add-switch-rule title="Add a new switch rule">Add rule</button>',
         '  </div>',
         '  <div class="modes-grid-head switch-grid-head" aria-hidden="true">',
         '    <span>Label</span>',
@@ -3612,14 +3625,14 @@
             '<article class="mode-summary-card' + (isActive ? ' active' : '') + '" data-mode-id="' + escapeHtml(modeId) + '">',
             '  <div class="mode-summary-head">',
             '    <div class="mode-summary-left">',
-            '      <label class="mode-row-enabled"><input type="checkbox" data-mode-row-enabled="' + escapeHtml(modeId) + '"' + ((mode.enabled === false) ? '' : ' checked') + '><span class="sr-only">Enable ' + escapeHtml(modeId) + '</span></label>',
+            '      <label class="mode-row-enabled" title="Enable or disable this mode"><input type="checkbox" data-mode-row-enabled="' + escapeHtml(modeId) + '"' + ((mode.enabled === false) ? '' : ' checked') + '><span class="sr-only">Enable ' + escapeHtml(modeId) + '</span></label>',
             '      <div class="mode-summary-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
             '    </div>',
             '    <div class="mode-summary-right">',
-            '      <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
-            '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '">Edit</button>',
+            '      <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '" title="Current enabled state for this mode">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
+            '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '" title="Open mode details">Edit</button>',
             '    </div>',
-            '  </div>',
+          '  </div>',
             '  <div class="mode-summary-meta">Expiry ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h • Actions ' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + ' • ' + escapeHtml(modeConstraintsSummary(mode)) + '</div>',
             '</article>'
           ].join('');
