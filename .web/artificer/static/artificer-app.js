@@ -602,6 +602,7 @@
     { value: "meta", label: "Command (Meta)" },
     { value: "shift", label: "Shift" },
     { value: "control", label: "Control" },
+    { value: "ctrl-m", label: "Ctrl + M" },
     { value: "space", label: "Space" },
     { value: "mouse-button-4", label: "Mouse Button 4" },
     { value: "mouse-button-5", label: "Mouse Button 5" },
@@ -12882,6 +12883,9 @@
   function dictationShortcutKeyboardTrigger(event) {
     var code = String(event && event.code ? event.code : "");
     var key = String(event && event.key ? event.key : "").toLowerCase();
+    if ((code === "KeyM" || key === "m") && !!(event && event.ctrlKey) && !(event && event.metaKey)) {
+      return "ctrl-m";
+    }
     if (code === "AltLeft" || code === "AltRight" || key === "alt") {
       return "alt";
     }
