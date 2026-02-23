@@ -30,6 +30,7 @@ llm_use_gpu_file="$llm_settings_dir/use-gpu"
 dictation_settings_dir="$data_root/dictation-settings"
 dictation_shortcut_hold_file="$dictation_settings_dir/shortcut-hold"
 dictation_shortcut_toggle_file="$dictation_settings_dir/shortcut-toggle"
+dictation_prewarm_enabled_file="$dictation_settings_dir/prewarm-enabled"
 state_light_cache_file="$data_root/state-light-cache.json"
 ALLOW_NETWORK=0
 ALLOW_WEB=0
@@ -240,6 +241,41 @@ dictation_shortcuts_set_values() {
   mkdir -p "$dictation_settings_dir"
   printf '%s\n' "$next_hold" > "$dictation_shortcut_hold_file"
   printf '%s\n' "$next_toggle" > "$dictation_shortcut_toggle_file"
+}
+
+dictation_prewarm_enabled() {
+  raw_value=$(trim "$(read_file_line "$dictation_prewarm_enabled_file" "1")")
+  case "$raw_value" in
+    0|false|FALSE|False|no|NO|No|off|OFF|Off)
+      printf '%s' "0"
+      ;;
+    *)
+      printf '%s' "1"
+      ;;
+  esac
+}
+
+set_dictation_prewarm_enabled() {
+  next_value=$1
+  mkdir -p "$dictation_settings_dir"
+  case "$next_value" in
+    1)
+      printf '%s\n' "1" > "$dictation_prewarm_enabled_file"
+      ;;
+    *)
+      printf '%s\n' "0" > "$dictation_prewarm_enabled_file"
+      ;;
+  esac
+}
+
+dictation_prewarm_get_json() {
+  prewarm_enabled=$(dictation_prewarm_enabled)
+  if [ "$prewarm_enabled" = "1" ]; then
+    prewarm_json=true
+  else
+    prewarm_json=false
+  fi
+  printf '{"success":true,"enabled":%s}\n' "$prewarm_json"
 }
 
 param() {
@@ -10765,6 +10801,29 @@ case "$action" in
     exit 0
     ;;
 
+  dictation_prewarm_get)
+    dictation_prewarm_get_json
+    exit 0
+    ;;
+
+  dictation_prewarm_set)
+    enabled=$(trim "$(param "enabled")")
+    case "$enabled" in
+      1|true|TRUE|True|yes|YES|Yes|on|ON|On)
+        set_dictation_prewarm_enabled 1
+        ;;
+      0|false|FALSE|False|no|NO|No|off|OFF|Off)
+        set_dictation_prewarm_enabled 0
+        ;;
+      *)
+        emit_error "invalid enabled value"
+        exit 0
+        ;;
+    esac
+    dictation_prewarm_get_json
+    exit 0
+    ;;
+
   mode_runtime_state)
     if command -v mr_mode_runtime_state_response >/dev/null 2>&1; then
       ensure_mode_runtime_bootstrap
@@ -13890,6 +13949,23 @@ EOF
     printf '{"success":true,"level":"%s","session_id":"%s"}\n' \
       "$(json_escape "$level")" \
       "$(json_escape "$session_id")"
+    exit 0
+    ;;
+
+  dictate_disarm)
+    if ! dictation_live_has_active_capture; then
+      printf '{"success":true,"disarmed":false}\n'
+      exit 0
+    fi
+    session_status=$(dictation_live_status)
+    if [ "$session_status" != "prepared" ]; then
+      printf '{"success":true,"disarmed":false}\n'
+      exit 0
+    fi
+    capture_pid=$(dictation_live_session_value "pid")
+    stop_capture_pid_gracefully "$capture_pid" >/dev/null 2>&1 || true
+    clear_dictation_live_session
+    printf '{"success":true,"disarmed":true}\n'
     exit 0
     ;;
 

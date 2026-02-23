@@ -760,6 +760,12 @@ Checking...
 <label class="dictation-shortcut-field" for="dictation-hold-shortcut"><span>Hold-to-Talk (Press)</span><select id="dictation-hold-shortcut"></select></label>
 <label class="dictation-shortcut-field" for="dictation-toggle-shortcut"><span>Toggle</span><select id="dictation-toggle-shortcut"></select></label>
 </div>
+<label id="dictation-prewarm-row" class="toggle-row hidden" title="Keeps mic capture armed while composing so dictation starts faster. Audio before start is discarded unless you begin dictation.">
+<input id="dictation-prewarm-toggle" type="checkbox" checked /> Prewarm for instant dictation
+</label>
+<p id="dictation-prewarm-hint" class="settings-hint hidden">
+Reduces start delay by arming capture in advance while composing. Pre-start audio is discarded.
+</p>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
 <label for="ssh-email">SSH key email/comment (optional)</label>

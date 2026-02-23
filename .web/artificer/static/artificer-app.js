@@ -473,6 +473,7 @@
     dictateWaveLevels: [],
     dictationShortcutHold: storageGet("artificer.dictationShortcutHold", "none"),
     dictationShortcutToggle: storageGet("artificer.dictationShortcutToggle", "none"),
+    dictationPrewarmEnabled: storageGet("artificer.dictationPrewarmEnabled", "1") !== "0",
     dictateHotkeyHoldActive: false,
     dictateHotkeyHoldTrigger: "",
     dictateHotkeyHoldIntent: false,
@@ -910,6 +911,9 @@
     dictationShortcutRow: document.getElementById("dictation-shortcut-row"),
     dictationHoldShortcut: document.getElementById("dictation-hold-shortcut"),
     dictationToggleShortcut: document.getElementById("dictation-toggle-shortcut"),
+    dictationPrewarmRow: document.getElementById("dictation-prewarm-row"),
+    dictationPrewarmToggle: document.getElementById("dictation-prewarm-toggle"),
+    dictationPrewarmHint: document.getElementById("dictation-prewarm-hint"),
     generateSshBtn: document.getElementById("generate-ssh-btn"),
     chooseSshBtn: document.getElementById("choose-ssh-btn"),
     clearSshBtn: document.getElementById("clear-ssh-btn"),
@@ -10118,6 +10122,11 @@
         });
         Promise.all([
           runWithRetry(function () {
+            return loadDictationPrewarmSetting();
+          }, 2, 180).catch(function () {
+            return null;
+          }),
+          runWithRetry(function () {
             return loadDictationStatus({ silent: true });
           }, 2, 180).catch(function () {
             return null;
@@ -12992,7 +13001,7 @@
       if (!installed) {
         dictationPrepareReadyUntil = 0;
         stopDictationPrepareLoop();
-      } else {
+      } else if (state.dictationPrewarmEnabled) {
         requestDictationPrepare({ silent: true }).catch(function () {
           return null;
         });
@@ -13029,8 +13038,53 @@
     return !!state.dictationInstalled;
   }
 
+  function loadDictationPrewarmSetting() {
+    return apiGet("dictation_prewarm_get", {}, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not load dictation prewarm setting");
+      }
+      var enabled = response.enabled !== false;
+      state.dictationPrewarmEnabled = !!enabled;
+      storageSet("artificer.dictationPrewarmEnabled", enabled ? "1" : "0");
+      if (!enabled) {
+        dictationPrepareReadyUntil = 0;
+        stopDictationPrepareLoop();
+      }
+      return enabled;
+    }).catch(function () {
+      state.dictationPrewarmEnabled = storageGet("artificer.dictationPrewarmEnabled", "1") !== "0";
+      return state.dictationPrewarmEnabled;
+    });
+  }
+
+  function saveDictationPrewarmSetting(enabled) {
+    var next = !!enabled;
+    state.dictationPrewarmEnabled = next;
+    storageSet("artificer.dictationPrewarmEnabled", next ? "1" : "0");
+    if (!next) {
+      dictationPrepareReadyUntil = 0;
+      stopDictationPrepareLoop();
+      return apiPost("dictate_disarm", {}, { timeoutMs: 12000 }).catch(function () {
+        return null;
+      }).then(function () {
+        return apiPost("dictation_prewarm_set", { enabled: "0" }, { timeoutMs: 12000 });
+      }).then(function (response) {
+        if (!response || !response.success) {
+          throw new Error((response && response.error) || "Could not save dictation prewarm setting");
+        }
+        return false;
+      });
+    }
+    return apiPost("dictation_prewarm_set", { enabled: "1" }, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not save dictation prewarm setting");
+      }
+      return true;
+    });
+  }
+
   function dictationPrepareLoopShouldRun() {
-    if (!state.dictationInstalled || state.dictateRecording || state.dictateBusy) {
+    if (!state.dictationInstalled || !state.dictationPrewarmEnabled || state.dictateRecording || state.dictateBusy) {
       return false;
     }
     if (typeof document === "undefined") {
@@ -13064,7 +13118,7 @@
 
   function requestDictationPrepare(options) {
     var opts = options && typeof options === "object" ? options : {};
-    if (!state.dictationInstalled || state.dictateRecording || state.dictateBusy) {
+    if (!state.dictationInstalled || !state.dictationPrewarmEnabled || state.dictateRecording || state.dictateBusy) {
       return Promise.resolve(false);
     }
     var now = Date.now();
@@ -13282,6 +13336,17 @@
         el.dictationInstallStatus.classList.add("error");
       } else {
         el.dictationInstallStatus.classList.remove("error");
+      }
+    }
+    if (el.dictationPrewarmRow) {
+      var showPrewarm = !!state.dictationInstalled;
+      el.dictationPrewarmRow.classList.toggle("hidden", !showPrewarm);
+      if (el.dictationPrewarmHint) {
+        el.dictationPrewarmHint.classList.toggle("hidden", !showPrewarm);
+      }
+      if (el.dictationPrewarmToggle) {
+        el.dictationPrewarmToggle.checked = !!state.dictationPrewarmEnabled;
+        el.dictationPrewarmToggle.disabled = !showPrewarm || state.dictationInstallBusy || state.dictateRecording || state.dictateBusy;
       }
     }
     renderDictationShortcutSettings();
@@ -14120,6 +14185,9 @@
     renderDictationInstallSettings();
     var dictationBootstrap = Promise.all([
       loadAuthStatus().catch(function () {
+        return null;
+      }),
+      loadDictationPrewarmSetting().catch(function () {
         return null;
       }),
       loadDictationShortcutPrefs().catch(function () {

@@ -333,41 +333,6 @@
               </div>
               <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
               <div id="modes-list" class="modes-list"></div>
-              <div class="modes-section-head modes-subtitle">
-                <div class="persona-section-title">Switch Rules</div>
-                <button id="btn-mode-add-rule" type="button" class="soft mini-add-btn">Add rule</button>
-              </div>
-              <div class="modes-grid-head switch-grid-head" aria-hidden="true">
-                <span>Label</span>
-                <span>Match phrases</span>
-                <span>Switch to</span>
-                <span>Duration (h)</span>
-                <span>Decay to</span>
-                <span>Template</span>
-                <span>Announce</span>
-                <span></span>
-              </div>
-              <div id="mode-switch-rules-list" class="mode-switch-rules-list"></div>
-              <div class="persona-section-title modes-subtitle">Opt-in Commands</div>
-              <div class="mode-fields-inline">
-                <div class="mode-field-row modes-wide-field">
-                  <label for="modes-opt-in-commands" class="mode-field-label">Commands</label>
-                  <input id="modes-opt-in-commands" type="text" placeholder="!summon, !engage, /u/botname">
-                </div>
-              </div>
-              <div class="modes-section-head modes-subtitle">
-                <div class="persona-section-title">Post-Action Transitions</div>
-                <button id="btn-mode-add-transition" type="button" class="soft mini-add-btn">Add transition</button>
-              </div>
-              <div class="modes-grid-head transition-grid-head" aria-hidden="true">
-                <span>Action</span>
-                <span>Switch to</span>
-                <span>Duration (h)</span>
-                <span>Decay to</span>
-                <span>Announce</span>
-                <span></span>
-              </div>
-              <div id="modes-transitions-list" class="mode-switch-rules-list"></div>
               <div class="settings-actions modes-save-actions">
                 <button id="btn-save-modes" type="button" class="primary">Save modes</button>
               </div>
@@ -3308,16 +3273,6 @@
       return out;
     }
 
-    function firstUnusedAction(actionCatalog, usedMap) {
-      var choices = Array.isArray(actionCatalog) ? actionCatalog : [];
-      for (var i = 0; i < choices.length; i += 1) {
-        var key = String(choices[i] || '').trim();
-        if (!key) continue;
-        if (!usedMap[key]) return key;
-      }
-      return choices.length ? String(choices[0]) : 'Reply';
-    }
-
     function modeSummaryCounts(mode, actionChoices) {
       var allow = (mode && typeof mode === 'object' && mode.allow && typeof mode.allow === 'object') ? mode.allow : {};
       var choices = Array.isArray(actionChoices) ? actionChoices : [];
@@ -3425,9 +3380,50 @@
       }
 
       var constraints = mode.constraints || {};
-      var actionToggles = (Array.isArray(actionChoices) ? actionChoices : []).map(function (actionName) {
-        var checked = mode.allow && mode.allow[actionName] ? ' checked' : '';
-        return '<label class="mini-toggle"><input type="checkbox" data-mode-drawer-allow="' + escapeHtml(actionName) + '"' + checked + '><span>' + escapeHtml(actionName) + '</span></label>';
+      var modeOpts = modeOptions(cfg);
+      var transitionSource = (cfg && cfg.postActionTransitions && typeof cfg.postActionTransitions === 'object')
+        ? cfg.postActionTransitions
+        : {};
+      var actionRows = (Array.isArray(actionChoices) ? actionChoices : []).map(function (actionName) {
+        var allowChecked = mode.allow && mode.allow[actionName] ? ' checked' : '';
+        var transition = transitionSource[actionName] || null;
+        var transitionEnabled = !!transition;
+        var toModeValue = transitionEnabled ? String(transition.toMode || '') : String(cfg.defaultDecayMode || cfg.startingMode || '');
+        var durationValue = transitionEnabled ? Math.max(0, parseInt(transition.durationHours, 10) || 0) : 0;
+        var decayValue = transitionEnabled ? String(transition.decayTo || '') : '';
+        var announceChecked = (transitionEnabled && transition.announce) ? ' checked' : '';
+        return [
+          '<div class="action-transition-row' + (transitionEnabled ? ' transition-enabled' : '') + '" data-action-transition-row="' + escapeHtml(actionName) + '">',
+          '  <div class="action-transition-row-top">',
+          '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-allow="' + escapeHtml(actionName) + '"' + allowChecked + '><span>' + escapeHtml(actionName) + '</span></label>',
+          '    <label class="mini-toggle action-transition-enable"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + '><span>After-action switch</span></label>',
+          '  </div>',
+          '  <div class="action-transition-controls">',
+          '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
+          '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '">',
+          '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '">' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
+          '    <label class="mini-toggle"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
+          '  </div>',
+          '</div>'
+        ].join('');
+      }).join('');
+      var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
+      var switchRuleRows = switchRules.map(function (rule, idx) {
+        var toModeHtml = modeOptionsHtml(modeOpts, String(rule.toMode || ''), false, '');
+        var decayModeHtml = modeOptionsHtml(modeOpts, String(rule.decayTo || ''), true, 'Default decay mode');
+        var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
+        return [
+          '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '" data-rule-id="' + escapeHtml(String(rule.id || '')) + '">',
+          '  <input type="text" class="rule-label-input" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '">',
+          '  <input type="text" class="rule-match-input" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '">',
+          '  <select class="rule-mode-select" data-rule-to-mode>' + toModeHtml + '</select>',
+          '  <input type="number" class="rule-duration-input" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '">',
+          '  <select class="rule-decay-select" data-rule-decay-to>' + decayModeHtml + '</select>',
+          '  <input type="text" class="rule-template-input" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '">',
+          '  <label class="mini-toggle rule-announce-toggle"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+          '  <button type="button" class="soft mini-remove-btn rule-remove-btn" data-remove-rule>Remove</button>',
+          '</div>'
+        ].join('');
       }).join('');
 
       title.textContent = String(mode.id || 'Mode') + ' details';
@@ -3439,8 +3435,9 @@
         '  </div>',
         '</div>',
         '<div class="mode-drawer-block">',
-        '  <div class="mode-drawer-section-title">Allowed actions</div>',
-        '  <div class="mode-permissions-grid mode-drawer-actions">' + actionToggles + '</div>',
+        '  <div class="mode-drawer-section-title">Actions and Post-Action Decorators</div>',
+        '  <div class="mode-drawer-helper">Transitions are global decorators on actions and run after the action executes.</div>',
+        '  <div class="mode-drawer-actions-list">' + actionRows + '</div>',
         '</div>',
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Constraints</div>',
@@ -3450,6 +3447,31 @@
         '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-constraint="noMention" ' + (constraints.noMention ? 'checked' : '') + '><span>No mention</span></label>',
         '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-constraint="noQuote" ' + (constraints.noQuote ? 'checked' : '') + '><span>No quote</span></label>',
         '  </div>',
+        '</div>',
+        '<div class="mode-drawer-block">',
+        '  <div class="mode-drawer-section-title">Switch Rules (Decorator)</div>',
+        '  <div class="mode-drawer-helper">Switch rules are trigger decorators that can change relationship mode when matching phrases are detected.</div>',
+        '  <div class="mode-fields-inline mode-drawer-optin-row">',
+        '    <div class="mode-field-row modes-wide-field">',
+        '      <label for="modes-opt-in-commands" class="mode-field-label">Opt-in commands</label>',
+        '      <input id="modes-opt-in-commands" type="text" placeholder="!summon, !engage, /u/botname" value="' + escapeHtml((cfg.optInCommands || []).join(', ')) + '">',
+        '    </div>',
+        '  </div>',
+        '  <div class="modes-section-head mode-drawer-rule-head">',
+        '    <div class="persona-section-title">Rules</div>',
+        '    <button type="button" class="soft mini-add-btn" data-add-switch-rule>Add rule</button>',
+        '  </div>',
+        '  <div class="modes-grid-head switch-grid-head" aria-hidden="true">',
+        '    <span>Label</span>',
+        '    <span>Match phrases</span>',
+        '    <span>Switch to</span>',
+        '    <span>Duration (h)</span>',
+        '    <span>Decay to</span>',
+        '    <span>Template</span>',
+        '    <span>Announce</span>',
+        '    <span></span>',
+        '  </div>',
+        '  <div class="mode-switch-rules-list">' + (switchRuleRows || '<div class="settings-empty-note">No switch rules yet.</div>') + '</div>',
         '</div>'
       ].join('');
       drawer.classList.add('open');
@@ -3483,10 +3505,7 @@
       var cfg = normalizeModesConfig(state.modesConfig);
       var line = document.getElementById('modes-line');
       var list = document.getElementById('modes-list');
-      var switchList = document.getElementById('mode-switch-rules-list');
-      var transitionsList = document.getElementById('modes-transitions-list');
-      var optInCommandsInput = document.getElementById('modes-opt-in-commands');
-      if (!list || !switchList || !transitionsList) return;
+      if (!list) return;
 
       fillModeSelect('modes-starting-mode', cfg.startingMode || '');
       fillModeSelect('modes-default-decay-mode', cfg.defaultDecayMode || '');
@@ -3494,10 +3513,6 @@
 
       var actionCatalog = Array.isArray(cfg.actionCatalog) ? cfg.actionCatalog : [];
       var actionChoices = actionCatalog.slice();
-      if (optInCommandsInput && document.activeElement !== optInCommandsInput) {
-        optInCommandsInput.value = (cfg.optInCommands || []).join(', ');
-      }
-
       var modes = Array.isArray(cfg.modes) ? cfg.modes : [];
       if (!modes.length) {
         list.innerHTML = '<div class="settings-empty-note">No modes configured.</div>';
@@ -3510,82 +3525,21 @@
             '<article class="mode-summary-card' + (isActive ? ' active' : '') + '" data-mode-id="' + escapeHtml(modeId) + '">',
             '  <div class="mode-summary-head">',
             '    <div class="mode-summary-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
-            '    <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
+            '    <div class="mode-summary-right">',
+            '      <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
+            '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '">Edit</button>',
+            '    </div>',
             '  </div>',
-            '  <div class="mode-summary-meta">',
-            '    <span>Default expiry: ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h</span>',
-            '    <span>Actions: ' + escapeHtml(String(counts.enabled)) + ' / ' + escapeHtml(String(counts.total)) + '</span>',
-            '    <span>Constraints: ' + escapeHtml(modeConstraintsSummary(mode)) + '</span>',
-            '  </div>',
-            '  <div class="mode-summary-actions">',
-            '    <button type="button" class="soft mini-add-btn mode-edit-btn" data-edit-mode="' + escapeHtml(modeId) + '">Edit details</button>',
-            '  </div>',
+            '  <div class="mode-summary-meta">Expiry ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h • Actions ' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + ' • ' + escapeHtml(modeConstraintsSummary(mode)) + '</div>',
             '</article>'
           ].join('');
         }).join('');
       }
 
       renderModeDrawer(cfg, actionChoices);
-
-      var modeOpts = modeOptions(cfg);
       var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
-      if (!switchRules.length) {
-        switchList.innerHTML = '<div class="settings-empty-note">No switch rules yet.</div>';
-      } else {
-        switchList.innerHTML = switchRules.map(function (rule, idx) {
-          var toModeHtml = modeOptionsHtml(modeOpts, String(rule.toMode || ''), false, '');
-          var decayModeHtml = modeOptionsHtml(modeOpts, String(rule.decayTo || ''), true, 'Default decay mode');
-          var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
-          return [
-            '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '" data-rule-id="' + escapeHtml(String(rule.id || '')) + '">',
-            '  <input type="text" class="rule-label-input" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '">',
-            '  <input type="text" class="rule-match-input" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '">',
-            '  <select class="rule-mode-select" data-rule-to-mode>' + toModeHtml + '</select>',
-            '  <input type="number" class="rule-duration-input" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '">',
-            '  <select class="rule-decay-select" data-rule-decay-to>' + decayModeHtml + '</select>',
-            '  <input type="text" class="rule-template-input" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '">',
-            '  <label class="mini-toggle rule-announce-toggle"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
-            '  <button type="button" class="soft mini-remove-btn rule-remove-btn" data-remove-rule>Remove</button>',
-            '</div>'
-          ].join('');
-        }).join('');
-      }
-
       var transitionSource = cfg.postActionTransitions || {};
       var transitionActionNames = Object.keys(transitionSource);
-      var actionOptions = actionChoices.slice();
-      for (var a = 0; a < transitionActionNames.length; a += 1) {
-        if (actionOptions.indexOf(transitionActionNames[a]) < 0) {
-          actionOptions.push(transitionActionNames[a]);
-        }
-      }
-      transitionActionNames.sort(function (left, right) {
-        return actionOptions.indexOf(left) - actionOptions.indexOf(right);
-      });
-
-      if (!transitionActionNames.length) {
-        transitionsList.innerHTML = '<div class="settings-empty-note">No post-action transitions yet.</div>';
-      } else {
-        transitionsList.innerHTML = transitionActionNames.map(function (actionName, idx) {
-          var row = transitionSource[actionName] || {};
-          var actionSelectHtml = actionOptions.map(function (name) {
-            var selected = name === actionName ? ' selected' : '';
-            return '<option value="' + escapeHtml(name) + '"' + selected + '>' + escapeHtml(name) + '</option>';
-          }).join('');
-          var toModeHtml = modeOptionsHtml(modeOpts, String(row.toMode || ''), false, '');
-          var decayModeHtml = modeOptionsHtml(modeOpts, String(row.decayTo || ''), true, 'Default decay mode');
-          return [
-            '<div class="switch-rule-row transition-row" data-transition-idx="' + String(idx) + '" data-transition-action="' + escapeHtml(actionName) + '">',
-            '  <select class="transition-action-select" data-transition-action>' + actionSelectHtml + '</select>',
-            '  <select class="transition-mode-select" data-transition-to-mode>' + toModeHtml + '</select>',
-            '  <input type="number" class="transition-duration-input" min="0" step="1" data-transition-duration value="' + escapeHtml(String(row.durationHours || 0)) + '">',
-            '  <select class="transition-decay-select" data-transition-decay-to>' + decayModeHtml + '</select>',
-            '  <label class="mini-toggle transition-announce-toggle"><input type="checkbox" data-transition-announce ' + (row.announce ? 'checked' : '') + '><span>Announce</span></label>',
-            '  <button type="button" class="soft mini-remove-btn transition-remove-btn" data-remove-transition>Remove</button>',
-            '</div>'
-          ].join('');
-        }).join('');
-      }
 
       if (line) {
         line.textContent = String((cfg.modes || []).length) + ' modes • ' +
@@ -3738,48 +3692,57 @@
       cfg.startingMode = String((document.getElementById('modes-starting-mode') || {}).value || cfg.startingMode || '');
       cfg.defaultDecayMode = String((document.getElementById('modes-default-decay-mode') || {}).value || cfg.defaultDecayMode || '');
 
-      cfg.optInCommands = parseCsvList((document.getElementById('modes-opt-in-commands') || {}).value || '');
-
-      var switchRows = document.querySelectorAll('.switch-rule-row[data-rule-idx]');
-      cfg.switchRules = [];
-      for (var r = 0; r < switchRows.length; r += 1) {
-        var row = switchRows[r];
-        var ruleId = String(row.getAttribute('data-rule-id') || '').trim();
-        var label = String((row.querySelector('[data-rule-label]') || {}).value || '').trim();
-        var matchAny = parseCsvList(String((row.querySelector('[data-rule-matchany]') || {}).value || ''));
-        var toMode = String((row.querySelector('[data-rule-to-mode]') || {}).value || '').trim();
-        var duration = Math.max(0, parseInt((row.querySelector('[data-rule-duration]') || {}).value || '0', 10) || 0);
-        var decayTo = String((row.querySelector('[data-rule-decay-to]') || {}).value || '').trim();
-        var template = String((row.querySelector('[data-rule-template]') || {}).value || '');
-        var announce = !!((row.querySelector('[data-rule-announce]') || {}).checked);
-        cfg.switchRules.push({
-          id: ruleId || ('rule-' + String(r + 1)),
-          label: label || ('Rule ' + String(r + 1)),
-          matchAny: matchAny,
-          toMode: toMode,
-          durationHours: duration,
-          decayTo: decayTo,
-          template: template,
-          announce: announce
-        });
+      var optInInput = document.getElementById('modes-opt-in-commands');
+      if (optInInput) {
+        cfg.optInCommands = parseCsvList(optInInput.value || '');
       }
 
-      var transitionRows = document.querySelectorAll('.transition-row[data-transition-idx]');
-      cfg.postActionTransitions = {};
-      for (var t = 0; t < transitionRows.length; t += 1) {
-        var transitionRow = transitionRows[t];
-        var actionKey = String((transitionRow.querySelector('[data-transition-action]') || {}).value || '').trim();
-        var toModeForAction = String((transitionRow.querySelector('[data-transition-to-mode]') || {}).value || '').trim();
-        var durationForAction = Math.max(0, parseInt((transitionRow.querySelector('[data-transition-duration]') || {}).value || '0', 10) || 0);
-        var decayForAction = String((transitionRow.querySelector('[data-transition-decay-to]') || {}).value || '').trim();
-        var announceForAction = !!((transitionRow.querySelector('[data-transition-announce]') || {}).checked);
-        if (!actionKey) continue;
-        cfg.postActionTransitions[actionKey] = {
-          toMode: toModeForAction,
-          durationHours: durationForAction,
-          decayTo: decayForAction,
-          announce: announceForAction
-        };
+      var switchRows = document.querySelectorAll('.switch-rule-row[data-rule-idx]');
+      if (switchRows.length) {
+        cfg.switchRules = [];
+        for (var r = 0; r < switchRows.length; r += 1) {
+          var row = switchRows[r];
+          var ruleId = String(row.getAttribute('data-rule-id') || '').trim();
+          var label = String((row.querySelector('[data-rule-label]') || {}).value || '').trim();
+          var matchAny = parseCsvList(String((row.querySelector('[data-rule-matchany]') || {}).value || ''));
+          var toMode = String((row.querySelector('[data-rule-to-mode]') || {}).value || '').trim();
+          var duration = Math.max(0, parseInt((row.querySelector('[data-rule-duration]') || {}).value || '0', 10) || 0);
+          var decayTo = String((row.querySelector('[data-rule-decay-to]') || {}).value || '').trim();
+          var template = String((row.querySelector('[data-rule-template]') || {}).value || '');
+          var announce = !!((row.querySelector('[data-rule-announce]') || {}).checked);
+          cfg.switchRules.push({
+            id: ruleId || ('rule-' + String(r + 1)),
+            label: label || ('Rule ' + String(r + 1)),
+            matchAny: matchAny,
+            toMode: toMode,
+            durationHours: duration,
+            decayTo: decayTo,
+            template: template,
+            announce: announce
+          });
+        }
+      }
+
+      var actionTransitionRows = document.querySelectorAll('[data-action-transition-row]');
+      if (actionTransitionRows.length) {
+        cfg.postActionTransitions = {};
+        for (var t = 0; t < actionTransitionRows.length; t += 1) {
+          var transitionRow = actionTransitionRows[t];
+          var actionKey = String(transitionRow.getAttribute('data-action-transition-row') || '').trim();
+          if (!actionKey) continue;
+          var enabled = !!((transitionRow.querySelector('[data-transition-enabled-action]') || {}).checked);
+          if (!enabled) continue;
+          var toModeForAction = String((transitionRow.querySelector('[data-transition-to-mode-action]') || {}).value || '').trim();
+          var durationForAction = Math.max(0, parseInt((transitionRow.querySelector('[data-transition-duration-action]') || {}).value || '0', 10) || 0);
+          var decayForAction = String((transitionRow.querySelector('[data-transition-decay-to-action]') || {}).value || '').trim();
+          var announceForAction = !!((transitionRow.querySelector('[data-transition-announce-action]') || {}).checked);
+          cfg.postActionTransitions[actionKey] = {
+            toMode: toModeForAction,
+            durationHours: durationForAction,
+            decayTo: decayForAction,
+            announce: announceForAction
+          };
+        }
       }
 
       var banRows = document.querySelectorAll('#ban-levels-body tr[data-ban-level]');
@@ -3837,22 +3800,6 @@
           template: '',
           announce: true
         });
-      });
-    }
-
-    function addModeTransitionRow() {
-      mutateModesConfigFromUi(function (cfg) {
-        var transitions = (cfg && cfg.postActionTransitions && typeof cfg.postActionTransitions === 'object')
-          ? cfg.postActionTransitions
-          : {};
-        var actionName = firstUnusedAction(cfg.actionCatalog || [], transitions);
-        transitions[actionName] = transitions[actionName] || {
-          toMode: String(cfg.defaultDecayMode || cfg.startingMode || ''),
-          durationHours: 0,
-          decayTo: '',
-          announce: false
-        };
-        cfg.postActionTransitions = transitions;
       });
     }
 
@@ -4488,12 +4435,6 @@
           setControlMessage(String(error && error.message ? error.message : error), true);
         });
       });
-      document.getElementById('btn-mode-add-rule').addEventListener('click', function () {
-        addModeSwitchRuleRow();
-      });
-      document.getElementById('btn-mode-add-transition').addEventListener('click', function () {
-        addModeTransitionRow();
-      });
       document.getElementById('btn-mode-drawer-close').addEventListener('click', function () {
         closeModeDrawer();
       });
@@ -4504,12 +4445,23 @@
         });
         modeDrawer.addEventListener('change', function (event) {
           updateModeFromDrawerField(event);
+          var target = event && event.target;
+          if (!target) return;
+          if (target.hasAttribute('data-transition-enabled-action')) {
+            var row = target.closest('[data-action-transition-row]');
+            if (row) row.classList.toggle('transition-enabled', !!target.checked);
+          }
         });
       }
       document.getElementById('panel-modes').addEventListener('click', function (event) {
         var editModeBtn = event.target && event.target.closest('[data-edit-mode]');
         if (editModeBtn) {
           openModeDrawer(editModeBtn.getAttribute('data-edit-mode') || '');
+          return;
+        }
+        var addSwitchRuleBtn = event.target && event.target.closest('[data-add-switch-rule]');
+        if (addSwitchRuleBtn) {
+          addModeSwitchRuleRow();
           return;
         }
         var removeRuleBtn = event.target && event.target.closest('[data-remove-rule]');
@@ -4524,23 +4476,6 @@
             });
           }
           return;
-        }
-        var removeTransitionBtn = event.target && event.target.closest('[data-remove-transition]');
-        if (removeTransitionBtn) {
-          var tRow = removeTransitionBtn.closest('[data-transition-idx]');
-          if (tRow) {
-            var actionSelect = tRow.querySelector('[data-transition-action]');
-            var actionName = String((actionSelect && actionSelect.value) || '').trim();
-            if (actionName) {
-              mutateModesConfigFromUi(function (cfg) {
-                var transitions = (cfg.postActionTransitions && typeof cfg.postActionTransitions === 'object')
-                  ? cfg.postActionTransitions
-                  : {};
-                delete transitions[actionName];
-                cfg.postActionTransitions = transitions;
-              });
-            }
-          }
         }
       });
       document.getElementById('btn-relationship-apply').addEventListener('click', async function () {
