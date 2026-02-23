@@ -12892,6 +12892,7 @@
   function dictationShortcutKeyboardTrigger(event) {
     var code = String(event && event.code ? event.code : "");
     var key = String(event && event.key ? event.key : "").toLowerCase();
+    var keyCompact = key.replace(/[\s_-]+/g, "");
     if ((code === "KeyM" || key === "m") && !!(event && event.ctrlKey) && !(event && event.metaKey)) {
       return "ctrl-m";
     }
@@ -12919,8 +12920,14 @@
     if (code === "Quote") {
       return "quote";
     }
-    if (code === "CapsLock" || key === "capslock") {
+    if (code === "CapsLock" || key === "capslock" || keyCompact === "capslock") {
       return "capslock";
+    }
+    if (code === "BrowserBack" || keyCompact === "browserback") {
+      return "mouse-button-4";
+    }
+    if (code === "BrowserForward" || keyCompact === "browserforward") {
+      return "mouse-button-5";
     }
     if (
       code === "F6" || code === "F7" || code === "F8" || code === "F9" || code === "F10" ||
@@ -12933,13 +12940,14 @@
 
   function dictationShortcutMouseTrigger(event) {
     var button = Number(event && event.button);
-    if (button === 3) {
+    var which = Number(event && event.which);
+    if (button === 3 || which === 4) {
       return "mouse-button-4";
     }
-    if (button === 4) {
+    if (button === 4 || which === 5) {
       return "mouse-button-5";
     }
-    if (button === 1) {
+    if (button === 1 || which === 2) {
       return "mouse-wheel-click";
     }
     return "";
@@ -18631,6 +18639,22 @@
         return;
       }
       onDictationShortcutUp(dictationKeyTrigger, event);
+    }, true);
+
+    document.addEventListener("pointerdown", function (event) {
+      var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
+      if (!dictationMouseTrigger) {
+        return;
+      }
+      onDictationShortcutDown(dictationMouseTrigger, event);
+    }, true);
+
+    document.addEventListener("pointerup", function (event) {
+      var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
+      if (!dictationMouseTrigger) {
+        return;
+      }
+      onDictationShortcutUp(dictationMouseTrigger, event);
     }, true);
 
     document.addEventListener("mousedown", function (event) {
