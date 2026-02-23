@@ -162,7 +162,7 @@ pagetitle: "Artificer"
 </summary>
 <pre id="run-terminal-monitor-output" class="terminal-output run-terminal-monitor-output"></pre>
 </details>
-<div class="composer-row">
+<div id="composer-row" class="composer-row">
 <button id="attach-btn" class="attach-btn" type="button" aria-label="Attach files" title="Attach files">+</button>
 <input id="attachment-picker" type="file" multiple hidden />
 <div class="menu-anchor model-anchor">
@@ -215,6 +215,11 @@ pagetitle: "Artificer"
 <button id="send-menu-queue-btn" type="button" data-action="send-menu-queue"><span>Queue</span><span class="shortcut">Enter</span></button>
 <button id="send-menu-stop-btn" type="button" data-action="send-menu-stop"><span>Stop</span><span class="shortcut">&#8984;&#8679;Enter</span></button>
 </div>
+</div>
+<div id="dictation-mode" class="dictation-mode hidden" aria-live="polite">
+<div id="dictation-wave" class="dictation-wave" aria-hidden="true"></div>
+<span id="dictation-timer" class="dictation-timer">0:00</span>
+<button id="dictation-stop-btn" class="dictation-stop-btn" type="button" aria-label="Stop dictation">Stop</button>
 </div>
 </div>
 <div class="session-row">

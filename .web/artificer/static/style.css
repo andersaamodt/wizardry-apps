@@ -2654,6 +2654,81 @@ h2 {
   border-top: 1px solid var(--line);
 }
 
+.composer-row.dictation-mode-active > :not(.dictation-mode) {
+  display: none !important;
+}
+
+.dictation-mode {
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-1) 92%, var(--surface-hover) 8%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 12px;
+}
+
+.dictation-mode.hidden {
+  display: none !important;
+}
+
+.dictation-wave {
+  min-width: 0;
+  width: 100%;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.dictation-wave-bar {
+  flex: 1 1 auto;
+  min-width: 2px;
+  max-width: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 78%, var(--text-muted) 22%);
+  transform-origin: center center;
+  transition: height 100ms linear, opacity 120ms ease;
+}
+
+.dictation-mode.processing .dictation-wave-bar,
+.dictation-mode.starting .dictation-wave-bar {
+  opacity: 0.55;
+}
+
+.dictation-timer {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.dictation-stop-btn {
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface-1) 84%);
+  color: var(--danger);
+  min-height: 24px;
+  padding: 4px 12px;
+  font-size: 0.77rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.dictation-stop-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 22%, var(--surface-1) 78%);
+}
+
+.dictation-stop-btn:disabled {
+  cursor: wait;
+  opacity: 0.9;
+}
+
 .session-row {
   display: flex;
   align-items: center;

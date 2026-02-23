@@ -467,6 +467,9 @@
     dictateBusy: false,
     dictateRecording: false,
     dictateSessionId: "",
+    dictatePhase: "idle",
+    dictateStartedAt: 0,
+    dictateElapsedMs: 0,
     dictationShortcutHold: storageGet("artificer.dictationShortcutHold", "none"),
     dictationShortcutToggle: storageGet("artificer.dictationShortcutToggle", "none"),
     dictateHotkeyHoldActive: false,
@@ -643,6 +646,7 @@
   var stateGetInFlight = null;
   var stateGetInFlightKey = "";
   var dictationShortcutPressState = {};
+  var dictationUiTickTimer = null;
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -769,6 +773,7 @@
     chatTitle: document.getElementById("chat-title"),
     chatLog: document.getElementById("chat-log"),
     chatJumpBottomBtn: document.getElementById("chat-jump-bottom-btn"),
+    composerRow: document.getElementById("composer-row"),
     runForm: document.getElementById("run-form"),
     runPrompt: document.getElementById("run-prompt"),
     attachBtn: document.getElementById("attach-btn"),
@@ -803,6 +808,10 @@
     sendMenuQueueBtn: document.getElementById("send-menu-queue-btn"),
     sendMenuStopBtn: document.getElementById("send-menu-stop-btn"),
     runBtn: document.getElementById("run-btn"),
+    dictationMode: document.getElementById("dictation-mode"),
+    dictationWave: document.getElementById("dictation-wave"),
+    dictationTimer: document.getElementById("dictation-timer"),
+    dictationStopBtn: document.getElementById("dictation-stop-btn"),
 
     diffPanel: document.getElementById("diff-panel"),
     diffResizer: document.getElementById("diff-resizer"),
@@ -6314,11 +6323,132 @@
     }
   }
 
+  function clearDictationUiTicker() {
+    if (dictationUiTickTimer) {
+      clearInterval(dictationUiTickTimer);
+      dictationUiTickTimer = null;
+    }
+  }
+
+  function formatDictationElapsed(ms) {
+    var total = Number(ms);
+    if (!isFinite(total) || total < 0) {
+      total = 0;
+    }
+    var seconds = Math.floor(total / 1000);
+    var minutes = Math.floor(seconds / 60);
+    var rem = seconds % 60;
+    return String(minutes) + ":" + (rem < 10 ? "0" : "") + String(rem);
+  }
+
+  function ensureDictationWaveBars() {
+    if (!el.dictationWave) {
+      return [];
+    }
+    var bars = el.dictationWave.querySelectorAll(".dictation-wave-bar");
+    if (bars && bars.length >= 40) {
+      return bars;
+    }
+    var html = "";
+    for (var i = 0; i < 42; i += 1) {
+      html += "<span class='dictation-wave-bar' aria-hidden='true'></span>";
+    }
+    el.dictationWave.innerHTML = html;
+    return el.dictationWave.querySelectorAll(".dictation-wave-bar");
+  }
+
+  function renderDictationWaveBars() {
+    var bars = ensureDictationWaveBars();
+    if (!bars || !bars.length) {
+      return;
+    }
+    var recording = state.dictatePhase === "recording";
+    var seed = Date.now() / 170;
+    for (var i = 0; i < bars.length; i += 1) {
+      var bar = bars[i];
+      var waveA = Math.sin(seed + (i * 0.41));
+      var waveB = Math.sin((seed * 0.73) + (i * 0.19));
+      var val = (waveA * 0.52) + (waveB * 0.48);
+      var unit = recording ? Math.abs(val) : 0.12;
+      var height = 2 + Math.round(unit * 12);
+      bar.style.height = String(height) + "px";
+    }
+  }
+
+  function setDictationPhase(phase) {
+    var next = String(phase || "idle");
+    if (next !== "starting" && next !== "recording" && next !== "processing") {
+      next = "idle";
+    }
+    state.dictatePhase = next;
+    if (next === "recording") {
+      if (!state.dictateStartedAt) {
+        state.dictateStartedAt = Date.now();
+      }
+      state.dictateElapsedMs = Math.max(0, Date.now() - state.dictateStartedAt);
+      if (!dictationUiTickTimer) {
+        dictationUiTickTimer = setInterval(function () {
+          if (state.dictatePhase !== "recording") {
+            clearDictationUiTicker();
+            return;
+          }
+          state.dictateElapsedMs = Math.max(0, Date.now() - Number(state.dictateStartedAt || Date.now()));
+          renderDictationMode();
+        }, 120);
+      }
+      return;
+    }
+    clearDictationUiTicker();
+    if (next === "idle") {
+      state.dictateStartedAt = 0;
+      state.dictateElapsedMs = 0;
+    }
+  }
+
+  function renderDictationMode() {
+    if (!el.dictationMode || !el.composerRow) {
+      return;
+    }
+    var phase = String(state.dictatePhase || "idle");
+    var showMode = phase === "starting" || phase === "recording" || phase === "processing";
+    el.composerRow.classList.toggle("dictation-mode-active", showMode);
+    el.dictationMode.classList.toggle("hidden", !showMode);
+    el.dictationMode.classList.toggle("starting", phase === "starting");
+    el.dictationMode.classList.toggle("processing", phase === "processing");
+    el.dictationMode.classList.toggle("recording", phase === "recording");
+    if (!showMode) {
+      return;
+    }
+    if (el.dictationTimer) {
+      if (phase === "recording") {
+        el.dictationTimer.textContent = formatDictationElapsed(state.dictateElapsedMs);
+      } else if (phase === "processing") {
+        el.dictationTimer.textContent = "Processing...";
+      } else {
+        el.dictationTimer.textContent = "Starting...";
+      }
+    }
+    renderDictationWaveBars();
+    if (el.dictationStopBtn) {
+      var processing = phase === "processing";
+      var starting = phase === "starting";
+      el.dictationStopBtn.disabled = processing || starting;
+      el.dictationStopBtn.classList.toggle("ui-pending-spinner", processing);
+      if (processing) {
+        el.dictationStopBtn.textContent = "Stop";
+        el.dictationStopBtn.setAttribute("aria-label", "Processing dictation");
+      } else {
+        el.dictationStopBtn.textContent = "Stop";
+        el.dictationStopBtn.setAttribute("aria-label", "Stop dictation");
+      }
+    }
+  }
+
   function renderDictateButton() {
     if (!el.dictateBtn) {
       return;
     }
-    var available = !!state.dictationInstalled || !!state.dictateRecording || !!state.dictateBusy;
+    var available = !!state.dictationInstalled || !!state.dictateRecording || !!state.dictateBusy || state.dictatePhase !== "idle";
     el.dictateBtn.classList.toggle("hidden", !available);
     if (!available) {
       el.dictateBtn.disabled = true;
@@ -6334,9 +6464,13 @@
     el.dictateBtn.disabled = busy;
     el.dictateBtn.classList.toggle("recording", recording);
     el.dictateBtn.setAttribute("aria-pressed", recording ? "true" : "false");
-    if (recording) {
+    var phase = String(state.dictatePhase || "idle");
+    if (recording || phase === "recording") {
       el.dictateBtn.setAttribute("aria-label", "Stop dictation");
       el.dictateBtn.setAttribute("data-tooltip", "Stop dictation");
+    } else if (phase === "processing") {
+      el.dictateBtn.setAttribute("aria-label", "Processing dictation");
+      el.dictateBtn.setAttribute("data-tooltip", "Processing dictation...");
     } else if (busy) {
       el.dictateBtn.setAttribute("aria-label", "Starting dictation");
       el.dictateBtn.setAttribute("data-tooltip", "Starting dictation...");
@@ -8436,6 +8570,7 @@
     safeStep("renderModelPickerButton", renderModelPickerButton);
     safeStep("renderRunControls", renderRunControls);
     safeStep("renderDictateButton", renderDictateButton);
+    safeStep("renderDictationMode", renderDictationMode);
     safeStep("renderRunButton", renderRunButton);
     safeStep("renderQueueControls", renderQueueControls);
     safeStep("renderOpenButton", renderOpenButton);
@@ -12649,6 +12784,11 @@
       state.dictationBackend = backend;
       state.dictationPreferredBackend = preferred;
       state.dictationInstallError = "";
+      if (!installed && !state.dictateBusy) {
+        state.dictateRecording = false;
+        state.dictateSessionId = "";
+        setDictationPhase("idle");
+      }
       return combined;
     }).catch(function (error) {
       state.dictationInstallInfo = null;
@@ -12659,6 +12799,9 @@
       state.dictationInstalled = false;
       state.dictationBackend = "";
       state.dictationPreferredBackend = "";
+      state.dictateRecording = false;
+      state.dictateSessionId = "";
+      setDictationPhase("idle");
       throw error;
     }).finally(function () {
       state.dictationInstallInfoLoading = false;
@@ -15392,6 +15535,7 @@
     }
     var stopAfterStart = false;
     state.dictateBusy = true;
+    setDictationPhase("starting");
     renderUi();
     return apiPost("dictate_start", {}, { timeoutMs: 30000 })
       .then(function (response) {
@@ -15400,10 +15544,17 @@
         }
         state.dictateRecording = true;
         state.dictateSessionId = trim(String((response.session && response.session.id) || ""));
+        state.dictateStartedAt = Date.now();
+        state.dictateElapsedMs = 0;
+        setDictationPhase("recording");
         if (opts.fromHotkey && !state.dictateHotkeyHoldIntent) {
           stopAfterStart = true;
         }
         return true;
+      })
+      .catch(function (error) {
+        setDictationPhase("idle");
+        throw error;
       })
       .finally(function () {
         state.dictateBusy = false;
@@ -15434,6 +15585,7 @@
     var activeSessionId = trim(String(state.dictateSessionId || ""));
     state.dictateBusy = true;
     state.dictateRecording = false;
+    setDictationPhase("processing");
     renderUi();
     return apiPost("dictate_stop", { session_id: activeSessionId }, { timeoutMs: 220000 })
       .then(function (response) {
@@ -15457,6 +15609,7 @@
       .finally(function () {
         state.dictateBusy = false;
         state.dictateSessionId = "";
+        setDictationPhase("idle");
         renderUi();
       });
   }
@@ -17560,6 +17713,17 @@
         onDictateClick(event).catch(showError);
       });
     }
+    if (el.dictationStopBtn) {
+      on(el.dictationStopBtn, "click", function (event) {
+        if (event) {
+          event.preventDefault();
+        }
+        if (state.dictateBusy) {
+          return;
+        }
+        stopDictationCapture({ fromHotkey: false }).catch(showError);
+      });
+    }
 
     if (el.attachmentStrip) {
       on(el.attachmentStrip, "click", function (event) {
@@ -18233,6 +18397,7 @@
     stopModelAutoRefreshLoop();
     stopRunEventHealLoop();
     stopApprovalResumeWatch();
+    clearDictationUiTicker();
     clearDictationShortcutPressState();
     clearPendingAttachments();
   });
