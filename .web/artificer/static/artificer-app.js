@@ -465,6 +465,8 @@
     pendingArchiveSubmittingKey: "",
     pendingAttachments: [],
     dictateBusy: false,
+    dictateRecording: false,
+    dictateSessionId: "",
     dictationInstallReady: false,
     dictationInstallInfo: null,
     dictationInstallInfoLoading: false,
@@ -6257,11 +6259,20 @@
       return;
     }
     var busy = !!state.dictateBusy;
-    el.dictateBtn.disabled = false;
-    el.dictateBtn.classList.toggle("recording", busy);
-    el.dictateBtn.setAttribute("aria-pressed", busy ? "true" : "false");
-    el.dictateBtn.setAttribute("aria-label", busy ? "Listening for dictation" : "Dictate prompt");
-    el.dictateBtn.setAttribute("data-tooltip", busy ? "Listening..." : "Dictate prompt");
+    var recording = !!state.dictateRecording;
+    el.dictateBtn.disabled = busy;
+    el.dictateBtn.classList.toggle("recording", recording);
+    el.dictateBtn.setAttribute("aria-pressed", recording ? "true" : "false");
+    if (recording) {
+      el.dictateBtn.setAttribute("aria-label", "Stop dictation");
+      el.dictateBtn.setAttribute("data-tooltip", "Stop dictation");
+    } else if (busy) {
+      el.dictateBtn.setAttribute("aria-label", "Starting dictation");
+      el.dictateBtn.setAttribute("data-tooltip", "Starting dictation...");
+    } else {
+      el.dictateBtn.setAttribute("aria-label", "Dictate prompt");
+      el.dictateBtn.setAttribute("data-tooltip", "Dictate prompt");
+    }
     if (el.dictateBtn.hasAttribute("title")) {
       el.dictateBtn.removeAttribute("title");
     }
@@ -15136,24 +15147,44 @@
       return Promise.resolve();
     }
 
+    if (state.dictateRecording) {
+      var activeSessionId = trim(String(state.dictateSessionId || ""));
+      state.dictateBusy = true;
+      state.dictateRecording = false;
+      renderUi();
+      return apiPost("dictate_stop", { session_id: activeSessionId }, { timeoutMs: 220000 })
+        .then(function (response) {
+          if (!response.success) {
+            throw new Error(response.error || "Dictation failed");
+          }
+          var dictatedText = trim(String(response.text || ""));
+          if (!dictatedText) {
+            showTransientNotice("No speech detected");
+            return;
+          }
+          insertTextAtCursor(el.runPrompt, dictatedText);
+          dispatchInputEvent(el.runPrompt);
+          if (typeof el.runPrompt.focus === "function") {
+            el.runPrompt.focus();
+          }
+        })
+        .finally(function () {
+          state.dictateBusy = false;
+          state.dictateSessionId = "";
+          renderUi();
+        });
+    }
+
     state.dictateBusy = true;
     renderUi();
 
-    return apiPost("dictate", { duration: "8" }, { timeoutMs: 220000 })
+    return apiPost("dictate_start", {}, { timeoutMs: 30000 })
       .then(function (response) {
         if (!response.success) {
           throw new Error(response.error || "Dictation failed");
         }
-        var dictatedText = trim(String(response.text || ""));
-        if (!dictatedText) {
-          showTransientNotice("No speech detected");
-          return;
-        }
-        insertTextAtCursor(el.runPrompt, dictatedText);
-        dispatchInputEvent(el.runPrompt);
-        if (typeof el.runPrompt.focus === "function") {
-          el.runPrompt.focus();
-        }
+        state.dictateRecording = true;
+        state.dictateSessionId = trim(String((response.session && response.session.id) || ""));
       })
       .finally(function () {
         state.dictateBusy = false;
