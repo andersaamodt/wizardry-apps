@@ -308,6 +308,9 @@ ensure_global_default_instructions_file() {
 10. Keep participation targeted.
     - Remain available to everyone else in the thread.
     - Keep the sanctioned-user circuit closed during the cooling period.
+11. Keep tone non-escalatory.
+    - Never escalate intensity, hostility, or rhetoric.
+    - At most mirror the user's intensity; prefer de-escalation whenever possible.
 DEFAULTS
   fi
 }
