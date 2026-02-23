@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Redditor</title>
-  <link rel="stylesheet" href="style.css?v=vr20260221h">
+  <link rel="stylesheet" href="style.css?v=vr20260223a">
   <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
 </head>
 <body class="is-booting">
@@ -803,7 +803,7 @@
       '    - Keep the sanctioned-user circuit closed during the cooling period.\n' +
       '11. Keep tone non-escalatory.\n' +
       '    - Never escalate intensity, hostility, or rhetoric.\n' +
-      '    - At most mirror the user\\'s intensity; prefer de-escalation whenever possible.\n'
+      '    - At most mirror the user\'s intensity; prefer de-escalation whenever possible.\n'
     );
 
     var state = {
@@ -3092,6 +3092,105 @@
       out.optInCommands = out.optInCommands
         .map(function (item) { return String(item || '').trim(); })
         .filter(function (item, idx, arr) { return !!item && arr.indexOf(item) === idx; });
+      if (!out.optInCommands.length) {
+        out.optInCommands = ['!summon', '!engage', '/u/{{bot_username}}'];
+      }
+
+      function allowMap(enabledActions) {
+        var allow = {};
+        var enabled = Array.isArray(enabledActions) ? enabledActions : [];
+        for (var ai = 0; ai < actionCatalog.length; ai += 1) {
+          var action = actionCatalog[ai];
+          allow[action] = enabled.indexOf(action) >= 0;
+        }
+        return allow;
+      }
+
+      if (!out.modes.length) {
+        out.modes = [
+          {
+            id: 'SHADE',
+            label: 'Cordial Conversationalist',
+            enabled: true,
+            defaultExpiryHours: 0,
+            allow: allowMap(['Reply', 'Initiate', 'Mention', 'Followup', 'Cross-thread Reply']),
+            constraints: { maxRepliesPerUserThread24h: 4, noFollowup: false, noMention: false, noQuote: true }
+          },
+          {
+            id: 'TEACH',
+            label: 'Direct Speaker',
+            enabled: true,
+            defaultExpiryHours: 0,
+            allow: allowMap(['Reply', 'Initiate', 'Warn', 'Mention', 'Quote', 'Followup', 'Cross-thread Reply']),
+            constraints: { maxRepliesPerUserThread24h: 5, noFollowup: false, noMention: false, noQuote: false }
+          },
+          {
+            id: 'WARN',
+            label: 'Verbal Corrector',
+            enabled: true,
+            defaultExpiryHours: 24,
+            allow: allowMap(['Reply', 'Warn', 'Post Neutral Ban Notice']),
+            constraints: { maxRepliesPerUserThread24h: 2, noFollowup: true, noMention: true, noQuote: true }
+          },
+          {
+            id: 'PROBATION',
+            label: 'Watchful Referee',
+            enabled: true,
+            defaultExpiryHours: 72,
+            allow: allowMap(['Reply', 'Warn', 'Short Ban', 'Remove Content', 'Post Neutral Ban Notice']),
+            constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
+          },
+          {
+            id: 'BAN',
+            label: 'Explicit Enforcer',
+            enabled: true,
+            defaultExpiryHours: 168,
+            allow: allowMap(['Reply', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Neutral Ban Notice']),
+            constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
+          },
+          {
+            id: 'RULES',
+            label: 'Silent Enforcer',
+            enabled: true,
+            defaultExpiryHours: 168,
+            allow: allowMap(['Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice']),
+            constraints: { maxRepliesPerUserThread24h: 0, noFollowup: true, noMention: true, noQuote: true }
+          },
+          {
+            id: 'STRICT',
+            label: 'Active Moderator',
+            enabled: true,
+            defaultExpiryHours: 336,
+            allow: allowMap(['Reply', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice']),
+            constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
+          }
+        ];
+      }
+
+      if (!out.switchRules.length) {
+        out.switchRules = [
+          {
+            id: 'opt-out',
+            label: 'General opt-out',
+            matchAny: ['leave me alone', 'do not reply', 'stop replying', 'opt out'],
+            toMode: 'BAN',
+            durationHours: 72,
+            decayTo: 'SHADE',
+            template: 'Acknowledged. I will not continue this conversational dyad right now.',
+            announce: true
+          }
+        ];
+      }
+
+      if (!out.postActionTransitions || !Object.keys(out.postActionTransitions).length) {
+        out.postActionTransitions = {
+          Warn: { toMode: 'WARN', durationHours: 24, decayTo: 'SHADE', announce: false },
+          'Short Ban': { toMode: 'BAN', durationHours: 72, decayTo: 'PROBATION', announce: true },
+          'Medium Ban': { toMode: 'BAN', durationHours: 168, decayTo: 'PROBATION', announce: true },
+          'Long Ban': { toMode: 'RULES', durationHours: 720, decayTo: 'BAN', announce: true },
+          'Remove Content': { toMode: 'PROBATION', durationHours: 72, decayTo: 'TEACH', announce: false }
+        };
+      }
 
       out.modes = out.modes.map(function (mode) {
         var next = Object.assign({}, mode || {});
