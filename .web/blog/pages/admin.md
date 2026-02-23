@@ -489,7 +489,7 @@ body {
 
 .admin-content {
   min-width: 0;
-  padding-left: 1.25rem;
+  padding: 0.45rem 0 0 0.7rem;
 }
 
 #admin-panel.account-only {
@@ -522,15 +522,15 @@ body {
 
 .demo-box {
   margin: 0;
-  padding: 1.12rem;
-  border-radius: 18px;
-  border: 1px solid #c8d6f2;
-  background: linear-gradient(180deg, #f8fbff 0%, #f2f7ff 100%);
-  box-shadow: 0 16px 34px rgba(30, 58, 138, 0.09);
+  padding: 0.62rem 0.7rem 0.8rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .admin-card {
-  min-height: 300px;
+  min-height: 0;
 }
 
 .section-head {
@@ -554,23 +554,29 @@ body {
 
 .settings-stack {
   display: grid;
-  gap: 0.56rem;
+  gap: 0.36rem;
 }
 
 .sub-card {
-  border: 1px solid #d1ddf5;
-  border-radius: 14px;
-  background: #ffffff;
-  padding: 0.6rem 0.72rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border: 0;
+  border-top: 1px solid #d7e1f4;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.45rem 0 0.18rem;
+  box-shadow: none;
+}
+
+.settings-stack .sub-card:first-child {
+  border-top: 0;
+  padding-top: 0.1rem;
 }
 
 .section-actions {
-  margin-top: 0.65rem;
+  margin-top: 0.38rem;
 }
 
 .field-row {
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.42rem;
 }
 
 .field-row:last-child {
@@ -1308,7 +1314,7 @@ body {
 
 @media (max-width: 480px) {
   .demo-box {
-    padding: 0.85rem;
+    padding: 0.45rem 0.42rem 0.6rem;
   }
 
   .toolbar button {
