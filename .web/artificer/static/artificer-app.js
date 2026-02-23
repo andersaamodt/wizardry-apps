@@ -563,6 +563,8 @@
   var modelInstallPollTimer = null;
   var dictationInstallPollTimer = null;
   var dictationInstallPollSession = 0;
+  var dictationShortcutPrefsRevision = 0;
+  var dictationShortcutPrefsLoadSeq = 0;
   var modelAutoRefreshTimer = null;
   var modelAutoRefreshBusy = false;
   var modelAutoRefreshLastAt = 0;
@@ -657,6 +659,7 @@
   var dictationWaveSource = null;
   var dictationWaveData = null;
   var dictationWaveStartPromise = null;
+  var dictationWavePollTimer = null;
   var dictatePointerHandledAt = 0;
   var dictateStopPointerHandledAt = 0;
   var dictationShortcutLastToggleAtByTrigger = {};
@@ -6371,6 +6374,10 @@
   }
 
   function stopDictationWaveMonitor() {
+    if (dictationWavePollTimer) {
+      clearInterval(dictationWavePollTimer);
+      dictationWavePollTimer = null;
+    }
     dictationWaveMonitorSession += 1;
     if (dictationWaveRafId) {
       cancelAnimationFrame(dictationWaveRafId);
@@ -6420,6 +6427,27 @@
     state.dictateWaveLevels = [];
   }
 
+  function applyDictationWaveLevel(levelValue) {
+    var level = Number(levelValue || 0);
+    if (!isFinite(level) || level < 0) {
+      level = 0;
+    }
+    if (level > 1) {
+      level = 1;
+    }
+    var barCount = 42;
+    var existing = Array.isArray(state.dictateWaveLevels) ? state.dictateWaveLevels.slice(0, barCount) : [];
+    if (existing.length < barCount) {
+      while (existing.length < barCount) {
+        existing.push(0);
+      }
+    }
+    var shifted = existing.slice(1);
+    shifted.push(level);
+    state.dictateWaveLevels = shifted;
+    renderDictationWaveBars();
+  }
+
   function startDictationWaveMonitor() {
     if (dictationWaveStartPromise) {
       return dictationWaveStartPromise;
@@ -6427,97 +6455,28 @@
     stopDictationWaveMonitor();
     var monitorSession = dictationWaveMonitorSession + 1;
     dictationWaveMonitorSession = monitorSession;
-    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
-      state.dictateWaveLevels = [];
-      return Promise.resolve(false);
-    }
-    dictationWaveStartPromise = navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    }).then(function (stream) {
-      if (monitorSession !== dictationWaveMonitorSession) {
-        try {
-          var staleTracks = stream.getTracks ? stream.getTracks() : [];
-          for (var sti = 0; sti < staleTracks.length; sti += 1) {
-            if (staleTracks[sti] && typeof staleTracks[sti].stop === "function") {
-              staleTracks[sti].stop();
-            }
-          }
-        } catch (_err) {
-          // noop
+    dictationWaveStartPromise = Promise.resolve(true).then(function () {
+      dictationWavePollTimer = setInterval(function () {
+        if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording") {
+          return;
         }
-        return false;
-      }
-      dictationWaveStream = stream;
-      var AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) {
-        return false;
-      }
-      dictationWaveAudioContext = new AudioCtx();
-      dictationWaveSource = dictationWaveAudioContext.createMediaStreamSource(stream);
-      dictationWaveAnalyser = dictationWaveAudioContext.createAnalyser();
-      dictationWaveAnalyser.fftSize = 1024;
-      dictationWaveAnalyser.smoothingTimeConstant = 0.55;
-      dictationWaveAnalyser.minDecibels = -92;
-      dictationWaveAnalyser.maxDecibels = -12;
-      dictationWaveSource.connect(dictationWaveAnalyser);
-      dictationWaveData = new Uint8Array(dictationWaveAnalyser.frequencyBinCount);
-      if (dictationWaveAudioContext && dictationWaveAudioContext.state === "suspended" && typeof dictationWaveAudioContext.resume === "function") {
-        dictationWaveAudioContext.resume().catch(function () {
+        var activeSessionId = trim(String(state.dictateSessionId || ""));
+        if (!activeSessionId) {
+          return;
+        }
+        apiGet("dictate_levels", { session_id: activeSessionId }, { timeoutMs: 2200 }).then(function (response) {
+          if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording") {
+            return;
+          }
+          if (!response || !response.success) {
+            return;
+          }
+          applyDictationWaveLevel(Number(response.level || 0));
+        }).catch(function () {
           return null;
         });
-      }
-
-      function tick() {
-        if (monitorSession !== dictationWaveMonitorSession) {
-          return;
-        }
-        if (!dictationWaveAnalyser || !dictationWaveData) {
-          return;
-        }
-        if (
-          dictationWaveAudioContext &&
-          dictationWaveAudioContext.state === "suspended" &&
-          typeof dictationWaveAudioContext.resume === "function"
-        ) {
-          dictationWaveAudioContext.resume().catch(function () {
-            return null;
-          });
-        }
-        dictationWaveAnalyser.getByteFrequencyData(dictationWaveData);
-        var bars = ensureDictationWaveBars();
-        var barCount = bars ? bars.length : 42;
-        if (barCount < 1) {
-          barCount = 42;
-        }
-        var levels = new Array(barCount);
-        var chunk = Math.max(1, Math.floor(dictationWaveData.length / barCount));
-        for (var i = 0; i < barCount; i += 1) {
-          var from = Math.max(1, i * chunk);
-          var to = Math.min(dictationWaveData.length, from + chunk);
-          var peak = 0;
-          for (var j = from; j < to; j += 1) {
-            var magnitude = Number(dictationWaveData[j] || 0) / 255;
-            if (magnitude > peak) {
-              peak = magnitude;
-            }
-          }
-          var gated = Math.max(0, peak - 0.015);
-          levels[i] = Math.max(0, Math.min(1, gated * 1.6));
-        }
-        state.dictateWaveLevels = levels;
-        renderDictationWaveBars();
-        dictationWaveRafId = requestAnimationFrame(tick);
-      }
-
-      tick();
+      }, 70);
       return true;
-    }).catch(function () {
-      state.dictateWaveLevels = [];
-      return false;
     }).finally(function () {
       dictationWaveStartPromise = null;
     });
@@ -13055,9 +13014,15 @@
   }
 
   function loadDictationShortcutPrefs() {
+    var loadSeq = dictationShortcutPrefsLoadSeq + 1;
+    dictationShortcutPrefsLoadSeq = loadSeq;
+    var revisionAtStart = dictationShortcutPrefsRevision;
     return apiGet("dictation_shortcuts_get", {}, { timeoutMs: 12000 }).then(function (response) {
       if (!response || !response.success) {
         throw new Error((response && response.error) || "Could not load dictation shortcuts");
+      }
+      if (loadSeq !== dictationShortcutPrefsLoadSeq || revisionAtStart !== dictationShortcutPrefsRevision) {
+        return null;
       }
       var holdValue = normalizeDictationShortcut("hold", response.hold);
       var toggleValue = normalizeDictationShortcut("toggle", response.toggle);
@@ -13071,6 +13036,7 @@
   }
 
   function saveDictationShortcutPrefs() {
+    dictationShortcutPrefsRevision += 1;
     var holdValue = normalizeDictationShortcut("hold", state.dictationShortcutHold);
     var toggleValue = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
     return apiPost("dictation_shortcuts_set", {
@@ -13093,6 +13059,7 @@
   function saveDictationShortcutChoice(kind, value) {
     var normalizedKind = kind === "toggle" ? "toggle" : "hold";
     var normalizedValue = normalizeDictationShortcut(normalizedKind, value);
+    dictationShortcutPrefsRevision += 1;
     if (normalizedKind === "toggle") {
       state.dictationShortcutToggle = normalizedValue;
       storageSet("artificer.dictationShortcutToggle", normalizedValue);

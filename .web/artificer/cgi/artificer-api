@@ -5488,6 +5488,34 @@ dictation_live_has_active_capture() {
   kill -0 "$capture_pid" 2>/dev/null
 }
 
+dictation_live_level_for_session() {
+  levels_file=$(dictation_live_session_value "levels_file")
+  if [ -z "$levels_file" ] || [ ! -f "$levels_file" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+  rms_db=$(awk -F= '/lavfi\.astats\.Overall\.RMS_level=/{v=$2} END{print v}' "$levels_file" 2>/dev/null | tr -d '\r' | tail -n 1 | tr -d '[:space:]')
+  if [ -z "$rms_db" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+  if printf '%s' "$rms_db" | grep -Eq '^-?inf$'; then
+    printf '%s' "0"
+    return 0
+  fi
+  awk -v db="$rms_db" '
+    BEGIN {
+      v = db + 0.0
+      if (v < -90) v = -90
+      if (v > -8) v = -8
+      level = (v + 90) / 82
+      if (level < 0) level = 0
+      if (level > 1) level = 1
+      printf "%.5f", level
+    }
+  '
+}
+
 stop_capture_pid_gracefully() {
   capture_pid=$1
   case "$capture_pid" in
@@ -13572,6 +13600,7 @@ EOF
 
     session_id=$(new_id)
     audio_file="$session_dir/audio.wav"
+    levels_file="$session_dir/levels.log"
     log_file="$session_dir/capture.log"
     runner_script="$session_dir/capture.sh"
     model_name=$model
@@ -13589,22 +13618,29 @@ EOF
 set -eu
 audio_file=$1
 log_file=$2
+levels_file=$3
 os_name=$(uname -s 2>/dev/null || printf 'unknown')
 
 case "$os_name" in
   Darwin)
     exec ffmpeg -nostdin -hide_banner -loglevel error \
+      -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
       -f avfoundation -i ":0" \
+      -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     ;;
   Linux)
     if ffmpeg -nostdin -hide_banner -loglevel error \
+      -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
       -f pulse -i default \
+      -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1; then
       :
     else
       ffmpeg -nostdin -hide_banner -loglevel error \
+        -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
         -f alsa -i default \
+        -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
         -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     fi
     ;;
@@ -13616,8 +13652,8 @@ esac
 EOF
     chmod +x "$runner_script"
 
-    capture_pid=$(spawn_detached_job "$runner_script" "$audio_file" "$log_file")
-    sleep 0.03
+    capture_pid=$(spawn_detached_job "$runner_script" "$audio_file" "$log_file" "$levels_file")
+    sleep 0.005
     if ! kill -0 "$capture_pid" 2>/dev/null; then
       capture_error=$(strip_terminal_noise "$(cat "$log_file" 2>/dev/null || true)")
       clear_dictation_live_session
@@ -13629,6 +13665,7 @@ EOF
     printf '%s\n' "$session_id" > "$session_dir/id"
     printf '%s\n' "$capture_pid" > "$session_dir/pid"
     printf '%s\n' "$audio_file" > "$session_dir/audio_file"
+    printf '%s\n' "$levels_file" > "$session_dir/levels_file"
     printf '%s\n' "$backend" > "$session_dir/backend"
     printf '%s\n' "$model_name" > "$session_dir/model"
     printf '%s\n' "$language" > "$session_dir/language"
@@ -13639,6 +13676,24 @@ EOF
       "$(json_escape "$session_id")" \
       "$(json_escape "$backend")" \
       "$(json_escape "$(voice_component_label "$backend")")"
+    exit 0
+    ;;
+
+  dictate_levels)
+    requested_session_id=$(trim "$(param "session_id")")
+    if ! dictation_live_has_active_capture; then
+      printf '{"success":true,"level":"0"}\n'
+      exit 0
+    fi
+    session_id=$(dictation_live_session_value "id")
+    if [ -n "$requested_session_id" ] && [ "$requested_session_id" != "$session_id" ]; then
+      printf '{"success":true,"level":"0"}\n'
+      exit 0
+    fi
+    level=$(dictation_live_level_for_session)
+    printf '{"success":true,"level":"%s","session_id":"%s"}\n' \
+      "$(json_escape "$level")" \
+      "$(json_escape "$session_id")"
     exit 0
     ;;
 
