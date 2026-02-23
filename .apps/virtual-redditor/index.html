@@ -336,6 +336,16 @@
               <div class="persona-section-title">Switch Rules</div>
               <button id="btn-mode-add-rule" type="button" class="soft mini-add-btn">Add rule</button>
             </div>
+            <div class="modes-grid-head switch-grid-head" aria-hidden="true">
+              <span>Label</span>
+              <span>Match phrases</span>
+              <span>Switch to</span>
+              <span>Duration (h)</span>
+              <span>Decay to</span>
+              <span>Template</span>
+              <span>Announce</span>
+              <span></span>
+            </div>
             <div id="mode-switch-rules-list" class="mode-switch-rules-list"></div>
             <div class="persona-section-title modes-subtitle">Opt-in Commands</div>
             <div class="mode-fields-inline">
@@ -347,6 +357,14 @@
             <div class="modes-section-head modes-subtitle">
               <div class="persona-section-title">Post-Action Transitions</div>
               <button id="btn-mode-add-transition" type="button" class="soft mini-add-btn">Add transition</button>
+            </div>
+            <div class="modes-grid-head transition-grid-head" aria-hidden="true">
+              <span>Action</span>
+              <span>Switch to</span>
+              <span>Duration (h)</span>
+              <span>Decay to</span>
+              <span>Announce</span>
+              <span></span>
             </div>
             <div id="modes-transitions-list" class="mode-switch-rules-list"></div>
             <div class="settings-actions modes-save-actions">
@@ -3271,14 +3289,14 @@
           var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
           return [
             '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '" data-rule-id="' + escapeHtml(String(rule.id || '')) + '">',
-            '  <input type="text" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '">',
-            '  <input type="text" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '">',
-            '  <select data-rule-to-mode>' + toModeHtml + '</select>',
-            '  <input type="number" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '">',
-            '  <select data-rule-decay-to>' + decayModeHtml + '</select>',
-            '  <input type="text" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '">',
-            '  <label class="mini-toggle"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
-            '  <button type="button" class="soft mini-remove-btn" data-remove-rule>Remove</button>',
+            '  <input type="text" class="rule-label-input" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '">',
+            '  <input type="text" class="rule-match-input" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '">',
+            '  <select class="rule-mode-select" data-rule-to-mode>' + toModeHtml + '</select>',
+            '  <input type="number" class="rule-duration-input" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '">',
+            '  <select class="rule-decay-select" data-rule-decay-to>' + decayModeHtml + '</select>',
+            '  <input type="text" class="rule-template-input" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '">',
+            '  <label class="mini-toggle rule-announce-toggle"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+            '  <button type="button" class="soft mini-remove-btn rule-remove-btn" data-remove-rule>Remove</button>',
             '</div>'
           ].join('');
         }).join('');
@@ -3309,12 +3327,12 @@
           var decayModeHtml = modeOptionsHtml(modeOpts, String(row.decayTo || ''), true, 'Default decay mode');
           return [
             '<div class="switch-rule-row transition-row" data-transition-idx="' + String(idx) + '" data-transition-action="' + escapeHtml(actionName) + '">',
-            '  <select data-transition-action>' + actionSelectHtml + '</select>',
-            '  <select data-transition-to-mode>' + toModeHtml + '</select>',
-            '  <input type="number" min="0" step="1" data-transition-duration value="' + escapeHtml(String(row.durationHours || 0)) + '">',
-            '  <select data-transition-decay-to>' + decayModeHtml + '</select>',
-            '  <label class="mini-toggle"><input type="checkbox" data-transition-announce ' + (row.announce ? 'checked' : '') + '><span>Announce</span></label>',
-            '  <button type="button" class="soft mini-remove-btn" data-remove-transition>Remove</button>',
+            '  <select class="transition-action-select" data-transition-action>' + actionSelectHtml + '</select>',
+            '  <select class="transition-mode-select" data-transition-to-mode>' + toModeHtml + '</select>',
+            '  <input type="number" class="transition-duration-input" min="0" step="1" data-transition-duration value="' + escapeHtml(String(row.durationHours || 0)) + '">',
+            '  <select class="transition-decay-select" data-transition-decay-to>' + decayModeHtml + '</select>',
+            '  <label class="mini-toggle transition-announce-toggle"><input type="checkbox" data-transition-announce ' + (row.announce ? 'checked' : '') + '><span>Announce</span></label>',
+            '  <button type="button" class="soft mini-remove-btn transition-remove-btn" data-remove-transition>Remove</button>',
             '</div>'
           ].join('');
         }).join('');

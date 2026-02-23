@@ -27,6 +27,9 @@ terminal_sessions_root="$data_root/terminal-sessions"
 mode_runtime_root="$data_root/mode-runtime"
 llm_settings_dir="$data_root/llm-settings"
 llm_use_gpu_file="$llm_settings_dir/use-gpu"
+dictation_settings_dir="$data_root/dictation-settings"
+dictation_shortcut_hold_file="$dictation_settings_dir/shortcut-hold"
+dictation_shortcut_toggle_file="$dictation_settings_dir/shortcut-toggle"
 state_light_cache_file="$data_root/state-light-cache.json"
 ALLOW_NETWORK=0
 ALLOW_WEB=0
@@ -39,6 +42,7 @@ mkdir -p "$command_policy_root"
 mkdir -p "$terminal_sessions_root"
 mkdir -p "$mode_runtime_root"
 mkdir -p "$llm_settings_dir"
+mkdir -p "$dictation_settings_dir"
 
 json_escape() {
   printf '%s' "$1" | awk '
@@ -188,6 +192,54 @@ set_llm_use_gpu_enabled() {
       printf '%s\n' "0" > "$llm_use_gpu_file"
       ;;
   esac
+}
+
+normalize_dictation_shortcut() {
+  shortcut_kind=$1
+  shortcut_value=$(printf '%s' "${2:-}" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  case "$shortcut_value" in
+    none)
+      printf '%s' "none"
+      return 0
+      ;;
+  esac
+
+  case "$shortcut_kind" in
+    hold)
+      case "$shortcut_value" in
+        alt|meta|shift|control|ctrl-m|space|mouse-button-4|mouse-button-5|mouse-wheel-click|backslash|semicolon|quote|f6|f7|f8|f9|f10|f13|f14|f15|f16|f17|f18|f19)
+          printf '%s' "$shortcut_value"
+          return 0
+          ;;
+      esac
+      ;;
+    toggle)
+      case "$shortcut_value" in
+        capslock|backslash|semicolon|quote|f6|f7|f8|f9|f10|f13|f14|f15|f16|f17|f18|f19|mouse-button-4|mouse-button-5|mouse-wheel-click)
+          printf '%s' "$shortcut_value"
+          return 0
+          ;;
+      esac
+      ;;
+  esac
+
+  printf '%s' "none"
+}
+
+dictation_shortcuts_get_json() {
+  hold_value=$(normalize_dictation_shortcut "hold" "$(read_file_line "$dictation_shortcut_hold_file" "none")")
+  toggle_value=$(normalize_dictation_shortcut "toggle" "$(read_file_line "$dictation_shortcut_toggle_file" "none")")
+  printf '{"success":true,"hold":"%s","toggle":"%s"}\n' \
+    "$(json_escape "$hold_value")" \
+    "$(json_escape "$toggle_value")"
+}
+
+dictation_shortcuts_set_values() {
+  next_hold=$(normalize_dictation_shortcut "hold" "${1:-none}")
+  next_toggle=$(normalize_dictation_shortcut "toggle" "${2:-none}")
+  mkdir -p "$dictation_settings_dir"
+  printf '%s\n' "$next_hold" > "$dictation_shortcut_hold_file"
+  printf '%s\n' "$next_toggle" > "$dictation_shortcut_toggle_file"
 }
 
 param() {
@@ -10624,6 +10676,19 @@ case "$action" in
       use_gpu_json=false
     fi
     printf '{"success":true,"provider":"ollama","use_gpu":%s}\n' "$use_gpu_json"
+    exit 0
+    ;;
+
+  dictation_shortcuts_get)
+    dictation_shortcuts_get_json
+    exit 0
+    ;;
+
+  dictation_shortcuts_set)
+    hold_value=$(param "hold")
+    toggle_value=$(param "toggle")
+    dictation_shortcuts_set_values "$hold_value" "$toggle_value"
+    dictation_shortcuts_get_json
     exit 0
     ;;
 

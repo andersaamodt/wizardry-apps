@@ -1404,6 +1404,18 @@ label {
   margin: 0;
 }
 
+.modes-grid-head {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 0 4px;
+  margin-top: 6px;
+  color: color-mix(in srgb, var(--text-subtle) 88%, var(--text) 12%);
+  font-size: 0.69rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .mini-add-btn {
   min-height: 1.75rem;
   padding: 0 0.6rem;
@@ -1541,6 +1553,36 @@ label {
   min-width: 130px;
 }
 
+.rule-label-input {
+  flex: 0 1 164px !important;
+}
+
+.rule-match-input {
+  flex: 1 1 260px !important;
+}
+
+.rule-mode-select,
+.rule-decay-select,
+.transition-action-select,
+.transition-mode-select,
+.transition-decay-select {
+  flex: 0 1 152px !important;
+}
+
+.rule-duration-input,
+.transition-duration-input {
+  flex: 0 0 96px !important;
+}
+
+.rule-template-input {
+  flex: 1 1 240px !important;
+}
+
+.rule-announce-toggle,
+.transition-announce-toggle {
+  min-width: 86px;
+}
+
 .switch-rule-row .mini-toggle {
   flex: 0 0 auto;
 }
@@ -1554,6 +1596,53 @@ label {
 
 .transition-row select[data-transition-action] {
   flex: 1 1 220px;
+}
+
+.switch-grid-head span:nth-child(1) {
+  flex: 0 1 164px;
+}
+
+.switch-grid-head span:nth-child(2) {
+  flex: 1 1 260px;
+}
+
+.switch-grid-head span:nth-child(3),
+.switch-grid-head span:nth-child(5) {
+  flex: 0 1 152px;
+}
+
+.switch-grid-head span:nth-child(4) {
+  flex: 0 0 96px;
+}
+
+.switch-grid-head span:nth-child(6) {
+  flex: 1 1 240px;
+}
+
+.switch-grid-head span:nth-child(7) {
+  flex: 0 0 86px;
+}
+
+.switch-grid-head span:nth-child(8) {
+  flex: 0 0 68px;
+}
+
+.transition-grid-head span:nth-child(1),
+.transition-grid-head span:nth-child(2),
+.transition-grid-head span:nth-child(4) {
+  flex: 0 1 152px;
+}
+
+.transition-grid-head span:nth-child(3) {
+  flex: 0 0 96px;
+}
+
+.transition-grid-head span:nth-child(5) {
+  flex: 0 0 86px;
+}
+
+.transition-grid-head span:nth-child(6) {
+  flex: 0 0 68px;
 }
 
 .compact-template-input {
@@ -2857,6 +2946,10 @@ label {
   .modes-section-head {
     flex-wrap: wrap;
     align-items: flex-start;
+  }
+
+  .modes-grid-head {
+    display: none;
   }
 
   .switch-rule-row {

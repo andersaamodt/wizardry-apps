@@ -10153,9 +10153,18 @@
         syncCommandExecModeForWorkspace(state.activeWorkspaceId).catch(function () {
           return null;
         });
-        runWithRetry(function () {
-          return loadDictationStatus({ silent: true });
-        }, 2, 180)
+        Promise.all([
+          runWithRetry(function () {
+            return loadDictationStatus({ silent: true });
+          }, 2, 180).catch(function () {
+            return null;
+          }),
+          runWithRetry(function () {
+            return loadDictationShortcutPrefs();
+          }, 2, 180).catch(function () {
+            return null;
+          })
+        ])
           .catch(function () {
             return null;
           })
@@ -12998,6 +13007,42 @@
     return !!state.dictationInstalled;
   }
 
+  function loadDictationShortcutPrefs() {
+    return apiGet("dictation_shortcuts_get", {}, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not load dictation shortcuts");
+      }
+      var holdValue = normalizeDictationShortcut("hold", response.hold);
+      var toggleValue = normalizeDictationShortcut("toggle", response.toggle);
+      state.dictationShortcutHold = holdValue;
+      state.dictationShortcutToggle = toggleValue;
+      storageSet("artificer.dictationShortcutHold", holdValue);
+      storageSet("artificer.dictationShortcutToggle", toggleValue);
+      clearDictationShortcutPressState();
+      return { hold: holdValue, toggle: toggleValue };
+    });
+  }
+
+  function saveDictationShortcutPrefs() {
+    var holdValue = normalizeDictationShortcut("hold", state.dictationShortcutHold);
+    var toggleValue = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
+    return apiPost("dictation_shortcuts_set", {
+      hold: holdValue,
+      toggle: toggleValue
+    }, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not save dictation shortcuts");
+      }
+      var savedHold = normalizeDictationShortcut("hold", response.hold);
+      var savedToggle = normalizeDictationShortcut("toggle", response.toggle);
+      state.dictationShortcutHold = savedHold;
+      state.dictationShortcutToggle = savedToggle;
+      storageSet("artificer.dictationShortcutHold", savedHold);
+      storageSet("artificer.dictationShortcutToggle", savedToggle);
+      return true;
+    });
+  }
+
   function saveDictationShortcutChoice(kind, value) {
     var normalizedKind = kind === "toggle" ? "toggle" : "hold";
     var normalizedValue = normalizeDictationShortcut(normalizedKind, value);
@@ -13022,6 +13067,9 @@
     }
     clearDictationShortcutPressState();
     renderDictationInstallSettings();
+    saveDictationShortcutPrefs().catch(function () {
+      return null;
+    });
   }
 
   function renderDictationShortcutSettings() {
@@ -13982,6 +14030,9 @@
     renderDictationInstallSettings();
     var dictationBootstrap = Promise.all([
       loadAuthStatus().catch(function () {
+        return null;
+      }),
+      loadDictationShortcutPrefs().catch(function () {
         return null;
       }),
       loadDictationStatus({ silent: true }).catch(function () {
