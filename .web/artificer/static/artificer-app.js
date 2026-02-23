@@ -586,7 +586,6 @@
   var DICTATION_PREINSTALL_SIZE_BYTES = 480000000;
   var stateGetInFlight = null;
   var stateGetInFlightKey = "";
-  var dictateAbortController = null;
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -6261,8 +6260,8 @@
     el.dictateBtn.disabled = false;
     el.dictateBtn.classList.toggle("recording", busy);
     el.dictateBtn.setAttribute("aria-pressed", busy ? "true" : "false");
-    el.dictateBtn.setAttribute("aria-label", busy ? "Stop dictation" : "Dictate prompt");
-    el.dictateBtn.setAttribute("data-tooltip", busy ? "Stop dictation" : "Dictate prompt");
+    el.dictateBtn.setAttribute("aria-label", busy ? "Listening for dictation" : "Dictate prompt");
+    el.dictateBtn.setAttribute("data-tooltip", busy ? "Listening..." : "Dictate prompt");
     if (el.dictateBtn.hasAttribute("title")) {
       el.dictateBtn.removeAttribute("title");
     }
@@ -15130,26 +15129,17 @@
       event.preventDefault();
     }
     if (state.dictateBusy) {
-      if (dictateAbortController) {
-        try {
-          dictateAbortController.abort();
-          showTransientNotice("Stopping dictation...");
-        } catch (_err) {
-          // Ignore abort errors from stale controllers.
-        }
-      }
+      showTransientNotice("Finishing dictation...");
       return Promise.resolve();
     }
     if (!el.runPrompt) {
       return Promise.resolve();
     }
 
-    dictateAbortController = new AbortController();
-    var requestController = dictateAbortController;
     state.dictateBusy = true;
     renderUi();
 
-    return apiPost("dictate", { duration: "20" }, { timeoutMs: 220000, signal: requestController.signal })
+    return apiPost("dictate", { duration: "8" }, { timeoutMs: 220000 })
       .then(function (response) {
         if (!response.success) {
           throw new Error(response.error || "Dictation failed");
@@ -15165,17 +15155,7 @@
           el.runPrompt.focus();
         }
       })
-      .catch(function (error) {
-        var message = trim(String(error && error.message ? error.message : ""));
-        if (message === "Request cancelled.") {
-          return;
-        }
-        throw error;
-      })
       .finally(function () {
-        if (dictateAbortController === requestController) {
-          dictateAbortController = null;
-        }
         state.dictateBusy = false;
         renderUi();
       });
