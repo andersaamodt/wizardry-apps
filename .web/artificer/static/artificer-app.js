@@ -6433,12 +6433,10 @@
       var processing = phase === "processing";
       var starting = phase === "starting";
       el.dictationStopBtn.disabled = processing || starting;
-      el.dictationStopBtn.classList.toggle("ui-pending-spinner", processing);
+      el.dictationStopBtn.classList.toggle("processing", processing);
       if (processing) {
-        el.dictationStopBtn.textContent = "Stop";
         el.dictationStopBtn.setAttribute("aria-label", "Processing dictation");
       } else {
-        el.dictationStopBtn.textContent = "Stop";
         el.dictationStopBtn.setAttribute("aria-label", "Stop dictation");
       }
     }

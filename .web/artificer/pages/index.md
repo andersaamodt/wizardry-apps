@@ -219,7 +219,7 @@ pagetitle: "Artificer"
 <div id="dictation-mode" class="dictation-mode hidden" aria-live="polite">
 <div id="dictation-wave" class="dictation-wave" aria-hidden="true"></div>
 <span id="dictation-timer" class="dictation-timer">0:00</span>
-<button id="dictation-stop-btn" class="dictation-stop-btn" type="button" aria-label="Stop dictation">Stop</button>
+<button id="dictation-stop-btn" class="dictation-stop-btn" type="button" aria-label="Stop dictation"><span class="dictation-stop-icon" aria-hidden="true"></span></button>
 </div>
 </div>
 <div class="session-row">
