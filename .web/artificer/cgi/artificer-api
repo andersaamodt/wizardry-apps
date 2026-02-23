@@ -13245,10 +13245,21 @@ EOF
 
     dictate_output_file=$(mktemp)
     dictate_error_file=$(mktemp)
+    active_backend=$(installed_voice_backend_for_host || true)
 
     set +e
-    run_with_timeout "$timeout_sec" "$@" > "$dictate_output_file" 2> "$dictate_error_file"
-    dictate_rc=$?
+    if [ "$active_backend" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
+      if voice_can_run_arch_arm64; then
+        run_with_timeout "$timeout_sec" arch -arm64 "$@" > "$dictate_output_file" 2> "$dictate_error_file"
+        dictate_rc=$?
+      else
+        printf '%s\n' "voice-recognition: native arm64 execution is unavailable" > "$dictate_error_file"
+        dictate_rc=126
+      fi
+    else
+      run_with_timeout "$timeout_sec" "$@" > "$dictate_output_file" 2> "$dictate_error_file"
+      dictate_rc=$?
+    fi
     set -e
 
     dictate_stdout=$(cat "$dictate_output_file" 2>/dev/null || true)

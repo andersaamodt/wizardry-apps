@@ -586,6 +586,7 @@
   var DICTATION_PREINSTALL_SIZE_BYTES = 480000000;
   var stateGetInFlight = null;
   var stateGetInFlightKey = "";
+  var dictateAbortController = null;
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -1579,6 +1580,9 @@
 
   function requestJson(url, options) {
     var controller = new AbortController();
+    var externalSignal = options && options.signal ? options.signal : null;
+    var abortedByCaller = false;
+    var onExternalAbort = null;
     var timeoutMs = Number(options && options.timeoutMs ? options.timeoutMs : 30000);
     if (!isFinite(timeoutMs) || timeoutMs <= 0) {
       timeoutMs = 30000;
@@ -1591,6 +1595,10 @@
           return;
         }
         settled = true;
+        if (externalSignal && onExternalAbort) {
+          externalSignal.removeEventListener("abort", onExternalAbort);
+          onExternalAbort = null;
+        }
         try {
           controller.abort();
         } catch (_abortErr) {
@@ -1598,6 +1606,30 @@
         }
         reject(new Error(timeoutErrorText));
       }, timeoutMs);
+
+      if (externalSignal) {
+        if (externalSignal.aborted) {
+          settled = true;
+          clearTimeout(timeoutId);
+          reject(new Error("Request cancelled."));
+          return;
+        }
+        onExternalAbort = function () {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          abortedByCaller = true;
+          clearTimeout(timeoutId);
+          try {
+            controller.abort();
+          } catch (_abortErr2) {
+            // Ignore abort failures; caller cancellation already finalized.
+          }
+          reject(new Error("Request cancelled."));
+        };
+        externalSignal.addEventListener("abort", onExternalAbort, { once: true });
+      }
 
       fetch(url, {
         method: options.method,
@@ -1624,6 +1656,10 @@
           }
           settled = true;
           clearTimeout(timeoutId);
+          if (externalSignal && onExternalAbort) {
+            externalSignal.removeEventListener("abort", onExternalAbort);
+            onExternalAbort = null;
+          }
           resolve(json);
         })
         .catch(function (err) {
@@ -1632,7 +1668,15 @@
           }
           settled = true;
           clearTimeout(timeoutId);
+          if (externalSignal && onExternalAbort) {
+            externalSignal.removeEventListener("abort", onExternalAbort);
+            onExternalAbort = null;
+          }
           if (err && err.name === "AbortError") {
+            if (abortedByCaller) {
+              reject(new Error("Request cancelled."));
+              return;
+            }
             reject(new Error(timeoutErrorText));
             return;
           }
@@ -1700,7 +1744,8 @@
         Accept: "application/json"
       },
       body: body.toString(),
-      timeoutMs: timeoutMs
+      timeoutMs: timeoutMs,
+      signal: options && options.signal ? options.signal : null
     });
   }
 
@@ -6213,11 +6258,11 @@
       return;
     }
     var busy = !!state.dictateBusy;
-    el.dictateBtn.disabled = busy;
+    el.dictateBtn.disabled = false;
     el.dictateBtn.classList.toggle("recording", busy);
     el.dictateBtn.setAttribute("aria-pressed", busy ? "true" : "false");
-    el.dictateBtn.setAttribute("aria-label", busy ? "Listening for dictation" : "Dictate prompt");
-    el.dictateBtn.setAttribute("data-tooltip", busy ? "Listening..." : "Dictate prompt");
+    el.dictateBtn.setAttribute("aria-label", busy ? "Stop dictation" : "Dictate prompt");
+    el.dictateBtn.setAttribute("data-tooltip", busy ? "Stop dictation" : "Dictate prompt");
     if (el.dictateBtn.hasAttribute("title")) {
       el.dictateBtn.removeAttribute("title");
     }
@@ -15085,16 +15130,26 @@
       event.preventDefault();
     }
     if (state.dictateBusy) {
+      if (dictateAbortController) {
+        try {
+          dictateAbortController.abort();
+          showTransientNotice("Stopping dictation...");
+        } catch (_err) {
+          // Ignore abort errors from stale controllers.
+        }
+      }
       return Promise.resolve();
     }
     if (!el.runPrompt) {
       return Promise.resolve();
     }
 
+    dictateAbortController = new AbortController();
+    var requestController = dictateAbortController;
     state.dictateBusy = true;
     renderUi();
 
-    return apiPost("dictate", { duration: "20" }, { timeoutMs: 220000 })
+    return apiPost("dictate", { duration: "20" }, { timeoutMs: 220000, signal: requestController.signal })
       .then(function (response) {
         if (!response.success) {
           throw new Error(response.error || "Dictation failed");
@@ -15110,7 +15165,17 @@
           el.runPrompt.focus();
         }
       })
+      .catch(function (error) {
+        var message = trim(String(error && error.message ? error.message : ""));
+        if (message === "Request cancelled.") {
+          return;
+        }
+        throw error;
+      })
       .finally(function () {
+        if (dictateAbortController === requestController) {
+          dictateAbortController = null;
+        }
         state.dictateBusy = false;
         renderUi();
       });
