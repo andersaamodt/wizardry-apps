@@ -251,6 +251,42 @@ mode_default_config_json() {
           }
         },
         {
+          id: "SUMMON",
+          label: "On Mention",
+          enabled: true,
+          defaultExpiryHours: 0,
+          allow: {
+            Reply:true,Initiate:false,Warn:false,Mention:false,Quote:false,Followup:false,
+            "Cross-thread Reply":false,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
+            "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
+            "Lock Thread":false,"Post Neutral Ban Notice":false
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 2,
+            noFollowup: true,
+            noMention: true,
+            noQuote: true
+          }
+        },
+        {
+          id: "SPOTLIGHT",
+          label: "Spotlight Presence",
+          enabled: true,
+          defaultExpiryHours: 0,
+          allow: {
+            Reply:true,Initiate:true,Warn:false,Mention:true,Quote:false,Followup:true,
+            "Cross-thread Reply":true,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
+            "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
+            "Lock Thread":false,"Post Neutral Ban Notice":false
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 4,
+            noFollowup: false,
+            noMention: false,
+            noQuote: true
+          }
+        },
+        {
           id: "PROBATION",
           label: "Watchful Referee",
           enabled: true,
@@ -307,6 +343,24 @@ mode_default_config_json() {
         {
           id: "STRICT",
           label: "Active Moderator",
+          enabled: true,
+          defaultExpiryHours: 336,
+          allow: {
+            Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
+            "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":true,"Long Ban":true,
+            "Extended Ban":true,"Year Ban":true,"Permanent Ban":true,"Remove Content":true,
+            "Lock Thread":true,"Post Neutral Ban Notice":true
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 1,
+            noFollowup: true,
+            noMention: true,
+            noQuote: true
+          }
+        },
+        {
+          id: "ENFORCE",
+          label: "Bans First",
           enabled: true,
           defaultExpiryHours: 336,
           allow: {
@@ -1798,6 +1852,16 @@ $response
 EOFJSON
 }
 
+post_lock_thread() {
+  thing_id=$1
+  response=$(reddit_post "/api/lock" \
+    --data-urlencode "id=$thing_id") || return 1
+
+  jq -e '.json.errors? // [] | length == 0' >/dev/null 2>&1 <<EOFJSON
+$response
+EOFJSON
+}
+
 check_already_replied() {
   thing_id=$1
   if [ ! -s "$REPLIES_LOG" ]; then
@@ -1955,6 +2019,23 @@ process_comment() {
     proposed_actions=$(json_array_add_unique "$proposed_actions" "Remove Content")
   fi
 
+  norm_severity=$(jq -rs --arg norm "$norm" '
+    if ($norm | length) == 0 then "low"
+    else
+      (map(select(((.id // "") == $norm) or ((.text // "") == $norm)))[0].severity // "low")
+    end
+  ' "$NORMS_FILE" 2>/dev/null || printf 'low')
+  escalation_on_high=$(read_modes_config_json | jq -r '.escalation.onHighSeverity // false' 2>/dev/null || printf 'false')
+  escalation_targets=$(read_modes_config_json | jq -r '.escalation.targets // "modmail"' 2>/dev/null || printf 'modmail')
+  escalation_timing=$(read_modes_config_json | jq -r '.escalation.timing // "enforce_then_escalate"' 2>/dev/null || printf 'enforce_then_escalate')
+  escalation_active=false
+  if [ "$norm_severity" = "high" ] && [ "$escalation_on_high" = "true" ]; then
+    escalation_active=true
+  fi
+  if [ "$escalation_active" = true ] && [ "$escalation_timing" = "escalate_immediately" ]; then
+    append_mode_log_event "escalation" "$(jq -cn --arg user "$author_key" --arg norm "$norm" --arg action "pending" --arg content "$(printf '%s' "$comment_json" | jq -r '.body // ""')" --arg link "$(printf '%s' "$comment_json" | jq -r '.permalink // empty')" --arg severity "$norm_severity" --arg timing "$escalation_timing" --arg targets "$escalation_targets" '{user_id:$user,norm:$norm,action:$action,content:$content,thread_link:$link,severity:$severity,timing:$timing,targets:$targets}')"
+  fi
+
   allowed_actions='[]'
   blocked_actions='[]'
   for action_name in $(printf '%s' "$proposed_actions" | jq -r '.[]' 2>/dev/null); do
@@ -1967,6 +2048,18 @@ process_comment() {
   done
   if [ "$(printf '%s' "$blocked_actions" | jq 'length' 2>/dev/null || printf '0')" -gt 0 ]; then
     append_mode_log_event "blocked-actions" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --argjson blocked "$blocked_actions" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,blocked:$blocked,comment_id:$comment_id}')"
+  fi
+
+  lock_target=''
+  if json_array_has "$allowed_actions" "Lock Thread"; then
+    case "$link_id" in
+      t3_*)
+        lock_target=$link_id
+        ;;
+      *)
+        append_mode_log_event "blocked-actions" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg action "Lock Thread" --arg reason "invalid-lock-target" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,action:$action,reason:$reason,comment_id:$comment_id}')"
+        ;;
+    esac
   fi
 
   warning_template=$(read_modes_config_json | jq -r '.replies.warningTemplate // empty' 2>/dev/null || printf '')
@@ -2237,22 +2330,101 @@ process_comment() {
     fi
   fi
 
-  norm_severity=$(jq -rs --arg norm "$norm" '
-    if ($norm | length) == 0 then "low"
+  if [ -n "$lock_target" ]; then
+    lock_action_id=$(new_event_id "action")
+    lock_ts=$(now_iso)
+    lock_ts_epoch=$(now_epoch)
+    if post_lock_thread "$lock_target"; then
+      lock_action=$(jq -cn \
+        --arg event "enforce" \
+        --arg action_id "$lock_action_id" \
+        --arg ts "$lock_ts" \
+        --argjson ts_epoch "$lock_ts_epoch" \
+        --arg status "active" \
+        --arg type "lock" \
+        --arg subreddit "$SUBREDDIT" \
+        --arg mode "$current_mode" \
+        --arg pathway "$pathway" \
+        --arg norm "$norm" \
+        --arg feeling "$feeling" \
+        --arg reasoning "$reasoning" \
+        --arg comment "$comment_json" \
+        --arg permalink "$permalink" \
+        --arg lock_target "$lock_target" \
+        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,lock_target:$lock_target,undoable:false}')
+      record_action_event "$lock_action"
+      executed_actions=$(json_array_add_unique "$executed_actions" "Lock Thread")
     else
-      (map(select(((.id // "") == $norm) or ((.text // "") == $norm)))[0].severity // "low")
-    end
-  ' "$NORMS_FILE" 2>/dev/null || printf 'low')
-  escalation_enabled=$(read_modes_config_json | jq -r '.escalation.onHighSeverity // false' 2>/dev/null || printf 'false')
-  if [ "$norm_severity" = "high" ] && [ "$escalation_enabled" = "true" ]; then
-    append_mode_log_event "escalation" "$(jq -cn --arg user "$author_key" --arg norm "$norm" --arg action "$(printf '%s' "$executed_actions" | jq -r '.[0] // ""')" --arg content "$(printf '%s' "$comment_json" | jq -r '.body // ""')" --arg link "$permalink" --arg severity "$norm_severity" '{user_id:$user,norm:$norm,action:$action,content:$content,thread_link:$link,severity:$severity}')"
+      lock_action=$(jq -cn \
+        --arg event "enforce" \
+        --arg action_id "$lock_action_id" \
+        --arg ts "$lock_ts" \
+        --argjson ts_epoch "$lock_ts_epoch" \
+        --arg status "failed" \
+        --arg error "lock API request failed" \
+        --arg type "lock" \
+        --arg subreddit "$SUBREDDIT" \
+        --arg mode "$current_mode" \
+        --arg pathway "$pathway" \
+        --arg norm "$norm" \
+        --arg feeling "$feeling" \
+        --arg reasoning "$reasoning" \
+        --arg comment "$comment_json" \
+        --arg permalink "$permalink" \
+        --arg lock_target "$lock_target" \
+        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,lock_target:$lock_target,undoable:false}')
+      record_action_event "$lock_action"
+    fi
   fi
+
+  if [ "$escalation_active" = true ] && [ "$escalation_timing" != "escalate_immediately" ]; then
+    append_mode_log_event "escalation" "$(jq -cn --arg user "$author_key" --arg norm "$norm" --arg action "$(printf '%s' "$executed_actions" | jq -r '.[0] // ""')" --arg content "$(printf '%s' "$comment_json" | jq -r '.body // ""')" --arg link "$permalink" --arg severity "$norm_severity" --arg timing "$escalation_timing" --arg targets "$escalation_targets" '{user_id:$user,norm:$norm,action:$action,content:$content,thread_link:$link,severity:$severity,timing:$timing,targets:$targets}')"
+  fi
+
+  append_mode_log_event "event-cycle" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg comment_id "$thing_id" --argjson proposed "$proposed_actions" --argjson allowed "$allowed_actions" --argjson blocked "$blocked_actions" --argjson executed "$executed_actions" --arg severity "$norm_severity" '{user_id:$user,mode:$mode,comment_id:$comment_id,proposed:$proposed,allowed:$allowed,blocked:$blocked,executed:$executed,norm_severity:$severity}')"
 
   valence=$(relationship_valence_for_decision "$decision")
   primary_action=$(printf '%s' "$executed_actions" | jq -r '.[0] // "none"' 2>/dev/null || printf 'none')
   relationship_row=$(relationship_record_interaction_row "$relationship_row" "$valence" "$thing_id" "$primary_action")
 
   transition_row=$(resolve_post_action_transition "$executed_actions")
+  if [ "$escalation_active" = true ]; then
+    esc_switch_enabled=$(read_modes_config_json | jq -r '.escalation.afterActionSwitch.enabled // false' 2>/dev/null || printf 'false')
+    if [ "$esc_switch_enabled" = "true" ]; then
+      esc_to_mode=$(read_modes_config_json | jq -r '.escalation.afterActionSwitch.toMode // empty' 2>/dev/null || printf '')
+      esc_duration=$(read_modes_config_json | jq -r '.escalation.afterActionSwitch.durationHours // 0' 2>/dev/null || printf '0')
+      esc_decay=$(read_modes_config_json | jq -r '.escalation.afterActionSwitch.decayTo // empty' 2>/dev/null || printf '')
+      if [ -n "$esc_to_mode" ]; then
+        use_esc_switch=false
+        esc_score=92
+        if [ -z "$transition_row" ] || [ "$transition_row" = "null" ]; then
+          use_esc_switch=true
+        else
+          tr_score=$(printf '%s' "$transition_row" | jq -r '.score // 0' 2>/dev/null || printf '0')
+          tr_score=$(to_int "$tr_score" 0)
+          if [ "$esc_score" -gt "$tr_score" ]; then
+            use_esc_switch=true
+          elif [ "$esc_score" -eq "$tr_score" ]; then
+            tr_mode=$(printf '%s' "$transition_row" | jq -r '.transition.toMode // empty' 2>/dev/null || printf '')
+            esc_rank=$(mode_restrictiveness_rank "$esc_to_mode")
+            tr_rank=$(mode_restrictiveness_rank "$tr_mode")
+            if [ "$esc_rank" -lt "$tr_rank" ]; then
+              use_esc_switch=true
+            fi
+          fi
+        fi
+        if [ "$use_esc_switch" = true ]; then
+          transition_row=$(jq -cn \
+            --arg action "Escalation" \
+            --arg to_mode "$esc_to_mode" \
+            --argjson duration "$(to_int "$esc_duration" 0)" \
+            --arg decay "$esc_decay" \
+            --argjson score "$esc_score" \
+            '{action:$action,transition:{toMode:$to_mode,durationHours:$duration,decayTo:$decay,announce:false},score:$score}')
+        fi
+      fi
+    fi
+  fi
   if [ -n "$transition_row" ] && [ "$transition_row" != "null" ]; then
     transition_action=$(printf '%s' "$transition_row" | jq -r '.action // empty' 2>/dev/null || printf '')
     to_mode=$(printf '%s' "$transition_row" | jq -r '.transition.toMode // empty' 2>/dev/null || printf '')

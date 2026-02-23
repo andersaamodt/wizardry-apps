@@ -467,6 +467,11 @@
     dictateBusy: false,
     dictateRecording: false,
     dictateSessionId: "",
+    dictationShortcutHold: storageGet("artificer.dictationShortcutHold", "none"),
+    dictationShortcutToggle: storageGet("artificer.dictationShortcutToggle", "none"),
+    dictateHotkeyHoldActive: false,
+    dictateHotkeyHoldTrigger: "",
+    dictateHotkeyHoldIntent: false,
     dictationInstallReady: false,
     dictationInstallInfo: null,
     dictationInstallInfoLoading: false,
@@ -586,8 +591,58 @@
   var approvalAnswerPending = false;
   var TOOLTIP_DELAY_MS = 520;
   var DICTATION_PREINSTALL_SIZE_BYTES = 480000000;
+  var DICTATION_SHORTCUT_TAP_MS = 220;
+  var DICTATION_SHORTCUT_HOLD_OPTIONS = [
+    { value: "none", label: "None" },
+    { value: "alt", label: "Option (Alt)" },
+    { value: "meta", label: "Command (Meta)" },
+    { value: "shift", label: "Shift" },
+    { value: "control", label: "Control" },
+    { value: "space", label: "Space" },
+    { value: "mouse-button-4", label: "Mouse Button 4" },
+    { value: "mouse-button-5", label: "Mouse Button 5" },
+    { value: "mouse-wheel-click", label: "Mouse Wheel Click" },
+    { value: "backslash", label: "Backslash (\\)" },
+    { value: "semicolon", label: "Semicolon (;)" },
+    { value: "quote", label: "Quote (')" },
+    { value: "f6", label: "F6" },
+    { value: "f7", label: "F7" },
+    { value: "f8", label: "F8" },
+    { value: "f9", label: "F9" },
+    { value: "f10", label: "F10" },
+    { value: "f13", label: "F13" },
+    { value: "f14", label: "F14" },
+    { value: "f15", label: "F15" },
+    { value: "f16", label: "F16" },
+    { value: "f17", label: "F17" },
+    { value: "f18", label: "F18" },
+    { value: "f19", label: "F19" }
+  ];
+  var DICTATION_SHORTCUT_TOGGLE_OPTIONS = [
+    { value: "none", label: "None" },
+    { value: "capslock", label: "Caps Lock" },
+    { value: "backslash", label: "Backslash (\\)" },
+    { value: "semicolon", label: "Semicolon (;)" },
+    { value: "quote", label: "Quote (')" },
+    { value: "f6", label: "F6" },
+    { value: "f7", label: "F7" },
+    { value: "f8", label: "F8" },
+    { value: "f9", label: "F9" },
+    { value: "f10", label: "F10" },
+    { value: "f13", label: "F13" },
+    { value: "f14", label: "F14" },
+    { value: "f15", label: "F15" },
+    { value: "f16", label: "F16" },
+    { value: "f17", label: "F17" },
+    { value: "f18", label: "F18" },
+    { value: "f19", label: "F19" },
+    { value: "mouse-button-4", label: "Mouse Button 4" },
+    { value: "mouse-button-5", label: "Mouse Button 5" },
+    { value: "mouse-wheel-click", label: "Mouse Wheel Click" }
+  ];
   var stateGetInFlight = null;
   var stateGetInFlightKey = "";
+  var dictationShortcutPressState = {};
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -636,6 +691,8 @@
   if (state.commandExecMode === "ask") {
     state.commandExecMode = "ask-some";
   }
+  state.dictationShortcutHold = normalizeDictationShortcut("hold", state.dictationShortcutHold);
+  state.dictationShortcutToggle = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
   state.runMode = normalizeRunMode(state.runMode);
   state.assistantModeId = normalizeAssistantModeId(state.assistantModeId);
   if (state.runMode === "instant") {
@@ -822,6 +879,9 @@
     refreshAuthBtn: document.getElementById("refresh-auth-btn"),
     installDictationBtn: document.getElementById("install-dictation-btn"),
     dictationInstallStatus: document.getElementById("dictation-install-status"),
+    dictationShortcutRow: document.getElementById("dictation-shortcut-row"),
+    dictationHoldShortcut: document.getElementById("dictation-hold-shortcut"),
+    dictationToggleShortcut: document.getElementById("dictation-toggle-shortcut"),
     generateSshBtn: document.getElementById("generate-ssh-btn"),
     chooseSshBtn: document.getElementById("choose-ssh-btn"),
     clearSshBtn: document.getElementById("clear-ssh-btn"),
@@ -12455,6 +12515,110 @@
     return (bytes / 1000000000).toFixed(places);
   }
 
+  function dictationShortcutChoices(kind) {
+    return kind === "toggle" ? DICTATION_SHORTCUT_TOGGLE_OPTIONS : DICTATION_SHORTCUT_HOLD_OPTIONS;
+  }
+
+  function normalizeDictationShortcut(kind, value) {
+    var raw = trim(String(value || "")).toLowerCase();
+    var options = dictationShortcutChoices(kind);
+    for (var i = 0; i < options.length; i += 1) {
+      if (raw === String(options[i].value || "")) {
+        return raw;
+      }
+    }
+    return "none";
+  }
+
+  function dictationShortcutLabel(kind, value) {
+    var normalized = normalizeDictationShortcut(kind, value);
+    var options = dictationShortcutChoices(kind);
+    for (var i = 0; i < options.length; i += 1) {
+      if (normalized === String(options[i].value || "")) {
+        return String(options[i].label || normalized);
+      }
+    }
+    return "None";
+  }
+
+  function dictationShortcutOptionsHtml(kind, selected) {
+    var normalized = normalizeDictationShortcut(kind, selected);
+    var options = dictationShortcutChoices(kind);
+    var html = "";
+    for (var i = 0; i < options.length; i += 1) {
+      var option = options[i] || {};
+      var value = String(option.value || "none");
+      var label = String(option.label || value);
+      html += "<option value='" + escAttr(value) + "'" + (value === normalized ? " selected" : "") + ">" + escHtml(label) + "</option>";
+    }
+    return html;
+  }
+
+  function clearDictationShortcutPressState() {
+    var keys = Object.keys(dictationShortcutPressState);
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = keys[i];
+      var entry = dictationShortcutPressState[key];
+      if (entry && entry.timer) {
+        clearTimeout(entry.timer);
+      }
+      delete dictationShortcutPressState[key];
+    }
+  }
+
+  function dictationShortcutKeyboardTrigger(event) {
+    var code = String(event && event.code ? event.code : "");
+    var key = String(event && event.key ? event.key : "").toLowerCase();
+    if (code === "AltLeft" || code === "AltRight" || key === "alt") {
+      return "alt";
+    }
+    if (code === "MetaLeft" || code === "MetaRight" || key === "meta" || key === "command" || key === "os") {
+      return "meta";
+    }
+    if (code === "ShiftLeft" || code === "ShiftRight" || key === "shift") {
+      return "shift";
+    }
+    if (code === "ControlLeft" || code === "ControlRight" || key === "control" || key === "ctrl") {
+      return "control";
+    }
+    if (code === "Space" || key === " ") {
+      return "space";
+    }
+    if (code === "Backslash") {
+      return "backslash";
+    }
+    if (code === "Semicolon") {
+      return "semicolon";
+    }
+    if (code === "Quote") {
+      return "quote";
+    }
+    if (code === "CapsLock" || key === "capslock") {
+      return "capslock";
+    }
+    if (
+      code === "F6" || code === "F7" || code === "F8" || code === "F9" || code === "F10" ||
+      code === "F13" || code === "F14" || code === "F15" || code === "F16" || code === "F17" || code === "F18" || code === "F19"
+    ) {
+      return code.toLowerCase();
+    }
+    return "";
+  }
+
+  function dictationShortcutMouseTrigger(event) {
+    var button = Number(event && event.button);
+    if (button === 3) {
+      return "mouse-button-4";
+    }
+    if (button === 4) {
+      return "mouse-button-5";
+    }
+    if (button === 1) {
+      return "mouse-wheel-click";
+    }
+    return "";
+  }
+
   function loadDictationStatus(options) {
     var opts = options && typeof options === "object" ? options : {};
     var silent = !!opts.silent;
@@ -12505,8 +12669,70 @@
     });
   }
 
+  function dictationHotkeysEnabled() {
+    return !!state.dictationInstalled;
+  }
+
+  function saveDictationShortcutChoice(kind, value) {
+    var normalizedKind = kind === "toggle" ? "toggle" : "hold";
+    var normalizedValue = normalizeDictationShortcut(normalizedKind, value);
+    if (normalizedKind === "toggle") {
+      state.dictationShortcutToggle = normalizedValue;
+      storageSet("artificer.dictationShortcutToggle", normalizedValue);
+    } else {
+      state.dictationShortcutHold = normalizedValue;
+      storageSet("artificer.dictationShortcutHold", normalizedValue);
+    }
+    if (
+      state.dictateHotkeyHoldActive &&
+      state.dictateHotkeyHoldTrigger &&
+      state.dictateHotkeyHoldTrigger !== state.dictationShortcutHold
+    ) {
+      state.dictateHotkeyHoldIntent = false;
+      stopDictationCapture({ fromHotkey: true, silentNoSpeech: true }).catch(function () {
+        return null;
+      });
+      state.dictateHotkeyHoldActive = false;
+      state.dictateHotkeyHoldTrigger = "";
+    }
+    clearDictationShortcutPressState();
+    renderDictationInstallSettings();
+  }
+
+  function renderDictationShortcutSettings() {
+    if (!el.dictationShortcutRow || !el.dictationHoldShortcut || !el.dictationToggleShortcut) {
+      return;
+    }
+    var showRow = !!state.dictationInstalled;
+    el.dictationShortcutRow.classList.toggle("hidden", !showRow);
+    if (!showRow) {
+      return;
+    }
+    var holdNormalized = normalizeDictationShortcut("hold", state.dictationShortcutHold);
+    var toggleNormalized = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
+    state.dictationShortcutHold = holdNormalized;
+    state.dictationShortcutToggle = toggleNormalized;
+    var holdHtml = dictationShortcutOptionsHtml("hold", holdNormalized);
+    if (el.dictationHoldShortcut.innerHTML !== holdHtml) {
+      el.dictationHoldShortcut.innerHTML = holdHtml;
+    } else if (String(el.dictationHoldShortcut.value || "") !== holdNormalized) {
+      el.dictationHoldShortcut.value = holdNormalized;
+    }
+    var toggleHtml = dictationShortcutOptionsHtml("toggle", toggleNormalized);
+    if (el.dictationToggleShortcut.innerHTML !== toggleHtml) {
+      el.dictationToggleShortcut.innerHTML = toggleHtml;
+    } else if (String(el.dictationToggleShortcut.value || "") !== toggleNormalized) {
+      el.dictationToggleShortcut.value = toggleNormalized;
+    }
+    var holdLabel = dictationShortcutLabel("hold", holdNormalized);
+    var toggleLabel = dictationShortcutLabel("toggle", toggleNormalized);
+    el.dictationHoldShortcut.setAttribute("aria-label", "Hold-to-Talk (Press): " + holdLabel);
+    el.dictationToggleShortcut.setAttribute("aria-label", "Toggle: " + toggleLabel);
+  }
+
   function renderDictationInstallSettings() {
     if (!el.installDictationBtn) {
+      renderDictationShortcutSettings();
       return;
     }
 
@@ -12595,6 +12821,7 @@
         el.dictationInstallStatus.classList.remove("error");
       }
     }
+    renderDictationShortcutSettings();
   }
 
   function stopDictationInstallPolling() {
@@ -15155,6 +15382,252 @@
     }
   }
 
+  function startDictationCapture(options) {
+    var opts = options && typeof options === "object" ? options : {};
+    if (!state.dictationInstalled) {
+      return Promise.resolve(false);
+    }
+    if (state.dictateBusy || state.dictateRecording || !el.runPrompt) {
+      return Promise.resolve(false);
+    }
+    var stopAfterStart = false;
+    state.dictateBusy = true;
+    renderUi();
+    return apiPost("dictate_start", {}, { timeoutMs: 30000 })
+      .then(function (response) {
+        if (!response.success) {
+          throw new Error(response.error || "Dictation failed");
+        }
+        state.dictateRecording = true;
+        state.dictateSessionId = trim(String((response.session && response.session.id) || ""));
+        if (opts.fromHotkey && !state.dictateHotkeyHoldIntent) {
+          stopAfterStart = true;
+        }
+        return true;
+      })
+      .finally(function () {
+        state.dictateBusy = false;
+        renderUi();
+      })
+      .then(function (started) {
+        if (!started) {
+          return false;
+        }
+        if (!stopAfterStart) {
+          return true;
+        }
+        return stopDictationCapture({ fromHotkey: true, silentNoSpeech: true })
+          .then(function () {
+            return false;
+          })
+          .catch(function () {
+            return false;
+          });
+      });
+  }
+
+  function stopDictationCapture(options) {
+    var opts = options && typeof options === "object" ? options : {};
+    if (state.dictateBusy || !state.dictateRecording || !el.runPrompt) {
+      return Promise.resolve(false);
+    }
+    var activeSessionId = trim(String(state.dictateSessionId || ""));
+    state.dictateBusy = true;
+    state.dictateRecording = false;
+    renderUi();
+    return apiPost("dictate_stop", { session_id: activeSessionId }, { timeoutMs: 220000 })
+      .then(function (response) {
+        if (!response.success) {
+          throw new Error(response.error || "Dictation failed");
+        }
+        var dictatedText = trim(String(response.text || ""));
+        if (!dictatedText) {
+          if (!opts.silentNoSpeech) {
+            showTransientNotice("No speech detected");
+          }
+          return true;
+        }
+        insertTextAtCursor(el.runPrompt, dictatedText);
+        dispatchInputEvent(el.runPrompt);
+        if (typeof el.runPrompt.focus === "function") {
+          el.runPrompt.focus();
+        }
+        return true;
+      })
+      .finally(function () {
+        state.dictateBusy = false;
+        state.dictateSessionId = "";
+        renderUi();
+      });
+  }
+
+  function toggleDictationCapture(options) {
+    if (state.dictateRecording) {
+      return stopDictationCapture(options);
+    }
+    return startDictationCapture(options);
+  }
+
+  function beginDictationHotkeyHold(trigger) {
+    if (!dictationHotkeysEnabled()) {
+      return;
+    }
+    if (state.dictateHotkeyHoldIntent && state.dictateHotkeyHoldTrigger === trigger) {
+      return;
+    }
+    state.dictateHotkeyHoldIntent = true;
+    state.dictateHotkeyHoldTrigger = String(trigger || "");
+    if (state.dictateRecording) {
+      return;
+    }
+    startDictationCapture({ fromHotkey: true }).then(function (started) {
+      if (started) {
+        state.dictateHotkeyHoldActive = true;
+      }
+      if (!state.dictateHotkeyHoldIntent && state.dictateHotkeyHoldActive) {
+        stopDictationCapture({ fromHotkey: true, silentNoSpeech: true }).catch(function () {
+          return null;
+        }).finally(function () {
+          state.dictateHotkeyHoldActive = false;
+          state.dictateHotkeyHoldTrigger = "";
+        });
+      }
+    }).catch(showError);
+  }
+
+  function endDictationHotkeyHold(trigger) {
+    var triggerName = String(trigger || "");
+    if (state.dictateHotkeyHoldTrigger && triggerName && state.dictateHotkeyHoldTrigger !== triggerName) {
+      return;
+    }
+    state.dictateHotkeyHoldIntent = false;
+    if (!state.dictateHotkeyHoldActive) {
+      return;
+    }
+    state.dictateHotkeyHoldActive = false;
+    state.dictateHotkeyHoldTrigger = "";
+    stopDictationCapture({ fromHotkey: true, silentNoSpeech: true }).catch(showError);
+  }
+
+  function shouldHandleDictationShortcutTrigger(trigger) {
+    if (!dictationHotkeysEnabled()) {
+      return false;
+    }
+    if (!trigger || trigger === "none") {
+      return false;
+    }
+    var holdTrigger = normalizeDictationShortcut("hold", state.dictationShortcutHold);
+    var toggleTrigger = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
+    return trigger === holdTrigger || trigger === toggleTrigger;
+  }
+
+  function onDictationShortcutDown(trigger, event) {
+    if (!shouldHandleDictationShortcutTrigger(trigger)) {
+      return;
+    }
+    var holdTrigger = normalizeDictationShortcut("hold", state.dictationShortcutHold);
+    var toggleTrigger = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
+    var bothSame = holdTrigger !== "none" && holdTrigger === toggleTrigger;
+    if (bothSame && trigger === holdTrigger) {
+      if (dictationShortcutPressState[trigger]) {
+        return;
+      }
+      var pressState = {
+        downAt: Date.now(),
+        holdStarted: false,
+        timer: null
+      };
+      pressState.timer = setTimeout(function () {
+        pressState.holdStarted = true;
+        beginDictationHotkeyHold(trigger);
+      }, DICTATION_SHORTCUT_TAP_MS);
+      dictationShortcutPressState[trigger] = pressState;
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (trigger === holdTrigger) {
+      beginDictationHotkeyHold(trigger);
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (trigger === toggleTrigger) {
+      if (dictationShortcutPressState[trigger]) {
+        return;
+      }
+      dictationShortcutPressState[trigger] = {
+        downAt: Date.now(),
+        holdStarted: false,
+        timer: null
+      };
+      toggleDictationCapture({ fromHotkey: true }).catch(showError);
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
+    }
+  }
+
+  function onDictationShortcutUp(trigger, event) {
+    if (!trigger) {
+      return;
+    }
+    var holdTrigger = normalizeDictationShortcut("hold", state.dictationShortcutHold);
+    var toggleTrigger = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
+    var bothSame = holdTrigger !== "none" && holdTrigger === toggleTrigger;
+    var pressState = dictationShortcutPressState[trigger] || null;
+    if (bothSame && trigger === holdTrigger) {
+      if (pressState && pressState.timer) {
+        clearTimeout(pressState.timer);
+      }
+      var elapsed = pressState ? Date.now() - Number(pressState.downAt || 0) : 0;
+      var holdStarted = !!(pressState && pressState.holdStarted);
+      delete dictationShortcutPressState[trigger];
+      if (holdStarted) {
+        endDictationHotkeyHold(trigger);
+      } else if (elapsed <= DICTATION_SHORTCUT_TAP_MS) {
+        toggleDictationCapture({ fromHotkey: true }).catch(showError);
+      }
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (trigger === holdTrigger) {
+      endDictationHotkeyHold(trigger);
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (trigger === toggleTrigger && pressState) {
+      delete dictationShortcutPressState[trigger];
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
+    }
+  }
+
   function onDictateClick(event) {
     if (event && typeof event.preventDefault === "function") {
       event.preventDefault();
@@ -15163,53 +15636,11 @@
       showTransientNotice("Finishing dictation...");
       return Promise.resolve();
     }
-    if (!el.runPrompt) {
+    if (!state.dictationInstalled) {
+      showTransientNotice("Install dictation in Settings first.");
       return Promise.resolve();
     }
-
-    if (state.dictateRecording) {
-      var activeSessionId = trim(String(state.dictateSessionId || ""));
-      state.dictateBusy = true;
-      state.dictateRecording = false;
-      renderUi();
-      return apiPost("dictate_stop", { session_id: activeSessionId }, { timeoutMs: 220000 })
-        .then(function (response) {
-          if (!response.success) {
-            throw new Error(response.error || "Dictation failed");
-          }
-          var dictatedText = trim(String(response.text || ""));
-          if (!dictatedText) {
-            showTransientNotice("No speech detected");
-            return;
-          }
-          insertTextAtCursor(el.runPrompt, dictatedText);
-          dispatchInputEvent(el.runPrompt);
-          if (typeof el.runPrompt.focus === "function") {
-            el.runPrompt.focus();
-          }
-        })
-        .finally(function () {
-          state.dictateBusy = false;
-          state.dictateSessionId = "";
-          renderUi();
-        });
-    }
-
-    state.dictateBusy = true;
-    renderUi();
-
-    return apiPost("dictate_start", {}, { timeoutMs: 30000 })
-      .then(function (response) {
-        if (!response.success) {
-          throw new Error(response.error || "Dictation failed");
-        }
-        state.dictateRecording = true;
-        state.dictateSessionId = trim(String((response.session && response.session.id) || ""));
-      })
-      .finally(function () {
-        state.dictateBusy = false;
-        renderUi();
-      });
+    return toggleDictationCapture({ fromHotkey: false });
   }
 
   function onRunSubmit(event) {
@@ -16744,6 +17175,16 @@
         toggleDictationSoftware().catch(showError);
       });
     }
+    if (el.dictationHoldShortcut) {
+      on(el.dictationHoldShortcut, "change", function () {
+        saveDictationShortcutChoice("hold", el.dictationHoldShortcut.value);
+      });
+    }
+    if (el.dictationToggleShortcut) {
+      on(el.dictationToggleShortcut, "change", function () {
+        saveDictationShortcutChoice("toggle", el.dictationToggleShortcut.value);
+      });
+    }
 
     if (el.modeRuntimeTickBtn) {
       on(el.modeRuntimeTickBtn, "click", function () {
@@ -17664,6 +18105,12 @@
     });
 
     document.addEventListener("keydown", function (event) {
+      var dictationKeyTrigger = dictationShortcutKeyboardTrigger(event);
+      if (dictationKeyTrigger) {
+        if (!event.repeat) {
+          onDictationShortcutDown(dictationKeyTrigger, event);
+        }
+      }
       if (
         (event.metaKey || event.ctrlKey) &&
         !event.altKey &&
@@ -17726,6 +18173,44 @@
 
       closeAllMenus();
     });
+
+    document.addEventListener("keyup", function (event) {
+      var dictationKeyTrigger = dictationShortcutKeyboardTrigger(event);
+      if (!dictationKeyTrigger) {
+        return;
+      }
+      onDictationShortcutUp(dictationKeyTrigger, event);
+    }, true);
+
+    document.addEventListener("mousedown", function (event) {
+      var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
+      if (!dictationMouseTrigger) {
+        return;
+      }
+      onDictationShortcutDown(dictationMouseTrigger, event);
+    }, true);
+
+    document.addEventListener("mouseup", function (event) {
+      var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
+      if (!dictationMouseTrigger) {
+        return;
+      }
+      onDictationShortcutUp(dictationMouseTrigger, event);
+    }, true);
+
+    document.addEventListener("auxclick", function (event) {
+      var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
+      if (!dictationMouseTrigger || !shouldHandleDictationShortcutTrigger(dictationMouseTrigger)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
+
+    window.addEventListener("blur", function () {
+      clearDictationShortcutPressState();
+      endDictationHotkeyHold("");
+    });
   }
 
   window.addEventListener("beforeunload", function () {
@@ -17748,6 +18233,7 @@
     stopModelAutoRefreshLoop();
     stopRunEventHealLoop();
     stopApprovalResumeWatch();
+    clearDictationShortcutPressState();
     clearPendingAttachments();
   });
 

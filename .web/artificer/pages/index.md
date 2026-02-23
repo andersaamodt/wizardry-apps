@@ -392,6 +392,10 @@ pagetitle: "Artificer"
 <button id="install-dictation-btn" type="button" class="ui-pending-spinner" disabled>Checking...</button>
 <p id="dictation-install-status" class="settings-hint hidden"></p>
 </div>
+<div id="dictation-shortcut-row" class="dictation-shortcut-row hidden">
+<label class="dictation-shortcut-field" for="dictation-hold-shortcut"><span>Hold-to-Talk (Press)</span><select id="dictation-hold-shortcut"></select></label>
+<label class="dictation-shortcut-field" for="dictation-toggle-shortcut"><span>Toggle</span><select id="dictation-toggle-shortcut"></select></label>
+</div>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
 <label for="ssh-email">SSH key email/comment (optional)</label>

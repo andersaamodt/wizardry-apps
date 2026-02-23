@@ -4711,6 +4711,29 @@ select:focus {
   color: var(--danger);
 }
 
+.dictation-shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-top: -2px;
+}
+
+.dictation-shortcut-field {
+  display: grid;
+  gap: 4px;
+}
+
+.dictation-shortcut-field span {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.dictation-shortcut-field select {
+  width: 100%;
+  min-width: 0;
+}
+
 .settings-links {
   margin: 0;
   font-size: 0.83rem;
