@@ -1619,6 +1619,12 @@ compose_context_envelope() {
   manifesto_text=$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
   global_instructions_text=$(cat "$GLOBAL_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
   norms_json=$(jq -cs '[.[]]' "$NORMS_FILE" 2>/dev/null || printf '[]')
+  relationship_mode=$(printf '%s' "$relationship_json" | jq -r '.current_mode // empty' 2>/dev/null || printf '')
+  mode_allow_json=$(read_modes_config_json | jq -c --arg mode "$relationship_mode" '
+    (.modes // [])
+    | map(select((.id // "") == $mode))
+    | if length == 0 then {} else (.[0].allow // {}) end
+  ' 2>/dev/null || printf '{}')
 
   jq -cn \
     --arg mode "$MODE" \
@@ -1636,12 +1642,13 @@ compose_context_envelope() {
     --arg global_instructions "$global_instructions_text" \
     --arg norms "$norms_json" \
     --arg relationship "$relationship_json" \
+    --arg mode_allow "$mode_allow_json" \
     '{
       mode:$mode,
       subreddit:$subreddit,
       doctrine:{global_instructions:$global_instructions, manifesto:$manifesto, norms:(($norms|fromjson?) // [])},
       utterance:($comment|fromjson),
-      relationship:(($relationship|fromjson?) // {}),
+      relationship:((($relationship|fromjson?) // {}) + {allowed_actions: (($mode_allow|fromjson?) // {})}),
       context:{
         parent:($parent|fromjson),
         grandparent:($grandparent|fromjson),
