@@ -6457,10 +6457,17 @@
       dictationWaveAudioContext = new AudioCtx();
       dictationWaveSource = dictationWaveAudioContext.createMediaStreamSource(stream);
       dictationWaveAnalyser = dictationWaveAudioContext.createAnalyser();
-      dictationWaveAnalyser.fftSize = 512;
-      dictationWaveAnalyser.smoothingTimeConstant = 0.72;
+      dictationWaveAnalyser.fftSize = 1024;
+      dictationWaveAnalyser.smoothingTimeConstant = 0.55;
+      dictationWaveAnalyser.minDecibels = -92;
+      dictationWaveAnalyser.maxDecibels = -12;
       dictationWaveSource.connect(dictationWaveAnalyser);
-      dictationWaveData = new Uint8Array(dictationWaveAnalyser.fftSize);
+      dictationWaveData = new Uint8Array(dictationWaveAnalyser.frequencyBinCount);
+      if (dictationWaveAudioContext && dictationWaveAudioContext.state === "suspended" && typeof dictationWaveAudioContext.resume === "function") {
+        dictationWaveAudioContext.resume().catch(function () {
+          return null;
+        });
+      }
 
       function tick() {
         if (monitorSession !== dictationWaveMonitorSession) {
@@ -6469,7 +6476,16 @@
         if (!dictationWaveAnalyser || !dictationWaveData) {
           return;
         }
-        dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
+        if (
+          dictationWaveAudioContext &&
+          dictationWaveAudioContext.state === "suspended" &&
+          typeof dictationWaveAudioContext.resume === "function"
+        ) {
+          dictationWaveAudioContext.resume().catch(function () {
+            return null;
+          });
+        }
+        dictationWaveAnalyser.getByteFrequencyData(dictationWaveData);
         var bars = ensureDictationWaveBars();
         var barCount = bars ? bars.length : 42;
         if (barCount < 1) {
@@ -6478,18 +6494,17 @@
         var levels = new Array(barCount);
         var chunk = Math.max(1, Math.floor(dictationWaveData.length / barCount));
         for (var i = 0; i < barCount; i += 1) {
-          var from = i * chunk;
+          var from = Math.max(1, i * chunk);
           var to = Math.min(dictationWaveData.length, from + chunk);
-          var sum = 0;
-          var count = 0;
+          var peak = 0;
           for (var j = from; j < to; j += 1) {
-            var centered = (Number(dictationWaveData[j] || 128) - 128) / 128;
-            sum += Math.abs(centered);
-            count += 1;
+            var magnitude = Number(dictationWaveData[j] || 0) / 255;
+            if (magnitude > peak) {
+              peak = magnitude;
+            }
           }
-          var avg = count > 0 ? (sum / count) : 0;
-          var gated = Math.max(0, avg - 0.02);
-          levels[i] = Math.max(0, Math.min(1, gated * 2.8));
+          var gated = Math.max(0, peak - 0.015);
+          levels[i] = Math.max(0, Math.min(1, gated * 1.6));
         }
         state.dictateWaveLevels = levels;
         renderDictationWaveBars();
