@@ -9359,7 +9359,7 @@
       pollModelInstallStatus(jobId).catch(function () {
         return null;
       });
-    }, 600);
+    }, 1200);
   }
 
   function syncModelInstallPollingFromCatalog() {
@@ -12699,7 +12699,7 @@
         renderUi();
         showError(error);
       });
-    }, 1200);
+    }, 600);
   }
 
   function installDictationSoftware() {
