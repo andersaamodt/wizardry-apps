@@ -13552,7 +13552,7 @@ EOF
     chmod +x "$runner_script"
 
     capture_pid=$(spawn_detached_job "$runner_script" "$audio_file" "$log_file")
-    sleep 0.12
+    sleep 0.03
     if ! kill -0 "$capture_pid" 2>/dev/null; then
       capture_error=$(strip_terminal_noise "$(cat "$log_file" 2>/dev/null || true)")
       clear_dictation_live_session

@@ -595,7 +595,7 @@
   var approvalAnswerPending = false;
   var TOOLTIP_DELAY_MS = 520;
   var DICTATION_PREINSTALL_SIZE_BYTES = 480000000;
-  var DICTATION_SHORTCUT_TAP_MS = 220;
+  var DICTATION_SHORTCUT_TAP_MS = 130;
   var DICTATION_SHORTCUT_HOLD_OPTIONS = [
     { value: "none", label: "None" },
     { value: "alt", label: "Option (Alt)" },
@@ -656,6 +656,7 @@
   var dictationWaveSource = null;
   var dictationWaveData = null;
   var dictationWaveStartPromise = null;
+  var dictatePointerHandledAt = 0;
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -6532,7 +6533,7 @@
       next = "idle";
     }
     state.dictatePhase = next;
-    if (next === "starting" || next === "recording") {
+    if (next === "recording") {
       if (!dictationWaveAnalyser && !dictationWaveStream) {
         startDictationWaveMonitor().then(function (started) {
         if (!started && state.dictatePhase === "recording") {
@@ -17870,7 +17871,20 @@
     }
 
     if (el.dictateBtn) {
+      on(el.dictateBtn, "mousedown", function (event) {
+        if (event && event.button !== 0) {
+          return;
+        }
+        dictatePointerHandledAt = Date.now();
+        onDictateClick(event).catch(showError);
+      });
       on(el.dictateBtn, "click", function (event) {
+        if (Date.now() - dictatePointerHandledAt < 420) {
+          if (event && typeof event.preventDefault === "function") {
+            event.preventDefault();
+          }
+          return;
+        }
         onDictateClick(event).catch(showError);
       });
     }
