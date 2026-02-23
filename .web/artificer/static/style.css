@@ -3445,8 +3445,15 @@ h2 {
   place-items: center;
   font-size: 1.15rem;
   padding: 0;
-  margin-left: auto;
+  margin-left: 0;
   cursor: pointer;
+}
+
+.send-menu-anchor {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .send-menu-anchor .floating-menu {
