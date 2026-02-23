@@ -13424,14 +13424,14 @@
       }
     }
     if (el.dictationPrewarmRow) {
-      var showPrewarm = !!state.dictationInstalled;
+      var showPrewarm = true;
       el.dictationPrewarmRow.classList.toggle("hidden", !showPrewarm);
       if (el.dictationPrewarmHint) {
         el.dictationPrewarmHint.classList.toggle("hidden", !showPrewarm);
       }
       if (el.dictationPrewarmToggle) {
         el.dictationPrewarmToggle.checked = !!state.dictationPrewarmEnabled;
-        el.dictationPrewarmToggle.disabled = !showPrewarm || state.dictationInstallBusy || state.dictateRecording || state.dictateBusy;
+        el.dictationPrewarmToggle.disabled = !state.dictationInstalled || state.dictationInstallBusy || state.dictateRecording || state.dictateBusy;
       }
     }
     renderDictationShortcutSettings();
