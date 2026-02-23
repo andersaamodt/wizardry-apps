@@ -5450,7 +5450,7 @@ stop_capture_pid_gracefully() {
 
   kill -INT "$capture_pid" 2>/dev/null || true
   waited=0
-  while kill -0 "$capture_pid" 2>/dev/null && [ "$waited" -lt 1500 ]; do
+  while kill -0 "$capture_pid" 2>/dev/null && [ "$waited" -lt 3000 ]; do
     sleep 0.05
     waited=$((waited + 50))
   done
@@ -5460,7 +5460,7 @@ stop_capture_pid_gracefully() {
 
   kill -TERM "$capture_pid" 2>/dev/null || true
   waited=0
-  while kill -0 "$capture_pid" 2>/dev/null && [ "$waited" -lt 1500 ]; do
+  while kill -0 "$capture_pid" 2>/dev/null && [ "$waited" -lt 3000 ]; do
     sleep 0.05
     waited=$((waited + 50))
   done
@@ -5480,7 +5480,7 @@ transcribe_dictation_audio() {
 
   [ -x "$python_bin" ] || return 1
 
-  set +e
+  transcribe_rc=0
   if [ "$backend" = "mlx-whisper" ] && voice_needs_macos_arm64_uname_override; then
     if voice_can_run_arch_arm64; then
       DICTATE_AUDIO_PATH="$audio_path" \
@@ -5657,7 +5657,6 @@ sys.stdout.write(text + "\n")
 PY
     transcribe_rc=$?
   fi
-  set -e
 
   return "$transcribe_rc"
 }
@@ -13529,7 +13528,7 @@ os_name=$(uname -s 2>/dev/null || printf 'unknown')
 
 case "$os_name" in
   Darwin)
-    ffmpeg -nostdin -hide_banner -loglevel error \
+    exec ffmpeg -nostdin -hide_banner -loglevel error \
       -f avfoundation -i ":0" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     ;;
@@ -13648,6 +13647,12 @@ EOF
     clear_dictation_live_session
 
     if [ "$transcribe_rc" -ne 0 ]; then
+      transcribe_error_lower=$(printf '%s' "$transcribe_stderr" | tr '[:upper:]' '[:lower:]')
+      if [ "$used_backend" = "mlx-whisper" ] && printf '%s' "$transcribe_error_lower" | grep -Fq "load_npz"; then
+        remove_voice_component_artifacts "mlx-whisper" >/dev/null 2>&1 || true
+        emit_error "Dictation model files were corrupted and have been cleared. Reinstall dictation and try again."
+        exit 0
+      fi
       if [ -n "$transcribe_stderr" ]; then
         emit_error "$transcribe_stderr"
       else
