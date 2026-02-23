@@ -2417,43 +2417,6 @@ process_comment() {
   relationship_row=$(relationship_record_interaction_row "$relationship_row" "$valence" "$thing_id" "$primary_action")
 
   transition_row=$(resolve_post_action_transition "$executed_actions")
-  if [ "$escalation_active" = true ]; then
-    esc_switch_enabled=$(read_modes_config_json | jq -r '.escalation.afterActionSwitch.enabled // false' 2>/dev/null || printf 'false')
-    if [ "$esc_switch_enabled" = "true" ]; then
-      esc_to_mode=$(read_modes_config_json | jq -r '.escalation.afterActionSwitch.toMode // empty' 2>/dev/null || printf '')
-      esc_duration=$(read_modes_config_json | jq -r '.escalation.afterActionSwitch.durationHours // 0' 2>/dev/null || printf '0')
-      esc_decay=$(read_modes_config_json | jq -r '.escalation.afterActionSwitch.decayTo // empty' 2>/dev/null || printf '')
-      if [ -n "$esc_to_mode" ]; then
-        use_esc_switch=false
-        esc_score=92
-        if [ -z "$transition_row" ] || [ "$transition_row" = "null" ]; then
-          use_esc_switch=true
-        else
-          tr_score=$(printf '%s' "$transition_row" | jq -r '.score // 0' 2>/dev/null || printf '0')
-          tr_score=$(to_int "$tr_score" 0)
-          if [ "$esc_score" -gt "$tr_score" ]; then
-            use_esc_switch=true
-          elif [ "$esc_score" -eq "$tr_score" ]; then
-            tr_mode=$(printf '%s' "$transition_row" | jq -r '.transition.toMode // empty' 2>/dev/null || printf '')
-            esc_rank=$(mode_restrictiveness_rank "$esc_to_mode")
-            tr_rank=$(mode_restrictiveness_rank "$tr_mode")
-            if [ "$esc_rank" -lt "$tr_rank" ]; then
-              use_esc_switch=true
-            fi
-          fi
-        fi
-        if [ "$use_esc_switch" = true ]; then
-          transition_row=$(jq -cn \
-            --arg action "Escalation" \
-            --arg to_mode "$esc_to_mode" \
-            --argjson duration "$(to_int "$esc_duration" 0)" \
-            --arg decay "$esc_decay" \
-            --argjson score "$esc_score" \
-            '{action:$action,transition:{toMode:$to_mode,durationHours:$duration,decayTo:$decay,announce:false},score:$score}')
-        fi
-      fi
-    fi
-  fi
   if [ -n "$transition_row" ] && [ "$transition_row" != "null" ]; then
     transition_action=$(printf '%s' "$transition_row" | jq -r '.action // empty' 2>/dev/null || printf '')
     to_mode=$(printf '%s' "$transition_row" | jq -r '.transition.toMode // empty' 2>/dev/null || printf '')

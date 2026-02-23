@@ -459,26 +459,9 @@
                 </select>
               </div>
             </div>
-            <div class="mode-fields-inline modes-grid">
-              <div class="mode-field-row">
-                <label for="enforcement-after-switch-enabled" class="mode-field-label">After escalation</label>
-                <label class="schedule-toggle">
-                  <input id="enforcement-after-switch-enabled" type="checkbox">
-                  <span>Switch relationship mode</span>
-                </label>
-              </div>
-              <div class="mode-field-row">
-                <label for="enforcement-after-switch-mode" class="mode-field-label">Switch to mode</label>
-                <select id="enforcement-after-switch-mode"></select>
-              </div>
-              <div class="mode-field-row">
-                <label for="enforcement-after-switch-duration" class="mode-field-label">Duration (hours)</label>
-                <input id="enforcement-after-switch-duration" type="number" min="0" step="1" value="168">
-              </div>
-              <div class="mode-field-row">
-                <label for="enforcement-after-switch-decay" class="mode-field-label">Decay to</label>
-                <select id="enforcement-after-switch-decay"></select>
-              </div>
+            <div class="settings-empty-note">
+              After-action relationship mode switches are configured per action in
+              <strong>Modes</strong> via each mode's details panel.
             </div>
             <div class="settings-actions modes-save-actions">
               <button id="btn-save-enforcement" type="button" class="primary">Save enforcement</button>
@@ -3804,24 +3787,9 @@
       var onHigh = document.getElementById('enforcement-escalate-on-high');
       var targets = document.getElementById('enforcement-escalation-targets');
       var timing = document.getElementById('enforcement-escalation-timing');
-      var afterSwitchEnabled = document.getElementById('enforcement-after-switch-enabled');
-      var afterSwitchMode = document.getElementById('enforcement-after-switch-mode');
-      var afterSwitchDuration = document.getElementById('enforcement-after-switch-duration');
-      var afterSwitchDecay = document.getElementById('enforcement-after-switch-decay');
       if (onHigh) onHigh.checked = !!escalation.onHighSeverity;
       if (targets) targets.value = String(escalation.targets || 'modmail');
       if (timing) timing.value = String(escalation.timing || 'enforce_then_escalate');
-      var afterSwitch = escalation.afterActionSwitch || {};
-      var modeOpts = modeOptions(cfg);
-      if (afterSwitchEnabled) afterSwitchEnabled.checked = !!afterSwitch.enabled;
-      if (afterSwitchMode) {
-        afterSwitchMode.innerHTML = modeOptionsHtml(modeOpts, String(afterSwitch.toMode || cfg.defaultDecayMode || cfg.startingMode || ''), false, '');
-        if (!afterSwitchMode.value && modeOpts.length) afterSwitchMode.value = modeOpts[0].id;
-      }
-      if (afterSwitchDuration) afterSwitchDuration.value = String(Math.max(0, parseInt(afterSwitch.durationHours, 10) || 0));
-      if (afterSwitchDecay) {
-        afterSwitchDecay.innerHTML = modeOptionsHtml(modeOpts, String(afterSwitch.decayTo || ''), true, 'Default decay mode');
-      }
     }
 
     function renderReplyTemplatesPanel() {
@@ -3989,10 +3957,10 @@
       cfg.escalation.targets = String((document.getElementById('enforcement-escalation-targets') || {}).value || 'modmail');
       cfg.escalation.timing = String((document.getElementById('enforcement-escalation-timing') || {}).value || 'enforce_then_escalate');
       cfg.escalation.afterActionSwitch = cfg.escalation.afterActionSwitch || {};
-      cfg.escalation.afterActionSwitch.enabled = !!((document.getElementById('enforcement-after-switch-enabled') || {}).checked);
-      cfg.escalation.afterActionSwitch.toMode = String((document.getElementById('enforcement-after-switch-mode') || {}).value || '');
-      cfg.escalation.afterActionSwitch.durationHours = Math.max(0, parseInt((document.getElementById('enforcement-after-switch-duration') || {}).value || '0', 10) || 0);
-      cfg.escalation.afterActionSwitch.decayTo = String((document.getElementById('enforcement-after-switch-decay') || {}).value || '');
+      cfg.escalation.afterActionSwitch.enabled = false;
+      cfg.escalation.afterActionSwitch.toMode = '';
+      cfg.escalation.afterActionSwitch.durationHours = 0;
+      cfg.escalation.afterActionSwitch.decayTo = '';
 
       cfg.replies = cfg.replies || {};
       cfg.replies.warningTemplate = String((document.getElementById('reply-template-warning') || {}).value || '');
