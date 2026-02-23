@@ -318,6 +318,7 @@
 
         <section class="tab-panel" id="panel-modes">
           <div class="status-line" id="modes-line">Modes not loaded yet.</div>
+          <div id="modes-conflict-banner" class="modes-conflict-banner" aria-live="polite" hidden></div>
           <div id="modes-layout-card" class="settings-card subpanel-card modes-layout-card">
             <div class="modes-main-pane">
               <div class="persona-section-title">Mode Defaults</div>
@@ -3307,6 +3308,85 @@
       return null;
     }
 
+    function validateModesConfigConflicts(cfg) {
+      var out = [];
+      var modes = (cfg && Array.isArray(cfg.modes)) ? cfg.modes : [];
+      var enabledById = {};
+      var existsById = {};
+      var enabledCount = 0;
+      for (var i = 0; i < modes.length; i += 1) {
+        var modeId = String((modes[i] || {}).id || '');
+        if (!modeId) continue;
+        var enabled = ((modes[i] || {}).enabled !== false);
+        existsById[modeId] = true;
+        enabledById[modeId] = enabled;
+        if (enabled) enabledCount += 1;
+      }
+      function checkRef(kind, label, value) {
+        var target = String(value || '').trim();
+        if (!target) return;
+        if (!existsById[target]) {
+          out.push(kind + ' "' + label + '" targets missing mode "' + target + '".');
+          return;
+        }
+        if (!enabledById[target]) {
+          out.push(kind + ' "' + label + '" targets disabled mode "' + target + '".');
+        }
+      }
+
+      if (!enabledCount) {
+        out.push('All modes are disabled. At least one mode must stay enabled.');
+      }
+
+      checkRef('Starting mode', 'default', cfg.startingMode);
+      checkRef('Default decay mode', 'default', cfg.defaultDecayMode);
+
+      var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
+      for (var s = 0; s < switchRules.length; s += 1) {
+        var rule = switchRules[s] || {};
+        var label = String(rule.label || ('Rule ' + String(s + 1)));
+        checkRef('Switch rule', label, rule.toMode);
+        checkRef('Switch rule decay', label, rule.decayTo);
+      }
+
+      var transitions = (cfg && cfg.postActionTransitions && typeof cfg.postActionTransitions === 'object')
+        ? cfg.postActionTransitions
+        : {};
+      var actionNames = Object.keys(transitions);
+      for (var t = 0; t < actionNames.length; t += 1) {
+        var action = String(actionNames[t] || '');
+        if (!action) continue;
+        var row = transitions[action] || {};
+        checkRef('Post-action transition', action, row.toMode);
+        checkRef('Post-action decay', action, row.decayTo);
+      }
+
+      return out;
+    }
+
+    function renderModesConflictBanner(conflicts) {
+      var banner = document.getElementById('modes-conflict-banner');
+      var saveBtn = document.getElementById('btn-save-modes');
+      var items = Array.isArray(conflicts) ? conflicts : [];
+      if (!banner) return;
+      if (!items.length) {
+        banner.hidden = true;
+        banner.innerHTML = '';
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+      banner.hidden = false;
+      banner.innerHTML = [
+        '<div class="modes-conflict-pill">Needs action</div>',
+        '<div class="modes-conflict-copy">' +
+          '<strong>' + escapeHtml(String(items.length)) + ' mode configuration conflict' + (items.length === 1 ? '' : 's') + '</strong>' +
+          '<ul>' + items.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>' +
+          '<div class="modes-conflict-hint">Save is blocked until conflicts are resolved.</div>' +
+        '</div>'
+      ].join('');
+      if (saveBtn) saveBtn.disabled = true;
+    }
+
     function closeModeDrawer(skipRender) {
       if (!state.modeDrawerModeId) return;
       state.modeDrawerModeId = '';
@@ -3527,7 +3607,10 @@
           return [
             '<article class="mode-summary-card' + (isActive ? ' active' : '') + '" data-mode-id="' + escapeHtml(modeId) + '">',
             '  <div class="mode-summary-head">',
-            '    <div class="mode-summary-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
+            '    <div class="mode-summary-left">',
+            '      <label class="mode-row-enabled"><input type="checkbox" data-mode-row-enabled="' + escapeHtml(modeId) + '"' + ((mode.enabled === false) ? '' : ' checked') + '><span class="sr-only">Enable ' + escapeHtml(modeId) + '</span></label>',
+            '      <div class="mode-summary-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
+            '    </div>',
             '    <div class="mode-summary-right">',
             '      <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
             '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '">Edit</button>',
@@ -3543,6 +3626,8 @@
       var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
       var transitionSource = cfg.postActionTransitions || {};
       var transitionActionNames = Object.keys(transitionSource);
+      var conflicts = validateModesConfigConflicts(cfg);
+      renderModesConflictBanner(conflicts);
 
       if (line) {
         line.textContent = String((cfg.modes || []).length) + ' modes • ' +
@@ -3837,6 +3922,12 @@
 
     async function saveModesConfigWithFeedback(okMessage) {
       var payload = collectModesConfigFromUi();
+      var conflicts = validateModesConfigConflicts(payload);
+      if (conflicts.length) {
+        renderModesConflictBanner(conflicts);
+        setControlMessage('Resolve mode conflicts before saving.', true);
+        return;
+      }
       if (state.previewMode) {
         state.modesConfig = normalizeModesConfig(payload);
         renderModesDrivenPanels();
@@ -4522,6 +4613,21 @@
           }
           return;
         }
+      });
+      document.getElementById('panel-modes').addEventListener('change', function (event) {
+        var target = event && event.target;
+        if (!target) return;
+        if (!target.hasAttribute('data-mode-row-enabled')) return;
+        var modeId = String(target.getAttribute('data-mode-row-enabled') || '').trim();
+        if (!modeId) return;
+        mutateModesConfigFromUi(function (cfg) {
+          var modes = Array.isArray(cfg.modes) ? cfg.modes : [];
+          for (var i = 0; i < modes.length; i += 1) {
+            if (String((modes[i] || {}).id || '') !== modeId) continue;
+            modes[i].enabled = !!target.checked;
+            break;
+          }
+        });
       });
       document.getElementById('btn-relationship-apply').addEventListener('click', async function () {
         if (state.previewMode) {

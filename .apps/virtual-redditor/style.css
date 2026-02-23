@@ -1385,6 +1385,54 @@ label {
   gap: 8px;
 }
 
+.modes-conflict-banner {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 9px;
+  width: min(100%, 1020px);
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 54%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-panel) 90%);
+}
+
+.modes-conflict-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.2rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--danger) 64%, transparent);
+  color: color-mix(in srgb, var(--danger) 84%, var(--text) 16%);
+  background: color-mix(in srgb, var(--danger) 18%, var(--bg-panel) 82%);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.modes-conflict-copy {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--danger) 76%, var(--text) 24%);
+}
+
+.modes-conflict-copy ul {
+  margin: 5px 0 0;
+  padding-left: 16px;
+}
+
+.modes-conflict-copy li {
+  margin: 2px 0;
+}
+
+.modes-conflict-hint {
+  margin-top: 6px;
+  font-size: 0.69rem;
+  color: color-mix(in srgb, var(--danger) 78%, var(--text) 22%);
+}
+
 .subpanel-card {
   width: min(100%, 1020px);
   max-width: 100%;
@@ -1457,6 +1505,28 @@ label {
   gap: 8px;
 }
 
+.mode-summary-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mode-row-enabled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.mode-row-enabled input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+}
+
 .mode-summary-title {
   display: inline-flex;
   flex-wrap: nowrap;
@@ -1520,6 +1590,18 @@ label {
   padding: 0 0.5rem;
   font-size: 0.67rem;
   line-height: 1;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 .modes-layout-card {
@@ -3218,6 +3300,10 @@ label {
   .mode-summary-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .mode-summary-left {
+    width: 100%;
   }
 
   .mode-summary-right {
