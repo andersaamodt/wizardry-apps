@@ -797,11 +797,27 @@ oauth_env_upsert() {
   mv "$tmp" "$file"
 }
 
+oauth_identity_slug() {
+  raw=${1-}
+  slug=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9_-]#-#g; s#--*#-#g; s#^-##; s#-$##')
+  printf '%s' "$slug"
+}
+
 oauth_default_user_agent() {
-  uname_raw=${1-}
-  uname_safe=$(printf '%s' "$uname_raw" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9_-]#_#g')
-  [ -z "$uname_safe" ] && uname_safe=virtual_redditor
-  printf 'virtual-redditor/0.1-by-u/%s' "$uname_safe"
+  username_raw=${1-}
+  subreddit_raw=${2-}
+  profile_raw=${ACTIVE_PROFILE_ID-}
+
+  username_safe=$(oauth_identity_slug "$username_raw")
+  subreddit_safe=$(oauth_identity_slug "$subreddit_raw")
+  profile_safe=$(oauth_identity_slug "$profile_raw")
+
+  [ -z "$username_safe" ] && username_safe="virtual_redditor"
+  [ -z "$subreddit_safe" ] && subreddit_safe="unknown"
+  [ -z "$profile_safe" ] && profile_safe="single"
+
+  # Reddit guidance: include platform/app/version and "by /u/<account>".
+  printf 'script:virtual-redditor:%s:1.0 (by /u/%s; subreddit:r/%s)' "$profile_safe" "$username_safe" "$subreddit_safe"
 }
 
 oauth_kill_listener() {
@@ -906,7 +922,7 @@ oauth_begin_json() {
   redirect_uri="http://127.0.0.1:${port}/vr/callback"
   scope='identity read submit modposts modcontributors modconfig modflair modlog modwiki modself modothers privatemessages'
   state_token=$(oauth_rand_hex)
-  user_agent=$(oauth_default_user_agent "$username_hint")
+  user_agent=$(oauth_default_user_agent "$username_hint" "$subreddit")
 
   if ! oauth_port_available "$port"; then
     jq -cn --arg err "loopback port ${port} is in use; close the conflicting process and try again" '{ok:false,error:$err}'
@@ -1088,7 +1104,7 @@ oauth_finish_json() {
     return 1
   fi
   if [ -z "$user_agent" ]; then
-    user_agent=$(oauth_default_user_agent "$username_hint")
+    user_agent=$(oauth_default_user_agent "$username_hint" "$subreddit")
   fi
 
   token_response=$(curl -sS --fail \
@@ -1120,7 +1136,7 @@ oauth_finish_json() {
   [ -z "$reddit_username" ] && reddit_username=$username_hint
   [ -z "$subreddit" ] && subreddit=$(read_env_var "$REDDIT_ENV_FILE" SUBREDDIT)
   [ -z "$reddit_username" ] && reddit_username=$(read_env_var "$REDDIT_ENV_FILE" REDDIT_USERNAME)
-  [ -z "$user_agent" ] && user_agent=$(oauth_default_user_agent "$reddit_username")
+  user_agent=$(oauth_default_user_agent "$reddit_username" "$subreddit")
 
   if [ -n "$reddit_username" ] && profile_username_conflicts "$reddit_username" "$ACTIVE_PROFILE_ID"; then
     jq -cn --arg err "reddit username already belongs to another virtual redditor: $reddit_username" '{ok:false,error:$err}'
@@ -1175,7 +1191,9 @@ check_subreddit_json() {
   fi
 
   url="https://www.reddit.com/r/$name/about.json"
-  body=$(curl -sS -A "virtual-redditor/0.1 subreddit-check" "$url" 2>/dev/null || printf '')
+  existing_username=$(read_env_var "$REDDIT_ENV_FILE" REDDIT_USERNAME)
+  check_agent=$(oauth_default_user_agent "$existing_username" "$name")
+  body=$(curl -sS -A "$check_agent" "$url" 2>/dev/null || printf '')
   if [ -z "$body" ]; then
     jq -cn --arg name "$name" '{ok:true,subreddit:$name,exists:false,error:"Could not verify subreddit right now."}'
     return 0

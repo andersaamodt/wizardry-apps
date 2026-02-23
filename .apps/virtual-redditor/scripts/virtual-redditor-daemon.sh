@@ -206,7 +206,7 @@ BOTENV
 REDDIT_CLIENT_ID=
 REDDIT_CLIENT_SECRET=
 REDDIT_REFRESH_TOKEN=
-REDDIT_USER_AGENT='virtual-redditor/0.1-by-u/replace_me'
+REDDIT_USER_AGENT=
 REDDIT_USERNAME=
 SUBREDDIT=
 REDDITENV
@@ -275,6 +275,38 @@ require_env_value() {
   return 0
 }
 
+identity_slug() {
+  raw=${1-}
+  slug=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9_-]#-#g; s#--*#-#g; s#^-##; s#-$##')
+  printf '%s' "$slug"
+}
+
+default_reddit_user_agent() {
+  username_raw=${1-}
+  subreddit_raw=${2-}
+  profile_raw=$(basename "$STATE_DIR" 2>/dev/null || printf 'single')
+
+  username_safe=$(identity_slug "$username_raw")
+  subreddit_safe=$(identity_slug "$subreddit_raw")
+  profile_safe=$(identity_slug "$profile_raw")
+
+  [ -z "$username_safe" ] && username_safe="virtual_redditor"
+  [ -z "$subreddit_safe" ] && subreddit_safe="unknown"
+  [ -z "$profile_safe" ] && profile_safe="single"
+
+  printf 'script:virtual-redditor:%s:1.0 (by /u/%s; subreddit:r/%s)' "$profile_safe" "$username_safe" "$subreddit_safe"
+}
+
+is_generic_or_masked_user_agent() {
+  ua=$(printf '%s' "${1-}" | tr '[:upper:]' '[:lower:]')
+  case "$ua" in
+    ""|virtual-redditor/0.1*|*subreddit-check*|*replace_me*|*by-u/*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 load_reddit_env() {
   # shellcheck disable=SC1090
   . "$REDDIT_ENV_FILE"
@@ -285,6 +317,9 @@ load_reddit_env() {
   require_env_value REDDIT_USER_AGENT || return 1
   require_env_value REDDIT_USERNAME || return 1
   require_env_value SUBREDDIT || return 1
+  if is_generic_or_masked_user_agent "$REDDIT_USER_AGENT"; then
+    REDDIT_USER_AGENT=$(default_reddit_user_agent "$REDDIT_USERNAME" "$SUBREDDIT")
+  fi
   return 0
 }
 
@@ -299,6 +334,9 @@ load_reddit_env_optional() {
   REDDIT_USER_AGENT=${REDDIT_USER_AGENT-}
   REDDIT_USERNAME=${REDDIT_USERNAME-}
   SUBREDDIT=${SUBREDDIT-}
+  if is_generic_or_masked_user_agent "$REDDIT_USER_AGENT"; then
+    REDDIT_USER_AGENT=$(default_reddit_user_agent "$REDDIT_USERNAME" "$SUBREDDIT")
+  fi
   return 0
 }
 
