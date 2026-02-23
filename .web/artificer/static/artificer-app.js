@@ -6463,6 +6463,86 @@
     var monitorSession = dictationWaveMonitorSession + 1;
     dictationWaveMonitorSession = monitorSession;
     dictationWaveStartPromise = Promise.resolve(true).then(function () {
+      var AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor || !navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+        return false;
+      }
+      return navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      }).then(function (stream) {
+        if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording") {
+          try {
+            var staleTracks = stream.getTracks ? stream.getTracks() : [];
+            for (var sti = 0; sti < staleTracks.length; sti += 1) {
+              if (staleTracks[sti] && typeof staleTracks[sti].stop === "function") {
+                staleTracks[sti].stop();
+              }
+            }
+          } catch (_streamCloseErr) {
+            // noop
+          }
+          return false;
+        }
+        var context = null;
+        try {
+          context = new AudioContextCtor();
+        } catch (_contextErr) {
+          try {
+            var failedTracks = stream.getTracks ? stream.getTracks() : [];
+            for (var fti = 0; fti < failedTracks.length; fti += 1) {
+              if (failedTracks[fti] && typeof failedTracks[fti].stop === "function") {
+                failedTracks[fti].stop();
+              }
+            }
+          } catch (_streamCloseErr2) {
+            // noop
+          }
+          return false;
+        }
+        var analyser = context.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.15;
+        var source = context.createMediaStreamSource(stream);
+        source.connect(analyser);
+        var data = new Uint8Array(analyser.fftSize);
+
+        dictationWaveStream = stream;
+        dictationWaveAudioContext = context;
+        dictationWaveAnalyser = analyser;
+        dictationWaveSource = source;
+        dictationWaveData = data;
+
+        var sample = function () {
+          if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording" || !dictationWaveAnalyser || !dictationWaveData) {
+            return;
+          }
+          dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
+          var sum = 0;
+          for (var i = 0; i < dictationWaveData.length; i += 1) {
+            var centered = (dictationWaveData[i] - 128) / 128;
+            sum += centered * centered;
+          }
+          var rms = Math.sqrt(sum / dictationWaveData.length);
+          var normalized = rms * 11;
+          if (normalized > 1) {
+            normalized = 1;
+          }
+          applyDictationWaveLevel(normalized);
+          dictationWaveRafId = requestAnimationFrame(sample);
+        };
+        dictationWaveRafId = requestAnimationFrame(sample);
+        return true;
+      }).catch(function () {
+        return false;
+      });
+    }).then(function (startedFromMic) {
+      if (startedFromMic) {
+        return true;
+      }
       dictationWavePollTimer = setInterval(function () {
         if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording") {
           return;
@@ -13005,6 +13085,9 @@
         requestDictationPrepare({ silent: true }).catch(function () {
           return null;
         });
+        if (dictationPrepareLoopShouldRun()) {
+          startDictationPrepareLoop();
+        }
       }
       if (!installed && !state.dictateBusy) {
         state.dictateRecording = false;
@@ -13090,8 +13173,10 @@
     if (typeof document === "undefined") {
       return false;
     }
-    var activeEl = document.activeElement;
-    return !!(activeEl && (activeEl === el.runPrompt || activeEl === el.dictateBtn));
+    if (document.hidden || document.visibilityState === "hidden") {
+      return false;
+    }
+    return true;
   }
 
   function stopDictationPrepareLoop() {
@@ -13113,7 +13198,7 @@
       requestDictationPrepare({ silent: true }).catch(function () {
         return null;
       });
-    }, 12000);
+    }, 6000);
   }
 
   function requestDictationPrepare(options) {
@@ -15925,12 +16010,18 @@
       return Promise.resolve(false);
     }
     var stopAfterStart = false;
+    var requestedStartedAtMs = Number(opts.startedAtMs || Date.now());
+    if (!isFinite(requestedStartedAtMs) || requestedStartedAtMs < 0) {
+      requestedStartedAtMs = Date.now();
+    } else {
+      requestedStartedAtMs = Math.floor(requestedStartedAtMs);
+    }
     dictationPrepareReadyUntil = 0;
     stopDictationPrepareLoop();
     state.dictateBusy = true;
     setDictationPhase("starting");
     renderUi();
-    return apiPost("dictate_start", {}, { timeoutMs: 30000 })
+    return apiPost("dictate_start", { requested_started_ms: String(requestedStartedAtMs) }, { timeoutMs: 30000 })
       .then(function (response) {
         if (!response.success) {
           throw new Error(response.error || "Dictation failed");
@@ -16020,7 +16111,7 @@
     return startDictationCapture(options);
   }
 
-  function beginDictationHotkeyHold(trigger) {
+  function beginDictationHotkeyHold(trigger, startedAtMs) {
     if (!dictationHotkeysEnabled()) {
       return;
     }
@@ -16032,7 +16123,7 @@
     if (state.dictateRecording) {
       return;
     }
-    startDictationCapture({ fromHotkey: true, holdShortcut: true }).then(function (started) {
+    startDictationCapture({ fromHotkey: true, holdShortcut: true, startedAtMs: startedAtMs }).then(function (started) {
       if (started) {
         state.dictateHotkeyHoldActive = true;
       }
@@ -16091,7 +16182,7 @@
       };
       pressState.timer = setTimeout(function () {
         pressState.holdStarted = true;
-        beginDictationHotkeyHold(trigger);
+        beginDictationHotkeyHold(trigger, pressState.downAt);
       }, DICTATION_SHORTCUT_TAP_MS);
       dictationShortcutPressState[trigger] = pressState;
       if (event && typeof event.preventDefault === "function") {
@@ -16103,7 +16194,7 @@
       return;
     }
     if (trigger === holdTrigger) {
-      beginDictationHotkeyHold(trigger);
+      beginDictationHotkeyHold(trigger, Date.now());
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
       }
@@ -16137,7 +16228,7 @@
         holdStarted: false,
         timer: null
       };
-      toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
+      toggleDictationCapture({ fromHotkey: true, holdShortcut: false, startedAtMs: Date.now() }).catch(showError);
       markDictationToggleTriggered(trigger);
       if (isKeyboardEvent) {
         delete dictationShortcutPressState[trigger];
@@ -16169,7 +16260,7 @@
       if (holdStarted) {
         endDictationHotkeyHold(trigger);
       } else if (elapsed <= DICTATION_SHORTCUT_TAP_MS) {
-        toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
+        toggleDictationCapture({ fromHotkey: true, holdShortcut: false, startedAtMs: Number(pressState.downAt || Date.now()) }).catch(showError);
         markDictationToggleTriggered(trigger);
       }
       if (event && typeof event.preventDefault === "function") {
@@ -16187,7 +16278,7 @@
       trigger === toggleTrigger &&
       !dictationToggleTriggerHandledRecently(trigger, 170)
     ) {
-      toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
+      toggleDictationCapture({ fromHotkey: true, holdShortcut: false, startedAtMs: Date.now() }).catch(showError);
       markDictationToggleTriggered(trigger);
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
@@ -16218,7 +16309,7 @@
     }
   }
 
-  function onDictateClick(event) {
+  function onDictateClick(event, startedAtMs) {
     if (event && typeof event.preventDefault === "function") {
       event.preventDefault();
     }
@@ -16230,7 +16321,7 @@
       showTransientNotice("Install dictation in Settings first.");
       return Promise.resolve();
     }
-    return toggleDictationCapture({ fromHotkey: false });
+    return toggleDictationCapture({ fromHotkey: false, startedAtMs: startedAtMs });
   }
 
   function onRunSubmit(event) {
@@ -17775,6 +17866,30 @@
         saveDictationShortcutChoice("toggle", el.dictationToggleShortcut.value);
       });
     }
+    if (el.dictationPrewarmToggle) {
+      on(el.dictationPrewarmToggle, "change", function () {
+        var nextEnabled = !!el.dictationPrewarmToggle.checked;
+        saveDictationPrewarmSetting(nextEnabled).then(function () {
+          if (nextEnabled) {
+            requestDictationPrepare({ silent: true, force: true }).catch(function () {
+              return null;
+            });
+            if (dictationPrepareLoopShouldRun()) {
+              startDictationPrepareLoop();
+            }
+          } else {
+            dictationPrepareReadyUntil = 0;
+            stopDictationPrepareLoop();
+          }
+          renderDictationInstallSettings();
+        }).catch(function (error) {
+          showError(error);
+          loadDictationPrewarmSetting().finally(function () {
+            renderDictationInstallSettings();
+          });
+        });
+      });
+    }
 
     if (el.modeRuntimeTickBtn) {
       on(el.modeRuntimeTickBtn, "click", function () {
@@ -18166,8 +18281,9 @@
         if (event && event.button !== 0) {
           return;
         }
+        var startedAtMs = Date.now();
         dictatePointerHandledAt = Date.now();
-        onDictateClick(event).catch(showError);
+        onDictateClick(event, startedAtMs).catch(showError);
       });
       on(el.dictateBtn, "click", function (event) {
         if (Date.now() - dictatePointerHandledAt < 420) {
@@ -18176,7 +18292,7 @@
           }
           return;
         }
-        onDictateClick(event).catch(showError);
+        onDictateClick(event, Date.now()).catch(showError);
       });
     }
     if (el.dictationStopBtn) {
@@ -18887,6 +19003,27 @@
       event.preventDefault();
       event.stopPropagation();
     }, true);
+
+    document.addEventListener("visibilitychange", function () {
+      if (dictationPrepareLoopShouldRun()) {
+        requestDictationPrepare({ silent: true }).catch(function () {
+          return null;
+        });
+        startDictationPrepareLoop();
+        return;
+      }
+      stopDictationPrepareLoop();
+    });
+
+    window.addEventListener("focus", function () {
+      if (!dictationPrepareLoopShouldRun()) {
+        return;
+      }
+      requestDictationPrepare({ silent: true }).catch(function () {
+        return null;
+      });
+      startDictationPrepareLoop();
+    });
 
     window.addEventListener("blur", function () {
       clearDictationShortcutPressState();

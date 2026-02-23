@@ -13802,6 +13802,7 @@ EOF
   dictate_start)
     language=$(trim "$(param "language")")
     model=$(trim "$(param "model")")
+    requested_started_ms=$(trim "$(param "requested_started_ms")")
 
     if [ -n "$language" ]; then
       case "$language" in
@@ -13838,8 +13839,32 @@ EOF
       fi
       existing_backend=$(dictation_live_session_value "backend")
       [ -n "$existing_backend" ] || existing_backend="$backend"
+      capture_started_ms=$(dictation_live_session_value "capture_started_ms")
       now_ms=$(current_time_millis)
-      printf '%s\n' "$now_ms" > "$session_dir/started_ms"
+      start_ms=$now_ms
+      case "$requested_started_ms" in
+        ""|*[!0-9]*)
+          ;;
+        *)
+          max_backfill_ms=2000
+          min_allowed_ms=$((now_ms - max_backfill_ms))
+          if [ "$requested_started_ms" -lt "$min_allowed_ms" ]; then
+            start_ms=$min_allowed_ms
+          elif [ "$requested_started_ms" -le "$now_ms" ]; then
+            start_ms=$requested_started_ms
+          fi
+          ;;
+      esac
+      case "$capture_started_ms" in
+        ""|*[!0-9]*)
+          ;;
+        *)
+          if [ "$start_ms" -lt "$capture_started_ms" ]; then
+            start_ms=$capture_started_ms
+          fi
+          ;;
+      esac
+      printf '%s\n' "$start_ms" > "$session_dir/started_ms"
       printf '%s\n' "recording" > "$session_dir/status"
       printf '{"success":true,"session":{"id":"%s","status":"recording","backend":"%s"}}\n' \
         "$(json_escape "$existing_id")" \
