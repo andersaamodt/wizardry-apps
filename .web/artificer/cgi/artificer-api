@@ -5488,13 +5488,58 @@ dictation_live_has_active_capture() {
   kill -0 "$capture_pid" 2>/dev/null
 }
 
+dictation_live_status() {
+  read_file_line "$(dictation_live_session_file "status")" ""
+}
+
+current_time_millis() {
+  now_ms=$(perl -MTime::HiRes=time -e 'printf "%.0f\n", time()*1000' 2>/dev/null || true)
+  case "$now_ms" in
+    ""|*[!0-9]*)
+      now_s=$(date +%s 2>/dev/null || printf '0')
+      case "$now_s" in
+        ""|*[!0-9]*) now_s=0 ;;
+      esac
+      now_ms=$((now_s * 1000))
+      ;;
+  esac
+  printf '%s' "$now_ms"
+}
+
+arm_dictation_prepare_guard() {
+  session_dir=$1
+  capture_pid=$2
+  guard_script="$session_dir/prepare-guard.sh"
+  cat > "$guard_script" <<'EOF'
+#!/bin/sh
+set -eu
+session_dir=$1
+capture_pid=$2
+sleep 20
+status_file="$session_dir/status"
+pid_file="$session_dir/pid"
+status_val=$(cat "$status_file" 2>/dev/null || printf '')
+pid_val=$(cat "$pid_file" 2>/dev/null || printf '')
+if [ "$status_val" = "prepared" ] && [ "$pid_val" = "$capture_pid" ]; then
+  kill -INT "$capture_pid" 2>/dev/null || true
+  sleep 0.08
+  kill -TERM "$capture_pid" 2>/dev/null || true
+  rm -rf "$session_dir" 2>/dev/null || true
+fi
+EOF
+  chmod +x "$guard_script"
+  guard_pid=$(spawn_detached_job "$guard_script" "$session_dir" "$capture_pid")
+  printf '%s\n' "$guard_pid" > "$session_dir/prepare_guard_pid"
+}
+
 dictation_live_level_for_session() {
   levels_file=$(dictation_live_session_value "levels_file")
   if [ -z "$levels_file" ] || [ ! -f "$levels_file" ]; then
     printf '%s' "0"
     return 0
   fi
-  rms_db=$(awk -F= '/lavfi\.astats\.Overall\.RMS_level=/{v=$2} END{print v}' "$levels_file" 2>/dev/null | tr -d '\r' | tail -n 1 | tr -d '[:space:]')
+  rms_line=$(grep -E 'lavfi\.astats\.Overall\.RMS_level' "$levels_file" 2>/dev/null | tail -n 1 | tr -d '\r' || true)
+  rms_db=$(printf '%s' "$rms_line" | sed -E 's/.*RMS_level[:=][[:space:]]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\1/I')
   if [ -z "$rms_db" ]; then
     printf '%s' "0"
     return 0
@@ -13556,7 +13601,7 @@ EOF
     exit 0
     ;;
 
-  dictate_start)
+  dictate_prepare)
     language=$(trim "$(param "language")")
     model=$(trim "$(param "model")")
 
@@ -13589,9 +13634,21 @@ EOF
     session_dir=$(dictation_live_session_dir)
     if dictation_live_has_active_capture; then
       existing_id=$(dictation_live_session_value "id")
-      printf '{"success":true,"session":{"id":"%s","status":"recording","backend":"%s"}}\n' \
+      existing_status=$(dictation_live_status)
+      [ -n "$existing_status" ] || existing_status="prepared"
+      if [ "$existing_status" != "prepared" ] && [ "$existing_status" != "recording" ]; then
+        existing_status="prepared"
+      fi
+      if [ -z "$existing_id" ]; then
+        existing_id=$(new_id)
+        printf '%s\n' "$existing_id" > "$session_dir/id"
+      fi
+      existing_backend=$(dictation_live_session_value "backend")
+      [ -n "$existing_backend" ] || existing_backend="$backend"
+      printf '{"success":true,"session":{"id":"%s","status":"%s","backend":"%s"}}\n' \
         "$(json_escape "$existing_id")" \
-        "$(json_escape "$backend")"
+        "$(json_escape "$existing_status")" \
+        "$(json_escape "$existing_backend")"
       exit 0
     fi
 
@@ -13662,6 +13719,7 @@ EOF
       exit 0
     fi
 
+    capture_started_ms=$(current_time_millis)
     printf '%s\n' "$session_id" > "$session_dir/id"
     printf '%s\n' "$capture_pid" > "$session_dir/pid"
     printf '%s\n' "$audio_file" > "$session_dir/audio_file"
@@ -13670,7 +13728,145 @@ EOF
     printf '%s\n' "$model_name" > "$session_dir/model"
     printf '%s\n' "$language" > "$session_dir/language"
     printf '%s\n' "$python_bin" > "$session_dir/python_bin"
-    date +%s > "$session_dir/started" 2>/dev/null || printf '%s\n' "0" > "$session_dir/started"
+    printf '%s\n' "$capture_started_ms" > "$session_dir/capture_started_ms"
+    printf '%s\n' "0" > "$session_dir/started_ms"
+    printf '%s\n' "prepared" > "$session_dir/status"
+    arm_dictation_prepare_guard "$session_dir" "$capture_pid"
+
+    printf '{"success":true,"session":{"id":"%s","status":"prepared","backend":"%s","backend_label":"%s"}}\n' \
+      "$(json_escape "$session_id")" \
+      "$(json_escape "$backend")" \
+      "$(json_escape "$(voice_component_label "$backend")")"
+    exit 0
+    ;;
+
+  dictate_start)
+    language=$(trim "$(param "language")")
+    model=$(trim "$(param "model")")
+
+    if [ -n "$language" ]; then
+      case "$language" in
+        *[!A-Za-z0-9_-]*)
+          emit_error "invalid language"
+          exit 0
+          ;;
+      esac
+    fi
+
+    if [ -n "$model" ] && ! safe_model_name "$model"; then
+      emit_error "invalid model"
+      exit 0
+    fi
+
+    backend=$(installed_voice_backend_for_host || true)
+    if [ -z "$backend" ]; then
+      emit_error "No dictation backend is installed."
+      exit 0
+    fi
+
+    python_bin=$(voice_component_python_bin "$backend")
+    if [ ! -x "$python_bin" ]; then
+      emit_error "Selected dictation backend runtime is unavailable."
+      exit 0
+    fi
+
+    session_dir=$(dictation_live_session_dir)
+    if dictation_live_has_active_capture; then
+      existing_id=$(dictation_live_session_value "id")
+      if [ -z "$existing_id" ]; then
+        existing_id=$(new_id)
+        printf '%s\n' "$existing_id" > "$session_dir/id"
+      fi
+      existing_backend=$(dictation_live_session_value "backend")
+      [ -n "$existing_backend" ] || existing_backend="$backend"
+      now_ms=$(current_time_millis)
+      printf '%s\n' "$now_ms" > "$session_dir/started_ms"
+      printf '%s\n' "recording" > "$session_dir/status"
+      printf '{"success":true,"session":{"id":"%s","status":"recording","backend":"%s"}}\n' \
+        "$(json_escape "$existing_id")" \
+        "$(json_escape "$existing_backend")"
+      exit 0
+    fi
+
+    clear_dictation_live_session
+    mkdir -p "$session_dir"
+
+    session_id=$(new_id)
+    audio_file="$session_dir/audio.wav"
+    levels_file="$session_dir/levels.log"
+    log_file="$session_dir/capture.log"
+    runner_script="$session_dir/capture.sh"
+    model_name=$model
+    if [ -z "$model_name" ]; then
+      model_name=$(voice_component_model "$backend" || true)
+    fi
+    if [ -z "$model_name" ]; then
+      clear_dictation_live_session
+      emit_error "Selected dictation backend model is unavailable."
+      exit 0
+    fi
+
+    cat > "$runner_script" <<'EOF'
+#!/bin/sh
+set -eu
+audio_file=$1
+log_file=$2
+levels_file=$3
+os_name=$(uname -s 2>/dev/null || printf 'unknown')
+
+case "$os_name" in
+  Darwin)
+    exec ffmpeg -nostdin -hide_banner -loglevel error \
+      -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
+      -f avfoundation -i ":0" \
+      -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+      -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
+    ;;
+  Linux)
+    if ffmpeg -nostdin -hide_banner -loglevel error \
+      -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
+      -f pulse -i default \
+      -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+      -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1; then
+      :
+    else
+      ffmpeg -nostdin -hide_banner -loglevel error \
+        -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
+        -f alsa -i default \
+        -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+        -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
+    fi
+    ;;
+  *)
+    printf '%s\n' "Unsupported platform for dictation capture: $os_name" >>"$log_file"
+    exit 1
+    ;;
+esac
+EOF
+    chmod +x "$runner_script"
+
+    capture_pid=$(spawn_detached_job "$runner_script" "$audio_file" "$log_file" "$levels_file")
+    sleep 0.005
+    if ! kill -0 "$capture_pid" 2>/dev/null; then
+      capture_error=$(strip_terminal_noise "$(cat "$log_file" 2>/dev/null || true)")
+      clear_dictation_live_session
+      [ -n "$capture_error" ] || capture_error="Microphone capture failed to start."
+      emit_error "$capture_error"
+      exit 0
+    fi
+
+    capture_started_ms=$(current_time_millis)
+    printf '%s\n' "$session_id" > "$session_dir/id"
+    printf '%s\n' "$capture_pid" > "$session_dir/pid"
+    printf '%s\n' "$audio_file" > "$session_dir/audio_file"
+    printf '%s\n' "$levels_file" > "$session_dir/levels_file"
+    printf '%s\n' "$backend" > "$session_dir/backend"
+    printf '%s\n' "$model_name" > "$session_dir/model"
+    printf '%s\n' "$language" > "$session_dir/language"
+    printf '%s\n' "$python_bin" > "$session_dir/python_bin"
+    printf '%s\n' "$capture_started_ms" > "$session_dir/capture_started_ms"
+    printf '%s\n' "$capture_started_ms" > "$session_dir/started_ms"
+    printf '%s\n' "recording" > "$session_dir/status"
 
     printf '{"success":true,"session":{"id":"%s","status":"recording","backend":"%s","backend_label":"%s"}}\n' \
       "$(json_escape "$session_id")" \
@@ -13712,9 +13908,16 @@ EOF
     model_name=$(dictation_live_session_value "model")
     language=$(dictation_live_session_value "language")
     python_bin=$(dictation_live_session_value "python_bin")
+    session_status=$(dictation_live_status)
+    started_ms=$(dictation_live_session_value "started_ms")
+    capture_started_ms=$(dictation_live_session_value "capture_started_ms")
 
     if [ -n "$requested_session_id" ] && [ -n "$session_id" ] && [ "$requested_session_id" != "$session_id" ]; then
       emit_error "Dictation session changed. Start dictation again."
+      exit 0
+    fi
+    if [ "$session_status" != "recording" ]; then
+      emit_error "No active dictation session."
       exit 0
     fi
 
@@ -13740,9 +13943,29 @@ EOF
 
     transcribe_out_file=$(mktemp)
     transcribe_err_file=$(mktemp)
+    transcribe_audio_file="$audio_file"
+    trimmed_audio_file=""
+    case "$started_ms" in
+      *[!0-9]*|"") started_ms=0 ;;
+    esac
+    case "$capture_started_ms" in
+      *[!0-9]*|"") capture_started_ms=0 ;;
+    esac
+    if [ "$started_ms" -gt "$capture_started_ms" ] && [ "$capture_started_ms" -gt 0 ]; then
+      offset_ms=$((started_ms - capture_started_ms))
+      if [ "$offset_ms" -gt 20 ]; then
+        offset_sec=$(awk -v ms="$offset_ms" 'BEGIN { printf "%.3f", (ms / 1000.0) }')
+        trimmed_audio_file=$(mktemp "/tmp/artificer-dictation-trim.XXXXXX.wav")
+        if ffmpeg -nostdin -hide_banner -loglevel error -ss "$offset_sec" -i "$audio_file" -ac 1 -ar 16000 -f wav -y "$trimmed_audio_file" >/dev/null 2>&1; then
+          if [ -s "$trimmed_audio_file" ]; then
+            transcribe_audio_file="$trimmed_audio_file"
+          fi
+        fi
+      fi
+    fi
 
     set +e
-    transcribe_dictation_audio "$backend" "$model_name" "$language" "$audio_file" "$python_bin" >"$transcribe_out_file" 2>"$transcribe_err_file"
+    transcribe_dictation_audio "$backend" "$model_name" "$language" "$transcribe_audio_file" "$python_bin" >"$transcribe_out_file" 2>"$transcribe_err_file"
     transcribe_rc=$?
     set -e
 
@@ -13752,7 +13975,7 @@ EOF
       fallback_model=$(voice_component_model "ctranslate2-whisper" || true)
       if [ -x "$fallback_python" ] && [ -n "$fallback_model" ]; then
         set +e
-        transcribe_dictation_audio "ctranslate2-whisper" "$fallback_model" "$language" "$audio_file" "$fallback_python" >"$transcribe_out_file" 2>"$transcribe_err_file"
+        transcribe_dictation_audio "ctranslate2-whisper" "$fallback_model" "$language" "$transcribe_audio_file" "$fallback_python" >"$transcribe_out_file" 2>"$transcribe_err_file"
         transcribe_rc=$?
         set -e
         if [ "$transcribe_rc" -eq 0 ]; then
@@ -13763,6 +13986,7 @@ EOF
 
     transcribe_stdout=$(trim "$(cat "$transcribe_out_file" 2>/dev/null || true)")
     transcribe_stderr=$(strip_terminal_noise "$(cat "$transcribe_err_file" 2>/dev/null || true)")
+    rm -f "$trimmed_audio_file" 2>/dev/null || true
     rm -f "$transcribe_out_file" "$transcribe_err_file"
     clear_dictation_live_session
 

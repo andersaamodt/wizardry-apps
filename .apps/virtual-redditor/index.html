@@ -332,6 +332,13 @@
             </div>
             <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
             <div id="modes-list" class="modes-list"></div>
+            <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
+              <div class="mode-detail-drawer-head">
+                <div id="mode-detail-drawer-title" class="mode-detail-drawer-title">Mode details</div>
+                <button id="btn-mode-drawer-close" type="button" class="mode-detail-drawer-close" aria-label="Close mode details">✕</button>
+              </div>
+              <div id="mode-detail-drawer-body" class="mode-detail-drawer-body"></div>
+            </aside>
             <div class="modes-section-head modes-subtitle">
               <div class="persona-section-title">Switch Rules</div>
               <button id="btn-mode-add-rule" type="button" class="soft mini-add-btn">Add rule</button>
@@ -857,6 +864,7 @@
       actionsRenderSig: '',
       repliesRenderSig: '',
       modesRenderSig: '',
+      modeDrawerModeId: '',
       relationshipsRenderSig: '',
       modeLogRenderSig: '',
       logsAvailable: false,
@@ -3308,6 +3316,135 @@
       return choices.length ? String(choices[0]) : 'Reply';
     }
 
+    function modeSummaryCounts(mode, actionChoices) {
+      var allow = (mode && typeof mode === 'object' && mode.allow && typeof mode.allow === 'object') ? mode.allow : {};
+      var choices = Array.isArray(actionChoices) ? actionChoices : [];
+      var enabledCount = 0;
+      for (var i = 0; i < choices.length; i += 1) {
+        if (allow[choices[i]]) enabledCount += 1;
+      }
+      return { enabled: enabledCount, total: choices.length };
+    }
+
+    function modeConstraintsSummary(mode) {
+      var constraints = (mode && typeof mode === 'object' && mode.constraints && typeof mode.constraints === 'object')
+        ? mode.constraints
+        : {};
+      var bits = [];
+      bits.push('max ' + String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h)));
+      if (constraints.noFollowup) bits.push('no followup');
+      if (constraints.noMention) bits.push('no mention');
+      if (constraints.noQuote) bits.push('no quote');
+      return bits.join(', ');
+    }
+
+    function findModeById(cfg, modeId) {
+      var modes = (cfg && Array.isArray(cfg.modes)) ? cfg.modes : [];
+      var wanted = String(modeId || '');
+      for (var i = 0; i < modes.length; i += 1) {
+        if (String((modes[i] || {}).id || '') === wanted) return modes[i];
+      }
+      return null;
+    }
+
+    function closeModeDrawer(skipRender) {
+      if (!state.modeDrawerModeId) return;
+      state.modeDrawerModeId = '';
+      if (!skipRender) renderModesPanel();
+    }
+
+    function openModeDrawer(modeId) {
+      var wanted = String(modeId || '').trim();
+      if (!wanted) return;
+      var cfg = normalizeModesConfig(state.modesConfig);
+      if (!findModeById(cfg, wanted)) return;
+      state.modeDrawerModeId = wanted;
+      renderModesPanel();
+    }
+
+    function updateModeFromDrawerField(event) {
+      var target = event && event.target;
+      if (!target) return;
+      var modeId = String(state.modeDrawerModeId || '');
+      if (!modeId) return;
+      var cfg = normalizeModesConfig(state.modesConfig);
+      var mode = findModeById(cfg, modeId);
+      if (!mode) return;
+
+      if (target.hasAttribute('data-mode-drawer-enabled')) {
+        mode.enabled = !!target.checked;
+      } else if (target.hasAttribute('data-mode-drawer-default-expiry')) {
+        mode.defaultExpiryHours = Math.max(0, parseInt(target.value || '0', 10) || 0);
+      } else if (target.hasAttribute('data-mode-drawer-allow')) {
+        var actionName = String(target.getAttribute('data-mode-drawer-allow') || '');
+        if (!actionName) return;
+        mode.allow = Object.assign({}, mode.allow || {});
+        mode.allow[actionName] = !!target.checked;
+      } else if (target.hasAttribute('data-mode-drawer-constraint')) {
+        var key = String(target.getAttribute('data-mode-drawer-constraint') || '');
+        if (!key) return;
+        mode.constraints = Object.assign({}, mode.constraints || {});
+        if (key === 'maxRepliesPerUserThread24h') {
+          mode.constraints[key] = Math.max(0, parseInt(target.value || '0', 10) || 0);
+        } else {
+          mode.constraints[key] = !!target.checked;
+        }
+      } else {
+        return;
+      }
+
+      state.modesConfig = cfg;
+    }
+
+    function renderModeDrawer(cfg, actionChoices) {
+      var drawer = document.getElementById('mode-detail-drawer');
+      var title = document.getElementById('mode-detail-drawer-title');
+      var body = document.getElementById('mode-detail-drawer-body');
+      if (!drawer || !title || !body) return;
+
+      var modeId = String(state.modeDrawerModeId || '');
+      var mode = findModeById(cfg, modeId);
+      if (!mode) {
+        state.modeDrawerModeId = '';
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+        title.textContent = 'Mode details';
+        body.innerHTML = '';
+        return;
+      }
+
+      var constraints = mode.constraints || {};
+      var actionToggles = (Array.isArray(actionChoices) ? actionChoices : []).map(function (actionName) {
+        var checked = mode.allow && mode.allow[actionName] ? ' checked' : '';
+        return '<label class="mini-toggle"><input type="checkbox" data-mode-drawer-allow="' + escapeHtml(actionName) + '"' + checked + '><span>' + escapeHtml(actionName) + '</span></label>';
+      }).join('');
+
+      title.textContent = String(mode.id || 'Mode') + ' details';
+      body.innerHTML = [
+        '<div class="mode-drawer-block">',
+        '  <div class="mode-drawer-inline">',
+        '    <label class="schedule-toggle"><input type="checkbox" data-mode-drawer-enabled ' + ((mode.enabled === false) ? '' : 'checked') + '><span>Enabled</span></label>',
+        '    <label class="mini-input mode-expiry-input">Default expiry (h)<input type="number" min="0" step="1" data-mode-drawer-default-expiry value="' + escapeHtml(String(mode.defaultExpiryHours || 0)) + '"></label>',
+        '  </div>',
+        '</div>',
+        '<div class="mode-drawer-block">',
+        '  <div class="mode-drawer-section-title">Allowed actions</div>',
+        '  <div class="mode-permissions-grid mode-drawer-actions">' + actionToggles + '</div>',
+        '</div>',
+        '<div class="mode-drawer-block">',
+        '  <div class="mode-drawer-section-title">Constraints</div>',
+        '  <div class="mode-constraints-grid mode-drawer-constraints">',
+        '    <label class="mini-input">Max replies/user/thread per 24h<input type="number" min="0" step="1" data-mode-drawer-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '"></label>',
+        '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-constraint="noFollowup" ' + (constraints.noFollowup ? 'checked' : '') + '><span>No followup</span></label>',
+        '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-constraint="noMention" ' + (constraints.noMention ? 'checked' : '') + '><span>No mention</span></label>',
+        '    <label class="mini-toggle"><input type="checkbox" data-mode-drawer-constraint="noQuote" ' + (constraints.noQuote ? 'checked' : '') + '><span>No quote</span></label>',
+        '  </div>',
+        '</div>'
+      ].join('');
+      drawer.classList.add('open');
+      drawer.setAttribute('aria-hidden', 'false');
+    }
+
     function renderBehaviorsPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
       var behaviors = cfg.behaviors || {};
@@ -3349,33 +3486,34 @@
         optInCommandsInput.value = (cfg.optInCommands || []).join(', ');
       }
 
-      list.innerHTML = (cfg.modes || []).map(function (mode) {
-        var constraints = mode.constraints || {};
-        var allow = mode.allow || {};
-        var modeId = String(mode.id || '');
-        var actionToggles = actionChoices.map(function (actionName) {
-          var checked = allow[actionName] ? ' checked' : '';
-          return '<label class="mini-toggle"><input type="checkbox" data-mode-allow="' + escapeHtml(actionName) + '"' + checked + '><span>' + escapeHtml(actionName) + '</span></label>';
+      var modes = Array.isArray(cfg.modes) ? cfg.modes : [];
+      if (!modes.length) {
+        list.innerHTML = '<div class="settings-empty-note">No modes configured.</div>';
+      } else {
+        list.innerHTML = modes.map(function (mode) {
+          var modeId = String(mode.id || '');
+          var counts = modeSummaryCounts(mode, actionChoices);
+          var isActive = modeId === String(state.modeDrawerModeId || '');
+          return [
+            '<article class="mode-summary-card' + (isActive ? ' active' : '') + '" data-mode-id="' + escapeHtml(modeId) + '">',
+            '  <div class="mode-summary-head">',
+            '    <div class="mode-summary-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
+            '    <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
+            '  </div>',
+            '  <div class="mode-summary-meta">',
+            '    <span>Default expiry: ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h</span>',
+            '    <span>Actions: ' + escapeHtml(String(counts.enabled)) + ' / ' + escapeHtml(String(counts.total)) + '</span>',
+            '    <span>Constraints: ' + escapeHtml(modeConstraintsSummary(mode)) + '</span>',
+            '  </div>',
+            '  <div class="mode-summary-actions">',
+            '    <button type="button" class="soft mini-add-btn mode-edit-btn" data-edit-mode="' + escapeHtml(modeId) + '">Edit details</button>',
+            '  </div>',
+            '</article>'
+          ].join('');
         }).join('');
-        return [
-          '<article class="mode-card" data-mode-id="' + escapeHtml(modeId) + '">',
-          '  <div class="mode-card-head">',
-          '    <div class="mode-card-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
-          '    <label class="schedule-toggle"><input type="checkbox" data-mode-enabled ' + ((mode.enabled === false) ? '' : 'checked') + '><span>Enabled</span></label>',
-          '  </div>',
-          '  <div class="mode-meta-row">',
-          '    <label class="mini-input mode-expiry-input">Default expiry (h)<input type="number" min="0" step="1" data-mode-default-expiry value="' + escapeHtml(String(mode.defaultExpiryHours || 0)) + '"></label>',
-          '  </div>',
-          '  <div class="mode-permissions-grid">' + actionToggles + '</div>',
-          '  <div class="mode-constraints-grid">',
-          '    <label class="mini-input">Max replies/user/thread per 24h<input type="number" min="0" step="1" data-mode-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '"></label>',
-          '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noFollowup" ' + (constraints.noFollowup ? 'checked' : '') + '><span>No followup</span></label>',
-          '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noMention" ' + (constraints.noMention ? 'checked' : '') + '><span>No mention</span></label>',
-          '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noQuote" ' + (constraints.noQuote ? 'checked' : '') + '><span>No quote</span></label>',
-          '  </div>',
-          '</article>'
-        ].join('');
-      }).join('');
+      }
+
+      renderModeDrawer(cfg, actionChoices);
 
       var modeOpts = modeOptions(cfg);
       var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
@@ -3587,33 +3725,6 @@
 
       cfg.startingMode = String((document.getElementById('modes-starting-mode') || {}).value || cfg.startingMode || '');
       cfg.defaultDecayMode = String((document.getElementById('modes-default-decay-mode') || {}).value || cfg.defaultDecayMode || '');
-
-      cfg.modes = (cfg.modes || []).map(function (mode) {
-        var modeSelectorValue = String(mode.id || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        var card = document.querySelector('.mode-card[data-mode-id="' + modeSelectorValue + '"]');
-        if (!card) return mode;
-        var next = cloneJson(mode);
-        next.enabled = !!((card.querySelector('[data-mode-enabled]') || {}).checked);
-        var modeDefaultExpiry = card.querySelector('[data-mode-default-expiry]');
-        next.defaultExpiryHours = Math.max(0, parseInt((modeDefaultExpiry && modeDefaultExpiry.value) || '0', 10) || 0);
-        next.allow = Object.assign({}, next.allow || {});
-        var allowToggles = card.querySelectorAll('[data-mode-allow]');
-        for (var i = 0; i < allowToggles.length; i += 1) {
-          var actionName = String(allowToggles[i].getAttribute('data-mode-allow') || '');
-          if (!actionName) continue;
-          next.allow[actionName] = !!allowToggles[i].checked;
-        }
-        next.constraints = Object.assign({}, next.constraints || {});
-        var maxReplies = card.querySelector('[data-mode-constraint="maxRepliesPerUserThread24h"]');
-        var noFollow = card.querySelector('[data-mode-constraint="noFollowup"]');
-        var noMention = card.querySelector('[data-mode-constraint="noMention"]');
-        var noQuote = card.querySelector('[data-mode-constraint="noQuote"]');
-        next.constraints.maxRepliesPerUserThread24h = Math.max(0, parseInt((maxReplies && maxReplies.value) || '0', 10) || 0);
-        next.constraints.noFollowup = !!(noFollow && noFollow.checked);
-        next.constraints.noMention = !!(noMention && noMention.checked);
-        next.constraints.noQuote = !!(noQuote && noQuote.checked);
-        return next;
-      });
 
       cfg.optInCommands = parseCsvList((document.getElementById('modes-opt-in-commands') || {}).value || '');
 
@@ -4242,6 +4353,9 @@
     function setActiveTab(tab) {
       updateConditionalTabs();
       if (!isTabVisible(tab)) tab = 'persona';
+      if (tab !== 'modes') {
+        closeModeDrawer(true);
+      }
       state.activeTab = tab;
       var buttons = document.querySelectorAll('.tab-btn');
       for (var i = 0; i < buttons.length; i += 1) {
@@ -4368,7 +4482,24 @@
       document.getElementById('btn-mode-add-transition').addEventListener('click', function () {
         addModeTransitionRow();
       });
+      document.getElementById('btn-mode-drawer-close').addEventListener('click', function () {
+        closeModeDrawer();
+      });
+      var modeDrawer = document.getElementById('mode-detail-drawer');
+      if (modeDrawer) {
+        modeDrawer.addEventListener('input', function (event) {
+          updateModeFromDrawerField(event);
+        });
+        modeDrawer.addEventListener('change', function (event) {
+          updateModeFromDrawerField(event);
+        });
+      }
       document.getElementById('panel-modes').addEventListener('click', function (event) {
+        var editModeBtn = event.target && event.target.closest('[data-edit-mode]');
+        if (editModeBtn) {
+          openModeDrawer(editModeBtn.getAttribute('data-edit-mode') || '');
+          return;
+        }
         var removeRuleBtn = event.target && event.target.closest('[data-remove-rule]');
         if (removeRuleBtn) {
           var row = removeRuleBtn.closest('[data-rule-idx]');
