@@ -5574,8 +5574,9 @@ dictation_live_level_for_session() {
     printf '%s' "0"
     return 0
   fi
-  rms_line=$(grep -E 'lavfi\.astats\.Overall\.RMS_level' "$levels_file" 2>/dev/null | tail -n 1 | tr -d '\r' || true)
-  rms_db=$(printf '%s' "$rms_line" | sed -E 's/.*RMS_level[:=][[:space:]]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\1/I')
+  # ffmpeg metadata keys vary by build/platform; use the latest RMS_level line regardless of exact key prefix.
+  rms_line=$(tail -n 180 "$levels_file" 2>/dev/null | tr -d '\r' | awk 'BEGIN { IGNORECASE=1 } /RMS_level/ { line=$0 } END { print line }' || true)
+  rms_db=$(printf '%s' "$rms_line" | sed -E 's/.*RMS_level[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\1/I')
   if [ -z "$rms_db" ]; then
     printf '%s' "0"
     return 0
@@ -5590,6 +5591,8 @@ dictation_live_level_for_session() {
       if (v < -90) v = -90
       if (v > -8) v = -8
       level = (v + 90) / 82
+      # Preserve visible movement at low voice levels while keeping real mic-derived dynamics.
+      level = sqrt(level)
       if (level < 0) level = 0
       if (level > 1) level = 1
       printf "%.5f", level

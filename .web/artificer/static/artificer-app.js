@@ -6522,12 +6522,18 @@
           }
           dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
           var sum = 0;
+          var peak = 0;
           for (var i = 0; i < dictationWaveData.length; i += 1) {
             var centered = (dictationWaveData[i] - 128) / 128;
             sum += centered * centered;
+            var mag = centered < 0 ? -centered : centered;
+            if (mag > peak) {
+              peak = mag;
+            }
           }
           var rms = Math.sqrt(sum / dictationWaveData.length);
-          var normalized = rms * 11;
+          // Calibrated real mic amplitude mapping: stays truthful, but avoids visual flat-lining on quieter inputs.
+          var normalized = Math.max(rms * 28, peak * 3.6);
           if (normalized > 1) {
             normalized = 1;
           }
