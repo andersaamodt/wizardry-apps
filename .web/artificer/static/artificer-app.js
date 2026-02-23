@@ -659,6 +659,7 @@
   var dictationWaveStartPromise = null;
   var dictatePointerHandledAt = 0;
   var dictateStopPointerHandledAt = 0;
+  var dictationShortcutLastToggleAtByTrigger = {};
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -12889,6 +12890,27 @@
     }
   }
 
+  function markDictationToggleTriggered(trigger) {
+    var name = String(trigger || "");
+    if (!name) {
+      return;
+    }
+    dictationShortcutLastToggleAtByTrigger[name] = Date.now();
+  }
+
+  function dictationToggleTriggerHandledRecently(trigger, withinMs) {
+    var name = String(trigger || "");
+    if (!name) {
+      return false;
+    }
+    var windowMs = Number(withinMs || 0);
+    if (!isFinite(windowMs) || windowMs < 1) {
+      windowMs = 1;
+    }
+    var lastAt = Number(dictationShortcutLastToggleAtByTrigger[name] || 0);
+    return !!lastAt && (Date.now() - lastAt) <= windowMs;
+  }
+
   function dictationShortcutKeyboardTrigger(event) {
     var code = String(event && event.code ? event.code : "");
     var key = String(event && event.key ? event.key : "").toLowerCase();
@@ -12929,6 +12951,12 @@
     if (code === "BrowserForward" || keyCompact === "browserforward") {
       return "mouse-button-5";
     }
+    if (keyCompact === "xbutton1" || keyCompact === "xf86back") {
+      return "mouse-button-4";
+    }
+    if (keyCompact === "xbutton2" || keyCompact === "xf86forward") {
+      return "mouse-button-5";
+    }
     if (
       code === "F6" || code === "F7" || code === "F8" || code === "F9" || code === "F10" ||
       code === "F13" || code === "F14" || code === "F15" || code === "F16" || code === "F17" || code === "F18" || code === "F19"
@@ -12941,6 +12969,9 @@
   function dictationShortcutMouseTrigger(event) {
     var button = Number(event && event.button);
     var which = Number(event && event.which);
+    var buttons = Number(event && event.buttons);
+    var eventType = String(event && event.type ? event.type : "").toLowerCase();
+    var isDownEvent = eventType.indexOf("down") >= 0;
     if (button === 3 || which === 4) {
       return "mouse-button-4";
     }
@@ -12949,6 +12980,14 @@
     }
     if (button === 1 || which === 2) {
       return "mouse-wheel-click";
+    }
+    if (isDownEvent && isFinite(buttons)) {
+      if ((buttons & 8) === 8) {
+        return "mouse-button-4";
+      }
+      if ((buttons & 16) === 16) {
+        return "mouse-button-5";
+      }
     }
     return "";
   }
@@ -15980,6 +16019,7 @@
         timer: null
       };
       toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
+      markDictationToggleTriggered(trigger);
       if (isKeyboardEvent) {
         delete dictationShortcutPressState[trigger];
       }
@@ -16011,7 +16051,25 @@
         endDictationHotkeyHold(trigger);
       } else if (elapsed <= DICTATION_SHORTCUT_TAP_MS) {
         toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
+        markDictationToggleTriggered(trigger);
       }
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+      if (event && typeof event.stopPropagation === "function") {
+        event.stopPropagation();
+      }
+      return;
+    }
+    var isKeyboardEvent = !!(event && String(event.type || "").indexOf("key") === 0);
+    if (
+      isKeyboardEvent &&
+      trigger === "capslock" &&
+      trigger === toggleTrigger &&
+      !dictationToggleTriggerHandledRecently(trigger, 170)
+    ) {
+      toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
+      markDictationToggleTriggered(trigger);
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
       }

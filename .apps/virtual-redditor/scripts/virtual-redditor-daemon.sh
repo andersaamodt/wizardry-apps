@@ -1442,7 +1442,7 @@ is_summons_comment() {
         | map(gsub("^\\s+"; "") | gsub("\\s+$"; ""))
         | map(select(length > 0))
       ) as $tokens
-    | if ($tokens | any($b | contains(.))) then "1" else "0" end
+    | if ($tokens | any(. as $token | ($b | contains($token)))) then "1" else "0" end
   ' 2>/dev/null || printf '0')
 
   case "$hit" in
