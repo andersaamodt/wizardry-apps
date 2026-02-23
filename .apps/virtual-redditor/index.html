@@ -3240,13 +3240,15 @@
       });
     }
 
-    function fillModeSelect(selectId, selectedValue) {
+    function fillModeSelect(selectId, selectedValue, idOnly) {
       var select = document.getElementById(selectId);
       if (!select) return;
       var options = modeOptions();
+      var useIdOnly = !!idOnly;
       select.innerHTML = options.map(function (opt) {
         var selected = String(selectedValue || '') === opt.id ? ' selected' : '';
-        return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(opt.id + ' - ' + opt.label) + '</option>';
+        var text = useIdOnly ? opt.id : (opt.id + ' - ' + opt.label);
+        return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(text) + '</option>';
       }).join('');
       if (!select.value && options.length) {
         select.value = options[0].id;
@@ -3590,8 +3592,8 @@
       var list = document.getElementById('modes-list');
       if (!list) return;
 
-      fillModeSelect('modes-starting-mode', cfg.startingMode || '');
-      fillModeSelect('modes-default-decay-mode', cfg.defaultDecayMode || '');
+      fillModeSelect('modes-starting-mode', cfg.startingMode || '', true);
+      fillModeSelect('modes-default-decay-mode', cfg.defaultDecayMode || '', true);
       fillModeSelect('relationship-mode', cfg.startingMode || '');
 
       var actionCatalog = Array.isArray(cfg.actionCatalog) ? cfg.actionCatalog : [];
