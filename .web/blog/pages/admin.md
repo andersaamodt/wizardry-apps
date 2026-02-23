@@ -309,6 +309,10 @@ title: Blog Admin
 <div class="field-row">
 <label for="account-nostr-pubkey"><strong>Nostr Pubkey</strong></label>
 <input type="text" id="account-nostr-pubkey" readonly>
+<p class="muted account-note">This key is account-bound and cannot be edited directly.</p>
+<div class="account-row">
+<button id="btn-migrate-nostr-key" type="button" class="danger">Migrate Nostr Key...</button>
+</div>
 </div>
 
 <div class="field-row">
@@ -744,6 +748,17 @@ body {
 [data-admin-section="account"] #account-nostr-pubkey,
 [data-admin-section="account"] #account-ssh-public-key {
   inline-size: min(100%, 42rem);
+}
+
+.account-note {
+  margin: 0.28rem 0 0.34rem;
+}
+
+[data-admin-section="account"] #account-nostr-pubkey {
+  background: #eef2fb;
+  color: #334155;
+  border-style: dashed;
+  cursor: not-allowed;
 }
 
 .account-ssh-optional {

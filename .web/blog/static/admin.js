@@ -52,6 +52,7 @@
     publishNowButton: document.getElementById('btn-publish-now'),
     mirrorNostrButton: document.getElementById('btn-mirror-nostr'),
     bindPasskeyButton: document.getElementById('btn-bind-passkey'),
+    migrateNostrKeyButton: document.getElementById('btn-migrate-nostr-key'),
     generateSshButton: document.getElementById('btn-generate-ssh'),
     linkSshButton: document.getElementById('btn-link-ssh'),
     imagePicker: document.getElementById('image-picker'),
@@ -148,6 +149,24 @@
     const bg = kind === 'ok' ? '#e8f5e9' : (kind === 'warn' ? '#fff8e1' : '#ffebee');
     const border = kind === 'ok' ? '#4caf50' : (kind === 'warn' ? '#f9a825' : '#e53935');
     target.innerHTML = '<div class="notice" style="background:' + bg + ';border-color:' + border + ';">' + message + '</div>';
+  }
+
+  function lockNostrPubkeyField() {
+    if (!els.accountNostrPubkey) {
+      return;
+    }
+    const lockedValue = String(els.accountNostrPubkey.value || '');
+    els.accountNostrPubkey.readOnly = true;
+    els.accountNostrPubkey.setAttribute('readonly', 'readonly');
+    els.accountNostrPubkey.setAttribute('aria-readonly', 'true');
+    els.accountNostrPubkey.addEventListener('beforeinput', function (event) {
+      event.preventDefault();
+    });
+    els.accountNostrPubkey.addEventListener('input', function () {
+      if (els.accountNostrPubkey.value !== lockedValue) {
+        els.accountNostrPubkey.value = lockedValue;
+      }
+    });
   }
 
   function applyThemePreview(theme) {
@@ -542,6 +561,7 @@
       }
       if (els.accountNostrPubkey) {
         els.accountNostrPubkey.value = state.nostrPubkey;
+        lockNostrPubkeyField();
       }
       if (els.accountSshPublicKey) {
         els.accountSshPublicKey.placeholder = state.sshFingerprint
@@ -1169,6 +1189,15 @@
           .catch(function (err) {
             setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
           });
+      });
+    }
+    if (els.migrateNostrKeyButton) {
+      els.migrateNostrKeyButton.addEventListener('click', function () {
+        setOutput(
+          els.outputAccount,
+          'Nostr key migration is intentionally gated. It requires proof of control for both old and new keys before any account rebind. This flow is not enabled yet.',
+          'warn'
+        );
       });
     }
     if (els.generateSshButton) {
