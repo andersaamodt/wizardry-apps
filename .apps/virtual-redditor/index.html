@@ -318,20 +318,60 @@
 
         <section class="tab-panel" id="panel-modes">
           <div class="status-line" id="modes-line">Modes not loaded yet.</div>
-          <div class="settings-card subpanel-card">
-            <div class="persona-section-title">Mode Defaults</div>
-            <div class="mode-fields-inline modes-grid">
-              <div class="mode-field-row">
-                <label for="modes-starting-mode" class="mode-field-label">Starting mode</label>
-                <select id="modes-starting-mode"></select>
+          <div id="modes-layout-card" class="settings-card subpanel-card modes-layout-card">
+            <div class="modes-main-pane">
+              <div class="persona-section-title">Mode Defaults</div>
+              <div class="mode-fields-inline modes-grid">
+                <div class="mode-field-row">
+                  <label for="modes-starting-mode" class="mode-field-label">Starting mode</label>
+                  <select id="modes-starting-mode"></select>
+                </div>
+                <div class="mode-field-row">
+                  <label for="modes-default-decay-mode" class="mode-field-label">Default decay mode</label>
+                  <select id="modes-default-decay-mode"></select>
+                </div>
               </div>
-              <div class="mode-field-row">
-                <label for="modes-default-decay-mode" class="mode-field-label">Default decay mode</label>
-                <select id="modes-default-decay-mode"></select>
+              <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
+              <div id="modes-list" class="modes-list"></div>
+              <div class="modes-section-head modes-subtitle">
+                <div class="persona-section-title">Switch Rules</div>
+                <button id="btn-mode-add-rule" type="button" class="soft mini-add-btn">Add rule</button>
+              </div>
+              <div class="modes-grid-head switch-grid-head" aria-hidden="true">
+                <span>Label</span>
+                <span>Match phrases</span>
+                <span>Switch to</span>
+                <span>Duration (h)</span>
+                <span>Decay to</span>
+                <span>Template</span>
+                <span>Announce</span>
+                <span></span>
+              </div>
+              <div id="mode-switch-rules-list" class="mode-switch-rules-list"></div>
+              <div class="persona-section-title modes-subtitle">Opt-in Commands</div>
+              <div class="mode-fields-inline">
+                <div class="mode-field-row modes-wide-field">
+                  <label for="modes-opt-in-commands" class="mode-field-label">Commands</label>
+                  <input id="modes-opt-in-commands" type="text" placeholder="!summon, !engage, /u/botname">
+                </div>
+              </div>
+              <div class="modes-section-head modes-subtitle">
+                <div class="persona-section-title">Post-Action Transitions</div>
+                <button id="btn-mode-add-transition" type="button" class="soft mini-add-btn">Add transition</button>
+              </div>
+              <div class="modes-grid-head transition-grid-head" aria-hidden="true">
+                <span>Action</span>
+                <span>Switch to</span>
+                <span>Duration (h)</span>
+                <span>Decay to</span>
+                <span>Announce</span>
+                <span></span>
+              </div>
+              <div id="modes-transitions-list" class="mode-switch-rules-list"></div>
+              <div class="settings-actions modes-save-actions">
+                <button id="btn-save-modes" type="button" class="primary">Save modes</button>
               </div>
             </div>
-            <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
-            <div id="modes-list" class="modes-list"></div>
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div id="mode-detail-drawer-title" class="mode-detail-drawer-title">Mode details</div>
@@ -339,44 +379,6 @@
               </div>
               <div id="mode-detail-drawer-body" class="mode-detail-drawer-body"></div>
             </aside>
-            <div class="modes-section-head modes-subtitle">
-              <div class="persona-section-title">Switch Rules</div>
-              <button id="btn-mode-add-rule" type="button" class="soft mini-add-btn">Add rule</button>
-            </div>
-            <div class="modes-grid-head switch-grid-head" aria-hidden="true">
-              <span>Label</span>
-              <span>Match phrases</span>
-              <span>Switch to</span>
-              <span>Duration (h)</span>
-              <span>Decay to</span>
-              <span>Template</span>
-              <span>Announce</span>
-              <span></span>
-            </div>
-            <div id="mode-switch-rules-list" class="mode-switch-rules-list"></div>
-            <div class="persona-section-title modes-subtitle">Opt-in Commands</div>
-            <div class="mode-fields-inline">
-              <div class="mode-field-row modes-wide-field">
-                <label for="modes-opt-in-commands" class="mode-field-label">Commands</label>
-                <input id="modes-opt-in-commands" type="text" placeholder="!summon, !engage, /u/botname">
-              </div>
-            </div>
-            <div class="modes-section-head modes-subtitle">
-              <div class="persona-section-title">Post-Action Transitions</div>
-              <button id="btn-mode-add-transition" type="button" class="soft mini-add-btn">Add transition</button>
-            </div>
-            <div class="modes-grid-head transition-grid-head" aria-hidden="true">
-              <span>Action</span>
-              <span>Switch to</span>
-              <span>Duration (h)</span>
-              <span>Decay to</span>
-              <span>Announce</span>
-              <span></span>
-            </div>
-            <div id="modes-transitions-list" class="mode-switch-rules-list"></div>
-            <div class="settings-actions modes-save-actions">
-              <button id="btn-save-modes" type="button" class="primary">Save modes</button>
-            </div>
           </div>
         </section>
 
@@ -3350,6 +3352,13 @@
     function closeModeDrawer(skipRender) {
       if (!state.modeDrawerModeId) return;
       state.modeDrawerModeId = '';
+      var drawer = document.getElementById('mode-detail-drawer');
+      var layoutCard = document.getElementById('modes-layout-card');
+      if (drawer) {
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+      }
+      if (layoutCard) layoutCard.classList.remove('drawer-open');
       if (!skipRender) renderModesPanel();
     }
 
@@ -3398,6 +3407,7 @@
 
     function renderModeDrawer(cfg, actionChoices) {
       var drawer = document.getElementById('mode-detail-drawer');
+      var layoutCard = document.getElementById('modes-layout-card');
       var title = document.getElementById('mode-detail-drawer-title');
       var body = document.getElementById('mode-detail-drawer-body');
       if (!drawer || !title || !body) return;
@@ -3407,6 +3417,7 @@
       if (!mode) {
         state.modeDrawerModeId = '';
         drawer.classList.remove('open');
+        if (layoutCard) layoutCard.classList.remove('drawer-open');
         drawer.setAttribute('aria-hidden', 'true');
         title.textContent = 'Mode details';
         body.innerHTML = '';
@@ -3442,6 +3453,7 @@
         '</div>'
       ].join('');
       drawer.classList.add('open');
+      if (layoutCard) layoutCard.classList.add('drawer-open');
       drawer.setAttribute('aria-hidden', 'false');
     }
 

@@ -660,6 +660,9 @@
   var dictationWaveData = null;
   var dictationWaveStartPromise = null;
   var dictationWavePollTimer = null;
+  var dictationPreparePromise = null;
+  var dictationPrepareReadyUntil = 0;
+  var dictationPrepareLoopTimer = null;
   var dictatePointerHandledAt = 0;
   var dictateStopPointerHandledAt = 0;
   var dictationShortcutLastToggleAtByTrigger = {};
@@ -12986,6 +12989,14 @@
       state.dictationBackend = backend;
       state.dictationPreferredBackend = preferred;
       state.dictationInstallError = "";
+      if (!installed) {
+        dictationPrepareReadyUntil = 0;
+        stopDictationPrepareLoop();
+      } else {
+        requestDictationPrepare({ silent: true }).catch(function () {
+          return null;
+        });
+      }
       if (!installed && !state.dictateBusy) {
         state.dictateRecording = false;
         state.dictateSessionId = "";
@@ -13016,6 +13027,66 @@
 
   function dictationHotkeysEnabled() {
     return !!state.dictationInstalled;
+  }
+
+  function dictationPrepareLoopShouldRun() {
+    if (!state.dictationInstalled || state.dictateRecording || state.dictateBusy) {
+      return false;
+    }
+    if (typeof document === "undefined") {
+      return false;
+    }
+    var activeEl = document.activeElement;
+    return !!(activeEl && (activeEl === el.runPrompt || activeEl === el.dictateBtn));
+  }
+
+  function stopDictationPrepareLoop() {
+    if (dictationPrepareLoopTimer) {
+      clearInterval(dictationPrepareLoopTimer);
+      dictationPrepareLoopTimer = null;
+    }
+  }
+
+  function startDictationPrepareLoop() {
+    if (dictationPrepareLoopTimer) {
+      return;
+    }
+    dictationPrepareLoopTimer = setInterval(function () {
+      if (!dictationPrepareLoopShouldRun()) {
+        stopDictationPrepareLoop();
+        return;
+      }
+      requestDictationPrepare({ silent: true }).catch(function () {
+        return null;
+      });
+    }, 12000);
+  }
+
+  function requestDictationPrepare(options) {
+    var opts = options && typeof options === "object" ? options : {};
+    if (!state.dictationInstalled || state.dictateRecording || state.dictateBusy) {
+      return Promise.resolve(false);
+    }
+    var now = Date.now();
+    if (!opts.force && dictationPrepareReadyUntil && now < dictationPrepareReadyUntil) {
+      return Promise.resolve(true);
+    }
+    if (dictationPreparePromise) {
+      return dictationPreparePromise;
+    }
+    dictationPreparePromise = apiPost("dictate_prepare", {}, { timeoutMs: 16000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not prepare dictation");
+      }
+      dictationPrepareReadyUntil = Date.now() + 18000;
+      return true;
+    }).catch(function (_error) {
+      dictationPrepareReadyUntil = 0;
+      return false;
+    }).finally(function () {
+      dictationPreparePromise = null;
+    });
+    return dictationPreparePromise;
   }
 
   function loadDictationShortcutPrefs() {
@@ -15786,6 +15857,8 @@
       return Promise.resolve(false);
     }
     var stopAfterStart = false;
+    dictationPrepareReadyUntil = 0;
+    stopDictationPrepareLoop();
     state.dictateBusy = true;
     setDictationPhase("starting");
     renderUi();
@@ -15863,6 +15936,12 @@
         state.dictateSessionId = "";
         setDictationPhase("idle");
         renderUi();
+        requestDictationPrepare({ silent: true }).catch(function () {
+          return null;
+        });
+        if (dictationPrepareLoopShouldRun()) {
+          startDictationPrepareLoop();
+        }
       });
   }
 
@@ -17999,6 +18078,22 @@
     }
 
     if (el.dictateBtn) {
+      on(el.dictateBtn, "mouseenter", function () {
+        requestDictationPrepare({ silent: true }).catch(function () {
+          return null;
+        });
+      });
+      on(el.dictateBtn, "focus", function () {
+        requestDictationPrepare({ silent: true }).catch(function () {
+          return null;
+        });
+        startDictationPrepareLoop();
+      });
+      on(el.dictateBtn, "blur", function () {
+        if (!dictationPrepareLoopShouldRun()) {
+          stopDictationPrepareLoop();
+        }
+      });
       on(el.dictateBtn, "mousedown", function (event) {
         if (event && event.button !== 0) {
           return;
@@ -18513,6 +18608,19 @@
       renderRunButton();
     });
 
+    on(el.runPrompt, "focus", function () {
+      requestDictationPrepare({ silent: true }).catch(function () {
+        return null;
+      });
+      startDictationPrepareLoop();
+    });
+
+    on(el.runPrompt, "blur", function () {
+      if (!dictationPrepareLoopShouldRun()) {
+        stopDictationPrepareLoop();
+      }
+    });
+
     on(el.runPrompt, "paste", function (event) {
       try {
         onPromptPaste(event);
@@ -18715,6 +18823,7 @@
     window.addEventListener("blur", function () {
       clearDictationShortcutPressState();
       endDictationHotkeyHold("");
+      stopDictationPrepareLoop();
     });
   }
 
@@ -18740,6 +18849,7 @@
     stopApprovalResumeWatch();
     clearDictationUiTicker();
     stopDictationWaveMonitor();
+    stopDictationPrepareLoop();
     clearDictationShortcutPressState();
     clearPendingAttachments();
   });
