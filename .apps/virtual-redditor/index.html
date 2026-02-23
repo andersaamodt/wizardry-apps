@@ -82,9 +82,12 @@
 
         <nav class="tabbar" aria-label="Virtual Redditor panels">
           <button type="button" class="tab-btn active" data-tab="persona">Persona</button>
+          <button type="button" class="tab-btn" data-tab="behaviors">Behaviors</button>
+          <button type="button" class="tab-btn" data-tab="modes">Modes</button>
+          <button type="button" class="tab-btn" data-tab="relationships">Relationships</button>
           <button type="button" class="tab-btn" data-tab="replies">Replies</button>
-          <button type="button" class="tab-btn" data-tab="actions">Enforcement</button>
-          <button type="button" class="tab-btn" data-tab="logs">Logs</button>
+          <button type="button" class="tab-btn" data-tab="enforcement">Enforcement</button>
+          <button type="button" class="tab-btn" data-tab="log">Log</button>
         </nav>
 
         <section class="tab-panel active persona-panel" id="panel-persona">
@@ -251,7 +254,202 @@
           </div>
         </section>
 
-        <section class="tab-panel" id="panel-actions">
+        <section class="tab-panel" id="panel-behaviors">
+          <div class="settings-card subpanel-card">
+            <div class="persona-section-title">Behavior Policy</div>
+            <div class="mode-fields-inline modes-grid">
+              <div class="mode-field-row">
+                <label for="behavior-mirror-tone" class="mode-field-label">Mirror tone</label>
+                <select id="behavior-mirror-tone">
+                  <option value="mirror_or_less">Mirror or less</option>
+                  <option value="deescalate_only">Always de-escalate</option>
+                  <option value="mirror_exact">Mirror exactly</option>
+                </select>
+              </div>
+              <div class="mode-field-row">
+                <label for="behavior-humor" class="mode-field-label">Humor</label>
+                <select id="behavior-humor">
+                  <option value="measured">Measured</option>
+                  <option value="dry">Dry</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+              <div class="mode-field-row">
+                <label for="behavior-citations" class="mode-field-label">Citations</label>
+                <select id="behavior-citations">
+                  <option value="as-needed">As needed</option>
+                  <option value="never">Never</option>
+                  <option value="always">Always</option>
+                </select>
+              </div>
+              <div class="mode-field-row">
+                <label for="behavior-summonable" class="mode-field-label">Summonable</label>
+                <label class="schedule-toggle">
+                  <input id="behavior-summonable" type="checkbox">
+                  <span>Enable summon command responses</span>
+                </label>
+              </div>
+            </div>
+            <div class="mode-fields-inline modes-grid">
+              <div class="mode-field-row">
+                <label class="mode-field-label">Latency jitter</label>
+                <div class="inline-field-row">
+                  <input id="behavior-latency-min" type="number" min="0" step="1" value="0">
+                  <span class="schedule-inline">to</span>
+                  <input id="behavior-latency-max" type="number" min="0" step="1" value="0">
+                  <span class="schedule-inline">sec</span>
+                </div>
+              </div>
+              <div class="mode-field-row">
+                <label class="mode-field-label">Ban jitter</label>
+                <div class="inline-field-row">
+                  <input id="behavior-ban-min" type="number" min="0" step="1" value="7">
+                  <span class="schedule-inline">to</span>
+                  <input id="behavior-ban-max" type="number" min="0" step="1" value="45">
+                  <span class="schedule-inline">sec</span>
+                </div>
+              </div>
+            </div>
+            <div class="settings-actions modes-save-actions">
+              <button id="btn-save-behaviors" type="button" class="primary">Save behaviors</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-modes">
+          <div class="status-line" id="modes-line">Modes not loaded yet.</div>
+          <div class="settings-card subpanel-card">
+            <div class="persona-section-title">Mode Defaults</div>
+            <div class="mode-fields-inline modes-grid">
+              <div class="mode-field-row">
+                <label for="modes-starting-mode" class="mode-field-label">Starting mode</label>
+                <select id="modes-starting-mode"></select>
+              </div>
+              <div class="mode-field-row">
+                <label for="modes-default-decay-mode" class="mode-field-label">Default decay mode</label>
+                <select id="modes-default-decay-mode"></select>
+              </div>
+            </div>
+            <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
+            <div id="modes-list" class="modes-list"></div>
+            <div class="persona-section-title modes-subtitle">Switch Rules</div>
+            <div id="mode-switch-rules-list" class="mode-switch-rules-list"></div>
+            <div class="settings-actions modes-save-actions">
+              <button id="btn-save-modes" type="button" class="primary">Save modes</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-relationships">
+          <div class="status-line" id="relationships-line">Relationships not loaded yet.</div>
+          <div class="settings-card subpanel-card">
+            <div class="persona-section-title">Manual Override</div>
+            <div class="mode-fields-inline modes-grid">
+              <div class="mode-field-row">
+                <label for="relationship-user" class="mode-field-label">User</label>
+                <input id="relationship-user" type="text" placeholder="reddit username">
+              </div>
+              <div class="mode-field-row">
+                <label for="relationship-mode" class="mode-field-label">Mode</label>
+                <select id="relationship-mode"></select>
+              </div>
+              <div class="mode-field-row">
+                <label for="relationship-duration" class="mode-field-label">Duration (hours)</label>
+                <input id="relationship-duration" type="number" min="0" step="1" value="72">
+              </div>
+              <div class="mode-field-row">
+                <label class="mode-field-label">&nbsp;</label>
+                <button id="btn-relationship-apply" type="button" class="primary">Apply override</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="relationships-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Mode</th>
+                  <th>Since</th>
+                  <th>Expires</th>
+                  <th>Trigger</th>
+                  <th>Interactions</th>
+                  <th>Valence</th>
+                </tr>
+              </thead>
+              <tbody id="relationships-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="panel-replies">
+          <div class="settings-card subpanel-card">
+            <div class="persona-section-title">Reply Templates</div>
+            <div class="mode-fields-inline modes-grid">
+              <div class="mode-field-row">
+                <label for="reply-template-warning" class="mode-field-label">Warning template</label>
+                <textarea id="reply-template-warning" class="custom-instructions-input compact-template-input"></textarea>
+              </div>
+              <div class="mode-field-row">
+                <label for="reply-template-switch" class="mode-field-label">Mode-switch template</label>
+                <textarea id="reply-template-switch" class="custom-instructions-input compact-template-input"></textarea>
+              </div>
+              <div class="mode-field-row">
+                <label for="reply-template-neutral-ban" class="mode-field-label">Neutral ban notice</label>
+                <textarea id="reply-template-neutral-ban" class="custom-instructions-input compact-template-input"></textarea>
+              </div>
+            </div>
+            <div class="settings-actions modes-save-actions">
+              <button id="btn-save-reply-templates" type="button" class="primary">Save templates</button>
+            </div>
+          </div>
+          <div class="status-line" id="replies-line">No replies loaded yet.</div>
+          <div id="replies-list"></div>
+        </section>
+
+        <section class="tab-panel" id="panel-enforcement">
+          <div class="settings-card subpanel-card">
+            <div class="persona-section-title">Ban Ladder</div>
+            <div class="table-wrap mini-table-wrap">
+              <table class="table" id="ban-levels-table">
+                <thead>
+                  <tr>
+                    <th>Level</th>
+                    <th>Enabled</th>
+                    <th>Default duration</th>
+                  </tr>
+                </thead>
+                <tbody id="ban-levels-body"></tbody>
+              </table>
+            </div>
+            <div class="persona-section-title modes-subtitle">Escalation</div>
+            <div class="mode-fields-inline modes-grid">
+              <div class="mode-field-row">
+                <label for="enforcement-escalate-on-high" class="mode-field-label">High severity</label>
+                <label class="schedule-toggle">
+                  <input id="enforcement-escalate-on-high" type="checkbox">
+                  <span>Escalate on high severity norms</span>
+                </label>
+              </div>
+              <div class="mode-field-row">
+                <label for="enforcement-escalation-targets" class="mode-field-label">Target</label>
+                <select id="enforcement-escalation-targets">
+                  <option value="modmail">Modmail</option>
+                  <option value="personal_mail">Personal Mail</option>
+                  <option value="both">Both</option>
+                </select>
+              </div>
+              <div class="mode-field-row">
+                <label for="enforcement-escalation-timing" class="mode-field-label">Timing</label>
+                <select id="enforcement-escalation-timing">
+                  <option value="enforce_then_escalate">Enforce then escalate</option>
+                  <option value="escalate_immediately">Escalate immediately</option>
+                </select>
+              </div>
+            </div>
+            <div class="settings-actions modes-save-actions">
+              <button id="btn-save-enforcement" type="button" class="primary">Save enforcement</button>
+            </div>
+          </div>
           <div class="status-line" id="actions-line">No actions loaded yet.</div>
           <div class="table-wrap">
             <table class="table" id="actions-table">
@@ -270,12 +468,20 @@
           </div>
         </section>
 
-        <section class="tab-panel" id="panel-replies">
-          <div class="status-line" id="replies-line">No replies loaded yet.</div>
-          <div id="replies-list"></div>
-        </section>
-
-        <section class="tab-panel" id="panel-logs">
+        <section class="tab-panel" id="panel-log">
+          <div class="status-line" id="mode-log-line">No mode log loaded yet.</div>
+          <div class="table-wrap mini-table-wrap">
+            <table class="table" id="mode-log-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Event</th>
+                  <th>Payload</th>
+                </tr>
+              </thead>
+              <tbody id="mode-log-body"></tbody>
+            </table>
+          </div>
           <div class="log-head-row">
             <div class="status-line">Standard Output</div>
             <button id="btn-log-clear-stdout" type="button" class="soft log-clear-btn">Clear</button>
@@ -553,6 +759,9 @@
       activeProfile: '',
       actions: [],
       replies: [],
+      modesConfig: null,
+      relationships: [],
+      modeLogEvents: [],
       activeTab: 'persona',
       pollTimer: null,
       doctrineDirty: false,
@@ -593,6 +802,9 @@
       profilesRenderSig: '',
       actionsRenderSig: '',
       repliesRenderSig: '',
+      modesRenderSig: '',
+      relationshipsRenderSig: '',
+      modeLogRenderSig: '',
       logsAvailable: false,
       normRows: [],
       doctrineCacheByProfile: {},
@@ -612,24 +824,12 @@
     };
 
     function updateConditionalTabs() {
-      var show = {
-        persona: true,
-        replies: Array.isArray(state.replies) && state.replies.length > 0,
-        actions: Array.isArray(state.actions) && state.actions.length > 0,
-        logs: !!state.logsAvailable
-      };
-      var tabs = ['replies', 'actions', 'logs'];
-      for (var i = 0; i < tabs.length; i += 1) {
-        var tab = tabs[i];
-        var btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
-        if (btn) btn.classList.toggle('hidden', !show[tab]);
-      }
+      return;
     }
 
     function isTabVisible(tab) {
-      if (tab === 'persona') return true;
       var btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
-      return !!(btn && !btn.classList.contains('hidden'));
+      return !!btn;
     }
 
     function ensureActiveTabVisible() {
@@ -1924,8 +2124,14 @@
       };
       state.actions = [];
       state.replies = [];
+      state.modesConfig = defaultModesConfigClient();
+      state.relationships = [];
+      state.modeLogEvents = [];
       state.logsAvailable = false;
       renderStatus();
+      renderModesDrivenPanels();
+      renderRelationships();
+      renderModeLog();
       renderActions();
       renderReplies();
       updateConditionalTabs();
@@ -2214,7 +2420,7 @@
 
     function jumpToActionByCommentKey(key) {
       if (!key) return;
-      setActiveTab('actions');
+      setActiveTab('enforcement');
       setTimeout(function () {
         var row = document.querySelector('#actions-body tr[data-comment-key="' + key + '"]');
         scrollAndFlash(row, 'linked-focus-row');
@@ -2752,6 +2958,418 @@
       line.textContent = String(replies.length) + ' replies loaded';
     }
 
+    function defaultModesConfigClient() {
+      return {
+        startingMode: 'SHADE',
+        defaultDecayMode: 'SHADE',
+        actionCatalog: ['Reply', 'Initiate', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Neutral Ban Notice'],
+        behaviors: {
+          mirrorTone: 'mirror_or_less',
+          humor: 'measured',
+          citations: 'as-needed',
+          latencyJitterSec: { min: 0, max: 0 },
+          banJitterSec: { min: 7, max: 45 },
+          summonable: true
+        },
+        modes: [],
+        switchRules: [],
+        replies: {
+          warningTemplate: '',
+          modeSwitchTemplate: '',
+          neutralBanTemplate: ''
+        },
+        banLevels: {
+          short: { enabled: true, durationHours: 72 },
+          medium: { enabled: true, durationHours: 168 },
+          long: { enabled: true, durationHours: 720 },
+          extended: { enabled: true, durationHours: 4380 },
+          year: { enabled: true, durationHours: 8760 },
+          permanent: { enabled: true, durationHours: 0 }
+        },
+        escalation: {
+          onHighSeverity: false,
+          targets: 'modmail',
+          timing: 'enforce_then_escalate'
+        }
+      };
+    }
+
+    function normalizeModesConfig(config) {
+      var base = defaultModesConfigClient();
+      var src = (config && typeof config === 'object') ? config : {};
+      var out = Object.assign({}, base, src);
+      out.behaviors = Object.assign({}, base.behaviors, src.behaviors || {});
+      out.behaviors.latencyJitterSec = Object.assign({}, base.behaviors.latencyJitterSec, ((src.behaviors || {}).latencyJitterSec) || {});
+      out.behaviors.banJitterSec = Object.assign({}, base.behaviors.banJitterSec, ((src.behaviors || {}).banJitterSec) || {});
+      out.replies = Object.assign({}, base.replies, src.replies || {});
+      out.escalation = Object.assign({}, base.escalation, src.escalation || {});
+      out.banLevels = Object.assign({}, base.banLevels, src.banLevels || {});
+      if (!Array.isArray(out.modes)) out.modes = [];
+      if (!Array.isArray(out.switchRules)) out.switchRules = [];
+      if (!Array.isArray(out.actionCatalog) || !out.actionCatalog.length) out.actionCatalog = base.actionCatalog.slice();
+      return out;
+    }
+
+    function cloneJson(value) {
+      try {
+        return JSON.parse(JSON.stringify(value || {}));
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function modeOptions(config) {
+      var cfg = normalizeModesConfig(config || state.modesConfig);
+      return (cfg.modes || []).filter(function (m) { return !!m && !!m.id; }).map(function (m) {
+        return { id: String(m.id), label: String(m.label || m.id) };
+      });
+    }
+
+    function fillModeSelect(selectId, selectedValue) {
+      var select = document.getElementById(selectId);
+      if (!select) return;
+      var options = modeOptions();
+      select.innerHTML = options.map(function (opt) {
+        var selected = String(selectedValue || '') === opt.id ? ' selected' : '';
+        return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(opt.id + ' - ' + opt.label) + '</option>';
+      }).join('');
+      if (!select.value && options.length) {
+        select.value = options[0].id;
+      }
+    }
+
+    function renderBehaviorsPanel() {
+      var cfg = normalizeModesConfig(state.modesConfig);
+      var behaviors = cfg.behaviors || {};
+      var mirror = document.getElementById('behavior-mirror-tone');
+      var humor = document.getElementById('behavior-humor');
+      var citations = document.getElementById('behavior-citations');
+      var summonable = document.getElementById('behavior-summonable');
+      var latencyMin = document.getElementById('behavior-latency-min');
+      var latencyMax = document.getElementById('behavior-latency-max');
+      var banMin = document.getElementById('behavior-ban-min');
+      var banMax = document.getElementById('behavior-ban-max');
+      if (mirror) mirror.value = String(behaviors.mirrorTone || 'mirror_or_less');
+      if (humor) humor.value = String(behaviors.humor || 'measured');
+      if (citations) citations.value = String(behaviors.citations || 'as-needed');
+      var statusSummons = (((state.status || {}).settings || {}).summonsEnabled);
+      if (summonable) summonable.checked = (typeof statusSummons === 'boolean') ? !!statusSummons : !!behaviors.summonable;
+      if (latencyMin) latencyMin.value = String((((behaviors.latencyJitterSec || {}).min) || 0));
+      if (latencyMax) latencyMax.value = String((((behaviors.latencyJitterSec || {}).max) || 0));
+      if (banMin) banMin.value = String((((behaviors.banJitterSec || {}).min) || 7));
+      if (banMax) banMax.value = String((((behaviors.banJitterSec || {}).max) || 45));
+    }
+
+    function renderModesPanel() {
+      var cfg = normalizeModesConfig(state.modesConfig);
+      var line = document.getElementById('modes-line');
+      var list = document.getElementById('modes-list');
+      var switchList = document.getElementById('mode-switch-rules-list');
+      if (!list || !switchList) return;
+
+      fillModeSelect('modes-starting-mode', cfg.startingMode || '');
+      fillModeSelect('modes-default-decay-mode', cfg.defaultDecayMode || '');
+      fillModeSelect('relationship-mode', cfg.startingMode || '');
+
+      var actionCatalog = Array.isArray(cfg.actionCatalog) ? cfg.actionCatalog : [];
+      var actionChoices = actionCatalog.filter(function (name) {
+        return ['Reply', 'Initiate', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Neutral Ban Notice'].indexOf(name) >= 0;
+      });
+
+      list.innerHTML = (cfg.modes || []).map(function (mode) {
+        var constraints = mode.constraints || {};
+        var allow = mode.allow || {};
+        var modeId = String(mode.id || '');
+        var actionToggles = actionChoices.map(function (actionName) {
+          var checked = allow[actionName] ? ' checked' : '';
+          return '<label class="mini-toggle"><input type="checkbox" data-mode-allow="' + escapeHtml(actionName) + '"' + checked + '><span>' + escapeHtml(actionName) + '</span></label>';
+        }).join('');
+        return [
+          '<article class="mode-card" data-mode-id="' + escapeHtml(modeId) + '">',
+          '  <div class="mode-card-head">',
+          '    <div class="mode-card-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
+          '    <label class="schedule-toggle"><input type="checkbox" data-mode-enabled ' + ((mode.enabled === false) ? '' : 'checked') + '><span>Enabled</span></label>',
+          '  </div>',
+          '  <div class="mode-permissions-grid">' + actionToggles + '</div>',
+          '  <div class="mode-constraints-grid">',
+          '    <label class="mini-input">Max replies/24h<input type="number" min="0" step="1" data-mode-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '"></label>',
+          '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noFollowup" ' + (constraints.noFollowup ? 'checked' : '') + '><span>No followup</span></label>',
+          '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noMention" ' + (constraints.noMention ? 'checked' : '') + '><span>No mention</span></label>',
+          '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noQuote" ' + (constraints.noQuote ? 'checked' : '') + '><span>No quote</span></label>',
+          '  </div>',
+          '</article>'
+        ].join('');
+      }).join('');
+
+      var modeOpts = modeOptions(cfg);
+      switchList.innerHTML = (cfg.switchRules || []).map(function (rule, idx) {
+        var modesOptionsHtml = modeOpts.map(function (opt) {
+          var selected = String(rule.toMode || '') === opt.id ? ' selected' : '';
+          return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(opt.id) + '</option>';
+        }).join('');
+        var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
+        return [
+          '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '">',
+          '  <input type="text" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '">',
+          '  <input type="text" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '">',
+          '  <select data-rule-to-mode>' + modesOptionsHtml + '</select>',
+          '  <input type="number" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '">',
+          '  <label class="mini-toggle"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+          '</div>'
+        ].join('');
+      }).join('');
+
+      if (line) line.textContent = String((cfg.modes || []).length) + ' modes loaded';
+    }
+
+    function renderBanLevelsPanel() {
+      var cfg = normalizeModesConfig(state.modesConfig);
+      var levels = [
+        { key: 'short', label: 'Short' },
+        { key: 'medium', label: 'Medium' },
+        { key: 'long', label: 'Long' },
+        { key: 'extended', label: 'Extended' },
+        { key: 'year', label: 'Year' },
+        { key: 'permanent', label: 'Permanent' }
+      ];
+      var body = document.getElementById('ban-levels-body');
+      if (!body) return;
+      body.innerHTML = levels.map(function (level) {
+        var row = ((cfg.banLevels || {})[level.key]) || {};
+        var enabled = row.enabled === false ? '' : ' checked';
+        var duration = (row.durationHours == null) ? 0 : Number(row.durationHours);
+        return [
+          '<tr data-ban-level="' + escapeHtml(level.key) + '">',
+          '  <td>' + escapeHtml(level.label) + '</td>',
+          '  <td><label class="mini-toggle"><input type="checkbox" data-ban-enabled' + enabled + '><span></span></label></td>',
+          '  <td>' + (level.key === 'permanent'
+            ? '<span class="micro">Permanent</span>'
+            : '<input type="number" min="1" step="1" data-ban-duration value="' + escapeHtml(String(duration || 0)) + '">') + '</td>',
+          '</tr>'
+        ].join('');
+      }).join('');
+
+      var escalation = cfg.escalation || {};
+      var onHigh = document.getElementById('enforcement-escalate-on-high');
+      var targets = document.getElementById('enforcement-escalation-targets');
+      var timing = document.getElementById('enforcement-escalation-timing');
+      if (onHigh) onHigh.checked = !!escalation.onHighSeverity;
+      if (targets) targets.value = String(escalation.targets || 'modmail');
+      if (timing) timing.value = String(escalation.timing || 'enforce_then_escalate');
+    }
+
+    function renderReplyTemplatesPanel() {
+      var cfg = normalizeModesConfig(state.modesConfig);
+      var templates = cfg.replies || {};
+      var warning = document.getElementById('reply-template-warning');
+      var sw = document.getElementById('reply-template-switch');
+      var neutral = document.getElementById('reply-template-neutral-ban');
+      if (warning) warning.value = String(templates.warningTemplate || '');
+      if (sw) sw.value = String(templates.modeSwitchTemplate || '');
+      if (neutral) neutral.value = String(templates.neutralBanTemplate || '');
+    }
+
+    function renderRelationships() {
+      var body = document.getElementById('relationships-body');
+      var line = document.getElementById('relationships-line');
+      var rows = Array.isArray(state.relationships) ? state.relationships : [];
+      if (!body) return;
+      var sig = stableStringify(rows);
+      if (sig && sig === state.relationshipsRenderSig) return;
+      state.relationshipsRenderSig = sig;
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="7" class="actions-empty-cell">No relationships yet.</td></tr>';
+        if (line) line.textContent = '0 relationships';
+        return;
+      }
+      body.innerHTML = rows.map(function (row) {
+        var summary = row.valence_summary || {};
+        return [
+          '<tr>',
+          '  <td>' + escapeHtml(row.user_id || '-') + '</td>',
+          '  <td>' + escapeHtml(row.current_mode || '-') + '</td>',
+          '  <td>' + escapeHtml(formatTs(row.set_at || '')) + '</td>',
+          '  <td>' + escapeHtml(row.expires_at ? formatTs(row.expires_at) : '-') + '</td>',
+          '  <td>' + escapeHtml(row.trigger || '-') + '</td>',
+          '  <td>' + escapeHtml(String(row.interaction_count || 0)) + '</td>',
+          '  <td><span class="micro">rolling ' + escapeHtml(String(summary.rolling || 0)) + ' / life ' + escapeHtml(String(summary.lifetime || 0)) + '</span></td>',
+          '</tr>'
+        ].join('');
+      }).join('');
+      if (line) line.textContent = String(rows.length) + ' relationships loaded';
+    }
+
+    function renderModeLog() {
+      var body = document.getElementById('mode-log-body');
+      var line = document.getElementById('mode-log-line');
+      var rows = Array.isArray(state.modeLogEvents) ? state.modeLogEvents : [];
+      if (!body) return;
+      var sig = stableStringify(rows);
+      if (sig && sig === state.modeLogRenderSig) return;
+      state.modeLogRenderSig = sig;
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="3" class="actions-empty-cell">No mode events yet.</td></tr>';
+        if (line) line.textContent = '0 mode events';
+        return;
+      }
+      body.innerHTML = rows.map(function (row) {
+        return [
+          '<tr>',
+          '  <td>' + escapeHtml(formatTs(row.ts || '')) + '</td>',
+          '  <td>' + escapeHtml(String(row.event || 'event')) + '</td>',
+          '  <td><code class="inline-code">' + escapeHtml(stableStringify(row.payload || {})) + '</code></td>',
+          '</tr>'
+        ].join('');
+      }).join('');
+      if (line) line.textContent = String(rows.length) + ' mode events loaded';
+    }
+
+    function renderModesDrivenPanels() {
+      state.modesConfig = normalizeModesConfig(state.modesConfig);
+      renderBehaviorsPanel();
+      renderModesPanel();
+      renderBanLevelsPanel();
+      renderReplyTemplatesPanel();
+    }
+
+    function collectModesConfigFromUi() {
+      var cfg = normalizeModesConfig(cloneJson(state.modesConfig));
+
+      cfg.behaviors.mirrorTone = String((document.getElementById('behavior-mirror-tone') || {}).value || 'mirror_or_less');
+      cfg.behaviors.humor = String((document.getElementById('behavior-humor') || {}).value || 'measured');
+      cfg.behaviors.citations = String((document.getElementById('behavior-citations') || {}).value || 'as-needed');
+      cfg.behaviors.summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
+      cfg.behaviors.latencyJitterSec = {
+        min: Math.max(0, parseInt((document.getElementById('behavior-latency-min') || {}).value || '0', 10) || 0),
+        max: Math.max(0, parseInt((document.getElementById('behavior-latency-max') || {}).value || '0', 10) || 0)
+      };
+      cfg.behaviors.banJitterSec = {
+        min: Math.max(0, parseInt((document.getElementById('behavior-ban-min') || {}).value || '0', 10) || 0),
+        max: Math.max(0, parseInt((document.getElementById('behavior-ban-max') || {}).value || '0', 10) || 0)
+      };
+
+      cfg.startingMode = String((document.getElementById('modes-starting-mode') || {}).value || cfg.startingMode || '');
+      cfg.defaultDecayMode = String((document.getElementById('modes-default-decay-mode') || {}).value || cfg.defaultDecayMode || '');
+
+      cfg.modes = (cfg.modes || []).map(function (mode) {
+        var modeSelectorValue = String(mode.id || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        var card = document.querySelector('.mode-card[data-mode-id="' + modeSelectorValue + '"]');
+        if (!card) return mode;
+        var next = cloneJson(mode);
+        next.enabled = !!((card.querySelector('[data-mode-enabled]') || {}).checked);
+        next.allow = Object.assign({}, next.allow || {});
+        var allowToggles = card.querySelectorAll('[data-mode-allow]');
+        for (var i = 0; i < allowToggles.length; i += 1) {
+          var actionName = String(allowToggles[i].getAttribute('data-mode-allow') || '');
+          if (!actionName) continue;
+          next.allow[actionName] = !!allowToggles[i].checked;
+        }
+        next.constraints = Object.assign({}, next.constraints || {});
+        var maxReplies = card.querySelector('[data-mode-constraint="maxRepliesPerUserThread24h"]');
+        var noFollow = card.querySelector('[data-mode-constraint="noFollowup"]');
+        var noMention = card.querySelector('[data-mode-constraint="noMention"]');
+        var noQuote = card.querySelector('[data-mode-constraint="noQuote"]');
+        next.constraints.maxRepliesPerUserThread24h = Math.max(0, parseInt((maxReplies && maxReplies.value) || '0', 10) || 0);
+        next.constraints.noFollowup = !!(noFollow && noFollow.checked);
+        next.constraints.noMention = !!(noMention && noMention.checked);
+        next.constraints.noQuote = !!(noQuote && noQuote.checked);
+        return next;
+      });
+
+      var switchRows = document.querySelectorAll('.switch-rule-row');
+      cfg.switchRules = [];
+      for (var r = 0; r < switchRows.length; r += 1) {
+        var row = switchRows[r];
+        var label = String((row.querySelector('[data-rule-label]') || {}).value || '').trim();
+        var matchRaw = String((row.querySelector('[data-rule-matchany]') || {}).value || '');
+        var toMode = String((row.querySelector('[data-rule-to-mode]') || {}).value || '').trim();
+        var duration = Math.max(0, parseInt((row.querySelector('[data-rule-duration]') || {}).value || '0', 10) || 0);
+        var announce = !!((row.querySelector('[data-rule-announce]') || {}).checked);
+        if (!label || !toMode) continue;
+        cfg.switchRules.push({
+          id: 'rule-' + String(r + 1),
+          label: label,
+          matchAny: matchRaw.split(',').map(function (item) { return item.trim(); }).filter(Boolean),
+          toMode: toMode,
+          durationHours: duration,
+          announce: announce
+        });
+      }
+
+      var banRows = document.querySelectorAll('#ban-levels-body tr[data-ban-level]');
+      for (var b = 0; b < banRows.length; b += 1) {
+        var banRow = banRows[b];
+        var key = String(banRow.getAttribute('data-ban-level') || '');
+        if (!key) continue;
+        var enabled = !!((banRow.querySelector('[data-ban-enabled]') || {}).checked);
+        var durationInput = banRow.querySelector('[data-ban-duration]');
+        var duration = durationInput ? Math.max(1, parseInt(durationInput.value || '0', 10) || 1) : 0;
+        cfg.banLevels[key] = {
+          enabled: enabled,
+          durationHours: key === 'permanent' ? 0 : duration
+        };
+      }
+
+      cfg.escalation = cfg.escalation || {};
+      cfg.escalation.onHighSeverity = !!((document.getElementById('enforcement-escalate-on-high') || {}).checked);
+      cfg.escalation.targets = String((document.getElementById('enforcement-escalation-targets') || {}).value || 'modmail');
+      cfg.escalation.timing = String((document.getElementById('enforcement-escalation-timing') || {}).value || 'enforce_then_escalate');
+
+      cfg.replies = cfg.replies || {};
+      cfg.replies.warningTemplate = String((document.getElementById('reply-template-warning') || {}).value || '');
+      cfg.replies.modeSwitchTemplate = String((document.getElementById('reply-template-switch') || {}).value || '');
+      cfg.replies.neutralBanTemplate = String((document.getElementById('reply-template-neutral-ban') || {}).value || '');
+
+      return cfg;
+    }
+
+    async function saveModesConfigWithFeedback(okMessage) {
+      var payload = collectModesConfigFromUi();
+      if (state.previewMode) {
+        state.modesConfig = normalizeModesConfig(payload);
+        renderModesDrivenPanels();
+        setControlMessage(okMessage || 'Saved.', false);
+        return;
+      }
+      var out = await backendJson('save-modes-config', [JSON.stringify(payload)]);
+      state.modesConfig = normalizeModesConfig((out || {}).config || payload);
+      renderModesDrivenPanels();
+      setControlMessage(okMessage || 'Saved.', false);
+    }
+
+    async function refreshModesConfig() {
+      if (state.previewMode) {
+        state.modesConfig = normalizeModesConfig(state.modesConfig || defaultModesConfigClient());
+        renderModesDrivenPanels();
+        return;
+      }
+      var out = await backendJson('get-modes-config', []);
+      state.modesConfig = normalizeModesConfig((out || {}).config || {});
+      renderModesDrivenPanels();
+    }
+
+    async function refreshRelationships() {
+      if (state.previewMode) {
+        state.relationships = Array.isArray(state.relationships) ? state.relationships : [];
+        renderRelationships();
+        return;
+      }
+      var out = await backendJson('list-relationships', ['300']);
+      state.relationships = Array.isArray(out.relationships) ? out.relationships : [];
+      renderRelationships();
+    }
+
+    async function refreshModeLog() {
+      if (state.previewMode) {
+        state.modeLogEvents = Array.isArray(state.modeLogEvents) ? state.modeLogEvents : [];
+        renderModeLog();
+        return;
+      }
+      var out = await backendJson('list-mode-log', ['200']);
+      state.modeLogEvents = Array.isArray(out.events) ? out.events : [];
+      renderModeLog();
+    }
+
     async function refreshActions() {
       var out = await backendJson('list-actions', ['120']);
       state.actions = Array.isArray(out.actions) ? out.actions : [];
@@ -2809,6 +3427,32 @@
       renderStatus();
     }
 
+    async function refreshForActiveTab() {
+      if (state.activeTab === 'enforcement') {
+        await Promise.all([refreshModesConfig(), refreshActions()]);
+        return;
+      }
+      if (state.activeTab === 'replies') {
+        await Promise.all([refreshModesConfig(), refreshReplies()]);
+        return;
+      }
+      if (state.activeTab === 'relationships') {
+        await Promise.all([refreshModesConfig(), refreshRelationships()]);
+        return;
+      }
+      if (state.activeTab === 'modes' || state.activeTab === 'behaviors') {
+        await refreshModesConfig();
+        return;
+      }
+      if (state.activeTab === 'log') {
+        await Promise.all([refreshModeLog(), refreshLogs()]);
+        return;
+      }
+      if (state.activeTab === 'persona' && !state.doctrineDirty) {
+        await refreshDoctrine(false);
+      }
+    }
+
     async function fullRefresh(options) {
       var opts = options || {};
       var poll = !!opts.poll;
@@ -2820,26 +3464,10 @@
           await refreshProfiles();
         }
         if (!poll) {
-          if (state.activeTab === 'actions') {
-            await refreshActions();
-          } else if (state.activeTab === 'replies') {
-            await refreshReplies();
-          } else if (state.activeTab === 'logs') {
-            await refreshLogs();
-          } else if (state.activeTab === 'persona' && !state.doctrineDirty) {
-            await refreshDoctrine(false);
-          }
+          await refreshForActiveTab();
           return;
         }
-        if (state.activeTab === 'actions') {
-          await refreshActions();
-        } else if (state.activeTab === 'replies') {
-          await refreshReplies();
-        } else if (state.activeTab === 'logs') {
-          await refreshLogs();
-        } else if (state.activeTab === 'persona' && !state.doctrineDirty) {
-          await refreshDoctrine(false);
-        }
+        await refreshForActiveTab();
       } catch (error) {
         setControlMessage(String(error && error.message ? error.message : error), true);
       } finally {
@@ -3214,16 +3842,27 @@
         var panelId = panels[j].id.replace('panel-', '');
         panels[j].classList.toggle('active', panelId === tab);
       }
-      if (tab === 'logs') {
-        refreshLogs().catch(function (error) { setControlMessage(String(error && error.message ? error.message : error), true); });
-      }
-      if (tab === 'actions') {
-        refreshActions().catch(function (error) { setControlMessage(String(error && error.message ? error.message : error), true); });
-      }
-      if (tab === 'replies') {
-        refreshReplies().catch(function (error) { setControlMessage(String(error && error.message ? error.message : error), true); });
-      }
-      if (tab === 'persona') {
+      if (tab === 'log') {
+        Promise.all([refreshModeLog(), refreshLogs()]).catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      } else if (tab === 'enforcement') {
+        Promise.all([refreshModesConfig(), refreshActions()]).catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      } else if (tab === 'replies') {
+        Promise.all([refreshModesConfig(), refreshReplies()]).catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      } else if (tab === 'modes' || tab === 'behaviors') {
+        refreshModesConfig().catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      } else if (tab === 'relationships') {
+        Promise.all([refreshModesConfig(), refreshRelationships()]).catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      } else if (tab === 'persona') {
         refreshDoctrine(false).catch(function (error) { setDoctrineMessage(String(error && error.message ? error.message : error), true); });
       }
     }
@@ -3288,6 +3927,50 @@
       });
       document.getElementById('btn-extract-norms-run').addEventListener('click', function () {
         runExtractNormsWorkflow();
+      });
+      document.getElementById('btn-save-behaviors').addEventListener('click', async function () {
+        try {
+          await saveModesConfigWithFeedback('Behaviors saved.');
+          var summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
+          await saveSetting('SUMMONS_ENABLED', summonable ? '1' : '0');
+        } catch (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        }
+      });
+      document.getElementById('btn-save-modes').addEventListener('click', function () {
+        saveModesConfigWithFeedback('Modes saved.').catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      });
+      document.getElementById('btn-save-reply-templates').addEventListener('click', function () {
+        saveModesConfigWithFeedback('Reply templates saved.').catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      });
+      document.getElementById('btn-save-enforcement').addEventListener('click', function () {
+        saveModesConfigWithFeedback('Enforcement saved.').catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      });
+      document.getElementById('btn-relationship-apply').addEventListener('click', async function () {
+        if (state.previewMode) {
+          setControlMessage('Relationship override is available in the desktop app.', false);
+          return;
+        }
+        var user = String((document.getElementById('relationship-user') || {}).value || '').trim();
+        var mode = String((document.getElementById('relationship-mode') || {}).value || '').trim();
+        var duration = String((document.getElementById('relationship-duration') || {}).value || '0').trim();
+        if (!user || !mode) {
+          setControlMessage('User and mode are required for override.', true);
+          return;
+        }
+        try {
+          await backendJson('set-relationship', [user, mode, duration, 'manual-override']);
+          setControlMessage('Relationship override saved.', false);
+          await Promise.all([refreshRelationships(), refreshModeLog()]);
+        } catch (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        }
       });
       document.getElementById('status-chip-row').addEventListener('click', function (event) {
         var btn = event.target && event.target.closest('[data-status-action]');
@@ -4021,6 +4704,9 @@
         var startupResults = await Promise.allSettled([
           refreshStatus(),
           refreshDoctrine(true),
+          refreshModesConfig(),
+          refreshRelationships(),
+          refreshModeLog(),
           refreshLogs()
         ]);
         if (startupResults[0] && startupResults[0].status === 'rejected') {
@@ -4030,6 +4716,15 @@
           setDoctrineMessage(String(startupResults[1].reason && startupResults[1].reason.message ? startupResults[1].reason.message : startupResults[1].reason), true);
         }
         if (startupResults[2] && startupResults[2].status === 'rejected') {
+          setControlMessage(String(startupResults[2].reason && startupResults[2].reason.message ? startupResults[2].reason.message : startupResults[2].reason), true);
+        }
+        if (startupResults[3] && startupResults[3].status === 'rejected') {
+          setControlMessage(String(startupResults[3].reason && startupResults[3].reason.message ? startupResults[3].reason.message : startupResults[3].reason), true);
+        }
+        if (startupResults[4] && startupResults[4].status === 'rejected') {
+          setControlMessage(String(startupResults[4].reason && startupResults[4].reason.message ? startupResults[4].reason.message : startupResults[4].reason), true);
+        }
+        if (startupResults[5] && startupResults[5].status === 'rejected') {
           state.logsAvailable = false;
           updateConditionalTabs();
         }

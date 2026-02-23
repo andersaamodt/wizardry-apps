@@ -42,6 +42,8 @@ printf '%s' "$init_out" | jq -e '.ok == true and (.paths.manifesto | type == "st
 [ -f "$state_dir/manifesto.md" ]
 [ -f "$state_dir/norms.jsonl" ]
 [ -f "$state_dir/last_seen.txt" ]
+[ -f "$state_dir/modes.json" ]
+[ -f "$state_dir/relationships.json" ]
 
 status_out=$(VR_STATE_DIR="$state_dir" "$backend" status)
 printf '%s' "$status_out" | jq -e '.ok == true and .settings.ok == true and .metrics.ok == true and .launchd.ok == true' >/dev/null
@@ -51,6 +53,22 @@ printf '%s' "$actions_out" | jq -e '.ok == true and (.actions | type == "array")
 
 replies_out=$(VR_STATE_DIR="$state_dir" "$backend" list-replies 5)
 printf '%s' "$replies_out" | jq -e '.ok == true and (.replies | type == "array")' >/dev/null
+
+modes_out=$(VR_STATE_DIR="$state_dir" "$backend" get-modes-config)
+printf '%s' "$modes_out" | jq -e '.ok == true and (.config.modes | type == "array") and (.config.behaviors | type == "object")' >/dev/null
+
+patched_modes=$(printf '%s' "$modes_out" | jq -c '.config + {behaviors:(.config.behaviors + {humor:"dry"})}')
+save_modes_out=$(VR_STATE_DIR="$state_dir" "$backend" save-modes-config "$patched_modes")
+printf '%s' "$save_modes_out" | jq -e '.ok == true and .config.behaviors.humor == "dry"' >/dev/null
+
+relationships_out=$(VR_STATE_DIR="$state_dir" "$backend" list-relationships 5)
+printf '%s' "$relationships_out" | jq -e '.ok == true and (.relationships | type == "array")' >/dev/null
+
+set_rel_out=$(VR_STATE_DIR="$state_dir" "$backend" set-relationship test_user SHADE 48 manual-test)
+printf '%s' "$set_rel_out" | jq -e '.ok == true and .relationship.user_id == "test_user" and .relationship.current_mode == "SHADE"' >/dev/null
+
+mode_log_out=$(VR_STATE_DIR="$state_dir" "$backend" list-mode-log 5)
+printf '%s' "$mode_log_out" | jq -e '.ok == true and (.events | type == "array")' >/dev/null
 
 VR_STATE_DIR="$state_dir" "$backend" write-file manifesto "# Edited Manifesto" >/dev/null
 manifesto_out=$(VR_STATE_DIR="$state_dir" "$backend" read-file manifesto)

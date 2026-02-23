@@ -209,7 +209,7 @@ pagetitle: "Artificer"
 </div>
 </div>
 <div class="menu-anchor send-menu-anchor">
-<button id="dictate-btn" class="dictate-btn" type="button" aria-label="Dictate prompt" title="Dictate prompt"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0"></path><path d="M12 17v4"></path><path d="M9 21h6"></path></svg></span></button>
+<button id="dictate-btn" class="dictate-btn hidden" type="button" aria-label="Dictate prompt" title="Dictate prompt"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0"></path><path d="M12 17v4"></path><path d="M9 21h6"></path></svg></span></button>
 <button id="run-btn" class="run-fab" type="submit" aria-label="Run agent" title="Send message" aria-haspopup="menu" aria-expanded="false" data-tooltip="Send message. Right-click for Queue/Stop options."><span aria-hidden="true">&uarr;</span></button>
 <div id="send-menu" class="floating-menu hidden send-menu" role="menu" aria-label="Send options">
 <button id="send-menu-queue-btn" type="button" data-action="send-menu-queue"><span>Queue</span><span class="shortcut">Enter</span></button>

@@ -13,6 +13,11 @@ Commands:
   run
   list-actions [LIMIT]
   list-replies [LIMIT]
+  get-modes-config
+  save-modes-config JSON
+  list-relationships [LIMIT]
+  set-relationship USER MODE [DURATION_HOURS] [TRIGGER]
+  list-mode-log [LIMIT]
   extract-norms [full]
   undo ACTION_ID
   apologize ACTION_ID [MESSAGE]
@@ -42,6 +47,9 @@ BANS_LOG="$STATE_DIR/bans.jsonl"
 REPLIES_LOG="$STATE_DIR/replies.jsonl"
 ACTIONS_LOG="$STATE_DIR/actions.jsonl"
 NORM_PROPOSALS_LOG="$STATE_DIR/norm-proposals.jsonl"
+MODES_CONFIG_FILE="$STATE_DIR/modes.json"
+RELATIONSHIPS_FILE="$STATE_DIR/relationships.json"
+MODE_LOG_FILE="$STATE_DIR/mode-log.jsonl"
 LAST_SEEN_FILE="$STATE_DIR/last_seen.txt"
 LAST_STATUTE_SEEN_FILE="$STATE_DIR/last_statute_seen.txt"
 LAST_STATUTE_DAY_FILE="$STATE_DIR/last_statute_day.txt"
@@ -159,9 +167,675 @@ append_jsonl() {
   printf '%s\n' "$json" >> "$file"
 }
 
+mode_default_config_json() {
+  jq -cn '
+    {
+      version: 1,
+      actionCatalog: [
+        "Reply","Initiate","Warn","Mention","Quote","Followup","Cross-thread Reply",
+        "Short Ban","Medium Ban","Long Ban","Extended Ban","Year Ban","Permanent Ban",
+        "Remove Content","Lock Thread","Post Neutral Ban Notice"
+      ],
+      templates: [
+        {name:"Needler",startingMode:"SHADE"},
+        {name:"Teacher",startingMode:"TEACH"},
+        {name:"Celebrity",startingMode:"SPOTLIGHT"},
+        {name:"Judge",startingMode:"SUMMON"},
+        {name:"Moderator",startingMode:"STRICT"},
+        {name:"Enforcer",startingMode:"ENFORCE"}
+      ],
+      behaviors: {
+        mirrorTone: "mirror_or_less",
+        humor: "measured",
+        citations: "as-needed",
+        latencyJitterSec: {min: 0, max: 0},
+        banJitterSec: {min: 7, max: 45},
+        summonable: true
+      },
+      startingMode: "SHADE",
+      defaultDecayMode: "SHADE",
+      restrictivenessOrder: ["STRICT","RULES","BAN","PROBATION","WARN","TEACH","SHADE"],
+      modes: [
+        {
+          id: "SHADE",
+          label: "Cordial Conversationalist",
+          enabled: true,
+          defaultExpiryHours: 0,
+          allow: {
+            Reply:true,Initiate:true,Warn:false,Mention:true,Quote:false,Followup:true,
+            "Cross-thread Reply":true,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
+            "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
+            "Lock Thread":false,"Post Neutral Ban Notice":false
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 4,
+            noFollowup: false,
+            noMention: false,
+            noQuote: true
+          }
+        },
+        {
+          id: "TEACH",
+          label: "Direct Speaker",
+          enabled: true,
+          defaultExpiryHours: 0,
+          allow: {
+            Reply:true,Initiate:true,Warn:true,Mention:true,Quote:true,Followup:true,
+            "Cross-thread Reply":true,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
+            "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
+            "Lock Thread":false,"Post Neutral Ban Notice":false
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 5,
+            noFollowup: false,
+            noMention: false,
+            noQuote: false
+          }
+        },
+        {
+          id: "WARN",
+          label: "Verbal Corrector",
+          enabled: true,
+          defaultExpiryHours: 24,
+          allow: {
+            Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
+            "Cross-thread Reply":false,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
+            "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
+            "Lock Thread":false,"Post Neutral Ban Notice":true
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 2,
+            noFollowup: true,
+            noMention: true,
+            noQuote: true
+          }
+        },
+        {
+          id: "PROBATION",
+          label: "Watchful Referee",
+          enabled: true,
+          defaultExpiryHours: 72,
+          allow: {
+            Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
+            "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":false,"Long Ban":false,
+            "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":true,
+            "Lock Thread":false,"Post Neutral Ban Notice":true
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 1,
+            noFollowup: true,
+            noMention: true,
+            noQuote: true
+          }
+        },
+        {
+          id: "BAN",
+          label: "Explicit Enforcer",
+          enabled: true,
+          defaultExpiryHours: 168,
+          allow: {
+            Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
+            "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":true,"Long Ban":true,
+            "Extended Ban":true,"Year Ban":true,"Permanent Ban":true,"Remove Content":true,
+            "Lock Thread":false,"Post Neutral Ban Notice":true
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 1,
+            noFollowup: true,
+            noMention: true,
+            noQuote: true
+          }
+        },
+        {
+          id: "RULES",
+          label: "Silent Enforcer",
+          enabled: true,
+          defaultExpiryHours: 168,
+          allow: {
+            Reply:false,Initiate:false,Warn:false,Mention:false,Quote:false,Followup:false,
+            "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":true,"Long Ban":true,
+            "Extended Ban":true,"Year Ban":true,"Permanent Ban":true,"Remove Content":true,
+            "Lock Thread":true,"Post Neutral Ban Notice":true
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 0,
+            noFollowup: true,
+            noMention: true,
+            noQuote: true
+          }
+        },
+        {
+          id: "STRICT",
+          label: "Active Moderator",
+          enabled: true,
+          defaultExpiryHours: 336,
+          allow: {
+            Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
+            "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":true,"Long Ban":true,
+            "Extended Ban":true,"Year Ban":true,"Permanent Ban":true,"Remove Content":true,
+            "Lock Thread":true,"Post Neutral Ban Notice":true
+          },
+          constraints: {
+            maxRepliesPerUserThread24h: 1,
+            noFollowup: true,
+            noMention: true,
+            noQuote: true
+          }
+        }
+      ],
+      banLevels: {
+        short: {enabled:true,durationHours:72},
+        medium: {enabled:true,durationHours:168},
+        long: {enabled:true,durationHours:720},
+        extended: {enabled:true,durationHours:4380},
+        year: {enabled:true,durationHours:8760},
+        permanent: {enabled:true,durationHours:0}
+      },
+      postActionTransitions: {
+        Warn: {toMode:"WARN",durationHours:24,decayTo:"SHADE",announce:false},
+        "Short Ban": {toMode:"BAN",durationHours:72,decayTo:"PROBATION",announce:true},
+        "Medium Ban": {toMode:"BAN",durationHours:168,decayTo:"PROBATION",announce:true},
+        "Long Ban": {toMode:"RULES",durationHours:720,decayTo:"BAN",announce:true},
+        "Extended Ban": {toMode:"RULES",durationHours:4380,decayTo:"BAN",announce:true},
+        "Year Ban": {toMode:"STRICT",durationHours:8760,decayTo:"RULES",announce:true},
+        "Permanent Ban": {toMode:"STRICT",durationHours:0,decayTo:"RULES",announce:true},
+        "Remove Content": {toMode:"PROBATION",durationHours:72,decayTo:"TEACH",announce:false}
+      },
+      switchRules: [
+        {
+          id: "opt-out",
+          label: "General opt-out",
+          matchAny: ["leave me alone","do not reply","dont reply","stop replying","opt out"],
+          toMode: "BAN",
+          durationHours: 72,
+          decayTo: "SHADE",
+          announce: true,
+          template: "Acknowledged. I will not continue this conversational dyad right now."
+        }
+      ],
+      optInCommands: ["!summon","!engage","/u/{{bot_username}}"],
+      replies: {
+        warningTemplate: "Moderator notice: please follow subreddit norms.",
+        modeSwitchTemplate: "Mode update: {{user}} is now in {{mode}}.",
+        neutralBanTemplate: "Neutral moderator notice: enforcement was applied."
+      },
+      escalation: {
+        onHighSeverity: false,
+        targets: "modmail",
+        timing: "enforce_then_escalate",
+        includePayload: ["content","user_id","norm","bot_action","thread_link"],
+        afterActionSwitch: {enabled:false,toMode:"STRICT",durationHours:168,decayTo:"RULES"}
+      }
+    }
+  '
+}
+
+ensure_modes_config_file() {
+  if [ ! -s "$MODES_CONFIG_FILE" ]; then
+    mode_default_config_json > "$MODES_CONFIG_FILE"
+    return 0
+  fi
+  merged=$(jq -c --argjson defaults "$(mode_default_config_json)" '$defaults * .' "$MODES_CONFIG_FILE" 2>/dev/null || printf '')
+  if [ -z "$merged" ]; then
+    mode_default_config_json > "$MODES_CONFIG_FILE"
+    return 0
+  fi
+  printf '%s\n' "$merged" > "$MODES_CONFIG_FILE"
+}
+
+ensure_relationships_file() {
+  if [ ! -s "$RELATIONSHIPS_FILE" ]; then
+    printf '[]\n' > "$RELATIONSHIPS_FILE"
+    return 0
+  fi
+  if ! jq -e 'type == "array"' "$RELATIONSHIPS_FILE" >/dev/null 2>&1; then
+    printf '[]\n' > "$RELATIONSHIPS_FILE"
+  fi
+}
+
+read_modes_config_json() {
+  ensure_modes_config_file
+  cat "$MODES_CONFIG_FILE" 2>/dev/null || mode_default_config_json
+}
+
+save_modes_config_json() {
+  raw=${1-}
+  if [ -z "$raw" ]; then
+    emit_error "save-modes-config requires JSON payload"
+    return 1
+  fi
+  normalized=$(printf '%s' "$raw" | jq -c --argjson defaults "$(mode_default_config_json)" '
+    (if type == "string" then (fromjson? // {}) else . end) as $in
+    | if ($in | type) != "object" then empty else ($defaults * $in) end
+  ' 2>/dev/null || printf '')
+  if [ -z "$normalized" ]; then
+    emit_error "invalid modes config JSON"
+    return 1
+  fi
+  printf '%s\n' "$normalized" > "$MODES_CONFIG_FILE"
+  jq -cn --argjson config "$normalized" '{ok:true,config:$config}'
+}
+
+mode_config_field() {
+  path_expr=$1
+  read_modes_config_json | jq -c "$path_expr" 2>/dev/null || printf 'null'
+}
+
+relationship_key() {
+  raw=${1-}
+  printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed 's#^[[:space:]]*##; s#[[:space:]]*$##'
+}
+
+find_mode_id_or_default() {
+  requested=$1
+  fallback=$(read_modes_config_json | jq -r '.startingMode // "SHADE"' 2>/dev/null || printf 'SHADE')
+  [ -z "$fallback" ] && fallback="SHADE"
+  if [ -z "$requested" ]; then
+    printf '%s' "$fallback"
+    return 0
+  fi
+  valid=$(read_modes_config_json | jq -r --arg id "$requested" '
+    (.modes // [])
+    | map(select((.id // "") == $id and (.enabled // true)))
+    | if length > 0 then $id else "" end
+  ' 2>/dev/null || printf '')
+  if [ -n "$valid" ]; then
+    printf '%s' "$requested"
+  else
+    printf '%s' "$fallback"
+  fi
+}
+
+relationship_default_row() {
+  user_id=$1
+  mode_id=$(find_mode_id_or_default "")
+  ts=$(now_iso)
+  epoch=$(now_epoch)
+  jq -cn \
+    --arg user_id "$user_id" \
+    --arg mode "$mode_id" \
+    --arg ts "$ts" \
+    --argjson epoch "$epoch" \
+    '{
+      user_id:$user_id,
+      current_mode:$mode,
+      set_at:$ts,
+      set_at_epoch:$epoch,
+      expires_at:null,
+      expires_at_epoch:null,
+      trigger:"starting-mode",
+      interaction_count:0,
+      valence_history:[],
+      valence_summary:{rolling:0,lifetime:0}
+    }'
+}
+
+relationship_get_or_create() {
+  user_id=$(relationship_key "${1-}")
+  if [ -z "$user_id" ]; then
+    printf '{}'
+    return 0
+  fi
+  ensure_relationships_file
+  found=$(jq -c --arg uid "$user_id" '
+    map(select((.user_id // "") == $uid))
+    | if length > 0 then .[0] else empty end
+  ' "$RELATIONSHIPS_FILE" 2>/dev/null || printf '')
+  if [ -n "$found" ]; then
+    printf '%s' "$found"
+    return 0
+  fi
+  created=$(relationship_default_row "$user_id")
+  jq -c --argjson row "$created" '. + [$row]' "$RELATIONSHIPS_FILE" > "$RELATIONSHIPS_FILE.tmp" 2>/dev/null || printf '[]' > "$RELATIONSHIPS_FILE.tmp"
+  mv "$RELATIONSHIPS_FILE.tmp" "$RELATIONSHIPS_FILE"
+  printf '%s' "$created"
+}
+
+relationship_upsert_row() {
+  row=${1-}
+  if [ -z "$row" ]; then
+    return 1
+  fi
+  user_id=$(printf '%s' "$row" | jq -r '.user_id // empty' 2>/dev/null || printf '')
+  [ -n "$user_id" ] || return 1
+  ensure_relationships_file
+  jq -c --arg uid "$user_id" --argjson row "$row" '
+    (map(select((.user_id // "") != $uid))) + [$row]
+    | sort_by(.user_id // "")
+  ' "$RELATIONSHIPS_FILE" > "$RELATIONSHIPS_FILE.tmp" 2>/dev/null || return 1
+  mv "$RELATIONSHIPS_FILE.tmp" "$RELATIONSHIPS_FILE"
+  return 0
+}
+
+relationship_mode_expiry_resolve() {
+  row=${1-}
+  if [ -z "$row" ]; then
+    printf '{}'
+    return 0
+  fi
+  now=$(now_epoch)
+  printf '%s' "$row" | jq -c --argjson now "$now" --argjson cfg "$(read_modes_config_json)" '
+    def default_decay: ($cfg.defaultDecayMode // $cfg.startingMode // "SHADE");
+    if ((.expires_at_epoch // 0) > 0 and (.expires_at_epoch // 0) <= $now) then
+      .current_mode = ((.decay_to_mode // default_decay) | tostring)
+      | .set_at = (now | todateiso8601)
+      | .set_at_epoch = $now
+      | .trigger = "mode-expired"
+      | .expires_at = null
+      | .expires_at_epoch = null
+      | .decay_to_mode = null
+    else
+      .
+    end
+  ' 2>/dev/null || printf '%s' "$row"
+}
+
+relationship_set_mode_row() {
+  row=${1-}
+  to_mode=${2-}
+  duration_hours=${3-0}
+  decay_to=${4-}
+  trigger=${5-manual}
+  announce=${6-false}
+  duration_hours=$(to_int "$duration_hours" 0)
+  if [ "$duration_hours" -lt 0 ]; then
+    duration_hours=0
+  fi
+  now=$(now_epoch)
+  now_ts=$(now_iso)
+  to_mode=$(find_mode_id_or_default "$to_mode")
+  decay_mode=$(find_mode_id_or_default "$decay_to")
+  printf '%s' "$row" | jq -c \
+    --arg mode "$to_mode" \
+    --arg trigger "$trigger" \
+    --arg now_ts "$now_ts" \
+    --arg decay_mode "$decay_mode" \
+    --argjson now "$now" \
+    --argjson duration_hours "$duration_hours" \
+    --argjson announce "$announce" '
+    .current_mode = $mode
+    | .set_at = $now_ts
+    | .set_at_epoch = $now
+    | .trigger = $trigger
+    | .announce = ($announce == true)
+    | if $duration_hours > 0 then
+        .expires_at_epoch = ($now + ($duration_hours * 3600))
+        | .expires_at = (.expires_at_epoch | todateiso8601)
+      else
+        .expires_at = null
+        | .expires_at_epoch = null
+      end
+    | .decay_to_mode = (if $decay_mode == "" then null else $decay_mode end)
+  ' 2>/dev/null || printf '%s' "$row"
+}
+
+relationship_record_interaction_row() {
+  row=${1-}
+  valence=${2-0}
+  comment_id=${3-}
+  action_name=${4-}
+  ts=$(now_iso)
+  valence=$(to_int "$valence" 0)
+  if [ "$valence" -gt 1 ]; then valence=1; fi
+  if [ "$valence" -lt -1 ]; then valence=-1; fi
+  printf '%s' "$row" | jq -c \
+    --arg ts "$ts" \
+    --arg comment_id "$comment_id" \
+    --arg action "$action_name" \
+    --argjson valence "$valence" '
+      .interaction_count = ((.interaction_count // 0) + 1)
+      | .valence_history = ((.valence_history // []) + [{ts:$ts,valence:$valence,comment_id:$comment_id,action:$action}])
+      | .valence_history = (if (.valence_history | length) > 200 then .valence_history[-200:] else .valence_history end)
+      | .valence_summary.rolling = (((.valence_history | if length > 12 then .[-12:] else . end) | map(.valence // 0) | add) // 0)
+      | .valence_summary.lifetime = ((.valence_history | map(.valence // 0) | add) // 0)
+    ' 2>/dev/null || printf '%s' "$row"
+}
+
+append_mode_log_event() {
+  event_type=$1
+  payload=${2-\{\}}
+  ts=$(now_iso)
+  epoch=$(now_epoch)
+  line=$(jq -cn \
+    --arg event "$event_type" \
+    --arg ts "$ts" \
+    --argjson ts_epoch "$epoch" \
+    --arg subreddit "${SUBREDDIT-}" \
+    --argjson payload "$payload" \
+    '{event:$event,ts:$ts,ts_epoch:$ts_epoch,subreddit:$subreddit,payload:$payload}')
+  append_jsonl "$MODE_LOG_FILE" "$line"
+}
+
+list_relationships_json() {
+  limit=$(to_int "${1-300}" 300)
+  [ "$limit" -lt 1 ] && limit=1
+  ensure_relationships_file
+  jq -cn --argjson rows "$(cat "$RELATIONSHIPS_FILE" 2>/dev/null || printf '[]')" --argjson limit "$limit" '
+    {
+      ok:true,
+      relationships: (
+        ($rows // [])
+        | map(
+            .valence_summary = (.valence_summary // {
+              rolling: (((.valence_history // []) | if length > 12 then .[-12:] else . end | map(.valence // 0) | add) // 0),
+              lifetime: (((.valence_history // []) | map(.valence // 0) | add) // 0)
+            })
+          )
+        | sort_by(.set_at_epoch // 0)
+        | reverse
+        | .[0:$limit]
+      )
+    }
+  '
+}
+
+set_relationship_json() {
+  user_raw=${1-}
+  mode_raw=${2-}
+  duration_raw=${3-0}
+  trigger_raw=${4-manual-override}
+  if [ -z "$user_raw" ] || [ -z "$mode_raw" ]; then
+    emit_error "set-relationship requires USER MODE [DURATION_HOURS] [TRIGGER]"
+    return 1
+  fi
+  user_id=$(relationship_key "$user_raw")
+  [ -n "$user_id" ] || { emit_error "invalid user"; return 1; }
+  row=$(relationship_get_or_create "$user_id")
+  row=$(relationship_mode_expiry_resolve "$row")
+  duration=$(to_int "$duration_raw" 0)
+  if [ "$duration" -lt 0 ]; then duration=0; fi
+  row=$(relationship_set_mode_row "$row" "$mode_raw" "$duration" "" "$trigger_raw" true)
+  relationship_upsert_row "$row" || { emit_error "failed to persist relationship"; return 1; }
+  append_mode_log_event "relationship-override" "$(jq -cn --arg user "$user_id" --arg mode "$(printf '%s' "$row" | jq -r '.current_mode // ""')" --arg trigger "$trigger_raw" --argjson duration "$duration" '{user_id:$user,current_mode:$mode,trigger:$trigger,duration_hours:$duration}')"
+  jq -cn --argjson relationship "$row" '{ok:true,relationship:$relationship}'
+}
+
+list_mode_log_json() {
+  limit=$(to_int "${1-200}" 200)
+  [ "$limit" -lt 1 ] && limit=1
+  jq -cs --argjson limit "$limit" '
+    sort_by(.ts_epoch // 0)
+    | reverse
+    | .[0:$limit]
+    | {ok:true,events:.}
+  ' "$MODE_LOG_FILE" 2>/dev/null || jq -cn '{ok:true,events:[]}'
+}
+
+mode_allows_action() {
+  mode_id=${1-}
+  action_name=${2-}
+  read_modes_config_json | jq -r --arg mode "$mode_id" --arg action "$action_name" '
+    (.modes // [])
+    | map(select((.id // "") == $mode and (.enabled // true)))
+    | if length == 0 then "false" else ((.[0].allow[$action] // false) | if . then "true" else "false" end) end
+  ' 2>/dev/null || printf 'false'
+}
+
+mode_constraints_for() {
+  mode_id=${1-}
+  read_modes_config_json | jq -c --arg mode "$mode_id" '
+    (.modes // [])
+    | map(select((.id // "") == $mode and (.enabled // true)))
+    | if length == 0 then {} else (.[0].constraints // {}) end
+  ' 2>/dev/null || printf '{}'
+}
+
+mode_switch_rule_match() {
+  comment_json=$1
+  body_lc=$(printf '%s' "$comment_json" | jq -r '(.body // "") | ascii_downcase' 2>/dev/null || printf '')
+  [ -n "$body_lc" ] || { printf '{}'; return 0; }
+  read_modes_config_json | jq -c --arg body "$body_lc" '
+    (.switchRules // [])
+    | map(select(
+        ((.matchAny // []) | map(tostring | ascii_downcase) | map(select(length > 0)) | any($body | contains(.)))
+      ))
+    | if length > 0 then .[0] else {} end
+  ' 2>/dev/null || printf '{}'
+}
+
+ban_action_from_decision() {
+  ban_type=${1-none}
+  ban_days=${2-0}
+  ban_type_lc=$(printf '%s' "$ban_type" | tr '[:upper:]' '[:lower:]')
+  days=$(to_int "$ban_days" 0)
+  if [ "$ban_type_lc" = "none" ]; then
+    printf '%s' ''
+    return 0
+  fi
+  if [ "$ban_type_lc" = "permanent" ]; then
+    printf '%s' 'Permanent Ban'
+    return 0
+  fi
+  if [ "$days" -le 3 ]; then
+    printf '%s' 'Short Ban'
+  elif [ "$days" -le 7 ]; then
+    printf '%s' 'Medium Ban'
+  elif [ "$days" -le 30 ]; then
+    printf '%s' 'Long Ban'
+  elif [ "$days" -le 183 ]; then
+    printf '%s' 'Extended Ban'
+  elif [ "$days" -le 365 ]; then
+    printf '%s' 'Year Ban'
+  else
+    printf '%s' 'Permanent Ban'
+  fi
+}
+
+ban_days_for_action() {
+  action_name=${1-}
+  case "$action_name" in
+    "Short Ban") level=short ;;
+    "Medium Ban") level=medium ;;
+    "Long Ban") level=long ;;
+    "Extended Ban") level=extended ;;
+    "Year Ban") level=year ;;
+    "Permanent Ban") level=permanent ;;
+    *) printf '%s' '0'; return 0 ;;
+  esac
+  read_modes_config_json | jq -r --arg level "$level" '
+    .banLevels[$level] as $x
+    | if ($x.enabled // true) | not then "disabled"
+      elif ($level == "permanent") then "permanent"
+      else (($x.durationHours // 0) | tonumber? // 0 | if . <= 0 then 0 else (((. + 23) / 24) | floor) end | tostring)
+      end
+  ' 2>/dev/null || printf '0'
+}
+
+action_severity_score() {
+  action_name=${1-}
+  case "$action_name" in
+    "Permanent Ban") printf '%s' '100' ;;
+    "Year Ban") printf '%s' '95' ;;
+    "Extended Ban") printf '%s' '90' ;;
+    "Long Ban") printf '%s' '85' ;;
+    "Medium Ban") printf '%s' '80' ;;
+    "Short Ban") printf '%s' '75' ;;
+    "Lock Thread") printf '%s' '68' ;;
+    "Remove Content") printf '%s' '65' ;;
+    "Warn") printf '%s' '50' ;;
+    "Post Neutral Ban Notice") printf '%s' '45' ;;
+    "Cross-thread Reply") printf '%s' '35' ;;
+    "Followup") printf '%s' '30' ;;
+    "Mention") printf '%s' '25' ;;
+    "Quote") printf '%s' '20' ;;
+    "Initiate") printf '%s' '18' ;;
+    "Reply") printf '%s' '16' ;;
+    *) printf '%s' '0' ;;
+  esac
+}
+
+mode_restrictiveness_rank() {
+  mode_id=${1-}
+  read_modes_config_json | jq -r --arg mode "$mode_id" '
+    (.restrictivenessOrder // []) as $ord
+    | ($ord | index($mode)) as $idx
+    | if $idx == null then 9999 else $idx end
+  ' 2>/dev/null || printf '9999'
+}
+
+resolve_post_action_transition() {
+  actions_json=${1-[]}
+  modes_cfg=$(read_modes_config_json)
+  printf '%s' "$actions_json" | jq -c --argjson cfg "$modes_cfg" '
+    def severity($a):
+      if $a == "Permanent Ban" then 100
+      elif $a == "Year Ban" then 95
+      elif $a == "Extended Ban" then 90
+      elif $a == "Long Ban" then 85
+      elif $a == "Medium Ban" then 80
+      elif $a == "Short Ban" then 75
+      elif $a == "Lock Thread" then 68
+      elif $a == "Remove Content" then 65
+      elif $a == "Warn" then 50
+      else 0 end;
+    def mode_rank($m):
+      (($cfg.restrictivenessOrder // []) | index($m)) as $idx
+      | if $idx == null then 9999 else $idx end;
+    map({
+      action: .,
+      transition: (($cfg.postActionTransitions // {})[.] // null),
+      score: severity(.)
+    })
+    | map(select(.transition != null and (.transition.toMode // "") != ""))
+    | if length == 0 then null
+      else sort_by([-(.score), mode_rank(.transition.toMode // "")]) | .[0]
+      end
+  ' 2>/dev/null || printf 'null'
+}
+
+relationship_valence_for_decision() {
+  decision_json=$1
+  printf '%s' "$decision_json" | jq -r '
+    if (.ban.type // "none") != "none" or (.remove_comment // false) == true then "-1"
+    elif ((.reply // "") | length) > 0 then "1"
+    else "0"
+    end
+  ' 2>/dev/null || printf '0'
+}
+
+json_array_add_unique() {
+  list_json=${1-[]}
+  value=${2-}
+  if [ -z "$value" ]; then
+    printf '%s' "$list_json"
+    return 0
+  fi
+  jq -cn --argjson list "$list_json" --arg value "$value" '$list + [$value] | unique'
+}
+
+json_array_has() {
+  list_json=${1-[]}
+  value=${2-}
+  jq -e --arg value "$value" 'index($value) != null' >/dev/null 2>&1 <<EOFJSON
+$list_json
+EOFJSON
+}
+
 bootstrap_state() {
   mkdir -p "$STATE_DIR"
-  touch "$BANS_LOG" "$REPLIES_LOG" "$ACTIONS_LOG" "$NORM_PROPOSALS_LOG"
+  touch "$BANS_LOG" "$REPLIES_LOG" "$ACTIONS_LOG" "$NORM_PROPOSALS_LOG" "$MODE_LOG_FILE"
+  ensure_modes_config_file
+  ensure_relationships_file
 
   if [ ! -f "$LAST_SEEN_FILE" ]; then
     printf '0\n' > "$LAST_SEEN_FILE"
@@ -423,10 +1097,13 @@ settings_json() {
     --arg actions_path "$ACTIONS_LOG" \
     --arg bans_path "$BANS_LOG" \
     --arg replies_path "$REPLIES_LOG" \
+    --arg modes_path "$MODES_CONFIG_FILE" \
+    --arg relationships_path "$RELATIONSHIPS_FILE" \
+    --arg mode_log_path "$MODE_LOG_FILE" \
     --arg last_seen_path "$LAST_SEEN_FILE" \
     --arg daemon_log_path "$DAEMON_STDOUT_LOG" \
     --arg daemon_error_path "$DAEMON_STDERR_LOG" \
-    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
+    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,modes:$modes_path,relationships:$relationships_path,modeLog:$mode_log_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
 }
 
 metrics_json() {
@@ -827,6 +1504,7 @@ cached_reddit_get() {
 compose_context_envelope() {
   cache_dir=$1
   comment_json=$2
+  relationship_json=${3-\{\}}
 
   comment_name=$(printf '%s' "$comment_json" | jq -r '.name // empty')
   parent_id=$(printf '%s' "$comment_json" | jq -r '.parent_id // empty')
@@ -903,11 +1581,13 @@ compose_context_envelope() {
     --arg manifesto "$manifesto_text" \
     --arg global_instructions "$global_instructions_text" \
     --arg norms "$norms_json" \
+    --arg relationship "$relationship_json" \
     '{
       mode:$mode,
       subreddit:$subreddit,
       doctrine:{global_instructions:$global_instructions, manifesto:$manifesto, norms:(($norms|fromjson?) // [])},
       utterance:($comment|fromjson),
+      relationship:(($relationship|fromjson?) // {}),
       context:{
         parent:($parent|fromjson),
         grandparent:($grandparent|fromjson),
@@ -944,6 +1624,8 @@ Required policy constraints:
 - Capricious mode: bans only for vibes (feeling string required).
 - Mixed mode: bans may come from either pathway.
 - Obey-admins mode: $(if [ "$OBEY_ADMINS" -eq 1 ]; then printf 'enabled. If subreddit admins issue a relevant instruction in context, follow it unless impossible or unsafe.'; else printf 'disabled.'; fi)
+- The `relationship.current_mode` field in context is authoritative for per-user permissions.
+- Never attempt actions that are disallowed by the relationship mode.
 - If banning, include a reply first. The system performs reply->delay->ban ritual.
 - Reply text must be concise and sub-native in style.
 - Judicial bans: reply must clearly cite the violated norm.
@@ -954,6 +1636,7 @@ Return STRICT JSON only, no markdown, with this shape:
 {
   "reply": "string",
   "category": "playful|didactic|topical|obscure|enforcement",
+  "actions": ["Reply","Warn","Short Ban"],
   "ban": {"type":"none|temporary|permanent","days":3},
   "remove_comment": false,
   "norm": "optional norm id or norm quote",
@@ -990,6 +1673,7 @@ normalize_decision_json() {
     {
       reply: text(.reply // .message // .response),
       category: text(.category // .tone // "playful"),
+      actions: (if (.actions | type) == "array" then (.actions | map(text(.))) else [] end),
       norm: text(.norm // .rule // .violation_norm),
       feeling: text(.feeling // .affect // .emotion),
       reasoning: text(.reasoning // .reason // .rationale),
@@ -999,7 +1683,7 @@ normalize_decision_json() {
         days: ((.ban.days // .ban_days // .duration // 3) | tonumber? // 3)
       }
     }
-  ' 2>/dev/null || printf '{"reply":"","category":"playful","norm":"","feeling":"","reasoning":"","remove_comment":false,"ban":{"type":"none","days":3}}')
+  ' 2>/dev/null || printf '{"reply":"","category":"playful","actions":[],"norm":"","feeling":"","reasoning":"","remove_comment":false,"ban":{"type":"none","days":3}}')
 
   printf '%s' "$normalized"
 }
@@ -1147,7 +1831,7 @@ record_reply_event() {
     --arg category "$category" \
     --arg decision "$decision_json" \
     --arg source "$source" \
-    '{event:$event,reply_event_id:$reply_event_id,ts:$ts,ts_epoch:$ts_epoch,subreddit:$subreddit,mode:$mode,source:$source,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),reply_id:$reply_id,reply:$reply_text,category:$category,decision:(($decision|fromjson? // {}))}')
+    '{event:$event,reply_event_id:$reply_event_id,ts:$ts,ts_epoch:$ts_epoch,subreddit:$subreddit,mode:$mode,source:$source,comment_id:(($comment|fromjson).name // ""),comment_link_id:(($comment|fromjson).link_id // ""),comment_author:(($comment|fromjson).author // ""),reply_id:$reply_id,reply:$reply_text,category:$category,decision:(($decision|fromjson? // {}))}')
 
   append_jsonl "$REPLIES_LOG" "$event"
 }
@@ -1168,7 +1852,8 @@ process_comment() {
 
   author=$(printf '%s' "$comment_json" | jq -r '.author // empty')
   thing_id=$(printf '%s' "$comment_json" | jq -r '.name // empty')
-  comment_id=$(printf '%s' "$comment_json" | jq -r '.id // empty')
+  link_id=$(printf '%s' "$comment_json" | jq -r '.link_id // empty')
+  author_key=$(relationship_key "$author")
 
   case "$thing_id" in
     t1_*) ;;
@@ -1194,7 +1879,42 @@ process_comment() {
     return 0
   fi
 
-  envelope=$(compose_context_envelope "$cache_dir" "$comment_json")
+  relationship_row=$(relationship_get_or_create "$author_key")
+  relationship_row=$(relationship_mode_expiry_resolve "$relationship_row")
+  relationship_upsert_row "$relationship_row" || :
+  current_mode=$(printf '%s' "$relationship_row" | jq -r '.current_mode // empty' 2>/dev/null || printf '')
+  current_mode=$(find_mode_id_or_default "$current_mode")
+
+  switch_rule=$(mode_switch_rule_match "$comment_json")
+  switch_to_mode=$(printf '%s' "$switch_rule" | jq -r '.toMode // empty' 2>/dev/null || printf '')
+  if [ -n "$switch_to_mode" ]; then
+    rule_id=$(printf '%s' "$switch_rule" | jq -r '.id // "switch-rule"' 2>/dev/null || printf 'switch-rule')
+    duration=$(printf '%s' "$switch_rule" | jq -r '.durationHours // 0' 2>/dev/null || printf '0')
+    duration=$(to_int "$duration" 0)
+    decay_to=$(printf '%s' "$switch_rule" | jq -r '.decayTo // empty' 2>/dev/null || printf '')
+    announce=$(printf '%s' "$switch_rule" | jq -r '.announce // true' 2>/dev/null || printf 'true')
+    announce_bool=false
+    [ "$announce" = "true" ] && announce_bool=true
+    previous_mode=$current_mode
+    relationship_row=$(relationship_set_mode_row "$relationship_row" "$switch_to_mode" "$duration" "$decay_to" "switch-rule:$rule_id" "$announce_bool")
+    relationship_upsert_row "$relationship_row" || :
+    current_mode=$(printf '%s' "$relationship_row" | jq -r '.current_mode // empty' 2>/dev/null || printf '')
+    current_mode=$(find_mode_id_or_default "$current_mode")
+    append_mode_log_event "switch-rule" "$(jq -cn --arg user "$author_key" --arg from "$previous_mode" --arg to "$current_mode" --arg rule "$rule_id" --arg comment_id "$thing_id" '{user_id:$user,from_mode:$from,to_mode:$to,rule_id:$rule,comment_id:$comment_id}')"
+
+    if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$current_mode" "Post Neutral Ban Notice")" = "true" ]; then
+      notice=$(printf '%s' "$switch_rule" | jq -r '.template // empty' 2>/dev/null || printf '')
+      if [ -n "$notice" ]; then
+        if notice_reply_id=$(post_reply "$thing_id" "$notice" 2>/dev/null); then
+          rule_decision=$(jq -cn --arg rule "$rule_id" --arg mode "$current_mode" '{rule:$rule,toMode:$mode}')
+          record_reply_event "$comment_json" "$notice_reply_id" "$notice" "switch-rule" "$rule_decision" "switch-rule"
+        fi
+      fi
+    fi
+    return 0
+  fi
+
+  envelope=$(compose_context_envelope "$cache_dir" "$comment_json" "$relationship_row")
   prompt=$(build_adjudication_prompt "$envelope")
 
   if ! model_response=$(ollama_generate "$prompt" 2>/dev/null); then
@@ -1206,16 +1926,149 @@ process_comment() {
 
   reply_text=$(printf '%s' "$decision" | jq -r '.reply // empty')
   category=$(printf '%s' "$decision" | jq -r '.category // "playful"')
+  model_actions=$(printf '%s' "$decision" | jq -c '.actions // []' 2>/dev/null || printf '[]')
   ban_type=$(printf '%s' "$decision" | jq -r '.ban.type // "none"')
   ban_days=$(printf '%s' "$decision" | jq -r '.ban.days // 3')
   remove_comment=$(printf '%s' "$decision" | jq -r '.remove_comment // false')
   norm=$(printf '%s' "$decision" | jq -r '.norm // empty')
   feeling=$(printf '%s' "$decision" | jq -r '.feeling // empty')
-  pathway=$(printf '%s' "$decision" | jq -r '.pathway // "none"')
-  needs_enforcement=$(printf '%s' "$decision" | jq -r '.needs_enforcement // false')
+  pathway=$(printf '%s' "$decision" | jq -r '.pathway // "none"' 2>/dev/null || printf 'none')
+  reasoning=$(printf '%s' "$decision" | jq -r '.reasoning // empty' 2>/dev/null || printf '')
+
+  proposed_actions='[]'
+  if [ -n "$reply_text" ]; then
+    if [ "$reply_source" = "engaged" ]; then
+      proposed_actions=$(json_array_add_unique "$proposed_actions" "Reply")
+    else
+      proposed_actions=$(json_array_add_unique "$proposed_actions" "Initiate")
+    fi
+  fi
+  for model_action in $(printf '%s' "$model_actions" | jq -r '.[]' 2>/dev/null); do
+    [ -n "$model_action" ] || continue
+    proposed_actions=$(json_array_add_unique "$proposed_actions" "$model_action")
+  done
+  ban_action_requested=$(ban_action_from_decision "$ban_type" "$ban_days")
+  if [ -n "$ban_action_requested" ]; then
+    proposed_actions=$(json_array_add_unique "$proposed_actions" "$ban_action_requested")
+  fi
+  if [ "$remove_comment" = "true" ]; then
+    proposed_actions=$(json_array_add_unique "$proposed_actions" "Remove Content")
+  fi
+
+  allowed_actions='[]'
+  blocked_actions='[]'
+  for action_name in $(printf '%s' "$proposed_actions" | jq -r '.[]' 2>/dev/null); do
+    [ -n "$action_name" ] || continue
+    if [ "$(mode_allows_action "$current_mode" "$action_name")" = "true" ]; then
+      allowed_actions=$(json_array_add_unique "$allowed_actions" "$action_name")
+    else
+      blocked_actions=$(json_array_add_unique "$blocked_actions" "$action_name")
+    fi
+  done
+  if [ "$(printf '%s' "$blocked_actions" | jq 'length' 2>/dev/null || printf '0')" -gt 0 ]; then
+    append_mode_log_event "blocked-actions" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --argjson blocked "$blocked_actions" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,blocked:$blocked,comment_id:$comment_id}')"
+  fi
+
+  warning_template=$(read_modes_config_json | jq -r '.replies.warningTemplate // empty' 2>/dev/null || printf '')
+  neutral_template=$(read_modes_config_json | jq -r '.replies.neutralBanTemplate // empty' 2>/dev/null || printf '')
+  if [ -z "$reply_text" ] && json_array_has "$allowed_actions" "Warn"; then
+    reply_text=$warning_template
+  fi
+  if [ -z "$reply_text" ] && json_array_has "$allowed_actions" "Post Neutral Ban Notice"; then
+    reply_text=$neutral_template
+  fi
+
+  constraints=$(mode_constraints_for "$current_mode")
+  max_replies=$(printf '%s' "$constraints" | jq -r '.maxRepliesPerUserThread24h // -1' 2>/dev/null || printf '-1')
+  max_replies=$(to_int "$max_replies" -1)
+  no_followup=$(printf '%s' "$constraints" | jq -r '.noFollowup // false' 2>/dev/null || printf 'false')
+  no_mention=$(printf '%s' "$constraints" | jq -r '.noMention // false' 2>/dev/null || printf 'false')
+  no_quote=$(printf '%s' "$constraints" | jq -r '.noQuote // false' 2>/dev/null || printf 'false')
+
+  should_reply=false
+  if [ -n "$reply_text" ]; then
+    if json_array_has "$allowed_actions" "Warn" || json_array_has "$allowed_actions" "Reply" || json_array_has "$allowed_actions" "Initiate" || json_array_has "$allowed_actions" "Post Neutral Ban Notice"; then
+      should_reply=true
+    fi
+  fi
+
+  if [ "$should_reply" = true ] && [ "$max_replies" -ge 0 ] && [ -n "$link_id" ]; then
+    cutoff=$(( $(now_epoch) - 86400 ))
+    recent_replies=$(jq -cs --arg user "$author_key" --arg link "$link_id" --argjson cutoff "$cutoff" '
+      map(select(((.comment_author // "") | ascii_downcase) == $user and (.comment_link_id // "") == $link and (.ts_epoch // 0) >= $cutoff))
+      | length
+    ' "$REPLIES_LOG" 2>/dev/null || printf '0')
+    recent_replies=$(to_int "$recent_replies" 0)
+    if [ "$recent_replies" -ge "$max_replies" ]; then
+      should_reply=false
+      append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "max-replies-24h" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
+    fi
+  fi
+
+  if [ "$should_reply" = true ] && [ "$no_followup" = "true" ] && [ "$reply_source" = "engaged" ]; then
+    should_reply=false
+    append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "no-followup" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
+  fi
+
+  author_lc=$(printf '%s' "$author_key" | tr '[:upper:]' '[:lower:]')
+  reply_lc=$(printf '%s' "$reply_text" | tr '[:upper:]' '[:lower:]')
+  if [ "$should_reply" = true ] && [ "$no_mention" = "true" ]; then
+    case "$reply_lc" in
+      *"/u/$author_lc"*|*"u/$author_lc"*)
+        should_reply=false
+        append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "no-mention" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
+        ;;
+    esac
+  fi
+
+  if [ "$should_reply" = true ] && [ "$no_quote" = "true" ]; then
+    if printf '%s\n' "$reply_text" | grep -Eq '^[[:space:]]*>' ; then
+      should_reply=false
+      append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "no-quote" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
+    fi
+  fi
+
+  selected_ban_action=''
+  for candidate in "Permanent Ban" "Year Ban" "Extended Ban" "Long Ban" "Medium Ban" "Short Ban"; do
+    if json_array_has "$allowed_actions" "$candidate"; then
+      selected_ban_action=$candidate
+      break
+    fi
+  done
+
+  ban_type_exec='none'
+  ban_days_exec=0
+  if [ -n "$selected_ban_action" ]; then
+    ban_days_setting=$(ban_days_for_action "$selected_ban_action")
+    case "$ban_days_setting" in
+      disabled)
+        append_mode_log_event "blocked-actions" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg action "$selected_ban_action" --arg reason "ban-level-disabled" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,action:$action,reason:$reason,comment_id:$comment_id}')"
+        selected_ban_action=''
+        ;;
+      permanent)
+        ban_type_exec='permanent'
+        ban_days_exec=0
+        ;;
+      *)
+        ban_type_exec='temporary'
+        ban_days_exec=$(to_int "$ban_days_setting" 0)
+        if [ "$ban_days_exec" -lt 1 ]; then
+          ban_type_exec='none'
+          selected_ban_action=''
+        fi
+        ;;
+    esac
+  fi
+
+  remove_exec=false
+  if json_array_has "$allowed_actions" "Remove Content"; then
+    if [ "$ban_type_exec" = "none" ]; then
+      remove_exec=true
+    fi
+  fi
 
   reply_id=''
-  if [ -n "$reply_text" ]; then
+  if [ "$should_reply" = true ] && [ -n "$reply_text" ]; then
     reply_text=$(truncate_reply "$reply_text")
     if reply_id=$(post_reply "$thing_id" "$reply_text" 2>/dev/null); then
       record_reply_event "$comment_json" "$reply_id" "$reply_text" "$category" "$decision" "$reply_source"
@@ -1224,17 +2077,23 @@ process_comment() {
     fi
   fi
 
-  if [ "$needs_enforcement" != "true" ]; then
-    return 0
+  executed_actions='[]'
+  if [ -n "$reply_id" ]; then
+    if json_array_has "$allowed_actions" "Warn"; then
+      executed_actions=$(json_array_add_unique "$executed_actions" "Warn")
+    elif [ "$reply_source" = "engaged" ]; then
+      executed_actions=$(json_array_add_unique "$executed_actions" "Reply")
+    else
+      executed_actions=$(json_array_add_unique "$executed_actions" "Initiate")
+    fi
   fi
 
   action_id=$(new_event_id "action")
   ts=$(now_iso)
   ts_epoch=$(now_epoch)
   permalink=$(printf '%s' "$comment_json" | jq -r '.permalink // empty')
-  reasoning=$(printf '%s' "$decision" | jq -r '.reasoning // empty')
 
-  if [ "$ban_type" != "none" ]; then
+  if [ "$ban_type_exec" != "none" ]; then
     if [ -z "$reply_id" ]; then
       action=$(jq -cn \
         --arg event "enforce" \
@@ -1244,10 +2103,10 @@ process_comment() {
         --arg status "failed" \
         --arg error "ban blocked: no direct pre-ban reply" \
         --arg type "ban" \
-        --arg ban_type "$ban_type" \
-        --argjson ban_days "$ban_days" \
+        --arg ban_type "$ban_type_exec" \
+        --argjson ban_days "$ban_days_exec" \
         --arg subreddit "$SUBREDDIT" \
-        --arg mode "$MODE" \
+        --arg mode "$current_mode" \
         --arg pathway "$pathway" \
         --arg norm "$norm" \
         --arg feeling "$feeling" \
@@ -1256,63 +2115,64 @@ process_comment() {
         --arg permalink "$permalink" \
         '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,ban_type:$ban_type,ban_days:$ban_days,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:null,undoable:false}')
       record_action_event "$action"
-      return 0
-    fi
-
-    delay=$(random_between "$SANCTION_DELAY_MIN" "$SANCTION_DELAY_MAX")
-    if [ "$delay" -gt 0 ]; then
-      sleep "$delay"
-    fi
-
-    ban_note=$(printf 'mode=%s pathway=%s norm=%s feeling=%s' "$MODE" "$pathway" "$norm" "$feeling")
-    if post_temp_or_perm_ban "$author" "$ban_type" "$ban_days" "$ban_note"; then
-      action=$(jq -cn \
-        --arg event "enforce" \
-        --arg action_id "$action_id" \
-        --arg ts "$ts" \
-        --argjson ts_epoch "$ts_epoch" \
-        --arg status "active" \
-        --arg type "ban" \
-        --arg ban_type "$ban_type" \
-        --argjson ban_days "$ban_days" \
-        --arg subreddit "$SUBREDDIT" \
-        --arg mode "$MODE" \
-        --arg pathway "$pathway" \
-        --arg norm "$norm" \
-        --arg feeling "$feeling" \
-        --arg reasoning "$reasoning" \
-        --arg comment "$comment_json" \
-        --arg permalink "$permalink" \
-        --arg reply_id "$reply_id" \
-        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,type:$type,ban_type:$ban_type,ban_days:$ban_days,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:true,undone_at:null}')
     else
-      action=$(jq -cn \
-        --arg event "enforce" \
-        --arg action_id "$action_id" \
-        --arg ts "$ts" \
-        --argjson ts_epoch "$ts_epoch" \
-        --arg status "failed" \
-        --arg error "ban API request failed" \
-        --arg type "ban" \
-        --arg ban_type "$ban_type" \
-        --argjson ban_days "$ban_days" \
-        --arg subreddit "$SUBREDDIT" \
-        --arg mode "$MODE" \
-        --arg pathway "$pathway" \
-        --arg norm "$norm" \
-        --arg feeling "$feeling" \
-        --arg reasoning "$reasoning" \
-        --arg comment "$comment_json" \
-        --arg permalink "$permalink" \
-        --arg reply_id "$reply_id" \
-        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,ban_type:$ban_type,ban_days:$ban_days,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:false}')
+      ban_jitter_min=$(read_modes_config_json | jq -r '.behaviors.banJitterSec.min // empty' 2>/dev/null || printf '')
+      ban_jitter_max=$(read_modes_config_json | jq -r '.behaviors.banJitterSec.max // empty' 2>/dev/null || printf '')
+      ban_jitter_min=$(to_int "${ban_jitter_min:-$SANCTION_DELAY_MIN}" "$SANCTION_DELAY_MIN")
+      ban_jitter_max=$(to_int "${ban_jitter_max:-$SANCTION_DELAY_MAX}" "$SANCTION_DELAY_MAX")
+      delay=$(random_between "$ban_jitter_min" "$ban_jitter_max")
+      if [ "$delay" -gt 0 ]; then
+        sleep "$delay"
+      fi
+
+      ban_note=$(printf 'mode=%s pathway=%s norm=%s feeling=%s relationship_mode=%s' "$MODE" "$pathway" "$norm" "$feeling" "$current_mode")
+      if post_temp_or_perm_ban "$author" "$ban_type_exec" "$ban_days_exec" "$ban_note"; then
+        action=$(jq -cn \
+          --arg event "enforce" \
+          --arg action_id "$action_id" \
+          --arg ts "$ts" \
+          --argjson ts_epoch "$ts_epoch" \
+          --arg status "active" \
+          --arg type "ban" \
+          --arg ban_type "$ban_type_exec" \
+          --argjson ban_days "$ban_days_exec" \
+          --arg subreddit "$SUBREDDIT" \
+          --arg mode "$current_mode" \
+          --arg pathway "$pathway" \
+          --arg norm "$norm" \
+          --arg feeling "$feeling" \
+          --arg reasoning "$reasoning" \
+          --arg comment "$comment_json" \
+          --arg permalink "$permalink" \
+          --arg reply_id "$reply_id" \
+          '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,type:$type,ban_type:$ban_type,ban_days:$ban_days,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:true,undone_at:null}')
+        record_action_event "$action"
+        executed_actions=$(json_array_add_unique "$executed_actions" "$selected_ban_action")
+      else
+        action=$(jq -cn \
+          --arg event "enforce" \
+          --arg action_id "$action_id" \
+          --arg ts "$ts" \
+          --argjson ts_epoch "$ts_epoch" \
+          --arg status "failed" \
+          --arg error "ban API request failed" \
+          --arg type "ban" \
+          --arg ban_type "$ban_type_exec" \
+          --argjson ban_days "$ban_days_exec" \
+          --arg subreddit "$SUBREDDIT" \
+          --arg mode "$current_mode" \
+          --arg pathway "$pathway" \
+          --arg norm "$norm" \
+          --arg feeling "$feeling" \
+          --arg reasoning "$reasoning" \
+          --arg comment "$comment_json" \
+          --arg permalink "$permalink" \
+          --arg reply_id "$reply_id" \
+          '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,ban_type:$ban_type,ban_days:$ban_days,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:false}')
+        record_action_event "$action"
+      fi
     fi
-
-    record_action_event "$action"
-    return 0
-  fi
-
-  if [ "$remove_comment" = "true" ]; then
+  elif [ "$remove_exec" = true ]; then
     if [ -z "$reply_id" ]; then
       action=$(jq -cn \
         --arg event "enforce" \
@@ -1323,7 +2183,7 @@ process_comment() {
         --arg error "remove blocked: no direct pre-action reply" \
         --arg type "remove" \
         --arg subreddit "$SUBREDDIT" \
-        --arg mode "$MODE" \
+        --arg mode "$current_mode" \
         --arg pathway "$pathway" \
         --arg norm "$norm" \
         --arg feeling "$feeling" \
@@ -1332,53 +2192,94 @@ process_comment() {
         --arg permalink "$permalink" \
         '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:null,undoable:false,removed:true}')
       record_action_event "$action"
-      return 0
-    fi
-
-    if post_remove_comment "$thing_id"; then
-      action=$(jq -cn \
-        --arg event "enforce" \
-        --arg action_id "$action_id" \
-        --arg ts "$ts" \
-        --argjson ts_epoch "$ts_epoch" \
-        --arg status "active" \
-        --arg type "remove" \
-        --arg subreddit "$SUBREDDIT" \
-        --arg mode "$MODE" \
-        --arg pathway "$pathway" \
-        --arg norm "$norm" \
-        --arg feeling "$feeling" \
-        --arg reasoning "$reasoning" \
-        --arg comment "$comment_json" \
-        --arg permalink "$permalink" \
-        --arg reply_id "$reply_id" \
-        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:true,removed:true,undone_at:null}')
     else
-      action=$(jq -cn \
-        --arg event "enforce" \
-        --arg action_id "$action_id" \
-        --arg ts "$ts" \
-        --argjson ts_epoch "$ts_epoch" \
-        --arg status "failed" \
-        --arg error "remove API request failed" \
-        --arg type "remove" \
-        --arg subreddit "$SUBREDDIT" \
-        --arg mode "$MODE" \
-        --arg pathway "$pathway" \
-        --arg norm "$norm" \
-        --arg feeling "$feeling" \
-        --arg reasoning "$reasoning" \
-        --arg comment "$comment_json" \
-        --arg permalink "$permalink" \
-        --arg reply_id "$reply_id" \
-        '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:false,removed:true}')
+      if post_remove_comment "$thing_id"; then
+        action=$(jq -cn \
+          --arg event "enforce" \
+          --arg action_id "$action_id" \
+          --arg ts "$ts" \
+          --argjson ts_epoch "$ts_epoch" \
+          --arg status "active" \
+          --arg type "remove" \
+          --arg subreddit "$SUBREDDIT" \
+          --arg mode "$current_mode" \
+          --arg pathway "$pathway" \
+          --arg norm "$norm" \
+          --arg feeling "$feeling" \
+          --arg reasoning "$reasoning" \
+          --arg comment "$comment_json" \
+          --arg permalink "$permalink" \
+          --arg reply_id "$reply_id" \
+          '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:true,removed:true,undone_at:null}')
+        record_action_event "$action"
+        executed_actions=$(json_array_add_unique "$executed_actions" "Remove Content")
+      else
+        action=$(jq -cn \
+          --arg event "enforce" \
+          --arg action_id "$action_id" \
+          --arg ts "$ts" \
+          --argjson ts_epoch "$ts_epoch" \
+          --arg status "failed" \
+          --arg error "remove API request failed" \
+          --arg type "remove" \
+          --arg subreddit "$SUBREDDIT" \
+          --arg mode "$current_mode" \
+          --arg pathway "$pathway" \
+          --arg norm "$norm" \
+          --arg feeling "$feeling" \
+          --arg reasoning "$reasoning" \
+          --arg comment "$comment_json" \
+          --arg permalink "$permalink" \
+          --arg reply_id "$reply_id" \
+          '{event:$event,action_id:$action_id,ts:$ts,ts_epoch:$ts_epoch,status:$status,error:$error,type:$type,subreddit:$subreddit,mode:$mode,pathway:$pathway,norm:$norm,feeling:$feeling,reasoning:$reasoning,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),permalink:$permalink,reply_id:$reply_id,undoable:false,removed:true}')
+        record_action_event "$action"
+      fi
     fi
-
-    record_action_event "$action"
   fi
 
-  # Per spec: never remove a comment after banning.
-  comment_id=$comment_id
+  norm_severity=$(jq -rs --arg norm "$norm" '
+    if ($norm | length) == 0 then "low"
+    else
+      (map(select(((.id // "") == $norm) or ((.text // "") == $norm)))[0].severity // "low")
+    end
+  ' "$NORMS_FILE" 2>/dev/null || printf 'low')
+  escalation_enabled=$(read_modes_config_json | jq -r '.escalation.onHighSeverity // false' 2>/dev/null || printf 'false')
+  if [ "$norm_severity" = "high" ] && [ "$escalation_enabled" = "true" ]; then
+    append_mode_log_event "escalation" "$(jq -cn --arg user "$author_key" --arg norm "$norm" --arg action "$(printf '%s' "$executed_actions" | jq -r '.[0] // ""')" --arg content "$(printf '%s' "$comment_json" | jq -r '.body // ""')" --arg link "$permalink" --arg severity "$norm_severity" '{user_id:$user,norm:$norm,action:$action,content:$content,thread_link:$link,severity:$severity}')"
+  fi
+
+  valence=$(relationship_valence_for_decision "$decision")
+  primary_action=$(printf '%s' "$executed_actions" | jq -r '.[0] // "none"' 2>/dev/null || printf 'none')
+  relationship_row=$(relationship_record_interaction_row "$relationship_row" "$valence" "$thing_id" "$primary_action")
+
+  transition_row=$(resolve_post_action_transition "$executed_actions")
+  if [ -n "$transition_row" ] && [ "$transition_row" != "null" ]; then
+    transition_action=$(printf '%s' "$transition_row" | jq -r '.action // empty' 2>/dev/null || printf '')
+    to_mode=$(printf '%s' "$transition_row" | jq -r '.transition.toMode // empty' 2>/dev/null || printf '')
+    duration=$(printf '%s' "$transition_row" | jq -r '.transition.durationHours // 0' 2>/dev/null || printf '0')
+    decay_to=$(printf '%s' "$transition_row" | jq -r '.transition.decayTo // empty' 2>/dev/null || printf '')
+    announce=$(printf '%s' "$transition_row" | jq -r '.transition.announce // false' 2>/dev/null || printf 'false')
+    if [ -n "$to_mode" ]; then
+      old_mode=$(printf '%s' "$relationship_row" | jq -r '.current_mode // ""' 2>/dev/null || printf '')
+      announce_bool=false
+      [ "$announce" = "true" ] && announce_bool=true
+      relationship_row=$(relationship_set_mode_row "$relationship_row" "$to_mode" "$duration" "$decay_to" "post-action:$transition_action" "$announce_bool")
+      new_mode=$(printf '%s' "$relationship_row" | jq -r '.current_mode // ""' 2>/dev/null || printf '')
+      append_mode_log_event "mode-switch" "$(jq -cn --arg user "$author_key" --arg from "$old_mode" --arg to "$new_mode" --arg action "$transition_action" '{user_id:$user,from_mode:$from,to_mode:$to,action:$action}')"
+      if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$new_mode" "Post Neutral Ban Notice")" = "true" ]; then
+        switch_notice=$(read_modes_config_json | jq -r --arg user "$author" --arg mode "$new_mode" '.replies.modeSwitchTemplate // "" | gsub("\\{\\{user\\}\\}";$user) | gsub("\\{\\{mode\\}\\}";$mode)' 2>/dev/null || printf '')
+        if [ -n "$switch_notice" ]; then
+          if switch_reply_id=$(post_reply "$thing_id" "$switch_notice" 2>/dev/null); then
+            transition_decision=$(jq -cn --arg action "$transition_action" --arg mode "$new_mode" '{transitionAction:$action,toMode:$mode}')
+            record_reply_event "$comment_json" "$switch_reply_id" "$switch_notice" "mode-switch" "$transition_decision" "mode-switch"
+          fi
+        fi
+      fi
+    fi
+  fi
+
+  relationship_upsert_row "$relationship_row" || :
+  return 0
 }
 
 merged_action_by_id() {
@@ -1881,6 +2782,26 @@ main() {
 
     list-replies)
       list_replies_json "${1-120}"
+      ;;
+
+    get-modes-config)
+      jq -cn --argjson config "$(read_modes_config_json)" '{ok:true,config:$config}'
+      ;;
+
+    save-modes-config)
+      save_modes_config_json "${1-}"
+      ;;
+
+    list-relationships)
+      list_relationships_json "${1-300}"
+      ;;
+
+    set-relationship)
+      set_relationship_json "${1-}" "${2-}" "${3-0}" "${4-manual-override}"
+      ;;
+
+    list-mode-log)
+      list_mode_log_json "${1-200}"
       ;;
 
     extract-norms)

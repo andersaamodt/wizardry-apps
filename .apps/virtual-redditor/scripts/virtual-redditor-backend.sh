@@ -21,6 +21,11 @@ Actions:
   extract-norms-full
   list-actions [LIMIT]
   list-replies [LIMIT]
+  get-modes-config
+  save-modes-config JSON
+  list-relationships [LIMIT]
+  set-relationship USER MODE [DURATION_HOURS] [TRIGGER]
+  list-mode-log [LIMIT]
   undo ACTION_ID
   apologize ACTION_ID [MESSAGE]
   set-setting KEY VALUE
@@ -257,6 +262,9 @@ refresh_paths() {
   BANS_LOG="$CURRENT_STATE_DIR/bans.jsonl"
   REPLIES_LOG="$CURRENT_STATE_DIR/replies.jsonl"
   ACTIONS_LOG="$CURRENT_STATE_DIR/actions.jsonl"
+  MODES_CONFIG_FILE="$CURRENT_STATE_DIR/modes.json"
+  RELATIONSHIPS_FILE="$CURRENT_STATE_DIR/relationships.json"
+  MODE_LOG_FILE="$CURRENT_STATE_DIR/mode-log.jsonl"
   MANIFESTO_FILE="$CURRENT_STATE_DIR/manifesto.md"
   NORMS_FILE="$CURRENT_STATE_DIR/norms.jsonl"
   BOT_ENV_FILE="$CURRENT_STATE_DIR/bot.env"
@@ -1326,6 +1334,26 @@ main() {
       run_daemon list-replies "${1-120}"
       ;;
 
+    get-modes-config)
+      run_daemon get-modes-config
+      ;;
+
+    save-modes-config)
+      run_daemon save-modes-config "${1-}"
+      ;;
+
+    list-relationships)
+      run_daemon list-relationships "${1-300}"
+      ;;
+
+    set-relationship)
+      run_daemon set-relationship "${1-}" "${2-}" "${3-0}" "${4-manual-override}"
+      ;;
+
+    list-mode-log)
+      run_daemon list-mode-log "${1-200}"
+      ;;
+
     undo)
       aid=${1-}
       if [ -z "$aid" ]; then
@@ -1467,6 +1495,9 @@ main() {
         --arg actions "$ACTIONS_LOG" \
         --arg bans "$BANS_LOG" \
         --arg replies "$REPLIES_LOG" \
+        --arg modes "$MODES_CONFIG_FILE" \
+        --arg relationships "$RELATIONSHIPS_FILE" \
+        --arg mode_log "$MODE_LOG_FILE" \
         --arg manifesto "$MANIFESTO_FILE" \
         --arg norms "$NORMS_FILE" \
         --arg global_instructions "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" \
@@ -1476,7 +1507,7 @@ main() {
         --arg daemon_error_log "$DAEMON_STDERR_LOG" \
         --arg active_profile "$ACTIVE_PROFILE_ID" \
         --argjson multi_profile "$MULTI_PROFILE" \
-        '{ok:true,stateRoot:$root,stateDir:$state,activeProfile:$active_profile,multiProfile:($multi_profile==1),paths:{actions:$actions,bans:$bans,replies:$replies,manifesto:$manifesto,norms:$norms,globalInstructions:$global_instructions,redditEnv:$reddit_env,botEnv:$bot_env,daemonLog:$daemon_log,daemonErrorLog:$daemon_error_log}}'
+        '{ok:true,stateRoot:$root,stateDir:$state,activeProfile:$active_profile,multiProfile:($multi_profile==1),paths:{actions:$actions,bans:$bans,replies:$replies,modes:$modes,relationships:$relationships,modeLog:$mode_log,manifesto:$manifesto,norms:$norms,globalInstructions:$global_instructions,redditEnv:$reddit_env,botEnv:$bot_env,daemonLog:$daemon_log,daemonErrorLog:$daemon_error_log}}'
       ;;
 
     *)

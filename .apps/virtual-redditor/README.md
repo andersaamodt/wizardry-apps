@@ -36,6 +36,9 @@ Key files:
 - `actions.jsonl`: all enforcement actions and undo events
 - `bans.jsonl`: ban-specific enforcement events
 - `replies.jsonl`: bot replies and apologies
+- `modes.json`: modes, behavior policies, switch rules, ban ladder, and templates
+- `relationships.json`: per-user relationship state for this bot/subreddit
+- `mode-log.jsonl`: mode switches, overrides, constraints, and escalation log events
 - `last_seen.txt`: incremental patrol watermark
 
 ## Credentials
@@ -69,6 +72,9 @@ Main actions:
 - `start` / `stop` / `restart`
 - `run-once`
 - `list-actions` / `list-replies`
+- `get-modes-config` / `save-modes-config`
+- `list-relationships` / `set-relationship`
+- `list-mode-log`
 - `undo ACTION_ID`
 - `apologize ACTION_ID [MESSAGE]`
 - `extract-norms`

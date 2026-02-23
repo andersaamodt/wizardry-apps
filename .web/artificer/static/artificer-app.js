@@ -6258,6 +6258,17 @@
     if (!el.dictateBtn) {
       return;
     }
+    var available = !!state.dictationInstalled || !!state.dictateRecording || !!state.dictateBusy;
+    el.dictateBtn.classList.toggle("hidden", !available);
+    if (!available) {
+      el.dictateBtn.disabled = true;
+      el.dictateBtn.classList.remove("recording");
+      el.dictateBtn.setAttribute("aria-pressed", "false");
+      if (el.dictateBtn.hasAttribute("title")) {
+        el.dictateBtn.removeAttribute("title");
+      }
+      return;
+    }
     var busy = !!state.dictateBusy;
     var recording = !!state.dictateRecording;
     el.dictateBtn.disabled = busy;
@@ -9768,6 +9779,15 @@
         syncCommandExecModeForWorkspace(state.activeWorkspaceId).catch(function () {
           return null;
         });
+        runWithRetry(function () {
+          return loadDictationStatus({ silent: true });
+        }, 2, 180)
+          .catch(function () {
+            return null;
+          })
+          .finally(function () {
+            renderUi();
+          });
 
         refreshGitStatus()
           .then(function () {
