@@ -178,6 +178,17 @@
               </div>
 
               <div class="mode-field-row behavior-schedule-row">
+                <label for="thread-initiate-max-pct" class="mode-field-label">Thread saturation</label>
+                <div class="schedule-controls">
+                  <div class="inline-field-row" title="Maximum share of comments in a thread that this bot can initiate on. Replies to direct engagement are always allowed.">
+                    <span class="schedule-inline">Initiate on up to</span>
+                    <input id="thread-initiate-max-pct" type="number" min="0" max="100" step="1" value="25">
+                    <span class="schedule-inline">% per thread</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mode-field-row behavior-schedule-row">
                 <label for="passes-enabled" class="mode-field-label">Pass schedule</label>
                 <div class="schedule-controls">
                   <label class="schedule-toggle">
@@ -539,6 +550,7 @@
       doctrineRemoteNorms: '',
       settingsSaveTimer: null,
       passIntervalSaveTimer: null,
+      threadInitiateSaveTimer: null,
       usernameSaveTimer: null,
       usernameCheckReqId: 0,
       subredditCheckTimer: null,
@@ -1868,6 +1880,7 @@
           patrolSampleMax: 20,
           patrolIntervalMin: 86400,
           patrolIntervalMax: 86400,
+          threadInitiateMaxPct: 25,
           ollamaModel: 'llama3.1:8b',
           subreddit: 'virtualredditor',
           redditUsername: 'preview_bot',
@@ -2593,6 +2606,7 @@
       var passIntervalInput = document.getElementById('pass-interval-input');
       var passIntervalUnit = document.getElementById('pass-interval-unit');
       var obeyAdmins = document.getElementById('obey-admins');
+      var threadInitiateMaxInput = document.getElementById('thread-initiate-max-pct');
 
       if (titleUsername && document.activeElement !== titleUsername && !state.usernameEditing) {
         titleUsername.value = String(settings.redditUsername || '');
@@ -2624,6 +2638,11 @@
       }
       if (obeyAdmins) {
         obeyAdmins.checked = !!settings.obeyAdmins;
+      }
+      if (threadInitiateMaxInput && document.activeElement !== threadInitiateMaxInput) {
+        threadInitiateMaxInput.value = String(
+          typeof settings.threadInitiateMaxPct === 'number' ? settings.threadInitiateMaxPct : 25
+        );
       }
       updateModeDescriptions(normalizeMode(settings.mode || 'judicial'));
       updatePatrolModeDescriptions(normalizePatrolMode(settings.patrolMode || 'full'));
@@ -2838,6 +2857,7 @@
           if (key === 'PATROL_SAMPLE_MAX') state.status.settings.patrolSampleMax = Number(value || 20) || 20;
           if (key === 'PATROL_INTERVAL_MIN') state.status.settings.patrolIntervalMin = Number(value || 86400) || 86400;
           if (key === 'PATROL_INTERVAL_MAX') state.status.settings.patrolIntervalMax = Number(value || 86400) || 86400;
+          if (key === 'THREAD_INITIATE_MAX_PCT') state.status.settings.threadInitiateMaxPct = Number(value || 25);
           if (key === 'OBEY_ADMINS') state.status.settings.obeyAdmins = (String(value || '0') === '1');
           if (key === 'OLLAMA_MODEL') state.status.settings.ollamaModel = String(value || '');
           renderStatus();
@@ -2863,6 +2883,23 @@
           return;
         }
         saveSetting('PATROL_SAMPLE_MAX', sample);
+      }, 350);
+    }
+
+    function scheduleThreadInitiateMaxSave() {
+      if (state.threadInitiateSaveTimer) clearTimeout(state.threadInitiateSaveTimer);
+      state.threadInitiateSaveTimer = setTimeout(function () {
+        var value = String((document.getElementById('thread-initiate-max-pct').value) || '').trim();
+        if (!/^\d+$/.test(value)) {
+          setSettingsMessage('Thread saturation must be a whole number from 0 to 100.', true);
+          return;
+        }
+        var pct = Number(value);
+        if (!isFinite(pct) || pct < 0 || pct > 100) {
+          setSettingsMessage('Thread saturation must be between 0 and 100.', true);
+          return;
+        }
+        saveSetting('THREAD_INITIATE_MAX_PCT', String(Math.round(pct)));
       }, 350);
     }
 
@@ -3604,6 +3641,11 @@
         scheduleSampleSave();
       });
       document.getElementById('sample-max-input').addEventListener('blur', scheduleSampleSave);
+      document.getElementById('thread-initiate-max-pct').addEventListener('input', function () {
+        setSettingsMessage('Saving...', false);
+        scheduleThreadInitiateMaxSave();
+      });
+      document.getElementById('thread-initiate-max-pct').addEventListener('blur', scheduleThreadInitiateMaxSave);
       document.getElementById('pass-interval-input').addEventListener('input', function () {
         setSettingsMessage('Saving...', false);
         schedulePassIntervalSave();

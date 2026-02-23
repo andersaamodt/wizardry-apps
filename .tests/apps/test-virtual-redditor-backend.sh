@@ -68,4 +68,7 @@ printf '%s' "$oauth_status" | jq -e '.ok == true and (.status == "waiting" or .s
 oauth_cancel=$(VR_STATE_DIR="$state_dir" "$backend" oauth-cancel)
 printf '%s' "$oauth_cancel" | jq -e '.ok == true and .status == "cancelled"' >/dev/null
 
+thread_cap_set=$(VR_STATE_DIR="$state_dir" "$backend" set-setting THREAD_INITIATE_MAX_PCT 15)
+printf '%s' "$thread_cap_set" | jq -e '.ok == true and .threadInitiateMaxPct == 15' >/dev/null
+
 printf '%s\n' "virtual redditor backend tests passed"

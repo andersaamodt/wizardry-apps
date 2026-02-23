@@ -185,6 +185,7 @@ PATROL_MODE=full
 PATROL_SAMPLE_MAX=20
 PATROL_INTERVAL_MIN=35
 PATROL_INTERVAL_MAX=95
+THREAD_INITIATE_MAX_PCT=25
 SANCTION_DELAY_MIN=7
 SANCTION_DELAY_MAX=45
 SUMMONS_ENABLED=1
@@ -231,6 +232,7 @@ load_bot_env() {
   PATROL_SAMPLE_MAX=$(to_int "${PATROL_SAMPLE_MAX:-20}" 20)
   PATROL_INTERVAL_MIN=$(to_int "${PATROL_INTERVAL_MIN:-35}" 35)
   PATROL_INTERVAL_MAX=$(to_int "${PATROL_INTERVAL_MAX:-95}" 95)
+  THREAD_INITIATE_MAX_PCT=$(to_int "${THREAD_INITIATE_MAX_PCT:-25}" 25)
   SANCTION_DELAY_MIN=$(to_int "${SANCTION_DELAY_MIN:-7}" 7)
   SANCTION_DELAY_MAX=$(to_int "${SANCTION_DELAY_MAX:-45}" 45)
   SUMMONS_ENABLED=$(to_int "${SUMMONS_ENABLED:-1}" 1)
@@ -257,6 +259,8 @@ load_bot_env() {
   [ "$PATROL_SAMPLE_MAX" -lt 1 ] && PATROL_SAMPLE_MAX=1
   [ "$PATROL_INTERVAL_MIN" -lt 3 ] && PATROL_INTERVAL_MIN=3
   [ "$PATROL_INTERVAL_MAX" -lt "$PATROL_INTERVAL_MIN" ] && PATROL_INTERVAL_MAX=$PATROL_INTERVAL_MIN
+  [ "$THREAD_INITIATE_MAX_PCT" -lt 0 ] && THREAD_INITIATE_MAX_PCT=0
+  [ "$THREAD_INITIATE_MAX_PCT" -gt 100 ] && THREAD_INITIATE_MAX_PCT=100
   [ "$SANCTION_DELAY_MIN" -lt 0 ] && SANCTION_DELAY_MIN=0
   [ "$SANCTION_DELAY_MAX" -lt "$SANCTION_DELAY_MIN" ] && SANCTION_DELAY_MAX=$SANCTION_DELAY_MIN
   [ "$USER_HISTORY_LIMIT" -lt 1 ] && USER_HISTORY_LIMIT=1
@@ -351,7 +355,7 @@ set_setting() {
   value=$2
 
   case "$key" in
-    MODE|PATROL_MODE|PATROL_SAMPLE_MAX|PATROL_INTERVAL_MIN|PATROL_INTERVAL_MAX|SANCTION_DELAY_MIN|SANCTION_DELAY_MAX|SUMMONS_ENABLED|NIGHTLY_STATUTE_ENABLED|NIGHTLY_HOUR|HIGH_SIGNAL_MIN_SCORE|AUTO_ACCEPT_NORMS|USER_HISTORY_LIMIT|THREAD_SIBLING_LIMIT|OBEY_ADMINS|OLLAMA_MODEL|OLLAMA_URL)
+    MODE|PATROL_MODE|PATROL_SAMPLE_MAX|PATROL_INTERVAL_MIN|PATROL_INTERVAL_MAX|THREAD_INITIATE_MAX_PCT|SANCTION_DELAY_MIN|SANCTION_DELAY_MAX|SUMMONS_ENABLED|NIGHTLY_STATUTE_ENABLED|NIGHTLY_HOUR|HIGH_SIGNAL_MIN_SCORE|AUTO_ACCEPT_NORMS|USER_HISTORY_LIMIT|THREAD_SIBLING_LIMIT|OBEY_ADMINS|OLLAMA_MODEL|OLLAMA_URL)
       ;;
     *)
       emit_error "unsupported setting key: $key"
@@ -397,6 +401,7 @@ settings_json() {
     --argjson patrol_sample_max "$PATROL_SAMPLE_MAX" \
     --argjson patrol_interval_min "$PATROL_INTERVAL_MIN" \
     --argjson patrol_interval_max "$PATROL_INTERVAL_MAX" \
+    --argjson thread_initiate_max_pct "$THREAD_INITIATE_MAX_PCT" \
     --argjson sanction_delay_min "$SANCTION_DELAY_MIN" \
     --argjson sanction_delay_max "$SANCTION_DELAY_MAX" \
     --argjson summons_enabled "$SUMMONS_ENABLED" \
@@ -421,7 +426,7 @@ settings_json() {
     --arg last_seen_path "$LAST_SEEN_FILE" \
     --arg daemon_log_path "$DAEMON_STDOUT_LOG" \
     --arg daemon_error_path "$DAEMON_STDERR_LOG" \
-    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
+    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
 }
 
 metrics_json() {
@@ -707,6 +712,97 @@ is_summons_comment() {
     1) printf '%s' "1" ;;
     *) printf '%s' "0" ;;
   esac
+}
+
+comment_parent_is_bot() {
+  cache_dir=$1
+  comment_json=$2
+  parent_id=$(printf '%s' "$comment_json" | jq -r '.parent_id // empty' 2>/dev/null || printf '')
+  case "$parent_id" in
+    t1_*) ;;
+    *) printf '%s' "0"; return 0 ;;
+  esac
+
+  parent_payload=$(cached_reddit_get "$cache_dir" "parent-$parent_id" "/api/info.json?id=$parent_id&raw_json=1")
+  parent_author=$(printf '%s' "$parent_payload" | jq -r '.data.children[0].data.author // empty' 2>/dev/null || printf '')
+  if [ -n "$parent_author" ] && [ "$(printf '%s' "$parent_author" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$REDDIT_USERNAME" | tr '[:upper:]' '[:lower:]')" ]; then
+    printf '%s' "1"
+  else
+    printf '%s' "0"
+  fi
+}
+
+is_direct_engagement_comment() {
+  cache_dir=$1
+  comment_json=$2
+  if [ "$(is_summons_comment "$comment_json")" = "1" ]; then
+    printf '%s' "1"
+    return 0
+  fi
+  comment_parent_is_bot "$cache_dir" "$comment_json"
+}
+
+thread_proactive_cap_allows() {
+  cache_dir=$1
+  comment_json=$2
+
+  if [ "$THREAD_INITIATE_MAX_PCT" -ge 100 ]; then
+    printf '%s' "1"
+    return 0
+  fi
+
+  link_id=$(printf '%s' "$comment_json" | jq -r '.link_id // empty' 2>/dev/null || printf '')
+  case "$link_id" in
+    t3_*) ;;
+    *) printf '%s' "1"; return 0 ;;
+  esac
+  post_id=${link_id#t3_}
+  [ -n "$post_id" ] || { printf '%s' "1"; return 0; }
+
+  thread_payload=$(cached_reddit_get "$cache_dir" "thread-$post_id" "/comments/$post_id/.json?limit=200&depth=6&raw_json=1&sort=new")
+  replied_ids='[]'
+  if [ -s "$REPLIES_LOG" ]; then
+    replied_ids=$(jq -cs 'map(.comment_id // empty) | map(select(length > 0)) | unique' "$REPLIES_LOG" 2>/dev/null || printf '[]')
+  fi
+
+  stats=$(printf '%s' "$thread_payload" | jq -c --arg me "$(printf '%s' "$REDDIT_USERNAME" | tr '[:upper:]' '[:lower:]')" --argjson replied "$replied_ids" '
+    [.. | objects | select(.kind? == "t1") | .data] as $all
+    | ($all | map({key:(.name // ""), value:(.author // "")}) | from_entries) as $authors
+    | ($all | map(select((.author // "") != "" and (.author // "") != "[deleted]" and (.author // "") != "[removed]" and ((.author // "") | ascii_downcase) != $me))) as $human
+    | ($human | map(select((.name // "") as $id | ($replied | index($id)) != null))) as $replied_human
+    | ($replied_human | map(select(
+        (
+          (((.body // "") | ascii_downcase) | contains("/u/" + $me))
+          or
+          (((.body // "") | ascii_downcase) | contains("u/" + $me))
+        ) | not
+      ))) as $not_mention
+    | ($not_mention | map(select(
+        (
+          ((.parent_id // "") | startswith("t1_"))
+          and
+          (($authors[.parent_id] // "" | ascii_downcase) == $me)
+        ) | not
+      ))) as $proactive
+    | {eligible:($human | length), proactive:($proactive | length)}
+  ' 2>/dev/null || printf '{"eligible":0,"proactive":0}')
+
+  eligible=$(printf '%s' "$stats" | jq -r '.eligible // 0' 2>/dev/null || printf '0')
+  proactive=$(printf '%s' "$stats" | jq -r '.proactive // 0' 2>/dev/null || printf '0')
+  eligible=$(to_int "$eligible" 0)
+  proactive=$(to_int "$proactive" 0)
+  if [ "$eligible" -le 0 ]; then
+    printf '%s' "1"
+    return 0
+  fi
+  max_proactive=$(awk -v n="$eligible" -v p="$THREAD_INITIATE_MAX_PCT" 'BEGIN { v=int((n*p)/100); if (v<0) v=0; printf "%d", v }')
+  max_proactive=$(to_int "$max_proactive" 0)
+
+  if [ "$proactive" -lt "$max_proactive" ]; then
+    printf '%s' "1"
+  else
+    printf '%s' "0"
+  fi
 }
 
 cache_key_safe() {
@@ -1032,6 +1128,7 @@ record_reply_event() {
   reply_text=$3
   category=$4
   decision_json=$5
+  source=$6
 
   ts=$(now_iso)
   ts_epoch=$(now_epoch)
@@ -1049,7 +1146,8 @@ record_reply_event() {
     --arg reply_text "$reply_text" \
     --arg category "$category" \
     --arg decision "$decision_json" \
-    '{event:$event,reply_event_id:$reply_event_id,ts:$ts,ts_epoch:$ts_epoch,subreddit:$subreddit,mode:$mode,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),reply_id:$reply_id,reply:$reply_text,category:$category,decision:(($decision|fromjson? // {}))}')
+    --arg source "$source" \
+    '{event:$event,reply_event_id:$reply_event_id,ts:$ts,ts_epoch:$ts_epoch,subreddit:$subreddit,mode:$mode,source:$source,comment_id:(($comment|fromjson).name // ""),comment_author:(($comment|fromjson).author // ""),reply_id:$reply_id,reply:$reply_text,category:$category,decision:(($decision|fromjson? // {}))}')
 
   append_jsonl "$REPLIES_LOG" "$event"
 }
@@ -1089,6 +1187,13 @@ process_comment() {
     return 0
   fi
 
+  reply_source="proactive"
+  if [ "$(is_direct_engagement_comment "$cache_dir" "$comment_json")" = "1" ]; then
+    reply_source="engaged"
+  elif [ "$(thread_proactive_cap_allows "$cache_dir" "$comment_json")" != "1" ]; then
+    return 0
+  fi
+
   envelope=$(compose_context_envelope "$cache_dir" "$comment_json")
   prompt=$(build_adjudication_prompt "$envelope")
 
@@ -1113,7 +1218,7 @@ process_comment() {
   if [ -n "$reply_text" ]; then
     reply_text=$(truncate_reply "$reply_text")
     if reply_id=$(post_reply "$thing_id" "$reply_text" 2>/dev/null); then
-      record_reply_event "$comment_json" "$reply_id" "$reply_text" "$category" "$decision"
+      record_reply_event "$comment_json" "$reply_id" "$reply_text" "$category" "$decision" "$reply_source"
     else
       reply_id=''
     fi
@@ -1644,15 +1749,15 @@ patrol_once() {
     | .[]
   ' 2>/dev/null > "$new_comments_file" || :
 
-  summons_file="$cache_dir/summons.jsonl"
+  engaged_file="$cache_dir/engaged.jsonl"
   others_file="$cache_dir/others.jsonl"
-  : > "$summons_file"
+  : > "$engaged_file"
   : > "$others_file"
 
   while IFS= read -r comment_row; do
     [ -z "$comment_row" ] && continue
-    if [ "$(is_summons_comment "$comment_row")" = "1" ]; then
-      printf '%s\n' "$comment_row" >> "$summons_file"
+    if [ "$(is_direct_engagement_comment "$cache_dir" "$comment_row")" = "1" ]; then
+      printf '%s\n' "$comment_row" >> "$engaged_file"
     else
       printf '%s\n' "$comment_row" >> "$others_file"
     fi
@@ -1662,13 +1767,13 @@ patrol_once() {
   : > "$selected_file"
 
   if [ "$PATROL_MODE" = "full" ]; then
-    cat "$summons_file" "$others_file" >> "$selected_file"
+    cat "$engaged_file" "$others_file" >> "$selected_file"
   else
-    cat "$summons_file" >> "$selected_file"
+    cat "$engaged_file" >> "$selected_file"
 
-    summons_count=$(wc -l < "$summons_file" | tr -d ' ')
-    summons_count=$(to_int "$summons_count" 0)
-    slots=$((PATROL_SAMPLE_MAX - summons_count))
+    engaged_count=$(wc -l < "$engaged_file" | tr -d ' ')
+    engaged_count=$(to_int "$engaged_count" 0)
+    slots=$((PATROL_SAMPLE_MAX - engaged_count))
     if [ "$slots" -gt 0 ]; then
       awk 'BEGIN { srand(); } { print rand() "\t" $0; }' "$others_file" 2>/dev/null \
         | sort -n \
