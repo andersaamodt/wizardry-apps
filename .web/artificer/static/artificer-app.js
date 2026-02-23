@@ -551,6 +551,7 @@
   var runStreamPollTimers = {};
   var modelInstallPollTimer = null;
   var dictationInstallPollTimer = null;
+  var dictationInstallPollSession = 0;
   var modelAutoRefreshTimer = null;
   var modelAutoRefreshBusy = false;
   var modelAutoRefreshLastAt = 0;
@@ -12519,18 +12520,22 @@
   }
 
   function stopDictationInstallPolling() {
+    dictationInstallPollSession += 1;
     if (dictationInstallPollTimer) {
       clearInterval(dictationInstallPollTimer);
       dictationInstallPollTimer = null;
     }
   }
 
-  function pollDictationInstallStatus(jobId) {
+  function pollDictationInstallStatus(jobId, pollSessionId) {
     var id = trim(String(jobId || ""));
     if (!id) {
       return Promise.resolve(null);
     }
     return apiGet("dictation_install_status", { job_id: id }, { timeoutMs: 12000 }).then(function (response) {
+      if (typeof pollSessionId === "number" && pollSessionId !== dictationInstallPollSession) {
+        return null;
+      }
       if (!response || !response.success || !response.job) {
         throw new Error((response && response.error) || "Could not load dictation install status");
       }
@@ -12689,8 +12694,9 @@
       return;
     }
     stopDictationInstallPolling();
+    var sessionId = dictationInstallPollSession;
     dictationInstallPollTimer = setInterval(function () {
-      pollDictationInstallStatus(id).catch(function (error) {
+      pollDictationInstallStatus(id, sessionId).catch(function (error) {
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
         state.dictationInstallCancelling = false;
@@ -12736,7 +12742,7 @@
       }
       startDictationInstallPolling(String(response.job.id || ""));
       renderUi();
-      return pollDictationInstallStatus(String(response.job.id || "")).catch(function (error) {
+      return pollDictationInstallStatus(String(response.job.id || ""), dictationInstallPollSession).catch(function (error) {
         stopDictationInstallPolling();
         state.dictationInstallBusy = false;
         state.dictationInstallCancelling = false;
