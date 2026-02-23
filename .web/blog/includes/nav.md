@@ -217,6 +217,10 @@
     }
   }
 
+  function goToAccountSettings() {
+    window.location.href = '/pages/admin.html#account';
+  }
+
   function setLoggedInUI(isLoggedIn, isAdmin, username) {
     var displayName = username || '';
     isAuthenticated = !!isLoggedIn;
@@ -233,6 +237,9 @@
       if (userName) {
         userName.style.display = 'inline-block';
         userName.textContent = displayName || 'signed-in';
+        userName.setAttribute('role', 'link');
+        userName.setAttribute('tabindex', '0');
+        userName.setAttribute('aria-label', 'Open account settings');
       }
     } else {
       loginBtn.textContent = 'Login';
@@ -247,6 +254,9 @@
       if (userName) {
         userName.style.display = 'none';
         userName.textContent = '';
+        userName.removeAttribute('role');
+        userName.removeAttribute('tabindex');
+        userName.removeAttribute('aria-label');
       }
     }
   }
@@ -538,6 +548,27 @@
       menuLogoutBtn.addEventListener('click', function () {
         closeUserMenu();
         logout();
+      });
+    }
+
+    if (userName) {
+      userName.addEventListener('click', function () {
+        if (!isAuthenticated) {
+          return;
+        }
+        closeUserMenu();
+        goToAccountSettings();
+      });
+
+      userName.addEventListener('keydown', function (event) {
+        if (!isAuthenticated) {
+          return;
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          closeUserMenu();
+          goToAccountSettings();
+        }
       });
     }
 

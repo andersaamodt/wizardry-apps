@@ -370,6 +370,7 @@ header h1 {
   font-weight: 700;
   color: #1f2937;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 /* Theme settings panel */
