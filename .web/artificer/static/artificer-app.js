@@ -470,6 +470,7 @@
     dictatePhase: "idle",
     dictateStartedAt: 0,
     dictateElapsedMs: 0,
+    dictateWaveLevels: [],
     dictationShortcutHold: storageGet("artificer.dictationShortcutHold", "none"),
     dictationShortcutToggle: storageGet("artificer.dictationShortcutToggle", "none"),
     dictateHotkeyHoldActive: false,
@@ -647,6 +648,14 @@
   var stateGetInFlightKey = "";
   var dictationShortcutPressState = {};
   var dictationUiTickTimer = null;
+  var dictationWaveMonitorSession = 0;
+  var dictationWaveRafId = null;
+  var dictationWaveStream = null;
+  var dictationWaveAudioContext = null;
+  var dictationWaveAnalyser = null;
+  var dictationWaveSource = null;
+  var dictationWaveData = null;
+  var dictationWaveStartPromise = null;
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -6357,19 +6366,161 @@
     return el.dictationWave.querySelectorAll(".dictation-wave-bar");
   }
 
+  function stopDictationWaveMonitor() {
+    dictationWaveMonitorSession += 1;
+    if (dictationWaveRafId) {
+      cancelAnimationFrame(dictationWaveRafId);
+      dictationWaveRafId = null;
+    }
+    if (dictationWaveSource) {
+      try {
+        dictationWaveSource.disconnect();
+      } catch (_err) {
+        // noop
+      }
+      dictationWaveSource = null;
+    }
+    if (dictationWaveAnalyser) {
+      try {
+        dictationWaveAnalyser.disconnect();
+      } catch (_err2) {
+        // noop
+      }
+      dictationWaveAnalyser = null;
+    }
+    if (dictationWaveStream) {
+      try {
+        var tracks = dictationWaveStream.getTracks ? dictationWaveStream.getTracks() : [];
+        for (var ti = 0; ti < tracks.length; ti += 1) {
+          if (tracks[ti] && typeof tracks[ti].stop === "function") {
+            tracks[ti].stop();
+          }
+        }
+      } catch (_err3) {
+        // noop
+      }
+      dictationWaveStream = null;
+    }
+    if (dictationWaveAudioContext) {
+      try {
+        if (typeof dictationWaveAudioContext.close === "function") {
+          dictationWaveAudioContext.close();
+        }
+      } catch (_err4) {
+        // noop
+      }
+      dictationWaveAudioContext = null;
+    }
+    dictationWaveData = null;
+    dictationWaveStartPromise = null;
+    state.dictateWaveLevels = [];
+  }
+
+  function startDictationWaveMonitor() {
+    if (dictationWaveStartPromise) {
+      return dictationWaveStartPromise;
+    }
+    stopDictationWaveMonitor();
+    var monitorSession = dictationWaveMonitorSession + 1;
+    dictationWaveMonitorSession = monitorSession;
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+      state.dictateWaveLevels = [];
+      return Promise.resolve(false);
+    }
+    dictationWaveStartPromise = navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    }).then(function (stream) {
+      if (monitorSession !== dictationWaveMonitorSession) {
+        try {
+          var staleTracks = stream.getTracks ? stream.getTracks() : [];
+          for (var sti = 0; sti < staleTracks.length; sti += 1) {
+            if (staleTracks[sti] && typeof staleTracks[sti].stop === "function") {
+              staleTracks[sti].stop();
+            }
+          }
+        } catch (_err) {
+          // noop
+        }
+        return false;
+      }
+      dictationWaveStream = stream;
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) {
+        return false;
+      }
+      dictationWaveAudioContext = new AudioCtx();
+      dictationWaveSource = dictationWaveAudioContext.createMediaStreamSource(stream);
+      dictationWaveAnalyser = dictationWaveAudioContext.createAnalyser();
+      dictationWaveAnalyser.fftSize = 512;
+      dictationWaveAnalyser.smoothingTimeConstant = 0.72;
+      dictationWaveSource.connect(dictationWaveAnalyser);
+      dictationWaveData = new Uint8Array(dictationWaveAnalyser.fftSize);
+
+      function tick() {
+        if (monitorSession !== dictationWaveMonitorSession) {
+          return;
+        }
+        if (!dictationWaveAnalyser || !dictationWaveData) {
+          return;
+        }
+        dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
+        var bars = ensureDictationWaveBars();
+        var barCount = bars ? bars.length : 42;
+        if (barCount < 1) {
+          barCount = 42;
+        }
+        var levels = new Array(barCount);
+        var chunk = Math.max(1, Math.floor(dictationWaveData.length / barCount));
+        for (var i = 0; i < barCount; i += 1) {
+          var from = i * chunk;
+          var to = Math.min(dictationWaveData.length, from + chunk);
+          var sum = 0;
+          var count = 0;
+          for (var j = from; j < to; j += 1) {
+            var centered = (Number(dictationWaveData[j] || 128) - 128) / 128;
+            sum += Math.abs(centered);
+            count += 1;
+          }
+          var avg = count > 0 ? (sum / count) : 0;
+          var gated = Math.max(0, avg - 0.02);
+          levels[i] = Math.max(0, Math.min(1, gated * 2.8));
+        }
+        state.dictateWaveLevels = levels;
+        renderDictationWaveBars();
+        dictationWaveRafId = requestAnimationFrame(tick);
+      }
+
+      tick();
+      return true;
+    }).catch(function () {
+      state.dictateWaveLevels = [];
+      return false;
+    }).finally(function () {
+      dictationWaveStartPromise = null;
+    });
+    return dictationWaveStartPromise;
+  }
+
   function renderDictationWaveBars() {
     var bars = ensureDictationWaveBars();
     if (!bars || !bars.length) {
       return;
     }
+    var levels = Array.isArray(state.dictateWaveLevels) ? state.dictateWaveLevels : [];
     var recording = state.dictatePhase === "recording";
-    var seed = Date.now() / 170;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
-      var waveA = Math.sin(seed + (i * 0.41));
-      var waveB = Math.sin((seed * 0.73) + (i * 0.19));
-      var val = (waveA * 0.52) + (waveB * 0.48);
-      var unit = recording ? Math.abs(val) : 0.12;
+      var unit = Number(levels[i] || 0);
+      if (!isFinite(unit) || unit < 0) {
+        unit = 0;
+      }
+      if (!recording) {
+        unit *= 0.3;
+      }
       var height = 2 + Math.round(unit * 12);
       bar.style.height = String(height) + "px";
     }
@@ -6381,6 +6532,18 @@
       next = "idle";
     }
     state.dictatePhase = next;
+    if (next === "starting" || next === "recording") {
+      if (!dictationWaveAnalyser && !dictationWaveStream) {
+        startDictationWaveMonitor().then(function (started) {
+        if (!started && state.dictatePhase === "recording") {
+          state.dictateWaveLevels = [];
+          renderDictationWaveBars();
+        }
+        });
+      }
+    } else {
+      stopDictationWaveMonitor();
+    }
     if (next === "recording") {
       if (!state.dictateStartedAt) {
         state.dictateStartedAt = Date.now();
@@ -18396,6 +18559,7 @@
     stopRunEventHealLoop();
     stopApprovalResumeWatch();
     clearDictationUiTicker();
+    stopDictationWaveMonitor();
     clearDictationShortcutPressState();
     clearPendingAttachments();
   });
