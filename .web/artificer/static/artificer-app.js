@@ -6217,7 +6217,10 @@
     el.dictateBtn.classList.toggle("recording", busy);
     el.dictateBtn.setAttribute("aria-pressed", busy ? "true" : "false");
     el.dictateBtn.setAttribute("aria-label", busy ? "Listening for dictation" : "Dictate prompt");
-    el.dictateBtn.title = busy ? "Listening..." : "Dictate prompt";
+    el.dictateBtn.setAttribute("data-tooltip", busy ? "Listening..." : "Dictate prompt");
+    if (el.dictateBtn.hasAttribute("title")) {
+      el.dictateBtn.removeAttribute("title");
+    }
   }
 
   function renderQueueControls() {
