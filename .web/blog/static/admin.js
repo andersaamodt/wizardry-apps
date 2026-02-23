@@ -556,6 +556,7 @@
       }
 
       setAccountOnlyMode(false);
+      activateSection(getSectionFromHash(), false);
 
       await Promise.all([loadConfig(), loadDrafts(), loadQueue()]);
       renderPreview();
