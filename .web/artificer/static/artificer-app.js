@@ -657,6 +657,7 @@
   var dictationWaveData = null;
   var dictationWaveStartPromise = null;
   var dictatePointerHandledAt = 0;
+  var dictateStopPointerHandledAt = 0;
 
   if (state.sortMode !== "updated" && state.sortMode !== "created") {
     state.sortMode = "updated";
@@ -17889,7 +17890,26 @@
       });
     }
     if (el.dictationStopBtn) {
+      on(el.dictationStopBtn, "mousedown", function (event) {
+        if (event && event.button !== 0) {
+          return;
+        }
+        dictateStopPointerHandledAt = Date.now();
+        if (event && typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+        if (state.dictateBusy) {
+          return;
+        }
+        stopDictationCapture({ fromHotkey: false }).catch(showError);
+      });
       on(el.dictationStopBtn, "click", function (event) {
+        if (Date.now() - dictateStopPointerHandledAt < 420) {
+          if (event && typeof event.preventDefault === "function") {
+            event.preventDefault();
+          }
+          return;
+        }
         if (event) {
           event.preventDefault();
         }

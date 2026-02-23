@@ -1434,9 +1434,15 @@ is_summons_comment() {
     return
   fi
 
-  hit=$(printf '%s' "$comment_json" | jq -r --arg uname "$uname" '
+  hit=$(printf '%s' "$comment_json" | jq -r --arg uname "$uname" --argjson cfg "$(read_modes_config_json)" '
     ((.body // "") | ascii_downcase) as $b
-    | if ($b | contains("/u/" + $uname)) or ($b | contains("u/" + $uname)) then "1" else "0" end
+    | (
+        ($cfg.optInCommands // [])
+        | map(tostring | gsub("\\{\\{bot_username\\}\\}"; $uname) | ascii_downcase)
+        | map(gsub("^\\s+"; "") | gsub("\\s+$"; ""))
+        | map(select(length > 0))
+      ) as $tokens
+    | if ($tokens | any($b | contains(.))) then "1" else "0" end
   ' 2>/dev/null || printf '0')
 
   case "$hit" in

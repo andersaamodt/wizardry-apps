@@ -332,8 +332,23 @@
             </div>
             <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
             <div id="modes-list" class="modes-list"></div>
-            <div class="persona-section-title modes-subtitle">Switch Rules</div>
+            <div class="modes-section-head modes-subtitle">
+              <div class="persona-section-title">Switch Rules</div>
+              <button id="btn-mode-add-rule" type="button" class="soft mini-add-btn">Add rule</button>
+            </div>
             <div id="mode-switch-rules-list" class="mode-switch-rules-list"></div>
+            <div class="persona-section-title modes-subtitle">Opt-in Commands</div>
+            <div class="mode-fields-inline">
+              <div class="mode-field-row modes-wide-field">
+                <label for="modes-opt-in-commands" class="mode-field-label">Commands</label>
+                <input id="modes-opt-in-commands" type="text" placeholder="!summon, !engage, /u/botname">
+              </div>
+            </div>
+            <div class="modes-section-head modes-subtitle">
+              <div class="persona-section-title">Post-Action Transitions</div>
+              <button id="btn-mode-add-transition" type="button" class="soft mini-add-btn">Add transition</button>
+            </div>
+            <div id="modes-transitions-list" class="mode-switch-rules-list"></div>
             <div class="settings-actions modes-save-actions">
               <button id="btn-save-modes" type="button" class="primary">Save modes</button>
             </div>
@@ -444,6 +459,27 @@
                   <option value="enforce_then_escalate">Enforce then escalate</option>
                   <option value="escalate_immediately">Escalate immediately</option>
                 </select>
+              </div>
+            </div>
+            <div class="mode-fields-inline modes-grid">
+              <div class="mode-field-row">
+                <label for="enforcement-after-switch-enabled" class="mode-field-label">After escalation</label>
+                <label class="schedule-toggle">
+                  <input id="enforcement-after-switch-enabled" type="checkbox">
+                  <span>Switch relationship mode</span>
+                </label>
+              </div>
+              <div class="mode-field-row">
+                <label for="enforcement-after-switch-mode" class="mode-field-label">Switch to mode</label>
+                <select id="enforcement-after-switch-mode"></select>
+              </div>
+              <div class="mode-field-row">
+                <label for="enforcement-after-switch-duration" class="mode-field-label">Duration (hours)</label>
+                <input id="enforcement-after-switch-duration" type="number" min="0" step="1" value="168">
+              </div>
+              <div class="mode-field-row">
+                <label for="enforcement-after-switch-decay" class="mode-field-label">Decay to</label>
+                <select id="enforcement-after-switch-decay"></select>
               </div>
             </div>
             <div class="settings-actions modes-save-actions">
@@ -2962,7 +2998,11 @@
       return {
         startingMode: 'SHADE',
         defaultDecayMode: 'SHADE',
-        actionCatalog: ['Reply', 'Initiate', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Neutral Ban Notice'],
+        actionCatalog: [
+          'Reply', 'Initiate', 'Warn', 'Mention', 'Quote', 'Followup', 'Cross-thread Reply',
+          'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban',
+          'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice'
+        ],
         behaviors: {
           mirrorTone: 'mirror_or_less',
           humor: 'measured',
@@ -2973,6 +3013,8 @@
         },
         modes: [],
         switchRules: [],
+        postActionTransitions: {},
+        optInCommands: [],
         replies: {
           warningTemplate: '',
           modeSwitchTemplate: '',
@@ -2989,7 +3031,13 @@
         escalation: {
           onHighSeverity: false,
           targets: 'modmail',
-          timing: 'enforce_then_escalate'
+          timing: 'enforce_then_escalate',
+          afterActionSwitch: {
+            enabled: false,
+            toMode: 'STRICT',
+            durationHours: 168,
+            decayTo: 'RULES'
+          }
         }
       };
     }
@@ -3003,10 +3051,81 @@
       out.behaviors.banJitterSec = Object.assign({}, base.behaviors.banJitterSec, ((src.behaviors || {}).banJitterSec) || {});
       out.replies = Object.assign({}, base.replies, src.replies || {});
       out.escalation = Object.assign({}, base.escalation, src.escalation || {});
+      out.escalation.afterActionSwitch = Object.assign({}, base.escalation.afterActionSwitch, ((src.escalation || {}).afterActionSwitch) || {});
+      out.escalation.afterActionSwitch.enabled = !!out.escalation.afterActionSwitch.enabled;
+      out.escalation.afterActionSwitch.toMode = String(out.escalation.afterActionSwitch.toMode || '');
+      out.escalation.afterActionSwitch.durationHours = Math.max(0, parseInt(out.escalation.afterActionSwitch.durationHours, 10) || 0);
+      out.escalation.afterActionSwitch.decayTo = String(out.escalation.afterActionSwitch.decayTo || '');
       out.banLevels = Object.assign({}, base.banLevels, src.banLevels || {});
       if (!Array.isArray(out.modes)) out.modes = [];
       if (!Array.isArray(out.switchRules)) out.switchRules = [];
-      if (!Array.isArray(out.actionCatalog) || !out.actionCatalog.length) out.actionCatalog = base.actionCatalog.slice();
+      if (!out.postActionTransitions || typeof out.postActionTransitions !== 'object') out.postActionTransitions = {};
+      if (!Array.isArray(out.optInCommands)) out.optInCommands = [];
+
+      var savedCatalog = Array.isArray(out.actionCatalog) ? out.actionCatalog : [];
+      var actionCatalog = base.actionCatalog.slice();
+      for (var i = 0; i < savedCatalog.length; i += 1) {
+        var actionName = String(savedCatalog[i] || '').trim();
+        if (!actionName || actionCatalog.indexOf(actionName) >= 0) continue;
+        actionCatalog.push(actionName);
+      }
+      out.actionCatalog = actionCatalog;
+
+      out.optInCommands = out.optInCommands
+        .map(function (item) { return String(item || '').trim(); })
+        .filter(function (item, idx, arr) { return !!item && arr.indexOf(item) === idx; });
+
+      out.modes = out.modes.map(function (mode) {
+        var next = Object.assign({}, mode || {});
+        next.id = String(next.id || '');
+        next.label = String(next.label || next.id);
+        next.allow = Object.assign({}, next.allow || {});
+        next.constraints = Object.assign({
+          maxRepliesPerUserThread24h: 4,
+          noFollowup: false,
+          noMention: false,
+          noQuote: false
+        }, next.constraints || {});
+        next.defaultExpiryHours = Math.max(0, parseInt(next.defaultExpiryHours, 10) || 0);
+        for (var c = 0; c < actionCatalog.length; c += 1) {
+          var name = actionCatalog[c];
+          if (typeof next.allow[name] !== 'boolean') next.allow[name] = !!next.allow[name];
+        }
+        return next;
+      }).filter(function (mode) { return !!mode.id; });
+
+      out.switchRules = out.switchRules.map(function (rule, idx) {
+        var next = Object.assign({}, rule || {});
+        next.id = String(next.id || ('rule-' + String(idx + 1)));
+        next.label = String(next.label || '');
+        next.matchAny = Array.isArray(next.matchAny)
+          ? next.matchAny.map(function (item) { return String(item || '').trim(); }).filter(Boolean)
+          : [];
+        next.toMode = String(next.toMode || '');
+        next.durationHours = Math.max(0, parseInt(next.durationHours, 10) || 0);
+        next.decayTo = String(next.decayTo || '');
+        next.template = String(next.template || '');
+        next.announce = !!next.announce;
+        return next;
+      });
+
+      var normalizedTransitions = {};
+      var transitionSource = out.postActionTransitions || {};
+      var transitionKeys = Object.keys(transitionSource);
+      for (var t = 0; t < transitionKeys.length; t += 1) {
+        var key = String(transitionKeys[t] || '').trim();
+        if (!key) continue;
+        var row = transitionSource[key] || {};
+        var toMode = String(row.toMode || '').trim();
+        if (!toMode) continue;
+        normalizedTransitions[key] = {
+          toMode: toMode,
+          durationHours: Math.max(0, parseInt(row.durationHours, 10) || 0),
+          decayTo: String(row.decayTo || '').trim(),
+          announce: !!row.announce
+        };
+      }
+      out.postActionTransitions = normalizedTransitions;
       return out;
     }
 
@@ -3038,6 +3157,40 @@
       }
     }
 
+    function modeOptionsHtml(modeOpts, selectedValue, includeBlank, blankLabel) {
+      var html = '';
+      if (includeBlank) {
+        html += '<option value="">' + escapeHtml(blankLabel || 'None') + '</option>';
+      }
+      html += (modeOpts || []).map(function (opt) {
+        var selected = String(selectedValue || '') === opt.id ? ' selected' : '';
+        return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(opt.id) + '</option>';
+      }).join('');
+      return html;
+    }
+
+    function parseCsvList(raw) {
+      var out = [];
+      var chunks = String(raw || '').split(',');
+      for (var i = 0; i < chunks.length; i += 1) {
+        var next = String(chunks[i] || '').trim();
+        if (!next) continue;
+        if (out.indexOf(next) >= 0) continue;
+        out.push(next);
+      }
+      return out;
+    }
+
+    function firstUnusedAction(actionCatalog, usedMap) {
+      var choices = Array.isArray(actionCatalog) ? actionCatalog : [];
+      for (var i = 0; i < choices.length; i += 1) {
+        var key = String(choices[i] || '').trim();
+        if (!key) continue;
+        if (!usedMap[key]) return key;
+      }
+      return choices.length ? String(choices[0]) : 'Reply';
+    }
+
     function renderBehaviorsPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
       var behaviors = cfg.behaviors || {};
@@ -3065,16 +3218,19 @@
       var line = document.getElementById('modes-line');
       var list = document.getElementById('modes-list');
       var switchList = document.getElementById('mode-switch-rules-list');
-      if (!list || !switchList) return;
+      var transitionsList = document.getElementById('modes-transitions-list');
+      var optInCommandsInput = document.getElementById('modes-opt-in-commands');
+      if (!list || !switchList || !transitionsList) return;
 
       fillModeSelect('modes-starting-mode', cfg.startingMode || '');
       fillModeSelect('modes-default-decay-mode', cfg.defaultDecayMode || '');
       fillModeSelect('relationship-mode', cfg.startingMode || '');
 
       var actionCatalog = Array.isArray(cfg.actionCatalog) ? cfg.actionCatalog : [];
-      var actionChoices = actionCatalog.filter(function (name) {
-        return ['Reply', 'Initiate', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Neutral Ban Notice'].indexOf(name) >= 0;
-      });
+      var actionChoices = actionCatalog.slice();
+      if (optInCommandsInput && document.activeElement !== optInCommandsInput) {
+        optInCommandsInput.value = (cfg.optInCommands || []).join(', ');
+      }
 
       list.innerHTML = (cfg.modes || []).map(function (mode) {
         var constraints = mode.constraints || {};
@@ -3090,9 +3246,12 @@
           '    <div class="mode-card-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
           '    <label class="schedule-toggle"><input type="checkbox" data-mode-enabled ' + ((mode.enabled === false) ? '' : 'checked') + '><span>Enabled</span></label>',
           '  </div>',
+          '  <div class="mode-meta-row">',
+          '    <label class="mini-input mode-expiry-input">Default expiry (h)<input type="number" min="0" step="1" data-mode-default-expiry value="' + escapeHtml(String(mode.defaultExpiryHours || 0)) + '"></label>',
+          '  </div>',
           '  <div class="mode-permissions-grid">' + actionToggles + '</div>',
           '  <div class="mode-constraints-grid">',
-          '    <label class="mini-input">Max replies/24h<input type="number" min="0" step="1" data-mode-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '"></label>',
+          '    <label class="mini-input">Max replies/user/thread per 24h<input type="number" min="0" step="1" data-mode-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '"></label>',
           '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noFollowup" ' + (constraints.noFollowup ? 'checked' : '') + '><span>No followup</span></label>',
           '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noMention" ' + (constraints.noMention ? 'checked' : '') + '><span>No mention</span></label>',
           '    <label class="mini-toggle"><input type="checkbox" data-mode-constraint="noQuote" ' + (constraints.noQuote ? 'checked' : '') + '><span>No quote</span></label>',
@@ -3102,24 +3261,70 @@
       }).join('');
 
       var modeOpts = modeOptions(cfg);
-      switchList.innerHTML = (cfg.switchRules || []).map(function (rule, idx) {
-        var modesOptionsHtml = modeOpts.map(function (opt) {
-          var selected = String(rule.toMode || '') === opt.id ? ' selected' : '';
-          return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(opt.id) + '</option>';
+      var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
+      if (!switchRules.length) {
+        switchList.innerHTML = '<div class="settings-empty-note">No switch rules yet.</div>';
+      } else {
+        switchList.innerHTML = switchRules.map(function (rule, idx) {
+          var toModeHtml = modeOptionsHtml(modeOpts, String(rule.toMode || ''), false, '');
+          var decayModeHtml = modeOptionsHtml(modeOpts, String(rule.decayTo || ''), true, 'Default decay mode');
+          var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
+          return [
+            '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '" data-rule-id="' + escapeHtml(String(rule.id || '')) + '">',
+            '  <input type="text" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '">',
+            '  <input type="text" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '">',
+            '  <select data-rule-to-mode>' + toModeHtml + '</select>',
+            '  <input type="number" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '">',
+            '  <select data-rule-decay-to>' + decayModeHtml + '</select>',
+            '  <input type="text" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '">',
+            '  <label class="mini-toggle"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+            '  <button type="button" class="soft mini-remove-btn" data-remove-rule>Remove</button>',
+            '</div>'
+          ].join('');
         }).join('');
-        var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
-        return [
-          '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '">',
-          '  <input type="text" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '">',
-          '  <input type="text" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '">',
-          '  <select data-rule-to-mode>' + modesOptionsHtml + '</select>',
-          '  <input type="number" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '">',
-          '  <label class="mini-toggle"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
-          '</div>'
-        ].join('');
-      }).join('');
+      }
 
-      if (line) line.textContent = String((cfg.modes || []).length) + ' modes loaded';
+      var transitionSource = cfg.postActionTransitions || {};
+      var transitionActionNames = Object.keys(transitionSource);
+      var actionOptions = actionChoices.slice();
+      for (var a = 0; a < transitionActionNames.length; a += 1) {
+        if (actionOptions.indexOf(transitionActionNames[a]) < 0) {
+          actionOptions.push(transitionActionNames[a]);
+        }
+      }
+      transitionActionNames.sort(function (left, right) {
+        return actionOptions.indexOf(left) - actionOptions.indexOf(right);
+      });
+
+      if (!transitionActionNames.length) {
+        transitionsList.innerHTML = '<div class="settings-empty-note">No post-action transitions yet.</div>';
+      } else {
+        transitionsList.innerHTML = transitionActionNames.map(function (actionName, idx) {
+          var row = transitionSource[actionName] || {};
+          var actionSelectHtml = actionOptions.map(function (name) {
+            var selected = name === actionName ? ' selected' : '';
+            return '<option value="' + escapeHtml(name) + '"' + selected + '>' + escapeHtml(name) + '</option>';
+          }).join('');
+          var toModeHtml = modeOptionsHtml(modeOpts, String(row.toMode || ''), false, '');
+          var decayModeHtml = modeOptionsHtml(modeOpts, String(row.decayTo || ''), true, 'Default decay mode');
+          return [
+            '<div class="switch-rule-row transition-row" data-transition-idx="' + String(idx) + '" data-transition-action="' + escapeHtml(actionName) + '">',
+            '  <select data-transition-action>' + actionSelectHtml + '</select>',
+            '  <select data-transition-to-mode>' + toModeHtml + '</select>',
+            '  <input type="number" min="0" step="1" data-transition-duration value="' + escapeHtml(String(row.durationHours || 0)) + '">',
+            '  <select data-transition-decay-to>' + decayModeHtml + '</select>',
+            '  <label class="mini-toggle"><input type="checkbox" data-transition-announce ' + (row.announce ? 'checked' : '') + '><span>Announce</span></label>',
+            '  <button type="button" class="soft mini-remove-btn" data-remove-transition>Remove</button>',
+            '</div>'
+          ].join('');
+        }).join('');
+      }
+
+      if (line) {
+        line.textContent = String((cfg.modes || []).length) + ' modes • ' +
+          String(switchRules.length) + ' switch rules • ' +
+          String(transitionActionNames.length) + ' post-action transitions';
+      }
     }
 
     function renderBanLevelsPanel() {
@@ -3153,9 +3358,24 @@
       var onHigh = document.getElementById('enforcement-escalate-on-high');
       var targets = document.getElementById('enforcement-escalation-targets');
       var timing = document.getElementById('enforcement-escalation-timing');
+      var afterSwitchEnabled = document.getElementById('enforcement-after-switch-enabled');
+      var afterSwitchMode = document.getElementById('enforcement-after-switch-mode');
+      var afterSwitchDuration = document.getElementById('enforcement-after-switch-duration');
+      var afterSwitchDecay = document.getElementById('enforcement-after-switch-decay');
       if (onHigh) onHigh.checked = !!escalation.onHighSeverity;
       if (targets) targets.value = String(escalation.targets || 'modmail');
       if (timing) timing.value = String(escalation.timing || 'enforce_then_escalate');
+      var afterSwitch = escalation.afterActionSwitch || {};
+      var modeOpts = modeOptions(cfg);
+      if (afterSwitchEnabled) afterSwitchEnabled.checked = !!afterSwitch.enabled;
+      if (afterSwitchMode) {
+        afterSwitchMode.innerHTML = modeOptionsHtml(modeOpts, String(afterSwitch.toMode || cfg.defaultDecayMode || cfg.startingMode || ''), false, '');
+        if (!afterSwitchMode.value && modeOpts.length) afterSwitchMode.value = modeOpts[0].id;
+      }
+      if (afterSwitchDuration) afterSwitchDuration.value = String(Math.max(0, parseInt(afterSwitch.durationHours, 10) || 0));
+      if (afterSwitchDecay) {
+        afterSwitchDecay.innerHTML = modeOptionsHtml(modeOpts, String(afterSwitch.decayTo || ''), true, 'Default decay mode');
+      }
     }
 
     function renderReplyTemplatesPanel() {
@@ -3257,6 +3477,8 @@
         if (!card) return mode;
         var next = cloneJson(mode);
         next.enabled = !!((card.querySelector('[data-mode-enabled]') || {}).checked);
+        var modeDefaultExpiry = card.querySelector('[data-mode-default-expiry]');
+        next.defaultExpiryHours = Math.max(0, parseInt((modeDefaultExpiry && modeDefaultExpiry.value) || '0', 10) || 0);
         next.allow = Object.assign({}, next.allow || {});
         var allowToggles = card.querySelectorAll('[data-mode-allow]');
         for (var i = 0; i < allowToggles.length; i += 1) {
@@ -3276,24 +3498,48 @@
         return next;
       });
 
-      var switchRows = document.querySelectorAll('.switch-rule-row');
+      cfg.optInCommands = parseCsvList((document.getElementById('modes-opt-in-commands') || {}).value || '');
+
+      var switchRows = document.querySelectorAll('.switch-rule-row[data-rule-idx]');
       cfg.switchRules = [];
       for (var r = 0; r < switchRows.length; r += 1) {
         var row = switchRows[r];
+        var ruleId = String(row.getAttribute('data-rule-id') || '').trim();
         var label = String((row.querySelector('[data-rule-label]') || {}).value || '').trim();
-        var matchRaw = String((row.querySelector('[data-rule-matchany]') || {}).value || '');
+        var matchAny = parseCsvList(String((row.querySelector('[data-rule-matchany]') || {}).value || ''));
         var toMode = String((row.querySelector('[data-rule-to-mode]') || {}).value || '').trim();
         var duration = Math.max(0, parseInt((row.querySelector('[data-rule-duration]') || {}).value || '0', 10) || 0);
+        var decayTo = String((row.querySelector('[data-rule-decay-to]') || {}).value || '').trim();
+        var template = String((row.querySelector('[data-rule-template]') || {}).value || '');
         var announce = !!((row.querySelector('[data-rule-announce]') || {}).checked);
-        if (!label || !toMode) continue;
         cfg.switchRules.push({
-          id: 'rule-' + String(r + 1),
-          label: label,
-          matchAny: matchRaw.split(',').map(function (item) { return item.trim(); }).filter(Boolean),
+          id: ruleId || ('rule-' + String(r + 1)),
+          label: label || ('Rule ' + String(r + 1)),
+          matchAny: matchAny,
           toMode: toMode,
           durationHours: duration,
+          decayTo: decayTo,
+          template: template,
           announce: announce
         });
+      }
+
+      var transitionRows = document.querySelectorAll('.transition-row[data-transition-idx]');
+      cfg.postActionTransitions = {};
+      for (var t = 0; t < transitionRows.length; t += 1) {
+        var transitionRow = transitionRows[t];
+        var actionKey = String((transitionRow.querySelector('[data-transition-action]') || {}).value || '').trim();
+        var toModeForAction = String((transitionRow.querySelector('[data-transition-to-mode]') || {}).value || '').trim();
+        var durationForAction = Math.max(0, parseInt((transitionRow.querySelector('[data-transition-duration]') || {}).value || '0', 10) || 0);
+        var decayForAction = String((transitionRow.querySelector('[data-transition-decay-to]') || {}).value || '').trim();
+        var announceForAction = !!((transitionRow.querySelector('[data-transition-announce]') || {}).checked);
+        if (!actionKey) continue;
+        cfg.postActionTransitions[actionKey] = {
+          toMode: toModeForAction,
+          durationHours: durationForAction,
+          decayTo: decayForAction,
+          announce: announceForAction
+        };
       }
 
       var banRows = document.querySelectorAll('#ban-levels-body tr[data-ban-level]');
@@ -3314,6 +3560,11 @@
       cfg.escalation.onHighSeverity = !!((document.getElementById('enforcement-escalate-on-high') || {}).checked);
       cfg.escalation.targets = String((document.getElementById('enforcement-escalation-targets') || {}).value || 'modmail');
       cfg.escalation.timing = String((document.getElementById('enforcement-escalation-timing') || {}).value || 'enforce_then_escalate');
+      cfg.escalation.afterActionSwitch = cfg.escalation.afterActionSwitch || {};
+      cfg.escalation.afterActionSwitch.enabled = !!((document.getElementById('enforcement-after-switch-enabled') || {}).checked);
+      cfg.escalation.afterActionSwitch.toMode = String((document.getElementById('enforcement-after-switch-mode') || {}).value || '');
+      cfg.escalation.afterActionSwitch.durationHours = Math.max(0, parseInt((document.getElementById('enforcement-after-switch-duration') || {}).value || '0', 10) || 0);
+      cfg.escalation.afterActionSwitch.decayTo = String((document.getElementById('enforcement-after-switch-decay') || {}).value || '');
 
       cfg.replies = cfg.replies || {};
       cfg.replies.warningTemplate = String((document.getElementById('reply-template-warning') || {}).value || '');
@@ -3321,6 +3572,48 @@
       cfg.replies.neutralBanTemplate = String((document.getElementById('reply-template-neutral-ban') || {}).value || '');
 
       return cfg;
+    }
+
+    function mutateModesConfigFromUi(mutator) {
+      var cfg = collectModesConfigFromUi();
+      if (typeof mutator === 'function') {
+        mutator(cfg);
+      }
+      state.modesConfig = normalizeModesConfig(cfg);
+      renderModesPanel();
+    }
+
+    function addModeSwitchRuleRow() {
+      mutateModesConfigFromUi(function (cfg) {
+        var idx = (cfg.switchRules || []).length + 1;
+        cfg.switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
+        cfg.switchRules.push({
+          id: 'rule-' + String(Date.now()),
+          label: 'Rule ' + String(idx),
+          matchAny: [],
+          toMode: String(cfg.defaultDecayMode || cfg.startingMode || ''),
+          durationHours: 0,
+          decayTo: '',
+          template: '',
+          announce: true
+        });
+      });
+    }
+
+    function addModeTransitionRow() {
+      mutateModesConfigFromUi(function (cfg) {
+        var transitions = (cfg && cfg.postActionTransitions && typeof cfg.postActionTransitions === 'object')
+          ? cfg.postActionTransitions
+          : {};
+        var actionName = firstUnusedAction(cfg.actionCatalog || [], transitions);
+        transitions[actionName] = transitions[actionName] || {
+          toMode: String(cfg.defaultDecayMode || cfg.startingMode || ''),
+          durationHours: 0,
+          decayTo: '',
+          announce: false
+        };
+        cfg.postActionTransitions = transitions;
+      });
     }
 
     async function saveModesConfigWithFeedback(okMessage) {
@@ -3951,6 +4244,44 @@
         saveModesConfigWithFeedback('Enforcement saved.').catch(function (error) {
           setControlMessage(String(error && error.message ? error.message : error), true);
         });
+      });
+      document.getElementById('btn-mode-add-rule').addEventListener('click', function () {
+        addModeSwitchRuleRow();
+      });
+      document.getElementById('btn-mode-add-transition').addEventListener('click', function () {
+        addModeTransitionRow();
+      });
+      document.getElementById('panel-modes').addEventListener('click', function (event) {
+        var removeRuleBtn = event.target && event.target.closest('[data-remove-rule]');
+        if (removeRuleBtn) {
+          var row = removeRuleBtn.closest('[data-rule-idx]');
+          var idx = row ? parseInt(row.getAttribute('data-rule-idx') || '-1', 10) : -1;
+          if (idx >= 0) {
+            mutateModesConfigFromUi(function (cfg) {
+              cfg.switchRules = (cfg.switchRules || []).filter(function (_rule, ruleIndex) {
+                return ruleIndex !== idx;
+              });
+            });
+          }
+          return;
+        }
+        var removeTransitionBtn = event.target && event.target.closest('[data-remove-transition]');
+        if (removeTransitionBtn) {
+          var tRow = removeTransitionBtn.closest('[data-transition-idx]');
+          if (tRow) {
+            var actionSelect = tRow.querySelector('[data-transition-action]');
+            var actionName = String((actionSelect && actionSelect.value) || '').trim();
+            if (actionName) {
+              mutateModesConfigFromUi(function (cfg) {
+                var transitions = (cfg.postActionTransitions && typeof cfg.postActionTransitions === 'object')
+                  ? cfg.postActionTransitions
+                  : {};
+                delete transitions[actionName];
+                cfg.postActionTransitions = transitions;
+              });
+            }
+          }
+        }
       });
       document.getElementById('btn-relationship-apply').addEventListener('click', async function () {
         if (state.previewMode) {
