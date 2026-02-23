@@ -765,8 +765,14 @@ h2 {
  width: 36px;
  text-align: center;
  justify-self: center;
- font-size: 1.05rem;
  border-right: 1px solid var(--line);
+}
+
+.footer-gear-glyph {
+  width: 14px;
+  height: 14px;
+  display: block;
+  margin: 0 auto;
 }
 
 .footer-theme-anchor {
