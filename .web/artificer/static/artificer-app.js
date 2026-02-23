@@ -15896,8 +15896,24 @@
       return;
     }
     if (trigger === toggleTrigger) {
-      if (dictationShortcutPressState[trigger]) {
-        return;
+      var existingPress = dictationShortcutPressState[trigger] || null;
+      var isKeyboardEvent = !!(event && String(event.type || "").indexOf("key") === 0);
+      if (existingPress) {
+        var sinceDown = Date.now() - Number(existingPress.downAt || 0);
+        if (isKeyboardEvent && event && event.repeat) {
+          if (event && typeof event.preventDefault === "function") {
+            event.preventDefault();
+          }
+          if (event && typeof event.stopPropagation === "function") {
+            event.stopPropagation();
+          }
+          return;
+        }
+        if (!isKeyboardEvent || sinceDown < 110) {
+          return;
+        }
+        // Recover if keyup was never observed (Caps Lock and some lock/media keys).
+        delete dictationShortcutPressState[trigger];
       }
       dictationShortcutPressState[trigger] = {
         downAt: Date.now(),
@@ -15905,6 +15921,9 @@
         timer: null
       };
       toggleDictationCapture({ fromHotkey: true, holdShortcut: false }).catch(showError);
+      if (isKeyboardEvent) {
+        delete dictationShortcutPressState[trigger];
+      }
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
       }
