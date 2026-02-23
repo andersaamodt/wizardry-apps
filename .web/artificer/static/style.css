@@ -2713,9 +2713,9 @@ h2 {
   border-radius: 999px;
   background: color-mix(in srgb, var(--danger) 16%, var(--surface-1) 84%);
   color: var(--danger);
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
   padding: 0;
   display: grid;
   place-items: center;

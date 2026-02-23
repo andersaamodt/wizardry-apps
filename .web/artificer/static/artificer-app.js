@@ -17890,13 +17890,16 @@
       });
     }
     if (el.dictationStopBtn) {
-      on(el.dictationStopBtn, "mousedown", function (event) {
-        if (event && event.button !== 0) {
+      on(el.dictationStopBtn, "pointerdown", function (event) {
+        if (event && event.pointerType === "mouse" && event.button !== 0) {
           return;
         }
         dictateStopPointerHandledAt = Date.now();
         if (event && typeof event.preventDefault === "function") {
           event.preventDefault();
+        }
+        if (event && typeof event.stopPropagation === "function") {
+          event.stopPropagation();
         }
         if (state.dictateBusy) {
           return;
