@@ -307,7 +307,10 @@
                   <input id="behavior-latency-min" type="number" min="0" step="1" value="0">
                   <span class="schedule-inline">to</span>
                   <input id="behavior-latency-max" type="number" min="0" step="1" value="0">
-                  <span class="schedule-inline">sec</span>
+                  <select id="behavior-latency-unit" title="Latency jitter units">
+                    <option value="minutes" selected>min</option>
+                    <option value="hours">hours</option>
+                  </select>
                 </div>
               </div>
               <div class="mode-field-row">
@@ -789,6 +792,32 @@
       if (!Number.isFinite(n) || n < 1) n = 1;
       var normalizedUnit = String(unit || '').toLowerCase() === 'hours' ? 'hours' : 'minutes';
       return normalizedUnit === 'hours' ? (Math.round(n) * 3600) : (Math.round(n) * 60);
+    }
+
+    function latencyUnitFromSecondsPair(minSec, maxSec) {
+      var min = Number(minSec || 0);
+      var max = Number(maxSec || 0);
+      if (!Number.isFinite(min) || min < 0) min = 0;
+      if (!Number.isFinite(max) || max < 0) max = 0;
+      if (min > 0 && max > 0 && min % 3600 === 0 && max % 3600 === 0) return 'hours';
+      return 'minutes';
+    }
+
+    function latencyUiValueFromSeconds(seconds, unit) {
+      var sec = Number(seconds || 0);
+      if (!Number.isFinite(sec) || sec < 0) sec = 0;
+      var normalizedUnit = String(unit || '').toLowerCase() === 'hours' ? 'hours' : 'minutes';
+      if (sec === 0) return 0;
+      if (normalizedUnit === 'hours') return Math.ceil(sec / 3600);
+      return Math.ceil(sec / 60);
+    }
+
+    function latencySecondsFromUi(value, unit) {
+      var n = Number(value || 0);
+      if (!Number.isFinite(n) || n < 0) n = 0;
+      n = Math.round(n);
+      var normalizedUnit = String(unit || '').toLowerCase() === 'hours' ? 'hours' : 'minutes';
+      return normalizedUnit === 'hours' ? (n * 3600) : (n * 60);
     }
 
     var THEME_KEY = 'wizardry.virtual_redditor.theme';
@@ -3886,6 +3915,7 @@
       var implicitSummons = document.getElementById('behavior-implicit-summons');
       var latencyMin = document.getElementById('behavior-latency-min');
       var latencyMax = document.getElementById('behavior-latency-max');
+      var latencyUnit = document.getElementById('behavior-latency-unit');
       var banMin = document.getElementById('behavior-ban-min');
       var banMax = document.getElementById('behavior-ban-max');
       if (mirror) mirror.value = String(behaviors.mirrorTone || 'mirror_or_less');
@@ -3894,8 +3924,12 @@
       var statusSummons = (((state.status || {}).settings || {}).summonsEnabled);
       if (summonable) summonable.checked = (typeof statusSummons === 'boolean') ? !!statusSummons : !!behaviors.summonable;
       if (implicitSummons) implicitSummons.checked = !!behaviors.implicitSummons;
-      if (latencyMin) latencyMin.value = String((((behaviors.latencyJitterSec || {}).min) || 0));
-      if (latencyMax) latencyMax.value = String((((behaviors.latencyJitterSec || {}).max) || 0));
+      var latencyMinSec = (((behaviors.latencyJitterSec || {}).min) || 0);
+      var latencyMaxSec = (((behaviors.latencyJitterSec || {}).max) || 0);
+      var latencyUiUnit = latencyUnitFromSecondsPair(latencyMinSec, latencyMaxSec);
+      if (latencyUnit) latencyUnit.value = latencyUiUnit;
+      if (latencyMin) latencyMin.value = String(latencyUiValueFromSeconds(latencyMinSec, latencyUiUnit));
+      if (latencyMax) latencyMax.value = String(latencyUiValueFromSeconds(latencyMaxSec, latencyUiUnit));
       if (banMin) banMin.value = String((((behaviors.banJitterSec || {}).min) || 7));
       if (banMax) banMax.value = String((((behaviors.banJitterSec || {}).max) || 45));
     }
@@ -4084,9 +4118,10 @@
       cfg.behaviors.citations = String((document.getElementById('behavior-citations') || {}).value || 'as-needed');
       cfg.behaviors.summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
       cfg.behaviors.implicitSummons = !!((document.getElementById('behavior-implicit-summons') || {}).checked);
+      var latencyUnit = String((document.getElementById('behavior-latency-unit') || {}).value || 'minutes');
       cfg.behaviors.latencyJitterSec = {
-        min: Math.max(0, parseInt((document.getElementById('behavior-latency-min') || {}).value || '0', 10) || 0),
-        max: Math.max(0, parseInt((document.getElementById('behavior-latency-max') || {}).value || '0', 10) || 0)
+        min: latencySecondsFromUi((document.getElementById('behavior-latency-min') || {}).value || '0', latencyUnit),
+        max: latencySecondsFromUi((document.getElementById('behavior-latency-max') || {}).value || '0', latencyUnit)
       };
       cfg.behaviors.banJitterSec = {
         min: Math.max(0, parseInt((document.getElementById('behavior-ban-min') || {}).value || '0', 10) || 0),
@@ -4859,6 +4894,7 @@
         'behavior-implicit-summons',
         'behavior-latency-min',
         'behavior-latency-max',
+        'behavior-latency-unit',
         'behavior-ban-min',
         'behavior-ban-max'
       ];

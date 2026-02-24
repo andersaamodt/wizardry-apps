@@ -13,6 +13,9 @@ blog_auth_dir="$blog_site_data/ssh-auth"
 blog_users_dir="$blog_auth_dir/users"
 blog_sessions_dir="$blog_auth_dir/sessions"
 blog_nostr_login_requests_dir="$blog_auth_dir/nostr-login-requests"
+blog_nostr_delegations_dir="$blog_auth_dir/nostr-delegations"
+blog_nostr_rate_limits_dir="$blog_auth_dir/rate-limits"
+blog_nostr_delegation_revocations_file="$blog_auth_dir/nostr-delegation-revocations.txt"
 blog_state_dir="$blog_site_data/blog"
 blog_drafts_dir="$blog_state_dir/drafts"
 blog_uploads_dir="$blog_site_data/uploads"
@@ -36,11 +39,17 @@ BLOG_SESSION_FINGERPRINT=${BLOG_SESSION_FINGERPRINT-}
 BLOG_SESSION_IS_ADMIN=${BLOG_SESSION_IS_ADMIN-}
 BLOG_SESSION_TOKEN=${BLOG_SESSION_TOKEN-}
 BLOG_SESSION_CSRF=${BLOG_SESSION_CSRF-}
+BLOG_SESSION_USER_PUBKEY=${BLOG_SESSION_USER_PUBKEY-}
+BLOG_SESSION_SIGNER_PUBKEY=${BLOG_SESSION_SIGNER_PUBKEY-}
+BLOG_SESSION_DELEGATION_ID=${BLOG_SESSION_DELEGATION_ID-}
+BLOG_SESSION_AUTH_METHOD=${BLOG_SESSION_AUTH_METHOD-}
+BLOG_SESSION_FORCE_INTERACTIVE=${BLOG_SESSION_FORCE_INTERACTIVE-}
 
 blog_init() {
-  mkdir -p "$blog_auth_dir" "$blog_users_dir" "$blog_sessions_dir" "$blog_nostr_login_requests_dir" "$blog_state_dir" "$blog_drafts_dir" "$blog_uploads_dir"
+  mkdir -p "$blog_auth_dir" "$blog_users_dir" "$blog_sessions_dir" "$blog_nostr_login_requests_dir" "$blog_nostr_delegations_dir" "$blog_nostr_rate_limits_dir" "$blog_state_dir" "$blog_drafts_dir" "$blog_uploads_dir"
   mkdir -p "$blog_posts_dir"
   mkdir -p "$blog_nostr_state_dir" "$blog_nostr_events_dir" "$blog_nostr_derived_dir"
+  [ -f "$blog_nostr_delegation_revocations_file" ] || : > "$blog_nostr_delegation_revocations_file"
   [ -f "$blog_nostr_authors_file" ] || : > "$blog_nostr_authors_file"
   [ -f "$blog_nostr_relays_file" ] || : > "$blog_nostr_relays_file"
   [ -f "$blog_nostr_blocklist_file" ] || : > "$blog_nostr_blocklist_file"
@@ -257,6 +266,67 @@ blog_from_base64url() {
     *) ;;
   esac
   printf '%s\n' "$raw"
+}
+
+blog_client_ip() {
+  forwarded=${HTTP_X_FORWARDED_FOR-}
+  if [ -n "$forwarded" ]; then
+    printf '%s' "$forwarded" | awk -F',' '{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1); print $1}'
+    return 0
+  fi
+  if [ -n "${REMOTE_ADDR-}" ]; then
+    printf '%s\n' "$REMOTE_ADDR"
+    return 0
+  fi
+  printf 'unknown\n'
+}
+
+blog_rate_limit_key_path() {
+  scope=${1-}
+  key=${2-}
+  [ -n "$scope" ] || return 1
+  [ -n "$key" ] || return 1
+  digest=$(printf '%s' "$scope:$key" | blog_sha256)
+  printf '%s/%s-%s.conf\n' "$blog_nostr_rate_limits_dir" "$scope" "$digest"
+}
+
+blog_rate_limit_check() {
+  # args: scope key limit window_seconds
+  scope=${1-}
+  key=${2-}
+  limit=${3-0}
+  window=${4-0}
+  case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
+  case "$window" in ''|*[!0-9]*) window=0 ;; esac
+  if [ "$limit" -le 0 ] || [ "$window" -le 0 ] || [ -z "$scope" ] || [ -z "$key" ]; then
+    return 0
+  fi
+
+  path=$(blog_rate_limit_key_path "$scope" "$key")
+  now=$(blog_now_epoch)
+  started=0
+  count=0
+  if [ -f "$path" ]; then
+    started=$(config-get "$path" started_at 2>/dev/null || printf '0')
+    count=$(config-get "$path" count 2>/dev/null || printf '0')
+  fi
+  case "$started" in ''|*[!0-9]*) started=0 ;; esac
+  case "$count" in ''|*[!0-9]*) count=0 ;; esac
+
+  if [ "$started" -le 0 ] || [ "$((now - started))" -ge "$window" ]; then
+    started=$now
+    count=0
+  fi
+
+  if [ "$count" -ge "$limit" ]; then
+    return 1
+  fi
+
+  count=$((count + 1))
+  config-set "$path" started_at "$started"
+  config-set "$path" count "$count"
+  config-set "$path" updated_at "$now"
+  return 0
 }
 
 blog_read_request_body() {
@@ -672,33 +742,47 @@ blog_nostr_login_request_path() {
 }
 
 blog_create_nostr_login_request() {
+  # args: [pubkey_hint] [domain] [type]
   pubkey=$(blog_validate_nostr_pubkey "${1-}" 2>/dev/null || printf '')
-  [ -n "$pubkey" ] || return 1
+  domain=${2-${HTTP_HOST:-${SERVER_NAME:-}}}
+  request_type=${3-login}
+  [ -n "$domain" ] || domain="unknown"
   request_id=$(blog_random_token 16)
   challenge=$(blog_random_token 24)
   now=$(blog_now_epoch)
+  expires_at=$((now + 120))
   request_path=$(blog_nostr_login_request_path "$request_id")
-  config-set "$request_path" pubkey "$pubkey"
+  config-set "$request_path" pubkey_hint "$pubkey"
+  config-set "$request_path" domain "$domain"
+  config-set "$request_path" request_type "$request_type"
   config-set "$request_path" challenge "$challenge"
   config-set "$request_path" created_at "$now"
-  printf '%s;%s\n' "$request_id" "$challenge"
+  config-set "$request_path" expires_at "$expires_at"
+  printf '%s;%s;%s\n' "$request_id" "$challenge" "$expires_at"
 }
 
 blog_get_nostr_login_request() {
   request_id=${1-}
   request_path=$(blog_nostr_login_request_path "$request_id")
   [ -f "$request_path" ] || return 1
-  pubkey=$(config-get "$request_path" pubkey 2>/dev/null || printf '')
+  pubkey=$(config-get "$request_path" pubkey_hint 2>/dev/null || printf '')
+  domain=$(config-get "$request_path" domain 2>/dev/null || printf '')
+  request_type=$(config-get "$request_path" request_type 2>/dev/null || printf 'login')
   challenge=$(config-get "$request_path" challenge 2>/dev/null || printf '')
   created_at=$(config-get "$request_path" created_at 2>/dev/null || printf '0')
+  expires_at=$(config-get "$request_path" expires_at 2>/dev/null || printf '0')
   pubkey=$(blog_validate_nostr_pubkey "$pubkey" 2>/dev/null || printf '')
   case "$created_at" in ''|*[!0-9]*) created_at=0 ;; esac
+  case "$expires_at" in ''|*[!0-9]*) expires_at=0 ;; esac
+  if [ "$expires_at" -le 0 ]; then
+    expires_at=$((created_at + 120))
+  fi
   now=$(blog_now_epoch)
-  if [ -z "$pubkey" ] || [ -z "$challenge" ] || [ "$((now - created_at))" -gt 600 ]; then
+  if [ -z "$challenge" ] || [ -z "$domain" ] || [ "$now" -gt "$expires_at" ]; then
     rm -f "$request_path"
     return 1
   fi
-  printf '%s;%s\n' "$pubkey" "$challenge"
+  printf '%s;%s;%s;%s;%s\n' "$pubkey" "$challenge" "$domain" "$request_type" "$expires_at"
 }
 
 blog_clear_nostr_login_request() {
@@ -707,9 +791,175 @@ blog_clear_nostr_login_request() {
   rm -f "$(blog_nostr_login_request_path "$request_id")"
 }
 
+blog_nostr_delegation_path() {
+  delegation_id=${1-}
+  printf '%s/%s.conf\n' "$blog_nostr_delegations_dir" "$delegation_id"
+}
+
+blog_nostr_delegation_revoked() {
+  key=${1-}
+  [ -n "$key" ] || return 1
+  [ -f "$blog_nostr_delegation_revocations_file" ] || return 1
+  grep -Fqx "$key" "$blog_nostr_delegation_revocations_file" 2>/dev/null
+}
+
+blog_nostr_revoke_marker() {
+  key=${1-}
+  [ -n "$key" ] || return 0
+  if blog_nostr_delegation_revoked "$key"; then
+    return 0
+  fi
+  printf '%s\n' "$key" >> "$blog_nostr_delegation_revocations_file"
+}
+
+blog_nostr_delegation_activate() {
+  # args: delegation_event_json expected_user_pubkey expected_domain
+  delegation_json=${1-}
+  expected_user_pubkey=$(blog_validate_nostr_pubkey "${2-}" 2>/dev/null || printf '')
+  expected_domain=${3-${HTTP_HOST:-${SERVER_NAME:-}}}
+  [ -n "$delegation_json" ] || return 1
+  [ -n "$expected_user_pubkey" ] || return 1
+  [ -n "$expected_domain" ] || return 1
+  if ! command -v jq >/dev/null 2>&1; then
+    return 1
+  fi
+
+  delegation_json=$(printf '%s\n' "$delegation_json" | jq -c '.' 2>/dev/null || printf '')
+  [ -n "$delegation_json" ] || return 1
+  if ! blog_nostr_verify_event_json "$delegation_json"; then
+    return 1
+  fi
+
+  delegator=$(printf '%s\n' "$delegation_json" | jq -r '.pubkey // ""' 2>/dev/null || printf '')
+  delegator=$(blog_validate_nostr_pubkey "$delegator" 2>/dev/null || printf '')
+  if [ "$delegator" != "$expected_user_pubkey" ]; then
+    return 1
+  fi
+
+  kind=$(printf '%s\n' "$delegation_json" | jq -r '.kind // 0' 2>/dev/null || printf '0')
+  if [ "$kind" != "27235" ]; then
+    return 1
+  fi
+
+  session_pubkey=$(printf '%s\n' "$delegation_json" | jq -r '[.tags[]? | select(type=="array" and length>=2 and .[0]=="session_pubkey") | .[1]] | first // ""' 2>/dev/null || printf '')
+  domain=$(printf '%s\n' "$delegation_json" | jq -r '[.tags[]? | select(type=="array" and length>=2 and .[0]=="domain") | .[1]] | first // ""' 2>/dev/null || printf '')
+  expires_at=$(printf '%s\n' "$delegation_json" | jq -r '[.tags[]? | select(type=="array" and length>=2 and .[0]=="expires_at") | .[1]] | first // "0"' 2>/dev/null || printf '0')
+
+  session_pubkey=$(blog_validate_nostr_pubkey "$session_pubkey" 2>/dev/null || printf '')
+  case "$expires_at" in ''|*[!0-9]*) expires_at=0 ;; esac
+  if [ -z "$session_pubkey" ] || [ "$domain" != "$expected_domain" ] || [ "$expires_at" -le 0 ]; then
+    return 1
+  fi
+
+  now=$(blog_now_epoch)
+  min_exp=$((now + 86400))
+  max_exp=$((now + 7776000))
+  if [ "$expires_at" -lt "$min_exp" ] || [ "$expires_at" -gt "$max_exp" ]; then
+    return 1
+  fi
+
+  event_id=$(printf '%s\n' "$delegation_json" | jq -r '.id // ""' 2>/dev/null || printf '')
+  if [ -n "$event_id" ]; then
+    delegation_id=$event_id
+  else
+    delegation_id=$(printf '%s:%s:%s:%s' "$delegator" "$session_pubkey" "$domain" "$expires_at" | blog_sha256)
+  fi
+  path=$(blog_nostr_delegation_path "$delegation_id")
+  config-set "$path" delegation_id "$delegation_id"
+  config-set "$path" user_pubkey "$delegator"
+  config-set "$path" session_pubkey "$session_pubkey"
+  config-set "$path" domain "$domain"
+  config-set "$path" expires_at "$expires_at"
+  config-set "$path" created_at "$now"
+  config-set "$path" delegation_event_id "$event_id"
+  config-set "$path" revoked false
+  printf '%s;%s;%s\n' "$delegation_id" "$session_pubkey" "$expires_at"
+}
+
+blog_nostr_active_delegation_for_session() {
+  # args: session_pubkey expected_domain
+  session_pubkey=$(blog_validate_nostr_pubkey "${1-}" 2>/dev/null || printf '')
+  expected_domain=${2-${HTTP_HOST:-${SERVER_NAME:-}}}
+  [ -n "$session_pubkey" ] || return 1
+  [ -n "$expected_domain" ] || return 1
+  now=$(blog_now_epoch)
+  for file in "$blog_nostr_delegations_dir"/*.conf; do
+    [ -f "$file" ] || continue
+    delegation_id=$(config-get "$file" delegation_id 2>/dev/null || printf '')
+    user_pubkey=$(config-get "$file" user_pubkey 2>/dev/null || printf '')
+    deleg_session=$(config-get "$file" session_pubkey 2>/dev/null || printf '')
+    domain=$(config-get "$file" domain 2>/dev/null || printf '')
+    expires_at=$(config-get "$file" expires_at 2>/dev/null || printf '0')
+    revoked=$(config-get "$file" revoked 2>/dev/null || printf 'false')
+    user_pubkey=$(blog_validate_nostr_pubkey "$user_pubkey" 2>/dev/null || printf '')
+    deleg_session=$(blog_validate_nostr_pubkey "$deleg_session" 2>/dev/null || printf '')
+    case "$expires_at" in ''|*[!0-9]*) expires_at=0 ;; esac
+    if [ -z "$delegation_id" ] || [ -z "$user_pubkey" ] || [ -z "$deleg_session" ]; then
+      continue
+    fi
+    if [ "$deleg_session" != "$session_pubkey" ] || [ "$domain" != "$expected_domain" ]; then
+      continue
+    fi
+    if [ "$revoked" = "true" ] || [ "$expires_at" -le "$now" ]; then
+      continue
+    fi
+    if blog_nostr_delegation_revoked "$delegation_id" || blog_nostr_delegation_revoked "$deleg_session"; then
+      continue
+    fi
+    printf '%s;%s;%s\n' "$delegation_id" "$user_pubkey" "$expires_at"
+    return 0
+  done
+  return 1
+}
+
+blog_nostr_revoke_user_delegations() {
+  user_pubkey=$(blog_validate_nostr_pubkey "${1-}" 2>/dev/null || printf '')
+  [ -n "$user_pubkey" ] || return 1
+  count=0
+  for file in "$blog_nostr_delegations_dir"/*.conf; do
+    [ -f "$file" ] || continue
+    d_user=$(config-get "$file" user_pubkey 2>/dev/null || printf '')
+    d_user=$(blog_validate_nostr_pubkey "$d_user" 2>/dev/null || printf '')
+    if [ "$d_user" != "$user_pubkey" ]; then
+      continue
+    fi
+    delegation_id=$(config-get "$file" delegation_id 2>/dev/null || printf '')
+    session_pubkey=$(config-get "$file" session_pubkey 2>/dev/null || printf '')
+    [ -n "$delegation_id" ] || delegation_id=$(basename "$file" .conf)
+    blog_nostr_revoke_marker "$delegation_id"
+    session_pubkey=$(blog_validate_nostr_pubkey "$session_pubkey" 2>/dev/null || printf '')
+    if [ -n "$session_pubkey" ]; then
+      blog_nostr_revoke_marker "$session_pubkey"
+    fi
+    rm -f "$file"
+    count=$((count + 1))
+  done
+  printf '%s\n' "$count"
+}
+
+blog_invalidate_user_sessions() {
+  username=${1-}
+  [ -n "$username" ] || return 1
+  count=0
+  for file in "$blog_sessions_dir"/*.conf; do
+    [ -f "$file" ] || continue
+    session_user=$(config-get "$file" username 2>/dev/null || printf '')
+    if [ "$session_user" = "$username" ]; then
+      rm -f "$file"
+      count=$((count + 1))
+    fi
+  done
+  printf '%s\n' "$count"
+}
+
 blog_create_session() {
   username=$1
   fingerprint=$2
+  user_pubkey=$(blog_validate_nostr_pubkey "${3-}" 2>/dev/null || printf '')
+  signer_pubkey=$(blog_validate_nostr_pubkey "${4-}" 2>/dev/null || printf '')
+  delegation_id=${5-}
+  auth_method=${6-nostr}
+  force_interactive=${7-false}
 
   token=$(blog_random_token 24)
   csrf=$(blog_random_token 16)
@@ -727,6 +977,11 @@ blog_create_session() {
   config-set "$path" created_at "$now"
   config-set "$path" expires_at "$expires"
   config-set "$path" is_admin "$is_admin"
+  config-set "$path" user_pubkey "$user_pubkey"
+  config-set "$path" signer_pubkey "$signer_pubkey"
+  config-set "$path" delegation_id "$delegation_id"
+  config-set "$path" auth_method "$auth_method"
+  config-set "$path" force_interactive "$force_interactive"
 
   printf '%s;%s;%s\n' "$token" "$csrf" "$is_admin"
 }
@@ -747,6 +1002,11 @@ blog_load_session() {
   load_csrf=$(config-get "$load_path" csrf_token 2>/dev/null || printf '')
   load_expires=$(config-get "$load_path" expires_at 2>/dev/null || printf '0')
   load_is_admin=$(config-get "$load_path" is_admin 2>/dev/null || printf 'false')
+  load_user_pubkey=$(config-get "$load_path" user_pubkey 2>/dev/null || printf '')
+  load_signer_pubkey=$(config-get "$load_path" signer_pubkey 2>/dev/null || printf '')
+  load_delegation_id=$(config-get "$load_path" delegation_id 2>/dev/null || printf '')
+  load_auth_method=$(config-get "$load_path" auth_method 2>/dev/null || printf 'nostr')
+  load_force_interactive=$(config-get "$load_path" force_interactive 2>/dev/null || printf 'false')
 
   if [ -z "$load_username" ] || [ -z "$load_csrf" ]; then
     return 1
@@ -766,6 +1026,14 @@ blog_load_session() {
   BLOG_SESSION_FINGERPRINT=$load_fingerprint
   BLOG_SESSION_CSRF=$load_csrf
   BLOG_SESSION_IS_ADMIN=$load_is_admin
+  BLOG_SESSION_USER_PUBKEY=$(blog_validate_nostr_pubkey "$load_user_pubkey" 2>/dev/null || printf '')
+  BLOG_SESSION_SIGNER_PUBKEY=$(blog_validate_nostr_pubkey "$load_signer_pubkey" 2>/dev/null || printf '')
+  BLOG_SESSION_DELEGATION_ID=$load_delegation_id
+  BLOG_SESSION_AUTH_METHOD=$load_auth_method
+  BLOG_SESSION_FORCE_INTERACTIVE=$load_force_interactive
+  if [ -z "$BLOG_SESSION_USER_PUBKEY" ]; then
+    BLOG_SESSION_USER_PUBKEY=$(blog_get_nostr_pubkey "$load_username" 2>/dev/null || printf '')
+  fi
   return 0
 }
 
