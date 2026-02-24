@@ -881,6 +881,7 @@
       repliesRenderSig: '',
       modesRenderSig: '',
       modeDrawerModeId: '',
+      modesConfigDirty: false,
       relationshipOverrideOpen: false,
       repliesTemplatesOpen: false,
       enforcementEscalationOpen: false,
@@ -3630,6 +3631,10 @@
       if (workarea) workarea.classList.add('drawer-open');
     }
 
+    function markModesConfigDirty() {
+      state.modesConfigDirty = true;
+    }
+
     function updateModeFromDrawerField(event) {
       var target = event && event.target;
       if (!target) return;
@@ -3681,6 +3686,7 @@
       }
 
       state.modesConfig = cfg;
+      markModesConfigDirty();
     }
 
     function renderModeDrawer(cfg, actionChoices) {
@@ -4176,6 +4182,7 @@
         mutator(cfg);
       }
       state.modesConfig = normalizeModesConfig(cfg);
+      markModesConfigDirty();
       renderModesPanel();
     }
 
@@ -4189,6 +4196,7 @@
         await saveModesConfigWithFeedback('Behaviors saved.');
         var summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
         await saveSetting('SUMMONS_ENABLED', summonable ? '1' : '0');
+        state.modesConfigDirty = false;
       } catch (error) {
         setControlMessage(String(error && error.message ? error.message : error), true);
       } finally {
@@ -4235,12 +4243,14 @@
       }
       if (state.previewMode) {
         state.modesConfig = normalizeModesConfig(payload);
+        state.modesConfigDirty = false;
         renderModesDrivenPanels();
         setControlMessage(okMessage || 'Saved.', false);
         return;
       }
       var out = await backendJson('save-modes-config', [JSON.stringify(payload)]);
       state.modesConfig = normalizeModesConfig((out || {}).config || payload);
+      state.modesConfigDirty = false;
       renderModesDrivenPanels();
       setControlMessage(okMessage || 'Saved.', false);
     }
@@ -4337,19 +4347,21 @@
 
     async function refreshForActiveTab() {
       if (state.activeTab === 'enforcement') {
-        await Promise.all([refreshModesConfig(), refreshActions()]);
+        await Promise.all([state.modesConfigDirty ? Promise.resolve() : refreshModesConfig(), refreshActions()]);
         return;
       }
       if (state.activeTab === 'replies') {
-        await Promise.all([refreshModesConfig(), refreshReplies()]);
+        await Promise.all([state.modesConfigDirty ? Promise.resolve() : refreshModesConfig(), refreshReplies()]);
         return;
       }
       if (state.activeTab === 'relationships') {
-        await Promise.all([refreshModesConfig(), refreshRelationships()]);
+        await Promise.all([state.modesConfigDirty ? Promise.resolve() : refreshModesConfig(), refreshRelationships()]);
         return;
       }
       if (state.activeTab === 'modes' || state.activeTab === 'behaviors') {
-        await refreshModesConfig();
+        if (!state.modesConfigDirty) {
+          await refreshModesConfig();
+        }
         return;
       }
       if (state.activeTab === 'log') {
@@ -4854,10 +4866,12 @@
         var behaviorEl = document.getElementById(behaviorAutoSaveFields[bi]);
         if (!behaviorEl) continue;
         behaviorEl.addEventListener('change', function () {
+          markModesConfigDirty();
           queueBehaviorAutosave(120);
         });
         if (behaviorEl.tagName === 'INPUT' && behaviorEl.type === 'number') {
           behaviorEl.addEventListener('input', function () {
+            markModesConfigDirty();
             queueBehaviorAutosave(520);
           });
         }
@@ -4950,6 +4964,64 @@
             break;
           }
         });
+      });
+      document.getElementById('panel-modes').addEventListener('input', function (event) {
+        var target = event && event.target;
+        if (!target) return;
+        if (
+          target.hasAttribute('data-rule-label') ||
+          target.hasAttribute('data-rule-matchany') ||
+          target.hasAttribute('data-rule-duration') ||
+          target.hasAttribute('data-rule-template') ||
+          target.hasAttribute('data-transition-duration-action') ||
+          target.hasAttribute('data-transition-to-mode-action') ||
+          target.hasAttribute('data-transition-decay-to-action')
+        ) {
+          markModesConfigDirty();
+        }
+      });
+      document.getElementById('panel-modes').addEventListener('change', function (event) {
+        var target = event && event.target;
+        if (!target) return;
+        if (
+          target.hasAttribute('data-rule-to-mode') ||
+          target.hasAttribute('data-rule-decay-to') ||
+          target.hasAttribute('data-rule-announce') ||
+          target.hasAttribute('data-transition-enabled-action') ||
+          target.hasAttribute('data-transition-announce-action') ||
+          target.hasAttribute('data-transition-to-mode-action') ||
+          target.hasAttribute('data-transition-decay-to-action')
+        ) {
+          markModesConfigDirty();
+        }
+      });
+      document.getElementById('panel-enforcement').addEventListener('input', function (event) {
+        var target = event && event.target;
+        if (!target) return;
+        if (target.hasAttribute('data-ban-duration')) markModesConfigDirty();
+      });
+      document.getElementById('panel-enforcement').addEventListener('change', function (event) {
+        var target = event && event.target;
+        if (!target) return;
+        if (
+          target.hasAttribute('data-ban-enabled') ||
+          target.id === 'enforcement-notify-severity' ||
+          target.id === 'enforcement-escalation-targets' ||
+          target.id === 'enforcement-escalation-timing'
+        ) {
+          markModesConfigDirty();
+        }
+      });
+      document.getElementById('panel-replies').addEventListener('input', function (event) {
+        var target = event && event.target;
+        if (!target) return;
+        if (
+          target.id === 'reply-template-warning' ||
+          target.id === 'reply-template-switch' ||
+          target.id === 'reply-template-neutral-ban'
+        ) {
+          markModesConfigDirty();
+        }
       });
       document.getElementById('btn-relationships-manual-override').addEventListener('click', function () {
         openRelationshipOverrideDrawer();
