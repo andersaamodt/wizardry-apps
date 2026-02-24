@@ -361,43 +361,59 @@
         </section>
 
         <section class="tab-panel" id="panel-relationships">
-          <div class="status-line" id="relationships-line">Relationships not loaded yet.</div>
-          <div class="settings-card subpanel-card">
-            <div class="persona-section-title">Manual Override</div>
-            <div class="mode-fields-inline modes-grid">
-              <div class="mode-field-row">
-                <label for="relationship-user" class="mode-field-label">User</label>
-                <input id="relationship-user" type="text" placeholder="reddit username">
-              </div>
-              <div class="mode-field-row">
-                <label for="relationship-mode" class="mode-field-label">Mode</label>
-                <select id="relationship-mode"></select>
-              </div>
-              <div class="mode-field-row">
-                <label for="relationship-duration" class="mode-field-label">Duration (hours)</label>
-                <input id="relationship-duration" type="number" min="0" step="1" value="72">
-              </div>
-              <div class="mode-field-row">
-                <label class="mode-field-label">&nbsp;</label>
-                <button id="btn-relationship-apply" type="button" class="primary">Apply override</button>
+          <div class="relationships-head-row">
+            <div class="status-line" id="relationships-line">Relationships not loaded yet.</div>
+            <button id="btn-relationships-manual-override" type="button" class="soft" title="Open manual relationship override">Manual override...</button>
+          </div>
+          <div id="relationships-workarea" class="relationships-workarea">
+            <div class="settings-card subpanel-card relationships-main-card">
+              <div class="table-wrap">
+                <table class="table" id="relationships-table">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Mode</th>
+                      <th>Since</th>
+                      <th>Expires</th>
+                      <th>Trigger</th>
+                      <th>Interactions</th>
+                      <th>Valence</th>
+                    </tr>
+                  </thead>
+                  <tbody id="relationships-body"></tbody>
+                </table>
               </div>
             </div>
-          </div>
-          <div class="table-wrap">
-            <table class="table" id="relationships-table">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Mode</th>
-                  <th>Since</th>
-                  <th>Expires</th>
-                  <th>Trigger</th>
-                  <th>Interactions</th>
-                  <th>Valence</th>
-                </tr>
-              </thead>
-              <tbody id="relationships-body"></tbody>
-            </table>
+            <aside id="relationship-override-drawer" class="mode-detail-drawer relationship-override-drawer" aria-hidden="true">
+              <div class="mode-detail-drawer-head">
+                <div class="mode-detail-drawer-title">Manual override</div>
+                <div class="mode-detail-drawer-head-right">
+                  <button id="btn-relationship-drawer-close" type="button" class="mode-detail-drawer-close" aria-label="Close manual override" title="Close manual override">✕</button>
+                </div>
+              </div>
+              <div class="mode-detail-drawer-body">
+                <div class="mode-drawer-block">
+                  <div class="mode-fields-inline modes-grid">
+                    <div class="mode-field-row">
+                      <label for="relationship-user" class="mode-field-label">User</label>
+                      <input id="relationship-user" type="text" placeholder="reddit username">
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="relationship-mode" class="mode-field-label">Mode</label>
+                      <select id="relationship-mode"></select>
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="relationship-duration" class="mode-field-label">Duration (hours)</label>
+                      <input id="relationship-duration" type="number" min="0" step="1" value="72">
+                    </div>
+                    <div class="mode-field-row">
+                      <label class="mode-field-label">&nbsp;</label>
+                      <button id="btn-relationship-apply" type="button" class="primary">Apply override</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </aside>
           </div>
         </section>
 
@@ -831,6 +847,7 @@
       repliesRenderSig: '',
       modesRenderSig: '',
       modeDrawerModeId: '',
+      relationshipOverrideOpen: false,
       relationshipsRenderSig: '',
       modeLogRenderSig: '',
       logsAvailable: false,
@@ -3487,6 +3504,28 @@
       renderModesPanel();
     }
 
+    function closeRelationshipOverrideDrawer() {
+      state.relationshipOverrideOpen = false;
+      var drawer = document.getElementById('relationship-override-drawer');
+      var workarea = document.getElementById('relationships-workarea');
+      if (drawer) {
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+      }
+      if (workarea) workarea.classList.remove('drawer-open');
+    }
+
+    function openRelationshipOverrideDrawer() {
+      state.relationshipOverrideOpen = true;
+      var drawer = document.getElementById('relationship-override-drawer');
+      var workarea = document.getElementById('relationships-workarea');
+      if (drawer) {
+        drawer.classList.add('open');
+        drawer.setAttribute('aria-hidden', 'false');
+      }
+      if (workarea) workarea.classList.add('drawer-open');
+    }
+
     function updateModeFromDrawerField(event) {
       var target = event && event.target;
       if (!target) return;
@@ -3862,12 +3901,19 @@
       var body = document.getElementById('relationships-body');
       var line = document.getElementById('relationships-line');
       var rows = Array.isArray(state.relationships) ? state.relationships : [];
+      var drawer = document.getElementById('relationship-override-drawer');
+      var workarea = document.getElementById('relationships-workarea');
+      if (drawer) {
+        drawer.classList.toggle('open', !!state.relationshipOverrideOpen);
+        drawer.setAttribute('aria-hidden', state.relationshipOverrideOpen ? 'false' : 'true');
+      }
+      if (workarea) workarea.classList.toggle('drawer-open', !!state.relationshipOverrideOpen);
       if (!body) return;
       var sig = stableStringify(rows);
       if (sig && sig === state.relationshipsRenderSig) return;
       state.relationshipsRenderSig = sig;
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="7" class="actions-empty-cell">No relationships yet.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7" class="relationships-empty-cell">No relationships yet.</td></tr>';
         if (line) line.textContent = '0 relationships';
         return;
       }
@@ -4786,6 +4832,12 @@
           }
         });
       });
+      document.getElementById('btn-relationships-manual-override').addEventListener('click', function () {
+        openRelationshipOverrideDrawer();
+      });
+      document.getElementById('btn-relationship-drawer-close').addEventListener('click', function () {
+        closeRelationshipOverrideDrawer();
+      });
       document.getElementById('btn-relationship-apply').addEventListener('click', async function () {
         if (state.previewMode) {
           setControlMessage('Relationship override is available in the desktop app.', false);
@@ -4801,6 +4853,7 @@
         try {
           await backendJson('set-relationship', [user, mode, duration, 'manual-override']);
           setControlMessage('Relationship override saved.', false);
+          closeRelationshipOverrideDrawer();
           await Promise.all([refreshRelationships(), refreshModeLog()]);
         } catch (error) {
           setControlMessage(String(error && error.message ? error.message : error), true);

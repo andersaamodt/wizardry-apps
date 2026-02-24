@@ -1632,6 +1632,43 @@ label {
   margin-bottom: 0;
 }
 
+.relationships-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.relationships-workarea {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  align-items: stretch;
+  column-gap: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  transition: grid-template-columns 200ms ease, column-gap 200ms ease;
+}
+
+.relationships-workarea.drawer-open {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  column-gap: 12px;
+}
+
+.relationships-main-card {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+}
+
+.relationship-override-drawer .mode-field-row {
+  grid-template-columns: 1fr;
+}
+
+.relationship-override-drawer .mode-field-label {
+  margin-top: 0;
+}
+
 .modes-main-pane {
   min-width: 0;
   overflow: auto;
@@ -2862,6 +2899,14 @@ label {
   font-style: italic;
   font-size: 0.8rem;
   padding: 12px 8px;
+}
+
+#relationships-table td.relationships-empty-cell {
+  text-align: center;
+  color: var(--text-subtle);
+  font-style: italic;
+  font-size: 0.8rem;
+  padding: 14px 8px;
 }
 
 .micro {
