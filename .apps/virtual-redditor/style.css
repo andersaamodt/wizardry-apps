@@ -1653,10 +1653,9 @@ label {
   column-gap: 12px;
 }
 
-.relationships-main-card {
-  width: 100%;
-  max-width: none;
-  margin-bottom: 0;
+.relationships-main-pane {
+  min-width: 0;
+  overflow: auto;
 }
 
 .relationship-override-drawer .mode-field-row {
