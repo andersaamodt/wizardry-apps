@@ -484,9 +484,6 @@
                 After-action relationship mode switches are configured per action in
                 <strong>Modes</strong> via each mode's details panel.
               </div>
-              <div class="settings-actions modes-save-actions">
-                <button id="btn-save-enforcement" type="button" class="primary">Save enforcement</button>
-              </div>
             </div>
             <aside id="enforcement-escalation-drawer" class="mode-detail-drawer enforcement-escalation-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
@@ -876,6 +873,9 @@
       behaviorSaveTimer: null,
       behaviorSaveInFlight: false,
       behaviorSaveQueued: false,
+      enforcementSaveTimer: null,
+      enforcementSaveInFlight: false,
+      enforcementSaveQueued: false,
       passIntervalSaveTimer: null,
       threadInitiateSaveTimer: null,
       usernameSaveTimer: null,
@@ -4250,6 +4250,34 @@
       }, Math.max(0, parseInt(delayMs, 10) || 480));
     }
 
+    async function runEnforcementAutosave() {
+      if (state.enforcementSaveInFlight) {
+        state.enforcementSaveQueued = true;
+        return;
+      }
+      state.enforcementSaveInFlight = true;
+      try {
+        await saveModesConfigWithFeedback('', { quiet: true });
+        state.modesConfigDirty = false;
+      } catch (error) {
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.enforcementSaveInFlight = false;
+        if (state.enforcementSaveQueued) {
+          state.enforcementSaveQueued = false;
+          queueEnforcementAutosave(120);
+        }
+      }
+    }
+
+    function queueEnforcementAutosave(delayMs) {
+      if (state.enforcementSaveTimer) clearTimeout(state.enforcementSaveTimer);
+      state.enforcementSaveTimer = setTimeout(function () {
+        state.enforcementSaveTimer = null;
+        runEnforcementAutosave();
+      }, Math.max(0, parseInt(delayMs, 10) || 420));
+    }
+
     function addModeSwitchRuleRow() {
       mutateModesConfigFromUi(function (cfg) {
         var idx = (cfg.switchRules || []).length + 1;
@@ -4267,7 +4295,8 @@
       });
     }
 
-    async function saveModesConfigWithFeedback(okMessage) {
+    async function saveModesConfigWithFeedback(okMessage, options) {
+      var quiet = !!(options && options.quiet);
       var payload = collectModesConfigFromUi();
       var conflicts = validateModesConfigConflicts(payload);
       if (conflicts.length) {
@@ -4279,14 +4308,14 @@
         state.modesConfig = normalizeModesConfig(payload);
         state.modesConfigDirty = false;
         renderModesDrivenPanels();
-        setControlMessage(okMessage || 'Saved.', false);
+        if (!quiet) setControlMessage(okMessage || 'Saved.', false);
         return;
       }
       var out = await backendJson('save-modes-config', [JSON.stringify(payload)]);
       state.modesConfig = normalizeModesConfig((out || {}).config || payload);
       state.modesConfigDirty = false;
       renderModesDrivenPanels();
-      setControlMessage(okMessage || 'Saved.', false);
+      if (!quiet) setControlMessage(okMessage || 'Saved.', false);
     }
 
     async function refreshModesConfig() {
@@ -4935,13 +4964,6 @@
       document.getElementById('btn-enforcement-escalation-close').addEventListener('click', function () {
         closeEnforcementEscalationDrawer();
       });
-      document.getElementById('btn-save-enforcement').addEventListener('click', function () {
-        saveModesConfigWithFeedback('Enforcement saved.').then(function () {
-          closeEnforcementEscalationDrawer();
-        }).catch(function (error) {
-          setControlMessage(String(error && error.message ? error.message : error), true);
-        });
-      });
       document.getElementById('btn-mode-drawer-close').addEventListener('click', function () {
         closeModeDrawer();
       });
@@ -5033,7 +5055,10 @@
       document.getElementById('panel-enforcement').addEventListener('input', function (event) {
         var target = event && event.target;
         if (!target) return;
-        if (target.hasAttribute('data-ban-duration')) markModesConfigDirty();
+        if (target.hasAttribute('data-ban-duration')) {
+          markModesConfigDirty();
+          queueEnforcementAutosave(520);
+        }
       });
       document.getElementById('panel-enforcement').addEventListener('change', function (event) {
         var target = event && event.target;
@@ -5045,6 +5070,7 @@
           target.id === 'enforcement-escalation-timing'
         ) {
           markModesConfigDirty();
+          queueEnforcementAutosave(120);
         }
       });
       document.getElementById('panel-replies').addEventListener('input', function (event) {
