@@ -1862,10 +1862,16 @@ label {
 
 .mode-detail-drawer-body {
   flex: 1 1 auto;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 8px 9px;
   display: grid;
   gap: 8px;
+}
+
+.mode-detail-drawer * {
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .mode-drawer-block {
@@ -1916,7 +1922,7 @@ label {
 }
 
 .action-transition-enable {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .action-meaning {
@@ -2040,6 +2046,10 @@ label {
   padding: 7px;
 }
 
+.mode-detail-drawer .modes-grid-head {
+  display: none;
+}
+
 .mode-detail-drawer .switch-rule-row input[type='text'],
 .mode-detail-drawer .switch-rule-row input[type='number'],
 .mode-detail-drawer .switch-rule-row select {
@@ -2052,6 +2062,25 @@ label {
 .mode-detail-drawer .switch-rule-row .mini-remove-btn {
   width: 100%;
   justify-content: flex-start;
+}
+
+.mode-detail-drawer .mini-input {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+}
+
+.mode-detail-drawer .mini-input input,
+.mode-detail-drawer .mini-input select {
+  width: 100%;
+  max-width: 100%;
+}
+
+.mode-detail-drawer .action-transition-controls .mini-toggle {
+  white-space: normal;
+  width: 100%;
 }
 
 .mode-permissions-grid {
@@ -2069,7 +2098,8 @@ label {
 }
 
 .mode-drawer-constraints .mini-input {
-  min-width: 260px;
+  min-width: 0;
+  width: 100%;
 }
 
 .mini-toggle {
