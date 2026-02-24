@@ -463,36 +463,35 @@
         <section class="tab-panel" id="panel-enforcement">
           <div class="enforcement-head-row">
             <div class="status-line" id="actions-line">No actions loaded yet.</div>
-            <button id="btn-enforcement-escalation-settings" type="button" class="inline-link-btn enforcement-escalation-link" title="Open escalation settings">Escalation settings...</button>
+            <button id="btn-enforcement-escalation-settings" type="button" class="inline-link-btn enforcement-escalation-link" title="Open enforcement settings">Enforcement settings...</button>
           </div>
           <div id="enforcement-workarea" class="enforcement-workarea">
             <div class="settings-card subpanel-card enforcement-main-card">
-              <div class="persona-section-title">Ban Ladder</div>
-              <div class="table-wrap mini-table-wrap">
-                <table class="table" id="ban-levels-table">
-                  <thead>
-                    <tr>
-                      <th>Level</th>
-                      <th>Enabled</th>
-                      <th>Default duration</th>
-                    </tr>
-                  </thead>
-                  <tbody id="ban-levels-body"></tbody>
-                </table>
-              </div>
-              <div class="settings-empty-note">
-                After-action relationship mode switches are configured per action in
-                <strong>Modes</strong> via each mode's details panel.
-              </div>
+              <div class="settings-empty-note">Configure ban ladder and moderator notifications in <strong>Enforcement settings...</strong>.</div>
             </div>
             <aside id="enforcement-escalation-drawer" class="mode-detail-drawer enforcement-escalation-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
-                <div class="mode-detail-drawer-title">Escalation settings</div>
+                <div class="mode-detail-drawer-title">Enforcement settings</div>
                 <div class="mode-detail-drawer-head-right">
-                  <button id="btn-enforcement-escalation-close" type="button" class="mode-detail-drawer-close" aria-label="Close escalation settings" title="Close escalation settings">✕</button>
+                  <button id="btn-enforcement-escalation-close" type="button" class="mode-detail-drawer-close" aria-label="Close enforcement settings" title="Close enforcement settings">✕</button>
                 </div>
               </div>
               <div class="mode-detail-drawer-body">
+                <div class="mode-drawer-block">
+                  <div class="persona-section-title">Ban Ladder</div>
+                  <div class="table-wrap mini-table-wrap">
+                    <table class="table" id="ban-levels-table">
+                      <thead>
+                        <tr>
+                          <th>Level</th>
+                          <th>Enabled</th>
+                          <th>Default duration</th>
+                        </tr>
+                      </thead>
+                      <tbody id="ban-levels-body"></tbody>
+                    </table>
+                  </div>
+                </div>
                 <div class="mode-drawer-block">
                   <div class="persona-section-title">Moderator Notification</div>
                   <div class="mode-fields-inline modes-grid">
