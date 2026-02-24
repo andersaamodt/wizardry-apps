@@ -3083,7 +3083,7 @@
             enabled: true,
             defaultExpiryHours: 0,
             allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Initiate', 'Mention', 'Followup', 'Cross-thread Reply']),
-            constraints: { maxRepliesPerUserThread24h: 4, noFollowup: false, noMention: false, noQuote: true }
+            constraints: { maxRepliesPerUserThread24h: 4, canFollowup: true, canMention: true, canQuote: false }
           },
           {
             id: 'TEACH',
@@ -3091,7 +3091,7 @@
             enabled: true,
             defaultExpiryHours: 0,
             allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Initiate', 'Warn', 'Mention', 'Quote', 'Followup', 'Cross-thread Reply']),
-            constraints: { maxRepliesPerUserThread24h: 5, noFollowup: false, noMention: false, noQuote: false }
+            constraints: { maxRepliesPerUserThread24h: 5, canFollowup: true, canMention: true, canQuote: true }
           },
           {
             id: 'WARN',
@@ -3099,7 +3099,7 @@
             enabled: true,
             defaultExpiryHours: 24,
             allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Post Ban Notice']),
-            constraints: { maxRepliesPerUserThread24h: 2, noFollowup: true, noMention: true, noQuote: true }
+            constraints: { maxRepliesPerUserThread24h: 2, canFollowup: false, canMention: false, canQuote: false }
           },
           {
             id: 'PROBATION',
@@ -3107,7 +3107,7 @@
             enabled: true,
             defaultExpiryHours: 72,
             allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Remove Content', 'Post Ban Notice']),
-            constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
+            constraints: { maxRepliesPerUserThread24h: 1, canFollowup: false, canMention: false, canQuote: false }
           },
           {
             id: 'BAN',
@@ -3115,7 +3115,7 @@
             enabled: true,
             defaultExpiryHours: 168,
             allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Ban Notice']),
-            constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
+            constraints: { maxRepliesPerUserThread24h: 1, canFollowup: false, canMention: false, canQuote: false }
           },
           {
             id: 'RULES',
@@ -3123,7 +3123,7 @@
             enabled: true,
             defaultExpiryHours: 168,
             allow: allowMap(['Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Ban Notice']),
-            constraints: { maxRepliesPerUserThread24h: 0, noFollowup: true, noMention: true, noQuote: true }
+            constraints: { maxRepliesPerUserThread24h: 0, canFollowup: false, canMention: false, canQuote: false }
           },
           {
             id: 'STRICT',
@@ -3131,7 +3131,7 @@
             enabled: true,
             defaultExpiryHours: 336,
             allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Ban Notice']),
-            constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
+            constraints: { maxRepliesPerUserThread24h: 1, canFollowup: false, canMention: false, canQuote: false }
           }
         ];
       }
@@ -3173,10 +3173,22 @@
         delete next.allow['Post Neutral Ban Notice'];
         next.constraints = Object.assign({
           maxRepliesPerUserThread24h: 4,
-          noFollowup: false,
-          noMention: false,
-          noQuote: false
+          canFollowup: true,
+          canMention: true,
+          canQuote: true
         }, next.constraints || {});
+        if (typeof next.constraints.canFollowup !== 'boolean') {
+          next.constraints.canFollowup = !(next.constraints.noFollowup === true);
+        }
+        if (typeof next.constraints.canMention !== 'boolean') {
+          next.constraints.canMention = !(next.constraints.noMention === true);
+        }
+        if (typeof next.constraints.canQuote !== 'boolean') {
+          next.constraints.canQuote = !(next.constraints.noQuote === true);
+        }
+        delete next.constraints.noFollowup;
+        delete next.constraints.noMention;
+        delete next.constraints.noQuote;
         next.banNoticeStyle = normalizeBanNoticeStyle(next.banNoticeStyle);
         next.defaultExpiryHours = Math.max(0, parseInt(next.defaultExpiryHours, 10) || 0);
         for (var c = 0; c < actionCatalog.length; c += 1) {
@@ -3299,9 +3311,9 @@
         : {};
       var bits = [];
       bits.push('max ' + String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h)));
-      if (constraints.noFollowup) bits.push('no followup');
-      if (constraints.noMention) bits.push('no mention');
-      if (constraints.noQuote) bits.push('no quote');
+      bits.push((constraints.canFollowup === false) ? 'followup off' : 'followup on');
+      bits.push((constraints.canMention === false) ? 'mention off' : 'mention on');
+      bits.push((constraints.canQuote === false) ? 'quote off' : 'quote on');
       return bits.join(', ');
     }
 
@@ -3694,9 +3706,9 @@
         '  <div class="mode-drawer-section-title">Constraints</div>',
         '  <div class="mode-constraints-grid mode-drawer-constraints">',
         '    <label class="mini-input" title="Limit replies to the same user in the same thread over 24 hours">Max replies/user/thread per 24h<input type="number" min="0" step="1" data-mode-drawer-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '" title="Limit replies to the same user in the same thread over 24 hours"></label>',
-        '    <label class="mini-toggle" title="Do not send follow-up replies in this mode"><input type="checkbox" data-mode-drawer-constraint="noFollowup" ' + (constraints.noFollowup ? 'checked' : '') + '><span>No followup</span></label>',
-        '    <label class="mini-toggle" title="Do not @mention users in this mode"><input type="checkbox" data-mode-drawer-constraint="noMention" ' + (constraints.noMention ? 'checked' : '') + '><span>No mention</span></label>',
-        '    <label class="mini-toggle" title="Do not quote user text in this mode"><input type="checkbox" data-mode-drawer-constraint="noQuote" ' + (constraints.noQuote ? 'checked' : '') + '><span>No quote</span></label>',
+        '    <label class="mini-toggle" title="Allow additional replies to the same user in this mode"><input type="checkbox" data-mode-drawer-constraint="canFollowup" ' + (constraints.canFollowup !== false ? 'checked' : '') + '><span>Can follow up</span></label>',
+        '    <label class="mini-toggle" title="Allow @mentioning users in this mode"><input type="checkbox" data-mode-drawer-constraint="canMention" ' + (constraints.canMention !== false ? 'checked' : '') + '><span>Can mention users</span></label>',
+        '    <label class="mini-toggle" title="Allow quoting user text in this mode"><input type="checkbox" data-mode-drawer-constraint="canQuote" ' + (constraints.canQuote !== false ? 'checked' : '') + '><span>Can quote users</span></label>',
         '  </div>',
         '</div>',
         '<div class="mode-drawer-block">',

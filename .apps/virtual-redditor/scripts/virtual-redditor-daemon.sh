@@ -209,9 +209,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 4,
-            noFollowup: false,
-            noMention: false,
-            noQuote: true
+            canFollowup: true,
+            canMention: true,
+            canQuote: false
           }
         },
         {
@@ -227,9 +227,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 5,
-            noFollowup: false,
-            noMention: false,
-            noQuote: false
+            canFollowup: true,
+            canMention: true,
+            canQuote: true
           }
         },
         {
@@ -245,9 +245,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 2,
-            noFollowup: true,
-            noMention: true,
-            noQuote: true
+            canFollowup: false,
+            canMention: false,
+            canQuote: false
           }
         },
         {
@@ -263,9 +263,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 2,
-            noFollowup: true,
-            noMention: true,
-            noQuote: true
+            canFollowup: false,
+            canMention: false,
+            canQuote: false
           }
         },
         {
@@ -281,9 +281,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 4,
-            noFollowup: false,
-            noMention: false,
-            noQuote: true
+            canFollowup: true,
+            canMention: true,
+            canQuote: false
           }
         },
         {
@@ -299,9 +299,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 1,
-            noFollowup: true,
-            noMention: true,
-            noQuote: true
+            canFollowup: false,
+            canMention: false,
+            canQuote: false
           }
         },
         {
@@ -317,9 +317,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 1,
-            noFollowup: true,
-            noMention: true,
-            noQuote: true
+            canFollowup: false,
+            canMention: false,
+            canQuote: false
           }
         },
         {
@@ -335,9 +335,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 0,
-            noFollowup: true,
-            noMention: true,
-            noQuote: true
+            canFollowup: false,
+            canMention: false,
+            canQuote: false
           }
         },
         {
@@ -353,9 +353,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 1,
-            noFollowup: true,
-            noMention: true,
-            noQuote: true
+            canFollowup: false,
+            canMention: false,
+            canQuote: false
           }
         },
         {
@@ -371,9 +371,9 @@ mode_default_config_json() {
           },
           constraints: {
             maxRepliesPerUserThread24h: 1,
-            noFollowup: true,
-            noMention: true,
-            noQuote: true
+            canFollowup: false,
+            canMention: false,
+            canQuote: false
           }
         }
       ],
@@ -743,7 +743,16 @@ mode_constraints_for() {
   read_modes_config_json | jq -c --arg mode "$mode_id" '
     (.modes // [])
     | map(select((.id // "") == $mode and (.enabled // true)))
-    | if length == 0 then {} else (.[0].constraints // {}) end
+    | if length == 0 then {}
+      else
+        (.[0].constraints // {}) as $c
+        | {
+            maxRepliesPerUserThread24h: ($c.maxRepliesPerUserThread24h // 4),
+            canFollowup: ($c.canFollowup // (if ($c.noFollowup // false) then false else true end)),
+            canMention: ($c.canMention // (if ($c.noMention // false) then false else true end)),
+            canQuote: ($c.canQuote // (if ($c.noQuote // false) then false else true end))
+          }
+      end
   ' 2>/dev/null || printf '{}'
 }
 
@@ -2165,9 +2174,9 @@ process_comment() {
   constraints=$(mode_constraints_for "$current_mode")
   max_replies=$(printf '%s' "$constraints" | jq -r '.maxRepliesPerUserThread24h // -1' 2>/dev/null || printf '-1')
   max_replies=$(to_int "$max_replies" -1)
-  no_followup=$(printf '%s' "$constraints" | jq -r '.noFollowup // false' 2>/dev/null || printf 'false')
-  no_mention=$(printf '%s' "$constraints" | jq -r '.noMention // false' 2>/dev/null || printf 'false')
-  no_quote=$(printf '%s' "$constraints" | jq -r '.noQuote // false' 2>/dev/null || printf 'false')
+  can_followup=$(printf '%s' "$constraints" | jq -r '.canFollowup // true' 2>/dev/null || printf 'true')
+  can_mention=$(printf '%s' "$constraints" | jq -r '.canMention // true' 2>/dev/null || printf 'true')
+  can_quote=$(printf '%s' "$constraints" | jq -r '.canQuote // true' 2>/dev/null || printf 'true')
 
   should_reply=false
   if [ -n "$reply_text" ]; then
@@ -2189,26 +2198,26 @@ process_comment() {
     fi
   fi
 
-  if [ "$should_reply" = true ] && [ "$no_followup" = "true" ] && [ "$reply_source" = "engaged" ]; then
+  if [ "$should_reply" = true ] && [ "$can_followup" != "true" ] && [ "$reply_source" = "engaged" ]; then
     should_reply=false
-    append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "no-followup" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
+    append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "followup-disabled" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
   fi
 
   author_lc=$(printf '%s' "$author_key" | tr '[:upper:]' '[:lower:]')
   reply_lc=$(printf '%s' "$reply_text" | tr '[:upper:]' '[:lower:]')
-  if [ "$should_reply" = true ] && [ "$no_mention" = "true" ]; then
+  if [ "$should_reply" = true ] && [ "$can_mention" != "true" ]; then
     case "$reply_lc" in
       *"/u/$author_lc"*|*"u/$author_lc"*)
         should_reply=false
-        append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "no-mention" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
+        append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "mention-disabled" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
         ;;
     esac
   fi
 
-  if [ "$should_reply" = true ] && [ "$no_quote" = "true" ]; then
+  if [ "$should_reply" = true ] && [ "$can_quote" != "true" ]; then
     if printf '%s\n' "$reply_text" | grep -Eq '^[[:space:]]*>' ; then
       should_reply=false
-      append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "no-quote" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
+      append_mode_log_event "constraint-hit" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg constraint "quote-disabled" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,constraint:$constraint,comment_id:$comment_id}')"
     fi
   fi
 
