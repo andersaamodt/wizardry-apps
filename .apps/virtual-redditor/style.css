@@ -2216,6 +2216,19 @@ label {
   flex: 0 0 auto;
 }
 
+.action-trigger-row .trigger-field-setmode {
+  display: none;
+}
+
+.action-trigger-row.trigger-action-set_mode .trigger-field-setmode {
+  display: inline-flex;
+}
+
+.action-trigger-row.trigger-action-set_mode input.trigger-field-setmode,
+.action-trigger-row.trigger-action-set_mode select.trigger-field-setmode {
+  display: inline-block;
+}
+
 .mini-remove-btn {
   min-height: 1.75rem;
   padding: 0 0.58rem;

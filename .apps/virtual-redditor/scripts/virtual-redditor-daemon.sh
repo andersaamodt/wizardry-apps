@@ -816,7 +816,7 @@ mode_action_trigger_match() {
   read_modes_config_json | jq -c --arg body "$body_lc" --argjson is_mod "$author_is_mod" '
     (.actionTriggers // [])
     | map(select(
-        ((.triggerAction // "set_mode") == "set_mode")
+        ((.triggerAction // "set_mode") == "set_mode" or (.triggerAction // "set_mode") == "canned_reply")
         and (((.adminOnly // false) | not) or $is_mod)
         and
         ((.matchAny // []) | map(tostring | ascii_downcase) | map(select(length > 0)) | any($body | contains(.)))
@@ -2090,8 +2090,12 @@ process_comment() {
 
   comment_author_is_mod=$(printf '%s' "$comment_json" | jq -r 'if ((.distinguished // "") == "moderator") or (.author_is_moderator == true) then "true" else "false" end' 2>/dev/null || printf 'false')
   action_trigger=$(mode_action_trigger_match "$comment_json" "$comment_author_is_mod")
-  trigger_to_mode=$(printf '%s' "$action_trigger" | jq -r '.toMode // empty' 2>/dev/null || printf '')
-  if [ -n "$trigger_to_mode" ]; then
+  trigger_action_type=$(printf '%s' "$action_trigger" | jq -r '.triggerAction // "set_mode"' 2>/dev/null || printf 'set_mode')
+  if [ "$trigger_action_type" = "set_mode" ]; then
+    trigger_to_mode=$(printf '%s' "$action_trigger" | jq -r '.toMode // empty' 2>/dev/null || printf '')
+    [ -n "$trigger_to_mode" ] || trigger_action_type=''
+  fi
+  if [ "$trigger_action_type" = "set_mode" ]; then
     trigger_id=$(printf '%s' "$action_trigger" | jq -r '.id // "action-trigger"' 2>/dev/null || printf 'action-trigger')
     duration=$(printf '%s' "$action_trigger" | jq -r '.durationHours // 0' 2>/dev/null || printf '0')
     duration=$(to_int "$duration" 0)
@@ -2113,6 +2117,26 @@ process_comment() {
           trigger_decision=$(jq -cn --arg trigger "$trigger_id" --arg mode "$current_mode" '{trigger:$trigger,toMode:$mode}')
           record_reply_event "$comment_json" "$notice_reply_id" "$notice" "action-trigger" "$trigger_decision" "action-trigger"
         fi
+      fi
+    fi
+    return 0
+  elif [ "$trigger_action_type" = "canned_reply" ]; then
+    trigger_id=$(printf '%s' "$action_trigger" | jq -r '.id // "action-trigger"' 2>/dev/null || printf 'action-trigger')
+    canned_template=$(printf '%s' "$action_trigger" | jq -r '.template // empty' 2>/dev/null || printf '')
+    if [ -z "$canned_template" ]; then
+      append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg trigger "$trigger_id" --arg action "$trigger_action_type" --arg reason "empty-template" --arg comment_id "$thing_id" '{user_id:$user,trigger_id:$trigger,action:$action,reason:$reason,comment_id:$comment_id}')"
+      return 0
+    fi
+    if [ "$(mode_allows_action "$current_mode" "Reply to Comments")" != "true" ]; then
+      append_mode_log_event "blocked-actions" "$(jq -cn --arg user "$author_key" --arg mode "$current_mode" --arg action "Reply to Comments" --arg reason "trigger-reply-disallowed" --arg comment_id "$thing_id" '{user_id:$user,mode:$mode,action:$action,reason:$reason,comment_id:$comment_id}')"
+      return 0
+    fi
+    canned_reply=$(printf '%s' "$canned_template" | jq -Rr --arg user "$author" --arg mode "$current_mode" --arg subreddit "$SUBREDDIT" 'gsub("\\{\\{user\\}\\}";$user) | gsub("\\{\\{mode\\}\\}";$mode) | gsub("\\{\\{subreddit\\}\\}";$subreddit)' 2>/dev/null || printf '%s' "$canned_template")
+    if [ -n "$canned_reply" ]; then
+      if canned_reply_id=$(post_reply "$thing_id" "$canned_reply" 2>/dev/null); then
+        trigger_decision=$(jq -cn --arg trigger "$trigger_id" --arg action "$trigger_action_type" '{trigger:$trigger,action:$action}')
+        record_reply_event "$comment_json" "$canned_reply_id" "$canned_reply" "action-trigger" "$trigger_decision" "action-trigger"
+        append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg trigger "$trigger_id" --arg action "$trigger_action_type" --arg comment_id "$thing_id" '{user_id:$user,trigger_id:$trigger,action:$action,comment_id:$comment_id}')"
       fi
     fi
     return 0

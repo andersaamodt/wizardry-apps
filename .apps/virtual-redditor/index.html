@@ -3298,7 +3298,7 @@
         next.id = String(next.id || ('trigger-' + String(idx + 1)));
         next.label = String(next.label || '');
         next.triggerAction = String(next.triggerAction || 'set_mode');
-        if (next.triggerAction !== 'set_mode') next.triggerAction = 'set_mode';
+        if (next.triggerAction !== 'set_mode' && next.triggerAction !== 'canned_reply') next.triggerAction = 'set_mode';
         next.adminOnly = !!next.adminOnly;
         next.matchAny = Array.isArray(next.matchAny)
           ? next.matchAny.map(function (item) { return String(item || '').trim(); }).filter(Boolean)
@@ -3668,6 +3668,14 @@
       state.modesConfigDirty = true;
     }
 
+    function setActionTriggerRowPresentation(row) {
+      if (!row) return;
+      var actionSel = row.querySelector('[data-trigger-action]');
+      var action = String((actionSel || {}).value || 'set_mode');
+      row.classList.toggle('trigger-action-set_mode', action === 'set_mode');
+      row.classList.toggle('trigger-action-canned_reply', action === 'canned_reply');
+    }
+
     function updateModeFromDrawerField(event) {
       var target = event && event.target;
       if (!target) return;
@@ -3843,16 +3851,19 @@
         var decayModeHtml = modeOptionsHtml(modeOpts, String(rule.decayTo || ''), true, 'Default decay mode');
         var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
         return [
-          '<div class="action-trigger-row" data-trigger-idx="' + String(idx) + '" data-trigger-id="' + escapeHtml(String(rule.id || '')) + '">',
+          '<div class="action-trigger-row trigger-action-' + escapeHtml(triggerAction) + '" data-trigger-idx="' + String(idx) + '" data-trigger-id="' + escapeHtml(String(rule.id || '')) + '">',
           '  <input type="text" class="trigger-label-input" data-trigger-label placeholder="Trigger label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this action trigger">',
           '  <input type="text" class="trigger-match-input" data-trigger-matchany placeholder="trigger phrases, comma separated" value="' + escapeHtml(matchAny) + '" title="Comma-separated phrases that activate this trigger">',
-          '  <select class="trigger-action-select" data-trigger-action title="Action to run when this trigger matches"><option value="set_mode"' + (triggerAction === 'set_mode' ? ' selected' : '') + '>Set relationship mode</option></select>',
-          '  <select class="trigger-mode-select" data-trigger-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select>',
-          '  <input type="number" class="trigger-duration-input" min="0" step="1" data-trigger-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the switched mode">',
-          '  <select class="trigger-decay-select" data-trigger-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select>',
-          '  <input type="text" class="trigger-template-input" data-trigger-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '" title="Optional notice template posted when the trigger runs">',
+          '  <select class="trigger-action-select" data-trigger-action title="Action to run when this trigger matches">' +
+             '<option value="set_mode"' + (triggerAction === 'set_mode' ? ' selected' : '') + '>Set relationship mode</option>' +
+             '<option value="canned_reply"' + (triggerAction === 'canned_reply' ? ' selected' : '') + '>Post canned reply</option>' +
+             '</select>',
+          '  <select class="trigger-mode-select trigger-field-setmode" data-trigger-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select>',
+          '  <input type="number" class="trigger-duration-input trigger-field-setmode" min="0" step="1" data-trigger-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the switched mode">',
+          '  <select class="trigger-decay-select trigger-field-setmode" data-trigger-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select>',
+          '  <input type="text" class="trigger-template-input trigger-field-template" data-trigger-template placeholder="Reply/notice template" value="' + escapeHtml(String(rule.template || '')) + '" title="Template text posted when this trigger runs">',
           '  <label class="mini-toggle trigger-admin-toggle" title="Only moderators can invoke this trigger"><input type="checkbox" data-trigger-admin-only ' + (rule.adminOnly ? 'checked' : '') + '><span>Admin-only</span></label>',
-          '  <label class="mini-toggle trigger-announce-toggle" title="Post a notice when this trigger runs"><input type="checkbox" data-trigger-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+          '  <label class="mini-toggle trigger-announce-toggle trigger-field-setmode" title="Post a notice when this trigger runs"><input type="checkbox" data-trigger-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
           '  <button type="button" class="soft mini-remove-btn trigger-remove-btn" data-remove-trigger title="Remove this action trigger">Remove</button>',
           '</div>'
         ].join('');
@@ -3889,7 +3900,7 @@
         '</div>',
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Action Triggers (Decorator)</div>',
-        '  <div class="mode-drawer-helper">Action triggers match user phrases and run configured actions. For safety, host-computer command triggers are not enabled.</div>',
+        '  <div class="mode-drawer-helper">Action triggers match user phrases and run configured actions. Supported actions are relationship mode set and canned reply. Host-computer command triggers are not enabled.</div>',
         '  <div class="modes-section-head mode-drawer-trigger-head">',
         '    <div class="persona-section-title">Triggers</div>',
         '    <button type="button" class="soft mini-add-btn" data-add-action-trigger title="Add a new action trigger">Add trigger</button>',
@@ -3909,6 +3920,10 @@
         '  <div class="mode-action-triggers-list">' + (actionTriggerRows || '<div class="settings-empty-note">No action triggers yet.</div>') + '</div>',
         '</div>'
       ].join('');
+      var triggerRows = body.querySelectorAll('.action-trigger-row');
+      for (var tri = 0; tri < triggerRows.length; tri += 1) {
+        setActionTriggerRowPresentation(triggerRows[tri]);
+      }
       drawer.classList.add('open');
       if (workarea) workarea.classList.add('drawer-open');
       drawer.setAttribute('aria-hidden', 'false');
@@ -4148,7 +4163,7 @@
           var triggerId = String(row.getAttribute('data-trigger-id') || '').trim();
           var label = String((row.querySelector('[data-trigger-label]') || {}).value || '').trim();
           var triggerAction = String((row.querySelector('[data-trigger-action]') || {}).value || 'set_mode').trim();
-          if (triggerAction !== 'set_mode') triggerAction = 'set_mode';
+          if (triggerAction !== 'set_mode' && triggerAction !== 'canned_reply') triggerAction = 'set_mode';
           var matchAny = parseCsvList(String((row.querySelector('[data-trigger-matchany]') || {}).value || ''));
           var toMode = String((row.querySelector('[data-trigger-to-mode]') || {}).value || '').trim();
           var duration = Math.max(0, parseInt((row.querySelector('[data-trigger-duration]') || {}).value || '0', 10) || 0);
@@ -5057,6 +5072,9 @@
       document.getElementById('panel-modes').addEventListener('change', function (event) {
         var target = event && event.target;
         if (!target) return;
+        if (target.hasAttribute('data-trigger-action')) {
+          setActionTriggerRowPresentation(target.closest('.action-trigger-row'));
+        }
         if (
           target.hasAttribute('data-trigger-to-mode') ||
           target.hasAttribute('data-trigger-decay-to') ||
