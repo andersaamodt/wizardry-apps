@@ -1694,10 +1694,9 @@ label {
   column-gap: 12px;
 }
 
-.replies-main-card {
-  width: 100%;
-  max-width: none;
-  margin-bottom: 0;
+.replies-main-pane {
+  min-width: 0;
+  overflow: auto;
 }
 
 .reply-templates-drawer .mode-field-row {
