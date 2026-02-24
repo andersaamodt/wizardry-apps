@@ -1717,6 +1717,48 @@ label {
   resize: vertical;
 }
 
+.enforcement-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.enforcement-escalation-link {
+  padding: 0;
+  min-height: 0;
+}
+
+.enforcement-workarea {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  align-items: stretch;
+  column-gap: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  transition: grid-template-columns 200ms ease, column-gap 200ms ease;
+}
+
+.enforcement-workarea.drawer-open {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  column-gap: 12px;
+}
+
+.enforcement-main-card {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+}
+
+.enforcement-escalation-drawer .mode-field-row {
+  grid-template-columns: 1fr;
+}
+
+.enforcement-escalation-drawer .mode-field-label {
+  margin-top: 0;
+}
+
 .modes-main-pane {
   min-width: 0;
   overflow: auto;

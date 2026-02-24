@@ -459,55 +459,72 @@
         </section>
 
         <section class="tab-panel" id="panel-enforcement">
-          <div class="settings-card subpanel-card">
-            <div class="persona-section-title">Ban Ladder</div>
-            <div class="table-wrap mini-table-wrap">
-              <table class="table" id="ban-levels-table">
-                <thead>
-                  <tr>
-                    <th>Level</th>
-                    <th>Enabled</th>
-                    <th>Default duration</th>
-                  </tr>
-                </thead>
-                <tbody id="ban-levels-body"></tbody>
-              </table>
-            </div>
-            <div class="persona-section-title modes-subtitle">Moderator Notification</div>
-            <div class="mode-fields-inline modes-grid">
-              <div class="mode-field-row">
-                <label for="enforcement-notify-severity" class="mode-field-label">Notify a human moderator</label>
-                <select id="enforcement-notify-severity">
-                  <option value="high">On high severity norm violations</option>
-                  <option value="medium">On medium+ severity norm violations</option>
-                  <option value="low">On low+ severity norm violations</option>
-                </select>
-              </div>
-              <div class="mode-field-row">
-                <label for="enforcement-escalation-targets" class="mode-field-label">Target</label>
-                <select id="enforcement-escalation-targets">
-                  <option value="modmail">Modmail</option>
-                  <option value="personal_mail">Personal Mail</option>
-                  <option value="both">Both</option>
-                </select>
-              </div>
-              <div class="mode-field-row">
-                <label for="enforcement-escalation-timing" class="mode-field-label">Timing</label>
-                <select id="enforcement-escalation-timing">
-                  <option value="enforce_then_escalate">Enforce then escalate</option>
-                  <option value="escalate_immediately">Escalate immediately</option>
-                </select>
-              </div>
-            </div>
-            <div class="settings-empty-note">
-              After-action relationship mode switches are configured per action in
-              <strong>Modes</strong> via each mode's details panel.
-            </div>
-            <div class="settings-actions modes-save-actions">
-              <button id="btn-save-enforcement" type="button" class="primary">Save enforcement</button>
-            </div>
+          <div class="enforcement-head-row">
+            <div class="status-line" id="actions-line">No actions loaded yet.</div>
+            <button id="btn-enforcement-escalation-settings" type="button" class="inline-link-btn enforcement-escalation-link" title="Open escalation settings">Escalation settings...</button>
           </div>
-          <div class="status-line" id="actions-line">No actions loaded yet.</div>
+          <div id="enforcement-workarea" class="enforcement-workarea">
+            <div class="settings-card subpanel-card enforcement-main-card">
+              <div class="persona-section-title">Ban Ladder</div>
+              <div class="table-wrap mini-table-wrap">
+                <table class="table" id="ban-levels-table">
+                  <thead>
+                    <tr>
+                      <th>Level</th>
+                      <th>Enabled</th>
+                      <th>Default duration</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ban-levels-body"></tbody>
+                </table>
+              </div>
+              <div class="settings-empty-note">
+                After-action relationship mode switches are configured per action in
+                <strong>Modes</strong> via each mode's details panel.
+              </div>
+              <div class="settings-actions modes-save-actions">
+                <button id="btn-save-enforcement" type="button" class="primary">Save enforcement</button>
+              </div>
+            </div>
+            <aside id="enforcement-escalation-drawer" class="mode-detail-drawer enforcement-escalation-drawer" aria-hidden="true">
+              <div class="mode-detail-drawer-head">
+                <div class="mode-detail-drawer-title">Escalation settings</div>
+                <div class="mode-detail-drawer-head-right">
+                  <button id="btn-enforcement-escalation-close" type="button" class="mode-detail-drawer-close" aria-label="Close escalation settings" title="Close escalation settings">✕</button>
+                </div>
+              </div>
+              <div class="mode-detail-drawer-body">
+                <div class="mode-drawer-block">
+                  <div class="persona-section-title">Moderator Notification</div>
+                  <div class="mode-fields-inline modes-grid">
+                    <div class="mode-field-row">
+                      <label for="enforcement-notify-severity" class="mode-field-label">Notify a human moderator</label>
+                      <select id="enforcement-notify-severity">
+                        <option value="high">On high severity norm violations</option>
+                        <option value="medium">On medium+ severity norm violations</option>
+                        <option value="low">On low+ severity norm violations</option>
+                      </select>
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="enforcement-escalation-targets" class="mode-field-label">Target</label>
+                      <select id="enforcement-escalation-targets">
+                        <option value="modmail">Modmail</option>
+                        <option value="personal_mail">Personal Mail</option>
+                        <option value="both">Both</option>
+                      </select>
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="enforcement-escalation-timing" class="mode-field-label">Timing</label>
+                      <select id="enforcement-escalation-timing">
+                        <option value="enforce_then_escalate">Enforce then escalate</option>
+                        <option value="escalate_immediately">Escalate immediately</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
           <div class="table-wrap">
             <table class="table" id="actions-table">
               <thead>
@@ -866,6 +883,7 @@
       modeDrawerModeId: '',
       relationshipOverrideOpen: false,
       repliesTemplatesOpen: false,
+      enforcementEscalationOpen: false,
       relationshipsRenderSig: '',
       modeLogRenderSig: '',
       logsAvailable: false,
@@ -3590,6 +3608,28 @@
       if (workarea) workarea.classList.add('drawer-open');
     }
 
+    function closeEnforcementEscalationDrawer() {
+      state.enforcementEscalationOpen = false;
+      var drawer = document.getElementById('enforcement-escalation-drawer');
+      var workarea = document.getElementById('enforcement-workarea');
+      if (drawer) {
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+      }
+      if (workarea) workarea.classList.remove('drawer-open');
+    }
+
+    function openEnforcementEscalationDrawer() {
+      state.enforcementEscalationOpen = true;
+      var drawer = document.getElementById('enforcement-escalation-drawer');
+      var workarea = document.getElementById('enforcement-workarea');
+      if (drawer) {
+        drawer.classList.add('open');
+        drawer.setAttribute('aria-hidden', 'false');
+      }
+      if (workarea) workarea.classList.add('drawer-open');
+    }
+
     function updateModeFromDrawerField(event) {
       var target = event && event.target;
       if (!target) return;
@@ -3908,6 +3948,13 @@
 
     function renderBanLevelsPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
+      var drawer = document.getElementById('enforcement-escalation-drawer');
+      var workarea = document.getElementById('enforcement-workarea');
+      if (drawer) {
+        drawer.classList.toggle('open', !!state.enforcementEscalationOpen);
+        drawer.setAttribute('aria-hidden', state.enforcementEscalationOpen ? 'false' : 'true');
+      }
+      if (workarea) workarea.classList.toggle('drawer-open', !!state.enforcementEscalationOpen);
       var levels = [
         { key: 'short', label: 'Short' },
         { key: 'medium', label: 'Medium' },
@@ -4833,8 +4880,16 @@
           setControlMessage(String(error && error.message ? error.message : error), true);
         });
       });
+      document.getElementById('btn-enforcement-escalation-settings').addEventListener('click', function () {
+        openEnforcementEscalationDrawer();
+      });
+      document.getElementById('btn-enforcement-escalation-close').addEventListener('click', function () {
+        closeEnforcementEscalationDrawer();
+      });
       document.getElementById('btn-save-enforcement').addEventListener('click', function () {
-        saveModesConfigWithFeedback('Enforcement saved.').catch(function (error) {
+        saveModesConfigWithFeedback('Enforcement saved.').then(function () {
+          closeEnforcementEscalationDrawer();
+        }).catch(function (error) {
           setControlMessage(String(error && error.message ? error.message : error), true);
         });
       });
