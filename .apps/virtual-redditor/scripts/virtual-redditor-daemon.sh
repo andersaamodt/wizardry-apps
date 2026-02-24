@@ -190,7 +190,8 @@ mode_default_config_json() {
         citations: "as-needed",
         latencyJitterSec: {min: 0, max: 0},
         banJitterSec: {min: 7, max: 45},
-        summonable: true
+        summonable: true,
+        implicitSummons: false
       },
       startingMode: "SHADE",
       defaultDecayMode: "SHADE",
@@ -407,7 +408,6 @@ mode_default_config_json() {
           template: "Acknowledged. I will not continue this conversational dyad right now."
         }
       ],
-      optInCommands: ["!summon","!engage","/u/{{bot_username}}"],
       replies: {
         warningTemplate: "Moderator notice: please follow subreddit norms.",
         modeSwitchTemplate: "Mode update: {{user}} is now in {{mode}}.",
@@ -1513,17 +1513,50 @@ is_summons_comment() {
     return
   fi
 
-  hit=$(printf '%s' "$comment_json" | jq -r --arg uname "$uname" --argjson cfg "$(read_modes_config_json)" '
+  hit=$(printf '%s' "$comment_json" | jq -r --arg uname "$uname" '
     ((.body // "") | ascii_downcase) as $b
-    | (
-        ($cfg.optInCommands // [])
-        | map(tostring | gsub("\\{\\{bot_username\\}\\}"; $uname) | ascii_downcase)
-        | map(gsub("^\\s+"; "") | gsub("\\s+$"; ""))
-        | map(select(length > 0))
-      ) as $tokens
-    | if ($tokens | any(. as $token | ($b | contains($token)))) then "1" else "0" end
+    | if (($b | contains("/u/" + $uname)) or ($b | contains("u/" + $uname))) then "1" else "0" end
   ' 2>/dev/null || printf '0')
 
+  case "$hit" in
+    1) printf '%s' "1" ;;
+    *) printf '%s' "0" ;;
+  esac
+}
+
+is_implicit_summons_comment() {
+  cache_dir=$1
+  comment_json=$2
+  implicit_enabled=$(read_modes_config_json | jq -r '.behaviors.implicitSummons // false' 2>/dev/null || printf 'false')
+  if [ "$implicit_enabled" != "true" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+
+  if [ "$(is_summons_comment "$comment_json")" = "1" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+
+  link_id=$(printf '%s' "$comment_json" | jq -r '.link_id // empty' 2>/dev/null || printf '')
+  has_bot_context=0
+  if [ -n "$link_id" ] && [ -s "$REPLIES_LOG" ]; then
+    has_bot_context=$(jq -cs --arg link "$link_id" '
+      map(select((.comment_link_id // "") == $link))
+      | if length > 0 then 1 else 0 end
+    ' "$REPLIES_LOG" 2>/dev/null || printf '0')
+  fi
+  if [ "$has_bot_context" != "1" ] && [ "$(comment_parent_is_bot "$cache_dir" "$comment_json")" != "1" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+
+  hit=$(printf '%s' "$comment_json" | jq -r '
+    ((.body // "") | ascii_downcase) as $b
+    | if (
+        ($b | test("\\b(what do you think|thoughts\\?|weigh in|chime in|can you respond|can you clarify|can someone moderate|mod(?:erator)?(?: bot)?\\??|bot\\??)\\b"))
+      ) then "1" else "0" end
+  ' 2>/dev/null || printf '0')
   case "$hit" in
     1) printf '%s' "1" ;;
     *) printf '%s' "0" ;;
@@ -1552,6 +1585,10 @@ is_direct_engagement_comment() {
   cache_dir=$1
   comment_json=$2
   if [ "$(is_summons_comment "$comment_json")" = "1" ]; then
+    printf '%s' "1"
+    return 0
+  fi
+  if [ "$(is_implicit_summons_comment "$cache_dir" "$comment_json")" = "1" ]; then
     printf '%s' "1"
     return 0
   fi

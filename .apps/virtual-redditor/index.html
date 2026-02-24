@@ -286,10 +286,17 @@
                 </select>
               </div>
               <div class="mode-field-row">
-                <label for="behavior-summonable" class="mode-field-label">Mentions</label>
+                <label for="behavior-summonable" class="mode-field-label">Summons</label>
                 <label class="schedule-toggle">
                   <input id="behavior-summonable" type="checkbox">
-                  <span>Respond to mentions by appearing and replying</span>
+                  <span>Respond to explicit mentions</span>
+                </label>
+              </div>
+              <div class="mode-field-row">
+                <label for="behavior-implicit-summons" class="mode-field-label">Implicit summons</label>
+                <label class="schedule-toggle">
+                  <input id="behavior-implicit-summons" type="checkbox">
+                  <span>Respond to implicit/context summons</span>
                 </label>
               </div>
             </div>
@@ -760,7 +767,7 @@
       '   - Do not quote or reference the pre-ban exchange inside the ban reason.\n' +
       '9. Apply a cooling window after sanctioning.\n' +
       '   - For 24-72 hours, do not reply to that user in any thread.\n' +
-      '   - Exception: allow replies only when the user explicitly invokes an opt-in summon command.\n' +
+      '   - Exception: allow replies only when the user explicitly mentions the bot.\n' +
       '10. Keep participation targeted.\n' +
       '    - Remain available to everyone else in the thread.\n' +
       '    - Keep the sanctioned-user circuit closed during the cooling period.\n' +
@@ -2994,12 +3001,12 @@
           citations: 'as-needed',
           latencyJitterSec: { min: 0, max: 0 },
           banJitterSec: { min: 7, max: 45 },
-          summonable: true
+          summonable: true,
+          implicitSummons: false
         },
         modes: [],
         switchRules: [],
         postActionTransitions: {},
-        optInCommands: [],
         replies: {
           warningTemplate: '',
           modeSwitchTemplate: '',
@@ -3045,7 +3052,6 @@
       if (!Array.isArray(out.modes)) out.modes = [];
       if (!Array.isArray(out.switchRules)) out.switchRules = [];
       if (!out.postActionTransitions || typeof out.postActionTransitions !== 'object') out.postActionTransitions = {};
-      if (!Array.isArray(out.optInCommands)) out.optInCommands = [];
 
       var savedCatalog = Array.isArray(out.actionCatalog) ? out.actionCatalog : [];
       var actionCatalog = base.actionCatalog.slice();
@@ -3057,13 +3063,6 @@
         actionCatalog.push(actionName);
       }
       out.actionCatalog = actionCatalog;
-
-      out.optInCommands = out.optInCommands
-        .map(function (item) { return String(item || '').trim(); })
-        .filter(function (item, idx, arr) { return !!item && arr.indexOf(item) === idx; });
-      if (!out.optInCommands.length) {
-        out.optInCommands = ['!summon', '!engage', '/u/{{bot_username}}'];
-      }
 
       function allowMap(enabledActions) {
         var allow = {};
@@ -3714,12 +3713,6 @@
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Switch Rules (Decorator)</div>',
         '  <div class="mode-drawer-helper">Switch rules are trigger decorators that can change relationship mode when matching phrases are detected.</div>',
-        '  <div class="mode-fields-inline mode-drawer-optin-row">',
-        '    <div class="mode-field-row modes-wide-field">',
-        '      <label for="modes-opt-in-commands" class="mode-field-label" title="Commands users can use to explicitly opt in to replies">Opt-in commands</label>',
-        '      <input id="modes-opt-in-commands" type="text" placeholder="!summon, !engage, /u/botname" value="' + escapeHtml((cfg.optInCommands || []).join(', ')) + '" title="Comma-separated commands users can use to explicitly opt in to replies">',
-        '    </div>',
-        '  </div>',
         '  <div class="modes-section-head mode-drawer-rule-head">',
         '    <div class="persona-section-title">Rules</div>',
         '    <button type="button" class="soft mini-add-btn" data-add-switch-rule title="Add a new switch rule">Add rule</button>',
@@ -3749,6 +3742,7 @@
       var humor = document.getElementById('behavior-humor');
       var citations = document.getElementById('behavior-citations');
       var summonable = document.getElementById('behavior-summonable');
+      var implicitSummons = document.getElementById('behavior-implicit-summons');
       var latencyMin = document.getElementById('behavior-latency-min');
       var latencyMax = document.getElementById('behavior-latency-max');
       var banMin = document.getElementById('behavior-ban-min');
@@ -3758,6 +3752,7 @@
       if (citations) citations.value = String(behaviors.citations || 'as-needed');
       var statusSummons = (((state.status || {}).settings || {}).summonsEnabled);
       if (summonable) summonable.checked = (typeof statusSummons === 'boolean') ? !!statusSummons : !!behaviors.summonable;
+      if (implicitSummons) implicitSummons.checked = !!behaviors.implicitSummons;
       if (latencyMin) latencyMin.value = String((((behaviors.latencyJitterSec || {}).min) || 0));
       if (latencyMax) latencyMax.value = String((((behaviors.latencyJitterSec || {}).max) || 0));
       if (banMin) banMin.value = String((((behaviors.banJitterSec || {}).min) || 7));
@@ -3933,6 +3928,7 @@
       cfg.behaviors.humor = String((document.getElementById('behavior-humor') || {}).value || 'measured');
       cfg.behaviors.citations = String((document.getElementById('behavior-citations') || {}).value || 'as-needed');
       cfg.behaviors.summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
+      cfg.behaviors.implicitSummons = !!((document.getElementById('behavior-implicit-summons') || {}).checked);
       cfg.behaviors.latencyJitterSec = {
         min: Math.max(0, parseInt((document.getElementById('behavior-latency-min') || {}).value || '0', 10) || 0),
         max: Math.max(0, parseInt((document.getElementById('behavior-latency-max') || {}).value || '0', 10) || 0)
@@ -3944,11 +3940,6 @@
 
       cfg.startingMode = String((document.getElementById('modes-starting-mode') || {}).value || cfg.startingMode || '');
       cfg.defaultDecayMode = String((document.getElementById('modes-default-decay-mode') || {}).value || cfg.defaultDecayMode || '');
-
-      var optInInput = document.getElementById('modes-opt-in-commands');
-      if (optInInput) {
-        cfg.optInCommands = parseCsvList(optInInput.value || '');
-      }
 
       var switchRows = document.querySelectorAll('.switch-rule-row[data-rule-idx]');
       if (switchRows.length) {
@@ -4704,6 +4695,7 @@
         'behavior-humor',
         'behavior-citations',
         'behavior-summonable',
+        'behavior-implicit-summons',
         'behavior-latency-min',
         'behavior-latency-max',
         'behavior-ban-min',
