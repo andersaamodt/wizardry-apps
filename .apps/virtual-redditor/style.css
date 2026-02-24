@@ -1934,6 +1934,44 @@ label {
   border-style: dashed;
 }
 
+.ban-sub-row.ban-level-disabled {
+  opacity: 0.72;
+}
+
+.ban-level-head {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ban-level-meta {
+  font-size: 0.62rem;
+  color: var(--text-subtle);
+}
+
+.ban-level-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.32rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
+.ban-level-pill.enabled {
+  color: color-mix(in srgb, var(--accent-strong) 78%, var(--text) 22%);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-main) 88%);
+}
+
+.ban-level-pill.disabled {
+  color: color-mix(in srgb, var(--text-subtle) 86%, var(--text) 14%);
+  border-color: color-mix(in srgb, var(--line) 84%, transparent);
+  background: color-mix(in srgb, var(--bg-main) 88%, var(--line) 12%);
+}
+
 .mode-detail-drawer .mode-fields-inline,
 .mode-detail-drawer .mode-field-row {
   width: 100%;

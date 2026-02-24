@@ -3370,6 +3370,17 @@
       return ['Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban'];
     }
 
+    function banLevelKeyForAction(actionName) {
+      var name = String(actionName || '');
+      if (name === 'Short Ban') return 'short';
+      if (name === 'Medium Ban') return 'medium';
+      if (name === 'Long Ban') return 'long';
+      if (name === 'Extended Ban') return 'extended';
+      if (name === 'Year Ban') return 'year';
+      if (name === 'Permanent Ban') return 'permanent';
+      return '';
+    }
+
     function banNoticeStyleChoices() {
       return [
         { value: 'neutral_terse', label: 'Neutral terse' },
@@ -3604,22 +3615,9 @@
       } else if (target.hasAttribute('data-mode-drawer-allow')) {
         var actionName = String(target.getAttribute('data-mode-drawer-allow') || '');
         if (!actionName) return;
+        if (isBanActionName(actionName)) return;
         mode.allow = Object.assign({}, mode.allow || {});
         mode.allow[actionName] = !!target.checked;
-        if (isBanActionName(actionName)) {
-          var banRow = target.closest('[data-ban-group-row]');
-          var banEnabled = false;
-          var banNamesSync = banActionNames();
-          for (var bs = 0; bs < banNamesSync.length; bs += 1) {
-            if (mode.allow[banNamesSync[bs]]) {
-              banEnabled = true;
-              break;
-            }
-          }
-          if (banRow) banRow.classList.toggle('ban-group-enabled', banEnabled);
-          var banMaster = banRow ? banRow.querySelector('[data-mode-drawer-ban-master]') : null;
-          if (banMaster) banMaster.checked = banEnabled;
-        }
       } else if (target.hasAttribute('data-mode-drawer-constraint')) {
         var key = String(target.getAttribute('data-mode-drawer-constraint') || '');
         if (!key) return;
@@ -3714,25 +3712,30 @@
       }
 
       var banRows = banNames.map(function (actionName) {
-        var allowChecked = mode.allow && mode.allow[actionName] ? ' checked' : '';
+        var levelKey = banLevelKeyForAction(actionName);
+        var levelCfg = ((cfg.banLevels || {})[levelKey]) || {};
+        var levelEnabled = (levelCfg.enabled !== false);
+        var durationHours = Math.max(0, parseInt(levelCfg.durationHours, 10) || 0);
+        var durationText = (levelKey === 'permanent') ? 'Permanent' : (String(durationHours) + 'h');
         var transition = transitionSource[actionName] || null;
         var transitionEnabled = !!transition;
         var toModeValue = transitionEnabled ? String(transition.toMode || '') : String(cfg.defaultDecayMode || cfg.startingMode || '');
         var durationValue = transitionEnabled ? Math.max(0, parseInt(transition.durationHours, 10) || 0) : 0;
         var decayValue = transitionEnabled ? String(transition.decayTo || '') : '';
         var announceChecked = (transitionEnabled && transition.announce) ? ' checked' : '';
+        var disabledAttr = levelEnabled ? '' : ' disabled';
         return [
-          '<div class="action-transition-row ban-sub-row' + (transitionEnabled ? ' transition-enabled' : '') + '" data-action-transition-row="' + escapeHtml(actionName) + '">',
+          '<div class="action-transition-row ban-sub-row' + (transitionEnabled ? ' transition-enabled' : '') + (levelEnabled ? '' : ' ban-level-disabled') + '" data-action-transition-row="' + escapeHtml(actionName) + '">',
           '  <div class="action-transition-row-top">',
-          '    <label class="mini-toggle" title="Allow this ban action while in this mode"><input type="checkbox" data-mode-drawer-allow="' + escapeHtml(actionName) + '"' + allowChecked + '><span>' + escapeHtml(actionName) + '</span></label>',
-          '    <label class="mini-toggle action-transition-enable" title="Enable a mode switch after this action runs"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + '><span>After-action switch</span></label>',
+          '    <div class="ban-level-head"><span>' + escapeHtml(actionName) + '</span><span class="ban-level-meta">' + escapeHtml(durationText) + ' • <span class="ban-level-pill ' + (levelEnabled ? 'enabled' : 'disabled') + '">' + (levelEnabled ? 'Enabled in Enforcement' : 'Disabled in Enforcement') + '</span></span></div>',
+          '    <label class="mini-toggle action-transition-enable" title="Enable a mode switch after this action runs"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + disabledAttr + '><span>After-action switch</span></label>',
           '  </div>',
-          '  <div class="action-meaning">' + escapeHtml(actionMeaning(actionName)) + '</div>',
+          '  <div class="action-meaning">Level availability and duration are configured on Enforcement.</div>',
           '  <div class="action-transition-controls">',
-          '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
-          '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode">',
-          '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '" title="Mode to decay to when transition duration expires">' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
-          '    <label class="mini-toggle" title="Post a notice when this transition applies"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
+          '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action"' + disabledAttr + '>' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
+          '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode"' + disabledAttr + '>',
+          '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '" title="Mode to decay to when transition duration expires"' + disabledAttr + '>' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
+          '    <label class="mini-toggle" title="Post a notice when this transition applies"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + disabledAttr + '><span>Announce</span></label>',
           '  </div>',
           '</div>'
         ].join('');
@@ -3743,7 +3746,7 @@
         '  <div class="action-transition-row-top">',
         '    <label class="mini-toggle" title="Enable or disable ban actions for this mode"><input type="checkbox" data-mode-drawer-ban-master' + (banMasterEnabled ? ' checked' : '') + '><span>Ban</span></label>',
         '  </div>',
-        '  <div class="action-meaning">Allow ban actions. Expand to configure each ban level separately.</div>',
+        '  <div class="action-meaning">Mode-level ban permission. Ban level enablement and duration live only on Enforcement.</div>',
         '  <div class="ban-sub-list">' + banRows + '</div>',
         '</div>'
       ].join('');
