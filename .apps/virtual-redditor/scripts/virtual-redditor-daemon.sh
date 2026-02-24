@@ -414,7 +414,7 @@ mode_default_config_json() {
         neutralBanTemplate: "Neutral moderator notice: enforcement was applied."
       },
       escalation: {
-        onHighSeverity: false,
+        notifyOnSeverity: "high",
         targets: "modmail",
         timing: "enforce_then_escalate",
         includePayload: ["content","user_id","norm","bot_action","thread_link"],
@@ -2154,13 +2154,25 @@ process_comment() {
       (map(select(((.id // "") == $norm) or ((.text // "") == $norm)))[0].severity // "low")
     end
   ' "$NORMS_FILE" 2>/dev/null || printf 'low')
-  escalation_on_high=$(read_modes_config_json | jq -r '.escalation.onHighSeverity // false' 2>/dev/null || printf 'false')
+  escalation_notify_on=$(read_modes_config_json | jq -r '(.escalation.notifyOnSeverity // "high") | tostring | ascii_downcase' 2>/dev/null || printf 'high')
   escalation_targets=$(read_modes_config_json | jq -r '.escalation.targets // "modmail"' 2>/dev/null || printf 'modmail')
   escalation_timing=$(read_modes_config_json | jq -r '.escalation.timing // "enforce_then_escalate"' 2>/dev/null || printf 'enforce_then_escalate')
   escalation_active=false
-  if [ "$norm_severity" = "high" ] && [ "$escalation_on_high" = "true" ]; then
-    escalation_active=true
-  fi
+  case "$escalation_notify_on" in
+    low)
+      escalation_active=true
+      ;;
+    medium)
+      if [ "$norm_severity" = "medium" ] || [ "$norm_severity" = "high" ]; then
+        escalation_active=true
+      fi
+      ;;
+    high|*)
+      if [ "$norm_severity" = "high" ]; then
+        escalation_active=true
+      fi
+      ;;
+  esac
   if [ "$escalation_active" = true ] && [ "$escalation_timing" = "escalate_immediately" ]; then
     append_mode_log_event "escalation" "$(jq -cn --arg user "$author_key" --arg norm "$norm" --arg action "pending" --arg content "$(printf '%s' "$comment_json" | jq -r '.body // ""')" --arg link "$(printf '%s' "$comment_json" | jq -r '.permalink // empty')" --arg severity "$norm_severity" --arg timing "$escalation_timing" --arg targets "$escalation_targets" '{user_id:$user,norm:$norm,action:$action,content:$content,thread_link:$link,severity:$severity,timing:$timing,targets:$targets}')"
   fi

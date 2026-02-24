@@ -473,14 +473,15 @@
                 <tbody id="ban-levels-body"></tbody>
               </table>
             </div>
-            <div class="persona-section-title modes-subtitle">Escalation</div>
+            <div class="persona-section-title modes-subtitle">Moderator Notification</div>
             <div class="mode-fields-inline modes-grid">
               <div class="mode-field-row">
-                <label for="enforcement-escalate-on-high" class="mode-field-label">High severity</label>
-                <label class="schedule-toggle">
-                  <input id="enforcement-escalate-on-high" type="checkbox">
-                  <span>Escalate on high severity norms</span>
-                </label>
+                <label for="enforcement-notify-severity" class="mode-field-label">Notify a human moderator</label>
+                <select id="enforcement-notify-severity">
+                  <option value="high">On high severity norm violations</option>
+                  <option value="medium">On medium+ severity norm violations</option>
+                  <option value="low">On low+ severity norm violations</option>
+                </select>
               </div>
               <div class="mode-field-row">
                 <label for="enforcement-escalation-targets" class="mode-field-label">Target</label>
@@ -3062,7 +3063,7 @@
           permanent: { enabled: true, durationHours: 0 }
         },
         escalation: {
-          onHighSeverity: false,
+          notifyOnSeverity: 'high',
           targets: 'modmail',
           timing: 'enforce_then_escalate',
           afterActionSwitch: {
@@ -3089,6 +3090,12 @@
       out.escalation.afterActionSwitch.toMode = String(out.escalation.afterActionSwitch.toMode || '');
       out.escalation.afterActionSwitch.durationHours = Math.max(0, parseInt(out.escalation.afterActionSwitch.durationHours, 10) || 0);
       out.escalation.afterActionSwitch.decayTo = String(out.escalation.afterActionSwitch.decayTo || '');
+      if (!out.escalation.notifyOnSeverity) out.escalation.notifyOnSeverity = 'high';
+      out.escalation.notifyOnSeverity = String(out.escalation.notifyOnSeverity || 'high').toLowerCase();
+      if (['low', 'medium', 'high'].indexOf(out.escalation.notifyOnSeverity) < 0) {
+        out.escalation.notifyOnSeverity = 'high';
+      }
+      delete out.escalation.onHighSeverity;
       out.banLevels = Object.assign({}, base.banLevels, src.banLevels || {});
       if (!Array.isArray(out.modes)) out.modes = [];
       if (!Array.isArray(out.switchRules)) out.switchRules = [];
@@ -3927,10 +3934,10 @@
       }).join('');
 
       var escalation = cfg.escalation || {};
-      var onHigh = document.getElementById('enforcement-escalate-on-high');
+      var notifySeverity = document.getElementById('enforcement-notify-severity');
       var targets = document.getElementById('enforcement-escalation-targets');
       var timing = document.getElementById('enforcement-escalation-timing');
-      if (onHigh) onHigh.checked = !!escalation.onHighSeverity;
+      if (notifySeverity) notifySeverity.value = String(escalation.notifyOnSeverity || 'high');
       if (targets) targets.value = String(escalation.targets || 'modmail');
       if (timing) timing.value = String(escalation.timing || 'enforce_then_escalate');
     }
@@ -4099,7 +4106,7 @@
       }
 
       cfg.escalation = cfg.escalation || {};
-      cfg.escalation.onHighSeverity = !!((document.getElementById('enforcement-escalate-on-high') || {}).checked);
+      cfg.escalation.notifyOnSeverity = String((document.getElementById('enforcement-notify-severity') || {}).value || 'high');
       cfg.escalation.targets = String((document.getElementById('enforcement-escalation-targets') || {}).value || 'modmail');
       cfg.escalation.timing = String((document.getElementById('enforcement-escalation-timing') || {}).value || 'enforce_then_escalate');
       cfg.escalation.afterActionSwitch = cfg.escalation.afterActionSwitch || {};
