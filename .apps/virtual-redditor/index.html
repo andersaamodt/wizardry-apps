@@ -407,7 +407,7 @@
                 <textarea id="reply-template-switch" class="custom-instructions-input compact-template-input"></textarea>
               </div>
               <div class="mode-field-row">
-                <label for="reply-template-neutral-ban" class="mode-field-label">Neutral ban notice</label>
+                <label for="reply-template-neutral-ban" class="mode-field-label">Ban notice template</label>
                 <textarea id="reply-template-neutral-ban" class="custom-instructions-input compact-template-input"></textarea>
               </div>
             </div>
@@ -2986,7 +2986,7 @@
         actionCatalog: [
           'Reply to Comments', 'Reply to Posts', 'Initiate', 'Warn', 'Mention', 'Quote', 'Followup', 'Cross-thread Reply',
           'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban',
-          'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice'
+          'Remove Content', 'Lock Thread', 'Post Ban Notice'
         ],
         behaviors: {
           mirrorTone: 'mirror_or_less',
@@ -3051,6 +3051,7 @@
       var actionCatalog = base.actionCatalog.slice();
       for (var i = 0; i < savedCatalog.length; i += 1) {
         var actionName = String(savedCatalog[i] || '').trim();
+        if (actionName === 'Post Neutral Ban Notice') actionName = 'Post Ban Notice';
         if (actionName === 'Reply') continue;
         if (!actionName || actionCatalog.indexOf(actionName) >= 0) continue;
         actionCatalog.push(actionName);
@@ -3097,7 +3098,7 @@
             label: 'Verbal Corrector',
             enabled: true,
             defaultExpiryHours: 24,
-            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Post Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 2, noFollowup: true, noMention: true, noQuote: true }
           },
           {
@@ -3105,7 +3106,7 @@
             label: 'Watchful Referee',
             enabled: true,
             defaultExpiryHours: 72,
-            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Remove Content', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Remove Content', 'Post Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
           },
           {
@@ -3113,7 +3114,7 @@
             label: 'Explicit Enforcer',
             enabled: true,
             defaultExpiryHours: 168,
-            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Post Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
           },
           {
@@ -3121,7 +3122,7 @@
             label: 'Silent Enforcer',
             enabled: true,
             defaultExpiryHours: 168,
-            allow: allowMap(['Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 0, noFollowup: true, noMention: true, noQuote: true }
           },
           {
@@ -3129,7 +3130,7 @@
             label: 'Active Moderator',
             enabled: true,
             defaultExpiryHours: 336,
-            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Neutral Ban Notice']),
+            allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Warn', 'Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban', 'Remove Content', 'Lock Thread', 'Post Ban Notice']),
             constraints: { maxRepliesPerUserThread24h: 1, noFollowup: true, noMention: true, noQuote: true }
           }
         ];
@@ -3167,13 +3168,16 @@
         next.allow = Object.assign({}, next.allow || {});
         if (next.allow.Reply && !next.allow['Reply to Comments']) next.allow['Reply to Comments'] = true;
         if (next.allow.Reply && !next.allow['Reply to Posts']) next.allow['Reply to Posts'] = true;
+        if (next.allow['Post Neutral Ban Notice'] && !next.allow['Post Ban Notice']) next.allow['Post Ban Notice'] = true;
         delete next.allow.Reply;
+        delete next.allow['Post Neutral Ban Notice'];
         next.constraints = Object.assign({
           maxRepliesPerUserThread24h: 4,
           noFollowup: false,
           noMention: false,
           noQuote: false
         }, next.constraints || {});
+        next.banNoticeStyle = normalizeBanNoticeStyle(next.banNoticeStyle);
         next.defaultExpiryHours = Math.max(0, parseInt(next.defaultExpiryHours, 10) || 0);
         for (var c = 0; c < actionCatalog.length; c += 1) {
           var name = actionCatalog[c];
@@ -3202,7 +3206,11 @@
       if (transitionSource.Reply && !transitionSource['Reply to Comments']) {
         transitionSource['Reply to Comments'] = transitionSource.Reply;
       }
+      if (transitionSource['Post Neutral Ban Notice'] && !transitionSource['Post Ban Notice']) {
+        transitionSource['Post Ban Notice'] = transitionSource['Post Neutral Ban Notice'];
+      }
       delete transitionSource.Reply;
+      delete transitionSource['Post Neutral Ban Notice'];
       var transitionKeys = Object.keys(transitionSource);
       for (var t = 0; t < transitionKeys.length; t += 1) {
         var key = String(transitionKeys[t] || '').trim();
@@ -3310,6 +3318,34 @@
       return ['Short Ban', 'Medium Ban', 'Long Ban', 'Extended Ban', 'Year Ban', 'Permanent Ban'];
     }
 
+    function banNoticeStyleChoices() {
+      return [
+        { value: 'neutral_terse', label: 'Neutral terse' },
+        { value: 'neutral_verbose', label: 'Neutral verbose' },
+        { value: 'firm_factual', label: 'Firm factual' },
+        { value: 'restorative', label: 'Restorative' },
+        { value: 'shady', label: 'Shady' },
+        { value: 'diffusing_joke', label: 'Diffusing joke' }
+      ];
+    }
+
+    function normalizeBanNoticeStyle(value) {
+      var wanted = String(value || '').trim();
+      var choices = banNoticeStyleChoices();
+      for (var i = 0; i < choices.length; i += 1) {
+        if (choices[i].value === wanted) return wanted;
+      }
+      return 'neutral_terse';
+    }
+
+    function banNoticeStyleOptionsHtml(selectedValue) {
+      var selected = normalizeBanNoticeStyle(selectedValue);
+      return banNoticeStyleChoices().map(function (row) {
+        var isSelected = row.value === selected ? ' selected' : '';
+        return '<option value="' + escapeHtml(row.value) + '"' + isSelected + '>' + escapeHtml(row.label) + '</option>';
+      }).join('');
+    }
+
     function isBanActionName(actionName) {
       return banActionNames().indexOf(String(actionName || '')) >= 0;
     }
@@ -3333,7 +3369,8 @@
         'Permanent Ban': 'Can issue a permanent ban.',
         'Remove Content': 'Can remove offending posts/comments.',
         'Lock Thread': 'Can lock threads from further replies.',
-        'Post Neutral Ban Notice': 'Can post a neutral ban notice.'
+        'Post Ban Notice': 'Can post a public ban notice in a selected style.',
+        'Post Neutral Ban Notice': 'Can post a public ban notice in a selected style.'
       };
       return map[key] || 'Action permission for this mode.';
     }
@@ -3496,6 +3533,8 @@
         } else {
           mode.constraints[key] = !!target.checked;
         }
+      } else if (target.hasAttribute('data-mode-drawer-ban-style')) {
+        mode.banNoticeStyle = normalizeBanNoticeStyle(target.value || '');
       } else {
         return;
       }
@@ -3533,6 +3572,7 @@
         ? cfg.postActionTransitions
         : {};
       var actionRowsSource = Array.isArray(actionChoices) ? actionChoices : [];
+      var banNoticeStyle = normalizeBanNoticeStyle(mode.banNoticeStyle);
       var banNames = banActionNames();
       var nonBanActionRows = actionRowsSource.filter(function (actionName) {
         return !isBanActionName(actionName);
@@ -3544,6 +3584,13 @@
         var durationValue = transitionEnabled ? Math.max(0, parseInt(transition.durationHours, 10) || 0) : 0;
         var decayValue = transitionEnabled ? String(transition.decayTo || '') : '';
         var announceChecked = (transitionEnabled && transition.announce) ? ' checked' : '';
+        var styleControl = actionName === 'Post Ban Notice'
+          ? ('<div class="action-transition-controls action-transition-controls-single">' +
+             '<label class="mini-input" title="Style used when the bot posts a ban notice in this mode">Style<select data-mode-drawer-ban-style title="Style used when the bot posts a ban notice in this mode">' +
+             banNoticeStyleOptionsHtml(banNoticeStyle) +
+             '</select></label>' +
+             '</div>')
+          : '';
         return [
           '<div class="action-transition-row' + (transitionEnabled ? ' transition-enabled' : '') + '" data-action-transition-row="' + escapeHtml(actionName) + '">',
           '  <div class="action-transition-row-top">',
@@ -3551,6 +3598,7 @@
           '    <label class="mini-toggle action-transition-enable" title="Enable a mode switch after this action runs"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + '><span>After-action switch</span></label>',
           '  </div>',
           '  <div class="action-meaning">' + escapeHtml(actionMeaning(actionName)) + '</div>',
+          '  ' + styleControl,
           '  <div class="action-transition-controls">',
           '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
           '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode">',

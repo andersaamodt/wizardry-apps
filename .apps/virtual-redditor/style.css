@@ -1815,6 +1815,18 @@ label {
   flex: 1 1 100%;
 }
 
+.action-transition-controls.action-transition-controls-single {
+  display: flex;
+}
+
+.action-transition-controls-single .mini-input {
+  width: 100%;
+}
+
+.action-transition-controls-single .mini-input select {
+  margin-top: 3px;
+}
+
 .mode-drawer-rule-head {
   margin-top: 8px;
 }

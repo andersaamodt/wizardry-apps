@@ -174,7 +174,7 @@ mode_default_config_json() {
       actionCatalog: [
         "Reply","Initiate","Warn","Mention","Quote","Followup","Cross-thread Reply",
         "Short Ban","Medium Ban","Long Ban","Extended Ban","Year Ban","Permanent Ban",
-        "Remove Content","Lock Thread","Post Neutral Ban Notice"
+        "Remove Content","Lock Thread","Post Ban Notice"
       ],
       templates: [
         {name:"Needler",startingMode:"SHADE"},
@@ -205,7 +205,7 @@ mode_default_config_json() {
             Reply:true,Initiate:true,Warn:false,Mention:true,Quote:false,Followup:true,
             "Cross-thread Reply":true,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
             "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
-            "Lock Thread":false,"Post Neutral Ban Notice":false
+            "Lock Thread":false,"Post Ban Notice":false
           },
           constraints: {
             maxRepliesPerUserThread24h: 4,
@@ -223,7 +223,7 @@ mode_default_config_json() {
             Reply:true,Initiate:true,Warn:true,Mention:true,Quote:true,Followup:true,
             "Cross-thread Reply":true,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
             "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
-            "Lock Thread":false,"Post Neutral Ban Notice":false
+            "Lock Thread":false,"Post Ban Notice":false
           },
           constraints: {
             maxRepliesPerUserThread24h: 5,
@@ -241,7 +241,7 @@ mode_default_config_json() {
             Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
             "Cross-thread Reply":false,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
             "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
-            "Lock Thread":false,"Post Neutral Ban Notice":true
+            "Lock Thread":false,"Post Ban Notice":true
           },
           constraints: {
             maxRepliesPerUserThread24h: 2,
@@ -259,7 +259,7 @@ mode_default_config_json() {
             Reply:true,Initiate:false,Warn:false,Mention:false,Quote:false,Followup:false,
             "Cross-thread Reply":false,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
             "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
-            "Lock Thread":false,"Post Neutral Ban Notice":false
+            "Lock Thread":false,"Post Ban Notice":false
           },
           constraints: {
             maxRepliesPerUserThread24h: 2,
@@ -277,7 +277,7 @@ mode_default_config_json() {
             Reply:true,Initiate:true,Warn:false,Mention:true,Quote:false,Followup:true,
             "Cross-thread Reply":true,"Short Ban":false,"Medium Ban":false,"Long Ban":false,
             "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":false,
-            "Lock Thread":false,"Post Neutral Ban Notice":false
+            "Lock Thread":false,"Post Ban Notice":false
           },
           constraints: {
             maxRepliesPerUserThread24h: 4,
@@ -295,7 +295,7 @@ mode_default_config_json() {
             Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
             "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":false,"Long Ban":false,
             "Extended Ban":false,"Year Ban":false,"Permanent Ban":false,"Remove Content":true,
-            "Lock Thread":false,"Post Neutral Ban Notice":true
+            "Lock Thread":false,"Post Ban Notice":true
           },
           constraints: {
             maxRepliesPerUserThread24h: 1,
@@ -313,7 +313,7 @@ mode_default_config_json() {
             Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
             "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":true,"Long Ban":true,
             "Extended Ban":true,"Year Ban":true,"Permanent Ban":true,"Remove Content":true,
-            "Lock Thread":false,"Post Neutral Ban Notice":true
+            "Lock Thread":false,"Post Ban Notice":true
           },
           constraints: {
             maxRepliesPerUserThread24h: 1,
@@ -331,7 +331,7 @@ mode_default_config_json() {
             Reply:false,Initiate:false,Warn:false,Mention:false,Quote:false,Followup:false,
             "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":true,"Long Ban":true,
             "Extended Ban":true,"Year Ban":true,"Permanent Ban":true,"Remove Content":true,
-            "Lock Thread":true,"Post Neutral Ban Notice":true
+            "Lock Thread":true,"Post Ban Notice":true
           },
           constraints: {
             maxRepliesPerUserThread24h: 0,
@@ -349,7 +349,7 @@ mode_default_config_json() {
             Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
             "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":true,"Long Ban":true,
             "Extended Ban":true,"Year Ban":true,"Permanent Ban":true,"Remove Content":true,
-            "Lock Thread":true,"Post Neutral Ban Notice":true
+            "Lock Thread":true,"Post Ban Notice":true
           },
           constraints: {
             maxRepliesPerUserThread24h: 1,
@@ -367,7 +367,7 @@ mode_default_config_json() {
             Reply:true,Initiate:false,Warn:true,Mention:false,Quote:false,Followup:false,
             "Cross-thread Reply":false,"Short Ban":true,"Medium Ban":true,"Long Ban":true,
             "Extended Ban":true,"Year Ban":true,"Permanent Ban":true,"Remove Content":true,
-            "Lock Thread":true,"Post Neutral Ban Notice":true
+            "Lock Thread":true,"Post Ban Notice":true
           },
           constraints: {
             maxRepliesPerUserThread24h: 1,
@@ -725,6 +725,10 @@ mode_allows_action() {
       else (
         if $action == "Reply" then
           ((.[0].allow[$action] // .[0].allow["Reply to Comments"] // false))
+        elif $action == "Post Ban Notice" then
+          ((.[0].allow[$action] // .[0].allow["Post Neutral Ban Notice"] // false))
+        elif $action == "Post Neutral Ban Notice" then
+          ((.[0].allow[$action] // .[0].allow["Post Ban Notice"] // false))
         else
           (.[0].allow[$action] // false)
         end
@@ -741,6 +745,52 @@ mode_constraints_for() {
     | map(select((.id // "") == $mode and (.enabled // true)))
     | if length == 0 then {} else (.[0].constraints // {}) end
   ' 2>/dev/null || printf '{}'
+}
+
+mode_ban_notice_style() {
+  mode_id=${1-}
+  style=$(read_modes_config_json | jq -r --arg mode "$mode_id" '
+    (.modes // [])
+    | map(select((.id // "") == $mode))
+    | if length == 0 then "neutral_terse" else (.[0].banNoticeStyle // "neutral_terse") end
+  ' 2>/dev/null || printf 'neutral_terse')
+  case "$style" in
+    neutral_terse|neutral_verbose|firm_factual|restorative|shady|diffusing_joke)
+      printf '%s' "$style"
+      ;;
+    *)
+      printf '%s' 'neutral_terse'
+      ;;
+  esac
+}
+
+default_ban_notice_text() {
+  style=${1-neutral_terse}
+  norm_label=${2-}
+  norm_suffix=''
+  if [ -n "$norm_label" ]; then
+    norm_suffix=$(printf ' Norm: %s.' "$norm_label")
+  fi
+  case "$style" in
+    neutral_verbose)
+      printf '%s' "Moderator notice: an enforcement action was applied under subreddit policy.$norm_suffix"
+      ;;
+    firm_factual)
+      printf '%s' "Moderator notice: this account has been sanctioned for policy violations in this thread.$norm_suffix"
+      ;;
+    restorative)
+      printf '%s' "Moderator notice: enforcement was applied. Reset and rejoin in good faith under community norms."
+      ;;
+    shady)
+      printf '%s' "Moderator notice: enforcement was applied after repeated boundary-pushing behavior."
+      ;;
+    diffusing_joke)
+      printf '%s' "Moderator notice: timeout issued. Everybody gets a sip of water and a fresh start."
+      ;;
+    *)
+      printf '%s' "Moderator notice: enforcement was applied."
+      ;;
+  esac
 }
 
 mode_switch_rule_match() {
@@ -816,7 +866,7 @@ action_severity_score() {
     "Lock Thread") printf '%s' '68' ;;
     "Remove Content") printf '%s' '65' ;;
     "Warn") printf '%s' '50' ;;
-    "Post Neutral Ban Notice") printf '%s' '45' ;;
+    "Post Ban Notice"|"Post Neutral Ban Notice") printf '%s' '45' ;;
     "Cross-thread Reply") printf '%s' '35' ;;
     "Followup") printf '%s' '30' ;;
     "Mention") printf '%s' '25' ;;
@@ -861,6 +911,10 @@ resolve_post_action_transition() {
       transition: (
         if . == "Reply"
         then (($cfg.postActionTransitions // {})["Reply"] // ($cfg.postActionTransitions // {})["Reply to Comments"] // null)
+        elif . == "Post Ban Notice"
+        then (($cfg.postActionTransitions // {})["Post Ban Notice"] // ($cfg.postActionTransitions // {})["Post Neutral Ban Notice"] // null)
+        elif . == "Post Neutral Ban Notice"
+        then (($cfg.postActionTransitions // {})["Post Neutral Ban Notice"] // ($cfg.postActionTransitions // {})["Post Ban Notice"] // null)
         else (($cfg.postActionTransitions // {})[.] // null)
         end
       ),
@@ -1995,7 +2049,7 @@ process_comment() {
     current_mode=$(find_mode_id_or_default "$current_mode")
     append_mode_log_event "switch-rule" "$(jq -cn --arg user "$author_key" --arg from "$previous_mode" --arg to "$current_mode" --arg rule "$rule_id" --arg comment_id "$thing_id" '{user_id:$user,from_mode:$from,to_mode:$to,rule_id:$rule,comment_id:$comment_id}')"
 
-    if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$current_mode" "Post Neutral Ban Notice")" = "true" ]; then
+    if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$current_mode" "Post Ban Notice")" = "true" ]; then
       notice=$(printf '%s' "$switch_rule" | jq -r '.template // empty' 2>/dev/null || printf '')
       if [ -n "$notice" ]; then
         if notice_reply_id=$(post_reply "$thing_id" "$notice" 2>/dev/null); then
@@ -2092,12 +2146,20 @@ process_comment() {
   fi
 
   warning_template=$(read_modes_config_json | jq -r '.replies.warningTemplate // empty' 2>/dev/null || printf '')
-  neutral_template=$(read_modes_config_json | jq -r '.replies.neutralBanTemplate // empty' 2>/dev/null || printf '')
+  ban_notice_template=$(read_modes_config_json | jq -r '.replies.neutralBanTemplate // empty' 2>/dev/null || printf '')
   if [ -z "$reply_text" ] && json_array_has "$allowed_actions" "Warn"; then
     reply_text=$warning_template
   fi
-  if [ -z "$reply_text" ] && json_array_has "$allowed_actions" "Post Neutral Ban Notice"; then
-    reply_text=$neutral_template
+  has_ban_notice_action=false
+  if json_array_has "$allowed_actions" "Post Ban Notice" || json_array_has "$allowed_actions" "Post Neutral Ban Notice"; then
+    has_ban_notice_action=true
+  fi
+  if [ -z "$reply_text" ] && [ "$has_ban_notice_action" = true ]; then
+    reply_text=$ban_notice_template
+    if [ -z "$reply_text" ]; then
+      ban_notice_style=$(mode_ban_notice_style "$current_mode")
+      reply_text=$(default_ban_notice_text "$ban_notice_style" "$norm")
+    fi
   fi
 
   constraints=$(mode_constraints_for "$current_mode")
@@ -2109,7 +2171,7 @@ process_comment() {
 
   should_reply=false
   if [ -n "$reply_text" ]; then
-    if json_array_has "$allowed_actions" "Warn" || json_array_has "$allowed_actions" "Reply" || json_array_has "$allowed_actions" "Initiate" || json_array_has "$allowed_actions" "Post Neutral Ban Notice"; then
+    if json_array_has "$allowed_actions" "Warn" || json_array_has "$allowed_actions" "Reply" || json_array_has "$allowed_actions" "Initiate" || json_array_has "$allowed_actions" "Post Ban Notice" || json_array_has "$allowed_actions" "Post Neutral Ban Notice"; then
       should_reply=true
     fi
   fi
@@ -2430,7 +2492,7 @@ process_comment() {
       relationship_row=$(relationship_set_mode_row "$relationship_row" "$to_mode" "$duration" "$decay_to" "post-action:$transition_action" "$announce_bool")
       new_mode=$(printf '%s' "$relationship_row" | jq -r '.current_mode // ""' 2>/dev/null || printf '')
       append_mode_log_event "mode-switch" "$(jq -cn --arg user "$author_key" --arg from "$old_mode" --arg to "$new_mode" --arg action "$transition_action" '{user_id:$user,from_mode:$from,to_mode:$to,action:$action}')"
-      if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$new_mode" "Post Neutral Ban Notice")" = "true" ]; then
+      if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$new_mode" "Post Ban Notice")" = "true" ]; then
         switch_notice=$(read_modes_config_json | jq -r --arg user "$author" --arg mode "$new_mode" '.replies.modeSwitchTemplate // "" | gsub("\\{\\{user\\}\\}";$user) | gsub("\\{\\{mode\\}\\}";$mode)' 2>/dev/null || printf '')
         if [ -n "$switch_notice" ]; then
           if switch_reply_id=$(post_reply "$thing_id" "$switch_notice" 2>/dev/null); then
