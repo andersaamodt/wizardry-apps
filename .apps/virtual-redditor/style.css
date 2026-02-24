@@ -1967,7 +1967,7 @@ label {
   margin-top: 3px;
 }
 
-.mode-drawer-rule-head {
+.mode-drawer-trigger-head {
   margin-top: 8px;
 }
 
@@ -2041,7 +2041,7 @@ label {
   margin-top: 0;
 }
 
-.mode-detail-drawer .switch-rule-row {
+.mode-detail-drawer .action-trigger-row {
   gap: 6px;
   padding: 7px;
 }
@@ -2050,16 +2050,16 @@ label {
   display: none;
 }
 
-.mode-detail-drawer .switch-rule-row input[type='text'],
-.mode-detail-drawer .switch-rule-row input[type='number'],
-.mode-detail-drawer .switch-rule-row select {
+.mode-detail-drawer .action-trigger-row input[type='text'],
+.mode-detail-drawer .action-trigger-row input[type='number'],
+.mode-detail-drawer .action-trigger-row select {
   flex: 1 1 100% !important;
   min-width: 0 !important;
   width: 100% !important;
 }
 
-.mode-detail-drawer .switch-rule-row .mini-toggle,
-.mode-detail-drawer .switch-rule-row .mini-remove-btn {
+.mode-detail-drawer .action-trigger-row .mini-toggle,
+.mode-detail-drawer .action-trigger-row .mini-remove-btn {
   width: 100%;
   justify-content: flex-start;
 }
@@ -2143,12 +2143,12 @@ label {
   padding: 6px 2px;
 }
 
-.mode-switch-rules-list {
+.mode-action-triggers-list {
   display: grid;
   gap: 8px;
 }
 
-.switch-rule-row {
+.action-trigger-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -2159,60 +2159,60 @@ label {
   background: color-mix(in srgb, var(--bg-main) 90%, var(--bg-panel) 10%);
 }
 
-.switch-rule-row input[type='text'],
-.switch-rule-row input[type='number'],
-.switch-rule-row select {
+.action-trigger-row input[type='text'],
+.action-trigger-row input[type='number'],
+.action-trigger-row select {
   font-size: 0.74rem;
 }
 
-.switch-rule-row input[type='number'] {
+.action-trigger-row input[type='number'] {
   width: 96px;
   flex: 0 0 96px;
 }
 
-.switch-rule-row input[type='text'] {
+.action-trigger-row input[type='text'] {
   flex: 1 1 210px;
   min-width: 170px;
 }
 
-.switch-rule-row select {
+.action-trigger-row select {
   flex: 0 1 170px;
   min-width: 130px;
 }
 
-.rule-label-input {
+.trigger-label-input {
   flex: 0 1 164px !important;
 }
 
-.rule-match-input {
+.trigger-match-input {
   flex: 1 1 260px !important;
 }
 
-.rule-mode-select,
-.rule-decay-select,
-.rule-action-select,
+.trigger-mode-select,
+.trigger-decay-select,
+.trigger-action-select,
 .transition-action-select,
 .transition-mode-select,
 .transition-decay-select {
   flex: 0 1 152px !important;
 }
 
-.rule-duration-input,
+.trigger-duration-input,
 .transition-duration-input {
   flex: 0 0 96px !important;
 }
 
-.rule-template-input {
+.trigger-template-input {
   flex: 1 1 240px !important;
 }
 
-.rule-announce-toggle,
-.rule-admin-toggle,
+.trigger-announce-toggle,
+.trigger-admin-toggle,
 .transition-announce-toggle {
   min-width: 86px;
 }
 
-.switch-rule-row .mini-toggle {
+.action-trigger-row .mini-toggle {
   flex: 0 0 auto;
 }
 
@@ -3598,20 +3598,20 @@ label {
     display: none;
   }
 
-  .switch-rule-row {
+  .action-trigger-row {
     padding: 7px;
   }
 
-  .switch-rule-row input[type='text'],
-  .switch-rule-row input[type='number'],
-  .switch-rule-row select {
+  .action-trigger-row input[type='text'],
+  .action-trigger-row input[type='number'],
+  .action-trigger-row select {
     flex: 1 1 100%;
     min-width: 0;
     width: 100%;
   }
 
-  .switch-rule-row .mini-toggle,
-  .switch-rule-row .mini-remove-btn {
+  .action-trigger-row .mini-toggle,
+  .action-trigger-row .mini-remove-btn {
     width: 100%;
     justify-content: flex-start;
   }

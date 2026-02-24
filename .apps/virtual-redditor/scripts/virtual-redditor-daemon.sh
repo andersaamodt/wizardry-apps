@@ -396,7 +396,7 @@ mode_default_config_json() {
         "Permanent Ban": {toMode:"STRICT",durationHours:0,decayTo:"RULES",announce:true},
         "Remove Content": {toMode:"PROBATION",durationHours:72,decayTo:"TEACH",announce:false}
       },
-      switchRules: [
+      actionTriggers: [
         {
           id: "opt-out",
           label: "General opt-out",
@@ -804,7 +804,7 @@ default_ban_notice_text() {
   esac
 }
 
-mode_switch_rule_match() {
+mode_action_trigger_match() {
   comment_json=$1
   author_is_mod=${2-false}
   case "$author_is_mod" in
@@ -814,7 +814,7 @@ mode_switch_rule_match() {
   body_lc=$(printf '%s' "$comment_json" | jq -r '(.body // "") | ascii_downcase' 2>/dev/null || printf '')
   [ -n "$body_lc" ] || { printf '{}'; return 0; }
   read_modes_config_json | jq -c --arg body "$body_lc" --argjson is_mod "$author_is_mod" '
-    (.switchRules // [])
+    (.actionTriggers // [])
     | map(select(
         ((.triggerAction // "switch_mode") == "switch_mode")
         and (((.adminOnly // false) | not) or $is_mod)
@@ -2089,14 +2089,14 @@ process_comment() {
   current_mode=$(find_mode_id_or_default "$current_mode")
 
   comment_author_is_mod=$(printf '%s' "$comment_json" | jq -r 'if ((.distinguished // "") == "moderator") or (.author_is_moderator == true) then "true" else "false" end' 2>/dev/null || printf 'false')
-  switch_rule=$(mode_switch_rule_match "$comment_json" "$comment_author_is_mod")
-  switch_to_mode=$(printf '%s' "$switch_rule" | jq -r '.toMode // empty' 2>/dev/null || printf '')
+  action_trigger=$(mode_action_trigger_match "$comment_json" "$comment_author_is_mod")
+  switch_to_mode=$(printf '%s' "$action_trigger" | jq -r '.toMode // empty' 2>/dev/null || printf '')
   if [ -n "$switch_to_mode" ]; then
-    rule_id=$(printf '%s' "$switch_rule" | jq -r '.id // "action-trigger"' 2>/dev/null || printf 'action-trigger')
-    duration=$(printf '%s' "$switch_rule" | jq -r '.durationHours // 0' 2>/dev/null || printf '0')
+    rule_id=$(printf '%s' "$action_trigger" | jq -r '.id // "action-trigger"' 2>/dev/null || printf 'action-trigger')
+    duration=$(printf '%s' "$action_trigger" | jq -r '.durationHours // 0' 2>/dev/null || printf '0')
     duration=$(to_int "$duration" 0)
-    decay_to=$(printf '%s' "$switch_rule" | jq -r '.decayTo // empty' 2>/dev/null || printf '')
-    announce=$(printf '%s' "$switch_rule" | jq -r '.announce // true' 2>/dev/null || printf 'true')
+    decay_to=$(printf '%s' "$action_trigger" | jq -r '.decayTo // empty' 2>/dev/null || printf '')
+    announce=$(printf '%s' "$action_trigger" | jq -r '.announce // true' 2>/dev/null || printf 'true')
     announce_bool=false
     [ "$announce" = "true" ] && announce_bool=true
     previous_mode=$current_mode
@@ -2107,7 +2107,7 @@ process_comment() {
     append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg from "$previous_mode" --arg to "$current_mode" --arg rule "$rule_id" --arg comment_id "$thing_id" '{user_id:$user,from_mode:$from,to_mode:$to,trigger_id:$rule,comment_id:$comment_id}')"
 
     if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$current_mode" "Post Ban Notice")" = "true" ]; then
-      notice=$(printf '%s' "$switch_rule" | jq -r '.template // empty' 2>/dev/null || printf '')
+      notice=$(printf '%s' "$action_trigger" | jq -r '.template // empty' 2>/dev/null || printf '')
       if [ -n "$notice" ]; then
         if notice_reply_id=$(post_reply "$thing_id" "$notice" 2>/dev/null); then
           rule_decision=$(jq -cn --arg rule "$rule_id" --arg mode "$current_mode" '{rule:$rule,toMode:$mode}')

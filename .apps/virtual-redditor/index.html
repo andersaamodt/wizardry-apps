@@ -3093,7 +3093,7 @@
           implicitSummons: false
         },
         modes: [],
-        switchRules: [],
+        actionTriggers: [],
         postActionTransitions: {},
         replies: {
           warningTemplate: '',
@@ -3144,7 +3144,7 @@
       delete out.escalation.onHighSeverity;
       out.banLevels = Object.assign({}, base.banLevels, src.banLevels || {});
       if (!Array.isArray(out.modes)) out.modes = [];
-      if (!Array.isArray(out.switchRules)) out.switchRules = [];
+      if (!Array.isArray(out.actionTriggers)) out.actionTriggers = [];
       if (!out.postActionTransitions || typeof out.postActionTransitions !== 'object') out.postActionTransitions = {};
 
       var savedCatalog = Array.isArray(out.actionCatalog) ? out.actionCatalog : [];
@@ -3229,8 +3229,8 @@
         ];
       }
 
-      if (!out.switchRules.length) {
-        out.switchRules = [
+      if (!out.actionTriggers.length) {
+        out.actionTriggers = [
           {
             id: 'opt-out',
             label: 'General opt-out',
@@ -3293,9 +3293,9 @@
         return next;
       }).filter(function (mode) { return !!mode.id; });
 
-      out.switchRules = out.switchRules.map(function (rule, idx) {
+      out.actionTriggers = out.actionTriggers.map(function (rule, idx) {
         var next = Object.assign({}, rule || {});
-        next.id = String(next.id || ('rule-' + String(idx + 1)));
+        next.id = String(next.id || ('trigger-' + String(idx + 1)));
         next.label = String(next.label || '');
         next.triggerAction = String(next.triggerAction || 'switch_mode');
         if (next.triggerAction !== 'switch_mode') next.triggerAction = 'switch_mode';
@@ -3529,9 +3529,9 @@
       checkRef('Starting mode', 'default', cfg.startingMode);
       checkRef('Default decay mode', 'default', cfg.defaultDecayMode);
 
-      var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
-      for (var s = 0; s < switchRules.length; s += 1) {
-        var rule = switchRules[s] || {};
+      var actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
+      for (var s = 0; s < actionTriggers.length; s += 1) {
+        var rule = actionTriggers[s] || {};
         if (String(rule.triggerAction || 'switch_mode') !== 'switch_mode') continue;
         var label = String(rule.label || ('Action Trigger ' + String(s + 1)));
         checkRef('Action trigger', label, rule.toMode);
@@ -3836,24 +3836,24 @@
         '  <div class="ban-sub-list">' + banRows + '</div>',
         '</div>'
       ].join('');
-      var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
-      var switchRuleRows = switchRules.map(function (rule, idx) {
+      var actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
+      var actionTriggerRows = actionTriggers.map(function (rule, idx) {
         var triggerAction = String(rule.triggerAction || 'switch_mode');
         var toModeHtml = modeOptionsHtml(modeOpts, String(rule.toMode || ''), false, '');
         var decayModeHtml = modeOptionsHtml(modeOpts, String(rule.decayTo || ''), true, 'Default decay mode');
         var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
         return [
-          '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '" data-rule-id="' + escapeHtml(String(rule.id || '')) + '">',
-          '  <input type="text" class="rule-label-input" data-rule-label placeholder="Trigger label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this action trigger">',
-          '  <input type="text" class="rule-match-input" data-rule-matchany placeholder="trigger phrases, comma separated" value="' + escapeHtml(matchAny) + '" title="Comma-separated phrases that activate this trigger">',
-          '  <select class="rule-action-select" data-rule-action title="Action to run when this trigger matches"><option value="switch_mode"' + (triggerAction === 'switch_mode' ? ' selected' : '') + '>Switch relationship mode</option></select>',
-          '  <select class="rule-mode-select" data-rule-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select>',
-          '  <input type="number" class="rule-duration-input" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the switched mode">',
-          '  <select class="rule-decay-select" data-rule-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select>',
-          '  <input type="text" class="rule-template-input" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '" title="Optional notice template posted when the trigger runs">',
-          '  <label class="mini-toggle rule-admin-toggle" title="Only moderators can invoke this trigger"><input type="checkbox" data-rule-admin-only ' + (rule.adminOnly ? 'checked' : '') + '><span>Admin-only</span></label>',
-          '  <label class="mini-toggle rule-announce-toggle" title="Post a notice when this trigger runs"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
-          '  <button type="button" class="soft mini-remove-btn rule-remove-btn" data-remove-rule title="Remove this action trigger">Remove</button>',
+          '<div class="action-trigger-row" data-trigger-idx="' + String(idx) + '" data-trigger-id="' + escapeHtml(String(rule.id || '')) + '">',
+          '  <input type="text" class="trigger-label-input" data-trigger-label placeholder="Trigger label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this action trigger">',
+          '  <input type="text" class="trigger-match-input" data-trigger-matchany placeholder="trigger phrases, comma separated" value="' + escapeHtml(matchAny) + '" title="Comma-separated phrases that activate this trigger">',
+          '  <select class="trigger-action-select" data-trigger-action title="Action to run when this trigger matches"><option value="switch_mode"' + (triggerAction === 'switch_mode' ? ' selected' : '') + '>Switch relationship mode</option></select>',
+          '  <select class="trigger-mode-select" data-trigger-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select>',
+          '  <input type="number" class="trigger-duration-input" min="0" step="1" data-trigger-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the switched mode">',
+          '  <select class="trigger-decay-select" data-trigger-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select>',
+          '  <input type="text" class="trigger-template-input" data-trigger-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '" title="Optional notice template posted when the trigger runs">',
+          '  <label class="mini-toggle trigger-admin-toggle" title="Only moderators can invoke this trigger"><input type="checkbox" data-trigger-admin-only ' + (rule.adminOnly ? 'checked' : '') + '><span>Admin-only</span></label>',
+          '  <label class="mini-toggle trigger-announce-toggle" title="Post a notice when this trigger runs"><input type="checkbox" data-trigger-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+          '  <button type="button" class="soft mini-remove-btn trigger-remove-btn" data-remove-trigger title="Remove this action trigger">Remove</button>',
           '</div>'
         ].join('');
       }).join('');
@@ -3890,9 +3890,9 @@
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Action Triggers (Decorator)</div>',
         '  <div class="mode-drawer-helper">Action triggers match user phrases and run configured actions. For safety, host-computer command triggers are not enabled.</div>',
-        '  <div class="modes-section-head mode-drawer-rule-head">',
+        '  <div class="modes-section-head mode-drawer-trigger-head">',
         '    <div class="persona-section-title">Triggers</div>',
-        '    <button type="button" class="soft mini-add-btn" data-add-switch-rule title="Add a new action trigger">Add trigger</button>',
+        '    <button type="button" class="soft mini-add-btn" data-add-action-trigger title="Add a new action trigger">Add trigger</button>',
         '  </div>',
         '  <div class="modes-grid-head switch-grid-head" aria-hidden="true">',
         '    <span>Label</span>',
@@ -3906,7 +3906,7 @@
         '    <span>Announce</span>',
         '    <span></span>',
         '  </div>',
-        '  <div class="mode-switch-rules-list">' + (switchRuleRows || '<div class="settings-empty-note">No action triggers yet.</div>') + '</div>',
+        '  <div class="mode-action-triggers-list">' + (actionTriggerRows || '<div class="settings-empty-note">No action triggers yet.</div>') + '</div>',
         '</div>'
       ].join('');
       drawer.classList.add('open');
@@ -3982,7 +3982,7 @@
       }
 
       renderModeDrawer(cfg, actionChoices);
-      var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
+      var actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
       var transitionSource = cfg.postActionTransitions || {};
       var transitionActionNames = Object.keys(transitionSource);
       var conflicts = validateModesConfigConflicts(cfg);
@@ -3990,7 +3990,7 @@
 
       if (line) {
         line.textContent = String((cfg.modes || []).length) + ' modes • ' +
-          String(switchRules.length) + ' action triggers • ' +
+          String(actionTriggers.length) + ' action triggers • ' +
           String(transitionActionNames.length) + ' post-action transitions';
       }
     }
@@ -4140,24 +4140,24 @@
       cfg.startingMode = String((document.getElementById('modes-starting-mode') || {}).value || cfg.startingMode || '');
       cfg.defaultDecayMode = String((document.getElementById('modes-default-decay-mode') || {}).value || cfg.defaultDecayMode || '');
 
-      var switchRows = document.querySelectorAll('.switch-rule-row[data-rule-idx]');
-      if (switchRows.length) {
-        cfg.switchRules = [];
-        for (var r = 0; r < switchRows.length; r += 1) {
-          var row = switchRows[r];
-          var ruleId = String(row.getAttribute('data-rule-id') || '').trim();
-          var label = String((row.querySelector('[data-rule-label]') || {}).value || '').trim();
-          var triggerAction = String((row.querySelector('[data-rule-action]') || {}).value || 'switch_mode').trim();
+      var triggerRows = document.querySelectorAll('.action-trigger-row[data-trigger-idx]');
+      if (triggerRows.length) {
+        cfg.actionTriggers = [];
+        for (var r = 0; r < triggerRows.length; r += 1) {
+          var row = triggerRows[r];
+          var triggerId = String(row.getAttribute('data-trigger-id') || '').trim();
+          var label = String((row.querySelector('[data-trigger-label]') || {}).value || '').trim();
+          var triggerAction = String((row.querySelector('[data-trigger-action]') || {}).value || 'switch_mode').trim();
           if (triggerAction !== 'switch_mode') triggerAction = 'switch_mode';
-          var matchAny = parseCsvList(String((row.querySelector('[data-rule-matchany]') || {}).value || ''));
-          var toMode = String((row.querySelector('[data-rule-to-mode]') || {}).value || '').trim();
-          var duration = Math.max(0, parseInt((row.querySelector('[data-rule-duration]') || {}).value || '0', 10) || 0);
-          var decayTo = String((row.querySelector('[data-rule-decay-to]') || {}).value || '').trim();
-          var template = String((row.querySelector('[data-rule-template]') || {}).value || '');
-          var adminOnly = !!((row.querySelector('[data-rule-admin-only]') || {}).checked);
-          var announce = !!((row.querySelector('[data-rule-announce]') || {}).checked);
-          cfg.switchRules.push({
-            id: ruleId || ('rule-' + String(r + 1)),
+          var matchAny = parseCsvList(String((row.querySelector('[data-trigger-matchany]') || {}).value || ''));
+          var toMode = String((row.querySelector('[data-trigger-to-mode]') || {}).value || '').trim();
+          var duration = Math.max(0, parseInt((row.querySelector('[data-trigger-duration]') || {}).value || '0', 10) || 0);
+          var decayTo = String((row.querySelector('[data-trigger-decay-to]') || {}).value || '').trim();
+          var template = String((row.querySelector('[data-trigger-template]') || {}).value || '');
+          var adminOnly = !!((row.querySelector('[data-trigger-admin-only]') || {}).checked);
+          var announce = !!((row.querySelector('[data-trigger-announce]') || {}).checked);
+          cfg.actionTriggers.push({
+            id: triggerId || ('trigger-' + String(r + 1)),
             label: label || ('Action Trigger ' + String(r + 1)),
             triggerAction: triggerAction,
             adminOnly: adminOnly,
@@ -4293,12 +4293,12 @@
       }, Math.max(0, parseInt(delayMs, 10) || 420));
     }
 
-    function addModeSwitchRuleRow() {
+    function addModeActionTriggerRow() {
       mutateModesConfigFromUi(function (cfg) {
-        var idx = (cfg.switchRules || []).length + 1;
-        cfg.switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
-        cfg.switchRules.push({
-          id: 'rule-' + String(Date.now()),
+        var idx = (cfg.actionTriggers || []).length + 1;
+        cfg.actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
+        cfg.actionTriggers.push({
+          id: 'trigger-' + String(Date.now()),
           label: 'Action Trigger ' + String(idx),
           triggerAction: 'switch_mode',
           adminOnly: false,
@@ -5005,18 +5005,18 @@
           openModeDrawer(editModeBtn.getAttribute('data-edit-mode') || '');
           return;
         }
-        var addSwitchRuleBtn = event.target && event.target.closest('[data-add-switch-rule]');
-        if (addSwitchRuleBtn) {
-          addModeSwitchRuleRow();
+        var addActionTriggerBtn = event.target && event.target.closest('[data-add-action-trigger]');
+        if (addActionTriggerBtn) {
+          addModeActionTriggerRow();
           return;
         }
-        var removeRuleBtn = event.target && event.target.closest('[data-remove-rule]');
-        if (removeRuleBtn) {
-          var row = removeRuleBtn.closest('[data-rule-idx]');
-          var idx = row ? parseInt(row.getAttribute('data-rule-idx') || '-1', 10) : -1;
+        var removeTriggerBtn = event.target && event.target.closest('[data-remove-trigger]');
+        if (removeTriggerBtn) {
+          var row = removeTriggerBtn.closest('[data-trigger-idx]');
+          var idx = row ? parseInt(row.getAttribute('data-trigger-idx') || '-1', 10) : -1;
           if (idx >= 0) {
             mutateModesConfigFromUi(function (cfg) {
-              cfg.switchRules = (cfg.switchRules || []).filter(function (_rule, ruleIndex) {
+              cfg.actionTriggers = (cfg.actionTriggers || []).filter(function (_rule, ruleIndex) {
                 return ruleIndex !== idx;
               });
             });
@@ -5043,10 +5043,10 @@
         var target = event && event.target;
         if (!target) return;
         if (
-          target.hasAttribute('data-rule-label') ||
-          target.hasAttribute('data-rule-matchany') ||
-          target.hasAttribute('data-rule-duration') ||
-          target.hasAttribute('data-rule-template') ||
+          target.hasAttribute('data-trigger-label') ||
+          target.hasAttribute('data-trigger-matchany') ||
+          target.hasAttribute('data-trigger-duration') ||
+          target.hasAttribute('data-trigger-template') ||
           target.hasAttribute('data-transition-duration-action') ||
           target.hasAttribute('data-transition-to-mode-action') ||
           target.hasAttribute('data-transition-decay-to-action')
@@ -5058,11 +5058,11 @@
         var target = event && event.target;
         if (!target) return;
         if (
-          target.hasAttribute('data-rule-to-mode') ||
-          target.hasAttribute('data-rule-decay-to') ||
-          target.hasAttribute('data-rule-action') ||
-          target.hasAttribute('data-rule-admin-only') ||
-          target.hasAttribute('data-rule-announce') ||
+          target.hasAttribute('data-trigger-to-mode') ||
+          target.hasAttribute('data-trigger-decay-to') ||
+          target.hasAttribute('data-trigger-action') ||
+          target.hasAttribute('data-trigger-admin-only') ||
+          target.hasAttribute('data-trigger-announce') ||
           target.hasAttribute('data-transition-enabled-action') ||
           target.hasAttribute('data-transition-announce-action') ||
           target.hasAttribute('data-transition-to-mode-action') ||
