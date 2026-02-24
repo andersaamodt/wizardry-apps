@@ -328,27 +328,25 @@
         </section>
 
         <section class="tab-panel" id="panel-modes">
-          <div class="status-line" id="modes-line">Modes not loaded yet.</div>
-          <div id="modes-conflict-banner" class="modes-conflict-banner" aria-live="polite" hidden></div>
           <div id="modes-workarea" class="modes-workarea">
-            <div id="modes-layout-card" class="settings-card subpanel-card modes-layout-card">
-              <div class="modes-main-pane">
-                <div class="persona-section-title">Mode Defaults</div>
-                <div class="mode-fields-inline modes-grid">
-                  <div class="mode-field-row">
-                    <label for="modes-starting-mode" class="mode-field-label" title="Mode assigned to users with no existing relationship">Starting mode</label>
-                    <select id="modes-starting-mode" title="Mode assigned to users with no existing relationship"></select>
-                  </div>
-                  <div class="mode-field-row">
-                    <label for="modes-default-decay-mode" class="mode-field-label" title="Fallback mode used when a transition/rule has no explicit decay target">Default decay mode</label>
-                    <select id="modes-default-decay-mode" title="Fallback mode used when a transition/rule has no explicit decay target"></select>
-                  </div>
+            <div class="modes-main-pane">
+              <div class="status-line" id="modes-line">Modes not loaded yet.</div>
+              <div id="modes-conflict-banner" class="modes-conflict-banner" aria-live="polite" hidden></div>
+              <div class="persona-section-title">Mode Defaults</div>
+              <div class="mode-fields-inline modes-grid">
+                <div class="mode-field-row">
+                  <label for="modes-starting-mode" class="mode-field-label" title="Mode assigned to users with no existing relationship">Starting mode</label>
+                  <select id="modes-starting-mode" title="Mode assigned to users with no existing relationship"></select>
                 </div>
-                <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
-                <div id="modes-list" class="modes-list"></div>
-                <div class="settings-actions modes-save-actions">
-                  <button id="btn-save-modes" type="button" class="primary">Save modes</button>
+                <div class="mode-field-row">
+                  <label for="modes-default-decay-mode" class="mode-field-label" title="Fallback mode used when a transition/rule has no explicit decay target">Default decay mode</label>
+                  <select id="modes-default-decay-mode" title="Fallback mode used when a transition/rule has no explicit decay target"></select>
                 </div>
+              </div>
+              <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
+              <div id="modes-list" class="modes-list"></div>
+              <div class="settings-actions modes-save-actions">
+                <button id="btn-save-modes" type="button" class="primary">Save modes</button>
               </div>
             </div>
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
