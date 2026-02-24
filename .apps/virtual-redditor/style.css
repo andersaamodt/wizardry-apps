@@ -1669,6 +1669,54 @@ label {
   margin-top: 0;
 }
 
+.replies-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.replies-edit-link {
+  padding: 0;
+  min-height: 0;
+}
+
+.replies-workarea {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  align-items: stretch;
+  column-gap: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  transition: grid-template-columns 200ms ease, column-gap 200ms ease;
+}
+
+.replies-workarea.drawer-open {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  column-gap: 12px;
+}
+
+.replies-main-card {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+}
+
+.reply-templates-drawer .mode-field-row {
+  grid-template-columns: 1fr;
+}
+
+.reply-templates-drawer .mode-field-label {
+  margin-top: 0;
+}
+
+.reply-templates-drawer .compact-template-input {
+  min-height: 92px;
+  height: 108px;
+  resize: vertical;
+}
+
 .modes-main-pane {
   min-width: 0;
   overflow: auto;
