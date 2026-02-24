@@ -3235,6 +3235,8 @@
             id: 'opt-out',
             label: 'General opt-out',
             matchAny: ['leave me alone', 'do not reply', 'stop replying', 'opt out'],
+            triggerAction: 'switch_mode',
+            adminOnly: false,
             toMode: 'BAN',
             durationHours: 72,
             decayTo: 'SHADE',
@@ -3295,6 +3297,9 @@
         var next = Object.assign({}, rule || {});
         next.id = String(next.id || ('rule-' + String(idx + 1)));
         next.label = String(next.label || '');
+        next.triggerAction = String(next.triggerAction || 'switch_mode');
+        if (next.triggerAction !== 'switch_mode') next.triggerAction = 'switch_mode';
+        next.adminOnly = !!next.adminOnly;
         next.matchAny = Array.isArray(next.matchAny)
           ? next.matchAny.map(function (item) { return String(item || '').trim(); }).filter(Boolean)
           : [];
@@ -3527,9 +3532,10 @@
       var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
       for (var s = 0; s < switchRules.length; s += 1) {
         var rule = switchRules[s] || {};
-        var label = String(rule.label || ('Rule ' + String(s + 1)));
-        checkRef('Switch rule', label, rule.toMode);
-        checkRef('Switch rule decay', label, rule.decayTo);
+        if (String(rule.triggerAction || 'switch_mode') !== 'switch_mode') continue;
+        var label = String(rule.label || ('Action Trigger ' + String(s + 1)));
+        checkRef('Action trigger', label, rule.toMode);
+        checkRef('Action trigger decay', label, rule.decayTo);
       }
 
       var transitions = (cfg && cfg.postActionTransitions && typeof cfg.postActionTransitions === 'object')
@@ -3832,19 +3838,22 @@
       ].join('');
       var switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
       var switchRuleRows = switchRules.map(function (rule, idx) {
+        var triggerAction = String(rule.triggerAction || 'switch_mode');
         var toModeHtml = modeOptionsHtml(modeOpts, String(rule.toMode || ''), false, '');
         var decayModeHtml = modeOptionsHtml(modeOpts, String(rule.decayTo || ''), true, 'Default decay mode');
         var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
         return [
           '<div class="switch-rule-row" data-rule-idx="' + String(idx) + '" data-rule-id="' + escapeHtml(String(rule.id || '')) + '">',
-          '  <input type="text" class="rule-label-input" data-rule-label placeholder="Rule label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this switch rule">',
-          '  <input type="text" class="rule-match-input" data-rule-matchany placeholder="match phrases, comma separated" value="' + escapeHtml(matchAny) + '" title="Comma-separated phrases that trigger this rule">',
-          '  <select class="rule-mode-select" data-rule-to-mode title="Mode to switch to when this rule matches">' + toModeHtml + '</select>',
+          '  <input type="text" class="rule-label-input" data-rule-label placeholder="Trigger label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this action trigger">',
+          '  <input type="text" class="rule-match-input" data-rule-matchany placeholder="trigger phrases, comma separated" value="' + escapeHtml(matchAny) + '" title="Comma-separated phrases that activate this trigger">',
+          '  <select class="rule-action-select" data-rule-action title="Action to run when this trigger matches"><option value="switch_mode"' + (triggerAction === 'switch_mode' ? ' selected' : '') + '>Switch relationship mode</option></select>',
+          '  <select class="rule-mode-select" data-rule-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select>',
           '  <input type="number" class="rule-duration-input" min="0" step="1" data-rule-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the switched mode">',
-          '  <select class="rule-decay-select" data-rule-decay-to title="Mode to decay to after rule duration expires">' + decayModeHtml + '</select>',
-          '  <input type="text" class="rule-template-input" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '" title="Optional notice template posted when the rule triggers">',
-          '  <label class="mini-toggle rule-announce-toggle" title="Post a notice when this rule triggers"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
-          '  <button type="button" class="soft mini-remove-btn rule-remove-btn" data-remove-rule title="Remove this switch rule">Remove</button>',
+          '  <select class="rule-decay-select" data-rule-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select>',
+          '  <input type="text" class="rule-template-input" data-rule-template placeholder="Announcement template (optional)" value="' + escapeHtml(String(rule.template || '')) + '" title="Optional notice template posted when the trigger runs">',
+          '  <label class="mini-toggle rule-admin-toggle" title="Only moderators can invoke this trigger"><input type="checkbox" data-rule-admin-only ' + (rule.adminOnly ? 'checked' : '') + '><span>Admin-only</span></label>',
+          '  <label class="mini-toggle rule-announce-toggle" title="Post a notice when this trigger runs"><input type="checkbox" data-rule-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+          '  <button type="button" class="soft mini-remove-btn rule-remove-btn" data-remove-rule title="Remove this action trigger">Remove</button>',
           '</div>'
         ].join('');
       }).join('');
@@ -3879,23 +3888,25 @@
         '  </div>',
         '</div>',
         '<div class="mode-drawer-block">',
-        '  <div class="mode-drawer-section-title">Switch Rules (Decorator)</div>',
-        '  <div class="mode-drawer-helper">Switch rules are trigger decorators that can change relationship mode when matching phrases are detected.</div>',
+        '  <div class="mode-drawer-section-title">Action Triggers (Decorator)</div>',
+        '  <div class="mode-drawer-helper">Action triggers match user phrases and run configured actions. For safety, host-computer command triggers are not enabled.</div>',
         '  <div class="modes-section-head mode-drawer-rule-head">',
-        '    <div class="persona-section-title">Rules</div>',
-        '    <button type="button" class="soft mini-add-btn" data-add-switch-rule title="Add a new switch rule">Add rule</button>',
+        '    <div class="persona-section-title">Triggers</div>',
+        '    <button type="button" class="soft mini-add-btn" data-add-switch-rule title="Add a new action trigger">Add trigger</button>',
         '  </div>',
         '  <div class="modes-grid-head switch-grid-head" aria-hidden="true">',
         '    <span>Label</span>',
-        '    <span>Match phrases</span>',
+        '    <span>Trigger phrases</span>',
+        '    <span>Action</span>',
         '    <span>Switch to</span>',
         '    <span>Duration (h)</span>',
         '    <span>Decay to</span>',
         '    <span>Template</span>',
+        '    <span>Admin-only</span>',
         '    <span>Announce</span>',
         '    <span></span>',
         '  </div>',
-        '  <div class="mode-switch-rules-list">' + (switchRuleRows || '<div class="settings-empty-note">No switch rules yet.</div>') + '</div>',
+        '  <div class="mode-switch-rules-list">' + (switchRuleRows || '<div class="settings-empty-note">No action triggers yet.</div>') + '</div>',
         '</div>'
       ].join('');
       drawer.classList.add('open');
@@ -3979,7 +3990,7 @@
 
       if (line) {
         line.textContent = String((cfg.modes || []).length) + ' modes • ' +
-          String(switchRules.length) + ' switch rules • ' +
+          String(switchRules.length) + ' action triggers • ' +
           String(transitionActionNames.length) + ' post-action transitions';
       }
     }
@@ -4136,15 +4147,20 @@
           var row = switchRows[r];
           var ruleId = String(row.getAttribute('data-rule-id') || '').trim();
           var label = String((row.querySelector('[data-rule-label]') || {}).value || '').trim();
+          var triggerAction = String((row.querySelector('[data-rule-action]') || {}).value || 'switch_mode').trim();
+          if (triggerAction !== 'switch_mode') triggerAction = 'switch_mode';
           var matchAny = parseCsvList(String((row.querySelector('[data-rule-matchany]') || {}).value || ''));
           var toMode = String((row.querySelector('[data-rule-to-mode]') || {}).value || '').trim();
           var duration = Math.max(0, parseInt((row.querySelector('[data-rule-duration]') || {}).value || '0', 10) || 0);
           var decayTo = String((row.querySelector('[data-rule-decay-to]') || {}).value || '').trim();
           var template = String((row.querySelector('[data-rule-template]') || {}).value || '');
+          var adminOnly = !!((row.querySelector('[data-rule-admin-only]') || {}).checked);
           var announce = !!((row.querySelector('[data-rule-announce]') || {}).checked);
           cfg.switchRules.push({
             id: ruleId || ('rule-' + String(r + 1)),
-            label: label || ('Rule ' + String(r + 1)),
+            label: label || ('Action Trigger ' + String(r + 1)),
+            triggerAction: triggerAction,
+            adminOnly: adminOnly,
             matchAny: matchAny,
             toMode: toMode,
             durationHours: duration,
@@ -4283,7 +4299,9 @@
         cfg.switchRules = Array.isArray(cfg.switchRules) ? cfg.switchRules : [];
         cfg.switchRules.push({
           id: 'rule-' + String(Date.now()),
-          label: 'Rule ' + String(idx),
+          label: 'Action Trigger ' + String(idx),
+          triggerAction: 'switch_mode',
+          adminOnly: false,
           matchAny: [],
           toMode: String(cfg.defaultDecayMode || cfg.startingMode || ''),
           durationHours: 0,
@@ -5042,6 +5060,8 @@
         if (
           target.hasAttribute('data-rule-to-mode') ||
           target.hasAttribute('data-rule-decay-to') ||
+          target.hasAttribute('data-rule-action') ||
+          target.hasAttribute('data-rule-admin-only') ||
           target.hasAttribute('data-rule-announce') ||
           target.hasAttribute('data-transition-enabled-action') ||
           target.hasAttribute('data-transition-announce-action') ||

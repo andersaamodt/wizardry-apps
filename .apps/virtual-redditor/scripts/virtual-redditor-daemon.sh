@@ -401,6 +401,8 @@ mode_default_config_json() {
           id: "opt-out",
           label: "General opt-out",
           matchAny: ["leave me alone","do not reply","dont reply","stop replying","opt out"],
+          triggerAction: "switch_mode",
+          adminOnly: false,
           toMode: "BAN",
           durationHours: 72,
           decayTo: "SHADE",
@@ -804,11 +806,19 @@ default_ban_notice_text() {
 
 mode_switch_rule_match() {
   comment_json=$1
+  author_is_mod=${2-false}
+  case "$author_is_mod" in
+    true|1|yes) author_is_mod=true ;;
+    *) author_is_mod=false ;;
+  esac
   body_lc=$(printf '%s' "$comment_json" | jq -r '(.body // "") | ascii_downcase' 2>/dev/null || printf '')
   [ -n "$body_lc" ] || { printf '{}'; return 0; }
-  read_modes_config_json | jq -c --arg body "$body_lc" '
+  read_modes_config_json | jq -c --arg body "$body_lc" --argjson is_mod "$author_is_mod" '
     (.switchRules // [])
     | map(select(
+        ((.triggerAction // "switch_mode") == "switch_mode")
+        and (((.adminOnly // false) | not) or $is_mod)
+        and
         ((.matchAny // []) | map(tostring | ascii_downcase) | map(select(length > 0)) | any($body | contains(.)))
       ))
     | if length > 0 then .[0] else {} end
@@ -2078,10 +2088,11 @@ process_comment() {
   current_mode=$(printf '%s' "$relationship_row" | jq -r '.current_mode // empty' 2>/dev/null || printf '')
   current_mode=$(find_mode_id_or_default "$current_mode")
 
-  switch_rule=$(mode_switch_rule_match "$comment_json")
+  comment_author_is_mod=$(printf '%s' "$comment_json" | jq -r 'if ((.distinguished // "") == "moderator") or (.author_is_moderator == true) then "true" else "false" end' 2>/dev/null || printf 'false')
+  switch_rule=$(mode_switch_rule_match "$comment_json" "$comment_author_is_mod")
   switch_to_mode=$(printf '%s' "$switch_rule" | jq -r '.toMode // empty' 2>/dev/null || printf '')
   if [ -n "$switch_to_mode" ]; then
-    rule_id=$(printf '%s' "$switch_rule" | jq -r '.id // "switch-rule"' 2>/dev/null || printf 'switch-rule')
+    rule_id=$(printf '%s' "$switch_rule" | jq -r '.id // "action-trigger"' 2>/dev/null || printf 'action-trigger')
     duration=$(printf '%s' "$switch_rule" | jq -r '.durationHours // 0' 2>/dev/null || printf '0')
     duration=$(to_int "$duration" 0)
     decay_to=$(printf '%s' "$switch_rule" | jq -r '.decayTo // empty' 2>/dev/null || printf '')
@@ -2089,18 +2100,18 @@ process_comment() {
     announce_bool=false
     [ "$announce" = "true" ] && announce_bool=true
     previous_mode=$current_mode
-    relationship_row=$(relationship_set_mode_row "$relationship_row" "$switch_to_mode" "$duration" "$decay_to" "switch-rule:$rule_id" "$announce_bool")
+    relationship_row=$(relationship_set_mode_row "$relationship_row" "$switch_to_mode" "$duration" "$decay_to" "action-trigger:$rule_id" "$announce_bool")
     relationship_upsert_row "$relationship_row" || :
     current_mode=$(printf '%s' "$relationship_row" | jq -r '.current_mode // empty' 2>/dev/null || printf '')
     current_mode=$(find_mode_id_or_default "$current_mode")
-    append_mode_log_event "switch-rule" "$(jq -cn --arg user "$author_key" --arg from "$previous_mode" --arg to "$current_mode" --arg rule "$rule_id" --arg comment_id "$thing_id" '{user_id:$user,from_mode:$from,to_mode:$to,rule_id:$rule,comment_id:$comment_id}')"
+    append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg from "$previous_mode" --arg to "$current_mode" --arg rule "$rule_id" --arg comment_id "$thing_id" '{user_id:$user,from_mode:$from,to_mode:$to,trigger_id:$rule,comment_id:$comment_id}')"
 
     if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$current_mode" "Post Ban Notice")" = "true" ]; then
       notice=$(printf '%s' "$switch_rule" | jq -r '.template // empty' 2>/dev/null || printf '')
       if [ -n "$notice" ]; then
         if notice_reply_id=$(post_reply "$thing_id" "$notice" 2>/dev/null); then
           rule_decision=$(jq -cn --arg rule "$rule_id" --arg mode "$current_mode" '{rule:$rule,toMode:$mode}')
-          record_reply_event "$comment_json" "$notice_reply_id" "$notice" "switch-rule" "$rule_decision" "switch-rule"
+          record_reply_event "$comment_json" "$notice_reply_id" "$notice" "action-trigger" "$rule_decision" "action-trigger"
         fi
       fi
     fi

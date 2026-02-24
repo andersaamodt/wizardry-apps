@@ -2190,6 +2190,7 @@ label {
 
 .rule-mode-select,
 .rule-decay-select,
+.rule-action-select,
 .transition-action-select,
 .transition-mode-select,
 .transition-decay-select {
@@ -2206,6 +2207,7 @@ label {
 }
 
 .rule-announce-toggle,
+.rule-admin-toggle,
 .transition-announce-toggle {
   min-width: 86px;
 }
