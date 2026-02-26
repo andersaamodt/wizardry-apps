@@ -75,6 +75,17 @@
     var siteName = 'artificer';
     var entryPath = '/pages/index.html';
     var launchCacheKey = Date.now().toString(36);
+    var wizardryShellInit =
+      'base_path="/opt/homebrew/bin:/opt/homebrew/sbin:/opt/pkg/bin:/opt/pkg/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin"; ' +
+      'PATH="$base_path${PATH:+:$PATH}"; export PATH; ' +
+      'wiz="${WIZARDRY_DIR:-$HOME/.wizardry}"; ' +
+      'iw="$wiz/spells/.imps/sys/invoke-wizardry"; ' +
+      '[ -f "$iw" ] || { printf "wizardry runtime missing (%s)\\n" "$iw" >&2; exit 127; }; ' +
+      '. "$iw" >/dev/null 2>&1 || { printf "wizardry runtime initialization failed\\n" >&2; exit 127; }; ';
+
+    function wizardryShellCommand(commandText) {
+      return ['sh', '-c', wizardryShellInit + commandText];
+    }
 
     var commands = {
       ensureDataRoot: [
@@ -87,22 +98,9 @@
         '-c',
         'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ -f "$cfg" ] && [ -f "$built" ]; then printf "yes"; else printf "no"; fi'
       ],
-      ensureSite: [
-        'sh',
-        '-c',
-        'wwbin=$(command -v web-wizardry 2>/dev/null || true); if [ -z "$wwbin" ] && [ -x "$HOME/.wizardry/spells/web/web-wizardry" ]; then wwbin="$HOME/.wizardry/spells/web/web-wizardry"; fi; [ -n "$wwbin" ] || { printf "web-wizardry unavailable\\n" >&2; exit 127; }; root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template artificer artificer; fi; if [ ! -f "$built" ]; then "$wwbin" build artificer; fi'
-      ],
-      startServe: [
-        'sh',
-        '-c',
-        'wwbin=$(command -v web-wizardry 2>/dev/null || true); if [ -z "$wwbin" ] && [ -x "$HOME/.wizardry/spells/web/web-wizardry" ]; then wwbin="$HOME/.wizardry/spells/web/web-wizardry"; fi; [ -n "$wwbin" ] || { printf "web-wizardry unavailable\\n" >&2; exit 127; }; exec "$wwbin" serve artificer'
-      ],
-      ensureUsablePort: [
-        'sh',
-        '-c',
-        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; pidf="$root/artificer/nginx/nginx.pid"; port=$(sed -n "s/^port=//p" "$cfg" 2>/dev/null | head -n 1); [ -n "$port" ] || port=8080; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "$port"; exit 0; fi; if command -v lsof >/dev/null 2>&1; then if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then printf "$port"; exit 0; fi; p=8081; while [ "$p" -le 8120 ]; do if ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then change-site-port artificer "$p" >/dev/null 2>&1 && printf "$p" && exit 0; fi; p=$((p+1)); done; exit 1; fi; printf "$port"; exit 0'
-      ],
-      setPort: ['change-site-port', 'artificer'],
+      ensureSite: wizardryShellCommand('root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template artificer artificer; fi; if [ ! -f "$built" ]; then web-wizardry build artificer; fi'),
+      startServe: wizardryShellCommand('exec web-wizardry serve artificer'),
+      ensureUsablePort: wizardryShellCommand('root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; pidf="$root/artificer/nginx/nginx.pid"; port=$(sed -n "s/^port=//p" "$cfg" 2>/dev/null | head -n 1); [ -n "$port" ] || port=8080; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "$port"; exit 0; fi; if command -v lsof >/dev/null 2>&1; then if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then printf "$port"; exit 0; fi; p=8081; while [ "$p" -le 8120 ]; do if ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then change-site-port artificer "$p" >/dev/null 2>&1 && printf "$p" && exit 0; fi; p=$((p+1)); done; exit 1; fi; printf "$port"; exit 0'),
       isRunning: [
         'sh',
         '-c',
