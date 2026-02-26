@@ -147,7 +147,7 @@
   function getBrowserSigner() {
     var signer = window.nostr || null;
     if (!signer) {
-      throw new Error('No browser signer detected. Install nostr-keyx or use phone/manual login.');
+      throw new Error('No browser signer detected. Install nos2x-fox or use phone/manual login.');
     }
     if (typeof signer.getPublicKey !== 'function' || typeof signer.signEvent !== 'function') {
       throw new Error('Browser signer is missing getPublicKey/signEvent.');

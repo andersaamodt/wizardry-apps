@@ -552,6 +552,7 @@
     runTodoMonitorOpenByConversation: {},
     runTerminalMonitorOpenByConversation: {},
     pendingOutgoingByKey: {},
+    composerDraftByKey: {},
     conversationCacheByKey: {},
     threadsPaneWidth: parseStoredPaneWidth("artificer.threadsPaneWidth", 308),
     diffPaneWidth: 300,
@@ -3755,6 +3756,43 @@
       draftWorkspaceId = state.activeWorkspaceId;
     }
     return outgoingKeyFor(state.activeWorkspaceId, state.activeConversationId, draftWorkspaceId);
+  }
+
+  function setComposerDraftForKey(key, text) {
+    var safeKey = String(key || "");
+    if (!safeKey) {
+      return;
+    }
+    var value = String(text || "");
+    if (!value) {
+      delete state.composerDraftByKey[safeKey];
+      return;
+    }
+    state.composerDraftByKey[safeKey] = value;
+  }
+
+  function hasComposerDraftForKey(key) {
+    var safeKey = String(key || "");
+    return !!safeKey && Object.prototype.hasOwnProperty.call(state.composerDraftByKey, safeKey);
+  }
+
+  function getComposerDraftForTarget(workspaceId, conversationId, draftWorkspaceId) {
+    var key = outgoingKeyFor(workspaceId, conversationId, draftWorkspaceId);
+    if (!hasComposerDraftForKey(key)) {
+      return "";
+    }
+    return String(state.composerDraftByKey[key] || "");
+  }
+
+  function rememberActiveComposerDraft() {
+    if (!el.runPrompt) {
+      return;
+    }
+    var key = activeOutgoingKey();
+    if (!key) {
+      return;
+    }
+    setComposerDraftForKey(key, el.runPrompt.value || "");
   }
 
   function pendingOutgoingList(key) {
@@ -10069,11 +10107,11 @@
     if (!state.activeDraftWorkspaceId) {
       return;
     }
+    var workspaceId = state.activeDraftWorkspaceId;
+    var draftText = String((el.runPrompt && el.runPrompt.value) || "");
 
     clearDraftAutosaveTimer();
     saveDraftTimer = setTimeout(function () {
-      var workspaceId = state.activeDraftWorkspaceId;
-      var draftText = el.runPrompt.value;
       saveDraft(workspaceId, draftText).catch(showError);
     }, 550);
   }
@@ -10503,6 +10541,7 @@
   function selectWorkspace(workspaceId) {
     var selectionVersion = newSelectionVersion();
     state.chatAutoScroll = true;
+    rememberActiveComposerDraft();
     var workspace = getWorkspaceById(workspaceId);
     if (!workspace) {
       return Promise.resolve();
@@ -10524,7 +10563,7 @@
           if (!isSelectionVersionCurrent(selectionVersion)) {
             return;
           }
-          el.runPrompt.value = "";
+          el.runPrompt.value = getComposerDraftForTarget(workspaceId, state.activeConversationId, "");
           resetComposerAttachments();
           return refreshGitStatus().catch(function () {
             return null;
@@ -10570,7 +10609,7 @@
       return selectDraft(workspaceId);
     }
 
-    el.runPrompt.value = "";
+    el.runPrompt.value = getComposerDraftForTarget(workspaceId, "", workspaceId);
     resetComposerAttachments();
 
     return refreshGitStatus()
@@ -10592,6 +10631,7 @@
 
   function selectConversation(workspaceId, conversationId) {
     var selectionVersion = newSelectionVersion();
+    rememberActiveComposerDraft();
     if (!isQueueEditForConversation(workspaceId, conversationId) && state.queueEdit.itemId) {
       clearQueueEditState();
     }
@@ -10662,7 +10702,7 @@
         if (!isSelectionVersionCurrent(selectionVersion)) {
           return;
         }
-        el.runPrompt.value = "";
+        el.runPrompt.value = getComposerDraftForTarget(workspaceId, conversationId, "");
         resetComposerAttachments();
         return refreshGitStatus().catch(function () {
           return null;
@@ -10703,6 +10743,7 @@
 
   function selectDraft(workspaceId) {
     var selectionVersion = newSelectionVersion();
+    rememberActiveComposerDraft();
     if (state.queueEdit.itemId) {
       clearQueueEditState();
     }
@@ -10721,7 +10762,8 @@
         if (!isSelectionVersionCurrent(selectionVersion)) {
           return;
         }
-        el.runPrompt.value = draft;
+        var localDraft = getComposerDraftForTarget(workspaceId, "", workspaceId);
+        el.runPrompt.value = hasComposerDraftForKey(outgoingKeyFor(workspaceId, "", workspaceId)) ? localDraft : draft;
         resetComposerAttachments();
         return refreshGitStatus().catch(function () {
           return null;
@@ -10750,6 +10792,7 @@
   }
 
   function createDraftForWorkspace(workspaceId) {
+    rememberActiveComposerDraft();
     state.chatAutoScroll = true;
     state.activeTriage = false;
     state.activeWorkspaceId = workspaceId;
@@ -10761,7 +10804,8 @@
 
     return loadDraft(workspaceId)
       .then(function (draft) {
-        el.runPrompt.value = draft;
+        var localDraft = getComposerDraftForTarget(workspaceId, "", workspaceId);
+        el.runPrompt.value = hasComposerDraftForKey(outgoingKeyFor(workspaceId, "", workspaceId)) ? localDraft : draft;
         resetComposerAttachments();
         return syncCommandExecModeForWorkspace(workspaceId);
       })
@@ -16535,6 +16579,7 @@
   function onRunSubmit(event) {
     event.preventDefault();
 
+    var composerKey = activeOutgoingKey();
     var rawPrompt = String(el.runPrompt.value || "");
     var directive = parsePromptModeDirective(rawPrompt);
     if (directive.mode) {
@@ -16552,6 +16597,7 @@
     if (!prompt) {
       if (directive.mode) {
         el.runPrompt.value = "";
+        setComposerDraftForKey(composerKey, "");
         if (state.activeDraftWorkspaceId) {
           state.draftTextByWorkspace[state.activeDraftWorkspaceId] = "";
         }
@@ -16576,6 +16622,7 @@
     var pendingKey = activeOutgoingKey();
     var pendingId = addPendingOutgoing(pendingKey, queuedPrompt);
     el.runPrompt.value = "";
+    setComposerDraftForKey(pendingKey, "");
     if (state.activeDraftWorkspaceId) {
       state.draftTextByWorkspace[state.activeDraftWorkspaceId] = "";
     }
@@ -16636,6 +16683,7 @@
         removePendingOutgoing(pendingKey, pendingId);
         if (!queueSubmissionAccepted) {
           el.runPrompt.value = queuedPrompt;
+          setComposerDraftForKey(pendingKey, queuedPrompt);
         } else {
           kickQueueWorker();
         }
@@ -19005,6 +19053,7 @@
     }
 
     on(el.runPrompt, "input", function () {
+      rememberActiveComposerDraft();
       if (state.activeDraftWorkspaceId) {
         state.draftTextByWorkspace[state.activeDraftWorkspaceId] = el.runPrompt.value;
         saveDraftDebounced();

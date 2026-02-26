@@ -41,7 +41,7 @@
     <button class="auth-modal-close" type="button" aria-label="Close login" data-close-auth-modal>&times;</button>
     <h2 id="auth-modal-title">Sign in</h2>
     <p class="auth-modal-help">Accounts are Nostr-key based only. No email, password, or recovery. If your Nostr key is lost, the account is lost by design.</p>
-    <p class="auth-modal-help">Desktop login uses NIP-07 when available. Recommended desktop signer: <a class="auth-inline-link" href="https://github.com/susumuota/nostr-keyx" target="_blank" rel="noopener noreferrer">nostr-keyx</a>. Recommended mobile signer: <a class="auth-inline-link" href="https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst" target="_blank" rel="noopener noreferrer">Amethyst</a>.</p>
+    <p class="auth-modal-help">Desktop login uses NIP-07 when available. Recommended desktop signer: <a class="auth-inline-link" href="https://addons.mozilla.org/en-US/firefox/addon/nos2x/" target="_blank" rel="noopener noreferrer">nos2x-fox</a>. Recommended mobile signer: <a class="auth-inline-link" href="https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst" target="_blank" rel="noopener noreferrer">Amethyst</a>.</p>
 
     <div class="auth-intent">
       <div class="auth-intent-row">
