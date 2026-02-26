@@ -59,9 +59,8 @@
     </div>
 
     <div class="auth-actions auth-actions-primary">
-      <button id="auth-nostr-btn" class="auth-primary-btn" type="button">Login with Nostr</button>
-      <button id="auth-phone-btn" class="auth-secondary-btn" type="button">Use phone signer (QR)</button>
-      <button id="auth-paste-btn" class="auth-secondary-btn" type="button">Paste signed login</button>
+      <button id="auth-phone-btn" class="auth-primary-btn" type="button">Continue with phone signer (QR)</button>
+      <button id="auth-paste-btn" class="auth-secondary-btn" type="button">Paste signed login instead</button>
     </div>
 
     <div id="auth-phone-panel" class="auth-panel" hidden>

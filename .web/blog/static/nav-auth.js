@@ -186,6 +186,15 @@
     });
   }
 
+  function prepareDefaultAuthView() {
+    showPanel(els.authPhonePanel, true);
+    showPanel(els.authManualPanel, false);
+    setAuthMessage('Scan the QR with your signer app, then continue with phone signer.', 'warn');
+    initNip46Pairing().catch(function (err) {
+      setAuthMessage(err.message || 'Unable to prepare phone signer QR.', 'error');
+    });
+  }
+
   function resetAuthPanels() {
     showPanel(els.authPhonePanel, false);
     showPanel(els.authManualPanel, false);
@@ -215,6 +224,7 @@
     document.body.classList.add('auth-modal-open');
     resetAuthPanels();
     setAuthControlsDisabled(false);
+    prepareDefaultAuthView();
     refreshAuthIntentUi();
   }
 
@@ -1398,20 +1408,6 @@
     }
     if (els.authDelegationDays) {
       els.authDelegationDays.addEventListener('input', refreshAuthIntentUi);
-    }
-
-    if (els.authNostrBtn) {
-      els.authNostrBtn.addEventListener('click', function () {
-        setAuthMessage('Starting Nostr login...', 'warn');
-        showPanel(els.authPhonePanel, false);
-        showPanel(els.authManualPanel, false);
-        setAuthControlsDisabled(true);
-        loginWithNip07().catch(function (err) {
-          setAuthMessage(err.message || 'Nostr login failed.', 'error');
-        }).finally(function () {
-          setAuthControlsDisabled(false);
-        });
-      });
     }
 
     if (els.authPhoneBtn) {
