@@ -763,6 +763,53 @@ header h1 {
 }
 
 @media (max-width: 640px) {
+  .auth-modal-panel {
+    width: calc(100vw - 1rem);
+    margin: 0.75rem auto 0;
+    max-height: calc(100vh - 1.5rem);
+    padding: 0.88rem 0.78rem 1rem;
+    border-radius: 12px;
+  }
+
+  .auth-intent-row {
+    gap: 0.45rem;
+  }
+
+  .auth-intent-row label {
+    width: 100%;
+  }
+
+  .auth-intent-days {
+    align-items: flex-start;
+  }
+
+  .auth-days-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .auth-actions-primary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .auth-actions-primary .auth-primary-btn,
+  .auth-actions-primary .auth-secondary-btn,
+  #auth-manual-submit,
+  #auth-manual-start {
+    width: 100%;
+  }
+
+  .auth-qr {
+    width: min(100%, 240px);
+    margin: 0 auto;
+  }
+
+  .auth-nip46-uri {
+    font-size: 0.75rem;
+  }
+
   .auth-key-row {
     flex-direction: column;
   }
@@ -2251,9 +2298,20 @@ nav.site-nav {
   .post-comments-head {
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  #post-comments-refresh {
+    width: 100%;
+    min-height: 2.3rem;
   }
 
   #post-comment-submit {
-    width: auto;
+    width: 100%;
+    min-height: 2.3rem;
+  }
+
+  .post-comments-shortcut {
+    font-size: 0.78rem;
   }
 }

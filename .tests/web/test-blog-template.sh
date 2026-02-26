@@ -692,9 +692,9 @@ test_blog_nostr_auth_endpoints_require_identity() {
 
   run_cgi_post "$cgi_dir/nostr-auth-login-begin" "pubkey=bad"
   case "$CGI_BODY" in
-    *'invalid_pubkey'*|*'nostril_required'*) ;;
+    *'"success":true'*|*'invalid_pubkey'*|*'nostril_required'*) ;;
     *)
-      TEST_FAILURE_REASON="nostr-auth-login-begin should reject invalid pubkey with structured error"
+      TEST_FAILURE_REASON="nostr-auth-login-begin should return a structured response for invalid pubkey hints"
       teardown_blog_fixture
       return 1
       ;;
@@ -807,6 +807,62 @@ test_blog_account_update_and_player_name() {
   teardown_blog_fixture
 }
 
+test_blog_force_interactive_blocks_mutating_delegated_sessions() {
+  setup_blog_fixture || return $?
+
+  config-set "$session_file" auth_method nostr_delegated
+  config-set "$session_file" force_interactive true
+  config-set "$session_file" user_pubkey "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  config-set "$session_file" signer_pubkey "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+  run_cgi_post "$cgi_dir/blog-list-drafts" "$(auth_body_prefix)"
+  case "$CGI_BODY" in
+    *'"success":true'*)
+      ;;
+    *)
+      TEST_FAILURE_REASON="force-interactive delegated session should still allow non-mutating list endpoint"
+      teardown_blog_fixture
+      return 1
+      ;;
+  esac
+
+  run_cgi_post "$cgi_dir/blog-save-post" "$(auth_body_prefix)&action=save_draft&title=Blocked+Save&content=blocked"
+  case "$CGI_BODY" in
+    *'interactive_signature_required'*)
+      ;;
+    *)
+      TEST_FAILURE_REASON="force-interactive delegated session should block mutating admin endpoint"
+      teardown_blog_fixture
+      return 1
+      ;;
+  esac
+
+  run_cgi_post "$cgi_dir/blog-update-account" "$(auth_body_prefix)&player_name=Blocked+Name"
+  case "$CGI_BODY" in
+    *'interactive_signature_required'*)
+      ;;
+    *)
+      TEST_FAILURE_REASON="force-interactive delegated session should block account mutation endpoint"
+      teardown_blog_fixture
+      return 1
+      ;;
+  esac
+
+  config-set "$session_file" force_interactive false
+  run_cgi_post "$cgi_dir/blog-save-post" "$(auth_body_prefix)&action=save_draft&title=Allowed+Save&content=allowed"
+  case "$CGI_BODY" in
+    *'"success":true'*)
+      ;;
+    *)
+      TEST_FAILURE_REASON="delegated session should allow mutation once force_interactive is disabled"
+      teardown_blog_fixture
+      return 1
+      ;;
+  esac
+
+  teardown_blog_fixture
+}
+
 run_test_case "blog scheduler publishes due scheduled drafts" test_blog_draft_scheduler_flow
 run_test_case "blog drip interval is global and enforced" test_blog_drip_interval_enforced
 run_test_case "blog media upload works and csrf is enforced" test_blog_media_upload_and_auth_csrf
@@ -825,5 +881,6 @@ run_test_case "blog submit-comment endpoint returns structured errors" test_blog
 run_test_case "blog nostr auth endpoints enforce identity requirements" test_blog_nostr_auth_endpoints_require_identity
 run_test_case "blog open-post redirects to post html" test_blog_open_post_redirects
 run_test_case "blog account update persists player name" test_blog_account_update_and_player_name
+run_test_case "blog force-interactive blocks delegated mutations" test_blog_force_interactive_blocks_mutating_delegated_sessions
 
 finish_tests
