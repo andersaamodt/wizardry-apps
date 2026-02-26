@@ -172,6 +172,7 @@
       editingPath: '',
       pendingRenamePath: '',
       pendingAddText: '',
+      pendingOptimisticAddByPath: Object.create(null),
       addQueue: [],
       addQueueActive: false,
       prioritizeQueue: [],
@@ -1237,15 +1238,50 @@
     }
 
     function setCachedDirItems(dir, items) {
-      var key = cacheKeyForDir(dir);
-      state.cache[key] = items;
-      if (dir !== key) {
-        state.cache[dir] = items;
+      var nextItems = Array.isArray(items) ? items : [];
+      var dirKey = cacheKeyForDir(dir);
+      var pendingKeys = Object.keys(state.pendingOptimisticAddByPath || {});
+      var merged = false;
+      for (var i = 0; i < pendingKeys.length; i += 1) {
+        var pendingPath = pendingKeys[i];
+        var pending = state.pendingOptimisticAddByPath[pendingPath];
+        if (!pending || pending.dirKey !== dirKey || !pending.item) {
+          continue;
+        }
+        var exists = false;
+        for (var j = 0; j < nextItems.length; j += 1) {
+          if (nextItems[j] && nextItems[j].path === pending.item.path) {
+            exists = true;
+            break;
+          }
+        }
+        if (exists) {
+          continue;
+        }
+        nextItems.push({
+          path: pending.item.path,
+          name: pending.item.name,
+          kind: pending.item.kind,
+          echelon: Number(pending.item.echelon) || 0,
+          priority: Number(pending.item.priority) || 0,
+          checked: Number(pending.item.checked) || 0,
+          upvotes: Number(pending.item.upvotes) || 0,
+          hasSubpriorities: !!pending.item.hasSubpriorities
+        });
+        merged = true;
       }
-      rememberDirAlias(dir, items);
+      if (merged) {
+        nextItems.sort(comparePriorityItems);
+      }
+      var key = cacheKeyForDir(dir);
+      state.cache[key] = nextItems;
+      if (dir !== key) {
+        state.cache[dir] = nextItems;
+      }
+      rememberDirAlias(dir, nextItems);
       var alias = cacheAliasForDir(dir);
       if (alias && alias !== key) {
-        state.cache[alias] = items;
+        state.cache[alias] = nextItems;
       }
     }
 
@@ -1536,6 +1572,19 @@
       };
       items.push(optimisticItem);
       items.sort(comparePriorityItems);
+      state.pendingOptimisticAddByPath[newPath] = {
+        dirKey: cacheKeyForDir(dir),
+        item: {
+          path: optimisticItem.path,
+          name: optimisticItem.name,
+          kind: optimisticItem.kind,
+          echelon: Number(optimisticItem.echelon) || 0,
+          priority: Number(optimisticItem.priority) || 0,
+          checked: Number(optimisticItem.checked) || 0,
+          upvotes: Number(optimisticItem.upvotes) || 0,
+          hasSubpriorities: !!optimisticItem.hasSubpriorities
+        }
+      };
       return { dir: dir, path: newPath, inserted: true };
     }
 
@@ -1543,6 +1592,7 @@
       if (!touch || !touch.inserted || !touch.dir || !touch.path) {
         return;
       }
+      delete state.pendingOptimisticAddByPath[touch.path];
       removeCachedItemByPath(touch.dir, touch.path);
     }
 
@@ -3572,6 +3622,9 @@
                 ['add-fast', entry.dir, entry.name],
                 ['add', entry.dir, entry.name]
               );
+              if (entry.optimisticAdd && entry.optimisticAdd.path) {
+                delete state.pendingOptimisticAddByPath[entry.optimisticAdd.path];
+              }
               var refreshed = await listDir(entry.dir);
               setCachedDirItems(entry.dir, refreshed);
             } catch (error) {
