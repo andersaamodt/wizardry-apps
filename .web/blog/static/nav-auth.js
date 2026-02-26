@@ -53,6 +53,8 @@
     authModal: document.getElementById('auth-modal'),
     authMessage: document.getElementById('auth-modal-message'),
     authNostrBtn: document.getElementById('auth-nostr-btn'),
+    authNip07Btn: document.getElementById('auth-nip07-btn'),
+    authPhoneConnectBtn: document.getElementById('auth-phone-connect-btn'),
     authPhoneBtn: document.getElementById('auth-phone-btn'),
     authPasteBtn: document.getElementById('auth-paste-btn'),
 
@@ -171,6 +173,8 @@
     var isDisabled = !!disabled;
     [
       els.authNostrBtn,
+      els.authNip07Btn,
+      els.authPhoneConnectBtn,
       els.authPhoneBtn,
       els.authPasteBtn,
       els.authManualStart,
@@ -184,12 +188,26 @@
         node.disabled = isDisabled;
       }
     });
+    if (!isDisabled) {
+      updatePhoneContinueState();
+    }
+  }
+
+  function updatePhoneContinueState() {
+    if (!els.authPhoneBtn) {
+      return;
+    }
+    var paired = !!state.nip46.signerPubkey;
+    els.authPhoneBtn.disabled = !paired;
+    els.authPhoneBtn.setAttribute('aria-disabled', paired ? 'false' : 'true');
   }
 
   function prepareDefaultAuthView() {
     showPanel(els.authPhonePanel, true);
     showPanel(els.authManualPanel, false);
-    setAuthMessage('Scan the QR with your signer app, then continue with phone signer.', 'warn');
+    setAuthMessage('Connect your phone signer first. Continue becomes available after pairing.', 'warn');
+    state.nip46.signerPubkey = '';
+    updatePhoneContinueState();
     initNip46Pairing().catch(function (err) {
       setAuthMessage(err.message || 'Unable to prepare phone signer QR.', 'error');
     });
@@ -840,6 +858,7 @@
             return;
           }
           state.nip46.signerPubkey = String(event.pubkey || '');
+          updatePhoneContinueState();
           setAuthMessage('Phone signer paired. You can continue login now.', 'ok');
           return;
         }
@@ -1056,10 +1075,9 @@
 
     return initNip46Pairing()
       .then(function () {
-        setAuthMessage('Scan the QR with your phone signer. Waiting for pairing...', 'warn');
-        return waitForPhonePairing(90000);
-      })
-      .then(function () {
+        if (!state.nip46.signerPubkey) {
+          throw new Error('Phone signer is not paired yet. Connect it first via QR.');
+        }
         return signInWithSigner(
           function () {
             return Promise.resolve(state.nip46.signerPubkey);
@@ -1410,9 +1428,41 @@
       els.authDelegationDays.addEventListener('input', refreshAuthIntentUi);
     }
 
+    if (els.authNip07Btn) {
+      els.authNip07Btn.addEventListener('click', function () {
+        setAuthMessage('Starting desktop signer login...', 'warn');
+        setAuthControlsDisabled(true);
+        loginWithNip07().catch(function (err) {
+          setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
+        }).finally(function () {
+          setAuthControlsDisabled(false);
+        });
+      });
+    }
+
+    if (els.authPhoneConnectBtn) {
+      els.authPhoneConnectBtn.addEventListener('click', function () {
+        setAuthMessage('Preparing phone signer pairing QR...', 'warn');
+        setAuthControlsDisabled(true);
+        initNip46Pairing().then(function () {
+          showPanel(els.authPhonePanel, true);
+          showPanel(els.authManualPanel, false);
+          setAuthMessage('Scan QR in your signer app. Continue unlocks after pairing.', 'warn');
+          return waitForPhonePairing(90000);
+        }).then(function () {
+          updatePhoneContinueState();
+          setAuthMessage('Phone signer paired. Continue is ready.', 'ok');
+        }).catch(function (err) {
+          setAuthMessage(err.message || 'Phone pairing setup failed.', 'error');
+        }).finally(function () {
+          setAuthControlsDisabled(false);
+        });
+      });
+    }
+
     if (els.authPhoneBtn) {
       els.authPhoneBtn.addEventListener('click', function () {
-        setAuthMessage('Starting phone signer pairing...', 'warn');
+        setAuthMessage('Starting phone signer login...', 'warn');
         setAuthControlsDisabled(true);
         loginWithPhoneSigner().catch(function (err) {
           setAuthMessage(err.message || 'Phone signer login failed.', 'error');

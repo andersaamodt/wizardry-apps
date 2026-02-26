@@ -59,7 +59,9 @@
     </div>
 
     <div class="auth-actions auth-actions-primary">
-      <button id="auth-phone-btn" class="auth-primary-btn" type="button">Continue with phone signer (QR)</button>
+      <button id="auth-nip07-btn" class="auth-secondary-btn" type="button">Login with desktop signer (nos2x-fox)</button>
+      <button id="auth-phone-connect-btn" class="auth-secondary-btn" type="button">Connect phone signer (QR)</button>
+      <button id="auth-phone-btn" class="auth-primary-btn" type="button" disabled>Continue with phone signer (QR)</button>
       <button id="auth-paste-btn" class="auth-secondary-btn" type="button">Paste signed login instead</button>
     </div>
 
