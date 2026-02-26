@@ -1145,6 +1145,12 @@ button:hover {
   background: transparent;
 }
 
+.row.row-first-task .name.editable-name:hover,
+.row.row-first-task .name.editable-name:focus-visible {
+  border-color: color-mix(in srgb, var(--accent, #7782d6) 58%, var(--border, #d4d0e6) 42%);
+  background: color-mix(in srgb, var(--light-bg, #f8f7fc) 90%, #fff 10%);
+}
+
 .name.project-name-clickable {
   cursor: default;
 }
