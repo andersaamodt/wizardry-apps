@@ -4861,18 +4861,22 @@ select:focus {
   max-width: 100%;
 }
 
-#dictation-language-row {
+#settings-modal #dictation-language-row {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
-  width: auto;
+  justify-self: start;
+  align-self: start;
+  width: max-content !important;
   max-width: max-content;
 }
 
-#dictation-language-select {
-  width: auto !important;
+#settings-modal #dictation-language-select {
+  display: inline-block;
+  width: max-content !important;
+  inline-size: max-content !important;
   min-width: max-content;
-  max-width: none;
+  max-width: max-content !important;
 }
 
 .settings-links {
