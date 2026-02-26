@@ -1057,6 +1057,11 @@ blog_extend_session() {
 
 blog_require_session() {
   require_admin=${1:-false}
+  require_interactive=${2:-false}
+  case "$require_interactive" in
+    true|1|yes|on) require_interactive=true ;;
+    *) require_interactive=false ;;
+  esac
 
   req_token=$(blog_param "session_token")
   req_csrf=$(blog_param "csrf_token")
@@ -1081,7 +1086,7 @@ blog_require_session() {
     return 1
   fi
 
-  if [ "$require_admin" = "true" ] && [ "$BLOG_SESSION_AUTH_METHOD" = "nostr_delegated" ] && [ "${BLOG_SESSION_FORCE_INTERACTIVE-false}" = "true" ]; then
+  if [ "$require_interactive" = "true" ] && [ "$BLOG_SESSION_AUTH_METHOD" = "nostr_delegated" ] && [ "${BLOG_SESSION_FORCE_INTERACTIVE-false}" = "true" ]; then
     blog_json_error "This action requires direct signer approval. Sign in with Login with Nostr or Use phone signer (QR)." "interactive_signature_required"
     return 1
   fi

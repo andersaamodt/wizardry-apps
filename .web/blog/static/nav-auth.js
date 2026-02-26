@@ -167,6 +167,39 @@
     }
   }
 
+  function setAuthControlsDisabled(disabled) {
+    var isDisabled = !!disabled;
+    [
+      els.authNostrBtn,
+      els.authPhoneBtn,
+      els.authPasteBtn,
+      els.authManualStart,
+      els.authManualSubmit,
+      els.authModeOnce,
+      els.authModeApprove,
+      els.authDelegationDays,
+      els.authForceInteractive
+    ].forEach(function (node) {
+      if (node) {
+        node.disabled = isDisabled;
+      }
+    });
+  }
+
+  function resetAuthPanels() {
+    showPanel(els.authPhonePanel, false);
+    showPanel(els.authManualPanel, false);
+    state.manualChallenge = null;
+    state.pendingDeviceSession = null;
+    if (els.authManualRequestId) { els.authManualRequestId.value = ''; }
+    if (els.authManualChallenge) { els.authManualChallenge.value = ''; }
+    if (els.authManualExpires) { els.authManualExpires.value = ''; }
+    if (els.authManualTemplate) { els.authManualTemplate.value = ''; }
+    if (els.authManualDelegationTemplate) { els.authManualDelegationTemplate.value = ''; }
+    if (els.authManualEvent) { els.authManualEvent.value = ''; }
+    if (els.authManualDelegation) { els.authManualDelegation.value = ''; }
+  }
+
   function showAuthModal() {
     if (!els.authModal) {
       return;
@@ -180,6 +213,8 @@
       els.authModal.classList.add('is-open');
     });
     document.body.classList.add('auth-modal-open');
+    resetAuthPanels();
+    setAuthControlsDisabled(false);
     refreshAuthIntentUi();
   }
 
@@ -190,6 +225,7 @@
     els.authModal.classList.remove('is-open');
     document.body.classList.remove('auth-modal-open');
     setAuthMessage('', '');
+    setAuthControlsDisabled(false);
     if (authModalHideTimer) {
       clearTimeout(authModalHideTimer);
     }
@@ -1369,8 +1405,11 @@
         setAuthMessage('Starting Nostr login...', 'warn');
         showPanel(els.authPhonePanel, false);
         showPanel(els.authManualPanel, false);
+        setAuthControlsDisabled(true);
         loginWithNip07().catch(function (err) {
           setAuthMessage(err.message || 'Nostr login failed.', 'error');
+        }).finally(function () {
+          setAuthControlsDisabled(false);
         });
       });
     }
@@ -1378,24 +1417,33 @@
     if (els.authPhoneBtn) {
       els.authPhoneBtn.addEventListener('click', function () {
         setAuthMessage('Starting phone signer pairing...', 'warn');
+        setAuthControlsDisabled(true);
         loginWithPhoneSigner().catch(function (err) {
           setAuthMessage(err.message || 'Phone signer login failed.', 'error');
+        }).finally(function () {
+          setAuthControlsDisabled(false);
         });
       });
     }
 
     if (els.authPasteBtn) {
       els.authPasteBtn.addEventListener('click', function () {
+        setAuthControlsDisabled(true);
         prepareManualLogin().catch(function (err) {
           setAuthMessage(err.message || 'Failed to prepare manual login.', 'error');
+        }).finally(function () {
+          setAuthControlsDisabled(false);
         });
       });
     }
 
     if (els.authManualStart) {
       els.authManualStart.addEventListener('click', function () {
+        setAuthControlsDisabled(true);
         prepareManualLogin().catch(function (err) {
           setAuthMessage(err.message || 'Failed to create manual challenge.', 'error');
+        }).finally(function () {
+          setAuthControlsDisabled(false);
         });
       });
     }
@@ -1403,12 +1451,16 @@
     if (els.authManualSubmit) {
       els.authManualSubmit.addEventListener('click', function () {
         setAuthMessage('Verifying pasted signed login...', 'warn');
+        setAuthControlsDisabled(true);
         Promise.resolve()
           .then(function () {
             return submitManualLogin();
           })
           .catch(function (err) {
             setAuthMessage(err.message || 'Manual login failed.', 'error');
+          })
+          .finally(function () {
+            setAuthControlsDisabled(false);
           });
       });
     }
@@ -1419,6 +1471,8 @@
     window.addEventListener('hashchange', highlightCurrentPage);
     bindThemeSelect();
     bindUiEvents();
+    window.blogAuth = window.blogAuth || {};
+    window.blogAuth.openLoginModal = showAuthModal;
     refreshAuthIntentUi();
     loadTheme();
     checkAuth();

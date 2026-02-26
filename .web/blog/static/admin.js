@@ -218,14 +218,25 @@
     });
   }
 
+  function maybePromptInteractiveApproval(data) {
+    if (!data || data.code !== 'interactive_signature_required') {
+      return;
+    }
+    if (window.blogAuth && typeof window.blogAuth.openLoginModal === 'function') {
+      window.blogAuth.openLoginModal();
+    }
+  }
+
   async function apiPost(url, data, includeAuth) {
     const payload = includeAuth ? buildAuthPayload(data || {}) : (data || {});
     const body = new URLSearchParams(payload);
-    return fetchJson(url, {
+    const res = await fetchJson(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString()
     });
+    maybePromptInteractiveApproval(res);
+    return res;
   }
 
   function getPublishMode() {
