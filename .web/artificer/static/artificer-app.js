@@ -16055,7 +16055,6 @@
   }
 
   function stopDictationCapture(options) {
-    var opts = options && typeof options === "object" ? options : {};
     if (state.dictateBusy || !state.dictateRecording || !el.runPrompt) {
       return Promise.resolve(false);
     }
@@ -16067,13 +16066,14 @@
     return apiPost("dictate_stop", { session_id: activeSessionId }, { timeoutMs: 220000 })
       .then(function (response) {
         if (!response.success) {
-          throw new Error(response.error || "Dictation failed");
+          var responseError = trim(String(response.error || "Dictation failed"));
+          if (responseError.toLowerCase() === "no speech detected") {
+            return true;
+          }
+          throw new Error(responseError || "Dictation failed");
         }
         var dictatedText = trim(String(response.text || ""));
         if (!dictatedText) {
-          if (!opts.silentNoSpeech) {
-            showTransientNotice("No speech detected");
-          }
           return true;
         }
         appendDictationText(el.runPrompt, dictatedText);
@@ -16210,17 +16210,37 @@
           }
           return;
         }
-        if (!isKeyboardEvent || sinceDown < 110) {
+        if (!isKeyboardEvent) {
+          if (sinceDown < 110) {
+            return;
+          }
+          if (existingPress.timer) {
+            clearTimeout(existingPress.timer);
+          }
+          delete dictationShortcutPressState[trigger];
+        } else if (sinceDown < 110) {
           return;
+        } else {
+          // Recover if keyup was never observed (Caps Lock and some lock/media keys).
+          if (existingPress.timer) {
+            clearTimeout(existingPress.timer);
+          }
+          delete dictationShortcutPressState[trigger];
         }
-        // Recover if keyup was never observed (Caps Lock and some lock/media keys).
-        delete dictationShortcutPressState[trigger];
       }
-      dictationShortcutPressState[trigger] = {
+      var togglePressState = {
         downAt: Date.now(),
         holdStarted: false,
         timer: null
       };
+      if (!isKeyboardEvent) {
+        // Some side-button drivers do not emit mouseup reliably in WebView.
+        // Auto-clear to avoid getting stuck after a single trigger.
+        togglePressState.timer = setTimeout(function () {
+          delete dictationShortcutPressState[trigger];
+        }, 420);
+      }
+      dictationShortcutPressState[trigger] = togglePressState;
       toggleDictationCapture({ fromHotkey: true, holdShortcut: false, startedAtMs: Date.now() }).catch(showError);
       markDictationToggleTriggered(trigger);
       if (isKeyboardEvent) {
@@ -16292,6 +16312,9 @@
       return;
     }
     if (trigger === toggleTrigger && pressState) {
+      if (pressState.timer) {
+        clearTimeout(pressState.timer);
+      }
       delete dictationShortcutPressState[trigger];
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
@@ -18997,7 +19020,7 @@
       // Use auxclick as a fallback shortcut trigger without double-firing when
       // mousedown/mouseup already handled the same action.
       if (
-        (event && (event.button === 1 || event.button === 3 || event.button === 4)) &&
+        (event && (event.button === 3 || event.button === 4)) &&
         !dictationShortcutPressState[dictationMouseTrigger] &&
         !dictationToggleTriggerHandledRecently(dictationMouseTrigger, 220)
       ) {
