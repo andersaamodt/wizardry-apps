@@ -4841,8 +4841,12 @@ select:focus {
 }
 
 .dictation-language-field {
-  display: grid;
+  display: inline-grid;
   gap: 4px;
+  justify-items: start;
+  align-items: start;
+  width: max-content;
+  max-width: 100%;
 }
 
 .dictation-language-field span {
@@ -4852,7 +4856,7 @@ select:focus {
 }
 
 .dictation-language-field select {
-  width: auto;
+  width: fit-content;
   min-width: max-content;
   max-width: 100%;
 }
