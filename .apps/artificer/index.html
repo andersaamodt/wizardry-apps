@@ -90,9 +90,13 @@
       ensureSite: [
         'sh',
         '-c',
-        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template artificer artificer; fi; if [ ! -f "$built" ]; then web-wizardry build artificer; fi'
+        'wwbin=$(command -v web-wizardry 2>/dev/null || true); if [ -z "$wwbin" ] && [ -x "$HOME/.wizardry/spells/web/web-wizardry" ]; then wwbin="$HOME/.wizardry/spells/web/web-wizardry"; fi; [ -n "$wwbin" ] || { printf "web-wizardry unavailable\\n" >&2; exit 127; }; root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template artificer artificer; fi; if [ ! -f "$built" ]; then "$wwbin" build artificer; fi'
       ],
-      startServe: ['web-wizardry', 'serve', 'artificer'],
+      startServe: [
+        'sh',
+        '-c',
+        'wwbin=$(command -v web-wizardry 2>/dev/null || true); if [ -z "$wwbin" ] && [ -x "$HOME/.wizardry/spells/web/web-wizardry" ]; then wwbin="$HOME/.wizardry/spells/web/web-wizardry"; fi; [ -n "$wwbin" ] || { printf "web-wizardry unavailable\\n" >&2; exit 127; }; exec "$wwbin" serve artificer'
+      ],
       ensureUsablePort: [
         'sh',
         '-c',
