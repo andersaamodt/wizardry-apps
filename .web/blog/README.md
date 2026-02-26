@@ -14,7 +14,7 @@ A single-author blog template for wizardry web with optional Nostr bridge suppor
 - **Public discovery**: Index, tags, search, RSS, Atom, sitemap
 - **Archive index**: Month-grouped archive view with per-month counts
 - **Post context UX**: Read-time card, tags, and automatic older/newer links
-- **Nostr-first auth**: Nostr challenge login, optional WebAuthn passkeys, optional SSH link
+- **Nostr-first auth**: Nostr challenge login with optional delegated device sessions and optional SSH link
 
 ## Post Model
 
@@ -172,14 +172,19 @@ To enable Nostr bridge for a site, turn on “Enable Nostr Bridge” in `/pages/
 - `site/nostr/state/authors.txt`
 - `site/nostr/state/relays.txt`
 
-## Authentication & MUD Integration
-
-The blog template now uses Nostr keys as primary account identity, with optional passkeys and optional SSH key linking for MUD compatibility.
+## Authentication
 
 ### Key Features
 
-- **Nostr Identity**: Accounts are anchored to a Nostr pubkey
-- **WebAuthn Authentication**: Passwordless login with biometrics/security keys
+- **Nostr Identity**: Accounts are anchored to one Nostr pubkey (`P_user`)
+- **Nostr-Only Web Login**: Authentication is verified from signed Nostr events
+- **No Password/Email Recovery**: Loss of `P_user` means loss of account access by design
+- **NIP-07 Desktop Login**: Uses browser signer extension when available
+- **NIP-46 Phone Signer**: QR + `nostrconnect://` deep link pairing fallback
+- **Manual Signed Event Fallback**: Paste signed auth event JSON, optionally with delegation JSON
+- **Delegated Device Sessions**: Optional local session key delegation (1-90 days, default 30)
+- **Per-Action Approval Option**: Sensitive admin actions can require direct signer approval instead of delegated session auth
+- **Revocation Flow**: “Log out everywhere” requires fresh owner signature and revokes active delegations
 - **Optional SSH Link**: Attach SSH public key to your account for terminal/MUD workflows
 - **UNIX Group Permissions**: Admin access via `blog-admin` group
 - **Admin Panel**: Compose, publish, and manage posts
@@ -225,11 +230,13 @@ This prevents new users from registering while keeping your access.
 ### Authentication Flow
 
 ```
-Sign in with Nostr key (creates account if needed)
+Request server challenge (single-use, short-lived, domain-bound)
     ↓
-Optional: bind WebAuthn passkey
+Sign with NIP-07, NIP-46, or manual signer
     ↓
-Optional: link SSH public key for MUD
+Server verifies signed event and binds backend session to P_user
+    ↓
+Optional: delegate local session key for N days (default 30)
     ↓
 Access admin panel (if in blog-admin group)
 ```
@@ -244,13 +251,17 @@ Access admin panel (if in blog-admin group)
 **Authentication:**
 - `nostr-auth-login-begin` - Create Nostr login challenge
 - `nostr-auth-login-finish` - Verify signed Nostr event and create session
+- `nostr-auth-revoke-all-begin` - Start signed revocation challenge
+- `nostr-auth-revoke-all-finish` - Verify owner revocation signature and revoke delegations
+- `ssh-auth-check-session` - Validate session and permissions
+- `ssh-auth-logout` - Destroy current session
+
+**Optional Account Tooling (not primary web login):**
 - `nostr-auth-passkey-begin` - Start passkey binding for logged-in account
 - `nostr-auth-link-ssh` - Link SSH public key to logged-in Nostr account
 - `ssh-auth-bind-webauthn` - Store WebAuthn credential delegate
 - `ssh-auth-login-begin` - Start passkey login challenge
 - `ssh-auth-login-finish` - Verify signed assertion and create session
-- `ssh-auth-check-session` - Validate session and permissions
-- `ssh-auth-logout` - Destroy current session
 - `ssh-auth-list-delegates` - List all WebAuthn delegates
 - `ssh-auth-revoke-delegate` - Revoke a WebAuthn delegate
 
@@ -303,11 +314,13 @@ Access admin panel (if in blog-admin group)
 ### Security Model
 
 - **Root Identity**: Nostr pubkey (canonical account anchor)
-- **Delegates**: WebAuthn credentials (revocable, multi-device)
+- **Login Proof**: Signed Nostr auth events with challenge + domain + time checks
+- **Delegation**: Optional `P_user -> P_sess` auth delegation with expiry and revocation support
+- **Revocation List**: Delegation IDs/session pubkeys tracked server-side for global logout
 - **Optional Link**: SSH public key for terminal/MUD interoperability
 - **Permissions**: UNIX group membership (`blog-admin`)
 - **Session Validation**: Every admin action checks permissions
-- **Phishing-Resistant**: WebAuthn and Nostr challenge signing
+- **Phishing-Resistant**: Challenge-bound Nostr event signing
 
 See `.github/MUD_BLOG_INTEGRATION.md` for complete documentation.
 

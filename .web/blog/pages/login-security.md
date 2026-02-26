@@ -44,6 +44,8 @@ You can choose:
 Delegation is signed by your account key (`P_user`) and includes domain + expiry.  
 During the delegation window, the browser can authenticate with `S_sess` without repeated prompts.
 
+If you enable **Require direct signer approval for sensitive actions**, delegated sessions are not accepted for admin actions, and a direct signer flow is required.
+
 ## Logout and Revocation
 
 - **Logout** clears local session key material and invalidates the server session.

@@ -534,7 +534,7 @@
 
   async function checkAuth() {
     if (!state.sessionToken) {
-      setAuthMessage('Not logged in. Use the Login button in the top navigation to sign in with Nostr or passkey.', 'error');
+      setAuthMessage('Not logged in. Use the Login button in the top navigation to sign in with Nostr.', 'error');
       return;
     }
 
