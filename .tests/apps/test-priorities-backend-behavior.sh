@@ -118,6 +118,18 @@ children=$("$backend" list "$scratch/task one")
 child_row=$(row_by_name "$children" "child note")
 assert_nonempty "$child_row" "child note should exist inside converted project"
 
+"$backend" add-fast "$scratch" "fallback project" >/dev/null
+cat > "$fake_bin/file-to-folder" <<'EOF'
+#!/bin/sh
+set -eu
+exit 1
+EOF
+chmod +x "$fake_bin/file-to-folder"
+PATH="$fake_bin:$PATH" "$backend" make-project-fast "$scratch/fallback project" >/dev/null
+list_blob=$(list_root)
+fallback_row=$(row_by_name "$list_blob" "fallback project")
+assert_eq "$(field "$fallback_row" 3)" "dir" "make-project-fast should fallback when file-to-folder fails"
+
 copy_root="$scratch/copy-root"
 mkdir -p "$copy_root"
 "$backend" add-fast "$copy_root" "alpha" >/dev/null
