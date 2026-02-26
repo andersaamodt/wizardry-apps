@@ -92,14 +92,18 @@
         '-c',
         'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template artificer artificer; fi; if [ ! -f "$built" ]; then web-wizardry build artificer; fi'
       ],
-      startDetached: ['sh', '-c', 'web-wizardry serve artificer >/dev/null 2>&1 &'],
+      startServe: ['web-wizardry', 'serve', 'artificer'],
       ensureUsablePort: [
         'sh',
         '-c',
         'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; pidf="$root/artificer/nginx/nginx.pid"; port=$(sed -n "s/^port=//p" "$cfg" 2>/dev/null | head -n 1); [ -n "$port" ] || port=8080; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "$port"; exit 0; fi; if command -v lsof >/dev/null 2>&1; then if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then printf "$port"; exit 0; fi; p=8081; while [ "$p" -le 8120 ]; do if ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then change-site-port artificer "$p" >/dev/null 2>&1 && printf "$p" && exit 0; fi; p=$((p+1)); done; exit 1; fi; printf "$port"; exit 0'
       ],
       setPort: ['change-site-port', 'artificer'],
-      isRunning: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; pidf="$root/artificer/nginx/nginx.pid"; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "yes"; else printf "no"; fi'],
+      isRunning: [
+        'sh',
+        '-c',
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; pidf="$root/artificer/nginx/nginx.pid"; port=$(sed -n "s/^port=//p" "$cfg" 2>/dev/null | head -n 1); [ -n "$port" ] || port=8080; if command -v lsof >/dev/null 2>&1; then if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then printf "yes"; exit 0; fi; fi; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "yes"; else printf "no"; fi'
+      ],
       getPort: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
     };
 
@@ -182,15 +186,15 @@
     }
 
     async function startWithFallbackPort() {
-      await bridgeExec(commands.startDetached);
-      if (await waitUntilRunning(7000)) {
+      await bridgeExec(commands.startServe);
+      if (await waitUntilRunning(15000)) {
         return;
       }
 
       // One emergency retry after re-checking port usability.
       await bridgeExec(commands.ensureUsablePort);
-      await bridgeExec(commands.startDetached);
-      if (await waitUntilRunning(5000)) {
+      await bridgeExec(commands.startServe);
+      if (await waitUntilRunning(15000)) {
         return;
       }
 
