@@ -13025,30 +13025,32 @@
 
   function dictationShortcutMouseTrigger(event) {
     var button = Number(event && event.button);
+    var which = Number(event && event.which);
     var buttons = Number(event && event.buttons);
     var eventType = String(event && event.type ? event.type : "").toLowerCase();
-    var isDownEvent = eventType.indexOf("down") >= 0;
-    if (button === 3) {
+    var isDownEvent = eventType.indexOf("down") >= 0 || eventType.indexOf("click") >= 0;
+    // Prefer explicit side-button signals first.
+    if (button === 3 || which === 4) {
       return "mouse-button-4";
     }
-    if (button === 4) {
+    if (button === 4 || which === 5) {
       return "mouse-button-5";
     }
-    if (button === 1) {
-      return "mouse-wheel-click";
-    }
-    // Fallback for environments that do not expose side-button values in `button`:
-    // only map when exactly one aux-bit is active to avoid collapsing all aux buttons.
+    // Fallback for environments that do not expose side-button values in `button`.
+    // Use bitwise checks (not equality) so combined button masks still map correctly.
     if (isDownEvent && isFinite(buttons)) {
-      if (buttons === 8) {
+      if ((buttons & 8) !== 0 && (buttons & 16) === 0) {
         return "mouse-button-4";
       }
-      if (buttons === 16) {
+      if ((buttons & 16) !== 0 && (buttons & 8) === 0) {
         return "mouse-button-5";
       }
-      if (buttons === 4) {
+      if ((buttons & 4) !== 0 && (buttons & 24) === 0) {
         return "mouse-wheel-click";
       }
+    }
+    if (button === 1 || which === 2) {
+      return "mouse-wheel-click";
     }
     return "";
   }
