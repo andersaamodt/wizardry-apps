@@ -474,6 +474,8 @@
     dictationShortcutHold: storageGet("artificer.dictationShortcutHold", "none"),
     dictationShortcutToggle: storageGet("artificer.dictationShortcutToggle", "none"),
     dictationPrewarmEnabled: storageGet("artificer.dictationPrewarmEnabled", "1") !== "0",
+    dictationLanguage: storageGet("artificer.dictationLanguage", "auto"),
+    dictationLanguages: [{ value: "auto", label: "Auto-detect" }],
     dictateHotkeyHoldActive: false,
     dictateHotkeyHoldTrigger: "",
     dictateHotkeyHoldIntent: false,
@@ -598,7 +600,7 @@
   var approvalAnswerPending = false;
   var TOOLTIP_DELAY_MS = 520;
   var DICTATION_PREINSTALL_SIZE_BYTES = 480000000;
-  var DICTATION_SHORTCUT_TAP_MS = 130;
+  var DICTATION_SHORTCUT_TAP_MS = 200;
   var DICTATION_SHORTCUT_HOLD_OPTIONS = [
     { value: "none", label: "None" },
     { value: "alt", label: "Option (Alt)" },
@@ -607,9 +609,6 @@
     { value: "control", label: "Control" },
     { value: "ctrl-m", label: "Ctrl + M" },
     { value: "space", label: "Space" },
-    { value: "mouse-button-4", label: "Mouse Button 4" },
-    { value: "mouse-button-5", label: "Mouse Button 5" },
-    { value: "mouse-wheel-click", label: "Mouse Wheel Click" },
     { value: "backslash", label: "Backslash (\\)" },
     { value: "semicolon", label: "Semicolon (;)" },
     { value: "quote", label: "Quote (')" },
@@ -624,7 +623,10 @@
     { value: "f16", label: "F16" },
     { value: "f17", label: "F17" },
     { value: "f18", label: "F18" },
-    { value: "f19", label: "F19" }
+    { value: "f19", label: "F19" },
+    { value: "mouse-button-4", label: "Mouse Button 4" },
+    { value: "mouse-button-5", label: "Mouse Button 5" },
+    { value: "mouse-wheel-click", label: "Mouse Wheel Click" }
   ];
   var DICTATION_SHORTCUT_TOGGLE_OPTIONS = [
     { value: "none", label: "None" },
@@ -647,6 +649,9 @@
     { value: "mouse-button-4", label: "Mouse Button 4" },
     { value: "mouse-button-5", label: "Mouse Button 5" },
     { value: "mouse-wheel-click", label: "Mouse Wheel Click" }
+  ];
+  var DICTATION_LANGUAGE_DEFAULT_OPTIONS = [
+    { value: "auto", label: "Auto-detect" }
   ];
   var stateGetInFlight = null;
   var stateGetInFlightKey = "";
@@ -717,6 +722,8 @@
   }
   state.dictationShortcutHold = normalizeDictationShortcut("hold", state.dictationShortcutHold);
   state.dictationShortcutToggle = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
+  state.dictationLanguages = normalizeDictationLanguageOptions(state.dictationLanguages);
+  state.dictationLanguage = normalizeDictationLanguageValue(state.dictationLanguage, state.dictationLanguages);
   state.runMode = normalizeRunMode(state.runMode);
   state.assistantModeId = normalizeAssistantModeId(state.assistantModeId);
   if (state.runMode === "instant") {
@@ -911,6 +918,8 @@
     dictationShortcutRow: document.getElementById("dictation-shortcut-row"),
     dictationHoldShortcut: document.getElementById("dictation-hold-shortcut"),
     dictationToggleShortcut: document.getElementById("dictation-toggle-shortcut"),
+    dictationLanguageRow: document.getElementById("dictation-language-row"),
+    dictationLanguageSelect: document.getElementById("dictation-language-select"),
     dictationPrewarmRow: document.getElementById("dictation-prewarm-row"),
     dictationPrewarmToggle: document.getElementById("dictation-prewarm-toggle"),
     dictationPrewarmHint: document.getElementById("dictation-prewarm-hint"),
@@ -10221,6 +10230,11 @@
             return loadDictationShortcutPrefs();
           }, 2, 180).catch(function () {
             return null;
+          }),
+          runWithRetry(function () {
+            return loadDictationLanguageSetting();
+          }, 2, 180).catch(function () {
+            return null;
           })
         ])
           .catch(function () {
@@ -12935,6 +12949,92 @@
     return html;
   }
 
+  function normalizeDictationLanguageOptions(rawOptions) {
+    var normalized = [];
+    var seen = {};
+    var hasAuto = false;
+    var source = Array.isArray(rawOptions) ? rawOptions : [];
+    for (var i = 0; i < source.length; i += 1) {
+      var raw = source[i];
+      if (!raw || typeof raw !== "object") {
+        continue;
+      }
+      var value = trim(String(raw.value || "")).toLowerCase();
+      if (!/^[a-z0-9_-]+$/.test(value)) {
+        continue;
+      }
+      if (seen[value]) {
+        continue;
+      }
+      var label = trim(String(raw.label || ""));
+      if (!label) {
+        if (value === "auto") {
+          label = "Auto-detect";
+        } else {
+          label = value.toUpperCase();
+        }
+      }
+      seen[value] = true;
+      if (value === "auto") {
+        hasAuto = true;
+      }
+      normalized.push({ value: value, label: label });
+    }
+    if (!hasAuto) {
+      normalized.unshift({ value: "auto", label: "Auto-detect" });
+    }
+    if (!normalized.length) {
+      normalized = DICTATION_LANGUAGE_DEFAULT_OPTIONS.slice();
+    }
+    return normalized;
+  }
+
+  function normalizeDictationLanguageValue(value, options) {
+    var normalizedValue = trim(String(value || "")).toLowerCase();
+    if (!normalizedValue || normalizedValue === "none" || normalizedValue === "default" || normalizedValue === "detect") {
+      normalizedValue = "auto";
+    }
+    var languageOptions = normalizeDictationLanguageOptions(options || state.dictationLanguages);
+    for (var i = 0; i < languageOptions.length; i += 1) {
+      if (normalizedValue === String(languageOptions[i].value || "")) {
+        return normalizedValue;
+      }
+    }
+    return "auto";
+  }
+
+  function dictationLanguageLabel(value) {
+    var normalizedValue = normalizeDictationLanguageValue(value, state.dictationLanguages);
+    var options = normalizeDictationLanguageOptions(state.dictationLanguages);
+    for (var i = 0; i < options.length; i += 1) {
+      if (normalizedValue === String(options[i].value || "")) {
+        return String(options[i].label || normalizedValue);
+      }
+    }
+    return "Auto-detect";
+  }
+
+  function dictationLanguageOptionsHtml(selected) {
+    var options = normalizeDictationLanguageOptions(state.dictationLanguages);
+    var normalizedSelected = normalizeDictationLanguageValue(selected, options);
+    var html = "";
+    for (var i = 0; i < options.length; i += 1) {
+      var option = options[i] || {};
+      var value = String(option.value || "");
+      var label = String(option.label || value);
+      html += "<option value='" + escAttr(value) + "'" + (value === normalizedSelected ? " selected" : "") + ">" + escHtml(label) + "</option>";
+    }
+    return html;
+  }
+
+  function dictationRequestedLanguageParam() {
+    var normalized = normalizeDictationLanguageValue(state.dictationLanguage, state.dictationLanguages);
+    if (normalized === "auto") {
+      return "";
+    }
+    return normalized;
+  }
+
   function clearDictationShortcutPressState() {
     var keys = Object.keys(dictationShortcutPressState);
     for (var i = 0; i < keys.length; i += 1) {
@@ -13029,11 +13129,12 @@
     var buttons = Number(event && event.buttons);
     var eventType = String(event && event.type ? event.type : "").toLowerCase();
     var isDownEvent = eventType.indexOf("down") >= 0 || eventType.indexOf("click") >= 0;
+    var hasButton = isFinite(button) && button >= 0;
     // Prefer explicit side-button signals first.
-    if (button === 3 || which === 4) {
+    if ((hasButton && button === 3) || (!hasButton && which === 4)) {
       return "mouse-button-4";
     }
-    if (button === 4 || which === 5) {
+    if ((hasButton && button === 4) || (!hasButton && which === 5)) {
       return "mouse-button-5";
     }
     // Fallback for environments that do not expose side-button values in `button`.
@@ -13049,7 +13150,7 @@
         return "mouse-wheel-click";
       }
     }
-    if (button === 1 || which === 2) {
+    if ((hasButton && button === 1) || (!hasButton && which === 2)) {
       return "mouse-wheel-click";
     }
     return "";
@@ -13074,6 +13175,8 @@
       var backend = trim(String(statusResponse.backend || ""));
       var preferred = trim(String(statusResponse.preferred || ""));
       var installed = statusResponse.installed === true;
+      var languageOptions = normalizeDictationLanguageOptions(statusResponse.languages);
+      var selectedLanguage = normalizeDictationLanguageValue(statusResponse.language, languageOptions);
       var combined = statusResponse;
       if (infoResponse && infoResponse.success && infoResponse.download_size_bytes) {
         combined = Object.assign({}, statusResponse, {
@@ -13084,7 +13187,10 @@
       state.dictationInstalled = installed;
       state.dictationBackend = backend;
       state.dictationPreferredBackend = preferred;
+      state.dictationLanguages = languageOptions;
+      state.dictationLanguage = selectedLanguage;
       state.dictationInstallError = "";
+      storageSet("artificer.dictationLanguage", selectedLanguage);
       if (!installed) {
         dictationPrepareReadyUntil = 0;
         stopDictationPrepareLoop();
@@ -13111,6 +13217,8 @@
       state.dictationInstalled = false;
       state.dictationBackend = "";
       state.dictationPreferredBackend = "";
+      state.dictationLanguages = DICTATION_LANGUAGE_DEFAULT_OPTIONS.slice();
+      state.dictationLanguage = normalizeDictationLanguageValue(storageGet("artificer.dictationLanguage", "auto"), state.dictationLanguages);
       state.dictateRecording = false;
       state.dictateSessionId = "";
       setDictationPhase("idle");
@@ -13144,6 +13252,24 @@
     }).catch(function () {
       state.dictationPrewarmEnabled = storageGet("artificer.dictationPrewarmEnabled", "1") !== "0";
       return state.dictationPrewarmEnabled;
+    });
+  }
+
+  function loadDictationLanguageSetting() {
+    return apiGet("dictation_language_get", {}, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not load dictation language setting");
+      }
+      var languageOptions = normalizeDictationLanguageOptions(response.languages);
+      var selectedLanguage = normalizeDictationLanguageValue(response.language, languageOptions);
+      state.dictationLanguages = languageOptions;
+      state.dictationLanguage = selectedLanguage;
+      storageSet("artificer.dictationLanguage", selectedLanguage);
+      return selectedLanguage;
+    }).catch(function () {
+      state.dictationLanguages = DICTATION_LANGUAGE_DEFAULT_OPTIONS.slice();
+      state.dictationLanguage = normalizeDictationLanguageValue(storageGet("artificer.dictationLanguage", "auto"), state.dictationLanguages);
+      return state.dictationLanguage;
     });
   }
 
@@ -13220,7 +13346,12 @@
     if (dictationPreparePromise) {
       return dictationPreparePromise;
     }
-    dictationPreparePromise = apiPost("dictate_prepare", {}, { timeoutMs: 16000 }).then(function (response) {
+    var prepareLanguage = dictationRequestedLanguageParam();
+    var preparePayload = {};
+    if (prepareLanguage) {
+      preparePayload.language = prepareLanguage;
+    }
+    dictationPreparePromise = apiPost("dictate_prepare", preparePayload, { timeoutMs: 16000 }).then(function (response) {
       if (!response || !response.success) {
         throw new Error((response && response.error) || "Could not prepare dictation");
       }
@@ -13308,6 +13439,34 @@
     });
   }
 
+  function saveDictationLanguageChoice(value) {
+    var normalized = normalizeDictationLanguageValue(value, state.dictationLanguages);
+    state.dictationLanguage = normalized;
+    storageSet("artificer.dictationLanguage", normalized);
+    renderDictationInstallSettings();
+    return apiPost("dictation_language_set", {
+      language: normalized
+    }, { timeoutMs: 12000 }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not save dictation language");
+      }
+      var languageOptions = normalizeDictationLanguageOptions(response.languages);
+      var savedLanguage = normalizeDictationLanguageValue(response.language, languageOptions);
+      state.dictationLanguages = languageOptions;
+      state.dictationLanguage = savedLanguage;
+      storageSet("artificer.dictationLanguage", savedLanguage);
+      dictationPrepareReadyUntil = 0;
+      if (state.dictationInstalled && state.dictationPrewarmEnabled && !state.dictateRecording && !state.dictateBusy) {
+        return requestDictationPrepare({ silent: true, force: true }).catch(function () {
+          return false;
+        }).then(function () {
+          return true;
+        });
+      }
+      return true;
+    });
+  }
+
   function renderDictationShortcutSettings() {
     if (!el.dictationShortcutRow || !el.dictationHoldShortcut || !el.dictationToggleShortcut) {
       return;
@@ -13339,9 +13498,33 @@
     el.dictationToggleShortcut.setAttribute("aria-label", "Toggle: " + toggleLabel);
   }
 
+  function renderDictationLanguageSettings() {
+    if (!el.dictationLanguageRow || !el.dictationLanguageSelect) {
+      return;
+    }
+    var showRow = !!state.dictationInstalled;
+    el.dictationLanguageRow.classList.toggle("hidden", !showRow);
+    if (!showRow) {
+      return;
+    }
+    var languageOptions = normalizeDictationLanguageOptions(state.dictationLanguages);
+    var selectedLanguage = normalizeDictationLanguageValue(state.dictationLanguage, languageOptions);
+    state.dictationLanguages = languageOptions;
+    state.dictationLanguage = selectedLanguage;
+    var languageHtml = dictationLanguageOptionsHtml(selectedLanguage);
+    if (el.dictationLanguageSelect.innerHTML !== languageHtml) {
+      el.dictationLanguageSelect.innerHTML = languageHtml;
+    } else if (String(el.dictationLanguageSelect.value || "") !== selectedLanguage) {
+      el.dictationLanguageSelect.value = selectedLanguage;
+    }
+    el.dictationLanguageSelect.disabled = !state.dictationInstalled || state.dictationInstallBusy || state.dictateRecording || state.dictateBusy;
+    el.dictationLanguageSelect.setAttribute("aria-label", "Dictation language: " + dictationLanguageLabel(selectedLanguage));
+  }
+
   function renderDictationInstallSettings() {
     if (!el.installDictationBtn) {
       renderDictationShortcutSettings();
+      renderDictationLanguageSettings();
       return;
     }
 
@@ -13442,6 +13625,7 @@
       }
     }
     renderDictationShortcutSettings();
+    renderDictationLanguageSettings();
   }
 
   function stopDictationInstallPolling() {
@@ -14283,6 +14467,9 @@
         return null;
       }),
       loadDictationShortcutPrefs().catch(function () {
+        return null;
+      }),
+      loadDictationLanguageSetting().catch(function () {
         return null;
       }),
       loadDictationStatus({ silent: true }).catch(function () {
@@ -16014,7 +16201,12 @@
     state.dictateBusy = true;
     setDictationPhase("starting");
     renderUi();
-    return apiPost("dictate_start", { requested_started_ms: String(requestedStartedAtMs) }, { timeoutMs: 30000 })
+    var startPayload = { requested_started_ms: String(requestedStartedAtMs) };
+    var requestedLanguage = dictationRequestedLanguageParam();
+    if (requestedLanguage) {
+      startPayload.language = requestedLanguage;
+    }
+    return apiPost("dictate_start", startPayload, { timeoutMs: 30000 })
       .then(function (response) {
         if (!response.success) {
           throw new Error(response.error || "Dictation failed");
@@ -17882,6 +18074,18 @@
         saveDictationShortcutChoice("toggle", el.dictationToggleShortcut.value);
       });
     }
+    if (el.dictationLanguageSelect) {
+      on(el.dictationLanguageSelect, "change", function () {
+        saveDictationLanguageChoice(el.dictationLanguageSelect.value).then(function () {
+          renderDictationInstallSettings();
+        }).catch(function (error) {
+          showError(error);
+          loadDictationLanguageSetting().finally(function () {
+            renderDictationInstallSettings();
+          });
+        });
+      });
+    }
     if (el.dictationPrewarmToggle) {
       on(el.dictationPrewarmToggle, "change", function () {
         var nextEnabled = !!el.dictationPrewarmToggle.checked;
@@ -19013,18 +19217,56 @@
 
     document.addEventListener("auxclick", function (event) {
       var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
-      if (!dictationMouseTrigger || !shouldHandleDictationShortcutTrigger(dictationMouseTrigger)) {
+      if (!dictationMouseTrigger) {
         return;
       }
-      // Some macOS/WebKit configurations emit side buttons only via auxclick.
-      // Use auxclick as a fallback shortcut trigger without double-firing when
-      // mousedown/mouseup already handled the same action.
-      if (
-        (event && (event.button === 3 || event.button === 4)) &&
-        !dictationShortcutPressState[dictationMouseTrigger] &&
-        !dictationToggleTriggerHandledRecently(dictationMouseTrigger, 220)
-      ) {
-        onDictationShortcutDown(dictationMouseTrigger, event);
+      if (dictationMouseTrigger === "mouse-wheel-click") {
+        if (state.dictateHotkeyHoldIntent && (state.dictateHotkeyHoldTrigger === "mouse-button-4" || state.dictateHotkeyHoldTrigger === "mouse-button-5")) {
+          onDictationShortcutUp(state.dictateHotkeyHoldTrigger, event);
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return;
+      }
+      if (!shouldHandleDictationShortcutTrigger(dictationMouseTrigger)) {
+        return;
+      }
+      var holdTrigger = normalizeDictationShortcut("hold", state.dictationShortcutHold);
+      var toggleTrigger = normalizeDictationShortcut("toggle", state.dictationShortcutToggle);
+      var bothSame = holdTrigger !== "none" && holdTrigger === toggleTrigger;
+      var hasPressState = !!dictationShortcutPressState[dictationMouseTrigger];
+      var holdActive = state.dictateHotkeyHoldIntent && state.dictateHotkeyHoldTrigger === dictationMouseTrigger;
+      if (bothSame && dictationMouseTrigger === holdTrigger) {
+        if (hasPressState || holdActive) {
+          onDictationShortcutUp(dictationMouseTrigger, event);
+        } else if (!dictationToggleTriggerHandledRecently(dictationMouseTrigger, 260)) {
+          toggleDictationCapture({ fromHotkey: true, holdShortcut: false, startedAtMs: Date.now() }).catch(showError);
+          markDictationToggleTriggered(dictationMouseTrigger);
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (dictationMouseTrigger === holdTrigger && dictationMouseTrigger !== toggleTrigger) {
+        if (holdActive) {
+          onDictationShortcutUp(dictationMouseTrigger, event);
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (dictationMouseTrigger === toggleTrigger && dictationMouseTrigger !== holdTrigger) {
+        if (hasPressState) {
+          onDictationShortcutUp(dictationMouseTrigger, event);
+        } else if (!dictationToggleTriggerHandledRecently(dictationMouseTrigger, 260)) {
+          onDictationShortcutDown(dictationMouseTrigger, event);
+          onDictationShortcutUp(dictationMouseTrigger, event);
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (holdActive) {
         onDictationShortcutUp(dictationMouseTrigger, event);
       }
       event.preventDefault();

@@ -4840,6 +4840,23 @@ select:focus {
   max-width: 100%;
 }
 
+.dictation-language-field {
+  display: grid;
+  gap: 4px;
+}
+
+.dictation-language-field span {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.dictation-language-field select {
+  width: auto;
+  min-width: max-content;
+  max-width: 100%;
+}
+
 .settings-links {
   margin: 0;
   font-size: 0.83rem;
