@@ -3298,7 +3298,9 @@
         next.id = String(next.id || ('trigger-' + String(idx + 1)));
         next.label = String(next.label || '');
         next.triggerAction = String(next.triggerAction || 'set_mode');
-        if (next.triggerAction !== 'set_mode' && next.triggerAction !== 'canned_reply') next.triggerAction = 'set_mode';
+        if (['set_mode', 'canned_reply', 'warn', 'mod_action', 'rate_limit_user'].indexOf(next.triggerAction) < 0) {
+          next.triggerAction = 'set_mode';
+        }
         next.adminOnly = !!next.adminOnly;
         next.matchAny = Array.isArray(next.matchAny)
           ? next.matchAny.map(function (item) { return String(item || '').trim(); }).filter(Boolean)
@@ -3308,6 +3310,7 @@
         next.decayTo = String(next.decayTo || '');
         next.template = String(next.template || '');
         next.announce = !!next.announce;
+        next.maxRepliesPerUserThread24h = Math.max(0, parseInt(next.maxRepliesPerUserThread24h, 10) || 0);
         return next;
       });
 
@@ -3532,7 +3535,8 @@
       var actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
       for (var s = 0; s < actionTriggers.length; s += 1) {
         var rule = actionTriggers[s] || {};
-        if (String(rule.triggerAction || 'set_mode') !== 'set_mode') continue;
+        var triggerAction = String(rule.triggerAction || 'set_mode');
+        if (triggerAction !== 'set_mode' && triggerAction !== 'mod_action') continue;
         var label = String(rule.label || ('Action Trigger ' + String(s + 1)));
         checkRef('Action trigger', label, rule.toMode);
         checkRef('Action trigger decay', label, rule.decayTo);
@@ -3850,6 +3854,7 @@
         var toModeHtml = modeOptionsHtml(modeOpts, String(rule.toMode || ''), false, '');
         var decayModeHtml = modeOptionsHtml(modeOpts, String(rule.decayTo || ''), true, 'Default decay mode');
         var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
+        var maxReplies = Math.max(0, parseInt(rule.maxRepliesPerUserThread24h, 10) || 1);
         return [
           '<div class="action-trigger-row trigger-action-' + escapeHtml(triggerAction) + '" data-trigger-idx="' + String(idx) + '" data-trigger-id="' + escapeHtml(String(rule.id || '')) + '">',
           '  <input type="text" class="trigger-label-input" data-trigger-label placeholder="Trigger label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this action trigger">',
@@ -3857,13 +3862,17 @@
           '  <select class="trigger-action-select" data-trigger-action title="Action to run when this trigger matches">' +
              '<option value="set_mode"' + (triggerAction === 'set_mode' ? ' selected' : '') + '>Set relationship mode</option>' +
              '<option value="canned_reply"' + (triggerAction === 'canned_reply' ? ' selected' : '') + '>Post canned reply</option>' +
+             '<option value="warn"' + (triggerAction === 'warn' ? ' selected' : '') + '>Warn user</option>' +
+             '<option value="mod_action"' + (triggerAction === 'mod_action' ? ' selected' : '') + '>Mod action</option>' +
+             '<option value="rate_limit_user"' + (triggerAction === 'rate_limit_user' ? ' selected' : '') + '>Rate limit user</option>' +
              '</select>',
-          '  <select class="trigger-mode-select trigger-field-setmode" data-trigger-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select>',
-          '  <input type="number" class="trigger-duration-input trigger-field-setmode" min="0" step="1" data-trigger-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the switched mode">',
-          '  <select class="trigger-decay-select trigger-field-setmode" data-trigger-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select>',
+          '  <select class="trigger-mode-select trigger-field-mode" data-trigger-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select>',
+          '  <input type="number" class="trigger-duration-input trigger-field-duration" min="0" step="1" data-trigger-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the trigger effect">',
+          '  <select class="trigger-decay-select trigger-field-mode" data-trigger-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select>',
+          '  <input type="number" class="trigger-rate-limit-input trigger-field-rate-limit" min="1" step="1" data-trigger-max-replies value="' + escapeHtml(String(maxReplies)) + '" title="Max replies to this user per thread in rolling 24h during rate-limit window">',
           '  <input type="text" class="trigger-template-input trigger-field-template" data-trigger-template placeholder="Reply/notice template" value="' + escapeHtml(String(rule.template || '')) + '" title="Template text posted when this trigger runs">',
           '  <label class="mini-toggle trigger-admin-toggle" title="Only moderators can invoke this trigger"><input type="checkbox" data-trigger-admin-only ' + (rule.adminOnly ? 'checked' : '') + '><span>Admin-only</span></label>',
-          '  <label class="mini-toggle trigger-announce-toggle trigger-field-setmode" title="Post a notice when this trigger runs"><input type="checkbox" data-trigger-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
+          '  <label class="mini-toggle trigger-announce-toggle trigger-field-announce" title="Post a notice when this trigger runs"><input type="checkbox" data-trigger-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
           '  <button type="button" class="soft mini-remove-btn trigger-remove-btn" data-remove-trigger title="Remove this action trigger">Remove</button>',
           '</div>'
         ].join('');
@@ -3912,6 +3921,7 @@
         '    <span>Switch to</span>',
         '    <span>Duration (h)</span>',
         '    <span>Decay to</span>',
+        '    <span>Max/24h</span>',
         '    <span>Template</span>',
         '    <span>Admin-only</span>',
         '    <span>Announce</span>',

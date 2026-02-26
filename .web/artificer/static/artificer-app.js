@@ -19089,6 +19089,31 @@
     }
   }
 
+  var artificerBootReadySent = false;
+  function signalArtificerBootReady() {
+    if (artificerBootReadySent) {
+      return;
+    }
+    artificerBootReadySent = true;
+    if (typeof window !== "undefined") {
+      window.__artificerBooted = true;
+    }
+    if (!(window && window.wizardry && typeof window.wizardry.rpc === "function")) {
+      return;
+    }
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        window.wizardry.rpc("bridge.exec", { argv: ["__wizardry_host_boot_ready"] }).catch(function () {
+          return null;
+        });
+      });
+    });
+  }
+
+  var bootReadyFallbackTimer = setTimeout(function () {
+    signalArtificerBootReady();
+  }, 10000);
+
   refreshAll()
     .catch(function (error) {
       if (!isRetriableRequestError(error)) {
@@ -19102,9 +19127,8 @@
       kickQueueWorker();
       startModelAutoRefreshLoop();
       startRunEventHealLoop();
-      if (typeof window !== "undefined") {
-        window.__artificerBooted = true;
-      }
+      clearTimeout(bootReadyFallbackTimer);
+      signalArtificerBootReady();
     })
     .catch(function (error) {
       state.initialLoadComplete = true;
@@ -19112,5 +19136,7 @@
       state.queueWorkerActive = false;
       kickQueueWorker();
       showError(error);
+      clearTimeout(bootReadyFallbackTimer);
+      signalArtificerBootReady();
     });
 })();
