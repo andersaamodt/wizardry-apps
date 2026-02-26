@@ -19,6 +19,10 @@ You can sign in using:
 2. **Use phone signer (QR)**: NIP-46 pairing with `nostrconnect://` deep link/QR.
 3. **Paste signed login**: manual fallback with pasted signed auth event JSON.
 
+Recommended signer apps:
+- Desktop: [nostr-keyx](https://github.com/susumuota/nostr-keyx)
+- Mobile: [Amethyst](https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst)
+
 ## Challenge Rules
 
 Every login requires a server-issued challenge that is:
