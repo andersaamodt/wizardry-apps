@@ -15954,7 +15954,7 @@
     addComposerFiles(clipboard.files);
   }
 
-  function insertTextAtCursor(inputEl, text) {
+  function appendDictationText(inputEl, text) {
     if (!inputEl) {
       return;
     }
@@ -15962,25 +15962,11 @@
     if (!insertion) {
       return;
     }
-
     var current = String(inputEl.value || "");
-    var start = Number(inputEl.selectionStart);
-    var end = Number(inputEl.selectionEnd);
-    if (!isFinite(start) || start < 0) {
-      start = current.length;
-    }
-    if (!isFinite(end) || end < start) {
-      end = start;
-    }
-
-    var before = current.slice(0, start);
-    var after = current.slice(end);
-    var prefix = before && !/\s$/.test(before) ? " " : "";
-    var suffix = after && !/^\s/.test(after) ? " " : "";
-    var nextText = before + prefix + insertion + suffix + after;
+    var needsLeadingSpace = current.length > 0 && !/\s$/.test(current);
+    var nextText = current + (needsLeadingSpace ? " " : "") + insertion;
     inputEl.value = nextText;
-
-    var caret = (before + prefix + insertion).length;
+    var caret = nextText.length;
     if (typeof inputEl.setSelectionRange === "function") {
       inputEl.setSelectionRange(caret, caret);
     }
@@ -16089,7 +16075,7 @@
           }
           return true;
         }
-        insertTextAtCursor(el.runPrompt, dictatedText);
+        appendDictationText(el.runPrompt, dictatedText);
         dispatchInputEvent(el.runPrompt);
         if (typeof el.runPrompt.focus === "function") {
           el.runPrompt.focus();
@@ -19005,6 +18991,13 @@
       var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
       if (!dictationMouseTrigger || !shouldHandleDictationShortcutTrigger(dictationMouseTrigger)) {
         return;
+      }
+      // Some macOS/WebKit configurations emit side buttons only via auxclick.
+      // Use auxclick as a fallback shortcut trigger without double-firing when
+      // mousedown/mouseup already handled the same action.
+      if (!dictationShortcutPressState[dictationMouseTrigger] && !dictationToggleTriggerHandledRecently(dictationMouseTrigger, 220)) {
+        onDictationShortcutDown(dictationMouseTrigger, event);
+        onDictationShortcutUp(dictationMouseTrigger, event);
       }
       event.preventDefault();
       event.stopPropagation();
