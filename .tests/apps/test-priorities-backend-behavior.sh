@@ -117,6 +117,16 @@ assert_eq "$(field "$row_project" 8)" "1" "project should report hasSubprioritie
 children=$("$backend" list "$scratch/task one")
 child_row=$(row_by_name "$children" "child note")
 assert_nonempty "$child_row" "child note should exist inside converted project"
+self_row=$(row_by_name "$children" "task one")
+assert_eq "$self_row" "" "make-project should not leave a self-named placeholder task"
+
+"$backend" rename-fast "$scratch/task one" "task one renamed" >/dev/null
+children_after_rename=$("$backend" list "$scratch/task one renamed")
+old_name_row=$(row_by_name "$children_after_rename" "task one")
+assert_eq "$old_name_row" "" "renaming a project should not leave old-name placeholder task"
+child_after_rename=$(row_by_name "$children_after_rename" "child note")
+assert_nonempty "$child_after_rename" "renaming project should keep real child tasks"
+project_path="$scratch/task one renamed"
 
 "$backend" add-fast "$scratch" "fallback project" >/dev/null
 cat > "$fake_bin/file-to-folder" <<'EOF'
@@ -129,6 +139,9 @@ PATH="$fake_bin:$PATH" "$backend" make-project-fast "$scratch/fallback project" 
 list_blob=$(list_root)
 fallback_row=$(row_by_name "$list_blob" "fallback project")
 assert_eq "$(field "$fallback_row" 3)" "dir" "make-project-fast should fallback when file-to-folder fails"
+fallback_children=$("$backend" list "$scratch/fallback project")
+fallback_self_row=$(row_by_name "$fallback_children" "fallback project")
+assert_eq "$fallback_self_row" "" "make-project-fast fallback should not create self-named child task"
 
 copy_root="$scratch/copy-root"
 mkdir -p "$copy_root"
@@ -174,17 +187,17 @@ opened_path=$(cat "$scratch/open-dir-path.txt")
 copy_root_abs=$(CDPATH= cd -- "$copy_root" && pwd -P)
 assert_eq "$opened_path" "$copy_root_abs" "open-dir should invoke OS opener with absolute directory path"
 
-desc=$("$backend" descendant-count "$scratch/task one")
+desc=$("$backend" descendant-count "$project_path")
 case "$desc" in
   ''|*[!0-9]*) fail "descendant-count should return a numeric value" ;;
 esac
 [ "$desc" -ge 1 ] || fail "descendant-count should be >= 1 for project with one child"
 
-parent=$("$backend" parent "$scratch/task one")
+parent=$("$backend" parent "$project_path")
 scratch_abs=$(CDPATH= cd -- "$scratch" && pwd -P)
 assert_eq "$parent" "$scratch_abs" "parent action should return parent directory"
 
-assert_status_fail "$backend" rename-fast "$scratch/task one" "bad/name"
+assert_status_fail "$backend" rename-fast "$project_path" "bad/name"
 assert_status_fail "$backend" check-toggle-fast "$scratch/does-not-exist"
 assert_status_fail "$backend" remove-fast "$scratch/does-not-exist"
 

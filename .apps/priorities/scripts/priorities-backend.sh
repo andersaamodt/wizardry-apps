@@ -1088,19 +1088,13 @@ make_project_convert_impl() {
     return 0
   fi
 
-  if command -v file-to-folder >/dev/null 2>&1; then
-    if file-to-folder "$target" >/dev/null 2>&1; then
-      return 0
-    fi
-  fi
-
   parent_dir=$(dirname "$target")
-  base_name=$(basename "$target")
-  tmp_item=$parent_dir/."$base_name".priorities-project.$$
+  project_name=$(basename "$target")
+  tmp_item=$parent_dir/."$project_name".priorities-project.$$
   tmp_index=0
   while [ -e "$tmp_item" ]; do
     tmp_index=$((tmp_index + 1))
-    tmp_item=$parent_dir/."$base_name".priorities-project.$$.${tmp_index}
+    tmp_item=$parent_dir/."$project_name".priorities-project.$$.${tmp_index}
   done
 
   mv -- "$target" "$tmp_item"
@@ -1109,13 +1103,30 @@ make_project_convert_impl() {
     printf '%s\n' "priorities-backend: could not create project directory: $target" >&2
     return 1
   fi
-  if ! mv -- "$tmp_item" "$target/$base_name"; then
+  if ! rm -f -- "$tmp_item"; then
     rmdir -- "$target" >/dev/null 2>&1 || true
     mv -- "$tmp_item" "$target" >/dev/null 2>&1 || true
-    printf '%s\n' "priorities-backend: could not move file into project directory: $target" >&2
+    printf '%s\n' "priorities-backend: could not finalize project conversion: $target" >&2
     return 1
   fi
   return 0
+}
+
+cleanup_project_placeholder_after_rename() {
+  project_dir=$1
+  old_name=$2
+  [ -d "$project_dir" ] || return 0
+  [ -n "$old_name" ] || return 0
+  placeholder=$project_dir/$old_name
+  [ -f "$placeholder" ] || return 0
+  size_bytes=$(wc -c <"$placeholder" 2>/dev/null | tr -d '[:space:]')
+  case "$size_bytes" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  if [ "$size_bytes" -ne 0 ]; then
+    return 0
+  fi
+  rm -f -- "$placeholder" >/dev/null 2>&1 || true
 }
 
 make_project_impl() {
@@ -1753,9 +1764,11 @@ case "$action" in
         exit 2
         ;;
     esac
+    old_name=$(basename "$target")
     parent_dir=$(dirname "$target")
     renamed_path=$parent_dir/$new_name
     mv -- "$target" "$renamed_path"
+    cleanup_project_placeholder_after_rename "$renamed_path" "$old_name"
     printf '%s\n' "$renamed_path"
     ;;
 
@@ -1777,9 +1790,11 @@ case "$action" in
         exit 2
         ;;
     esac
+    old_name=$(basename "$target")
     parent_dir=$(dirname "$target")
     renamed_path=$parent_dir/$new_name
     mv -- "$target" "$renamed_path"
+    cleanup_project_placeholder_after_rename "$renamed_path" "$old_name"
     emit_list "$parent_dir"
     ;;
 
