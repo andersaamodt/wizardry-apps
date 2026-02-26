@@ -1767,6 +1767,14 @@ case "$action" in
     old_name=$(basename "$target")
     parent_dir=$(dirname "$target")
     renamed_path=$parent_dir/$new_name
+    if [ "$target" = "$renamed_path" ]; then
+      printf '%s\n' "$renamed_path"
+      exit 0
+    fi
+    if [ -e "$renamed_path" ]; then
+      printf '%s\n' "priorities-backend: rename target already exists: $new_name" >&2
+      exit 1
+    fi
     mv -- "$target" "$renamed_path"
     cleanup_project_placeholder_after_rename "$renamed_path" "$old_name"
     printf '%s\n' "$renamed_path"
@@ -1793,6 +1801,14 @@ case "$action" in
     old_name=$(basename "$target")
     parent_dir=$(dirname "$target")
     renamed_path=$parent_dir/$new_name
+    if [ "$target" = "$renamed_path" ]; then
+      emit_list "$parent_dir"
+      exit 0
+    fi
+    if [ -e "$renamed_path" ]; then
+      printf '%s\n' "priorities-backend: rename target already exists: $new_name" >&2
+      exit 1
+    fi
     mv -- "$target" "$renamed_path"
     cleanup_project_placeholder_after_rename "$renamed_path" "$old_name"
     emit_list "$parent_dir"

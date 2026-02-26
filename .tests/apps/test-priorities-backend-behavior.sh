@@ -82,6 +82,13 @@ assert_eq "$first_name" "task one" "first-added item should remain first within 
 row_task_two=$(row_by_name "$list_blob" "task two")
 assert_eq "$(field "$row_task_two" 5)" "2" "second add-fast should use next priority value"
 
+assert_status_fail "$backend" rename-fast "$scratch/task one" "task two"
+list_blob=$(list_root)
+rename_collision_src=$(row_by_name "$list_blob" "task one")
+rename_collision_dst=$(row_by_name "$list_blob" "task two")
+assert_nonempty "$rename_collision_src" "rename collision should keep source task"
+assert_nonempty "$rename_collision_dst" "rename collision should keep destination task"
+
 "$backend" check-toggle-fast "$scratch/task two" >/dev/null
 list_blob=$(list_root)
 row_task_two=$(row_by_name "$list_blob" "task two")
@@ -113,6 +120,12 @@ list_blob=$(list_root)
 row_project=$(row_by_name "$list_blob" "task one")
 assert_eq "$(field "$row_project" 3)" "dir" "make-project should convert file to dir"
 assert_eq "$(field "$row_project" 8)" "1" "project should report hasSubpriorities=1 when child exists"
+assert_status_fail "$backend" rename-fast "$scratch/task renamed" "task one"
+list_blob=$(list_root)
+file_row_after_dir_collision=$(row_by_name "$list_blob" "task renamed")
+dir_row_after_dir_collision=$(row_by_name "$list_blob" "task one")
+assert_nonempty "$file_row_after_dir_collision" "rename collision against directory should keep source task"
+assert_nonempty "$dir_row_after_dir_collision" "rename collision against directory should keep destination project"
 
 children=$("$backend" list "$scratch/task one")
 child_row=$(row_by_name "$children" "child note")
