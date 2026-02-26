@@ -2,6 +2,8 @@
   var currentRelPath = '';
   var currentNostrAddress = '';
   var currentNostrEventId = '';
+  var refreshInFlight = false;
+  var submitInFlight = false;
 
   function isPostPage(pathname) {
     return /^\/pages\/posts\/.+\.html$/.test(pathname || '');
@@ -156,6 +158,26 @@
     status.textContent = message || '';
   }
 
+  function setRefreshBusy(isBusy) {
+    refreshInFlight = !!isBusy;
+    var button = document.getElementById('post-comments-refresh');
+    if (!button) {
+      return;
+    }
+    button.disabled = refreshInFlight;
+    button.textContent = refreshInFlight ? 'Refreshing...' : 'Refresh comments';
+  }
+
+  function setSubmitBusy(isBusy) {
+    submitInFlight = !!isBusy;
+    var button = document.getElementById('post-comment-submit');
+    if (!button) {
+      return;
+    }
+    button.disabled = submitInFlight;
+    button.textContent = submitInFlight ? 'Posting...' : 'Post comment';
+  }
+
   function loadComments() {
     if (!currentRelPath) {
       return;
@@ -177,9 +199,13 @@
   }
 
   function refreshComments() {
+    if (refreshInFlight) {
+      return;
+    }
     if (!currentRelPath) {
       return;
     }
+    setRefreshBusy(true);
     setCommentStatus('Refreshing comments from relays...', 'info');
     fetch('/cgi/blog-refresh-comments', {
       method: 'POST',
@@ -199,6 +225,9 @@
       })
       .catch(function () {
         setCommentStatus('Comment refresh failed.', 'warn');
+      })
+      .finally(function () {
+        setRefreshBusy(false);
       });
   }
 
@@ -221,6 +250,9 @@
   }
 
   function submitComment() {
+    if (submitInFlight) {
+      return;
+    }
     var textarea = document.getElementById('post-comment-input');
     if (!textarea) {
       return;
@@ -252,6 +284,7 @@
       content: content
     };
 
+    setSubmitBusy(true);
     setCommentStatus('Signing comment event...', 'info');
     signCommentEvent(draftEvent)
       .then(function (signed) {
@@ -285,6 +318,9 @@
       })
       .catch(function (err) {
         setCommentStatus(err.message || 'Comment submit failed.', 'warn');
+      })
+      .finally(function () {
+        setSubmitBusy(false);
       });
   }
 
@@ -303,6 +339,7 @@
       '<textarea id="post-comment-input" rows="3" placeholder="Write a Nostr-signed reply..."></textarea>' +
       '<button type="button" id="post-comment-submit">Post comment</button>' +
       '</div>' +
+      '<p class="post-comments-shortcut">Press Ctrl/Cmd + Enter to post quickly.</p>' +
       '<p id="post-comments-status" class="post-comments-status"></p>' +
       '<div id="post-comments-list" class="post-comments-list"><p class="placeholder">No comments mirrored yet.</p></div>' +
       '</section>'
@@ -314,6 +351,15 @@
     var submitButton = document.getElementById('post-comment-submit');
     if (submitButton) {
       submitButton.addEventListener('click', submitComment);
+    }
+    var input = document.getElementById('post-comment-input');
+    if (input) {
+      input.addEventListener('keydown', function (event) {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          event.preventDefault();
+          submitComment();
+        }
+      });
     }
   }
 

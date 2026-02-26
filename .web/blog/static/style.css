@@ -2179,6 +2179,18 @@ nav.site-nav {
   cursor: pointer;
 }
 
+#post-comments-refresh:disabled,
+#post-comment-submit:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.post-comments-shortcut {
+  margin: 0.18rem 0 0.34rem;
+  color: var(--light-text);
+  font-size: 0.81rem;
+}
+
 .post-comments-status {
   margin: 0.45rem 0 0.5rem;
   min-height: 1.05rem;

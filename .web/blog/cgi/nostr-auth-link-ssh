@@ -10,7 +10,7 @@ blog_init
 blog_read_request_body
 blog_send_json_headers
 
-if ! blog_require_session false; then
+if ! blog_require_session false true; then
   exit 0
 fi
 
