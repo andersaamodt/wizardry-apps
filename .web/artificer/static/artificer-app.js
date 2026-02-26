@@ -13025,7 +13025,6 @@
 
   function dictationShortcutMouseTrigger(event) {
     var button = Number(event && event.button);
-    var which = Number(event && event.which);
     var buttons = Number(event && event.buttons);
     var eventType = String(event && event.type ? event.type : "").toLowerCase();
     var isDownEvent = eventType.indexOf("down") >= 0;
@@ -13035,7 +13034,7 @@
     if (button === 4) {
       return "mouse-button-5";
     }
-    if (button === 1 || which === 2) {
+    if (button === 1) {
       return "mouse-wheel-click";
     }
     // Fallback for environments that do not expose side-button values in `button`:
@@ -18995,7 +18994,11 @@
       // Some macOS/WebKit configurations emit side buttons only via auxclick.
       // Use auxclick as a fallback shortcut trigger without double-firing when
       // mousedown/mouseup already handled the same action.
-      if (!dictationShortcutPressState[dictationMouseTrigger] && !dictationToggleTriggerHandledRecently(dictationMouseTrigger, 220)) {
+      if (
+        (event && (event.button === 1 || event.button === 3 || event.button === 4)) &&
+        !dictationShortcutPressState[dictationMouseTrigger] &&
+        !dictationToggleTriggerHandledRecently(dictationMouseTrigger, 220)
+      ) {
         onDictationShortcutDown(dictationMouseTrigger, event);
         onDictationShortcutUp(dictationMouseTrigger, event);
       }
