@@ -19073,6 +19073,28 @@
       return false;
     }
 
+    function shouldPreserveEditableShortcut(event) {
+      if (!isKeyboardEditableTarget(event && event.target)) {
+        return false;
+      }
+      var key = String((event && event.key) || "").toLowerCase();
+      var code = String((event && event.code) || "");
+      var meta = !!(event && event.metaKey);
+      var ctrl = !!(event && event.ctrlKey);
+      var alt = !!(event && event.altKey);
+      var shift = !!(event && event.shiftKey);
+      if ((meta || ctrl) && !alt && !shift && (key === "a" || key === "c" || key === "x" || key === "v" || key === "z" || key === "y")) {
+        return true;
+      }
+      if (meta && ctrl && !alt && !shift && (code === "Space" || key === " ")) {
+        return true;
+      }
+      if (ctrl && !meta && !alt && !shift && (code === "Period" || key === ".")) {
+        return true;
+      }
+      return false;
+    }
+
     document.addEventListener("click", function (event) {
       if (Date.now() < suppressMenuCloseUntilMs) {
         return;
@@ -19106,6 +19128,9 @@
     });
 
     document.addEventListener("keydown", function (event) {
+      if (shouldPreserveEditableShortcut(event)) {
+        return;
+      }
       var dictationKeyTrigger = dictationShortcutKeyboardTrigger(event);
       if (dictationKeyTrigger) {
         if (!event.repeat) {
@@ -19176,6 +19201,9 @@
     });
 
     document.addEventListener("keyup", function (event) {
+      if (shouldPreserveEditableShortcut(event)) {
+        return;
+      }
       var dictationKeyTrigger = dictationShortcutKeyboardTrigger(event);
       if (!dictationKeyTrigger) {
         return;
