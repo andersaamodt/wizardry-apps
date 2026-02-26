@@ -4861,6 +4861,20 @@ select:focus {
   max-width: 100%;
 }
 
+#dictation-language-row {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: auto;
+  max-width: max-content;
+}
+
+#dictation-language-select {
+  width: auto !important;
+  min-width: max-content;
+  max-width: none;
+}
+
 .settings-links {
   margin: 0;
   font-size: 0.83rem;
