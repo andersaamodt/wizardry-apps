@@ -1,60 +1,50 @@
 ---
-title: Nostr, Passkeys, and SSH Linking
+title: Nostr Login Security
 ---
 
 This page explains how login works on this site, in plain language.
 
 ## Quick Summary
 
-- Primary identity is your **Nostr key**.
-- You can sign in every time with Nostr, or bind a **passkey** (WebAuthn) for convenience.
-- You can optionally link an **SSH public key** for MUD/terminal compatibility.
-- You should **never** upload your SSH private key.
+- Your account is identified by exactly one **Nostr public key** (`P_user`).
+- There is no email/password login and no recovery reset flow.
+- If control of `P_user` is lost, account access is lost by design.
+- This site never asks for your private key (`nsec`).
 
-## What Is an SSH Key Pair?
+## Login Methods
 
-An SSH key pair has two parts:
+You can sign in using:
 
-- **Private key**: Secret. Stays on your device.
-- **Public key**: Safe to share. Usually ends in `.pub`.
+1. **Login with Nostr**: NIP-07 extension flow (desktop default when available).
+2. **Use phone signer (QR)**: NIP-46 pairing with `nostrconnect://` deep link/QR.
+3. **Paste signed login**: manual fallback with pasted signed auth event JSON.
 
-When this site asks for an SSH key, it only wants the **public key**.
+## Challenge Rules
 
-## Why SSH Is Optional Here
+Every login requires a server-issued challenge that is:
 
-SSH linking is optional and exists for MUD/player workflows that still rely on SSH key auth.
-
-## What Is a Passkey (WebAuthn)?
-
-A passkey is a modern login credential stored in your device/browser ecosystem (often protected by Face ID, Touch ID, PIN, or hardware key support).
-
-- It is phishing-resistant.
-- It avoids password reuse.
-- It can work with security key hardware and platform authenticators.
-
-## How Login Works Here
-
-1. New user: sign a Nostr login challenge.
-2. Optionally bind a passkey in Account settings.
-3. Next sign-ins: use Nostr or passkey.
-4. Optional: link an SSH public key for MUD flows.
+- Single-use
+- Short-lived (about 2 minutes)
+- Bound to this domain
+- Verified against signed event time
 
 ## Safety Notes
 
-- Never paste private key material into web forms.
-- If you generate an SSH key in Account settings, keep the downloaded private key safe.
-- Only submit your `.pub` key string when linking SSH.
+- Never paste private key material (`nsec`) into any form.
+- Sign only events that include this site domain/origin and expected action tags.
+- Use the challenge expiry as a hard limit.
 
-## How to Create an SSH Key Pair (If Needed)
+## Device Approval (Delegation)
 
-```sh
-ssh-keygen -t ed25519 -C "your-name@your-device"
-```
+You can choose:
 
-Your public key is then typically at:
+- **One-time login**: no delegated device key.
+- **Approve this device for N days**: creates a local session keypair (`P_sess/S_sess`) in your browser, default 30 days (range 1-90).
 
-```sh
-~/.ssh/id_ed25519.pub
-```
+Delegation is signed by your account key (`P_user`) and includes domain + expiry.  
+During the delegation window, the browser can authenticate with `S_sess` without repeated prompts.
 
-Use that `.pub` content when linking SSH in Account settings.
+## Logout and Revocation
+
+- **Logout** clears local session key material and invalidates the server session.
+- **Log out everywhere** requires a fresh signature from `P_user` and revokes all active device delegations.

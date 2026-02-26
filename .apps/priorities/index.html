@@ -208,6 +208,8 @@
       prioritizeHoverLockUntil: 0,
       pointerClientX: null,
       pointerClientY: null,
+      pendingTrashUndo: null,
+      pendingTrashSeq: 0,
       reorderAnimationPromise: null,
       reorderAnimationResolve: null
     };
@@ -614,12 +616,10 @@
       }
     }
 
-    function status(text, isError) {
-      var el = document.getElementById('toast');
+    function clearToastTimers(el) {
       if (!el) {
         return;
       }
-      var message = String(text || '').trim();
       if (el._hideTimer) {
         clearTimeout(el._hideTimer);
         el._hideTimer = null;
@@ -628,16 +628,56 @@
         clearTimeout(el._clearTimer);
         el._clearTimer = null;
       }
+    }
+
+    function status(text, isError, options) {
+      var el = document.getElementById('toast');
+      if (!el) {
+        return;
+      }
+      options = options || {};
+      var message = String(text || '').trim();
+      clearToastTimers(el);
       if (!message) {
-        el.classList.remove('visible', 'fading-out', 'error', 'success');
+        el.classList.remove('visible', 'fading-out', 'error', 'success', 'interactive', 'bottom');
         el.classList.add('hidden');
         el.textContent = '';
         el.setAttribute('aria-hidden', 'true');
         return;
       }
-      el.textContent = message;
+      var actionLabel = String(options.actionLabel || '').trim();
+      var onAction = typeof options.onAction === 'function' ? options.onAction : null;
+      var placement = String(options.placement || '').trim().toLowerCase();
+      var hasAction = !!(actionLabel && onAction);
+      var durationMs = Number(options.durationMs);
+      if (!Number.isFinite(durationMs) || durationMs < 0) {
+        durationMs = hasAction ? 5200 : 3000;
+      }
+      el.textContent = '';
+      var messageNode = document.createElement('span');
+      messageNode.className = 'toast-message';
+      messageNode.textContent = message;
+      el.appendChild(messageNode);
+      if (hasAction) {
+        var actionButton = document.createElement('button');
+        actionButton.type = 'button';
+        actionButton.className = 'toast-action';
+        actionButton.textContent = actionLabel;
+        actionButton.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          try {
+            onAction();
+          } catch (_) {
+            // Ignore toast action failures.
+          }
+        });
+        el.appendChild(actionButton);
+      }
       el.classList.toggle('error', !!isError);
       el.classList.toggle('success', !isError);
+      el.classList.toggle('interactive', hasAction);
+      el.classList.toggle('bottom', placement === 'bottom');
       el.classList.remove('hidden', 'fading-out', 'visible');
       void el.offsetWidth;
       el.classList.add('visible');
@@ -650,10 +690,10 @@
         el._clearTimer = setTimeout(function () {
           el._clearTimer = null;
           el.classList.add('hidden');
-          el.classList.remove('fading-out', 'error', 'success');
+          el.classList.remove('fading-out', 'error', 'success', 'interactive', 'bottom');
           el.textContent = '';
         }, 210);
-      }, 3000);
+      }, durationMs);
     }
 
     function setLoadingOverlay(visible) {
@@ -2632,6 +2672,14 @@
       scheduleHostPrioritiesDragHoleSync();
     }
 
+    function isMacEmojiPickerShortcut(event) {
+      if (!event || !event.metaKey || !event.ctrlKey || event.altKey || event.shiftKey) {
+        return false;
+      }
+      var key = String(event.key || '');
+      return key === ' ' || key === 'Spacebar' || key === 'Space';
+    }
+
     function bindStandardTextboxBehavior(input) {
       if (!input || input._prioritiesTextboxBound) {
         return;
@@ -2643,6 +2691,9 @@
           event.preventDefault();
           event.stopPropagation();
           input.select();
+          return;
+        }
+        if (isMacEmojiPickerShortcut(event)) {
           return;
         }
         event.stopPropagation();
@@ -2952,11 +3003,11 @@
         nameStack.appendChild(edit);
       } else {
         name.textContent = item.name;
-        name.classList.add('hover-outline-name');
         if (item.kind === 'dir') {
           name.classList.add('project-name-clickable');
         }
         if (item.kind === 'file') {
+          name.classList.add('hover-outline-name');
           name.classList.add('editable-name');
           name.addEventListener('click', function (event) {
             event.preventDefault();
@@ -3301,7 +3352,9 @@
         if (!tree.childNodes.length) {
           status('No priorities found.', false);
         } else {
-          status('', false);
+          if (!state.pendingTrashUndo) {
+            status('', false);
+          }
           saveStartupSnapshot();
         }
         scheduleHostPrioritiesDragHoleSync();
@@ -3585,6 +3638,65 @@
       return window.confirm(message);
     }
 
+    async function finalizePendingTrashRemoval(pending) {
+      if (!pending || pending.committing) {
+        return;
+      }
+      pending.committing = true;
+      while (state.busy) {
+        await new Promise(function (resolve) { setTimeout(resolve, 36); });
+      }
+      state.busy = true;
+      try {
+        await runMutationWithListFallback(
+          pending.parentDir,
+          ['remove-fast', pending.path],
+          ['remove', pending.path]
+        );
+      } catch (error) {
+        if (pending.removedOptimistically && pending.previousItems) {
+          setCachedDirItems(pending.parentDir, pending.previousItems);
+          await render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+        }
+        throw error;
+      } finally {
+        state.busy = false;
+        processPrioritizeQueue();
+      }
+    }
+
+    function flushPendingTrashUndo() {
+      var pending = state.pendingTrashUndo;
+      if (!pending) {
+        return;
+      }
+      state.pendingTrashUndo = null;
+      if (pending.timer) {
+        clearTimeout(pending.timer);
+        pending.timer = null;
+      }
+      finalizePendingTrashRemoval(pending).catch(function (error) {
+        status(String(error && error.message ? error.message : error), true);
+      });
+    }
+
+    function undoPendingTrashRemoval(pendingId) {
+      var pending = state.pendingTrashUndo;
+      if (!pending || pending.id !== pendingId) {
+        return;
+      }
+      state.pendingTrashUndo = null;
+      if (pending.timer) {
+        clearTimeout(pending.timer);
+        pending.timer = null;
+      }
+      if (pending.removedOptimistically && pending.previousItems) {
+        setCachedDirItems(pending.parentDir, pending.previousItems);
+        render({ suppressLoadingOverlay: true, preserveInputSelection: true });
+      }
+      status('Delete undone.', false, { placement: 'bottom', durationMs: 1800 });
+    }
+
     function actRemove(itemOrPath) {
       if (!itemOrPath || state.busy) {
         return;
@@ -3597,6 +3709,7 @@
         if (!ok) {
           return;
         }
+        flushPendingTrashUndo();
         var parentDir = parentDirOfPath(path);
         var cachedParentItems = getCachedDirItems(parentDir);
         var previousItems = Array.isArray(cachedParentItems) ? cachedParentItems.slice() : null;
@@ -3604,20 +3717,35 @@
         if (removedOptimistically) {
           render({ suppressLoadingOverlay: true, preserveInputSelection: true });
         }
-        return runAction(function () {
-          return runMutationWithListFallback(
-            parentDir,
-            ['remove-fast', path],
-            ['remove', path]
-          ).catch(function (error) {
-            if (removedOptimistically && previousItems) {
-              setCachedDirItems(parentDir, previousItems);
-              render({ suppressLoadingOverlay: true, preserveInputSelection: true });
-            }
-            throw error;
+        var pendingId = state.pendingTrashSeq + 1;
+        state.pendingTrashSeq = pendingId;
+        var pending = {
+          id: pendingId,
+          path: path,
+          parentDir: parentDir,
+          previousItems: previousItems,
+          removedOptimistically: removedOptimistically,
+          timer: null,
+          committing: false
+        };
+        state.pendingTrashUndo = pending;
+        pending.timer = setTimeout(function () {
+          if (!state.pendingTrashUndo || state.pendingTrashUndo.id !== pending.id) {
+            return;
+          }
+          state.pendingTrashUndo = null;
+          pending.timer = null;
+          finalizePendingTrashRemoval(pending).catch(function (error) {
+            status(String(error && error.message ? error.message : error), true);
           });
-        }, {
-          suppressLoadingOverlay: true
+        }, 5200);
+        status('Priority moved to trash.', false, {
+          placement: 'bottom',
+          durationMs: 5200,
+          actionLabel: 'Undo',
+          onAction: function () {
+            undoPendingTrashRemoval(pendingId);
+          }
         });
       }).catch(function (error) {
         status(String(error && error.message ? error.message : error), true);
@@ -3744,11 +3872,16 @@
       }
       state.pendingMakeProjectPath = path;
       render({ suppressLoadingOverlay: true });
+      var parentDir = parentDirOfPath(path);
       runAction(function () {
-        return runBackend(['make-project', path]);
+        return runMutationWithListFallback(
+          parentDir,
+          ['make-project-fast', path],
+          ['make-project', path]
+        );
       }, {
         suppressLoadingOverlay: true,
-        invalidateDirs: [parentDirOfPath(path)]
+        invalidateDirs: [parentDir]
       }).then(function () {
         state.revealedMakeProjectPath = '';
         drillInto(path);
@@ -4258,6 +4391,9 @@
         var key = String(event.key || '').toLowerCase();
         var target = event.target;
         var isAddInputFocused = !!(target && target.classList && target.classList.contains('add-inline-input'));
+        if (isMacEmojiPickerShortcut(event)) {
+          return;
+        }
 
         if (hasPrimaryMod) {
           if (key === 'a' || key === 'c') {

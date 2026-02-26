@@ -18,6 +18,8 @@ Actions:
   prioritize-quick PATH Promote PATH and print: echelon<tab>priority<tab>checked
   check-toggle PATH     Toggle checked state using check/uncheck spells
   make-project PATH     Convert PATH file to project folder
+  make-project-fast PATH
+                        Convert PATH file to project folder and emit parent listing
   rename PATH NAME      Rename PATH to NAME in same directory
   add DIR NAME          Add NAME in DIR and prioritize it
   remove PATH           Move PATH to system trash
@@ -1072,6 +1074,83 @@ descendant_count_impl() {
   printf '%s\n' "$count"
 }
 
+make_project_convert_impl() {
+  target=$1
+  if [ -z "$target" ]; then
+    printf '%s\n' "priorities-backend: path required for make-project" >&2
+    return 2
+  fi
+  if [ ! -e "$target" ]; then
+    printf '%s\n' "priorities-backend: file not found: $target" >&2
+    return 1
+  fi
+  if [ -d "$target" ]; then
+    return 0
+  fi
+
+  if command -v file-to-folder >/dev/null 2>&1; then
+    if file-to-folder "$target" >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+
+  parent_dir=$(dirname "$target")
+  base_name=$(basename "$target")
+  tmp_item=$parent_dir/."$base_name".priorities-project.$$
+  tmp_index=0
+  while [ -e "$tmp_item" ]; do
+    tmp_index=$((tmp_index + 1))
+    tmp_item=$parent_dir/."$base_name".priorities-project.$$.${tmp_index}
+  done
+
+  mv -- "$target" "$tmp_item"
+  if ! mkdir -- "$target"; then
+    mv -- "$tmp_item" "$target" >/dev/null 2>&1 || true
+    printf '%s\n' "priorities-backend: could not create project directory: $target" >&2
+    return 1
+  fi
+  if ! mv -- "$tmp_item" "$target/$base_name"; then
+    rmdir -- "$target" >/dev/null 2>&1 || true
+    mv -- "$tmp_item" "$target" >/dev/null 2>&1 || true
+    printf '%s\n' "priorities-backend: could not move file into project directory: $target" >&2
+    return 1
+  fi
+  return 0
+}
+
+make_project_impl() {
+  target=$1
+  if [ -z "$target" ]; then
+    printf '%s\n' "priorities-backend: path required for make-project" >&2
+    return 2
+  fi
+
+  read_item_attrs "$target"
+  preserve_echelon=$attr_echelon
+  preserve_priority=$attr_priority
+  preserve_checked=$attr_checked
+  preserve_upvotes=$attr_upvotes
+
+  make_project_convert_impl "$target"
+
+  case "$preserve_echelon" in
+    ''|*Error*|*[!0-9]*) ;;
+    *) set_user_attr "$target" echelon "$preserve_echelon" ;;
+  esac
+  case "$preserve_priority" in
+    ''|*Error*|*[!0-9]*) ;;
+    *) set_user_attr "$target" priority "$preserve_priority" ;;
+  esac
+  case "$preserve_checked" in
+    ''|*Error*|*[!0-9]*) ;;
+    *) set_user_attr "$target" checked "$preserve_checked" ;;
+  esac
+  case "$preserve_upvotes" in
+    ''|*Error*|*[!0-9]*) ;;
+    *) set_user_attr "$target" upvotes "$preserve_upvotes" ;;
+  esac
+}
+
 set_order_emit_impl() {
   directory=$1
   echelon=$2
@@ -1641,29 +1720,19 @@ case "$action" in
       exit 2
     fi
     target=$(expand_home_path "$target")
-    read_item_attrs "$target"
-    preserve_echelon=$attr_echelon
-    preserve_priority=$attr_priority
-    preserve_checked=$attr_checked
-    preserve_upvotes=$attr_upvotes
-    file-to-folder "$target" >/dev/null
-    case "$preserve_echelon" in
-      ''|*Error*|*[!0-9]*) ;;
-      *) set_user_attr "$target" echelon "$preserve_echelon" ;;
-    esac
-    case "$preserve_priority" in
-      ''|*Error*|*[!0-9]*) ;;
-      *) set_user_attr "$target" priority "$preserve_priority" ;;
-    esac
-    case "$preserve_checked" in
-      ''|*Error*|*[!0-9]*) ;;
-      *) set_user_attr "$target" checked "$preserve_checked" ;;
-    esac
-    case "$preserve_upvotes" in
-      ''|*Error*|*[!0-9]*) ;;
-      *) set_user_attr "$target" upvotes "$preserve_upvotes" ;;
-    esac
+    make_project_impl "$target"
     printf '%s\n' "$target"
+    ;;
+
+  make-project-fast)
+    target=${1-}
+    if [ -z "$target" ]; then
+      printf '%s\n' "priorities-backend: path required for make-project-fast" >&2
+      exit 2
+    fi
+    target=$(expand_home_path "$target")
+    make_project_impl "$target"
+    emit_list "$(dirname "$target")"
     ;;
 
   rename)

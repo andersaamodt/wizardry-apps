@@ -482,6 +482,8 @@ header h1 {
   opacity: 0;
   transform: translateY(10px) scale(0.985);
   transition: opacity 0.2s ease, transform 0.2s ease;
+  max-height: calc(100vh - 4rem);
+  overflow: auto;
 }
 
 .auth-modal.is-open .auth-modal-panel {
@@ -555,6 +557,102 @@ header h1 {
   gap: 0.6rem;
   margin-top: 0.7rem;
   flex-wrap: wrap;
+}
+
+.auth-actions-primary {
+  margin-top: 0.42rem;
+}
+
+.auth-intent {
+  margin: 0.4rem 0 0.62rem;
+  border: 1px solid #d7e2f6;
+  border-radius: 10px;
+  background: #f1f6ff;
+  padding: 0.6rem 0.72rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.auth-intent-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  color: #1f335f;
+  font-size: 0.88rem;
+}
+
+.auth-intent-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+.auth-intent-days label {
+  font-weight: 700;
+}
+
+.auth-days-input {
+  width: 6.3rem;
+  min-width: 6.3rem;
+}
+
+.auth-panel {
+  margin-top: 0.72rem;
+  border-top: 1px solid #d8e1f5;
+  padding-top: 0.62rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.auth-qr {
+  width: 196px;
+  min-height: 196px;
+  border: 1px solid #c4d2f1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.32rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-qr img,
+.auth-qr canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.auth-nip46-uri {
+  margin: 0.2rem 0 0;
+  border: 1px solid #d8e1f5;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.46rem 0.56rem;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.auth-manual-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.3rem 0.55rem;
+  align-items: center;
+}
+
+.auth-manual-grid label {
+  margin: 0;
+  color: #1f335f;
+  font-size: 0.82rem;
+}
+
+.auth-manual-grid .auth-input {
+  min-height: 0;
 }
 
 .auth-passkey-inline-message {
@@ -677,6 +775,10 @@ header h1 {
     width: 100%;
     min-width: 0;
     min-height: 84px;
+  }
+
+  .auth-manual-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -906,7 +1008,7 @@ button.tag,
   background: #f6f8ff;
   border-color: #e2e8f8;
   color: #6f7fae;
-  filter: blur(2.8px);
+  filter: blur(4.8px);
   transition: filter 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
 

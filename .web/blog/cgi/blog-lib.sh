@@ -960,6 +960,10 @@ blog_create_session() {
   delegation_id=${5-}
   auth_method=${6-nostr}
   force_interactive=${7-false}
+  case "$force_interactive" in
+    true|1|yes|on) force_interactive=true ;;
+    *) force_interactive=false ;;
+  esac
 
   token=$(blog_random_token 24)
   csrf=$(blog_random_token 16)
@@ -1007,6 +1011,10 @@ blog_load_session() {
   load_delegation_id=$(config-get "$load_path" delegation_id 2>/dev/null || printf '')
   load_auth_method=$(config-get "$load_path" auth_method 2>/dev/null || printf 'nostr')
   load_force_interactive=$(config-get "$load_path" force_interactive 2>/dev/null || printf 'false')
+  case "$load_force_interactive" in
+    true|1|yes|on) load_force_interactive=true ;;
+    *) load_force_interactive=false ;;
+  esac
 
   if [ -z "$load_username" ] || [ -z "$load_csrf" ]; then
     return 1
@@ -1070,6 +1078,11 @@ blog_require_session() {
 
   if [ "$require_admin" = "true" ] && [ "$BLOG_SESSION_IS_ADMIN" != "true" ]; then
     blog_json_error "Admin permission required" "admin_required"
+    return 1
+  fi
+
+  if [ "$require_admin" = "true" ] && [ "$BLOG_SESSION_AUTH_METHOD" = "nostr_delegated" ] && [ "${BLOG_SESSION_FORCE_INTERACTIVE-false}" = "true" ]; then
+    blog_json_error "This action requires direct signer approval. Sign in with Login with Nostr or Use phone signer (QR)." "interactive_signature_required"
     return 1
   fi
 
