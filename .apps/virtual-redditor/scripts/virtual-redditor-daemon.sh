@@ -816,7 +816,11 @@ mode_action_trigger_match() {
   read_modes_config_json | jq -c --arg body "$body_lc" --argjson is_mod "$author_is_mod" '
     (.actionTriggers // [])
     | map(select(
-        ((.triggerAction // "set_mode") == "set_mode" or (.triggerAction // "set_mode") == "canned_reply")
+        ((.triggerAction // "set_mode") == "set_mode"
+          or (.triggerAction // "set_mode") == "canned_reply"
+          or (.triggerAction // "set_mode") == "warn"
+          or (.triggerAction // "set_mode") == "mod_action"
+          or (.triggerAction // "set_mode") == "rate_limit_user")
         and (((.adminOnly // false) | not) or $is_mod)
         and
         ((.matchAny // []) | map(tostring | ascii_downcase) | map(select(length > 0)) | any($body | contains(.)))
@@ -2091,11 +2095,11 @@ process_comment() {
   comment_author_is_mod=$(printf '%s' "$comment_json" | jq -r 'if ((.distinguished // "") == "moderator") or (.author_is_moderator == true) then "true" else "false" end' 2>/dev/null || printf 'false')
   action_trigger=$(mode_action_trigger_match "$comment_json" "$comment_author_is_mod")
   trigger_action_type=$(printf '%s' "$action_trigger" | jq -r '.triggerAction // "set_mode"' 2>/dev/null || printf 'set_mode')
-  if [ "$trigger_action_type" = "set_mode" ]; then
+  if [ "$trigger_action_type" = "set_mode" ] || [ "$trigger_action_type" = "mod_action" ]; then
     trigger_to_mode=$(printf '%s' "$action_trigger" | jq -r '.toMode // empty' 2>/dev/null || printf '')
     [ -n "$trigger_to_mode" ] || trigger_action_type=''
   fi
-  if [ "$trigger_action_type" = "set_mode" ]; then
+  if [ "$trigger_action_type" = "set_mode" ] || [ "$trigger_action_type" = "mod_action" ]; then
     trigger_id=$(printf '%s' "$action_trigger" | jq -r '.id // "action-trigger"' 2>/dev/null || printf 'action-trigger')
     duration=$(printf '%s' "$action_trigger" | jq -r '.durationHours // 0' 2>/dev/null || printf '0')
     duration=$(to_int "$duration" 0)
@@ -2108,21 +2112,28 @@ process_comment() {
     relationship_upsert_row "$relationship_row" || :
     current_mode=$(printf '%s' "$relationship_row" | jq -r '.current_mode // empty' 2>/dev/null || printf '')
     current_mode=$(find_mode_id_or_default "$current_mode")
-    append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg from "$previous_mode" --arg to "$current_mode" --arg trigger "$trigger_id" --arg comment_id "$thing_id" '{user_id:$user,from_mode:$from,to_mode:$to,trigger_id:$trigger,comment_id:$comment_id}')"
+    append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg from "$previous_mode" --arg to "$current_mode" --arg trigger "$trigger_id" --arg action "$trigger_action_type" --arg comment_id "$thing_id" '{user_id:$user,from_mode:$from,to_mode:$to,trigger_id:$trigger,action:$action,comment_id:$comment_id}')"
 
-    if [ "$announce_bool" = true ] && [ "$(mode_allows_action "$current_mode" "Post Ban Notice")" = "true" ]; then
-      notice=$(printf '%s' "$action_trigger" | jq -r '.template // empty' 2>/dev/null || printf '')
-      if [ -n "$notice" ]; then
-        if notice_reply_id=$(post_reply "$thing_id" "$notice" 2>/dev/null); then
-          trigger_decision=$(jq -cn --arg trigger "$trigger_id" --arg mode "$current_mode" '{trigger:$trigger,toMode:$mode}')
-          record_reply_event "$comment_json" "$notice_reply_id" "$notice" "action-trigger" "$trigger_decision" "action-trigger"
+    trigger_template=$(printf '%s' "$action_trigger" | jq -r '.template // empty' 2>/dev/null || printf '')
+    if [ "$trigger_action_type" = "mod_action" ] && [ -z "$trigger_template" ]; then
+      trigger_template=$(read_modes_config_json | jq -r --arg user "$author" --arg mode "$current_mode" '.replies.modeSwitchTemplate // "" | gsub("\\{\\{user\\}\\}";$user) | gsub("\\{\\{mode\\}\\}";$mode)' 2>/dev/null || printf '')
+    fi
+    if [ "$trigger_action_type" = "mod_action" ] || [ "$announce_bool" = true ]; then
+      if [ -n "$trigger_template" ] && [ "$(mode_allows_action "$current_mode" "Reply to Comments")" = "true" ]; then
+        trigger_reply=$(printf '%s' "$trigger_template" | jq -Rr --arg user "$author" --arg mode "$current_mode" --arg subreddit "$SUBREDDIT" 'gsub("\\{\\{user\\}\\}";$user) | gsub("\\{\\{mode\\}\\}";$mode) | gsub("\\{\\{subreddit\\}\\}";$subreddit)' 2>/dev/null || printf '%s' "$trigger_template")
+        if [ -n "$trigger_reply" ] && trigger_reply_id=$(post_reply "$thing_id" "$trigger_reply" 2>/dev/null); then
+          trigger_decision=$(jq -cn --arg trigger "$trigger_id" --arg mode "$current_mode" --arg action "$trigger_action_type" '{trigger:$trigger,toMode:$mode,action:$action}')
+          record_reply_event "$comment_json" "$trigger_reply_id" "$trigger_reply" "action-trigger" "$trigger_decision" "action-trigger"
         fi
       fi
     fi
     return 0
-  elif [ "$trigger_action_type" = "canned_reply" ]; then
+  elif [ "$trigger_action_type" = "canned_reply" ] || [ "$trigger_action_type" = "warn" ]; then
     trigger_id=$(printf '%s' "$action_trigger" | jq -r '.id // "action-trigger"' 2>/dev/null || printf 'action-trigger')
     canned_template=$(printf '%s' "$action_trigger" | jq -r '.template // empty' 2>/dev/null || printf '')
+    if [ "$trigger_action_type" = "warn" ] && [ -z "$canned_template" ]; then
+      canned_template=$(read_modes_config_json | jq -r '.replies.warningTemplate // empty' 2>/dev/null || printf '')
+    fi
     if [ -z "$canned_template" ]; then
       append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg trigger "$trigger_id" --arg action "$trigger_action_type" --arg reason "empty-template" --arg comment_id "$thing_id" '{user_id:$user,trigger_id:$trigger,action:$action,reason:$reason,comment_id:$comment_id}')"
       return 0
@@ -2139,6 +2150,23 @@ process_comment() {
         append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg trigger "$trigger_id" --arg action "$trigger_action_type" --arg comment_id "$thing_id" '{user_id:$user,trigger_id:$trigger,action:$action,comment_id:$comment_id}')"
       fi
     fi
+    return 0
+  elif [ "$trigger_action_type" = "rate_limit_user" ]; then
+    trigger_id=$(printf '%s' "$action_trigger" | jq -r '.id // "action-trigger"' 2>/dev/null || printf 'action-trigger')
+    duration=$(printf '%s' "$action_trigger" | jq -r '.durationHours // 24' 2>/dev/null || printf '24')
+    duration=$(to_int "$duration" 24)
+    if [ "$duration" -le 0 ]; then
+      append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg trigger "$trigger_id" --arg action "$trigger_action_type" --arg reason "invalid-duration" --arg comment_id "$thing_id" '{user_id:$user,trigger_id:$trigger,action:$action,reason:$reason,comment_id:$comment_id}')"
+      return 0
+    fi
+    max_replies_cap=$(printf '%s' "$action_trigger" | jq -r '.maxRepliesPerUserThread24h // 1' 2>/dev/null || printf '1')
+    max_replies_cap=$(to_int "$max_replies_cap" 1)
+    if [ "$max_replies_cap" -le 0 ]; then max_replies_cap=1; fi
+    now_ts=$(now_epoch)
+    rl_expires=$((now_ts + (duration * 3600)))
+    relationship_row=$(printf '%s' "$relationship_row" | jq -c --argjson max "$max_replies_cap" --argjson exp "$rl_expires" --arg trigger "action-trigger:$trigger_id" '. + {rate_limit_max_replies_per_thread_24h:$max,rate_limit_expires_at:$exp,trigger:$trigger}' 2>/dev/null || printf '%s' "$relationship_row")
+    relationship_upsert_row "$relationship_row" || :
+    append_mode_log_event "action-trigger" "$(jq -cn --arg user "$author_key" --arg trigger "$trigger_id" --arg action "$trigger_action_type" --argjson max "$max_replies_cap" --argjson expires "$rl_expires" --arg comment_id "$thing_id" '{user_id:$user,trigger_id:$trigger,action:$action,max_replies_per_thread_24h:$max,expires_at_epoch:$expires,comment_id:$comment_id}')"
     return 0
   fi
 
@@ -2258,6 +2286,16 @@ process_comment() {
   constraints=$(mode_constraints_for "$current_mode")
   max_replies=$(printf '%s' "$constraints" | jq -r '.maxRepliesPerUserThread24h // -1' 2>/dev/null || printf '-1')
   max_replies=$(to_int "$max_replies" -1)
+  relationship_rate_limit_max=$(printf '%s' "$relationship_row" | jq -r '.rate_limit_max_replies_per_thread_24h // empty' 2>/dev/null || printf '')
+  relationship_rate_limit_exp=$(printf '%s' "$relationship_row" | jq -r '.rate_limit_expires_at // empty' 2>/dev/null || printf '')
+  relationship_rate_limit_max=$(to_int "$relationship_rate_limit_max" -1)
+  relationship_rate_limit_exp=$(to_int "$relationship_rate_limit_exp" 0)
+  now_epoch_val=$(now_epoch)
+  if [ "$relationship_rate_limit_max" -ge 0 ] && [ "$relationship_rate_limit_exp" -gt "$now_epoch_val" ]; then
+    if [ "$max_replies" -lt 0 ] || [ "$relationship_rate_limit_max" -lt "$max_replies" ]; then
+      max_replies=$relationship_rate_limit_max
+    fi
+  fi
   can_followup=$(printf '%s' "$constraints" | jq -r '.canFollowup // true' 2>/dev/null || printf 'true')
   can_mention=$(printf '%s' "$constraints" | jq -r '.canMention // true' 2>/dev/null || printf 'true')
   can_quote=$(printf '%s' "$constraints" | jq -r '.canQuote // true' 2>/dev/null || printf 'true')

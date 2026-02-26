@@ -2206,6 +2206,10 @@ label {
   flex: 1 1 240px !important;
 }
 
+.trigger-rate-limit-input {
+  flex: 0 0 96px !important;
+}
+
 .trigger-announce-toggle,
 .trigger-admin-toggle,
 .transition-announce-toggle {
@@ -2216,16 +2220,25 @@ label {
   flex: 0 0 auto;
 }
 
-.action-trigger-row .trigger-field-setmode {
+.action-trigger-row .trigger-field-mode,
+.action-trigger-row .trigger-field-duration,
+.action-trigger-row .trigger-field-template,
+.action-trigger-row .trigger-field-rate-limit,
+.action-trigger-row .trigger-field-announce {
   display: none;
 }
 
-.action-trigger-row.trigger-action-set_mode .trigger-field-setmode {
-  display: inline-flex;
-}
-
-.action-trigger-row.trigger-action-set_mode input.trigger-field-setmode,
-.action-trigger-row.trigger-action-set_mode select.trigger-field-setmode {
+.action-trigger-row.trigger-action-set_mode .trigger-field-mode,
+.action-trigger-row.trigger-action-set_mode .trigger-field-duration,
+.action-trigger-row.trigger-action-set_mode .trigger-field-template,
+.action-trigger-row.trigger-action-set_mode .trigger-field-announce,
+.action-trigger-row.trigger-action-mod_action .trigger-field-mode,
+.action-trigger-row.trigger-action-mod_action .trigger-field-duration,
+.action-trigger-row.trigger-action-mod_action .trigger-field-template,
+.action-trigger-row.trigger-action-canned_reply .trigger-field-template,
+.action-trigger-row.trigger-action-warn .trigger-field-template,
+.action-trigger-row.trigger-action-rate_limit_user .trigger-field-duration,
+.action-trigger-row.trigger-action-rate_limit_user .trigger-field-rate-limit {
   display: inline-block;
 }
 
@@ -2259,15 +2272,19 @@ label {
 }
 
 .trigger-grid-head span:nth-child(7) {
+  flex: 0 0 96px;
+}
+
+.trigger-grid-head span:nth-child(8) {
   flex: 1 1 240px;
 }
 
-.trigger-grid-head span:nth-child(8),
-.trigger-grid-head span:nth-child(9) {
+.trigger-grid-head span:nth-child(9),
+.trigger-grid-head span:nth-child(10) {
   flex: 0 0 86px;
 }
 
-.trigger-grid-head span:nth-child(10) {
+.trigger-grid-head span:nth-child(11) {
   flex: 0 0 68px;
 }
 

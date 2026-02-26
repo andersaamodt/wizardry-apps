@@ -3678,6 +3678,9 @@
       var action = String((actionSel || {}).value || 'set_mode');
       row.classList.toggle('trigger-action-set_mode', action === 'set_mode');
       row.classList.toggle('trigger-action-canned_reply', action === 'canned_reply');
+      row.classList.toggle('trigger-action-warn', action === 'warn');
+      row.classList.toggle('trigger-action-mod_action', action === 'mod_action');
+      row.classList.toggle('trigger-action-rate_limit_user', action === 'rate_limit_user');
     }
 
     function updateModeFromDrawerField(event) {
@@ -3909,7 +3912,7 @@
         '</div>',
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Action Triggers (Decorator)</div>',
-        '  <div class="mode-drawer-helper">Action triggers match user phrases and run configured actions. Supported actions are relationship mode set and canned reply. Host-computer command triggers are not enabled.</div>',
+        '  <div class="mode-drawer-helper">Action triggers match user phrases and run configured actions. Supported actions: set mode, canned reply, warn, mod action, and rate limit user. Host-computer command triggers are not enabled.</div>',
         '  <div class="modes-section-head mode-drawer-trigger-head">',
         '    <div class="persona-section-title">Triggers</div>',
         '    <button type="button" class="soft mini-add-btn" data-add-action-trigger title="Add a new action trigger">Add trigger</button>',
@@ -4173,11 +4176,14 @@
           var triggerId = String(row.getAttribute('data-trigger-id') || '').trim();
           var label = String((row.querySelector('[data-trigger-label]') || {}).value || '').trim();
           var triggerAction = String((row.querySelector('[data-trigger-action]') || {}).value || 'set_mode').trim();
-          if (triggerAction !== 'set_mode' && triggerAction !== 'canned_reply') triggerAction = 'set_mode';
+          if (['set_mode', 'canned_reply', 'warn', 'mod_action', 'rate_limit_user'].indexOf(triggerAction) < 0) {
+            triggerAction = 'set_mode';
+          }
           var matchAny = parseCsvList(String((row.querySelector('[data-trigger-matchany]') || {}).value || ''));
           var toMode = String((row.querySelector('[data-trigger-to-mode]') || {}).value || '').trim();
           var duration = Math.max(0, parseInt((row.querySelector('[data-trigger-duration]') || {}).value || '0', 10) || 0);
           var decayTo = String((row.querySelector('[data-trigger-decay-to]') || {}).value || '').trim();
+          var maxReplies = Math.max(1, parseInt((row.querySelector('[data-trigger-max-replies]') || {}).value || '1', 10) || 1);
           var template = String((row.querySelector('[data-trigger-template]') || {}).value || '');
           var adminOnly = !!((row.querySelector('[data-trigger-admin-only]') || {}).checked);
           var announce = !!((row.querySelector('[data-trigger-announce]') || {}).checked);
@@ -4190,6 +4196,7 @@
             toMode: toMode,
             durationHours: duration,
             decayTo: decayTo,
+            maxRepliesPerUserThread24h: maxReplies,
             template: template,
             announce: announce
           });
@@ -4331,6 +4338,7 @@
           toMode: String(cfg.defaultDecayMode || cfg.startingMode || ''),
           durationHours: 0,
           decayTo: '',
+          maxRepliesPerUserThread24h: 1,
           template: '',
           announce: true
         });
@@ -5071,6 +5079,7 @@
           target.hasAttribute('data-trigger-label') ||
           target.hasAttribute('data-trigger-matchany') ||
           target.hasAttribute('data-trigger-duration') ||
+          target.hasAttribute('data-trigger-max-replies') ||
           target.hasAttribute('data-trigger-template') ||
           target.hasAttribute('data-transition-duration-action') ||
           target.hasAttribute('data-transition-to-mode-action') ||
