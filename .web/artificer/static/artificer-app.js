@@ -6762,7 +6762,8 @@
     var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 0;
-    var maxWaveHeight = 17;
+    var maxWaveHeight = 15;
+    var silenceGate = 0.07;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -6781,14 +6782,14 @@
       }
       bar.classList.remove("is-baseline");
       var height = baselineHeight;
-      if (unit > 0.02) {
-        var adjusted = (unit - 0.02) / 0.98;
+      if (unit > silenceGate) {
+        var adjusted = (unit - silenceGate) / (1 - silenceGate);
         if (adjusted < 0) {
           adjusted = 0;
         } else if (adjusted > 1) {
           adjusted = 1;
         }
-        height = 1 + Math.round(Math.pow(adjusted, 1.18) * (maxWaveHeight - 1));
+        height = baselineHeight + Math.round(Math.pow(adjusted, 1.28) * maxWaveHeight);
       }
       bar.style.height = String(height) + "px";
     }
