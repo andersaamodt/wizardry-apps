@@ -2005,13 +2005,14 @@ label {
   box-shadow: none;
   align-self: stretch;
   min-height: 0;
+  height: 100%;
   transform: translateX(20px);
   opacity: 0;
   pointer-events: none;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   transition: transform 180ms ease, opacity 180ms ease;
-  display: flex;
-  flex-direction: column;
+  display: block;
 }
 
 .mode-detail-drawer.open {
@@ -2083,9 +2084,7 @@ label {
 }
 
 .mode-detail-drawer-body {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   padding: 10px 12px 12px;
   display: grid;
   gap: 8px;
