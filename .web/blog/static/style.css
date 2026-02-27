@@ -75,7 +75,7 @@ button:disabled,
 input:disabled,
 select:disabled,
 [aria-disabled="true"] {
-  cursor: not-allowed;
+  cursor: default;
 }
 
 body > h1:first-of-type {
@@ -1581,20 +1581,20 @@ input[type="reset"],
   cursor: pointer;
 }
 
-button:hover,
-.btn:hover {
+button:hover:not(:disabled),
+.btn:hover:not(:disabled) {
   background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
 }
 
-button:active,
-.btn:active {
+button:active:not(:disabled),
+.btn:active:not(:disabled) {
   background: linear-gradient(135deg, #21618c 0%, #1a5276 100%);
 }
 
 button:disabled,
 .btn:disabled {
   opacity: 0.6;
-  cursor: not-allowed;
+  cursor: default;
 }
 
 /* Success Button Variant */

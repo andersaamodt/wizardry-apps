@@ -669,6 +669,16 @@
       });
   }
 
+  function finalizeLoginUiAfterSuccess() {
+    return checkAuth().then(function () {
+      if (!state.isAuthenticated) {
+        throw new Error('Login signature was accepted, but no active session was established. Try again and check signer permissions for this domain.');
+      }
+      hideAuthModal();
+      window.location.reload();
+    });
+  }
+
   function openUserMenu() {
     if (!els.menuPanel || !els.menuBtn) {
       return;
@@ -975,9 +985,9 @@
             return finishLogin(begin.request_id, signed, null, intent.forceInteractive)
               .then(function (finish) {
                 rememberAuth(finish);
-                hideAuthModal();
-                window.location.reload();
-                return true;
+                return finalizeLoginUiAfterSuccess().then(function () {
+                  return true;
+                });
               });
           })
           .catch(function () {
@@ -1070,8 +1080,7 @@
             return idbDelete(KEY_DEVICE_SESSION);
           })
           .then(function () {
-            hideAuthModal();
-            window.location.reload();
+            return finalizeLoginUiAfterSuccess();
           });
       });
   }
@@ -1201,14 +1210,12 @@
         state.pendingDeviceSession.delegationId = finish.delegation_id || '';
         return saveDeviceSession(state.pendingDeviceSession).then(function () {
           state.pendingDeviceSession = null;
-          hideAuthModal();
-          window.location.reload();
+          return finalizeLoginUiAfterSuccess();
         });
       }
 
       return idbDelete(KEY_DEVICE_SESSION).then(function () {
-        hideAuthModal();
-        window.location.reload();
+        return finalizeLoginUiAfterSuccess();
       });
     });
   }
