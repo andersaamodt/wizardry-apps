@@ -1,0 +1,74 @@
+#!/bin/sh
+
+# Install or verify server-side Nostr signature verifier tooling.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: install-nostr-verifier
+
+Ensures a server-side Nostr signature verifier is available.
+Accepted verifiers:
+  - nostril (preferred for this template)
+  - nak verify (fallback)
+
+Installation strategy:
+  1) If already available, do nothing.
+  2) Try cargo install for nostril.
+  3) Try cargo install for nak (fallback verifier).
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+. env-clear
+
+has_nostril_verify() {
+  if ! has nostril; then
+    return 1
+  fi
+  if nostril --help 2>/dev/null | grep -qi 'verify'; then
+    return 0
+  fi
+  # Older variants may still accept --verify even if help output differs.
+  if printf '{}' | nostril --verify >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+has_nak_verify() {
+  has nak || return 1
+  nak help 2>/dev/null | grep -qi 'verify' || return 1
+}
+
+if has_nostril_verify; then
+  success "Nostr verifier already available: nostril"
+  exit 0
+fi
+
+if has_nak_verify; then
+  success "Nostr verifier already available: nak verify"
+  exit 0
+fi
+
+if has cargo; then
+  step "Installing nostril with cargo..."
+  if cargo install --locked nostril >/dev/null 2>&1; then
+    if has_nostril_verify; then
+      success "Installed Nostr verifier: nostril"
+      exit 0
+    fi
+  fi
+
+  step "Installing nak with cargo (fallback verifier)..."
+  if cargo install --locked nak >/dev/null 2>&1; then
+    if has_nak_verify; then
+      success "Installed Nostr verifier: nak verify"
+      exit 0
+    fi
+  fi
+fi
+
+die "install-nostr-verifier: unable to install nostril/nak automatically. Install Rust toolchain (cargo), then run this command again."
