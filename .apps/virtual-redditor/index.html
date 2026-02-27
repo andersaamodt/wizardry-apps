@@ -72,9 +72,6 @@
               <button id="btn-run-toggle" class="icon-btn run" type="button" aria-label="Start bot" title="Start bot">
                 <span id="run-toggle-icon" aria-hidden="true">▶</span>
               </button>
-              <button id="btn-restart" class="icon-btn soft" type="button" aria-label="Restart daemon" title="Restart daemon">
-                <span aria-hidden="true">↻</span>
-              </button>
               <button id="btn-run-once" class="menu-btn soft" type="button">Run Once</button>
             </div>
           </div>
@@ -2622,7 +2619,7 @@
         }
       }
 
-      var controlIds = ['btn-restart', 'btn-run-once'];
+      var controlIds = ['btn-run-once'];
       for (var i = 0; i < controlIds.length; i += 1) {
         var btn = document.getElementById(controlIds[i]);
         if (btn) btn.disabled = !connected;
@@ -6238,9 +6235,6 @@
       document.getElementById('btn-run-toggle').addEventListener('click', function () {
         var running = isBotRunning(state.status);
         toggleBotRun(!running);
-      });
-      document.getElementById('btn-restart').addEventListener('click', function () {
-        runControlAction('restart', 'Bot restarted.');
       });
       document.getElementById('btn-run-once').addEventListener('click', function () {
         runControlAction('run-once', 'Patrol pass complete.');
