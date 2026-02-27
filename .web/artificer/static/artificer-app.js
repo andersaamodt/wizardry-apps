@@ -19111,19 +19111,27 @@
       }
     });
 
-    function isKeyboardEditableTarget(target) {
+    function isEditableTarget(target) {
       var node = target && target.nodeType === 3 ? target.parentElement : target;
       if (!node || typeof node.closest !== "function") {
         return false;
       }
-      if (node.closest("textarea, input, [contenteditable='true']")) {
+      if (node.closest("textarea, input, [contenteditable='true'], [contenteditable=''], [contenteditable]:not([contenteditable='false'])")) {
         return true;
       }
       return false;
     }
 
+    function shouldBlockSideMouseButtonDefaultInEditable(event, trigger) {
+      var triggerName = String(trigger || "");
+      if (triggerName !== "mouse-button-4" && triggerName !== "mouse-button-5") {
+        return false;
+      }
+      return isEditableTarget(event && event.target);
+    }
+
     function shouldPreserveEditableShortcut(event) {
-      if (!isKeyboardEditableTarget(event && event.target)) {
+      if (!isEditableTarget(event && event.target)) {
         return false;
       }
       var key = String((event && event.key) || "").toLowerCase();
@@ -19192,7 +19200,7 @@
         !event.shiftKey &&
         String(event.key || "").toLowerCase() === "a"
       ) {
-        if (!isKeyboardEditableTarget(event.target)) {
+        if (!isEditableTarget(event.target)) {
           event.preventDefault();
           if (window.getSelection) {
             var selectAll = window.getSelection();
@@ -19265,6 +19273,10 @@
       if (!dictationMouseTrigger) {
         return;
       }
+      if (shouldBlockSideMouseButtonDefaultInEditable(event, dictationMouseTrigger)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       onDictationShortcutDown(dictationMouseTrigger, event);
     }, true);
 
@@ -19272,6 +19284,10 @@
       var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
       if (!dictationMouseTrigger) {
         return;
+      }
+      if (shouldBlockSideMouseButtonDefaultInEditable(event, dictationMouseTrigger)) {
+        event.preventDefault();
+        event.stopPropagation();
       }
       onDictationShortcutUp(dictationMouseTrigger, event);
     }, true);
@@ -19281,6 +19297,10 @@
       if (!dictationMouseTrigger) {
         return;
       }
+      if (shouldBlockSideMouseButtonDefaultInEditable(event, dictationMouseTrigger)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       onDictationShortcutDown(dictationMouseTrigger, event);
     }, true);
 
@@ -19289,6 +19309,10 @@
       if (!dictationMouseTrigger) {
         return;
       }
+      if (shouldBlockSideMouseButtonDefaultInEditable(event, dictationMouseTrigger)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       onDictationShortcutUp(dictationMouseTrigger, event);
     }, true);
 
@@ -19296,6 +19320,10 @@
       var dictationMouseTrigger = dictationShortcutMouseTrigger(event);
       if (!dictationMouseTrigger) {
         return;
+      }
+      if (shouldBlockSideMouseButtonDefaultInEditable(event, dictationMouseTrigger)) {
+        event.preventDefault();
+        event.stopPropagation();
       }
       if (dictationMouseTrigger === "mouse-wheel-click") {
         if (state.dictateHotkeyHoldIntent && (state.dictateHotkeyHoldTrigger === "mouse-button-4" || state.dictateHotkeyHoldTrigger === "mouse-button-5")) {
