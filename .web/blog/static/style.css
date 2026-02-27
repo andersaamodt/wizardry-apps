@@ -739,6 +739,10 @@ header h1 {
   gap: 0.45rem;
 }
 
+.auth-panel[hidden] {
+  display: none !important;
+}
+
 .auth-info-modal-panel {
   width: min(520px, calc(100vw - 2rem));
 }

@@ -62,6 +62,7 @@
 
     authModal: document.getElementById('auth-modal'),
     authInfoModal: document.getElementById('nostr-info-modal'),
+    authModalTitle: document.getElementById('auth-modal-title'),
     authMessage: document.getElementById('auth-modal-message'),
     authRegisterBtn: document.getElementById('auth-register-btn'),
     authPhoneConnectBtn: document.getElementById('auth-phone-connect-btn'),
@@ -69,12 +70,6 @@
     authTabRegister: document.getElementById('auth-tab-register'),
     authTabPhone: document.getElementById('auth-tab-phone'),
     authTabManual: document.getElementById('auth-tab-manual'),
-
-    authModeOnce: document.getElementById('auth-mode-once'),
-    authModeApprove: document.getElementById('auth-mode-approve'),
-    authIntentDaysRow: document.getElementById('auth-intent-days-row'),
-    authDelegationDays: document.getElementById('auth-delegation-days'),
-    authForceInteractive: document.getElementById('auth-force-interactive'),
 
     authRegisterPanel: document.getElementById('auth-register-panel'),
     authPhonePanel: document.getElementById('auth-phone-panel'),
@@ -88,9 +83,7 @@
     authManualChallenge: document.getElementById('auth-manual-challenge'),
     authManualExpires: document.getElementById('auth-manual-expires'),
     authManualTemplate: document.getElementById('auth-manual-template'),
-    authManualDelegationTemplate: document.getElementById('auth-manual-delegation-template'),
     authManualEvent: document.getElementById('auth-manual-event'),
-    authManualDelegation: document.getElementById('auth-manual-delegation'),
     authManualSubmit: document.getElementById('auth-manual-submit')
   };
 
@@ -349,10 +342,6 @@
       els.authPhoneBtn,
       els.authManualStart,
       els.authManualSubmit,
-      els.authModeOnce,
-      els.authModeApprove,
-      els.authDelegationDays,
-      els.authForceInteractive,
       els.authTabRegister,
       els.authTabPhone,
       els.authTabManual
@@ -385,15 +374,16 @@
     if (els.authManualChallenge) { els.authManualChallenge.value = ''; }
     if (els.authManualExpires) { els.authManualExpires.value = ''; }
     if (els.authManualTemplate) { els.authManualTemplate.value = ''; }
-    if (els.authManualDelegationTemplate) { els.authManualDelegationTemplate.value = ''; }
     if (els.authManualEvent) { els.authManualEvent.value = ''; }
-    if (els.authManualDelegation) { els.authManualDelegation.value = ''; }
   }
 
   function setActiveAuthTab(tabName) {
     var tab = String(tabName || 'register');
     if (tab !== 'register' && tab !== 'phone' && tab !== 'manual') {
       tab = 'register';
+    }
+    if (els.authModalTitle) {
+      els.authModalTitle.textContent = (tab === 'register') ? 'Register' : 'Sign in';
     }
 
     if (els.authTabRegister) {
@@ -447,7 +437,6 @@
     document.body.classList.add('auth-modal-open');
     resetAuthPanels();
     setAuthControlsDisabled(false);
-    refreshAuthIntentUi();
     setActiveAuthTab(initialTab || 'register');
   }
 
@@ -801,24 +790,14 @@
   }
 
   function getAuthIntent() {
-    var approve = !!(els.authModeApprove && els.authModeApprove.checked);
-    var days = clampDays(els.authDelegationDays ? els.authDelegationDays.value : DEFAULT_DELEGATION_DAYS);
-    if (els.authDelegationDays) {
-      els.authDelegationDays.value = String(days);
-    }
     return {
-      mode: approve ? 'approve' : 'once',
-      days: days,
-      forceInteractive: !!(els.authForceInteractive && els.authForceInteractive.checked)
+      mode: 'once',
+      days: DEFAULT_DELEGATION_DAYS,
+      forceInteractive: false
     };
   }
 
-  function refreshAuthIntentUi() {
-    var intent = getAuthIntent();
-    if (els.authIntentDaysRow) {
-      els.authIntentDaysRow.hidden = intent.mode !== 'approve';
-    }
-  }
+  function refreshAuthIntentUi() {}
 
   function applyLoggedInUi(isLoggedIn, isAdmin, username) {
     var displayName = String(username || '');
@@ -978,18 +957,7 @@
     return !!(window.nostr && typeof window.nostr.signEvent === 'function');
   }
 
-  function applyQuickLoginDefaults() {
-    if (els.authModeApprove) {
-      els.authModeApprove.checked = true;
-    }
-    if (els.authModeOnce) {
-      els.authModeOnce.checked = false;
-    }
-    if (els.authDelegationDays) {
-      els.authDelegationDays.value = String(QUICK_DELEGATION_DAYS);
-    }
-    refreshAuthIntentUi();
-  }
+  function applyQuickLoginDefaults() {}
 
   function pageRequiresAuthorization() {
     var path = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
@@ -1323,99 +1291,51 @@
     var opts = options && typeof options === 'object' ? options : {};
     var getPubkeyFn = typeof opts.getPubkeyFn === 'function' ? opts.getPubkeyFn : null;
     var pubkeyHint = String(opts.pubkeyHint || '').trim();
-    var intent = getAuthIntent();
-
-    return tryDelegatedSessionLogin(intent)
-      .then(function (usedDelegated) {
-        if (usedDelegated) {
-          return;
-        }
-
-        setAuthMessage('Creating a single-use login challenge...', 'warn');
-        return beginChallenge(pubkeyHint || localStorage.getItem('last_auth_pubkey') || '')
-          .then(function (begin) {
-            var authTemplate = authEventTemplate(begin.challenge, 'login', pubkeyHint);
-            setAuthMessage('Sign the login challenge event...', 'warn');
-            return requestSignerApproval(
-              signEventFn,
-              authTemplate,
-              'Step 1 of 2: approve login in your signer',
-              70000
-            ).then(function (signedAuth) {
-              var userPubkey = signedEventPubkey(signedAuth);
-              if (!userPubkey && getPubkeyFn) {
-                return Promise.resolve(getPubkeyFn()).then(function (fallbackPubkey) {
-                  return {
-                    begin: begin,
-                    userPubkey: String(fallbackPubkey || '').trim(),
-                    signedAuth: signedAuth
-                  };
-                });
-              }
+    setAuthMessage('Creating a single-use login challenge...', 'warn');
+    return beginChallenge(pubkeyHint || localStorage.getItem('last_auth_pubkey') || '')
+      .then(function (begin) {
+        var authTemplate = authEventTemplate(begin.challenge, 'login', pubkeyHint);
+        setAuthMessage('Sign the login challenge event...', 'warn');
+        return requestSignerApproval(
+          signEventFn,
+          authTemplate,
+          'Approve login in your signer',
+          70000
+        ).then(function (signedAuth) {
+          var userPubkey = signedEventPubkey(signedAuth);
+          if (!userPubkey && getPubkeyFn) {
+            return Promise.resolve(getPubkeyFn()).then(function (fallbackPubkey) {
               return {
                 begin: begin,
-                userPubkey: userPubkey,
+                userPubkey: String(fallbackPubkey || '').trim(),
                 signedAuth: signedAuth
               };
             });
-          })
-          .then(function (payload) {
-            var delegationSigned = null;
-            state.pendingDeviceSession = null;
-            if (!payload.userPubkey) {
-              throw new Error('Signed auth event is missing pubkey.');
-            }
-            localStorage.setItem('last_auth_pubkey', payload.userPubkey);
-
-            if (intent.mode === 'approve') {
-              state.pendingDeviceSession = createSessionRecord(payload.userPubkey, intent.days);
-              var delegationTemplate = delegationEventTemplate(state.pendingDeviceSession, payload.userPubkey);
-              setAuthMessage('Step 2 of 2: approve device session delegation in your signer...', 'warn');
-              return requestSignerApproval(
-                signEventFn,
-                delegationTemplate,
-                'Step 2 of 2: approve device session delegation in your signer',
-                70000
-              ).then(function (signedDelegation) {
-                delegationSigned = signedDelegation;
-                return {
-                  begin: payload.begin,
-                  signedAuth: payload.signedAuth,
-                  delegationSigned: delegationSigned
-                };
-              });
-            }
-
-            return {
-              begin: payload.begin,
-              signedAuth: payload.signedAuth,
-              delegationSigned: null
-            };
-          })
-          .then(function (payload) {
-            return finishLogin(
-              payload.begin.request_id,
-              payload.signedAuth,
-              payload.delegationSigned,
-              intent.forceInteractive
-            );
-          })
-          .then(function (finish) {
-            rememberAuth(finish);
-            if (intent.mode === 'approve' && state.pendingDeviceSession) {
-              state.pendingDeviceSession.delegationId = finish.delegation_id || '';
-              return saveDeviceSession(state.pendingDeviceSession).then(function () {
-                state.pendingDeviceSession = null;
-                return finish;
-              });
-            }
-            return idbDelete(KEY_DEVICE_SESSION).then(function () {
-              return finish;
-            });
-          })
-          .then(function (finish) {
-            return finalizeLoginUiAfterSuccess(finish);
-          });
+          }
+          return {
+            begin: begin,
+            userPubkey: userPubkey,
+            signedAuth: signedAuth
+          };
+        });
+      })
+      .then(function (payload) {
+        if (!payload.userPubkey) {
+          throw new Error('Signed auth event is missing pubkey.');
+        }
+        localStorage.setItem('last_auth_pubkey', payload.userPubkey);
+        return finishLogin(
+          payload.begin.request_id,
+          payload.signedAuth,
+          null,
+          false
+        );
+      })
+      .then(function (finish) {
+        rememberAuth(finish);
+        return idbDelete(KEY_DEVICE_SESSION).then(function () {
+          return finalizeLoginUiAfterSuccess(finish);
+        });
       });
   }
 
@@ -1493,7 +1413,6 @@
   }
 
   function prepareManualLogin() {
-    var intent = getAuthIntent();
     state.pendingDeviceSession = null;
 
     setAuthMessage('Creating a single-use login challenge...', 'warn');
@@ -1519,17 +1438,6 @@
           els.authManualTemplate.value = JSON.stringify(authTemplate, null, 2);
         }
 
-        if (intent.mode === 'approve') {
-          var pubkeyHint = localStorage.getItem('last_auth_pubkey') || '';
-          state.pendingDeviceSession = createSessionRecord(pubkeyHint, intent.days);
-          var dTemplate = delegationEventTemplate(state.pendingDeviceSession, pubkeyHint);
-          if (els.authManualDelegationTemplate) {
-            els.authManualDelegationTemplate.value = JSON.stringify(dTemplate, null, 2);
-          }
-        } else if (els.authManualDelegationTemplate) {
-          els.authManualDelegationTemplate.value = '';
-        }
-
         setAuthMessage('Challenge created. Sign the auth event and paste JSON below.', 'ok');
       });
   }
@@ -1544,44 +1452,20 @@
       return Promise.reject(new Error('Signed auth event JSON is required.'));
     }
 
-    var signedDelegationRaw = els.authManualDelegation ? String(els.authManualDelegation.value || '').trim() : '';
-    var intent = getAuthIntent();
-    if (intent.mode === 'approve' && !signedDelegationRaw) {
-      return Promise.reject(new Error('Signed delegation JSON is required for approved-device mode.'));
-    }
-
     var signedAuth;
-    var signedDelegation = null;
     try {
       signedAuth = parseJsonResponse(signedAuthRaw);
     } catch (_) {
       throw new Error('Signed auth event JSON is invalid.');
     }
-    if (signedDelegationRaw) {
-      try {
-        signedDelegation = parseJsonResponse(signedDelegationRaw);
-      } catch (_) {
-        throw new Error('Signed delegation JSON is invalid.');
-      }
-    }
 
     return finishLogin(
       state.manualChallenge.request_id,
       signedAuth,
-      signedDelegation,
-      intent.forceInteractive
+      null,
+      false
     ).then(function (finish) {
       rememberAuth(finish);
-
-      if (intent.mode === 'approve' && state.pendingDeviceSession) {
-        state.pendingDeviceSession.userPubkey = finish.pubkey || state.pendingDeviceSession.userPubkey;
-        state.pendingDeviceSession.delegationId = finish.delegation_id || '';
-        return saveDeviceSession(state.pendingDeviceSession).then(function () {
-          state.pendingDeviceSession = null;
-          return finalizeLoginUiAfterSuccess(finish);
-        });
-      }
-
       return idbDelete(KEY_DEVICE_SESSION).then(function () {
         return finalizeLoginUiAfterSuccess(finish);
       });
@@ -1892,16 +1776,6 @@
       }
     });
 
-    if (els.authModeOnce) {
-      els.authModeOnce.addEventListener('change', refreshAuthIntentUi);
-    }
-    if (els.authModeApprove) {
-      els.authModeApprove.addEventListener('change', refreshAuthIntentUi);
-    }
-    if (els.authDelegationDays) {
-      els.authDelegationDays.addEventListener('input', refreshAuthIntentUi);
-    }
-
     if (els.authRegisterBtn) {
       els.authRegisterBtn.addEventListener('click', function () {
         startDesktopSignerLogin().catch(function (err) {
@@ -1982,7 +1856,6 @@
     bindUiEvents();
     window.blogAuth = window.blogAuth || {};
     window.blogAuth.openLoginModal = showAuthModal;
-    refreshAuthIntentUi();
     flushRememberedNavToast();
     loadTheme();
     checkAuth();

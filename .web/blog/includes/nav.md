@@ -90,21 +90,6 @@
     <p class="auth-modal-help">Accounts are Nostr-key based only. No email, password, or recovery. If your Nostr key is lost, the account is lost by design.</p>
     <p class="auth-modal-help">Desktop login uses NIP-07 when available. Phone login uses NIP-46 pairing via QR/deep-link.</p>
 
-    <div class="auth-intent">
-      <div class="auth-intent-row">
-        <label><input type="radio" id="auth-mode-once" name="auth-mode" value="once"> One-time login</label>
-        <label><input type="radio" id="auth-mode-approve" name="auth-mode" value="approve" checked> Approve this device</label>
-      </div>
-      <div class="auth-intent-row auth-intent-days" id="auth-intent-days-row">
-        <label for="auth-delegation-days">Delegation days (1-90)</label>
-        <input class="auth-input auth-days-input" type="number" id="auth-delegation-days" min="1" max="90" step="1" value="30">
-      </div>
-      <label class="auth-intent-row">
-        <input type="checkbox" id="auth-force-interactive">
-        Require direct signer approval for sensitive actions
-      </label>
-    </div>
-
     <div class="auth-tabs" role="tablist" aria-label="Sign-in methods">
       <button id="auth-tab-register" class="auth-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="auth-register-panel">Register</button>
       <button id="auth-tab-phone" class="auth-tab" type="button" role="tab" aria-selected="false" aria-controls="auth-phone-panel">Phone signer</button>
@@ -148,12 +133,8 @@
       </div>
       <label for="auth-manual-template"><strong>Unsigned Auth Event Template</strong></label>
       <textarea id="auth-manual-template" class="auth-input auth-key-input" readonly></textarea>
-      <label for="auth-manual-delegation-template"><strong>Unsigned Delegation Template (approve mode)</strong></label>
-      <textarea id="auth-manual-delegation-template" class="auth-input auth-key-input" readonly></textarea>
       <label for="auth-manual-event"><strong>Signed Auth Event JSON</strong></label>
       <textarea id="auth-manual-event" class="auth-input auth-key-input" placeholder='{"kind":22242,...,"sig":"..."}'></textarea>
-      <label for="auth-manual-delegation"><strong>Signed Delegation JSON (optional)</strong></label>
-      <textarea id="auth-manual-delegation" class="auth-input auth-key-input" placeholder='{"kind":27235,...,"sig":"..."}'></textarea>
       <div class="auth-actions">
         <button id="auth-manual-submit" class="auth-primary-btn" type="button">Submit signed login</button>
       </div>
@@ -175,4 +156,4 @@
 
 <script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.7.2/lib/nostr.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-<script src="/static/nav-auth.js?v=20260227-logintabs1"></script>
+<script src="/static/nav-auth.js?v=20260227-logintabs2"></script>
