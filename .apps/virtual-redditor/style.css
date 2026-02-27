@@ -2140,6 +2140,10 @@ label {
   max-width: 100%;
 }
 
+.enforcement-escalation-drawer .mode-drawer-block + .mode-drawer-block {
+  margin-top: 12px;
+}
+
 .modes-main-pane {
   display: flex;
   flex-direction: column;
@@ -2506,6 +2510,28 @@ label {
   flex-wrap: nowrap;
 }
 
+#ban-levels-table {
+  table-layout: auto;
+}
+
+#ban-levels-table th,
+#ban-levels-table td {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+#ban-levels-table th:nth-child(1),
+#ban-levels-table td:nth-child(1) {
+  width: 1%;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+
+#ban-levels-table th:nth-child(2),
+#ban-levels-table td:nth-child(2) {
+  width: auto;
+}
+
 #ban-levels-table input[data-ban-duration-min],
 #ban-levels-table input[data-ban-duration-max] {
   width: 50px;
@@ -2521,6 +2547,7 @@ label {
 #ban-levels-table .ban-range-sep {
   font-size: 0.72rem;
   color: var(--text-subtle);
+  white-space: nowrap;
 }
 
 .mode-permissions-grid {
