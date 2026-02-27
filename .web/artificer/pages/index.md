@@ -606,4 +606,4 @@ pagetitle: "Artificer"
 </div>
 </div>
 
-<script src="/static/artificer-app.js?v=20260227-assaymentor1"></script>
+<script src="/static/artificer-app.js?v=20260227-wavefix16"></script>

@@ -7082,7 +7082,7 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.02;
     }
-    if (probe >= floor + 0.04) {
+    if (probe >= floor + 0.03) {
       // Prevent ambient floor from climbing into normal speech and flattening bars.
       floor = (floor * 0.995) + (probe * 0.005);
     } else if (probe >= floor) {
@@ -7092,8 +7092,8 @@
     }
     if (floor < 0.0012) {
       floor = 0.0012;
-    } else if (floor > 0.06) {
-      floor = 0.06;
+    } else if (floor > 0.03) {
+      floor = 0.03;
     }
     dictationWaveNoiseFloor = floor;
     return floor;
@@ -7108,12 +7108,12 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.02;
     }
-    var gate = floor + 0.003;
+    var gate = floor + 0.0016;
     var signal = raw - gate;
     if (signal < 0) {
       signal = 0;
     }
-    var normalized = (signal * 2.35) / Math.max(0.02, 0.56 - gate);
+    var normalized = (signal * 2.6) / Math.max(0.015, 0.5 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
@@ -7122,7 +7122,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.46);
     }
-    if (normalized < 0.004) {
+    if (normalized < 0.0025) {
       normalized = 0;
     }
     return normalized;
@@ -7150,8 +7150,8 @@
       floor = 0.25;
     }
     dictationWaveBackendFloor = floor;
-    var gate = floor + 0.005;
-    var normalized = ((raw - gate) * 2.2) / Math.max(0.015, 0.52 - gate);
+    var gate = floor + 0.0035;
+    var normalized = ((raw - gate) * 2.35) / Math.max(0.012, 0.5 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
@@ -7160,7 +7160,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.52);
     }
-    if (normalized < 0.004) {
+    if (normalized < 0.0025) {
       normalized = 0;
     }
     return normalized;
@@ -7269,15 +7269,33 @@
           rawHistory.push(rawLevel);
         }
         var floorProbe = 0;
+        var rawPeak = 0;
         if (rawHistory.length) {
           var sortedProbe = rawHistory.slice().sort(function (a, b) { return a - b; });
           var probeIndex = sortedProbe.length > 2 ? 1 : 0;
           floorProbe = Number(sortedProbe[probeIndex] || 0);
+          rawPeak = Number(sortedProbe[sortedProbe.length - 1] || 0);
         }
         calibrateDictationWaveNoiseFloor(floorProbe);
         var normalizedHistory = [];
         for (var hi = 0; hi < rawHistory.length; hi += 1) {
-          normalizedHistory.push(normalizedDictationWaveSliceLevel(rawHistory[hi]));
+          var normalizedSlice = normalizedDictationWaveSliceLevel(rawHistory[hi]);
+          if (normalizedSlice <= 0 && rawPeak > (dictationWaveNoiseFloor + 0.004)) {
+            var rescue = (rawHistory[hi] - dictationWaveNoiseFloor) * 1.8;
+            if (!isFinite(rescue) || rescue < 0) {
+              rescue = 0;
+            } else if (rescue > 1) {
+              rescue = 1;
+            }
+            if (rescue < 0.0025) {
+              rescue = 0;
+            }
+            normalizedSlice = rescue;
+          }
+          normalizedHistory.push(normalizedSlice);
+        }
+        if (!dictationWaveSeenSignal && rawPeak > (dictationWaveNoiseFloor + 0.004)) {
+          dictationWaveSeenSignal = true;
         }
         applyDictationWaveHistoryLevels(normalizedHistory);
         dictationWaveRafId = requestAnimationFrame(sample);
@@ -7457,7 +7475,7 @@
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal && (Date.now() - Number(dictationWaveActivatedAt || 0) < 700);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.012;
+    var silenceGate = 0.006;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
