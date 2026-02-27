@@ -1404,7 +1404,8 @@
       setAuthMessage('All active delegated sessions were revoked.', 'ok');
       clearLocalStorageAuth();
       return clearLocalKeyMaterial().finally(function () {
-        window.location.reload();
+        applyLoggedInUi(false, false, '');
+        handlePostLogoutNavigation();
       });
     });
   }
