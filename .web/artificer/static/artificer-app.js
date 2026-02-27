@@ -668,6 +668,7 @@
   var dictationWaveData = null;
   var dictationWaveStartPromise = null;
   var dictationWavePollTimer = null;
+  var dictationWaveWarmReleaseTimer = null;
   var dictationWaveMicLevel = 0;
   var dictationWaveMicLevelAt = 0;
   var dictationWaveBackendLevel = 0;
@@ -6462,16 +6463,15 @@
     return el.dictationWave.querySelectorAll(".dictation-wave-bar");
   }
 
-  function stopDictationWaveMonitor() {
-    if (dictationWavePollTimer) {
-      clearInterval(dictationWavePollTimer);
-      dictationWavePollTimer = null;
+  function clearDictationWaveWarmReleaseTimer() {
+    if (dictationWaveWarmReleaseTimer) {
+      clearTimeout(dictationWaveWarmReleaseTimer);
+      dictationWaveWarmReleaseTimer = null;
     }
-    dictationWaveMonitorSession += 1;
-    if (dictationWaveRafId) {
-      cancelAnimationFrame(dictationWaveRafId);
-      dictationWaveRafId = null;
-    }
+  }
+
+  function releaseDictationWaveResources() {
+    clearDictationWaveWarmReleaseTimer();
     if (dictationWaveSource) {
       try {
         dictationWaveSource.disconnect();
@@ -6512,6 +6512,28 @@
       dictationWaveAudioContext = null;
     }
     dictationWaveData = null;
+  }
+
+  function stopDictationWaveMonitor(options) {
+    var opts = options && typeof options === "object" ? options : {};
+    var keepWarm = !!opts.keepWarm;
+    if (dictationWavePollTimer) {
+      clearInterval(dictationWavePollTimer);
+      dictationWavePollTimer = null;
+    }
+    dictationWaveMonitorSession += 1;
+    if (dictationWaveRafId) {
+      cancelAnimationFrame(dictationWaveRafId);
+      dictationWaveRafId = null;
+    }
+    clearDictationWaveWarmReleaseTimer();
+    if (keepWarm && dictationWaveStream && dictationWaveAnalyser && dictationWaveData) {
+      dictationWaveWarmReleaseTimer = setTimeout(function () {
+        releaseDictationWaveResources();
+      }, 12000);
+    } else {
+      releaseDictationWaveResources();
+    }
     dictationWaveStartPromise = null;
     dictationWaveMicLevel = 0;
     dictationWaveMicLevelAt = 0;
@@ -6581,12 +6603,122 @@
   }
 
   function startDictationWaveMonitor() {
+    clearDictationWaveWarmReleaseTimer();
     if (dictationWaveStartPromise) {
       return dictationWaveStartPromise;
     }
-    stopDictationWaveMonitor();
+    stopDictationWaveMonitor({ keepWarm: true });
     var monitorSession = dictationWaveMonitorSession + 1;
     dictationWaveMonitorSession = monitorSession;
+    function startSamplingLoop() {
+      var sample = function () {
+        if (
+          monitorSession !== dictationWaveMonitorSession ||
+          (state.dictatePhase !== "recording" && state.dictatePhase !== "starting") ||
+          !dictationWaveAnalyser ||
+          !dictationWaveData
+        ) {
+          return;
+        }
+        dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
+        var sum = 0;
+        var peak = 0;
+        for (var i = 0; i < dictationWaveData.length; i += 1) {
+          var centered = (dictationWaveData[i] - 128) / 128;
+          sum += centered * centered;
+          var mag = centered < 0 ? -centered : centered;
+          if (mag > peak) {
+            peak = mag;
+          }
+        }
+        var rms = Math.sqrt(sum / dictationWaveData.length);
+        // Dynamic gating to let quiet rooms return to near-zero while preserving headroom.
+        var rawLevel = (rms * 14) + (peak * 0.45);
+        if (!isFinite(rawLevel) || rawLevel < 0) {
+          rawLevel = 0;
+        }
+        if (rawLevel > 1.25) {
+          rawLevel = 1.25;
+        }
+        var floor = Number(dictationWaveNoiseFloor || 0.04);
+        if (!isFinite(floor) || floor < 0) {
+          floor = 0.04;
+        }
+        if (!dictationWaveSeenSignal || rawLevel <= floor + 0.06) {
+          floor = (floor * 0.97) + (rawLevel * 0.03);
+        }
+        if (floor < 0.01) {
+          floor = 0.01;
+        } else if (floor > 0.18) {
+          floor = 0.18;
+        }
+        dictationWaveNoiseFloor = floor;
+        var gate = floor + 0.03;
+        var normalized = (rawLevel - gate) / Math.max(0.08, 1 - gate);
+        if (!isFinite(normalized) || normalized < 0) {
+          normalized = 0;
+        }
+        if (normalized > 1) {
+          normalized = 1;
+        }
+        if (normalized < 0.05) {
+          normalized = 0;
+        }
+        dictationWaveMicLevel = normalized;
+        dictationWaveMicLevelAt = Date.now();
+        applyDictationWaveLevel(mergedDictationWaveLevel(normalized));
+        dictationWaveRafId = requestAnimationFrame(sample);
+      };
+      dictationWaveRafId = requestAnimationFrame(sample);
+    }
+
+    function startBackendPollLoop() {
+      dictationWavePollTimer = setInterval(function () {
+        if (
+          monitorSession !== dictationWaveMonitorSession ||
+          (state.dictatePhase !== "recording" && state.dictatePhase !== "starting")
+        ) {
+          return;
+        }
+        var activeSessionId = trim(String(state.dictateSessionId || ""));
+        if (!activeSessionId) {
+          return;
+        }
+        apiGet("dictate_levels", { session_id: activeSessionId }, { timeoutMs: 2200 }).then(function (response) {
+          if (
+            monitorSession !== dictationWaveMonitorSession ||
+            (state.dictatePhase !== "recording" && state.dictatePhase !== "starting")
+          ) {
+            return;
+          }
+          if (!response || !response.success) {
+            return;
+          }
+          var polledLevel = Number(response.level || 0);
+          if (!isFinite(polledLevel) || polledLevel < 0) {
+            polledLevel = 0;
+          }
+          if (polledLevel > 1) {
+            polledLevel = 1;
+          }
+          if (polledLevel < 0.05) {
+            polledLevel = 0;
+          }
+          dictationWaveBackendLevel = polledLevel;
+          dictationWaveBackendLevelAt = Date.now();
+          applyDictationWaveLevel(mergedDictationWaveLevel(polledLevel));
+        }).catch(function () {
+          return null;
+        });
+      }, 70);
+    }
+
+    if (dictationWaveStream && dictationWaveAnalyser && dictationWaveData) {
+      startSamplingLoop();
+      startBackendPollLoop();
+      return Promise.resolve(true);
+    }
+
     dictationWaveStartPromise = Promise.resolve(true).then(function () {
       var AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor || !navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
@@ -6643,109 +6775,13 @@
         dictationWaveAnalyser = analyser;
         dictationWaveSource = source;
         dictationWaveData = data;
-
-        var sample = function () {
-          if (
-            monitorSession !== dictationWaveMonitorSession ||
-            (state.dictatePhase !== "recording" && state.dictatePhase !== "starting") ||
-            !dictationWaveAnalyser ||
-            !dictationWaveData
-          ) {
-            return;
-          }
-          dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
-          var sum = 0;
-          var peak = 0;
-          for (var i = 0; i < dictationWaveData.length; i += 1) {
-            var centered = (dictationWaveData[i] - 128) / 128;
-            sum += centered * centered;
-            var mag = centered < 0 ? -centered : centered;
-            if (mag > peak) {
-              peak = mag;
-            }
-          }
-          var rms = Math.sqrt(sum / dictationWaveData.length);
-          // Dynamic gating to let quiet rooms return to near-zero while preserving headroom.
-          var rawLevel = (rms * 14) + (peak * 0.45);
-          if (!isFinite(rawLevel) || rawLevel < 0) {
-            rawLevel = 0;
-          }
-          if (rawLevel > 1.25) {
-            rawLevel = 1.25;
-          }
-          var floor = Number(dictationWaveNoiseFloor || 0.04);
-          if (!isFinite(floor) || floor < 0) {
-            floor = 0.04;
-          }
-          if (!dictationWaveSeenSignal || rawLevel <= floor + 0.06) {
-            floor = (floor * 0.97) + (rawLevel * 0.03);
-          }
-          if (floor < 0.01) {
-            floor = 0.01;
-          } else if (floor > 0.18) {
-            floor = 0.18;
-          }
-          dictationWaveNoiseFloor = floor;
-          var gate = floor + 0.03;
-          var normalized = (rawLevel - gate) / Math.max(0.08, 1 - gate);
-          if (!isFinite(normalized) || normalized < 0) {
-            normalized = 0;
-          }
-          if (normalized > 1) {
-            normalized = 1;
-          }
-          if (normalized < 0.05) {
-            normalized = 0;
-          }
-          dictationWaveMicLevel = normalized;
-          dictationWaveMicLevelAt = Date.now();
-          applyDictationWaveLevel(mergedDictationWaveLevel(normalized));
-          dictationWaveRafId = requestAnimationFrame(sample);
-        };
-        dictationWaveRafId = requestAnimationFrame(sample);
+        startSamplingLoop();
         return true;
       }).catch(function () {
         return false;
       });
     }).then(function () {
-      dictationWavePollTimer = setInterval(function () {
-        if (
-          monitorSession !== dictationWaveMonitorSession ||
-          (state.dictatePhase !== "recording" && state.dictatePhase !== "starting")
-        ) {
-          return;
-        }
-        var activeSessionId = trim(String(state.dictateSessionId || ""));
-        if (!activeSessionId) {
-          return;
-        }
-        apiGet("dictate_levels", { session_id: activeSessionId }, { timeoutMs: 2200 }).then(function (response) {
-          if (
-            monitorSession !== dictationWaveMonitorSession ||
-            (state.dictatePhase !== "recording" && state.dictatePhase !== "starting")
-          ) {
-            return;
-          }
-          if (!response || !response.success) {
-            return;
-          }
-          var polledLevel = Number(response.level || 0);
-          if (!isFinite(polledLevel) || polledLevel < 0) {
-            polledLevel = 0;
-          }
-          if (polledLevel > 1) {
-            polledLevel = 1;
-          }
-          if (polledLevel < 0.05) {
-            polledLevel = 0;
-          }
-          dictationWaveBackendLevel = polledLevel;
-          dictationWaveBackendLevelAt = Date.now();
-          applyDictationWaveLevel(mergedDictationWaveLevel(polledLevel));
-        }).catch(function () {
-          return null;
-        });
-      }, 70);
+      startBackendPollLoop();
       return true;
     }).finally(function () {
       dictationWaveStartPromise = null;
@@ -6815,7 +6851,7 @@
         });
       }
     } else {
-      stopDictationWaveMonitor();
+      stopDictationWaveMonitor({ keepWarm: next === "idle" });
     }
     if (next === "recording") {
       if (!state.dictateStartedAt) {
@@ -6861,7 +6897,7 @@
       } else if (phase === "processing") {
         el.dictationTimer.textContent = "Processing...";
       } else {
-        el.dictationTimer.textContent = "Starting...";
+        el.dictationTimer.textContent = formatDictationElapsed(0);
       }
     }
     renderDictationWaveBars();
