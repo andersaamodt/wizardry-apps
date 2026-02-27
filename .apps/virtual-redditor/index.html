@@ -150,6 +150,14 @@
                   </div>
                 </div>
                 <div class="mode-field-row">
+                  <label for="behavior-personality-strength" class="mode-field-label">Personality strength</label>
+                  <select id="behavior-personality-strength">
+                    <option value="subtle">Subtle</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="strong">Strong</option>
+                  </select>
+                </div>
+                <div class="mode-field-row">
                   <label for="behavior-humor-style" class="mode-field-label">Humor style</label>
                   <div class="mode-field-control-wrap">
                     <select id="behavior-humor-style">
@@ -3450,6 +3458,7 @@
         ],
         behaviors: {
           personality: 'typical_redditor',
+          personalityStrength: 'balanced',
           mirrorTone: 'mirror_or_less',
           directness: 'balanced',
           warmth: 'neutral',
@@ -3528,6 +3537,10 @@
       out.behaviors.humorStyle = String(out.behaviors.humorStyle || 'dry');
       out.behaviors.humorAmount = String(out.behaviors.humorAmount || 'medium');
       out.behaviors.personality = String(out.behaviors.personality || 'typical_redditor');
+      out.behaviors.personalityStrength = String(out.behaviors.personalityStrength || 'balanced').toLowerCase();
+      if (['subtle', 'balanced', 'strong'].indexOf(out.behaviors.personalityStrength) < 0) {
+        out.behaviors.personalityStrength = 'balanced';
+      }
       out.behaviors.directness = String(out.behaviors.directness || 'balanced');
       out.behaviors.warmth = String(out.behaviors.warmth || 'neutral');
       out.behaviors.verbosity = String(out.behaviors.verbosity || 'balanced');
@@ -4486,6 +4499,7 @@
       var cfg = normalizeModesConfig(state.modesConfig);
       var behaviors = cfg.behaviors || {};
       var personality = document.getElementById('behavior-personality');
+      var personalityStrength = document.getElementById('behavior-personality-strength');
       var mirror = document.getElementById('behavior-mirror-tone');
       var directness = document.getElementById('behavior-directness');
       var warmth = document.getElementById('behavior-warmth');
@@ -4503,6 +4517,7 @@
       var banMin = document.getElementById('behavior-ban-min');
       var banMax = document.getElementById('behavior-ban-max');
       if (personality) personality.value = String(behaviors.personality || 'typical_redditor');
+      if (personalityStrength) personalityStrength.value = String(behaviors.personalityStrength || 'balanced');
       if (mirror) mirror.value = String(behaviors.mirrorTone || 'mirror_or_less');
       if (directness) directness.value = String(behaviors.directness || 'balanced');
       if (warmth) warmth.value = String(behaviors.warmth || 'neutral');
@@ -4746,6 +4761,7 @@
       var cfg = normalizeModesConfig(cloneJson(state.modesConfig));
 
       cfg.behaviors.personality = String((document.getElementById('behavior-personality') || {}).value || 'typical_redditor');
+      cfg.behaviors.personalityStrength = String((document.getElementById('behavior-personality-strength') || {}).value || 'balanced');
       cfg.behaviors.mirrorTone = String((document.getElementById('behavior-mirror-tone') || {}).value || 'mirror_or_less');
       cfg.behaviors.directness = String((document.getElementById('behavior-directness') || {}).value || 'balanced');
       cfg.behaviors.warmth = String((document.getElementById('behavior-warmth') || {}).value || 'neutral');
@@ -5700,6 +5716,7 @@
       });
       var behaviorAutoSaveFields = [
         'behavior-personality',
+        'behavior-personality-strength',
         'behavior-mirror-tone',
         'behavior-directness',
         'behavior-warmth',

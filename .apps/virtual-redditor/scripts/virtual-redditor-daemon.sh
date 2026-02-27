@@ -205,6 +205,7 @@ mode_default_config_json() {
       ],
       behaviors: {
         personality: "typical_redditor",
+        personalityStrength: "balanced",
         mirrorTone: "mirror_or_less",
         directness: "balanced",
         warmth: "neutral",
@@ -1872,6 +1873,11 @@ compose_context_envelope() {
     | ($b.humor // "" | tostring | ascii_downcase) as $legacy
     | {
         personality: ($b.personality // "typical_redditor"),
+        personalityStrength: (
+          if (($b.personalityStrength // "balanced") == "subtle") then "subtle"
+          elif (($b.personalityStrength // "balanced") == "strong") then "strong"
+          else "balanced" end
+        ),
         mirrorTone: ($b.mirrorTone // "mirror_or_less"),
         directness: ($b.directness // "balanced"),
         warmth: ($b.warmth // "neutral"),
@@ -1911,7 +1917,7 @@ compose_context_envelope() {
         ),
         individualizedRelationships: (($b.individualizedRelationships // true) == true)
       }
-  ' 2>/dev/null || printf '{"personality":"typical_redditor","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"neutral","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","bigFive":{"enabled":false,"o":"medium","c":"medium","e":"medium","a":"medium","n":"medium"},"individualizedRelationships":true}')
+  ' 2>/dev/null || printf '{"personality":"typical_redditor","personalityStrength":"balanced","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"neutral","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","bigFive":{"enabled":false,"o":"medium","c":"medium","e":"medium","a":"medium","n":"medium"},"individualizedRelationships":true}')
   relationship_for_prompt_json=$(printf '%s' "$relationship_json" | jq -c --argjson behavior "$behavior_policy_json" '
     if ($behavior.individualizedRelationships // true) then .
     else
