@@ -7594,11 +7594,59 @@
       !state.activeTriage;
   }
 
+  var conversationSwitchOverlayHideTimer = 0;
+  var conversationSwitchOverlayShowFrame = 0;
+  var CONVERSATION_SWITCH_OVERLAY_FADE_OUT_MS = 85;
+
   function renderConversationSwitchOverlay() {
     if (!el.conversationSwitchOverlay) {
       return;
     }
-    el.conversationSwitchOverlay.classList.toggle("hidden", !conversationSwitchOverlayVisible());
+    var overlay = el.conversationSwitchOverlay;
+    var shouldShow = conversationSwitchOverlayVisible();
+    if (shouldShow) {
+      if (conversationSwitchOverlayHideTimer) {
+        clearTimeout(conversationSwitchOverlayHideTimer);
+        conversationSwitchOverlayHideTimer = 0;
+      }
+      if (conversationSwitchOverlayShowFrame) {
+        cancelAnimationFrame(conversationSwitchOverlayShowFrame);
+        conversationSwitchOverlayShowFrame = 0;
+      }
+      overlay.classList.remove("hidden");
+      overlay.classList.remove("is-hiding");
+      if (!overlay.classList.contains("is-visible")) {
+        conversationSwitchOverlayShowFrame = window.requestAnimationFrame(function () {
+          conversationSwitchOverlayShowFrame = 0;
+          if (!el.conversationSwitchOverlay || !conversationSwitchOverlayVisible()) {
+            return;
+          }
+          el.conversationSwitchOverlay.classList.add("is-visible");
+        });
+      }
+      return;
+    }
+    if (conversationSwitchOverlayShowFrame) {
+      cancelAnimationFrame(conversationSwitchOverlayShowFrame);
+      conversationSwitchOverlayShowFrame = 0;
+    }
+    overlay.classList.remove("is-visible");
+    if (overlay.classList.contains("hidden")) {
+      overlay.classList.remove("is-hiding");
+      return;
+    }
+    overlay.classList.add("is-hiding");
+    if (conversationSwitchOverlayHideTimer) {
+      clearTimeout(conversationSwitchOverlayHideTimer);
+    }
+    conversationSwitchOverlayHideTimer = window.setTimeout(function () {
+      conversationSwitchOverlayHideTimer = 0;
+      if (!el.conversationSwitchOverlay || conversationSwitchOverlayVisible()) {
+        return;
+      }
+      el.conversationSwitchOverlay.classList.add("hidden");
+      el.conversationSwitchOverlay.classList.remove("is-hiding");
+    }, CONVERSATION_SWITCH_OVERLAY_FADE_OUT_MS + 10);
   }
 
   function renderToolbarSwitchLock() {
