@@ -10021,6 +10021,8 @@
       }
       var conversation = response.conversation || null;
       if (conversation) {
+        var remoteDraft = String(conversation.draft || "");
+        setComposerDraftForKey(outgoingKeyFor(workspaceId, conversationId, ""), remoteDraft);
         conversation.decision_request = normalizeDecisionRequest(conversation.decision_request);
         conversation.approval_request = normalizeApprovalRequest(conversation.approval_request);
         if (Array.isArray(conversation.run_events)) {
@@ -10080,23 +10082,6 @@
       }
       state.draftTextByWorkspace[workspaceId] = response.draft || "";
       return response.draft || "";
-    });
-  }
-
-  function loadConversationDraft(workspaceId, conversationId) {
-    if (!workspaceId || !conversationId) {
-      return Promise.resolve("");
-    }
-    return apiGet("get_conversation_draft", {
-      workspace_id: workspaceId,
-      conversation_id: conversationId
-    }).then(function (response) {
-      if (!response || !response.success) {
-        throw new Error((response && response.error) || "Failed to load conversation draft");
-      }
-      var draft = String(response.draft || "");
-      setComposerDraftForKey(outgoingKeyFor(workspaceId, conversationId, ""), draft);
-      return draft;
     });
   }
 
@@ -10620,14 +10605,6 @@
           if (!isSelectionVersionCurrent(selectionVersion)) {
             return;
           }
-          return loadConversationDraft(workspaceId, state.activeConversationId).catch(function () {
-            return null;
-          });
-        })
-        .then(function () {
-          if (!isSelectionVersionCurrent(selectionVersion)) {
-            return;
-          }
           el.runPrompt.value = getComposerDraftForTarget(workspaceId, state.activeConversationId, "");
           resetComposerAttachments();
           return refreshGitStatus().catch(function () {
@@ -10762,14 +10739,6 @@
           .catch(function () {
             throw firstErr;
           });
-      })
-      .then(function () {
-        if (!isSelectionVersionCurrent(selectionVersion)) {
-          return;
-        }
-        return loadConversationDraft(workspaceId, conversationId).catch(function () {
-          return null;
-        });
       })
       .then(function () {
         if (!isSelectionVersionCurrent(selectionVersion)) {

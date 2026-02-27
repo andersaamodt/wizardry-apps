@@ -12199,9 +12199,12 @@ EOF_WRAPPER
     conversation_id_json=$(json_escape "$conversation_id")
     decision_request_json=$(decision_request_json_for_conversation "$conv_dir")
     approval_request_json=$(approval_request_json_for_conversation "$conv_dir")
+    draft_file=$(conversation_draft_file_for "$workspace_id" "$conversation_id")
+    draft_text=$(cat "$draft_file" 2>/dev/null || true)
+    draft_json=$(json_escape "$draft_text")
 
-    printf '{"success":true,"conversation":{"id":"%s","title":"%s","model":"%s","decision_request":%s,"approval_request":%s,"messages":' \
-      "$conversation_id_json" "$title_json" "$model_json" "$decision_request_json" "$approval_request_json"
+    printf '{"success":true,"conversation":{"id":"%s","title":"%s","model":"%s","decision_request":%s,"approval_request":%s,"draft":"%s","messages":' \
+      "$conversation_id_json" "$title_json" "$model_json" "$decision_request_json" "$approval_request_json" "$draft_json"
     json_messages "$conv_dir"
     printf ',"run_events":'
     json_run_events_with_active "$conv_dir"
