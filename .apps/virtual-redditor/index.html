@@ -1255,6 +1255,43 @@
       themeTypeaheadResetTimer: null
     };
 
+    function currentProfileScope() {
+      return String(state.activeProfile || '');
+    }
+
+    function isCurrentProfileScope(scope) {
+      return String(scope || '') === currentProfileScope();
+    }
+
+    function clearProfileScopedAutosaves() {
+      var timerKeys = [
+        'doctrineSaveTimer',
+        'settingsSaveTimer',
+        'behaviorSaveTimer',
+        'enforcementSaveTimer',
+        'replyTemplatesSaveTimer',
+        'passIntervalSaveTimer',
+        'threadInitiateSaveTimer',
+        'usernameSaveTimer',
+        'subredditCheckTimer',
+        'modesSaveTimer'
+      ];
+      for (var i = 0; i < timerKeys.length; i += 1) {
+        var key = timerKeys[i];
+        if (state[key]) {
+          clearTimeout(state[key]);
+          state[key] = null;
+        }
+      }
+      state.doctrineSaveQueued = false;
+      state.behaviorSaveQueued = false;
+      state.enforcementSaveQueued = false;
+      state.replyTemplatesSaveQueued = false;
+      state.modesSaveQueued = false;
+      state.usernameCheckReqId += 1;
+      state.subredditCheckReqId += 1;
+    }
+
     function updateConditionalTabs() {
       return;
     }
@@ -2469,9 +2506,11 @@
 
     function scheduleSubredditCheck(delayMs, force) {
       if (state.subredditCheckTimer) clearTimeout(state.subredditCheckTimer);
+      var scope = currentProfileScope();
       var delay = Number(delayMs);
       if (!Number.isFinite(delay) || delay < 0) delay = SUBREDDIT_CHECK_DEBOUNCE_MS;
       state.subredditCheckTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
         runSubredditCheck(!!force);
       }, delay);
     }
@@ -2512,7 +2551,9 @@
 
     function scheduleUsernameSave() {
       if (state.usernameSaveTimer) clearTimeout(state.usernameSaveTimer);
+      var scope = currentProfileScope();
       state.usernameSaveTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
         attemptUsernameSave();
       }, 500);
     }
@@ -5442,7 +5483,9 @@
 
     function queueBehaviorAutosave(delayMs) {
       if (state.behaviorSaveTimer) clearTimeout(state.behaviorSaveTimer);
+      var scope = currentProfileScope();
       state.behaviorSaveTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
         state.behaviorSaveTimer = null;
         runBehaviorAutosave();
       }, Math.max(0, parseInt(delayMs, 10) || 480));
@@ -5469,7 +5512,9 @@
 
     function queueEnforcementAutosave(delayMs) {
       if (state.enforcementSaveTimer) clearTimeout(state.enforcementSaveTimer);
+      var scope = currentProfileScope();
       state.enforcementSaveTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
         state.enforcementSaveTimer = null;
         runEnforcementAutosave();
       }, Math.max(0, parseInt(delayMs, 10) || 420));
@@ -5499,7 +5544,9 @@
 
     function queueReplyTemplatesAutosave(delayMs) {
       if (state.replyTemplatesSaveTimer) clearTimeout(state.replyTemplatesSaveTimer);
+      var scope = currentProfileScope();
       state.replyTemplatesSaveTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
         state.replyTemplatesSaveTimer = null;
         runReplyTemplatesAutosave();
       }, Math.max(0, parseInt(delayMs, 10) || 500));
@@ -5586,7 +5633,9 @@
 
     function queueModesAutosave(delayMs) {
       if (state.modesSaveTimer) clearTimeout(state.modesSaveTimer);
+      var scope = currentProfileScope();
       state.modesSaveTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
         state.modesSaveTimer = null;
         runModesAutosave();
       }, Math.max(0, parseInt(delayMs, 10) || 380));
@@ -5838,7 +5887,9 @@
 
     function scheduleSampleSave() {
       if (state.settingsSaveTimer) clearTimeout(state.settingsSaveTimer);
+      var scope = currentProfileScope();
       state.settingsSaveTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
         var sample = String((document.getElementById('sample-max-input').value) || '').trim();
         if (!/^\d+$/.test(sample) || Number(sample) < 1) {
           setSettingsMessage('PATROL_SAMPLE_MAX must be a positive integer.', true);
@@ -5850,7 +5901,9 @@
 
     function scheduleThreadInitiateMaxSave() {
       if (state.threadInitiateSaveTimer) clearTimeout(state.threadInitiateSaveTimer);
+      var scope = currentProfileScope();
       state.threadInitiateSaveTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
         var value = String((document.getElementById('thread-initiate-max-pct').value) || '').trim();
         if (!/^\d+$/.test(value)) {
           setSettingsMessage('Thread saturation must be a whole number from 0 to 100.', true);
@@ -5867,7 +5920,9 @@
 
     function schedulePassIntervalSave() {
       if (state.passIntervalSaveTimer) clearTimeout(state.passIntervalSaveTimer);
+      var scope = currentProfileScope();
       state.passIntervalSaveTimer = setTimeout(async function () {
+        if (!isCurrentProfileScope(scope)) return;
         var input = document.getElementById('pass-interval-input');
         var unitSelect = document.getElementById('pass-interval-unit');
         var rawValue = String((input && input.value) || '').trim();
@@ -5973,6 +6028,7 @@
       if (state.createProfileInFlight) return;
       var uname = normalizeUsername(username);
       if (!uname) return;
+      clearProfileScopedAutosaves();
       if (localNameExists(uname, '')) {
         setCreateProfileMessage('A virtual Redditor with that local name already exists.', true);
         setUsernameCheck('invalid', 'Local name already exists.');
@@ -6025,6 +6081,7 @@
     async function selectProfile(profileId) {
       if (!profileId) return;
       closeCreateProfilePane();
+      clearProfileScopedAutosaves();
       var targetId = String(profileId || '');
       if (!targetId) return;
       if (String(state.activeProfile || '') === targetId) return;
@@ -6087,7 +6144,8 @@
       }
     }
 
-    async function saveDoctrine() {
+    async function saveDoctrine(scope) {
+      if (scope && !isCurrentProfileScope(scope)) return;
       if (state.previewMode) {
         state.doctrineDirty = false;
         setDoctrineMessage('', false);
@@ -6119,7 +6177,11 @@
         if (state.doctrineSaveQueued) {
           state.doctrineSaveQueued = false;
           if (state.doctrineSaveTimer) clearTimeout(state.doctrineSaveTimer);
-          state.doctrineSaveTimer = setTimeout(function () { saveDoctrine(); }, 250);
+          var queuedScope = scope || currentProfileScope();
+          state.doctrineSaveTimer = setTimeout(function () {
+            if (!isCurrentProfileScope(queuedScope)) return;
+            saveDoctrine(queuedScope);
+          }, 250);
         }
       }
     }
@@ -6136,7 +6198,11 @@
       setDoctrineMessage('', false);
       setManifestoSaveIndicator('saving');
       if (state.doctrineSaveTimer) clearTimeout(state.doctrineSaveTimer);
-      state.doctrineSaveTimer = setTimeout(function () { saveDoctrine(); }, 500);
+      var scope = currentProfileScope();
+      state.doctrineSaveTimer = setTimeout(function () {
+        if (!isCurrentProfileScope(scope)) return;
+        saveDoctrine(scope);
+      }, 500);
     }
 
     function setActiveTab(tab) {
