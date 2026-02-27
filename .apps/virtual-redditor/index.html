@@ -1186,6 +1186,8 @@
       modeDrawerModeId: '',
       modesConfigDirty: false,
       modesConfigRefreshBlockedUntil: 0,
+      modesConfigEditVersion: 0,
+      modesConfigAppliedVersion: 0,
       relationshipOverrideOpen: false,
       repliesTemplatesOpen: false,
       enforcementEscalationOpen: false,
@@ -4148,6 +4150,7 @@
 
     function markModesConfigDirty() {
       state.modesConfigDirty = true;
+      state.modesConfigEditVersion = (Number(state.modesConfigEditVersion) || 0) + 1;
       var now = Date.now();
       var holdUntil = now + 7000;
       if (holdUntil > state.modesConfigRefreshBlockedUntil) {
@@ -5010,7 +5013,6 @@
         await saveModesConfigWithFeedback('Behaviors saved.');
         var summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
         await saveSetting('SUMMONS_ENABLED', summonable ? '1' : '0');
-        state.modesConfigDirty = false;
       } catch (error) {
         setControlMessage(String(error && error.message ? error.message : error), true);
       } finally {
@@ -5038,7 +5040,6 @@
       state.enforcementSaveInFlight = true;
       try {
         await saveModesConfigWithFeedback('', { quiet: true });
-        state.modesConfigDirty = false;
       } catch (error) {
         setControlMessage(String(error && error.message ? error.message : error), true);
       } finally {
@@ -5067,7 +5068,6 @@
       try {
         setReplyTemplatesSaveIndicator('saving');
         await saveModesConfigWithFeedback('', { quiet: true });
-        state.modesConfigDirty = false;
         setReplyTemplatesSaveIndicator('saved');
       } catch (error) {
         setReplyTemplatesSaveIndicator('');
@@ -5112,6 +5112,7 @@
     async function saveModesConfigWithFeedback(okMessage, options) {
       var quiet = !!(options && options.quiet);
       var suppressConflictMessage = !!(options && options.suppressConflictMessage);
+      var requestVersion = Number(state.modesConfigEditVersion) || 0;
       var payload = collectModesConfigFromUi();
       var now = Date.now();
       var holdUntil = now + 7000;
@@ -5127,13 +5128,19 @@
       if (state.previewMode) {
         state.modesConfig = normalizeModesConfig(payload);
         state.modesConfigDirty = false;
+        state.modesConfigAppliedVersion = requestVersion;
         renderModesDrivenPanels();
         if (!quiet) setControlMessage(okMessage || 'Saved.', false);
         return;
       }
       var out = await backendJson('save-modes-config', [JSON.stringify(payload)]);
+      if ((Number(state.modesConfigEditVersion) || 0) > requestVersion) {
+        // A newer local edit exists; ignore this stale save response.
+        return;
+      }
       state.modesConfig = normalizeModesConfig((out || {}).config || payload);
       state.modesConfigDirty = false;
+      state.modesConfigAppliedVersion = requestVersion;
       var postSaveHoldUntil = Date.now() + 7000;
       if (postSaveHoldUntil > state.modesConfigRefreshBlockedUntil) {
         state.modesConfigRefreshBlockedUntil = postSaveHoldUntil;
@@ -5150,7 +5157,6 @@
       state.modesSaveInFlight = true;
       try {
         await saveModesConfigWithFeedback('', { quiet: true, suppressConflictMessage: true });
-        state.modesConfigDirty = false;
       } catch (error) {
         setControlMessage(String(error && error.message ? error.message : error), true);
       } finally {
