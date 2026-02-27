@@ -1928,10 +1928,6 @@
         runBtn.textContent = loaded ? 'Stop daemon' : 'Start daemon';
         runBtn.disabled = !installed;
       }
-      var saveGlobalInstructionsBtn = document.getElementById('btn-settings-save-global-instructions');
-      if (saveGlobalInstructionsBtn) {
-        saveGlobalInstructionsBtn.disabled = !!state.globalInstructionsSaving || (state.globalInstructions === state.globalInstructionsRemote);
-      }
     }
 
     async function refreshGlobalInstructionsEditor() {
@@ -1943,6 +1939,7 @@
         state.globalInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
         state.globalInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
         textarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
+        setGlobalInstructionsSaveIndicator('');
         renderGlobalSettingsModal();
         return;
       }
@@ -1955,20 +1952,21 @@
         state.globalInstructions = content;
         state.globalInstructionsRemote = content;
         textarea.value = content;
+        setGlobalInstructionsSaveIndicator('');
       } catch (error) {
         state.globalInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
         state.globalInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
         textarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
         setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+        setGlobalInstructionsSaveIndicator('');
       } finally {
         renderGlobalSettingsModal();
       }
     }
 
-    async function saveGlobalInstructions() {
-      if (state.globalInstructionsSaving) {
-        return;
-      }
+    async function saveGlobalInstructions(options) {
+      var opts = options || {};
+      var quiet = !!opts.quiet;
       var textarea = document.getElementById('settings-global-instructions');
       if (!textarea) {
         return;
@@ -1976,28 +1974,55 @@
       var next = String(textarea.value || '');
       state.globalInstructions = next;
       if (next === state.globalInstructionsRemote) {
+        setGlobalInstructionsSaveIndicator('saved');
         renderGlobalSettingsModal();
         return;
       }
       if (state.previewMode) {
         state.globalInstructionsRemote = next;
-        setGlobalSettingsMessage('Saved (preview mode).', false);
+        setGlobalInstructionsSaveIndicator('saved');
+        if (!quiet) setGlobalSettingsMessage('Saved (preview mode).', 'success');
         renderGlobalSettingsModal();
         return;
       }
-      state.globalInstructionsSaving = true;
-      renderGlobalSettingsModal();
-      setGlobalSettingsMessage('Saving global instructions...', false);
+      if (!quiet) setGlobalSettingsMessage('Saving shared instructions...', 'pending');
       try {
         await backendJson('write-file', ['global-instructions', next]);
         state.globalInstructionsRemote = next;
-        setGlobalSettingsMessage('Global instructions saved.', false);
+        setGlobalInstructionsSaveIndicator('saved');
+        if (!quiet) setGlobalSettingsMessage('Shared instructions saved.', 'success');
       } catch (error) {
+        setGlobalInstructionsSaveIndicator('');
         setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+        throw error;
+      }
+      renderGlobalSettingsModal();
+    }
+
+    async function runGlobalInstructionsAutosave() {
+      if (state.globalInstructionsSaving) {
+        state.globalInstructionsSaveQueued = true;
+        return;
+      }
+      state.globalInstructionsSaving = true;
+      try {
+        await saveGlobalInstructions({ quiet: true });
+      } catch (_) {
       } finally {
         state.globalInstructionsSaving = false;
-        renderGlobalSettingsModal();
+        if (state.globalInstructionsSaveQueued) {
+          state.globalInstructionsSaveQueued = false;
+          queueGlobalInstructionsAutosave(120);
+        }
       }
+    }
+
+    function queueGlobalInstructionsAutosave(delayMs) {
+      if (state.globalInstructionsSaveTimer) clearTimeout(state.globalInstructionsSaveTimer);
+      state.globalInstructionsSaveTimer = setTimeout(function () {
+        state.globalInstructionsSaveTimer = null;
+        runGlobalInstructionsAutosave();
+      }, Math.max(0, parseInt(delayMs, 10) || 500));
     }
 
     async function openExternalUrl(url) {
@@ -2777,6 +2802,10 @@
       setAutosaveIndicator('reply-template-warning-save-indicator', 'reply-template-warning-save-text', mode);
       setAutosaveIndicator('reply-template-switch-save-indicator', 'reply-template-switch-save-text', mode);
       setAutosaveIndicator('reply-template-neutral-ban-save-indicator', 'reply-template-neutral-ban-save-text', mode);
+    }
+
+    function setGlobalInstructionsSaveIndicator(mode) {
+      setAutosaveIndicator('settings-global-instructions-save-indicator', 'settings-global-instructions-save-text', mode);
     }
 
     function setProfilesMessage(msg, isError) {
@@ -6235,10 +6264,15 @@
       });
       document.getElementById('settings-global-instructions').addEventListener('input', function (event) {
         state.globalInstructions = String((event && event.target && event.target.value) || '');
-        renderGlobalSettingsModal();
+        setGlobalInstructionsSaveIndicator('saving');
+        queueGlobalInstructionsAutosave(500);
       });
-      document.getElementById('btn-settings-save-global-instructions').addEventListener('click', function () {
-        saveGlobalInstructions();
+      document.getElementById('settings-global-instructions').addEventListener('blur', function () {
+        if (state.globalInstructions !== state.globalInstructionsRemote) {
+          if (state.globalInstructionsSaveTimer) clearTimeout(state.globalInstructionsSaveTimer);
+          state.globalInstructionsSaveTimer = null;
+          runGlobalInstructionsAutosave();
+        }
       });
       document.getElementById('btn-settings-install-toggle').addEventListener('click', function () {
         var launchd = (((state.status || {}).launchd) || {});

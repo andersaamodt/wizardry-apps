@@ -4120,22 +4120,23 @@ label {
   margin-top: 8px;
 }
 
+.settings-global-instructions-wrap {
+  position: relative;
+  width: 100%;
+}
+
 .settings-global-instructions {
   width: 100%;
   min-height: 180px;
   resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", monospace;
+  padding-bottom: 1.55rem;
+  font-family: "SF Pro Text", "Avenir Next", "Segoe UI", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
   font-size: 0.78rem;
 }
 
 .settings-global-instructions-note {
   font-size: 0.74rem;
   color: var(--text-subtle);
-}
-
-.settings-global-instructions-actions {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .settings-label {
@@ -4215,11 +4216,15 @@ label {
   margin-top: 10px;
 }
 
-.settings-global-instructions-actions button,
 .settings-actions button {
   font-size: 0.8rem;
   font-weight: 500;
   padding: 0.32rem 0.5rem;
+}
+
+.settings-global-save-indicator {
+  right: 10px;
+  bottom: 8px;
 }
 
 .settings-inline-msg {
