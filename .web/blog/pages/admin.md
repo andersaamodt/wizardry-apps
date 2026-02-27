@@ -590,7 +590,7 @@ body {
 
 .settings-stack {
   display: grid;
-  gap: 0.36rem;
+  gap: 0.2rem;
 }
 
 .sub-card {
@@ -598,21 +598,21 @@ body {
   border-top: 1px solid #d7e1f4;
   border-radius: 0;
   background: transparent;
-  padding: 0.45rem 0 0.18rem;
+  padding: 0.3rem 0 0.08rem;
   box-shadow: none;
 }
 
 .settings-stack .sub-card:first-child {
   border-top: 0;
-  padding-top: 0.1rem;
+  padding-top: 0.02rem;
 }
 
 .section-actions {
-  margin-top: 0.38rem;
+  margin-top: 0.22rem;
 }
 
 .field-row {
-  margin-bottom: 0.42rem;
+  margin-bottom: 0.28rem;
 }
 
 .field-row:last-child {
@@ -621,9 +621,9 @@ body {
 
 .field-row label {
   display: block;
-  margin-bottom: 0.32rem;
+  margin-bottom: 0.18rem;
   color: #1f335f;
-  font-size: 0.87rem;
+  font-size: 0.84rem;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -632,7 +632,7 @@ body {
   display: grid;
   grid-template-columns: minmax(12rem, max-content) minmax(0, 1fr);
   align-items: center;
-  gap: 0.25rem 0.75rem;
+  gap: 0.1rem 0.6rem;
 }
 
 [data-admin-section="settings"] .field-row > label {
@@ -649,7 +649,7 @@ body {
   align-items: center;
   gap: 0.38rem;
   color: #1f335f;
-  font-size: 0.87rem;
+  font-size: 0.84rem;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -657,9 +657,9 @@ body {
 [data-admin-section="settings"] .checkbox-row .checkbox-control {
   display: inline-flex;
   align-items: center;
-  gap: 0.46rem;
+  gap: 0.36rem;
   color: #1d3566;
-  font-size: 0.87rem;
+  font-size: 0.84rem;
   font-weight: 600;
 }
 
@@ -713,12 +713,12 @@ body {
   inline-size: clamp(12rem, 32vw, 24rem);
   max-inline-size: 100%;
   border: 1px solid #b8caeb;
-  border-radius: 11px;
+  border-radius: 9px;
   background: #fff;
   color: #102246;
-  font-size: 0.96rem;
-  line-height: 1.35;
-  padding: 0.62rem 0.74rem;
+  font-size: 0.92rem;
+  line-height: 1.3;
+  padding: 0.46rem 0.62rem;
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
@@ -768,19 +768,19 @@ body {
 }
 
 [data-admin-section="settings"] #site-title {
-  inline-size: clamp(12rem, 24vw, 20rem);
+  inline-size: clamp(11rem, 23vw, 18rem);
 }
 
 [data-admin-section="settings"] #admin-theme {
-  inline-size: clamp(9.5rem, 14vw, 12rem);
+  inline-size: clamp(8.5rem, 13vw, 10.5rem);
 }
 
 [data-admin-section="settings"] #drip-interval,
 [data-admin-section="settings"] #drip-randomness,
 [data-admin-section="settings"] #feed-items {
-  inline-size: 7.75rem !important;
-  width: 7.75rem !important;
-  max-inline-size: 7.75rem !important;
+  inline-size: 6.3rem !important;
+  width: 6.3rem !important;
+  max-inline-size: 6.3rem !important;
 }
 
 [data-admin-section="account"] #account-player-name {
