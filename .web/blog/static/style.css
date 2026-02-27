@@ -457,12 +457,12 @@ header h1 {
 
 .btn-login-caret {
   border-radius: 0 6px 6px 0;
-  min-width: 1.5rem;
-  width: 1.6rem;
+  min-width: 1.42rem;
+  width: 1.48rem;
   height: 2.05rem;
   padding: 0;
   border-left: 1px solid rgba(255, 255, 255, 0.35);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   line-height: 1;
   display: inline-flex;
