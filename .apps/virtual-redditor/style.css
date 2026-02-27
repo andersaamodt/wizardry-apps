@@ -2436,6 +2436,13 @@ label {
   font-size: 0.78rem;
 }
 
+#panel-persona #thread-initiate-max-pct {
+  width: 88px;
+  min-width: 88px;
+  font-family: inherit;
+  font-size: 0.78rem;
+}
+
 #panel-persona #subreddit-input {
   width: 210px;
   font-size: 0.84rem;
@@ -2599,6 +2606,10 @@ label {
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
+}
+
+.thread-saturation-inline {
+  margin: 7px 0 0;
 }
 
 #sample-max-shell .inline-field-row {
