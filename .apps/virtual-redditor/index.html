@@ -3351,11 +3351,9 @@
         if (typeof state.passesTogglePendingValue === 'boolean') {
           passesChecked = state.passesTogglePendingValue;
           passesEnabled.checked = passesChecked;
-          passesEnabled.disabled = true;
         } else {
           passesChecked = !!settings.runEnabled;
           passesEnabled.checked = passesChecked;
-          passesEnabled.disabled = false;
         }
       }
       if (passIntervalControls) {
@@ -3372,10 +3370,8 @@
       if (obeyAdmins) {
         if (typeof state.obeyAdminsPendingValue === 'boolean') {
           obeyAdmins.checked = state.obeyAdminsPendingValue;
-          obeyAdmins.disabled = true;
         } else {
           obeyAdmins.checked = !!settings.obeyAdmins;
-          obeyAdmins.disabled = false;
         }
       }
       if (threadInitiateMaxInput && document.activeElement !== threadInitiateMaxInput) {
