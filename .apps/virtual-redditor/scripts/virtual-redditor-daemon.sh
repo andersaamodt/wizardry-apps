@@ -1506,9 +1506,9 @@ launchd_install() {
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
   </dict>
   <key>RunAtLoad</key>
-  <true/>
+  <false/>
   <key>KeepAlive</key>
-  <true/>
+  <false/>
   <key>StandardOutPath</key>
   <string>$DAEMON_STDOUT_LOG</string>
   <key>StandardErrorPath</key>
@@ -1517,10 +1517,8 @@ launchd_install() {
 </plist>
 PLIST
 
-  launchctl bootout "gui/$uid" "$plist" >/dev/null 2>&1 || true
-  launchctl bootstrap "gui/$uid" "$plist" >/dev/null 2>&1 || launchctl load "$plist" >/dev/null 2>&1 || true
-  launchctl enable "gui/$uid/$label" >/dev/null 2>&1 || true
-  launchctl kickstart -k "gui/$uid/$label" >/dev/null 2>&1 || launchctl start "$label" >/dev/null 2>&1 || true
+  # Install should never auto-start bot execution.
+  launchctl bootout "gui/$uid" "$plist" >/dev/null 2>&1 || launchctl remove "$label" >/dev/null 2>&1 || true
 
   launchd_status_json
 }
@@ -3238,8 +3236,24 @@ maybe_run_nightly_statute_pass() {
 
 run_loop() {
   while :; do
-    patrol_once >/dev/null 2>&1 || true
-    maybe_run_nightly_statute_pass || true
+    # Reload mutable settings/env each cycle.
+    load_bot_env
+    load_reddit_env_optional
+
+    # Never poll unless this bot is fully configured.
+    if [ -n "${REDDIT_CLIENT_ID-}" ] && [ -n "${REDDIT_CLIENT_SECRET-}" ] && [ -n "${REDDIT_REFRESH_TOKEN-}" ] && [ -n "${REDDIT_USER_AGENT-}" ] && [ -n "${REDDIT_USERNAME-}" ] && [ -n "${SUBREDDIT-}" ]; then
+      patrol_once >/dev/null 2>&1 || true
+      maybe_run_nightly_statute_pass || true
+    else
+      now_ts=$(now_iso)
+      runtime=$(jq -cn \
+        --arg ts "$now_ts" \
+        --arg mode "$MODE" \
+        --arg patrol_mode "$PATROL_MODE" \
+        '{lastPollAt:$ts,processed:0,maxSeen:0,lastSeenBefore:0,mode:$mode,patrolMode:$patrol_mode,skipped:"reddit-not-configured"}')
+      printf '%s\n' "$runtime" > "$RUNTIME_FILE"
+    fi
+
     sleep_for=$(random_between "$PATROL_INTERVAL_MIN" "$PATROL_INTERVAL_MAX")
     [ "$sleep_for" -lt 1 ] && sleep_for=1
     sleep "$sleep_for"

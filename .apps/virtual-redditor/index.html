@@ -2576,6 +2576,10 @@
     }
 
     async function startBackgroundFromStatusChip() {
+      if (!selectedProfileConnected()) {
+        showToast('A Reddit account connection is required before starting this bot.', true);
+        return;
+      }
       if (state.launchdStartState === 'starting') return;
       if (state.launchdStartTimer) {
         clearTimeout(state.launchdStartTimer);
@@ -2994,28 +2998,39 @@
       var profilesPayload = s.profiles || {};
       var counts = metrics.counts || {};
       var runtime = metrics.runtime || {};
+      var connected = selectedProfileConnected();
 
       var chips = [];
       chips.push(statusChip('actions ' + String(counts.actions || 0) + ' • replies ' + String(counts.replies || 0)));
-      if (launchd.loaded) {
+      if (launchd.loaded && connected) {
         state.launchdStartState = '';
         state.launchdStartError = '';
         chips.push(statusChip('Bot running', 'ok'));
+      } else if (launchd.loaded && !connected) {
+        state.launchdStartState = '';
+        state.launchdStartError = '';
+        chips.push(statusChip('Bot paused (not connected)', 'warn'));
       } else if (state.launchdStartState === 'starting') {
         chips.push(statusChipWithSpinner('Starting...', 'warn'));
       } else if (state.launchdStartState === 'failed') {
         chips.push(statusActionChip('Failed', 'danger', 'start-background', (state.launchdStartError || 'this bot failed to start. Click to retry.')));
       } else {
-        chips.push(statusActionChip('Bot stopped', 'warn', 'start-background', 'This bot is not running in background. Click to start.'));
+        if (connected) {
+          chips.push(statusActionChip('Bot stopped', 'warn', 'start-background', 'This bot is not running in background. Click to start.'));
+        } else {
+          chips.push(statusChip('Bot stopped (not connected)', 'warn'));
+        }
       }
       var localName = activeProfileLocalName(profilesPayload) || 'Virtual Redditor';
       row.innerHTML = '<span class="status-active-name" title="' + escapeHtml(localName) + '">' + escapeHtml(localName) + '</span>' + chips.join('');
 
       if (runtimeLine) {
+        var skipped = String(runtime.skipped || '');
         runtimeLine.textContent = 'subreddit=' + String(settings.subreddit || '(unset)') +
           ' | user=' + String(settings.redditUsername || '(unset)') +
           ' | last poll=' + String(runtime.lastPollAt || 'n/a') +
-          ' | processed=' + String(runtime.processed || 0);
+          ' | processed=' + String(runtime.processed || 0) +
+          (skipped ? (' | ' + skipped) : '');
       }
 
       if (paths) {
