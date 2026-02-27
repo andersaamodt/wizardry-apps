@@ -2010,14 +2010,17 @@ button:disabled,
 
 .conversation-switch-overlay-content {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: 0;
   top: 44%;
-  transform: translate(-50%, -50%);
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   white-space: nowrap;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .conversation-switch-overlay.hidden {
@@ -2044,8 +2047,9 @@ button:disabled,
   display: inline-block;
   transform: none;
   text-shadow: none;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: auto;
+  text-rendering: geometricPrecision;
+  -webkit-text-stroke: 0 transparent;
 }
 
 .toolbar.conversation-switch-locked {
