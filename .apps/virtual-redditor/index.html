@@ -2872,7 +2872,7 @@
       var payload = statusPayload || state.status || {};
       var launchd = payload.launchd || {};
       var settings = payload.settings || {};
-      return !!launchd.loaded && !!settings.runEnabled;
+      return !!launchd.loaded && !!settings.runEnabled && !!settings.redditConnected;
     }
 
     function escapeHtml(input) {
@@ -5267,6 +5267,13 @@
     async function toggleBotRun(enabled, options) {
       var shouldRun = !!enabled;
       var opts = options || {};
+      var settings = (((state.status || {}).settings) || {});
+      if (shouldRun && !settings.redditConnected) {
+        setControlMessage('A Reddit account connection is required before starting this bot.', true);
+        await refreshStatus();
+        renderStatus();
+        return;
+      }
       if (state.previewMode) {
         if (state.status && state.status.settings) {
           state.status.settings.runEnabled = shouldRun;
@@ -5290,16 +5297,14 @@
           await backendJson('stop', []);
         }
 
-        var settled = false;
-        for (var i = 0; i < 16; i += 1) {
-          await refreshStatus();
-          if (isBotRunning(state.status) === shouldRun) {
-            settled = true;
-            break;
+        await refreshStatus();
+        if (shouldRun && !(state.status && state.status.launchd && state.status.launchd.loaded)) {
+          for (var i = 0; i < 6; i += 1) {
+            await new Promise(function (resolve) { setTimeout(resolve, 200); });
+            await refreshStatus();
+            if (state.status && state.status.launchd && state.status.launchd.loaded) break;
           }
-          await new Promise(function (resolve) { setTimeout(resolve, 250); });
         }
-        if (!settled) await fullRefresh();
         setControlMessage('', false);
       } catch (error) {
         setControlMessage(String(error && error.message ? error.message : error), true);
@@ -5387,10 +5392,6 @@
         try {
           await backendJson('set-setting', ['PATROL_INTERVAL_MIN', String(seconds)]);
           await backendJson('set-setting', ['PATROL_INTERVAL_MAX', String(seconds)]);
-          var loaded = !!(state.status && state.status.launchd && state.status.launchd.loaded);
-          if (loaded) {
-            await backendJson('restart', []);
-          }
           setSettingsMessage('', false);
           await refreshStatus();
         } catch (error) {

@@ -1252,6 +1252,11 @@ set_reddit_setting() {
 }
 
 settings_json() {
+  reddit_connected=0
+  if [ -n "${REDDIT_CLIENT_ID-}" ] && [ -n "${REDDIT_CLIENT_SECRET-}" ] && [ -n "${REDDIT_REFRESH_TOKEN-}" ] && [ -n "${REDDIT_USER_AGENT-}" ] && [ -n "${REDDIT_USERNAME-}" ] && [ -n "${SUBREDDIT-}" ]; then
+    reddit_connected=1
+  fi
+
   jq -cn \
     --arg state_dir "$STATE_DIR" \
     --arg mode "$MODE" \
@@ -1271,6 +1276,7 @@ settings_json() {
     --argjson user_history_limit "$USER_HISTORY_LIMIT" \
     --argjson thread_sibling_limit "$THREAD_SIBLING_LIMIT" \
     --argjson obey_admins "$OBEY_ADMINS" \
+    --argjson reddit_connected "$reddit_connected" \
     --arg ollama_model "$OLLAMA_MODEL" \
     --arg ollama_url "$OLLAMA_URL" \
     --arg subreddit "${SUBREDDIT-}" \
@@ -1288,7 +1294,7 @@ settings_json() {
     --arg last_seen_path "$LAST_SEEN_FILE" \
     --arg daemon_log_path "$DAEMON_STDOUT_LOG" \
     --arg daemon_error_path "$DAEMON_STDERR_LOG" \
-    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,runEnabled:($run_enabled==1),sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,modes:$modes_path,relationships:$relationships_path,modeLog:$mode_log_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
+    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,runEnabled:($run_enabled==1),redditConnected:($reddit_connected==1),sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,modes:$modes_path,relationships:$relationships_path,modeLog:$mode_log_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
 }
 
 metrics_json() {
