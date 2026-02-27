@@ -7,7 +7,6 @@
   var DEFAULT_DELEGATION_DAYS = 30;
   var MIN_DELEGATION_DAYS = 1;
   var MAX_DELEGATION_DAYS = 90;
-  var QUICK_DELEGATION_DAYS = 30;
   var NIP46_RELAYS = [
     'wss://relay.damus.io',
     'wss://nos.lol',
@@ -130,21 +129,6 @@
     return new Promise(function (resolve) {
       setTimeout(resolve, delay);
     });
-  }
-
-  function clampDays(value) {
-    var n = Number(value || DEFAULT_DELEGATION_DAYS);
-    if (!Number.isFinite(n)) {
-      n = DEFAULT_DELEGATION_DAYS;
-    }
-    n = Math.round(n);
-    if (n < MIN_DELEGATION_DAYS) {
-      n = MIN_DELEGATION_DAYS;
-    }
-    if (n > MAX_DELEGATION_DAYS) {
-      n = MAX_DELEGATION_DAYS;
-    }
-    return n;
   }
 
   function currentHost() {
@@ -655,48 +639,6 @@
     });
   }
 
-  function loadDeviceSession() {
-    return idbGet(KEY_DEVICE_SESSION).then(function (record) {
-      if (!record || typeof record !== 'object') {
-        return null;
-      }
-      if (record.domain !== currentHost()) {
-        return null;
-      }
-      if (!record.expiresAt || Number(record.expiresAt) <= nowEpoch()) {
-        return null;
-      }
-      if (!record.sessionSecretHex || !record.sessionPubkey || !record.userPubkey) {
-        return null;
-      }
-      return record;
-    });
-  }
-
-  function saveDeviceSession(record) {
-    return idbSet(KEY_DEVICE_SESSION, record);
-  }
-
-  function createSessionRecord(userPubkey, days) {
-    if (!hasNostrTools()) {
-      throw new Error('Nostr tools are unavailable in this browser.');
-    }
-    var durationDays = clampDays(days);
-    var secretBytes = window.NostrTools.generateSecretKey();
-    var sessionPubkey = window.NostrTools.getPublicKey(secretBytes);
-    var expiresAt = nowEpoch() + durationDays * 86400;
-    return {
-      version: 1,
-      domain: currentHost(),
-      createdAt: nowEpoch(),
-      expiresAt: expiresAt,
-      days: durationDays,
-      userPubkey: String(userPubkey || ''),
-      sessionPubkey: sessionPubkey,
-      sessionSecretHex: bytesToHex(secretBytes)
-    };
-  }
-
   function authEventTemplate(challenge, action, pubkey) {
     var eventAction = action || 'login';
     var signerPubkey = String(pubkey || '').trim();
@@ -713,23 +655,6 @@
       created_at: nowEpoch(),
       tags: tags,
       content: '',
-      pubkey: signerPubkey || undefined
-    };
-  }
-
-  function delegationEventTemplate(record, pubkey) {
-    var signerPubkey = String(pubkey || '').trim();
-    return {
-      kind: DELEGATION_KIND,
-      created_at: nowEpoch(),
-      tags: [
-        ['session_pubkey', String(record.sessionPubkey || '')],
-        ['domain', currentHost()],
-        ['expires_at', String(record.expiresAt || 0)],
-        ['scope', 'auth'],
-        ['action', 'delegate_session']
-      ],
-      content: 'wizardry delegated session authorization',
       pubkey: signerPubkey || undefined
     };
   }

@@ -25,7 +25,7 @@
     }
     .display.math{display: block; text-align: center; margin: 0.5rem auto;}
   </style>
-  <link rel="stylesheet" href="/static/style.css?v=20260227-waveformdensity1" />
+  <link rel="stylesheet" href="/static/style.css?v=20260227-overlayfullpane1" />
   <script src="/static/js/htmx.min.js"></script>
   <script src="/static/js/idiomorph-ext.min.js"></script>
 </head>
@@ -280,9 +280,6 @@ Submit decision
 </div>
 <div id="chat-log" class="chat-log">
 
-</div>
-<div id="conversation-switch-overlay" class="conversation-switch-overlay hidden" aria-live="polite">
-<span class="conversation-switch-overlay-content"><span class="conversation-switch-overlay-label">Loading messages...</span><span class="run-spinner" aria-hidden="true"></span></span>
 </div>
 <button id="chat-jump-bottom-btn" class="chat-jump-bottom hidden" type="button" aria-label="Jump to latest message">
 <span aria-hidden="true">↓</span>
@@ -615,6 +612,9 @@ title="Context window information will display here.">
 </div>
 </form>
 </section>
+<div id="conversation-switch-overlay" class="conversation-switch-overlay hidden" aria-live="polite">
+<span class="conversation-switch-overlay-content"><span class="conversation-switch-overlay-label">Loading messages...</span><span class="run-spinner" aria-hidden="true"></span></span>
+</div>
 </main>
 <aside id="diff-panel" class="diff-panel hidden" aria-label="Git diff panel">
 <div id="diff-resizer" class="pane-resizer diff-resizer"
@@ -1011,7 +1011,7 @@ Decision filters</label>
 </div>
 </div>
 </div>
-<script src="/static/artificer-app.js?v=20260227-waveformdensity1"></script>
+<script src="/static/artificer-app.js?v=20260227-overlayfullpane1"></script>
 </div>
 </body>
 </html>

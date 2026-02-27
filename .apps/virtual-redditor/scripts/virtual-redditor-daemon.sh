@@ -1034,6 +1034,7 @@ PATROL_SAMPLE_MAX=20
 PATROL_INTERVAL_MIN=3600
 PATROL_INTERVAL_MAX=3600
 THREAD_INITIATE_MAX_PCT=25
+RUN_ENABLED=0
 SANCTION_DELAY_MIN=7
 SANCTION_DELAY_MAX=45
 SUMMONS_ENABLED=1
@@ -1050,6 +1051,9 @@ BOTENV
   fi
   if ! awk -F= '$1 == "PATROL_MODE" { found=1 } END { exit found ? 0 : 1 }' "$BOT_ENV_FILE" 2>/dev/null; then
     printf 'PATROL_MODE=%s\n' "$DEFAULT_PATROL_MODE" >> "$BOT_ENV_FILE"
+  fi
+  if ! awk -F= '$1 == "RUN_ENABLED" { found=1 } END { exit found ? 0 : 1 }' "$BOT_ENV_FILE" 2>/dev/null; then
+    printf 'RUN_ENABLED=0\n' >> "$BOT_ENV_FILE"
   fi
 
   if [ ! -f "$REDDIT_ENV_FILE" ]; then
@@ -1084,6 +1088,7 @@ load_bot_env() {
   PATROL_INTERVAL_MIN=$(to_int "${PATROL_INTERVAL_MIN:-3600}" 3600)
   PATROL_INTERVAL_MAX=$(to_int "${PATROL_INTERVAL_MAX:-3600}" 3600)
   THREAD_INITIATE_MAX_PCT=$(to_int "${THREAD_INITIATE_MAX_PCT:-25}" 25)
+  RUN_ENABLED=$(to_int "${RUN_ENABLED:-0}" 0)
   SANCTION_DELAY_MIN=$(to_int "${SANCTION_DELAY_MIN:-7}" 7)
   SANCTION_DELAY_MAX=$(to_int "${SANCTION_DELAY_MAX:-45}" 45)
   SUMMONS_ENABLED=$(to_int "${SUMMONS_ENABLED:-1}" 1)
@@ -1112,6 +1117,7 @@ load_bot_env() {
   [ "$PATROL_INTERVAL_MAX" -lt "$PATROL_INTERVAL_MIN" ] && PATROL_INTERVAL_MAX=$PATROL_INTERVAL_MIN
   [ "$THREAD_INITIATE_MAX_PCT" -lt 0 ] && THREAD_INITIATE_MAX_PCT=0
   [ "$THREAD_INITIATE_MAX_PCT" -gt 100 ] && THREAD_INITIATE_MAX_PCT=100
+  [ "$RUN_ENABLED" -ne 1 ] && RUN_ENABLED=0
   [ "$SANCTION_DELAY_MIN" -lt 0 ] && SANCTION_DELAY_MIN=0
   [ "$SANCTION_DELAY_MAX" -lt "$SANCTION_DELAY_MIN" ] && SANCTION_DELAY_MAX=$SANCTION_DELAY_MIN
   [ "$USER_HISTORY_LIMIT" -lt 1 ] && USER_HISTORY_LIMIT=1
@@ -1206,7 +1212,7 @@ set_setting() {
   value=$2
 
   case "$key" in
-    MODE|PATROL_MODE|PATROL_SAMPLE_MAX|PATROL_INTERVAL_MIN|PATROL_INTERVAL_MAX|THREAD_INITIATE_MAX_PCT|SANCTION_DELAY_MIN|SANCTION_DELAY_MAX|SUMMONS_ENABLED|NIGHTLY_STATUTE_ENABLED|NIGHTLY_HOUR|HIGH_SIGNAL_MIN_SCORE|AUTO_ACCEPT_NORMS|USER_HISTORY_LIMIT|THREAD_SIBLING_LIMIT|OBEY_ADMINS|OLLAMA_MODEL|OLLAMA_URL)
+    MODE|PATROL_MODE|PATROL_SAMPLE_MAX|PATROL_INTERVAL_MIN|PATROL_INTERVAL_MAX|THREAD_INITIATE_MAX_PCT|RUN_ENABLED|SANCTION_DELAY_MIN|SANCTION_DELAY_MAX|SUMMONS_ENABLED|NIGHTLY_STATUTE_ENABLED|NIGHTLY_HOUR|HIGH_SIGNAL_MIN_SCORE|AUTO_ACCEPT_NORMS|USER_HISTORY_LIMIT|THREAD_SIBLING_LIMIT|OBEY_ADMINS|OLLAMA_MODEL|OLLAMA_URL)
       ;;
     *)
       emit_error "unsupported setting key: $key"
@@ -1253,6 +1259,7 @@ settings_json() {
     --argjson patrol_interval_min "$PATROL_INTERVAL_MIN" \
     --argjson patrol_interval_max "$PATROL_INTERVAL_MAX" \
     --argjson thread_initiate_max_pct "$THREAD_INITIATE_MAX_PCT" \
+    --argjson run_enabled "$RUN_ENABLED" \
     --argjson sanction_delay_min "$SANCTION_DELAY_MIN" \
     --argjson sanction_delay_max "$SANCTION_DELAY_MAX" \
     --argjson summons_enabled "$SUMMONS_ENABLED" \
@@ -1280,7 +1287,7 @@ settings_json() {
     --arg last_seen_path "$LAST_SEEN_FILE" \
     --arg daemon_log_path "$DAEMON_STDOUT_LOG" \
     --arg daemon_error_path "$DAEMON_STDERR_LOG" \
-    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,modes:$modes_path,relationships:$relationships_path,modeLog:$mode_log_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
+    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,runEnabled:($run_enabled==1),sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,modes:$modes_path,relationships:$relationships_path,modeLog:$mode_log_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
 }
 
 metrics_json() {
@@ -3323,6 +3330,21 @@ run_loop() {
     # Reload mutable settings/env each cycle.
     load_bot_env
     load_reddit_env_optional
+
+    if [ "$RUN_ENABLED" -ne 1 ]; then
+      now_ts=$(now_iso)
+      runtime=$(jq -cn \
+        --arg ts "$now_ts" \
+        --arg mode "$MODE" \
+        --arg patrol_mode "$PATROL_MODE" \
+        '{lastPollAt:$ts,processed:0,maxSeen:0,lastSeenBefore:0,mode:$mode,patrolMode:$patrol_mode,skipped:"bot-stopped"}')
+      printf '%s\n' "$runtime" > "$RUNTIME_FILE"
+
+      sleep_for=$(random_between "$PATROL_INTERVAL_MIN" "$PATROL_INTERVAL_MAX")
+      [ "$sleep_for" -lt 1 ] && sleep_for=1
+      sleep "$sleep_for"
+      continue
+    fi
 
     # Never poll unless this bot is fully configured.
     if [ -n "${REDDIT_CLIENT_ID-}" ] && [ -n "${REDDIT_CLIENT_SECRET-}" ] && [ -n "${REDDIT_REFRESH_TOKEN-}" ] && [ -n "${REDDIT_USER_AGENT-}" ] && [ -n "${REDDIT_USERNAME-}" ] && [ -n "${SUBREDDIT-}" ]; then

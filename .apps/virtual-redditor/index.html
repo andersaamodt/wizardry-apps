@@ -1171,9 +1171,7 @@
       doctrineCacheByProfile: {},
       usernameEditing: false,
       modelMenuCloseTimer: null,
-      launchdStartState: '',
-      launchdStartError: '',
-      launchdStartTimer: null,
+      botRunTransition: '',
       extractNormsBusy: false,
       renameTargetId: '',
       profileSwitchLoading: false,
@@ -2782,11 +2780,6 @@
       return '<span class="status-chip with-spinner ' + (klass || '') + '"><span class="chip-inline-spinner" aria-hidden="true"></span>' + text + '</span>';
     }
 
-    function statusActionChip(text, klass, action, title) {
-      return '<button type="button" class="status-chip status-chip-action ' + (klass || '') + '" data-status-action="' + escapeHtml(action || '') + '"' +
-        (title ? (' title="' + escapeHtml(title) + '"') : '') + '>' + text + '</button>';
-    }
-
     function activeProfileLocalName(profilesPayload) {
       var payload = profilesPayload || {};
       var profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
@@ -2819,47 +2812,11 @@
       }, 3400);
     }
 
-    async function startBackgroundFromStatusChip() {
-      if (!selectedProfileConnected()) {
-        showToast('A Reddit account connection is required before starting this bot.', true);
-        return;
-      }
-      if (state.launchdStartState === 'starting') return;
-      if (state.launchdStartTimer) {
-        clearTimeout(state.launchdStartTimer);
-        state.launchdStartTimer = null;
-      }
-      state.launchdStartState = 'starting';
-      state.launchdStartError = '';
-      renderStatus();
-      try {
-        await backendJson('start', []);
-        var started = false;
-        for (var i = 0; i < 14; i += 1) {
-          await refreshStatus();
-          if (state.status && state.status.launchd && state.status.launchd.loaded) {
-            started = true;
-            break;
-          }
-          await new Promise(function (resolve) { setTimeout(resolve, 250); });
-        }
-        if (!started) throw new Error('launchd did not report running state');
-        state.launchdStartState = '';
-        state.launchdStartError = '';
-        renderStatus();
-      } catch (error) {
-        var msg = normalizeUiErrorMessage(String(error && error.message ? error.message : error));
-        state.launchdStartState = 'failed';
-        state.launchdStartError = msg || 'Failed to start launchd background process.';
-        renderStatus();
-        if (state.launchdStartTimer) clearTimeout(state.launchdStartTimer);
-        state.launchdStartTimer = setTimeout(function () {
-          state.launchdStartState = '';
-          state.launchdStartError = '';
-          renderStatus();
-        }, 4200);
-        showToast(msg || 'Could not start background process.', true);
-      }
+    function isBotRunning(statusPayload) {
+      var payload = statusPayload || state.status || {};
+      var launchd = payload.launchd || {};
+      var settings = payload.settings || {};
+      return !!launchd.loaded && !!settings.runEnabled;
     }
 
     function escapeHtml(input) {

@@ -800,6 +800,7 @@ h2 {
 }
 
 .main-shell {
+  position: relative;
   grid-column: 2;
   min-height: 0;
   display: grid;
@@ -1973,7 +1974,7 @@ button:disabled,
 .conversation-switch-overlay {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 60;
   display: block;
   pointer-events: none;
   opacity: 0;
