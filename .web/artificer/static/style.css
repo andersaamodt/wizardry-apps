@@ -5561,6 +5561,14 @@ body.pane-resizing * {
   user-select: none !important;
 }
 
+body.pane-resizing .forge-shell {
+  transition: none !important;
+}
+
+body.pane-resizing .diff-panel {
+  transition: none !important;
+}
+
 body.pane-resizing-y,
 body.pane-resizing-y * {
   cursor: ns-resize !important;
