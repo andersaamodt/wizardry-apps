@@ -7611,6 +7611,24 @@
     for (var i = 0; i < controls.length; i += 1) {
       setControlPending(controls[i], locked, { spinner: false });
     }
+    var splitButtons = el.toolbar.querySelectorAll(".split-btn");
+    for (var j = 0; j < splitButtons.length; j += 1) {
+      var split = splitButtons[j];
+      var childButtons = split.querySelectorAll("button");
+      var splitDisabled = false;
+      for (var k = 0; k < childButtons.length; k += 1) {
+        if (childButtons[k].disabled || String(childButtons[k].getAttribute("data-ui-pending") || "") === "1") {
+          splitDisabled = true;
+          break;
+        }
+      }
+      split.classList.toggle("is-disabled", splitDisabled);
+    }
+    if (el.workspacePathWidget) {
+      var pathDisabled = !!el.workspacePathWidget.disabled ||
+        String(el.workspacePathWidget.getAttribute("data-ui-pending") || "") === "1";
+      el.workspacePathWidget.classList.toggle("is-disabled", pathDisabled);
+    }
   }
 
   function renderRightPaneChrome() {
