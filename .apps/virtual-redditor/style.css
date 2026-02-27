@@ -1366,6 +1366,14 @@ label {
   pointer-events: none;
 }
 
+.tab-btn.active:hover,
+.tab-btn.active:focus-visible,
+.tab-btn.active:active {
+  transform: none;
+  filter: none;
+  background: var(--bg-main);
+}
+
 .tab-btn:not(.active) {
   color: color-mix(in srgb, var(--text) 76%, var(--text-subtle));
 }
