@@ -2923,6 +2923,7 @@ label {
   align-items: center;
   min-height: 30px;
   line-height: 1;
+  margin-top: -1px;
 }
 
 .bigfive-summary {
@@ -2932,6 +2933,7 @@ label {
   border-radius: 999px;
   overflow: hidden;
   background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
+  margin-top: -1px;
 }
 
 .bigfive-chip-segment {
