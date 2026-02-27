@@ -841,6 +841,20 @@ h2 {
   pointer-events: none !important;
 }
 
+.empty-thread-hint.loading-thread-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.empty-thread-hint.loading-thread-hint .run-spinner {
+  width: 11px;
+  height: 11px;
+  border-width: 2px;
+  vertical-align: middle;
+}
+
 .toolbar {
   position: relative;
   z-index: 45;

@@ -8638,6 +8638,17 @@
     }
 
     if (!state.activeConversation) {
+      if (state.activeConversationLoading && !state.conversationSwitchOverlay) {
+        var inlineLoadingMarkup = "<p class='empty-thread-hint loading-thread-hint'><span>Loading...</span><span class='run-spinner' aria-hidden='true'></span></p>";
+        if (state.chatMarkupCache !== inlineLoadingMarkup) {
+          el.chatLog.innerHTML = inlineLoadingMarkup;
+          state.chatMarkupCache = inlineLoadingMarkup;
+        }
+        state.chatAutoScroll = true;
+        state.chatLastKey = conversationKey;
+        updateChatJumpButton();
+        return;
+      }
       if (state.activeConversationLoading || state.conversationSwitchOverlay) {
         // During thread switch, keep existing chat paint and rely on the overlay.
         state.chatAutoScroll = true;
@@ -10988,7 +10999,7 @@
     }
     state.activeConversationSelectedAt = Date.now();
     setActiveConversationLoading(workspaceId, conversationId, !canRenderCachedConversation);
-    state.conversationSwitchOverlay = switchingConversation;
+    state.conversationSwitchOverlay = switchingConversation && !!previousConversation;
     state.activeDraftWorkspaceId = "";
     state.openWorkspaceMenuWorkspaceId = "";
     state.expandedWorkspaceIds[workspaceId] = true;
