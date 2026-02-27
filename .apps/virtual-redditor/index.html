@@ -245,11 +245,11 @@
                     </label>
                     <button id="btn-bigfive-customize" type="button" class="inline-link-btn" title="Customize OCEAN traits">Customize...</button>
                     <div id="bigfive-summary" class="bigfive-summary hidden" role="group" aria-label="Big Five summary">
-                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="o" title="Openness">O•</button>
-                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="c" title="Conscientiousness">C•</button>
-                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="e" title="Extroversion">E•</button>
-                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="a" title="Agreeableness">A•</button>
-                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="n" title="Neuroticism">N•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="o" title="Openness to experience: curiosity and novelty seeking.">O•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="c" title="Conscientiousness: orderliness and reliability.">C•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="e" title="Extroversion: social energy and assertiveness.">E•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="a" title="Agreeableness: cooperation and empathy.">A•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="n" title="Neuroticism: focus on negative emotions.">N•</button>
                     </div>
                   </div>
                 </div>
@@ -4468,6 +4468,36 @@
       return ' −';
     }
 
+    function bigFiveTooltip(traitKey, level) {
+      var key = String(traitKey || '').toLowerCase();
+      var v = String(level || 'medium').toLowerCase();
+      var name = '';
+      var desc = '';
+      if (key === 'o') {
+        name = 'Openness to experience';
+        desc = 'curiosity and novelty seeking';
+      } else if (key === 'c') {
+        name = 'Conscientiousness';
+        desc = 'orderliness and reliability';
+      } else if (key === 'e') {
+        name = 'Extroversion';
+        desc = 'social energy and assertiveness';
+      } else if (key === 'a') {
+        name = 'Agreeableness';
+        desc = 'cooperation and empathy';
+      } else if (key === 'n') {
+        name = 'Neuroticism';
+        desc = 'focus on negative emotions';
+      } else {
+        name = 'Big Five trait';
+        desc = 'trait level';
+      }
+      var levelLabel = 'medium';
+      if (v === 'low') levelLabel = 'low';
+      if (v === 'high') levelLabel = 'high';
+      return name + ': ' + desc + '. Current level: ' + levelLabel + '. Click to cycle.';
+    }
+
     function closePersonaBigFiveDrawer() {
       state.personaBigFiveOpen = false;
       state.personaBigFiveFocusTrait = '';
@@ -4512,7 +4542,9 @@
         var key = traits[i];
         var btn = summary.querySelector('[data-bigfive-open="' + key + '"]');
         if (!btn) continue;
-        btn.textContent = key.toUpperCase() + bigFiveSymbol(cfg[key]);
+        var level = String(cfg[key] || 'medium').toLowerCase();
+        btn.textContent = key.toUpperCase() + bigFiveSymbol(level);
+        btn.title = bigFiveTooltip(key, level);
       }
     }
 
@@ -5749,7 +5781,18 @@
         if (!seg) return;
         var enabled = document.getElementById('behavior-bigfive-enabled');
         if (enabled && !enabled.checked) enabled.checked = true;
-        openPersonaBigFiveDrawer(String(seg.getAttribute('data-bigfive-open') || ''));
+        var trait = String(seg.getAttribute('data-bigfive-open') || '').toLowerCase();
+        if (['o', 'c', 'e', 'a', 'n'].indexOf(trait) < 0) return;
+        mutateModesConfigFromUi(function (cfg) {
+          cfg.behaviors = cfg.behaviors || {};
+          cfg.behaviors.bigFive = cfg.behaviors.bigFive || { enabled: true };
+          cfg.behaviors.bigFive.enabled = true;
+          var current = String(cfg.behaviors.bigFive[trait] || 'medium').toLowerCase();
+          var order = ['low', 'medium', 'high'];
+          var idx = order.indexOf(current);
+          if (idx < 0) idx = 1;
+          cfg.behaviors.bigFive[trait] = order[(idx + 1) % order.length];
+        });
         renderBigFiveSummary(collectModesConfigFromUi().behaviors);
         markModesConfigDirty();
         queueBehaviorAutosave(120);
