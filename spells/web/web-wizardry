@@ -18,7 +18,8 @@ Commands:
   status [SITENAME]  Show website status
   configure SITENAME Configure website settings
   nostr-mirror SITENAME  Mirror Nostr events for a blog site
-  install-nostr-verifier Ensure Nostr verifier tooling is installed
+  install-nostril Ensure nostril is installed
+  uninstall-nostril Remove nostril
 
 Without arguments, opens an interactive menu.
 
@@ -129,8 +130,12 @@ case "$cmd" in
     blog-nostr-mirror "$site_name"
     exit 0
     ;;
-  install-nostr-verifier)
-    install-nostr-verifier
+  install-nostril)
+    install-nostril
+    exit 0
+    ;;
+  uninstall-nostril)
+    uninstall-nostril
     exit 0
     ;;
   '')

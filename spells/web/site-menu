@@ -211,14 +211,20 @@ while true; do
     "update-from-template \"$site_name\"")
 
   mirror_nostr_option=""
-  install_nostr_verifier_option=""
+  nostril_tooling_option=""
   if [ "$site_template" = "blog" ]; then
     mirror_nostr_cmd_wrapped=$(wrap_cmd "Mirror Nostr events" \
       "blog-nostr-mirror \"$site_name\"")
     mirror_nostr_option="Mirror Nostr events%$mirror_nostr_cmd_wrapped"
-    install_nostr_verifier_cmd_wrapped=$(wrap_cmd "Install Nostr verifier" \
-      "install-nostr-verifier")
-    install_nostr_verifier_option="Install Nostr verifier%$install_nostr_verifier_cmd_wrapped"
+    if has nostril; then
+      uninstall_nostril_cmd_wrapped=$(wrap_cmd "Uninstall nostril" \
+        "uninstall-nostril")
+      nostril_tooling_option="Uninstall nostril%$uninstall_nostril_cmd_wrapped"
+    else
+      install_nostril_cmd_wrapped=$(wrap_cmd "Install nostril" \
+        "install-nostril")
+      nostril_tooling_option="Install nostril%$install_nostril_cmd_wrapped"
+    fi
   fi
   
   # Conditional: Copy .onion address
@@ -329,7 +335,7 @@ while true; do
     ${open_browser_option:+"$open_browser_option"} \
     "Build all & restart server%$build_restart_cmd_wrapped" \
     ${mirror_nostr_option:+"$mirror_nostr_option"} \
-    ${install_nostr_verifier_option:+"$install_nostr_verifier_option"} \
+    ${nostril_tooling_option:+"$nostril_tooling_option"} \
     "Update from template%$update_template_cmd_wrapped" \
     ${copy_site_onion:+"$copy_site_onion"} \
     "Open site directory%$open_dir_cmd_wrapped" \
