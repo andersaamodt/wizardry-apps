@@ -17,6 +17,7 @@ Commands:
   save-modes-config JSON
   list-relationships [LIMIT]
   set-relationship USER MODE [DURATION_HOURS] [TRIGGER]
+  cancel-relationship-override USER
   list-mode-log [LIMIT]
   extract-norms [full|all]
   undo ACTION_ID
@@ -732,6 +733,34 @@ set_relationship_json() {
   relationship_upsert_row "$row" || { emit_error "failed to persist relationship"; return 1; }
   append_mode_log_event "relationship-override" "$(jq -cn --arg user "$user_id" --arg mode "$(printf '%s' "$row" | jq -r '.current_mode // ""')" --arg trigger "$trigger_raw" --argjson duration "$duration" '{user_id:$user,current_mode:$mode,trigger:$trigger,duration_hours:$duration}')"
   jq -cn --argjson relationship "$row" '{ok:true,relationship:$relationship}'
+}
+
+cancel_relationship_override_json() {
+  user_raw=${1-}
+  if [ -z "$user_raw" ]; then
+    emit_error "cancel-relationship-override requires USER"
+    return 1
+  fi
+  user_id=$(relationship_key "$user_raw")
+  [ -n "$user_id" ] || { emit_error "invalid user"; return 1; }
+  row=$(relationship_get_or_create "$user_id")
+  row=$(relationship_mode_expiry_resolve "$row")
+  current_mode=$(printf '%s' "$row" | jq -r '.current_mode // empty' 2>/dev/null || printf '')
+  current_trigger=$(printf '%s' "$row" | jq -r '.trigger // empty' 2>/dev/null || printf '')
+  case "$current_trigger" in
+    manual-override|manual-override:*)
+      ;;
+    *)
+      jq -cn --argjson relationship "$row" --arg message "No active manual override." '{ok:true,changed:false,message:$message,relationship:$relationship}'
+      return 0
+      ;;
+  esac
+  fallback_mode=$(read_modes_config_json | jq -r '.defaultDecayMode // .startingMode // "SHADE"' 2>/dev/null || printf 'SHADE')
+  [ -n "$fallback_mode" ] || fallback_mode='SHADE'
+  row=$(relationship_set_mode_row "$row" "$fallback_mode" 0 "" "manual-override-cancel" false)
+  relationship_upsert_row "$row" || { emit_error "failed to persist relationship"; return 1; }
+  append_mode_log_event "relationship-override-cancel" "$(jq -cn --arg user "$user_id" --arg from "$current_mode" --arg to "$fallback_mode" '{user_id:$user,from_mode:$from,to_mode:$to}')"
+  jq -cn --argjson relationship "$row" '{ok:true,changed:true,relationship:$relationship}'
 }
 
 list_mode_log_json() {
@@ -3430,6 +3459,10 @@ main() {
 
     set-relationship)
       set_relationship_json "${1-}" "${2-}" "${3-0}" "${4-manual-override}"
+      ;;
+
+    cancel-relationship-override)
+      cancel_relationship_override_json "${1-}"
       ;;
 
     list-mode-log)

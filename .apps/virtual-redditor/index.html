@@ -4808,12 +4808,23 @@
         if (line) line.textContent = '0 relationships';
         return;
       }
+      function hasActiveManualOverride(row) {
+        var trigger = String((row && row.trigger) || '').toLowerCase();
+        if (!(trigger === 'manual-override' || trigger.indexOf('manual-override:') === 0)) return false;
+        var expiresEpoch = Number((row && row.expires_at_epoch) || 0);
+        if (expiresEpoch > 0 && expiresEpoch <= Math.floor(Date.now() / 1000)) return false;
+        return true;
+      }
       body.innerHTML = rows.map(function (row) {
         var summary = row.valence_summary || {};
+        var modeCell = escapeHtml(modeDisplayId(row.current_mode || '-'));
+        if (hasActiveManualOverride(row)) {
+          modeCell += ' <button type="button" class="relationship-override-pill" data-cancel-override="' + escapeHtml(String(row.user_id || '')) + '" title="Cancel this manual override now" aria-label="Cancel manual override">override ✕</button>';
+        }
         return [
           '<tr>',
           '  <td>' + escapeHtml(row.user_id || '-') + '</td>',
-          '  <td>' + escapeHtml(modeDisplayId(row.current_mode || '-')) + '</td>',
+          '  <td>' + modeCell + '</td>',
           '  <td>' + escapeHtml(formatTs(row.set_at || '')) + '</td>',
           '  <td>' + escapeHtml(row.expires_at ? formatTs(row.expires_at) : '-') + '</td>',
           '  <td>' + escapeHtml(row.trigger || '-') + '</td>',
@@ -6147,6 +6158,22 @@
           await Promise.all([refreshRelationships(), refreshModeLog()]);
         } catch (error) {
           setControlMessage(String(error && error.message ? error.message : error), true);
+        }
+      });
+      document.getElementById('relationships-body').addEventListener('click', async function (event) {
+        var cancelBtn = event && event.target && event.target.closest('[data-cancel-override]');
+        if (!cancelBtn) return;
+        var user = String(cancelBtn.getAttribute('data-cancel-override') || '').trim();
+        if (!user) return;
+        cancelBtn.disabled = true;
+        try {
+          await backendJson('cancel-relationship-override', [user]);
+          setControlMessage('Relationship override canceled.', false);
+          await Promise.all([refreshRelationships(), refreshModeLog()]);
+        } catch (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        } finally {
+          cancelBtn.disabled = false;
         }
       });
       document.getElementById('toggle-settings-panel').addEventListener('click', function () {

@@ -26,6 +26,7 @@ Actions:
   save-modes-config JSON
   list-relationships [LIMIT]
   set-relationship USER MODE [DURATION_HOURS] [TRIGGER]
+  cancel-relationship-override USER
   list-mode-log [LIMIT]
   undo ACTION_ID
   apologize ACTION_ID [MESSAGE]
@@ -1377,6 +1378,10 @@ main() {
 
     set-relationship)
       run_daemon set-relationship "${1-}" "${2-}" "${3-0}" "${4-manual-override}"
+      ;;
+
+    cancel-relationship-override)
+      run_daemon cancel-relationship-override "${1-}"
       ;;
 
     list-mode-log)

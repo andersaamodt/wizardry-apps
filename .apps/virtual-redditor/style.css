@@ -1928,6 +1928,28 @@ label {
   color: var(--text);
 }
 
+.relationship-override-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  min-height: 20px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--line) 45%);
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-panel) 90%);
+  color: color-mix(in srgb, var(--danger) 68%, var(--text) 32%);
+  font-size: 0.67rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.relationship-override-pill:hover {
+  transform: none;
+  filter: none;
+  background: color-mix(in srgb, var(--danger) 16%, var(--bg-panel) 84%);
+}
+
 .replies-workarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 0 0;
