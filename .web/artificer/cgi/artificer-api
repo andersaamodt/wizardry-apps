@@ -774,6 +774,75 @@ structured_incomplete_run_message() {
     "Next Improvement: $next_action_line"
 }
 
+assay_output_has_required_sections() {
+  text=$1
+  for required in "Outcome:" "Verification Evidence:" "Risks:" "Next Improvement:"; do
+    if ! printf '%s\n' "$text" | grep -q "$required"; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+assay_next_action_from_plan() {
+  plan_text=$1
+  next_action_line=$(printf '%s\n' "$plan_text" | sed -n '/^Next Action:/,$p' | sed -n '2p')
+  next_action_line=$(trim "$next_action_line")
+  if [ -z "$next_action_line" ]; then
+    next_action_line="continue from the failure ledger and retry with a narrower scope."
+  fi
+  printf '%s' "$next_action_line"
+}
+
+assay_normalize_assistant_output() {
+  raw_output=$(trim "$1")
+  final_mode=$(trim "$2")
+  plan_text=$3
+  run_time_budget=$4
+
+  if assay_output_has_required_sections "$raw_output"; then
+    printf '%s' "$raw_output"
+    return 0
+  fi
+
+  next_action_line=$(assay_next_action_from_plan "$plan_text")
+  if [ -z "$final_mode" ]; then
+    final_mode="UNKNOWN"
+  fi
+
+  if [ -z "$raw_output" ]; then
+    structured_incomplete_run_message "$final_mode" "$next_action_line" ""
+    return 0
+  fi
+
+  if printf '%s' "$raw_output" | grep -Eqi 'couldn.t complete|run timed out|before done mode|partial or stale'; then
+    risk_line="The current result may be partial or stale because the loop ended before DONE mode."
+    if printf '%s' "$raw_output" | grep -Eqi 'time budget|timed out'; then
+      risk_line="Run reached the time budget (${run_time_budget}s) before DONE mode."
+    fi
+    structured_incomplete_run_message "$final_mode" "$next_action_line" "$risk_line"
+    return 0
+  fi
+
+  outcome_line=$(printf '%s\n' "$raw_output" | sed -n '/[^[:space:]]/p' | sed -n '1p')
+  outcome_line=$(trim "$outcome_line")
+  if [ -z "$outcome_line" ]; then
+    outcome_line="Best-effort progress was produced in mode: $final_mode."
+  fi
+
+  if [ "$final_mode" = "DONE" ]; then
+    risk_line="Low risk, but verify implementation details against the command trace."
+  else
+    risk_line="The run ended in mode: $final_mode, so details may still require follow-up verification."
+  fi
+
+  printf '%s\n%s\n%s\n%s' \
+    "Outcome: $outcome_line" \
+    "Verification Evidence: Review the run trace for executed steps, commands, and controller transitions." \
+    "Risks: $risk_line" \
+    "Next Improvement: $next_action_line"
+}
+
 is_simple_direct_prompt() {
   prompt_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
   prompt_trimmed=$(trim "$prompt_lower")
@@ -16076,19 +16145,19 @@ $fallback_output"
     if [ "$assay_run_profile" -eq 1 ]; then
       case "$compute_budget" in
         quick)
-          assay_iteration_cap=2
-          ;;
-        standard|auto)
           assay_iteration_cap=3
           ;;
-        long)
+        standard|auto)
           assay_iteration_cap=4
           ;;
-        until-complete)
+        long)
           assay_iteration_cap=5
           ;;
+        until-complete)
+          assay_iteration_cap=6
+          ;;
         *)
-          assay_iteration_cap=4
+          assay_iteration_cap=5
           ;;
       esac
       if [ "$max_iterations" -gt "$assay_iteration_cap" ]; then
@@ -17012,6 +17081,7 @@ Assay mentoring contract:
 - Do not ask for user decisions; choose reasonable defaults and proceed.
 - Constrain all file edits to: ${assay_edit_root}/
 - If implementation needs files, create realistic minimal files under that path.
+- Do not end with a generic couldnt-complete response; provide best-effort concrete progress and remaining risks.
 - While thinking, emit short timestamp-friendly step updates.
 - End with sections: Outcome, Verification Evidence, Risks, Next Improvement."
     fi
@@ -18795,6 +18865,10 @@ EOF
           assistant_output="Completed implementation and verification successfully."
           ;;
       esac
+    fi
+
+    if [ "$assay_run_profile" -eq 1 ]; then
+      assistant_output=$(assay_normalize_assistant_output "$assistant_output" "$final_state_mode" "$plan_text" "$run_time_budget")
     fi
 
     if [ "$run_mode" = "teacher" ]; then

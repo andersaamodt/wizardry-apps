@@ -129,6 +129,14 @@ assert_preview_case \
   "git status --short"
 
 assert_preview_case \
+  "none-lowercase-token-near-miss" \
+  "none" \
+  "Deploy with prod_api_key and prod_host from config and continue autonomously." \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case \
   "none-external-in-programming" \
   "none" \
   "Collect diagnostics and continue autonomously." \
@@ -161,12 +169,28 @@ assert_preview_case \
   "curl https://example.com/health"
 
 assert_preview_case \
+  "precedence-explicit-over-external" \
+  "explicit-choice" \
+  "Which outreach path should I use, email or forum?" \
+  "Which outreach path should I choose?" \
+  "assistant" \
+  "curl https://example.com/health"
+
+assert_preview_case \
   "precedence-missing-over-risk" \
   "required-input-missing" \
   "Use <PROD_API_KEY> before deleting production rows." \
   "Which API key should I use before continuing?" \
   "programming" \
   "git status --short"
+
+assert_preview_case \
+  "precedence-missing-over-external" \
+  "required-input-missing" \
+  "Run outreach checks after setting <PROD_API_KEY>." \
+  "Which API key should I use before network actions?" \
+  "assistant" \
+  "curl https://example.com/health"
 
 assert_preview_case \
   "precedence-explicit-over-risk" \
