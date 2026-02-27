@@ -6559,11 +6559,10 @@
       dictationWaveSeenSignal = true;
     }
     var barCount = dictationWaveTargetBarCount();
-    var out = [];
-    for (var i = 0; i < barCount; i += 1) {
-      out.push(level);
-    }
-    state.dictateWaveLevels = out;
+    var existing = syncDictationWaveLevelsLength(barCount).slice();
+    var shifted = existing.slice(1);
+    shifted.push(level);
+    state.dictateWaveLevels = shifted;
     renderDictationWaveBars();
   }
 
@@ -6823,7 +6822,7 @@
           }
           dictationWaveBackendLevel = polledLevel;
           dictationWaveBackendLevelAt = Date.now();
-          if (!dictationWaveAnalyser || !dictationWaveData || (Date.now() - Number(dictationWaveMicLevelAt || 0)) > 160) {
+          if (!dictationWaveAnalyser || !dictationWaveData) {
             applyDictationWaveLevel(mergedDictationWaveLevel(polledLevel));
           }
         }).catch(function () {
