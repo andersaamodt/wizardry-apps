@@ -12,7 +12,8 @@
     autosaveTimer: null,
     suspendAutosave: false,
     previewVisible: localStorage.getItem('blog_admin_preview_hidden') !== '1',
-    nostrBridgeEnabled: false
+    nostrBridgeEnabled: false,
+    lastLinkedSshKeyText: ''
   };
 
   const els = {
@@ -624,6 +625,7 @@
           ? ('SSH linked (' + state.sshFingerprint.slice(0, 16) + '...)')
           : 'ssh-ed25519 AAAA...';
       }
+      syncSshAccountActionState();
 
       if (!state.isAdmin) {
         setAccountOnlyMode(true);
@@ -892,6 +894,21 @@
       throw new Error(data.error || 'SSH link failed.');
     }
     state.sshFingerprint = data.ssh_fingerprint || '';
+    state.lastLinkedSshKeyText = raw;
+    syncSshAccountActionState();
+  }
+
+  function syncSshAccountActionState() {
+    if (!els.accountSshPublicKey) {
+      return;
+    }
+    const raw = String(els.accountSshPublicKey.value || '').trim();
+    if (els.generateSshButton) {
+      els.generateSshButton.disabled = raw.length > 0;
+    }
+    if (els.linkSshButton) {
+      els.linkSshButton.disabled = (raw.length === 0 || raw === state.lastLinkedSshKeyText);
+    }
   }
 
   function renderDraftList(drafts) {
@@ -1257,6 +1274,7 @@
             if (els.accountSshPublicKey) {
               els.accountSshPublicKey.value = keyPair.publicKey;
             }
+            syncSshAccountActionState();
             triggerTextDownload('id_rsa', keyPair.privateKeyPem);
             triggerTextDownload('id_rsa.pub', keyPair.publicKey + '\n');
             setOutput(els.outputAccount, 'SSH keypair generated in-browser and downloaded. Private key was never sent to the server.', 'ok');
@@ -1276,6 +1294,12 @@
             setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
           });
       });
+    }
+    if (els.accountSshPublicKey) {
+      els.accountSshPublicKey.addEventListener('input', function () {
+        syncSshAccountActionState();
+      });
+      syncSshAccountActionState();
     }
 
     document.querySelectorAll('[data-toolbar]').forEach(function (btn) {
