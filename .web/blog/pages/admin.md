@@ -11,6 +11,7 @@ title: Blog Admin
 <button type="button" class="admin-nav-item is-compose" data-admin-nav="compose" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 18L7.2 13.8L15.8 5.2a2 2 0 1 1 2.8 2.8L10 16.6L6 18Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 21H19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="admin-nav-label">Compose</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="account" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Account</span></button>
 <button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Site Settings</span></button>
+<button type="button" class="admin-nav-item" data-admin-nav="nostr-bridge" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Nostr Bridge</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="users" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Users</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="drafts" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Drafts</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="queue" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Queue</span></button>
@@ -94,21 +95,6 @@ title: Blog Admin
 </section>
 
 <section class="sub-card">
-<h4>Nostr Bridge</h4>
-<div class="field-row checkbox-row">
-<div class="setting-label" title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">
-<strong title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">Enable Nostr Bridge</strong>
-<span class="inline-tip" tabindex="0" aria-label="When enabled, published posts are signed as Nostr events and local render indexes are derived from mirrored events.">?</span>
-</div>
-<label class="checkbox-control" for="nostr-bridge-enabled" title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">
-<input type="checkbox" id="nostr-bridge-enabled" title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">
-<span title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">Enabled</span>
-</label>
-</div>
-<p class="muted">Configure authors, relays, and blocklist in <code>site/nostr/state/</code>. Bridge actions are explicit and never run during page render.</p>
-</section>
-
-<section class="sub-card">
 <h4>Access Bootstrap</h4>
 <div class="field-row checkbox-row">
 <div class="setting-label" title="When enabled, newly registered accounts are granted admin rights automatically.">
@@ -127,6 +113,61 @@ title: Blog Admin
 <button id="btn-save-config" class="primary">Save Settings</button>
 </div>
 <div id="output-config" class="output"></div>
+</div>
+</section>
+
+<section class="admin-section" data-admin-section="nostr-bridge" hidden>
+<div class="demo-box admin-card">
+<div class="section-head">
+<h3>Nostr Bridge</h3>
+</div>
+
+<div class="settings-stack">
+<section class="sub-card">
+<h4>Bridge</h4>
+<div class="field-row checkbox-row">
+<div class="setting-label" title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">
+<strong title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">Enable Nostr Bridge</strong>
+<span class="inline-tip" tabindex="0" aria-label="When enabled, published posts are signed as Nostr events and local render indexes are rebuilt from mirrored events.">?</span>
+</div>
+<label class="checkbox-control" for="nostr-bridge-enabled" title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">
+<input type="checkbox" id="nostr-bridge-enabled" title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">
+<span title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">Enabled</span>
+</label>
+</div>
+</section>
+
+<section class="sub-card">
+<h4>Authors</h4>
+<div class="field-row">
+<label for="nostr-authors" title="Allowed author pubkeys for post mirroring. Use one hex pubkey per line."><strong title="Allowed author pubkeys for post mirroring. Use one hex pubkey per line.">Allowed Authors</strong></label>
+<textarea id="nostr-authors" class="bridge-textarea" rows="4" placeholder="hexpubkey1&#10;hexpubkey2" title="Allowed author pubkeys for post mirroring. Use one hex pubkey per line."></textarea>
+</div>
+</section>
+
+<section class="sub-card">
+<h4>Relays</h4>
+<div class="field-row">
+<label for="nostr-relays" title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line."><strong title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line.">Relay List</strong></label>
+<textarea id="nostr-relays" class="bridge-textarea" rows="4" placeholder="wss://relay.damus.io&#10;wss://relay.primal.net" title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line."></textarea>
+</div>
+</section>
+
+<section class="sub-card">
+<h4>Blocklist</h4>
+<div class="field-row">
+<label for="nostr-blocklist" title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line."><strong title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line.">Blocked Pubkeys</strong></label>
+<textarea id="nostr-blocklist" class="bridge-textarea" rows="4" placeholder="hexpubkey_to_block" title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line."></textarea>
+</div>
+</section>
+</div>
+
+<p class="muted">These settings are stored in <code>site/nostr/state/</code> as <code>authors.txt</code>, <code>relays.txt</code>, and <code>blocklist.txt</code>.</p>
+
+<div class="section-actions">
+<button id="btn-save-nostr-bridge" class="primary">Save Nostr Bridge Settings</button>
+</div>
+<div id="output-nostr-bridge" class="output"></div>
 </div>
 </section>
 
@@ -688,6 +729,12 @@ body {
   margin-bottom: 0.08rem;
 }
 
+[data-admin-section="nostr-bridge"] .field-row {
+  display: grid;
+  gap: 0.24rem;
+  margin-bottom: 0.08rem;
+}
+
 [data-admin-section="settings"] .field-row > label {
   margin-bottom: 0;
 }
@@ -707,7 +754,26 @@ body {
   letter-spacing: 0.01em;
 }
 
+[data-admin-section="nostr-bridge"] .setting-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  color: #1f335f;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 [data-admin-section="settings"] .checkbox-row .checkbox-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  color: #1d3566;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+[data-admin-section="nostr-bridge"] .checkbox-row .checkbox-control {
   display: inline-flex;
   align-items: center;
   gap: 0.36rem;
@@ -823,6 +889,16 @@ body {
 
 [data-admin-section="settings"] #site-title {
   inline-size: clamp(11rem, 23vw, 18rem);
+}
+
+[data-admin-section="nostr-bridge"] .bridge-textarea {
+  inline-size: min(100%, 42rem) !important;
+  width: min(100%, 42rem) !important;
+  max-inline-size: 100% !important;
+  min-height: 5.6rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.86rem;
+  line-height: 1.35;
 }
 
 [data-admin-section="settings"] #admin-theme {

@@ -43,13 +43,14 @@ Actions:
   oauth-submit-callback CALLBACK_URL_OR_QUERY
   oauth-finish
   oauth-cancel
+  compiled-instructions
   read-file TARGET
   read-doctrine
   write-file TARGET CONTENT
   tail-log [LINES]
 
 TARGET values for read-file:
-  manifesto | norms | global-instructions | bot-env | reddit-env | daemon-log | daemon-error-log
+  manifesto | norms | shared-instructions | core-instructions | bot-env | reddit-env | daemon-log | daemon-error-log
 USAGE
   exit 0
   ;;
@@ -274,9 +275,13 @@ refresh_paths() {
   DAEMON_STDOUT_LOG="$CURRENT_STATE_DIR/daemon.log"
   DAEMON_STDERR_LOG="$CURRENT_STATE_DIR/daemon-error.log"
   if [ "$MULTI_PROFILE" -eq 1 ]; then
-    GLOBAL_DEFAULT_INSTRUCTIONS_FILE="$STATE_ROOT/global-default-instructions.md"
+    SHARED_INSTRUCTIONS_FILE="$STATE_ROOT/shared-instructions.md"
+    CORE_DEFAULT_INSTRUCTIONS_FILE="$STATE_ROOT/core-default-instructions.md"
+    LEGACY_GLOBAL_INSTRUCTIONS_FILE="$STATE_ROOT/global-default-instructions.md"
   else
-    GLOBAL_DEFAULT_INSTRUCTIONS_FILE="$CURRENT_STATE_DIR/global-default-instructions.md"
+    SHARED_INSTRUCTIONS_FILE="$CURRENT_STATE_DIR/shared-instructions.md"
+    CORE_DEFAULT_INSTRUCTIONS_FILE="$CURRENT_STATE_DIR/core-default-instructions.md"
+    LEGACY_GLOBAL_INSTRUCTIONS_FILE="$CURRENT_STATE_DIR/global-default-instructions.md"
   fi
   OAUTH_PENDING_FILE="$CURRENT_STATE_DIR/.oauth-pending.json"
   OAUTH_RESULT_FILE="$CURRENT_STATE_DIR/.oauth-result.json"
@@ -285,20 +290,42 @@ refresh_paths() {
 
 run_daemon() {
   VR_STATE_DIR="$CURRENT_STATE_DIR" \
-  VR_GLOBAL_INSTRUCTIONS_FILE="$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" \
+  VR_SHARED_INSTRUCTIONS_FILE="$SHARED_INSTRUCTIONS_FILE" \
+  VR_CORE_INSTRUCTIONS_FILE="$CORE_DEFAULT_INSTRUCTIONS_FILE" \
   "$DAEMON_SCRIPT" "$@"
 }
 
-ensure_global_default_instructions_file() {
-  mkdir -p "$(dirname "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE")"
-  if [ -f "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" ]; then
+is_legacy_manifesto_default_file() {
+  file=${1-}
+  [ -f "$file" ] || return 1
+  tmp_legacy=$(mktemp "${TMPDIR:-/tmp}/vr-legacy-manifesto.XXXXXX")
+  cat > "$tmp_legacy" <<'LEGACY'
+# Virtual Redditor Manifesto
+
+1. Protect discourse continuity over rhetorical purity.
+2. Prefer specific correction to vague condemnation.
+3. Keep sanctions legible unless mode doctrine permits opacity.
+4. Never punish without first speaking directly to the triggering utterance.
+5. Treat repeat behavior as context, not destiny.
+6. Separate playful persona from enforcement authority when possible.
+7. Keep reversible records for every enforcement action.
+LEGACY
+  if cmp -s "$file" "$tmp_legacy"; then
+    rm -f "$tmp_legacy"
     return 0
   fi
+  rm -f "$tmp_legacy"
+  return 1
+}
+
+ensure_instruction_files() {
+  mkdir -p "$(dirname "$SHARED_INSTRUCTIONS_FILE")"
   app_default="$SCRIPT_DIR/../manifesto.md"
-  if [ -f "$app_default" ]; then
-    cp "$app_default" "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" 2>/dev/null || cat "$app_default" > "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE"
-  else
-    cat > "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" <<'DEFAULTS'
+  if [ ! -f "$CORE_DEFAULT_INSTRUCTIONS_FILE" ]; then
+    if [ -f "$app_default" ]; then
+      cp "$app_default" "$CORE_DEFAULT_INSTRUCTIONS_FILE" 2>/dev/null || cat "$app_default" > "$CORE_DEFAULT_INSTRUCTIONS_FILE"
+    else
+      cat > "$CORE_DEFAULT_INSTRUCTIONS_FILE" <<'DEFAULTS'
 # Global Default Instructions
 
 1. Optimize for useful participation in the live thread.
@@ -339,6 +366,19 @@ ensure_global_default_instructions_file() {
     - No doxxing, no private-data speculation, no targeted harassment.
     - No calls to unsafe real-world behavior or illegal activity.
 DEFAULTS
+    fi
+  fi
+
+  if [ ! -f "$SHARED_INSTRUCTIONS_FILE" ]; then
+    if [ -f "$LEGACY_GLOBAL_INSTRUCTIONS_FILE" ]; then
+      if cmp -s "$LEGACY_GLOBAL_INSTRUCTIONS_FILE" "$CORE_DEFAULT_INSTRUCTIONS_FILE" || is_legacy_manifesto_default_file "$LEGACY_GLOBAL_INSTRUCTIONS_FILE"; then
+        : > "$SHARED_INSTRUCTIONS_FILE"
+      else
+        cp "$LEGACY_GLOBAL_INSTRUCTIONS_FILE" "$SHARED_INSTRUCTIONS_FILE" 2>/dev/null || cat "$LEGACY_GLOBAL_INSTRUCTIONS_FILE" > "$SHARED_INSTRUCTIONS_FILE"
+      fi
+    else
+      : > "$SHARED_INSTRUCTIONS_FILE"
+    fi
   fi
 }
 
@@ -713,7 +753,8 @@ read_file_json() {
   case "$target" in
     manifesto) file="$MANIFESTO_FILE" ;;
     norms) file="$NORMS_FILE" ;;
-    global-instructions) file="$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" ;;
+    shared-instructions) file="$SHARED_INSTRUCTIONS_FILE" ;;
+    core-instructions) file="$CORE_DEFAULT_INSTRUCTIONS_FILE" ;;
     bot-env) file="$BOT_ENV_FILE" ;;
     reddit-env) file="$REDDIT_ENV_FILE" ;;
     daemon-log) file="$DAEMON_STDOUT_LOG" ;;
@@ -753,7 +794,8 @@ write_file_json() {
   case "$target" in
     manifesto) file="$MANIFESTO_FILE" ;;
     norms) file="$NORMS_FILE" ;;
-    global-instructions) file="$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" ;;
+    shared-instructions) file="$SHARED_INSTRUCTIONS_FILE" ;;
+    core-instructions) file="$CORE_DEFAULT_INSTRUCTIONS_FILE" ;;
     bot-env) file="$BOT_ENV_FILE" ;;
     reddit-env) file="$REDDIT_ENV_FILE" ;;
     *)
@@ -1300,7 +1342,7 @@ main() {
 
   resolve_current_state
   refresh_paths
-  ensure_global_default_instructions_file
+  ensure_instruction_files
 
   case "$action" in
     list-themes)
@@ -1512,6 +1554,10 @@ main() {
       oauth_cancel_json
       ;;
 
+    compiled-instructions)
+      run_daemon compiled-instructions
+      ;;
+
     read-file)
       target=${1-}
       if [ -z "$target" ]; then
@@ -1551,14 +1597,15 @@ main() {
         --arg mode_log "$MODE_LOG_FILE" \
         --arg manifesto "$MANIFESTO_FILE" \
         --arg norms "$NORMS_FILE" \
-        --arg global_instructions "$GLOBAL_DEFAULT_INSTRUCTIONS_FILE" \
+        --arg shared_instructions "$SHARED_INSTRUCTIONS_FILE" \
+        --arg core_instructions "$CORE_DEFAULT_INSTRUCTIONS_FILE" \
         --arg reddit_env "$REDDIT_ENV_FILE" \
         --arg bot_env "$BOT_ENV_FILE" \
         --arg daemon_log "$DAEMON_STDOUT_LOG" \
         --arg daemon_error_log "$DAEMON_STDERR_LOG" \
         --arg active_profile "$ACTIVE_PROFILE_ID" \
         --argjson multi_profile "$MULTI_PROFILE" \
-        '{ok:true,stateRoot:$root,stateDir:$state,activeProfile:$active_profile,multiProfile:($multi_profile==1),paths:{actions:$actions,bans:$bans,replies:$replies,modes:$modes,relationships:$relationships,modeLog:$mode_log,manifesto:$manifesto,norms:$norms,globalInstructions:$global_instructions,redditEnv:$reddit_env,botEnv:$bot_env,daemonLog:$daemon_log,daemonErrorLog:$daemon_error_log}}'
+        '{ok:true,stateRoot:$root,stateDir:$state,activeProfile:$active_profile,multiProfile:($multi_profile==1),paths:{actions:$actions,bans:$bans,replies:$replies,modes:$modes,relationships:$relationships,modeLog:$mode_log,manifesto:$manifesto,norms:$norms,sharedInstructions:$shared_instructions,coreInstructions:$core_instructions,redditEnv:$reddit_env,botEnv:$bot_env,daemonLog:$daemon_log,daemonErrorLog:$daemon_error_log}}'
       ;;
 
     *)

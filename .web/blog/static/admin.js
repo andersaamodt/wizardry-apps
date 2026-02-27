@@ -32,6 +32,7 @@
     authStatus: document.getElementById('admin-access-message'),
     adminPanel: document.getElementById('admin-panel'),
     outputConfig: document.getElementById('output-config'),
+    outputNostrBridge: document.getElementById('output-nostr-bridge'),
     outputCompose: document.getElementById('output-compose'),
     outputQueue: document.getElementById('output-queue'),
     outputAccount: document.getElementById('output-account'),
@@ -44,6 +45,9 @@
     feedFullText: document.getElementById('feed-full-text'),
     feedItems: document.getElementById('feed-items'),
     nostrBridgeEnabled: document.getElementById('nostr-bridge-enabled'),
+    nostrAuthors: document.getElementById('nostr-authors'),
+    nostrRelays: document.getElementById('nostr-relays'),
+    nostrBlocklist: document.getElementById('nostr-blocklist'),
     newUsersAreAdmins: document.getElementById('new-users-are-admins'),
     postTitle: document.getElementById('post-title'),
     postTags: document.getElementById('post-tags'),
@@ -919,6 +923,15 @@
     if (els.nostrBridgeEnabled) {
       els.nostrBridgeEnabled.checked = state.nostrBridgeEnabled;
     }
+    if (els.nostrAuthors) {
+      els.nostrAuthors.value = Array.isArray(data.nostr_authors) ? data.nostr_authors.join('\n') : '';
+    }
+    if (els.nostrRelays) {
+      els.nostrRelays.value = Array.isArray(data.nostr_relays) ? data.nostr_relays.join('\n') : '';
+    }
+    if (els.nostrBlocklist) {
+      els.nostrBlocklist.value = Array.isArray(data.nostr_blocklist) ? data.nostr_blocklist.join('\n') : '';
+    }
     if (els.newUsersAreAdmins) {
       els.newUsersAreAdmins.checked = !!data.new_users_are_admins;
     }
@@ -937,20 +950,46 @@
         drip_randomness_minutes: els.dripRandomness.value.trim(),
         feed_full_text: els.feedFullText.checked ? 'true' : 'false',
         feed_items: els.feedItems.value.trim(),
-        nostr_bridge_enabled: (els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked) ? 'true' : 'false',
         new_users_are_admins: (els.newUsersAreAdmins && els.newUsersAreAdmins.checked) ? 'true' : 'false'
       }, true);
       if (!data.success) {
         throw new Error(data.error || 'Failed to save config');
       }
-      state.nostrBridgeEnabled = !!(els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked);
-      if (els.mirrorNostrButton) {
-        els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
-      }
       setOutput(els.outputConfig, 'Settings saved.', 'ok');
       await loadQueue();
     } catch (err) {
       setOutput(els.outputConfig, 'Error: ' + err.message, 'error');
+    }
+  }
+
+  function normalizeLineList(text) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map(function (line) { return line.trim(); })
+      .filter(function (line) { return !!line; })
+      .join('\n');
+  }
+
+  async function saveNostrBridgeConfig() {
+    try {
+      const data = await apiPost('/cgi/blog-update-config', {
+        nostr_lists_update: 'true',
+        nostr_bridge_enabled: (els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked) ? 'true' : 'false',
+        nostr_authors: normalizeLineList(els.nostrAuthors ? els.nostrAuthors.value : ''),
+        nostr_relays: normalizeLineList(els.nostrRelays ? els.nostrRelays.value : ''),
+        nostr_blocklist: normalizeLineList(els.nostrBlocklist ? els.nostrBlocklist.value : '')
+      }, true);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to save Nostr bridge settings');
+      }
+      state.nostrBridgeEnabled = !!(els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked);
+      if (els.mirrorNostrButton) {
+        els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
+      }
+      await loadConfig();
+      setOutput(els.outputNostrBridge, 'Nostr Bridge settings saved.', 'ok');
+    } catch (err) {
+      setOutput(els.outputNostrBridge, 'Error: ' + err.message, 'error');
     }
   }
 
@@ -1690,6 +1729,10 @@
 
   function bindEvents() {
     document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+    const saveNostrBridgeBtn = document.getElementById('btn-save-nostr-bridge');
+    if (saveNostrBridgeBtn) {
+      saveNostrBridgeBtn.addEventListener('click', saveNostrBridgeConfig);
+    }
     if (els.adminTheme) {
       els.adminTheme.addEventListener('change', function () {
         applyThemePreview(els.adminTheme.value);

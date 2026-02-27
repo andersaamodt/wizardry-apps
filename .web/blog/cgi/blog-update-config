@@ -25,6 +25,19 @@ feed_full_text=$(blog_param feed_full_text)
 feed_items=$(blog_param feed_items)
 nostr_bridge_enabled=$(blog_param nostr_bridge_enabled)
 new_users_are_admins=$(blog_param new_users_are_admins)
+nostr_lists_update=$(blog_param nostr_lists_update)
+nostr_authors=$(blog_param nostr_authors)
+nostr_relays=$(blog_param nostr_relays)
+nostr_blocklist=$(blog_param nostr_blocklist)
+
+write_nostr_lines_file() {
+  target_file=$1
+  raw_value=$2
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/blog-nostr-list-write.XXXXXX")
+  printf '%s' "$raw_value" | tr '\r' '\n' | sed -e 's/#.*$//' -e 's/[[:space:]]\+$//' -e 's/^[[:space:]]*//' | awk 'NF { if (!seen[$0]++) print $0; }' > "$tmp_file"
+  mv "$tmp_file" "$target_file"
+  chmod 644 "$target_file" 2>/dev/null || true
+}
 
 if [ -n "$registration_enabled" ]; then
   case "$registration_enabled" in
@@ -118,6 +131,15 @@ if [ -n "$new_users_are_admins" ]; then
   case "$new_users_are_admins" in
     true|false) config-set "$blog_site_conf" new_users_are_admins "$new_users_are_admins" ;;
   esac
+fi
+
+if [ "$nostr_lists_update" = "true" ]; then
+  write_nostr_lines_file "$blog_nostr_authors_file" "$nostr_authors"
+  write_nostr_lines_file "$blog_nostr_relays_file" "$nostr_relays"
+  write_nostr_lines_file "$blog_nostr_blocklist_file" "$nostr_blocklist"
+  if blog_nostr_bridge_enabled; then
+    blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+  fi
 fi
 
 printf '{"success":true,"message":"Configuration updated"}\n'

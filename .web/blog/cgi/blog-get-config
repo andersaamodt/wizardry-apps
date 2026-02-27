@@ -19,6 +19,9 @@ feed_full_text=$(config-get "$blog_site_conf" feed_full_text 2>/dev/null || prin
 feed_items=$(config-get "$blog_site_conf" feed_items 2>/dev/null || printf '50')
 nostr_bridge_enabled=$(config-get "$blog_site_conf" nostr_bridge_enabled 2>/dev/null || printf 'false')
 new_users_are_admins=$(config-get "$blog_site_conf" new_users_are_admins 2>/dev/null || printf 'false')
+nostr_authors=$(blog_nostr_list_file_to_json_array "$blog_nostr_authors_file")
+nostr_relays=$(blog_nostr_list_file_to_json_array "$blog_nostr_relays_file")
+nostr_blocklist=$(blog_nostr_list_file_to_json_array "$blog_nostr_blocklist_file")
 
 case "$registration_enabled" in true|false) ;; *) registration_enabled=true ;; esac
 case "$feed_full_text" in true|false) ;; *) feed_full_text=true ;; esac
@@ -37,5 +40,8 @@ printf '"drip_jitter_minutes":%s,' "$drip_randomness"
 printf '"feed_full_text":%s,' "$feed_full_text"
 printf '"feed_items":%s,' "$feed_items"
 printf '"nostr_bridge_enabled":%s,' "$nostr_bridge_enabled"
-printf '"new_users_are_admins":%s' "$new_users_are_admins"
+printf '"new_users_are_admins":%s,' "$new_users_are_admins"
+printf '"nostr_authors":%s,' "$nostr_authors"
+printf '"nostr_relays":%s,' "$nostr_relays"
+printf '"nostr_blocklist":%s' "$nostr_blocklist"
 printf '}\n'
