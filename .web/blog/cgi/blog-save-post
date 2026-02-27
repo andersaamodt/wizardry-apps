@@ -67,6 +67,9 @@ if [ -z "$draft_id" ]; then
   draft_id=$(blog_new_draft_id)
 fi
 
+# Summary is generated automatically from content for now.
+summary=$(blog_auto_summary_from_content "$content")
+
 normalized_tags=$(blog_normalize_tags "$tags")
 
 case "$action" in

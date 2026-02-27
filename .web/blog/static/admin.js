@@ -49,7 +49,6 @@
     postTagsInput: document.getElementById('post-tags-input'),
     postTagsEditor: document.getElementById('post-tags-editor'),
     postTagsPills: document.getElementById('post-tags-pills'),
-    postSummary: document.getElementById('post-summary'),
     postContent: document.getElementById('post-content'),
     postScheduleAt: document.getElementById('post-scheduled-at'),
     dripQueuePill: document.getElementById('drip-queue-pill'),
@@ -497,7 +496,7 @@
       draft_id: state.currentDraftId,
       title: els.postTitle.value.trim(),
       tags: els.postTags.value.trim(),
-      summary: els.postSummary.value.trim(),
+      summary: '',
       content: els.postContent.value,
       scheduled_at: localToIso(els.postScheduleAt.value),
       publish_mode: getPublishMode()
@@ -509,7 +508,6 @@
     state.currentDraftId = draft.draft_id || '';
     els.postTitle.value = draft.title || '';
     setComposeTagsFromString(draft.tags || '');
-    els.postSummary.value = draft.summary || '';
     els.postContent.value = draft.content || '';
     els.postScheduleAt.value = isoToLocal(draft.scheduled_at || '');
     setPublishMode(draft.publish_mode || 'draft');
@@ -524,7 +522,6 @@
     state.currentDraftId = '';
     els.postTitle.value = '';
     setComposeTags([]);
-    els.postSummary.value = '';
     els.postContent.value = '';
     els.postScheduleAt.value = '';
     setPublishMode('draft');
@@ -1956,10 +1953,10 @@
       }
     });
 
-    [els.postTitle, els.postSummary, els.postContent, els.postScheduleAt].forEach(function (el) {
+    [els.postTitle, els.postContent, els.postScheduleAt].forEach(function (el) {
       el.addEventListener('input', function () {
         renderPreview();
-        const typing = (el === els.postTitle || el === els.postSummary || el === els.postContent);
+        const typing = (el === els.postTitle || el === els.postContent);
         queueAutosave(typing ? 'typing' : 'saving');
       });
     });

@@ -516,6 +516,31 @@ blog_validate_player_name() {
   printf '%s\n' "$name" | grep -Eq '^[A-Za-z0-9._ -]+$'
 }
 
+blog_auto_summary_from_content() {
+  content=${1-}
+  if [ -z "$content" ]; then
+    printf '%s\n' ''
+    return 0
+  fi
+  # Strip common markdown syntax and collapse whitespace.
+  plain=$(
+    printf '%s\n' "$content" \
+      | sed -E 's/```[^`]*```/ /g; s/`([^`]*)`/\1/g; s/!\[[^]]*\]\([^)]*\)/ /g; s/\[([^]]*)\]\([^)]*\)/\1/g; s/^[[:space:]]{0,3}[#>*-]+[[:space:]]*//g; s/[*_~]+//g' \
+      | tr '\n' ' ' \
+      | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//'
+  )
+  if [ -z "$plain" ]; then
+    printf '%s\n' ''
+    return 0
+  fi
+  max_words=28
+  summary=$(printf '%s\n' "$plain" | awk -v n="$max_words" '{ for (i=1; i<=NF && i<=n; i++) { printf "%s%s", $i, (i<n && i<NF ? " " : "") } }')
+  if [ -n "$summary" ] && [ "$(printf '%s\n' "$plain" | wc -w | tr -d ' ')" -gt "$max_words" ]; then
+    summary="$summary..."
+  fi
+  printf '%s\n' "$summary"
+}
+
 blog_validate_nostr_pubkey() {
   pubkey=$(printf '%s' "${1-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
   case "$pubkey" in

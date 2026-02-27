@@ -246,10 +246,6 @@ title: Blog Admin
 <input type="text" id="post-tags-input" class="tag-editor-input" placeholder="tag, tag, tag">
 </div>
 </div>
-<div class="field-row">
-<label for="post-summary"><strong>Summary</strong></label>
-<input type="text" id="post-summary" placeholder="Short description for index + feeds">
-</div>
 </div>
 
 <div class="field-row">
