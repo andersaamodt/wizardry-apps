@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Uninstall server-side nostril tooling.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: uninstall-nostril
+
+Removes the nostril CLI installed for server-side Nostr signature verification.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+. env-clear
+
+if ! has nostril; then
+  info "nostril is not installed"
+  exit 0
+fi
+
+if has cargo; then
+  step "Removing nostril via cargo..."
+  if cargo uninstall nostril >/dev/null 2>&1; then
+    success "Uninstalled nostril"
+    exit 0
+  fi
+fi
+
+nostril_path=$(command -v nostril 2>/dev/null || printf '')
+if [ -n "$nostril_path" ] && [ -f "$nostril_path" ]; then
+  step "Removing nostril binary at $nostril_path"
+  rm -f "$nostril_path"
+fi
+
+if has nostril; then
+  die "uninstall-nostril: nostril is still present on PATH"
+fi
+
+success "Uninstalled nostril"
