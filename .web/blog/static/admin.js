@@ -22,7 +22,9 @@
     userDragUsername: '',
     userDropAfterUsername: '',
     usersMenuOpenFor: '',
-    usersActionInFlight: false
+    usersActionInFlight: false,
+    dripQueueAhead: 0,
+    dripQueueEtaMinutes: 0
   };
 
   const els = {
@@ -50,6 +52,7 @@
     postSummary: document.getElementById('post-summary'),
     postContent: document.getElementById('post-content'),
     postScheduleAt: document.getElementById('post-scheduled-at'),
+    dripQueuePill: document.getElementById('drip-queue-pill'),
     scheduledRow: document.getElementById('scheduled-row'),
     markdownPreview: document.getElementById('markdown-preview'),
     composeShell: document.querySelector('.compose-shell'),
@@ -331,10 +334,10 @@
   }
 
   function buildAuthPayload(data) {
-    return Object.assign({}, data, {
+    return Object.assign({
       session_token: state.sessionToken,
       csrf_token: state.csrfToken
-    });
+    }, data || {});
   }
 
   function maybePromptInteractiveApproval(data) {
@@ -369,6 +372,7 @@
     });
     updatePrimaryPublishButton(mode);
     updateScheduledRowVisibility(mode);
+    updateDripQueuePill(mode);
   }
 
   function updatePrimaryPublishButton(mode) {
@@ -392,7 +396,62 @@
       return;
     }
     const picked = mode || getPublishMode();
-    els.scheduledRow.classList.toggle('is-hidden', picked !== 'scheduled');
+    const isScheduled = picked === 'scheduled';
+    els.scheduledRow.classList.toggle('is-hidden', !isScheduled);
+    if (isScheduled && els.postScheduleAt) {
+      window.setTimeout(function () {
+        try {
+          els.postScheduleAt.focus();
+          if (typeof els.postScheduleAt.showPicker === 'function') {
+            els.postScheduleAt.showPicker();
+          }
+        } catch (_) {
+          // Browser may block programmatic picker open; focus is still useful.
+        }
+      }, 40);
+    }
+  }
+
+  function formatEtaMinutes(minutes) {
+    const total = Math.max(0, Number(minutes || 0));
+    if (!total) {
+      return 'next';
+    }
+    if (total < 60) {
+      return total + 'm';
+    }
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return m ? (h + 'h ' + m + 'm') : (h + 'h');
+  }
+
+  function updateDripQueuePill(mode) {
+    if (!els.dripQueuePill) {
+      return;
+    }
+    const picked = mode || getPublishMode();
+    if (picked !== 'drip') {
+      els.dripQueuePill.hidden = true;
+      els.dripQueuePill.textContent = '';
+      return;
+    }
+    const ahead = Math.max(0, Number(state.dripQueueAhead || 0));
+    if (ahead === 0) {
+      els.dripQueuePill.textContent = 'next';
+      els.dripQueuePill.hidden = false;
+      return;
+    }
+    els.dripQueuePill.textContent = ahead + ' ahead • ~' + formatEtaMinutes(state.dripQueueEtaMinutes);
+    els.dripQueuePill.hidden = false;
+  }
+
+  function setAutosaveStatus(message) {
+    if (!els.autosaveStatus) {
+      return;
+    }
+    const text = String(message || '').trim();
+    els.autosaveStatus.textContent = text;
+    els.autosaveStatus.hidden = !text;
   }
 
   function setPreviewVisibility(visible) {
@@ -452,8 +511,8 @@
     setComposeTagsFromString(draft.tags || '');
     els.postSummary.value = draft.summary || '';
     els.postContent.value = draft.content || '';
-    setPublishMode(draft.publish_mode || 'draft');
     els.postScheduleAt.value = isoToLocal(draft.scheduled_at || '');
+    setPublishMode(draft.publish_mode || 'draft');
     renderPreview();
     refreshDraftLabel();
     setTimeout(function () {
@@ -475,6 +534,7 @@
 
   function refreshDraftLabel() {
     if (!els.currentDraftLabel) {
+      updateDripQueuePill();
       return;
     }
     if (state.currentDraftId) {
@@ -482,6 +542,7 @@
     } else {
       els.currentDraftLabel.textContent = 'New draft';
     }
+    updateDripQueuePill();
   }
 
   function syncComposeTagsField() {
@@ -623,17 +684,99 @@
     });
   }
 
-  function prependLine(prefix) {
-    replaceSelection(function (selected) {
-      const source = selected || 'item';
-      const lines = source.split('\n').map(function (line) {
+  function replaceSelectedLines(transformer) {
+    const textarea = els.postContent;
+    const value = textarea.value;
+    const selStart = textarea.selectionStart;
+    const selEnd = textarea.selectionEnd;
+    const lineStart = value.lastIndexOf('\n', Math.max(0, selStart - 1)) + 1;
+    const lineEndIdx = value.indexOf('\n', selEnd);
+    const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+    const source = value.slice(lineStart, lineEnd);
+    const lines = source.split('\n');
+    const result = transformer(lines);
+    if (!result || !Array.isArray(result.lines)) {
+      return;
+    }
+    const next = result.lines.join('\n');
+    textarea.value = value.slice(0, lineStart) + next + value.slice(lineEnd);
+    placeCursor(textarea, lineStart, lineStart + next.length);
+    renderPreview();
+    queueAutosave('saving');
+  }
+
+  function toggleHeadingOnCurrentLine(level) {
+    const heading = '#'.repeat(level) + ' ';
+    replaceSelectedLines(function (lines) {
+      const line = lines[0] || '';
+      const stripped = line.replace(/^#{1,6}\s+/, '');
+      if (line.startsWith(heading)) {
+        lines[0] = stripped;
+      } else {
+        lines[0] = heading + stripped;
+      }
+      return { lines: lines };
+    });
+  }
+
+  function togglePrefixOnLines(prefix) {
+    replaceSelectedLines(function (lines) {
+      const nonEmpty = lines.filter(function (line) { return line.trim() !== ''; });
+      const allHave = nonEmpty.length > 0 && nonEmpty.every(function (line) {
+        return line.startsWith(prefix);
+      });
+      const next = lines.map(function (line) {
+        if (line.trim() === '') {
+          return line;
+        }
+        if (allHave) {
+          return line.startsWith(prefix) ? line.slice(prefix.length) : line;
+        }
         return prefix + line;
       });
-      const text = lines.join('\n');
+      return { lines: next };
+    });
+  }
+
+  function toggleOrderedListOnLines() {
+    replaceSelectedLines(function (lines) {
+      const nonEmpty = lines.filter(function (line) { return line.trim() !== ''; });
+      const allOrdered = nonEmpty.length > 0 && nonEmpty.every(function (line) {
+        return /^\d+\.\s+/.test(line);
+      });
+      let idx = 1;
+      const next = lines.map(function (line) {
+        if (line.trim() === '') {
+          return line;
+        }
+        if (allOrdered) {
+          return line.replace(/^\d+\.\s+/, '');
+        }
+        const text = line.replace(/^\d+\.\s+/, '').replace(/^-+\s+/, '');
+        const out = idx + '. ' + text;
+        idx += 1;
+        return out;
+      });
+      return { lines: next };
+    });
+  }
+
+  function toggleCodeBlock() {
+    replaceSelection(function (selected) {
+      const source = selected || '';
+      if (/^```[\s\S]*```$/.test(source.trim())) {
+        const unwrapped = source.trim().replace(/^```[\n]?/, '').replace(/\n?```$/, '');
+        return {
+          text: unwrapped,
+          cursorStart: 0,
+          cursorEnd: unwrapped.length
+        };
+      }
+      const wrapped = '```\n' + source + '\n```';
       return {
-        text: text,
-        cursorStart: 0,
-        cursorEnd: text.length
+        text: wrapped,
+        cursorStart: 4,
+        cursorEnd: wrapped.length - 4
       };
     });
   }
@@ -1059,6 +1202,24 @@
     if (!data.success) {
       throw new Error(data.error || 'Failed to load queue');
     }
+    const queue = Array.isArray(data.queue) ? data.queue : [];
+    const dripQueue = queue.filter(function (item) {
+      return item && item.publish_mode === 'drip' && item.status === 'queued';
+    });
+    let ahead = dripQueue.length;
+    if (state.currentDraftId) {
+      const currentIdx = dripQueue.findIndex(function (item) {
+        return item && item.draft_id === state.currentDraftId;
+      });
+      if (currentIdx >= 0) {
+        ahead = currentIdx;
+      }
+    }
+    const intervalHours = Number(data.drip_interval_hours || 0);
+    const intervalMinutes = Math.max(1, Math.round(intervalHours * 60));
+    state.dripQueueAhead = ahead;
+    state.dripQueueEtaMinutes = ahead * intervalMinutes;
+    updateDripQueuePill();
     renderQueue(data);
   }
 
@@ -1351,7 +1512,7 @@
       }
 
       await Promise.all([loadDrafts(), loadQueue()]);
-      els.autosaveStatus.textContent = 'Saved at ' + new Date().toLocaleTimeString();
+      setAutosaveStatus('Saved at ' + new Date().toLocaleTimeString());
     } catch (err) {
       setOutput(els.outputCompose, 'Error: ' + err.message, 'error');
     }
@@ -1372,10 +1533,10 @@
       if (data.success && data.draft_id) {
         state.currentDraftId = data.draft_id;
         refreshDraftLabel();
-        els.autosaveStatus.textContent = 'Autosaved at ' + new Date().toLocaleTimeString();
+        setAutosaveStatus('Autosaved at ' + new Date().toLocaleTimeString());
       }
     } catch (err) {
-      els.autosaveStatus.textContent = 'Autosave failed (' + err.message + ')';
+      setAutosaveStatus('Autosave failed (' + err.message + ')');
     }
   }
 
@@ -1386,7 +1547,7 @@
     if (state.autosaveTimer) {
       clearTimeout(state.autosaveTimer);
     }
-    els.autosaveStatus.textContent = reason === 'typing' ? 'Typing...' : 'Saving...';
+    setAutosaveStatus(reason === 'typing' ? 'Typing...' : 'Saving...');
     state.autosaveTimer = setTimeout(autosave, 1500);
   }
 
@@ -1773,11 +1934,12 @@
         if (action === 'bold') { toggleWrap('**', '**'); return; }
         if (action === 'italic') { toggleWrap('*', '*'); return; }
         if (action === 'code') { toggleWrap('`', '`'); return; }
-        if (action === 'h2') { prependLine('## '); return; }
-        if (action === 'h3') { prependLine('### '); return; }
-        if (action === 'quote') { prependLine('> '); return; }
-        if (action === 'ul') { prependLine('- '); return; }
-        if (action === 'ol') { prependLine('1. '); return; }
+        if (action === 'code_block') { toggleCodeBlock(); return; }
+        if (action === 'h2') { toggleHeadingOnCurrentLine(2); return; }
+        if (action === 'h3') { toggleHeadingOnCurrentLine(3); return; }
+        if (action === 'quote') { togglePrefixOnLines('> '); return; }
+        if (action === 'ul') { togglePrefixOnLines('- '); return; }
+        if (action === 'ol') { toggleOrderedListOnLines(); return; }
         if (action === 'link') { insertLink(); return; }
         if (action === 'image') { els.imagePicker.click(); return; }
       });
@@ -1865,6 +2027,7 @@
   refreshDraftLabel();
   updatePrimaryPublishButton();
   updateScheduledRowVisibility();
+  setAutosaveStatus('');
   setPreviewVisibility(state.previewVisible);
   renderPreview();
 })();

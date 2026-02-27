@@ -208,12 +208,16 @@ title: Blog Admin
 <svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M9 7L4 12L9 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7L20 12L15 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 <span class="sr-only">Inline code</span>
 </button>
+<button type="button" data-toolbar="code_block" aria-label="Code block" title="Code block">
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M8 6L5 12L8 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6L19 12L16 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 4L10 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+<span class="sr-only">Code block</span>
+</button>
 <button type="button" data-toolbar="link" aria-label="Insert link" title="Insert link">
-<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M9.4 14.6L7.2 16.8C5.5 18.5 2.8 18.5 1.2 16.8C-0.5 15.2 -0.5 12.5 1.2 10.8L3.4 8.6" stroke="currentColor" stroke-width="2" stroke-linecap="round" transform="translate(3 0)"/><path d="M14.6 9.4L16.8 7.2C18.5 5.5 21.2 5.5 22.8 7.2C24.5 8.8 24.5 11.5 22.8 13.2L20.6 15.4" stroke="currentColor" stroke-width="2" stroke-linecap="round" transform="translate(-3 0)"/><path d="M8.5 15.5L15.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M10 8L8 10C6.9 11.1 6.9 12.9 8 14C9.1 15.1 10.9 15.1 12 14L14 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 8L16 6C17.1 4.9 18.9 4.9 20 6C21.1 7.1 21.1 8.9 20 10L18 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" transform="translate(-4 4)"/><path d="M9 12H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
 <span class="sr-only">Insert link</span>
 </button>
 <button type="button" data-toolbar="quote" aria-label="Quote" title="Quote">
-<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M6 9H10V13H7V16H10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 9H18V13H15V16H18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg class="tb-icon" viewBox="0 0 24 24" fill="none"><path d="M7 10H11V14H8.6C8.7 15 9.2 15.7 10.1 16.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 10H18V14H15.6C15.7 15 16.2 15.7 17.1 16.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 <span class="sr-only">Quote</span>
 </button>
 <button type="button" data-toolbar="ul" aria-label="Bullet list" title="Bullet list">
@@ -253,7 +257,7 @@ title: Blog Admin
 <div class="mode-row">
 <label><input type="radio" name="publish-mode" value="draft" checked> Draft</label>
 <label><input type="radio" name="publish-mode" value="scheduled"> Scheduled Date</label>
-<label><input type="radio" name="publish-mode" value="drip"> Drip Queue</label>
+<label><input type="radio" name="publish-mode" value="drip"> Drip Queue <span id="drip-queue-pill" class="drip-queue-pill" hidden></span></label>
 </div>
 </div>
 
@@ -263,7 +267,17 @@ title: Blog Admin
 </div>
 
 <input type="file" id="image-picker" accept="image/*" multiple style="display:none;">
+</div>
 
+<aside class="preview-panel">
+<h4>Live Preview</h4>
+<div id="markdown-preview" class="preview-box">
+<p class="placeholder">Preview will appear here...</p>
+</div>
+</aside>
+</div>
+
+<div class="compose-footer">
 <div class="compose-actions">
 <button id="btn-delete-current" type="button" class="icon-danger" aria-label="Delete draft" title="Delete draft">
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -277,16 +291,8 @@ title: Blog Admin
 <button id="btn-publish-now" type="button" class="primary">Publish Now</button>
 </div>
 
-<div id="autosave-status" class="muted">Autosave idle</div>
+<div id="autosave-status" class="muted" hidden></div>
 <div id="output-compose" class="output"></div>
-</div>
-
-<aside class="preview-panel">
-<h4>Live Preview</h4>
-<div id="markdown-preview" class="preview-box">
-<p class="placeholder">Preview will appear here...</p>
-</div>
-</aside>
 </div>
 </div>
 </section>
@@ -1143,6 +1149,14 @@ body {
   flex: 1 1 auto !important;
 }
 
+.compose-editor .grid-two {
+  align-items: start;
+}
+
+.compose-editor .grid-two .field-row {
+  margin-bottom: 0;
+}
+
 .button-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
@@ -1151,7 +1165,7 @@ body {
 }
 
 .compose-actions {
-  margin-top: 0.74rem;
+  margin-top: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1161,6 +1175,35 @@ body {
 
 .compose-actions #btn-publish-now {
   min-width: 11rem;
+}
+
+.compose-footer {
+  margin-top: 0.25rem;
+}
+
+.drip-queue-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.2rem;
+  padding: 0.07rem 0.36rem;
+  border-radius: 999px;
+  border: 1px solid #9eb7eb;
+  background: #edf3ff;
+  color: #234a93;
+  font-size: 0.73rem;
+  line-height: 1.2;
+  animation: drip-pill-pop 170ms ease;
+}
+
+@keyframes drip-pill-pop {
+  from {
+    transform: scale(0.92);
+    opacity: 0.65;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 #admin-panel button.icon-danger {
@@ -1259,6 +1302,11 @@ body {
 
 .compose-shell.preview-hidden .preview-panel {
   display: none;
+}
+
+.compose-shell {
+  display: flex;
+  flex-direction: column;
 }
 
 .preview-box {
