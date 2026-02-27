@@ -8476,6 +8476,13 @@
     }
 
     if (!state.activeConversation) {
+      if (state.activeConversationLoading) {
+        // During thread switch, keep existing chat paint and rely on the overlay.
+        state.chatAutoScroll = true;
+        state.chatLastKey = conversationKey;
+        updateChatJumpButton();
+        return;
+      }
       var pendingConversationMarkup = "<p class='empty-state empty-state-loading'><span class='run-spinner' aria-hidden='true'></span> Loading messages...</p>";
       if (state.chatMarkupCache !== pendingConversationMarkup) {
         el.chatLog.innerHTML = pendingConversationMarkup;
@@ -8522,7 +8529,7 @@
           }
           runningOnlyMarkup += "</article>";
         } else {
-          runningOnlyMarkup = "<p class='empty-state empty-state-loading'><span class='run-spinner' aria-hidden='true'></span> Loading messages...</p>";
+          runningOnlyMarkup = "<p class='empty-state'>No messages yet in this thread.</p>";
         }
         if (state.chatMarkupCache !== runningOnlyMarkup) {
           el.chatLog.innerHTML = runningOnlyMarkup;
