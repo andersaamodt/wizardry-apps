@@ -413,8 +413,8 @@ mode_default_config_json() {
       ],
       replies: {
         warningTemplate: "Moderator notice: please follow subreddit norms.",
-        modeSwitchTemplate: "Mode update: {{user}} is now in {{mode}}.",
-        neutralBanTemplate: "Neutral moderator notice: enforcement was applied."
+        modeSwitchTemplate: "Mode update: I am now in {{mode}} mode with {{user}}.",
+        neutralBanTemplate: "Enforcement was automatically applied."
       },
       escalation: {
         notifyOnSeverity: "high",
