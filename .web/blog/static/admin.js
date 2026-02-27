@@ -1025,7 +1025,7 @@
       html += '<div class="user-card">';
       html += '<div class="user-card-main">';
       html += '<div class="user-card-name">' + escapeHtml(user.player_name || username) + ' <span class="user-pill' + (isAdmin ? ' is-admin' : '') + '">' + (isAdmin ? 'Admin' : 'User') + '</span></div>';
-      html += '<div class="user-card-meta">@' + escapeHtml(username) + ' · Rank ' + escapeHtml(String(rank));
+      html += '<div class="user-card-meta">@' + escapeHtml(username);
       if (isSelf) {
         html += ' · You';
       }
