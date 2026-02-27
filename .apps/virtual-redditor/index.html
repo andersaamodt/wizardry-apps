@@ -4685,6 +4685,9 @@
       }
       body.innerHTML = [
         '<div class="mode-drawer-block">',
+        '  <div class="mode-drawer-helper">These toggles grant or deny actions; the LLM chooses when to use allowed actions.</div>',
+        '</div>',
+        '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-inline">',
         '    <label class="mini-input mode-expiry-input" title="Default duration this mode remains active when duration is needed">Default expiry<input type="number" min="0" step="1" data-mode-drawer-default-expiry value="' + escapeHtml(String(durationUiFromHours(mode.defaultExpiryHours || 0, mode.defaultExpiryUnit || ((mode.defaultExpiryHours || 0) % 24 === 0 && (mode.defaultExpiryHours || 0) > 0 ? 'days' : 'hours')))) + '" title="Default duration this mode remains active when duration is needed"></label>',
         '    <select data-mode-drawer-default-expiry-unit title="Default expiry unit"><option value="hours"' + (normalizeHoursOrDaysUnit(mode.defaultExpiryUnit || ((mode.defaultExpiryHours || 0) % 24 === 0 && (mode.defaultExpiryHours || 0) > 0 ? 'days' : 'hours')) === 'hours' ? ' selected' : '') + '>hours</option><option value="days"' + (normalizeHoursOrDaysUnit(mode.defaultExpiryUnit || ((mode.defaultExpiryHours || 0) % 24 === 0 && (mode.defaultExpiryHours || 0) > 0 ? 'days' : 'hours')) === 'days' ? ' selected' : '') + '>days</option></select>',
