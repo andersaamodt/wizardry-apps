@@ -6417,12 +6417,12 @@
     if (!isFinite(width) || width <= 0) {
       return 42;
     }
-    // Match CSS rhythm: about 3px bar + 1px gap.
-    var count = Math.floor((width + 1) / 4);
-    if (!isFinite(count) || count < 28) {
-      count = 28;
-    } else if (count > 140) {
-      count = 140;
+    // Slightly thicker, lower-density bars so each update is more visible.
+    var count = Math.floor((width + 2) / 8);
+    if (!isFinite(count) || count < 24) {
+      count = 24;
+    } else if (count > 72) {
+      count = 72;
     }
     return count;
   }
@@ -6560,8 +6560,17 @@
     }
     var barCount = dictationWaveTargetBarCount();
     var existing = syncDictationWaveLevelsLength(barCount).slice();
-    var shifted = existing.slice(1);
-    shifted.push(level);
+    var advance = 1;
+    if (barCount > 56) {
+      advance = 2;
+    }
+    if (barCount > 84) {
+      advance = 3;
+    }
+    var shifted = existing.slice(advance);
+    while (shifted.length < barCount) {
+      shifted.push(level);
+    }
     state.dictateWaveLevels = shifted;
     renderDictationWaveBars();
   }
@@ -6635,27 +6644,27 @@
         }
         var rms = Math.sqrt(sum / dictationWaveData.length);
         // Dynamic gating to let quiet rooms return to near-zero while preserving headroom.
-        var rawLevel = (rms * 10.6) + (peak * 0.46);
+        var rawLevel = (rms * 8.8) + (peak * 0.38);
         if (!isFinite(rawLevel) || rawLevel < 0) {
           rawLevel = 0;
         }
-        if (rawLevel > 1.2) {
-          rawLevel = 1.2;
+        if (rawLevel > 1.1) {
+          rawLevel = 1.1;
         }
         var floor = Number(dictationWaveNoiseFloor || 0.04);
         if (!isFinite(floor) || floor < 0) {
           floor = 0.04;
         }
-        if (!dictationWaveSeenSignal || rawLevel <= floor + 0.04) {
-          floor = (floor * 0.92) + (rawLevel * 0.08);
+        if (!dictationWaveSeenSignal || rawLevel <= floor + 0.03) {
+          floor = (floor * 0.85) + (rawLevel * 0.15);
         }
-        if (floor < 0.006) {
-          floor = 0.006;
-        } else if (floor > 0.1) {
-          floor = 0.1;
+        if (floor < 0.004) {
+          floor = 0.004;
+        } else if (floor > 0.09) {
+          floor = 0.09;
         }
         dictationWaveNoiseFloor = floor;
-        var gate = floor + 0.028;
+        var gate = floor + 0.032;
         var normalized = (rawLevel - gate) / Math.max(0.06, 1 - gate);
         if (!isFinite(normalized) || normalized < 0) {
           normalized = 0;
@@ -6663,7 +6672,10 @@
         if (normalized > 1) {
           normalized = 1;
         }
-        if (normalized < 0.03) {
+        if (normalized > 0) {
+          normalized = Math.pow(normalized, 0.92);
+        }
+        if (normalized < 0.045) {
           normalized = 0;
         }
         dictationWaveMicLevel = normalized;
@@ -6766,8 +6778,8 @@
           return false;
         }
         var analyser = context.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.02;
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.0;
         var source = context.createMediaStreamSource(stream);
         source.connect(analyser);
         var data = new Uint8Array(analyser.fftSize);
@@ -6801,7 +6813,7 @@
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.09;
+    var silenceGate = 0.07;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -6820,7 +6832,8 @@
       }
       var height = baselineHeight;
       if (unit <= silenceGate) {
-        bar.classList.add("is-baseline");
+        // Running silence: keep dot height but use active (darker) color.
+        bar.classList.remove("is-baseline");
         bar.style.height = (i % 2 === 0) ? "1px" : "0px";
         continue;
       } else {
@@ -6832,7 +6845,7 @@
           adjusted = 1;
         }
         var waveTravel = Math.max(1, maxWaveHeight - baselineHeight);
-        height = baselineHeight + Math.round(Math.pow(adjusted, 1.02) * waveTravel);
+        height = baselineHeight + Math.round(Math.pow(adjusted, 1.18) * waveTravel);
       }
       bar.style.height = String(height) + "px";
     }

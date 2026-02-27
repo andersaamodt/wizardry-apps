@@ -2841,12 +2841,12 @@ button:disabled,
 .dictation-wave-bar {
   flex: 1 1 auto;
   min-width: 2px;
-  max-width: 3px;
+  max-width: 4px;
   height: 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 78%, var(--text-muted) 22%);
   transform-origin: center center;
-  transition: height 10ms linear, opacity 36ms ease;
+  transition: none;
 }
 
 .dictation-wave-bar.is-baseline {
