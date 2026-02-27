@@ -2847,6 +2847,13 @@
         extractBtn.disabled = !validSubreddit;
         extractBtn.title = extractNormsTooltip(!validSubreddit);
       }
+
+      var createBtn = document.getElementById('btn-create-profile');
+      if (createBtn) {
+        var createLocked = !!state.createProfileMode || !!state.createProfileInFlight;
+        createBtn.disabled = createLocked;
+        createBtn.title = createLocked ? 'Finish creating the current virtual Redditor first' : 'Create Virtual Redditor';
+      }
     }
 
     function hasBridge() {
@@ -7761,6 +7768,7 @@
       }
 
       document.getElementById('btn-create-profile').addEventListener('click', function () {
+        if (this.disabled || state.createProfileMode || state.createProfileInFlight) return;
         openCreateProfilePane();
       });
       document.getElementById('profiles-list').addEventListener('click', function (event) {
