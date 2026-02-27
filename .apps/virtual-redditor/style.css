@@ -2979,7 +2979,7 @@ label {
 }
 
 .persona-style-main-grid .mode-field-control-wrap {
-  max-width: 240px;
+  max-width: 220px;
 }
 
 .persona-style-warning {
@@ -2988,7 +2988,7 @@ label {
   color: var(--danger);
   font-style: normal;
   width: 100%;
-  max-width: 240px;
+  max-width: 220px;
 }
 
 .persona-style-hint {
