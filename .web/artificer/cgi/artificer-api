@@ -16483,21 +16483,27 @@ EOF
     if [ "$assay_run_profile" -eq 1 ]; then
       case "$compute_budget" in
         quick)
-          assay_runtime_ceiling=75
+          assay_runtime_ceiling=90
           ;;
         standard|auto)
-          assay_runtime_ceiling=105
+          assay_runtime_ceiling=120
           ;;
         long)
-          assay_runtime_ceiling=150
+          assay_runtime_ceiling=180
           ;;
         until-complete)
-          assay_runtime_ceiling=210
+          assay_runtime_ceiling=260
           ;;
         *)
-          assay_runtime_ceiling=240
+          assay_runtime_ceiling=280
           ;;
       esac
+      if printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'race|concurren|migration|idempotent|rollback|security|audit|failure recovery|fallback|benchmark|stress|flaky|end[- ]to[- ]end|contract tests?'; then
+        assay_runtime_ceiling=$((assay_runtime_ceiling + 30))
+      fi
+      if [ "$assay_runtime_ceiling" -gt 300 ]; then
+        assay_runtime_ceiling=300
+      fi
       if [ "$run_time_budget" -gt "$assay_runtime_ceiling" ]; then
         run_time_budget=$assay_runtime_ceiling
       fi
@@ -18659,6 +18665,13 @@ $iteration_report"
     session_tail=$(tail -n 800 "$session_log_file" 2>/dev/null || sed -n '1,800p' "$session_log_file")
     controller_tail=$(tail -n 1200 "$controller_raw_file" 2>/dev/null || sed -n '1,1200p' "$controller_raw_file")
     final_state_mode=$(normalize_mode "$(state_get "$state_file" "mode" "INVESTIGATE")")
+
+    if printf '%s' "$assistant_output" | grep -qi '^Run timed out after'; then
+      assistant_output=$(structured_incomplete_run_message \
+        "$final_state_mode" \
+        "Retry with a larger compute budget or narrower scope." \
+        "Run reached the time budget (${run_time_budget}s) before DONE mode.")
+    fi
 
     if [ "$final_state_mode" != "DONE" ] && [ -z "$(trim "$assistant_output")" ]; then
       next_action_line=$(printf '%s\n' "$plan_text" | sed -n '/^Next Action:/,$p' | sed -n '2p')
