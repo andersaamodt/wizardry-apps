@@ -569,6 +569,22 @@ body {
   margin: 0 !important;
 }
 
+#admin-panel .admin-nav-list .admin-nav-item.admin-nav-divider-after {
+  position: relative !important;
+  padding-bottom: 0.78rem !important;
+  margin-bottom: 0.34rem !important;
+}
+
+#admin-panel .admin-nav-list .admin-nav-item.admin-nav-divider-after::after {
+  content: "";
+  position: absolute;
+  left: 0.52rem;
+  right: 0.52rem;
+  bottom: 0.22rem;
+  border-bottom: 1px solid #d0dbf2;
+  pointer-events: none;
+}
+
 #admin-panel .admin-nav-list .admin-nav-item:hover {
   border: 0 !important;
   background: #e9f1ff !important;
@@ -922,12 +938,20 @@ body {
 }
 
 [data-admin-section="queue"] .queue-drip-settings {
-  margin: 0.1rem 0 0.5rem;
+  margin: 0.02rem 0 0.44rem;
   gap: 0.34rem 0.62rem;
 }
 
 [data-admin-section="queue"] .queue-drip-settings .field-row {
   margin-bottom: 0;
+}
+
+[data-admin-section="queue"] .row-head {
+  margin-bottom: 0.34rem;
+}
+
+[data-admin-section="queue"] .row-head .muted {
+  margin: 0.1rem 0 0;
 }
 
 [data-admin-section="settings"] input[type="text"],
