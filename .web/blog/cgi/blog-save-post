@@ -123,11 +123,9 @@ case "$action" in
 
   autosave|save_draft|save)
     status=draft
-    if [ "$publish_mode" = "scheduled" ]; then
-      status=scheduled
-    fi
-    if [ "$publish_mode" = "drip" ]; then
-      status=queued
+    # Selecting release mode in Compose should not queue/schedule until explicit publish action.
+    if [ "$publish_mode" = "scheduled" ] || [ "$publish_mode" = "drip" ]; then
+      publish_mode=draft
     fi
     blog_save_draft "$draft_id" "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" "$publish_mode" "$scheduled_at" "$status"
     printf '{"success":true,"message":"Draft saved","draft_id":"%s","status":"%s","autosaved":%s}\n' \

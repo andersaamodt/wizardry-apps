@@ -26,6 +26,8 @@
     usersActionInFlight: false,
     dripQueueAhead: 0,
     dripQueueEtaMinutes: 0,
+    dripQueueInfoReady: false,
+    nextDripTitle: '',
     configSaveTimer: null,
     nostrBridgeSaveTimer: null,
     isLoadingConfig: false
@@ -393,7 +395,7 @@
       return;
     }
     if (picked === 'drip') {
-      els.publishNowButton.textContent = 'In Queue Post';
+      els.publishNowButton.textContent = 'Enqueue Post';
       return;
     }
     els.publishNowButton.textContent = 'Publish Now';
@@ -439,6 +441,11 @@
     }
     const picked = mode || getPublishMode();
     if (picked !== 'drip') {
+      els.dripQueuePill.hidden = true;
+      els.dripQueuePill.textContent = '';
+      return;
+    }
+    if (!state.dripQueueInfoReady) {
       els.dripQueuePill.hidden = true;
       els.dripQueuePill.textContent = '';
       return;
@@ -1312,15 +1319,19 @@
       ? data.drip_randomness_minutes
       : data.drip_jitter_minutes;
     let html = '<p class="muted">Global drip: every ' + escapeHtml(String(intervalHours)) + ' hour(s), randomness up to ' + escapeHtml(String(randomnessMinutes || 0)) + ' min. Next drip: ' + escapeHtml(nextDripText) + '</p>';
-    html += '<div class="draft-grid">';
+    html += '<div class="queue-rows">';
     queue.forEach(function (item) {
-      html += '<div class="draft-card">';
-      html += '<div class="draft-card-head"><strong>' + escapeHtml(item.title || 'Untitled') + '</strong></div>';
-      html += '<div class="muted">' + escapeHtml(item.draft_id) + '</div>';
-      html += '<div class="muted">' + escapeHtml(item.publish_mode) + ' / ' + escapeHtml(item.status) + '</div>';
+      const rowClass = (item && item.publish_mode === 'drip') ? ' queue-row queue-row-drip' : ' queue-row queue-row-scheduled';
+      html += '<div class="' + rowClass + '">';
+      html += '<div class="queue-row-main">';
+      html += '<div class="queue-row-title"><strong>' + escapeHtml(item.title || 'Untitled') + '</strong></div>';
       if (item.scheduled_at) {
         html += '<div class="muted">Scheduled: ' + escapeHtml(item.scheduled_at) + '</div>';
       }
+      html += '</div>';
+      html += '<div class="queue-row-actions">';
+      html += '<button type="button" data-queue-action="unqueue" data-draft-id="' + escapeAttr(item.draft_id || '') + '">Unqueue</button>';
+      html += '</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -1344,6 +1355,7 @@
     const dripQueue = queue.filter(function (item) {
       return item && item.publish_mode === 'drip' && item.status === 'queued';
     });
+    state.nextDripTitle = dripQueue.length ? String(dripQueue[0].title || 'Untitled') : '';
     let ahead = dripQueue.length;
     if (state.currentDraftId) {
       const currentIdx = dripQueue.findIndex(function (item) {
@@ -1357,8 +1369,22 @@
     const intervalMinutes = Math.max(1, Math.round(intervalHours * 60));
     state.dripQueueAhead = ahead;
     state.dripQueueEtaMinutes = ahead * intervalMinutes;
+    state.dripQueueInfoReady = true;
     updateDripQueuePill();
     renderQueue(data);
+  }
+
+  async function unqueueDraft(draftId) {
+    const id = String(draftId || '').trim();
+    if (!id) {
+      return;
+    }
+    const data = await apiPost('/cgi/blog-unqueue-draft', { draft_id: id }, true);
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to unqueue draft');
+    }
+    await Promise.all([loadDrafts(), loadQueue()]);
+    setOutput(els.outputQueue, data.message || 'Draft moved back to drafts.', 'ok');
   }
 
   function userCardActionButton(label, action, username, className) {
@@ -1450,13 +1476,13 @@
       html += '<div class="user-card' + (canDrag ? ' is-draggable' : '') + ((idx % 2) === 1 ? ' user-row-alt' : '') + '"' + dragAttrs + ' data-username="' + escapeAttr(username) + '" data-rank="' + escapeAttr(String(rank)) + '">';
       html += '<div class="user-card-main">';
       html += '<div class="user-card-name">' + escapeHtml(user.player_name || username);
+      if (isSelf) {
+        html += ' <strong class="user-self-label">You</strong>';
+      }
       if (isAdmin) {
         html += ' <span class="user-pill is-admin">Admin</span>';
       }
       html += '</div>';
-      if (isSelf) {
-        html += '<div class="user-card-meta">You</div>';
-      }
       html += '</div>';
       html += '<div class="user-card-actions">';
       if (!isSelf && (isBelow || !isAdmin)) {
@@ -1717,13 +1743,20 @@
   }
 
   async function runSchedulerNow() {
+    const nextTitle = String(state.nextDripTitle || '').trim();
+    const prompt = nextTitle
+      ? ('Drip now and publish the next queued draft?\n\n' + nextTitle)
+      : 'Run drip now?';
+    if (!window.confirm(prompt)) {
+      return;
+    }
     try {
       const data = await apiPost('/cgi/blog-run-scheduler', {}, true);
       if (!data.success) {
         throw new Error(data.error || 'Scheduler failed');
       }
       await Promise.all([loadDrafts(), loadQueue()]);
-      setOutput(els.outputQueue, 'Scheduler ran. Scheduled published: ' + data.scheduled_published + ', drip published: ' + data.drip_published + '.', 'ok');
+      setOutput(els.outputQueue, 'Drip run complete. Scheduled published: ' + data.scheduled_published + ', drip published: ' + data.drip_published + '.', 'ok');
     } catch (err) {
       setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
     }
@@ -1875,6 +1908,26 @@
         setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
       });
     });
+    if (els.queueList) {
+      els.queueList.addEventListener('click', function (event) {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        const actionNode = target.closest('[data-queue-action][data-draft-id]');
+        if (!(actionNode instanceof HTMLElement)) {
+          return;
+        }
+        const action = actionNode.getAttribute('data-queue-action');
+        const draftId = actionNode.getAttribute('data-draft-id');
+        if (action !== 'unqueue' || !draftId) {
+          return;
+        }
+        unqueueDraft(draftId).catch(function (err) {
+          setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
+        });
+      });
+    }
     if (els.usersList) {
       els.usersList.addEventListener('click', function (event) {
         const target = event.target;

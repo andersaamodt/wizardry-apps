@@ -267,7 +267,7 @@ title: Blog Admin
 
 <div class="grid-two">
 <div class="field-row">
-<label for="post-tags"><strong>Tags (comma-separated)</strong></label>
+<label for="post-tags"><strong>Tags</strong></label>
 <input type="hidden" id="post-tags" value="">
 <div id="post-tags-editor" class="tag-editor" role="group" aria-label="Post tags">
 <div id="post-tags-pills" class="tag-editor-pills"></div>
@@ -276,7 +276,7 @@ title: Blog Admin
 </div>
 </div>
 
-<div class="field-row">
+<div class="field-row compose-release-row">
 <strong>Release Mode</strong>
 <div class="mode-row">
 <label><input type="radio" name="publish-mode" value="draft" checked> Draft</label>
@@ -305,11 +305,7 @@ title: Blog Admin
 <div class="compose-actions">
 <button id="btn-delete-current" type="button" class="icon-danger" aria-label="Delete draft" title="Delete draft">
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-<path d="M4 7H20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-<path d="M9 7V5.5C9 4.67 9.67 4 10.5 4H13.5C14.33 4 15 4.67 15 5.5V7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-<path d="M7.5 7L8.2 18.2C8.25 19.02 8.93 19.66 9.75 19.66H14.25C15.07 19.66 15.75 19.02 15.8 18.2L16.5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-<path d="M10 10.5V16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-<path d="M14 10.5V16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
 </svg>
 </button>
 <button id="btn-publish-now" type="button" class="primary">Publish Now</button>
@@ -340,8 +336,8 @@ title: Blog Admin
 </div>
 <div class="row-actions">
 <button id="btn-refresh-queue" type="button">Refresh</button>
-<button id="btn-mirror-nostr" type="button">Mirror Nostr</button>
-<button id="btn-run-scheduler" type="button" class="primary">Run Scheduler</button>
+<button id="btn-mirror-nostr" type="button" title="Fetch events from configured Nostr relays and update local derived content.">Sync from Nostr</button>
+<button id="btn-run-scheduler" type="button" class="primary">Drip Now</button>
 </div>
 </div>
 <div class="grid-two settings-inline queue-drip-settings">
@@ -624,7 +620,7 @@ body {
 .admin-content {
   min-width: 0;
   min-height: calc(100vh - 3.25rem);
-  padding: 0.45rem 0.72rem 0.95rem 0.7rem;
+  padding: 0.45rem 0.72rem 0 0.7rem;
   background: #f4f7fd;
 }
 
@@ -1140,47 +1136,43 @@ body {
 
 .autosave-indicator {
   position: absolute;
-  right: 0.5rem;
+  right: 0.72rem;
   bottom: 0.45rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.22rem;
-  padding: 0.08rem 0.38rem;
-  border-radius: 999px;
-  border: 1px solid #bcd0f2;
-  background: #f3f7ff;
-  color: #2b4c86;
-  font-size: 0.74rem;
+  gap: 0.2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6b778a;
+  font-size: 0.75rem;
+  font-weight: 560;
   line-height: 1.2;
   z-index: 3;
   cursor: default;
 }
 
 .autosave-indicator.is-saving {
-  border-color: #c6d3e9;
-  background: #f6f8fd;
-  color: #4f6180;
+  color: #737f90;
 }
 
 .autosave-indicator.is-error {
-  border-color: #e2b6b6;
-  background: #fff2f2;
   color: #8a2e2e;
 }
 
 .tag-editor {
   inline-size: min(100%, 24rem);
   min-height: 2.2rem;
-  height: 2.2rem;
   border: 1px solid #b8caeb;
   border-radius: 11px;
   background: #fff;
-  padding: 0.18rem 0.38rem;
+  padding: 0.18rem 0.34rem;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 0.34rem;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .tag-editor:focus-within {
@@ -1194,8 +1186,9 @@ body {
   flex-wrap: nowrap;
   overflow: visible;
   gap: 0.3rem;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 1 auto;
+  min-width: max-content;
+  white-space: nowrap;
 }
 
 .tag-pill {
@@ -1235,11 +1228,12 @@ body {
   border: 0 !important;
   box-shadow: none !important;
   padding: 0.12rem 0.16rem !important;
-  min-width: 0;
+  min-width: 7.4rem;
   inline-size: auto !important;
-  flex: 1 1 auto;
-  width: 100% !important;
+  flex: 1 0 7.4rem;
+  width: auto !important;
   background: transparent !important;
+  text-align: left !important;
 }
 
 #admin-panel .tag-pill-remove {
@@ -1260,9 +1254,10 @@ body {
   box-shadow: none !important;
   padding: 0.12rem 0.16rem !important;
   inline-size: auto !important;
-  min-width: 0 !important;
-  width: 100% !important;
-  flex: 1 1 auto !important;
+  min-width: 7.4rem !important;
+  width: auto !important;
+  flex: 1 0 7.4rem !important;
+  text-align: left !important;
 }
 
 .tag-editor.has-tags .tag-editor-input::placeholder {
@@ -1298,7 +1293,13 @@ body {
 }
 
 .compose-footer {
-  margin-top: 0.25rem;
+  margin-top: auto;
+  padding-top: 0.3rem;
+}
+
+.compose-release-row {
+  margin-top: 0.54rem;
+  margin-bottom: 0.08rem;
 }
 
 .drip-queue-pill {
@@ -1313,6 +1314,10 @@ body {
   font-size: 0.73rem;
   line-height: 1.2;
   animation: drip-pill-pop 170ms ease;
+}
+
+.drip-queue-pill[hidden] {
+  display: none !important;
 }
 
 @keyframes drip-pill-pop {
@@ -1334,10 +1339,10 @@ body {
   width: 2.25rem;
   height: 2.25rem;
   padding: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid #d7b6b6;
   background: #fff;
-  color: #a23a39;
+  color: #111;
 }
 
 #admin-panel button.icon-danger:hover {
@@ -1391,6 +1396,14 @@ body {
 #admin-panel button:disabled {
   opacity: 0.64;
   transform: none;
+  cursor: default;
+}
+
+#admin-panel button:disabled:hover {
+  background: inherit;
+  border-color: inherit;
+  color: inherit;
+  transform: none;
 }
 
 .notice {
@@ -1427,6 +1440,7 @@ body {
 .compose-shell {
   display: flex;
   flex-direction: column;
+  min-height: calc(100vh - 5.2rem);
 }
 
 .preview-box {
@@ -1521,6 +1535,41 @@ body {
   gap: 0.48rem;
 }
 
+.queue-rows {
+  display: block;
+  border-top: 1px solid #d2def3;
+  border-bottom: 1px solid #d2def3;
+  background: transparent;
+}
+
+.queue-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.52rem 0.24rem;
+}
+
+.queue-row:nth-child(odd) {
+  background: #f5f8ff;
+}
+
+.queue-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 0.08rem;
+}
+
+.queue-row-title {
+  color: #1f335f;
+}
+
+.queue-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
 .draft-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
@@ -1537,15 +1586,17 @@ body {
 
 .users-list {
   display: block;
-  border: 1px solid #d2def3;
-  border-radius: 10px;
+  border-top: 1px solid #d2def3;
+  border-bottom: 1px solid #d2def3;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
   overflow: hidden;
-  background: #fff;
+  background: transparent;
 }
 
 .user-card {
   border: 0;
-  border-bottom: 1px solid #d9e3f4;
   border-radius: 0;
   background: #fff;
   padding: 0.5rem 0.68rem;
@@ -1554,10 +1605,6 @@ body {
   justify-content: space-between;
   gap: 0.5rem;
   min-height: 3rem;
-}
-
-.user-card:last-of-type {
-  border-bottom: 0;
 }
 
 .user-card.user-row-alt {
@@ -1588,6 +1635,12 @@ body {
   gap: 0.42rem;
   font-weight: 700;
   color: #163161;
+}
+
+.user-self-label {
+  color: #294672;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .user-pill {
