@@ -133,16 +133,35 @@
               <div class="persona-section-title">Persona Style</div>
               <div class="mode-fields-inline modes-grid">
                 <div class="mode-field-row">
+                  <label for="behavior-personality" class="mode-field-label">Personality</label>
+                  <div class="mode-field-control-wrap">
+                    <select id="behavior-personality">
+                      <option value="typical_redditor">Typical Redditor</option>
+                      <option value="academic">Academic</option>
+                      <option value="helpful_peer">Helpful Peer</option>
+                      <option value="skeptical_debater">Skeptical Debater</option>
+                      <option value="builder_operator">Builder/Operator</option>
+                      <option value="community_regular">Community Regular</option>
+                      <option value="troll">Troll</option>
+                      <option value="other">Other (Custom)</option>
+                    </select>
+                    <div id="behavior-personality-warning" class="persona-style-warning hidden"></div>
+                  </div>
+                </div>
+                <div class="mode-field-row">
                   <label for="behavior-humor-style" class="mode-field-label">Humor style</label>
-                  <select id="behavior-humor-style">
-                    <option value="straight">Straight</option>
-                    <option value="dry">Dry wit</option>
-                    <option value="shady">Shady</option>
-                    <option value="sardonic">Sardonic</option>
-                    <option value="ominous">Ominous</option>
-                    <option value="joker">Joker</option>
-                    <option value="absurdist">Absurdist</option>
-                  </select>
+                  <div class="mode-field-control-wrap">
+                    <select id="behavior-humor-style">
+                      <option value="straight">Straight</option>
+                      <option value="dry">Dry wit</option>
+                      <option value="shady">Shady</option>
+                      <option value="sardonic">Sardonic</option>
+                      <option value="ominous">Ominous</option>
+                      <option value="joker">Joker</option>
+                      <option value="absurdist">Absurdist</option>
+                    </select>
+                    <div id="behavior-humor-style-warning" class="persona-style-warning hidden"></div>
+                  </div>
                 </div>
                 <div class="mode-field-row">
                   <label for="behavior-humor-amount" class="mode-field-label">Humor amount</label>
@@ -156,11 +175,46 @@
                 </div>
                 <div class="mode-field-row">
                   <label for="behavior-mirror-tone" class="mode-field-label">Tone</label>
-                  <select id="behavior-mirror-tone">
-                    <option value="mirror_or_less">Mirror or less</option>
-                    <option value="deescalate_only">Always de-escalate</option>
-                    <option value="mirror_exact">Mirror exactly</option>
-                    <option value="escalate_when_appropriate">Escalate when appropriate</option>
+                  <div class="mode-field-control-wrap">
+                    <select id="behavior-mirror-tone">
+                      <option value="mirror_or_less">Mirror or less</option>
+                      <option value="deescalate_only">Always de-escalate</option>
+                      <option value="mirror_exact">Mirror exactly</option>
+                      <option value="escalate_when_appropriate">Escalate when appropriate</option>
+                    </select>
+                    <div id="behavior-tone-warning" class="persona-style-warning hidden"></div>
+                  </div>
+                </div>
+                <div class="mode-field-row">
+                  <label for="behavior-directness" class="mode-field-label">Directness</label>
+                  <select id="behavior-directness">
+                    <option value="indirect">Indirect</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="blunt">Blunt</option>
+                  </select>
+                </div>
+                <div class="mode-field-row">
+                  <label for="behavior-warmth" class="mode-field-label">Warmth</label>
+                  <select id="behavior-warmth">
+                    <option value="cool">Cool</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="warm">Warm</option>
+                  </select>
+                </div>
+                <div class="mode-field-row">
+                  <label for="behavior-verbosity" class="mode-field-label">Verbosity</label>
+                  <select id="behavior-verbosity">
+                    <option value="concise">Concise</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="detailed">Detailed</option>
+                  </select>
+                </div>
+                <div class="mode-field-row">
+                  <label for="behavior-formality" class="mode-field-label">Formality</label>
+                  <select id="behavior-formality">
+                    <option value="casual">Casual</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="formal">Formal</option>
                   </select>
                 </div>
                 <div class="mode-field-row">
@@ -316,6 +370,13 @@
                 <label class="schedule-toggle">
                   <input id="behavior-implicit-summons" type="checkbox">
                   <span>Respond to implicit/context summons</span>
+                </label>
+              </div>
+              <div class="mode-field-row">
+                <label for="behavior-individualized-relationships" class="mode-field-label">Relationship memory</label>
+                <label class="schedule-toggle" title="When enabled, the bot adapts tone and familiarity based on prior interactions with each user.">
+                  <input id="behavior-individualized-relationships" type="checkbox">
+                  <span>Treat users as individuals over time</span>
                 </label>
               </div>
             </div>
@@ -3324,14 +3385,20 @@
           'Remove Content', 'Lock Thread', 'Post Ban Notice'
         ],
         behaviors: {
+          personality: 'typical_redditor',
           mirrorTone: 'mirror_or_less',
+          directness: 'balanced',
+          warmth: 'neutral',
+          verbosity: 'balanced',
+          formality: 'neutral',
           humorStyle: 'dry',
           humorAmount: 'medium',
           citations: 'as-needed',
           latencyJitterSec: { min: 0, max: 0 },
           banJitterSec: { min: 7, max: 45 },
           summonable: true,
-          implicitSummons: false
+          implicitSummons: false,
+          individualizedRelationships: true
         },
         modes: [],
         actionTriggers: [],
@@ -3394,6 +3461,12 @@
       }
       out.behaviors.humorStyle = String(out.behaviors.humorStyle || 'dry');
       out.behaviors.humorAmount = String(out.behaviors.humorAmount || 'medium');
+      out.behaviors.personality = String(out.behaviors.personality || 'typical_redditor');
+      out.behaviors.directness = String(out.behaviors.directness || 'balanced');
+      out.behaviors.warmth = String(out.behaviors.warmth || 'neutral');
+      out.behaviors.verbosity = String(out.behaviors.verbosity || 'balanced');
+      out.behaviors.formality = String(out.behaviors.formality || 'neutral');
+      out.behaviors.individualizedRelationships = (out.behaviors.individualizedRelationships !== false);
       out.replies = Object.assign({}, base.replies, src.replies || {});
       out.escalation = Object.assign({}, base.escalation, src.escalation || {});
       out.escalation.afterActionSwitch = Object.assign({}, base.escalation.afterActionSwitch, ((src.escalation || {}).afterActionSwitch) || {});
@@ -4212,27 +4285,79 @@
       drawer.setAttribute('aria-hidden', 'false');
     }
 
+    function updatePersonaStyleWarnings() {
+      var personality = String((document.getElementById('behavior-personality') || {}).value || '');
+      var tone = String((document.getElementById('behavior-mirror-tone') || {}).value || '');
+      var humorStyle = String((document.getElementById('behavior-humor-style') || {}).value || '');
+
+      var personalityWarn = document.getElementById('behavior-personality-warning');
+      var toneWarn = document.getElementById('behavior-tone-warning');
+      var humorWarn = document.getElementById('behavior-humor-style-warning');
+
+      if (personalityWarn) {
+        if (personality === 'troll') {
+          personalityWarn.textContent = 'Warning: troll personas tend to get banned; you assume risk. Soften with other controls.';
+          personalityWarn.classList.remove('hidden');
+        } else {
+          personalityWarn.textContent = '';
+          personalityWarn.classList.add('hidden');
+        }
+      }
+
+      if (toneWarn) {
+        if (tone === 'escalate_when_appropriate') {
+          toneWarn.textContent = 'Warning: allows verbal self-defense against insults; you assume risk.';
+          toneWarn.classList.remove('hidden');
+        } else {
+          toneWarn.textContent = '';
+          toneWarn.classList.add('hidden');
+        }
+      }
+
+      if (humorWarn) {
+        if (humorStyle === 'ominous') {
+          humorWarn.textContent = 'Warning: many people find ominous humor triggering. Use with caution.';
+          humorWarn.classList.remove('hidden');
+        } else {
+          humorWarn.textContent = '';
+          humorWarn.classList.add('hidden');
+        }
+      }
+    }
+
     function renderBehaviorsPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
       var behaviors = cfg.behaviors || {};
+      var personality = document.getElementById('behavior-personality');
       var mirror = document.getElementById('behavior-mirror-tone');
+      var directness = document.getElementById('behavior-directness');
+      var warmth = document.getElementById('behavior-warmth');
+      var verbosity = document.getElementById('behavior-verbosity');
+      var formality = document.getElementById('behavior-formality');
       var humorStyle = document.getElementById('behavior-humor-style');
       var humorAmount = document.getElementById('behavior-humor-amount');
       var citations = document.getElementById('behavior-citations');
       var summonable = document.getElementById('behavior-summonable');
       var implicitSummons = document.getElementById('behavior-implicit-summons');
+      var individualizedRelationships = document.getElementById('behavior-individualized-relationships');
       var latencyMin = document.getElementById('behavior-latency-min');
       var latencyMax = document.getElementById('behavior-latency-max');
       var latencyUnit = document.getElementById('behavior-latency-unit');
       var banMin = document.getElementById('behavior-ban-min');
       var banMax = document.getElementById('behavior-ban-max');
+      if (personality) personality.value = String(behaviors.personality || 'typical_redditor');
       if (mirror) mirror.value = String(behaviors.mirrorTone || 'mirror_or_less');
+      if (directness) directness.value = String(behaviors.directness || 'balanced');
+      if (warmth) warmth.value = String(behaviors.warmth || 'neutral');
+      if (verbosity) verbosity.value = String(behaviors.verbosity || 'balanced');
+      if (formality) formality.value = String(behaviors.formality || 'neutral');
       if (humorStyle) humorStyle.value = String(behaviors.humorStyle || 'dry');
       if (humorAmount) humorAmount.value = String(behaviors.humorAmount || 'medium');
       if (citations) citations.value = String(behaviors.citations || 'as-needed');
       var statusSummons = (((state.status || {}).settings || {}).summonsEnabled);
       if (summonable) summonable.checked = (typeof statusSummons === 'boolean') ? !!statusSummons : !!behaviors.summonable;
       if (implicitSummons) implicitSummons.checked = !!behaviors.implicitSummons;
+      if (individualizedRelationships) individualizedRelationships.checked = (behaviors.individualizedRelationships !== false);
       var latencyMinSec = (((behaviors.latencyJitterSec || {}).min) || 0);
       var latencyMaxSec = (((behaviors.latencyJitterSec || {}).max) || 0);
       var latencyUiUnit = latencyUnitFromSecondsPair(latencyMinSec, latencyMaxSec);
@@ -4241,6 +4366,7 @@
       if (latencyMax) latencyMax.value = String(latencyUiValueFromSeconds(latencyMaxSec, latencyUiUnit));
       if (banMin) banMin.value = String((((behaviors.banJitterSec || {}).min) || 7));
       if (banMax) banMax.value = String((((behaviors.banJitterSec || {}).max) || 45));
+      updatePersonaStyleWarnings();
     }
 
     function renderModesPanel() {
@@ -4463,12 +4589,18 @@
     function collectModesConfigFromUi() {
       var cfg = normalizeModesConfig(cloneJson(state.modesConfig));
 
+      cfg.behaviors.personality = String((document.getElementById('behavior-personality') || {}).value || 'typical_redditor');
       cfg.behaviors.mirrorTone = String((document.getElementById('behavior-mirror-tone') || {}).value || 'mirror_or_less');
+      cfg.behaviors.directness = String((document.getElementById('behavior-directness') || {}).value || 'balanced');
+      cfg.behaviors.warmth = String((document.getElementById('behavior-warmth') || {}).value || 'neutral');
+      cfg.behaviors.verbosity = String((document.getElementById('behavior-verbosity') || {}).value || 'balanced');
+      cfg.behaviors.formality = String((document.getElementById('behavior-formality') || {}).value || 'neutral');
       cfg.behaviors.humorStyle = String((document.getElementById('behavior-humor-style') || {}).value || 'dry');
       cfg.behaviors.humorAmount = String((document.getElementById('behavior-humor-amount') || {}).value || 'medium');
       cfg.behaviors.citations = String((document.getElementById('behavior-citations') || {}).value || 'as-needed');
       cfg.behaviors.summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
       cfg.behaviors.implicitSummons = !!((document.getElementById('behavior-implicit-summons') || {}).checked);
+      cfg.behaviors.individualizedRelationships = !!((document.getElementById('behavior-individualized-relationships') || {}).checked);
       var latencyUnit = String((document.getElementById('behavior-latency-unit') || {}).value || 'minutes');
       cfg.behaviors.latencyJitterSec = {
         min: latencySecondsFromUi((document.getElementById('behavior-latency-min') || {}).value || '0', latencyUnit),
@@ -5313,12 +5445,18 @@
         runExtractNormsWorkflow();
       });
       var behaviorAutoSaveFields = [
+        'behavior-personality',
         'behavior-mirror-tone',
+        'behavior-directness',
+        'behavior-warmth',
+        'behavior-verbosity',
+        'behavior-formality',
         'behavior-humor-style',
         'behavior-humor-amount',
         'behavior-citations',
         'behavior-summonable',
         'behavior-implicit-summons',
+        'behavior-individualized-relationships',
         'behavior-latency-min',
         'behavior-latency-max',
         'behavior-latency-unit',
@@ -5329,6 +5467,7 @@
         var behaviorEl = document.getElementById(behaviorAutoSaveFields[bi]);
         if (!behaviorEl) continue;
         behaviorEl.addEventListener('change', function () {
+          updatePersonaStyleWarnings();
           markModesConfigDirty();
           queueBehaviorAutosave(120);
         });

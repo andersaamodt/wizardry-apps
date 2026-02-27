@@ -186,14 +186,20 @@ mode_default_config_json() {
         {name:"Enforcer",startingMode:"ENFORCE"}
       ],
       behaviors: {
+        personality: "typical_redditor",
         mirrorTone: "mirror_or_less",
+        directness: "balanced",
+        warmth: "neutral",
+        verbosity: "balanced",
+        formality: "neutral",
         humorStyle: "dry",
         humorAmount: "medium",
         citations: "as-needed",
         latencyJitterSec: {min: 0, max: 0},
         banJitterSec: {min: 7, max: 45},
         summonable: true,
-        implicitSummons: false
+        implicitSummons: false,
+        individualizedRelationships: true
       },
       startingMode: "SHADE",
       defaultDecayMode: "SHADE",
@@ -1839,7 +1845,12 @@ compose_context_envelope() {
     (.behaviors // {}) as $b
     | ($b.humor // "" | tostring | ascii_downcase) as $legacy
     | {
+        personality: ($b.personality // "typical_redditor"),
         mirrorTone: ($b.mirrorTone // "mirror_or_less"),
+        directness: ($b.directness // "balanced"),
+        warmth: ($b.warmth // "neutral"),
+        verbosity: ($b.verbosity // "balanced"),
+        formality: ($b.formality // "neutral"),
         humorStyle: (
           $b.humorStyle
           // (if $legacy == "none" then "straight"
@@ -1860,9 +1871,18 @@ compose_context_envelope() {
               elif $legacy == "measured" then "medium"
               else "medium" end)
         ),
-        citations: ($b.citations // "as-needed")
+        citations: ($b.citations // "as-needed"),
+        individualizedRelationships: (($b.individualizedRelationships // true) == true)
       }
-  ' 2>/dev/null || printf '{"mirrorTone":"mirror_or_less","humorStyle":"dry","humorAmount":"medium","citations":"as-needed"}')
+  ' 2>/dev/null || printf '{"personality":"typical_redditor","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"neutral","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","individualizedRelationships":true}')
+  relationship_for_prompt_json=$(printf '%s' "$relationship_json" | jq -c --argjson behavior "$behavior_policy_json" '
+    if ($behavior.individualizedRelationships // true) then .
+    else
+      .interaction_count = 0
+      | .valence_history = []
+      | .valence_summary = {rolling:0,lifetime:0}
+    end
+  ' 2>/dev/null || printf '%s' "$relationship_json")
 
   jq -cn \
     --arg mode "$MODE" \
@@ -1879,7 +1899,7 @@ compose_context_envelope() {
     --arg manifesto "$manifesto_text" \
     --arg global_instructions "$global_instructions_text" \
     --arg norms "$norms_json" \
-    --arg relationship "$relationship_json" \
+    --arg relationship "$relationship_for_prompt_json" \
     --arg mode_allow "$mode_allow_json" \
     --arg behavior_policy "$behavior_policy_json" \
     '{
