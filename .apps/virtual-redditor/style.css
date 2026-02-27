@@ -3675,7 +3675,7 @@ input.range-input-invalid[type='number'] {
 
 #pass-interval-controls {
   position: relative;
-  top: -2px;
+  top: -3px;
 }
 
 #pass-interval-controls .schedule-inline {
