@@ -774,6 +774,7 @@
   var dictationWaveSeenSignal = false;
   var dictationWaveNoiseFloor = 0.02;
   var dictationWaveActivatedAt = 0;
+  var dictationWaveLastSampleAt = 0;
   var dictationWaveBackendPumpBusy = false;
   var dictationWaveBackendPumpAt = 0;
   var dictationPreparePromise = null;
@@ -6876,8 +6877,8 @@
     if (!isFinite(width) || width <= 0) {
       return 42;
     }
-    // Match fixed bar geometry (4px bar + 1px gap) so the lane fills fully.
-    var count = Math.floor((width + 1) / 5);
+    // Match fixed bar geometry (3px bar + 1px gap) so the lane fills fully.
+    var count = Math.floor((width + 1) / 4);
     if (!isFinite(count) || count < 32) {
       count = 32;
     } else if (count > 180) {
@@ -7002,6 +7003,7 @@
     dictationWaveBackendFloor = 0.02;
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
+    dictationWaveLastSampleAt = 0;
     state.dictateWaveLevels = [];
   }
 
@@ -7046,6 +7048,10 @@
     }
     if (!pushed.length) {
       return;
+    }
+    if (pushed.length > 3) {
+      // Keep motion smooth by limiting bar-advance per update.
+      pushed = pushed.slice(pushed.length - 3);
     }
     var framePeak = 0;
     for (var pi = 0; pi < pushed.length; pi += 1) {
@@ -7192,6 +7198,9 @@
   }
 
   function pumpDictationWaveFromBackend() {
+    if (dictationWaveAnalyser && dictationWaveData) {
+      return;
+    }
     if (dictationWavePollTimer && (Date.now() - Number(dictationWaveBackendLevelAt || 0) < 260)) {
       return;
     }
@@ -7277,9 +7286,15 @@
           return;
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
+        var sampleNow = Date.now();
+        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 46) {
+          dictationWaveRafId = requestAnimationFrame(sample);
+          return;
+        }
+        dictationWaveLastSampleAt = sampleNow;
         var len = dictationWaveData.length;
-        var barsPerFrame = 8;
-        var windowSamples = Math.min(96, len);
+        var barsPerFrame = 2;
+        var windowSamples = Math.min(128, len);
         var sliceSamples = Math.max(6, Math.floor(windowSamples / barsPerFrame));
         var consumed = sliceSamples * barsPerFrame;
         var baseStart = Math.max(0, len - consumed);
@@ -7427,6 +7442,9 @@
             dictationWaveBackendRecentLevels = parsedIncoming.slice(parsedIncoming.length - 18);
           }
           if (normalizedSequence.length) {
+            if (normalizedSequence.length > 3) {
+              normalizedSequence = normalizedSequence.slice(normalizedSequence.length - 3);
+            }
             normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
           }
           dictationWaveBackendLevel = normalizedBackend;
@@ -7444,7 +7462,7 @@
         }).catch(function () {
           return null;
         });
-      }, 28);
+      }, 45);
     }
 
     if (dictationWaveStream && dictationWaveAnalyser && dictationWaveData) {

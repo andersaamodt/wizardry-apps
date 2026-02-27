@@ -13664,6 +13664,10 @@ EOF
     if should_allow_model_decision_request "$prompt_text" "$question_text" "$run_mode_name" "$commands_text"; then
       allow=1
     fi
+    allow_json=false
+    if [ "$allow" -eq 1 ]; then
+      allow_json=true
+    fi
     explicit_choice=0
     if decision_prompt_requests_explicit_choice "$prompt_text"; then
       explicit_choice=1
@@ -13682,7 +13686,7 @@ EOF
     fi
 
     printf '{"success":true,"allow_decision_request":%s,"category":"%s","signals":{"explicit_choice":%s,"missing_required_inputs":%s,"risk_gate_question":%s,"external_commands":%s}}\n' \
-      "$allow" \
+      "$allow_json" \
       "$(json_escape "$category")" \
       "$explicit_choice" \
       "$missing_required" \
