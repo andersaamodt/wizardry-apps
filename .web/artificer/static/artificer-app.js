@@ -10138,6 +10138,8 @@
       var isActiveTarget = state.activeWorkspaceId === workspaceId && state.activeConversationId === conversationId;
       if (isActiveTarget) {
         state.activeConversation = conversation;
+        // Remove switching overlay in the same render pass as fresh conversation content.
+        state.conversationSwitchOverlay = false;
         setActiveConversationLoading(workspaceId, conversationId, false);
         if (shouldApplyComposerDraft && el.runPrompt) {
           var nextDraftText = getComposerDraftForTarget(workspaceId, conversationId, "");

@@ -1195,11 +1195,14 @@
               state.pendingDeviceSession.delegationId = finish.delegation_id || '';
               return saveDeviceSession(state.pendingDeviceSession).then(function () {
                 state.pendingDeviceSession = null;
+                return finish;
               });
             }
-            return idbDelete(KEY_DEVICE_SESSION);
+            return idbDelete(KEY_DEVICE_SESSION).then(function () {
+              return finish;
+            });
           })
-          .then(function () {
+          .then(function (finish) {
             return finalizeLoginUiAfterSuccess(finish);
           });
       });

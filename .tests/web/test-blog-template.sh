@@ -675,7 +675,7 @@ test_blog_submit_comment_endpoint_graceful_failure() {
   config-set "$site_dir/site.conf" nostr_bridge_enabled true
   run_cgi_post "$cgi_dir/blog-submit-comment" "session_token=$session_token&csrf_token=$csrf_token&path=2024-01-15-welcome.html&event_json=%7B%7D"
   case "$CGI_BODY" in
-    *'nostril_required'*|*'nostr_verifier_required'*|*'invalid_kind'*|*'invalid_signature'*|*'missing_post_reference'*)
+    *'nostril_required'*|*'nostr_verifier_required'*|*'invalid_kind'*|*'invalid_signature'*|*'invalid_pubkey'*|*'missing_post_reference'*)
       ;;
     *)
       TEST_FAILURE_REASON="blog-submit-comment should fail gracefully with a structured error"
