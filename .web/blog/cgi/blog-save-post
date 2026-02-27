@@ -100,8 +100,15 @@ case "$action" in
       blog_delete_draft "$draft_id"
     fi
     blog_run_build_async
-    printf '{"success":true,"message":"Post published","filename":"%s","draft_id":"%s"}\n' \
-      "$(blog_json_escape "$filename")" "$(blog_json_escape "$draft_id")"
+    publish_message="Post published"
+    if [ "${BLOG_PUBLISH_LAST_MODE-}" = "local_fallback" ]; then
+      publish_message="Post published locally. Nostr bridge signing is not configured, so this post was not signed/pushed as a Nostr event."
+    fi
+    printf '{"success":true,"message":"%s","filename":"%s","draft_id":"%s","publish_mode_used":"%s"}\n' \
+      "$(blog_json_escape "$publish_message")" \
+      "$(blog_json_escape "$filename")" \
+      "$(blog_json_escape "$draft_id")" \
+      "$(blog_json_escape "${BLOG_PUBLISH_LAST_MODE-unknown}")"
     ;;
 
   queue_scheduled)

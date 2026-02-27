@@ -2264,10 +2264,20 @@ blog_publish_content_nostr() {
 blog_publish_content() {
   # args: title tags summary content author draft_id publish_mode scheduled_at
   if blog_nostr_bridge_enabled; then
-    blog_publish_content_nostr "$@"
-    return $?
+    if out=$(blog_publish_content_nostr "$@" 2>/dev/null); then
+      BLOG_PUBLISH_LAST_MODE="nostr"
+      printf '%s\n' "$out"
+      return 0
+    fi
+    out=$(blog_publish_content_markdown "$@")
+    BLOG_PUBLISH_LAST_MODE="local_fallback"
+    printf '%s\n' "$out"
+    return 0
   fi
-  blog_publish_content_markdown "$@"
+  out=$(blog_publish_content_markdown "$@")
+  BLOG_PUBLISH_LAST_MODE="local"
+  printf '%s\n' "$out"
+  return 0
 }
 
 blog_run_build_async() {
