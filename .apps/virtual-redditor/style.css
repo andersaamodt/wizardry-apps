@@ -1262,6 +1262,8 @@ textarea {
 select {
   -webkit-appearance: none;
   appearance: none;
+  font-size: 0.76rem;
+  line-height: 1.2;
   background-image:
     linear-gradient(45deg, transparent 50%, color-mix(in srgb, var(--text) 72%, var(--text-subtle) 28%) 50%),
     linear-gradient(135deg, color-mix(in srgb, var(--text) 72%, var(--text-subtle) 28%) 50%, transparent 50%);
@@ -1270,7 +1272,7 @@ select {
     calc(100% - 8px) 52%;
   background-size: 4px 4px, 4px 4px;
   background-repeat: no-repeat;
-  padding-right: 20px;
+  padding: 0.38rem 20px 0.3rem 0.44rem;
 }
 
 select:focus {
@@ -3730,9 +3732,11 @@ label {
   max-width: 100%;
   text-align: left;
   font-weight: 400;
+  font-size: 0.76rem;
+  line-height: 1.2;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--bg-panel) 92%, #fff 8%);
-  padding: 0.42rem 2rem 0.46rem 0.58rem;
+  padding: 0.38rem 2rem 0.3rem 0.5rem;
   border-radius: 6px;
   position: relative;
   transform: none !important;
@@ -3750,7 +3754,7 @@ label {
 
 .mode-selected-name {
   display: block;
-  font-size: 0.84rem;
+  font-size: 0.76rem;
   color: var(--text);
   font-weight: 400;
 }
