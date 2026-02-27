@@ -33,7 +33,7 @@
 </div>
 <div class="nav-login-split" id="nav-login-split" style="display:none;">
   <button class="btn-login btn-login-main" id="login-btn" type="button">Login</button>
-  <button class="btn-login btn-login-caret" id="login-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More login options">▾</button>
+  <button class="btn-login btn-login-caret" id="login-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More login options">▼</button>
   <div class="nav-login-menu" id="nav-login-menu" role="menu" hidden>
     <button id="login-menu-desktop" class="nav-menu-item" type="button" role="menuitem">Sign in with desktop signer</button>
     <button id="login-menu-phone" class="nav-menu-item" type="button" role="menuitem">Use phone signer (QR)</button>
