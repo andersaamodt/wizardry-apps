@@ -6417,12 +6417,12 @@
     if (!isFinite(width) || width <= 0) {
       return 42;
     }
-    // Slightly thicker, lower-density bars so each update is more visible.
-    var count = Math.floor((width + 2) / 8);
-    if (!isFinite(count) || count < 24) {
-      count = 24;
-    } else if (count > 72) {
-      count = 72;
+    // Match fixed bar geometry (3px bar + 1px gap) so the lane fills fully.
+    var count = Math.floor((width + 1) / 4);
+    if (!isFinite(count) || count < 32) {
+      count = 32;
+    } else if (count > 180) {
+      count = 180;
     }
     return count;
   }
@@ -6552,7 +6552,7 @@
     if (level > 1) {
       level = 1;
     }
-    if (level < 0.035) {
+    if (level < 0.04) {
       level = 0;
     }
     if (!dictationWaveSeenSignal && level >= 0.03) {
@@ -6560,17 +6560,8 @@
     }
     var barCount = dictationWaveTargetBarCount();
     var existing = syncDictationWaveLevelsLength(barCount).slice();
-    var advance = 1;
-    if (barCount > 56) {
-      advance = 2;
-    }
-    if (barCount > 84) {
-      advance = 3;
-    }
-    var shifted = existing.slice(advance);
-    while (shifted.length < barCount) {
-      shifted.push(level);
-    }
+    var shifted = existing.slice(1);
+    shifted.push(level);
     state.dictateWaveLevels = shifted;
     renderDictationWaveBars();
   }
@@ -6644,7 +6635,7 @@
         }
         var rms = Math.sqrt(sum / dictationWaveData.length);
         // Dynamic gating to let quiet rooms return to near-zero while preserving headroom.
-        var rawLevel = (rms * 8.8) + (peak * 0.38);
+        var rawLevel = (rms * 11.2) + (peak * 0.42);
         if (!isFinite(rawLevel) || rawLevel < 0) {
           rawLevel = 0;
         }
@@ -6656,16 +6647,19 @@
           floor = 0.04;
         }
         if (!dictationWaveSeenSignal || rawLevel <= floor + 0.03) {
-          floor = (floor * 0.85) + (rawLevel * 0.15);
+          floor = (floor * 0.78) + (rawLevel * 0.22);
+        } else {
+          // Rise floor slowly on sustained ambient noise, not on speech spikes.
+          floor = (floor * 0.995) + (rawLevel * 0.005);
         }
-        if (floor < 0.004) {
-          floor = 0.004;
-        } else if (floor > 0.09) {
-          floor = 0.09;
+        if (floor < 0.003) {
+          floor = 0.003;
+        } else if (floor > 0.12) {
+          floor = 0.12;
         }
         dictationWaveNoiseFloor = floor;
-        var gate = floor + 0.032;
-        var normalized = (rawLevel - gate) / Math.max(0.06, 1 - gate);
+        var gate = floor + 0.024;
+        var normalized = (rawLevel - gate) / Math.max(0.08, 1 - gate);
         if (!isFinite(normalized) || normalized < 0) {
           normalized = 0;
         }
@@ -6673,9 +6667,9 @@
           normalized = 1;
         }
         if (normalized > 0) {
-          normalized = Math.pow(normalized, 0.92);
+          normalized = Math.pow(normalized, 0.96);
         }
-        if (normalized < 0.045) {
+        if (normalized < 0.04) {
           normalized = 0;
         }
         dictationWaveMicLevel = normalized;
@@ -6720,7 +6714,9 @@
           }
           dictationWaveBackendLevel = polledLevel;
           dictationWaveBackendLevelAt = Date.now();
-          applyDictationWaveLevel(mergedDictationWaveLevel(polledLevel));
+          if (!dictationWaveAnalyser || !dictationWaveData || (Date.now() - Number(dictationWaveMicLevelAt || 0)) > 260) {
+            applyDictationWaveLevel(mergedDictationWaveLevel(polledLevel));
+          }
         }).catch(function () {
           return null;
         });
@@ -6813,7 +6809,7 @@
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.07;
+    var silenceGate = 0.05;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -6845,7 +6841,7 @@
           adjusted = 1;
         }
         var waveTravel = Math.max(1, maxWaveHeight - baselineHeight);
-        height = baselineHeight + Math.round(Math.pow(adjusted, 1.18) * waveTravel);
+        height = baselineHeight + Math.round(Math.pow(adjusted, 1.08) * waveTravel);
       }
       bar.style.height = String(height) + "px";
     }
