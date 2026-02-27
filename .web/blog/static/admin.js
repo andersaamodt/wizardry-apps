@@ -19,11 +19,14 @@
     activeSection: '',
     usersPollTimer: null,
     draftsPollTimer: null,
+    postsPollTimer: null,
     userDragActive: false,
     userDragUsername: '',
     userDropAfterUsername: '',
     usersMenuOpenFor: '',
     usersActionInFlight: false,
+    postsMenuOpenFor: '',
+    postsActionInFlight: false,
     dripQueueAhead: 0,
     dripQueueEtaMinutes: 0,
     dripQueueInfoReady: false,
@@ -40,6 +43,7 @@
     outputNostrBridge: document.getElementById('output-nostr-bridge'),
     outputCompose: document.getElementById('output-compose'),
     outputQueue: document.getElementById('output-queue'),
+    outputPosts: document.getElementById('output-posts'),
     outputAccount: document.getElementById('output-account'),
     outputUsers: document.getElementById('output-users'),
     siteTitle: document.getElementById('site-title'),
@@ -64,6 +68,7 @@
     postScheduleAt: document.getElementById('post-scheduled-at'),
     navDraftsCount: document.getElementById('admin-nav-drafts-count'),
     navQueueCount: document.getElementById('admin-nav-queue-count'),
+    navPostsCount: document.getElementById('admin-nav-posts-count'),
     dripQueuePill: document.getElementById('drip-queue-pill'),
     scheduledRow: document.getElementById('scheduled-row'),
     markdownPreview: document.getElementById('markdown-preview'),
@@ -71,6 +76,7 @@
     togglePreviewButton: document.getElementById('btn-toggle-preview'),
     draftsList: document.getElementById('drafts-list'),
     queueList: document.getElementById('queue-list'),
+    postsList: document.getElementById('posts-list'),
     usersList: document.getElementById('users-list'),
     currentDraftLabel: document.getElementById('current-draft-label'),
     accountPlayerName: document.getElementById('account-player-name'),
@@ -152,6 +158,7 @@
     }
     syncUsersAutoRefresh();
     syncDraftsAutoRefresh();
+    syncPostsAutoRefresh();
   }
 
   function initSectionNavigation() {
@@ -899,7 +906,7 @@
       setAccountOnlyMode(false);
       activateSection(getSectionFromHash(), false);
 
-      await Promise.all([loadConfig(), loadUsers(), loadDrafts(), loadQueue()]);
+      await Promise.all([loadConfig(), loadUsers(), loadDrafts(), loadQueue(), loadPosts()]);
       renderPreview();
     } catch (err) {
       setAuthMessage('Authentication check failed: ' + err.message, 'error');
@@ -1432,6 +1439,172 @@
     }
     await Promise.all([loadDrafts(), loadQueue()]);
     setOutput(els.outputQueue, data.message || 'Draft moved back to drafts.', 'ok');
+  }
+
+  function formatPostPublishedAt(isoValue) {
+    const raw = String(isoValue || '').trim();
+    if (!raw) {
+      return 'Unknown date';
+    }
+    const dt = new Date(raw);
+    if (Number.isNaN(dt.getTime())) {
+      return raw;
+    }
+    return dt.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function postActionButton(label, action, postPath, className, extraAttrs) {
+    const classes = className ? ' class="' + className + '"' : '';
+    const attrs = extraAttrs ? (' ' + extraAttrs) : '';
+    return '<button type="button"' + classes + ' data-post-action="' + escapeAttr(action) + '" data-post-path="' + escapeAttr(postPath) + '"' + attrs + '>' + label + '</button>';
+  }
+
+  function renderPostsList(posts) {
+    if (!els.postsList) {
+      return;
+    }
+    if (!posts.length) {
+      els.postsList.innerHTML = '<p class="placeholder">No published posts yet.</p>';
+      return;
+    }
+
+    let html = '';
+    posts.forEach(function (post) {
+      const title = String(post.title || 'Untitled');
+      const path = String(post.path || '');
+      const source = String(post.source || 'local');
+      const author = String(post.author || '').trim();
+      const sourceLabel = source === 'nostr' ? 'Nostr' : 'Local';
+      const sourceClass = source === 'nostr' ? ' is-nostr' : ' is-local';
+      const openUrl = String(post.open_url || '');
+      const dateLabel = formatPostPublishedAt(post.published_at);
+
+      html += '<div class="post-row">';
+      html += '<div class="post-row-main">';
+      html += '<span class="post-row-title" title="' + escapeAttr(title) + '">' + escapeHtml(title) + '</span>';
+      html += '<span class="post-pill' + sourceClass + '">' + escapeHtml(sourceLabel) + '</span>';
+      html += '<span class="post-pill">' + escapeHtml(dateLabel) + '</span>';
+      if (author) {
+        html += '<span class="post-pill is-author">' + escapeHtml(author) + '</span>';
+      }
+      html += '</div>';
+      html += '<div class="post-row-actions">';
+      html += '<div class="post-menu">';
+      html += postActionButton('⋯', 'toggle_menu', path, 'post-menu-trigger');
+      html += '<div class="post-menu-panel" data-post-menu-panel="' + escapeAttr(path) + '" hidden>';
+      if (openUrl) {
+        html += postActionButton('Open post', 'open', path, '', 'data-post-url="' + escapeAttr(openUrl) + '"');
+        html += postActionButton('Copy link', 'copy_link', path, '', 'data-post-url="' + escapeAttr(openUrl) + '"');
+      }
+      if (post.can_hide) {
+        html += postActionButton('Hide from site...', 'hide', path, 'post-hide');
+      }
+      if (post.can_delete) {
+        html += postActionButton(prioritiesTrashIconSvg() + '<span>Delete post...</span>', 'delete', path, 'post-delete');
+      }
+      html += '</div>';
+      html += '</div>';
+      html += '</div>';
+      html += '</div>';
+    });
+    els.postsList.innerHTML = html;
+  }
+
+  async function loadPosts() {
+    const data = await apiPost('/cgi/blog-list-posts', {}, true);
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to load posts');
+    }
+    const posts = Array.isArray(data.posts) ? data.posts : [];
+    if (els.navPostsCount) {
+      els.navPostsCount.textContent = '(' + posts.length + ')';
+    }
+    renderPostsList(posts);
+  }
+
+  function stopPostsPolling() {
+    if (state.postsPollTimer) {
+      clearInterval(state.postsPollTimer);
+      state.postsPollTimer = null;
+    }
+  }
+
+  function syncPostsAutoRefresh() {
+    const postsVisible = state.isAdmin && state.activeSection === 'posts';
+    if (!postsVisible) {
+      stopPostsPolling();
+      return;
+    }
+    loadPosts().catch(function (err) {
+      setOutput(els.outputPosts, 'Error: ' + err.message, 'error');
+    });
+    if (state.postsPollTimer) {
+      return;
+    }
+    state.postsPollTimer = setInterval(function () {
+      if (!(state.isAdmin && state.activeSection === 'posts')) {
+        stopPostsPolling();
+        return;
+      }
+      if (state.postsActionInFlight || state.postsMenuOpenFor) {
+        return;
+      }
+      loadPosts().catch(function () {});
+    }, 7000);
+  }
+
+  async function runPostAction(action, postPath, postUrl) {
+    const pickedAction = String(action || '').trim();
+    const path = String(postPath || '').trim();
+    const url = String(postUrl || '').trim();
+    if (!pickedAction || !path) {
+      return;
+    }
+    if (pickedAction === 'open') {
+      if (url) {
+        window.open(url, '_blank', 'noopener');
+      }
+      return;
+    }
+    if (pickedAction === 'copy_link') {
+      if (!url) {
+        return;
+      }
+      const absoluteUrl = new URL(url, window.location.origin).toString();
+      const copied = await copyTextToClipboard(absoluteUrl);
+      setOutput(els.outputPosts, copied ? 'Post link copied.' : 'Could not copy post link.', copied ? 'ok' : 'warn');
+      return;
+    }
+
+    if (state.postsActionInFlight) {
+      return;
+    }
+    if (pickedAction === 'delete') {
+      if (!window.confirm('Delete this published post from this site? This cannot be undone.')) {
+        return;
+      }
+    }
+    if (pickedAction === 'hide') {
+      if (!window.confirm('Hide this Nostr-projected post from this site?')) {
+        return;
+      }
+    }
+
+    state.postsActionInFlight = true;
+    try {
+      const data = await apiPost('/cgi/blog-manage-post', {
+        action: pickedAction,
+        post_path: path
+      }, true);
+      if (!data.success) {
+        throw new Error(data.error || 'Post action failed');
+      }
+      state.postsMenuOpenFor = '';
+      await loadPosts();
+      setOutput(els.outputPosts, data.message || 'Post updated.', 'ok');
+    } finally {
+      state.postsActionInFlight = false;
+    }
   }
 
   function userCardActionButton(label, action, username, className) {
@@ -2000,6 +2173,58 @@
         });
       });
     }
+    if (els.postsList) {
+      els.postsList.addEventListener('click', function (event) {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        const actionNode = target.closest('[data-post-action][data-post-path]');
+        if (!(actionNode instanceof HTMLElement)) {
+          return;
+        }
+        const action = actionNode.getAttribute('data-post-action');
+        const postPath = actionNode.getAttribute('data-post-path');
+        const postUrl = actionNode.getAttribute('data-post-url') || '';
+        if (!action || !postPath) {
+          return;
+        }
+        if (action === 'toggle_menu') {
+          const panels = Array.from(els.postsList.querySelectorAll('[data-post-menu-panel]'));
+          let opened = '';
+          panels.forEach(function (panel) {
+            const thisPath = panel.getAttribute('data-post-menu-panel');
+            if (!thisPath) {
+              return;
+            }
+            const openThis = thisPath === postPath ? panel.hidden : false;
+            panel.hidden = !openThis;
+            if (openThis) {
+              opened = thisPath;
+            }
+          });
+          state.postsMenuOpenFor = opened;
+          return;
+        }
+        runPostAction(action, postPath, postUrl).catch(function (err) {
+          setOutput(els.outputPosts, 'Error: ' + err.message, 'error');
+        });
+      });
+
+      document.addEventListener('click', function (event) {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        if (target.closest('.post-menu')) {
+          return;
+        }
+        state.postsMenuOpenFor = '';
+        Array.from(els.postsList.querySelectorAll('[data-post-menu-panel]')).forEach(function (panel) {
+          panel.hidden = true;
+        });
+      });
+    }
     if (els.usersList) {
       els.usersList.addEventListener('click', function (event) {
         const target = event.target;
@@ -2137,10 +2362,16 @@
       if (state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
         loadUsers(false).catch(function () {});
       }
+      if (state.isAdmin && state.activeSection === 'posts' && !state.postsActionInFlight) {
+        loadPosts().catch(function () {});
+      }
     });
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
         loadUsers(false).catch(function () {});
+      }
+      if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'posts' && !state.postsActionInFlight) {
+        loadPosts().catch(function () {});
       }
     });
 

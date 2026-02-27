@@ -56,6 +56,13 @@
 - Use consistent labels for repeated concepts across apps.
 - Prefer one-screen comprehension over hidden routes and modal mazes.
 
+## Admin List Pages
+- Prefer row-based management tables over card grids for dense admin lists (users, drafts, posts, queue).
+- Use full-width rows with alternating subtle background tint for scanability.
+- Keep each row concise, ideally one-line with compact pills for status/source metadata.
+- Put destructive or advanced actions behind a compact overflow menu to reduce visual noise.
+- Keep list pages live-updating when visible, but pause refresh while menus/actions/drag operations are active.
+
 ## Port and Runtime Safety
 - Never hardcode a fixed localhost port for embedded site URLs.
 - Resolve runtime port from canonical config files like `site.conf`.

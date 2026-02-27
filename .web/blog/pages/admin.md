@@ -11,6 +11,7 @@ title: Blog Admin
 <button type="button" class="admin-nav-item is-compose" data-admin-nav="compose" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 18L7.2 13.8L15.8 5.2a2 2 0 1 1 2.8 2.8L10 16.6L6 18Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 21H19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="admin-nav-label">Compose</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="drafts" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Drafts <span id="admin-nav-drafts-count" class="admin-nav-count">(0)</span></span></button>
 <button type="button" class="admin-nav-item admin-nav-divider-after" data-admin-nav="queue" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Queue <span id="admin-nav-queue-count" class="admin-nav-count">(0)</span></span></button>
+<button type="button" class="admin-nav-item" data-admin-nav="posts" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Posts <span id="admin-nav-posts-count" class="admin-nav-count">(0)</span></span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="users" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Users</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="account" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Account</span></button>
 <button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Site Settings</span></button>
@@ -327,6 +328,18 @@ title: Blog Admin
 </div>
 <div id="queue-list"></div>
 <div id="output-queue" class="output"></div>
+</div>
+</section>
+
+<section class="admin-section" data-admin-section="posts" hidden>
+<div class="demo-box admin-card">
+<div class="row-head">
+<div>
+<h3>Posts</h3>
+</div>
+</div>
+<div id="posts-list" class="posts-list"></div>
+<div id="output-posts" class="output"></div>
 </div>
 </section>
 
@@ -1698,6 +1711,152 @@ body {
   border-radius: 0;
   overflow: visible;
   background: transparent;
+}
+
+.posts-list {
+  display: block;
+  border-top: 1px solid #d2def3;
+  border-bottom: 1px solid #d2def3;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.post-row {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  padding: 0.48rem 0.68rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2.9rem;
+}
+
+.post-row:nth-child(odd) {
+  background: #f5f8ff;
+}
+
+.post-row-main {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.post-row-title {
+  color: #163161;
+  font-weight: 700;
+  max-width: min(52ch, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.post-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.07rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.71rem;
+  font-weight: 700;
+  border: 1px solid #c1d1f0;
+  color: #32508f;
+  background: #f2f6ff;
+  line-height: 1.15;
+}
+
+.post-pill.is-local {
+  border-color: #a9bddf;
+  color: #2d4d87;
+  background: #ecf3ff;
+}
+
+.post-pill.is-nostr {
+  border-color: #9cd5b6;
+  color: #1c7b47;
+  background: #e8f8f0;
+}
+
+.post-pill.is-author {
+  border-color: #d0d9ea;
+  color: #48607f;
+  background: #f7f9fd;
+}
+
+.post-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+}
+
+#admin-panel .post-menu {
+  position: relative;
+}
+
+#admin-panel button.post-menu-trigger {
+  min-width: 2rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  padding: 0;
+}
+
+#admin-panel .post-menu-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 13.5rem;
+  background: #fff;
+  border: 1px solid #c8d7f1;
+  border-radius: 10px;
+  box-shadow: 0 14px 30px rgba(16, 28, 56, 0.16);
+  padding: 0.3rem;
+}
+
+#admin-panel .post-menu-panel button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0.5rem 0.55rem;
+  font-weight: 620;
+}
+
+#admin-panel .post-menu-panel button:hover {
+  background: #eef4ff;
+}
+
+#admin-panel .post-menu-panel button.post-hide {
+  color: #8a4d00;
+}
+
+#admin-panel .post-menu-panel button.post-hide:hover {
+  background: #fff6ea;
+}
+
+#admin-panel .post-menu-panel button.post-delete {
+  color: #a52c2a;
+}
+
+#admin-panel .post-menu-panel button.post-delete .trash-icon-svg {
+  width: 0.98rem;
+  height: 0.98rem;
+  color: #a52c2a;
+  flex: 0 0 auto;
+}
+
+#admin-panel .post-menu-panel button.post-delete:hover {
+  background: #fff1f1;
 }
 
 .user-card {
