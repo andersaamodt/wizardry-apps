@@ -6565,7 +6565,10 @@
           autoGainControl: false
         }
       }).then(function (stream) {
-        if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording") {
+        if (
+          monitorSession !== dictationWaveMonitorSession ||
+          (state.dictatePhase !== "recording" && state.dictatePhase !== "starting")
+        ) {
           try {
             var staleTracks = stream.getTracks ? stream.getTracks() : [];
             for (var sti = 0; sti < staleTracks.length; sti += 1) {
@@ -6608,7 +6611,12 @@
         dictationWaveData = data;
 
         var sample = function () {
-          if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording" || !dictationWaveAnalyser || !dictationWaveData) {
+          if (
+            monitorSession !== dictationWaveMonitorSession ||
+            (state.dictatePhase !== "recording" && state.dictatePhase !== "starting") ||
+            !dictationWaveAnalyser ||
+            !dictationWaveData
+          ) {
             return;
           }
           dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
@@ -6640,7 +6648,10 @@
       });
     }).then(function () {
       dictationWavePollTimer = setInterval(function () {
-        if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording") {
+        if (
+          monitorSession !== dictationWaveMonitorSession ||
+          (state.dictatePhase !== "recording" && state.dictatePhase !== "starting")
+        ) {
           return;
         }
         var activeSessionId = trim(String(state.dictateSessionId || ""));
@@ -6648,7 +6659,10 @@
           return;
         }
         apiGet("dictate_levels", { session_id: activeSessionId }, { timeoutMs: 2200 }).then(function (response) {
-          if (monitorSession !== dictationWaveMonitorSession || state.dictatePhase !== "recording") {
+          if (
+            monitorSession !== dictationWaveMonitorSession ||
+            (state.dictatePhase !== "recording" && state.dictatePhase !== "starting")
+          ) {
             return;
           }
           if (!response || !response.success) {
@@ -6681,17 +6695,17 @@
       return;
     }
     var levels = Array.isArray(state.dictateWaveLevels) ? state.dictateWaveLevels : [];
-    var recording = state.dictatePhase === "recording";
+    var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
       if (!isFinite(unit) || unit < 0) {
         unit = 0;
       }
-      if (!recording) {
+      if (!waveformActive) {
         unit *= 0.3;
       }
-      var height = 2 + Math.round(unit * 12);
+      var height = Math.round(unit * 18);
       bar.style.height = String(height) + "px";
     }
   }
@@ -6702,10 +6716,10 @@
       next = "idle";
     }
     state.dictatePhase = next;
-    if (next === "recording") {
+    if (next === "recording" || next === "starting") {
       if (!dictationWaveAnalyser && !dictationWaveStream) {
         startDictationWaveMonitor().then(function (started) {
-        if (!started && state.dictatePhase === "recording") {
+        if (!started && (state.dictatePhase === "recording" || state.dictatePhase === "starting")) {
           state.dictateWaveLevels = [];
           renderDictationWaveBars();
         }
