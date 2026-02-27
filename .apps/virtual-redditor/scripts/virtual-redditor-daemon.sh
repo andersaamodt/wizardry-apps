@@ -62,6 +62,7 @@ MANIFESTO_FILE="$STATE_DIR/manifesto.md"
 NORMS_FILE="$STATE_DIR/norms.jsonl"
 DAEMON_STDOUT_LOG="$STATE_DIR/daemon.log"
 DAEMON_STDERR_LOG="$STATE_DIR/daemon-error.log"
+DEFAULT_PATROL_MODE=full
 
 require_tool() {
   tool=$1
@@ -1021,6 +1022,9 @@ OLLAMA_MODEL=llama3.1:8b
 OLLAMA_URL=http://127.0.0.1:11434/api/generate
 BOTENV
   fi
+  if ! awk -F= '$1 == "PATROL_MODE" { found=1 } END { exit found ? 0 : 1 }' "$BOT_ENV_FILE" 2>/dev/null; then
+    printf 'PATROL_MODE=%s\n' "$DEFAULT_PATROL_MODE" >> "$BOT_ENV_FILE"
+  fi
 
   if [ ! -f "$REDDIT_ENV_FILE" ]; then
     cat > "$REDDIT_ENV_FILE" <<'REDDITENV'
@@ -1049,7 +1053,7 @@ load_bot_env() {
   . "$BOT_ENV_FILE"
 
   MODE=${MODE:-judicial}
-  PATROL_MODE=${PATROL_MODE:-full}
+  PATROL_MODE=${PATROL_MODE:-$DEFAULT_PATROL_MODE}
   PATROL_SAMPLE_MAX=$(to_int "${PATROL_SAMPLE_MAX:-20}" 20)
   PATROL_INTERVAL_MIN=$(to_int "${PATROL_INTERVAL_MIN:-3600}" 3600)
   PATROL_INTERVAL_MAX=$(to_int "${PATROL_INTERVAL_MAX:-3600}" 3600)
@@ -1074,7 +1078,7 @@ load_bot_env() {
 
   case "$PATROL_MODE" in
     full|sample) ;;
-    *) PATROL_MODE=full ;;
+    *) PATROL_MODE=$DEFAULT_PATROL_MODE ;;
   esac
 
   [ "$PATROL_SAMPLE_MAX" -lt 1 ] && PATROL_SAMPLE_MAX=1

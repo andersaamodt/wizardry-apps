@@ -756,6 +756,7 @@
       full: 'Scan all available recent comments each pass.',
       sample: 'Scan only up to Max samples each pass.'
     };
+    var DEFAULT_PATROL_MODE = 'full';
 
     function normalizeMode(value) {
       var mode = String(value || '').trim().toLowerCase();
@@ -764,7 +765,7 @@
 
     function normalizePatrolMode(value) {
       var mode = String(value || '').trim().toLowerCase();
-      return PATROL_MODE_DESCRIPTIONS[mode] ? mode : 'full';
+      return PATROL_MODE_DESCRIPTIONS[mode] ? mode : DEFAULT_PATROL_MODE;
     }
 
     function parseIntervalSecondsFromSettings(settings) {
@@ -2250,7 +2251,7 @@
         launchd: { loaded: false },
         settings: {
           mode: 'judicial',
-          patrolMode: 'full',
+          patrolMode: DEFAULT_PATROL_MODE,
           patrolSampleMax: 20,
           patrolIntervalMin: 3600,
           patrolIntervalMax: 3600,
@@ -2993,7 +2994,7 @@
       }
       syncUsernameDisplay();
       if (modeSelect) modeSelect.value = normalizeMode(settings.mode || 'judicial');
-      if (patrolSelect) patrolSelect.value = normalizePatrolMode(settings.patrolMode || 'full');
+      if (patrolSelect) patrolSelect.value = normalizePatrolMode(settings.patrolMode || DEFAULT_PATROL_MODE);
       if (sampleInput && document.activeElement !== sampleInput) sampleInput.value = String(settings.patrolSampleMax || 20);
       if (subredditInput && document.activeElement !== subredditInput) subredditInput.value = String(settings.subreddit || '');
       if (subredditInput && document.activeElement !== subredditInput) scheduleSubredditCheck(0, false);
@@ -3025,7 +3026,7 @@
         );
       }
       updateModeDescriptions(normalizeMode(settings.mode || 'judicial'));
-      updatePatrolModeDescriptions(normalizePatrolMode(settings.patrolMode || 'full'));
+      updatePatrolModeDescriptions(normalizePatrolMode(settings.patrolMode || DEFAULT_PATROL_MODE));
       if (settings.ollamaModel) {
         var activeFromSettings = String(settings.ollamaModel);
         state.installedModels[activeFromSettings] = true;
@@ -4579,7 +4580,7 @@
       if (state.previewMode) {
         if (state.status && state.status.settings) {
           if (key === 'MODE') state.status.settings.mode = String(value || 'judicial');
-          if (key === 'PATROL_MODE') state.status.settings.patrolMode = String(value || 'full');
+          if (key === 'PATROL_MODE') state.status.settings.patrolMode = String(value || DEFAULT_PATROL_MODE);
           if (key === 'PATROL_SAMPLE_MAX') state.status.settings.patrolSampleMax = Number(value || 20) || 20;
           if (key === 'PATROL_INTERVAL_MIN') state.status.settings.patrolIntervalMin = Number(value || 3600) || 3600;
           if (key === 'PATROL_INTERVAL_MAX') state.status.settings.patrolIntervalMax = Number(value || 3600) || 3600;
@@ -5574,7 +5575,7 @@
       document.getElementById('patrol-mode-dropdown-menu').addEventListener('click', function (event) {
         var option = event.target.closest('button[data-patrol-mode-option]');
         if (!option) return;
-        var value = normalizePatrolMode(option.getAttribute('data-patrol-mode-option') || 'full');
+        var value = normalizePatrolMode(option.getAttribute('data-patrol-mode-option') || DEFAULT_PATROL_MODE);
         updatePatrolModeDescriptions(value);
         closePatrolModeMenu();
         saveSetting('PATROL_MODE', value);
@@ -5920,7 +5921,7 @@
       renderModelPicker();
       renderNormsTable();
       updateModeDescriptions('judicial');
-      updatePatrolModeDescriptions('full');
+      updatePatrolModeDescriptions(DEFAULT_PATROL_MODE);
       applyTheme(state.activeTheme);
       setLeftRailWidth(state.leftRailWidth);
       wireEvents();
