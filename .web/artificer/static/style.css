@@ -2042,7 +2042,10 @@ button:disabled,
 
 .conversation-switch-overlay-label {
   display: inline-block;
-  transform: translateY(0.5px);
+  transform: none;
+  text-shadow: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .toolbar.conversation-switch-locked {
