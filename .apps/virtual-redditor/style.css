@@ -2363,7 +2363,16 @@ label {
 }
 
 .mini-table-wrap {
-  max-height: 240px;
+  max-height: clamp(220px, 34vh, 340px);
+  min-height: 160px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
+}
+
+#panel-log .mini-table-wrap {
+  margin-bottom: 8px;
 }
 
 .modes-save-actions {
