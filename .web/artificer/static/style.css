@@ -916,7 +916,7 @@ h2 {
   min-width: 34px;
 }
 
-.path-widget:hover {
+.path-widget:hover:not(:disabled) {
   background: var(--btn-hover-bg);
   border-color: var(--btn-hover-border);
 }
@@ -976,7 +976,7 @@ h2 {
 button:disabled,
 .toolbar-btn:disabled,
 .path-widget:disabled {
-  cursor: not-allowed;
+  cursor: default;
 }
 
 .toolbar-btn:disabled,
@@ -1015,7 +1015,19 @@ button:disabled,
   border-color: var(--btn-hover-border);
 }
 
-.split-anchor .split-btn .toolbar-btn:hover {
+.split-anchor .split-btn:hover:has(.toolbar-btn:disabled) {
+  border-color: var(--btn-border);
+}
+
+.split-anchor .split-btn:has(.toolbar-btn:disabled) {
+  opacity: 0.58;
+}
+
+.split-anchor .split-btn:has(.toolbar-btn:disabled) .toolbar-btn {
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--line) 12%);
+}
+
+.split-anchor .split-btn .toolbar-btn:hover:not(:disabled) {
   background: var(--btn-hover-bg);
 }
 
@@ -1078,7 +1090,7 @@ button:disabled,
   transform: translateY(1px);
 }
 
-.toolbar-btn:hover {
+.toolbar-btn:hover:not(:disabled) {
   background: var(--btn-hover-bg);
   border-color: var(--btn-hover-border);
 }
@@ -1129,6 +1141,8 @@ button:disabled,
 
 .terminal-icon-btn:disabled,
 .changes-btn:disabled {
+  background: transparent;
+  border-color: transparent;
   opacity: 0.52;
   color: color-mix(in srgb, var(--text-muted) 90%, var(--line) 10%);
 }

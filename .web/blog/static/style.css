@@ -440,6 +440,41 @@ header h1 {
   text-decoration: none;
 }
 
+.nav-login-split {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+.btn-login-main {
+  border-radius: 0;
+}
+
+.btn-login-caret {
+  border-radius: 0;
+  min-width: 2rem;
+  padding: 0.5rem 0.6rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.nav-login-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 14.5rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  padding: 0.28rem;
+  z-index: 40;
+}
+
 .auth-modal[hidden] {
   display: none;
 }
@@ -2053,6 +2088,7 @@ nav.site-nav {
   }
 
   .btn-login,
+  .nav-login-split,
   .nav-user-menu,
   .nav-menu-btn,
   .nav-compose,
@@ -2122,6 +2158,7 @@ nav.site-nav {
 
   nav.site-nav .nav-search button,
   nav.site-nav .btn-login,
+  nav.site-nav .nav-login-split,
   nav.site-nav .nav-user-menu,
   nav.site-nav .nav-menu-btn,
   nav.site-nav .nav-compose,

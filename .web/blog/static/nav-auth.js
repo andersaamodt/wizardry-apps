@@ -7,6 +7,7 @@
   var DEFAULT_DELEGATION_DAYS = 30;
   var MIN_DELEGATION_DAYS = 1;
   var MAX_DELEGATION_DAYS = 90;
+  var QUICK_DELEGATION_DAYS = 30;
   var NIP46_RELAYS = [
     'wss://relay.damus.io',
     'wss://nos.lol',
@@ -41,6 +42,13 @@
 
   var els = {
     loginBtn: document.getElementById('login-btn'),
+    loginSplit: document.getElementById('nav-login-split'),
+    loginMoreBtn: document.getElementById('login-more-btn'),
+    loginMenu: document.getElementById('nav-login-menu'),
+    loginMenuDesktop: document.getElementById('login-menu-desktop'),
+    loginMenuPhone: document.getElementById('login-menu-phone'),
+    loginMenuManual: document.getElementById('login-menu-manual'),
+    loginMenuAdvanced: document.getElementById('login-menu-advanced'),
     composeLink: document.querySelector('.nav-compose'),
     userMenu: document.getElementById('nav-user-menu'),
     menuBtn: document.getElementById('nav-menu-btn'),
@@ -677,7 +685,9 @@
     state.isAuthenticated = !!isLoggedIn;
 
     if (isLoggedIn) {
-      if (els.loginBtn) {
+      if (els.loginSplit) {
+        els.loginSplit.style.display = 'none';
+      } else if (els.loginBtn) {
         els.loginBtn.style.display = 'none';
       }
       if (els.composeLink) {
@@ -705,7 +715,10 @@
       return;
     }
 
-    if (els.loginBtn) {
+    if (els.loginSplit) {
+      els.loginSplit.style.display = 'inline-flex';
+      closeLoginMenu();
+    } else if (els.loginBtn) {
       els.loginBtn.style.display = 'inline-block';
     }
     if (els.composeLink) {
@@ -803,6 +816,39 @@
     }
     els.menuPanel.hidden = true;
     els.menuBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function openLoginMenu() {
+    if (!els.loginMenu || !els.loginMoreBtn) {
+      return;
+    }
+    els.loginMenu.hidden = false;
+    els.loginMoreBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeLoginMenu() {
+    if (!els.loginMenu || !els.loginMoreBtn) {
+      return;
+    }
+    els.loginMenu.hidden = true;
+    els.loginMoreBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function hasDesktopSigner() {
+    return !!(window.nostr && typeof window.nostr.signEvent === 'function');
+  }
+
+  function applyQuickLoginDefaults() {
+    if (els.authModeApprove) {
+      els.authModeApprove.checked = true;
+    }
+    if (els.authModeOnce) {
+      els.authModeOnce.checked = false;
+    }
+    if (els.authDelegationDays) {
+      els.authDelegationDays.value = String(QUICK_DELEGATION_DAYS);
+    }
+    refreshAuthIntentUi();
   }
 
   function pageRequiresAuthorization() {
@@ -1252,6 +1298,33 @@
     );
   }
 
+  function startPhonePairingFlow() {
+    setAuthMessage('Preparing phone signer pairing QR...', 'warn');
+    setAuthControlsDisabled(true);
+    return initNip46Pairing().then(function () {
+      showPanel(els.authPhonePanel, true);
+      showPanel(els.authManualPanel, false);
+      setAuthMessage('Scan QR in your signer app. Continue unlocks after pairing.', 'warn');
+      return waitForPhonePairing(90000);
+    }).then(function () {
+      updatePhoneContinueState();
+      setAuthMessage('Phone signer paired. Continue is ready.', 'ok');
+    }).finally(function () {
+      setAuthControlsDisabled(false);
+    });
+  }
+
+  function startDesktopSignerLogin() {
+    applyQuickLoginDefaults();
+    if (!hasDesktopSigner()) {
+      return Promise.reject(new Error('No desktop signer detected. Use the login menu for phone QR or signed challenge login.'));
+    }
+    setAuthControlsDisabled(true);
+    return loginWithNip07().finally(function () {
+      setAuthControlsDisabled(false);
+    });
+  }
+
   function loginWithPhoneSigner() {
     if (!hasNostrTools()) {
       return Promise.reject(new Error('Phone signer pairing requires nostr-tools support.'));
@@ -1527,6 +1600,62 @@
   function bindUiEvents() {
     if (els.loginBtn) {
       els.loginBtn.addEventListener('click', function () {
+        closeLoginMenu();
+        startDesktopSignerLogin().catch(function (err) {
+          setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
+          openLoginMenu();
+        });
+      });
+    }
+
+    if (els.loginMoreBtn && els.loginMenu) {
+      els.loginMoreBtn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (els.loginMenu.hidden) {
+          openLoginMenu();
+        } else {
+          closeLoginMenu();
+        }
+      });
+    }
+
+    if (els.loginMenuDesktop) {
+      els.loginMenuDesktop.addEventListener('click', function () {
+        closeLoginMenu();
+        startDesktopSignerLogin().catch(function (err) {
+          showAuthModal();
+          setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
+        });
+      });
+    }
+
+    if (els.loginMenuPhone) {
+      els.loginMenuPhone.addEventListener('click', function () {
+        closeLoginMenu();
+        showAuthModal();
+        startPhonePairingFlow().catch(function (err) {
+          setAuthMessage(err.message || 'Phone pairing setup failed.', 'error');
+        });
+      });
+    }
+
+    if (els.loginMenuManual) {
+      els.loginMenuManual.addEventListener('click', function () {
+        closeLoginMenu();
+        showAuthModal();
+        setAuthControlsDisabled(true);
+        prepareManualLogin().catch(function (err) {
+          setAuthMessage(err.message || 'Failed to prepare manual login.', 'error');
+        }).finally(function () {
+          setAuthControlsDisabled(false);
+        });
+      });
+    }
+
+    if (els.loginMenuAdvanced) {
+      els.loginMenuAdvanced.addEventListener('click', function () {
+        closeLoginMenu();
         showAuthModal();
       });
     }
@@ -1591,16 +1720,26 @@
 
     document.addEventListener('click', function (event) {
       if (!els.userMenu || els.userMenu.style.display === 'none') {
+        if (els.loginSplit && els.loginMenu && !els.loginMenu.hidden && !els.loginSplit.contains(event.target)) {
+          closeLoginMenu();
+        }
         return;
       }
       if (!els.userMenu.contains(event.target)) {
         closeUserMenu();
+      }
+      if (els.loginSplit && els.loginMenu && !els.loginMenu.hidden && !els.loginSplit.contains(event.target)) {
+        closeLoginMenu();
       }
     });
 
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && els.authModal && !els.authModal.hidden) {
         hideAuthModal();
+        return;
+      }
+      if (event.key === 'Escape' && els.loginMenu && !els.loginMenu.hidden) {
+        closeLoginMenu();
       }
     });
 

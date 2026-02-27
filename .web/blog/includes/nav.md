@@ -31,7 +31,17 @@
     <button id="nav-menu-logout" class="nav-menu-item nav-menu-item-danger" type="button" role="menuitem">Logout</button>
   </div>
 </div>
-<button class="btn-login" id="login-btn" type="button">Login</button>
+<div class="nav-login-split" id="nav-login-split">
+  <button class="btn-login btn-login-main" id="login-btn" type="button">Login</button>
+  <button class="btn-login btn-login-caret" id="login-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More login options">▾</button>
+  <div class="nav-login-menu" id="nav-login-menu" role="menu" hidden>
+    <button id="login-menu-desktop" class="nav-menu-item" type="button" role="menuitem">Sign in with desktop signer</button>
+    <button id="login-menu-phone" class="nav-menu-item" type="button" role="menuitem">Use phone signer (QR)</button>
+    <button id="login-menu-manual" class="nav-menu-item" type="button" role="menuitem">Use signed challenge (manual)</button>
+    <button id="login-menu-advanced" class="nav-menu-item" type="button" role="menuitem">Open advanced sign-in panel</button>
+    <a class="nav-menu-item" href="/pages/login-security.html" role="menuitem">Learn about Nostr sign-in</a>
+  </div>
+</div>
 </div>
 </nav>
 
@@ -115,4 +125,4 @@
 
 <script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.7.2/lib/nostr.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-<script src="/static/nav-auth.js?v=20260227-loginflowfix5"></script>
+<script src="/static/nav-auth.js?v=20260227-loginsplit1"></script>
