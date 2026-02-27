@@ -829,6 +829,17 @@
       return normalizedUnit === 'hours' ? (n * 3600) : (n * 60);
     }
 
+    function updatePassIntervalUnitLabels() {
+      var input = document.getElementById('pass-interval-input');
+      var unitSelect = document.getElementById('pass-interval-unit');
+      if (!input || !unitSelect || !unitSelect.options || unitSelect.options.length < 2) return;
+      var n = Number(String(input.value || '').trim());
+      if (!Number.isFinite(n) || n < 1) n = 1;
+      var singular = Math.round(n) === 1;
+      unitSelect.options[0].text = singular ? 'minute' : 'minutes';
+      unitSelect.options[1].text = singular ? 'hour' : 'hours';
+    }
+
     var THEME_KEY = 'wizardry.virtual_redditor.theme';
     var MODEL_INSTALL_KEY = 'wizardry.virtual_redditor.models.installed';
     var LEFT_RAIL_WIDTH_KEY = 'wizardry.virtual_redditor.left_rail.width';
@@ -3132,6 +3143,7 @@
         passIntervalInput.value = String(intervalUi.value);
         passIntervalUnit.value = intervalUi.unit;
       }
+      updatePassIntervalUnitLabels();
       if (obeyAdmins) {
         obeyAdmins.checked = !!settings.obeyAdmins;
       }
@@ -5811,11 +5823,13 @@
       document.getElementById('thread-initiate-max-pct').addEventListener('blur', scheduleThreadInitiateMaxSave);
       document.getElementById('pass-interval-input').addEventListener('input', function () {
         setSettingsMessage('Saving...', false);
+        updatePassIntervalUnitLabels();
         schedulePassIntervalSave();
       });
       document.getElementById('pass-interval-input').addEventListener('blur', schedulePassIntervalSave);
       document.getElementById('pass-interval-unit').addEventListener('change', function () {
         setSettingsMessage('Saving...', false);
+        updatePassIntervalUnitLabels();
         schedulePassIntervalSave();
       });
       document.getElementById('passes-enabled').addEventListener('change', function (event) {
