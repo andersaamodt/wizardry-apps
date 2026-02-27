@@ -616,6 +616,8 @@ body.is-resizing [contenteditable='true'] {
   gap: 6px;
   margin-bottom: 8px;
   justify-content: end;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .icon-action {
