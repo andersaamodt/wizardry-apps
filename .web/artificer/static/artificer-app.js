@@ -6877,8 +6877,8 @@
     if (!isFinite(width) || width <= 0) {
       return 42;
     }
-    // Match fixed bar geometry (3px bar + 1px gap) so the lane fills fully.
-    var count = Math.floor((width + 1) / 4);
+    // Match fixed bar geometry (2.5px bar + 1px gap) so the lane fills fully.
+    var count = Math.floor((width + 1) / 3.5);
     if (!isFinite(count) || count < 32) {
       count = 32;
     } else if (count > 180) {
@@ -7049,9 +7049,9 @@
     if (!pushed.length) {
       return;
     }
-    if (pushed.length > 3) {
+    if (pushed.length > 2) {
       // Keep motion smooth by limiting bar-advance per update.
-      pushed = pushed.slice(pushed.length - 3);
+      pushed = pushed.slice(pushed.length - 2);
     }
     var framePeak = 0;
     for (var pi = 0; pi < pushed.length; pi += 1) {
@@ -7293,7 +7293,7 @@
         }
         dictationWaveLastSampleAt = sampleNow;
         var len = dictationWaveData.length;
-        var barsPerFrame = 2;
+        var barsPerFrame = 1;
         var windowSamples = Math.min(128, len);
         var sliceSamples = Math.max(6, Math.floor(windowSamples / barsPerFrame));
         var consumed = sliceSamples * barsPerFrame;
@@ -7442,8 +7442,8 @@
             dictationWaveBackendRecentLevels = parsedIncoming.slice(parsedIncoming.length - 18);
           }
           if (normalizedSequence.length) {
-            if (normalizedSequence.length > 3) {
-              normalizedSequence = normalizedSequence.slice(normalizedSequence.length - 3);
+            if (normalizedSequence.length > 2) {
+              normalizedSequence = normalizedSequence.slice(normalizedSequence.length - 2);
             }
             normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
           }
