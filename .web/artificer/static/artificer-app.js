@@ -10778,24 +10778,28 @@
     }
     var snapshot = mentorSnapshot && typeof mentorSnapshot === "object" ? mentorSnapshot : {};
     var mentor = snapshot[taskId] || null;
-    if (!mentor || Number(mentor.runs || 0) < 1) {
-      return basePrompt;
-    }
     var lines = [];
     lines.push(basePrompt);
     lines.push("");
-    lines.push("Assay mentor guidance from prior cycles:");
-    if (mentor.topStrength && mentor.topStrength.label) {
-      lines.push("- Preserve: " + mentor.topStrength.label);
+    lines.push("Assay output contract:");
+    lines.push("- While thinking, emit short timestamp-friendly step updates (what changed and why).");
+    lines.push("- Keep updates readable: one action per step, avoid long paragraph dumps.");
+    lines.push("- End with explicit sections: Outcome, Verification Evidence, Risks, Next Improvement.");
+    lines.push("- If blocked, state the blocker and best fallback attempted.");
+    if (mentor && Number(mentor.runs || 0) >= 1) {
+      lines.push("");
+      lines.push("Assay mentor guidance from prior cycles:");
+      if (mentor.topStrength && mentor.topStrength.label) {
+        lines.push("- Preserve: " + mentor.topStrength.label);
+      }
+      if (mentor.topFocus && mentor.topFocus.label) {
+        lines.push("- Improve: " + mentor.topFocus.label);
+      }
+      if (mentor.directive) {
+        lines.push("- Direction: " + mentor.directive);
+      }
+      lines.push("- Target scores: intelligence " + String(mentor.targetIntelligence) + "+, flow " + String(mentor.targetFlow) + "+.");
     }
-    if (mentor.topFocus && mentor.topFocus.label) {
-      lines.push("- Improve: " + mentor.topFocus.label);
-    }
-    if (mentor.directive) {
-      lines.push("- Direction: " + mentor.directive);
-    }
-    lines.push("- Target scores: intelligence " + String(mentor.targetIntelligence) + "+, flow " + String(mentor.targetFlow) + "+.");
-    lines.push("- Keep step updates concise and timestamp-friendly, and end with explicit verification evidence.");
     return lines.join("\n");
   }
 
@@ -12840,6 +12844,22 @@
       selectedIterations += 2;
     } else if (computeBudgetForRun === "until-complete" && selectedIterations < 12) {
       selectedIterations += 4;
+    }
+    if (explicitAssayTaskId) {
+      var assayIterationCap = 3;
+      if (computeBudgetForRun === "quick") {
+        assayIterationCap = 2;
+      } else if (computeBudgetForRun === "long") {
+        assayIterationCap = 4;
+      } else if (computeBudgetForRun === "until-complete") {
+        assayIterationCap = 5;
+      }
+      if (selectedIterations > assayIterationCap) {
+        selectedIterations = assayIterationCap;
+      }
+      if (selectedIterations < 1) {
+        selectedIterations = 1;
+      }
     }
     var streamSession = String(Date.now()) + "-" + String(Math.floor(Math.random() * 1000000));
     var streamOffset = 0;

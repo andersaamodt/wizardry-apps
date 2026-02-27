@@ -15797,89 +15797,95 @@ $fallback_output"
       esac
     fi
 
+    assay_run_profile=0
+    if [ -n "$assay_task_id" ]; then
+      assay_run_profile=1
+    fi
     prompt_lower_for_budget=$(printf '%s' "$user_prompt" | tr '[:upper:]' '[:lower:]')
-    if [ "$max_iterations" -lt 6 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'godot|replay|checksum|self[- ]?tests?|regression|barnes[- ]?hut|rk4|benchmark'; then
-      max_iterations=6
-    fi
-    if [ "$max_iterations" -lt 7 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'gameplay|fun|interactiv|challenge|objective|score|combo|polish|juice'; then
-      max_iterations=7
-    fi
-    if [ "$max_iterations" -lt 8 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq '80\\+|at least[[:space:]]+80([^0-9]|$)|final[ -]?state checksum|end[ -]?state checksum|deterministic replay'; then
-      max_iterations=8
-    fi
-    if [ "$max_iterations" -lt 9 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'large[ -]?context|large[ -]?scale|monorepo|multi[- ]module|multi[- ]service|architecture|refactor|migration|complexity|orchestrat|distributed'; then
-      max_iterations=9
-    fi
-    if [ "$max_iterations" -lt 10 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'launch|business|go[- ]to[- ]market|pricing|compliance|legal|regulatory|operations|sales|website|funnel|growth'; then
-      max_iterations=10
-    fi
-    if [ "$max_iterations" -lt 10 ] && \
-       printf '%s' "$prompt_lower_for_budget" | grep -Eq 'barnes[- ]?hut|checksum|deterministic replay|final[ -]?state checksum' && \
-       printf '%s' "$prompt_lower_for_budget" | grep -Eq 'gameplay|challenge|fun|polish|objective'; then
-      max_iterations=10
-    fi
+    if [ "$assay_run_profile" -ne 1 ]; then
+      if [ "$max_iterations" -lt 6 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'godot|replay|checksum|self[- ]?tests?|regression|barnes[- ]?hut|rk4|benchmark'; then
+        max_iterations=6
+      fi
+      if [ "$max_iterations" -lt 7 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'gameplay|fun|interactiv|challenge|objective|score|combo|polish|juice'; then
+        max_iterations=7
+      fi
+      if [ "$max_iterations" -lt 8 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq '80\\+|at least[[:space:]]+80([^0-9]|$)|final[ -]?state checksum|end[ -]?state checksum|deterministic replay'; then
+        max_iterations=8
+      fi
+      if [ "$max_iterations" -lt 9 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'large[ -]?context|large[ -]?scale|monorepo|multi[- ]module|multi[- ]service|architecture|refactor|migration|complexity|orchestrat|distributed'; then
+        max_iterations=9
+      fi
+      if [ "$max_iterations" -lt 10 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'launch|business|go[- ]to[- ]market|pricing|compliance|legal|regulatory|operations|sales|website|funnel|growth'; then
+        max_iterations=10
+      fi
+      if [ "$max_iterations" -lt 10 ] && \
+         printf '%s' "$prompt_lower_for_budget" | grep -Eq 'barnes[- ]?hut|checksum|deterministic replay|final[ -]?state checksum' && \
+         printf '%s' "$prompt_lower_for_budget" | grep -Eq 'gameplay|challenge|fun|polish|objective'; then
+        max_iterations=10
+      fi
 
-    case "$run_mode" in
-      instant)
-        reasoning_effort="low"
-        max_iterations=1
-        ;;
-      auto)
-        ;;
-      programming)
-        case "$reasoning_effort" in
-          low|medium)
-            reasoning_effort="high"
-            ;;
-        esac
-        if [ "$max_iterations" -lt 6 ]; then
-          max_iterations=6
-        fi
-        if [ "$max_iterations" -lt 8 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'large[ -]?context|architecture|multi[- ]module|refactor|migration|distributed|monorepo'; then
-          max_iterations=8
-        fi
-        ;;
-      chat)
-        case "$reasoning_effort" in
-          low) reasoning_effort="medium" ;;
-        esac
-        if [ "$max_iterations" -gt 2 ]; then
-          max_iterations=2
-        fi
-        ;;
-      teacher)
-        case "$reasoning_effort" in
-          low|medium)
-            reasoning_effort="high"
-            ;;
-        esac
-        if [ "$max_iterations" -lt 6 ]; then
-          max_iterations=6
-        fi
-        if [ "$max_iterations" -lt 8 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'curriculum|syllabus|course|lesson plan|spaced review|learning path|mastery'; then
-          max_iterations=8
-        fi
-        ;;
-      report)
-        case "$reasoning_effort" in
-          low|medium)
-            reasoning_effort="high"
-            ;;
-        esac
-        if [ "$max_iterations" -lt 8 ]; then
-          max_iterations=8
-        fi
-        ;;
-      assistant)
-        reasoning_effort="extra-high"
-        if [ "$max_iterations" -lt 10 ]; then
-          max_iterations=10
-        fi
-        if [ "$max_iterations" -lt 11 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'launch|business|operations|compliance|legal|policy|market|pricing|customer'; then
-          max_iterations=11
-        fi
-        ;;
-    esac
+      case "$run_mode" in
+        instant)
+          reasoning_effort="low"
+          max_iterations=1
+          ;;
+        auto)
+          ;;
+        programming)
+          case "$reasoning_effort" in
+            low|medium)
+              reasoning_effort="high"
+              ;;
+          esac
+          if [ "$max_iterations" -lt 6 ]; then
+            max_iterations=6
+          fi
+          if [ "$max_iterations" -lt 8 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'large[ -]?context|architecture|multi[- ]module|refactor|migration|distributed|monorepo'; then
+            max_iterations=8
+          fi
+          ;;
+        chat)
+          case "$reasoning_effort" in
+            low) reasoning_effort="medium" ;;
+          esac
+          if [ "$max_iterations" -gt 2 ]; then
+            max_iterations=2
+          fi
+          ;;
+        teacher)
+          case "$reasoning_effort" in
+            low|medium)
+              reasoning_effort="high"
+              ;;
+          esac
+          if [ "$max_iterations" -lt 6 ]; then
+            max_iterations=6
+          fi
+          if [ "$max_iterations" -lt 8 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'curriculum|syllabus|course|lesson plan|spaced review|learning path|mastery'; then
+            max_iterations=8
+          fi
+          ;;
+        report)
+          case "$reasoning_effort" in
+            low|medium)
+              reasoning_effort="high"
+              ;;
+          esac
+          if [ "$max_iterations" -lt 8 ]; then
+            max_iterations=8
+          fi
+          ;;
+        assistant)
+          reasoning_effort="extra-high"
+          if [ "$max_iterations" -lt 10 ]; then
+            max_iterations=10
+          fi
+          if [ "$max_iterations" -lt 11 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'launch|business|operations|compliance|legal|policy|market|pricing|customer'; then
+            max_iterations=11
+          fi
+          ;;
+      esac
+    fi
 
     case "$compute_budget" in
       long)
@@ -15900,6 +15906,28 @@ $fallback_output"
     max_iterations_cap=$(compute_budget_iteration_cap "$compute_budget")
     if [ "$max_iterations" -gt "$max_iterations_cap" ]; then
       max_iterations=$max_iterations_cap
+    fi
+    if [ "$assay_run_profile" -eq 1 ]; then
+      case "$compute_budget" in
+        quick)
+          assay_iteration_cap=1
+          ;;
+        standard|auto)
+          assay_iteration_cap=2
+          ;;
+        long)
+          assay_iteration_cap=3
+          ;;
+        until-complete)
+          assay_iteration_cap=4
+          ;;
+        *)
+          assay_iteration_cap=3
+          ;;
+      esac
+      if [ "$max_iterations" -gt "$assay_iteration_cap" ]; then
+        max_iterations=$assay_iteration_cap
+      fi
     fi
 
     ws_dir=$(workspace_dir_for "$workspace_id")
@@ -16237,47 +16265,49 @@ EOF
       run_time_budget=120
     fi
     prompt_lower_budget_runtime=$(printf '%s' "$user_prompt" | tr '[:upper:]' '[:lower:]')
-    if [ "$run_time_budget" -lt 420 ] && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'godot|barnes[- ]?hut|checksum|replay|self[- ]?tests?|regression|gameplay|challenge|objective|polish'; then
-      run_time_budget=420
+    if [ "$assay_run_profile" -ne 1 ]; then
+      if [ "$run_time_budget" -lt 420 ] && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'godot|barnes[- ]?hut|checksum|replay|self[- ]?tests?|regression|gameplay|challenge|objective|polish'; then
+        run_time_budget=420
+      fi
+      if [ "$run_time_budget" -lt 540 ] && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq '120\\+|100\\+|80\\+|at least[[:space:]]+(80|100|120)([^0-9]|$)|deterministic replay|final[ -]?state checksum|barnes[- ]?hut' && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'gameplay|challenge|polish|objective|score|combo'; then
+        run_time_budget=540
+      fi
+      if [ "$run_time_budget" -lt 900 ] && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'large[ -]?context|large[ -]?scale|architecture|monorepo|multi[- ]module|multi[- ]service|refactor|migration|distributed'; then
+        run_time_budget=900
+      fi
+      if [ "$run_time_budget" -lt 1200 ] && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'launch|business|go[- ]to[- ]market|compliance|legal|regulatory|operations|sales|pricing|growth'; then
+        run_time_budget=1200
+      fi
+      case "$run_mode" in
+        programming)
+          if [ "$run_time_budget" -lt 420 ]; then
+            run_time_budget=420
+          fi
+          ;;
+        report)
+          if [ "$run_time_budget" -lt 900 ]; then
+            run_time_budget=900
+          fi
+          ;;
+        teacher)
+          if [ "$run_time_budget" -lt 900 ]; then
+            run_time_budget=900
+          fi
+          ;;
+        assistant)
+          if [ "$run_time_budget" -lt 1200 ]; then
+            run_time_budget=1200
+          fi
+          ;;
+        instant|chat)
+          if [ "$compute_budget" = "quick" ] && [ "$run_time_budget" -gt 420 ]; then
+            run_time_budget=420
+          elif [ "$compute_budget" = "auto" ] && [ "$run_time_budget" -gt 900 ]; then
+            run_time_budget=900
+          fi
+          ;;
+      esac
     fi
-    if [ "$run_time_budget" -lt 540 ] && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq '120\\+|100\\+|80\\+|at least[[:space:]]+(80|100|120)([^0-9]|$)|deterministic replay|final[ -]?state checksum|barnes[- ]?hut' && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'gameplay|challenge|polish|objective|score|combo'; then
-      run_time_budget=540
-    fi
-    if [ "$run_time_budget" -lt 900 ] && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'large[ -]?context|large[ -]?scale|architecture|monorepo|multi[- ]module|multi[- ]service|refactor|migration|distributed'; then
-      run_time_budget=900
-    fi
-    if [ "$run_time_budget" -lt 1200 ] && printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'launch|business|go[- ]to[- ]market|compliance|legal|regulatory|operations|sales|pricing|growth'; then
-      run_time_budget=1200
-    fi
-    case "$run_mode" in
-      programming)
-        if [ "$run_time_budget" -lt 420 ]; then
-          run_time_budget=420
-        fi
-        ;;
-      report)
-        if [ "$run_time_budget" -lt 900 ]; then
-          run_time_budget=900
-        fi
-        ;;
-      teacher)
-        if [ "$run_time_budget" -lt 900 ]; then
-          run_time_budget=900
-        fi
-        ;;
-      assistant)
-        if [ "$run_time_budget" -lt 1200 ]; then
-          run_time_budget=1200
-        fi
-        ;;
-      instant|chat)
-        if [ "$compute_budget" = "quick" ] && [ "$run_time_budget" -gt 420 ]; then
-          run_time_budget=420
-        elif [ "$compute_budget" = "auto" ] && [ "$run_time_budget" -gt 900 ]; then
-          run_time_budget=900
-        fi
-        ;;
-    esac
     compute_budget_floor=$(compute_budget_runtime_floor_sec "$compute_budget")
     compute_budget_ceiling=$(compute_budget_runtime_ceiling_sec "$compute_budget")
     if [ "$run_time_budget" -lt "$compute_budget_floor" ]; then
@@ -16285,6 +16315,28 @@ EOF
     fi
     if [ "$run_time_budget" -gt "$compute_budget_ceiling" ]; then
       run_time_budget=$compute_budget_ceiling
+    fi
+    if [ "$assay_run_profile" -eq 1 ]; then
+      case "$compute_budget" in
+        quick)
+          assay_runtime_ceiling=45
+          ;;
+        standard|auto)
+          assay_runtime_ceiling=75
+          ;;
+        long)
+          assay_runtime_ceiling=105
+          ;;
+        until-complete)
+          assay_runtime_ceiling=135
+          ;;
+        *)
+          assay_runtime_ceiling=240
+          ;;
+      esac
+      if [ "$run_time_budget" -gt "$assay_runtime_ceiling" ]; then
+        run_time_budget=$assay_runtime_ceiling
+      fi
     fi
     if [ "$run_time_budget" -gt 86400 ]; then
       run_time_budget=86400
