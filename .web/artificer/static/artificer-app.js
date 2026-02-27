@@ -6530,7 +6530,7 @@
     if (level > 1) {
       level = 1;
     }
-    if (level < 0.02) {
+    if (level < 0.05) {
       level = 0;
     }
     if (!dictationWaveSeenSignal && level >= 0.03) {
@@ -6694,7 +6694,7 @@
           if (normalized > 1) {
             normalized = 1;
           }
-          if (normalized < 0.03) {
+          if (normalized < 0.05) {
             normalized = 0;
           }
           dictationWaveMicLevel = normalized;
@@ -6736,7 +6736,7 @@
           if (polledLevel > 1) {
             polledLevel = 1;
           }
-          if (polledLevel < 0.03) {
+          if (polledLevel < 0.05) {
             polledLevel = 0;
           }
           dictationWaveBackendLevel = polledLevel;
@@ -6762,8 +6762,8 @@
     var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 0;
-    var maxWaveHeight = 15;
-    var silenceGate = 0.07;
+    var maxWaveHeight = 13;
+    var silenceGate = 0.11;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -6789,7 +6789,11 @@
         } else if (adjusted > 1) {
           adjusted = 1;
         }
-        height = baselineHeight + Math.round(Math.pow(adjusted, 1.28) * maxWaveHeight);
+        height = baselineHeight + Math.round(Math.pow(adjusted, 1.35) * maxWaveHeight);
+        // Keep heights even so bars stay visually centered in an even-height lane.
+        if (height > 1 && (height % 2) !== 0) {
+          height -= 1;
+        }
       }
       bar.style.height = String(height) + "px";
     }
