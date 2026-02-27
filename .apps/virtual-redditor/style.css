@@ -3038,6 +3038,10 @@ label {
   font-weight: 700;
 }
 
+.bigfive-chip-segment:not([data-bigfive-open='n']) {
+  padding-right: calc(0.4rem - 1px);
+}
+
 .bigfive-chip-segment + .bigfive-chip-segment {
   border-left: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
 }
