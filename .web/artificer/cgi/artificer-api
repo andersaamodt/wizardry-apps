@@ -5796,24 +5796,25 @@ dictation_live_level_for_session() {
     printf '%s' "0"
     return 0
   fi
-  # ffmpeg metadata keys vary by build/platform; use the latest RMS_level line regardless of exact key prefix.
-  rms_line=$(tail -n 180 "$levels_file" 2>/dev/null | tr -d '\r' | awk 'BEGIN { IGNORECASE=1 } /RMS_level/ { line=$0 } END { print line }' || true)
-  rms_db=$(printf '%s' "$rms_line" | sed -E 's/.*RMS_level[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\1/I')
-  if [ -z "$rms_db" ]; then
+
+  # ffmpeg metadata keys vary by build/platform. Prefer the newest RMS/Peak level line.
+  level_line=$(tail -n 260 "$levels_file" 2>/dev/null | tr -d '\r' | grep -E -i 'RMS_level|Peak_level' | tail -n 1 || true)
+  level_db=$(printf '%s' "$level_line" | sed -E 's/.*(RMS_level|Peak_level)[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\2/I')
+  if [ -z "$level_db" ]; then
     printf '%s' "0"
     return 0
   fi
-  if printf '%s' "$rms_db" | grep -Eq '^-?inf$'; then
+  if printf '%s' "$level_db" | grep -Eq '^-?inf$'; then
     printf '%s' "0"
     return 0
   fi
-  awk -v db="$rms_db" '
+  awk -v db="$level_db" '
     BEGIN {
       v = db + 0.0
       if (v < -90) v = -90
-      if (v > -8) v = -8
-      level = (v + 90) / 82
-      # Preserve visible movement at low voice levels while keeping real mic-derived dynamics.
+      if (v > -4) v = -4
+      level = (v + 90) / 86
+      # Keep dynamics real, but avoid persistent visual flatline on quieter voices.
       level = sqrt(level)
       if (level < 0) level = 0
       if (level > 1) level = 1
@@ -14066,21 +14067,21 @@ case "$os_name" in
     exec ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
       -f avfoundation -i ":0" \
-      -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+      -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     ;;
   Linux)
     if ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
       -f pulse -i default \
-      -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+      -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1; then
       :
     else
       ffmpeg -nostdin -hide_banner -loglevel error \
         -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
         -f alsa -i default \
-        -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+        -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
         -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     fi
     ;;
@@ -14237,21 +14238,21 @@ case "$os_name" in
     exec ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
       -f avfoundation -i ":0" \
-      -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+      -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     ;;
   Linux)
     if ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
       -f pulse -i default \
-      -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+      -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1; then
       :
     else
       ffmpeg -nostdin -hide_banner -loglevel error \
         -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
         -f alsa -i default \
-        -af "astats=metadata=1:reset=1,ametadata=print:key=lavfi.astats.Overall.RMS_level:file=$levels_file" \
+        -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
         -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     fi
     ;;
