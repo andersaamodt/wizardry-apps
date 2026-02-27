@@ -1682,6 +1682,7 @@ label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.22rem;
   min-height: 1.05rem;
   padding: 0 0.42rem;
   border-radius: 999px;
@@ -1690,6 +1691,26 @@ label {
   letter-spacing: 0.01em;
   text-transform: lowercase;
   border: 1px solid var(--line);
+}
+
+.mode-summary-flag-icon {
+  display: inline-block;
+  font-size: 0.66rem;
+  line-height: 1;
+  opacity: 0.92;
+}
+
+.mode-summary-flag.actions {
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--line));
+  color: color-mix(in srgb, var(--accent-strong) 78%, var(--text) 22%);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-panel) 86%);
+}
+
+.mode-summary-flag.expiry {
+  border-color: color-mix(in srgb, var(--danger) 52%, var(--line));
+  color: color-mix(in srgb, var(--danger) 78%, var(--text) 22%);
+  background: color-mix(in srgb, var(--danger) 14%, var(--bg-panel) 86%);
+  text-transform: none;
 }
 
 .mode-summary-flag.followup {

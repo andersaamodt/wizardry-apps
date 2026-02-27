@@ -4637,7 +4637,19 @@
           var modeId = String(mode.id || '');
           var counts = modeSummaryCounts(mode, actionChoices);
           var isActive = modeId === String(state.modeDrawerModeId || '');
+          var metaPills = [
+            '<span class="mode-summary-flag actions" title="Enabled actions in this mode">' +
+              '<span class="mode-summary-flag-icon" aria-hidden="true">⛭</span>' +
+              '<span>' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + '</span>' +
+            '</span>',
+            '<span class="mode-summary-flag expiry" title="Default mode expiry in hours">' +
+              '<span class="mode-summary-flag-icon" aria-hidden="true">◷</span>' +
+              '<span>' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h</span>' +
+            '</span>'
+          ];
           var constraintPills = modeConstraintPillsHtml(mode);
+          if (constraintPills) metaPills.push(constraintPills);
+          var pillsHtml = metaPills.join('');
           return [
             '<article class="mode-summary-card' + (isActive ? ' active' : '') + '" data-mode-id="' + escapeHtml(modeId) + '">',
             '  <div class="mode-summary-head">',
@@ -4650,7 +4662,7 @@
             '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '" title="Open mode details">Edit</button>',
             '    </div>',
           '  </div>',
-            '  <div class="mode-summary-meta"><span class="mode-summary-meta-text">Expiry ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h • Actions ' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + '</span>' + (constraintPills ? ('<span class="mode-summary-flags">' + constraintPills + '</span>') : '') + '</div>',
+            '  <div class="mode-summary-meta"><span class="mode-summary-flags">' + pillsHtml + '</span></div>',
             '</article>'
           ].join('');
         }).join('') + summaryFooterHtml;
