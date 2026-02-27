@@ -20,7 +20,7 @@ You can sign in using:
 3. **Paste signed login**: manual fallback with pasted signed auth event JSON.
 
 Recommended signer apps:
-- Desktop: [nos2x-fox](https://addons.mozilla.org/en-US/firefox/addon/nos2x/)
+- Desktop: [nos2x-fox](https://addons.mozilla.org/en-US/firefox/addon/nos2x-fox/)
 - Mobile: [Amethyst](https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst)
 
 ## Challenge Rules
