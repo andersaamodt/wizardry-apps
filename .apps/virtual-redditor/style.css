@@ -3206,14 +3206,14 @@ label {
 .norms-head-row {
   margin-top: 4px;
   margin-bottom: 6px;
-  font-size: 0.69rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--text-subtle) 88%, var(--text) 12%);
+  font-size: 0.73rem;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  text-transform: none;
+  color: color-mix(in srgb, var(--text-subtle) 72%, var(--text) 28%);
   padding: 4px 6px;
-  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-  background: color-mix(in srgb, var(--bg-panel) 80%, #fff 20%);
+  border: 1px solid color-mix(in srgb, var(--line) 64%, transparent);
+  background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
   border-radius: 6px;
 }
 

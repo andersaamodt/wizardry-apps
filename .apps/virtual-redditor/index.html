@@ -935,6 +935,7 @@
       modeLogRenderSig: '',
       logsAvailable: false,
       normRows: [],
+      normPendingEmptyRow: false,
       doctrineCacheByProfile: {},
       usernameEditing: false,
       modelMenuCloseTimer: null,
@@ -2701,9 +2702,11 @@
       var out = [];
       for (var i = 0; i < rows.length; i += 1) {
         var row = rows[i] || {};
+        var text = String(row.text || '');
+        if (!text.trim()) continue;
         out.push(JSON.stringify({
           id: 'N-' + String(i + 1),
-          text: String(row.text || ''),
+          text: text,
           severity: String(row.severity || 'medium')
         }));
       }
@@ -2720,6 +2723,9 @@
     function loadNormRowsFromTextarea() {
       var normsInput = document.getElementById('norms-input');
       state.normRows = parseNormRows(normsInput ? normsInput.value : '');
+      if (state.normPendingEmptyRow && firstEmptyNormRowIndex() < 0) {
+        state.normRows.push({ text: '', severity: 'medium' });
+      }
     }
 
     function firstEmptyNormRowIndex() {
@@ -5857,6 +5863,7 @@
           updateNormAddButtonState();
           return;
         }
+        state.normPendingEmptyRow = true;
         state.normRows.push({
           text: '',
           severity: 'medium'
@@ -5870,7 +5877,12 @@
         var field = String(event.target.getAttribute('data-field') || '');
         var idx = Number(rowEl.getAttribute('data-norm-idx'));
         if (!Number.isFinite(idx) || idx < 0 || idx >= state.normRows.length) return;
-        if (field === 'text') state.normRows[idx].text = String(event.target.value || '');
+        if (field === 'text') {
+          state.normRows[idx].text = String(event.target.value || '');
+          if (String(state.normRows[idx].text || '').trim()) {
+            state.normPendingEmptyRow = false;
+          }
+        }
         if (field === 'severity') state.normRows[idx].severity = String(event.target.value || 'medium');
         updateNormAddButtonState();
         syncNormsTextareaFromRows(true);
@@ -5895,7 +5907,11 @@
         if (!Number.isFinite(idx) || idx < 0 || idx >= state.normRows.length) return;
         var action = String(button.getAttribute('data-norm-action') || '');
         if (action === 'delete') {
+          var removed = state.normRows[idx] || {};
           state.normRows.splice(idx, 1);
+          if (!String(removed.text || '').trim()) {
+            state.normPendingEmptyRow = false;
+          }
         }
         renderNormsTable();
         updateNormAddButtonState();
