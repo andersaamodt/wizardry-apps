@@ -7,7 +7,7 @@ A single-author blog template for wizardry web with optional Nostr bridge suppor
 - **Full admin panel**: Compose, edit, delete, schedule, drip-queue, and publish
 - **Smart Markdown editing**: Selection-aware toolbar + live preview
 - **Autosave drafts**: Debounced autosave with draft persistence
-- **Global drip queue**: Publish one queued post per global interval (optional jitter)
+- **Local drip queue**: Publish one queued post per interval while an admin browser tab remains open (optional jitter)
 - **Scheduled release**: Per-draft exact release datetime
 - **Media workflow**: Drag/drop image upload + markdown embed insertion
 - **Content-addressed posts**: SHA-256 hash per published post
