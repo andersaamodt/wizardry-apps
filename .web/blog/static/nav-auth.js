@@ -518,16 +518,18 @@
   function authEventTemplate(challenge, action, pubkey) {
     var eventAction = action || 'login';
     var signerPubkey = String(pubkey || '').trim();
+    var tags = [
+      ['challenge', String(challenge || '')],
+      ['relay', currentOrigin()],
+      ['domain', currentHost()]
+    ];
+    if (eventAction && eventAction !== 'login') {
+      tags.push(['action', eventAction]);
+    }
     return {
       kind: AUTH_KIND,
       created_at: nowEpoch(),
-      tags: [
-        ['challenge', String(challenge || '')],
-        ['relay', currentOrigin()],
-        ['origin', currentHost()],
-        ['domain', currentHost()],
-        ['action', eventAction]
-      ],
+      tags: tags,
       content: '',
       pubkey: signerPubkey || undefined
     };
