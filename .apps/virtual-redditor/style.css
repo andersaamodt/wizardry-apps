@@ -3119,6 +3119,10 @@ input.range-input-invalid[type='number'] {
   word-break: break-word;
 }
 
+#relationships-table th {
+  text-align: center;
+}
+
 #relationships-table th:nth-child(1),
 #relationships-table td:nth-child(1) {
   width: 17%;
@@ -4114,6 +4118,10 @@ input.range-input-invalid[type='number'] {
 #actions-table td:nth-child(1) {
   width: 16%;
   padding-left: 4px;
+}
+
+#actions-table th {
+  text-align: center;
 }
 
 #actions-table th:nth-child(2),
