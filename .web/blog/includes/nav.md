@@ -169,7 +169,7 @@
     <h2 id="nostr-info-modal-title">Nostr Sign-In</h2>
     <p class="auth-modal-help">Your account identity is your Nostr public key. The site verifies signed events and never asks for private keys.</p>
     <p class="auth-modal-help">Desktop sign-in uses a NIP-07 extension. Phone sign-in uses Nostr Connect (NIP-46) pairing via QR/deep link.</p>
-    <p class="auth-modal-help">For full details, open: <a class="auth-inline-link" href="/pages/login-security.html">Nostr Login Security</a>.</p>
+    <p class="auth-modal-help">For full details, visit <a class="auth-inline-link" href="https://github.com/nostr-protocol/nips" target="_blank" rel="noopener noreferrer">the official Nostr NIPs repository</a>.</p>
   </div>
 </div>
 

@@ -502,10 +502,9 @@
         <section class="tab-panel" id="panel-modes">
           <div id="modes-workarea" class="modes-workarea">
             <div class="modes-main-pane">
-              <div class="status-line" id="modes-line">Modes not loaded yet.</div>
               <div id="modes-conflict-banner" class="modes-conflict-banner" aria-live="polite" hidden></div>
               <div class="persona-section-title">Mode Defaults</div>
-              <div class="mode-fields-inline modes-grid">
+              <div class="mode-fields-inline modes-grid mode-defaults-grid">
                 <div class="mode-field-row">
                   <label for="modes-starting-mode" class="mode-field-label" title="Mode assigned to users with no existing relationship">Starting mode</label>
                   <select id="modes-starting-mode" title="Mode assigned to users with no existing relationship"></select>
@@ -517,9 +516,6 @@
               </div>
               <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
               <div id="modes-list" class="modes-list"></div>
-              <div class="settings-actions modes-save-actions">
-                <button id="btn-save-modes" type="button" class="primary">Save modes</button>
-              </div>
             </div>
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
@@ -1162,6 +1158,9 @@
       relationshipOverrideOpen: false,
       repliesTemplatesOpen: false,
       enforcementEscalationOpen: false,
+      modesSaveTimer: null,
+      modesSaveInFlight: false,
+      modesSaveQueued: false,
       personaBigFiveOpen: false,
       personaBigFiveFocusTrait: '',
       relationshipsRenderSig: '',
@@ -3794,6 +3793,11 @@
       }
     }
 
+    function modeDisplayId(rawId) {
+      var modeId = String(rawId || '');
+      return modeId === 'SHADE' ? 'CHAT' : modeId;
+    }
+
     function modeOptions(config) {
       var cfg = normalizeModesConfig(config || state.modesConfig);
       return (cfg.modes || []).filter(function (m) { return !!m && !!m.id; }).map(function (m) {
@@ -3808,7 +3812,8 @@
       var useIdOnly = !!idOnly;
       select.innerHTML = options.map(function (opt) {
         var selected = String(selectedValue || '') === opt.id ? ' selected' : '';
-        var text = useIdOnly ? opt.id : (opt.id + ' - ' + opt.label);
+        var displayId = modeDisplayId(opt.id);
+        var text = useIdOnly ? displayId : (displayId + ' - ' + opt.label);
         return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(text) + '</option>';
       }).join('');
       if (!select.value && options.length) {
@@ -3823,7 +3828,7 @@
       }
       html += (modeOpts || []).map(function (opt) {
         var selected = String(selectedValue || '') === opt.id ? ' selected' : '';
-        return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(opt.id) + '</option>';
+        return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(modeDisplayId(opt.id)) + '</option>';
       }).join('');
       return html;
     }
@@ -4008,13 +4013,11 @@
 
     function renderModesConflictBanner(conflicts) {
       var banner = document.getElementById('modes-conflict-banner');
-      var saveBtn = document.getElementById('btn-save-modes');
       var items = Array.isArray(conflicts) ? conflicts : [];
       if (!banner) return;
       if (!items.length) {
         banner.hidden = true;
         banner.innerHTML = '';
-        if (saveBtn) saveBtn.disabled = false;
         return;
       }
       banner.hidden = false;
@@ -4023,10 +4026,9 @@
         '<div class="modes-conflict-copy">' +
           '<strong>' + escapeHtml(String(items.length)) + ' mode configuration conflict' + (items.length === 1 ? '' : 's') + '</strong>' +
           '<ul>' + items.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>' +
-          '<div class="modes-conflict-hint">Save is blocked until conflicts are resolved.</div>' +
+          '<div class="modes-conflict-hint">Autosave pauses until conflicts are resolved.</div>' +
         '</div>'
       ].join('');
-      if (saveBtn) saveBtn.disabled = true;
     }
 
     function closeModeDrawer(skipRender) {
@@ -4184,6 +4186,9 @@
 
       state.modesConfig = cfg;
       markModesConfigDirty();
+      var autosaveDelay = 140;
+      if (target.tagName === 'INPUT' && String(target.type || '').toLowerCase() === 'number') autosaveDelay = 420;
+      queueModesAutosave(autosaveDelay);
     }
 
     function renderModeDrawer(cfg, actionChoices) {
@@ -4330,7 +4335,7 @@
         ].join('');
       }).join('');
 
-      title.textContent = String(mode.id || 'Mode') + ' details';
+      title.textContent = modeDisplayId(String(mode.id || 'Mode')) + ' details';
       if (statePill) {
         var modeEnabled = (mode.enabled !== false);
         statePill.textContent = modeEnabled ? 'Enabled' : 'Disabled';
@@ -4553,7 +4558,6 @@
 
     function renderModesPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
-      var line = document.getElementById('modes-line');
       var list = document.getElementById('modes-list');
       if (!list) return;
 
@@ -4564,8 +4568,15 @@
       var actionCatalog = Array.isArray(cfg.actionCatalog) ? cfg.actionCatalog : [];
       var actionChoices = actionCatalog.slice();
       var modes = Array.isArray(cfg.modes) ? cfg.modes : [];
+      var actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
+      var transitionSource = cfg.postActionTransitions || {};
+      var transitionActionNames = Object.keys(transitionSource);
+      var summaryText = String((cfg.modes || []).length) + ' modes • ' +
+        String(actionTriggers.length) + ' action triggers • ' +
+        String(transitionActionNames.length) + ' post-action transitions';
+      var summaryFooterHtml = '<div class="mode-list-status mode-summary-meta-text">' + escapeHtml(summaryText) + '</div>';
       if (!modes.length) {
-        list.innerHTML = '<div class="settings-empty-note">No modes configured.</div>';
+        list.innerHTML = '<div class="settings-empty-note">No modes configured.</div>' + summaryFooterHtml;
       } else {
         list.innerHTML = modes.map(function (mode) {
           var modeId = String(mode.id || '');
@@ -4577,7 +4588,7 @@
             '  <div class="mode-summary-head">',
             '    <div class="mode-summary-left">',
             '      <label class="mode-row-enabled" title="Enable or disable this mode"><input type="checkbox" data-mode-row-enabled="' + escapeHtml(modeId) + '"' + ((mode.enabled === false) ? '' : ' checked') + '><span class="sr-only">Enable ' + escapeHtml(modeId) + '</span></label>',
-            '      <div class="mode-summary-title"><strong>' + escapeHtml(modeId) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
+            '      <div class="mode-summary-title"><strong>' + escapeHtml(modeDisplayId(modeId)) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
             '    </div>',
             '    <div class="mode-summary-right">',
             '      <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '" title="Current enabled state for this mode">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
@@ -4587,21 +4598,12 @@
             '  <div class="mode-summary-meta"><span class="mode-summary-meta-text">Expiry ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h • Actions ' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + '</span>' + (constraintPills ? ('<span class="mode-summary-flags">' + constraintPills + '</span>') : '') + '</div>',
             '</article>'
           ].join('');
-        }).join('');
+        }).join('') + summaryFooterHtml;
       }
 
       renderModeDrawer(cfg, actionChoices);
-      var actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
-      var transitionSource = cfg.postActionTransitions || {};
-      var transitionActionNames = Object.keys(transitionSource);
       var conflicts = validateModesConfigConflicts(cfg);
       renderModesConflictBanner(conflicts);
-
-      if (line) {
-        line.textContent = String((cfg.modes || []).length) + ' modes • ' +
-          String(actionTriggers.length) + ' action triggers • ' +
-          String(transitionActionNames.length) + ' post-action transitions';
-      }
     }
 
     function renderBanLevelsPanel() {
@@ -4684,7 +4686,7 @@
         return [
           '<tr>',
           '  <td>' + escapeHtml(row.user_id || '-') + '</td>',
-          '  <td>' + escapeHtml(row.current_mode || '-') + '</td>',
+          '  <td>' + escapeHtml(modeDisplayId(row.current_mode || '-')) + '</td>',
           '  <td>' + escapeHtml(formatTs(row.set_at || '')) + '</td>',
           '  <td>' + escapeHtml(row.expires_at ? formatTs(row.expires_at) : '-') + '</td>',
           '  <td>' + escapeHtml(row.trigger || '-') + '</td>',
@@ -4699,8 +4701,8 @@
     function modeLogPayloadSummary(row) {
       var eventName = String((row && row.event) || 'event');
       var payload = (row && typeof row.payload === 'object' && row.payload) ? row.payload : {};
-      var toMode = String(payload.toMode || payload.to_mode || payload.current_mode || payload.mode || '');
-      var fromMode = String(payload.fromMode || payload.from_mode || '');
+      var toMode = modeDisplayId(String(payload.toMode || payload.to_mode || payload.current_mode || payload.mode || ''));
+      var fromMode = modeDisplayId(String(payload.fromMode || payload.from_mode || ''));
       var user = String(payload.user || payload.user_id || payload.author || payload.target_user || '');
       var action = String(payload.action || payload.action_name || payload.actionType || '');
       var trigger = String(payload.trigger || payload.reason || payload.source || '');
@@ -5014,11 +5016,12 @@
 
     async function saveModesConfigWithFeedback(okMessage, options) {
       var quiet = !!(options && options.quiet);
+      var suppressConflictMessage = !!(options && options.suppressConflictMessage);
       var payload = collectModesConfigFromUi();
       var conflicts = validateModesConfigConflicts(payload);
       if (conflicts.length) {
         renderModesConflictBanner(conflicts);
-        setControlMessage('Resolve mode conflicts before saving.', true);
+        if (!suppressConflictMessage) setControlMessage('Resolve mode conflicts before saving.', true);
         return;
       }
       if (state.previewMode) {
@@ -5033,6 +5036,34 @@
       state.modesConfigDirty = false;
       renderModesDrivenPanels();
       if (!quiet) setControlMessage(okMessage || 'Saved.', false);
+    }
+
+    async function runModesAutosave() {
+      if (state.modesSaveInFlight) {
+        state.modesSaveQueued = true;
+        return;
+      }
+      state.modesSaveInFlight = true;
+      try {
+        await saveModesConfigWithFeedback('', { quiet: true, suppressConflictMessage: true });
+        state.modesConfigDirty = false;
+      } catch (error) {
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.modesSaveInFlight = false;
+        if (state.modesSaveQueued) {
+          state.modesSaveQueued = false;
+          queueModesAutosave(120);
+        }
+      }
+    }
+
+    function queueModesAutosave(delayMs) {
+      if (state.modesSaveTimer) clearTimeout(state.modesSaveTimer);
+      state.modesSaveTimer = setTimeout(function () {
+        state.modesSaveTimer = null;
+        runModesAutosave();
+      }, Math.max(0, parseInt(delayMs, 10) || 380));
     }
 
     async function refreshModesConfig() {
@@ -5730,11 +5761,6 @@
           });
         }
       }
-      document.getElementById('btn-save-modes').addEventListener('click', function () {
-        saveModesConfigWithFeedback('Modes saved.').catch(function (error) {
-          setControlMessage(String(error && error.message ? error.message : error), true);
-        });
-      });
       document.getElementById('btn-replies-edit-templates').addEventListener('click', function () {
         openReplyTemplatesDrawer();
       });
@@ -5804,6 +5830,7 @@
             break;
           }
         });
+        queueModesAutosave(120);
       });
       document.getElementById('panel-modes').addEventListener('input', function (event) {
         var target = event && event.target;
@@ -5819,6 +5846,7 @@
           target.hasAttribute('data-transition-decay-to-action')
         ) {
           markModesConfigDirty();
+          queueModesAutosave(520);
         }
       });
       document.getElementById('panel-modes').addEventListener('change', function (event) {
@@ -5833,12 +5861,15 @@
           target.hasAttribute('data-trigger-action') ||
           target.hasAttribute('data-trigger-admin-only') ||
           target.hasAttribute('data-trigger-announce') ||
+          target.id === 'modes-starting-mode' ||
+          target.id === 'modes-default-decay-mode' ||
           target.hasAttribute('data-transition-enabled-action') ||
           target.hasAttribute('data-transition-announce-action') ||
           target.hasAttribute('data-transition-to-mode-action') ||
           target.hasAttribute('data-transition-decay-to-action')
         ) {
           markModesConfigDirty();
+          queueModesAutosave(140);
         }
       });
       document.getElementById('panel-enforcement').addEventListener('input', function (event) {

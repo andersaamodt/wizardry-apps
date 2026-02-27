@@ -1461,6 +1461,13 @@ label {
   align-items: end;
 }
 
+.mode-defaults-grid {
+  display: grid;
+  grid-template-columns: minmax(0, max-content);
+  column-gap: 16px;
+  row-gap: 6px;
+}
+
 .modes-subtitle {
   margin-top: 12px;
 }
@@ -1521,6 +1528,13 @@ label {
 
 .mode-summary-card.active {
   background: color-mix(in srgb, var(--accent) 14%, var(--bg-panel) 86%);
+}
+
+.mode-list-status {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  padding: 3px 4px 1px;
+  text-align: center;
 }
 
 .mode-summary-head {
@@ -1604,6 +1618,11 @@ label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.mode-summary-meta-text {
+  font-size: 0.66rem;
+  color: var(--text-subtle);
 }
 
 .mode-summary-flags {
@@ -2531,10 +2550,6 @@ label {
   text-align: center;
   font-size: 0.68rem;
   color: color-mix(in srgb, var(--text-subtle) 82%, var(--bg-main) 18%);
-}
-
-.modes-save-actions {
-  justify-content: flex-end;
 }
 
 .inline-code {
@@ -4024,6 +4039,12 @@ label {
 
 .oauth-callback-row input {
   width: min(560px, 100%);
+}
+
+@media (min-width: 980px) {
+  .mode-defaults-grid {
+    grid-template-columns: repeat(2, minmax(0, max-content));
+  }
 }
 
 @media (max-width: 760px) {
