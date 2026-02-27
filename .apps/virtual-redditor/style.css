@@ -2589,6 +2589,14 @@ label {
   grid-template-columns: 96px minmax(0, 1fr);
 }
 
+.follows-instructions-row {
+  align-items: center;
+}
+
+.follows-instructions-row .mode-field-label {
+  margin-top: 0;
+}
+
 .mode-field-label {
   margin: 7px 0 0;
   font-size: 0.78rem;
