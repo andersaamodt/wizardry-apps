@@ -7049,9 +7049,9 @@
     if (!pushed.length) {
       return;
     }
-    if (pushed.length > 2) {
+    if (pushed.length > 4) {
       // Keep motion smooth by limiting bar-advance per update.
-      pushed = pushed.slice(pushed.length - 2);
+      pushed = pushed.slice(pushed.length - 4);
     }
     var framePeak = 0;
     for (var pi = 0; pi < pushed.length; pi += 1) {
@@ -7287,13 +7287,13 @@
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
         var sampleNow = Date.now();
-        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 46) {
+        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 32) {
           dictationWaveRafId = requestAnimationFrame(sample);
           return;
         }
         dictationWaveLastSampleAt = sampleNow;
         var len = dictationWaveData.length;
-        var barsPerFrame = 1;
+        var barsPerFrame = 2;
         var windowSamples = Math.min(128, len);
         var sliceSamples = Math.max(6, Math.floor(windowSamples / barsPerFrame));
         var consumed = sliceSamples * barsPerFrame;
@@ -7442,8 +7442,8 @@
             dictationWaveBackendRecentLevels = parsedIncoming.slice(parsedIncoming.length - 18);
           }
           if (normalizedSequence.length) {
-            if (normalizedSequence.length > 2) {
-              normalizedSequence = normalizedSequence.slice(normalizedSequence.length - 2);
+            if (normalizedSequence.length > 4) {
+              normalizedSequence = normalizedSequence.slice(normalizedSequence.length - 4);
             }
             normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
           }
@@ -7462,7 +7462,7 @@
         }).catch(function () {
           return null;
         });
-      }, 45);
+      }, 34);
     }
 
     if (dictationWaveStream && dictationWaveAnalyser && dictationWaveData) {
