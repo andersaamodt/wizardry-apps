@@ -549,11 +549,11 @@ body {
 }
 
 .admin-nav-item.is-compose {
-  background: #ecf3ff;
+  background: #f2f7ff;
 }
 
 .admin-nav-item.is-compose:hover {
-  background: #e2ecff;
+  background: #e9f1ff;
 }
 
 .admin-nav-item:hover {
@@ -562,7 +562,7 @@ body {
 }
 
 .admin-nav-item.is-active {
-  background: #cfdfff;
+  background: #e9f1ff;
   color: #153878;
   box-shadow: none;
   cursor: default;
@@ -570,8 +570,8 @@ body {
 
 .admin-nav-item[aria-selected="true"],
 .admin-nav-item[aria-current="page"] {
-  background: #c7d9ff;
-  color: #0f326f;
+  background: #e9f1ff;
+  color: #153878;
   box-shadow: none;
   font-weight: 700;
 }
@@ -600,8 +600,8 @@ body {
 #admin-panel .admin-nav-list .admin-nav-item[aria-selected="true"],
 #admin-panel .admin-nav-list .admin-nav-item[aria-current="page"] {
   border: 0 !important;
-  background: #c7d9ff !important;
-  color: #0f326f !important;
+  background: #e9f1ff !important;
+  color: #153878 !important;
   box-shadow: none !important;
   transform: none !important;
   cursor: default !important;
@@ -609,8 +609,16 @@ body {
 
 #admin-panel .admin-nav-list .admin-nav-item[aria-selected="true"]:hover,
 #admin-panel .admin-nav-list .admin-nav-item[aria-current="page"]:hover {
-  background: #c7d9ff !important;
-  color: #0f326f !important;
+  background: #e9f1ff !important;
+  color: #153878 !important;
+}
+
+#admin-panel .admin-nav-list .admin-nav-item.is-compose {
+  background: #f2f7ff !important;
+}
+
+#admin-panel .admin-nav-list .admin-nav-item.is-compose:hover {
+  background: #e9f1ff !important;
 }
 
 .admin-content {
