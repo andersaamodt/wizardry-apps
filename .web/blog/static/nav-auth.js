@@ -1215,8 +1215,9 @@
       .then(function (finish) {
         rememberAuth(finish);
         return idbDelete(KEY_DEVICE_SESSION).then(function () {
-          if (registerAttempt && finish && finish.account_created === false) {
-            showNavToast('Logged in. This Nostr key already has an account.', 'ok', 4200);
+          var created = !!(finish && (finish.account_created === true || finish.account_created === 'true'));
+          if (registerAttempt && !created) {
+            showNavToast('You were logged in because this account already exists.', 'ok', 4200);
           }
           return finalizeLoginUiAfterSuccess(finish);
         });
