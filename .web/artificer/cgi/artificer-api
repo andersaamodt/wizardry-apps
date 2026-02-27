@@ -15967,9 +15967,6 @@ $fallback_output"
       assay_run_profile=1
       assay_edit_root=".assay-runs/$assay_task_id"
     fi
-    if [ "$assay_run_profile" -eq 1 ] && [ -n "$assay_edit_root" ]; then
-      mkdir -p "$workspace_path/$assay_edit_root"
-    fi
     prompt_lower_for_budget=$(printf '%s' "$user_prompt" | tr '[:upper:]' '[:lower:]')
     if [ "$assay_run_profile" -ne 1 ]; then
       if [ "$max_iterations" -lt 6 ] && printf '%s' "$prompt_lower_for_budget" | grep -Eq 'godot|replay|checksum|self[- ]?tests?|regression|barnes[- ]?hut|rk4|benchmark'; then
@@ -16171,6 +16168,9 @@ $fallback_output"
       rm -f "$queue_explicit_skills_override_file" "$request_explicit_skills_file" "$prompt_explicit_skills_file" "$explicit_skills_file"
       emit_error "workspace path is missing or unavailable"
       exit 0
+    fi
+    if [ "$assay_run_profile" -eq 1 ] && [ -n "$assay_edit_root" ]; then
+      mkdir -p "$workspace_path/$assay_edit_root" 2>/dev/null || true
     fi
 
     model=$(read_file_line "$conv_dir/model" "")

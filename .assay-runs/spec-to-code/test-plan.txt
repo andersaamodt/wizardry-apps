@@ -1,0 +1,6 @@
+Test Plan for Adding a Comment Feature
+1. Create a new migration file to add the comment table.
+2. Implement the backend service to handle adding and retrieving comments.
+3. Update the frontend to allow users to add and view comments on posts.
+4. Write unit tests for the backend service.
+5. Write integration tests to ensure the frontend can communicate with the backend.
