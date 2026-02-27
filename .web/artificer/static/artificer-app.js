@@ -7000,7 +7000,6 @@
     dictationWaveBackendFloor = 0.02;
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
-    dictationWaveActivatedAt = 0;
     state.dictateWaveLevels = [];
   }
 
@@ -7525,12 +7524,12 @@
       if (!dictationWaveActivatedAt) {
         dictationWaveActivatedAt = Date.now();
       }
-      if (!dictationWaveAnalyser && !dictationWaveStream) {
+      if (!dictationWaveAnalyser && !dictationWaveStream && !dictationWavePollTimer && !dictationWaveStartPromise) {
         startDictationWaveMonitor().then(function (started) {
-        if (!started && (state.dictatePhase === "recording" || state.dictatePhase === "starting")) {
-          state.dictateWaveLevels = [];
-          renderDictationWaveBars();
-        }
+          if (!started && (state.dictatePhase === "recording" || state.dictatePhase === "starting")) {
+            state.dictateWaveLevels = [];
+            renderDictationWaveBars();
+          }
         });
       }
     } else {
