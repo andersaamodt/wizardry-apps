@@ -2897,7 +2897,7 @@ label {
 .subreddit-input-stack {
   display: inline-flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 3px;
   min-width: 0;
 }
@@ -2906,6 +2906,7 @@ label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 30px;
 }
 
 .subreddit-check-meta {
@@ -2913,6 +2914,7 @@ label {
   font-size: 0.72rem;
   color: var(--text-subtle);
   line-height: 1.2;
+  text-align: center;
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
@@ -2948,6 +2950,7 @@ label {
   font-size: 0.84rem;
   color: var(--text-subtle);
   white-space: nowrap;
+  line-height: 30px;
 }
 
 .subreddit-field .title-caption {
