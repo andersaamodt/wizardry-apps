@@ -2829,7 +2829,7 @@ button:disabled,
 .dictation-wave {
   min-width: 0;
   width: 100%;
-  height: 18px;
+  height: 26px;
   display: flex;
   align-items: center;
   gap: 1px;
@@ -2844,7 +2844,7 @@ button:disabled,
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 78%, var(--text-muted) 22%);
   transform-origin: center center;
-  transition: height 100ms linear, opacity 120ms ease;
+  transition: height 40ms linear, opacity 80ms ease;
 }
 
 .dictation-wave-bar.is-baseline {

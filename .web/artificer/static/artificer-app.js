@@ -6552,7 +6552,7 @@
     if (level > 1) {
       level = 1;
     }
-    if (level < 0.05) {
+    if (level < 0.02) {
       level = 0;
     }
     if (!dictationWaveSeenSignal && level >= 0.03) {
@@ -6633,7 +6633,7 @@
         }
         var rms = Math.sqrt(sum / dictationWaveData.length);
         // Dynamic gating to let quiet rooms return to near-zero while preserving headroom.
-        var rawLevel = (rms * 9.6) + (peak * 0.34);
+        var rawLevel = (rms * 11.5) + (peak * 0.42);
         if (!isFinite(rawLevel) || rawLevel < 0) {
           rawLevel = 0;
         }
@@ -6661,7 +6661,7 @@
         if (normalized > 1) {
           normalized = 1;
         }
-        if (normalized < 0.05) {
+        if (normalized < 0.02) {
           normalized = 0;
         }
         dictationWaveMicLevel = normalized;
@@ -6701,7 +6701,7 @@
           if (polledLevel > 1) {
             polledLevel = 1;
           }
-          if (polledLevel < 0.05) {
+          if (polledLevel < 0.02) {
             polledLevel = 0;
           }
           dictationWaveBackendLevel = polledLevel;
@@ -6765,7 +6765,7 @@
         }
         var analyser = context.createAnalyser();
         analyser.fftSize = 1024;
-        analyser.smoothingTimeConstant = 0.15;
+        analyser.smoothingTimeConstant = 0.05;
         var source = context.createMediaStreamSource(stream);
         source.connect(analyser);
         var data = new Uint8Array(analyser.fftSize);
@@ -6798,8 +6798,8 @@
     var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 0;
-    var maxWaveHeight = 19;
-    var silenceGate = 0.11;
+    var maxWaveHeight = 23;
+    var silenceGate = 0.05;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -6825,7 +6825,7 @@
         } else if (adjusted > 1) {
           adjusted = 1;
         }
-        height = baselineHeight + Math.round(Math.pow(adjusted, 1.35) * maxWaveHeight);
+        height = baselineHeight + Math.round(Math.pow(adjusted, 1.15) * maxWaveHeight);
         // Keep heights even so bars stay visually centered in an even-height lane.
         if (height > 1 && (height % 2) !== 0) {
           height -= 1;
