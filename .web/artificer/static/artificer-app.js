@@ -774,6 +774,8 @@
   var dictationWaveSeenSignal = false;
   var dictationWaveNoiseFloor = 0.02;
   var dictationWaveActivatedAt = 0;
+  var dictationWaveBackendPumpBusy = false;
+  var dictationWaveBackendPumpAt = 0;
   var dictationPreparePromise = null;
   var dictationPrepareReadyUntil = 0;
   var dictationPrepareLoopTimer = null;
@@ -7217,8 +7219,72 @@
     return merged;
   }
 
+  function pumpDictationWaveFromBackend() {
+    if (dictationWaveBackendPumpBusy) {
+      return;
+    }
+    if (state.dictatePhase !== "recording" && state.dictatePhase !== "starting") {
+      return;
+    }
+    var activeSessionId = trim(String(state.dictateSessionId || ""));
+    if (!activeSessionId) {
+      return;
+    }
+    var now = Date.now();
+    if (now - Number(dictationWaveBackendPumpAt || 0) < 90) {
+      return;
+    }
+    dictationWaveBackendPumpAt = now;
+    dictationWaveBackendPumpBusy = true;
+    apiGet("dictate_levels", { session_id: activeSessionId }, { timeoutMs: 2200 }).then(function (response) {
+      if (!response || !response.success) {
+        return;
+      }
+      var polledLevel = Number(response.level || 0);
+      if (!isFinite(polledLevel) || polledLevel < 0) {
+        polledLevel = 0;
+      } else if (polledLevel > 1) {
+        polledLevel = 1;
+      }
+      var normalizedBackend = normalizedDictationBackendLevel(polledLevel);
+      var incomingLevels = Array.isArray(response.levels) ? response.levels : [];
+      var normalizedSequence = [];
+      for (var li = 0; li < incomingLevels.length; li += 1) {
+        var seqLevel = Number(incomingLevels[li]);
+        if (!isFinite(seqLevel) || seqLevel < 0) {
+          continue;
+        }
+        if (seqLevel > 1) {
+          seqLevel = 1;
+        }
+        normalizedSequence.push(normalizedDictationBackendLevel(seqLevel));
+      }
+      if (normalizedSequence.length) {
+        normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
+      }
+      dictationWaveBackendLevel = normalizedBackend;
+      dictationWaveBackendLevelAt = Date.now();
+      if (normalizedSequence.length) {
+        applyDictationWaveHistoryLevels(normalizedSequence);
+      } else {
+        var lifted = mergedDictationWaveLevel(Math.max(normalizedBackend, polledLevel * 0.9));
+        applyDictationWaveHistoryLevels([lifted]);
+      }
+    }).catch(function () {
+      return null;
+    }).finally(function () {
+      dictationWaveBackendPumpBusy = false;
+    });
+  }
+
   function startDictationWaveMonitor() {
     clearDictationWaveWarmReleaseTimer();
+    if (
+      dictationWavePollTimer &&
+      (state.dictatePhase === "recording" || state.dictatePhase === "starting")
+    ) {
+      return Promise.resolve(true);
+    }
     if (dictationWaveStartPromise) {
       return dictationWaveStartPromise;
     }
@@ -7544,14 +7610,12 @@
       if (!dictationWaveActivatedAt) {
         dictationWaveActivatedAt = Date.now();
       }
-      if (!dictationWaveAnalyser && !dictationWaveStream && !dictationWavePollTimer && !dictationWaveStartPromise) {
-        startDictationWaveMonitor().then(function (started) {
-          if (!started && (state.dictatePhase === "recording" || state.dictatePhase === "starting")) {
-            state.dictateWaveLevels = [];
-            renderDictationWaveBars();
-          }
-        });
-      }
+      startDictationWaveMonitor().then(function (started) {
+        if (!started && (state.dictatePhase === "recording" || state.dictatePhase === "starting")) {
+          state.dictateWaveLevels = [];
+          renderDictationWaveBars();
+        }
+      });
     } else {
       dictationWaveActivatedAt = 0;
       stopDictationWaveMonitor({ keepWarm: next === "idle" });
@@ -7568,6 +7632,7 @@
             return;
           }
           state.dictateElapsedMs = Math.max(0, Date.now() - Number(state.dictateStartedAt || Date.now()));
+          pumpDictationWaveFromBackend();
           renderDictationMode();
         }, 120);
       }

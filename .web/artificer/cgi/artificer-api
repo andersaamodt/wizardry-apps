@@ -5934,13 +5934,15 @@ dictation_live_level_for_session() {
     return 0
   fi
 
-  # Prefer RMS_level for steadier silence behavior; fall back to Peak_level when RMS is unavailable.
-  recent_levels=$(tail -n 320 "$levels_file" 2>/dev/null | tr -d '\r' || true)
-  level_line=$(printf '%s\n' "$recent_levels" | grep -E -i 'RMS_level' | tail -n 1 || true)
+  # Prefer RMS-derived telemetry for steadier silence behavior.
+  # Newer ffmpeg astats emits `RMS_peak` instead of `RMS_level`.
+  # Some ffmpeg builds include NUL bytes in ametadata output; strip binary bytes first.
+  recent_levels=$(tail -n 320 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
+  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | tail -n 1 || true)
   if [ -z "$level_line" ]; then
-    level_line=$(printf '%s\n' "$recent_levels" | grep -E -i 'Peak_level' | tail -n 1 || true)
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_(level|count)' | tail -n 1 || true)
   fi
-  level_db=$(printf '%s' "$level_line" | sed -E 's/.*(RMS_level|Peak_level)[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\2/I')
+  level_db=$(printf '%s' "$level_line" | sed -E 's/.*(RMS_(level|peak)|Peak_(level|count))[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\4/I')
   if [ -z "$level_db" ]; then
     printf '%s' "0"
     return 0
@@ -5972,10 +5974,11 @@ dictation_live_levels_json_for_session() {
   fi
 
   # Emit recent RMS-derived levels so the UI can draw per-bar history without a rolling-average look.
-  recent_levels=$(tail -n 960 "$levels_file" 2>/dev/null | tr -d '\r' || true)
-  rms_lines=$(printf '%s\n' "$recent_levels" | grep -E -i 'RMS_level' || true)
+  # Newer ffmpeg astats emits `RMS_peak` instead of `RMS_level`.
+  recent_levels=$(tail -n 960 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
+  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' || true)
   if [ -z "$rms_lines" ]; then
-    rms_lines=$(printf '%s\n' "$recent_levels" | grep -E -i 'Peak_level' || true)
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_(level|count)' || true)
   fi
   if [ -z "$rms_lines" ]; then
     printf '%s' "[]"
@@ -5999,8 +6002,10 @@ dictation_live_levels_json_for_session() {
     {
       line = $0
       raw = ""
-      if (match(line, /(RMS_level|Peak_level)[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?)/, m)) {
-        raw = m[2]
+      if (line ~ /(RMS_(level|peak)|Peak_(level|count))/) {
+        raw = line
+        sub(/.*(RMS_(level|peak)|Peak_(level|count))[^-0-9iInNfF]*/, "", raw)
+        sub(/[^-0-9iInNfF.].*$/, "", raw)
       }
       mapped = to_level(raw)
       if (mapped != "") {
