@@ -1691,9 +1691,9 @@ label {
 }
 
 .mode-summary-state.disabled {
-  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
-  color: color-mix(in srgb, var(--danger) 82%, var(--text) 18%);
-  background: color-mix(in srgb, var(--danger) 18%, var(--bg-main) 82%);
+  border-color: color-mix(in srgb, var(--text-subtle) 38%, var(--line) 62%);
+  color: color-mix(in srgb, var(--text-subtle) 86%, var(--text) 14%);
+  background: color-mix(in srgb, var(--text-subtle) 12%, var(--bg-main) 88%);
 }
 
 .mode-summary-meta {
@@ -2261,9 +2261,9 @@ label {
 }
 
 .mode-detail-drawer-state.disabled {
-  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
-  color: color-mix(in srgb, var(--danger) 82%, var(--text) 18%);
-  background: color-mix(in srgb, var(--danger) 18%, var(--bg-main) 82%);
+  border-color: color-mix(in srgb, var(--text-subtle) 38%, var(--line) 62%);
+  color: color-mix(in srgb, var(--text-subtle) 86%, var(--text) 14%);
+  background: color-mix(in srgb, var(--text-subtle) 12%, var(--bg-main) 88%);
 }
 
 .mode-detail-drawer-title {
