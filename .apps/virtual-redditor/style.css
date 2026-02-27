@@ -3938,7 +3938,7 @@ label {
 #actions-table th:nth-child(1),
 #actions-table td:nth-child(1) {
   width: 16%;
-  padding-left: 0;
+  padding-left: 4px;
 }
 
 #actions-table th:nth-child(2),
