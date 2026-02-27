@@ -3123,11 +3123,77 @@
       for (var i = 0; i < profiles.length; i += 1) {
         profiles[i].selected = false;
       }
-      profiles.unshift(ghost);
+      profiles.push(ghost);
       state.profiles = profiles;
       state.activeProfile = ghostId;
       state.createProfileGhostId = ghostId;
       return ghostId;
+    }
+
+    function orderProfilesLikePrevious(incomingProfiles) {
+      var incoming = Array.isArray(incomingProfiles) ? incomingProfiles.slice() : [];
+      var previous = Array.isArray(state.profiles) ? state.profiles : [];
+      var prevOrder = {};
+      for (var i = 0; i < previous.length; i += 1) {
+        var prev = previous[i] || {};
+        if (prev._ghost) continue;
+        var prevId = String(prev.id || '');
+        if (!prevId) continue;
+        if (typeof prevOrder[prevId] === 'number') continue;
+        prevOrder[prevId] = i;
+      }
+      return incoming
+        .map(function (p, idx) { return { profile: p, idx: idx }; })
+        .sort(function (a, b) {
+          var aId = String((a.profile && a.profile.id) || '');
+          var bId = String((b.profile && b.profile.id) || '');
+          var aKnown = Object.prototype.hasOwnProperty.call(prevOrder, aId);
+          var bKnown = Object.prototype.hasOwnProperty.call(prevOrder, bId);
+          if (aKnown && bKnown) return prevOrder[aId] - prevOrder[bId];
+          if (aKnown) return -1;
+          if (bKnown) return 1;
+          return a.idx - b.idx;
+        })
+        .map(function (row) { return row.profile; });
+    }
+
+    function materializeCreateProfileGhost(profileId, profileName, username) {
+      var id = String(profileId || '').trim();
+      if (!id) return false;
+      var ghostId = String(state.createProfileGhostId || '');
+      var list = Array.isArray(state.profiles) ? state.profiles : [];
+      var replaced = false;
+      for (var i = 0; i < list.length; i += 1) {
+        var row = list[i] || {};
+        if (String(row.id || '') !== ghostId) continue;
+        list[i] = Object.assign({}, row, {
+          id: id,
+          name: String(profileName || username || row.name || id),
+          username: String(username || row.username || ''),
+          selected: true,
+          _ghost: false
+        });
+        replaced = true;
+        break;
+      }
+      if (!replaced) {
+        list.push({
+          id: id,
+          name: String(profileName || username || id),
+          username: String(username || ''),
+          subreddit: '',
+          connected: false,
+          selected: true
+        });
+      }
+      for (var j = 0; j < list.length; j += 1) {
+        if (String((list[j] || {}).id || '') !== id) list[j].selected = false;
+      }
+      state.profiles = list;
+      state.activeProfile = id;
+      state.createProfileGhostId = '';
+      state.createProfilePrevActiveId = '';
+      return true;
     }
 
     function applyDraftProfileDefaultsToUi() {
@@ -3861,11 +3927,12 @@
       }
 
       var baseProfiles = Array.isArray(profilesPayload.profiles) ? profilesPayload.profiles.slice() : [];
+      baseProfiles = orderProfilesLikePrevious(baseProfiles);
       if (state.createProfileMode && state.createProfileGhostId) {
         for (var bp = 0; bp < baseProfiles.length; bp += 1) {
           baseProfiles[bp].selected = false;
         }
-        baseProfiles.unshift({
+        baseProfiles.push({
           id: String(state.createProfileGhostId),
           name: 'New Virtual Redditor',
           username: '',
@@ -6429,10 +6496,16 @@
       }
       try {
         setCreateProfileMessage('Creating...', false);
-        await backendJson('create-profile', [uname]);
+        var created = await backendJson('create-profile', [uname]);
+        var createdId = String((((created || {}).profile) || {}).id || '');
+        var createdName = String((((created || {}).profile) || {}).name || uname);
+        materializeCreateProfileGhost(createdId, createdName, uname);
+        state.createProfileMode = false;
+        var pane = document.getElementById('create-profile-pane');
+        if (pane) pane.classList.add('hidden');
+        renderProfiles();
+        updateToolbarButtonStates();
         await backendJson('set-reddit-setting', ['REDDIT_USERNAME', uname]);
-        removeCreateProfileGhost({ restoreActive: false });
-        closeCreateProfilePane({ restoreActive: false });
         setUsernameEditing(false);
         setSettingsMessage('', false);
         await refreshStatus();
