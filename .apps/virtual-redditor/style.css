@@ -2414,29 +2414,31 @@ label {
 }
 
 #panel-persona select,
-#panel-persona .mode-dropdown {
+#panel-persona .mode-dropdown,
+#panel-behaviors select,
+#panel-behaviors .mode-dropdown {
   display: inline-block;
   width: auto;
   max-width: 100%;
   vertical-align: top;
 }
 
-#panel-persona #mode-dropdown {
+#panel-behaviors #mode-dropdown {
   width: fit-content;
   max-width: 100%;
 }
 
-#panel-persona #patrol-mode-select {
+#panel-behaviors #patrol-mode-select {
   width: 220px;
 }
 
-#panel-persona #sample-max-input {
+#panel-behaviors #sample-max-input {
   width: 88px;
   font-family: inherit;
   font-size: 0.78rem;
 }
 
-#panel-persona #thread-initiate-max-pct {
+#panel-behaviors #thread-initiate-max-pct {
   width: 88px;
   min-width: 88px;
   font-family: inherit;

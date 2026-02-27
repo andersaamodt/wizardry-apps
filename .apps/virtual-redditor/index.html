@@ -126,94 +126,35 @@
                 </div>
               </div>
 
-              <div class="persona-section-title">Behavior</div>
-              <div class="mode-fields-inline">
+              <div class="persona-section-title">Persona Style</div>
+              <div class="mode-fields-inline modes-grid">
                 <div class="mode-field-row">
-                  <label for="mode-dropdown-btn" class="mode-field-label">Enforcement</label>
-                  <input id="mode-select" type="hidden" value="judicial">
-                  <div id="mode-dropdown" class="mode-dropdown">
-                    <button id="mode-dropdown-btn" type="button" class="mode-dropdown-btn" aria-haspopup="menu" aria-expanded="false"></button>
-                    <div id="mode-dropdown-menu" class="mode-dropdown-menu hidden" role="menu" aria-label="Mode options">
-                      <button type="button" class="mode-option" data-mode-option="judicial">
-                        <span class="mode-option-name">Judicial</span>
-                        <span class="mode-option-desc">Bans only for explicit norm violations.</span>
-                      </button>
-                      <button type="button" class="mode-option" data-mode-option="capricious">
-                        <span class="mode-option-name">Capricious</span>
-                        <span class="mode-option-desc">Bans only for vibes.</span>
-                      </button>
-                      <button type="button" class="mode-option" data-mode-option="mixed">
-                        <span class="mode-option-name">Mixed</span>
-                        <span class="mode-option-desc">Bans for either norm violations or vibes.</span>
-                      </button>
-                    </div>
-                  </div>
+                  <label for="behavior-mirror-tone" class="mode-field-label">Tone</label>
+                  <select id="behavior-mirror-tone">
+                    <option value="mirror_or_less">Mirror or less</option>
+                    <option value="deescalate_only">Always de-escalate</option>
+                    <option value="mirror_exact">Mirror exactly</option>
+                    <option value="escalate_when_appropriate">Escalate when appropriate</option>
+                  </select>
                 </div>
-
                 <div class="mode-field-row">
-                  <label for="patrol-mode-dropdown-btn" class="mode-field-label">Attentiveness</label>
-                  <input id="patrol-mode-select" type="hidden" value="full">
-                  <div id="patrol-mode-dropdown" class="mode-dropdown">
-                    <button id="patrol-mode-dropdown-btn" type="button" class="mode-dropdown-btn" aria-haspopup="menu" aria-expanded="false"></button>
-                    <div id="patrol-mode-dropdown-menu" class="mode-dropdown-menu hidden" role="menu" aria-label="Attentiveness options">
-                      <button type="button" class="mode-option patrol-option" data-patrol-mode-option="full">
-                        <span class="mode-option-name">Read everything</span>
-                        <span class="mode-option-desc">Scan all available recent comments each pass.</span>
-                      </button>
-                      <button type="button" class="mode-option patrol-option" data-patrol-mode-option="sample">
-                        <span class="mode-option-name">Random sample</span>
-                        <span class="mode-option-desc">Scan only up to Max samples each pass.</span>
-                      </button>
-                    </div>
-                  </div>
+                  <label for="behavior-humor" class="mode-field-label">Humor</label>
+                  <select id="behavior-humor">
+                    <option value="none">None (straight)</option>
+                    <option value="dry">Dry wit</option>
+                    <option value="shady">Shady</option>
+                    <option value="measured">Measured light humor</option>
+                    <option value="joker">Joker (frequent quips)</option>
+                    <option value="absurdist">Absurdist (max playful)</option>
+                  </select>
                 </div>
-              </div>
-
-              <div id="sample-max-shell" class="sample-max-shell" aria-hidden="true">
-                <div class="inline-field-row">
-                  <label
-                    for="sample-max-input"
-                    class="inline-field-label"
-                    title="The maximum number of new posts and comments read and responded to per cycle"
-                  >Max comments:</label>
-                  <input id="sample-max-input" type="number" min="1" step="1" value="20">
-                </div>
-              </div>
-
-              <div class="mode-field-row behavior-schedule-row">
-                <label for="thread-initiate-max-pct" class="mode-field-label">Thread saturation</label>
-                <div class="schedule-controls">
-                  <div class="inline-field-row thread-saturation-inline" title="Maximum share of comments in a thread that this bot can initiate on. Replies to direct engagement are always allowed.">
-                    <input id="thread-initiate-max-pct" type="number" min="0" max="100" step="1" value="25">
-                    <span class="schedule-inline">% initiations per thread</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="mode-field-row behavior-schedule-row">
-                <label for="passes-enabled" class="mode-field-label">Pass schedule</label>
-                <div class="schedule-controls">
-                  <label class="schedule-toggle">
-                    <input id="passes-enabled" type="checkbox">
-                    <span>Background passes</span>
-                  </label>
-                  <div id="pass-interval-controls" class="schedule-interval-controls hidden">
-                    <span class="schedule-inline">every</span>
-                    <input id="pass-interval-input" type="number" min="1" step="1" value="1" title="How often to run passes in background">
-                    <select id="pass-interval-unit" title="Pass interval units">
-                      <option value="minutes">minutes</option>
-                      <option value="hours" selected>hours</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div class="mode-field-row behavior-schedule-row">
-                <label class="mode-field-label">Follows instructions</label>
-                <div class="schedule-controls">
-                  <label class="schedule-toggle" title="The virtual Redditor will obey anything admins say that is relevant to them.">
-                    <input id="obey-admins" type="checkbox">
-                    <span>Obey Admins</span>
-                  </label>
+                <div class="mode-field-row">
+                  <label for="behavior-citations" class="mode-field-label">Citations</label>
+                  <select id="behavior-citations">
+                    <option value="as-needed">As needed</option>
+                    <option value="never">Never</option>
+                    <option value="always">Always</option>
+                  </select>
                 </div>
               </div>
 
@@ -256,36 +197,98 @@
 
         <section class="tab-panel" id="panel-behaviors">
           <div class="settings-card subpanel-card">
-            <div class="persona-section-title">Behavior Policy</div>
+            <div class="persona-section-title">Operational Behavior</div>
             <div class="mode-fields-inline modes-grid">
               <div class="mode-field-row">
-                <label for="behavior-mirror-tone" class="mode-field-label">Tone</label>
-                <select id="behavior-mirror-tone">
-                  <option value="mirror_or_less">Mirror or less</option>
-                  <option value="deescalate_only">Always de-escalate</option>
-                  <option value="mirror_exact">Mirror exactly</option>
-                  <option value="escalate_when_appropriate">Escalate when appropriate</option>
-                </select>
+                <label for="mode-dropdown-btn" class="mode-field-label">Enforcement</label>
+                <input id="mode-select" type="hidden" value="judicial">
+                <div id="mode-dropdown" class="mode-dropdown">
+                  <button id="mode-dropdown-btn" type="button" class="mode-dropdown-btn" aria-haspopup="menu" aria-expanded="false"></button>
+                  <div id="mode-dropdown-menu" class="mode-dropdown-menu hidden" role="menu" aria-label="Mode options">
+                    <button type="button" class="mode-option" data-mode-option="judicial">
+                      <span class="mode-option-name">Judicial</span>
+                      <span class="mode-option-desc">Bans only for explicit norm violations.</span>
+                    </button>
+                    <button type="button" class="mode-option" data-mode-option="capricious">
+                      <span class="mode-option-name">Capricious</span>
+                      <span class="mode-option-desc">Bans only for vibes.</span>
+                    </button>
+                    <button type="button" class="mode-option" data-mode-option="mixed">
+                      <span class="mode-option-name">Mixed</span>
+                      <span class="mode-option-desc">Bans for either norm violations or vibes.</span>
+                    </button>
+                  </div>
+                </div>
               </div>
               <div class="mode-field-row">
-                <label for="behavior-humor" class="mode-field-label">Humor</label>
-                <select id="behavior-humor">
-                  <option value="none">None (straight)</option>
-                  <option value="dry">Dry wit</option>
-                  <option value="shady">Shady</option>
-                  <option value="measured">Measured light humor</option>
-                  <option value="joker">Joker (frequent quips)</option>
-                  <option value="absurdist">Absurdist (max playful)</option>
-                </select>
+                <label for="patrol-mode-dropdown-btn" class="mode-field-label">Attentiveness</label>
+                <input id="patrol-mode-select" type="hidden" value="full">
+                <div id="patrol-mode-dropdown" class="mode-dropdown">
+                  <button id="patrol-mode-dropdown-btn" type="button" class="mode-dropdown-btn" aria-haspopup="menu" aria-expanded="false"></button>
+                  <div id="patrol-mode-dropdown-menu" class="mode-dropdown-menu hidden" role="menu" aria-label="Attentiveness options">
+                    <button type="button" class="mode-option patrol-option" data-patrol-mode-option="full">
+                      <span class="mode-option-name">Read everything</span>
+                      <span class="mode-option-desc">Scan all available recent comments each pass.</span>
+                    </button>
+                    <button type="button" class="mode-option patrol-option" data-patrol-mode-option="sample">
+                      <span class="mode-option-name">Random sample</span>
+                      <span class="mode-option-desc">Scan only up to Max samples each pass.</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div class="mode-field-row">
-                <label for="behavior-citations" class="mode-field-label">Citations</label>
-                <select id="behavior-citations">
-                  <option value="as-needed">As needed</option>
-                  <option value="never">Never</option>
-                  <option value="always">Always</option>
-                </select>
+            </div>
+
+            <div id="sample-max-shell" class="sample-max-shell" aria-hidden="true">
+              <div class="inline-field-row">
+                <label
+                  for="sample-max-input"
+                  class="inline-field-label"
+                  title="The maximum number of new posts and comments read and responded to per cycle"
+                >Max comments:</label>
+                <input id="sample-max-input" type="number" min="1" step="1" value="20">
               </div>
+            </div>
+
+            <div class="mode-field-row behavior-schedule-row">
+              <label for="thread-initiate-max-pct" class="mode-field-label">Thread saturation</label>
+              <div class="schedule-controls">
+                <div class="inline-field-row thread-saturation-inline" title="Maximum share of comments in a thread that this bot can initiate on. Replies to direct engagement are always allowed.">
+                  <input id="thread-initiate-max-pct" type="number" min="0" max="100" step="1" value="25">
+                  <span class="schedule-inline">% initiations per thread</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mode-field-row behavior-schedule-row">
+              <label for="passes-enabled" class="mode-field-label">Pass schedule</label>
+              <div class="schedule-controls">
+                <label class="schedule-toggle">
+                  <input id="passes-enabled" type="checkbox">
+                  <span>Background passes</span>
+                </label>
+                <div id="pass-interval-controls" class="schedule-interval-controls hidden">
+                  <span class="schedule-inline">every</span>
+                  <input id="pass-interval-input" type="number" min="1" step="1" value="1" title="How often to run passes in background">
+                  <select id="pass-interval-unit" title="Pass interval units">
+                    <option value="minutes">minutes</option>
+                    <option value="hours" selected>hours</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="mode-field-row behavior-schedule-row">
+              <label class="mode-field-label">Follows instructions</label>
+              <div class="schedule-controls">
+                <label class="schedule-toggle" title="The virtual Redditor will obey anything admins say that is relevant to them.">
+                  <input id="obey-admins" type="checkbox">
+                  <span>Obey Admins</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="persona-section-title modes-subtitle">Engagement Behavior</div>
+            <div class="mode-fields-inline modes-grid">
               <div class="mode-field-row">
                 <label for="behavior-summonable" class="mode-field-label">Summons</label>
                 <label class="schedule-toggle">
@@ -301,6 +304,8 @@
                 </label>
               </div>
             </div>
+
+            <div class="persona-section-title modes-subtitle">Timing Behavior</div>
             <div class="mode-fields-inline modes-grid">
               <div class="mode-field-row">
                 <label class="mode-field-label">Latency jitter</label>

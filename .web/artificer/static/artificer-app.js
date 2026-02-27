@@ -3068,7 +3068,7 @@
     var isSubmitting = key === state.pendingArchiveSubmittingKey;
     if (!isArmed) {
       return (
-        "<button type='button' class='thread-archive-btn' title='Archive thread' data-action='arm-archive-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversationId) + "'><span class='archive-icon' aria-hidden='true'><svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'><rect x='2.4' y='3.2' width='11.2' height='9.2' rx='1.4'></rect><path d='M4.5 6.1h7'></path><path d='M6 8.3h4'></path></svg></span></button>"
+        "<span class='thread-archive-wrap'><button type='button' class='thread-archive-btn' title='Archive thread' data-action='arm-archive-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversationId) + "'><span class='archive-icon' aria-hidden='true'><svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'><rect x='2.4' y='3.2' width='11.2' height='9.2' rx='1.4'></rect><path d='M4.5 6.1h7'></path><path d='M6 8.3h4'></path></svg></span></button></span>"
       );
     }
 
@@ -3079,7 +3079,7 @@
       ? "<span class='thread-confirm-spinner' aria-hidden='true'></span><span>Archiving...</span>"
       : "Confirm";
     return (
-      "<button type='button' class='thread-confirm-btn" + readyClass + loadingClass + "' data-action='confirm-archive-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversationId) + "'>" + label + "</button>"
+      "<span class='thread-archive-wrap'><button type='button' class='thread-confirm-btn" + readyClass + loadingClass + "' data-action='confirm-archive-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversationId) + "'>" + label + "</button></span>"
     );
   }
 
@@ -16051,8 +16051,12 @@
       event.preventDefault();
       event.stopPropagation();
       var key = conversationReadKey(workspaceId, conversationId);
-      if (key !== state.pendingArchiveKey || key === state.pendingArchiveSubmittingKey) {
+      if (key === state.pendingArchiveSubmittingKey) {
         return;
+      }
+      if (key !== state.pendingArchiveKey) {
+        state.pendingArchiveKey = key;
+        state.pendingArchiveReadyAt = Date.now();
       }
       state.pendingArchiveSubmittingKey = key;
       renderUi();
@@ -16077,10 +16081,32 @@
 
     if (action === "select-conversation") {
       if (workspaceId && conversationId) {
+        var clickedConversationMeta = !!(
+          event.target &&
+          event.target.closest &&
+          event.target.closest(".meta-age-slot, .thread-archive-wrap")
+        );
+        if (clickedConversationMeta) {
+          return;
+        }
+        var sameConversationSelected = (
+          String(state.activeWorkspaceId || "") === String(workspaceId || "") &&
+          String(state.activeConversationId || "") === String(conversationId || "") &&
+          !state.activeDraftWorkspaceId
+        );
+        if (sameConversationSelected) {
+          return;
+        }
         state.activeTriage = false;
-        state.pendingArchiveKey = "";
-        state.pendingArchiveReadyAt = 0;
-        state.pendingArchiveSubmittingKey = "";
+        var selectingDifferentConversation = (
+          String(state.activeWorkspaceId || "") !== String(workspaceId || "") ||
+          String(state.activeConversationId || "") !== String(conversationId || "")
+        );
+        if (selectingDifferentConversation) {
+          state.pendingArchiveKey = "";
+          state.pendingArchiveReadyAt = 0;
+          state.pendingArchiveSubmittingKey = "";
+        }
         runWithControlPending(target, function () {
           return selectConversation(workspaceId, conversationId);
         }, { spinner: false }).catch(showError);
