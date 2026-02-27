@@ -4113,8 +4113,7 @@
             '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '" title="Open mode details">Edit</button>',
             '    </div>',
           '  </div>',
-            '  <div class="mode-summary-meta">Expiry ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h • Actions ' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + '</div>',
-            (constraintPills ? ('  <div class="mode-summary-flags">' + constraintPills + '</div>') : ''),
+            '  <div class="mode-summary-meta"><span class="mode-summary-meta-text">Expiry ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h • Actions ' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + '</span>' + (constraintPills ? ('<span class="mode-summary-flags">' + constraintPills + '</span>') : '') + '</div>',
             '</article>'
           ].join('');
         }).join('');

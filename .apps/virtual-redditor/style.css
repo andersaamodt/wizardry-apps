@@ -1592,6 +1592,9 @@ label {
 
 .mode-summary-meta {
   margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: 0.66rem;
   color: var(--text-subtle);
   white-space: nowrap;
@@ -1600,11 +1603,11 @@ label {
 }
 
 .mode-summary-flags {
-  margin-top: 4px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
 }
 
 .mode-summary-flag {
