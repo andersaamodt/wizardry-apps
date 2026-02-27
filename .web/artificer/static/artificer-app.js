@@ -6633,7 +6633,7 @@
         }
         var rms = Math.sqrt(sum / dictationWaveData.length);
         // Dynamic gating to let quiet rooms return to near-zero while preserving headroom.
-        var rawLevel = (rms * 14) + (peak * 0.45);
+        var rawLevel = (rms * 9.6) + (peak * 0.34);
         if (!isFinite(rawLevel) || rawLevel < 0) {
           rawLevel = 0;
         }
@@ -6798,7 +6798,7 @@
     var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 0;
-    var maxWaveHeight = 13;
+    var maxWaveHeight = 19;
     var silenceGate = 0.11;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
