@@ -75,6 +75,13 @@
 - Avoid defaulting buttons and short text-entry inputs to `width: 100%`; size them to content or a bounded width unless full-width is required by layout.
 - Keep motion subtle and meaningful, never required for comprehension.
 
+## Button Patterns
+- Use an unobtrusive icon button pattern for low-emphasis in-field actions like copy/reveal helpers.
+- Unobtrusive icon buttons render with no border and no background at rest.
+- On hover/focus, unobtrusive icon buttons gain a compact opaque background and small rounded corners.
+- Keep unobtrusive icon buttons keyboard-focusable with a visible focus state.
+- Position in-field unobtrusive icon buttons inside the input wrapper with absolute positioning and preserve input text padding so content never overlaps the icon.
+
 ## AI Agent Delivery Rules
 - Prefer surgical edits that preserve each app’s existing visual language.
 - Extend shared patterns already present in Forge/Priorities/Virtual Redditor first.
