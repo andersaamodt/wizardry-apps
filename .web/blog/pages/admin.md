@@ -150,9 +150,6 @@ title: Blog Admin
 <div class="section-head">
 <h3>Users</h3>
 </div>
-<div class="users-toolbar">
-<button id="btn-refresh-users" type="button">Refresh Users</button>
-</div>
 <div id="users-list" class="users-list"></div>
 <div id="output-users" class="output"></div>
 </div>
@@ -1286,14 +1283,6 @@ body {
   background: #fff;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
   padding: 0.8rem;
-}
-
-.users-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.7rem;
 }
 
 .users-list {

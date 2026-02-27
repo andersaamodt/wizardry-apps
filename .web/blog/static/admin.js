@@ -15,7 +15,9 @@
     nostrBridgeEnabled: false,
     lastLinkedSshKeyText: '',
     users: [],
-    actorRank: 0
+    actorRank: 0,
+    activeSection: '',
+    usersPollTimer: null
   };
 
   const els = {
@@ -106,6 +108,7 @@
 
   function activateSection(name, updateHash) {
     const sectionName = (!state.isAdmin ? 'account' : (name || 'settings'));
+    state.activeSection = sectionName;
     els.sectionButtons.forEach(function (button) {
       const active = button.getAttribute('data-admin-nav') === sectionName;
       button.classList.toggle('is-active', active);
@@ -121,6 +124,7 @@
         history.replaceState(null, '', '#' + sectionName);
       }
     }
+    syncUsersAutoRefresh();
   }
 
   function initSectionNavigation() {
@@ -1065,6 +1069,38 @@
     renderUsersList();
   }
 
+  function stopUsersPolling() {
+    if (state.usersPollTimer) {
+      clearInterval(state.usersPollTimer);
+      state.usersPollTimer = null;
+    }
+  }
+
+  function syncUsersAutoRefresh() {
+    const usersVisible = state.isAdmin && state.activeSection === 'users';
+    if (!usersVisible) {
+      stopUsersPolling();
+      return;
+    }
+
+    loadUsers().catch(function (err) {
+      setOutput(els.outputUsers, 'Error: ' + err.message, 'error');
+    });
+
+    if (state.usersPollTimer) {
+      return;
+    }
+    state.usersPollTimer = setInterval(function () {
+      if (!(state.isAdmin && state.activeSection === 'users')) {
+        stopUsersPolling();
+        return;
+      }
+      loadUsers().catch(function () {
+        // Keep polling silently; avoid noisy toasts for transient failures.
+      });
+    }, 5000);
+  }
+
   async function runUserAction(action, username) {
     const user = state.users.find(function (item) { return item.username === username; });
     if (!user) {
@@ -1356,15 +1392,6 @@
         setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
       });
     });
-    const refreshUsersBtn = document.getElementById('btn-refresh-users');
-    if (refreshUsersBtn) {
-      refreshUsersBtn.addEventListener('click', function () {
-        loadUsers().catch(function (err) {
-          setOutput(els.outputUsers, 'Error: ' + err.message, 'error');
-        });
-      });
-    }
-
     if (els.usersList) {
       els.usersList.addEventListener('click', function (event) {
         const target = event.target;
@@ -1404,6 +1431,16 @@
         });
       });
     }
+    window.addEventListener('focus', function () {
+      if (state.isAdmin && state.activeSection === 'users') {
+        loadUsers().catch(function () {});
+      }
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'users') {
+        loadUsers().catch(function () {});
+      }
+    });
 
     document.getElementById('btn-run-scheduler').addEventListener('click', runSchedulerNow);
     if (els.mirrorNostrButton) {
