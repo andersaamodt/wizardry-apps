@@ -1517,8 +1517,8 @@
       els.loginBtn.addEventListener('click', function () {
         closeLoginMenu();
         startDesktopSignerLogin(false, '').catch(function (err) {
-          showAuthModal('register');
-          setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
+          showNavToast(err.message || 'Desktop signer login failed.', 'info', 4200);
+          openLoginMenu();
         });
       });
     }
