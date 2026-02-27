@@ -1802,6 +1802,13 @@ label {
   min-height: 0;
 }
 
+.relationships-override-btn {
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.24rem 0.44rem;
+  line-height: 1.1;
+}
+
 .replies-workarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 0;
@@ -3904,8 +3911,9 @@ label {
 
 .settings-global-instructions-actions button,
 .settings-actions button {
-  font-size: 1rem;
+  font-size: 0.8rem;
   font-weight: 500;
+  padding: 0.32rem 0.5rem;
 }
 
 #settings-global-msg {

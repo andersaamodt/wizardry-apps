@@ -2,11 +2,7 @@
   'use strict';
 
   var AUTH_KIND = 22242;
-  var DELEGATION_KIND = 27235;
   var NIP46_KIND = 24133;
-  var DEFAULT_DELEGATION_DAYS = 30;
-  var MIN_DELEGATION_DAYS = 1;
-  var MAX_DELEGATION_DAYS = 90;
   var NIP46_RELAYS = [
     'wss://relay.damus.io',
     'wss://nos.lol',
@@ -23,7 +19,6 @@
     currentTheme: 'archmage',
     isAuthenticated: false,
     manualChallenge: null,
-    pendingDeviceSession: null,
     idbPromise: null,
     nip46: {
       active: false,
@@ -353,7 +348,6 @@
     showPanel(els.authPhonePanel, false);
     showPanel(els.authManualPanel, false);
     state.manualChallenge = null;
-    state.pendingDeviceSession = null;
     if (els.authManualRequestId) { els.authManualRequestId.value = ''; }
     if (els.authManualChallenge) { els.authManualChallenge.value = ''; }
     if (els.authManualExpires) { els.authManualExpires.value = ''; }
@@ -674,14 +668,6 @@
     return String((normalized && normalized.pubkey) || '').trim();
   }
 
-  function signWithLocalSecret(template, secretHex) {
-    if (!hasNostrTools()) {
-      throw new Error('Nostr tools are unavailable in this browser.');
-    }
-    var secretBytes = hexToBytes(secretHex);
-    return window.NostrTools.finalizeEvent(template, secretBytes);
-  }
-
   function beginChallenge(pubkeyHint) {
     var payload = {};
     if (pubkeyHint) {
@@ -713,16 +699,6 @@
         return data;
       });
   }
-
-  function getAuthIntent() {
-    return {
-      mode: 'once',
-      days: DEFAULT_DELEGATION_DAYS,
-      forceInteractive: false
-    };
-  }
-
-  function refreshAuthIntentUi() {}
 
   function applyLoggedInUi(isLoggedIn, isAdmin, username) {
     var displayName = String(username || '');
@@ -881,8 +857,6 @@
   function hasDesktopSigner() {
     return !!(window.nostr && typeof window.nostr.signEvent === 'function');
   }
-
-  function applyQuickLoginDefaults() {}
 
   function pageRequiresAuthorization() {
     var path = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
@@ -1183,35 +1157,6 @@
     });
   }
 
-  function tryDelegatedSessionLogin(intent) {
-    if (!intent || intent.mode !== 'approve') {
-      return Promise.resolve(false);
-    }
-
-    return loadDeviceSession()
-      .then(function (record) {
-        if (!record) {
-          return false;
-        }
-        return beginChallenge(record.userPubkey)
-          .then(function (begin) {
-            var signed = signWithLocalSecret(authEventTemplate(begin.challenge, 'login', record.sessionPubkey), record.sessionSecretHex);
-            return finishLogin(begin.request_id, signed, null, intent.forceInteractive)
-              .then(function (finish) {
-                rememberAuth(finish);
-                return finalizeLoginUiAfterSuccess(finish).then(function () {
-                  return true;
-                });
-              });
-          })
-          .catch(function () {
-            return idbDelete(KEY_DEVICE_SESSION).then(function () {
-              return false;
-            });
-          });
-      });
-  }
-
   function signInWithSigner(signEventFn, options) {
     var opts = options && typeof options === 'object' ? options : {};
     var getPubkeyFn = typeof opts.getPubkeyFn === 'function' ? opts.getPubkeyFn : null;
@@ -1303,7 +1248,6 @@
   }
 
   function startDesktopSignerLogin() {
-    applyQuickLoginDefaults();
     if (!hasDesktopSigner()) {
       return Promise.reject(new Error('No desktop signer detected. Use the login menu for phone QR or signed challenge login.'));
     }
@@ -1338,8 +1282,6 @@
   }
 
   function prepareManualLogin() {
-    state.pendingDeviceSession = null;
-
     setAuthMessage('Creating a single-use login challenge...', 'warn');
     showPanel(els.authManualPanel, true);
     showPanel(els.authPhonePanel, false);

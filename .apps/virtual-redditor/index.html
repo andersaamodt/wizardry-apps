@@ -533,7 +533,7 @@
         <section class="tab-panel" id="panel-relationships">
           <div class="relationships-head-row">
             <div class="status-line" id="relationships-line">Relationships not loaded yet.</div>
-            <button id="btn-relationships-manual-override" type="button" class="inline-link-btn replies-edit-link" title="Open manual relationship override">Manual override...</button>
+            <button id="btn-relationships-manual-override" type="button" class="soft relationships-override-btn" title="Open manual relationship override">Manual override...</button>
           </div>
           <div id="relationships-workarea" class="relationships-workarea">
             <div class="relationships-main-pane">
@@ -2412,6 +2412,7 @@
       var connected = selectedProfileConnected();
       var validSubreddit = hasVerifiedSubreddit();
       var launchdLoaded = !!((((state.status || {}).launchd) || {}).loaded);
+      var botRunning = isBotRunning(state.status);
 
       var loginBtn = document.getElementById('btn-connect-reddit');
       if (loginBtn) {
@@ -2421,12 +2422,12 @@
 
       var runToggle = document.getElementById('btn-run-toggle');
       if (runToggle) {
-        var canToggleRun = launchdLoaded || connected;
+        var canToggleRun = connected;
         runToggle.disabled = !canToggleRun;
         if (!canToggleRun) {
           runToggle.title = 'Connect Reddit account first';
         } else {
-          runToggle.title = launchdLoaded ? 'Stop bot' : 'Start bot';
+          runToggle.title = botRunning ? 'Stop bot' : 'Start bot';
         }
       }
 
@@ -3233,16 +3234,15 @@
 
       var chips = [];
       chips.push(statusChip('actions ' + String(counts.actions || 0) + ' • replies ' + String(counts.replies || 0)));
-      if (launchd.loaded) {
-        state.launchdStartState = '';
-        state.launchdStartError = '';
+      var botRunning = isBotRunning(s);
+      if (botRunning) {
         chips.push(statusChip('Bot running', 'ok'));
-      } else if (state.launchdStartState === 'starting') {
+      } else if (state.botRunTransition === 'starting') {
         chips.push(statusChipWithSpinner('Starting...', 'warn'));
-      } else if (state.launchdStartState === 'failed') {
-        chips.push(statusActionChip('Failed', 'danger', 'start-background', (state.launchdStartError || 'this bot failed to start. Click to retry.')));
+      } else if (state.botRunTransition === 'stopping') {
+        chips.push(statusChipWithSpinner('Stopping...', 'warn'));
       } else {
-        chips.push(statusActionChip('Bot stopped', 'warn', 'start-background', 'This bot is not running in background. Click to start.'));
+        chips.push(statusChip('Bot stopped', 'danger'));
       }
       var localName = activeProfileLocalName(profilesPayload) || 'Virtual Redditor';
       row.innerHTML = '<span class="status-active-name" title="' + escapeHtml(localName) + '">' + escapeHtml(localName) + '</span>' + chips.join('');
@@ -3298,7 +3298,7 @@
           passesEnabled.checked = state.passesTogglePendingValue;
           passesEnabled.disabled = true;
         } else {
-          passesEnabled.checked = !!launchd.loaded;
+          passesEnabled.checked = botRunning;
           passesEnabled.disabled = false;
         }
       }
@@ -3340,12 +3340,11 @@
       var runToggle = document.getElementById('btn-run-toggle');
       var runIcon = document.getElementById('run-toggle-icon');
       if (runToggle && runIcon) {
-        var loaded = !!launchd.loaded;
-        runToggle.classList.toggle('run', !loaded);
-        runToggle.classList.toggle('stop', loaded);
-        runToggle.setAttribute('aria-label', loaded ? 'Stop bot' : 'Start bot');
-        runToggle.setAttribute('title', loaded ? 'Stop bot' : 'Start bot');
-        runIcon.textContent = loaded ? '■' : '▶';
+        runToggle.classList.toggle('run', !botRunning);
+        runToggle.classList.toggle('stop', botRunning);
+        runToggle.setAttribute('aria-label', botRunning ? 'Stop bot' : 'Start bot');
+        runToggle.setAttribute('title', botRunning ? 'Stop bot' : 'Start bot');
+        runIcon.textContent = botRunning ? '■' : '▶';
       }
       updateToolbarButtonStates();
     }
@@ -5178,6 +5177,52 @@
       }
     }
 
+    async function toggleBotRun(enabled, options) {
+      var shouldRun = !!enabled;
+      var opts = options || {};
+      if (state.previewMode) {
+        if (state.status && state.status.settings) {
+          state.status.settings.runEnabled = shouldRun;
+          if (state.status.launchd) state.status.launchd.loaded = shouldRun;
+          renderStatus();
+        }
+        return;
+      }
+      if (state.passesTogglePendingValue !== null) return;
+      try {
+        state.passesTogglePendingValue = shouldRun;
+        state.botRunTransition = shouldRun ? 'starting' : 'stopping';
+        renderStatus();
+        setControlMessage(shouldRun ? 'Starting bot...' : 'Stopping bot...', false);
+
+        await backendJson('set-setting', ['RUN_ENABLED', shouldRun ? '1' : '0']);
+        if (shouldRun) {
+          await backendJson('start', []);
+        }
+        if (opts.stopDaemon === true && !shouldRun) {
+          await backendJson('stop', []);
+        }
+
+        var settled = false;
+        for (var i = 0; i < 16; i += 1) {
+          await refreshStatus();
+          if (isBotRunning(state.status) === shouldRun) {
+            settled = true;
+            break;
+          }
+          await new Promise(function (resolve) { setTimeout(resolve, 250); });
+        }
+        if (!settled) await fullRefresh();
+        setControlMessage('', false);
+      } catch (error) {
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.botRunTransition = '';
+        state.passesTogglePendingValue = null;
+        renderStatus();
+      }
+    }
+
     async function saveSetting(key, value) {
       if (state.previewMode) {
         if (state.status && state.status.settings) {
@@ -5269,40 +5314,7 @@
 
     async function toggleBackgroundPasses(enabled) {
       var shouldRun = !!enabled;
-      if (state.previewMode) {
-        if (state.status && state.status.launchd) {
-          state.status.launchd.loaded = shouldRun;
-          renderStatus();
-        }
-        return;
-      }
-      if (state.passesTogglePendingValue !== null) {
-        return;
-      }
-      try {
-        state.passesTogglePendingValue = shouldRun;
-        renderStatus();
-        setControlMessage(shouldRun ? 'Starting background passes...' : 'Stopping background passes...', false);
-        await backendJson(shouldRun ? 'start' : 'stop', []);
-        var settled = false;
-        for (var i = 0; i < 16; i += 1) {
-          await refreshStatus();
-          if (state.status && state.status.launchd && !!state.status.launchd.loaded === shouldRun) {
-            settled = true;
-            break;
-          }
-          await new Promise(function (resolve) { setTimeout(resolve, 250); });
-        }
-        if (!settled) {
-          await fullRefresh();
-        }
-        setControlMessage('', false);
-      } catch (error) {
-        setControlMessage(String(error && error.message ? error.message : error), true);
-      } finally {
-        state.passesTogglePendingValue = null;
-        renderStatus();
-      }
+      await toggleBotRun(shouldRun);
     }
 
     async function saveUsernameFromTitle() {
@@ -5611,8 +5623,8 @@
 
     function wireEvents() {
       document.getElementById('btn-run-toggle').addEventListener('click', function () {
-        var loaded = !!(state.status && state.status.launchd && state.status.launchd.loaded);
-        runControlAction(loaded ? 'stop' : 'start', loaded ? 'Bot stopped.' : 'Bot started.');
+        var running = isBotRunning(state.status);
+        toggleBotRun(!running);
       });
       document.getElementById('btn-restart').addEventListener('click', function () {
         runControlAction('restart', 'Bot restarted.');
@@ -5890,19 +5902,6 @@
           setControlMessage(String(error && error.message ? error.message : error), true);
         }
       });
-      document.getElementById('status-chip-row').addEventListener('click', function (event) {
-        var btn = event.target && event.target.closest('[data-status-action]');
-        if (!btn) return;
-        var action = String(btn.getAttribute('data-status-action') || '');
-        if (action === 'start-background') {
-          btn.classList.remove('danger');
-          btn.classList.add('warn', 'with-spinner');
-          btn.innerHTML = '<span class="chip-inline-spinner" aria-hidden="true"></span>Starting...';
-          if (typeof btn.blur === 'function') btn.blur();
-          startBackgroundFromStatusChip();
-        }
-      });
-
       document.getElementById('toggle-settings-panel').addEventListener('click', function () {
         openSettingsModal();
       });
@@ -5939,7 +5938,11 @@
         var pendingMsg = loaded ? 'Stopping daemon...' : 'Starting daemon...';
         var doneMsg = loaded ? 'Daemon stopped.' : 'Daemon started.';
         setGlobalSettingsMessage(pendingMsg, false);
-        backendJson(action, []).then(function () {
+        var run = function () { return backendJson(action, []); };
+        var sequence = loaded
+          ? run()
+          : backendJson('set-setting', ['RUN_ENABLED', '0']).then(run);
+        sequence.then(function () {
           return fullRefresh();
         }).then(function () {
           renderGlobalSettingsModal();
