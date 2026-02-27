@@ -95,6 +95,20 @@ textarea {
   app-region: no-drag;
 }
 
+button,
+[role='button'],
+.status-chip,
+.badge,
+.profile-status-badge,
+.mode-summary-flag,
+.modes-conflict-pill,
+.ban-level-pill,
+.title-badge,
+.model-size-chip {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .title-cluster {
   display: flex;
   align-items: center;
