@@ -408,12 +408,12 @@ mode_default_config_json() {
         }
       ],
       banLevels: {
-        short: {enabled:true,durationHours:72},
-        medium: {enabled:true,durationHours:168},
-        long: {enabled:true,durationHours:720},
-        extended: {enabled:true,durationHours:4380},
-        year: {enabled:true,durationHours:8760},
-        permanent: {enabled:true,durationHours:0}
+        short: {enabled:true,durationHours:72,durationMinHours:72,durationMaxHours:72,durationUnit:"days"},
+        medium: {enabled:true,durationHours:168,durationMinHours:168,durationMaxHours:168,durationUnit:"days"},
+        long: {enabled:true,durationHours:720,durationMinHours:720,durationMaxHours:720,durationUnit:"days"},
+        extended: {enabled:true,durationHours:4380,durationMinHours:4380,durationMaxHours:4380,durationUnit:"days"},
+        year: {enabled:true,durationHours:8760,durationMinHours:8760,durationMaxHours:8760,durationUnit:"days"},
+        permanent: {enabled:true,durationHours:0,durationMinHours:0,durationMaxHours:0,durationUnit:"days"}
       },
       postActionTransitions: {
         Warn: {toMode:"WARN",durationHours:24,decayTo:"SHADE",announce:false},
@@ -925,13 +925,47 @@ ban_days_for_action() {
     "Permanent Ban") level=permanent ;;
     *) printf '%s' '0'; return 0 ;;
   esac
-  read_modes_config_json | jq -r --arg level "$level" '
+  raw=$(read_modes_config_json | jq -r --arg level "$level" '
     .banLevels[$level] as $x
-    | if ($x.enabled // true) | not then "disabled"
-      elif ($level == "permanent") then "permanent"
-      else (($x.durationHours // 0) | tonumber? // 0 | if . <= 0 then 0 else (((. + 23) / 24) | floor) end | tostring)
+    | if ($x.enabled // true) | not then "disabled|0|0"
+      elif ($level == "permanent") then "permanent|0|0"
+      else
+        (($x.durationMinHours // $x.durationHours // 0) | tonumber? // 0) as $min
+        | (($x.durationMaxHours // $x.durationHours // 0) | tonumber? // 0) as $max
+        | if $min <= 0 and $max <= 0 then "range|0|0" else ("range|\($min|floor)|\($max|floor)") end
       end
-  ' 2>/dev/null || printf '0'
+  ' 2>/dev/null || printf 'range|0|0')
+  state=$(printf '%s' "$raw" | awk -F'|' '{print $1}')
+  min_h=$(printf '%s' "$raw" | awk -F'|' '{print $2}')
+  max_h=$(printf '%s' "$raw" | awk -F'|' '{print $3}')
+  case "$state" in
+    disabled)
+      printf '%s' 'disabled'
+      return 0
+      ;;
+    permanent)
+      printf '%s' 'permanent'
+      return 0
+      ;;
+  esac
+  min_h=$(to_int "$min_h" 0)
+  max_h=$(to_int "$max_h" 0)
+  if [ "$min_h" -le 0 ]; then min_h=24; fi
+  if [ "$max_h" -le 0 ]; then max_h=$min_h; fi
+  if [ "$max_h" -lt "$min_h" ]; then
+    tmp=$min_h
+    min_h=$max_h
+    max_h=$tmp
+  fi
+  chosen_h=$min_h
+  if [ "$max_h" -gt "$min_h" ]; then
+    chosen_h=$(random_between "$min_h" "$max_h")
+  fi
+  if [ "$chosen_h" -le 0 ]; then
+    printf '%s' '0'
+    return 0
+  fi
+  printf '%s' "$(((chosen_h + 23) / 24))"
 }
 
 action_severity_score() {

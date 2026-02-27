@@ -701,9 +701,8 @@
                   <table class="table" id="ban-levels-table">
                     <thead>
                       <tr>
-                        <th aria-label="Enabled"></th>
                         <th>Level</th>
-                        <th>Default duration</th>
+                        <th>Default duration range</th>
                       </tr>
                     </thead>
                     <tbody id="ban-levels-body"></tbody>
@@ -3673,12 +3672,12 @@
           neutralBanTemplate: 'Enforcement was automatically applied.'
         },
         banLevels: {
-          short: { enabled: true, durationHours: 72 },
-          medium: { enabled: true, durationHours: 168 },
-          long: { enabled: true, durationHours: 720 },
-          extended: { enabled: true, durationHours: 4380 },
-          year: { enabled: true, durationHours: 8760 },
-          permanent: { enabled: true, durationHours: 0 }
+          short: { enabled: true, durationHours: 72, durationMinHours: 72, durationMaxHours: 72, durationUnit: 'days' },
+          medium: { enabled: true, durationHours: 168, durationMinHours: 168, durationMaxHours: 168, durationUnit: 'days' },
+          long: { enabled: true, durationHours: 720, durationMinHours: 720, durationMaxHours: 720, durationUnit: 'days' },
+          extended: { enabled: true, durationHours: 4380, durationMinHours: 4380, durationMaxHours: 4380, durationUnit: 'days' },
+          year: { enabled: true, durationHours: 8760, durationMinHours: 8760, durationMaxHours: 8760, durationUnit: 'days' },
+          permanent: { enabled: true, durationHours: 0, durationMinHours: 0, durationMaxHours: 0, durationUnit: 'days' }
         },
         escalation: {
           notifyOnSeverity: 'high',
@@ -3759,6 +3758,37 @@
       }
       delete out.escalation.onHighSeverity;
       out.banLevels = Object.assign({}, base.banLevels, src.banLevels || {});
+      ['short', 'medium', 'long', 'extended', 'year', 'permanent'].forEach(function (levelKey) {
+        var row = Object.assign({}, (base.banLevels || {})[levelKey] || {}, (out.banLevels || {})[levelKey] || {});
+        var durationHours = Math.max(0, parseInt(row.durationHours, 10) || 0);
+        var minHours = Math.max(0, parseInt(row.durationMinHours, 10) || durationHours);
+        var maxHours = Math.max(0, parseInt(row.durationMaxHours, 10) || durationHours);
+        if (maxHours < minHours) {
+          var tmp = minHours;
+          minHours = maxHours;
+          maxHours = tmp;
+        }
+        var unit = String(row.durationUnit || '').toLowerCase();
+        if (unit !== 'hours' && unit !== 'days') {
+          unit = (minHours > 0 && maxHours > 0 && minHours % 24 === 0 && maxHours % 24 === 0) ? 'days' : 'hours';
+        }
+        if (levelKey === 'permanent') {
+          row.durationHours = 0;
+          row.durationMinHours = 0;
+          row.durationMaxHours = 0;
+          row.durationUnit = 'days';
+          row.enabled = true;
+        } else {
+          if (minHours < 1) minHours = 1;
+          if (maxHours < minHours) maxHours = minHours;
+          row.durationHours = maxHours;
+          row.durationMinHours = minHours;
+          row.durationMaxHours = maxHours;
+          row.durationUnit = unit;
+          row.enabled = true;
+        }
+        out.banLevels[levelKey] = row;
+      });
       if (!Array.isArray(out.modes)) out.modes = [];
       if (!Array.isArray(out.actionTriggers)) out.actionTriggers = [];
       if (!out.postActionTransitions || typeof out.postActionTransitions !== 'object') out.postActionTransitions = {};
@@ -4882,21 +4912,39 @@
       ];
       var body = document.getElementById('ban-levels-body');
       if (!body) return;
-      function banEnabledTooltip(isEnabled) {
-        return isEnabled ? 'Enabled. Click to disable.' : 'Disabled. Click to enable.';
+      function hoursToUi(hours, unit) {
+        var h = Math.max(1, parseInt(hours, 10) || 1);
+        if (unit === 'days') return Math.max(1, Math.round(h / 24));
+        return h;
       }
       body.innerHTML = levels.map(function (level) {
         var row = ((cfg.banLevels || {})[level.key]) || {};
-        var enabledBool = row.enabled !== false;
-        var enabled = enabledBool ? ' checked' : '';
-        var duration = (row.durationHours == null) ? 0 : Number(row.durationHours);
+        var durationHours = Math.max(1, parseInt(row.durationHours, 10) || 1);
+        var minHours = Math.max(1, parseInt(row.durationMinHours, 10) || durationHours);
+        var maxHours = Math.max(1, parseInt(row.durationMaxHours, 10) || durationHours);
+        if (maxHours < minHours) {
+          var swap = minHours;
+          minHours = maxHours;
+          maxHours = swap;
+        }
+        var unit = String(row.durationUnit || '').toLowerCase();
+        if (unit !== 'hours' && unit !== 'days') {
+          unit = (minHours % 24 === 0 && maxHours % 24 === 0) ? 'days' : 'hours';
+        }
         return [
           '<tr data-ban-level="' + escapeHtml(level.key) + '">',
-          '  <td><label class="mini-toggle" title="' + escapeHtml(banEnabledTooltip(enabledBool)) + '"><input type="checkbox" data-ban-enabled' + enabled + ' title="' + escapeHtml(banEnabledTooltip(enabledBool)) + '"><span></span></label></td>',
           '  <td>' + escapeHtml(level.label) + '</td>',
           '  <td>' + (level.key === 'permanent'
             ? '<span class="micro">Permanent</span>'
-            : '<input type="number" min="1" step="1" data-ban-duration value="' + escapeHtml(String(duration || 0)) + '">') + '</td>',
+            : '<div class="ban-duration-range">' +
+                '<input type="number" min="1" step="1" data-ban-duration-min value="' + escapeHtml(String(hoursToUi(minHours, unit))) + '" title="Minimum default ban duration">' +
+                '<span class="ban-range-sep">to</span>' +
+                '<input type="number" min="1" step="1" data-ban-duration-max value="' + escapeHtml(String(hoursToUi(maxHours, unit))) + '" title="Maximum default ban duration">' +
+                '<select data-ban-duration-unit title="Units for default ban duration range">' +
+                  '<option value="hours"' + (unit === 'hours' ? ' selected' : '') + '>hours</option>' +
+                  '<option value="days"' + (unit === 'days' ? ' selected' : '') + '>days</option>' +
+                '</select>' +
+              '</div>') + '</td>',
           '</tr>'
         ].join('');
       }).join('');
@@ -5146,12 +5194,22 @@
         var banRow = banRows[b];
         var key = String(banRow.getAttribute('data-ban-level') || '');
         if (!key) continue;
-        var enabled = !!((banRow.querySelector('[data-ban-enabled]') || {}).checked);
-        var durationInput = banRow.querySelector('[data-ban-duration]');
-        var duration = durationInput ? Math.max(1, parseInt(durationInput.value || '0', 10) || 1) : 0;
+        var minInput = banRow.querySelector('[data-ban-duration-min]');
+        var maxInput = banRow.querySelector('[data-ban-duration-max]');
+        var unitSelect = banRow.querySelector('[data-ban-duration-unit]');
+        var unit = String((unitSelect && unitSelect.value) || 'hours').toLowerCase();
+        if (unit !== 'days') unit = 'hours';
+        var minRaw = minInput ? Math.max(1, parseInt(minInput.value || '0', 10) || 1) : 1;
+        var maxRaw = maxInput ? Math.max(1, parseInt(maxInput.value || '0', 10) || 1) : minRaw;
+        if (maxRaw < minRaw) maxRaw = minRaw;
+        var minHours = unit === 'days' ? (minRaw * 24) : minRaw;
+        var maxHours = unit === 'days' ? (maxRaw * 24) : maxRaw;
         cfg.banLevels[key] = {
-          enabled: enabled,
-          durationHours: key === 'permanent' ? 0 : duration
+          enabled: true,
+          durationHours: key === 'permanent' ? 0 : maxHours,
+          durationMinHours: key === 'permanent' ? 0 : minHours,
+          durationMaxHours: key === 'permanent' ? 0 : maxHours,
+          durationUnit: key === 'permanent' ? 'days' : unit
         };
       }
 
@@ -6228,7 +6286,10 @@
       document.getElementById('panel-enforcement').addEventListener('input', function (event) {
         var target = event && event.target;
         if (!target) return;
-        if (target.hasAttribute('data-ban-duration')) {
+        if (
+          target.hasAttribute('data-ban-duration-min') ||
+          target.hasAttribute('data-ban-duration-max')
+        ) {
           markModesConfigDirty();
           queueEnforcementAutosave(520);
         }
@@ -6236,14 +6297,8 @@
       document.getElementById('panel-enforcement').addEventListener('change', function (event) {
         var target = event && event.target;
         if (!target) return;
-        if (target.hasAttribute('data-ban-enabled')) {
-          var nextTitle = target.checked ? 'Enabled. Click to disable.' : 'Disabled. Click to enable.';
-          target.setAttribute('title', nextTitle);
-          var wrap = target.closest('label');
-          if (wrap) wrap.setAttribute('title', nextTitle);
-        }
         if (
-          target.hasAttribute('data-ban-enabled') ||
+          target.hasAttribute('data-ban-duration-unit') ||
           target.id === 'enforcement-notify-severity' ||
           target.id === 'enforcement-escalation-targets' ||
           target.id === 'enforcement-escalation-timing'

@@ -2461,6 +2461,30 @@ label {
   width: 100%;
 }
 
+#ban-levels-table .ban-duration-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+#ban-levels-table input[data-ban-duration-min],
+#ban-levels-table input[data-ban-duration-max] {
+  width: 50px;
+  min-width: 50px;
+}
+
+#ban-levels-table select[data-ban-duration-unit] {
+  width: fit-content;
+  min-width: 74px;
+  max-width: 100%;
+}
+
+#ban-levels-table .ban-range-sep {
+  font-size: 0.72rem;
+  color: var(--text-subtle);
+}
+
 .mode-permissions-grid {
   margin-top: 9px;
   display: flex;
