@@ -7535,6 +7535,9 @@
     if (state.activeDraftWorkspaceId) {
       return false;
     }
+    if (state.activeConversationId && state.activeConversationLoading) {
+      return true;
+    }
     return !state.activeConversationId;
   }
 
