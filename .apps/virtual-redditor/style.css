@@ -1298,6 +1298,12 @@ select {
   padding: 0.38rem 20px 0.3rem 0.44rem;
 }
 
+input[type='number'] {
+  font-size: 0.76rem;
+  line-height: 1.2;
+  padding: 0.34rem 0.44rem;
+}
+
 select:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
