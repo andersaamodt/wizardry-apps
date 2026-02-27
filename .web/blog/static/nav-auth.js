@@ -375,18 +375,8 @@
     els.authPhoneBtn.setAttribute('aria-disabled', paired ? 'false' : 'true');
   }
 
-  function prepareDefaultAuthView() {
-    showPanel(els.authPhonePanel, true);
-    showPanel(els.authManualPanel, false);
-    setAuthMessage('Connect your phone signer first. Continue becomes available after pairing.', 'warn');
-    state.nip46.signerPubkey = '';
-    updatePhoneContinueState();
-    initNip46Pairing().catch(function (err) {
-      setAuthMessage(err.message || 'Unable to prepare phone signer QR.', 'error');
-    });
-  }
-
   function resetAuthPanels() {
+    showPanel(els.authRegisterPanel, false);
     showPanel(els.authPhonePanel, false);
     showPanel(els.authManualPanel, false);
     state.manualChallenge = null;
@@ -400,7 +390,49 @@
     if (els.authManualDelegation) { els.authManualDelegation.value = ''; }
   }
 
-  function showAuthModal() {
+  function setActiveAuthTab(tabName) {
+    var tab = String(tabName || 'register');
+    if (tab !== 'register' && tab !== 'phone' && tab !== 'manual') {
+      tab = 'register';
+    }
+
+    if (els.authTabRegister) {
+      var activeRegister = tab === 'register';
+      els.authTabRegister.classList.toggle('is-active', activeRegister);
+      els.authTabRegister.setAttribute('aria-selected', activeRegister ? 'true' : 'false');
+    }
+    if (els.authTabPhone) {
+      var activePhone = tab === 'phone';
+      els.authTabPhone.classList.toggle('is-active', activePhone);
+      els.authTabPhone.setAttribute('aria-selected', activePhone ? 'true' : 'false');
+    }
+    if (els.authTabManual) {
+      var activeManual = tab === 'manual';
+      els.authTabManual.classList.toggle('is-active', activeManual);
+      els.authTabManual.setAttribute('aria-selected', activeManual ? 'true' : 'false');
+    }
+
+    showPanel(els.authRegisterPanel, tab === 'register');
+    showPanel(els.authPhonePanel, tab === 'phone');
+    showPanel(els.authManualPanel, tab === 'manual');
+
+    if (tab === 'phone') {
+      updatePhoneContinueState();
+      initNip46Pairing().then(function () {
+        setAuthMessage('Scan QR in your signer app. Continue unlocks after pairing.', 'warn');
+      }).catch(function (err) {
+        setAuthMessage(err.message || 'Unable to prepare phone signer QR.', 'error');
+      });
+      return;
+    }
+    if (tab === 'manual') {
+      setAuthMessage('Create a challenge, then paste the signed event JSON.', 'warn');
+      return;
+    }
+    setAuthMessage('Register uses your Nostr signer and creates your account on first successful sign-in.', 'warn');
+  }
+
+  function showAuthModal(initialTab) {
     if (!els.authModal) {
       return;
     }
@@ -415,8 +447,8 @@
     document.body.classList.add('auth-modal-open');
     resetAuthPanels();
     setAuthControlsDisabled(false);
-    prepareDefaultAuthView();
     refreshAuthIntentUi();
+    setActiveAuthTab(initialTab || 'register');
   }
 
   function hideAuthModal() {
@@ -424,7 +456,9 @@
       return;
     }
     els.authModal.classList.remove('is-open');
-    document.body.classList.remove('auth-modal-open');
+    if (!els.authInfoModal || !els.authInfoModal.classList.contains('is-open')) {
+      document.body.classList.remove('auth-modal-open');
+    }
     setAuthMessage('', '');
     setAuthControlsDisabled(false);
     if (authModalHideTimer) {
@@ -435,6 +469,32 @@
         els.authModal.hidden = true;
       }
       authModalHideTimer = null;
+    }, 210);
+  }
+
+  function showInfoModal() {
+    if (!els.authInfoModal) {
+      return;
+    }
+    els.authInfoModal.hidden = false;
+    requestAnimationFrame(function () {
+      els.authInfoModal.classList.add('is-open');
+    });
+    document.body.classList.add('auth-modal-open');
+  }
+
+  function hideInfoModal() {
+    if (!els.authInfoModal) {
+      return;
+    }
+    els.authInfoModal.classList.remove('is-open');
+    if (!els.authModal || !els.authModal.classList.contains('is-open')) {
+      document.body.classList.remove('auth-modal-open');
+    }
+    setTimeout(function () {
+      if (!els.authInfoModal.classList.contains('is-open')) {
+        els.authInfoModal.hidden = true;
+      }
     }, 210);
   }
 

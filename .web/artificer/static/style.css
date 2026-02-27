@@ -1983,6 +1983,7 @@ button:disabled,
   color: var(--text-muted);
   font-size: 0.86rem;
   line-height: 1.2;
+  animation: conversation-switch-overlay-in 140ms ease-out both;
 }
 
 .conversation-switch-overlay-content {
@@ -1999,6 +2000,19 @@ button:disabled,
 
 .conversation-switch-overlay.hidden {
   display: none !important;
+}
+
+@keyframes conversation-switch-overlay-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
 }
 
 .conversation-switch-overlay-label {
