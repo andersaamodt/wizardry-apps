@@ -4474,10 +4474,12 @@ label {
 }
 
 .settings-inline-msg {
-  margin-left: auto;
+  margin-left: 2px;
   min-height: 1.1rem;
   font-size: 0.82rem;
   color: var(--text-subtle);
+  position: relative;
+  top: 1px;
 }
 
 .settings-inline-msg.is-pending {
