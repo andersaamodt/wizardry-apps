@@ -9,6 +9,151 @@
     /* Default styles provided by pandoc.
     ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
     */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
     code{white-space: pre-wrap;}
     span.smallcaps{font-variant: small-caps;}
     div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -25,11 +170,9 @@
     }
     .display.math{display: block; text-align: center; margin: 0.5rem auto;}
   </style>
-  <link rel="stylesheet" href="/static/style.css?v=20260227-dictateattach1" />
-  <script src="/static/js/htmx.min.js"></script>
-  <script src="/static/js/idiomorph-ext.min.js"></script>
 </head>
 <body>
+<link rel="stylesheet" href="/static/style.css?v=20260227-reviewassay1" />
 <link id="artificer-theme-stylesheet" rel="stylesheet" href="/static/themes/psionic.css" />
 <div id="forge-shell" class="forge-shell">
 <aside class="workspace-sidebar" id="workspace-dropzone" tabindex="0">
@@ -209,7 +352,7 @@ push</span>
 </button>
 </div>
 </div>
-<div class="toolbar-right-group"><span class="toolbar-divider commit-terminal-divider"
+<p><span class="toolbar-divider commit-terminal-divider"
 aria-hidden="true"></span>
 <button id="terminal-toggle-btn" class="toolbar-btn terminal-icon-btn" type="button" aria-label="Terminal" title="Toggle terminal">
 <span
@@ -217,7 +360,7 @@ aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 </button>
 <button id="changes-btn" class="toolbar-btn changes-btn" type="button" title="Open diff panel"><span
 class="git-delta"><span class="git-add">+0</span> <span
-class="git-del">-0</span></span></button></div>
+class="git-del">-0</span></span></button></p>
 </div>
 </header>
 <section class="chat-shell">
@@ -464,15 +607,24 @@ aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 <button id="run-btn" class="run-fab" type="submit" aria-label="Run agent" title="Send message" aria-haspopup="menu" aria-expanded="false" data-tooltip="Send message. Right-click for Queue/Stop options.">
 <span aria-hidden="true">↑</span>
 </button>
-<div id="send-menu" class="floating-menu hidden send-menu" role="menu" aria-label="Send options">
-<button id="send-menu-queue-btn" type="button" data-action="send-menu-queue"><span>Queue</span><span class="shortcut">Enter</span></button>
-<button id="send-menu-stop-btn" type="button" data-action="send-menu-stop"><span>Stop</span><span class="shortcut">⌘⇧Enter</span></button>
+<div id="send-menu" class="floating-menu hidden send-menu" role="menu"
+aria-label="Send options">
+<button id="send-menu-queue-btn" type="button" data-action="send-menu-queue">
+<span>Queue</span><span class="shortcut">Enter</span>
+</button>
+<button id="send-menu-stop-btn" type="button" data-action="send-menu-stop">
+<span>Stop</span><span class="shortcut">⌘⇧Enter</span>
+</button>
 </div>
 </div>
-<div id="dictation-mode" class="dictation-mode hidden" aria-live="polite">
-<div id="dictation-wave" class="dictation-wave" aria-hidden="true"></div>
-<span id="dictation-timer" class="dictation-timer">0:00</span>
-<button id="dictation-stop-btn" class="dictation-stop-btn" type="button" aria-label="Stop dictation"><span class="dictation-stop-icon" aria-hidden="true"></span></button>
+<div id="dictation-mode" class="dictation-mode hidden"
+aria-live="polite">
+<div id="dictation-wave" class="dictation-wave" aria-hidden="true">
+
+</div>
+<p><span id="dictation-timer" class="dictation-timer">0:00</span>
+<button id="dictation-stop-btn" class="dictation-stop-btn" type="button" aria-label="Stop dictation"><span
+class="dictation-stop-icon" aria-hidden="true"></span></button></p>
 </div>
 </div>
 <div class="session-row">
@@ -612,9 +764,6 @@ title="Context window information will display here.">
 </div>
 </form>
 </section>
-<div id="conversation-switch-overlay" class="conversation-switch-overlay hidden" aria-live="polite">
-<span class="conversation-switch-overlay-content"><span class="conversation-switch-overlay-label">Loading messages...</span><span class="run-spinner" aria-hidden="true"></span></span>
-</div>
 </main>
 <aside id="diff-panel" class="diff-panel hidden" aria-label="Git diff panel">
 <div id="diff-resizer" class="pane-resizer diff-resizer"
@@ -755,18 +904,72 @@ available).
 </p>
 <div class="modal-actions modal-actions-compact dictation-install-row">
 <button id="install-dictation-btn" type="button" class="ui-pending-spinner" disabled>
-Checking...
+Checking…
 </button>
-<p id="dictation-install-status" class="settings-hint hidden"></p>
+<p id="dictation-install-status" class="settings-hint hidden">
+</p>
 </div>
 <div id="dictation-shortcut-row" class="dictation-shortcut-row hidden">
-<label class="dictation-shortcut-field" for="dictation-hold-shortcut"><span>Hold-to-Talk (Press)</span><select id="dictation-hold-shortcut"></select></label>
-<label class="dictation-shortcut-field" for="dictation-toggle-shortcut"><span>Toggle</span><select id="dictation-toggle-shortcut"></select></label>
+<p><label class="dictation-shortcut-field" for="dictation-hold-shortcut"><span>Hold-to-Talk
+(Press)</span><select id="dictation-hold-shortcut"></select></label>
+<label class="dictation-shortcut-field" for="dictation-toggle-shortcut"><span>Toggle</span><select id="dictation-toggle-shortcut"></select></label></p>
 </div>
-<label id="dictation-language-row" class="dictation-language-field hidden" for="dictation-language-select"><span>Language (Improves Accuracy)</span><select id="dictation-language-select"></select></label>
-<label id="dictation-prewarm-row" class="toggle-row hidden" title="When enabled, Artificer keeps a rolling 2-second local capture buffer while this window is visible to reduce start delay. Up to 2 seconds from just before start can be included.">
-<input id="dictation-prewarm-toggle" type="checkbox" checked /> Prewarm for instant dictation (2s buffer)
+<div class="settings-sep">
+
+</div>
+<div class="settings-rules">
+<div class="settings-rules-head">
+<p><strong>Programming mode</strong></p>
+</div>
+<label class="toggle-row" title="Run a built-in code reviewer pass after implementation verification in Programming mode.">
+<input id="programmer-review-toggle" type="checkbox" checked />
+Programmer does code reviews </label>
+<label class="settings-inline-field" for="programmer-review-rounds">
+<span>Max review rounds</span> <select id="programmer-review-rounds">
+<option value="1">1</option> <option value="2" selected>2</option>
+<option value="3">3</option> <option value="4">4</option> </select>
 </label>
+<p id="programmer-review-hint" class="settings-hint">
+Programming mode will run reviewer passes for high-signal issues only.
+</p>
+</div>
+<div class="settings-sep">
+
+</div>
+<div class="settings-rules">
+<div class="settings-rules-head">
+<p><strong>Capability assay cycle</strong></p>
+</div>
+<p class="settings-hint">
+Queue difficult benchmark tasks in sequence to stress intelligence,
+execution quality, and conversation flow.
+</p>
+<label class="settings-inline-field" for="assay-cycle-count">
+<span>Cycles to queue</span> <select id="assay-cycle-count">
+<option value="1" selected>1 cycle</option> <option value="2">2
+cycles</option> <option value="3">3 cycles</option> <option value="4">4
+cycles</option> </select> </label>
+<p id="assay-cycle-summary" class="settings-hint">
+Loading assay tasks…
+</p>
+<div class="modal-actions modal-actions-compact assay-actions">
+<button id="assay-queue-next-btn" type="button">
+Queue next task
+</button>
+<button id="assay-queue-cycle-btn" type="button">
+Queue cycle
+</button>
+<button id="assay-reset-btn" class="ghost" type="button">
+Reset cycle
+</button>
+</div>
+<div id="assay-task-list" class="assay-task-list">
+
+</div>
+</div>
+<div class="settings-sep">
+
+</div>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
 <label for="ssh-email">SSH key email/comment (optional)</label>
@@ -1011,7 +1214,7 @@ Decision filters</label>
 </div>
 </div>
 </div>
-<script src="/static/artificer-app.js?v=20260227-wavefix12"></script>
 </div>
+<script src="/static/artificer-app.js?v=20260227-reviewassay1"></script>
 </body>
 </html>

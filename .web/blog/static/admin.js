@@ -1331,16 +1331,20 @@
       return;
     }
 
-    let html = '<div class="draft-grid">';
+    let html = '<div class="draft-rows">';
     drafts.forEach(function (draft) {
-      html += '<div class="draft-card">';
-      html += '<div class="draft-card-head"><strong>' + escapeHtml(draft.title || 'Untitled') + '</strong></div>';
-      if (draft.content_excerpt) {
-        html += '<div class="muted">' + escapeHtml(draft.content_excerpt) + '</div>';
-      }
-      html += '<div class="draft-actions">';
+      const title = String(draft.title || 'Untitled');
+      const excerpt = String(draft.content_excerpt || '').trim();
+      const lineText = excerpt ? (title + ' - ' + excerpt) : title;
+      html += '<div class="draft-row">';
+      html += '<div class="draft-row-main">';
+      html += '<span class="draft-row-line" title="' + escapeAttr(lineText) + '"><strong>' + escapeHtml(title) + '</strong>' +
+        (excerpt ? '<span class="draft-row-excerpt"> - ' + escapeHtml(excerpt) + '</span>' : '') +
+        '</span>';
+      html += '</div>';
+      html += '<div class="draft-row-actions">';
       html += '<button type="button" data-action="edit" data-id="' + escapeHtml(draft.draft_id) + '">Edit</button>';
-      html += '<button type="button" class="danger" data-action="delete" data-id="' + escapeHtml(draft.draft_id) + '">Delete</button>';
+      html += '<button type="button" class="draft-delete" data-action="delete" data-id="' + escapeHtml(draft.draft_id) + '" aria-label="Delete draft" title="Delete draft">' + prioritiesTrashIconSvg() + '</button>';
       html += '</div>';
       html += '</div>';
     });
