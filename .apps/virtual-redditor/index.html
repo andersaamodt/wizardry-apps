@@ -4662,16 +4662,21 @@
           var modeId = String(mode.id || '');
           var counts = modeSummaryCounts(mode, actionChoices);
           var isActive = modeId === String(state.modeDrawerModeId || '');
+          var expiryHours = Math.max(0, parseInt(mode.defaultExpiryHours, 10) || 0);
           var metaPills = [
             '<span class="mode-summary-flag actions" title="Enabled actions in this mode">' +
               '<span class="mode-summary-flag-icon" aria-hidden="true">☰</span>' +
               '<span>' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + '</span>' +
-            '</span>',
-            '<span class="mode-summary-flag expiry" title="Default mode expiry in hours">' +
-              '<span class="mode-summary-flag-icon" aria-hidden="true">◷</span>' +
-              '<span>' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h</span>' +
             '</span>'
           ];
+          if (expiryHours > 0) {
+            metaPills.push(
+              '<span class="mode-summary-flag expiry" title="Default mode expiry in hours">' +
+                '<span class="mode-summary-flag-icon" aria-hidden="true">◷</span>' +
+                '<span>' + escapeHtml(String(expiryHours)) + 'h</span>' +
+              '</span>'
+            );
+          }
           var constraintPills = modeConstraintPillsHtml(mode);
           if (constraintPills) metaPills.push(constraintPills);
           var pillsHtml = metaPills.join('');

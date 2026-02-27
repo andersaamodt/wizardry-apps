@@ -1715,12 +1715,14 @@ label {
 }
 
 .mode-summary-flag.actions {
+  gap: 0.14rem;
   border-color: color-mix(in srgb, var(--accent) 44%, var(--line));
   color: color-mix(in srgb, var(--accent-strong) 78%, var(--text) 22%);
   background: color-mix(in srgb, var(--accent) 14%, var(--bg-panel) 86%);
 }
 
 .mode-summary-flag.expiry {
+  gap: 0.14rem;
   border-color: color-mix(in srgb, var(--danger) 52%, var(--line));
   color: color-mix(in srgb, var(--danger) 78%, var(--text) 22%);
   background: color-mix(in srgb, var(--danger) 14%, var(--bg-panel) 86%);
