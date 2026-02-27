@@ -225,6 +225,9 @@
     host.innerHTML = '';
     var toast = document.createElement('div');
     toast.className = 'nav-top-toast';
+    if (tone) {
+      toast.classList.add('is-' + String(tone));
+    }
     toast.textContent = text;
     host.appendChild(toast);
     requestAnimationFrame(function () {
@@ -1161,6 +1164,7 @@
     var opts = options && typeof options === 'object' ? options : {};
     var getPubkeyFn = typeof opts.getPubkeyFn === 'function' ? opts.getPubkeyFn : null;
     var pubkeyHint = String(opts.pubkeyHint || '').trim();
+    var registerAttempt = !!opts.registerAttempt;
     setAuthMessage('Creating a single-use login challenge...', 'warn');
     return beginChallenge(pubkeyHint || localStorage.getItem('last_auth_pubkey') || '')
       .then(function (begin) {
@@ -1204,13 +1208,17 @@
       .then(function (finish) {
         rememberAuth(finish);
         return idbDelete(KEY_DEVICE_SESSION).then(function () {
+          if (registerAttempt && finish && finish.account_created === false) {
+            showNavToast('Logged in. This Nostr key already has an account.', 'ok', 4200);
+          }
           return finalizeLoginUiAfterSuccess(finish);
         });
       });
   }
 
-  function loginWithNip07() {
+  function loginWithNip07(options) {
     var signer = getBrowserSigner();
+    var opts = options && typeof options === 'object' ? options : {};
     try {
       if (typeof window.focus === 'function') {
         window.focus();
@@ -1226,7 +1234,8 @@
         getPubkeyFn: typeof signer.getPublicKey === 'function'
           ? function () { return Promise.resolve(signer.getPublicKey()); }
           : null,
-        pubkeyHint: ''
+        pubkeyHint: '',
+        registerAttempt: !!opts.registerAttempt
       }
     );
   }
@@ -1247,12 +1256,13 @@
     });
   }
 
-  function startDesktopSignerLogin() {
+  function startDesktopSignerLogin(registerAttempt) {
+    var asRegister = !!registerAttempt;
     if (!hasDesktopSigner()) {
       return Promise.reject(new Error('No desktop signer detected. Use the login menu for phone QR or signed challenge login.'));
     }
     setAuthControlsDisabled(true);
-    return loginWithNip07().finally(function () {
+    return loginWithNip07({ registerAttempt: asRegister }).finally(function () {
       setAuthControlsDisabled(false);
     });
   }
@@ -1495,7 +1505,7 @@
     if (els.loginBtn) {
       els.loginBtn.addEventListener('click', function () {
         closeLoginMenu();
-        startDesktopSignerLogin().catch(function (err) {
+        startDesktopSignerLogin(false).catch(function (err) {
           showAuthModal('register');
           setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
         });
@@ -1645,7 +1655,7 @@
 
     if (els.authRegisterBtn) {
       els.authRegisterBtn.addEventListener('click', function () {
-        startDesktopSignerLogin().catch(function (err) {
+        startDesktopSignerLogin(true).catch(function (err) {
           setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
         });
       });

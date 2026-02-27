@@ -525,6 +525,12 @@ header h1 {
   transform: translateY(-7px);
 }
 
+.nav-top-toast.is-ok {
+  border-color: #9ad5b0;
+  background: rgba(235, 252, 242, 0.98);
+  color: #14532d;
+}
+
 .auth-modal[hidden] {
   display: none;
 }

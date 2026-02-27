@@ -153,12 +153,14 @@ if [ -n "$delegation_json" ]; then
 fi
 
 username=$(blog_find_username_by_nostr_pubkey "$user_pubkey" 2>/dev/null || printf '')
+account_created=false
 if [ -z "$username" ]; then
   username=$(blog_suggest_username_from_nostr_pubkey "$user_pubkey" 2>/dev/null || printf '')
   if [ -z "$username" ]; then
     blog_json_error "Failed to create username for Nostr identity" "username_failed"
     exit 0
   fi
+  account_created=true
 fi
 
 fingerprint=$(printf '%s' "$user_pubkey" | blog_sha256)
@@ -185,6 +187,7 @@ printf '"delegated_login":%s,' "$delegated_login"
 printf '"delegation_id":"%s",' "$(blog_json_escape "$delegation_id")"
 printf '"delegation_session_pubkey":"%s",' "$(blog_json_escape "$delegation_session_pubkey")"
 printf '"delegation_expires_at":"%s",' "$(blog_json_escape "$delegation_expires_at")"
+printf '"account_created":%s,' "$account_created"
 printf '"is_admin":%s,' "$is_admin"
 printf '"session_token":"%s",' "$(blog_json_escape "$session_token")"
 printf '"csrf_token":"%s"' "$(blog_json_escape "$csrf_token")"
