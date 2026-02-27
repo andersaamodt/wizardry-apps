@@ -1559,8 +1559,8 @@ label {
   background: transparent;
 }
 
-.mode-summary-card:hover {
-  background: color-mix(in srgb, var(--accent) 8%, var(--bg-panel) 92%);
+.mode-summary-card:nth-child(even) {
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg-panel) 96%);
 }
 
 .mode-summary-card.active {
