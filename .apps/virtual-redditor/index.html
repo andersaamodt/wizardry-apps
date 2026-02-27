@@ -829,6 +829,74 @@
       return normalizedUnit === 'hours' ? (n * 3600) : (n * 60);
     }
 
+    function tooltipTextFromElement(el) {
+      if (!el || !el.getAttribute) return '';
+      return String(
+        el.getAttribute('title') ||
+        el.getAttribute('data-tooltip') ||
+        el.getAttribute('aria-label') ||
+        ''
+      ).trim();
+    }
+
+    function syncTooltipAcrossElements(list) {
+      if (!Array.isArray(list) || !list.length) return;
+      var text = '';
+      for (var i = 0; i < list.length; i += 1) {
+        text = tooltipTextFromElement(list[i]);
+        if (text) break;
+      }
+      if (!text) return;
+      var seen = {};
+      for (var j = 0; j < list.length; j += 1) {
+        var el = list[j];
+        if (!el || !el.nodeType || !el.setAttribute) continue;
+        var key = el.tagName + '::' + String(el.id || '') + '::' + String(el.className || '');
+        if (seen[key]) continue;
+        seen[key] = true;
+        el.setAttribute('title', text);
+      }
+    }
+
+    function syncControlAndLabelTooltips(root) {
+      var scope = root || document;
+      if (!scope || !scope.querySelectorAll) return;
+
+      // Pair explicit labels with their controls.
+      var labelsFor = scope.querySelectorAll('label[for]');
+      for (var i = 0; i < labelsFor.length; i += 1) {
+        var label = labelsFor[i];
+        var id = String(label.getAttribute('for') || '').trim();
+        if (!id) continue;
+        var control = document.getElementById(id);
+        if (!control) continue;
+        syncTooltipAcrossElements([label, control]);
+      }
+
+      // Pair wrapping labels with contained controls.
+      var wrappingLabels = scope.querySelectorAll('label');
+      for (var j = 0; j < wrappingLabels.length; j += 1) {
+        var wrap = wrappingLabels[j];
+        var nested = wrap.querySelector('input, select, textarea, button');
+        if (!nested) continue;
+        syncTooltipAcrossElements([wrap, nested]);
+      }
+
+      // Mode rows: carry the same tooltip to the row label and all controls.
+      var rows = scope.querySelectorAll('.mode-field-row');
+      for (var r = 0; r < rows.length; r += 1) {
+        var row = rows[r];
+        var rowLabel = row.querySelector('.mode-field-label');
+        var rowControls = row.querySelectorAll('input, select, textarea, button, .schedule-toggle');
+        var members = [];
+        if (rowLabel) members.push(rowLabel);
+        for (var c = 0; c < rowControls.length; c += 1) {
+          members.push(rowControls[c]);
+        }
+        syncTooltipAcrossElements(members);
+      }
+    }
+
     function updatePassIntervalUnitLabels() {
       var input = document.getElementById('pass-interval-input');
       var unitSelect = document.getElementById('pass-interval-unit');
@@ -3166,6 +3234,7 @@
       state.profiles = Array.isArray(profilesPayload.profiles) ? profilesPayload.profiles : [];
       state.activeProfile = String(profilesPayload.activeProfile || '');
       renderProfiles();
+      syncControlAndLabelTooltips();
 
       var runToggle = document.getElementById('btn-run-toggle');
       var runIcon = document.getElementById('run-toggle-icon');
@@ -6208,6 +6277,7 @@
       applyTheme(state.activeTheme);
       setLeftRailWidth(state.leftRailWidth);
       wireEvents();
+      syncControlAndLabelTooltips();
       updateToolbarButtonStates();
       setActiveTab('persona');
       updateContentEmptyState();

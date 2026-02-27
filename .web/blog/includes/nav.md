@@ -31,7 +31,7 @@
     <button id="nav-menu-logout" class="nav-menu-item nav-menu-item-danger" type="button" role="menuitem">Logout</button>
   </div>
 </div>
-<div class="nav-login-split" id="nav-login-split">
+<div class="nav-login-split" id="nav-login-split" style="display:none;">
   <button class="btn-login btn-login-main" id="login-btn" type="button">Login</button>
   <button class="btn-login btn-login-caret" id="login-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More login options">▾</button>
   <div class="nav-login-menu" id="nav-login-menu" role="menu" hidden>
@@ -44,6 +44,42 @@
 </div>
 </div>
 </nav>
+<script>
+(function () {
+  try {
+    var token = localStorage.getItem('session_token') || '';
+    var cachedName = localStorage.getItem('last_auth_username') || '';
+    var loginSplit = document.getElementById('nav-login-split');
+    var userMenu = document.getElementById('nav-user-menu');
+    var userName = document.getElementById('nav-user-name');
+    if (token) {
+      if (loginSplit) {
+        loginSplit.style.display = 'none';
+      }
+      if (userMenu) {
+        userMenu.style.display = 'inline-flex';
+      }
+      if (userName) {
+        userName.style.display = 'inline-block';
+        userName.textContent = cachedName || 'signed-in';
+      }
+      return;
+    }
+    if (loginSplit) {
+      loginSplit.style.display = 'inline-flex';
+    }
+    if (userMenu) {
+      userMenu.style.display = 'none';
+    }
+    if (userName) {
+      userName.style.display = 'none';
+      userName.textContent = '';
+    }
+  } catch (_err) {
+    // Ignore storage access issues and let nav-auth.js reconcile state.
+  }
+})();
+</script>
 
 <div class="auth-modal" id="auth-modal" hidden>
   <div class="auth-modal-backdrop" data-close-auth-modal></div>
