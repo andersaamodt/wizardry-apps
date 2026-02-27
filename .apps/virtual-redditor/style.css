@@ -2640,8 +2640,8 @@ label {
 
 #ban-levels-table {
   table-layout: auto;
-  width: calc(100% - 8px);
-  margin: 0 4px;
+  width: calc(100% - 4px);
+  margin: 0 0 0 4px;
 }
 
 #ban-levels-table th,
