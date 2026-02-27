@@ -108,9 +108,6 @@ title: Blog Admin
 </section>
 </div>
 
-<div class="section-actions">
-<p class="muted">Changes save automatically.</p>
-</div>
 <div id="output-config" class="output"></div>
 </div>
 </section>
@@ -132,20 +129,23 @@ title: Blog Admin
 </div>
 <div class="field-row">
 <label for="nostr-relays" title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line."><strong title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line.">Relay List</strong></label>
+<div class="bridge-textarea-wrap">
 <textarea id="nostr-relays" class="bridge-textarea" rows="4" placeholder="wss://relay.damus.io&#10;wss://relay.primal.net" title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line."></textarea>
+<div id="nostr-relays-save-status" class="autosave-indicator bridge-save-indicator" hidden></div>
+</div>
 </div>
 <div class="field-row">
 <label for="nostr-blocklist" title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line."><strong title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line.">Blocked Pubkeys</strong></label>
+<div class="bridge-textarea-wrap">
 <textarea id="nostr-blocklist" class="bridge-textarea" rows="4" placeholder="hexpubkey_to_block" title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line."></textarea>
+<div id="nostr-blocklist-save-status" class="autosave-indicator bridge-save-indicator" hidden></div>
+</div>
 </div>
 </section>
 </div>
 
-<p class="muted">These settings are stored in <code>site/&lt;site-name&gt;/nostr/state/</code> as <code>authors</code>, <code>relays</code>, and <code>blocklist</code>.</p>
+<p class="muted">These settings are stored in <code>&lt;site-name&gt;/nostr/state/</code> as <code>authors</code>, <code>relays</code>, and <code>blocklist</code>.</p>
 
-<div class="section-actions">
-<p class="muted">Changes save automatically.</p>
-</div>
 <div id="output-nostr-bridge" class="output"></div>
 </div>
 </section>
@@ -918,9 +918,22 @@ body {
   width: min(100%, 42rem) !important;
   max-inline-size: 100% !important;
   min-height: 5.6rem;
+  padding-bottom: 1.95rem !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.86rem;
   line-height: 1.35;
+}
+
+[data-admin-section="nostr-bridge"] .bridge-textarea-wrap {
+  position: relative;
+  inline-size: min(100%, 42rem);
+  max-inline-size: 100%;
+}
+
+[data-admin-section="nostr-bridge"] .bridge-save-indicator {
+  right: 0.72rem;
+  bottom: 0.46rem;
+  font-size: 0.73rem;
 }
 
 [data-admin-section="settings"] #admin-theme {

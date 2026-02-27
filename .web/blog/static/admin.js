@@ -52,6 +52,8 @@
     nostrBridgeEnabled: document.getElementById('nostr-bridge-enabled'),
     nostrRelays: document.getElementById('nostr-relays'),
     nostrBlocklist: document.getElementById('nostr-blocklist'),
+    nostrRelaysSaveStatus: document.getElementById('nostr-relays-save-status'),
+    nostrBlocklistSaveStatus: document.getElementById('nostr-blocklist-save-status'),
     newUsersAreAdmins: document.getElementById('new-users-are-admins'),
     postTitle: document.getElementById('post-title'),
     postTags: document.getElementById('post-tags'),
@@ -997,6 +999,44 @@
       .join('\n');
   }
 
+  function setNostrBridgeSaveStatus(kind, detail) {
+    const nodes = [els.nostrRelaysSaveStatus, els.nostrBlocklistSaveStatus].filter(Boolean);
+    if (!nodes.length) {
+      return;
+    }
+    const mode = String(kind || '').trim();
+    nodes.forEach(function (node) {
+      if (!mode) {
+        node.hidden = true;
+        node.textContent = '';
+        node.removeAttribute('title');
+        node.classList.remove('is-saving', 'is-error');
+        return;
+      }
+      node.hidden = false;
+      node.classList.toggle('is-saving', mode === 'saving');
+      node.classList.toggle('is-error', mode === 'error');
+      if (mode === 'saving') {
+        node.textContent = 'Saving...';
+        node.removeAttribute('title');
+      } else if (mode === 'saved') {
+        node.textContent = '✓ Saved';
+        if (detail) {
+          node.setAttribute('title', String(detail));
+        } else {
+          node.removeAttribute('title');
+        }
+      } else {
+        node.textContent = 'Save failed';
+        if (detail) {
+          node.setAttribute('title', String(detail));
+        } else {
+          node.removeAttribute('title');
+        }
+      }
+    });
+  }
+
   async function saveNostrBridgeConfig() {
     try {
       const data = await apiPost('/cgi/blog-update-config', {
@@ -1013,10 +1053,12 @@
         els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
       }
       await loadConfig();
+      setNostrBridgeSaveStatus('saved', 'Saved at ' + new Date().toLocaleString());
       if (els.outputNostrBridge) {
         els.outputNostrBridge.innerHTML = '';
       }
     } catch (err) {
+      setNostrBridgeSaveStatus('error', 'Autosave failed (' + err.message + ')');
       setOutput(els.outputNostrBridge, 'Error: ' + err.message, 'error');
     }
   }
@@ -1028,6 +1070,7 @@
     if (state.nostrBridgeSaveTimer) {
       clearTimeout(state.nostrBridgeSaveTimer);
     }
+    setNostrBridgeSaveStatus('saving');
     state.nostrBridgeSaveTimer = setTimeout(function () {
       saveNostrBridgeConfig().catch(function () {});
     }, Math.max(180, Number(delayMs || 700)));
