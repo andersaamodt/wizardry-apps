@@ -1211,17 +1211,33 @@ check_subreddit_json() {
     return 0
   fi
 
-  url="https://www.reddit.com/r/$name/about.json"
   existing_username=$(read_env_var "$REDDIT_ENV_FILE" REDDIT_USERNAME)
   check_agent=$(oauth_default_user_agent "$existing_username" "$name")
-  body=$(curl -sS -A "$check_agent" "$url" 2>/dev/null || printf '')
+  body=''
+  http_status=''
+  for host in old.reddit.com www.reddit.com; do
+    url="https://$host/r/$name/about.json?raw_json=1"
+    response=$(curl -L -sS --connect-timeout 5 --max-time 12 -A "$check_agent" -H 'accept: application/json' -w '\n__VR_HTTP_STATUS__:%{http_code}' "$url" 2>/dev/null || printf '')
+    [ -n "$response" ] || continue
+    status_candidate=$(printf '%s\n' "$response" | sed -n 's/^__VR_HTTP_STATUS__://p' | tail -n 1 | tr -d '\r')
+    body_candidate=$(printf '%s\n' "$response" | sed '/^__VR_HTTP_STATUS__:/d')
+    [ -n "$status_candidate" ] || continue
+    if [ "$status_candidate" = "429" ] && [ "$host" = "old.reddit.com" ]; then
+      continue
+    fi
+    http_status=$status_candidate
+    body=$body_candidate
+    break
+  done
+
   if [ -z "$body" ]; then
     jq -cn --arg name "$name" '{ok:true,subreddit:$name,exists:false,error:"Could not verify subreddit right now."}'
     return 0
   fi
 
+  kind=$(printf '%s' "$body" | jq -r '.kind // empty' 2>/dev/null || printf '')
   created_utc=$(printf '%s' "$body" | jq -r '.data.created_utc // empty' 2>/dev/null || printf '')
-  if [ -n "$created_utc" ]; then
+  if [ -n "$created_utc" ] && [ "$kind" = "t5" ]; then
     display=$(printf '%s' "$body" | jq -r '.data.display_name // empty' 2>/dev/null || printf '')
     [ -z "$display" ] && display=$name
     month_year=$(format_epoch_month_year "$created_utc")
@@ -1239,9 +1255,17 @@ check_subreddit_json() {
   fi
 
   err_code=$(printf '%s' "$body" | jq -r '.error // empty' 2>/dev/null || printf '')
-  if [ "$err_code" = "404" ]; then
+  if [ "$http_status" = "404" ] || [ "$err_code" = "404" ]; then
     jq -cn --arg name "$name" '{ok:true,subreddit:$name,exists:false,error:"Subreddit not found."}'
     return 0
+  fi
+
+  if [ "$kind" = "Listing" ]; then
+    child_count=$(printf '%s' "$body" | jq -r '.data.children | length' 2>/dev/null || printf '')
+    if [ "$child_count" = "0" ]; then
+      jq -cn --arg name "$name" '{ok:true,subreddit:$name,exists:false,error:"Subreddit not found."}'
+      return 0
+    fi
   fi
 
   jq -cn --arg name "$name" '{ok:true,subreddit:$name,exists:false,error:"Could not verify subreddit right now."}'

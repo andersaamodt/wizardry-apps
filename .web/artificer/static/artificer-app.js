@@ -3072,15 +3072,14 @@
       );
     }
 
-    var ready = !isSubmitting && Date.now() >= Number(state.pendingArchiveReadyAt || 0);
-    var disabledAttr = ready ? "" : " disabled";
+    var ready = !isSubmitting;
     var readyClass = ready ? " ready" : "";
     var loadingClass = isSubmitting ? " loading" : "";
     var label = isSubmitting
       ? "<span class='thread-confirm-spinner' aria-hidden='true'></span><span>Archiving...</span>"
       : "Confirm";
     return (
-      "<button type='button' class='thread-confirm-btn" + readyClass + loadingClass + "' data-action='confirm-archive-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversationId) + "'" + disabledAttr + ">" + label + "</button>"
+      "<button type='button' class='thread-confirm-btn" + readyClass + loadingClass + "' data-action='confirm-archive-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversationId) + "'>" + label + "</button>"
     );
   }
 
@@ -3549,24 +3548,6 @@
     el.chatLog.scrollTop = el.chatLog.scrollHeight;
     state.chatAutoScroll = true;
     updateChatJumpButton();
-  }
-
-  function markArchiveConfirmReady(workspaceId, conversationId, key) {
-    if (!workspaceId || !conversationId || !key) {
-      return;
-    }
-    window.setTimeout(function () {
-      if (state.pendingArchiveKey !== key) {
-        return;
-      }
-      var selector = ".thread-confirm-btn[data-workspace-id='" + escAttr(workspaceId) + "'][data-conversation-id='" + escAttr(conversationId) + "']";
-      var button = el.workspaceTree ? el.workspaceTree.querySelector(selector) : null;
-      if (!button) {
-        return;
-      }
-      button.disabled = false;
-      button.classList.add("ready");
-    }, 270);
   }
 
   function normalizedRunEventsList(list) {
@@ -16058,9 +16039,8 @@
       event.stopPropagation();
       var archiveKey = conversationReadKey(workspaceId, conversationId);
       state.pendingArchiveKey = archiveKey;
-      state.pendingArchiveReadyAt = Date.now() + 250;
+      state.pendingArchiveReadyAt = Date.now();
       renderUi();
-      markArchiveConfirmReady(workspaceId, conversationId, archiveKey);
       return;
     }
 
@@ -16071,7 +16051,7 @@
       event.preventDefault();
       event.stopPropagation();
       var key = conversationReadKey(workspaceId, conversationId);
-      if (key !== state.pendingArchiveKey || key === state.pendingArchiveSubmittingKey || Date.now() < Number(state.pendingArchiveReadyAt || 0)) {
+      if (key !== state.pendingArchiveKey || key === state.pendingArchiveSubmittingKey) {
         return;
       }
       state.pendingArchiveSubmittingKey = key;

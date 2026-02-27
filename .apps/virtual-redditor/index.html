@@ -818,6 +818,7 @@
     var MODEL_INSTALL_KEY = 'wizardry.virtual_redditor.models.installed';
     var LEFT_RAIL_WIDTH_KEY = 'wizardry.virtual_redditor.left_rail.width';
     var PROFILES_CACHE_KEY = 'wizardry.virtual_redditor.profiles.cache';
+    var EXTRACT_NORMS_TOOLTIP_TEXT = 'Reads subreddit discourse and appends proposed social norms for your review. Can take several minutes.';
     var UI_PREF_MAP = {
       'wizardry.virtual_redditor.theme': 'theme',
       'wizardry.virtual_redditor.models.installed': 'models_installed',
@@ -882,6 +883,7 @@
       subredditCheckReqId: 0,
       subredditCheckedValue: '',
       subredditCheckStatus: 'idle',
+      subredditCheckMessage: '',
       createProfileInFlight: false,
       createProfileMode: false,
       oauthPollTimer: null,
@@ -1908,6 +1910,7 @@
         el.title = '';
         meta.classList.add('hidden');
         state.subredditCheckStatus = 'idle';
+        state.subredditCheckMessage = '';
         updateToolbarButtonStates();
         updateExtractNormsRunEnabled();
         return;
@@ -1924,15 +1927,36 @@
         meta.classList.add('is-error');
       }
       if (metaText) {
-        meta.textContent = String(metaText);
+        if (s === 'invalid' && shouldShowSubredditCheckRetry(metaText)) {
+          meta.appendChild(document.createTextNode(String(metaText) + ' '));
+          var retryBtn = document.createElement('button');
+          retryBtn.type = 'button';
+          retryBtn.className = 'subreddit-check-retry';
+          retryBtn.textContent = 'Retry';
+          retryBtn.title = 'Retry subreddit verification';
+          retryBtn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            scheduleSubredditCheck(0, true);
+          });
+          meta.appendChild(retryBtn);
+        } else {
+          meta.textContent = String(metaText);
+        }
         meta.classList.remove('hidden');
       } else {
         meta.classList.add('hidden');
       }
       el.title = text || '';
       state.subredditCheckStatus = s;
+      state.subredditCheckMessage = String(text || metaText || '');
       updateToolbarButtonStates();
       updateExtractNormsRunEnabled();
+    }
+
+    function shouldShowSubredditCheckRetry(message) {
+      var msg = String(message || '').toLowerCase();
+      return msg.indexOf('could not verify subreddit right now') >= 0 || msg.indexOf('rate limit') >= 0 || msg.indexOf('rate-limit') >= 0;
     }
 
     async function validateSubredditExists(subreddit) {
@@ -2055,6 +2079,26 @@
       return state.subredditCheckStatus === 'valid' && current === String(state.subredditCheckedValue || '');
     }
 
+    function extractNormsDisabledReason() {
+      var current = normalizeSubreddit((document.getElementById('subreddit-input') || {}).value || '');
+      if (!current) return "you haven't connected to a subreddit yet";
+      if (state.subredditCheckStatus === 'checking') return 'the subreddit is still being verified';
+      var reason = String(state.subredditCheckMessage || '').trim();
+      if (reason) return reason;
+      return "the subreddit hasn't been verified yet";
+    }
+
+    function extractNormsTooltip(disabled) {
+      var tooltip = EXTRACT_NORMS_TOOLTIP_TEXT;
+      if (!disabled) return tooltip;
+      var reason = extractNormsDisabledReason();
+      if (!reason) return tooltip;
+      var normalized = reason.charAt(0).toLowerCase() + reason.slice(1);
+      tooltip += ' Currently disabled because ' + normalized;
+      if (tooltip.charAt(tooltip.length - 1) !== '.') tooltip += '.';
+      return tooltip;
+    }
+
     function setUsernameEditing(editing) {
       var input = document.getElementById('title-username');
       var display = document.getElementById('title-username-display');
@@ -2094,7 +2138,10 @@
         if (btn) btn.disabled = !connected;
       }
       var extractBtn = document.getElementById('btn-extract-now');
-      if (extractBtn) extractBtn.disabled = !validSubreddit;
+      if (extractBtn) {
+        extractBtn.disabled = !validSubreddit;
+        extractBtn.title = extractNormsTooltip(!validSubreddit);
+      }
     }
 
     function hasBridge() {

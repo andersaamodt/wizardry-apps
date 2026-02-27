@@ -2733,6 +2733,22 @@ label {
   color: var(--danger);
 }
 
+.subreddit-check-retry {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.subreddit-check-retry:hover,
+.subreddit-check-retry:focus-visible {
+  text-decoration: underline;
+}
+
 .subreddit-field {
   align-items: start;
   margin-bottom: 2px;
