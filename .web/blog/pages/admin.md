@@ -1330,7 +1330,9 @@ body {
 }
 
 #admin-panel .user-menu-panel button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   width: 100%;
   text-align: left;
   border: 0;
@@ -1346,6 +1348,13 @@ body {
 
 #admin-panel .user-menu-panel button.user-delete {
   color: #a52c2a;
+}
+
+#admin-panel .user-menu-panel button.user-delete .trash-icon-svg {
+  width: 0.98rem;
+  height: 0.98rem;
+  color: #111;
+  flex: 0 0 auto;
 }
 
 #admin-panel .user-menu-panel button.user-delete:hover {
