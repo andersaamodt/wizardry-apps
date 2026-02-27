@@ -271,13 +271,20 @@ header h1 {
   justify-content: center;
   width: 2.55rem;
   height: 2.3rem;
-  padding: 0;
+  padding: 0 0.08rem 0 0.22rem;
   border-radius: 9px;
+  color: #fff;
 }
 
 .nav-compose-icon svg {
   width: 21px;
   height: 21px;
+  transform: translateY(1px);
+}
+
+.nav-compose-icon:hover,
+.nav-compose-icon.active {
+  color: #fff;
 }
 
 .nav-compose:hover {
