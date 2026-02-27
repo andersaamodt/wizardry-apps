@@ -4241,13 +4241,14 @@
             id: 'opt-out',
             label: 'General opt-out',
             matchAny: ['leave me alone', 'do not reply', 'stop replying', 'opt out'],
-            triggerAction: 'set_mode',
+            triggerAction: 'rate_limit_user',
             adminOnly: false,
-            toMode: 'BAN',
+            toMode: '',
             durationHours: 72,
-            decayTo: 'SHADE',
+            decayTo: '',
             template: 'Acknowledged. I will not continue this conversational dyad right now.',
-            announce: true
+            announce: false,
+            maxRepliesPerUserThread24h: 0
           }
         ];
       }
@@ -4318,6 +4319,14 @@
         next.template = String(next.template || '');
         next.announce = !!next.announce;
         next.maxRepliesPerUserThread24h = Math.max(0, parseInt(next.maxRepliesPerUserThread24h, 10) || 0);
+        if (String(next.id || '').toLowerCase() === 'opt-out' && next.triggerAction === 'set_mode' && String(next.toMode || '').toUpperCase() === 'BAN') {
+          next.triggerAction = 'rate_limit_user';
+          next.toMode = '';
+          next.decayTo = '';
+          if (next.durationHours <= 0) next.durationHours = 72;
+          next.maxRepliesPerUserThread24h = 0;
+          next.announce = false;
+        }
         return next;
       });
 

@@ -441,12 +441,13 @@ mode_default_config_json() {
           id: "opt-out",
           label: "General opt-out",
           matchAny: ["leave me alone","do not reply","dont reply","stop replying","opt out"],
-          triggerAction: "set_mode",
+          triggerAction: "rate_limit_user",
           adminOnly: false,
-          toMode: "BAN",
+          toMode: "",
           durationHours: 72,
-          decayTo: "SHADE",
-          announce: true,
+          decayTo: "",
+          announce: false,
+          maxRepliesPerUserThread24h: 0,
           template: "Acknowledged. I will not continue this conversational dyad right now."
         }
       ],
@@ -491,7 +492,28 @@ ensure_relationships_file() {
 
 read_modes_config_json() {
   ensure_modes_config_file
-  cat "$MODES_CONFIG_FILE" 2>/dev/null || mode_default_config_json
+  raw=$(cat "$MODES_CONFIG_FILE" 2>/dev/null || mode_default_config_json)
+  printf '%s' "$raw" | jq -c '
+    if ((.actionTriggers // null) | type) == "array" then
+      .actionTriggers |= map(
+        if ((.id // "" | ascii_downcase) == "opt-out"
+            and ((.triggerAction // "set_mode") == "set_mode")
+            and ((.toMode // "" | ascii_upcase) == "BAN"))
+        then
+          .triggerAction = "rate_limit_user"
+          | .toMode = ""
+          | .decayTo = ""
+          | .announce = false
+          | .durationHours = ((.durationHours // 72) | if . <= 0 then 72 else . end)
+          | .maxRepliesPerUserThread24h = 0
+        else
+          .
+        end
+      )
+    else
+      .
+    end
+  ' 2>/dev/null || printf '%s' "$raw"
 }
 
 save_modes_config_json() {
