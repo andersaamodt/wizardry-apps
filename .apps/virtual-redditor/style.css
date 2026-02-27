@@ -3158,7 +3158,7 @@ label {
   margin: 7px 0 0;
 }
 
-@media (min-width: 980px) {
+@media (min-width: 760px) {
   .persona-style-main-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, max-content));
