@@ -7599,6 +7599,14 @@
     if (state.activeDraftWorkspaceId) {
       return false;
     }
+    if (
+      !!state.activeConversationId &&
+      state.activeConversationLoading &&
+      !state.conversationSwitchOverlay &&
+      !state.activeConversation
+    ) {
+      return true;
+    }
     return !state.activeConversationId;
   }
 
