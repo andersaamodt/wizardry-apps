@@ -1509,6 +1509,10 @@ label {
   margin-top: 16px;
 }
 
+.behavior-engagement-grid {
+  margin-bottom: 10px;
+}
+
 .modes-section-head {
   display: flex;
   align-items: center;
