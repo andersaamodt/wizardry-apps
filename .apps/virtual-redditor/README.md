@@ -95,6 +95,7 @@ It runs:
 - `.apps/virtual-redditor/scripts/virtual-redditor-daemon.sh run`
 
 with `KeepAlive` and log files under the state directory.
+In multi-profile mode, launchd labels are per profile/state directory so bots can be started/stopped independently.
 
 ## Dependencies
 

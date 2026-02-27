@@ -1364,12 +1364,49 @@ subreddit_slug() {
   printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9_-]#-#g'
 }
 
-launchd_label() {
+state_dir_slug() {
+  raw=$(basename "$STATE_DIR" 2>/dev/null || printf '')
+  if [ -z "$raw" ]; then
+    raw=$STATE_DIR
+  fi
+  slug=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9_-]#-#g; s#--*#-#g; s#^-##; s#-$##')
+  [ -z "$slug" ] && slug="state"
+  printf '%s' "$slug"
+}
+
+legacy_launchd_label() {
   printf 'com.wizardry.virtualredditor.%s' "$(subreddit_slug)"
+}
+
+launchd_label() {
+  printf 'com.wizardry.virtualredditor.%s.%s' "$(subreddit_slug)" "$(state_dir_slug)"
 }
 
 launchd_plist_path() {
   printf '%s/Library/LaunchAgents/%s.plist' "$HOME" "$(launchd_label)"
+}
+
+legacy_launchd_plist_path() {
+  printf '%s/Library/LaunchAgents/%s.plist' "$HOME" "$(legacy_launchd_label)"
+}
+
+legacy_launchd_matches_state_dir() {
+  legacy_plist=$(legacy_launchd_plist_path)
+  [ -f "$legacy_plist" ] || return 1
+  grep -F "<string>$STATE_DIR</string>" "$legacy_plist" >/dev/null 2>&1
+}
+
+cleanup_legacy_launchd_for_state() {
+  legacy_label=$(legacy_launchd_label)
+  label=$(launchd_label)
+  [ "$legacy_label" = "$label" ] && return 0
+  if ! legacy_launchd_matches_state_dir; then
+    return 0
+  fi
+  legacy_plist=$(legacy_launchd_plist_path)
+  uid=$(id -u)
+  launchctl bootout "gui/$uid" "$legacy_plist" >/dev/null 2>&1 || launchctl remove "$legacy_label" >/dev/null 2>&1 || true
+  rm -f "$legacy_plist"
 }
 
 launchd_status_json() {
@@ -1388,6 +1425,11 @@ launchd_status_json() {
   installed=0
   loaded=0
   pid=''
+  legacy_label=''
+  legacy_plist=''
+  legacy_loaded=0
+  legacy_pid=''
+  legacy_installed=0
 
   [ -f "$plist" ] && installed=1
 
@@ -1397,6 +1439,26 @@ launchd_status_json() {
     pid=$(parse_launchctl_pid "$out_file")
   fi
   rm -f "$out_file"
+
+  legacy_label=$(legacy_launchd_label)
+  legacy_plist=$(legacy_launchd_plist_path)
+  if [ "$legacy_label" != "$label" ] && legacy_launchd_matches_state_dir; then
+    [ -f "$legacy_plist" ] && legacy_installed=1
+    out_file=$(mktemp "${TMPDIR:-/tmp}/vr-launchctl.XXXXXX")
+    if launchctl print "gui/$uid/$legacy_label" >"$out_file" 2>/dev/null; then
+      legacy_loaded=1
+      legacy_pid=$(parse_launchctl_pid "$out_file")
+    fi
+    rm -f "$out_file"
+  fi
+
+  if [ "$installed" -eq 0 ] && [ "$legacy_installed" -eq 1 ]; then
+    installed=1
+  fi
+  if [ "$loaded" -eq 0 ] && [ "$legacy_loaded" -eq 1 ]; then
+    loaded=1
+    pid=$legacy_pid
+  fi
 
   jq -cn \
     --arg label "$label" \
@@ -1412,6 +1474,8 @@ launchd_install() {
     emit_error "launchd-install requires macOS launchctl"
     return 1
   fi
+
+  cleanup_legacy_launchd_for_state
 
   label=$(launchd_label)
   plist=$(launchd_plist_path)
@@ -1467,6 +1531,8 @@ launchd_start() {
     return 1
   fi
 
+  cleanup_legacy_launchd_for_state
+
   label=$(launchd_label)
   plist=$(launchd_plist_path)
   uid=$(id -u)
@@ -1490,9 +1556,14 @@ launchd_stop() {
 
   label=$(launchd_label)
   plist=$(launchd_plist_path)
+  legacy_label=$(legacy_launchd_label)
+  legacy_plist=$(legacy_launchd_plist_path)
   uid=$(id -u)
 
   launchctl bootout "gui/$uid" "$plist" >/dev/null 2>&1 || launchctl remove "$label" >/dev/null 2>&1 || true
+  if [ "$legacy_label" != "$label" ] && legacy_launchd_matches_state_dir; then
+    launchctl bootout "gui/$uid" "$legacy_plist" >/dev/null 2>&1 || launchctl remove "$legacy_label" >/dev/null 2>&1 || true
+  fi
   launchd_status_json
 }
 

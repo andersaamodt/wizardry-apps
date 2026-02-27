@@ -47,6 +47,7 @@ printf '%s' "$init_out" | jq -e '.ok == true and (.paths.manifesto | type == "st
 
 status_out=$(VR_STATE_DIR="$state_dir" "$backend" status)
 printf '%s' "$status_out" | jq -e '.ok == true and .settings.ok == true and .metrics.ok == true and .launchd.ok == true' >/dev/null
+printf '%s' "$status_out" | jq -e '.launchd.label | test("^com\\.wizardry\\.virtualredditor\\.[a-z0-9_-]+\\.[a-z0-9_-]+$")' >/dev/null
 
 actions_out=$(VR_STATE_DIR="$state_dir" "$backend" list-actions 5)
 printf '%s' "$actions_out" | jq -e '.ok == true and (.actions | type == "array")' >/dev/null

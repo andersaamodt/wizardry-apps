@@ -69,7 +69,7 @@
           </div>
           <div class="pane-toolbar-right">
             <div class="daemon-menu" aria-label="Daemon controls">
-              <button id="btn-run-toggle" class="icon-btn run" type="button" aria-label="Start daemon" title="Start daemon">
+              <button id="btn-run-toggle" class="icon-btn run" type="button" aria-label="Start bot" title="Start bot">
                 <span id="run-toggle-icon" aria-hidden="true">▶</span>
               </button>
               <button id="btn-restart" class="icon-btn soft" type="button" aria-label="Restart daemon" title="Restart daemon">
@@ -2147,7 +2147,7 @@
         if (!canToggleRun) {
           runToggle.title = 'Connect Reddit account first';
         } else {
-          runToggle.title = launchdLoaded ? 'Stop daemon' : 'Start daemon';
+          runToggle.title = launchdLoaded ? 'Stop bot' : 'Start bot';
         }
       }
 
@@ -2955,13 +2955,13 @@
       if (launchd.loaded) {
         state.launchdStartState = '';
         state.launchdStartError = '';
-        chips.push(statusChip('Running', 'ok'));
+        chips.push(statusChip('Bot running', 'ok'));
       } else if (state.launchdStartState === 'starting') {
         chips.push(statusChipWithSpinner('Starting...', 'warn'));
       } else if (state.launchdStartState === 'failed') {
-        chips.push(statusActionChip('Failed', 'danger', 'start-background', (state.launchdStartError || 'launchd failed to start. Click to retry.')));
+        chips.push(statusActionChip('Failed', 'danger', 'start-background', (state.launchdStartError || 'this bot failed to start. Click to retry.')));
       } else {
-        chips.push(statusActionChip('Not running', 'warn', 'start-background', 'launchd is not running in background. Click to start.'));
+        chips.push(statusActionChip('Bot stopped', 'warn', 'start-background', 'This bot is not running in background. Click to start.'));
       }
       var localName = activeProfileLocalName(profilesPayload) || 'Virtual Redditor';
       row.innerHTML = '<span class="status-active-name" title="' + escapeHtml(localName) + '">' + escapeHtml(localName) + '</span>' + chips.join('');
@@ -3058,8 +3058,8 @@
         var loaded = !!launchd.loaded;
         runToggle.classList.toggle('run', !loaded);
         runToggle.classList.toggle('stop', loaded);
-        runToggle.setAttribute('aria-label', loaded ? 'Stop daemon' : 'Start daemon');
-        runToggle.setAttribute('title', loaded ? 'Stop daemon' : 'Start daemon');
+        runToggle.setAttribute('aria-label', loaded ? 'Stop bot' : 'Start bot');
+        runToggle.setAttribute('title', loaded ? 'Stop bot' : 'Start bot');
         runIcon.textContent = loaded ? '■' : '▶';
       }
       updateToolbarButtonStates();
@@ -5002,10 +5002,10 @@
     function wireEvents() {
       document.getElementById('btn-run-toggle').addEventListener('click', function () {
         var loaded = !!(state.status && state.status.launchd && state.status.launchd.loaded);
-        runControlAction(loaded ? 'stop' : 'start', loaded ? 'Daemon stopped.' : 'Daemon started.');
+        runControlAction(loaded ? 'stop' : 'start', loaded ? 'Bot stopped.' : 'Bot started.');
       });
       document.getElementById('btn-restart').addEventListener('click', function () {
-        runControlAction('restart', 'Daemon restarted.');
+        runControlAction('restart', 'Bot restarted.');
       });
       document.getElementById('btn-run-once').addEventListener('click', function () {
         runControlAction('run-once', 'Patrol pass complete.');
