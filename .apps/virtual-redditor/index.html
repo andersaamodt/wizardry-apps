@@ -6558,7 +6558,7 @@
         return;
       }
       try {
-        setCreateProfileMessage('Creating...', false);
+        setCreateProfileMessage('', false);
         var created = await backendJson('create-profile', [uname]);
         var createdId = String((((created || {}).profile) || {}).id || '');
         var createdName = String((((created || {}).profile) || {}).name || uname);
