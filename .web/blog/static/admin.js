@@ -1526,15 +1526,17 @@
       const title = String(draft.title || 'Untitled');
       const excerpt = String(draft.content_excerpt || '').trim();
       const lineText = excerpt ? (title + ' - ' + excerpt) : title;
-      html += '<div class="draft-row">';
+      const draftId = escapeAttr(draft.draft_id || '');
+      html += '<div class="draft-row" data-draft-id="' + draftId + '">';
       html += '<div class="draft-row-main">';
-      html += '<span class="draft-row-line" title="' + escapeAttr(lineText) + '"><strong>' + escapeHtml(title) + '</strong>' +
+      html += '<span class="draft-row-line" title="' + escapeAttr(lineText) + '">' +
+        '<button type="button" class="draft-row-open" data-action="open" data-id="' + draftId + '">' + escapeHtml(title) + '</button>' +
         (excerpt ? '<span class="draft-row-excerpt"> - ' + escapeHtml(excerpt) + '</span>' : '') +
         '</span>';
       html += '</div>';
       html += '<div class="draft-row-actions">';
-      html += '<button type="button" data-action="edit" data-id="' + escapeHtml(draft.draft_id) + '">Edit</button>';
-      html += '<button type="button" class="draft-delete" data-action="delete" data-id="' + escapeHtml(draft.draft_id) + '" aria-label="Delete draft" title="Delete draft">' + prioritiesTrashIconSvg() + '</button>';
+      html += '<button type="button" data-action="edit" data-id="' + draftId + '">Edit</button>';
+      html += '<button type="button" class="draft-delete" data-action="delete" data-id="' + draftId + '" aria-label="Delete draft" title="Delete draft">' + prioritiesTrashIconSvg() + '</button>';
       html += '</div>';
       html += '</div>';
     });
@@ -2777,7 +2779,7 @@
         return;
       }
 
-      if (action === 'edit') {
+      if (action === 'open' || action === 'edit') {
         loadDraft(draftId).catch(function (err) {
           setOutput(els.outputCompose, 'Error: ' + err.message, 'error');
         });
@@ -2787,6 +2789,26 @@
           setOutput(els.outputCompose, 'Error: ' + err.message, 'error');
         });
       }
+    });
+    els.draftsList.addEventListener('dblclick', function (event) {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (target.closest('button')) {
+        return;
+      }
+      const row = target.closest('.draft-row[data-draft-id]');
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+      const draftId = row.getAttribute('data-draft-id') || '';
+      if (!draftId) {
+        return;
+      }
+      loadDraft(draftId).catch(function (err) {
+        setOutput(els.outputCompose, 'Error: ' + err.message, 'error');
+      });
     });
 
     let dragDepth = 0;

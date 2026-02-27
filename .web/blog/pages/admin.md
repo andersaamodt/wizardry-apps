@@ -1871,6 +1871,30 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #1f335f;
+  cursor: default;
+}
+
+.draft-row-open {
+  border: 0;
+  background: transparent;
+  color: #163161;
+  font-weight: 700;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+#admin-panel .draft-row-open:hover {
+  text-decoration: underline;
+  background: transparent;
+}
+
+#admin-panel .draft-row-open:focus-visible {
+  outline: 2px solid #7ea2e6;
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 .draft-row-line strong {
@@ -1879,6 +1903,7 @@ body {
 
 .draft-row-excerpt {
   color: #4a5c78;
+  cursor: default;
 }
 
 .draft-row-actions {
