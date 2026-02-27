@@ -6747,8 +6747,8 @@
     if (!isFinite(width) || width <= 0) {
       return 42;
     }
-    // Match fixed bar geometry (3px bar + 1px gap) so the lane fills fully.
-    var count = Math.floor((width + 1) / 4);
+    // Match fixed bar geometry (4px bar + 1px gap) so the lane fills fully.
+    var count = Math.floor((width + 1) / 5);
     if (!isFinite(count) || count < 32) {
       count = 32;
     } else if (count > 180) {
@@ -6977,21 +6977,21 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.02;
     }
-    var gate = floor + 0.008;
+    var gate = floor + 0.005;
     var signal = raw - gate;
     if (signal < 0) {
       signal = 0;
     }
-    var normalized = (signal * 1.45) / Math.max(0.04, 0.78 - gate);
+    var normalized = (signal * 2.1) / Math.max(0.025, 0.62 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.52);
+      normalized = Math.pow(normalized, 0.46);
     }
-    if (normalized < 0.02) {
+    if (normalized < 0.012) {
       normalized = 0;
     }
     return normalized;
@@ -7019,17 +7019,17 @@
       floor = 0.25;
     }
     dictationWaveBackendFloor = floor;
-    var gate = floor + 0.014;
-    var normalized = ((raw - gate) * 1.6) / Math.max(0.05, 0.74 - gate);
+    var gate = floor + 0.01;
+    var normalized = ((raw - gate) * 1.95) / Math.max(0.03, 0.62 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.6);
+      normalized = Math.pow(normalized, 0.52);
     }
-    if (normalized < 0.02) {
+    if (normalized < 0.012) {
       normalized = 0;
     }
     return normalized;
@@ -7093,9 +7093,9 @@
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
         var len = dictationWaveData.length;
-        var barsPerFrame = 5;
-        var windowSamples = Math.min(240, len);
-        var sliceSamples = Math.max(10, Math.floor(windowSamples / barsPerFrame));
+        var barsPerFrame = 8;
+        var windowSamples = Math.min(96, len);
+        var sliceSamples = Math.max(6, Math.floor(windowSamples / barsPerFrame));
         var consumed = sliceSamples * barsPerFrame;
         var baseStart = Math.max(0, len - consumed);
         var rawHistory = [];
@@ -7107,19 +7107,34 @@
           }
           var sum = 0;
           var peak = 0;
+          var maxPos = -1;
+          var minNeg = 1;
+          var absSum = 0;
           var count = 0;
           for (var si = from; si < to; si += 1) {
             var centered = (Number(dictationWaveData[si] || 128) - 128) / 128;
             var mag = centered < 0 ? -centered : centered;
             sum += mag * mag;
+            absSum += mag;
             if (mag > peak) {
               peak = mag;
+            }
+            if (centered > maxPos) {
+              maxPos = centered;
+            }
+            if (centered < minNeg) {
+              minNeg = centered;
             }
             count += 1;
           }
           var rms = count > 0 ? Math.sqrt(sum / count) : 0;
+          var meanAbs = count > 0 ? absSum / count : 0;
+          var peakToPeak = maxPos - minNeg;
+          if (!isFinite(peakToPeak) || peakToPeak < 0) {
+            peakToPeak = 0;
+          }
           var crest = peak > rms ? (peak - rms) : 0;
-          var rawLevel = (rms * 2.4) + (peak * 2.8) + (crest * 1.4);
+          var rawLevel = (meanAbs * 3.4) + (peakToPeak * 2.1) + (peak * 1.2) + (crest * 0.8);
           rawHistory.push(rawLevel);
         }
         var floorProbe = 0;
@@ -7222,7 +7237,7 @@
         }).catch(function () {
           return null;
         });
-      }, 38);
+      }, 28);
     }
 
     if (dictationWaveStream && dictationWaveAnalyser && dictationWaveData) {
@@ -7343,7 +7358,7 @@
           adjusted = 1;
         }
         var waveTravel = Math.max(1, maxWaveHeight - baselineHeight);
-        height = baselineHeight + Math.round(Math.pow(adjusted, 1.08) * waveTravel);
+        height = baselineHeight + Math.round(Math.pow(adjusted, 0.96) * waveTravel);
       }
       bar.style.height = String(height) + "px";
     }
