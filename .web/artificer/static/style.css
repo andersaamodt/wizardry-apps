@@ -2707,7 +2707,8 @@ button:disabled,
 }
 
 #run-prompt::placeholder {
-  color: var(--input-placeholder);
+  color: color-mix(in srgb, var(--input-placeholder) 58%, transparent);
+  opacity: 1;
 }
 
 .attachment-strip {

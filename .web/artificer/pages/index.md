@@ -144,7 +144,7 @@ pagetitle: "Artificer"
 <span aria-hidden="true">&darr;</span>
 </button>
 <form id="run-form" class="run-form">
-<textarea id="run-prompt" rows="4" placeholder="Ask Artificer to inspect code, make changes, run checks, and summarize results. Tip: /chat /task /teacher /report /assistant and $skill-name"></textarea>
+<textarea id="run-prompt" rows="4" placeholder="Enter instructions"></textarea>
 <div id="attachment-strip" class="attachment-strip hidden" aria-live="polite"></div>
 <details id="run-todo-monitor" class="run-todo-monitor hidden">
 <summary>
