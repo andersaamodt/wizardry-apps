@@ -1602,8 +1602,8 @@
       els.loginBtn.addEventListener('click', function () {
         closeLoginMenu();
         startDesktopSignerLogin().catch(function (err) {
+          showAuthModal();
           setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
-          openLoginMenu();
         });
       });
     }
@@ -1672,6 +1672,7 @@
       els.menuBtn.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
+        closeLoginMenu();
         if (els.menuPanel.hidden) {
           openUserMenu();
         } else {
@@ -1755,32 +1756,16 @@
 
     if (els.authNip07Btn) {
       els.authNip07Btn.addEventListener('click', function () {
-        setAuthMessage('Starting desktop signer login...', 'warn');
-        setAuthControlsDisabled(true);
-        loginWithNip07().catch(function (err) {
+        startDesktopSignerLogin().catch(function (err) {
           setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
-        }).finally(function () {
-          setAuthControlsDisabled(false);
         });
       });
     }
 
     if (els.authPhoneConnectBtn) {
       els.authPhoneConnectBtn.addEventListener('click', function () {
-        setAuthMessage('Preparing phone signer pairing QR...', 'warn');
-        setAuthControlsDisabled(true);
-        initNip46Pairing().then(function () {
-          showPanel(els.authPhonePanel, true);
-          showPanel(els.authManualPanel, false);
-          setAuthMessage('Scan QR in your signer app. Continue unlocks after pairing.', 'warn');
-          return waitForPhonePairing(90000);
-        }).then(function () {
-          updatePhoneContinueState();
-          setAuthMessage('Phone signer paired. Continue is ready.', 'ok');
-        }).catch(function (err) {
+        startPhonePairingFlow().catch(function (err) {
           setAuthMessage(err.message || 'Phone pairing setup failed.', 'error');
-        }).finally(function () {
-          setAuthControlsDisabled(false);
         });
       });
     }
