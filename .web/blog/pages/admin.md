@@ -1591,7 +1591,7 @@ body {
   border-left: 0;
   border-right: 0;
   border-radius: 0;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
 }
 
