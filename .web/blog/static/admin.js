@@ -1068,7 +1068,6 @@
       state.csrfToken = data.csrf_token || state.csrfToken;
       localStorage.setItem('csrf_token', state.csrfToken || '');
       setAuthMessage('', '');
-      els.adminPanel.style.display = 'grid';
       if (els.accountPlayerName) {
         els.accountPlayerName.value = state.playerName;
       }
@@ -1087,6 +1086,7 @@
         stopLocalDripWorker();
         setAccountOnlyMode(true);
         activateSection('account', true);
+        els.adminPanel.style.display = 'grid';
         return;
       }
 
@@ -1096,6 +1096,7 @@
       activateSection(getSectionFromHash(), false);
 
       await Promise.all([loadConfig(), loadUsers(), loadDrafts(), loadQueue(), loadPosts()]);
+      els.adminPanel.style.display = 'grid';
       renderPreview();
     } catch (err) {
       stopLocalDripWorker();
