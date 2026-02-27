@@ -480,8 +480,8 @@ body {
 }
 
 .admin-nav-item:hover {
-  background: #dde8ff;
-  color: #173f85;
+  background: transparent;
+  color: #1e2d4e;
 }
 
 .admin-nav-item.is-active {
@@ -510,6 +510,9 @@ body {
 
 #admin-panel .admin-nav-list .admin-nav-item:hover {
   border: 0 !important;
+  background: transparent !important;
+  color: #1e2d4e !important;
+  transform: none !important;
 }
 
 #admin-panel .admin-nav-list .admin-nav-item.is-active {
@@ -519,6 +522,11 @@ body {
 #admin-panel .admin-nav-list .admin-nav-item[aria-selected="true"],
 #admin-panel .admin-nav-list .admin-nav-item[aria-current="page"] {
   border: 0 !important;
+  background: #c7d9ff !important;
+  color: #0f326f !important;
+  box-shadow: inset 3px 0 0 #2c57a8 !important;
+  transform: none !important;
+  cursor: default !important;
 }
 
 .admin-content {
