@@ -2439,8 +2439,8 @@ label {
 }
 
 #panel-behaviors #thread-initiate-max-pct {
-  width: 88px;
-  min-width: 88px;
+  width: 60px;
+  min-width: 60px;
   font-family: inherit;
   font-size: 0.78rem;
 }
