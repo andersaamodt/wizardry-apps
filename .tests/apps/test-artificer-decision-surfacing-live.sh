@@ -97,6 +97,14 @@ assert_preview_case \
   "git status --short"
 
 assert_preview_case \
+  "none-choice-words-without-choice-question" \
+  "none" \
+  "Preserve optional behavior and keep preferred defaults stable while refactoring." \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case \
   "none-missing-input-without-input-question" \
   "none" \
   "Deploy with <API_KEY> and <HOST>, values are missing." \
@@ -113,6 +121,14 @@ assert_preview_case \
   "curl https://example.com/health"
 
 assert_preview_case \
+  "none-assistant-without-external-commands" \
+  "none" \
+  "Create a launch memo but do not run external actions yet." \
+  "Need anything else?" \
+  "assistant" \
+  "git status --short"
+
+assert_preview_case \
   "precedence-explicit-over-missing" \
   "explicit-choice" \
   "Which deployment path should I choose for <PROD_HOST>, blue-green or canary?" \
@@ -127,5 +143,13 @@ assert_preview_case \
   "Do you approve this now?" \
   "assistant" \
   "curl https://example.com/health"
+
+assert_preview_case \
+  "precedence-explicit-over-risk" \
+  "explicit-choice" \
+  "Should I continue with the production deletion workflow now?" \
+  "Should I continue now?" \
+  "programming" \
+  "git status --short"
 
 printf '%s\n' "artificer decision-surfacing live tests passed"

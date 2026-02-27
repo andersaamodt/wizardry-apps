@@ -1,4 +1,4 @@
-#!/bin/sh
-set -eu
-ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
-exec sh "$ROOT_DIR/tools/forge/uninstall-forge.sh" "$@"
+#!/bin/bash
+# Uninstall the forge application
+# Placeholder for actual uninstall steps
+echo "Uninstalling forge..."

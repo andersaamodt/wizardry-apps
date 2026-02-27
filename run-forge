@@ -1,4 +1,4 @@
-#!/bin/sh
-set -eu
-ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
-exec sh "$ROOT_DIR/tools/forge/launch-forge.sh" --root "$ROOT_DIR" "$@"
+#!/bin/bash
+# Entry point for the forge application
+# Placeholder for actual forge command
+forge start

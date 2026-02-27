@@ -16054,7 +16054,7 @@ $fallback_output"
     if [ "$assay_run_profile" -eq 1 ]; then
       case "$compute_budget" in
         quick)
-          assay_iteration_cap=1
+          assay_iteration_cap=2
           ;;
         standard|auto)
           assay_iteration_cap=2
@@ -16463,7 +16463,7 @@ EOF
     if [ "$assay_run_profile" -eq 1 ]; then
       case "$compute_budget" in
         quick)
-          assay_runtime_ceiling=45
+          assay_runtime_ceiling=75
           ;;
         standard|auto)
           assay_runtime_ceiling=75
