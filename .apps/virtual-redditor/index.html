@@ -1201,6 +1201,7 @@
       profileSwitchLoading: false,
       deleteTargetId: '',
       passesTogglePendingValue: null,
+      obeyAdminsPendingValue: null,
       globalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS,
       globalInstructionsRemote: DEFAULT_GLOBAL_INSTRUCTIONS,
       globalInstructionsSaving: false
@@ -3369,7 +3370,13 @@
       }
       updatePassIntervalUnitLabels();
       if (obeyAdmins) {
-        obeyAdmins.checked = !!settings.obeyAdmins;
+        if (typeof state.obeyAdminsPendingValue === 'boolean') {
+          obeyAdmins.checked = state.obeyAdminsPendingValue;
+          obeyAdmins.disabled = true;
+        } else {
+          obeyAdmins.checked = !!settings.obeyAdmins;
+          obeyAdmins.disabled = false;
+        }
       }
       if (threadInitiateMaxInput && document.activeElement !== threadInitiateMaxInput) {
         threadInitiateMaxInput.value = String(
@@ -5405,6 +5412,32 @@
       await toggleBotRun(shouldRun);
     }
 
+    async function toggleObeyAdmins(enabled) {
+      var shouldEnable = !!enabled;
+      if (typeof state.obeyAdminsPendingValue === 'boolean') return;
+      if (state.previewMode) {
+        if (state.status && state.status.settings) {
+          state.status.settings.obeyAdmins = shouldEnable;
+          renderStatus();
+        }
+        setSettingsMessage('', false);
+        return;
+      }
+      try {
+        state.obeyAdminsPendingValue = shouldEnable;
+        renderStatus();
+        setSettingsMessage('Saving...', false);
+        await backendJson('set-setting', ['OBEY_ADMINS', shouldEnable ? '1' : '0']);
+        setSettingsMessage('', false);
+        await refreshStatus();
+      } catch (error) {
+        setSettingsMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.obeyAdminsPendingValue = null;
+        renderStatus();
+      }
+    }
+
     async function saveUsernameFromTitle() {
       var input = document.getElementById('title-username');
       if (!input) return;
@@ -6419,7 +6452,7 @@
       });
       document.getElementById('obey-admins').addEventListener('change', function (event) {
         var enabled = !!(event && event.target && event.target.checked);
-        saveSetting('OBEY_ADMINS', enabled ? '1' : '0');
+        toggleObeyAdmins(enabled);
       });
       document.getElementById('subreddit-input').addEventListener('input', function () {
         setSettingsMessage('', false);
