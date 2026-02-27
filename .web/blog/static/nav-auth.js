@@ -14,6 +14,7 @@
   var KEY_DEVICE_SESSION = 'nostr_device_session_v1';
   var KEY_NIP46_PAIR = 'nostr_nip46_pair_v1';
   var NAV_TOAST_KEY = 'wizardry_blog_nav_toast_v1';
+  var COMPOSE_ICON_KEY = 'wizardry_blog_compose_icon_idx_v1';
 
   var state = {
     currentTheme: 'archmage',
@@ -45,7 +46,9 @@
     loginMenuManual: document.getElementById('login-menu-manual'),
     loginMenuLearn: document.getElementById('login-menu-learn'),
     navToastHost: document.getElementById('nav-top-toast-host'),
+    composeTools: document.getElementById('nav-compose-tools'),
     composeLink: document.querySelector('.nav-compose'),
+    composeIconCycleBtn: document.getElementById('compose-icon-cycle-btn'),
     userMenu: document.getElementById('nav-user-menu'),
     menuBtn: document.getElementById('nav-menu-btn'),
     menuPanel: document.getElementById('nav-menu-panel'),
@@ -115,6 +118,54 @@
 
   function compact(text) {
     return String(text || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function composeIconSvgPaths() {
+    return [
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4l10-10-4-4L4 16v4zM13 7l4 4"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M5 19h4l9-9-4-4-9 9v4zM14 6l4 4"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M3 21h18"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M6 18l1.2-4.2L15.8 5.2a2 2 0 1 1 2.8 2.8l-8.6 8.6L6 18z"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M5 21h14"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M12 20H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h10l5 5v4"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M16 4v5h5"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M14 18l5-5 2 2-5 5h-2v-2z"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M5 20h3l10-10-3-3L5 17v3zM14 6l3 3"/><circle cx="18.5" cy="18.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4l9-9-4-4-9 9v4zM12 8l4 4"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M14 4h6M17 1v6"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M5 19l2-6 8-8 4 4-8 8-6 2z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M11 7l6 6"/>',
+      '<rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8 16l2.5-2.5L13 16l5-5"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M7 9h10"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M6 18h12M7 14h10M8 10h8M9 6h6"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M4 20h3l9-9-3-3-9 9v3z"/>',
+      '<circle cx="9" cy="15" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M11 13l8-8 2 2-8 8"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M4 20h6"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4l9.5-9.5-4-4L4 16v4zM13.5 6.5l4 4"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M9 4h11"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4l10-10-4-4L4 16v4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M14 6l4 4"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M3 3h7"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M4 20l6-2 9-9-4-4-9 9-2 6z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M6 14l4 4"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M5 19h4l9-9-4-4-9 9v4zM14 6l4 4"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M5 4h8M5 8h5"/>',
+      '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M18 18h3M19.5 16.5v3"/>'
+    ];
+  }
+
+  function readComposeIconIndex(total) {
+    var count = Number(total || 1);
+    if (!isFinite(count) || count < 1) {
+      count = 1;
+    }
+    var raw = localStorage.getItem(COMPOSE_ICON_KEY) || '0';
+    var idx = Number(raw);
+    if (!isFinite(idx) || idx < 0) {
+      idx = 0;
+    }
+    return idx % count;
+  }
+
+  function renderComposeIcon(index) {
+    if (!els.composeLink) {
+      return;
+    }
+    var icons = composeIconSvgPaths();
+    var count = icons.length;
+    var idx = Number(index || 0);
+    if (!isFinite(idx) || idx < 0) {
+      idx = 0;
+    }
+    idx = idx % count;
+    els.composeLink.innerHTML = '<svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">' + icons[idx] + '</svg>';
+    localStorage.setItem(COMPOSE_ICON_KEY, String(idx));
   }
 
   function waitMs(ms) {
@@ -718,8 +769,10 @@
       } else if (els.loginBtn) {
         els.loginBtn.style.display = 'none';
       }
-      if (els.composeLink) {
-        els.composeLink.style.display = isAdmin ? 'inline-block' : 'none';
+      if (els.composeTools) {
+        els.composeTools.style.display = isAdmin ? 'inline-flex' : 'none';
+      } else if (els.composeLink) {
+        els.composeLink.style.display = isAdmin ? 'inline-flex' : 'none';
       }
       if (els.userMenu) {
         if (els.menuPrimaryLink) {
@@ -749,7 +802,9 @@
     } else if (els.loginBtn) {
       els.loginBtn.style.display = 'inline-block';
     }
-    if (els.composeLink) {
+    if (els.composeTools) {
+      els.composeTools.style.display = 'none';
+    } else if (els.composeLink) {
       els.composeLink.style.display = 'none';
     }
     if (els.userMenu) {
@@ -1534,6 +1589,16 @@
   }
 
   function bindUiEvents() {
+    if (els.composeIconCycleBtn) {
+      els.composeIconCycleBtn.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var icons = composeIconSvgPaths();
+        var current = readComposeIconIndex(icons.length);
+        renderComposeIcon((current + 1) % icons.length);
+      });
+    }
+
     if (els.loginBtn) {
       els.loginBtn.addEventListener('click', function () {
         closeLoginMenu();
@@ -1760,6 +1825,7 @@
   }
 
   function bootstrap() {
+    renderComposeIcon(readComposeIconIndex(composeIconSvgPaths().length));
     highlightCurrentPage();
     window.addEventListener('hashchange', highlightCurrentPage);
     bindThemeSelect();

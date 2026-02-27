@@ -408,11 +408,11 @@ mode_default_config_json() {
         }
       ],
       banLevels: {
-        short: {enabled:true,durationHours:72,durationMinHours:72,durationMaxHours:72,durationUnit:"days"},
-        medium: {enabled:true,durationHours:168,durationMinHours:168,durationMaxHours:168,durationUnit:"days"},
-        long: {enabled:true,durationHours:720,durationMinHours:720,durationMaxHours:720,durationUnit:"days"},
-        extended: {enabled:true,durationHours:4380,durationMinHours:4380,durationMaxHours:4380,durationUnit:"days"},
-        year: {enabled:true,durationHours:8760,durationMinHours:8760,durationMaxHours:8760,durationUnit:"days"},
+        short: {enabled:true,durationHours:3,durationMinHours:1,durationMaxHours:3,durationUnit:"days"},
+        medium: {enabled:true,durationHours:7,durationMinHours:4,durationMaxHours:7,durationUnit:"days"},
+        long: {enabled:true,durationHours:30,durationMinHours:14,durationMaxHours:30,durationUnit:"days"},
+        extended: {enabled:true,durationHours:180,durationMinHours:60,durationMaxHours:180,durationUnit:"days"},
+        year: {enabled:true,durationHours:365,durationMinHours:240,durationMaxHours:365,durationUnit:"days"},
         permanent: {enabled:true,durationHours:0,durationMinHours:0,durationMaxHours:0,durationUnit:"days"}
       },
       postActionTransitions: {
@@ -927,17 +927,21 @@ ban_days_for_action() {
   esac
   raw=$(read_modes_config_json | jq -r --arg level "$level" '
     .banLevels[$level] as $x
-    | if ($x.enabled // true) | not then "disabled|0|0"
-      elif ($level == "permanent") then "permanent|0|0"
+    | if ($x.enabled // true) | not then "disabled|0|0|hours"
+      elif ($level == "permanent") then "permanent|0|0|days"
       else
+        (($x.durationUnit // "hours") | tostring | ascii_downcase) as $u
         (($x.durationMinHours // $x.durationHours // 0) | tonumber? // 0) as $min
         | (($x.durationMaxHours // $x.durationHours // 0) | tonumber? // 0) as $max
-        | if $min <= 0 and $max <= 0 then "range|0|0" else ("range|\($min|floor)|\($max|floor)") end
+        | if $min <= 0 and $max <= 0 then "range|0|0|\($u)"
+          else ("range|\($min|floor)|\($max|floor)|\($u)")
+          end
       end
-  ' 2>/dev/null || printf 'range|0|0')
+  ' 2>/dev/null || printf 'range|0|0|hours')
   state=$(printf '%s' "$raw" | awk -F'|' '{print $1}')
   min_h=$(printf '%s' "$raw" | awk -F'|' '{print $2}')
   max_h=$(printf '%s' "$raw" | awk -F'|' '{print $3}')
+  unit=$(printf '%s' "$raw" | awk -F'|' '{print $4}')
   case "$state" in
     disabled)
       printf '%s' 'disabled'
@@ -950,22 +954,53 @@ ban_days_for_action() {
   esac
   min_h=$(to_int "$min_h" 0)
   max_h=$(to_int "$max_h" 0)
-  if [ "$min_h" -le 0 ]; then min_h=24; fi
+  case "$(printf '%s' "$unit" | tr '[:upper:]' '[:lower:]')" in
+    minutes|hours|days) ;;
+    *) unit=hours ;;
+  esac
+  # Migrate legacy day-unit rows that stored hour values.
+  if [ "$unit" = "days" ] && [ "$min_h" -gt 0 ] && [ "$max_h" -gt 0 ] && [ $((min_h % 24)) -eq 0 ] && [ $((max_h % 24)) -eq 0 ]; then
+    min_h=$((min_h / 24))
+    max_h=$((max_h / 24))
+  fi
+  if [ "$min_h" -le 0 ]; then min_h=1; fi
   if [ "$max_h" -le 0 ]; then max_h=$min_h; fi
   if [ "$max_h" -lt "$min_h" ]; then
     tmp=$min_h
     min_h=$max_h
     max_h=$tmp
   fi
-  chosen_h=$min_h
-  if [ "$max_h" -gt "$min_h" ]; then
-    chosen_h=$(random_between "$min_h" "$max_h")
+  case "$unit" in
+    minutes)
+      min_m=$min_h
+      max_m=$max_h
+      ;;
+    days)
+      min_m=$((min_h * 24 * 60))
+      max_m=$((max_h * 24 * 60))
+      ;;
+    *)
+      min_m=$((min_h * 60))
+      max_m=$((max_h * 60))
+      ;;
+  esac
+  if [ "$min_m" -le 0 ]; then min_m=60; fi
+  if [ "$max_m" -le 0 ]; then max_m=$min_m; fi
+  if [ "$max_m" -lt "$min_m" ]; then
+    tmp=$min_m
+    min_m=$max_m
+    max_m=$tmp
   fi
-  if [ "$chosen_h" -le 0 ]; then
+  chosen_m=$min_m
+  if [ "$max_m" -gt "$min_m" ]; then
+    chosen_m=$(random_between "$min_m" "$max_m")
+  fi
+  if [ "$chosen_m" -le 0 ]; then
     printf '%s' '0'
     return 0
   fi
-  printf '%s' "$(((chosen_h + 23) / 24))"
+  # Reddit temporary bans are day-granular.
+  printf '%s' "$(((chosen_m + 1439) / 1440))"
 }
 
 action_severity_score() {

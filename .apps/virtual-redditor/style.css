@@ -2570,6 +2570,10 @@ label {
   word-break: normal;
 }
 
+#ban-levels-table th {
+  text-align: center;
+}
+
 #ban-levels-table th:nth-child(1),
 #ban-levels-table td:nth-child(1) {
   width: 1%;
@@ -2598,6 +2602,24 @@ label {
   font-size: 0.72rem;
   color: var(--text-subtle);
   white-space: nowrap;
+}
+
+#ban-levels-table .ban-level-error {
+  margin-top: 3px;
+  font-size: 0.62rem;
+  color: var(--danger);
+  display: none;
+}
+
+#ban-levels-table tr.ban-level-invalid .ban-level-error {
+  display: block;
+}
+
+#ban-levels-table tr.ban-level-invalid input[data-ban-duration-min],
+#ban-levels-table tr.ban-level-invalid input[data-ban-duration-max],
+#ban-levels-table tr.ban-level-invalid select[data-ban-duration-unit] {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg-panel) 92%);
 }
 
 .mode-permissions-grid {

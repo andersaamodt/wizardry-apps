@@ -701,7 +701,7 @@
                     <thead>
                       <tr>
                         <th>Level</th>
-                        <th>Default duration range</th>
+                        <th>Duration range</th>
                       </tr>
                     </thead>
                     <tbody id="ban-levels-body"></tbody>
@@ -3671,11 +3671,11 @@
           neutralBanTemplate: 'Enforcement was automatically applied.'
         },
         banLevels: {
-          short: { enabled: true, durationHours: 72, durationMinHours: 72, durationMaxHours: 72, durationUnit: 'days' },
-          medium: { enabled: true, durationHours: 168, durationMinHours: 168, durationMaxHours: 168, durationUnit: 'days' },
-          long: { enabled: true, durationHours: 720, durationMinHours: 720, durationMaxHours: 720, durationUnit: 'days' },
-          extended: { enabled: true, durationHours: 4380, durationMinHours: 4380, durationMaxHours: 4380, durationUnit: 'days' },
-          year: { enabled: true, durationHours: 8760, durationMinHours: 8760, durationMaxHours: 8760, durationUnit: 'days' },
+          short: { enabled: true, durationHours: 3, durationMinHours: 1, durationMaxHours: 3, durationUnit: 'days' },
+          medium: { enabled: true, durationHours: 7, durationMinHours: 4, durationMaxHours: 7, durationUnit: 'days' },
+          long: { enabled: true, durationHours: 30, durationMinHours: 14, durationMaxHours: 30, durationUnit: 'days' },
+          extended: { enabled: true, durationHours: 180, durationMinHours: 60, durationMaxHours: 180, durationUnit: 'days' },
+          year: { enabled: true, durationHours: 365, durationMinHours: 240, durationMaxHours: 365, durationUnit: 'days' },
           permanent: { enabled: true, durationHours: 0, durationMinHours: 0, durationMaxHours: 0, durationUnit: 'days' }
         },
         escalation: {
@@ -3759,17 +3759,34 @@
       out.banLevels = Object.assign({}, base.banLevels, src.banLevels || {});
       ['short', 'medium', 'long', 'extended', 'year', 'permanent'].forEach(function (levelKey) {
         var row = Object.assign({}, (base.banLevels || {})[levelKey] || {}, (out.banLevels || {})[levelKey] || {});
-        var durationHours = Math.max(0, parseInt(row.durationHours, 10) || 0);
-        var minHours = Math.max(0, parseInt(row.durationMinHours, 10) || durationHours);
-        var maxHours = Math.max(0, parseInt(row.durationMaxHours, 10) || durationHours);
-        if (maxHours < minHours) {
-          var tmp = minHours;
-          minHours = maxHours;
-          maxHours = tmp;
-        }
         var unit = String(row.durationUnit || '').toLowerCase();
-        if (unit !== 'hours' && unit !== 'days') {
-          unit = (minHours > 0 && maxHours > 0 && minHours % 24 === 0 && maxHours % 24 === 0) ? 'days' : 'hours';
+        if (unit !== 'minutes' && unit !== 'hours' && unit !== 'days') {
+          unit = 'hours';
+        }
+        var durationAmount = Math.max(0, parseInt(row.durationHours, 10) || 0);
+        var minAmount = Math.max(0, parseInt(row.durationMinHours, 10) || durationAmount);
+        var maxAmount = Math.max(0, parseInt(row.durationMaxHours, 10) || durationAmount);
+        if (unit === 'days') {
+          var allMultiplesOf24 = true;
+          var candidates = [durationAmount, minAmount, maxAmount];
+          for (var ci = 0; ci < candidates.length; ci += 1) {
+            var rawVal = candidates[ci];
+            if (rawVal > 0 && (rawVal % 24) !== 0) {
+              allMultiplesOf24 = false;
+              break;
+            }
+          }
+          // Migrate legacy stored "hours" values for day-unit rows into day amounts.
+          if (allMultiplesOf24) {
+            if (durationAmount > 0) durationAmount = Math.max(1, Math.round(durationAmount / 24));
+            if (minAmount > 0) minAmount = Math.max(1, Math.round(minAmount / 24));
+            if (maxAmount > 0) maxAmount = Math.max(1, Math.round(maxAmount / 24));
+          }
+        }
+        if (maxAmount < minAmount) {
+          var tmp = minAmount;
+          minAmount = maxAmount;
+          maxAmount = tmp;
         }
         if (levelKey === 'permanent') {
           row.durationHours = 0;
@@ -3778,11 +3795,11 @@
           row.durationUnit = 'days';
           row.enabled = true;
         } else {
-          if (minHours < 1) minHours = 1;
-          if (maxHours < minHours) maxHours = minHours;
-          row.durationHours = maxHours;
-          row.durationMinHours = minHours;
-          row.durationMaxHours = maxHours;
+          if (minAmount < 1) minAmount = 1;
+          if (maxAmount < minAmount) maxAmount = minAmount;
+          row.durationHours = maxAmount;
+          row.durationMinHours = minAmount;
+          row.durationMaxHours = maxAmount;
           row.durationUnit = unit;
           row.enabled = true;
         }
@@ -4501,8 +4518,22 @@
         var levelKey = banLevelKeyForAction(actionName);
         var levelCfg = ((cfg.banLevels || {})[levelKey]) || {};
         var levelEnabled = (levelCfg.enabled !== false);
-        var durationHours = Math.max(0, parseInt(levelCfg.durationHours, 10) || 0);
-        var durationText = (levelKey === 'permanent') ? 'Permanent' : (String(durationHours) + 'h');
+        var durationAmount = Math.max(0, parseInt(levelCfg.durationHours, 10) || 0);
+        var minAmount = Math.max(0, parseInt(levelCfg.durationMinHours, 10) || durationAmount);
+        var maxAmount = Math.max(0, parseInt(levelCfg.durationMaxHours, 10) || durationAmount);
+        if (maxAmount < minAmount) {
+          var amountSwap = minAmount;
+          minAmount = maxAmount;
+          maxAmount = amountSwap;
+        }
+        var durationUnit = String(levelCfg.durationUnit || 'hours').toLowerCase();
+        if (durationUnit !== 'minutes' && durationUnit !== 'hours' && durationUnit !== 'days') durationUnit = 'hours';
+        var durationSuffix = durationUnit === 'minutes' ? 'm' : (durationUnit === 'days' ? 'd' : 'h');
+        var durationText = (levelKey === 'permanent')
+          ? 'Permanent'
+          : (minAmount === maxAmount
+            ? (String(maxAmount) + durationSuffix)
+            : (String(minAmount) + '-' + String(maxAmount) + durationSuffix));
         var transition = transitionSource[actionName] || null;
         var transitionEnabled = !!transition;
         var toModeValue = transitionEnabled ? String(transition.toMode || '') : String(cfg.defaultDecayMode || cfg.startingMode || '');
@@ -4915,24 +4946,35 @@
       ];
       var body = document.getElementById('ban-levels-body');
       if (!body) return;
-      function hoursToUi(hours, unit) {
-        var h = Math.max(1, parseInt(hours, 10) || 1);
-        if (unit === 'days') return Math.max(1, Math.round(h / 24));
-        return h;
-      }
       body.innerHTML = levels.map(function (level) {
         var row = ((cfg.banLevels || {})[level.key]) || {};
-        var durationHours = Math.max(1, parseInt(row.durationHours, 10) || 1);
-        var minHours = Math.max(1, parseInt(row.durationMinHours, 10) || durationHours);
-        var maxHours = Math.max(1, parseInt(row.durationMaxHours, 10) || durationHours);
-        if (maxHours < minHours) {
-          var swap = minHours;
-          minHours = maxHours;
-          maxHours = swap;
+        var durationAmount = Math.max(1, parseInt(row.durationHours, 10) || 1);
+        var minAmount = Math.max(1, parseInt(row.durationMinHours, 10) || durationAmount);
+        var maxAmount = Math.max(1, parseInt(row.durationMaxHours, 10) || durationAmount);
+        if (maxAmount < minAmount) {
+          var swap = minAmount;
+          minAmount = maxAmount;
+          maxAmount = swap;
         }
         var unit = String(row.durationUnit || '').toLowerCase();
-        if (unit !== 'hours' && unit !== 'days') {
-          unit = (minHours % 24 === 0 && maxHours % 24 === 0) ? 'days' : 'hours';
+        if (unit !== 'minutes' && unit !== 'hours' && unit !== 'days') {
+          unit = 'hours';
+        }
+        if (unit === 'days') {
+          var allMultiplesOf24 = true;
+          var candidates = [durationAmount, minAmount, maxAmount];
+          for (var ci = 0; ci < candidates.length; ci += 1) {
+            var rawVal = candidates[ci];
+            if (rawVal > 0 && (rawVal % 24) !== 0) {
+              allMultiplesOf24 = false;
+              break;
+            }
+          }
+          if (allMultiplesOf24) {
+            if (durationAmount > 0) durationAmount = Math.max(1, Math.round(durationAmount / 24));
+            if (minAmount > 0) minAmount = Math.max(1, Math.round(minAmount / 24));
+            if (maxAmount > 0) maxAmount = Math.max(1, Math.round(maxAmount / 24));
+          }
         }
         return [
           '<tr data-ban-level="' + escapeHtml(level.key) + '">',
@@ -4940,17 +4982,19 @@
           '  <td>' + (level.key === 'permanent'
             ? '<span class="micro">Permanent</span>'
             : '<div class="ban-duration-range">' +
-                '<input type="number" min="1" step="1" data-ban-duration-min value="' + escapeHtml(String(hoursToUi(minHours, unit))) + '" title="Minimum default ban duration">' +
+                '<input type="number" min="1" step="1" data-ban-duration-min value="' + escapeHtml(String(minAmount)) + '" title="Minimum ban duration in selected unit">' +
                 '<span class="ban-range-sep">to</span>' +
-                '<input type="number" min="1" step="1" data-ban-duration-max value="' + escapeHtml(String(hoursToUi(maxHours, unit))) + '" title="Maximum default ban duration">' +
-                '<select data-ban-duration-unit title="Units for default ban duration range">' +
+                '<input type="number" min="1" step="1" data-ban-duration-max value="' + escapeHtml(String(maxAmount)) + '" title="Maximum ban duration in selected unit">' +
+                '<select data-ban-duration-unit title="Units for ban duration range">' +
+                  '<option value="minutes"' + (unit === 'minutes' ? ' selected' : '') + '>minutes</option>' +
                   '<option value="hours"' + (unit === 'hours' ? ' selected' : '') + '>hours</option>' +
                   '<option value="days"' + (unit === 'days' ? ' selected' : '') + '>days</option>' +
                 '</select>' +
-              '</div>') + '</td>',
+              '</div><div class="ban-level-error" data-ban-level-error></div>') + '</td>',
           '</tr>'
         ].join('');
       }).join('');
+      validateBanLevelsUi();
 
       var escalation = cfg.escalation || {};
       var notifySeverity = document.getElementById('enforcement-notify-severity');
@@ -4959,6 +5003,56 @@
       if (notifySeverity) notifySeverity.value = String(escalation.notifyOnSeverity || 'high');
       if (targets) targets.value = String(escalation.targets || 'modmail');
       if (timing) timing.value = String(escalation.timing || 'enforce_then_escalate');
+    }
+
+    function banDurationToMinutes(rawAmount, unit) {
+      var amount = Math.max(1, parseInt(rawAmount, 10) || 1);
+      var normalizedUnit = String(unit || '').toLowerCase();
+      if (normalizedUnit === 'minutes') return amount;
+      if (normalizedUnit === 'days') return amount * 24 * 60;
+      return amount * 60;
+    }
+
+    function validateBanLevelsUi() {
+      var levels = [
+        { key: 'short', label: 'Short' },
+        { key: 'medium', label: 'Medium' },
+        { key: 'long', label: 'Long' },
+        { key: 'extended', label: 'Extended' },
+        { key: 'year', label: 'Year' }
+      ];
+      var hasError = false;
+      var prevMaxMinutes = 0;
+      var prevLabel = '';
+      for (var i = 0; i < levels.length; i += 1) {
+        var level = levels[i];
+        var row = document.querySelector('#ban-levels-body tr[data-ban-level="' + level.key + '"]');
+        if (!row) continue;
+        var minInput = row.querySelector('[data-ban-duration-min]');
+        var maxInput = row.querySelector('[data-ban-duration-max]');
+        var unitSelect = row.querySelector('[data-ban-duration-unit]');
+        var errorEl = row.querySelector('[data-ban-level-error]');
+        if (!minInput || !maxInput || !unitSelect) continue;
+        var minAmount = Math.max(1, parseInt(minInput.value || '1', 10) || 1);
+        var maxAmount = Math.max(1, parseInt(maxInput.value || '1', 10) || 1);
+        if (maxAmount < minAmount) maxAmount = minAmount;
+        var unit = String(unitSelect.value || 'hours').toLowerCase();
+        if (unit !== 'minutes' && unit !== 'hours' && unit !== 'days') unit = 'hours';
+        var minMinutes = banDurationToMinutes(minAmount, unit);
+        var maxMinutes = banDurationToMinutes(maxAmount, unit);
+        var rowError = '';
+        if (maxMinutes < minMinutes) {
+          rowError = 'Maximum duration must be greater than or equal to minimum duration.';
+        } else if (prevMaxMinutes > 0 && minMinutes <= prevMaxMinutes) {
+          rowError = 'Minimum duration must be greater than ' + prevLabel + ' maximum duration.';
+        }
+        row.classList.toggle('ban-level-invalid', !!rowError);
+        if (errorEl) errorEl.textContent = rowError;
+        hasError = hasError || !!rowError;
+        prevMaxMinutes = maxMinutes;
+        prevLabel = level.label;
+      }
+      return { valid: !hasError };
     }
 
     function renderReplyTemplatesPanel() {
@@ -5201,17 +5295,15 @@
         var maxInput = banRow.querySelector('[data-ban-duration-max]');
         var unitSelect = banRow.querySelector('[data-ban-duration-unit]');
         var unit = String((unitSelect && unitSelect.value) || 'hours').toLowerCase();
-        if (unit !== 'days') unit = 'hours';
+        if (unit !== 'minutes' && unit !== 'hours' && unit !== 'days') unit = 'hours';
         var minRaw = minInput ? Math.max(1, parseInt(minInput.value || '0', 10) || 1) : 1;
         var maxRaw = maxInput ? Math.max(1, parseInt(maxInput.value || '0', 10) || 1) : minRaw;
         if (maxRaw < minRaw) maxRaw = minRaw;
-        var minHours = unit === 'days' ? (minRaw * 24) : minRaw;
-        var maxHours = unit === 'days' ? (maxRaw * 24) : maxRaw;
         cfg.banLevels[key] = {
           enabled: true,
-          durationHours: key === 'permanent' ? 0 : maxHours,
-          durationMinHours: key === 'permanent' ? 0 : minHours,
-          durationMaxHours: key === 'permanent' ? 0 : maxHours,
+          durationHours: key === 'permanent' ? 0 : maxRaw,
+          durationMinHours: key === 'permanent' ? 0 : minRaw,
+          durationMaxHours: key === 'permanent' ? 0 : maxRaw,
           durationUnit: key === 'permanent' ? 'days' : unit
         };
       }
@@ -6301,6 +6393,8 @@
           target.hasAttribute('data-ban-duration-min') ||
           target.hasAttribute('data-ban-duration-max')
         ) {
+          var check = validateBanLevelsUi();
+          if (!check.valid) return;
           markModesConfigDirty();
           queueEnforcementAutosave(520);
         }
@@ -6314,6 +6408,8 @@
           target.id === 'enforcement-escalation-targets' ||
           target.id === 'enforcement-escalation-timing'
         ) {
+          var check = validateBanLevelsUi();
+          if (!check.valid) return;
           markModesConfigDirty();
           queueEnforcementAutosave(120);
         }
