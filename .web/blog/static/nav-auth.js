@@ -116,6 +116,16 @@
     return String(text || '').replace(/\s+/g, ' ').trim();
   }
 
+  function waitMs(ms) {
+    var delay = Number(ms || 0);
+    if (!isFinite(delay) || delay < 0) {
+      delay = 0;
+    }
+    return new Promise(function (resolve) {
+      setTimeout(resolve, delay);
+    });
+  }
+
   function clampDays(value) {
     var n = Number(value || DEFAULT_DELEGATION_DAYS);
     if (!Number.isFinite(n)) {
@@ -645,7 +655,7 @@
     var token = getSessionToken();
     if (!token) {
       applyLoggedInUi(false, false, '');
-      return Promise.resolve();
+      return Promise.resolve(false);
     }
 
     return fetch('/cgi/ssh-auth-check-session?session_token=' + encodeURIComponent(token))
@@ -654,7 +664,7 @@
         if (!data || !data.authenticated) {
           clearLocalStorageAuth();
           applyLoggedInUi(false, false, '');
-          return;
+          return false;
         }
         if (data.csrf_token) {
           localStorage.setItem('csrf_token', data.csrf_token);
@@ -663,19 +673,46 @@
           localStorage.setItem('last_auth_pubkey', data.nostr_pubkey);
         }
         applyLoggedInUi(true, !!data.is_admin, data.player_name || data.username || '');
+        return true;
       })
       .catch(function () {
-        applyLoggedInUi(false, false, '');
+        if (!state.isAuthenticated) {
+          applyLoggedInUi(false, false, '');
+        }
+        return false;
       });
   }
 
-  function finalizeLoginUiAfterSuccess() {
-    return checkAuth().then(function () {
-      if (!state.isAuthenticated) {
-        throw new Error('Login signature was accepted, but no active session was established. Try again and check signer permissions for this domain.');
+  function verifySessionWithRetry(remainingAttempts, delayMs) {
+    var attempts = Number(remainingAttempts || 0);
+    if (!isFinite(attempts) || attempts < 1) {
+      attempts = 1;
+    }
+    return checkAuth().then(function (ok) {
+      if (ok) {
+        return true;
+      }
+      if (attempts <= 1) {
+        return false;
+      }
+      return waitMs(delayMs).then(function () {
+        return verifySessionWithRetry(attempts - 1, delayMs);
+      });
+    });
+  }
+
+  function finalizeLoginUiAfterSuccess(finishData) {
+    var data = finishData && typeof finishData === 'object' ? finishData : {};
+    var optimisticName = data.player_name || data.username || localStorage.getItem('last_auth_username') || 'signed-in';
+    applyLoggedInUi(true, !!data.is_admin, optimisticName);
+    return verifySessionWithRetry(6, 180).then(function (ok) {
+      if (!ok) {
+        clearLocalStorageAuth();
+        applyLoggedInUi(false, false, '');
+        throw new Error('Login was signed, but session validation failed. Please try again.');
       }
       hideAuthModal();
-      window.location.reload();
+      return true;
     });
   }
 
@@ -985,7 +1022,7 @@
             return finishLogin(begin.request_id, signed, null, intent.forceInteractive)
               .then(function (finish) {
                 rememberAuth(finish);
-                return finalizeLoginUiAfterSuccess().then(function () {
+                return finalizeLoginUiAfterSuccess(finish).then(function () {
                   return true;
                 });
               });
@@ -1080,7 +1117,7 @@
             return idbDelete(KEY_DEVICE_SESSION);
           })
           .then(function () {
-            return finalizeLoginUiAfterSuccess();
+            return finalizeLoginUiAfterSuccess(finish);
           });
       });
   }
@@ -1210,12 +1247,12 @@
         state.pendingDeviceSession.delegationId = finish.delegation_id || '';
         return saveDeviceSession(state.pendingDeviceSession).then(function () {
           state.pendingDeviceSession = null;
-          return finalizeLoginUiAfterSuccess();
+          return finalizeLoginUiAfterSuccess(finish);
         });
       }
 
       return idbDelete(KEY_DEVICE_SESSION).then(function () {
-        return finalizeLoginUiAfterSuccess();
+        return finalizeLoginUiAfterSuccess(finish);
       });
     });
   }
