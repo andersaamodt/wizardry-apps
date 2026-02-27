@@ -1429,6 +1429,14 @@ label {
   height: 100%;
 }
 
+#panel-persona .persona-workarea {
+  width: 100%;
+  max-width: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
 .modes-conflict-banner {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1762,6 +1770,7 @@ label {
 
 .persona-main-pane {
   min-width: 0;
+  height: 100%;
   overflow: auto;
 }
 
