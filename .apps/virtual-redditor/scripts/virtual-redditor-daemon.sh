@@ -9,6 +9,7 @@ Commands:
   bootstrap
   settings
   metrics
+  compiled-instructions
   once
   run
   list-actions [LIMIT]
@@ -32,6 +33,8 @@ Commands:
 
 Environment overrides:
   VR_STATE_DIR        Runtime/config directory (default: ~/.local/state/wizardry/virtual-redditor)
+  VR_SHARED_INSTRUCTIONS_FILE
+  VR_CORE_INSTRUCTIONS_FILE
 USAGE
   exit 0
   ;;
@@ -42,7 +45,15 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 STATE_DIR=${VR_STATE_DIR:-"${XDG_STATE_HOME:-$HOME/.local/state}/wizardry/virtual-redditor"}
-GLOBAL_INSTRUCTIONS_FILE=${VR_GLOBAL_INSTRUCTIONS_FILE:-"$STATE_DIR/global-default-instructions.md"}
+STATE_ROOT_INFERRED="$STATE_DIR"
+case "$STATE_DIR" in
+  */profiles/*)
+    STATE_ROOT_INFERRED=${STATE_DIR%/profiles/*}
+    ;;
+esac
+SHARED_INSTRUCTIONS_FILE=${VR_SHARED_INSTRUCTIONS_FILE:-"$STATE_ROOT_INFERRED/shared-instructions.md"}
+CORE_INSTRUCTIONS_FILE=${VR_CORE_INSTRUCTIONS_FILE:-"$STATE_ROOT_INFERRED/core-default-instructions.md"}
+LEGACY_GLOBAL_INSTRUCTIONS_FILE="$STATE_ROOT_INFERRED/global-default-instructions.md"
 
 BANS_LOG="$STATE_DIR/bans.jsonl"
 REPLIES_LOG="$STATE_DIR/replies.jsonl"
@@ -1167,12 +1178,23 @@ SUBREDDIT=
 REDDITENV
   fi
 
-  if [ ! -f "$GLOBAL_INSTRUCTIONS_FILE" ]; then
-    mkdir -p "$(dirname "$GLOBAL_INSTRUCTIONS_FILE")"
+  mkdir -p "$(dirname "$SHARED_INSTRUCTIONS_FILE")"
+  if [ ! -f "$CORE_INSTRUCTIONS_FILE" ]; then
     if [ -f "$APP_DIR/manifesto.md" ]; then
-      cp "$APP_DIR/manifesto.md" "$GLOBAL_INSTRUCTIONS_FILE" 2>/dev/null || cat "$APP_DIR/manifesto.md" > "$GLOBAL_INSTRUCTIONS_FILE"
+      cp "$APP_DIR/manifesto.md" "$CORE_INSTRUCTIONS_FILE" 2>/dev/null || cat "$APP_DIR/manifesto.md" > "$CORE_INSTRUCTIONS_FILE"
     else
-      : > "$GLOBAL_INSTRUCTIONS_FILE"
+      : > "$CORE_INSTRUCTIONS_FILE"
+    fi
+  fi
+  if [ ! -f "$SHARED_INSTRUCTIONS_FILE" ]; then
+    if [ -f "$LEGACY_GLOBAL_INSTRUCTIONS_FILE" ]; then
+      if cmp -s "$LEGACY_GLOBAL_INSTRUCTIONS_FILE" "$CORE_INSTRUCTIONS_FILE" 2>/dev/null; then
+        : > "$SHARED_INSTRUCTIONS_FILE"
+      else
+        cp "$LEGACY_GLOBAL_INSTRUCTIONS_FILE" "$SHARED_INSTRUCTIONS_FILE" 2>/dev/null || cat "$LEGACY_GLOBAL_INSTRUCTIONS_FILE" > "$SHARED_INSTRUCTIONS_FILE"
+      fi
+    else
+      : > "$SHARED_INSTRUCTIONS_FILE"
     fi
   fi
 }
@@ -1381,6 +1403,8 @@ settings_json() {
     --arg reddit_username "${REDDIT_USERNAME-}" \
     --arg manifesto_path "$MANIFESTO_FILE" \
     --arg norms_path "$NORMS_FILE" \
+    --arg shared_instructions_path "$SHARED_INSTRUCTIONS_FILE" \
+    --arg core_instructions_path "$CORE_INSTRUCTIONS_FILE" \
     --arg reddit_env_path "$REDDIT_ENV_FILE" \
     --arg bot_env_path "$BOT_ENV_FILE" \
     --arg actions_path "$ACTIONS_LOG" \
@@ -1392,7 +1416,7 @@ settings_json() {
     --arg last_seen_path "$LAST_SEEN_FILE" \
     --arg daemon_log_path "$DAEMON_STDOUT_LOG" \
     --arg daemon_error_path "$DAEMON_STDERR_LOG" \
-    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,runEnabled:($run_enabled==1),redditConnected:($reddit_connected==1),sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,modes:$modes_path,relationships:$relationships_path,modeLog:$mode_log_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
+    '{ok:true,stateDir:$state_dir,mode:$mode,patrolMode:$patrol_mode,patrolSampleMax:$patrol_sample_max,patrolIntervalMin:$patrol_interval_min,patrolIntervalMax:$patrol_interval_max,threadInitiateMaxPct:$thread_initiate_max_pct,runEnabled:($run_enabled==1),redditConnected:($reddit_connected==1),sanctionDelayMin:$sanction_delay_min,sanctionDelayMax:$sanction_delay_max,summonsEnabled:($summons_enabled==1),nightlyStatuteEnabled:($nightly_enabled==1),nightlyHour:$nightly_hour,highSignalMinScore:$high_signal_min_score,autoAcceptNorms:($auto_accept_norms==1),userHistoryLimit:$user_history_limit,threadSiblingLimit:$thread_sibling_limit,obeyAdmins:($obey_admins==1),ollamaModel:$ollama_model,ollamaUrl:$ollama_url,subreddit:$subreddit,redditUsername:$reddit_username,paths:{manifesto:$manifesto_path,norms:$norms_path,sharedInstructions:$shared_instructions_path,coreInstructions:$core_instructions_path,redditEnv:$reddit_env_path,botEnv:$bot_env_path,actions:$actions_path,bans:$bans_path,replies:$replies_path,modes:$modes_path,relationships:$relationships_path,modeLog:$mode_log_path,lastSeen:$last_seen_path,daemonLog:$daemon_log_path,daemonErrorLog:$daemon_error_path}}'
 }
 
 metrics_json() {
@@ -1964,7 +1988,8 @@ compose_context_envelope() {
   esac
 
   manifesto_text=$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
-  global_instructions_text=$(cat "$GLOBAL_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+  core_instructions_text=$(cat "$CORE_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+  shared_instructions_text=$(cat "$SHARED_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
   norms_json=$(jq -cs '[.[]]' "$NORMS_FILE" 2>/dev/null || printf '[]')
   relationship_mode=$(printf '%s' "$relationship_json" | jq -r '.current_mode // empty' 2>/dev/null || printf '')
   mode_allow_json=$(read_modes_config_json | jq -c --arg mode "$relationship_mode" '
@@ -2031,7 +2056,8 @@ compose_context_envelope() {
     --arg author_sub "$author_subreddit_json" \
     --arg author_global "$author_global_json" \
     --arg manifesto "$manifesto_text" \
-    --arg global_instructions "$global_instructions_text" \
+    --arg core_instructions "$core_instructions_text" \
+    --arg shared_instructions "$shared_instructions_text" \
     --arg norms "$norms_json" \
     --arg relationship "$relationship_for_prompt_json" \
     --arg mode_allow "$mode_allow_json" \
@@ -2040,7 +2066,7 @@ compose_context_envelope() {
       mode:$mode,
       subreddit:$subreddit,
       behavior_policy:(($behavior_policy|fromjson?) // {}),
-      doctrine:{global_instructions:$global_instructions, manifesto:$manifesto, norms:(($norms|fromjson?) // [])},
+      doctrine:{core_instructions:$core_instructions, shared_instructions:$shared_instructions, manifesto:$manifesto, norms:(($norms|fromjson?) // [])},
       utterance:($comment|fromjson),
       relationship:((($relationship|fromjson?) // {}) + {allowed_actions: (($mode_allow|fromjson?) // {})}),
       context:{
@@ -2065,8 +2091,11 @@ You are Virtual Redditor, the autonomous moderator and participant for r/$SUBRED
 
 MODE: $MODE
 
-Global default instructions (all virtual redditors):
-$(cat "$GLOBAL_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+Core default instructions (all virtual redditors):
+$(cat "$CORE_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+
+Shared instructions (operator editable):
+$(cat "$SHARED_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
 
 Per-redditor instructions (manifesto.md):
 $(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
@@ -2103,6 +2132,28 @@ Return STRICT JSON only, no markdown, with this shape:
 Context envelope JSON:
 $envelope_json
 PROMPT
+}
+
+compiled_instructions_json() {
+  behaviors_json=$(read_modes_config_json | jq -c '.behaviors // {}' 2>/dev/null || printf '{}')
+  compiled_text=$(cat <<TEXT
+Core default instructions:
+$(cat "$CORE_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+
+Shared instructions:
+$(cat "$SHARED_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+
+Per-redditor instructions (manifesto.md):
+$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
+
+Statutory doctrine (norms.jsonl):
+$(cat "$NORMS_FILE" 2>/dev/null || printf '')
+
+Behavior policy (from modes config):
+$behaviors_json
+TEXT
+)
+  jq -cn --arg compiled "$compiled_text" '{ok:true,compiled:$compiled}'
 }
 
 normalize_decision_json() {
@@ -3494,6 +3545,10 @@ main() {
 
     metrics)
       metrics_json
+      ;;
+
+    compiled-instructions)
+      compiled_instructions_json
       ;;
 
     once)

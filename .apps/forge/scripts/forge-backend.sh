@@ -1259,15 +1259,15 @@ cmd_run_desktop() {
 
   if command -v nohup >/dev/null 2>&1; then
     if [ -n "$host_zoom" ]; then
-      nohup env WIZARDRY_PAGE_ZOOM="$host_zoom" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+      nohup env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" WIZARDRY_PAGE_ZOOM="$host_zoom" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
     else
-      nohup "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+      nohup env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
     fi
   else
     if [ -n "$host_zoom" ]; then
-      env WIZARDRY_PAGE_ZOOM="$host_zoom" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+      env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" WIZARDRY_PAGE_ZOOM="$host_zoom" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
     else
-      "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+      env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
     fi
   fi
   pid=$!

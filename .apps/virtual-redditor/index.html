@@ -751,6 +751,11 @@
             <div id="mode-log-list" class="mode-log-list" role="table" aria-label="Mode events log"></div>
           </div>
           <div class="mode-log-status" id="mode-log-line">No mode events loaded yet.</div>
+          <div class="log-head-row with-top-margin">
+            <div class="status-line">Compiled Instructions</div>
+            <button id="btn-log-refresh-compiled" type="button" class="soft log-clear-btn">Refresh</button>
+          </div>
+          <pre id="compiled-instructions-log" class="log-pane">(loading compiled instructions...)</pre>
           <div class="log-head-row">
             <div class="status-line">Standard Output</div>
             <button id="btn-log-clear-stdout" type="button" class="soft log-clear-btn">Clear</button>
@@ -837,12 +842,13 @@
         <div class="settings-global-instructions-row">
           <label for="settings-global-instructions">Shared Instructions</label>
           <div class="settings-global-instructions-wrap">
-            <textarea id="settings-global-instructions" class="settings-global-instructions" spellcheck="false" placeholder="Used for every virtual Redditor unless you customize it."></textarea>
+            <textarea id="settings-global-instructions" class="settings-global-instructions" spellcheck="false" placeholder="Optional. Applies to every virtual Redditor."></textarea>
             <div id="settings-global-instructions-save-indicator" class="autosave-indicator settings-global-save-indicator hidden" aria-live="polite">
               <span class="autosave-icon" aria-hidden="true"></span>
               <span id="settings-global-instructions-save-text">saving</span>
             </div>
           </div>
+          <button id="btn-settings-advanced-instructions" type="button" class="inline-link-btn settings-advanced-link" title="Edit core default instructions">Advanced...</button>
         </div>
       </div>
       <div class="settings-launchd-row">
@@ -854,6 +860,29 @@
         <button id="btn-settings-run-toggle" type="button" class="soft">Start daemon</button>
         <span id="settings-global-msg" class="settings-inline-msg" aria-live="polite"></span>
       </div>
+    </div>
+  </div>
+
+  <div id="core-instructions-modal" class="settings-modal hidden" role="dialog" aria-modal="true" aria-labelledby="core-instructions-modal-title">
+    <div class="settings-sheet core-instructions-sheet">
+      <div class="settings-head">
+        <h3 id="core-instructions-modal-title">Core Default Instructions</h3>
+        <button id="btn-core-instructions-close" type="button" class="soft settings-close-btn" aria-label="Close core instructions">✕</button>
+      </div>
+      <p class="settings-subhead">These are foundational defaults tested for baseline behavior. Edit only if you know exactly what you are changing. No hidden core instructions are added here.</p>
+      <div class="settings-form-grid">
+        <div class="settings-global-instructions-row">
+          <label for="core-instructions-textarea">Core defaults</label>
+          <div class="settings-global-instructions-wrap">
+            <textarea id="core-instructions-textarea" class="settings-global-instructions" spellcheck="false"></textarea>
+            <div id="core-instructions-save-indicator" class="autosave-indicator settings-global-save-indicator hidden" aria-live="polite">
+              <span class="autosave-icon" aria-hidden="true"></span>
+              <span id="core-instructions-save-text">saving</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="core-instructions-msg" class="settings-inline-msg" aria-live="polite"></div>
     </div>
   </div>
 
@@ -1250,6 +1279,12 @@
       globalInstructionsSaveTimer: null,
       globalInstructionsSaveQueued: false,
       globalInstructionsSaving: false,
+      coreInstructions: DEFAULT_GLOBAL_INSTRUCTIONS,
+      coreInstructionsRemote: DEFAULT_GLOBAL_INSTRUCTIONS,
+      coreInstructionsSaveTimer: null,
+      coreInstructionsSaveQueued: false,
+      coreInstructionsSaving: false,
+      compiledInstructionsText: '',
       themeTypeaheadBuffer: '',
       themeTypeaheadTs: 0,
       themeTypeaheadResetTimer: null
@@ -1274,7 +1309,9 @@
         'threadInitiateSaveTimer',
         'usernameSaveTimer',
         'subredditCheckTimer',
-        'modesSaveTimer'
+        'modesSaveTimer',
+        'globalInstructionsSaveTimer',
+        'coreInstructionsSaveTimer'
       ];
       for (var i = 0; i < timerKeys.length; i += 1) {
         var key = timerKeys[i];
@@ -1288,6 +1325,8 @@
       state.enforcementSaveQueued = false;
       state.replyTemplatesSaveQueued = false;
       state.modesSaveQueued = false;
+      state.globalInstructionsSaveQueued = false;
+      state.coreInstructionsSaveQueued = false;
       state.usernameCheckReqId += 1;
       state.subredditCheckReqId += 1;
     }
@@ -1874,6 +1913,22 @@
       modal.classList.add('hidden');
     }
 
+    function openCoreInstructionsModal() {
+      var modal = document.getElementById('core-instructions-modal');
+      if (!modal) return;
+      setCoreInstructionsMessage('', '');
+      refreshCoreInstructionsEditor();
+      modal.classList.remove('hidden');
+      var closeBtn = document.getElementById('btn-core-instructions-close');
+      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+    }
+
+    function closeCoreInstructionsModal() {
+      var modal = document.getElementById('core-instructions-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+    }
+
     function setExtractNormsMessage(msg, level) {
       var line = document.getElementById('extract-norms-msg');
       if (!line) return;
@@ -1990,6 +2045,19 @@
       line.classList.add('is-' + k);
     }
 
+    function setCoreInstructionsMessage(msg, kind) {
+      var line = document.getElementById('core-instructions-msg');
+      if (!line) return;
+      line.textContent = msg || '';
+      var k = kind;
+      if (k === true) k = 'error';
+      if (k === false) k = (msg ? 'success' : '');
+      if (k !== 'pending' && k !== 'success' && k !== 'error') k = '';
+      line.classList.remove('is-pending', 'is-success', 'is-error');
+      if (!k) return;
+      line.classList.add('is-' + k);
+    }
+
     function renderGlobalSettingsModal() {
       var pill = document.getElementById('settings-daemon-pill');
       var installBtn = document.getElementById('btn-settings-install-toggle');
@@ -2026,27 +2094,30 @@
         return;
       }
       if (state.previewMode) {
-        state.globalInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
-        state.globalInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
-        textarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
+        state.globalInstructions = '';
+        state.globalInstructionsRemote = '';
+        textarea.value = '';
         setGlobalInstructionsSaveIndicator('');
+        state.coreInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
+        state.coreInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
+        var coreTextarea = document.getElementById('core-instructions-textarea');
+        if (coreTextarea) coreTextarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
+        setCoreInstructionsSaveIndicator('');
         renderGlobalSettingsModal();
         return;
       }
       try {
-        var out = await backendJson('read-file', ['global-instructions']);
+        var out = await backendJson('read-file', ['shared-instructions']);
         var content = String((out && out.content) || '');
-        if (!content.trim()) {
-          content = DEFAULT_GLOBAL_INSTRUCTIONS;
-        }
         state.globalInstructions = content;
         state.globalInstructionsRemote = content;
         textarea.value = content;
         setGlobalInstructionsSaveIndicator('');
+        await refreshCoreInstructionsEditor();
       } catch (error) {
-        state.globalInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
-        state.globalInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
-        textarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
+        state.globalInstructions = '';
+        state.globalInstructionsRemote = '';
+        textarea.value = '';
         setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
         setGlobalInstructionsSaveIndicator('');
       } finally {
@@ -2077,7 +2148,7 @@
       }
       if (!quiet) setGlobalSettingsMessage('Saving shared instructions...', 'pending');
       try {
-        await backendJson('write-file', ['global-instructions', next]);
+        await backendJson('write-file', ['shared-instructions', next]);
         state.globalInstructionsRemote = next;
         setGlobalInstructionsSaveIndicator('saved');
         if (!quiet) setGlobalSettingsMessage('Shared instructions saved.', 'success');
@@ -2112,6 +2183,83 @@
       state.globalInstructionsSaveTimer = setTimeout(function () {
         state.globalInstructionsSaveTimer = null;
         runGlobalInstructionsAutosave();
+      }, Math.max(0, parseInt(delayMs, 10) || 500));
+    }
+
+    async function refreshCoreInstructionsEditor() {
+      var textarea = document.getElementById('core-instructions-textarea');
+      if (!textarea) return;
+      if (state.previewMode) {
+        state.coreInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
+        state.coreInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
+        textarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
+        setCoreInstructionsSaveIndicator('');
+        return;
+      }
+      try {
+        var out = await backendJson('read-file', ['core-instructions']);
+        var content = String((out && out.content) || '');
+        if (!content.trim()) content = DEFAULT_GLOBAL_INSTRUCTIONS;
+        state.coreInstructions = content;
+        state.coreInstructionsRemote = content;
+        textarea.value = content;
+        setCoreInstructionsSaveIndicator('');
+      } catch (error) {
+        state.coreInstructions = DEFAULT_GLOBAL_INSTRUCTIONS;
+        state.coreInstructionsRemote = DEFAULT_GLOBAL_INSTRUCTIONS;
+        textarea.value = DEFAULT_GLOBAL_INSTRUCTIONS;
+        setCoreInstructionsSaveIndicator('');
+        setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+      }
+    }
+
+    async function saveCoreInstructions(options) {
+      var opts = options || {};
+      var quiet = !!opts.quiet;
+      var textarea = document.getElementById('core-instructions-textarea');
+      if (!textarea) return;
+      var next = String(textarea.value || '');
+      state.coreInstructions = next;
+      if (next === state.coreInstructionsRemote) {
+        setCoreInstructionsSaveIndicator('saved');
+        return;
+      }
+      if (!quiet) setCoreInstructionsMessage('Saving core defaults...', 'pending');
+      try {
+        await backendJson('write-file', ['core-instructions', next]);
+        state.coreInstructionsRemote = next;
+        setCoreInstructionsSaveIndicator('saved');
+        if (!quiet) setCoreInstructionsMessage('Core defaults saved.', 'success');
+      } catch (error) {
+        setCoreInstructionsSaveIndicator('');
+        setCoreInstructionsMessage(String(error && error.message ? error.message : error), 'error');
+        throw error;
+      }
+    }
+
+    async function runCoreInstructionsAutosave() {
+      if (state.coreInstructionsSaving) {
+        state.coreInstructionsSaveQueued = true;
+        return;
+      }
+      state.coreInstructionsSaving = true;
+      try {
+        await saveCoreInstructions({ quiet: true });
+      } catch (_) {
+      } finally {
+        state.coreInstructionsSaving = false;
+        if (state.coreInstructionsSaveQueued) {
+          state.coreInstructionsSaveQueued = false;
+          queueCoreInstructionsAutosave(120);
+        }
+      }
+    }
+
+    function queueCoreInstructionsAutosave(delayMs) {
+      if (state.coreInstructionsSaveTimer) clearTimeout(state.coreInstructionsSaveTimer);
+      state.coreInstructionsSaveTimer = setTimeout(function () {
+        state.coreInstructionsSaveTimer = null;
+        runCoreInstructionsAutosave();
       }, Math.max(0, parseInt(delayMs, 10) || 500));
     }
 
@@ -2900,6 +3048,10 @@
 
     function setGlobalInstructionsSaveIndicator(mode) {
       setAutosaveIndicator('settings-global-instructions-save-indicator', 'settings-global-instructions-save-text', mode);
+    }
+
+    function setCoreInstructionsSaveIndicator(mode) {
+      setAutosaveIndicator('core-instructions-save-indicator', 'core-instructions-save-text', mode);
     }
 
     function setProfilesMessage(msg, isError) {
@@ -5706,9 +5858,13 @@
       var out = await backendJson('tail-log', ['180']);
       var stdoutTail = String((((out.stdout || {}).tail) || '') || '');
       var stderrTail = String((((out.stderr || {}).tail) || '') || '');
+      var compiledOut = await backendJson('compiled-instructions', []);
+      var compiled = String((compiledOut && compiledOut.compiled) || '');
+      state.compiledInstructionsText = compiled;
       state.logsAvailable = !!(stdoutTail.trim() || stderrTail.trim());
       updateConditionalTabs();
       ensureActiveTabVisible();
+      document.getElementById('compiled-instructions-log').textContent = compiled || '(compiled instructions unavailable)';
       document.getElementById('stdout-log').textContent = stdoutTail || '(no stdout log)';
       document.getElementById('stderr-log').textContent = stderrTail || '(no stderr log)';
     }
@@ -6645,6 +6801,9 @@
       document.getElementById('btn-settings-close').addEventListener('click', function () {
         closeSettingsModal();
       });
+      document.getElementById('btn-settings-advanced-instructions').addEventListener('click', function () {
+        openCoreInstructionsModal();
+      });
       document.getElementById('settings-global-instructions').addEventListener('input', function (event) {
         state.globalInstructions = String((event && event.target && event.target.value) || '');
         setGlobalInstructionsSaveIndicator('saving');
@@ -6655,6 +6814,21 @@
           if (state.globalInstructionsSaveTimer) clearTimeout(state.globalInstructionsSaveTimer);
           state.globalInstructionsSaveTimer = null;
           runGlobalInstructionsAutosave();
+        }
+      });
+      document.getElementById('btn-core-instructions-close').addEventListener('click', function () {
+        closeCoreInstructionsModal();
+      });
+      document.getElementById('core-instructions-textarea').addEventListener('input', function (event) {
+        state.coreInstructions = String((event && event.target && event.target.value) || '');
+        setCoreInstructionsSaveIndicator('saving');
+        queueCoreInstructionsAutosave(500);
+      });
+      document.getElementById('core-instructions-textarea').addEventListener('blur', function () {
+        if (state.coreInstructions !== state.coreInstructionsRemote) {
+          if (state.coreInstructionsSaveTimer) clearTimeout(state.coreInstructionsSaveTimer);
+          state.coreInstructionsSaveTimer = null;
+          runCoreInstructionsAutosave();
         }
       });
       document.getElementById('btn-settings-install-toggle').addEventListener('click', function () {
@@ -7281,6 +7455,11 @@
       document.getElementById('btn-log-clear-stderr').addEventListener('click', function () {
         document.getElementById('stderr-log').textContent = '';
       });
+      document.getElementById('btn-log-refresh-compiled').addEventListener('click', function () {
+        refreshLogs().catch(function (error) {
+          setControlMessage(String(error && error.message ? error.message : error), true);
+        });
+      });
       document.getElementById('mode-log-list').addEventListener('click', async function (event) {
         var copyBtn = event.target && event.target.closest('[data-mode-log-copy]');
         if (!copyBtn) return;
@@ -7330,6 +7509,7 @@
         if (isCtrlTabCycle) {
           var modalOpen = (
             !document.getElementById('settings-modal').classList.contains('hidden') ||
+            !document.getElementById('core-instructions-modal').classList.contains('hidden') ||
             !document.getElementById('rename-modal').classList.contains('hidden') ||
             !document.getElementById('delete-modal').classList.contains('hidden') ||
             !document.getElementById('extract-norms-modal').classList.contains('hidden') ||
@@ -7349,6 +7529,10 @@
         if (event.key === 'Escape') {
           if (!document.getElementById('settings-modal').classList.contains('hidden')) {
             closeSettingsModal();
+            return;
+          }
+          if (!document.getElementById('core-instructions-modal').classList.contains('hidden')) {
+            closeCoreInstructionsModal();
             return;
           }
           if (!document.getElementById('rename-modal').classList.contains('hidden')) {
@@ -7392,6 +7576,11 @@
       document.getElementById('settings-modal').addEventListener('click', function (event) {
         if (event.target && event.target.id === 'settings-modal') {
           closeSettingsModal();
+        }
+      });
+      document.getElementById('core-instructions-modal').addEventListener('click', function (event) {
+        if (event.target && event.target.id === 'core-instructions-modal') {
+          closeCoreInstructionsModal();
         }
       });
       document.getElementById('rename-modal').addEventListener('click', function (event) {

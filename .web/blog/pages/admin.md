@@ -110,7 +110,7 @@ title: Blog Admin
 </div>
 
 <div class="section-actions">
-<button id="btn-save-config" class="primary">Save Settings</button>
+<p class="muted">Changes save automatically.</p>
 </div>
 <div id="output-config" class="output"></div>
 </div>
@@ -165,7 +165,7 @@ title: Blog Admin
 <p class="muted">These settings are stored in <code>site/nostr/state/</code> as <code>authors.txt</code>, <code>relays.txt</code>, and <code>blocklist.txt</code>.</p>
 
 <div class="section-actions">
-<button id="btn-save-nostr-bridge" class="primary">Save Nostr Bridge Settings</button>
+<p class="muted">Changes save automatically.</p>
 </div>
 <div id="output-nostr-bridge" class="output"></div>
 </div>
@@ -339,7 +339,6 @@ title: Blog Admin
 <p class="muted">See what will publish next and run the scheduler manually.</p>
 </div>
 <div class="row-actions">
-<button id="btn-save-drip" type="button">Save Drip Settings</button>
 <button id="btn-refresh-queue" type="button">Refresh</button>
 <button id="btn-mirror-nostr" type="button">Mirror Nostr</button>
 <button id="btn-run-scheduler" type="button" class="primary">Run Scheduler</button>

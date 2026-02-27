@@ -4366,6 +4366,12 @@ label {
   margin-top: 8px;
 }
 
+.settings-advanced-link {
+  justify-self: start;
+  margin-top: 2px;
+  font-size: 0.79rem;
+}
+
 .settings-global-instructions-wrap {
   position: relative;
   width: 100%;
@@ -4378,6 +4384,10 @@ label {
   padding-bottom: 1.55rem;
   font-family: "SF Pro Text", "Avenir Next", "Segoe UI", "Helvetica Neue", ui-sans-serif, system-ui, sans-serif;
   font-size: 0.78rem;
+}
+
+.core-instructions-sheet {
+  width: min(860px, 94vw);
 }
 
 .settings-global-instructions-note {

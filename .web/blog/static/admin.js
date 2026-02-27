@@ -25,7 +25,10 @@
     usersMenuOpenFor: '',
     usersActionInFlight: false,
     dripQueueAhead: 0,
-    dripQueueEtaMinutes: 0
+    dripQueueEtaMinutes: 0,
+    configSaveTimer: null,
+    nostrBridgeSaveTimer: null,
+    isLoadingConfig: false
   };
 
   const els = {
@@ -894,49 +897,54 @@
   }
 
   async function loadConfig() {
-    const data = await fetchJson('/cgi/blog-get-config');
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to load configuration');
-    }
-    els.siteTitle.value = data.site_title || 'My Blog';
-    if (els.adminTheme && data.theme) {
-      els.adminTheme.value = data.theme;
-    }
-    if (els.adminTheme) {
-      applyThemePreview(els.adminTheme.value);
-    }
-    els.registrationEnabled.checked = data.registration_enabled !== false;
-    if (typeof data.drip_interval_hours !== 'undefined') {
-      els.dripInterval.value = String(data.drip_interval_hours);
-    } else {
-      const legacyMinutes = Number(data.drip_interval_minutes || 240);
-      els.dripInterval.value = String(Math.max(legacyMinutes / 60, 1 / 60));
-    }
-    if (typeof data.drip_randomness_minutes !== 'undefined') {
-      els.dripRandomness.value = String(data.drip_randomness_minutes || 0);
-    } else {
-      els.dripRandomness.value = String(data.drip_jitter_minutes || 0);
-    }
-    els.feedFullText.checked = data.feed_full_text !== false;
-    els.feedItems.value = String(data.feed_items || 50);
-    state.nostrBridgeEnabled = !!data.nostr_bridge_enabled;
-    if (els.nostrBridgeEnabled) {
-      els.nostrBridgeEnabled.checked = state.nostrBridgeEnabled;
-    }
-    if (els.nostrAuthors) {
-      els.nostrAuthors.value = Array.isArray(data.nostr_authors) ? data.nostr_authors.join('\n') : '';
-    }
-    if (els.nostrRelays) {
-      els.nostrRelays.value = Array.isArray(data.nostr_relays) ? data.nostr_relays.join('\n') : '';
-    }
-    if (els.nostrBlocklist) {
-      els.nostrBlocklist.value = Array.isArray(data.nostr_blocklist) ? data.nostr_blocklist.join('\n') : '';
-    }
-    if (els.newUsersAreAdmins) {
-      els.newUsersAreAdmins.checked = !!data.new_users_are_admins;
-    }
-    if (els.mirrorNostrButton) {
-      els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
+    state.isLoadingConfig = true;
+    try {
+      const data = await fetchJson('/cgi/blog-get-config');
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load configuration');
+      }
+      els.siteTitle.value = data.site_title || 'My Blog';
+      if (els.adminTheme && data.theme) {
+        els.adminTheme.value = data.theme;
+      }
+      if (els.adminTheme) {
+        applyThemePreview(els.adminTheme.value);
+      }
+      els.registrationEnabled.checked = data.registration_enabled !== false;
+      if (typeof data.drip_interval_hours !== 'undefined') {
+        els.dripInterval.value = String(data.drip_interval_hours);
+      } else {
+        const legacyMinutes = Number(data.drip_interval_minutes || 240);
+        els.dripInterval.value = String(Math.max(legacyMinutes / 60, 1 / 60));
+      }
+      if (typeof data.drip_randomness_minutes !== 'undefined') {
+        els.dripRandomness.value = String(data.drip_randomness_minutes || 0);
+      } else {
+        els.dripRandomness.value = String(data.drip_jitter_minutes || 0);
+      }
+      els.feedFullText.checked = data.feed_full_text !== false;
+      els.feedItems.value = String(data.feed_items || 50);
+      state.nostrBridgeEnabled = !!data.nostr_bridge_enabled;
+      if (els.nostrBridgeEnabled) {
+        els.nostrBridgeEnabled.checked = state.nostrBridgeEnabled;
+      }
+      if (els.nostrAuthors) {
+        els.nostrAuthors.value = Array.isArray(data.nostr_authors) ? data.nostr_authors.join('\n') : '';
+      }
+      if (els.nostrRelays) {
+        els.nostrRelays.value = Array.isArray(data.nostr_relays) ? data.nostr_relays.join('\n') : '';
+      }
+      if (els.nostrBlocklist) {
+        els.nostrBlocklist.value = Array.isArray(data.nostr_blocklist) ? data.nostr_blocklist.join('\n') : '';
+      }
+      if (els.newUsersAreAdmins) {
+        els.newUsersAreAdmins.checked = !!data.new_users_are_admins;
+      }
+      if (els.mirrorNostrButton) {
+        els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
+      }
+    } finally {
+      state.isLoadingConfig = false;
     }
   }
 
@@ -955,11 +963,25 @@
       if (!data.success) {
         throw new Error(data.error || 'Failed to save config');
       }
-      setOutput(els.outputConfig, 'Settings saved.', 'ok');
+      if (els.outputConfig) {
+        els.outputConfig.innerHTML = '';
+      }
       await loadQueue();
     } catch (err) {
       setOutput(els.outputConfig, 'Error: ' + err.message, 'error');
     }
+  }
+
+  function queueConfigAutosave(delayMs) {
+    if (state.isLoadingConfig) {
+      return;
+    }
+    if (state.configSaveTimer) {
+      clearTimeout(state.configSaveTimer);
+    }
+    state.configSaveTimer = setTimeout(function () {
+      saveConfig().catch(function () {});
+    }, Math.max(150, Number(delayMs || 550)));
   }
 
   function normalizeLineList(text) {
@@ -987,10 +1009,59 @@
         els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
       }
       await loadConfig();
-      setOutput(els.outputNostrBridge, 'Nostr Bridge settings saved.', 'ok');
+      if (els.outputNostrBridge) {
+        els.outputNostrBridge.innerHTML = '';
+      }
     } catch (err) {
       setOutput(els.outputNostrBridge, 'Error: ' + err.message, 'error');
     }
+  }
+
+  function queueNostrBridgeAutosave(delayMs) {
+    if (state.isLoadingConfig) {
+      return;
+    }
+    if (state.nostrBridgeSaveTimer) {
+      clearTimeout(state.nostrBridgeSaveTimer);
+    }
+    state.nostrBridgeSaveTimer = setTimeout(function () {
+      saveNostrBridgeConfig().catch(function () {});
+    }, Math.max(180, Number(delayMs || 700)));
+  }
+
+  function bindSettingsAutosave() {
+    const configFields = [
+      els.siteTitle,
+      els.adminTheme,
+      els.registrationEnabled,
+      els.feedFullText,
+      els.feedItems,
+      els.newUsersAreAdmins,
+      els.dripInterval,
+      els.dripRandomness
+    ].filter(Boolean);
+
+    configFields.forEach(function (field) {
+      const tag = (field.tagName || '').toLowerCase();
+      const inputType = (field.type || '').toLowerCase();
+      if (inputType === 'checkbox' || tag === 'select') {
+        field.addEventListener('change', function () { queueConfigAutosave(200); });
+        return;
+      }
+      field.addEventListener('input', function () { queueConfigAutosave(650); });
+      field.addEventListener('change', function () { queueConfigAutosave(220); });
+      field.addEventListener('blur', function () { queueConfigAutosave(180); });
+    });
+
+    if (els.nostrBridgeEnabled) {
+      els.nostrBridgeEnabled.addEventListener('change', function () { queueNostrBridgeAutosave(180); });
+    }
+
+    [els.nostrAuthors, els.nostrRelays, els.nostrBlocklist].filter(Boolean).forEach(function (field) {
+      field.addEventListener('input', function () { queueNostrBridgeAutosave(850); });
+      field.addEventListener('change', function () { queueNostrBridgeAutosave(250); });
+      field.addEventListener('blur', function () { queueNostrBridgeAutosave(220); });
+    });
   }
 
   async function saveAccount() {
@@ -1728,11 +1799,7 @@
   }
 
   function bindEvents() {
-    document.getElementById('btn-save-config').addEventListener('click', saveConfig);
-    const saveNostrBridgeBtn = document.getElementById('btn-save-nostr-bridge');
-    if (saveNostrBridgeBtn) {
-      saveNostrBridgeBtn.addEventListener('click', saveNostrBridgeConfig);
-    }
+    bindSettingsAutosave();
     if (els.adminTheme) {
       els.adminTheme.addEventListener('change', function () {
         applyThemePreview(els.adminTheme.value);
@@ -1808,10 +1875,6 @@
         setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
       });
     });
-    const saveDripBtn = document.getElementById('btn-save-drip');
-    if (saveDripBtn) {
-      saveDripBtn.addEventListener('click', saveConfig);
-    }
     if (els.usersList) {
       els.usersList.addEventListener('click', function (event) {
         const target = event.target;
