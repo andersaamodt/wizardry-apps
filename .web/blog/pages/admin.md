@@ -11,6 +11,7 @@ title: Blog Admin
 <button type="button" class="admin-nav-item is-compose" data-admin-nav="compose" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 18L7.2 13.8L15.8 5.2a2 2 0 1 1 2.8 2.8L10 16.6L6 18Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 21H19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="admin-nav-label">Compose</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="drafts" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Drafts <span id="admin-nav-drafts-count" class="admin-nav-count">(0)</span></span></button>
 <button type="button" class="admin-nav-item admin-nav-divider-after" data-admin-nav="queue" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Queue <span id="admin-nav-queue-count" class="admin-nav-count">(0)</span></span></button>
+<button type="button" class="admin-nav-item" data-admin-nav="users" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Users</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="account" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Account</span></button>
 <button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Site Settings</span></button>
 <button type="button" class="admin-nav-item" data-admin-nav="nostr-bridge" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Nostr Bridge</span></button>
@@ -361,7 +362,7 @@ title: Blog Admin
 </div>
 </div>
 
-<div class="field-row">
+<div class="field-row account-passkey-row">
 <label><strong>Passkey</strong></label>
 <div class="account-row">
 <button id="btn-bind-passkey" type="button">Bind passkey</button>
@@ -1039,7 +1040,7 @@ body {
 }
 
 .account-ssh-optional {
-  margin-top: 0.74rem;
+  margin-top: 1.06rem;
 }
 
 .account-ssh-description {
@@ -1050,6 +1051,22 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+}
+
+[data-admin-section="account"] .account-passkey-row {
+  display: grid;
+  grid-template-columns: minmax(8.5rem, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.18rem 0.52rem;
+  margin-bottom: 0.76rem;
+}
+
+[data-admin-section="account"] .account-passkey-row > label {
+  margin-bottom: 0;
+}
+
+[data-admin-section="account"] .account-passkey-row .account-row {
+  justify-self: start;
 }
 
 .composer-grid {
@@ -1895,6 +1912,11 @@ body {
   }
 
   [data-admin-section="settings"] .field-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  [data-admin-section="account"] .account-passkey-row {
     grid-template-columns: 1fr;
     align-items: start;
   }
