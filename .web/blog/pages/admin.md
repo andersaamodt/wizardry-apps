@@ -385,7 +385,7 @@ title: Blog Admin
 </div>
 </details>
 
-<div class="field-row">
+<div class="field-row account-output-row">
 <div id="output-account" class="output"></div>
 </div>
 </div>
@@ -993,6 +993,17 @@ body {
   inline-size: clamp(12rem, 22vw, 18rem);
 }
 
+[data-admin-section="account"] .field-row {
+  display: grid;
+  grid-template-columns: minmax(9.2rem, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.18rem 0.56rem;
+}
+
+[data-admin-section="account"] .field-row > label {
+  margin-bottom: 0;
+}
+
 [data-admin-section="account"] #account-nostr-pubkey,
 [data-admin-section="account"] #account-ssh-public-key {
   inline-size: min(100%, 42rem);
@@ -1000,6 +1011,7 @@ body {
 
 .account-note {
   margin: 0.28rem 0 0.34rem;
+  grid-column: 2;
 }
 
 [data-admin-section="account"] #account-nostr-pubkey {
@@ -1022,6 +1034,7 @@ body {
 
 [data-admin-section="account"] .account-pubkey-field {
   position: relative;
+  flex: 1 1 24rem;
   min-width: min(100%, 32rem);
 }
 
@@ -1078,6 +1091,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+  flex-wrap: wrap;
 }
 
 [data-admin-section="account"] .account-passkey-row {
@@ -1094,6 +1108,10 @@ body {
 
 [data-admin-section="account"] .account-passkey-row .account-row {
   justify-self: start;
+}
+
+[data-admin-section="account"] .account-output-row {
+  grid-template-columns: 1fr;
 }
 
 .composer-grid {
@@ -1946,6 +1964,15 @@ body {
   [data-admin-section="account"] .account-passkey-row {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  [data-admin-section="account"] .field-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .account-note {
+    grid-column: 1;
   }
 
   .row-head,
