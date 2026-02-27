@@ -2716,14 +2716,14 @@ label {
   display: none;
 }
 
-#ban-levels-table tr.ban-level-invalid .ban-level-error {
-  display: block;
+#ban-levels-table tr.ban-level-invalid input[data-ban-duration-min],
+#ban-levels-table tr.ban-level-invalid input[data-ban-duration-max] {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg-panel) 92%);
 }
 
-#ban-levels-table tr.ban-level-invalid input[data-ban-duration-min],
-#ban-levels-table tr.ban-level-invalid input[data-ban-duration-max],
-#ban-levels-table tr.ban-level-invalid select[data-ban-duration-unit] {
-  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
+input.range-input-invalid[type='number'] {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%) !important;
   background: color-mix(in srgb, var(--danger) 8%, var(--bg-panel) 92%);
 }
 

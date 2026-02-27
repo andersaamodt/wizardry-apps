@@ -5263,6 +5263,7 @@
       renderBigFiveSummary(behaviors);
       renderPersonaBigFivePanel(behaviors);
       updatePersonaStyleWarnings();
+      validateBehaviorRangesUi();
     }
 
     function renderModesPanel() {
@@ -5426,49 +5427,66 @@
         { key: 'year', label: 'Year' }
       ];
       var hasError = false;
-      var prevMaxMinutes = 0;
-      var prevLabel = '';
       for (var i = 0; i < levels.length; i += 1) {
         var level = levels[i];
         var row = document.querySelector('#ban-levels-body tr[data-ban-level="' + level.key + '"]');
         if (!row) continue;
         var minInput = row.querySelector('[data-ban-duration-min]');
         var maxInput = row.querySelector('[data-ban-duration-max]');
-        var unitSelect = row.querySelector('[data-ban-duration-unit]');
         var enabledInput = row.querySelector('[data-ban-level-enabled]');
-        var errorEl = row.querySelector('[data-ban-level-error]');
         if (!enabledInput) continue;
         var levelEnabled = !!enabledInput.checked;
-        if (!minInput || !maxInput || !unitSelect) {
+        if (!minInput || !maxInput) {
           row.classList.toggle('ban-level-invalid', false);
-          if (errorEl) errorEl.textContent = '';
-          if (levelEnabled) prevLabel = level.label;
+          if (minInput) minInput.classList.remove('range-input-invalid');
+          if (maxInput) maxInput.classList.remove('range-input-invalid');
           continue;
         }
-        var minAmount = Math.max(1, parseInt(minInput.value || '1', 10) || 1);
-        var maxAmount = Math.max(1, parseInt(maxInput.value || '1', 10) || 1);
-        if (maxAmount < minAmount) maxAmount = minAmount;
-        var unit = String(unitSelect.value || 'hours').toLowerCase();
-        if (unit !== 'minutes' && unit !== 'hours' && unit !== 'days') unit = 'hours';
-        var minMinutes = banDurationToMinutes(minAmount, unit);
-        var maxMinutes = banDurationToMinutes(maxAmount, unit);
-        var rowError = '';
-        if (!levelEnabled) {
-          rowError = '';
-        } else if (maxMinutes < minMinutes) {
-          rowError = 'Maximum duration must be greater than or equal to minimum duration.';
-        } else if (prevMaxMinutes > 0 && minMinutes <= prevMaxMinutes) {
-          rowError = 'Minimum duration must be greater than ' + prevLabel + ' maximum duration.';
-        }
-        row.classList.toggle('ban-level-invalid', !!rowError);
-        if (errorEl) errorEl.textContent = rowError;
-        hasError = hasError || !!rowError;
-        if (levelEnabled) {
-          prevMaxMinutes = maxMinutes;
-          prevLabel = level.label;
-        }
+        var minAmount = Math.max(1, parseInt(minInput.value || '0', 10) || 0);
+        var maxAmount = Math.max(1, parseInt(maxInput.value || '0', 10) || 0);
+        var rowInvalid = levelEnabled && (maxAmount <= minAmount);
+        row.classList.toggle('ban-level-invalid', rowInvalid);
+        minInput.classList.toggle('range-input-invalid', rowInvalid);
+        maxInput.classList.toggle('range-input-invalid', rowInvalid);
+        hasError = hasError || rowInvalid;
       }
       return { valid: !hasError };
+    }
+
+    function validateBehaviorRangesUi() {
+      var latencyMinInput = document.getElementById('behavior-latency-min');
+      var latencyMaxInput = document.getElementById('behavior-latency-max');
+      var banMinInput = document.getElementById('behavior-ban-min');
+      var banMaxInput = document.getElementById('behavior-ban-max');
+      var hasError = false;
+
+      function applyStrictRange(minInput, maxInput, minAllowed) {
+        if (!minInput || !maxInput) return;
+        var minValue = parseInt(String(minInput.value || '').trim(), 10);
+        var maxValue = parseInt(String(maxInput.value || '').trim(), 10);
+        var invalid = false;
+        if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+          invalid = true;
+        } else {
+          minValue = Math.max(minAllowed, minValue);
+          maxValue = Math.max(minAllowed, maxValue);
+          invalid = maxValue <= minValue;
+        }
+        minInput.classList.toggle('range-input-invalid', invalid);
+        maxInput.classList.toggle('range-input-invalid', invalid);
+        hasError = hasError || invalid;
+      }
+
+      applyStrictRange(latencyMinInput, latencyMaxInput, 0);
+      applyStrictRange(banMinInput, banMaxInput, 0);
+
+      return { valid: !hasError };
+    }
+
+    function validateAllNumericRangesUi() {
+      var behaviorCheck = validateBehaviorRangesUi();
+      var banCheck = validateBanLevelsUi();
+      return { valid: !!(behaviorCheck.valid && banCheck.valid) };
     }
 
     function renderReplyTemplatesPanel() {
@@ -5871,6 +5889,7 @@
       var quiet = !!(options && options.quiet);
       var suppressConflictMessage = !!(options && options.suppressConflictMessage);
       var requestVersion = Number(state.modesConfigEditVersion) || 0;
+      if (!validateAllNumericRangesUi().valid) return;
       var payload = collectModesConfigFromUi();
       var now = Date.now();
       var holdUntil = now + 7000;
@@ -6723,12 +6742,35 @@
           if (target && String(target.id || '').indexOf('behavior-bigfive-') === 0) {
             renderBigFiveSummary(collectModesConfigFromUi().behaviors);
           }
+          var rangeField = target && (
+            target.id === 'behavior-latency-min' ||
+            target.id === 'behavior-latency-max' ||
+            target.id === 'behavior-ban-min' ||
+            target.id === 'behavior-ban-max'
+          );
+          if (rangeField) {
+            var rangeCheck = validateBehaviorRangesUi();
+            markModesConfigDirty();
+            if (!rangeCheck.valid) return;
+          }
           updatePersonaStyleWarnings();
           markModesConfigDirty();
           queueBehaviorAutosave(120);
         });
         if (behaviorEl.tagName === 'INPUT' && behaviorEl.type === 'number') {
           behaviorEl.addEventListener('input', function () {
+            var target = arguments[0] && arguments[0].target;
+            var rangeField = target && (
+              target.id === 'behavior-latency-min' ||
+              target.id === 'behavior-latency-max' ||
+              target.id === 'behavior-ban-min' ||
+              target.id === 'behavior-ban-max'
+            );
+            if (rangeField) {
+              var rangeCheck = validateBehaviorRangesUi();
+              markModesConfigDirty();
+              if (!rangeCheck.valid) return;
+            }
             markModesConfigDirty();
             queueBehaviorAutosave(520);
           });
