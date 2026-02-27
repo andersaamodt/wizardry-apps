@@ -35,7 +35,7 @@
   <button class="btn-login btn-login-main" id="login-btn" type="button">Login</button>
   <button class="btn-login btn-login-caret" id="login-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More login options">▼</button>
   <div class="nav-login-menu" id="nav-login-menu" role="menu" hidden>
-    <button id="login-menu-register" class="nav-menu-item" type="button" role="menuitem">Register</button>
+    <button id="login-menu-register" class="nav-menu-item" type="button" role="menuitem">Register...</button>
     <button id="login-menu-phone" class="nav-menu-item" type="button" role="menuitem">Use phone signer (QR)</button>
     <button id="login-menu-manual" class="nav-menu-item" type="button" role="menuitem">Use signed challenge (manual)</button>
     <button id="login-menu-learn" class="nav-menu-item" type="button" role="menuitem">Learn about Nostr sign-in</button>
