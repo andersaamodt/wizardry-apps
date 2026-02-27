@@ -1955,6 +1955,11 @@ label {
   padding: 10px 0 10px 12px;
 }
 
+#panel-relationships .table-wrap {
+  margin-left: -12px;
+  width: calc(100% + 12px);
+}
+
 .relationship-override-drawer .mode-field-row {
   grid-template-columns: 1fr;
 }
