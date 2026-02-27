@@ -32,6 +32,7 @@
     dripQueueEtaMinutes: 0,
     dripQueueInfoReady: false,
     nextDripTitle: '',
+    nextDripExcerpt: '',
     configSaveTimer: null,
     nostrBridgeSaveTimer: null,
     isLoadingConfig: false
@@ -1360,24 +1361,12 @@
       els.queueList.innerHTML = '<p class="placeholder">Queue is empty.</p>';
       return;
     }
-
-    const nextDripText = data.next_drip_epoch && Number(data.next_drip_epoch) > 0
-      ? new Date(Number(data.next_drip_epoch) * 1000).toLocaleString()
-      : 'ready immediately';
-
-    const intervalHours = typeof data.drip_interval_hours !== 'undefined'
-      ? data.drip_interval_hours
-      : (Number(data.drip_interval_minutes || 240) / 60);
-    const randomnessMinutes = typeof data.drip_randomness_minutes !== 'undefined'
-      ? data.drip_randomness_minutes
-      : data.drip_jitter_minutes;
-    let html = '<p class="muted">Global drip: every ' + escapeHtml(String(intervalHours)) + ' hour(s), randomness up to ' + escapeHtml(String(randomnessMinutes || 0)) + ' min. Next drip: ' + escapeHtml(nextDripText) + '</p>';
-    html += '<div class="queue-rows">';
+    let html = '<div class="queue-rows">';
     queue.forEach(function (item) {
       const rowClass = (item && item.publish_mode === 'drip') ? ' queue-row queue-row-drip' : ' queue-row queue-row-scheduled';
       html += '<div class="' + rowClass + '">';
       html += '<div class="queue-row-main">';
-      html += '<div class="queue-row-title"><strong>' + escapeHtml(item.title || 'Untitled') + '</strong></div>';
+      html += '<div class="queue-row-title"><button type="button" class="queue-row-open" data-queue-action="edit" data-draft-id="' + escapeAttr(item.draft_id || '') + '">' + escapeHtml(item.title || 'Untitled') + '</button></div>';
       if (item.scheduled_at) {
         html += '<div class="muted">Scheduled: ' + escapeHtml(item.scheduled_at) + '</div>';
       }
@@ -1416,6 +1405,7 @@
       return item && item.publish_mode === 'drip' && item.status === 'queued';
     });
     state.nextDripTitle = dripQueue.length ? String(dripQueue[0].title || 'Untitled') : '';
+    state.nextDripExcerpt = dripQueue.length ? String(dripQueue[0].content_excerpt || '').trim() : '';
     let ahead = dripQueue.length;
     if (state.currentDraftId) {
       const currentIdx = dripQueue.findIndex(function (item) {
@@ -2021,8 +2011,9 @@
 
   async function runSchedulerNow() {
     const nextTitle = String(state.nextDripTitle || '').trim();
+    const nextExcerpt = String(state.nextDripExcerpt || '').trim();
     const prompt = nextTitle
-      ? ('Drip now and publish the next queued draft?\n\n' + nextTitle)
+      ? ('Drip now and publish the next queued draft?\n\n' + nextTitle + (nextExcerpt ? ('\n\n' + nextExcerpt + '...') : ''))
       : 'Run drip now?';
     if (!window.confirm(prompt)) {
       return;
@@ -2210,7 +2201,16 @@
         }
         const action = actionNode.getAttribute('data-queue-action');
         const draftId = actionNode.getAttribute('data-draft-id');
-        if (action !== 'unqueue' || !draftId) {
+        if (!action || !draftId) {
+          return;
+        }
+        if (action === 'edit') {
+          loadDraft(draftId).catch(function (err) {
+            setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
+          });
+          return;
+        }
+        if (action !== 'unqueue') {
           return;
         }
         unqueueDraft(draftId).catch(function (err) {

@@ -317,12 +317,14 @@ title: Blog Admin
 </div>
 <div class="grid-two settings-inline queue-drip-settings">
 <div class="field-row">
-<label for="drip-interval" title="How often queued drip posts are published."><strong title="How often queued drip posts are published.">Drip Interval (hours)</strong></label>
+<label for="drip-interval" title="How often queued drip posts are published."><strong title="How often queued drip posts are published.">Drip Interval</strong></label>
 <input type="number" id="drip-interval" min="0.1" step="0.1" value="4" title="How often queued drip posts are published.">
+<span class="field-unit">hours</span>
 </div>
 <div class="field-row">
-<label for="drip-randomness" title="Adds up to this many random minutes to each drip cycle time."><strong title="Adds up to this many random minutes to each drip cycle time.">Drip Randomness (minutes)</strong></label>
+<label for="drip-randomness" title="Adds up to this many random minutes to each drip cycle time."><strong title="Adds up to this many random minutes to each drip cycle time.">Drip Randomness</strong></label>
 <input type="number" id="drip-randomness" min="0" step="1" value="0" title="Adds up to this many random minutes to each drip cycle time.">
+<span class="field-unit">minutes</span>
 </div>
 </div>
 <div id="queue-list"></div>
@@ -587,7 +589,7 @@ body {
   position: absolute;
   left: 0.82rem;
   right: 0.82rem;
-  bottom: 0;
+  bottom: -1px;
   border-bottom: 1px solid #d0dbf2;
   pointer-events: none;
 }
@@ -955,9 +957,9 @@ body {
 [data-admin-section="queue"] #drip-interval,
 [data-admin-section="queue"] #drip-randomness,
 [data-admin-section="settings"] #feed-items {
-  inline-size: 5.7rem !important;
-  width: 5.7rem !important;
-  max-inline-size: 5.7rem !important;
+  inline-size: 5rem !important;
+  width: 5rem !important;
+  max-inline-size: 5rem !important;
 }
 
 [data-admin-section="settings"] h4 {
@@ -983,6 +985,25 @@ body {
 
 [data-admin-section="queue"] .queue-drip-settings .field-row {
   margin-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+[data-admin-section="queue"] .queue-drip-settings .field-row > label {
+  margin-bottom: 0;
+}
+
+[data-admin-section="queue"] .queue-drip-settings .field-row > input {
+  min-height: 1.9rem;
+  padding: 0.24rem 0.45rem;
+}
+
+[data-admin-section="queue"] .queue-drip-settings .field-unit {
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: #4f5f78;
 }
 
 [data-admin-section="queue"] .row-head {
@@ -1706,6 +1727,22 @@ body {
 
 .queue-row-title {
   color: #1f335f;
+}
+
+#admin-panel .queue-row-open {
+  border: 0;
+  background: transparent;
+  color: #1f335f;
+  font-weight: 700;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  min-width: 0;
+}
+
+#admin-panel .queue-row-open:hover {
+  text-decoration: underline;
+  background: transparent;
 }
 
 .queue-row-actions {

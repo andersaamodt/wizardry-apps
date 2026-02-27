@@ -38,15 +38,20 @@ blog_find_draft_meta | while IFS= read -r meta; do
   status=$(config-get "$meta" status 2>/dev/null || printf 'draft')
   created_at=$(config-get "$meta" created_at 2>/dev/null || printf '')
   scheduled_at=$(config-get "$meta" scheduled_at 2>/dev/null || printf '')
+  body_file=$(dirname "$meta")/content.md
+  content_excerpt=""
+  if [ -f "$body_file" ]; then
+    content_excerpt=$(blog_auto_summary_from_content "$(cat "$body_file" 2>/dev/null || printf '')")
+  fi
 
   case "$mode:$status" in
     scheduled:scheduled)
       sort_key=$(blog_iso_to_epoch "$scheduled_at")
-      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$sort_key" "$draft_id" "$title" "$mode" "$status" "$scheduled_at"
+      printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$sort_key" "$draft_id" "$title" "$mode" "$status" "$scheduled_at" "$content_excerpt"
       ;;
     drip:queued)
       sort_key=$(blog_iso_to_epoch "$created_at")
-      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$sort_key" "$draft_id" "$title" "$mode" "$status" ""
+      printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$sort_key" "$draft_id" "$title" "$mode" "$status" "" "$content_excerpt"
       ;;
   esac
 done | sort -n > "$schedule_tmp"
@@ -61,7 +66,7 @@ printf '"next_drip_epoch":%s,' "$next_drip_epoch"
 printf '"queue":['
 
 first=1
-while IFS="$tab" read -r _ draft_id title mode status scheduled_at; do
+while IFS="$tab" read -r _ draft_id title mode status scheduled_at content_excerpt; do
   [ -n "$draft_id" ] || continue
   if [ "$first" -eq 0 ]; then
     printf ','
@@ -72,7 +77,8 @@ while IFS="$tab" read -r _ draft_id title mode status scheduled_at; do
   printf '"title":"%s",' "$(blog_json_escape "$title")"
   printf '"publish_mode":"%s",' "$(blog_json_escape "$mode")"
   printf '"status":"%s",' "$(blog_json_escape "$status")"
-  printf '"scheduled_at":"%s"' "$(blog_json_escape "$scheduled_at")"
+  printf '"scheduled_at":"%s",' "$(blog_json_escape "$scheduled_at")"
+  printf '"content_excerpt":"%s"' "$(blog_json_escape "$content_excerpt")"
   printf '}'
 done < "$schedule_tmp"
 
