@@ -2423,9 +2423,14 @@
       var runToggle = document.getElementById('btn-run-toggle');
       if (runToggle) {
         var canToggleRun = connected;
-        runToggle.disabled = !canToggleRun;
+        var transitionActive = !!state.botRunTransition;
+        runToggle.disabled = !canToggleRun || transitionActive;
         if (!canToggleRun) {
           runToggle.title = 'Connect Reddit account first';
+        } else if (state.botRunTransition === 'starting') {
+          runToggle.title = 'Starting bot...';
+        } else if (state.botRunTransition === 'stopping') {
+          runToggle.title = 'Stopping bot...';
         } else {
           runToggle.title = botRunning ? 'Stop bot' : 'Start bot';
         }
@@ -3340,11 +3345,22 @@
       var runToggle = document.getElementById('btn-run-toggle');
       var runIcon = document.getElementById('run-toggle-icon');
       if (runToggle && runIcon) {
-        runToggle.classList.toggle('run', !botRunning);
-        runToggle.classList.toggle('stop', botRunning);
-        runToggle.setAttribute('aria-label', botRunning ? 'Stop bot' : 'Start bot');
-        runToggle.setAttribute('title', botRunning ? 'Stop bot' : 'Start bot');
-        runIcon.textContent = botRunning ? '■' : '▶';
+        var transitioning = !!state.botRunTransition;
+        runToggle.classList.toggle('run', !botRunning && !transitioning);
+        runToggle.classList.toggle('stop', botRunning && !transitioning);
+        if (state.botRunTransition === 'starting') {
+          runToggle.setAttribute('aria-label', 'Starting bot');
+          runToggle.setAttribute('title', 'Starting bot...');
+          runIcon.textContent = '◌';
+        } else if (state.botRunTransition === 'stopping') {
+          runToggle.setAttribute('aria-label', 'Stopping bot');
+          runToggle.setAttribute('title', 'Stopping bot...');
+          runIcon.textContent = '◌';
+        } else {
+          runToggle.setAttribute('aria-label', botRunning ? 'Stop bot' : 'Start bot');
+          runToggle.setAttribute('title', botRunning ? 'Stop bot' : 'Start bot');
+          runIcon.textContent = botRunning ? '■' : '▶';
+        }
       }
       updateToolbarButtonStates();
     }
