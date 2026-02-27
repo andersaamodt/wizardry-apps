@@ -2689,7 +2689,9 @@
           severity: String(parsed.severity || 'medium')
         });
       }
-      return rows;
+      return rows.filter(function (row) {
+        return String((row && row.text) || '').trim().length > 0;
+      });
     }
 
     function serializeNormRows(rows) {
@@ -2717,6 +2719,28 @@
       state.normRows = parseNormRows(normsInput ? normsInput.value : '');
     }
 
+    function firstEmptyNormRowIndex() {
+      for (var i = 0; i < state.normRows.length; i += 1) {
+        var text = String((state.normRows[i] && state.normRows[i].text) || '').trim();
+        if (!text) return i;
+      }
+      return -1;
+    }
+
+    function updateNormAddButtonState() {
+      var addBtn = document.getElementById('btn-norm-add');
+      if (!addBtn) return;
+      var emptyIdx = firstEmptyNormRowIndex();
+      var hasEmpty = emptyIdx >= 0;
+      addBtn.disabled = hasEmpty;
+      addBtn.title = hasEmpty
+        ? 'Finish the current new social norm before adding another'
+        : 'Add norm';
+      addBtn.setAttribute('aria-label', hasEmpty
+        ? 'Finish the current new social norm before adding another'
+        : 'Add norm');
+    }
+
     function renderNormsTable() {
       var table = document.getElementById('norms-table');
       var head = document.getElementById('norms-head-row');
@@ -2724,6 +2748,7 @@
       if (!state.normRows.length) {
         if (head) head.classList.add('hidden');
         table.innerHTML = '<div class="norms-empty">No social norms yet. Click + to add a social norm.</div>';
+        updateNormAddButtonState();
         return;
       }
       if (head) head.classList.remove('hidden');
@@ -2742,6 +2767,7 @@
           '</div>'
         ].join('');
       }).join('');
+      updateNormAddButtonState();
     }
 
     function updateModeDescriptions(mode) {
@@ -5821,6 +5847,13 @@
       document.getElementById('manifesto-input').addEventListener('blur', function () { if (state.doctrineDirty) saveDoctrine(); });
       document.getElementById('norms-input').addEventListener('blur', function () { if (state.doctrineDirty) saveDoctrine(); });
       document.getElementById('btn-norm-add').addEventListener('click', function () {
+        var existingEmptyIdx = firstEmptyNormRowIndex();
+        if (existingEmptyIdx >= 0) {
+          var existingInput = document.querySelector('.norm-row[data-norm-idx="' + String(existingEmptyIdx) + '"] .norm-text');
+          if (existingInput && typeof existingInput.focus === 'function') existingInput.focus();
+          updateNormAddButtonState();
+          return;
+        }
         state.normRows.push({
           text: '',
           severity: 'medium'
@@ -5836,6 +5869,7 @@
         if (!Number.isFinite(idx) || idx < 0 || idx >= state.normRows.length) return;
         if (field === 'text') state.normRows[idx].text = String(event.target.value || '');
         if (field === 'severity') state.normRows[idx].severity = String(event.target.value || 'medium');
+        updateNormAddButtonState();
         syncNormsTextareaFromRows(true);
       });
       document.getElementById('norms-table').addEventListener('change', function (event) {
@@ -5861,6 +5895,7 @@
           state.normRows.splice(idx, 1);
         }
         renderNormsTable();
+        updateNormAddButtonState();
         syncNormsTextareaFromRows(true);
       });
 
