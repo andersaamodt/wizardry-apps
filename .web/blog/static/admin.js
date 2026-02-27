@@ -60,6 +60,8 @@
     postTagsPills: document.getElementById('post-tags-pills'),
     postContent: document.getElementById('post-content'),
     postScheduleAt: document.getElementById('post-scheduled-at'),
+    navDraftsCount: document.getElementById('admin-nav-drafts-count'),
+    navQueueCount: document.getElementById('admin-nav-queue-count'),
     dripQueuePill: document.getElementById('drip-queue-pill'),
     scheduledRow: document.getElementById('scheduled-row'),
     markdownPreview: document.getElementById('markdown-preview'),
@@ -1338,7 +1340,11 @@
     if (!data.success) {
       throw new Error(data.error || 'Failed to load drafts');
     }
-    renderDraftList(data.drafts || []);
+    const drafts = Array.isArray(data.drafts) ? data.drafts : [];
+    if (els.navDraftsCount) {
+      els.navDraftsCount.textContent = '(' + drafts.length + ')';
+    }
+    renderDraftList(drafts);
   }
 
   async function loadQueue() {
@@ -1347,6 +1353,9 @@
       throw new Error(data.error || 'Failed to load queue');
     }
     const queue = Array.isArray(data.queue) ? data.queue : [];
+    if (els.navQueueCount) {
+      els.navQueueCount.textContent = '(' + queue.length + ')';
+    }
     const dripQueue = queue.filter(function (item) {
       return item && item.publish_mode === 'drip' && item.status === 'queued';
     });
