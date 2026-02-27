@@ -92,7 +92,8 @@
 
         <section class="tab-panel active persona-panel" id="panel-persona">
           <div class="persona-layout">
-            <section class="persona-card settings-card">
+            <div id="persona-workarea" class="persona-workarea">
+            <section class="persona-card settings-card persona-main-pane">
               <div id="create-profile-pane" class="create-profile-pane hidden">
                 <h3>Create Virtual Redditor</h3>
                 <div class="status-line">Set Bot Username below, then click Save to create.</div>
@@ -225,6 +226,23 @@
                     <option value="always">Always</option>
                   </select>
                 </div>
+                <div class="mode-field-row">
+                  <label for="behavior-bigfive-enabled" class="mode-field-label">Big Five</label>
+                  <div class="bigfive-inline">
+                    <label class="schedule-toggle" title="Enable OCEAN personality controls for this bot.">
+                      <input id="behavior-bigfive-enabled" type="checkbox">
+                      <span>Enable</span>
+                    </label>
+                    <button id="btn-bigfive-customize" type="button" class="inline-link-btn" title="Customize OCEAN traits">Customize...</button>
+                    <div id="bigfive-summary" class="bigfive-summary hidden" role="group" aria-label="Big Five summary">
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="o" title="Openness">O•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="c" title="Conscientiousness">C•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="e" title="Extroversion">E•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="a" title="Agreeableness">A•</button>
+                      <button type="button" class="bigfive-chip-segment" data-bigfive-open="n" title="Neuroticism">N•</button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="settings-block">
@@ -261,6 +279,77 @@
                 <textarea id="norms-input" class="custom-instructions-input norms-raw-input" spellcheck="false" aria-hidden="true"></textarea>
               </div>
             </section>
+            <aside id="persona-bigfive-drawer" class="mode-detail-drawer persona-bigfive-drawer" aria-hidden="true">
+              <div class="mode-detail-drawer-head">
+                <div class="mode-detail-drawer-title">Big Five</div>
+                <div class="mode-detail-drawer-head-right">
+                  <button id="btn-persona-bigfive-close" type="button" class="mode-detail-drawer-close" aria-label="Close Big Five panel" title="Close Big Five panel">✕</button>
+                </div>
+              </div>
+              <div class="mode-detail-drawer-body">
+                <div class="mode-drawer-block">
+                  <div class="mode-drawer-helper">Set OCEAN levels for this bot. Changes save automatically.</div>
+                  <div class="mode-fields-inline">
+                    <div class="mode-field-row">
+                      <label for="behavior-bigfive-o" class="mode-field-label" title="Openness to experience">Openness</label>
+                      <div class="mode-field-control-wrap">
+                        <select id="behavior-bigfive-o">
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                        <div class="persona-style-hint">Curiosity and novelty seeking.</div>
+                      </div>
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="behavior-bigfive-c" class="mode-field-label" title="Conscientiousness">Conscientiousness</label>
+                      <div class="mode-field-control-wrap">
+                        <select id="behavior-bigfive-c">
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                        <div class="persona-style-hint">Orderliness and reliability.</div>
+                      </div>
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="behavior-bigfive-e" class="mode-field-label" title="Extroversion">Extroversion</label>
+                      <div class="mode-field-control-wrap">
+                        <select id="behavior-bigfive-e">
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                        <div class="persona-style-hint">Social energy and assertiveness.</div>
+                      </div>
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="behavior-bigfive-a" class="mode-field-label" title="Agreeableness">Agreeableness</label>
+                      <div class="mode-field-control-wrap">
+                        <select id="behavior-bigfive-a">
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                        <div class="persona-style-hint">Cooperation and empathy.</div>
+                      </div>
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="behavior-bigfive-n" class="mode-field-label" title="Neuroticism">Neuroticism</label>
+                      <div class="mode-field-control-wrap">
+                        <select id="behavior-bigfive-n">
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                        <div class="persona-style-hint">Focus on negative emotions.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </aside>
+            </div>
           </div>
         </section>
 
@@ -1071,6 +1160,8 @@
       relationshipOverrideOpen: false,
       repliesTemplatesOpen: false,
       enforcementEscalationOpen: false,
+      personaBigFiveOpen: false,
+      personaBigFiveFocusTrait: '',
       relationshipsRenderSig: '',
       modeLogRenderSig: '',
       logsAvailable: false,
@@ -3394,6 +3485,7 @@
           humorStyle: 'dry',
           humorAmount: 'medium',
           citations: 'as-needed',
+          bigFive: { enabled: false, o: 'medium', c: 'medium', e: 'medium', a: 'medium', n: 'medium' },
           latencyJitterSec: { min: 0, max: 0 },
           banJitterSec: { min: 7, max: 45 },
           summonable: true,
@@ -3437,6 +3529,7 @@
       out.behaviors = Object.assign({}, base.behaviors, src.behaviors || {});
       out.behaviors.latencyJitterSec = Object.assign({}, base.behaviors.latencyJitterSec, ((src.behaviors || {}).latencyJitterSec) || {});
       out.behaviors.banJitterSec = Object.assign({}, base.behaviors.banJitterSec, ((src.behaviors || {}).banJitterSec) || {});
+      out.behaviors.bigFive = Object.assign({}, base.behaviors.bigFive, ((src.behaviors || {}).bigFive) || {});
       if (!out.behaviors.humorStyle || !out.behaviors.humorAmount) {
         var legacyHumor = String(out.behaviors.humor || '').toLowerCase();
         if (legacyHumor === 'none') {
@@ -3467,6 +3560,17 @@
       out.behaviors.verbosity = String(out.behaviors.verbosity || 'balanced');
       out.behaviors.formality = String(out.behaviors.formality || 'neutral');
       out.behaviors.individualizedRelationships = (out.behaviors.individualizedRelationships !== false);
+      out.behaviors.bigFive.enabled = !!out.behaviors.bigFive.enabled;
+      function normalizeBigFiveLevel(value) {
+        var v = String(value || '').toLowerCase();
+        if (v === 'low' || v === 'high') return v;
+        return 'medium';
+      }
+      out.behaviors.bigFive.o = normalizeBigFiveLevel(out.behaviors.bigFive.o);
+      out.behaviors.bigFive.c = normalizeBigFiveLevel(out.behaviors.bigFive.c);
+      out.behaviors.bigFive.e = normalizeBigFiveLevel(out.behaviors.bigFive.e);
+      out.behaviors.bigFive.a = normalizeBigFiveLevel(out.behaviors.bigFive.a);
+      out.behaviors.bigFive.n = normalizeBigFiveLevel(out.behaviors.bigFive.n);
       out.replies = Object.assign({}, base.replies, src.replies || {});
       out.escalation = Object.assign({}, base.escalation, src.escalation || {});
       out.escalation.afterActionSwitch = Object.assign({}, base.escalation.afterActionSwitch, ((src.escalation || {}).afterActionSwitch) || {});
@@ -4325,6 +4429,80 @@
       }
     }
 
+    function bigFiveSymbol(level) {
+      var v = String(level || '').toLowerCase();
+      if (v === 'high') return '↑';
+      if (v === 'low') return '↓';
+      return '•';
+    }
+
+    function closePersonaBigFiveDrawer() {
+      state.personaBigFiveOpen = false;
+      state.personaBigFiveFocusTrait = '';
+      var drawer = document.getElementById('persona-bigfive-drawer');
+      var workarea = document.getElementById('persona-workarea');
+      if (drawer) {
+        drawer.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+      }
+      if (workarea) workarea.classList.remove('drawer-open');
+    }
+
+    function openPersonaBigFiveDrawer(focusTrait) {
+      state.personaBigFiveOpen = true;
+      state.personaBigFiveFocusTrait = String(focusTrait || '').toLowerCase();
+      var drawer = document.getElementById('persona-bigfive-drawer');
+      var workarea = document.getElementById('persona-workarea');
+      if (drawer) {
+        drawer.classList.add('open');
+        drawer.setAttribute('aria-hidden', 'false');
+      }
+      if (workarea) workarea.classList.add('drawer-open');
+      if (state.personaBigFiveFocusTrait) {
+        var selector = '#behavior-bigfive-' + state.personaBigFiveFocusTrait;
+        requestAnimationFrame(function () {
+          var focusEl = document.querySelector(selector);
+          if (focusEl && typeof focusEl.focus === 'function') focusEl.focus();
+        });
+      }
+    }
+
+    function renderBigFiveSummary(behaviors) {
+      var summary = document.getElementById('bigfive-summary');
+      var enabledToggle = document.getElementById('behavior-bigfive-enabled');
+      var cfg = (behaviors && behaviors.bigFive) ? behaviors.bigFive : { enabled: false };
+      var enabled = !!cfg.enabled;
+      if (enabledToggle) enabledToggle.checked = enabled;
+      if (!summary) return;
+      summary.classList.toggle('hidden', !enabled);
+      var traits = ['o', 'c', 'e', 'a', 'n'];
+      for (var i = 0; i < traits.length; i += 1) {
+        var key = traits[i];
+        var btn = summary.querySelector('[data-bigfive-open="' + key + '"]');
+        if (!btn) continue;
+        btn.textContent = key.toUpperCase() + bigFiveSymbol(cfg[key]);
+      }
+    }
+
+    function renderPersonaBigFivePanel(behaviors) {
+      var cfg = (behaviors && behaviors.bigFive) ? behaviors.bigFive : {};
+      var o = document.getElementById('behavior-bigfive-o');
+      var c = document.getElementById('behavior-bigfive-c');
+      var e = document.getElementById('behavior-bigfive-e');
+      var a = document.getElementById('behavior-bigfive-a');
+      var n = document.getElementById('behavior-bigfive-n');
+      if (o) o.value = String(cfg.o || 'medium');
+      if (c) c.value = String(cfg.c || 'medium');
+      if (e) e.value = String(cfg.e || 'medium');
+      if (a) a.value = String(cfg.a || 'medium');
+      if (n) n.value = String(cfg.n || 'medium');
+      if (!cfg.enabled) {
+        closePersonaBigFiveDrawer();
+      } else if (state.personaBigFiveOpen) {
+        openPersonaBigFiveDrawer(state.personaBigFiveFocusTrait || '');
+      }
+    }
+
     function renderBehaviorsPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
       var behaviors = cfg.behaviors || {};
@@ -4366,6 +4544,8 @@
       if (latencyMax) latencyMax.value = String(latencyUiValueFromSeconds(latencyMaxSec, latencyUiUnit));
       if (banMin) banMin.value = String((((behaviors.banJitterSec || {}).min) || 7));
       if (banMax) banMax.value = String((((behaviors.banJitterSec || {}).max) || 45));
+      renderBigFiveSummary(behaviors);
+      renderPersonaBigFivePanel(behaviors);
       updatePersonaStyleWarnings();
     }
 
@@ -4601,6 +4781,14 @@
       cfg.behaviors.summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
       cfg.behaviors.implicitSummons = !!((document.getElementById('behavior-implicit-summons') || {}).checked);
       cfg.behaviors.individualizedRelationships = !!((document.getElementById('behavior-individualized-relationships') || {}).checked);
+      cfg.behaviors.bigFive = {
+        enabled: !!((document.getElementById('behavior-bigfive-enabled') || {}).checked),
+        o: String((document.getElementById('behavior-bigfive-o') || {}).value || 'medium'),
+        c: String((document.getElementById('behavior-bigfive-c') || {}).value || 'medium'),
+        e: String((document.getElementById('behavior-bigfive-e') || {}).value || 'medium'),
+        a: String((document.getElementById('behavior-bigfive-a') || {}).value || 'medium'),
+        n: String((document.getElementById('behavior-bigfive-n') || {}).value || 'medium')
+      };
       var latencyUnit = String((document.getElementById('behavior-latency-unit') || {}).value || 'minutes');
       cfg.behaviors.latencyJitterSec = {
         min: latencySecondsFromUi((document.getElementById('behavior-latency-min') || {}).value || '0', latencyUnit),
@@ -5345,6 +5533,9 @@
       if (tab !== 'modes') {
         closeModeDrawer(true);
       }
+      if (tab !== 'persona') {
+        closePersonaBigFiveDrawer();
+      }
       state.activeTab = tab;
       var buttons = document.querySelectorAll('.tab-btn');
       for (var i = 0; i < buttons.length; i += 1) {
@@ -5444,6 +5635,27 @@
       document.getElementById('btn-extract-norms-run').addEventListener('click', function () {
         runExtractNormsWorkflow();
       });
+      document.getElementById('btn-persona-bigfive-close').addEventListener('click', function () {
+        closePersonaBigFiveDrawer();
+      });
+      document.getElementById('btn-bigfive-customize').addEventListener('click', function () {
+        var enabled = document.getElementById('behavior-bigfive-enabled');
+        if (enabled && !enabled.checked) enabled.checked = true;
+        openPersonaBigFiveDrawer('');
+        renderBigFiveSummary(collectModesConfigFromUi().behaviors);
+        markModesConfigDirty();
+        queueBehaviorAutosave(120);
+      });
+      document.getElementById('bigfive-summary').addEventListener('click', function (event) {
+        var seg = event.target && event.target.closest('[data-bigfive-open]');
+        if (!seg) return;
+        var enabled = document.getElementById('behavior-bigfive-enabled');
+        if (enabled && !enabled.checked) enabled.checked = true;
+        openPersonaBigFiveDrawer(String(seg.getAttribute('data-bigfive-open') || ''));
+        renderBigFiveSummary(collectModesConfigFromUi().behaviors);
+        markModesConfigDirty();
+        queueBehaviorAutosave(120);
+      });
       var behaviorAutoSaveFields = [
         'behavior-personality',
         'behavior-mirror-tone',
@@ -5453,6 +5665,12 @@
         'behavior-formality',
         'behavior-humor-style',
         'behavior-humor-amount',
+        'behavior-bigfive-enabled',
+        'behavior-bigfive-o',
+        'behavior-bigfive-c',
+        'behavior-bigfive-e',
+        'behavior-bigfive-a',
+        'behavior-bigfive-n',
         'behavior-citations',
         'behavior-summonable',
         'behavior-implicit-summons',
@@ -5467,6 +5685,14 @@
         var behaviorEl = document.getElementById(behaviorAutoSaveFields[bi]);
         if (!behaviorEl) continue;
         behaviorEl.addEventListener('change', function () {
+          var target = arguments[0] && arguments[0].target;
+          if (target && target.id === 'behavior-bigfive-enabled') {
+            if (target.checked) openPersonaBigFiveDrawer('');
+            else closePersonaBigFiveDrawer();
+          }
+          if (target && String(target.id || '').indexOf('behavior-bigfive-') === 0) {
+            renderBigFiveSummary(collectModesConfigFromUi().behaviors);
+          }
           updatePersonaStyleWarnings();
           markModesConfigDirty();
           queueBehaviorAutosave(120);

@@ -195,6 +195,7 @@ mode_default_config_json() {
         humorStyle: "dry",
         humorAmount: "medium",
         citations: "as-needed",
+        bigFive: {enabled: false, o: "medium", c: "medium", e: "medium", a: "medium", n: "medium"},
         latencyJitterSec: {min: 0, max: 0},
         banJitterSec: {min: 7, max: 45},
         summonable: true,
@@ -1872,9 +1873,20 @@ compose_context_envelope() {
               else "medium" end)
         ),
         citations: ($b.citations // "as-needed"),
+        bigFive: (
+          ($b.bigFive // {}) as $bf
+          | {
+              enabled: (($bf.enabled // false) == true),
+              o: (if ($bf.o // "medium") == "low" or ($bf.o // "medium") == "high" then ($bf.o // "medium") else "medium" end),
+              c: (if ($bf.c // "medium") == "low" or ($bf.c // "medium") == "high" then ($bf.c // "medium") else "medium" end),
+              e: (if ($bf.e // "medium") == "low" or ($bf.e // "medium") == "high" then ($bf.e // "medium") else "medium" end),
+              a: (if ($bf.a // "medium") == "low" or ($bf.a // "medium") == "high" then ($bf.a // "medium") else "medium" end),
+              n: (if ($bf.n // "medium") == "low" or ($bf.n // "medium") == "high" then ($bf.n // "medium") else "medium" end)
+            }
+        ),
         individualizedRelationships: (($b.individualizedRelationships // true) == true)
       }
-  ' 2>/dev/null || printf '{"personality":"typical_redditor","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"neutral","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","individualizedRelationships":true}')
+  ' 2>/dev/null || printf '{"personality":"typical_redditor","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"neutral","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","bigFive":{"enabled":false,"o":"medium","c":"medium","e":"medium","a":"medium","n":"medium"},"individualizedRelationships":true}')
   relationship_for_prompt_json=$(printf '%s' "$relationship_json" | jq -c --argjson behavior "$behavior_policy_json" '
     if ($behavior.individualizedRelationships // true) then .
     else

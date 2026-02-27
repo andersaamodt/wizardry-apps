@@ -1679,9 +1679,42 @@ label {
   transition: grid-template-columns 200ms ease, column-gap 200ms ease;
 }
 
+.persona-workarea {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  align-items: stretch;
+  column-gap: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  transition: grid-template-columns 200ms ease, column-gap 200ms ease;
+}
+
+.persona-workarea.drawer-open {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  column-gap: 12px;
+}
+
 .modes-workarea.drawer-open {
   grid-template-columns: minmax(0, 1fr) clamp(240px, 30vw, 380px);
   column-gap: 0;
+}
+
+.persona-main-pane {
+  min-width: 0;
+  overflow: auto;
+}
+
+.persona-bigfive-drawer {
+  grid-column: 2;
+}
+
+.persona-bigfive-drawer .mode-field-row {
+  grid-template-columns: 114px minmax(0, max-content);
+}
+
+.persona-bigfive-drawer .mode-field-label {
+  margin-top: 0;
 }
 
 .relationships-head-row {
@@ -2813,6 +2846,57 @@ label {
   color: var(--danger);
   font-style: normal;
   max-width: 360px;
+}
+
+.persona-style-hint {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--text-subtle);
+}
+
+.bigfive-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bigfive-summary {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, var(--accent) 28%);
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
+}
+
+.bigfive-chip-segment {
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  background: transparent;
+  color: var(--text-subtle);
+  min-height: 1.35rem;
+  min-width: 2rem;
+  padding: 0 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.bigfive-chip-segment:last-child {
+  border-right: 0;
+}
+
+.bigfive-chip-segment:hover,
+.bigfive-chip-segment:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
+  color: var(--text);
+  outline: none;
+}
+
+.persona-bigfive-drawer select {
+  width: fit-content;
+  min-width: 88px;
 }
 
 .inline-field-row {
@@ -3959,6 +4043,15 @@ label {
 
   .modes-workarea {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .persona-workarea {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .persona-workarea.drawer-open {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 10px;
   }
 
   .modes-workarea.drawer-open {
