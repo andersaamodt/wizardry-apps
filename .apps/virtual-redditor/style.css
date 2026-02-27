@@ -2486,9 +2486,9 @@ label {
 }
 
 .ban-level-pill.disabled {
-  color: color-mix(in srgb, var(--text-subtle) 86%, var(--text) 14%);
-  border-color: color-mix(in srgb, var(--line) 84%, transparent);
-  background: color-mix(in srgb, var(--bg-main) 88%, var(--line) 12%);
+  color: color-mix(in srgb, var(--danger) 82%, var(--text) 18%);
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
+  background: color-mix(in srgb, var(--danger) 18%, var(--bg-main) 82%);
 }
 
 .mode-detail-drawer .mode-fields-inline,

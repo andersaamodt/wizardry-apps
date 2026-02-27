@@ -4947,10 +4947,13 @@
         var durationValue = transitionEnabled ? durationUiFromHours(transition.durationHours, transitionDurationUnit) : 24;
         var announceChecked = (transitionEnabled && transition.announce) ? ' checked' : '';
         var disabledAttr = levelEnabled ? '' : ' disabled';
+        var enforcementPillHtml = levelEnabled
+          ? ''
+          : (' • <span class="ban-level-pill disabled">Disabled in Enforcement</span>');
         return [
           '<div class="action-transition-row ban-sub-row' + (transitionEnabled ? ' transition-enabled' : '') + (levelEnabled ? '' : ' ban-level-disabled') + '" data-action-transition-row="' + escapeHtml(actionName) + '">',
           '  <div class="action-transition-row-top">',
-          '    <div class="ban-level-head"><span>' + escapeHtml(actionName) + '</span><span class="ban-level-meta">' + escapeHtml(durationText) + ' • <span class="ban-level-pill ' + (levelEnabled ? 'enabled' : 'disabled') + '">' + (levelEnabled ? 'Enabled in Enforcement' : 'Disabled in Enforcement') + '</span></span></div>',
+          '    <div class="ban-level-head"><span>' + escapeHtml(actionName) + '</span><span class="ban-level-meta">' + escapeHtml(durationText) + enforcementPillHtml + '</span></div>',
           '    <label class="mini-toggle action-transition-enable" title="Enable switching mode after this action runs"><input type="checkbox" data-transition-enabled-action="' + escapeHtml(actionName) + '"' + (transitionEnabled ? ' checked' : '') + disabledAttr + '><span>Switch mode after</span></label>',
           '  </div>',
           '  <div class="action-meaning">Level availability and duration are configured on Enforcement.</div>',
