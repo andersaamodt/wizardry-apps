@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Redditor</title>
-  <link rel="stylesheet" href="style.css?v=vr20260227c">
+  <link rel="stylesheet" href="style.css?v=vr20260227d">
   <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
 </head>
 <body class="is-booting">
@@ -3459,16 +3459,21 @@
       return { enabled: enabledCount, total: choices.length };
     }
 
-    function modeConstraintsSummary(mode) {
+    function modeConstraintPillsHtml(mode) {
       var constraints = (mode && typeof mode === 'object' && mode.constraints && typeof mode.constraints === 'object')
         ? mode.constraints
         : {};
-      var bits = [];
-      bits.push('max ' + String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h)));
-      bits.push((constraints.canFollowup === false) ? 'followup off' : 'followup on');
-      bits.push((constraints.canMention === false) ? 'mention off' : 'mention on');
-      bits.push((constraints.canQuote === false) ? 'quote off' : 'quote on');
-      return bits.join(', ');
+      var pills = [];
+      if (constraints.canFollowup !== false) {
+        pills.push('<span class="mode-summary-flag followup" title="Can send follow-up replies in this mode">follow-up</span>');
+      }
+      if (constraints.canMention !== false) {
+        pills.push('<span class="mode-summary-flag mention" title="Can mention users in this mode">mention</span>');
+      }
+      if (constraints.canQuote !== false) {
+        pills.push('<span class="mode-summary-flag quote" title="Can quote user text in this mode">quote</span>');
+      }
+      return pills.join('');
     }
 
     function findModeById(cfg, modeId) {
@@ -4044,6 +4049,7 @@
           var modeId = String(mode.id || '');
           var counts = modeSummaryCounts(mode, actionChoices);
           var isActive = modeId === String(state.modeDrawerModeId || '');
+          var constraintPills = modeConstraintPillsHtml(mode);
           return [
             '<article class="mode-summary-card' + (isActive ? ' active' : '') + '" data-mode-id="' + escapeHtml(modeId) + '">',
             '  <div class="mode-summary-head">',
@@ -4056,7 +4062,8 @@
             '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '" title="Open mode details">Edit</button>',
             '    </div>',
           '  </div>',
-            '  <div class="mode-summary-meta">Expiry ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h • Actions ' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + ' • ' + escapeHtml(modeConstraintsSummary(mode)) + '</div>',
+            '  <div class="mode-summary-meta">Expiry ' + escapeHtml(String(mode.defaultExpiryHours || 0)) + 'h • Actions ' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + '</div>',
+            (constraintPills ? ('  <div class="mode-summary-flags">' + constraintPills + '</div>') : ''),
             '</article>'
           ].join('');
         }).join('');

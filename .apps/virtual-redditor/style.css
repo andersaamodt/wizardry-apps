@@ -1497,19 +1497,26 @@ label {
 
 .modes-list {
   display: grid;
-  gap: 6px;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent) 18%);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-panel) 95%, #fff 5%);
 }
 
 .mode-summary-card {
-  border: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent) 20%);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 6px;
   padding: 6px 8px;
-  background: color-mix(in srgb, var(--bg-main) 92%, var(--bg-panel) 8%);
+  background: transparent;
+}
+
+.mode-summary-card:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-panel) 92%);
 }
 
 .mode-summary-card.active {
-  border-color: color-mix(in srgb, var(--accent) 58%, var(--line));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-panel) 86%);
 }
 
 .mode-summary-head {
@@ -1590,6 +1597,46 @@ label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.mode-summary-flags {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.mode-summary-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.05rem;
+  padding: 0 0.42rem;
+  border-radius: 999px;
+  font-size: 0.61rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: lowercase;
+  border: 1px solid var(--line);
+}
+
+.mode-summary-flag.followup {
+  border-color: color-mix(in srgb, var(--ok) 52%, var(--line));
+  color: color-mix(in srgb, var(--ok) 80%, var(--text) 20%);
+  background: color-mix(in srgb, var(--ok) 16%, var(--bg-panel) 84%);
+}
+
+.mode-summary-flag.mention {
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
+  color: color-mix(in srgb, var(--accent-strong) 78%, var(--text) 22%);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel) 84%);
+}
+
+.mode-summary-flag.quote {
+  border-color: color-mix(in srgb, var(--warn) 52%, var(--line));
+  color: color-mix(in srgb, var(--warn) 82%, var(--text) 18%);
+  background: color-mix(in srgb, var(--warn) 16%, var(--bg-panel) 84%);
 }
 
 .mode-summary-right {
