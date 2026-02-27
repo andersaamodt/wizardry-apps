@@ -1465,6 +1465,10 @@ label {
   margin-top: 12px;
 }
 
+.behavior-timing-subtitle {
+  margin-top: 16px;
+}
+
 .modes-section-head {
   display: flex;
   align-items: center;
