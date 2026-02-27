@@ -3446,7 +3446,7 @@ input.range-input-invalid[type='number'] {
   align-items: center;
   min-height: 30px;
   line-height: 1;
-  margin-top: -2px;
+  margin-top: -3px;
 }
 
 .bigfive-summary {
@@ -3456,7 +3456,7 @@ input.range-input-invalid[type='number'] {
   border-radius: 999px;
   overflow: hidden;
   background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
-  margin-top: -1px;
+  margin-top: -2px;
 }
 
 .bigfive-chip-segment {
