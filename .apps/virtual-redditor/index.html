@@ -2132,6 +2132,7 @@
       var usernameValue = normalizeUsername((document.getElementById('title-username') || {}).value || '');
       var connected = selectedProfileConnected();
       var validSubreddit = hasVerifiedSubreddit();
+      var launchdLoaded = !!((((state.status || {}).launchd) || {}).loaded);
 
       var loginBtn = document.getElementById('btn-connect-reddit');
       if (loginBtn) {
@@ -2139,7 +2140,18 @@
         loginBtn.title = usernameValue ? 'Connect Reddit account for selected bot' : 'Enter bot username first';
       }
 
-      var controlIds = ['btn-run-toggle', 'btn-restart', 'btn-run-once'];
+      var runToggle = document.getElementById('btn-run-toggle');
+      if (runToggle) {
+        var canToggleRun = launchdLoaded || connected;
+        runToggle.disabled = !canToggleRun;
+        if (!canToggleRun) {
+          runToggle.title = 'Connect Reddit account first';
+        } else {
+          runToggle.title = launchdLoaded ? 'Stop daemon' : 'Start daemon';
+        }
+      }
+
+      var controlIds = ['btn-restart', 'btn-run-once'];
       for (var i = 0; i < controlIds.length; i += 1) {
         var btn = document.getElementById(controlIds[i]);
         if (btn) btn.disabled = !connected;
