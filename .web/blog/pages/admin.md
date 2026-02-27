@@ -311,7 +311,6 @@ title: Blog Admin
 <p class="muted">See what will publish next and run the scheduler manually.</p>
 </div>
 <div class="row-actions">
-<button id="btn-refresh-queue" type="button">Refresh</button>
 <button id="btn-mirror-nostr" type="button" title="Fetch events from configured Nostr relays and update local derived content.">Sync from Nostr</button>
 <button id="btn-run-scheduler" type="button" class="primary">Drip Now</button>
 </div>

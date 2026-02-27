@@ -17605,7 +17605,8 @@
     }
   }
 
-  function onDictateClick(event, startedAtMs) {
+  function onDictateClick(event) {
+    var startedAtMs = arguments.length > 1 ? arguments[1] : Date.now();
     if (event && typeof event.preventDefault === "function") {
       event.preventDefault();
     }

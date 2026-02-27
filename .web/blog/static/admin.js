@@ -19,6 +19,7 @@
     activeSection: '',
     usersPollTimer: null,
     draftsPollTimer: null,
+    queuePollTimer: null,
     postsPollTimer: null,
     userDragActive: false,
     userDragUsername: '',
@@ -158,6 +159,7 @@
     }
     syncUsersAutoRefresh();
     syncDraftsAutoRefresh();
+    syncQueueAutoRefresh();
     syncPostsAutoRefresh();
   }
 
@@ -1919,6 +1921,32 @@
     }, 6000);
   }
 
+  function stopQueuePolling() {
+    if (state.queuePollTimer) {
+      clearInterval(state.queuePollTimer);
+      state.queuePollTimer = null;
+    }
+  }
+
+  function syncQueueAutoRefresh() {
+    const queueVisible = state.isAdmin && state.activeSection === 'queue';
+    if (!queueVisible) {
+      stopQueuePolling();
+      return;
+    }
+    loadQueue().catch(function () {});
+    if (state.queuePollTimer) {
+      return;
+    }
+    state.queuePollTimer = setInterval(function () {
+      if (!(state.isAdmin && state.activeSection === 'queue')) {
+        stopQueuePolling();
+        return;
+      }
+      loadQueue().catch(function () {});
+    }, 6000);
+  }
+
   async function saveComposer(action) {
     const payload = readComposer();
     payload.action = action;
@@ -2152,11 +2180,6 @@
       });
     }
 
-    document.getElementById('btn-refresh-queue').addEventListener('click', function () {
-      loadQueue().catch(function (err) {
-        setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
-      });
-    });
     if (els.queueList) {
       els.queueList.addEventListener('click', function (event) {
         const target = event.target;
@@ -2366,6 +2389,9 @@
       if (state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
         loadUsers(false).catch(function () {});
       }
+      if (state.isAdmin && state.activeSection === 'queue') {
+        loadQueue().catch(function () {});
+      }
       if (state.isAdmin && state.activeSection === 'posts' && !state.postsActionInFlight) {
         loadPosts().catch(function () {});
       }
@@ -2373,6 +2399,9 @@
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
         loadUsers(false).catch(function () {});
+      }
+      if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'queue') {
+        loadQueue().catch(function () {});
       }
       if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'posts' && !state.postsActionInFlight) {
         loadPosts().catch(function () {});
