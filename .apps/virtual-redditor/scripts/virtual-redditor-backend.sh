@@ -19,6 +19,7 @@ Actions:
   run-once
   extract-norms
   extract-norms-full
+  extract-norms-all
   list-actions [LIMIT]
   list-replies [LIMIT]
   get-modes-config
@@ -1348,6 +1349,10 @@ main() {
 
     extract-norms-full)
       run_daemon extract-norms full
+      ;;
+
+    extract-norms-all)
+      run_daemon extract-norms all
       ;;
 
     list-actions)

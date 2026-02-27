@@ -711,11 +711,9 @@
         <select id="extract-norms-scope" class="settings-select">
           <option value="recent">Recent activity (faster)</option>
           <option value="full" selected>Broad subreddit scan (slower, more tokens)</option>
+          <option value="all">All available subreddit pages (slowest, highest token use)</option>
         </select>
-        <label class="schedule-toggle extract-norms-confirm-row">
-          <input id="extract-norms-confirm" type="checkbox">
-          <span>I understand this may take several minutes.</span>
-        </label>
+        <div class="status-line">Advisory: extraction can take several minutes depending on scope.</div>
       </div>
       <div id="extract-norms-msg" class="status-line"></div>
       <div class="settings-actions extract-actions">
@@ -1478,18 +1476,15 @@
 
     function updateExtractNormsRunEnabled() {
       var runBtn = document.getElementById('btn-extract-norms-run');
-      var confirmBox = document.getElementById('extract-norms-confirm');
-      if (!runBtn || !confirmBox) return;
-      runBtn.disabled = state.extractNormsBusy || !hasVerifiedSubreddit() || !confirmBox.checked;
+      if (!runBtn) return;
+      runBtn.disabled = state.extractNormsBusy || !hasVerifiedSubreddit();
     }
 
     function openExtractNormsModal() {
       var modal = document.getElementById('extract-norms-modal');
-      var confirmBox = document.getElementById('extract-norms-confirm');
       var scope = document.getElementById('extract-norms-scope');
-      if (!modal || !confirmBox || !scope) return;
+      if (!modal || !scope) return;
       scope.value = 'full';
-      confirmBox.checked = false;
       state.extractNormsBusy = false;
       var subreddit = normalizeSubreddit((document.getElementById('subreddit-input') || {}).value || '');
       if (!subreddit) {
@@ -1516,10 +1511,18 @@
     async function runExtractNormsWorkflow() {
       if (state.extractNormsBusy) return;
       var scope = document.getElementById('extract-norms-scope');
-      var action = (scope && scope.value === 'recent') ? 'extract-norms' : 'extract-norms-full';
+      var scopeValue = String((scope && scope.value) || 'full');
+      var action = scopeValue === 'recent'
+        ? 'extract-norms'
+        : (scopeValue === 'all' ? 'extract-norms-all' : 'extract-norms-full');
       state.extractNormsBusy = true;
       updateExtractNormsRunEnabled();
-      setExtractNormsMessage(action === 'extract-norms-full' ? 'Starting broad scan...' : 'Starting extraction from recent activity...', false);
+      var startMsg = scopeValue === 'recent'
+        ? 'Starting extraction from recent activity...'
+        : (scopeValue === 'all'
+          ? 'Starting full subreddit scan across available pages...'
+          : 'Starting broad scan...');
+      setExtractNormsMessage(startMsg, false);
       try {
         await backendJson(action, []);
         closeExtractNormsModal();
@@ -5019,9 +5022,6 @@
       document.getElementById('btn-extract-norms-cancel').addEventListener('click', function () {
         closeExtractNormsModal();
       });
-      document.getElementById('extract-norms-confirm').addEventListener('change', function () {
-        updateExtractNormsRunEnabled();
-      });
       document.getElementById('extract-norms-scope').addEventListener('change', function () {
         var settings = ((state.status || {}).settings) || {};
         var subreddit = normalizeSubreddit(settings.subreddit || '');
@@ -5029,7 +5029,9 @@
           var value = String((document.getElementById('extract-norms-scope') || {}).value || 'full');
           var msg = value === 'recent'
             ? ('This will scan recent activity from r/' + subreddit + ' and append proposals.')
-            : ('This will run a broader scan of r/' + subreddit + ' and append proposals.');
+            : (value === 'all'
+              ? ('This will scan all available pages from r/' + subreddit + ' and append proposals.')
+              : ('This will run a broader scan of r/' + subreddit + ' and append proposals.'));
           setExtractNormsMessage(msg, false);
         }
       });

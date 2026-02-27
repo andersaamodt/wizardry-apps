@@ -18,7 +18,7 @@ Commands:
   list-relationships [LIMIT]
   set-relationship USER MODE [DURATION_HOURS] [TRIGGER]
   list-mode-log [LIMIT]
-  extract-norms [full]
+  extract-norms [full|all]
   undo ACTION_ID
   apologize ACTION_ID [MESSAGE]
   launchd-status
@@ -2959,6 +2959,68 @@ extract_norms_internal() {
         | .[0:120]
       ' 2>/dev/null || printf '[]')
       ;;
+    all)
+      # Deep pass: scan as many available pages as practical for both comments and posts.
+      comments_after=''
+      comments_page=0
+      comments_max_pages=30
+      comments_combined='[]'
+      while [ "$comments_page" -lt "$comments_max_pages" ]; do
+        comments_path="/r/$SUBREDDIT/comments/.json?limit=100&raw_json=1&sort=new"
+        if [ -n "$comments_after" ]; then
+          comments_path="$comments_path&after=$comments_after"
+        fi
+        comments_feed=$(cached_reddit_get "$cache_dir" "high-signal-all-comments-$comments_page" "$comments_path")
+        comments_batch=$(printf '%s' "$comments_feed" | jq -c --argjson min_score "$HIGH_SIGNAL_MIN_SCORE" '
+          [ .data.children[].data
+            | select((.score // 0) >= $min_score or (.controversiality // 0) >= 1)
+            | {id:.name,author,body,score,permalink,created_utc}
+          ]
+        ' 2>/dev/null || printf '[]')
+        comments_combined=$(printf '%s\n%s\n' "$comments_combined" "$comments_batch" | jq -s 'add' 2>/dev/null || printf '[]')
+        comments_next_after=$(printf '%s' "$comments_feed" | jq -r '.data.after // empty' 2>/dev/null || printf '')
+        [ -n "$comments_next_after" ] || break
+        comments_after=$comments_next_after
+        comments_page=$((comments_page + 1))
+      done
+
+      posts_after=''
+      posts_page=0
+      posts_max_pages=20
+      posts_combined='[]'
+      while [ "$posts_page" -lt "$posts_max_pages" ]; do
+        posts_path="/r/$SUBREDDIT/new/.json?limit=100&raw_json=1"
+        if [ -n "$posts_after" ]; then
+          posts_path="$posts_path&after=$posts_after"
+        fi
+        posts_feed=$(cached_reddit_get "$cache_dir" "high-signal-all-posts-$posts_page" "$posts_path")
+        posts_batch=$(printf '%s' "$posts_feed" | jq -c --argjson min_score "$HIGH_SIGNAL_MIN_SCORE" '
+          [ .data.children[].data
+            | select((.score // 0) >= $min_score or (.num_comments // 0) >= 20)
+            | {
+                id:.name,
+                author,
+                body:((.title // "") + (if (.selftext // "") != "" then "\n\n" + (.selftext // "") else "" end)),
+                score,
+                permalink,
+                created_utc
+              }
+          ]
+        ' 2>/dev/null || printf '[]')
+        posts_combined=$(printf '%s\n%s\n' "$posts_combined" "$posts_batch" | jq -s 'add' 2>/dev/null || printf '[]')
+        posts_next_after=$(printf '%s' "$posts_feed" | jq -r '.data.after // empty' 2>/dev/null || printf '')
+        [ -n "$posts_next_after" ] || break
+        posts_after=$posts_next_after
+        posts_page=$((posts_page + 1))
+      done
+
+      combined=$(printf '%s\n%s\n' "$comments_combined" "$posts_combined" | jq -s 'add' 2>/dev/null || printf '[]')
+      candidates=$(printf '%s' "$combined" | jq -c '
+        sort_by(.score // 0)
+        | reverse
+        | .[0:220]
+      ' 2>/dev/null || printf '[]')
+      ;;
     *)
       feed=$(cached_reddit_get "$cache_dir" "high-signal" "/r/$SUBREDDIT/comments/.json?limit=150&raw_json=1&sort=new")
       max_seen=$(printf '%s' "$feed" | jq '[.data.children[].data.created_utc // 0] | max // 0' 2>/dev/null || printf '0')
@@ -3033,7 +3095,15 @@ PROMPT
       --arg text "$norm_text" \
       --arg severity "$severity" \
       --arg rationale "$rationale" \
-      --arg source "$( [ "$mode" = "full" ] && printf '%s' "full-subreddit-bootstrap" || printf '%s' "nightly-extract" )" \
+      --arg source "$(
+        if [ "$mode" = "full" ]; then
+          printf '%s' "full-subreddit-bootstrap"
+        elif [ "$mode" = "all" ]; then
+          printf '%s' "all-subreddit-scan"
+        else
+          printf '%s' "nightly-extract"
+        fi
+      )" \
       --arg ts "$(now_iso)" \
       --argjson evidence "$evidence" \
       '{id:$id,text:$text,severity:$severity,rationale:$rationale,source:$source,accepted_at:$ts,evidence_ids:$evidence}')

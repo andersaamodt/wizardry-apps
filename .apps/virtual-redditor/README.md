@@ -78,6 +78,8 @@ Main actions:
 - `undo ACTION_ID`
 - `apologize ACTION_ID [MESSAGE]`
 - `extract-norms`
+- `extract-norms-full`
+- `extract-norms-all`
 - `oauth-begin CLIENT_ID CLIENT_SECRET [SUBREDDIT] [USERNAME_HINT]`
 - `oauth-status`
 - `oauth-submit-callback CALLBACK_URL_OR_QUERY`
