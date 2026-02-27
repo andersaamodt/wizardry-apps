@@ -2361,14 +2361,24 @@ label {
 }
 
 .action-transition-controls {
-  margin-top: 6px;
-  display: none;
+  margin-top: 0;
+  display: flex;
   flex-wrap: wrap;
   gap: 5px;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-height 200ms ease, opacity 160ms ease, transform 200ms ease, margin-top 200ms ease;
 }
 
 .action-transition-row.transition-enabled .action-transition-controls {
-  display: flex;
+  margin-top: 6px;
+  max-height: 220px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .action-transition-controls select,
@@ -2405,13 +2415,23 @@ label {
 }
 
 .ban-group-row .ban-sub-list {
-  margin-top: 6px;
-  display: none;
+  margin-top: 0;
+  display: grid;
   gap: 6px;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-height 200ms ease, opacity 160ms ease, transform 200ms ease, margin-top 200ms ease;
 }
 
 .ban-group-row.ban-group-enabled .ban-sub-list {
-  display: grid;
+  margin-top: 6px;
+  max-height: 1200px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .ban-sub-row {
