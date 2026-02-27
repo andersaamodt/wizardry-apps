@@ -3,6 +3,7 @@ title: Blog Admin
 ---
 
 <div id="admin-access-message" class="admin-access-message" hidden></div>
+<div id="account-toast-host" class="account-toast-host" aria-live="polite" aria-atomic="true"></div>
 
 <div id="admin-panel" class="admin-layout" style="display:none;">
 <aside class="admin-sidebar">
@@ -379,6 +380,59 @@ body {
   background: #ffebee;
   border-color: #e53935;
   color: #8f1316;
+}
+
+.account-toast-host {
+  position: fixed;
+  top: 3.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2500;
+  width: auto;
+  max-width: calc(100vw - 1.2rem);
+  pointer-events: none;
+}
+
+.account-toast {
+  display: inline-block;
+  width: auto;
+  max-width: min(42rem, calc(100vw - 1.2rem));
+  border: 1px solid #b8c9ea;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1a2a46;
+  padding: 0.66rem 0.86rem;
+  font-size: 0.9rem;
+  line-height: 1.38;
+  box-shadow: 0 8px 24px rgba(12, 26, 54, 0.18);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.account-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.account-toast.is-hiding {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.account-toast.is-ok {
+  border-color: #4caf50;
+  background: #e8f5e9;
+}
+
+.account-toast.is-warn {
+  border-color: #f9a825;
+  background: #fff8e1;
+}
+
+.account-toast.is-error {
+  border-color: #e53935;
+  background: #ffebee;
 }
 
 .admin-layout {

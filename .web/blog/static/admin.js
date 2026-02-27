@@ -22,6 +22,7 @@
     outputCompose: document.getElementById('output-compose'),
     outputQueue: document.getElementById('output-queue'),
     outputAccount: document.getElementById('output-account'),
+    accountToastHost: document.getElementById('account-toast-host'),
     siteTitle: document.getElementById('site-title'),
     adminTheme: document.getElementById('admin-theme'),
     registrationEnabled: document.getElementById('registration-enabled'),
@@ -145,9 +146,54 @@
   }
 
   function setOutput(target, message, kind) {
+    if (target === els.outputAccount && message) {
+      showAccountToast(message, kind);
+      target.innerHTML = '';
+      return;
+    }
     const bg = kind === 'ok' ? '#e8f5e9' : (kind === 'warn' ? '#fff8e1' : '#ffebee');
     const border = kind === 'ok' ? '#4caf50' : (kind === 'warn' ? '#f9a825' : '#e53935');
     target.innerHTML = '<div class="notice" style="background:' + bg + ';border-color:' + border + ';">' + message + '</div>';
+  }
+
+  let accountToastHideTimer = null;
+  let accountToastRemoveTimer = null;
+
+  function clearAccountToastTimers() {
+    if (accountToastHideTimer) {
+      clearTimeout(accountToastHideTimer);
+      accountToastHideTimer = null;
+    }
+    if (accountToastRemoveTimer) {
+      clearTimeout(accountToastRemoveTimer);
+      accountToastRemoveTimer = null;
+    }
+  }
+
+  function showAccountToast(message, kind) {
+    if (!els.accountToastHost) {
+      return;
+    }
+    clearAccountToastTimers();
+
+    const flavor = kind === 'ok' ? 'is-ok' : (kind === 'warn' ? 'is-warn' : 'is-error');
+    els.accountToastHost.innerHTML = '<div class="account-toast ' + flavor + '">' + message + '</div>';
+    const toast = els.accountToastHost.firstElementChild;
+    if (!toast) {
+      return;
+    }
+
+    requestAnimationFrame(function () {
+      toast.classList.add('is-visible');
+    });
+
+    accountToastHideTimer = setTimeout(function () {
+      toast.classList.remove('is-visible');
+      toast.classList.add('is-hiding');
+      accountToastRemoveTimer = setTimeout(function () {
+        els.accountToastHost.innerHTML = '';
+      }, 260);
+    }, 5400);
   }
 
   function lockNostrPubkeyField() {
