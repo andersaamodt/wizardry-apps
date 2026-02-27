@@ -1253,7 +1253,10 @@
       globalInstructionsRemote: DEFAULT_GLOBAL_INSTRUCTIONS,
       globalInstructionsSaveTimer: null,
       globalInstructionsSaveQueued: false,
-      globalInstructionsSaving: false
+      globalInstructionsSaving: false,
+      themeTypeaheadBuffer: '',
+      themeTypeaheadTs: 0,
+      themeTypeaheadResetTimer: null
     };
 
     function updateConditionalTabs() {
@@ -1541,6 +1544,62 @@
       if (current < 0) current = 0;
       var next = (current + step + total) % total;
       applyTheme(state.themes[next]);
+    }
+
+    function resetThemeTypeahead() {
+      state.themeTypeaheadBuffer = '';
+      state.themeTypeaheadTs = 0;
+      if (state.themeTypeaheadResetTimer) {
+        clearTimeout(state.themeTypeaheadResetTimer);
+        state.themeTypeaheadResetTimer = null;
+      }
+    }
+
+    function isPrintableTypeaheadKey(event) {
+      if (!event || event.metaKey || event.ctrlKey || event.altKey) return false;
+      var key = String(event.key || '');
+      if (key.length !== 1) return false;
+      return /^[\x20-\x7E]$/.test(key);
+    }
+
+    function findThemeByPrefix(prefix) {
+      var list = Array.isArray(state.themes) ? state.themes : [];
+      if (!list.length || !prefix) return '';
+      var query = String(prefix || '').toLowerCase();
+      var current = list.indexOf(state.activeTheme);
+      if (current < 0) current = 0;
+      for (var i = 1; i <= list.length; i += 1) {
+        var idx = (current + i) % list.length;
+        var name = String(list[idx] || '');
+        var label = themeLabel(name).toLowerCase();
+        if (label.indexOf(query) === 0 || name.toLowerCase().indexOf(query) === 0) {
+          return name;
+        }
+      }
+      return '';
+    }
+
+    function handleThemeTypeahead(event) {
+      if (!isPrintableTypeaheadKey(event)) return false;
+      var now = Date.now();
+      if ((now - Number(state.themeTypeaheadTs || 0)) > 800) {
+        state.themeTypeaheadBuffer = '';
+      }
+      state.themeTypeaheadBuffer = String(state.themeTypeaheadBuffer || '') + String(event.key || '').toLowerCase();
+      state.themeTypeaheadTs = now;
+      var match = findThemeByPrefix(state.themeTypeaheadBuffer);
+      if (!match && state.themeTypeaheadBuffer.length > 1) {
+        state.themeTypeaheadBuffer = String(event.key || '').toLowerCase();
+        match = findThemeByPrefix(state.themeTypeaheadBuffer);
+      }
+      if (state.themeTypeaheadResetTimer) clearTimeout(state.themeTypeaheadResetTimer);
+      state.themeTypeaheadResetTimer = setTimeout(function () {
+        resetThemeTypeahead();
+      }, 800);
+      if (!match) return false;
+      applyTheme(match);
+      event.preventDefault();
+      return true;
     }
 
     function isThemeMenuOpen() {
@@ -6438,6 +6497,11 @@
         if (event.key === 'Escape' && isThemeMenuOpen()) {
           event.preventDefault();
           closeThemeMenu(true);
+          resetThemeTypeahead();
+          return;
+        }
+        if (handleThemeTypeahead(event)) {
+          return;
         }
       });
       document.getElementById('theme-picker-list').addEventListener('click', function (event) {
@@ -6450,6 +6514,7 @@
         if (event.key === 'Escape') {
           event.preventDefault();
           closeThemeMenu(true);
+          resetThemeTypeahead();
           return;
         }
         if (event.key === 'ArrowDown') {
@@ -6460,6 +6525,10 @@
         if (event.key === 'ArrowUp') {
           event.preventDefault();
           cycleTheme(-1);
+          return;
+        }
+        if (handleThemeTypeahead(event)) {
+          return;
         }
       });
 
