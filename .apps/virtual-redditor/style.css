@@ -1800,13 +1800,17 @@ label {
 }
 
 .replies-workarea.drawer-open {
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
-  column-gap: 12px;
+  grid-template-columns: minmax(0, 1fr) clamp(240px, 30vw, 380px);
+  column-gap: 0;
 }
 
 .replies-main-pane {
   min-width: 0;
   overflow: auto;
+}
+
+.reply-templates-drawer {
+  grid-column: 2;
 }
 
 .reply-templates-drawer .mode-field-row {
@@ -1818,19 +1822,20 @@ label {
 }
 
 .reply-templates-drawer .compact-template-input {
-  min-height: 92px;
-  height: 108px;
+  min-height: 96px;
+  height: 112px;
   resize: vertical;
 }
 
 .reply-templates-drawer .mode-drawer-block {
-  position: relative;
-  padding-bottom: 20px;
+  padding-bottom: 8px;
 }
 
 .reply-templates-drawer .autosave-indicator {
-  right: 8px;
-  bottom: 8px;
+  position: static;
+  margin-top: 6px;
+  margin-left: auto;
+  pointer-events: none;
 }
 
 .enforcement-head-row {
