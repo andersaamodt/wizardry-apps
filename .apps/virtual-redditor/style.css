@@ -3340,17 +3340,29 @@ label {
 }
 
 .norms-head-row {
-  margin-top: 4px;
-  margin-bottom: 6px;
-  font-size: 0.73rem;
-  font-weight: 600;
-  letter-spacing: 0.005em;
+  margin-top: 3px;
+  margin-bottom: 4px;
+  padding: 0 6px 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   text-transform: none;
-  color: color-mix(in srgb, var(--text-subtle) 72%, var(--text) 28%);
-  padding: 4px 6px;
-  border: 1px solid color-mix(in srgb, var(--line) 64%, transparent);
-  background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
-  border-radius: 6px;
+  color: color-mix(in srgb, var(--text-subtle) 70%, var(--text) 30%);
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.norms-head-row > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1rem;
+}
+
+.norms-head-row > span:nth-child(2),
+.norms-head-row > span:nth-child(3) {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 78%, var(--accent) 22%);
+  padding-bottom: 1px;
 }
 
 .norms-table {
