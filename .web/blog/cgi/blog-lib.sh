@@ -1223,19 +1223,46 @@ blog_nostr_verify_event_json() {
     return 1
   fi
 
-  if command -v nostril >/dev/null 2>&1; then
-    if printf '%s\n' "$event_json" | nostril verify >/dev/null 2>&1; then
-      return 0
-    fi
-    if printf '%s\n' "$event_json" | nostril --verify >/dev/null 2>&1; then
+  # Prefer `nak verify` when available; this is the supported event verifier path.
+  if command -v nak >/dev/null 2>&1; then
+    if printf '%s\n' "$event_json" | nak verify >/dev/null 2>&1; then
       return 0
     fi
   fi
+
+  # Some nostril variants may expose verification flags; only use when explicitly supported.
+  if command -v nostril >/dev/null 2>&1; then
+    nostril_help=$(nostril --help 2>/dev/null || printf '')
+    case "$nostril_help" in
+      *"verify"*|*"--verify"*)
+        if printf '%s\n' "$event_json" | nostril verify >/dev/null 2>&1; then
+          return 0
+        fi
+        if printf '%s\n' "$event_json" | nostril --verify >/dev/null 2>&1; then
+          return 0
+        fi
+        ;;
+    esac
+  fi
+
   return 1
 }
 
 blog_nostr_verifier_available() {
-  command -v nostril >/dev/null 2>&1
+  if command -v nak >/dev/null 2>&1; then
+    nak_help=$(nak help 2>/dev/null || nak --help 2>/dev/null || printf '')
+    case "$nak_help" in
+      *"verify"*) return 0 ;;
+    esac
+  fi
+
+  if command -v nostril >/dev/null 2>&1; then
+    nostril_help=$(nostril --help 2>/dev/null || printf '')
+    case "$nostril_help" in
+      *"verify"*|*"--verify"*) return 0 ;;
+    esac
+  fi
+  return 1
 }
 
 blog_nostr_store_event_json() {

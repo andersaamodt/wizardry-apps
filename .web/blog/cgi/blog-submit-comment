@@ -18,8 +18,8 @@ if ! blog_require_session false; then
   exit 0
 fi
 
-if ! command -v nostril >/dev/null 2>&1; then
-  blog_json_error "Comment signing verification requires nostril on the server" "nostril_required"
+if ! blog_nostr_verifier_available; then
+  blog_json_error "Comment signing verification requires a server-side verifier (nak recommended)." "nostr_verifier_required"
   exit 0
 fi
 if ! command -v jq >/dev/null 2>&1; then
