@@ -81,6 +81,8 @@
 })();
 </script>
 
+<div id="nav-top-toast-host" class="nav-top-toast-host" aria-live="polite" aria-atomic="true"></div>
+
 <div class="auth-modal" id="auth-modal" hidden>
   <div class="auth-modal-backdrop" data-close-auth-modal></div>
   <div class="auth-modal-panel" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
@@ -161,4 +163,4 @@
 
 <script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.7.2/lib/nostr.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-<script src="/static/nav-auth.js?v=20260227-loginsplit1"></script>
+<script src="/static/nav-auth.js?v=20260227-navtoast1"></script>

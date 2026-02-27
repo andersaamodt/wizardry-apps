@@ -18,6 +18,7 @@
   var IDB_STORE_NAME = 'kv';
   var KEY_DEVICE_SESSION = 'nostr_device_session_v1';
   var KEY_NIP46_PAIR = 'nostr_nip46_pair_v1';
+  var NAV_TOAST_KEY = 'wizardry_blog_nav_toast_v1';
 
   var state = {
     currentTheme: 'archmage',
@@ -49,6 +50,7 @@
     loginMenuPhone: document.getElementById('login-menu-phone'),
     loginMenuManual: document.getElementById('login-menu-manual'),
     loginMenuAdvanced: document.getElementById('login-menu-advanced'),
+    navToastHost: document.getElementById('nav-top-toast-host'),
     composeLink: document.querySelector('.nav-compose'),
     userMenu: document.getElementById('nav-user-menu'),
     menuBtn: document.getElementById('nav-menu-btn'),
@@ -214,6 +216,80 @@
     target.className = 'auth-modal-message';
     if (text && kind) {
       target.classList.add('is-' + kind);
+    }
+  }
+
+  function rememberNavToast(message, tone, durationMs) {
+    try {
+      sessionStorage.setItem(NAV_TOAST_KEY, JSON.stringify({
+        message: String(message || ''),
+        tone: String(tone || 'info'),
+        durationMs: Number(durationMs || 3600),
+        at: Date.now()
+      }));
+    } catch (_err) {
+      // Ignore storage write failures; in-place toasts still work.
+    }
+  }
+
+  function showNavToast(message, tone, durationMs) {
+    var text = String(message || '').trim();
+    if (!text) {
+      return;
+    }
+    var host = els.navToastHost;
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'nav-top-toast-host';
+      host.className = 'nav-top-toast-host';
+      host.setAttribute('aria-live', 'polite');
+      host.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(host);
+      els.navToastHost = host;
+    }
+    host.innerHTML = '';
+    var toast = document.createElement('div');
+    toast.className = 'nav-top-toast';
+    toast.textContent = text;
+    host.appendChild(toast);
+    requestAnimationFrame(function () {
+      toast.classList.add('is-visible');
+    });
+    var stay = Number(durationMs || 3600);
+    if (!isFinite(stay) || stay < 1200) {
+      stay = 3600;
+    }
+    setTimeout(function () {
+      toast.classList.add('is-closing');
+      setTimeout(function () {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 230);
+    }, stay);
+  }
+
+  function flushRememberedNavToast() {
+    var raw = '';
+    try {
+      raw = sessionStorage.getItem(NAV_TOAST_KEY) || '';
+      if (raw) {
+        sessionStorage.removeItem(NAV_TOAST_KEY);
+      }
+    } catch (_err) {
+      raw = '';
+    }
+    if (!raw) {
+      return;
+    }
+    try {
+      var payload = JSON.parse(raw);
+      if (!payload || typeof payload !== 'object') {
+        return;
+      }
+      showNavToast(payload.message || '', payload.tone || 'info', payload.durationMs || 3600);
+    } catch (_err2) {
+      // Ignore malformed persisted toasts.
     }
   }
 
@@ -862,14 +938,17 @@
     return false;
   }
 
-  function handlePostLogoutNavigation() {
+  function handlePostLogoutNavigation(toastMessage) {
+    var message = String(toastMessage || 'Logged out.');
     if (pageRequiresAuthorization()) {
+      rememberNavToast(message, 'info', 3800);
       window.location.assign('/');
       return;
     }
     if (els.authModal && !els.authModal.hidden) {
       hideAuthModal();
     }
+    showNavToast(message, 'info', 3800);
   }
 
   function logout() {
@@ -878,7 +957,7 @@
       clearLocalStorageAuth();
       return clearLocalKeyMaterial().finally(function () {
         applyLoggedInUi(false, false, '');
-        handlePostLogoutNavigation();
+        handlePostLogoutNavigation('Logged out.');
       });
     }
 
@@ -897,7 +976,7 @@
       clearLocalStorageAuth();
       return clearLocalKeyMaterial().finally(function () {
         applyLoggedInUi(false, false, '');
-        handlePostLogoutNavigation();
+        handlePostLogoutNavigation('Logged out.');
       });
     });
   }
@@ -1478,7 +1557,7 @@
       clearLocalStorageAuth();
       return clearLocalKeyMaterial().finally(function () {
         applyLoggedInUi(false, false, '');
-        handlePostLogoutNavigation();
+        handlePostLogoutNavigation('Logged out everywhere.');
       });
     });
   }
@@ -1830,6 +1909,7 @@
     window.blogAuth = window.blogAuth || {};
     window.blogAuth.openLoginModal = showAuthModal;
     refreshAuthIntentUi();
+    flushRememberedNavToast();
     loadTheme();
     checkAuth();
   }
