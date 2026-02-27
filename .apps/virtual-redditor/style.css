@@ -1830,9 +1830,12 @@ label {
 }
 
 .persona-bigfive-drawer .persona-style-hint {
+  order: -1;
   font-size: 0.71rem;
   line-height: 1.25;
   color: color-mix(in srgb, var(--text-subtle) 86%, var(--bg-panel) 14%);
+  margin-top: 0;
+  margin-bottom: 2px;
 }
 
 .relationships-head-row {
