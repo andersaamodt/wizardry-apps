@@ -7521,15 +7521,30 @@
     return !state.activeConversationId;
   }
 
+  function conversationSwitchOverlayVisible() {
+    return !!state.conversationSwitchOverlay &&
+      !!state.activeConversationId &&
+      !state.activeDraftWorkspaceId &&
+      !state.activeTriage;
+  }
+
   function renderConversationSwitchOverlay() {
     if (!el.conversationSwitchOverlay) {
       return;
     }
-    var show = !!state.conversationSwitchOverlay &&
-      !!state.activeConversationId &&
-      !state.activeDraftWorkspaceId &&
-      !state.activeTriage;
-    el.conversationSwitchOverlay.classList.toggle("hidden", !show);
+    el.conversationSwitchOverlay.classList.toggle("hidden", !conversationSwitchOverlayVisible());
+  }
+
+  function renderToolbarSwitchLock() {
+    if (!el.toolbar || !el.toolbar.querySelectorAll) {
+      return;
+    }
+    var locked = conversationSwitchOverlayVisible();
+    el.toolbar.classList.toggle("conversation-switch-locked", locked);
+    var controls = el.toolbar.querySelectorAll("button, .path-widget");
+    for (var i = 0; i < controls.length; i += 1) {
+      setControlPending(controls[i], locked, { spinner: false });
+    }
   }
 
   function renderRightPaneChrome() {
@@ -8953,6 +8968,7 @@
     safeStep("renderCommandApprovalInline", renderCommandApprovalInline);
     safeStep("renderChat", renderChat);
     safeStep("renderConversationSwitchOverlay", renderConversationSwitchOverlay);
+    safeStep("renderToolbarSwitchLock", renderToolbarSwitchLock);
     safeStep("renderAttachmentStrip", renderAttachmentStrip);
     safeStep("renderRunTodoMonitor", renderRunTodoMonitor);
     safeStep("renderQueueTray", renderQueueTray);

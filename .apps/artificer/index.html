@@ -98,7 +98,7 @@
         '-c',
         'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ -f "$cfg" ] && [ -f "$built" ]; then printf "yes"; else printf "no"; fi'
       ],
-      ensureSite: wizardryShellCommand('root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template artificer artificer; fi; if [ ! -f "$built" ]; then web-wizardry build artificer; fi'),
+      ensureSite: wizardryShellCommand('root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; if [ ! -f "$cfg" ]; then create-from-template artificer artificer; fi; web-wizardry build artificer'),
       startServe: wizardryShellCommand('exec web-wizardry serve artificer'),
       ensureUsablePort: wizardryShellCommand('root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; pidf="$root/artificer/nginx/nginx.pid"; port=$(sed -n "s/^port=//p" "$cfg" 2>/dev/null | head -n 1); [ -n "$port" ] || port=8080; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then printf "$port"; exit 0; fi; if command -v lsof >/dev/null 2>&1; then if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then printf "$port"; exit 0; fi; p=8081; while [ "$p" -le 8120 ]; do if ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then change-site-port artificer "$p" >/dev/null 2>&1 && printf "$p" && exit 0; fi; p=$((p+1)); done; exit 1; fi; printf "$port"; exit 0'),
       isRunning: [
@@ -180,11 +180,7 @@
     }
 
     async function ensureSiteIfNeeded() {
-      var res = await bridgeExec(commands.siteReady);
-      var ready = String((res && res.stdout) || '').trim() === 'yes';
-      if (!ready) {
-        await bridgeExec(commands.ensureSite);
-      }
+      await bridgeExec(commands.ensureSite);
     }
 
     async function startWithFallbackPort() {
@@ -213,15 +209,15 @@
           // Non-fatal: continue startup even if migration probe fails.
         }
 
+        setStatus('Preparing Artificer…', false);
+        await ensureSiteIfNeeded();
+
         if (await isRunning()) {
           var hotPort = await resolvePort();
           iframe.onload = hideStatus;
           iframe.src = 'http://localhost:' + hotPort + entryPath + '?launch=' + encodeURIComponent(launchCacheKey);
           return;
         }
-
-        setStatus('Preparing Artificer…', false);
-        await ensureSiteIfNeeded();
 
         setStatus('Starting Artificer…', false);
         try {
