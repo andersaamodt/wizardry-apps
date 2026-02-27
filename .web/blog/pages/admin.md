@@ -21,12 +21,11 @@ title: Blog Admin
 <section class="admin-section is-active" data-admin-section="settings">
 <div class="demo-box admin-card">
 <div class="section-head">
-<h3>Settings</h3>
+<h3>Site Settings</h3>
 </div>
 
 <div class="settings-stack">
 <section class="sub-card">
-<h4>General</h4>
 <div class="field-row">
 <label for="site-title" title="Public title shown in your blog header and feeds."><strong title="Public title shown in your blog header and feeds.">Site Title</strong></label>
 <input type="text" id="site-title" placeholder="My Blog" title="Public title shown in your blog header and feeds.">
@@ -72,9 +71,19 @@ title: Blog Admin
 <span title="Allow new users to register with a Nostr key. Disable for single-author blogs.">Enabled</span>
 </label>
 </div>
+<div class="field-row checkbox-row">
+<div class="setting-label" title="When enabled, newly registered accounts are granted admin rights automatically.">
+<strong title="When enabled, newly registered accounts are granted admin rights automatically.">Newly Created Accounts Are Admins</strong>
+<span class="inline-tip" tabindex="0" aria-label="When enabled, newly registered Nostr accounts are granted admin automatically. Turn this off after bootstrapping your initial admin team.">?</span>
+</div>
+<label class="checkbox-control" for="new-users-are-admins" title="When enabled, newly registered accounts are granted admin rights automatically.">
+<input type="checkbox" id="new-users-are-admins" title="When enabled, newly registered accounts are granted admin rights automatically.">
+<span title="When enabled, newly registered accounts are granted admin rights automatically.">Enabled</span>
+</label>
+</div>
 </section>
 
-<section class="sub-card">
+<section class="sub-card sub-card-feeds">
 <h4>Feeds</h4>
 <div class="grid-two">
 <div class="field-row checkbox-row">
@@ -90,20 +99,6 @@ title: Blog Admin
 <label for="feed-items" title="Maximum number of recent posts included in RSS and Atom feeds."><strong title="Maximum number of recent posts included in RSS and Atom feeds.">Feed Item Count</strong></label>
 <input type="number" id="feed-items" min="1" step="1" value="50" title="Maximum number of recent posts included in RSS and Atom feeds.">
 </div>
-</div>
-</section>
-
-<section class="sub-card">
-<h4>Access Bootstrap</h4>
-<div class="field-row checkbox-row">
-<div class="setting-label" title="When enabled, newly registered accounts are granted admin rights automatically.">
-<strong title="When enabled, newly registered accounts are granted admin rights automatically.">Newly Created Accounts Are Admins</strong>
-<span class="inline-tip" tabindex="0" aria-label="When enabled, newly registered Nostr accounts are granted admin automatically. Turn this off after bootstrapping your initial admin team.">?</span>
-</div>
-<label class="checkbox-control" for="new-users-are-admins" title="When enabled, newly registered accounts are granted admin rights automatically.">
-<input type="checkbox" id="new-users-are-admins" title="When enabled, newly registered accounts are granted admin rights automatically.">
-<span title="When enabled, newly registered accounts are granted admin rights automatically.">Enabled</span>
-</label>
 </div>
 </section>
 </div>
@@ -954,6 +949,14 @@ body {
 
 [data-admin-section="settings"] .grid-two {
   gap: 0.3rem 0.62rem;
+}
+
+[data-admin-section="settings"] .sub-card-feeds .grid-two {
+  gap: 0.06rem 0.62rem;
+}
+
+[data-admin-section="settings"] .sub-card-feeds .field-row {
+  margin-bottom: 0;
 }
 
 [data-admin-section="queue"] .queue-drip-settings {
