@@ -643,6 +643,23 @@
             <button id="btn-enforcement-escalation-settings" type="button" class="inline-link-btn enforcement-escalation-link" title="Open enforcement settings">Enforcement settings...</button>
           </div>
           <div id="enforcement-workarea" class="enforcement-workarea">
+            <div class="enforcement-main-pane">
+              <div class="table-wrap">
+                <table class="table" id="actions-table">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Action</th>
+                      <th>User</th>
+                      <th>Why</th>
+                      <th>Status</th>
+                      <th>Controls</th>
+                    </tr>
+                  </thead>
+                  <tbody id="actions-body"></tbody>
+                </table>
+              </div>
+            </div>
             <aside id="enforcement-escalation-drawer" class="mode-detail-drawer enforcement-escalation-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div class="mode-detail-drawer-title">Enforcement settings</div>
@@ -696,21 +713,6 @@
                 </div>
               </div>
             </aside>
-          </div>
-          <div class="table-wrap">
-            <table class="table" id="actions-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Action</th>
-                  <th>User</th>
-                  <th>Why</th>
-                  <th>Status</th>
-                  <th>Controls</th>
-                </tr>
-              </thead>
-              <tbody id="actions-body"></tbody>
-            </table>
           </div>
         </section>
 
