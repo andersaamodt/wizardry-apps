@@ -58,9 +58,9 @@ printf '%s' "$replies_out" | jq -e '.ok == true and (.replies | type == "array")
 modes_out=$(VR_STATE_DIR="$state_dir" "$backend" get-modes-config)
 printf '%s' "$modes_out" | jq -e '.ok == true and (.config.modes | type == "array") and (.config.behaviors | type == "object")' >/dev/null
 
-patched_modes=$(printf '%s' "$modes_out" | jq -c '.config + {behaviors:(.config.behaviors + {humor:"dry"})}')
+patched_modes=$(printf '%s' "$modes_out" | jq -c '.config + {behaviors:(.config.behaviors + {humorStyle:"shady",humorAmount:"high"})}')
 save_modes_out=$(VR_STATE_DIR="$state_dir" "$backend" save-modes-config "$patched_modes")
-printf '%s' "$save_modes_out" | jq -e '.ok == true and .config.behaviors.humor == "dry"' >/dev/null
+printf '%s' "$save_modes_out" | jq -e '.ok == true and .config.behaviors.humorStyle == "shady" and .config.behaviors.humorAmount == "high"' >/dev/null
 
 relationships_out=$(VR_STATE_DIR="$state_dir" "$backend" list-relationships 5)
 printf '%s' "$relationships_out" | jq -e '.ok == true and (.relationships | type == "array")' >/dev/null

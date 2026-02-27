@@ -187,7 +187,8 @@ mode_default_config_json() {
       ],
       behaviors: {
         mirrorTone: "mirror_or_less",
-        humor: "measured",
+        humorStyle: "dry",
+        humorAmount: "medium",
         citations: "as-needed",
         latencyJitterSec: {min: 0, max: 0},
         banJitterSec: {min: 7, max: 45},
@@ -1834,6 +1835,34 @@ compose_context_envelope() {
     | map(select((.id // "") == $mode))
     | if length == 0 then {} else (.[0].allow // {}) end
   ' 2>/dev/null || printf '{}')
+  behavior_policy_json=$(read_modes_config_json | jq -c '
+    (.behaviors // {}) as $b
+    | ($b.humor // "" | tostring | ascii_downcase) as $legacy
+    | {
+        mirrorTone: ($b.mirrorTone // "mirror_or_less"),
+        humorStyle: (
+          $b.humorStyle
+          // (if $legacy == "none" then "straight"
+              elif $legacy == "dry" then "dry"
+              elif $legacy == "shady" then "shady"
+              elif $legacy == "joker" then "joker"
+              elif $legacy == "absurdist" then "absurdist"
+              elif $legacy == "measured" then "dry"
+              else "dry" end)
+        ),
+        humorAmount: (
+          $b.humorAmount
+          // (if $legacy == "none" then "none"
+              elif $legacy == "dry" then "light"
+              elif $legacy == "shady" then "medium"
+              elif $legacy == "joker" then "high"
+              elif $legacy == "absurdist" then "high"
+              elif $legacy == "measured" then "medium"
+              else "medium" end)
+        ),
+        citations: ($b.citations // "as-needed")
+      }
+  ' 2>/dev/null || printf '{"mirrorTone":"mirror_or_less","humorStyle":"dry","humorAmount":"medium","citations":"as-needed"}')
 
   jq -cn \
     --arg mode "$MODE" \
@@ -1852,9 +1881,11 @@ compose_context_envelope() {
     --arg norms "$norms_json" \
     --arg relationship "$relationship_json" \
     --arg mode_allow "$mode_allow_json" \
+    --arg behavior_policy "$behavior_policy_json" \
     '{
       mode:$mode,
       subreddit:$subreddit,
+      behavior_policy:(($behavior_policy|fromjson?) // {}),
       doctrine:{global_instructions:$global_instructions, manifesto:$manifesto, norms:(($norms|fromjson?) // [])},
       utterance:($comment|fromjson),
       relationship:((($relationship|fromjson?) // {}) + {allowed_actions: (($mode_allow|fromjson?) // {})}),
@@ -1901,6 +1932,7 @@ Required policy constraints:
 - Judicial bans: reply must clearly cite the violated norm.
 - Capricious bans: reply must include a feeling-string.
 - Mixed bans: reply should reflect whichever causal pathway fired.
+- Apply `behavior_policy` from the context envelope for tone, humor style/amount, and citation behavior.
 
 Return STRICT JSON only, no markdown, with this shape:
 {

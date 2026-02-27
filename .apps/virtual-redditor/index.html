@@ -133,14 +133,22 @@
               <div class="persona-section-title">Persona Style</div>
               <div class="mode-fields-inline modes-grid">
                 <div class="mode-field-row">
-                  <label for="behavior-humor" class="mode-field-label">Humor</label>
-                  <select id="behavior-humor">
-                    <option value="none">None (straight)</option>
+                  <label for="behavior-humor-style" class="mode-field-label">Humor style</label>
+                  <select id="behavior-humor-style">
+                    <option value="straight">Straight</option>
                     <option value="dry">Dry wit</option>
                     <option value="shady">Shady</option>
-                    <option value="measured">Measured light humor</option>
-                    <option value="joker">Joker (frequent quips)</option>
-                    <option value="absurdist">Absurdist (max playful)</option>
+                    <option value="joker">Joker</option>
+                    <option value="absurdist">Absurdist</option>
+                  </select>
+                </div>
+                <div class="mode-field-row">
+                  <label for="behavior-humor-amount" class="mode-field-label">Humor amount</label>
+                  <select id="behavior-humor-amount">
+                    <option value="none">None</option>
+                    <option value="light">Light</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
                   </select>
                 </div>
                 <div class="mode-field-row">
@@ -3210,7 +3218,8 @@
         ],
         behaviors: {
           mirrorTone: 'mirror_or_less',
-          humor: 'measured',
+          humorStyle: 'dry',
+          humorAmount: 'medium',
           citations: 'as-needed',
           latencyJitterSec: { min: 0, max: 0 },
           banJitterSec: { min: 7, max: 45 },
@@ -3254,6 +3263,30 @@
       out.behaviors = Object.assign({}, base.behaviors, src.behaviors || {});
       out.behaviors.latencyJitterSec = Object.assign({}, base.behaviors.latencyJitterSec, ((src.behaviors || {}).latencyJitterSec) || {});
       out.behaviors.banJitterSec = Object.assign({}, base.behaviors.banJitterSec, ((src.behaviors || {}).banJitterSec) || {});
+      if (!out.behaviors.humorStyle || !out.behaviors.humorAmount) {
+        var legacyHumor = String(out.behaviors.humor || '').toLowerCase();
+        if (legacyHumor === 'none') {
+          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'straight';
+          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'none';
+        } else if (legacyHumor === 'dry') {
+          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'dry';
+          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'light';
+        } else if (legacyHumor === 'shady') {
+          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'shady';
+          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'medium';
+        } else if (legacyHumor === 'joker') {
+          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'joker';
+          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'high';
+        } else if (legacyHumor === 'absurdist') {
+          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'absurdist';
+          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'high';
+        } else if (legacyHumor === 'measured') {
+          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'dry';
+          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'medium';
+        }
+      }
+      out.behaviors.humorStyle = String(out.behaviors.humorStyle || 'dry');
+      out.behaviors.humorAmount = String(out.behaviors.humorAmount || 'medium');
       out.replies = Object.assign({}, base.replies, src.replies || {});
       out.escalation = Object.assign({}, base.escalation, src.escalation || {});
       out.escalation.afterActionSwitch = Object.assign({}, base.escalation.afterActionSwitch, ((src.escalation || {}).afterActionSwitch) || {});
@@ -4076,7 +4109,8 @@
       var cfg = normalizeModesConfig(state.modesConfig);
       var behaviors = cfg.behaviors || {};
       var mirror = document.getElementById('behavior-mirror-tone');
-      var humor = document.getElementById('behavior-humor');
+      var humorStyle = document.getElementById('behavior-humor-style');
+      var humorAmount = document.getElementById('behavior-humor-amount');
       var citations = document.getElementById('behavior-citations');
       var summonable = document.getElementById('behavior-summonable');
       var implicitSummons = document.getElementById('behavior-implicit-summons');
@@ -4086,7 +4120,8 @@
       var banMin = document.getElementById('behavior-ban-min');
       var banMax = document.getElementById('behavior-ban-max');
       if (mirror) mirror.value = String(behaviors.mirrorTone || 'mirror_or_less');
-      if (humor) humor.value = String(behaviors.humor || 'measured');
+      if (humorStyle) humorStyle.value = String(behaviors.humorStyle || 'dry');
+      if (humorAmount) humorAmount.value = String(behaviors.humorAmount || 'medium');
       if (citations) citations.value = String(behaviors.citations || 'as-needed');
       var statusSummons = (((state.status || {}).settings || {}).summonsEnabled);
       if (summonable) summonable.checked = (typeof statusSummons === 'boolean') ? !!statusSummons : !!behaviors.summonable;
@@ -4322,7 +4357,8 @@
       var cfg = normalizeModesConfig(cloneJson(state.modesConfig));
 
       cfg.behaviors.mirrorTone = String((document.getElementById('behavior-mirror-tone') || {}).value || 'mirror_or_less');
-      cfg.behaviors.humor = String((document.getElementById('behavior-humor') || {}).value || 'measured');
+      cfg.behaviors.humorStyle = String((document.getElementById('behavior-humor-style') || {}).value || 'dry');
+      cfg.behaviors.humorAmount = String((document.getElementById('behavior-humor-amount') || {}).value || 'medium');
       cfg.behaviors.citations = String((document.getElementById('behavior-citations') || {}).value || 'as-needed');
       cfg.behaviors.summonable = !!((document.getElementById('behavior-summonable') || {}).checked);
       cfg.behaviors.implicitSummons = !!((document.getElementById('behavior-implicit-summons') || {}).checked);
@@ -5171,7 +5207,8 @@
       });
       var behaviorAutoSaveFields = [
         'behavior-mirror-tone',
-        'behavior-humor',
+        'behavior-humor-style',
+        'behavior-humor-amount',
         'behavior-citations',
         'behavior-summonable',
         'behavior-implicit-summons',
