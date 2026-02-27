@@ -1784,6 +1784,20 @@ label {
 
 .persona-bigfive-drawer .mode-field-label {
   margin-top: 0;
+  margin-bottom: 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.persona-bigfive-drawer .mode-field-control-wrap {
+  gap: 4px;
+}
+
+.persona-bigfive-drawer .persona-style-hint {
+  font-size: 0.71rem;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--text-subtle) 86%, var(--bg-panel) 14%);
 }
 
 .relationships-head-row {
