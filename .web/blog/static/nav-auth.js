@@ -135,6 +135,10 @@
     return window.location.host;
   }
 
+  function currentOrigin() {
+    return window.location.origin;
+  }
+
   function hasNostrTools() {
     return !!(window.NostrTools &&
       typeof window.NostrTools.generateSecretKey === 'function' &&
@@ -151,8 +155,8 @@
     if (!signer) {
       throw new Error('No browser signer detected. Install nos2x-fox or use phone/manual login.');
     }
-    if (typeof signer.getPublicKey !== 'function' || typeof signer.signEvent !== 'function') {
-      throw new Error('Browser signer is missing getPublicKey/signEvent.');
+    if (typeof signer.signEvent !== 'function') {
+      throw new Error('Browser signer is missing signEvent.');
     }
     return signer;
   }
@@ -475,22 +479,26 @@
     };
   }
 
-  function authEventTemplate(challenge, action) {
+  function authEventTemplate(challenge, action, pubkey) {
     var eventAction = action || 'login';
+    var signerPubkey = String(pubkey || '').trim();
     return {
       kind: AUTH_KIND,
       created_at: nowEpoch(),
       tags: [
         ['challenge', String(challenge || '')],
+        ['relay', currentOrigin()],
         ['origin', currentHost()],
         ['domain', currentHost()],
         ['action', eventAction]
       ],
-      content: 'wizardry auth challenge'
+      content: '',
+      pubkey: signerPubkey || undefined
     };
   }
 
-  function delegationEventTemplate(record) {
+  function delegationEventTemplate(record, pubkey) {
+    var signerPubkey = String(pubkey || '').trim();
     return {
       kind: DELEGATION_KIND,
       created_at: nowEpoch(),
@@ -501,7 +509,8 @@
         ['scope', 'auth'],
         ['action', 'delegate_session']
       ],
-      content: 'wizardry delegated session authorization'
+      content: 'wizardry delegated session authorization',
+      pubkey: signerPubkey || undefined
     };
   }
 
@@ -513,6 +522,11 @@
       return result;
     }
     throw new Error('Signer did not return a valid signed event.');
+  }
+
+  function signedEventPubkey(result) {
+    var normalized = normalizeSignedEvent(result);
+    return String((normalized && normalized.pubkey) || '').trim();
   }
 
   function signWithLocalSecret(template, secretHex) {
@@ -957,7 +971,7 @@
         }
         return beginChallenge(record.userPubkey)
           .then(function (begin) {
-            var signed = signWithLocalSecret(authEventTemplate(begin.challenge, 'login'), record.sessionSecretHex);
+            var signed = signWithLocalSecret(authEventTemplate(begin.challenge, 'login', record.sessionPubkey), record.sessionSecretHex);
             return finishLogin(begin.request_id, signed, null, intent.forceInteractive)
               .then(function (finish) {
                 rememberAuth(finish);
@@ -974,7 +988,10 @@
       });
   }
 
-  function signInWithSigner(getPubkeyFn, signEventFn) {
+  function signInWithSigner(signEventFn, options) {
+    var opts = options && typeof options === 'object' ? options : {};
+    var getPubkeyFn = typeof opts.getPubkeyFn === 'function' ? opts.getPubkeyFn : null;
+    var pubkeyHint = String(opts.pubkeyHint || '').trim();
     var intent = getAuthIntent();
 
     return tryDelegatedSessionLogin(intent)
@@ -983,34 +1000,40 @@
           return;
         }
 
-        setAuthMessage('Requesting signer pubkey...', 'warn');
-        return Promise.resolve(getPubkeyFn())
-          .then(function (userPubkey) {
-            if (!userPubkey) {
-              throw new Error('Signer returned an empty pubkey.');
-            }
-            localStorage.setItem('last_auth_pubkey', userPubkey);
-            return beginChallenge(userPubkey)
-              .then(function (begin) {
-                var authTemplate = authEventTemplate(begin.challenge, 'login');
-                setAuthMessage('Sign the login challenge event...', 'warn');
-
-                return Promise.resolve(signEventFn(authTemplate)).then(function (signedAuth) {
+        setAuthMessage('Creating a single-use login challenge...', 'warn');
+        return beginChallenge(pubkeyHint || localStorage.getItem('last_auth_pubkey') || '')
+          .then(function (begin) {
+            var authTemplate = authEventTemplate(begin.challenge, 'login', pubkeyHint);
+            setAuthMessage('Sign the login challenge event...', 'warn');
+            return Promise.resolve(signEventFn(authTemplate)).then(function (signedAuth) {
+              var userPubkey = signedEventPubkey(signedAuth);
+              if (!userPubkey && getPubkeyFn) {
+                return Promise.resolve(getPubkeyFn()).then(function (fallbackPubkey) {
                   return {
                     begin: begin,
-                    userPubkey: userPubkey,
+                    userPubkey: String(fallbackPubkey || '').trim(),
                     signedAuth: signedAuth
                   };
                 });
-              });
+              }
+              return {
+                begin: begin,
+                userPubkey: userPubkey,
+                signedAuth: signedAuth
+              };
+            });
           })
           .then(function (payload) {
             var delegationSigned = null;
             state.pendingDeviceSession = null;
+            if (!payload.userPubkey) {
+              throw new Error('Signed auth event is missing pubkey.');
+            }
+            localStorage.setItem('last_auth_pubkey', payload.userPubkey);
 
             if (intent.mode === 'approve') {
               state.pendingDeviceSession = createSessionRecord(payload.userPubkey, intent.days);
-              var delegationTemplate = delegationEventTemplate(state.pendingDeviceSession);
+              var delegationTemplate = delegationEventTemplate(state.pendingDeviceSession, payload.userPubkey);
               setAuthMessage('Sign delegation for approved device session...', 'warn');
               return Promise.resolve(signEventFn(delegationTemplate)).then(function (signedDelegation) {
                 delegationSigned = signedDelegation;
@@ -1056,11 +1079,14 @@
   function loginWithNip07() {
     var signer = getBrowserSigner();
     return signInWithSigner(
-      function () {
-        return Promise.resolve(signer.getPublicKey());
-      },
       function (template) {
         return Promise.resolve(signer.signEvent(template));
+      },
+      {
+        getPubkeyFn: typeof signer.getPublicKey === 'function'
+          ? function () { return Promise.resolve(signer.getPublicKey()); }
+          : null,
+        pubkeyHint: localStorage.getItem('last_auth_pubkey') || ''
       }
     );
   }
@@ -1079,11 +1105,11 @@
           throw new Error('Phone signer is not paired yet. Connect it first via QR.');
         }
         return signInWithSigner(
-          function () {
-            return Promise.resolve(state.nip46.signerPubkey);
-          },
           function (template) {
             return nip46SignEvent(template);
+          },
+          {
+            pubkeyHint: state.nip46.signerPubkey
           }
         );
       });
@@ -1111,7 +1137,7 @@
           els.authManualExpires.value = String(begin.expires_at || '');
         }
 
-        var authTemplate = authEventTemplate(begin.challenge, 'login');
+        var authTemplate = authEventTemplate(begin.challenge, 'login', localStorage.getItem('last_auth_pubkey') || '');
         if (els.authManualTemplate) {
           els.authManualTemplate.value = JSON.stringify(authTemplate, null, 2);
         }
@@ -1119,7 +1145,7 @@
         if (intent.mode === 'approve') {
           var pubkeyHint = localStorage.getItem('last_auth_pubkey') || '';
           state.pendingDeviceSession = createSessionRecord(pubkeyHint, intent.days);
-          var dTemplate = delegationEventTemplate(state.pendingDeviceSession);
+          var dTemplate = delegationEventTemplate(state.pendingDeviceSession, pubkeyHint);
           if (els.authManualDelegationTemplate) {
             els.authManualDelegationTemplate.value = JSON.stringify(dTemplate, null, 2);
           }
@@ -1202,7 +1228,7 @@
         throw new Error((begin && begin.error) || 'Unable to start revocation challenge.');
       }
 
-      var revokeTemplate = authEventTemplate(begin.challenge, 'revoke_all');
+      var revokeTemplate = authEventTemplate(begin.challenge, 'revoke_all', begin.pubkey || '');
       return Promise.resolve(signEventFn(revokeTemplate))
         .then(function (signed) {
           return postForm('/cgi/nostr-auth-revoke-all-finish', {

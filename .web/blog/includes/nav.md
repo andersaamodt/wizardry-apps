@@ -41,7 +41,7 @@
     <button class="auth-modal-close" type="button" aria-label="Close login" data-close-auth-modal>&times;</button>
     <h2 id="auth-modal-title">Sign in</h2>
     <p class="auth-modal-help">Accounts are Nostr-key based only. No email, password, or recovery. If your Nostr key is lost, the account is lost by design.</p>
-    <p class="auth-modal-help">Desktop login uses NIP-07 when available. Recommended desktop signer: <a class="auth-inline-link" href="https://addons.mozilla.org/en-US/firefox/addon/nos2x-fox/" target="_blank" rel="noopener noreferrer">nos2x-fox</a>. Recommended mobile signer: <a class="auth-inline-link" href="https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst" target="_blank" rel="noopener noreferrer">Amethyst</a>.</p>
+    <p class="auth-modal-help">Desktop login uses NIP-07 when available. Phone login uses NIP-46 pairing via QR/deep-link.</p>
 
     <div class="auth-intent">
       <div class="auth-intent-row">
@@ -58,11 +58,21 @@
       </label>
     </div>
 
-    <div class="auth-actions auth-actions-primary">
-      <button id="auth-nip07-btn" class="auth-secondary-btn" type="button">Login with desktop signer (nos2x-fox)</button>
-      <button id="auth-phone-connect-btn" class="auth-secondary-btn" type="button">Connect phone signer (QR)</button>
-      <button id="auth-phone-btn" class="auth-primary-btn" type="button" disabled>Continue with phone signer (QR)</button>
-      <button id="auth-paste-btn" class="auth-secondary-btn" type="button">Paste signed login instead</button>
+    <div class="auth-actions auth-actions-primary auth-actions-stack">
+      <div class="auth-action-row">
+        <button id="auth-nip07-btn" class="auth-secondary-btn" type="button">Login with desktop signer</button>
+        <span class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://addons.mozilla.org/en-US/firefox/addon/nos2x-fox/" target="_blank" rel="noopener noreferrer">nos2x-fox</a></span>
+      </div>
+      <div class="auth-action-row">
+        <button id="auth-phone-connect-btn" class="auth-secondary-btn" type="button">Connect phone signer (QR)</button>
+        <span class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst" target="_blank" rel="noopener noreferrer">Amethyst</a></span>
+      </div>
+      <div class="auth-action-row">
+        <button id="auth-phone-btn" class="auth-primary-btn" type="button" disabled>Continue with phone signer</button>
+      </div>
+      <div class="auth-action-row">
+        <button id="auth-paste-btn" class="auth-secondary-btn" type="button">Paste signed login</button>
+      </div>
     </div>
 
     <div id="auth-phone-panel" class="auth-panel" hidden>
