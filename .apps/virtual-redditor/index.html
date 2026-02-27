@@ -1222,6 +1222,7 @@
       usernameEditing: false,
       modelMenuCloseTimer: null,
       botRunTransition: '',
+      hasUserStoppedBot: false,
       extractNormsBusy: false,
       renameTargetId: '',
       profileSwitchLoading: false,
@@ -3321,7 +3322,11 @@
       } else if (state.botRunTransition === 'stopping') {
         chips.push(statusChipWithSpinner('Stopping...', 'warn'));
       } else {
-        chips.push(statusChip('Bot stopped', 'danger'));
+        if (state.hasUserStoppedBot) {
+          chips.push(statusChip('Bot stopped', 'danger'));
+        } else {
+          chips.push(statusChip('Bot not running', 'warn'));
+        }
       }
       var localName = activeProfileLocalName(profilesPayload) || 'Virtual Redditor';
       row.innerHTML = '<span class="status-active-name" title="' + escapeHtml(localName) + '">' + escapeHtml(localName) + '</span>' + chips.join('');
@@ -5437,6 +5442,9 @@
             if (state.status && state.status.launchd && state.status.launchd.loaded) break;
           }
         }
+        var runningNow = isBotRunning(state.status);
+        if (shouldRun && runningNow) state.hasUserStoppedBot = false;
+        if (!shouldRun && !runningNow) state.hasUserStoppedBot = true;
         setControlMessage('', false);
       } catch (error) {
         setControlMessage(String(error && error.message ? error.message : error), true);
