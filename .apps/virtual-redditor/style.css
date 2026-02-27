@@ -3357,6 +3357,12 @@ label {
   min-height: 1.2em;
 }
 
+.warn-line {
+  color: var(--warn);
+  font-size: 0.83rem;
+  min-height: 1.2em;
+}
+
 .reply-card {
   border: 1px solid var(--line);
   border-radius: 0;

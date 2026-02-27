@@ -1470,18 +1470,31 @@
       modal.classList.add('hidden');
     }
 
-    function setExtractNormsMessage(msg, isError) {
+    function setExtractNormsMessage(msg, level) {
       var line = document.getElementById('extract-norms-msg');
       if (!line) return;
       line.textContent = msg || '';
-      line.classList.toggle('error-line', !!isError);
-      line.classList.toggle('status-line', !isError);
+      var tone = String(level || 'info');
+      line.classList.remove('error-line', 'status-line', 'warn-line');
+      if (tone === 'error') {
+        line.classList.add('error-line');
+      } else if (tone === 'warn') {
+        line.classList.add('warn-line');
+      } else {
+        line.classList.add('status-line');
+      }
+    }
+
+    function hasExtractNormsPreflight() {
+      if (!hasVerifiedSubreddit()) return false;
+      if (!selectedProfileConnected()) return false;
+      return true;
     }
 
     function updateExtractNormsRunEnabled() {
       var runBtn = document.getElementById('btn-extract-norms-run');
       if (!runBtn) return;
-      runBtn.disabled = state.extractNormsBusy || !hasVerifiedSubreddit();
+      runBtn.disabled = state.extractNormsBusy || !hasExtractNormsPreflight();
     }
 
     function openExtractNormsModal() {
@@ -1492,11 +1505,13 @@
       state.extractNormsBusy = false;
       var subreddit = normalizeSubreddit((document.getElementById('subreddit-input') || {}).value || '');
       if (!subreddit) {
-        setExtractNormsMessage('Set a subreddit first, then extract social norms.', true);
+        setExtractNormsMessage('Set a subreddit first, then extract social norms.', 'warn');
       } else if (!hasVerifiedSubreddit()) {
-        setExtractNormsMessage('Enter a valid subreddit name first.', true);
+        setExtractNormsMessage('Enter a valid subreddit name first.', 'warn');
+      } else if (!selectedProfileConnected()) {
+        setExtractNormsMessage('Connect your Reddit account first to extract social norms.', 'warn');
       } else {
-        setExtractNormsMessage('This will analyze r/' + subreddit + ' and append proposed norms.', false);
+        setExtractNormsMessage('This will analyze r/' + subreddit + ' and append proposed norms.', 'info');
       }
       updateExtractNormsRunEnabled();
       modal.classList.remove('hidden');
@@ -1509,11 +1524,20 @@
       if (!modal) return;
       state.extractNormsBusy = false;
       modal.classList.add('hidden');
-      setExtractNormsMessage('', false);
+      setExtractNormsMessage('', 'info');
     }
 
     async function runExtractNormsWorkflow() {
       if (state.extractNormsBusy) return;
+      if (!hasExtractNormsPreflight()) {
+        if (!hasVerifiedSubreddit()) {
+          setExtractNormsMessage('Enter a valid subreddit name first.', 'warn');
+        } else {
+          setExtractNormsMessage('Connect your Reddit account first to extract social norms.', 'warn');
+        }
+        updateExtractNormsRunEnabled();
+        return;
+      }
       var scope = document.getElementById('extract-norms-scope');
       var scopeValue = String((scope && scope.value) || 'full');
       var action = scopeValue === 'recent'
@@ -1526,7 +1550,7 @@
         : (scopeValue === 'all'
           ? 'Starting full subreddit scan across available pages...'
           : 'Starting broad scan...');
-      setExtractNormsMessage(startMsg, false);
+      setExtractNormsMessage(startMsg, 'info');
       try {
         await backendJson(action, []);
         closeExtractNormsModal();
@@ -1537,7 +1561,15 @@
       } catch (error) {
         state.extractNormsBusy = false;
         updateExtractNormsRunEnabled();
-        setExtractNormsMessage(normalizeUiErrorMessage(String(error && error.message ? error.message : error)), true);
+        var raw = String(error && error.message ? error.message : error);
+        var low = raw.toLowerCase();
+        if (low.indexOf('missing required reddit_client_id') >= 0 ||
+            low.indexOf('missing required reddit_refresh_token') >= 0 ||
+            low.indexOf('missing required reddit_username') >= 0) {
+          setExtractNormsMessage('Connect your Reddit account first to extract social norms.', 'warn');
+        } else {
+          setExtractNormsMessage(normalizeUiErrorMessage(raw), 'error');
+        }
       }
     }
 
@@ -5030,13 +5062,17 @@
         var settings = ((state.status || {}).settings) || {};
         var subreddit = normalizeSubreddit(settings.subreddit || '');
         if (subreddit) {
+          if (!selectedProfileConnected()) {
+            setExtractNormsMessage('Connect your Reddit account first to extract social norms.', 'warn');
+            return;
+          }
           var value = String((document.getElementById('extract-norms-scope') || {}).value || 'full');
           var msg = value === 'recent'
             ? ('This will scan recent activity from r/' + subreddit + ' and append proposals.')
             : (value === 'all'
               ? ('This will scan all available pages from r/' + subreddit + ' and append proposals.')
               : ('This will run a broader scan of r/' + subreddit + ' and append proposals.'));
-          setExtractNormsMessage(msg, false);
+          setExtractNormsMessage(msg, 'info');
         }
       });
       document.getElementById('btn-extract-norms-run').addEventListener('click', function () {
