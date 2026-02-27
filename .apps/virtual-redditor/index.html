@@ -5309,6 +5309,8 @@
           var constraintPills = modeConstraintPillsHtml(mode);
           if (constraintPills) metaPills.push(constraintPills);
           var pillsHtml = metaPills.join('');
+          var editDisabledAttr = isActive ? ' disabled' : '';
+          var editTitle = isActive ? 'Editing this mode' : 'Open mode details';
           return [
             '<article class="mode-summary-card' + (isActive ? ' active' : '') + '" data-mode-id="' + escapeHtml(modeId) + '">',
             '  <div class="mode-summary-head">',
@@ -5319,7 +5321,7 @@
             '    </div>',
             '    <div class="mode-summary-right">',
             '      <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '" title="Current enabled state for this mode">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
-            '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '" title="Open mode details">Edit</button>',
+            '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '"' + editDisabledAttr + ' title="' + escapeHtml(editTitle) + '">Edit</button>',
             '    </div>',
             '  </div>',
             '</article>'
