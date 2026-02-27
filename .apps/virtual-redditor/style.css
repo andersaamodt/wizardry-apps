@@ -1955,7 +1955,7 @@ label {
   left: 50%;
   width: 1px;
   transform: translateX(-50%);
-  background: color-mix(in srgb, var(--line) 80%, var(--accent) 20%);
+  background: transparent;
 }
 
 .drawer-open > .drawer-resizer {
@@ -1964,7 +1964,7 @@ label {
 }
 
 .drawer-resizer:hover::before {
-  background: color-mix(in srgb, var(--accent) 65%, var(--line) 35%);
+  background: transparent;
 }
 
 .enforcement-escalation-drawer .mode-field-row {
@@ -2068,8 +2068,8 @@ label {
   width: 1.8rem;
   height: 1.8rem;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
-  background: color-mix(in srgb, var(--bg-main) 92%, var(--line) 8%);
+  border: 0;
+  background: transparent;
   color: var(--text);
   font-size: 0.95rem;
   line-height: 1;
@@ -2080,7 +2080,9 @@ label {
 }
 
 .mode-detail-drawer-close:hover {
-  background: color-mix(in srgb, var(--bg-main) 84%, var(--line) 16%);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
+  transform: none;
+  filter: none;
 }
 
 .mode-detail-drawer-body {
