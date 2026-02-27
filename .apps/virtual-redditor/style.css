@@ -2693,11 +2693,16 @@ label {
 .mode-log-time {
   color: color-mix(in srgb, var(--text-subtle) 86%, var(--text) 14%);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mode-log-event {
   color: color-mix(in srgb, var(--text) 88%, var(--text-subtle) 12%);
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mode-log-detail {
