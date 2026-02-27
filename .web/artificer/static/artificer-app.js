@@ -769,6 +769,7 @@
   var dictationWaveBackendFloor = 0.02;
   var dictationWaveSeenSignal = false;
   var dictationWaveNoiseFloor = 0.02;
+  var dictationWaveActivatedAt = 0;
   var dictationPreparePromise = null;
   var dictationPrepareReadyUntil = 0;
   var dictationPrepareLoopTimer = null;
@@ -4665,15 +4666,102 @@
     return Math.max(0, Math.floor((endedMs - startedMs) / 1000));
   }
 
+  function runTraceReviewRoundCountFromText(rawText) {
+    var text = normalizeRunNarrativeText(rawText);
+    if (!text) {
+      return 0;
+    }
+    var pattern = /code review round\s+(\d+)\s*\/\s*(\d+)/ig;
+    var seen = {};
+    var count = 0;
+    var match = null;
+    while ((match = pattern.exec(text)) !== null) {
+      var roundIndex = Number(match[1] || 0);
+      if (!isFinite(roundIndex) || roundIndex < 1) {
+        continue;
+      }
+      var roundKey = String(Math.floor(roundIndex));
+      if (Object.prototype.hasOwnProperty.call(seen, roundKey)) {
+        continue;
+      }
+      seen[roundKey] = true;
+      count += 1;
+    }
+    return count;
+  }
+
+  function runTraceStepCount(event) {
+    return splitRunStreamEntries(event && event.stream_text).length;
+  }
+
+  function runTraceReviewRoundCount(event) {
+    if (!event) {
+      return 0;
+    }
+    var combined = trim(String(event.stream_text || "")) + "\n" + trim(String(event.session_log || ""));
+    return runTraceReviewRoundCountFromText(combined);
+  }
+
+  function runTraceMetaParts(event) {
+    var parts = [];
+    var stepCount = runTraceStepCount(event);
+    if (stepCount > 0) {
+      parts.push(String(stepCount) + " step" + (stepCount === 1 ? "" : "s"));
+    }
+    var reviewRoundCount = runTraceReviewRoundCount(event);
+    if (reviewRoundCount > 0) {
+      parts.push(String(reviewRoundCount) + " review round" + (reviewRoundCount === 1 ? "" : "s"));
+    }
+    return parts;
+  }
+
+  function refreshThinkingSummaryLabelText(existingLabel, durationLabel) {
+    var base = "Thinking... " + (durationLabel || "0s");
+    var existing = String(existingLabel || "");
+    var marker = " \u00b7 ";
+    var markerIndex = existing.indexOf(marker);
+    if (markerIndex < 0) {
+      return base;
+    }
+    var tail = trim(existing.slice(markerIndex + marker.length));
+    if (!tail) {
+      return base;
+    }
+    return base + marker + tail;
+  }
+
   function runTraceSummaryLabel(event, isRunning) {
     var duration = thoughtDurationLabel(event && event.started_at, isRunning ? "" : (event && event.finished_at));
+    var metaParts = runTraceMetaParts(event);
+    var metaSuffix = metaParts.length ? " \u00b7 " + metaParts.join(" \u00b7 ") : "";
     if (isRunning) {
-      return "Thinking... " + (duration || "0s");
+      return "Thinking... " + (duration || "0s") + metaSuffix;
     }
     if (duration) {
-      return "Worked for " + duration;
+      return "Worked for " + duration + metaSuffix;
+    }
+    if (metaParts.length) {
+      return "Worked \u00b7 " + metaParts.join(" \u00b7 ");
     }
     return "Worked";
+  }
+
+  function formatRunRunningHeader(event, workspaceId, conversationId) {
+    var startedAt = String((event && event.started_at) || "");
+    var elapsed = thoughtDurationLabel(startedAt, "") || "0s";
+    var metaParts = runTraceMetaParts(event);
+    var runningMeta = metaParts.length ? metaParts.join(" \u00b7 ") : "waiting for first step";
+    var startedAttr = startedAt ? " data-started-at='" + escAttr(startedAt) + "'" : "";
+    var html = "<p class='run-line running'" + startedAttr + ">";
+    html += "<span class='run-spinner' aria-hidden='true'></span>";
+    html += "<span class='meta-glimmer'>Thinking...</span>";
+    html += "<span class='run-elapsed'>" + escHtml(elapsed) + "</span>";
+    html += "<span class='run-running-meta'>&middot; " + escHtml(runningMeta) + "</span>";
+    if (workspaceId && conversationId) {
+      html += "<button type='button' class='run-stop-btn' aria-label='Stop run' title='Stop run' data-action='stop-run' data-workspace-id='" + escAttr(workspaceId) + "' data-conversation-id='" + escAttr(conversationId) + "'><span class='run-stop-square' aria-hidden='true'>&#9632;</span></button>";
+    }
+    html += "</p>";
+    return html;
   }
 
   function decodeMaybeUriText(rawText) {
@@ -5315,15 +5403,16 @@
 
     var status = event.status || "done";
     var defaultCompletedTraceOpen = !shouldAutoCollapseCompletedRunTrace(event);
+    if (status === "done" || status === "cancelled") {
+      defaultCompletedTraceOpen = false;
+    }
     var decisionHint = trim(String(event.decision_hint || ""));
     var runClass = "msg run " + escHtml(status);
     var html = "";
 
     if (status === "running") {
       html = "<article class='" + runClass + " run-narrative'>";
-      if (workspaceId && conversationId) {
-        html += "<p class='run-line running'><button type='button' class='run-stop-btn' aria-label='Stop run' title='Stop run' data-action='stop-run' data-workspace-id='" + escAttr(workspaceId) + "' data-conversation-id='" + escAttr(conversationId) + "'><span class='run-stop-square' aria-hidden='true'>&#9632;</span></button></p>";
-      }
+      html += formatRunRunningHeader(event, workspaceId, conversationId);
       html += formatRunTrace(event, { isRunning: true, defaultOpen: true });
       html += "</article>";
       return html;
@@ -5474,10 +5563,14 @@
       }
       var duration = thoughtDurationLabel(started, "");
       var summaryLabel = summary.querySelector(".run-summary-label");
+      var refreshedLabel = refreshThinkingSummaryLabelText(
+        summaryLabel ? summaryLabel.textContent : summary.textContent,
+        duration || "0s"
+      );
       if (summaryLabel) {
-        summaryLabel.textContent = "Thinking... " + (duration || "0s");
+        summaryLabel.textContent = refreshedLabel;
       } else {
-        summary.textContent = "Thinking... " + (duration || "0s");
+        summary.textContent = refreshedLabel;
       }
     }
   }
@@ -6873,6 +6966,7 @@
     dictationWaveBackendFloor = 0.02;
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
+    dictationWaveActivatedAt = 0;
     state.dictateWaveLevels = [];
   }
 
@@ -6884,10 +6978,10 @@
     if (level > 1) {
       level = 1;
     }
-    if (level < 0.02) {
+    if (level < 0.006) {
       level = 0;
     }
-    if (!dictationWaveSeenSignal && level >= 0.03) {
+    if (!dictationWaveSeenSignal && level >= 0.008) {
       dictationWaveSeenSignal = true;
     }
     var barCount = dictationWaveTargetBarCount();
@@ -6910,7 +7004,7 @@
       } else if (level > 1) {
         level = 1;
       }
-      if (level < 0.02) {
+      if (level < 0.006) {
         level = 0;
       }
       pushed.push(level);
@@ -6924,7 +7018,7 @@
         framePeak = pushed[pi];
       }
     }
-    if (!dictationWaveSeenSignal && framePeak >= 0.03) {
+    if (!dictationWaveSeenSignal && framePeak >= 0.008) {
       dictationWaveSeenSignal = true;
     }
     dictationWaveMicLevel = framePeak;
@@ -6954,15 +7048,18 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.02;
     }
-    if (probe >= floor) {
-      floor = (floor * 0.9) + (probe * 0.1);
+    if (probe >= floor + 0.04) {
+      // Prevent ambient floor from climbing into normal speech and flattening bars.
+      floor = (floor * 0.995) + (probe * 0.005);
+    } else if (probe >= floor) {
+      floor = (floor * 0.96) + (probe * 0.04);
     } else {
       floor = (floor * 0.62) + (probe * 0.38);
     }
     if (floor < 0.0012) {
       floor = 0.0012;
-    } else if (floor > 0.18) {
-      floor = 0.18;
+    } else if (floor > 0.06) {
+      floor = 0.06;
     }
     dictationWaveNoiseFloor = floor;
     return floor;
@@ -6977,12 +7074,12 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.02;
     }
-    var gate = floor + 0.005;
+    var gate = floor + 0.003;
     var signal = raw - gate;
     if (signal < 0) {
       signal = 0;
     }
-    var normalized = (signal * 2.1) / Math.max(0.025, 0.62 - gate);
+    var normalized = (signal * 2.35) / Math.max(0.02, 0.56 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
@@ -6991,7 +7088,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.46);
     }
-    if (normalized < 0.012) {
+    if (normalized < 0.004) {
       normalized = 0;
     }
     return normalized;
@@ -7019,8 +7116,8 @@
       floor = 0.25;
     }
     dictationWaveBackendFloor = floor;
-    var gate = floor + 0.01;
-    var normalized = ((raw - gate) * 1.95) / Math.max(0.03, 0.62 - gate);
+    var gate = floor + 0.005;
+    var normalized = ((raw - gate) * 2.2) / Math.max(0.015, 0.52 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
@@ -7029,7 +7126,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.52);
     }
-    if (normalized < 0.012) {
+    if (normalized < 0.004) {
       normalized = 0;
     }
     return normalized;
@@ -7323,10 +7420,10 @@
     }
     var levels = Array.isArray(state.dictateWaveLevels) ? state.dictateWaveLevels : [];
     var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
-    var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
+    var preSignalBaseline = waveformActive && !dictationWaveSeenSignal && (Date.now() - Number(dictationWaveActivatedAt || 0) < 700);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.03;
+    var silenceGate = 0.012;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -7371,6 +7468,9 @@
     }
     state.dictatePhase = next;
     if (next === "recording" || next === "starting") {
+      if (!dictationWaveActivatedAt) {
+        dictationWaveActivatedAt = Date.now();
+      }
       if (!dictationWaveAnalyser && !dictationWaveStream) {
         startDictationWaveMonitor().then(function (started) {
         if (!started && (state.dictatePhase === "recording" || state.dictatePhase === "starting")) {
@@ -7380,6 +7480,7 @@
         });
       }
     } else {
+      dictationWaveActivatedAt = 0;
       stopDictationWaveMonitor({ keepWarm: next === "idle" });
     }
     if (next === "recording") {
@@ -9284,7 +9385,7 @@
       if (runIsActiveHere || recentlySelected) {
         var runningOnlyMarkup = "";
         if (runIsActiveHere) {
-          runningOnlyMarkup = "<article class='run-line-only'><p class='run-line running'><span class='run-spinner' aria-hidden='true'></span> <span class='meta-glimmer'>Thinking</span></p>";
+          runningOnlyMarkup = "<article class='run-line-only'><p class='run-line running'><span class='run-spinner' aria-hidden='true'></span><span class='meta-glimmer'>Thinking...</span><span class='run-elapsed'>0s</span><span class='run-running-meta'>&middot; waiting for first step</span></p>";
           if (state.activeWorkspaceId && state.activeConversationId) {
             runningOnlyMarkup += "<p class='run-line subtle'>Working in this thread. Stream details will appear as events arrive.</p>";
           }
