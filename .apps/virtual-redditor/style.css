@@ -1885,6 +1885,23 @@ label {
   margin-top: 0;
 }
 
+.relationship-override-drawer #relationship-mode {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.relationship-override-drawer #relationship-duration {
+  width: 92px;
+  max-width: 100%;
+}
+
+.relationship-override-drawer #relationship-duration:disabled {
+  background: color-mix(in srgb, var(--bg-soft) 78%, var(--line) 22%);
+  border-color: color-mix(in srgb, var(--line) 86%, var(--bg-soft) 14%);
+  color: color-mix(in srgb, var(--text-subtle) 82%, var(--bg-soft) 18%);
+  opacity: 1;
+}
+
 .replies-head-row {
   display: flex;
   align-items: center;
