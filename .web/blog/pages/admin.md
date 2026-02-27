@@ -8,12 +8,12 @@ title: Blog Admin
 <aside class="admin-sidebar">
 <div class="admin-nav-title">Admin</div>
 <div class="admin-nav-list" role="tablist" aria-label="Admin sections">
-<button type="button" class="admin-nav-item" data-admin-nav="account" aria-selected="false">Account</button>
-<button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true">Site Settings</button>
-<button type="button" class="admin-nav-item" data-admin-nav="users" aria-selected="false">Users</button>
-<button type="button" class="admin-nav-item" data-admin-nav="compose" aria-selected="false">Compose</button>
-<button type="button" class="admin-nav-item" data-admin-nav="drafts" aria-selected="false">Drafts</button>
-<button type="button" class="admin-nav-item" data-admin-nav="queue" aria-selected="false">Queue</button>
+<button type="button" class="admin-nav-item is-compose" data-admin-nav="compose" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 18L7.2 13.8L15.8 5.2a2 2 0 1 1 2.8 2.8L10 16.6L6 18Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 21H19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="admin-nav-label">Compose</span></button>
+<button type="button" class="admin-nav-item" data-admin-nav="account" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Account</span></button>
+<button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Site Settings</span></button>
+<button type="button" class="admin-nav-item" data-admin-nav="users" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Users</span></button>
+<button type="button" class="admin-nav-item" data-admin-nav="drafts" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Drafts</span></button>
+<button type="button" class="admin-nav-item" data-admin-nav="queue" aria-selected="false"><span class="admin-nav-icon-slot" aria-hidden="true"></span><span class="admin-nav-label">Queue</span></button>
 </div>
 </aside>
 
@@ -471,7 +471,9 @@ body {
 }
 
 .admin-nav-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
@@ -487,6 +489,34 @@ body {
   font-weight: 650;
   line-height: 1.25;
   transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.admin-nav-icon-slot {
+  width: 1rem;
+  min-width: 1rem;
+  height: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2d4f8d;
+  flex: 0 0 1rem;
+}
+
+.admin-nav-icon-slot svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.admin-nav-label {
+  display: inline-block;
+}
+
+.admin-nav-item.is-compose {
+  background: #ecf3ff;
+}
+
+.admin-nav-item.is-compose:hover {
+  background: #e2ecff;
 }
 
 .admin-nav-item:hover {
@@ -511,7 +541,8 @@ body {
 
 #admin-panel .admin-nav-list .admin-nav-item {
   width: 100% !important;
-  display: block !important;
+  display: flex !important;
+  align-items: center !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
