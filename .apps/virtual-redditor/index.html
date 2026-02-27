@@ -1985,8 +1985,8 @@
       }
       updateExtractNormsRunEnabled();
       modal.classList.remove('hidden');
-      var closeBtn = document.getElementById('btn-extract-norms-close');
-      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+      var cancelBtn = document.getElementById('btn-extract-norms-cancel');
+      if (cancelBtn && typeof cancelBtn.focus === 'function') cancelBtn.focus();
     }
 
     function closeExtractNormsModal() {
@@ -1995,6 +1995,28 @@
       state.extractNormsBusy = false;
       modal.classList.add('hidden');
       setExtractNormsMessage('', 'info');
+    }
+
+    function activeModalId() {
+      var ids = ['settings-modal', 'core-instructions-modal', 'rename-modal', 'delete-modal', 'extract-norms-modal', 'oauth-modal'];
+      for (var i = 0; i < ids.length; i += 1) {
+        var id = ids[i];
+        var node = document.getElementById(id);
+        if (node && !node.classList.contains('hidden')) return id;
+      }
+      return '';
+    }
+
+    function closeModalById(modalId) {
+      if (modalId === 'settings-modal') return closeSettingsModal();
+      if (modalId === 'core-instructions-modal') return closeCoreInstructionsModal();
+      if (modalId === 'rename-modal') return closeRenameModal();
+      if (modalId === 'delete-modal') return closeDeleteModal();
+      if (modalId === 'extract-norms-modal') return closeExtractNormsModal();
+      if (modalId === 'oauth-modal') {
+        stopOauthPoll();
+        closeOauthModal();
+      }
     }
 
     async function runExtractNormsWorkflow() {
@@ -3672,7 +3694,11 @@
         }
         text.textContent = 'Delete ' + label + '? This cannot be undone.';
       }
-      if (modal) modal.classList.remove('hidden');
+      if (modal) {
+        modal.classList.remove('hidden');
+        var cancelBtn = document.getElementById('btn-delete-cancel');
+        if (cancelBtn && typeof cancelBtn.focus === 'function') cancelBtn.focus();
+      }
       return;
     }
 
@@ -7852,21 +7878,48 @@
         if (!inProfileMenu) closeProfileMenus();
       });
       document.addEventListener('keydown', function (event) {
-        var isCtrlTabCycle = !!(event.ctrlKey && !event.metaKey && event.key === 'Tab');
-        if (isCtrlTabCycle) {
-          var modalOpen = (
-            !document.getElementById('settings-modal').classList.contains('hidden') ||
-            !document.getElementById('core-instructions-modal').classList.contains('hidden') ||
-            !document.getElementById('rename-modal').classList.contains('hidden') ||
-            !document.getElementById('delete-modal').classList.contains('hidden') ||
-            !document.getElementById('extract-norms-modal').classList.contains('hidden') ||
-            !document.getElementById('oauth-modal').classList.contains('hidden')
-          );
-          if (!modalOpen) {
+        var modalId = activeModalId();
+        if (modalId) {
+          var modalNode = document.getElementById(modalId);
+          var insideModal = !!(modalNode && event.target && modalNode.contains(event.target));
+          if (!insideModal) {
             event.preventDefault();
-            cycleTab(!event.shiftKey);
+          }
+
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeModalById(modalId);
             return;
           }
+
+          if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === 'Enter') {
+            if (modalId === 'delete-modal') {
+              event.preventDefault();
+              event.stopPropagation();
+              var deleteConfirm = document.getElementById('btn-delete-confirm');
+              if (deleteConfirm && !deleteConfirm.disabled) deleteConfirm.click();
+              return;
+            }
+            if (modalId === 'extract-norms-modal') {
+              event.preventDefault();
+              event.stopPropagation();
+              var extractRun = document.getElementById('btn-extract-norms-run');
+              if (extractRun && !extractRun.disabled) extractRun.click();
+              return;
+            }
+          }
+
+          // Keep modal keyboard interaction isolated from background controls.
+          event.stopPropagation();
+          return;
+        }
+
+        var isCtrlTabCycle = !!(event.ctrlKey && !event.metaKey && event.key === 'Tab');
+        if (isCtrlTabCycle) {
+          event.preventDefault();
+          cycleTab(!event.shiftKey);
+          return;
         }
         if ((event.metaKey || event.ctrlKey) && isEditableTarget(event.target)) {
           // Preserve native text-edit shortcuts in all text fields.
@@ -7874,35 +7927,11 @@
           return;
         }
         if (event.key === 'Escape') {
-          if (!document.getElementById('settings-modal').classList.contains('hidden')) {
-            closeSettingsModal();
-            return;
-          }
-          if (!document.getElementById('core-instructions-modal').classList.contains('hidden')) {
-            closeCoreInstructionsModal();
-            return;
-          }
-          if (!document.getElementById('rename-modal').classList.contains('hidden')) {
-            closeRenameModal();
-            return;
-          }
-          if (!document.getElementById('delete-modal').classList.contains('hidden')) {
-            closeDeleteModal();
-            return;
-          }
-          if (!document.getElementById('extract-norms-modal').classList.contains('hidden')) {
-            closeExtractNormsModal();
-            return;
-          }
           closeProfileMenus();
           closeThemeMenu(true);
           closeModelMenu();
           closeModeMenu();
           closePatrolModeMenu();
-          if (!document.getElementById('oauth-modal').classList.contains('hidden')) {
-            stopOauthPoll();
-            closeOauthModal();
-          }
         }
       });
       window.addEventListener('resize', positionModelMenu);
