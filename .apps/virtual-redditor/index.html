@@ -3554,28 +3554,6 @@
       out.behaviors.latencyJitterSec = Object.assign({}, base.behaviors.latencyJitterSec, ((src.behaviors || {}).latencyJitterSec) || {});
       out.behaviors.banJitterSec = Object.assign({}, base.behaviors.banJitterSec, ((src.behaviors || {}).banJitterSec) || {});
       out.behaviors.bigFive = Object.assign({}, base.behaviors.bigFive, ((src.behaviors || {}).bigFive) || {});
-      if (!out.behaviors.humorStyle || !out.behaviors.humorAmount) {
-        var legacyHumor = String(out.behaviors.humor || '').toLowerCase();
-        if (legacyHumor === 'none') {
-          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'straight';
-          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'none';
-        } else if (legacyHumor === 'dry') {
-          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'dry';
-          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'light';
-        } else if (legacyHumor === 'shady') {
-          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'shady';
-          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'medium';
-        } else if (legacyHumor === 'joker') {
-          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'joker';
-          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'high';
-        } else if (legacyHumor === 'absurdist') {
-          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'absurdist';
-          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'high';
-        } else if (legacyHumor === 'measured') {
-          if (!out.behaviors.humorStyle) out.behaviors.humorStyle = 'dry';
-          if (!out.behaviors.humorAmount) out.behaviors.humorAmount = 'medium';
-        }
-      }
       out.behaviors.humorStyle = String(out.behaviors.humorStyle || 'dry');
       out.behaviors.humorAmount = String(out.behaviors.humorAmount || 'medium');
       out.behaviors.personality = String(out.behaviors.personality || 'typical_redditor');
@@ -3585,7 +3563,6 @@
       }
       out.behaviors.directness = String(out.behaviors.directness || 'balanced');
       out.behaviors.warmth = String(out.behaviors.warmth || 'even').toLowerCase();
-      if (out.behaviors.warmth === 'neutral') out.behaviors.warmth = 'even';
       if (['icy', 'cool', 'even', 'warm', 'affectionate'].indexOf(out.behaviors.warmth) < 0) {
         out.behaviors.warmth = 'even';
       }

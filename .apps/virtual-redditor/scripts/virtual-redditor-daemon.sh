@@ -1870,7 +1870,6 @@ compose_context_envelope() {
   ' 2>/dev/null || printf '{}')
   behavior_policy_json=$(read_modes_config_json | jq -c '
     (.behaviors // {}) as $b
-    | ($b.humor // "" | tostring | ascii_downcase) as $legacy
     | {
         personality: ($b.personality // "typical_redditor"),
         personalityStrength: (
@@ -1881,8 +1880,7 @@ compose_context_envelope() {
         mirrorTone: ($b.mirrorTone // "mirror_or_less"),
         directness: ($b.directness // "balanced"),
         warmth: (
-          if (($b.warmth // "even") == "neutral") then "even"
-          elif (($b.warmth // "even") == "icy") then "icy"
+          if (($b.warmth // "even") == "icy") then "icy"
           elif (($b.warmth // "even") == "cool") then "cool"
           elif (($b.warmth // "even") == "warm") then "warm"
           elif (($b.warmth // "even") == "affectionate") then "affectionate"
@@ -1890,26 +1888,8 @@ compose_context_envelope() {
         ),
         verbosity: ($b.verbosity // "balanced"),
         formality: ($b.formality // "neutral"),
-        humorStyle: (
-          $b.humorStyle
-          // (if $legacy == "none" then "straight"
-              elif $legacy == "dry" then "dry"
-              elif $legacy == "shady" then "shady"
-              elif $legacy == "joker" then "joker"
-              elif $legacy == "absurdist" then "absurdist"
-              elif $legacy == "measured" then "dry"
-              else "dry" end)
-        ),
-        humorAmount: (
-          $b.humorAmount
-          // (if $legacy == "none" then "none"
-              elif $legacy == "dry" then "light"
-              elif $legacy == "shady" then "medium"
-              elif $legacy == "joker" then "high"
-              elif $legacy == "absurdist" then "high"
-              elif $legacy == "measured" then "medium"
-              else "medium" end)
-        ),
+        humorStyle: ($b.humorStyle // "dry"),
+        humorAmount: ($b.humorAmount // "medium"),
         citations: ($b.citations // "as-needed"),
         bigFive: (
           ($b.bigFive // {}) as $bf
