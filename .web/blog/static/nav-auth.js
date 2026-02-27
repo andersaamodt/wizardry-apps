@@ -805,12 +805,34 @@
     els.menuBtn.setAttribute('aria-expanded', 'false');
   }
 
+  function pageRequiresAuthorization() {
+    var path = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
+    if (path === '/pages/admin.html' || path === '/pages/admin' || path === '/admin.html' || path === '/admin') {
+      return true;
+    }
+    if (document.body && document.body.getAttribute('data-requires-auth') === 'true') {
+      return true;
+    }
+    return false;
+  }
+
+  function handlePostLogoutNavigation() {
+    if (pageRequiresAuthorization()) {
+      window.location.assign('/');
+      return;
+    }
+    if (els.authModal && !els.authModal.hidden) {
+      hideAuthModal();
+    }
+  }
+
   function logout() {
     var token = getSessionToken();
     if (!token) {
       clearLocalStorageAuth();
       return clearLocalKeyMaterial().finally(function () {
         applyLoggedInUi(false, false, '');
+        handlePostLogoutNavigation();
       });
     }
 
@@ -829,7 +851,7 @@
       clearLocalStorageAuth();
       return clearLocalKeyMaterial().finally(function () {
         applyLoggedInUi(false, false, '');
-        window.location.reload();
+        handlePostLogoutNavigation();
       });
     });
   }
