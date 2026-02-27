@@ -5039,6 +5039,12 @@ workspace_draft_file_for() {
   printf '%s/%s/draft-first-message.txt' "$workspaces_dir" "$workspace_id"
 }
 
+conversation_draft_file_for() {
+  workspace_id=$1
+  conversation_id=$2
+  printf '%s/conversations/%s/draft-message.txt' "$(workspace_dir_for "$workspace_id")" "$conversation_id"
+}
+
 workspace_path_for_id() {
   workspace_id=$1
   ws_dir=$(workspace_dir_for "$workspace_id")
@@ -12277,6 +12283,63 @@ EOF_WRAPPER
     fi
 
     emit_ok_message "draft saved"
+    exit 0
+    ;;
+
+  get_conversation_draft)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    draft_file=$(conversation_draft_file_for "$workspace_id" "$conversation_id")
+    draft_text=$(cat "$draft_file" 2>/dev/null || true)
+    draft_json=$(json_escape "$draft_text")
+    printf '{"success":true,"draft":"%s"}\n' "$draft_json"
+    exit 0
+    ;;
+
+  save_conversation_draft)
+    workspace_id=$(trim "$(param "workspace_id")")
+    conversation_id=$(trim "$(param "conversation_id")")
+    draft_text=$(param "draft")
+
+    if ! valid_id "$workspace_id"; then
+      emit_error "invalid workspace_id"
+      exit 0
+    fi
+    if ! valid_id "$conversation_id"; then
+      emit_error "invalid conversation_id"
+      exit 0
+    fi
+
+    conv_dir=$(conversation_dir_for "$workspace_id" "$conversation_id")
+    if [ ! -d "$conv_dir" ]; then
+      emit_error "conversation not found"
+      exit 0
+    fi
+
+    draft_file=$(conversation_draft_file_for "$workspace_id" "$conversation_id")
+    if [ -z "$(trim "$draft_text")" ]; then
+      rm -f "$draft_file"
+    else
+      printf '%s' "$draft_text" > "$draft_file"
+    fi
+
+    emit_ok_message "conversation draft saved"
     exit 0
     ;;
 

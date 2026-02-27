@@ -10083,6 +10083,23 @@
     });
   }
 
+  function loadConversationDraft(workspaceId, conversationId) {
+    if (!workspaceId || !conversationId) {
+      return Promise.resolve("");
+    }
+    return apiGet("get_conversation_draft", {
+      workspace_id: workspaceId,
+      conversation_id: conversationId
+    }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Failed to load conversation draft");
+      }
+      var draft = String(response.draft || "");
+      setComposerDraftForKey(outgoingKeyFor(workspaceId, conversationId, ""), draft);
+      return draft;
+    });
+  }
+
   function saveDraft(workspaceId, text) {
     if (!workspaceId) {
       return Promise.resolve();
@@ -10103,17 +10120,57 @@
     });
   }
 
-  function saveDraftDebounced() {
-    if (!state.activeDraftWorkspaceId) {
+  function saveConversationDraft(workspaceId, conversationId, text) {
+    if (!workspaceId || !conversationId) {
+      return Promise.resolve();
+    }
+    return apiPost("save_conversation_draft", {
+      workspace_id: workspaceId,
+      conversation_id: conversationId,
+      draft: String(text || "")
+    }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Failed to save conversation draft");
+      }
+      return true;
+    });
+  }
+
+  function saveComposerDraftDebounced() {
+    var isWorkspaceDraft = !!state.activeDraftWorkspaceId;
+    var workspaceId = String(state.activeWorkspaceId || "");
+    var conversationId = String(state.activeConversationId || "");
+    var draftWorkspaceId = String(state.activeDraftWorkspaceId || "");
+    var draftText = String((el.runPrompt && el.runPrompt.value) || "");
+    if (!isWorkspaceDraft && (!workspaceId || !conversationId)) {
       return;
     }
-    var workspaceId = state.activeDraftWorkspaceId;
-    var draftText = String((el.runPrompt && el.runPrompt.value) || "");
 
     clearDraftAutosaveTimer();
     saveDraftTimer = setTimeout(function () {
-      saveDraft(workspaceId, draftText).catch(showError);
+      if (isWorkspaceDraft) {
+        saveDraft(draftWorkspaceId, draftText).catch(showError);
+        return;
+      }
+      saveConversationDraft(workspaceId, conversationId, draftText).catch(showError);
     }, 550);
+  }
+
+  function clearPersistedComposerDraft(workspaceId, conversationId, draftWorkspaceId) {
+    var wsId = String(workspaceId || "");
+    var convId = String(conversationId || "");
+    var draftWsId = String(draftWorkspaceId || "");
+    if (draftWsId) {
+      return saveDraft(draftWsId, "").catch(function () {
+        return null;
+      });
+    }
+    if (wsId && convId) {
+      return saveConversationDraft(wsId, convId, "").catch(function () {
+        return null;
+      });
+    }
+    return Promise.resolve();
   }
 
   function refreshGitStatus() {
@@ -10563,6 +10620,14 @@
           if (!isSelectionVersionCurrent(selectionVersion)) {
             return;
           }
+          return loadConversationDraft(workspaceId, state.activeConversationId).catch(function () {
+            return null;
+          });
+        })
+        .then(function () {
+          if (!isSelectionVersionCurrent(selectionVersion)) {
+            return;
+          }
           el.runPrompt.value = getComposerDraftForTarget(workspaceId, state.activeConversationId, "");
           resetComposerAttachments();
           return refreshGitStatus().catch(function () {
@@ -10697,6 +10762,14 @@
           .catch(function () {
             throw firstErr;
           });
+      })
+      .then(function () {
+        if (!isSelectionVersionCurrent(selectionVersion)) {
+          return;
+        }
+        return loadConversationDraft(workspaceId, conversationId).catch(function () {
+          return null;
+        });
       })
       .then(function () {
         if (!isSelectionVersionCurrent(selectionVersion)) {
@@ -16620,9 +16693,13 @@
 
     var queuedPrompt = directive.mode ? trim(rawPrompt) : prompt;
     var pendingKey = activeOutgoingKey();
+    var clearWorkspaceId = String(state.activeWorkspaceId || "");
+    var clearConversationId = String(state.activeConversationId || "");
+    var clearDraftWorkspaceId = String(state.activeDraftWorkspaceId || "");
     var pendingId = addPendingOutgoing(pendingKey, queuedPrompt);
     el.runPrompt.value = "";
     setComposerDraftForKey(pendingKey, "");
+    clearPersistedComposerDraft(clearWorkspaceId, clearConversationId, clearDraftWorkspaceId);
     if (state.activeDraftWorkspaceId) {
       state.draftTextByWorkspace[state.activeDraftWorkspaceId] = "";
     }
@@ -19056,8 +19133,8 @@
       rememberActiveComposerDraft();
       if (state.activeDraftWorkspaceId) {
         state.draftTextByWorkspace[state.activeDraftWorkspaceId] = el.runPrompt.value;
-        saveDraftDebounced();
       }
+      saveComposerDraftDebounced();
       renderRunButton();
     });
 
