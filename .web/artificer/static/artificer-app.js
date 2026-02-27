@@ -671,6 +671,7 @@
   var dictationWaveMicLevelAt = 0;
   var dictationWaveBackendLevel = 0;
   var dictationWaveBackendLevelAt = 0;
+  var dictationWaveSeenSignal = false;
   var dictationPreparePromise = null;
   var dictationPrepareReadyUntil = 0;
   var dictationPrepareLoopTimer = null;
@@ -6486,6 +6487,7 @@
     dictationWaveMicLevelAt = 0;
     dictationWaveBackendLevel = 0;
     dictationWaveBackendLevelAt = 0;
+    dictationWaveSeenSignal = false;
     state.dictateWaveLevels = [];
   }
 
@@ -6496,6 +6498,9 @@
     }
     if (level > 1) {
       level = 1;
+    }
+    if (!dictationWaveSeenSignal && level >= 0.032) {
+      dictationWaveSeenSignal = true;
     }
     var barCount = 42;
     var existing = Array.isArray(state.dictateWaveLevels) ? state.dictateWaveLevels.slice(0, barCount) : [];
@@ -6631,8 +6636,13 @@
             }
           }
           var rms = Math.sqrt(sum / dictationWaveData.length);
-          // Calibrated real mic amplitude mapping: stays truthful, but avoids visual flat-lining on quieter inputs.
-          var normalized = Math.max(rms * 28, peak * 3.6);
+          // Apply a noise floor so true silence can return to zero instead of sitting above it.
+          var rawLevel = Math.max(rms * 28, peak * 3.6);
+          var noiseFloor = 0.12;
+          var normalized = (rawLevel - noiseFloor) / (1 - noiseFloor);
+          if (!isFinite(normalized) || normalized < 0) {
+            normalized = 0;
+          }
           if (normalized > 1) {
             normalized = 1;
           }
@@ -6696,6 +6706,8 @@
     }
     var levels = Array.isArray(state.dictateWaveLevels) ? state.dictateWaveLevels : [];
     var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
+    var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
+    var baselineHeight = 2;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -6703,8 +6715,16 @@
         unit = 0;
       }
       if (!waveformActive) {
-        unit *= 0.3;
+        bar.classList.remove("is-baseline");
+        bar.style.height = "0px";
+        continue;
       }
+      if (preSignalBaseline) {
+        bar.classList.add("is-baseline");
+        bar.style.height = String(baselineHeight) + "px";
+        continue;
+      }
+      bar.classList.remove("is-baseline");
       var height = Math.round(unit * 18);
       bar.style.height = String(height) + "px";
     }
@@ -10052,6 +10072,7 @@
     var conversationId = explicitConversationId || state.activeConversationId;
     var isExplicitTarget = !!(explicitWorkspaceId || explicitConversationId);
     var shouldShowLoading = !!opts.showLoading;
+    var shouldApplyComposerDraft = !!opts.applyComposerDraft;
     if (!workspaceId || !conversationId) {
       if (!isExplicitTarget) {
         state.activeConversation = null;
@@ -10104,6 +10125,16 @@
       if (isActiveTarget) {
         state.activeConversation = conversation;
         setActiveConversationLoading(workspaceId, conversationId, false);
+        if (shouldApplyComposerDraft && el.runPrompt) {
+          var nextDraftText = getComposerDraftForTarget(workspaceId, conversationId, "");
+          if (String(el.runPrompt.value || "") !== nextDraftText) {
+            el.runPrompt.value = nextDraftText;
+            if (typeof el.runPrompt.setSelectionRange === "function") {
+              var draftCaret = nextDraftText.length;
+              el.runPrompt.setSelectionRange(draftCaret, draftCaret);
+            }
+          }
+        }
         if (state.activeConversation) {
           finalizeStaleRunningEventsForConversation(workspaceId, state.activeConversation);
           reconcilePendingOutgoingFromConversation(workspaceId, conversationId, state.activeConversation);
@@ -10666,12 +10697,11 @@
       state.activeConversationId = conversations[0].id;
       state.activeConversationSelectedAt = Date.now();
       syncSelectionUrl(false);
-      return loadConversation()
+      return loadConversation({ applyComposerDraft: true })
         .then(function () {
           if (!isSelectionVersionCurrent(selectionVersion)) {
             return;
           }
-          el.runPrompt.value = getComposerDraftForTarget(workspaceId, state.activeConversationId, "");
           resetComposerAttachments();
           return refreshGitStatus().catch(function () {
             return null;
@@ -10777,18 +10807,23 @@
       Array.isArray(cachedConversation.messages) &&
       cachedConversation.messages.length
     );
-    state.activeConversation = cachedConversation;
+    var hasCachedDraft = hasComposerDraftForKey(outgoingKeyFor(workspaceId, conversationId, ""));
+    var canRenderCachedConversation = hasCachedMessages && hasCachedDraft;
+    state.activeConversation = canRenderCachedConversation ? cachedConversation : null;
     state.activeConversationSelectedAt = Date.now();
-    setActiveConversationLoading(workspaceId, conversationId, !hasCachedMessages);
+    setActiveConversationLoading(workspaceId, conversationId, !canRenderCachedConversation);
     state.activeDraftWorkspaceId = "";
     state.openWorkspaceMenuWorkspaceId = "";
     state.expandedWorkspaceIds[workspaceId] = true;
+    if (el.runPrompt) {
+      el.runPrompt.value = hasCachedDraft ? getComposerDraftForTarget(workspaceId, conversationId, "") : "";
+    }
     syncSelectionUrl(false);
     renderUi();
 
-    return loadConversation({ showLoading: !hasCachedMessages })
+    return loadConversation({ showLoading: !canRenderCachedConversation, applyComposerDraft: true })
       .catch(function (firstErr) {
-        if (!hasCachedMessages) {
+        if (!canRenderCachedConversation) {
           setActiveConversationLoading(workspaceId, conversationId, true);
           renderUi();
         }
@@ -10797,10 +10832,10 @@
             if (state.activeWorkspaceId !== workspaceId || state.activeConversationId !== conversationId) {
               return null;
             }
-            if (!hasCachedMessages) {
+            if (!canRenderCachedConversation) {
               setActiveConversationLoading(workspaceId, conversationId, true);
             }
-            return loadConversation({ showLoading: !hasCachedMessages });
+            return loadConversation({ showLoading: !canRenderCachedConversation, applyComposerDraft: true });
           })
           .catch(function () {
             throw firstErr;
@@ -10810,7 +10845,6 @@
         if (!isSelectionVersionCurrent(selectionVersion)) {
           return;
         }
-        el.runPrompt.value = getComposerDraftForTarget(workspaceId, conversationId, "");
         resetComposerAttachments();
         return refreshGitStatus().catch(function () {
           return null;
