@@ -4286,7 +4286,6 @@
       if (sig && sig === state.modeLogRenderSig) return;
       state.modeLogRenderSig = sig;
       var previousScrollTop = list.scrollTop;
-      var wasPinnedToBottom = Math.abs((list.scrollHeight - list.clientHeight) - list.scrollTop) <= 8;
       if (!rows.length) {
         list.innerHTML = '<div class="mode-log-empty">No mode events yet.</div>';
         if (line) line.textContent = '0 mode events loaded';
@@ -4302,11 +4301,12 @@
           '</div>'
         ].join('');
       }).join('');
-      if (wasPinnedToBottom) {
-        list.scrollTop = list.scrollHeight;
-      } else {
-        list.scrollTop = Math.max(0, Math.min(previousScrollTop, Math.max(0, list.scrollHeight - list.clientHeight)));
-      }
+      // Keep scroll position stable across updates; never auto-jump.
+      var stableTop = Math.max(0, Math.min(previousScrollTop, Math.max(0, list.scrollHeight - list.clientHeight)));
+      list.scrollTop = stableTop;
+      requestAnimationFrame(function () {
+        list.scrollTop = stableTop;
+      });
       if (line) line.textContent = String(rows.length) + ' mode events loaded';
     }
 
