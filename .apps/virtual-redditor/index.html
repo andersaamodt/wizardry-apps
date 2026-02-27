@@ -527,7 +527,7 @@
             <div class="drawer-resizer" data-drawer-resizer="modes" aria-hidden="true"></div>
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
-                <div id="mode-detail-drawer-title" class="mode-detail-drawer-title">Mode Details</div>
+                <div id="mode-detail-drawer-title" class="mode-detail-drawer-title">Mode details</div>
                 <div class="mode-detail-drawer-head-right">
                   <span id="mode-detail-drawer-state" class="mode-detail-drawer-state" title="Whether this mode is currently enabled from the mode list">Enabled</span>
                   <button id="btn-mode-drawer-close" type="button" class="mode-detail-drawer-close" aria-label="Close mode details" title="Close mode details">✕</button>
@@ -4860,7 +4860,7 @@
         drawer.classList.remove('open');
         if (workarea) workarea.classList.remove('drawer-open');
         drawer.setAttribute('aria-hidden', 'true');
-        title.textContent = 'Mode Details';
+        title.textContent = 'Mode details';
         if (statePill) {
           statePill.textContent = '';
           statePill.classList.remove('disabled');
@@ -5010,7 +5010,7 @@
       var modeTitle = modeTitleId.replace(/\b([A-Z0-9])([A-Z0-9]*)\b/g, function (_all, first, rest) {
         return first + rest.toLowerCase();
       });
-      title.textContent = 'Mode Details - ' + modeTitle;
+      title.textContent = 'Mode details - ' + modeTitle;
       if (statePill) {
         var modeEnabled = (mode.enabled !== false);
         statePill.textContent = modeEnabled ? 'Enabled' : 'Disabled';
