@@ -564,6 +564,9 @@
     if (!els.postTagsPills) {
       return;
     }
+    if (els.postTagsEditor) {
+      els.postTagsEditor.classList.toggle('has-tags', state.composeTags.length > 0);
+    }
     if (!state.composeTags.length) {
       els.postTagsPills.innerHTML = '';
       return;

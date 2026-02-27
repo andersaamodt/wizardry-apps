@@ -1077,9 +1077,10 @@ body {
   display: inline-flex;
   align-items: center;
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow: visible;
   gap: 0.3rem;
-  max-width: 65%;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .tag-pill {
@@ -1147,6 +1148,10 @@ body {
   min-width: 0 !important;
   width: 100% !important;
   flex: 1 1 auto !important;
+}
+
+.tag-editor.has-tags .tag-editor-input::placeholder {
+  color: transparent;
 }
 
 .compose-editor .grid-two {
