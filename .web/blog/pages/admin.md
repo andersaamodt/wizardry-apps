@@ -1318,18 +1318,18 @@ body {
 
 .users-list {
   display: grid;
-  gap: 0.58rem;
+  gap: 0.34rem;
 }
 
 .user-card {
   border: 1px solid #d2def3;
   border-radius: 12px;
   background: #fff;
-  padding: 0.72rem 0.8rem;
+  padding: 0.56rem 0.74rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.65rem;
+  gap: 0.5rem;
 }
 
 .users-list.is-dragging .user-card.is-draggable {
@@ -1347,7 +1347,7 @@ body {
 .user-card-main {
   min-width: 0;
   display: grid;
-  gap: 0.14rem;
+  gap: 0.08rem;
 }
 
 .user-card-name {
