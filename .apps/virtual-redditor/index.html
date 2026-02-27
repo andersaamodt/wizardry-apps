@@ -4652,7 +4652,7 @@
           var isActive = modeId === String(state.modeDrawerModeId || '');
           var metaPills = [
             '<span class="mode-summary-flag actions" title="Enabled actions in this mode">' +
-              '<span class="mode-summary-flag-icon" aria-hidden="true">⛭</span>' +
+              '<span class="mode-summary-flag-icon" aria-hidden="true">☰</span>' +
               '<span>' + escapeHtml(String(counts.enabled)) + '/' + escapeHtml(String(counts.total)) + '</span>' +
             '</span>',
             '<span class="mode-summary-flag expiry" title="Default mode expiry in hours">' +
@@ -4669,13 +4669,13 @@
             '    <div class="mode-summary-left">',
             '      <label class="mode-row-enabled" title="Enable or disable this mode"><input type="checkbox" data-mode-row-enabled="' + escapeHtml(modeId) + '"' + ((mode.enabled === false) ? '' : ' checked') + '><span class="sr-only">Enable ' + escapeHtml(modeId) + '</span></label>',
             '      <div class="mode-summary-title"><strong>' + escapeHtml(modeDisplayId(modeId)) + '</strong><span>' + escapeHtml(String(mode.label || '')) + '</span></div>',
+            '      <span class="mode-summary-inline-flags">' + pillsHtml + '</span>',
             '    </div>',
             '    <div class="mode-summary-right">',
             '      <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '" title="Current enabled state for this mode">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
             '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '" title="Open mode details">Edit</button>',
             '    </div>',
           '  </div>',
-            '  <div class="mode-summary-meta"><span class="mode-summary-flags">' + pillsHtml + '</span></div>',
             '</article>'
           ].join('');
         }).join('') + summaryFooterHtml;

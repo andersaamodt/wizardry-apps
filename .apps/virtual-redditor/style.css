@@ -1592,8 +1592,9 @@ label {
 }
 
 .mode-summary-left {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 7px;
   min-width: 0;
   flex: 1 1 auto;
@@ -1678,6 +1679,14 @@ label {
   gap: 5px;
   flex-wrap: nowrap;
   flex: 0 0 auto;
+}
+
+.mode-summary-inline-flags {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .mode-summary-flag {
