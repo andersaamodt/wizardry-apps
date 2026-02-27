@@ -100,6 +100,9 @@
 
     <div id="auth-register-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-register">
       <p class="auth-modal-help">Accounts are created on first successful signer approval and are permanently tied to that Nostr key.</p>
+      <label for="auth-register-username"><strong>Username</strong></label>
+      <input id="auth-register-username" class="auth-input auth-username-input" type="text" maxlength="24" autocomplete="username" placeholder="optional (letters, numbers, ., _, -)">
+      <p class="auth-modal-help">Login is tied to your Nostr key, not your username. Usernames must be unique.</p>
       <div class="auth-actions">
         <button id="auth-register-btn" class="auth-primary-btn" type="button">Register with desktop signer</button>
         <span class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://addons.mozilla.org/en-US/firefox/addon/nos2x-fox/" target="_blank" rel="noopener noreferrer">nos2x-fox</a></span>

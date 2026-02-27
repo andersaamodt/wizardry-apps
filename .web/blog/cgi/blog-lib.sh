@@ -570,7 +570,7 @@ blog_find_username_by_nostr_pubkey() {
 blog_suggest_username_from_nostr_pubkey() {
   pubkey=$(blog_validate_nostr_pubkey "${1-}" 2>/dev/null || printf '')
   [ -n "$pubkey" ] || return 1
-  base="nostr-$(printf '%s' "$pubkey" | cut -c1-12)"
+  base="nostr-$(printf '%s' "$pubkey" | cut -c1-6)"
   candidate=$base
   n=1
   while [ -e "$(blog_user_profile "$candidate")" ]; do

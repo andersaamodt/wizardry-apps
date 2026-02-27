@@ -639,6 +639,10 @@ header h1 {
   color: var(--text);
 }
 
+.auth-username-input {
+  width: min(22rem, 100%);
+}
+
 .auth-key-input {
   min-height: 86px;
   resize: vertical;

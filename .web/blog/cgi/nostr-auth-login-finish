@@ -23,10 +23,12 @@ request_id=$(blog_param request_id)
 event_json=$(blog_param event_json)
 delegation_json=$(blog_param delegation_json)
 force_interactive=$(blog_param force_interactive)
+username_hint=$(blog_param username_hint)
 case "$force_interactive" in
   true|1|yes|on) force_interactive=true ;;
   *) force_interactive=false ;;
 esac
+username_hint=$(printf '%s' "$username_hint" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
 
 if [ -z "$request_id" ] || [ -z "$event_json" ]; then
   blog_json_error "request_id and event_json are required" "invalid_request"
@@ -155,7 +157,23 @@ fi
 username=$(blog_find_username_by_nostr_pubkey "$user_pubkey" 2>/dev/null || printf '')
 account_created=false
 if [ -z "$username" ]; then
-  username=$(blog_suggest_username_from_nostr_pubkey "$user_pubkey" 2>/dev/null || printf '')
+  if [ -n "$username_hint" ]; then
+    if ! blog_validate_username "$username_hint"; then
+      blog_json_error "Username may only contain letters, numbers, dot, underscore, and hyphen" "invalid_username"
+      exit 0
+    fi
+    if [ "${#username_hint}" -gt 24 ]; then
+      blog_json_error "Username must be 24 characters or fewer" "invalid_username"
+      exit 0
+    fi
+    if [ -e "$(blog_user_profile "$username_hint")" ]; then
+      blog_json_error "That username is already taken" "username_taken"
+      exit 0
+    fi
+    username=$username_hint
+  else
+    username=$(blog_suggest_username_from_nostr_pubkey "$user_pubkey" 2>/dev/null || printf '')
+  fi
   if [ -z "$username" ]; then
     blog_json_error "Failed to create username for Nostr identity" "username_failed"
     exit 0

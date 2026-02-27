@@ -59,6 +59,7 @@
     authModalTitle: document.getElementById('auth-modal-title'),
     authMessage: document.getElementById('auth-modal-message'),
     authRegisterBtn: document.getElementById('auth-register-btn'),
+    authRegisterUsername: document.getElementById('auth-register-username'),
     authPhoneConnectBtn: document.getElementById('auth-phone-connect-btn'),
     authPhoneBtn: document.getElementById('auth-phone-btn'),
     authTabRegister: document.getElementById('auth-tab-register'),
@@ -685,12 +686,16 @@
       });
   }
 
-  function finishLogin(requestId, signedEvent, delegationEvent, forceInteractive) {
+  function finishLogin(requestId, signedEvent, delegationEvent, forceInteractive, usernameHint) {
     var payload = {
       request_id: requestId,
       event_json: JSON.stringify(normalizeSignedEvent(signedEvent)),
       force_interactive: forceInteractive ? 'true' : 'false'
     };
+    var desiredUsername = String(usernameHint || '').trim();
+    if (desiredUsername) {
+      payload.username_hint = desiredUsername;
+    }
     if (delegationEvent) {
       payload.delegation_json = JSON.stringify(normalizeSignedEvent(delegationEvent));
     }
@@ -1165,6 +1170,7 @@
     var getPubkeyFn = typeof opts.getPubkeyFn === 'function' ? opts.getPubkeyFn : null;
     var pubkeyHint = String(opts.pubkeyHint || '').trim();
     var registerAttempt = !!opts.registerAttempt;
+    var usernameHint = String(opts.usernameHint || '').trim();
     setAuthMessage('Creating a single-use login challenge...', 'warn');
     return beginChallenge(pubkeyHint || localStorage.getItem('last_auth_pubkey') || '')
       .then(function (begin) {
@@ -1202,7 +1208,8 @@
           payload.begin.request_id,
           payload.signedAuth,
           null,
-          false
+          false,
+          usernameHint
         );
       })
       .then(function (finish) {
@@ -1235,7 +1242,8 @@
           ? function () { return Promise.resolve(signer.getPublicKey()); }
           : null,
         pubkeyHint: '',
-        registerAttempt: !!opts.registerAttempt
+        registerAttempt: !!opts.registerAttempt,
+        usernameHint: String(opts.usernameHint || '').trim()
       }
     );
   }
@@ -1256,13 +1264,16 @@
     });
   }
 
-  function startDesktopSignerLogin(registerAttempt) {
+  function startDesktopSignerLogin(registerAttempt, usernameHint) {
     var asRegister = !!registerAttempt;
     if (!hasDesktopSigner()) {
       return Promise.reject(new Error('No desktop signer detected. Use the login menu for phone QR or signed challenge login.'));
     }
     setAuthControlsDisabled(true);
-    return loginWithNip07({ registerAttempt: asRegister }).finally(function () {
+    return loginWithNip07({
+      registerAttempt: asRegister,
+      usernameHint: String(usernameHint || '').trim()
+    }).finally(function () {
       setAuthControlsDisabled(false);
     });
   }
@@ -1505,7 +1516,7 @@
     if (els.loginBtn) {
       els.loginBtn.addEventListener('click', function () {
         closeLoginMenu();
-        startDesktopSignerLogin(false).catch(function (err) {
+        startDesktopSignerLogin(false, '').catch(function (err) {
           showAuthModal('register');
           setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
         });
@@ -1655,7 +1666,8 @@
 
     if (els.authRegisterBtn) {
       els.authRegisterBtn.addEventListener('click', function () {
-        startDesktopSignerLogin(true).catch(function (err) {
+        var usernameHint = els.authRegisterUsername ? String(els.authRegisterUsername.value || '').trim() : '';
+        startDesktopSignerLogin(true, usernameHint).catch(function (err) {
           setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
         });
       });
