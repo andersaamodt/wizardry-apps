@@ -3948,6 +3948,7 @@
         delete next.constraints.noQuote;
         next.banNoticeStyle = normalizeBanNoticeStyle(next.banNoticeStyle);
         next.defaultExpiryHours = Math.max(0, parseInt(next.defaultExpiryHours, 10) || 0);
+        next.defaultExpiryUnit = normalizeHoursOrDaysUnit(next.defaultExpiryUnit || ((next.defaultExpiryHours > 0 && next.defaultExpiryHours % 24 === 0) ? 'days' : 'hours'));
         for (var c = 0; c < actionCatalog.length; c += 1) {
           var name = actionCatalog[c];
           if (typeof next.allow[name] !== 'boolean') next.allow[name] = !!next.allow[name];
@@ -3996,6 +3997,7 @@
         normalizedTransitions[key] = {
           toMode: toMode,
           durationHours: Math.max(0, parseInt(row.durationHours, 10) || 0),
+          durationUnit: normalizeHoursOrDaysUnit(row.durationUnit || ((Math.max(0, parseInt(row.durationHours, 10) || 0) % 24 === 0 && Math.max(0, parseInt(row.durationHours, 10) || 0) > 0) ? 'days' : 'hours')),
           decayTo: String(row.decayTo || '').trim(),
           announce: !!row.announce
         };
@@ -4020,6 +4022,26 @@
     function modeDisplayTitle(rawId) {
       var text = String(modeDisplayId(rawId) || '').toLowerCase();
       return text.replace(/\b[a-z]/g, function (ch) { return ch.toUpperCase(); });
+    }
+
+    function normalizeHoursOrDaysUnit(value) {
+      var v = String(value || '').toLowerCase();
+      return v === 'days' ? 'days' : 'hours';
+    }
+
+    function durationHoursFromUi(rawValue, unit) {
+      var amount = Math.max(0, parseInt(rawValue, 10) || 0);
+      return normalizeHoursOrDaysUnit(unit) === 'days' ? amount * 24 : amount;
+    }
+
+    function durationUiFromHours(hours, unit) {
+      var h = Math.max(0, parseInt(hours, 10) || 0);
+      var normalizedUnit = normalizeHoursOrDaysUnit(unit);
+      if (normalizedUnit === 'days') {
+        if (h > 0 && (h % 24) === 0) return Math.max(1, Math.round(h / 24));
+        return h;
+      }
+      return h;
     }
 
     function modeOptions(config) {
@@ -4391,8 +4413,17 @@
       var mode = findModeById(cfg, modeId);
       if (!mode) return;
 
-      if (target.hasAttribute('data-mode-drawer-default-expiry')) {
-        mode.defaultExpiryHours = Math.max(0, parseInt(target.value || '0', 10) || 0);
+      if (target.hasAttribute('data-mode-drawer-default-expiry') || target.hasAttribute('data-mode-drawer-default-expiry-unit')) {
+        var expiryInput = target.hasAttribute('data-mode-drawer-default-expiry')
+          ? target
+          : document.querySelector('#mode-detail-drawer [data-mode-drawer-default-expiry]');
+        var expiryUnitSelect = target.hasAttribute('data-mode-drawer-default-expiry-unit')
+          ? target
+          : document.querySelector('#mode-detail-drawer [data-mode-drawer-default-expiry-unit]');
+        var expiryUnit = normalizeHoursOrDaysUnit((expiryUnitSelect && expiryUnitSelect.value) || mode.defaultExpiryUnit || 'hours');
+        var expiryValue = (expiryInput && expiryInput.value != null) ? expiryInput.value : String(mode.defaultExpiryHours || 0);
+        mode.defaultExpiryHours = durationHoursFromUi(expiryValue, expiryUnit);
+        mode.defaultExpiryUnit = expiryUnit;
       } else if (target.hasAttribute('data-mode-drawer-ban-master')) {
         var banNames = banActionNames();
         var allowBan = !!target.checked;
@@ -4478,8 +4509,8 @@
         var transition = transitionSource[actionName] || null;
         var transitionEnabled = !!transition;
         var toModeValue = transitionEnabled ? String(transition.toMode || '') : String(cfg.defaultDecayMode || cfg.startingMode || '');
-        var durationValue = transitionEnabled ? Math.max(0, parseInt(transition.durationHours, 10) || 0) : 0;
-        var decayValue = transitionEnabled ? String(transition.decayTo || '') : '';
+        var transitionDurationUnit = normalizeHoursOrDaysUnit((transition && transition.durationUnit) || ((Math.max(0, parseInt((transition || {}).durationHours, 10) || 0) % 24 === 0 && Math.max(0, parseInt((transition || {}).durationHours, 10) || 0) > 0) ? 'days' : 'hours'));
+        var durationValue = transitionEnabled ? durationUiFromHours(transition.durationHours, transitionDurationUnit) : 24;
         var announceChecked = (transitionEnabled && transition.announce) ? ' checked' : '';
         var styleControl = actionName === 'Post Ban Notice'
           ? ('<div class="action-transition-controls action-transition-controls-single ban-notice-style-shell' + (allowChecked ? ' is-open' : '') + '" data-ban-notice-style-shell>' +
@@ -4497,10 +4528,10 @@
           '  <div class="action-meaning">' + escapeHtml(actionMeaning(actionName)) + '</div>',
           '  ' + styleControl,
           '  <div class="action-transition-controls">',
-          '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
-          '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode">',
-          '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '" title="Mode to decay to when transition duration expires">' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
-          '    <label class="mini-toggle" title="Post a reply announcing the mode switch to the affected user"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
+          '    <label class="mini-input" title="Mode to switch to after this action">Switch to<select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select></label>',
+          '    <label class="mini-input" title="Duration before returning to default decay mode">After<input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration before returning to default decay mode"></label>',
+          '    <select data-transition-duration-unit-action="' + escapeHtml(actionName) + '" title="Duration units for this transition"><option value="hours"' + (transitionDurationUnit === 'hours' ? ' selected' : '') + '>hours</option><option value="days"' + (transitionDurationUnit === 'days' ? ' selected' : '') + '>days</option></select>',
+          '    <label class="mini-toggle transition-announce-row" title="Post a reply announcing the mode switch to the affected user"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
           '  </div>',
           '</div>'
         ].join('');
@@ -4537,8 +4568,8 @@
         var transition = transitionSource[actionName] || null;
         var transitionEnabled = !!transition;
         var toModeValue = transitionEnabled ? String(transition.toMode || '') : String(cfg.defaultDecayMode || cfg.startingMode || '');
-        var durationValue = transitionEnabled ? Math.max(0, parseInt(transition.durationHours, 10) || 0) : 0;
-        var decayValue = transitionEnabled ? String(transition.decayTo || '') : '';
+        var transitionDurationUnit = normalizeHoursOrDaysUnit((transition && transition.durationUnit) || ((Math.max(0, parseInt((transition || {}).durationHours, 10) || 0) % 24 === 0 && Math.max(0, parseInt((transition || {}).durationHours, 10) || 0) > 0) ? 'days' : 'hours'));
+        var durationValue = transitionEnabled ? durationUiFromHours(transition.durationHours, transitionDurationUnit) : 24;
         var announceChecked = (transitionEnabled && transition.announce) ? ' checked' : '';
         var disabledAttr = levelEnabled ? '' : ' disabled';
         return [
@@ -4549,10 +4580,10 @@
           '  </div>',
           '  <div class="action-meaning">Level availability and duration are configured on Enforcement.</div>',
           '  <div class="action-transition-controls">',
-          '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action"' + disabledAttr + '>' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
-          '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode"' + disabledAttr + '>',
-          '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '" title="Mode to decay to when transition duration expires"' + disabledAttr + '>' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
-          '    <label class="mini-toggle" title="Post a reply announcing the mode switch to the affected user"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + disabledAttr + '><span>Announce</span></label>',
+          '    <label class="mini-input" title="Mode to switch to after this action">Switch to<select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action"' + disabledAttr + '>' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select></label>',
+          '    <label class="mini-input" title="Duration before returning to default decay mode">After<input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration before returning to default decay mode"' + disabledAttr + '></label>',
+          '    <select data-transition-duration-unit-action="' + escapeHtml(actionName) + '" title="Duration units for this transition"' + disabledAttr + '><option value="hours"' + (transitionDurationUnit === 'hours' ? ' selected' : '') + '>hours</option><option value="days"' + (transitionDurationUnit === 'days' ? ' selected' : '') + '>days</option></select>',
+          '    <label class="mini-toggle transition-announce-row" title="Post a reply announcing the mode switch to the affected user"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + disabledAttr + '><span>Announce</span></label>',
           '  </div>',
           '</div>'
         ].join('');
@@ -4601,7 +4632,7 @@
       var modeTitle = modeTitleId.replace(/\b([A-Z0-9])([A-Z0-9]*)\b/g, function (_all, first, rest) {
         return first + rest.toLowerCase();
       });
-      title.textContent = modeTitle + ' details';
+      title.textContent = modeTitle + ' mode details';
       if (statePill) {
         var modeEnabled = (mode.enabled !== false);
         statePill.textContent = modeEnabled ? 'Enabled' : 'Disabled';
@@ -4613,7 +4644,8 @@
       body.innerHTML = [
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-inline">',
-        '    <label class="mini-input mode-expiry-input" title="Default number of hours this mode remains active when duration is needed">Default expiry (h)<input type="number" min="0" step="1" data-mode-drawer-default-expiry value="' + escapeHtml(String(mode.defaultExpiryHours || 0)) + '" title="Default number of hours this mode remains active when duration is needed"></label>',
+        '    <label class="mini-input mode-expiry-input" title="Default duration this mode remains active when duration is needed">Default expiry<input type="number" min="0" step="1" data-mode-drawer-default-expiry value="' + escapeHtml(String(durationUiFromHours(mode.defaultExpiryHours || 0, mode.defaultExpiryUnit || ((mode.defaultExpiryHours || 0) % 24 === 0 && (mode.defaultExpiryHours || 0) > 0 ? 'days' : 'hours')))) + '" title="Default duration this mode remains active when duration is needed"></label>',
+        '    <select data-mode-drawer-default-expiry-unit title="Default expiry unit"><option value="hours"' + (normalizeHoursOrDaysUnit(mode.defaultExpiryUnit || ((mode.defaultExpiryHours || 0) % 24 === 0 && (mode.defaultExpiryHours || 0) > 0 ? 'days' : 'hours')) === 'hours' ? ' selected' : '') + '>hours</option><option value="days"' + (normalizeHoursOrDaysUnit(mode.defaultExpiryUnit || ((mode.defaultExpiryHours || 0) % 24 === 0 && (mode.defaultExpiryHours || 0) > 0 ? 'days' : 'hours')) === 'days' ? ' selected' : '') + '>days</option></select>',
         '  </div>',
         '</div>',
         '<div class="mode-drawer-block">',
@@ -5274,13 +5306,15 @@
           var enabled = !!((transitionRow.querySelector('[data-transition-enabled-action]') || {}).checked);
           if (!enabled) continue;
           var toModeForAction = String((transitionRow.querySelector('[data-transition-to-mode-action]') || {}).value || '').trim();
-          var durationForAction = Math.max(0, parseInt((transitionRow.querySelector('[data-transition-duration-action]') || {}).value || '0', 10) || 0);
-          var decayForAction = String((transitionRow.querySelector('[data-transition-decay-to-action]') || {}).value || '').trim();
+          var durationForActionRaw = Math.max(0, parseInt((transitionRow.querySelector('[data-transition-duration-action]') || {}).value || '0', 10) || 0);
+          var durationUnitForAction = normalizeHoursOrDaysUnit((transitionRow.querySelector('[data-transition-duration-unit-action]') || {}).value || 'hours');
+          var durationForAction = durationHoursFromUi(durationForActionRaw, durationUnitForAction);
           var announceForAction = !!((transitionRow.querySelector('[data-transition-announce-action]') || {}).checked);
           cfg.postActionTransitions[actionKey] = {
             toMode: toModeForAction,
             durationHours: durationForAction,
-            decayTo: decayForAction,
+            durationUnit: durationUnitForAction,
+            decayTo: '',
             announce: announceForAction
           };
         }
@@ -6357,7 +6391,7 @@
           target.hasAttribute('data-trigger-template') ||
           target.hasAttribute('data-transition-duration-action') ||
           target.hasAttribute('data-transition-to-mode-action') ||
-          target.hasAttribute('data-transition-decay-to-action')
+          target.hasAttribute('data-transition-duration-unit-action')
         ) {
           markModesConfigDirty();
           queueModesAutosave(520);
@@ -6380,7 +6414,7 @@
           target.hasAttribute('data-transition-enabled-action') ||
           target.hasAttribute('data-transition-announce-action') ||
           target.hasAttribute('data-transition-to-mode-action') ||
-          target.hasAttribute('data-transition-decay-to-action')
+          target.hasAttribute('data-transition-duration-unit-action')
         ) {
           markModesConfigDirty();
           queueModesAutosave(140);
