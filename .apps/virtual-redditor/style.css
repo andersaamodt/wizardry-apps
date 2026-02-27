@@ -1407,6 +1407,10 @@ label {
   background: color-mix(in srgb, var(--danger) 10%, var(--bg-panel) 90%);
 }
 
+.modes-conflict-banner[hidden] {
+  display: none !important;
+}
+
 .modes-conflict-pill {
   display: inline-flex;
   align-items: center;
