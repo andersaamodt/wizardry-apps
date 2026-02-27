@@ -453,6 +453,16 @@ button,
   overflow: hidden;
 }
 
+.toolbar-bot-chip-slot {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.toolbar-bot-chip-slot .status-chip {
+  max-width: none;
+}
+
 .status-chip.ok {
   border-color: color-mix(in srgb, var(--ok) 45%, var(--line));
   color: var(--ok);

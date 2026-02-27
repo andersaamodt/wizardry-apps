@@ -68,6 +68,7 @@
             </div>
           </div>
           <div class="pane-toolbar-right">
+            <div id="bot-status-chip-slot" class="toolbar-bot-chip-slot"></div>
             <div class="daemon-menu" aria-label="Daemon controls">
               <button id="btn-run-toggle" class="icon-btn run" type="button" aria-label="Start bot" title="Start bot">
                 <span id="run-toggle-icon" aria-hidden="true">▶</span>
@@ -3717,12 +3718,14 @@
 
     function renderStatus() {
       var row = document.getElementById('status-chip-row');
+      var botStatusSlot = document.getElementById('bot-status-chip-slot');
       var runtimeLine = document.getElementById('runtime-line');
       var paths = document.getElementById('paths');
       var s = state.status;
 
       if (!s) {
         row.innerHTML = statusChip('Status unavailable', 'warn');
+        if (botStatusSlot) botStatusSlot.innerHTML = '';
         if (runtimeLine) runtimeLine.textContent = 'No status available yet.';
         if (paths) paths.textContent = 'No paths loaded yet.';
         return;
@@ -3743,22 +3746,24 @@
         ', ' +
         String(repliesCount) + ' ' + (repliesCount === 1 ? 'reply' : 'replies')
       ));
+      var botChip = '';
       var botRunning = isBotRunning(s);
       if (botRunning) {
-        chips.push(statusChip('Bot running', 'ok'));
+        botChip = statusChip('Bot running', 'ok');
       } else if (state.botRunTransition === 'starting') {
-        chips.push(statusChipWithSpinner('Starting...', 'warn'));
+        botChip = statusChipWithSpinner('Starting...', 'warn');
       } else if (state.botRunTransition === 'stopping') {
-        chips.push(statusChipWithSpinner('Stopping...', 'warn'));
+        botChip = statusChipWithSpinner('Stopping...', 'warn');
       } else {
         if (state.hasUserStoppedBot) {
-          chips.push(statusChip('Bot stopped', 'danger'));
+          botChip = statusChip('Bot stopped', 'danger');
         } else {
-          chips.push(statusChip('Bot not running', 'warn'));
+          botChip = statusChip('Bot not running', 'warn');
         }
       }
       var localName = activeProfileLocalName(profilesPayload) || 'Virtual Redditor';
       row.innerHTML = '<span class="status-active-name" title="' + escapeHtml(localName) + '">' + escapeHtml(localName) + '</span>' + chips.join('');
+      if (botStatusSlot) botStatusSlot.innerHTML = botChip;
 
       if (runtimeLine) {
         var skipped = String(runtime.skipped || '');
