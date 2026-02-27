@@ -199,7 +199,7 @@
                   </label>
                   <div id="pass-interval-controls" class="schedule-interval-controls hidden">
                     <span class="schedule-inline">every</span>
-                    <input id="pass-interval-input" type="number" min="1" step="1" value="24" title="How often to run passes in background">
+                    <input id="pass-interval-input" type="number" min="1" step="1" value="1" title="How often to run passes in background">
                     <select id="pass-interval-unit" title="Pass interval units">
                       <option value="minutes">minutes</option>
                       <option value="hours" selected>hours</option>
@@ -765,16 +765,16 @@
       var s = settings || {};
       var minVal = Number(s.patrolIntervalMin || 0);
       var maxVal = Number(s.patrolIntervalMax || 0);
-      if (!Number.isFinite(minVal) || minVal < 1) minVal = 86400;
+      if (!Number.isFinite(minVal) || minVal < 1) minVal = 3600;
       if (!Number.isFinite(maxVal) || maxVal < 1) maxVal = minVal;
       var sec = Math.round((minVal + maxVal) / 2);
-      if (!Number.isFinite(sec) || sec < 1) sec = 86400;
+      if (!Number.isFinite(sec) || sec < 1) sec = 3600;
       return sec;
     }
 
     function intervalUiFromSeconds(seconds) {
       var sec = Number(seconds || 0);
-      if (!Number.isFinite(sec) || sec < 1) sec = 60;
+      if (!Number.isFinite(sec) || sec < 1) sec = 3600;
       if (sec % 3600 === 0) {
         return { value: Math.max(1, Math.round(sec / 3600)), unit: 'hours' };
       }
@@ -2199,8 +2199,8 @@
           mode: 'judicial',
           patrolMode: 'full',
           patrolSampleMax: 20,
-          patrolIntervalMin: 86400,
-          patrolIntervalMax: 86400,
+          patrolIntervalMin: 3600,
+          patrolIntervalMax: 3600,
           threadInitiateMaxPct: 25,
           ollamaModel: 'llama3.1:8b',
           subreddit: 'virtualredditor',
@@ -4528,8 +4528,8 @@
           if (key === 'MODE') state.status.settings.mode = String(value || 'judicial');
           if (key === 'PATROL_MODE') state.status.settings.patrolMode = String(value || 'full');
           if (key === 'PATROL_SAMPLE_MAX') state.status.settings.patrolSampleMax = Number(value || 20) || 20;
-          if (key === 'PATROL_INTERVAL_MIN') state.status.settings.patrolIntervalMin = Number(value || 86400) || 86400;
-          if (key === 'PATROL_INTERVAL_MAX') state.status.settings.patrolIntervalMax = Number(value || 86400) || 86400;
+          if (key === 'PATROL_INTERVAL_MIN') state.status.settings.patrolIntervalMin = Number(value || 3600) || 3600;
+          if (key === 'PATROL_INTERVAL_MAX') state.status.settings.patrolIntervalMax = Number(value || 3600) || 3600;
           if (key === 'THREAD_INITIATE_MAX_PCT') state.status.settings.threadInitiateMaxPct = Number(value || 25);
           if (key === 'OBEY_ADMINS') state.status.settings.obeyAdmins = (String(value || '0') === '1');
           if (key === 'OLLAMA_MODEL') state.status.settings.ollamaModel = String(value || '');
