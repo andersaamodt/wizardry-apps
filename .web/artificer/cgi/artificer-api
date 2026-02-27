@@ -3529,6 +3529,38 @@ normalize_permission_mode_value() {
   esac
 }
 
+normalize_programmer_review_enabled_value() {
+  raw_value=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  case "$raw_value" in
+    ""|1|true|yes|on|enabled)
+      printf '%s' "1"
+      ;;
+    0|false|no|off|disabled)
+      printf '%s' "0"
+      ;;
+    *)
+      printf '%s' "1"
+      ;;
+  esac
+}
+
+normalize_programmer_review_rounds_value() {
+  raw_value=$(trim "$1")
+  default_value=${2:-2}
+  case "$raw_value" in
+    ""|*[!0-9]*)
+      raw_value=$default_value
+      ;;
+  esac
+  if [ "$raw_value" -lt 1 ]; then
+    raw_value=1
+  fi
+  if [ "$raw_value" -gt 4 ]; then
+    raw_value=4
+  fi
+  printf '%s' "$raw_value"
+}
+
 command_text_to_rule_pattern_default() {
   cmd=$1
   first_word=$(printf '%s\n' "$cmd" | awk '{print $1}')
@@ -4382,8 +4414,10 @@ queue_meta_write() {
   compute_budget_value=$4
   command_exec_mode_value=$5
   permission_mode_value=$6
-  explicit_skill_ids_file=$7
-  attachment_ids_file=$8
+  programmer_review_enabled_value=$7
+  programmer_review_rounds_value=$8
+  explicit_skill_ids_file=$9
+  attachment_ids_file=${10}
   temp_meta=$(mktemp)
   : > "$temp_meta"
 
@@ -4411,6 +4445,12 @@ queue_meta_write() {
   if [ -n "$normalized_permission_mode" ]; then
     printf 'permission_mode=%s\n' "$normalized_permission_mode" >> "$temp_meta"
   fi
+
+  normalized_programmer_review_enabled=$(normalize_programmer_review_enabled_value "$programmer_review_enabled_value")
+  printf 'programmer_review=%s\n' "$normalized_programmer_review_enabled" >> "$temp_meta"
+
+  normalized_programmer_review_rounds=$(normalize_programmer_review_rounds_value "$programmer_review_rounds_value" 2)
+  printf 'programmer_review_rounds=%s\n' "$normalized_programmer_review_rounds" >> "$temp_meta"
 
   if [ -f "$explicit_skill_ids_file" ]; then
     while IFS= read -r skill_id; do
@@ -4459,6 +4499,10 @@ queue_meta_attachment_ids_to_file() {
       command_exec_mode=*)
         ;;
       permission_mode=*)
+        ;;
+      programmer_review=*)
+        ;;
+      programmer_review_rounds=*)
         ;;
       explicit_skill=*)
         ;;
@@ -4611,6 +4655,40 @@ queue_meta_permission_mode_from_file() {
   done < "$meta_file"
 }
 
+queue_meta_programmer_review_from_file() {
+  meta_file=$1
+  [ -f "$meta_file" ] || return 0
+  while IFS= read -r meta_line || [ -n "$meta_line" ]; do
+    line_trimmed=$(trim "$meta_line")
+    [ -n "$line_trimmed" ] || continue
+    case "$line_trimmed" in
+      programmer_review=*)
+        value=${line_trimmed#programmer_review=}
+        value=$(normalize_programmer_review_enabled_value "$value")
+        printf '%s' "$value"
+        return 0
+        ;;
+    esac
+  done < "$meta_file"
+}
+
+queue_meta_programmer_review_rounds_from_file() {
+  meta_file=$1
+  [ -f "$meta_file" ] || return 0
+  while IFS= read -r meta_line || [ -n "$meta_line" ]; do
+    line_trimmed=$(trim "$meta_line")
+    [ -n "$line_trimmed" ] || continue
+    case "$line_trimmed" in
+      programmer_review_rounds=*)
+        value=${line_trimmed#programmer_review_rounds=}
+        value=$(normalize_programmer_review_rounds_value "$value" 2)
+        printf '%s' "$value"
+        return 0
+        ;;
+    esac
+  done < "$meta_file"
+}
+
 queue_last_mode_file_for() {
   conv_dir=$1
   queue_dir=$(conversation_queue_dir_for "$conv_dir")
@@ -4639,6 +4717,18 @@ queue_last_permission_mode_file_for() {
   conv_dir=$1
   queue_dir=$(conversation_queue_dir_for "$conv_dir")
   printf '%s/last_permission_mode' "$queue_dir"
+}
+
+queue_last_programmer_review_file_for() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  printf '%s/last_programmer_review' "$queue_dir"
+}
+
+queue_last_programmer_review_rounds_file_for() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  printf '%s/last_programmer_review_rounds' "$queue_dir"
 }
 
 queue_item_id_from_path() {
@@ -12452,6 +12542,8 @@ EOF_WRAPPER
     compute_budget_raw=$(trim "$(param "compute_budget")")
     command_exec_mode_raw=$(trim "$(param "command_exec_mode")")
     permission_mode_raw=$(trim "$(param "permission_mode")")
+    programmer_review_raw=$(trim "$(param "programmer_review")")
+    programmer_review_rounds_raw=$(trim "$(param "programmer_review_rounds")")
     explicit_skill_ids_raw=$(param "explicit_skill_ids")
 
     if ! valid_id "$workspace_id"; then
@@ -12490,6 +12582,8 @@ EOF_WRAPPER
     queue_item_compute_budget=$(normalize_compute_budget "$compute_budget_raw")
     queue_item_command_exec_mode=$(normalize_command_exec_mode_value "$command_exec_mode_raw")
     queue_item_permission_mode=$(normalize_permission_mode_value "$permission_mode_raw")
+    queue_item_programmer_review=$(normalize_programmer_review_enabled_value "$programmer_review_raw")
+    queue_item_programmer_review_rounds=$(normalize_programmer_review_rounds_value "$programmer_review_rounds_raw" 2)
     if [ "$queue_item_mode" != "assistant" ]; then
       queue_item_assistant_mode=""
     fi
@@ -12516,7 +12610,7 @@ EOF_WRAPPER
         printf '%s\n' "$skill_id" >> "$validated_skill_ids_file"
       fi
     done < "$incoming_skill_ids_file"
-    queue_meta_write "$queue_item_meta" "$queue_item_mode" "$queue_item_assistant_mode" "$queue_item_compute_budget" "$queue_item_command_exec_mode" "$queue_item_permission_mode" "$validated_skill_ids_file" "$validated_ids_file"
+    queue_meta_write "$queue_item_meta" "$queue_item_mode" "$queue_item_assistant_mode" "$queue_item_compute_budget" "$queue_item_command_exec_mode" "$queue_item_permission_mode" "$queue_item_programmer_review" "$queue_item_programmer_review_rounds" "$validated_skill_ids_file" "$validated_ids_file"
 
     # Persist user intent at enqueue time so threads are never blank even if queue execution is interrupted.
     user_message_prompt=$prompt_text
@@ -12637,12 +12731,16 @@ EOF
       queued_compute_budget=$(queue_meta_compute_budget_from_file "$queued_meta")
       queued_command_exec_mode=$(queue_meta_command_exec_mode_from_file "$queued_meta")
       queued_permission_mode=$(queue_meta_permission_mode_from_file "$queued_meta")
+      queued_programmer_review=$(queue_meta_programmer_review_from_file "$queued_meta")
+      queued_programmer_review_rounds=$(queue_meta_programmer_review_rounds_from_file "$queued_meta")
 
       queued_mode_json=$(json_escape "$queued_mode")
       queued_assistant_mode_json=$(json_escape "$queued_assistant_mode")
       queued_compute_budget_json=$(json_escape "$queued_compute_budget")
       queued_command_exec_mode_json=$(json_escape "$queued_command_exec_mode")
       queued_permission_mode_json=$(json_escape "$queued_permission_mode")
+      queued_programmer_review_json=$(json_escape "$queued_programmer_review")
+      queued_programmer_review_rounds_json=$(json_escape "$queued_programmer_review_rounds")
 
       queued_skills_file=$(mktemp)
       queue_meta_explicit_skills_to_file "$queued_meta" "$queued_skills_file"
@@ -12652,7 +12750,7 @@ EOF
       if [ "$queue_items_count" -gt 0 ]; then
         queue_items_json="$queue_items_json,"
       fi
-      queue_items_json="$queue_items_json{\"id\":\"$queued_item_id_json\",\"order\":\"$queued_order_json\",\"prompt\":\"$queued_prompt_json\",\"run_mode\":\"$queued_mode_json\",\"assistant_mode_id\":\"$queued_assistant_mode_json\",\"compute_budget\":\"$queued_compute_budget_json\",\"command_exec_mode\":\"$queued_command_exec_mode_json\",\"permission_mode\":\"$queued_permission_mode_json\",\"explicit_skill_ids\":$queued_skills_json}"
+      queue_items_json="$queue_items_json{\"id\":\"$queued_item_id_json\",\"order\":\"$queued_order_json\",\"prompt\":\"$queued_prompt_json\",\"run_mode\":\"$queued_mode_json\",\"assistant_mode_id\":\"$queued_assistant_mode_json\",\"compute_budget\":\"$queued_compute_budget_json\",\"command_exec_mode\":\"$queued_command_exec_mode_json\",\"permission_mode\":\"$queued_permission_mode_json\",\"programmer_review\":\"$queued_programmer_review_json\",\"programmer_review_rounds\":\"$queued_programmer_review_rounds_json\",\"explicit_skill_ids\":$queued_skills_json}"
       queue_items_count=$((queue_items_count + 1))
     done < "$queue_paths_file"
     rm -f "$queue_paths_file"
@@ -13001,14 +13099,18 @@ EOF
     item_compute_budget=$(queue_meta_compute_budget_from_file "$running_meta_file")
     item_command_exec_mode=$(queue_meta_command_exec_mode_from_file "$running_meta_file")
     item_permission_mode=$(queue_meta_permission_mode_from_file "$running_meta_file")
+    item_programmer_review=$(queue_meta_programmer_review_from_file "$running_meta_file")
+    item_programmer_review_rounds=$(queue_meta_programmer_review_rounds_from_file "$running_meta_file")
     item_run_mode_json=$(json_escape "$item_run_mode")
     item_assistant_mode_json=$(json_escape "$item_assistant_mode")
     item_compute_budget_json=$(json_escape "$item_compute_budget")
     item_command_exec_mode_json=$(json_escape "$item_command_exec_mode")
     item_permission_mode_json=$(json_escape "$item_permission_mode")
+    item_programmer_review_json=$(json_escape "$item_programmer_review")
+    item_programmer_review_rounds_json=$(json_escape "$item_programmer_review_rounds")
 
-    printf '{"success":true,"busy":false,"has_item":true,"item":{"id":"%s","prompt":"%s","attachments":%s,"run_mode":"%s","assistant_mode_id":"%s","compute_budget":"%s","command_exec_mode":"%s","permission_mode":"%s","explicit_skill_ids":%s},"queue_pending":%s,"queue_running":1,"queue_done":0,"queue_first_id":"%s","queue_last_status":"running"}\n' \
-      "$item_id_json" "$prompt_json" "$attachments_json" "$item_run_mode_json" "$item_assistant_mode_json" "$item_compute_budget_json" "$item_command_exec_mode_json" "$item_permission_mode_json" "$explicit_skills_json" "$queue_pending" "$queue_first_id_json"
+    printf '{"success":true,"busy":false,"has_item":true,"item":{"id":"%s","prompt":"%s","attachments":%s,"run_mode":"%s","assistant_mode_id":"%s","compute_budget":"%s","command_exec_mode":"%s","permission_mode":"%s","programmer_review":"%s","programmer_review_rounds":"%s","explicit_skill_ids":%s},"queue_pending":%s,"queue_running":1,"queue_done":0,"queue_first_id":"%s","queue_last_status":"running"}\n' \
+      "$item_id_json" "$prompt_json" "$attachments_json" "$item_run_mode_json" "$item_assistant_mode_json" "$item_compute_budget_json" "$item_command_exec_mode_json" "$item_permission_mode_json" "$item_programmer_review_json" "$item_programmer_review_rounds_json" "$explicit_skills_json" "$queue_pending" "$queue_first_id_json"
     exit 0
     ;;
 
@@ -13372,10 +13474,14 @@ EOF
     queue_last_compute_budget_file=$(queue_last_compute_budget_file_for "$conv_dir")
     queue_last_command_exec_mode_file=$(queue_last_command_exec_mode_file_for "$conv_dir")
     queue_last_permission_mode_file=$(queue_last_permission_mode_file_for "$conv_dir")
+    queue_last_programmer_review_file=$(queue_last_programmer_review_file_for "$conv_dir")
+    queue_last_programmer_review_rounds_file=$(queue_last_programmer_review_rounds_file_for "$conv_dir")
     decision_run_mode=$(normalize_run_mode_name "$(read_file_line "$queue_last_mode_file" "auto")")
     decision_compute_budget=$(normalize_compute_budget "$(read_file_line "$queue_last_compute_budget_file" "auto")")
     decision_command_exec_mode=$(normalize_command_exec_mode_value "$(read_file_line "$queue_last_command_exec_mode_file" "ask-some")")
     decision_permission_mode=$(normalize_permission_mode_value "$(read_file_line "$queue_last_permission_mode_file" "default")")
+    decision_programmer_review=$(normalize_programmer_review_enabled_value "$(read_file_line "$queue_last_programmer_review_file" "1")")
+    decision_programmer_review_rounds=$(normalize_programmer_review_rounds_value "$(read_file_line "$queue_last_programmer_review_rounds_file" "2")" 2)
     decision_assistant_mode=""
     if [ "$decision_run_mode" = "assistant" ]; then
       decision_assistant_mode=$(normalize_assistant_mode_id "$(read_file_line "$queue_last_assistant_mode_file" "")")
@@ -13395,7 +13501,7 @@ EOF
     empty_skill_ids=$(mktemp)
     : > "$empty_attachment_ids"
     : > "$empty_skill_ids"
-    queue_meta_write "$queue_item_meta" "$decision_run_mode" "$decision_assistant_mode" "$decision_compute_budget" "$decision_command_exec_mode" "$decision_permission_mode" "$empty_skill_ids" "$empty_attachment_ids"
+    queue_meta_write "$queue_item_meta" "$decision_run_mode" "$decision_assistant_mode" "$decision_compute_budget" "$decision_command_exec_mode" "$decision_permission_mode" "$decision_programmer_review" "$decision_programmer_review_rounds" "$empty_skill_ids" "$empty_attachment_ids"
     rm -f "$empty_attachment_ids" "$empty_skill_ids"
     printf '%s\n' "queued" > "$queue_dir/last_status"
     date +%s > "$queue_dir/last_done"
@@ -15361,6 +15467,8 @@ $fallback_output"
     explicit_skill_ids_raw=$(param "explicit_skill_ids")
     reasoning_effort_raw=$(trim "$(param "reasoning_effort")")
     max_iterations_raw=$(trim "$(param "max_iterations")")
+    programmer_review_raw=$(trim "$(param "programmer_review")")
+    programmer_review_rounds_raw=$(trim "$(param "programmer_review_rounds")")
     stream_session=$(trim "$(param "stream_session")")
     run_event_id_param=$(trim "$(param "run_event_id")")
     run_message_anchor_raw=$(trim "$(param "run_message_anchor")")
@@ -15373,6 +15481,10 @@ $fallback_output"
     append_user_message=1
     command_mode="ask-some"
     permission_mode="default"
+    programmer_review_enabled=1
+    programmer_review_max_rounds=2
+    programmer_review_rounds_completed=0
+    programmer_review_last_signature=""
     allow_workspace_writes=1
     decision_request_json="null"
     forced_queue_status=""
@@ -15415,6 +15527,12 @@ $fallback_output"
         reasoning_effort=$(printf '%s' "$reasoning_effort_raw" | tr '[:upper:]' '[:lower:]')
         ;;
     esac
+    if [ -n "$programmer_review_raw" ]; then
+      programmer_review_enabled=$(normalize_programmer_review_enabled_value "$programmer_review_raw")
+    fi
+    if [ -n "$programmer_review_rounds_raw" ]; then
+      programmer_review_max_rounds=$(normalize_programmer_review_rounds_value "$programmer_review_rounds_raw" 2)
+    fi
     run_mode=$(normalize_run_mode_name "$run_mode_raw")
     assistant_mode_id=$(normalize_assistant_mode_id "$assistant_mode_raw")
     compute_budget=$(normalize_compute_budget "$compute_budget_raw")
@@ -15444,6 +15562,8 @@ $fallback_output"
     queue_compute_budget_override=""
     queue_command_exec_mode_override=""
     queue_permission_mode_override=""
+    queue_programmer_review_override=""
+    queue_programmer_review_rounds_override=""
     queue_explicit_skills_override_file=$(mktemp)
     : > "$queue_explicit_skills_override_file"
     if [ -n "$queue_item_id" ] && valid_id "$queue_item_id"; then
@@ -15458,6 +15578,8 @@ $fallback_output"
         queue_compute_budget_override=$(queue_meta_compute_budget_from_file "$running_meta_for_mode")
         queue_command_exec_mode_override=$(queue_meta_command_exec_mode_from_file "$running_meta_for_mode")
         queue_permission_mode_override=$(queue_meta_permission_mode_from_file "$running_meta_for_mode")
+        queue_programmer_review_override=$(queue_meta_programmer_review_from_file "$running_meta_for_mode")
+        queue_programmer_review_rounds_override=$(queue_meta_programmer_review_rounds_from_file "$running_meta_for_mode")
         queue_meta_explicit_skills_to_file "$running_meta_for_mode" "$queue_explicit_skills_override_file"
       fi
       if [ -n "$queue_mode_override" ]; then
@@ -15469,9 +15591,22 @@ $fallback_output"
       if [ -n "$queue_compute_budget_override" ]; then
         compute_budget=$queue_compute_budget_override
       fi
+      if [ -n "$queue_programmer_review_override" ]; then
+        programmer_review_enabled=$(normalize_programmer_review_enabled_value "$queue_programmer_review_override")
+      fi
+      if [ -n "$queue_programmer_review_rounds_override" ]; then
+        programmer_review_max_rounds=$(normalize_programmer_review_rounds_value "$queue_programmer_review_rounds_override" 2)
+      fi
     fi
     if [ "$run_mode" != "assistant" ]; then
       assistant_mode_id=""
+    fi
+    if [ "$run_mode" != "programming" ]; then
+      programmer_review_enabled=0
+      programmer_review_max_rounds=0
+    fi
+    if [ "$programmer_review_enabled" -ne 1 ]; then
+      programmer_review_max_rounds=0
     fi
 
     request_explicit_skills_file=$(mktemp)
@@ -16072,13 +16207,19 @@ EOF
     queue_last_compute_budget_file=$(queue_last_compute_budget_file_for "$conv_dir")
     queue_last_command_exec_mode_file=$(queue_last_command_exec_mode_file_for "$conv_dir")
     queue_last_permission_mode_file=$(queue_last_permission_mode_file_for "$conv_dir")
+    queue_last_programmer_review_file=$(queue_last_programmer_review_file_for "$conv_dir")
+    queue_last_programmer_review_rounds_file=$(queue_last_programmer_review_rounds_file_for "$conv_dir")
     printf '%s\n' "$run_mode" > "$queue_last_mode_file"
     printf '%s\n' "$assistant_mode_id" > "$queue_last_assistant_mode_file"
     printf '%s\n' "$compute_budget" > "$queue_last_compute_budget_file"
     printf '%s\n' "$command_mode" > "$queue_last_command_exec_mode_file"
     printf '%s\n' "$permission_mode" > "$queue_last_permission_mode_file"
+    printf '%s\n' "$programmer_review_enabled" > "$queue_last_programmer_review_file"
+    printf '%s\n' "$programmer_review_max_rounds" > "$queue_last_programmer_review_rounds_file"
     if [ -n "$assistant_mode_id" ]; then
       stream_emit_line "$stream_output_file" "Run mode: $run_mode (assistant_mode=$assistant_mode_id, advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations)"
+    elif [ "$run_mode" = "programming" ]; then
+      stream_emit_line "$stream_output_file" "Run mode: $run_mode (advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations, code_review=${programmer_review_enabled}, review_rounds=${programmer_review_max_rounds})"
     else
       stream_emit_line "$stream_output_file" "Run mode: $run_mode (advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations)"
     fi
@@ -17264,6 +17405,109 @@ $command_output"
                     fi
                     if [ -n "$candidate_final" ] && [ "$candidate_final" != "NONE" ]; then
                       assistant_output="$candidate_final"
+                    fi
+                  fi
+
+                  if [ "$run_mode" = "programming" ] && [ "$programmer_review_enabled" -eq 1 ] && [ "$programmer_review_rounds_completed" -lt "$programmer_review_max_rounds" ]; then
+                    review_round=$((programmer_review_rounds_completed + 1))
+                    stream_emit_line "$stream_output_file" "Code review round $review_round/$programmer_review_max_rounds started."
+                    review_diff=$(cd "$workspace_path" && git --no-pager diff --no-color 2>/dev/null | sed -n '1,320p')
+                    [ -n "$(trim "$review_diff")" ] || review_diff="No working tree diff available."
+                    review_loop_summary=$(printf '%s\n' "$loop_summary" | sed -n '1,120p')
+                    [ -n "$(trim "$review_loop_summary")" ] || review_loop_summary="(none yet)"
+                    review_prev_feedback="$programmer_review_last_feedback"
+                    [ -n "$(trim "$review_prev_feedback")" ] || review_prev_feedback="NONE"
+                    review_prompt=$(cat <<EOF
+You are Code Reviewer mode for a programming assistant.
+Judge whether another implementation pass is needed.
+
+Return ONLY these sections:
+REVIEW_DECISION:
+apply | done
+
+REVIEW_FEEDBACK:
+- concise actionable findings if REVIEW_DECISION is apply
+- otherwise "No actionable findings."
+
+Rules:
+- choose apply only for concrete, implementable issues that materially improve correctness, safety, reliability, or maintainability.
+- if findings are only style nits, vague, or already addressed, choose done.
+- avoid repeating unchanged feedback from previous rounds.
+- do not include shell commands or patches here; provide reviewer feedback only.
+
+User request:
+$augmented_user_prompt
+
+Current plan:
+$plan_text
+
+Loop summary:
+$review_loop_summary
+
+Current git diff:
+$review_diff
+
+Previous reviewer feedback:
+$review_prev_feedback
+EOF
+)
+                    if [ -n "$stream_output_file" ]; then
+                      ARTIFICER_STREAM_FILE="$stream_output_file"
+                      export ARTIFICER_STREAM_FILE
+                    fi
+                    review_timeout_sec=$(model_timeout_for_run "$run_started_epoch" "$run_time_budget" 22 8 5)
+                    RUN_TIMEOUT_SEC=$review_timeout_sec
+                    review_output=$(run_model "$model" "$review_prompt" || true)
+                    unset RUN_TIMEOUT_SEC 2>/dev/null || true
+                    unset ARTIFICER_STREAM_FILE 2>/dev/null || true
+                    review_output=$(strip_terminal_noise "$review_output")
+                    review_output=$(canonicalize_controller_output "$review_output")
+                    review_decision=$(extract_section "REVIEW_DECISION" "$review_output" | sed -n '1p' | tr '[:upper:]' '[:lower:]' | awk '{print $1}')
+                    review_feedback=$(extract_section "REVIEW_FEEDBACK" "$review_output")
+                    review_feedback=$(trim "$review_feedback")
+                    if [ -z "$review_feedback" ] || [ "$review_feedback" = "NONE" ]; then
+                      review_feedback="No actionable findings."
+                    fi
+                    if [ "$review_decision" != "apply" ] && [ "$review_decision" != "done" ]; then
+                      case "$(printf '%s' "$review_feedback" | tr '[:upper:]' '[:lower:]')" in
+                        *no\ actionable*|*no\ material*|*looks\ good*|*clean*)
+                          review_decision="done"
+                          ;;
+                        *)
+                          review_decision="apply"
+                          ;;
+                      esac
+                    fi
+                    review_signature=$(printf '%s' "$review_feedback" | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:]]\+/ /g;s/^ //;s/ $//' | cksum | awk '{print $1}')
+                    review_repeat=0
+                    if [ -n "$programmer_review_last_signature" ] && [ "$review_signature" = "$programmer_review_last_signature" ]; then
+                      review_repeat=1
+                    fi
+                    if [ "$review_decision" = "apply" ] && [ "$review_repeat" -eq 0 ]; then
+                      programmer_review_rounds_completed=$review_round
+                      programmer_review_last_signature=$review_signature
+                      programmer_review_last_feedback=$review_feedback
+                      next_mode="IMPLEMENT"
+                      transition_reason_runtime="code reviewer requested follow-up"
+                      state_set "$state_file" "blocking" "code review follow-up"
+                      iteration_report="${iteration_report}
+Code Review Round $review_round/$programmer_review_max_rounds:
+$review_feedback
+Action: returning to IMPLEMENT to address reviewer findings."
+                      loop_feedback="Code reviewer feedback (round $review_round/$programmer_review_max_rounds):
+$review_feedback"
+                      assistant_output=""
+                      stream_emit_line "$stream_output_file" "Code review round $review_round found actionable feedback; switching to IMPLEMENT."
+                    else
+                      if [ "$review_decision" = "apply" ] && [ "$review_repeat" -eq 1 ]; then
+                        stream_emit_line "$stream_output_file" "Code review repeated prior feedback; stopping further review rounds."
+                        review_feedback="$review_feedback (repeat detected)"
+                      else
+                        stream_emit_line "$stream_output_file" "Code review round $review_round found no actionable issues."
+                      fi
+                      iteration_report="${iteration_report}
+Code Review Round $review_round/$programmer_review_max_rounds:
+$review_feedback"
                     fi
                   fi
                 else
