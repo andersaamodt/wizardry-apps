@@ -5917,6 +5917,73 @@ dictation_live_level_for_session() {
   '
 }
 
+dictation_live_levels_json_for_session() {
+  levels_file=$(dictation_live_session_value "levels_file")
+  if [ -z "$levels_file" ] || [ ! -f "$levels_file" ]; then
+    printf '%s' "[]"
+    return 0
+  fi
+
+  # Emit recent RMS-derived levels so the UI can draw per-bar history without a rolling-average look.
+  recent_levels=$(tail -n 960 "$levels_file" 2>/dev/null | tr -d '\r' || true)
+  rms_lines=$(printf '%s\n' "$recent_levels" | grep -E -i 'RMS_level' || true)
+  if [ -z "$rms_lines" ]; then
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -E -i 'Peak_level' || true)
+  fi
+  if [ -z "$rms_lines" ]; then
+    printf '%s' "[]"
+    return 0
+  fi
+
+  levels_json=$(printf '%s\n' "$rms_lines" | awk '
+    function to_level(raw,   v, level) {
+      if (raw ~ /inf/i) {
+        return ""
+      }
+      v = raw + 0.0
+      if (v < -74) v = -74
+      if (v > -8) v = -8
+      level = (v + 74) / 66
+      level = level * level
+      if (level < 0) level = 0
+      if (level > 1) level = 1
+      return sprintf("%.5f", level)
+    }
+    {
+      line = $0
+      raw = ""
+      if (match(line, /(RMS_level|Peak_level)[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?)/, m)) {
+        raw = m[2]
+      }
+      mapped = to_level(raw)
+      if (mapped != "") {
+        vals[count] = mapped
+        count += 1
+      }
+    }
+    END {
+      start = count - 14
+      if (start < 0) {
+        start = 0
+      }
+      printf "["
+      out = 0
+      for (i = start; i < count; i += 1) {
+        if (out > 0) {
+          printf ","
+        }
+        printf "%s", vals[i]
+        out += 1
+      }
+      printf "]"
+    }
+  ')
+  if [ -z "$levels_json" ]; then
+    levels_json="[]"
+  fi
+  printf '%s' "$levels_json"
+}
+
 stop_capture_pid_gracefully() {
   capture_pid=$1
   case "$capture_pid" in
@@ -14427,18 +14494,21 @@ EOF
   dictate_levels)
     requested_session_id=$(trim "$(param "session_id")")
     if ! dictation_live_has_active_capture; then
-      printf '{"success":true,"level":"0"}\n'
+      printf '{"success":true,"level":"0","levels":[]}\n'
       exit 0
     fi
     session_id=$(dictation_live_session_value "id")
     if [ -n "$requested_session_id" ] && [ "$requested_session_id" != "$session_id" ]; then
-      printf '{"success":true,"level":"0"}\n'
+      printf '{"success":true,"level":"0","levels":[]}\n'
       exit 0
     fi
     level=$(dictation_live_level_for_session)
-    printf '{"success":true,"level":"%s","session_id":"%s"}\n' \
+    levels_json=$(dictation_live_levels_json_for_session)
+    [ -n "$levels_json" ] || levels_json="[]"
+    printf '{"success":true,"level":"%s","session_id":"%s","levels":%s}\n' \
       "$(json_escape "$level")" \
-      "$(json_escape "$session_id")"
+      "$(json_escape "$session_id")" \
+      "$levels_json"
     exit 0
     ;;
 

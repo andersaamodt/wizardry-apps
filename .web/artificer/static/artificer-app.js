@@ -765,6 +765,7 @@
   var dictationWaveMicLevelAt = 0;
   var dictationWaveBackendLevel = 0;
   var dictationWaveBackendLevelAt = 0;
+  var dictationWaveBackendRecentLevels = [];
   var dictationWaveBackendFloor = 0.02;
   var dictationWaveSeenSignal = false;
   var dictationWaveNoiseFloor = 0.02;
@@ -6868,6 +6869,7 @@
     dictationWaveMicLevelAt = 0;
     dictationWaveBackendLevel = 0;
     dictationWaveBackendLevelAt = 0;
+    dictationWaveBackendRecentLevels = [];
     dictationWaveBackendFloor = 0.02;
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
@@ -6975,21 +6977,21 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.02;
     }
-    var gate = floor + 0.011;
+    var gate = floor + 0.008;
     var signal = raw - gate;
     if (signal < 0) {
       signal = 0;
     }
-    var normalized = signal / Math.max(0.055, 0.92 - gate);
+    var normalized = (signal * 1.45) / Math.max(0.04, 0.78 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.58);
+      normalized = Math.pow(normalized, 0.52);
     }
-    if (normalized < 0.03) {
+    if (normalized < 0.02) {
       normalized = 0;
     }
     return normalized;
@@ -7017,17 +7019,17 @@
       floor = 0.25;
     }
     dictationWaveBackendFloor = floor;
-    var gate = floor + 0.02;
-    var normalized = (raw - gate) / Math.max(0.08, 1 - gate);
+    var gate = floor + 0.014;
+    var normalized = ((raw - gate) * 1.6) / Math.max(0.05, 0.74 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.7);
+      normalized = Math.pow(normalized, 0.6);
     }
-    if (normalized < 0.035) {
+    if (normalized < 0.02) {
       normalized = 0;
     }
     return normalized;
@@ -7091,9 +7093,9 @@
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
         var len = dictationWaveData.length;
-        var barsPerFrame = 4;
-        var windowSamples = Math.min(640, len);
-        var sliceSamples = Math.max(24, Math.floor(windowSamples / barsPerFrame));
+        var barsPerFrame = 5;
+        var windowSamples = Math.min(240, len);
+        var sliceSamples = Math.max(10, Math.floor(windowSamples / barsPerFrame));
         var consumed = sliceSamples * barsPerFrame;
         var baseStart = Math.max(0, len - consumed);
         var rawHistory = [];
@@ -7117,7 +7119,7 @@
           }
           var rms = count > 0 ? Math.sqrt(sum / count) : 0;
           var crest = peak > rms ? (peak - rms) : 0;
-          var rawLevel = (rms * 3.0) + (peak * 1.2) + (crest * 0.4);
+          var rawLevel = (rms * 2.4) + (peak * 2.8) + (crest * 1.4);
           rawHistory.push(rawLevel);
         }
         var floorProbe = 0;
@@ -7167,15 +7169,60 @@
             polledLevel = 1;
           }
           var normalizedBackend = normalizedDictationBackendLevel(polledLevel);
+          var incomingLevels = Array.isArray(response.levels) ? response.levels : [];
+          var parsedIncoming = [];
+          for (var li = 0; li < incomingLevels.length; li += 1) {
+            var seqLevel = Number(incomingLevels[li]);
+            if (!isFinite(seqLevel) || seqLevel < 0) {
+              continue;
+            }
+            if (seqLevel > 1) {
+              seqLevel = 1;
+            }
+            parsedIncoming.push(seqLevel);
+          }
+          var normalizedSequence = [];
+          if (parsedIncoming.length) {
+            var prevSeq = Array.isArray(dictationWaveBackendRecentLevels) ? dictationWaveBackendRecentLevels : [];
+            var overlap = 0;
+            var maxOverlap = prevSeq.length < parsedIncoming.length ? prevSeq.length : parsedIncoming.length;
+            for (var oi = maxOverlap; oi > 0; oi -= 1) {
+              var matched = true;
+              for (var oj = 0; oj < oi; oj += 1) {
+                var prevValue = Number(prevSeq[prevSeq.length - oi + oj] || 0);
+                var nextValue = Number(parsedIncoming[oj] || 0);
+                if (Math.abs(prevValue - nextValue) > 0.00001) {
+                  matched = false;
+                  break;
+                }
+              }
+              if (matched) {
+                overlap = oi;
+                break;
+              }
+            }
+            var appended = parsedIncoming.slice(overlap);
+            for (var ni = 0; ni < appended.length; ni += 1) {
+              normalizedSequence.push(normalizedDictationBackendLevel(appended[ni]));
+            }
+            dictationWaveBackendRecentLevels = parsedIncoming.slice(parsedIncoming.length - 18);
+          }
+          if (normalizedSequence.length) {
+            normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
+          }
           dictationWaveBackendLevel = normalizedBackend;
           dictationWaveBackendLevelAt = Date.now();
           if (!dictationWaveAnalyser || !dictationWaveData) {
-            applyDictationWaveHistoryLevels([mergedDictationWaveLevel(normalizedBackend)]);
+            if (normalizedSequence.length) {
+              applyDictationWaveHistoryLevels(normalizedSequence);
+            } else {
+              applyDictationWaveHistoryLevels([mergedDictationWaveLevel(normalizedBackend)]);
+            }
           }
         }).catch(function () {
           return null;
         });
-      }, 70);
+      }, 38);
     }
 
     if (dictationWaveStream && dictationWaveAnalyser && dictationWaveData) {
