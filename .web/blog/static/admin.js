@@ -1536,11 +1536,15 @@
     if (els.usersList) {
       els.usersList.addEventListener('click', function (event) {
         const target = event.target;
-        if (!(target instanceof HTMLElement)) {
+        if (!(target instanceof Element)) {
           return;
         }
-        const action = target.getAttribute('data-user-action');
-        const username = target.getAttribute('data-username');
+        const actionNode = target.closest('[data-user-action][data-username]');
+        if (!(actionNode instanceof HTMLElement)) {
+          return;
+        }
+        const action = actionNode.getAttribute('data-user-action');
+        const username = actionNode.getAttribute('data-username');
         if (!action || !username) {
           return;
         }
