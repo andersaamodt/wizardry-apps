@@ -1263,6 +1263,8 @@
       logsAvailable: false,
       repliesPrimed: false,
       actionsPrimed: false,
+      pendingProfileDeleteIds: [],
+      profilesRefreshSeq: 0,
       normRows: [],
       normPendingEmptyRow: false,
       doctrineCacheByProfile: {},
@@ -3720,6 +3722,9 @@
       }
       var previousProfiles = Array.isArray(state.profiles) ? state.profiles.slice() : [];
       var previousActive = String(state.activeProfile || '');
+      var pendingDeletes = Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds.slice() : [];
+      if (pendingDeletes.indexOf(profileId) < 0) pendingDeletes.push(profileId);
+      state.pendingProfileDeleteIds = pendingDeletes;
       state.profiles = previousProfiles.filter(function (p) {
         return String((p || {}).id || '') !== String(profileId);
       });
@@ -3733,8 +3738,14 @@
       backendJson('delete-profile', [String(profileId)]).then(function () {
         return fullRefresh();
       }).then(function () {
+        state.pendingProfileDeleteIds = (Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : []).filter(function (id) {
+          return String(id || '') !== String(profileId);
+        });
         return refreshDoctrine(true);
       }).catch(function (error) {
+        state.pendingProfileDeleteIds = (Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : []).filter(function (id) {
+          return String(id || '') !== String(profileId);
+        });
         state.profiles = previousProfiles;
         state.activeProfile = previousActive;
         renderProfiles();
@@ -6138,10 +6149,25 @@
     }
 
     async function refreshProfiles() {
+      var reqSeq = (Number(state.profilesRefreshSeq) || 0) + 1;
+      state.profilesRefreshSeq = reqSeq;
       var out = await backendJson('list-profiles', []);
+      if (reqSeq !== state.profilesRefreshSeq) return;
       var payload = out && out.profiles ? out : { profiles: [] };
-      state.profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
-      state.activeProfile = String(payload.activeProfile || state.activeProfile || '');
+      var profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
+      var pendingDeleteIds = Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : [];
+      if (pendingDeleteIds.length) {
+        profiles = profiles.filter(function (p) {
+          var id = String(((p || {}).id) || '');
+          return pendingDeleteIds.indexOf(id) < 0;
+        });
+      }
+      state.profiles = profiles;
+      var nextActive = String(payload.activeProfile || state.activeProfile || '');
+      if (nextActive && profiles.every(function (p) { return String(((p || {}).id) || '') !== nextActive; })) {
+        nextActive = String(((profiles[0] || {}).id) || '');
+      }
+      state.activeProfile = nextActive;
       saveProfilesCache();
       renderProfiles();
       updateToolbarButtonStates();
