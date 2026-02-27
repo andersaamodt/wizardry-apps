@@ -5212,7 +5212,7 @@ decision_question_looks_required_input() {
 
 decision_question_looks_risk_gate() {
   question_lower=$(lowercase_text "$1")
-  if printf '%s' "$question_lower" | grep -Eq 'approve|permission|proceed|continue|authorize|external|network|production|publish|deploy|delete|drop|migrate|irreversible'; then
+  if printf '%s' "$question_lower" | grep -Eq 'approve|permission|authorize|external|network|production|publish|deploy|delete|drop|migrate|irreversible|destructive|force'; then
     return 0
   fi
   return 1
