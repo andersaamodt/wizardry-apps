@@ -6596,6 +6596,53 @@
     renderDictationWaveBars();
   }
 
+  function applyDictationWaveHistoryLevels(levelsInput) {
+    var barCount = dictationWaveTargetBarCount();
+    var existing = syncDictationWaveLevelsLength(barCount).slice();
+    var incoming = Array.isArray(levelsInput) ? levelsInput : [];
+    var pushed = [];
+    for (var i = 0; i < incoming.length; i += 1) {
+      var level = Number(incoming[i] || 0);
+      if (!isFinite(level) || level < 0) {
+        level = 0;
+      } else if (level > 1) {
+        level = 1;
+      }
+      if (level < 0.04) {
+        level = 0;
+      }
+      pushed.push(level);
+    }
+    if (!pushed.length) {
+      return;
+    }
+    var framePeak = 0;
+    for (var pi = 0; pi < pushed.length; pi += 1) {
+      if (pushed[pi] > framePeak) {
+        framePeak = pushed[pi];
+      }
+    }
+    if (!dictationWaveSeenSignal && framePeak >= 0.03) {
+      dictationWaveSeenSignal = true;
+    }
+    dictationWaveMicLevel = framePeak;
+    dictationWaveMicLevelAt = Date.now();
+    var shift = pushed.length;
+    if (shift > barCount) {
+      pushed = pushed.slice(shift - barCount);
+      shift = pushed.length;
+    }
+    var out = existing.slice(shift);
+    for (var ai = 0; ai < pushed.length; ai += 1) {
+      out.push(pushed[ai]);
+    }
+    while (out.length < barCount) {
+      out.unshift(0);
+    }
+    state.dictateWaveLevels = out;
+    renderDictationWaveBars();
+  }
+
   function mergedDictationWaveLevel(candidateLevel) {
     var merged = Number(candidateLevel || 0);
     if (!isFinite(merged) || merged < 0) {
@@ -6654,11 +6701,17 @@
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
         var barCount = dictationWaveTargetBarCount();
+        var samplesPerFrame = 3;
+        if (barCount < 56) {
+          samplesPerFrame = 2;
+        } else if (barCount > 120) {
+          samplesPerFrame = 4;
+        }
         var frameLevels = [];
         var maxBins = dictationWaveData.length;
-        for (var bi = 0; bi < barCount; bi += 1) {
-          var from = Math.floor((bi * maxBins) / barCount);
-          var to = Math.floor(((bi + 1) * maxBins) / barCount);
+        for (var bi = 0; bi < samplesPerFrame; bi += 1) {
+          var from = Math.floor((bi * maxBins) / samplesPerFrame);
+          var to = Math.floor(((bi + 1) * maxBins) / samplesPerFrame);
           if (to <= from) {
             to = from + 1;
           }
@@ -6685,9 +6738,15 @@
           }
         }
 
-        var probe = frameLevels.slice().sort(function (a, b) { return a - b; });
-        var probeIndex = Math.max(0, Math.min(probe.length - 1, Math.floor(probe.length * 0.15)));
-        var floorProbe = Number(probe[probeIndex] || 0);
+        var floorProbe = 0;
+        if (frameLevels.length) {
+          floorProbe = frameLevels[0];
+          for (var fp = 1; fp < frameLevels.length; fp += 1) {
+            if (frameLevels[fp] < floorProbe) {
+              floorProbe = frameLevels[fp];
+            }
+          }
+        }
         if (!isFinite(floorProbe) || floorProbe < 0) {
           floorProbe = 0;
         }
@@ -6696,9 +6755,9 @@
           floor = 0.01;
         }
         if (floorProbe < floor) {
-          floor = (floor * 0.58) + (floorProbe * 0.42);
+          floor = (floor * 0.52) + (floorProbe * 0.48);
         } else {
-          floor = (floor * 0.995) + (floorProbe * 0.005);
+          floor = (floor * 0.997) + (floorProbe * 0.003);
         }
         if (floor < 0.0015) {
           floor = 0.0015;
@@ -6707,7 +6766,7 @@
         }
         dictationWaveNoiseFloor = floor;
 
-        var gate = floor + 0.012;
+        var gate = floor + 0.016;
         var normalizedBars = [];
         for (var ni = 0; ni < frameLevels.length; ni += 1) {
           var normalized = (frameLevels[ni] - gate) / Math.max(0.08, 1 - gate);
@@ -6717,14 +6776,14 @@
             normalized = 1;
           }
           if (normalized > 0) {
-            normalized = Math.pow(normalized, 0.86);
+            normalized = Math.pow(normalized, 0.8);
           }
           if (normalized < 0.03) {
             normalized = 0;
           }
           normalizedBars.push(normalized);
         }
-        applyDictationWaveFrameLevels(normalizedBars);
+        applyDictationWaveHistoryLevels(normalizedBars);
         dictationWaveRafId = requestAnimationFrame(sample);
       };
       dictationWaveRafId = requestAnimationFrame(sample);
