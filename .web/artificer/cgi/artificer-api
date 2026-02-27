@@ -16648,6 +16648,11 @@ EOF
         force_agent_execution=1
         ;;
     esac
+    if [ "$assay_run_profile" -eq 1 ]; then
+      # Assay runs must exercise the full loop for comparable intelligence/flow scoring.
+      quick_mode=0
+      force_agent_execution=1
+    fi
     if [ -n "$inline_mode_tag" ]; then
       stream_emit_line "$stream_output_file" "Inline mode directive detected: $inline_mode_tag -> $run_mode"
     fi
