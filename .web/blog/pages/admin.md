@@ -28,12 +28,12 @@ title: Blog Admin
 <section class="sub-card">
 <h4>General</h4>
 <div class="field-row">
-<label for="site-title"><strong>Site Title</strong></label>
-<input type="text" id="site-title" placeholder="My Blog">
+<label for="site-title" title="Public title shown in your blog header and feeds."><strong title="Public title shown in your blog header and feeds.">Site Title</strong></label>
+<input type="text" id="site-title" placeholder="My Blog" title="Public title shown in your blog header and feeds.">
 </div>
 <div class="field-row">
-<label for="admin-theme"><strong>Theme</strong></label>
-<select id="admin-theme">
+<label for="admin-theme" title="Visual theme for your public site and admin interface accents."><strong title="Visual theme for your public site and admin interface accents.">Theme</strong></label>
+<select id="admin-theme" title="Visual theme for your public site and admin interface accents.">
 <option value="adept">Adept</option>
 <option value="alchemist">Alchemist</option>
 <option value="archmage">Archmage</option>
@@ -63,13 +63,13 @@ title: Blog Admin
 </select>
 </div>
 <div class="field-row checkbox-row">
-<div class="setting-label">
-<strong>Enable User Registration</strong>
+<div class="setting-label" title="Allow new users to register with a Nostr key. Disable for single-author blogs.">
+<strong title="Allow new users to register with a Nostr key. Disable for single-author blogs.">Enable User Registration</strong>
 <span class="inline-tip" tabindex="0" aria-label="Allow new users to create accounts by signing in with a Nostr key.">?</span>
 </div>
-<label class="checkbox-control" for="registration-enabled">
-<input type="checkbox" id="registration-enabled">
-<span>Enabled</span>
+<label class="checkbox-control" for="registration-enabled" title="Allow new users to register with a Nostr key. Disable for single-author blogs.">
+<input type="checkbox" id="registration-enabled" title="Allow new users to register with a Nostr key. Disable for single-author blogs.">
+<span title="Allow new users to register with a Nostr key. Disable for single-author blogs.">Enabled</span>
 </label>
 </div>
 </section>
@@ -78,17 +78,17 @@ title: Blog Admin
 <h4>Feeds</h4>
 <div class="grid-two">
 <div class="field-row checkbox-row">
-<div class="setting-label">
-<strong>Full Text RSS/Atom</strong>
+<div class="setting-label" title="RSS and Atom feeds are always on. This only controls full text versus a shorter/truncated item in each feed entry.">
+<strong title="RSS and Atom feeds are always on. This only controls full text versus a shorter/truncated item in each feed entry.">Full Text RSS/Atom</strong>
 </div>
-<label class="checkbox-control" for="feed-full-text">
-<input type="checkbox" id="feed-full-text" checked>
-<span>Enabled</span>
+<label class="checkbox-control" for="feed-full-text" title="RSS and Atom feeds are always on. This only controls full text versus a shorter/truncated item in each feed entry.">
+<input type="checkbox" id="feed-full-text" checked title="RSS and Atom feeds are always on. This only controls full text versus a shorter/truncated item in each feed entry.">
+<span title="RSS and Atom feeds are always on. This only controls full text versus a shorter/truncated item in each feed entry.">Enabled</span>
 </label>
 </div>
 <div class="field-row">
-<label for="feed-items"><strong>Feed Item Count</strong></label>
-<input type="number" id="feed-items" min="1" step="1" value="50">
+<label for="feed-items" title="Maximum number of recent posts included in RSS and Atom feeds."><strong title="Maximum number of recent posts included in RSS and Atom feeds.">Feed Item Count</strong></label>
+<input type="number" id="feed-items" min="1" step="1" value="50" title="Maximum number of recent posts included in RSS and Atom feeds.">
 </div>
 </div>
 </section>
@@ -96,13 +96,13 @@ title: Blog Admin
 <section class="sub-card">
 <h4>Nostr Bridge</h4>
 <div class="field-row checkbox-row">
-<div class="setting-label">
-<strong>Enable Nostr Bridge</strong>
+<div class="setting-label" title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">
+<strong title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">Enable Nostr Bridge</strong>
 <span class="inline-tip" tabindex="0" aria-label="When enabled, published posts are signed as Nostr events and local render indexes are derived from mirrored events.">?</span>
 </div>
-<label class="checkbox-control" for="nostr-bridge-enabled">
-<input type="checkbox" id="nostr-bridge-enabled">
-<span>Enabled</span>
+<label class="checkbox-control" for="nostr-bridge-enabled" title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">
+<input type="checkbox" id="nostr-bridge-enabled" title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">
+<span title="Enable local Nostr mirroring and signed Nostr event publishing for posts/comments.">Enabled</span>
 </label>
 </div>
 <p class="muted">Configure authors, relays, and blocklist in <code>site/nostr/state/</code>. Bridge actions are explicit and never run during page render.</p>
@@ -111,13 +111,13 @@ title: Blog Admin
 <section class="sub-card">
 <h4>Access Bootstrap</h4>
 <div class="field-row checkbox-row">
-<div class="setting-label">
-<strong>Newly Created Accounts Are Admins</strong>
+<div class="setting-label" title="When enabled, newly registered accounts are granted admin rights automatically.">
+<strong title="When enabled, newly registered accounts are granted admin rights automatically.">Newly Created Accounts Are Admins</strong>
 <span class="inline-tip" tabindex="0" aria-label="When enabled, newly registered Nostr accounts are granted admin automatically. Turn this off after bootstrapping your initial admin team.">?</span>
 </div>
-<label class="checkbox-control" for="new-users-are-admins">
-<input type="checkbox" id="new-users-are-admins">
-<span>Enabled</span>
+<label class="checkbox-control" for="new-users-are-admins" title="When enabled, newly registered accounts are granted admin rights automatically.">
+<input type="checkbox" id="new-users-are-admins" title="When enabled, newly registered accounts are granted admin rights automatically.">
+<span title="When enabled, newly registered accounts are granted admin rights automatically.">Enabled</span>
 </label>
 </div>
 </section>
@@ -306,12 +306,12 @@ title: Blog Admin
 </div>
 <div class="grid-two settings-inline queue-drip-settings">
 <div class="field-row">
-<label for="drip-interval"><strong>Drip Interval (hours)</strong></label>
-<input type="number" id="drip-interval" min="0.1" step="0.1" value="4">
+<label for="drip-interval" title="How often queued drip posts are published."><strong title="How often queued drip posts are published.">Drip Interval (hours)</strong></label>
+<input type="number" id="drip-interval" min="0.1" step="0.1" value="4" title="How often queued drip posts are published.">
 </div>
 <div class="field-row">
-<label for="drip-randomness"><strong>Drip Randomness (minutes)</strong></label>
-<input type="number" id="drip-randomness" min="0" step="1" value="0">
+<label for="drip-randomness" title="Adds up to this many random minutes to each drip cycle time."><strong title="Adds up to this many random minutes to each drip cycle time.">Drip Randomness (minutes)</strong></label>
+<input type="number" id="drip-randomness" min="0" step="1" value="0" title="Adds up to this many random minutes to each drip cycle time.">
 </div>
 </div>
 <div id="queue-list"></div>
