@@ -4249,7 +4249,7 @@
             enabled: true,
             defaultExpiryHours: 0,
             allow: allowMap(['Reply to Comments', 'Reply to Posts', 'Initiate', 'Mention', 'Followup', 'Cross-thread Reply']),
-            constraints: { maxRepliesPerUserThread24h: 4, canFollowup: true, canMention: true, canQuote: false }
+            constraints: { maxRepliesPerUserThread24h: 6, canFollowup: true, canMention: true, canQuote: false }
           },
           {
             id: 'TEACH',
@@ -4341,7 +4341,7 @@
         delete next.allow.Reply;
         delete next.allow['Post Neutral Ban Notice'];
         next.constraints = Object.assign({
-          maxRepliesPerUserThread24h: 4,
+          maxRepliesPerUserThread24h: 6,
           canFollowup: true,
           canMention: true,
           canQuote: true
@@ -5123,7 +5123,7 @@
         '<div class="mode-drawer-block">',
         '  <div class="mode-drawer-section-title">Constraints</div>',
         '  <div class="mode-constraints-grid mode-drawer-constraints">',
-        '    <label class="mini-input" title="Limit replies to the same user in the same thread over 24 hours">Max replies/user/thread per 24h<input type="number" min="0" step="1" data-mode-drawer-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 4 : constraints.maxRepliesPerUserThread24h))) + '" title="Limit replies to the same user in the same thread over 24 hours"></label>',
+        '    <label class="mini-input" title="Limit replies to the same user in the same thread over 24 hours">Max replies/user/thread per 24h<input type="number" min="0" step="1" data-mode-drawer-constraint="maxRepliesPerUserThread24h" value="' + escapeHtml(String((constraints.maxRepliesPerUserThread24h == null ? 6 : constraints.maxRepliesPerUserThread24h))) + '" title="Limit replies to the same user in the same thread over 24 hours"></label>',
         '    <label class="mini-toggle" title="Allow additional replies to the same user in this mode"><input type="checkbox" data-mode-drawer-constraint="canFollowup" ' + (constraints.canFollowup !== false ? 'checked' : '') + '><span>Can follow up</span></label>',
         '    <label class="mini-toggle" title="Allow mentioning users in this mode"><input type="checkbox" data-mode-drawer-constraint="canMention" ' + (constraints.canMention !== false ? 'checked' : '') + '><span>Can mention users</span></label>',
         '    <label class="mini-toggle" title="Allow quoting user text in this mode"><input type="checkbox" data-mode-drawer-constraint="canQuote" ' + (constraints.canQuote !== false ? 'checked' : '') + '><span>Can quote users</span></label>',
