@@ -2089,6 +2089,10 @@ label {
   padding: 0 12px 8px 0;
 }
 
+#panel-enforcement #actions-line {
+  padding-left: 4px;
+}
+
 .enforcement-escalation-drawer {
   grid-column: 3;
 }

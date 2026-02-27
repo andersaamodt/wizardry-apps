@@ -763,6 +763,24 @@
       els.userName.removeAttribute('tabindex');
       els.userName.removeAttribute('aria-label');
     }
+    updateLogoutOtherSessionsUi(0);
+  }
+
+  function updateLogoutOtherSessionsUi(countRaw) {
+    if (!els.menuLogoutEverywhereBtn) {
+      return;
+    }
+    var count = Number(countRaw || 0);
+    if (!isFinite(count) || count < 0) {
+      count = 0;
+    }
+    if (count < 1) {
+      els.menuLogoutEverywhereBtn.style.display = 'none';
+      els.menuLogoutEverywhereBtn.textContent = 'Log out other sessions';
+      return;
+    }
+    els.menuLogoutEverywhereBtn.style.display = 'block';
+    els.menuLogoutEverywhereBtn.textContent = 'Log out other sessions (' + String(count) + ')';
   }
 
   function checkAuth() {
@@ -787,12 +805,14 @@
           localStorage.setItem('last_auth_pubkey', data.nostr_pubkey);
         }
         applyLoggedInUi(true, !!data.is_admin, data.player_name || data.username || '');
+        updateLogoutOtherSessionsUi(data.other_sessions_count || 0);
         return true;
       })
       .catch(function () {
         if (!state.isAuthenticated) {
           applyLoggedInUi(false, false, '');
         }
+        updateLogoutOtherSessionsUi(0);
         return false;
       });
   }
@@ -1394,7 +1414,7 @@
       clearLocalStorageAuth();
       return clearLocalKeyMaterial().finally(function () {
         applyLoggedInUi(false, false, '');
-        handlePostLogoutNavigation('Logged out everywhere.');
+        handlePostLogoutNavigation('Logged out other sessions.');
       });
     });
   }
@@ -1608,9 +1628,9 @@
     if (els.menuLogoutEverywhereBtn) {
       els.menuLogoutEverywhereBtn.addEventListener('click', function () {
         closeUserMenu();
-        setAuthMessage('Preparing log out everywhere challenge...', 'warn');
+        setAuthMessage('Preparing log out other sessions challenge...', 'warn');
         logoutEverywhere().catch(function (err) {
-          setAuthMessage(err.message || 'Log out everywhere failed.', 'error');
+          setAuthMessage(err.message || 'Log out other sessions failed.', 'error');
           showAuthModal('register');
         });
       });
