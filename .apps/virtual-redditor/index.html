@@ -1247,6 +1247,7 @@
       repliesRenderSig: '',
       modesRenderSig: '',
       modeDrawerModeId: '',
+      modeDrawerTriggerEditIdx: -1,
       modesConfigDirty: false,
       modesConfigRefreshBlockedUntil: 0,
       modesConfigEditVersion: 0,
@@ -4700,6 +4701,7 @@
     function closeModeDrawer(skipRender) {
       if (!state.modeDrawerModeId) return;
       state.modeDrawerModeId = '';
+      state.modeDrawerTriggerEditIdx = -1;
       var drawer = document.getElementById('mode-detail-drawer');
       var workarea = document.getElementById('modes-workarea');
       if (drawer) {
@@ -4715,6 +4717,7 @@
       if (!wanted) return;
       var cfg = normalizeModesConfig(state.modesConfig);
       if (!findModeById(cfg, wanted)) return;
+      if (state.modeDrawerModeId !== wanted) state.modeDrawerTriggerEditIdx = -1;
       state.modeDrawerModeId = wanted;
       renderModesPanel();
     }
@@ -5064,31 +5067,56 @@
         '</div>'
       ].join('');
       var actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
+      var editingTriggerIdx = Math.max(-1, parseInt(state.modeDrawerTriggerEditIdx, 10) || -1);
+      if (editingTriggerIdx >= actionTriggers.length) editingTriggerIdx = -1;
+      state.modeDrawerTriggerEditIdx = editingTriggerIdx;
       var actionTriggerRows = actionTriggers.map(function (rule, idx) {
         var triggerAction = String(rule.triggerAction || 'set_mode');
         var toModeHtml = modeOptionsHtml(modeOpts, String(rule.toMode || ''), false, '');
         var decayModeHtml = modeOptionsHtml(modeOpts, String(rule.decayTo || ''), true, 'Default decay mode');
         var matchAny = Array.isArray(rule.matchAny) ? rule.matchAny.join(', ') : '';
         var maxReplies = Math.max(0, parseInt(rule.maxRepliesPerUserThread24h, 10) || 1);
+        var isEditing = (idx === editingTriggerIdx);
+        var actionText = (
+          triggerAction === 'set_mode' ? 'Set relationship mode' :
+          triggerAction === 'canned_reply' ? 'Post canned reply' :
+          triggerAction === 'warn' ? 'Warn user' :
+          triggerAction === 'mod_action' ? 'Mod action' :
+          triggerAction === 'rate_limit_user' ? 'Rate limit user' :
+          'Set relationship mode'
+        );
+        var summaryLabel = String(rule.label || ('Action Trigger ' + String(idx + 1)));
+        var summaryPhrases = matchAny ? ('Phrases: ' + matchAny) : 'No trigger phrases yet';
+        var summaryAction = 'Action: ' + actionText;
         return [
-          '<div class="action-trigger-row trigger-action-' + escapeHtml(triggerAction) + '" data-trigger-idx="' + String(idx) + '" data-trigger-id="' + escapeHtml(String(rule.id || '')) + '">',
-          '  <input type="text" class="trigger-label-input" data-trigger-label placeholder="Trigger label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this action trigger">',
-          '  <input type="text" class="trigger-match-input" data-trigger-matchany placeholder="trigger phrases, comma separated" value="' + escapeHtml(matchAny) + '" title="Comma-separated phrases that activate this trigger">',
-          '  <select class="trigger-action-select" data-trigger-action title="Action to run when this trigger matches">' +
+          '<div class="action-trigger-row trigger-action-' + escapeHtml(triggerAction) + (isEditing ? ' is-editing' : '') + '" data-trigger-idx="' + String(idx) + '" data-trigger-id="' + escapeHtml(String(rule.id || '')) + '">',
+          '  <div class="trigger-row-summary">',
+          '    <div class="trigger-row-title">' + escapeHtml(summaryLabel) + '</div>',
+          '    <div class="trigger-row-meta">' + escapeHtml(summaryPhrases) + ' • ' + escapeHtml(summaryAction) + '</div>',
+          '  </div>',
+          '  <div class="trigger-row-summary-actions">',
+          '    <button type="button" class="inline-link-btn" data-edit-trigger title="Edit this action trigger">Edit...</button>',
+          '    <button type="button" class="soft mini-remove-btn trigger-remove-btn" data-remove-trigger title="Remove this action trigger">Remove</button>',
+          '  </div>',
+          '  <div class="trigger-edit-fields">',
+          '  <label class="mini-input trigger-field-block trigger-field-block-wide" title="Readable name for this action trigger"><span class="trigger-field-label">Label</span><input type="text" class="trigger-label-input" data-trigger-label placeholder="Trigger label" value="' + escapeHtml(String(rule.label || '')) + '" title="Readable name for this action trigger"></label>',
+          '  <label class="mini-input trigger-field-block trigger-field-block-wide" title="Comma-separated phrases that activate this trigger"><span class="trigger-field-label">Trigger phrases</span><input type="text" class="trigger-match-input" data-trigger-matchany placeholder="trigger phrases, comma separated" value="' + escapeHtml(matchAny) + '" title="Comma-separated phrases that activate this trigger"></label>',
+          '  <label class="mini-input trigger-field-block" title="Action to run when this trigger matches"><span class="trigger-field-label">Action</span><select class="trigger-action-select" data-trigger-action title="Action to run when this trigger matches">' +
              '<option value="set_mode"' + (triggerAction === 'set_mode' ? ' selected' : '') + '>Set relationship mode</option>' +
              '<option value="canned_reply"' + (triggerAction === 'canned_reply' ? ' selected' : '') + '>Post canned reply</option>' +
              '<option value="warn"' + (triggerAction === 'warn' ? ' selected' : '') + '>Warn user</option>' +
              '<option value="mod_action"' + (triggerAction === 'mod_action' ? ' selected' : '') + '>Mod action</option>' +
              '<option value="rate_limit_user"' + (triggerAction === 'rate_limit_user' ? ' selected' : '') + '>Rate limit user</option>' +
-             '</select>',
-          '  <select class="trigger-mode-select trigger-field-mode" data-trigger-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select>',
-          '  <input type="number" class="trigger-duration-input trigger-field-duration" min="0" step="1" data-trigger-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the trigger effect">',
-          '  <select class="trigger-decay-select trigger-field-mode" data-trigger-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select>',
-          '  <input type="number" class="trigger-rate-limit-input trigger-field-rate-limit" min="1" step="1" data-trigger-max-replies value="' + escapeHtml(String(maxReplies)) + '" title="Max replies to this user per thread in rolling 24h during rate-limit window">',
-          '  <input type="text" class="trigger-template-input trigger-field-template" data-trigger-template placeholder="Reply/notice template" value="' + escapeHtml(String(rule.template || '')) + '" title="Template text posted when this trigger runs">',
+             '</select></label>',
+          '  <label class="mini-input trigger-field-block trigger-field-mode" title="Mode to switch to when this trigger matches"><span class="trigger-field-label">Switch to mode</span><select class="trigger-mode-select" data-trigger-to-mode title="Mode to switch to when this trigger matches">' + toModeHtml + '</select></label>',
+          '  <label class="mini-input trigger-field-block trigger-field-duration" title="Duration in hours for the trigger effect"><span class="trigger-field-label">Duration (hours)</span><input type="number" class="trigger-duration-input" min="0" step="1" data-trigger-duration value="' + escapeHtml(String(rule.durationHours || 0)) + '" title="Duration in hours for the trigger effect"></label>',
+          '  <label class="mini-input trigger-field-block trigger-field-mode" title="Mode to decay to after trigger duration expires"><span class="trigger-field-label">Decay to mode</span><select class="trigger-decay-select" data-trigger-decay-to title="Mode to decay to after trigger duration expires">' + decayModeHtml + '</select></label>',
+          '  <label class="mini-input trigger-field-block trigger-field-rate-limit" title="Max replies to this user per thread in rolling 24h during rate-limit window"><span class="trigger-field-label">Max replies (24h)</span><input type="number" class="trigger-rate-limit-input" min="1" step="1" data-trigger-max-replies value="' + escapeHtml(String(maxReplies)) + '" title="Max replies to this user per thread in rolling 24h during rate-limit window"></label>',
+          '  <label class="mini-input trigger-field-block trigger-field-template trigger-field-block-wide" title="Template text posted when this trigger runs"><span class="trigger-field-label">Template</span><input type="text" class="trigger-template-input" data-trigger-template placeholder="Reply/notice template" value="' + escapeHtml(String(rule.template || '')) + '" title="Template text posted when this trigger runs"></label>',
           '  <label class="mini-toggle trigger-admin-toggle" title="Only moderators can invoke this trigger"><input type="checkbox" data-trigger-admin-only ' + (rule.adminOnly ? 'checked' : '') + '><span>Admin-only</span></label>',
           '  <label class="mini-toggle trigger-announce-toggle trigger-field-announce" title="Post a notice when this trigger runs"><input type="checkbox" data-trigger-announce ' + (rule.announce ? 'checked' : '') + '><span>Announce</span></label>',
-          '  <button type="button" class="soft mini-remove-btn trigger-remove-btn" data-remove-trigger title="Remove this action trigger">Remove</button>',
+          '  <div class="trigger-edit-actions"><button type="button" class="soft" data-save-trigger title="Save this action trigger">Save</button></div>',
+          '  </div>',
           '</div>'
         ].join('');
       }).join('');
@@ -5130,24 +5158,10 @@
         '  </div>',
         '</div>',
         '<div class="mode-drawer-block">',
-        '  <div class="mode-drawer-section-title">Action Triggers (Decorator)</div>',
-        '  <div class="mode-drawer-helper">Action triggers match user phrases and run configured actions. Supported actions: set mode, canned reply, warn, mod action, and rate limit user. Host-computer command triggers are not enabled.</div>',
+        '  <div class="persona-section-title">Action Triggers</div>',
+        '  <div class="mode-drawer-helper">Action triggers match user phrases and run configured actions. Host-computer command triggers are not enabled.</div>',
         '  <div class="modes-section-head mode-drawer-trigger-head">',
-        '    <div class="persona-section-title">Triggers</div>',
-        '    <button type="button" class="soft mini-add-btn" data-add-action-trigger title="Add a new action trigger">Add trigger</button>',
-        '  </div>',
-        '  <div class="modes-grid-head trigger-grid-head" aria-hidden="true">',
-        '    <span>Label</span>',
-        '    <span>Trigger phrases</span>',
-        '    <span>Action</span>',
-        '    <span>Switch to</span>',
-        '    <span>Duration (h)</span>',
-        '    <span>Decay to</span>',
-        '    <span>Max/24h</span>',
-        '    <span>Template</span>',
-        '    <span>Admin-only</span>',
-        '    <span>Announce</span>',
-        '    <span></span>',
+        '    <button type="button" class="soft mini-add-btn" data-add-action-trigger title="Add a new action trigger" aria-label="Add a new action trigger"' + (editingTriggerIdx >= 0 ? ' disabled' : '') + '>+</button>',
         '  </div>',
         '  <div class="mode-action-triggers-list">' + (actionTriggerRows || '<div class="settings-empty-note">No action triggers yet.</div>') + '</div>',
         '</div>'
@@ -5974,6 +5988,7 @@
           template: '',
           announce: true
         });
+        state.modeDrawerTriggerEditIdx = cfg.actionTriggers.length - 1;
       });
     }
 
@@ -6923,6 +6938,27 @@
           addModeActionTriggerRow();
           return;
         }
+        var saveTriggerBtn = event.target && event.target.closest('[data-save-trigger]');
+        if (saveTriggerBtn) {
+          var saveRow = saveTriggerBtn.closest('[data-trigger-idx]');
+          var saveIdx = saveRow ? parseInt(saveRow.getAttribute('data-trigger-idx') || '-1', 10) : -1;
+          if (saveIdx >= 0) {
+            state.modeDrawerTriggerEditIdx = -1;
+            mutateModesConfigFromUi(function () {});
+            queueModesAutosave(120);
+          }
+          return;
+        }
+        var editTriggerBtn = event.target && event.target.closest('[data-edit-trigger]');
+        if (editTriggerBtn) {
+          var editRow = editTriggerBtn.closest('[data-trigger-idx]');
+          var editIdx = editRow ? parseInt(editRow.getAttribute('data-trigger-idx') || '-1', 10) : -1;
+          if (editIdx >= 0) {
+            state.modeDrawerTriggerEditIdx = editIdx;
+            renderModesPanel();
+          }
+          return;
+        }
         var removeTriggerBtn = event.target && event.target.closest('[data-remove-trigger]');
         if (removeTriggerBtn) {
           var row = removeTriggerBtn.closest('[data-trigger-idx]');
@@ -6932,6 +6968,11 @@
               cfg.actionTriggers = (cfg.actionTriggers || []).filter(function (_trigger, triggerIndex) {
                 return triggerIndex !== idx;
               });
+              if (state.modeDrawerTriggerEditIdx === idx) {
+                state.modeDrawerTriggerEditIdx = -1;
+              } else if (state.modeDrawerTriggerEditIdx > idx) {
+                state.modeDrawerTriggerEditIdx -= 1;
+              }
             });
           }
           return;

@@ -2830,12 +2830,78 @@ input.range-input-invalid[type='number'] {
 .action-trigger-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+  gap: 8px 10px;
+  align-items: flex-start;
   border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
   border-radius: 9px;
   padding: 8px;
   background: color-mix(in srgb, var(--bg-main) 90%, var(--bg-panel) 10%);
+}
+
+.trigger-row-summary {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.trigger-row-title {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.trigger-row-meta {
+  font-size: 0.7rem;
+  color: var(--text-subtle);
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.trigger-row-summary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.action-trigger-row .trigger-edit-fields {
+  display: none;
+  width: 100%;
+}
+
+.action-trigger-row.is-editing .trigger-edit-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 10px;
+}
+
+.action-trigger-row.is-editing .trigger-row-summary-actions [data-edit-trigger] {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.trigger-field-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  font-size: 0.7rem;
+  color: var(--text-subtle);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.trigger-field-block-wide {
+  width: 100%;
+}
+
+.trigger-field-label {
+  font-size: 0.68rem;
+  color: var(--text-subtle);
+  line-height: 1.15;
 }
 
 .action-trigger-row input[type='text'],
@@ -2844,55 +2910,29 @@ input.range-input-invalid[type='number'] {
   font-size: 0.74rem;
 }
 
-.action-trigger-row input[type='number'] {
-  width: 96px;
-  flex: 0 0 96px;
+.action-trigger-row .trigger-label-input,
+.action-trigger-row .trigger-match-input,
+.action-trigger-row .trigger-template-input {
+  width: 100%;
+  min-width: 0;
 }
 
-.action-trigger-row input[type='text'] {
-  flex: 1 1 210px;
-  min-width: 170px;
+.action-trigger-row .trigger-action-select,
+.action-trigger-row .trigger-mode-select,
+.action-trigger-row .trigger-decay-select {
+  width: fit-content;
+  min-width: 142px;
 }
 
-.action-trigger-row select {
-  flex: 0 1 170px;
-  min-width: 130px;
+.action-trigger-row .trigger-duration-input,
+.action-trigger-row .trigger-rate-limit-input {
+  width: 56px;
+  min-width: 56px;
 }
 
-.trigger-label-input {
-  flex: 0 1 164px !important;
-}
-
-.trigger-match-input {
-  flex: 1 1 260px !important;
-}
-
-.trigger-mode-select,
-.trigger-decay-select,
-.trigger-action-select,
-.transition-action-select,
-.transition-mode-select,
-.transition-decay-select {
-  flex: 0 1 152px !important;
-}
-
-.trigger-duration-input,
-.transition-duration-input {
-  flex: 0 0 96px !important;
-}
-
-.trigger-template-input {
-  flex: 1 1 240px !important;
-}
-
-.trigger-rate-limit-input {
-  flex: 0 0 96px !important;
-}
-
-.trigger-announce-toggle,
 .trigger-admin-toggle,
-.transition-announce-toggle {
-  min-width: 86px;
+.trigger-announce-toggle {
+  min-width: fit-content;
 }
 
 .action-trigger-row .mini-toggle {
@@ -2919,6 +2959,12 @@ input.range-input-invalid[type='number'] {
 .action-trigger-row.trigger-action-rate_limit_user .trigger-field-duration,
 .action-trigger-row.trigger-action-rate_limit_user .trigger-field-rate-limit {
   display: inline-block;
+}
+
+.trigger-edit-actions {
+  display: inline-flex;
+  align-items: flex-end;
+  margin-left: auto;
 }
 
 .mini-remove-btn {
