@@ -801,8 +801,10 @@ assay_normalize_assistant_output() {
   run_time_budget=$4
 
   if assay_output_has_required_sections "$raw_output"; then
-    printf '%s' "$raw_output"
-    return 0
+    if ! printf '%s' "$raw_output" | grep -Eqi '^Outcome:[[:space:]]+I couldn.t complete'; then
+      printf '%s' "$raw_output"
+      return 0
+    fi
   fi
 
   next_action_line=$(assay_next_action_from_plan "$plan_text")

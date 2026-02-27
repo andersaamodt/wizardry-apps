@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: SpecToCodeContract
+metadata:
+  name: simple-feature-contract
+spec:
+  description: "Implement a feature to add two numbers and return the result."
+  inputs:
+    - name: num1
+      type: int
+    - name: num2
+      type: int
+  output:
+    type: int

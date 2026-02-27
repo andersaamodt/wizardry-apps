@@ -1,12 +1,15 @@
-# SQL Injection Risk Audit
-## Overview
-This directory contains files related to the security audit of potential SQL injection risks in the project.
-## Files
-- `sql-injection-risk.sql`: Demonstrates a vulnerable SQL query.
-- `fix-sql-injection.sql`: Contains the fix for the identified SQL injection risk.
-- `test-before.sql`: A test case that should fail before the fix is applied.
-- `test-after.sql`: A test case that should pass after the fix is implemented.
-## Steps to Run Tests
-1. Apply the fix by executing `fix-sql-injection.sql`.
-2. Execute `test-before.sql` and verify it fails as expected.
-3. Execute `test-after.sql` and verify it passes indicating the fix was successful.
+# SQL Injection Protection Audit
+## Objective
+To enhance the application's security by protecting against SQL injection through parameterized queries.
+## Steps Performed
+1. **Add Columns for Verification**: Added `email_verified` to the `users` table and `is_sensitive` to the `posts` table.
+2. **Update Tables Based on Injection Attempts**: Updated tables based on harmful SQL patterns detected in comments and posts.
+## Verification Evidence
+- Pre-protection state of `users` and `posts`.
+- Post-protection state of `users` and `posts`.
+## Risks
+- Potential data loss if existing harmful data is not properly handled.
+- Need to ensure that all database interactions are updated to use parameterized queries.
+## Next Improvement
+- Implement application-level input validation.
+- Regularly audit for new potential SQL injection vectors.
