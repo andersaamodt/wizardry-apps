@@ -3224,12 +3224,7 @@
       state.profilesRenderSig = renderSig;
       var filtered = profiles;
       if (summaryEl) {
-        if (!profiles.length) {
-          summaryEl.textContent = '';
-        } else {
-          summaryEl.textContent = String(filtered.length) + ' shown' +
-            ' • total=' + String(profiles.length);
-        }
+        summaryEl.textContent = '';
       }
       if (!filtered.length) {
         listEl.innerHTML = '<div class="profiles-empty">No virtual redditors yet. Add one with +.</div>';
