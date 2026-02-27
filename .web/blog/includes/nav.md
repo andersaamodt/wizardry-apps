@@ -35,11 +35,10 @@
   <button class="btn-login btn-login-main" id="login-btn" type="button">Login</button>
   <button class="btn-login btn-login-caret" id="login-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More login options">▼</button>
   <div class="nav-login-menu" id="nav-login-menu" role="menu" hidden>
-    <button id="login-menu-desktop" class="nav-menu-item" type="button" role="menuitem">Sign in with desktop signer</button>
+    <button id="login-menu-register" class="nav-menu-item" type="button" role="menuitem">Register</button>
     <button id="login-menu-phone" class="nav-menu-item" type="button" role="menuitem">Use phone signer (QR)</button>
     <button id="login-menu-manual" class="nav-menu-item" type="button" role="menuitem">Use signed challenge (manual)</button>
-    <button id="login-menu-advanced" class="nav-menu-item" type="button" role="menuitem">Open advanced sign-in panel</button>
-    <a class="nav-menu-item" href="/pages/login-security.html" role="menuitem">Learn about Nostr sign-in</a>
+    <button id="login-menu-learn" class="nav-menu-item" type="button" role="menuitem">Learn about Nostr sign-in</button>
   </div>
 </div>
 </div>
@@ -106,33 +105,35 @@
       </label>
     </div>
 
+    <div class="auth-tabs" role="tablist" aria-label="Sign-in methods">
+      <button id="auth-tab-register" class="auth-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="auth-register-panel">Register</button>
+      <button id="auth-tab-phone" class="auth-tab" type="button" role="tab" aria-selected="false" aria-controls="auth-phone-panel">Phone signer</button>
+      <button id="auth-tab-manual" class="auth-tab" type="button" role="tab" aria-selected="false" aria-controls="auth-manual-panel">Signed challenge</button>
+    </div>
+
     <div id="auth-modal-message" class="auth-modal-message" aria-live="polite"></div>
 
-    <div class="auth-actions auth-actions-primary auth-actions-stack">
-      <div class="auth-action-row">
-        <button id="auth-nip07-btn" class="auth-secondary-btn" type="button">Login with desktop signer</button>
+    <div id="auth-register-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-register">
+      <p class="auth-modal-help">Accounts are created on first successful signer approval and are permanently tied to that Nostr key.</p>
+      <div class="auth-actions">
+        <button id="auth-register-btn" class="auth-primary-btn" type="button">Register with desktop signer</button>
         <span class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://addons.mozilla.org/en-US/firefox/addon/nos2x-fox/" target="_blank" rel="noopener noreferrer">nos2x-fox</a></span>
-      </div>
-      <div class="auth-action-row">
-        <button id="auth-phone-connect-btn" class="auth-secondary-btn" type="button">Connect phone signer (QR)</button>
-        <span class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst" target="_blank" rel="noopener noreferrer">Amethyst</a></span>
-      </div>
-      <div class="auth-action-row">
-        <button id="auth-phone-btn" class="auth-primary-btn" type="button" disabled>Continue with phone signer</button>
-      </div>
-      <div class="auth-action-row">
-        <button id="auth-paste-btn" class="auth-secondary-btn" type="button">Paste signed login</button>
       </div>
     </div>
 
-    <div id="auth-phone-panel" class="auth-panel" hidden>
+    <div id="auth-phone-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-phone" hidden>
       <p class="auth-modal-help">Scan this with your phone signer app (Nostr Connect / NIP-46), or open via deep link.</p>
       <div id="auth-nip46-qr" class="auth-qr" aria-label="Nostr Connect QR code"></div>
       <a id="auth-nip46-open" class="auth-inline-link" href="#" target="_blank" rel="noopener noreferrer">Open nostrconnect:// link</a>
       <p class="auth-nip46-uri" id="auth-nip46-uri"></p>
+      <div class="auth-actions">
+        <button id="auth-phone-connect-btn" class="auth-secondary-btn" type="button">Connect phone signer (QR)</button>
+        <button id="auth-phone-btn" class="auth-primary-btn" type="button" disabled>Continue with phone signer</button>
+      </div>
+      <p class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst" target="_blank" rel="noopener noreferrer">Amethyst</a></p>
     </div>
 
-    <div id="auth-manual-panel" class="auth-panel" hidden>
+    <div id="auth-manual-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-manual" hidden>
       <p class="auth-modal-help">Manual fallback: sign the challenge event outside this page and paste signed JSON.</p>
       <div class="auth-actions">
         <button id="auth-manual-start" class="auth-secondary-btn" type="button">Create challenge</button>
@@ -161,6 +162,17 @@
   </div>
 </div>
 
+<div class="auth-modal" id="nostr-info-modal" hidden>
+  <div class="auth-modal-backdrop" data-close-auth-info></div>
+  <div class="auth-modal-panel auth-info-modal-panel" role="dialog" aria-modal="true" aria-labelledby="nostr-info-modal-title">
+    <button class="auth-modal-close" type="button" aria-label="Close Nostr info" data-close-auth-info>&times;</button>
+    <h2 id="nostr-info-modal-title">Nostr Sign-In</h2>
+    <p class="auth-modal-help">Your account identity is your Nostr public key. The site verifies signed events and never asks for private keys.</p>
+    <p class="auth-modal-help">Desktop sign-in uses a NIP-07 extension. Phone sign-in uses Nostr Connect (NIP-46) pairing via QR/deep link.</p>
+    <p class="auth-modal-help">For full details, open: <a class="auth-inline-link" href="/pages/login-security.html">Nostr Login Security</a>.</p>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.7.2/lib/nostr.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-<script src="/static/nav-auth.js?v=20260227-navtoast1"></script>
+<script src="/static/nav-auth.js?v=20260227-logintabs1"></script>

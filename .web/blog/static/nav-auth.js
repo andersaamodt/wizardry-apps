@@ -46,10 +46,10 @@
     loginSplit: document.getElementById('nav-login-split'),
     loginMoreBtn: document.getElementById('login-more-btn'),
     loginMenu: document.getElementById('nav-login-menu'),
-    loginMenuDesktop: document.getElementById('login-menu-desktop'),
+    loginMenuRegister: document.getElementById('login-menu-register'),
     loginMenuPhone: document.getElementById('login-menu-phone'),
     loginMenuManual: document.getElementById('login-menu-manual'),
-    loginMenuAdvanced: document.getElementById('login-menu-advanced'),
+    loginMenuLearn: document.getElementById('login-menu-learn'),
     navToastHost: document.getElementById('nav-top-toast-host'),
     composeLink: document.querySelector('.nav-compose'),
     userMenu: document.getElementById('nav-user-menu'),
@@ -61,12 +61,14 @@
     userName: document.getElementById('nav-user-name'),
 
     authModal: document.getElementById('auth-modal'),
+    authInfoModal: document.getElementById('nostr-info-modal'),
     authMessage: document.getElementById('auth-modal-message'),
-    authNostrBtn: document.getElementById('auth-nostr-btn'),
-    authNip07Btn: document.getElementById('auth-nip07-btn'),
+    authRegisterBtn: document.getElementById('auth-register-btn'),
     authPhoneConnectBtn: document.getElementById('auth-phone-connect-btn'),
     authPhoneBtn: document.getElementById('auth-phone-btn'),
-    authPasteBtn: document.getElementById('auth-paste-btn'),
+    authTabRegister: document.getElementById('auth-tab-register'),
+    authTabPhone: document.getElementById('auth-tab-phone'),
+    authTabManual: document.getElementById('auth-tab-manual'),
 
     authModeOnce: document.getElementById('auth-mode-once'),
     authModeApprove: document.getElementById('auth-mode-approve'),
@@ -74,6 +76,7 @@
     authDelegationDays: document.getElementById('auth-delegation-days'),
     authForceInteractive: document.getElementById('auth-force-interactive'),
 
+    authRegisterPanel: document.getElementById('auth-register-panel'),
     authPhonePanel: document.getElementById('auth-phone-panel'),
     authNip46Qr: document.getElementById('auth-nip46-qr'),
     authNip46Uri: document.getElementById('auth-nip46-uri'),
@@ -341,17 +344,18 @@
   function setAuthControlsDisabled(disabled) {
     var isDisabled = !!disabled;
     [
-      els.authNostrBtn,
-      els.authNip07Btn,
+      els.authRegisterBtn,
       els.authPhoneConnectBtn,
       els.authPhoneBtn,
-      els.authPasteBtn,
       els.authManualStart,
       els.authManualSubmit,
       els.authModeOnce,
       els.authModeApprove,
       els.authDelegationDays,
-      els.authForceInteractive
+      els.authForceInteractive,
+      els.authTabRegister,
+      els.authTabPhone,
+      els.authTabManual
     ].forEach(function (node) {
       if (node) {
         node.disabled = isDisabled;
