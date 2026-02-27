@@ -5562,7 +5562,7 @@
         } else {
           minValue = Math.max(minAllowed, minValue);
           maxValue = Math.max(minAllowed, maxValue);
-          invalid = maxValue <= minValue;
+          invalid = maxValue < minValue;
         }
         minInput.classList.toggle('range-input-invalid', invalid);
         maxInput.classList.toggle('range-input-invalid', invalid);

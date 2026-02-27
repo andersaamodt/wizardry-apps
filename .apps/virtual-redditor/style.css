@@ -2346,6 +2346,7 @@ label {
 .mode-drawer-inline {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-end;
   gap: 9px 12px;
 }
 
@@ -2650,6 +2651,7 @@ label {
   min-height: 30px;
   max-height: 30px;
   line-height: 1;
+  align-self: flex-end;
 }
 
 .mode-detail-drawer .ban-notice-style-shell {
