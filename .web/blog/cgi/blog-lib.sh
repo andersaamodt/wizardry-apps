@@ -1231,23 +1231,11 @@ blog_nostr_verify_event_json() {
       return 0
     fi
   fi
-
-  if command -v nak >/dev/null 2>&1; then
-    if printf '%s\n' "$event_json" | nak verify >/dev/null 2>&1; then
-      return 0
-    fi
-  fi
   return 1
 }
 
 blog_nostr_verifier_available() {
-  if command -v nostril >/dev/null 2>&1; then
-    return 0
-  fi
-  if command -v nak >/dev/null 2>&1; then
-    return 0
-  fi
-  return 1
+  command -v nostril >/dev/null 2>&1
 }
 
 blog_nostr_store_event_json() {

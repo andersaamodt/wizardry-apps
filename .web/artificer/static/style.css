@@ -1909,21 +1909,24 @@ h2 {
   position: absolute;
   inset: 0;
   z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   pointer-events: auto;
-  background: color-mix(in srgb, var(--bg-panel) 6%, transparent);
+  background: transparent;
   color: var(--text-muted);
   font-size: 0.86rem;
   line-height: 1.2;
 }
 
 .conversation-switch-overlay-content {
-  display: inline-flex;
+  position: absolute;
+  left: 50%;
+  top: 64%;
+  transform: translate(-50%, -50%);
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 .conversation-switch-overlay.hidden {

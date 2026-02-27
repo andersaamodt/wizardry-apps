@@ -447,17 +447,17 @@ build_site() {
   site_template=$(config-get "$SITE_DIR/site.conf" template 2>/dev/null || printf '')
 
   if [ "$site_template" = "blog" ]; then
-    if ! has nostril && ! has nak; then
-      if has install-nostr-verifier; then
-        info "Blog template requires Nostr verifier tooling; attempting install..."
-        install-nostr-verifier >/dev/null 2>&1 || true
+    if ! has nostril; then
+      if has install-nostril; then
+        info "Blog template requires nostril; attempting install..."
+        install-nostril >/dev/null 2>&1 || true
       fi
     fi
-    if ! has nostril && ! has nak; then
+    if ! has nostril; then
       if [ "${WIZARDRY_TEST_HELPERS_ONLY:-0}" = "1" ]; then
-        warn "build: missing Nostr verifier (nostril/nak) in test mode; continuing"
+        warn "build: missing nostril in test mode; continuing"
       else
-        die "build: blog template requires Nostr verifier (nostril or nak). Run: web-wizardry install-nostr-verifier"
+        die "build: blog template requires nostril. Run: web-wizardry install-nostril"
       fi
     fi
   fi

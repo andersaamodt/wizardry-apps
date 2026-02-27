@@ -139,7 +139,7 @@ visibility: "public"  # Change from "draft"
 - Posts publish as kind `30023` events with slug-only `d` identity.
 - Post markdown is stored directly in event `.content`.
 - Latest rendered version is selected by newest `created_at` per (`pubkey`, `kind`, `d`) with event-id tie-break.
-- Mirroring uses `nak`; signing/verification prefer `nostril` and fall back to `nak verify` when needed.
+- Mirroring uses `nak`; signing/verification require `nostril`.
 - Relay and author allowlist are file-backed:
   - `site/nostr/state/relays.txt`
   - `site/nostr/state/authors.txt`
@@ -154,8 +154,8 @@ visibility: "public"  # Change from "draft"
 # Create a blog site
 web-wizardry create myblog blog
 
-# Ensure Nostr verifier tooling is present for Nostr auth flows
-web-wizardry install-nostr-verifier
+# Ensure nostril is present for Nostr auth flows
+web-wizardry install-nostril
 
 # Edit content
 vim ~/sites/myblog/site/pages/posts/2024-01-15-welcome.md
@@ -194,13 +194,12 @@ To enable Nostr bridge for a site, turn on “Enable Nostr Bridge” in `/pages/
 
 ### Auth Dependency Notes
 
-- Nostr login/revocation verification requires server-side verifier tooling.
-- Blog workflows accept either:
-  - `nostril` (preferred in this template), or
-  - `nak verify` (fallback).
+- Nostr login/revocation verification requires `nostril` on the server.
 - Install via:
-  - `web-wizardry install-nostr-verifier`
-- `Build all & restart server` for blog sites attempts this installer automatically.
+  - `web-wizardry install-nostril`
+- Uninstall via:
+  - `web-wizardry uninstall-nostril`
+- `Build all & restart server` for blog sites attempts `install-nostril` automatically.
 - **Markdown Editor**: Live preview for easy writing
 - **Draft Management**: Save work-in-progress, publish when ready
 - **Configurable Registration**: Enable/disable new user registration
