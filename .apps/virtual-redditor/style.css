@@ -1986,10 +1986,10 @@ label {
 .enforcement-main-pane {
   min-width: 0;
   overflow: auto;
+  padding: 10px 0 10px 12px;
 }
 
 .persona-main-pane,
-.enforcement-main-pane,
 .modes-main-pane {
   padding: 10px 12px;
 }
@@ -2004,6 +2004,10 @@ label {
 }
 
 .relationships-head-row {
+  padding: 0 12px 8px 0;
+}
+
+.enforcement-head-row {
   padding: 0 12px 8px 0;
 }
 
