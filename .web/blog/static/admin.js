@@ -2040,6 +2040,16 @@
   }
 
   async function runNostrMirror() {
+    if (els.mirrorNostrButton && els.mirrorNostrButton.disabled) {
+      return;
+    }
+    if (els.mirrorNostrButton) {
+      els.mirrorNostrButton.disabled = true;
+      els.mirrorNostrButton.classList.add('is-loading');
+      els.mirrorNostrButton.setAttribute('aria-busy', 'true');
+      els.mirrorNostrButton.dataset.originalLabel = els.mirrorNostrButton.textContent || 'Sync from Nostr';
+      els.mirrorNostrButton.textContent = 'Syncing...';
+    }
     try {
       const data = await apiPost('/cgi/blog-nostr-mirror', {}, true);
       if (!data.success) {
@@ -2054,6 +2064,14 @@
       );
     } catch (err) {
       setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
+    } finally {
+      if (els.mirrorNostrButton) {
+        els.mirrorNostrButton.disabled = false;
+        els.mirrorNostrButton.classList.remove('is-loading');
+        els.mirrorNostrButton.removeAttribute('aria-busy');
+        els.mirrorNostrButton.textContent = els.mirrorNostrButton.dataset.originalLabel || 'Sync from Nostr';
+        delete els.mirrorNostrButton.dataset.originalLabel;
+      }
     }
   }
 

@@ -17248,6 +17248,10 @@
     }
   }
 
+  function insertTextAtCursor(inputEl, text) {
+    appendDictationText(inputEl, text);
+  }
+
   function dispatchInputEvent(inputEl) {
     if (!inputEl || typeof inputEl.dispatchEvent !== "function") {
       return;
@@ -17267,6 +17271,10 @@
     if (nextEvent) {
       inputEl.dispatchEvent(nextEvent);
     }
+  }
+
+  function dictateLegacyOneShot() {
+    return apiPost("dictate", { duration: "20" }, { timeoutMs: 220000 });
   }
 
   function startDictationCapture(options) {
@@ -17356,7 +17364,7 @@
         if (!dictatedText) {
           return true;
         }
-        appendDictationText(el.runPrompt, dictatedText);
+        insertTextAtCursor(el.runPrompt, dictatedText);
         dispatchInputEvent(el.runPrompt);
         if (typeof el.runPrompt.focus === "function") {
           el.runPrompt.focus();

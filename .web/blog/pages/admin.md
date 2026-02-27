@@ -1654,6 +1654,31 @@ body {
   gap: 0.48rem;
 }
 
+#admin-panel .row-actions button.is-loading {
+  position: relative;
+  padding-right: 1.8rem;
+}
+
+#admin-panel .row-actions button.is-loading::after {
+  content: "";
+  position: absolute;
+  right: 0.62rem;
+  top: 50%;
+  width: 0.78rem;
+  height: 0.78rem;
+  margin-top: -0.39rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: admin-spin 0.75s linear infinite;
+}
+
+@keyframes admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .queue-rows {
   display: block;
   border-top: 1px solid #d2def3;
