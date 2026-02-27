@@ -607,13 +607,13 @@
         </section>
 
         <section class="tab-panel" id="panel-replies">
-          <div class="replies-head-row">
-            <div class="status-line" id="replies-line"></div>
-            <button id="btn-replies-edit-templates" type="button" class="inline-link-btn replies-edit-link" title="Edit reply templates">Edit replies...</button>
-          </div>
           <div id="replies-workarea" class="replies-workarea">
             <div class="replies-main-pane">
-              <div id="replies-list"></div>
+              <div class="replies-head-row">
+                <div class="status-line" id="replies-line"></div>
+                <button id="btn-replies-edit-templates" type="button" class="inline-link-btn replies-edit-link" title="Edit reply templates">Edit replies...</button>
+              </div>
+              <div id="replies-list"><div class="empty-note">No replies logged yet.</div></div>
             </div>
             <div class="drawer-resizer" data-drawer-resizer="replies" aria-hidden="true"></div>
             <aside id="reply-templates-drawer" class="mode-detail-drawer reply-templates-drawer" aria-hidden="true">
@@ -1197,6 +1197,7 @@
       relationshipsRenderSig: '',
       modeLogRenderSig: '',
       logsAvailable: false,
+      repliesPrimed: false,
       normRows: [],
       normPendingEmptyRow: false,
       doctrineCacheByProfile: {},
@@ -5215,6 +5216,7 @@
     async function refreshReplies() {
       var out = await backendJson('list-replies', ['120']);
       state.replies = Array.isArray(out.replies) ? out.replies : [];
+      state.repliesPrimed = true;
       renderReplies();
     }
 
@@ -5303,6 +5305,9 @@
         }
         if (!poll) {
           await refreshForActiveTab();
+          if (!state.repliesPrimed) {
+            await refreshReplies();
+          }
           return;
         }
         await refreshForActiveTab();
