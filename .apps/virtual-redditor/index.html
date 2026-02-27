@@ -683,7 +683,7 @@
                       <th>Controls</th>
                     </tr>
                   </thead>
-                  <tbody id="actions-body"></tbody>
+                  <tbody id="actions-body"><tr><td colspan="6" class="actions-empty-cell">No enforcement actions yet.</td></tr></tbody>
                 </table>
               </div>
             </div>
@@ -1236,6 +1236,7 @@
       modeLogRenderSig: '',
       logsAvailable: false,
       repliesPrimed: false,
+      actionsPrimed: false,
       normRows: [],
       normPendingEmptyRow: false,
       doctrineCacheByProfile: {},
@@ -5391,6 +5392,7 @@
     async function refreshActions() {
       var out = await backendJson('list-actions', ['120']);
       state.actions = Array.isArray(out.actions) ? out.actions : [];
+      state.actionsPrimed = true;
       renderActions();
     }
 
@@ -5486,9 +5488,10 @@
         }
         if (!poll) {
           await refreshForActiveTab();
-          if (!state.repliesPrimed) {
-            await refreshReplies();
-          }
+          var primeTasks = [];
+          if (!state.repliesPrimed) primeTasks.push(refreshReplies());
+          if (!state.actionsPrimed) primeTasks.push(refreshActions());
+          if (primeTasks.length) await Promise.all(primeTasks);
           return;
         }
         await refreshForActiveTab();
