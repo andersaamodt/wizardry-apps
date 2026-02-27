@@ -1496,7 +1496,7 @@ label {
 
 .mode-defaults-grid {
   display: grid;
-  grid-template-columns: minmax(0, max-content);
+  grid-template-columns: repeat(auto-fit, minmax(220px, max-content));
   column-gap: 16px;
   row-gap: 6px;
 }
