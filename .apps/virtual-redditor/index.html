@@ -92,10 +92,6 @@
           <div class="persona-layout">
             <div id="persona-workarea" class="persona-workarea">
             <section class="persona-card settings-card persona-main-pane">
-              <div id="create-profile-pane" class="create-profile-pane hidden">
-                <div id="create-profile-msg" class="error-line"></div>
-              </div>
-
               <div id="settings-msg" class="error-line"></div>
 
               <div class="persona-section-title">Basic Info</div>
@@ -3094,7 +3090,7 @@
     }
 
     function setCreateProfileMessage(msg, isError) {
-      var el = document.getElementById('create-profile-msg');
+      var el = document.getElementById('settings-msg');
       if (!el) return;
       el.textContent = isError ? normalizeUiErrorMessage(msg) : (msg || '');
       el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
@@ -3270,8 +3266,6 @@
     }
 
     function openCreateProfilePane() {
-      var pane = document.getElementById('create-profile-pane');
-      if (pane) pane.classList.remove('hidden');
       ensureCreateProfileGhost();
       state.createProfileMode = true;
       setCreateProfileMessage('', false);
@@ -3288,8 +3282,6 @@
 
     function closeCreateProfilePane(options) {
       var opts = options || {};
-      var pane = document.getElementById('create-profile-pane');
-      if (pane) pane.classList.add('hidden');
       state.createProfileMode = false;
       removeCreateProfileGhost({ restoreActive: opts.restoreActive !== false });
       renderProfiles();
@@ -3315,11 +3307,10 @@
     function updateContentEmptyState() {
       var content = document.querySelector('main.content');
       var empty = document.getElementById('content-empty-state');
-      var createPane = document.getElementById('create-profile-pane');
       if (!content || !empty) return;
 
       var profiles = Array.isArray(state.profiles) ? state.profiles : [];
-      var createOpen = !!(createPane && !createPane.classList.contains('hidden'));
+      var createOpen = !!state.createProfileMode;
       var showEmpty = !createOpen && !hasSelectedProfile();
 
       content.classList.toggle('is-empty', showEmpty);
