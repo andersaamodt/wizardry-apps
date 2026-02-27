@@ -1694,6 +1694,30 @@ blog_nostr_sign_post_event() {
   printf '%s\n' "$event_json"
 }
 
+blog_nostr_publish_diagnostic() {
+  if ! command -v jq >/dev/null 2>&1; then
+    printf 'missing dependency: jq.\n'
+    return 0
+  fi
+
+  if ! command -v nostril >/dev/null 2>&1; then
+    printf 'nostril is not installed. Install nostril from the Nostr install menu.\n'
+    return 0
+  fi
+
+  if ! blog_nostr_secret_key >/dev/null 2>&1; then
+    printf 'Nostr signing key is missing at %s.\n' "$blog_nostr_secret_key_file"
+    return 0
+  fi
+
+  if ! blog_nostr_verifier_available; then
+    printf 'Nostr event verification is unavailable. Install a verifier or a nostril build with verify support.\n'
+    return 0
+  fi
+
+  printf 'signing or policy checks failed (author allowlist, key validity, or event verification).\n'
+}
+
 blog_nostr_clear_projection_posts() {
   if [ ! -d "$blog_posts_dir" ]; then
     return 0

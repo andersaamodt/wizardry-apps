@@ -85,7 +85,12 @@ case "$action" in
 
     if ! filename=$(blog_publish_content "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" "$draft_id" immediate ""); then
       if blog_nostr_bridge_enabled; then
-        blog_json_error "Publish failed. Check Nostr bridge key/relay configuration." "nostr_publish_failed"
+        reason=$(blog_nostr_publish_diagnostic 2>/dev/null || printf '')
+        if [ -n "$reason" ]; then
+          blog_json_error "Publish failed: $reason Disable Nostr Bridge in Site Settings if you want local-only publishing." "nostr_publish_failed"
+        else
+          blog_json_error "Publish failed. Check Nostr bridge key/relay configuration." "nostr_publish_failed"
+        fi
       else
         blog_json_error "Publish failed." "publish_failed"
       fi
