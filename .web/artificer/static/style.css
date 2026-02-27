@@ -1911,7 +1911,11 @@ h2 {
   z-index: 10;
   display: block;
   pointer-events: auto;
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--bg-panel-2) 74%, var(--accent-soft) 26%) 68%,
+    transparent
+  );
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   color: var(--text-muted);
@@ -1922,7 +1926,7 @@ h2 {
 .conversation-switch-overlay-content {
   position: absolute;
   left: 50%;
-  top: 66%;
+  top: 50%;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;

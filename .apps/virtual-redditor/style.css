@@ -3170,6 +3170,15 @@ label {
   background: transparent;
 }
 
+/* Keep compact tables (Mode Events, Ban Ladder) constrained and scrollable. */
+.table-wrap.mini-table-wrap {
+  max-height: clamp(220px, 34vh, 340px);
+  min-height: 160px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

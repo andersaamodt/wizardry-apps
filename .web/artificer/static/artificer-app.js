@@ -10839,7 +10839,7 @@
     }
     state.activeConversationSelectedAt = Date.now();
     setActiveConversationLoading(workspaceId, conversationId, !canRenderCachedConversation);
-    state.conversationSwitchOverlay = switchingConversation && !canRenderCachedConversation;
+    state.conversationSwitchOverlay = switchingConversation;
     state.activeDraftWorkspaceId = "";
     state.openWorkspaceMenuWorkspaceId = "";
     state.expandedWorkspaceIds[workspaceId] = true;
