@@ -2064,7 +2064,7 @@ label {
 .enforcement-main-pane {
   min-width: 0;
   overflow: auto;
-  padding: 10px 0 10px 12px;
+  padding: 10px 0;
 }
 
 .persona-main-pane,
@@ -3865,6 +3865,7 @@ label {
 #actions-table th:nth-child(1),
 #actions-table td:nth-child(1) {
   width: 16%;
+  padding-left: 0;
 }
 
 #actions-table th:nth-child(2),
