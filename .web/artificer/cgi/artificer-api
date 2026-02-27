@@ -5177,11 +5177,14 @@ lowercase_text() {
 
 decision_prompt_requests_explicit_choice() {
   prompt_lower=$(lowercase_text "$1")
-  case "$prompt_lower" in
-    *which*|*choose*|*choice*|*option*|*prefer*|*should\ i*|*do\ you\ want*|*pick\ one*)
+  if printf '%s' "$prompt_lower" | grep -Eq '\bwhich\b|\bchoose\b|\bchoice\b|\bselect\b|\bpick[[:space:]]+one\b|\bshould[[:space:]]+i\b|\bdo[[:space:]]+you[[:space:]]+want\b'; then
+    return 0
+  fi
+  if printf '%s' "$prompt_lower" | grep -Eq '\bprefer\b|\boption(s)?\b'; then
+    if printf '%s' "$prompt_lower" | grep -Eq '\\?|[[:space:]]or[[:space:]]'; then
       return 0
-      ;;
-  esac
+    fi
+  fi
   return 1
 }
 

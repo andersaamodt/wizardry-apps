@@ -88,4 +88,44 @@ assert_preview_case \
   "programming" \
   "git status --short"
 
+assert_preview_case \
+  "none-optional-near-miss" \
+  "none" \
+  "Enable optional caching for this endpoint and continue autonomously." \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case \
+  "none-missing-input-without-input-question" \
+  "none" \
+  "Deploy with <API_KEY> and <HOST>, values are missing." \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case \
+  "none-external-in-programming" \
+  "none" \
+  "Collect diagnostics and continue autonomously." \
+  "Need anything else?" \
+  "programming" \
+  "curl https://example.com/health"
+
+assert_preview_case \
+  "precedence-explicit-over-missing" \
+  "explicit-choice" \
+  "Which deployment path should I choose for <PROD_HOST>, blue-green or canary?" \
+  "Which deployment path should I use?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case \
+  "precedence-external-over-risk" \
+  "external-action-gate" \
+  "Launch this workflow and run outreach checks." \
+  "Do you approve this now?" \
+  "assistant" \
+  "curl https://example.com/health"
+
 printf '%s\n' "artificer decision-surfacing live tests passed"

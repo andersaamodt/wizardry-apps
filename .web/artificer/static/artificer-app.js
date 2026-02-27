@@ -5389,6 +5389,23 @@
     return base + " Please retry.";
   }
 
+  function structuredRunFallbackMessage(attemptCount) {
+    var attempts = Number(attemptCount || 0);
+    if (!isFinite(attempts) || attempts < 0) {
+      attempts = 0;
+    }
+    attempts = Math.floor(attempts);
+    var outcome = attempts > 0
+      ? "Outcome: I couldn't complete this run after " + attempts + " attempt" + (attempts === 1 ? "" : "s") + "."
+      : "Outcome: I couldn't produce a final response for this run.";
+    return [
+      outcome,
+      "Verification Evidence: Review the Thinking trace for executed steps and command outputs.",
+      "Risks: The current result may be partial or stale.",
+      "Next Improvement: Retry with a narrower scope or a higher compute budget."
+    ].join("\\n");
+  }
+
   function assistantLooksLikeTrace(text) {
     var raw = String(text || "");
     if (!trim(raw)) {
@@ -13039,9 +13056,7 @@
           if (!attemptCount && pendingEvent) {
             attemptCount = runTraceAttemptCount(pendingEvent);
           }
-          assistantText = attemptCount > 0
-            ? "I couldn't complete that run after " + attemptCount + " attempt" + (attemptCount === 1 ? "" : "s") + ". Check the Thinking trace and try again."
-            : "I couldn't produce a final response for that run. Please retry.";
+          assistantText = structuredRunFallbackMessage(attemptCount);
         }
 
         appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
