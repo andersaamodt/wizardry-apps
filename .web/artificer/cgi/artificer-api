@@ -3561,6 +3561,20 @@ normalize_programmer_review_rounds_value() {
   printf '%s' "$raw_value"
 }
 
+normalize_assay_task_id_value() {
+  raw_value=$(trim "$1")
+  raw_value=$(printf '%s' "$raw_value" | tr '[:upper:]' '[:lower:]')
+  if [ -z "$raw_value" ]; then
+    printf '%s' ""
+    return 0
+  fi
+  if valid_id "$raw_value"; then
+    printf '%s' "$raw_value"
+    return 0
+  fi
+  printf '%s' ""
+}
+
 command_text_to_rule_pattern_default() {
   cmd=$1
   first_word=$(printf '%s\n' "$cmd" | awk '{print $1}')
@@ -4418,6 +4432,7 @@ queue_meta_write() {
   programmer_review_rounds_value=$8
   explicit_skill_ids_file=$9
   attachment_ids_file=${10}
+  assay_task_id_value=${11}
   temp_meta=$(mktemp)
   : > "$temp_meta"
 
@@ -4451,6 +4466,11 @@ queue_meta_write() {
 
   normalized_programmer_review_rounds=$(normalize_programmer_review_rounds_value "$programmer_review_rounds_value" 2)
   printf 'programmer_review_rounds=%s\n' "$normalized_programmer_review_rounds" >> "$temp_meta"
+
+  normalized_assay_task_id=$(normalize_assay_task_id_value "$assay_task_id_value")
+  if [ -n "$normalized_assay_task_id" ]; then
+    printf 'assay_task_id=%s\n' "$normalized_assay_task_id" >> "$temp_meta"
+  fi
 
   if [ -f "$explicit_skill_ids_file" ]; then
     while IFS= read -r skill_id; do
@@ -4503,6 +4523,8 @@ queue_meta_attachment_ids_to_file() {
       programmer_review=*)
         ;;
       programmer_review_rounds=*)
+        ;;
+      assay_task_id=*)
         ;;
       explicit_skill=*)
         ;;
@@ -4689,6 +4711,25 @@ queue_meta_programmer_review_rounds_from_file() {
   done < "$meta_file"
 }
 
+queue_meta_assay_task_id_from_file() {
+  meta_file=$1
+  [ -f "$meta_file" ] || return 0
+  while IFS= read -r meta_line || [ -n "$meta_line" ]; do
+    line_trimmed=$(trim "$meta_line")
+    [ -n "$line_trimmed" ] || continue
+    case "$line_trimmed" in
+      assay_task_id=*)
+        value=${line_trimmed#assay_task_id=}
+        value=$(normalize_assay_task_id_value "$value")
+        if [ -n "$value" ]; then
+          printf '%s' "$value"
+          return 0
+        fi
+        ;;
+    esac
+  done < "$meta_file"
+}
+
 queue_last_mode_file_for() {
   conv_dir=$1
   queue_dir=$(conversation_queue_dir_for "$conv_dir")
@@ -4729,6 +4770,12 @@ queue_last_programmer_review_rounds_file_for() {
   conv_dir=$1
   queue_dir=$(conversation_queue_dir_for "$conv_dir")
   printf '%s/last_programmer_review_rounds' "$queue_dir"
+}
+
+queue_last_assay_task_id_file_for() {
+  conv_dir=$1
+  queue_dir=$(conversation_queue_dir_for "$conv_dir")
+  printf '%s/last_assay_task_id' "$queue_dir"
 }
 
 queue_item_id_from_path() {
@@ -7212,6 +7259,12 @@ active_run_event_json_for_conversation() {
 
   stream_preview=$(running_stream_preview_for_conversation "$conv_dir")
   model_name=$(read_file_line "$conv_dir/model" "$(default_model)")
+  running_meta_file=$(queue_running_meta_file_for "$conv_dir")
+  assay_task_id=$(queue_meta_assay_task_id_from_file "$running_meta_file")
+  assay_task_json=""
+  if [ -n "$assay_task_id" ]; then
+    assay_task_json=",\"assay_task_id\":\"$(json_escape "$assay_task_id")\""
+  fi
   tasks_dir=$(tasks_dir_for_conversation "$conv_dir")
   state_preview=$(sed -n '1,60p' "$conv_dir/agent/.state" 2>/dev/null || true)
   task_status_json=$(task_status_json_from_tasks_dir "$tasks_dir" "running" "$state_preview")
@@ -7224,11 +7277,12 @@ active_run_event_json_for_conversation() {
       ;;
   esac
 
-  printf '{"id":"%s","status":"running","started_at":"%s","finished_at":"","model":"%s","plan":"","commands":[],"stream_text":"%s","failures":"","session_log":"","state":"","git_status":"","git_diff":"","error":"","decision_hint":""%s,"task_status":%s}' \
+  printf '{"id":"%s","status":"running","started_at":"%s","finished_at":"","model":"%s","plan":"","commands":[],"stream_text":"%s","failures":"","session_log":"","state":"","git_status":"","git_diff":"","error":"","decision_hint":""%s%s,"task_status":%s}' \
     "$(json_escape "$run_event_id")" \
     "$(json_escape "$running_started_iso")" \
     "$(json_escape "$model_name")" \
     "$(json_escape "$stream_preview")" \
+    "$assay_task_json" \
     "$message_anchor_json" \
     "$task_status_json"
 }
@@ -7507,6 +7561,7 @@ build_run_event_json() {
   event_id_override=${15}
   task_status_json_override=${16}
   message_anchor_override=${17}
+  assay_task_id_override=${18}
 
   safe_plan=$(clip_for_run_event "$plan_text" 220 9000)
   safe_stream=$(clip_for_run_event "$stream_text" 260 9000)
@@ -7546,6 +7601,11 @@ build_run_event_json() {
       message_anchor_json=",\"message_anchor\":$message_anchor_override"
       ;;
   esac
+  assay_task_json=""
+  assay_task_id=$(normalize_assay_task_id_value "$assay_task_id_override")
+  if [ -n "$assay_task_id" ]; then
+    assay_task_json=",\"assay_task_id\":\"$(json_escape "$assay_task_id")\""
+  fi
   event_id_json=$(json_escape "$event_id")
   status_json=$(json_escape "$run_status")
   started_json=$(json_escape "$started_at")
@@ -7561,8 +7621,8 @@ build_run_event_json() {
   error_json=$(json_escape "$safe_error")
   hint_json=$(json_escape "$safe_hint")
 
-  printf '{"id":"%s","status":"%s","started_at":"%s","finished_at":"%s","model":"%s","plan":"%s","commands":%s,"stream_text":"%s","failures":"%s","session_log":"%s","state":"%s","git_status":"%s","git_diff":"%s","error":"%s","decision_hint":"%s"%s,"task_status":%s}' \
-    "$event_id_json" "$status_json" "$started_json" "$finished_json" "$model_json" "$plan_json" "$commands_json" "$stream_json" "$failures_json" "$session_json" "$state_json" "$git_status_json" "$git_diff_json" "$error_json" "$hint_json" "$message_anchor_json" "$task_status_json"
+  printf '{"id":"%s","status":"%s","started_at":"%s","finished_at":"%s","model":"%s","plan":"%s","commands":%s,"stream_text":"%s","failures":"%s","session_log":"%s","state":"%s","git_status":"%s","git_diff":"%s","error":"%s","decision_hint":"%s"%s%s,"task_status":%s}' \
+    "$event_id_json" "$status_json" "$started_json" "$finished_json" "$model_json" "$plan_json" "$commands_json" "$stream_json" "$failures_json" "$session_json" "$state_json" "$git_status_json" "$git_diff_json" "$error_json" "$hint_json" "$assay_task_json" "$message_anchor_json" "$task_status_json"
 }
 
 append_run_event_json() {
@@ -12615,6 +12675,7 @@ EOF_WRAPPER
     permission_mode_raw=$(trim "$(param "permission_mode")")
     programmer_review_raw=$(trim "$(param "programmer_review")")
     programmer_review_rounds_raw=$(trim "$(param "programmer_review_rounds")")
+    assay_task_id_raw=$(trim "$(param "assay_task_id")")
     explicit_skill_ids_raw=$(param "explicit_skill_ids")
 
     if ! valid_id "$workspace_id"; then
@@ -12655,6 +12716,7 @@ EOF_WRAPPER
     queue_item_permission_mode=$(normalize_permission_mode_value "$permission_mode_raw")
     queue_item_programmer_review=$(normalize_programmer_review_enabled_value "$programmer_review_raw")
     queue_item_programmer_review_rounds=$(normalize_programmer_review_rounds_value "$programmer_review_rounds_raw" 2)
+    queue_item_assay_task_id=$(normalize_assay_task_id_value "$assay_task_id_raw")
     if [ "$queue_item_mode" != "assistant" ]; then
       queue_item_assistant_mode=""
     fi
@@ -12681,7 +12743,7 @@ EOF_WRAPPER
         printf '%s\n' "$skill_id" >> "$validated_skill_ids_file"
       fi
     done < "$incoming_skill_ids_file"
-    queue_meta_write "$queue_item_meta" "$queue_item_mode" "$queue_item_assistant_mode" "$queue_item_compute_budget" "$queue_item_command_exec_mode" "$queue_item_permission_mode" "$queue_item_programmer_review" "$queue_item_programmer_review_rounds" "$validated_skill_ids_file" "$validated_ids_file"
+    queue_meta_write "$queue_item_meta" "$queue_item_mode" "$queue_item_assistant_mode" "$queue_item_compute_budget" "$queue_item_command_exec_mode" "$queue_item_permission_mode" "$queue_item_programmer_review" "$queue_item_programmer_review_rounds" "$validated_skill_ids_file" "$validated_ids_file" "$queue_item_assay_task_id"
 
     # Persist user intent at enqueue time so threads are never blank even if queue execution is interrupted.
     user_message_prompt=$prompt_text
@@ -12804,6 +12866,7 @@ EOF
       queued_permission_mode=$(queue_meta_permission_mode_from_file "$queued_meta")
       queued_programmer_review=$(queue_meta_programmer_review_from_file "$queued_meta")
       queued_programmer_review_rounds=$(queue_meta_programmer_review_rounds_from_file "$queued_meta")
+      queued_assay_task_id=$(queue_meta_assay_task_id_from_file "$queued_meta")
 
       queued_mode_json=$(json_escape "$queued_mode")
       queued_assistant_mode_json=$(json_escape "$queued_assistant_mode")
@@ -12812,6 +12875,7 @@ EOF
       queued_permission_mode_json=$(json_escape "$queued_permission_mode")
       queued_programmer_review_json=$(json_escape "$queued_programmer_review")
       queued_programmer_review_rounds_json=$(json_escape "$queued_programmer_review_rounds")
+      queued_assay_task_id_json=$(json_escape "$queued_assay_task_id")
 
       queued_skills_file=$(mktemp)
       queue_meta_explicit_skills_to_file "$queued_meta" "$queued_skills_file"
@@ -12821,7 +12885,7 @@ EOF
       if [ "$queue_items_count" -gt 0 ]; then
         queue_items_json="$queue_items_json,"
       fi
-      queue_items_json="$queue_items_json{\"id\":\"$queued_item_id_json\",\"order\":\"$queued_order_json\",\"prompt\":\"$queued_prompt_json\",\"run_mode\":\"$queued_mode_json\",\"assistant_mode_id\":\"$queued_assistant_mode_json\",\"compute_budget\":\"$queued_compute_budget_json\",\"command_exec_mode\":\"$queued_command_exec_mode_json\",\"permission_mode\":\"$queued_permission_mode_json\",\"programmer_review\":\"$queued_programmer_review_json\",\"programmer_review_rounds\":\"$queued_programmer_review_rounds_json\",\"explicit_skill_ids\":$queued_skills_json}"
+      queue_items_json="$queue_items_json{\"id\":\"$queued_item_id_json\",\"order\":\"$queued_order_json\",\"prompt\":\"$queued_prompt_json\",\"run_mode\":\"$queued_mode_json\",\"assistant_mode_id\":\"$queued_assistant_mode_json\",\"compute_budget\":\"$queued_compute_budget_json\",\"command_exec_mode\":\"$queued_command_exec_mode_json\",\"permission_mode\":\"$queued_permission_mode_json\",\"programmer_review\":\"$queued_programmer_review_json\",\"programmer_review_rounds\":\"$queued_programmer_review_rounds_json\",\"assay_task_id\":\"$queued_assay_task_id_json\",\"explicit_skill_ids\":$queued_skills_json}"
       queue_items_count=$((queue_items_count + 1))
     done < "$queue_paths_file"
     rm -f "$queue_paths_file"
@@ -13172,6 +13236,7 @@ EOF
     item_permission_mode=$(queue_meta_permission_mode_from_file "$running_meta_file")
     item_programmer_review=$(queue_meta_programmer_review_from_file "$running_meta_file")
     item_programmer_review_rounds=$(queue_meta_programmer_review_rounds_from_file "$running_meta_file")
+    item_assay_task_id=$(queue_meta_assay_task_id_from_file "$running_meta_file")
     item_run_mode_json=$(json_escape "$item_run_mode")
     item_assistant_mode_json=$(json_escape "$item_assistant_mode")
     item_compute_budget_json=$(json_escape "$item_compute_budget")
@@ -13179,9 +13244,10 @@ EOF
     item_permission_mode_json=$(json_escape "$item_permission_mode")
     item_programmer_review_json=$(json_escape "$item_programmer_review")
     item_programmer_review_rounds_json=$(json_escape "$item_programmer_review_rounds")
+    item_assay_task_id_json=$(json_escape "$item_assay_task_id")
 
-    printf '{"success":true,"busy":false,"has_item":true,"item":{"id":"%s","prompt":"%s","attachments":%s,"run_mode":"%s","assistant_mode_id":"%s","compute_budget":"%s","command_exec_mode":"%s","permission_mode":"%s","programmer_review":"%s","programmer_review_rounds":"%s","explicit_skill_ids":%s},"queue_pending":%s,"queue_running":1,"queue_done":0,"queue_first_id":"%s","queue_last_status":"running"}\n' \
-      "$item_id_json" "$prompt_json" "$attachments_json" "$item_run_mode_json" "$item_assistant_mode_json" "$item_compute_budget_json" "$item_command_exec_mode_json" "$item_permission_mode_json" "$item_programmer_review_json" "$item_programmer_review_rounds_json" "$explicit_skills_json" "$queue_pending" "$queue_first_id_json"
+    printf '{"success":true,"busy":false,"has_item":true,"item":{"id":"%s","prompt":"%s","attachments":%s,"run_mode":"%s","assistant_mode_id":"%s","compute_budget":"%s","command_exec_mode":"%s","permission_mode":"%s","programmer_review":"%s","programmer_review_rounds":"%s","assay_task_id":"%s","explicit_skill_ids":%s},"queue_pending":%s,"queue_running":1,"queue_done":0,"queue_first_id":"%s","queue_last_status":"running"}\n' \
+      "$item_id_json" "$prompt_json" "$attachments_json" "$item_run_mode_json" "$item_assistant_mode_json" "$item_compute_budget_json" "$item_command_exec_mode_json" "$item_permission_mode_json" "$item_programmer_review_json" "$item_programmer_review_rounds_json" "$item_assay_task_id_json" "$explicit_skills_json" "$queue_pending" "$queue_first_id_json"
     exit 0
     ;;
 
@@ -13547,12 +13613,14 @@ EOF
     queue_last_permission_mode_file=$(queue_last_permission_mode_file_for "$conv_dir")
     queue_last_programmer_review_file=$(queue_last_programmer_review_file_for "$conv_dir")
     queue_last_programmer_review_rounds_file=$(queue_last_programmer_review_rounds_file_for "$conv_dir")
+    queue_last_assay_task_id_file=$(queue_last_assay_task_id_file_for "$conv_dir")
     decision_run_mode=$(normalize_run_mode_name "$(read_file_line "$queue_last_mode_file" "auto")")
     decision_compute_budget=$(normalize_compute_budget "$(read_file_line "$queue_last_compute_budget_file" "auto")")
     decision_command_exec_mode=$(normalize_command_exec_mode_value "$(read_file_line "$queue_last_command_exec_mode_file" "ask-some")")
     decision_permission_mode=$(normalize_permission_mode_value "$(read_file_line "$queue_last_permission_mode_file" "default")")
     decision_programmer_review=$(normalize_programmer_review_enabled_value "$(read_file_line "$queue_last_programmer_review_file" "1")")
     decision_programmer_review_rounds=$(normalize_programmer_review_rounds_value "$(read_file_line "$queue_last_programmer_review_rounds_file" "2")" 2)
+    decision_assay_task_id=$(normalize_assay_task_id_value "$(read_file_line "$queue_last_assay_task_id_file" "")")
     decision_assistant_mode=""
     if [ "$decision_run_mode" = "assistant" ]; then
       decision_assistant_mode=$(normalize_assistant_mode_id "$(read_file_line "$queue_last_assistant_mode_file" "")")
@@ -13572,7 +13640,7 @@ EOF
     empty_skill_ids=$(mktemp)
     : > "$empty_attachment_ids"
     : > "$empty_skill_ids"
-    queue_meta_write "$queue_item_meta" "$decision_run_mode" "$decision_assistant_mode" "$decision_compute_budget" "$decision_command_exec_mode" "$decision_permission_mode" "$decision_programmer_review" "$decision_programmer_review_rounds" "$empty_skill_ids" "$empty_attachment_ids"
+    queue_meta_write "$queue_item_meta" "$decision_run_mode" "$decision_assistant_mode" "$decision_compute_budget" "$decision_command_exec_mode" "$decision_permission_mode" "$decision_programmer_review" "$decision_programmer_review_rounds" "$empty_skill_ids" "$empty_attachment_ids" "$decision_assay_task_id"
     rm -f "$empty_attachment_ids" "$empty_skill_ids"
     printf '%s\n' "queued" > "$queue_dir/last_status"
     date +%s > "$queue_dir/last_done"
@@ -15543,6 +15611,7 @@ $fallback_output"
     max_iterations_raw=$(trim "$(param "max_iterations")")
     programmer_review_raw=$(trim "$(param "programmer_review")")
     programmer_review_rounds_raw=$(trim "$(param "programmer_review_rounds")")
+    assay_task_id_raw=$(trim "$(param "assay_task_id")")
     stream_session=$(trim "$(param "stream_session")")
     run_event_id_param=$(trim "$(param "run_event_id")")
     run_message_anchor_raw=$(trim "$(param "run_message_anchor")")
@@ -15560,6 +15629,7 @@ $fallback_output"
     programmer_review_rounds_completed=0
     programmer_review_last_signature=""
     programmer_review_last_feedback=""
+    assay_task_id=""
     allow_workspace_writes=1
     decision_request_json="null"
     forced_queue_status=""
@@ -15608,6 +15678,9 @@ $fallback_output"
     if [ -n "$programmer_review_rounds_raw" ]; then
       programmer_review_max_rounds=$(normalize_programmer_review_rounds_value "$programmer_review_rounds_raw" 2)
     fi
+    if [ -n "$assay_task_id_raw" ]; then
+      assay_task_id=$(normalize_assay_task_id_value "$assay_task_id_raw")
+    fi
     run_mode=$(normalize_run_mode_name "$run_mode_raw")
     assistant_mode_id=$(normalize_assistant_mode_id "$assistant_mode_raw")
     compute_budget=$(normalize_compute_budget "$compute_budget_raw")
@@ -15639,6 +15712,7 @@ $fallback_output"
     queue_permission_mode_override=""
     queue_programmer_review_override=""
     queue_programmer_review_rounds_override=""
+    queue_assay_task_override=""
     queue_explicit_skills_override_file=$(mktemp)
     : > "$queue_explicit_skills_override_file"
     if [ -n "$queue_item_id" ] && valid_id "$queue_item_id"; then
@@ -15655,6 +15729,7 @@ $fallback_output"
         queue_permission_mode_override=$(queue_meta_permission_mode_from_file "$running_meta_for_mode")
         queue_programmer_review_override=$(queue_meta_programmer_review_from_file "$running_meta_for_mode")
         queue_programmer_review_rounds_override=$(queue_meta_programmer_review_rounds_from_file "$running_meta_for_mode")
+        queue_assay_task_override=$(queue_meta_assay_task_id_from_file "$running_meta_for_mode")
         queue_meta_explicit_skills_to_file "$running_meta_for_mode" "$queue_explicit_skills_override_file"
       fi
       if [ -n "$queue_mode_override" ]; then
@@ -15671,6 +15746,9 @@ $fallback_output"
       fi
       if [ -n "$queue_programmer_review_rounds_override" ]; then
         programmer_review_max_rounds=$(normalize_programmer_review_rounds_value "$queue_programmer_review_rounds_override" 2)
+      fi
+      if [ -n "$queue_assay_task_override" ]; then
+        assay_task_id=$(normalize_assay_task_id_value "$queue_assay_task_override")
       fi
     fi
     if [ "$run_mode" != "assistant" ]; then
@@ -16135,7 +16213,8 @@ EOF
         "$run_decision_hint" \
         "$run_event_id" \
         "$hello_task_status_json" \
-        "$run_message_anchor")
+        "$run_message_anchor" \
+        "$assay_task_id")
       append_run_event_json "$conv_dir" "$hello_event_json"
       session_json=$(json_escape "$session_log")
       state_json=$(json_escape "mode=DONE")
@@ -16284,6 +16363,7 @@ EOF
     queue_last_permission_mode_file=$(queue_last_permission_mode_file_for "$conv_dir")
     queue_last_programmer_review_file=$(queue_last_programmer_review_file_for "$conv_dir")
     queue_last_programmer_review_rounds_file=$(queue_last_programmer_review_rounds_file_for "$conv_dir")
+    queue_last_assay_task_id_file=$(queue_last_assay_task_id_file_for "$conv_dir")
     printf '%s\n' "$run_mode" > "$queue_last_mode_file"
     printf '%s\n' "$assistant_mode_id" > "$queue_last_assistant_mode_file"
     printf '%s\n' "$compute_budget" > "$queue_last_compute_budget_file"
@@ -16291,6 +16371,7 @@ EOF
     printf '%s\n' "$permission_mode" > "$queue_last_permission_mode_file"
     printf '%s\n' "$programmer_review_enabled" > "$queue_last_programmer_review_file"
     printf '%s\n' "$programmer_review_max_rounds" > "$queue_last_programmer_review_rounds_file"
+    printf '%s\n' "$assay_task_id" > "$queue_last_assay_task_id_file"
     if [ -n "$assistant_mode_id" ]; then
       stream_emit_line "$stream_output_file" "Run mode: $run_mode (assistant_mode=$assistant_mode_id, advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations)"
     elif [ "$run_mode" = "programming" ]; then
@@ -16591,7 +16672,8 @@ $explicit_skill_context_text"
         "" \
         "$run_event_id" \
         "$quick_task_status_json" \
-        "$run_message_anchor")
+        "$run_message_anchor" \
+        "$assay_task_id")
       append_run_event_json "$conv_dir" "$quick_event_json"
       printf '{"success":true,"model":"%s","plan":"%s","assistant":"%s","git_status":"%s","git_diff":"%s","commands":[],"blocked_commands":%s,"decision_request":null,"failures":"","session_log":"%s","state":"%s","task_status":%s}\n' \
         "$model_json" "$plan_json" "$assistant_json" "$git_status_json" "$git_diff_json" "$blocked_commands_json" "$quick_session_json" "$state_json" "$quick_task_status_json"
@@ -18508,7 +18590,8 @@ EOF
       "" \
       "$run_event_id" \
       "$final_task_status_json" \
-      "$run_message_anchor")
+      "$run_message_anchor" \
+      "$assay_task_id")
     append_run_event_json "$conv_dir" "$agent_event_json"
 
     printf '{"success":true,"model":"%s","plan":"%s","assistant":"%s","git_status":"%s","git_diff":"%s","commands":[%s],"blocked_commands":%s,"decision_request":%s,"failures":"%s","session_log":"%s","state":"%s","task_status":%s}\n' \

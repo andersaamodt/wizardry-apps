@@ -174,6 +174,10 @@
       failures: clipTextForStorage(event.failures || "", 7000),
       session_log: clipTextForStorage(event.session_log || "", 7000)
     };
+    var assayTaskId = normalizeAssayTaskId(event.assay_task_id || "");
+    if (assayTaskId) {
+      cleaned.assay_task_id = assayTaskId;
+    }
     var anchorRaw = Number(event.message_anchor);
     if (isFinite(anchorRaw) && anchorRaw >= 0) {
       cleaned.message_anchor = Math.floor(anchorRaw);
@@ -2792,6 +2796,7 @@
       permission_mode: normalizePermissionModeValue(item.permission_mode || ""),
       programmer_review: normalizeProgrammerReviewEnabledValue(item.programmer_review),
       programmer_review_rounds: normalizeProgrammerReviewRoundsValue(item.programmer_review_rounds || 2),
+      assay_task_id: normalizeAssayTaskId(item.assay_task_id || ""),
       explicit_skill_ids: Array.isArray(item.explicit_skill_ids) ? item.explicit_skill_ids : []
     };
   }
@@ -3791,6 +3796,9 @@
     }
     if (!trim(merged.session_log || "") && trim(fallback.session_log || "")) {
       merged.session_log = fallback.session_log;
+    }
+    if (!trim(merged.assay_task_id || "") && trim(fallback.assay_task_id || "")) {
+      merged.assay_task_id = fallback.assay_task_id;
     }
     return merged;
   }
@@ -6605,6 +6613,7 @@
     if (!el.assayTaskList || !el.assayCycleSummary) {
       return;
     }
+    var mentorSnapshot = buildAssayMentorSnapshot();
     if (el.assayCycleCount) {
       var cycleValue = String(normalizeAssayCyclesToQueue(state.assayCyclesToQueue));
       if (el.assayCycleCount.value !== cycleValue) {
@@ -6617,7 +6626,13 @@
       ? ("on (" + state.programmerReviewRounds + " rounds)")
       : "off";
     if (nextTask) {
-      el.assayCycleSummary.textContent = "Next task: #" + String(activeCursor + 1) + " " + nextTask.title + " | Completed cycles: " + String(state.assayCompletedCycles) + " | Programmer code review: " + reviewLabel + ".";
+      var nextTaskId = normalizeAssayTaskId(nextTask.id || "");
+      var nextMentor = nextTaskId ? mentorSnapshot[nextTaskId] : null;
+      var mentorHint = "";
+      if (nextMentor && nextMentor.topFocus && nextMentor.topFocus.label) {
+        mentorHint = " | Next focus: " + nextMentor.topFocus.label;
+      }
+      el.assayCycleSummary.textContent = "Next task: #" + String(activeCursor + 1) + " " + nextTask.title + " | Completed cycles: " + String(state.assayCompletedCycles) + " | Programmer code review: " + reviewLabel + mentorHint + ".";
     } else {
       el.assayCycleSummary.textContent = "Assay tasks are unavailable.";
     }
@@ -6634,6 +6649,14 @@
         html += "<div class='assay-task-main'>";
         html += "<strong>" + escHtml(assayTask.title || ("Task " + String(i + 1))) + "</strong>";
         html += "<span class='settings-hint'>" + escHtml(runModeLabel(assayTask.mode || "auto")) + " | " + escHtml(computeBudgetLabel(assayTask.compute_budget || "auto")) + "</span>";
+        var assayTaskId = normalizeAssayTaskId(assayTask.id || "");
+        var assayMentor = assayTaskId ? mentorSnapshot[assayTaskId] : null;
+        if (assayMentor && Number(assayMentor.runs || 0) > 0) {
+          html += "<span class='assay-task-metrics'>IQ " + escHtml(String(assayMentor.intelligence)) + " | Flow " + escHtml(String(assayMentor.flow)) + " | Runs " + escHtml(String(assayMentor.runs)) + "</span>";
+          if (assayMentor.topFocus && assayMentor.topFocus.label) {
+            html += "<span class='settings-hint assay-task-focus'>Focus: " + escHtml(assayMentor.topFocus.label) + "</span>";
+          }
+        }
         html += "</div>";
         html += "</div>";
       }
@@ -6700,7 +6723,13 @@
       return Promise.reject(new Error("No assay tasks were selected."));
     }
 
-    var firstPrompt = String((sequence[0] && sequence[0].task && sequence[0].task.prompt) || "");
+    var mentorSnapshot = buildAssayMentorSnapshot();
+
+    var firstTask = (sequence[0] && sequence[0].task) || {};
+    var firstPrompt = buildAssayMentoredPromptForTask(firstTask, mentorSnapshot);
+    if (!trim(firstPrompt)) {
+      firstPrompt = String(firstTask.prompt || "");
+    }
     return ensureConversationFromDraft(firstPrompt).then(function (conversationId) {
       var resolvedWorkspace = trim(String(state.activeWorkspaceId || workspaceId));
       var resolvedConversation = trim(String(conversationId || state.activeConversationId || ""));
@@ -6715,7 +6744,11 @@
         var entry = sequence[index] || {};
         var taskDef = entry.task || {};
         var taskMode = normalizeRunMode(taskDef.mode || "programming");
-        var taskPrompt = trim(String(taskDef.prompt || ""));
+        var taskId = normalizeAssayTaskId(taskDef.id || "");
+        var taskPrompt = trim(buildAssayMentoredPromptForTask(taskDef, mentorSnapshot));
+        if (!taskPrompt) {
+          taskPrompt = trim(String(taskDef.prompt || ""));
+        }
         if (!taskPrompt) {
           return enqueueStep(index + 1);
         }
@@ -6734,7 +6767,8 @@
           state.permissionMode,
           state.commandExecMode,
           state.programmerReviewEnabled,
-          state.programmerReviewRounds
+          state.programmerReviewRounds,
+          taskId
         ).then(function () {
           return enqueueStep(index + 1);
         });
@@ -7632,6 +7666,15 @@
         parts.push("Code review x" + String(reviewRounds));
       } else {
         parts.push("Code review off");
+      }
+    }
+    var assayTaskId = normalizeAssayTaskId(item && item.assay_task_id);
+    if (assayTaskId) {
+      var assayTask = assayTaskById(assayTaskId);
+      if (assayTask && assayTask.title) {
+        parts.push("Assay: " + assayTask.title);
+      } else {
+        parts.push("Assay: " + assayTaskId);
       }
     }
     if (item && Array.isArray(item.explicit_skill_ids) && item.explicit_skill_ids.length) {
@@ -10380,6 +10423,343 @@
     return ASSAY_TASKS[normalized] || null;
   }
 
+  function normalizeAssayTaskId(value) {
+    var id = trim(String(value || "")).toLowerCase();
+    if (!id) {
+      return "";
+    }
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(id)) {
+      return "";
+    }
+    return id;
+  }
+
+  function assayTaskById(taskId) {
+    var normalized = normalizeAssayTaskId(taskId);
+    if (!normalized) {
+      return null;
+    }
+    for (var i = 0; i < ASSAY_TASKS.length; i += 1) {
+      var task = ASSAY_TASKS[i] || {};
+      if (normalizeAssayTaskId(task.id || "") === normalized) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  function runEventAssayTaskId(event) {
+    return normalizeAssayTaskId(event && event.assay_task_id);
+  }
+
+  function assayScoreClamp(value) {
+    var score = Number(value || 0);
+    if (!isFinite(score)) {
+      score = 0;
+    }
+    if (score < 0) {
+      score = 0;
+    }
+    if (score > 100) {
+      score = 100;
+    }
+    return Math.round(score);
+  }
+
+  function assayBumpCount(map, id, label) {
+    var key = trim(String(id || ""));
+    if (!key) {
+      return;
+    }
+    if (!map[key]) {
+      map[key] = {
+        id: key,
+        label: trim(String(label || key)) || key,
+        count: 0
+      };
+    }
+    map[key].count += 1;
+  }
+
+  function assayTopCountEntry(map) {
+    var keys = Object.keys(map || {});
+    if (!keys.length) {
+      return null;
+    }
+    var best = null;
+    for (var i = 0; i < keys.length; i += 1) {
+      var item = map[keys[i]] || null;
+      if (!item) {
+        continue;
+      }
+      if (!best || Number(item.count || 0) > Number(best.count || 0)) {
+        best = item;
+      }
+    }
+    return best;
+  }
+
+  function assayMentorDirectiveForFocus(focusId) {
+    var id = trim(String(focusId || ""));
+    if (id === "step_coverage") {
+      return "Emit more short, timestamp-friendly steps while thinking.";
+    }
+    if (id === "verification_evidence") {
+      return "Show concrete verification evidence before claiming completion.";
+    }
+    if (id === "plan_structure") {
+      return "State a tighter plan with explicit completion criteria early.";
+    }
+    if (id === "execution_depth") {
+      return "Increase concrete execution depth before synthesis.";
+    }
+    if (id === "reliability") {
+      return "When blocked, pivot to a fallback path and keep progress moving.";
+    }
+    return "Keep updates structured and evidence-first.";
+  }
+
+  function assayEvaluateRun(event) {
+    var status = String(event && event.status || "");
+    var taskId = runEventAssayTaskId(event);
+    var task = assayTaskById(taskId);
+    var mode = normalizeRunMode(task && task.mode || "");
+    var entries = splitRunStreamEntries(event && event.stream_text);
+    var stepCount = entries.length;
+    var timestampedSteps = 0;
+    for (var i = 0; i < entries.length; i += 1) {
+      if (trim(String(entries[i] && entries[i].time || ""))) {
+        timestampedSteps += 1;
+      }
+    }
+    var commandCount = Array.isArray(event && event.commands) ? event.commands.length : 0;
+    var reviewRounds = runTraceReviewRoundCount(event);
+    var durationSeconds = runDurationSeconds(event && event.started_at, event && event.finished_at);
+    var planText = trim(String(event && event.plan || ""));
+    var streamText = String(event && event.stream_text || "");
+    var sessionText = String(event && event.session_log || "");
+    var controlScaffold = /MODE_UPDATE:|PLAN_UPDATE:|Next Action:|Completion Criteria:|Transition:/i.test(streamText + "\n" + planText + "\n" + sessionText);
+    var verificationSignals = /verified|verification|regression|tests?\s+(pass|passed)|DONE_CLAIM:\s*yes/i.test(streamText + "\n" + sessionText + "\n" + String(event && event.state || ""));
+    var taskStatus = normalizeRunTaskStatusSnapshot(event && event.task_status);
+    var completionRatio = 0;
+    if (taskStatus && taskStatus.total > 0) {
+      completionRatio = Number(taskStatus.completed || 0) / Number(taskStatus.total || 1);
+    }
+
+    var intelligence = 44;
+    if (status === "done") {
+      intelligence += 24;
+    } else if (status === "error") {
+      intelligence -= 26;
+    } else if (status === "cancelled") {
+      intelligence -= 18;
+    } else if (status === "awaiting_approval" || status === "awaiting_decision") {
+      intelligence -= 8;
+    }
+    if (planText) {
+      intelligence += 8;
+    }
+    if (controlScaffold) {
+      intelligence += 8;
+    }
+    if (verificationSignals) {
+      intelligence += 9;
+    }
+    if (completionRatio >= 0.8) {
+      intelligence += 10;
+    } else if (taskStatus && completionRatio < 0.5) {
+      intelligence -= 10;
+    }
+    if (stepCount < 3) {
+      intelligence -= 12;
+    }
+    if (reviewRounds > 0) {
+      intelligence += 5;
+    }
+    if ((mode === "programming" || mode === "report") && commandCount >= 2) {
+      intelligence += 10;
+    }
+    if ((mode === "programming" || mode === "report") && commandCount >= 6) {
+      intelligence += 6;
+    }
+    if ((mode === "programming" || mode === "report") && commandCount === 0 && status === "done") {
+      intelligence -= 8;
+    }
+
+    var flow = 40;
+    if (stepCount >= 10) {
+      flow += 18;
+    } else if (stepCount >= 5) {
+      flow += 10;
+    } else if (stepCount >= 2) {
+      flow += 4;
+    } else {
+      flow -= 12;
+    }
+    if (timestampedSteps >= Math.min(3, stepCount)) {
+      flow += 8;
+    }
+    if (controlScaffold) {
+      flow += 9;
+    }
+    if (verificationSignals) {
+      flow += 6;
+    }
+    if (durationSeconds >= 45) {
+      flow += 5;
+    }
+    if (trim(streamText).length < 90) {
+      flow -= 10;
+    }
+    if (status === "error" && stepCount < 4) {
+      flow -= 8;
+    }
+
+    var strengths = [];
+    var focus = [];
+    if (controlScaffold) {
+      strengths.push({ id: "plan_structure", label: "Structured plan updates stayed visible." });
+    } else {
+      focus.push({ id: "plan_structure", label: "Make plan updates and completion criteria explicit." });
+    }
+    if (verificationSignals) {
+      strengths.push({ id: "verification_evidence", label: "Verification evidence was visible in trace output." });
+    } else {
+      focus.push({ id: "verification_evidence", label: "Add explicit verification evidence before DONE." });
+    }
+    if (stepCount >= 8) {
+      strengths.push({ id: "step_coverage", label: "Step coverage stayed detailed through the run." });
+    } else {
+      focus.push({ id: "step_coverage", label: "Increase step-by-step trace coverage while thinking." });
+    }
+    if ((mode === "programming" || mode === "report") && commandCount < 2) {
+      focus.push({ id: "execution_depth", label: "Increase concrete command-level execution depth." });
+    }
+    if (status === "error" || status === "cancelled" || status === "awaiting_approval" || status === "awaiting_decision") {
+      focus.push({ id: "reliability", label: "Improve reliability with clearer fallback and recovery flow." });
+    }
+
+    return {
+      taskId: taskId,
+      intelligence: assayScoreClamp(intelligence),
+      flow: assayScoreClamp(flow),
+      overall: assayScoreClamp((intelligence + flow) / 2),
+      strengths: strengths,
+      focus: focus
+    };
+  }
+
+  function buildAssayMentorSnapshot() {
+    var snapshot = {};
+    var conversations = state.runEventsByConversation || {};
+    var conversationIds = Object.keys(conversations);
+    for (var i = 0; i < conversationIds.length; i += 1) {
+      var conversationId = conversationIds[i];
+      var events = Array.isArray(conversations[conversationId]) ? conversations[conversationId] : [];
+      for (var j = 0; j < events.length; j += 1) {
+        var event = events[j] || {};
+        var taskId = runEventAssayTaskId(event);
+        if (!taskId) {
+          continue;
+        }
+        var status = String(event.status || "");
+        if (status === "running" || status === "approval_granted") {
+          continue;
+        }
+        var quality = assayEvaluateRun(event);
+        if (!quality.taskId) {
+          continue;
+        }
+        var bucket = snapshot[taskId];
+        if (!bucket) {
+          bucket = {
+            runs: 0,
+            intelligenceTotal: 0,
+            flowTotal: 0,
+            overallTotal: 0,
+            strengthCounts: {},
+            focusCounts: {},
+            lastEvent: null
+          };
+          snapshot[taskId] = bucket;
+        }
+        bucket.runs += 1;
+        bucket.intelligenceTotal += quality.intelligence;
+        bucket.flowTotal += quality.flow;
+        bucket.overallTotal += quality.overall;
+        for (var s = 0; s < quality.strengths.length; s += 1) {
+          var strength = quality.strengths[s] || {};
+          assayBumpCount(bucket.strengthCounts, strength.id, strength.label);
+        }
+        for (var f = 0; f < quality.focus.length; f += 1) {
+          var focus = quality.focus[f] || {};
+          assayBumpCount(bucket.focusCounts, focus.id, focus.label);
+        }
+        var eventTime = runEventTimestampValue(event);
+        var previousTime = runEventTimestampValue(bucket.lastEvent || null);
+        if (!bucket.lastEvent || eventTime >= previousTime) {
+          bucket.lastEvent = event;
+        }
+      }
+    }
+
+    var taskIds = Object.keys(snapshot);
+    for (var k = 0; k < taskIds.length; k += 1) {
+      var id = taskIds[k];
+      var item = snapshot[id] || {};
+      var runs = Number(item.runs || 0);
+      if (runs < 1) {
+        delete snapshot[id];
+        continue;
+      }
+      var topStrength = assayTopCountEntry(item.strengthCounts);
+      var topFocus = assayTopCountEntry(item.focusCounts);
+      item.intelligence = assayScoreClamp(item.intelligenceTotal / runs);
+      item.flow = assayScoreClamp(item.flowTotal / runs);
+      item.overall = assayScoreClamp(item.overallTotal / runs);
+      item.topStrength = topStrength;
+      item.topFocus = topFocus;
+      item.directive = assayMentorDirectiveForFocus(topFocus && topFocus.id);
+      item.targetIntelligence = assayScoreClamp(Math.max(70, Math.min(95, item.intelligence + 6)));
+      item.targetFlow = assayScoreClamp(Math.max(70, Math.min(95, item.flow + 6)));
+    }
+
+    return snapshot;
+  }
+
+  function buildAssayMentoredPromptForTask(task, mentorSnapshot) {
+    var taskDef = task || {};
+    var basePrompt = trim(String(taskDef.prompt || ""));
+    if (!basePrompt) {
+      return "";
+    }
+    var taskId = normalizeAssayTaskId(taskDef.id || "");
+    if (!taskId) {
+      return basePrompt;
+    }
+    var snapshot = mentorSnapshot && typeof mentorSnapshot === "object" ? mentorSnapshot : {};
+    var mentor = snapshot[taskId] || null;
+    if (!mentor || Number(mentor.runs || 0) < 1) {
+      return basePrompt;
+    }
+    var lines = [];
+    lines.push(basePrompt);
+    lines.push("");
+    lines.push("Assay mentor guidance from prior cycles:");
+    if (mentor.topStrength && mentor.topStrength.label) {
+      lines.push("- Preserve: " + mentor.topStrength.label);
+    }
+    if (mentor.topFocus && mentor.topFocus.label) {
+      lines.push("- Improve: " + mentor.topFocus.label);
+    }
+    if (mentor.directive) {
+      lines.push("- Direction: " + mentor.directive);
+    }
+    lines.push("- Target scores: intelligence " + String(mentor.targetIntelligence) + "+, flow " + String(mentor.targetFlow) + "+.");
+    lines.push("- Keep step updates concise and timestamp-friendly, and end with explicit verification evidence.");
+    return lines.join("\n");
+  }
+
   function computeBudgetLabel(value) {
     var next = normalizeComputeBudget(value);
     if (next === "quick") {
@@ -12287,6 +12667,7 @@
     var explicitPermissionModeOverride = normalizePermissionModeValue(runOptions.permissionMode || "");
     var explicitCommandExecModeOverride = normalizeCommandExecModeValue(runOptions.commandExecMode || "");
     var explicitSkillIdsOverride = Array.isArray(runOptions.explicitSkillIds) ? runOptions.explicitSkillIds : [];
+    var explicitAssayTaskId = normalizeAssayTaskId(runOptions.assayTaskId || "");
     var explicitProgrammerReviewOverride = null;
     var explicitProgrammerReviewRoundsOverride = null;
     if (Object.prototype.hasOwnProperty.call(runOptions, "programmerReview")) {
@@ -12376,7 +12757,8 @@
         status: "running",
         started_at: new Date().toISOString(),
         stream_text: "",
-        message_anchor: runAnchor
+        message_anchor: runAnchor,
+        assay_task_id: explicitAssayTaskId
       });
     } else {
       if (preferredEventId && String(pendingEvent.id || "") !== preferredEventId) {
@@ -12385,6 +12767,9 @@
       var pendingAnchor = Number(pendingEvent.message_anchor);
       if (!isFinite(pendingAnchor) || pendingAnchor < 0) {
         pendingEvent.message_anchor = runAnchor;
+      }
+      if (explicitAssayTaskId) {
+        pendingEvent.assay_task_id = explicitAssayTaskId;
       }
       persistRunEventsSoon();
     }
@@ -12511,6 +12896,7 @@
       explicit_skill_ids: explicitSkillIdsForRun.join(","),
       reasoning_effort: runProfile.reasoning,
       max_iterations: String(selectedIterations),
+      assay_task_id: explicitAssayTaskId,
       stream_session: streamSession,
       run_event_id: pendingEvent && pendingEvent.id ? String(pendingEvent.id) : "",
       run_message_anchor: String(Math.max(0, Math.floor(Number(runAnchor || 0))))
@@ -12785,7 +13171,7 @@
     }
   }
 
-  function enqueuePrompt(workspaceId, conversationId, promptText, position, attachmentIds, runMode, assistantModeId, computeBudget, explicitSkillIds, permissionMode, commandExecMode, programmerReviewEnabled, programmerReviewRounds) {
+  function enqueuePrompt(workspaceId, conversationId, promptText, position, attachmentIds, runMode, assistantModeId, computeBudget, explicitSkillIds, permissionMode, commandExecMode, programmerReviewEnabled, programmerReviewRounds, assayTaskId) {
     var attachmentList = Array.isArray(attachmentIds) ? attachmentIds : [];
     var normalizedMode = normalizeRunMode(runMode || state.runMode);
     var normalizedAssistantMode = normalizedMode === "assistant" ? normalizeAssistantModeId(assistantModeId || state.assistantModeId) : "";
@@ -12804,6 +13190,7 @@
     if (!normalizedProgrammerReview) {
       normalizedProgrammerReviewRounds = 0;
     }
+    var normalizedAssayTaskId = normalizeAssayTaskId(assayTaskId || "");
     var normalizedSkillIds = mergeSkillIdLists(explicitSkillIds, []);
     return apiPost("queue_enqueue", {
       workspace_id: workspaceId,
@@ -12818,6 +13205,7 @@
       command_exec_mode: normalizedCommandExecMode,
       programmer_review: normalizedProgrammerReview ? "1" : "0",
       programmer_review_rounds: String(normalizedProgrammerReviewRounds),
+      assay_task_id: normalizedAssayTaskId,
       explicit_skill_ids: normalizedSkillIds.join(",")
     }, { timeoutMs: 90000 }).then(function (response) {
       if (!response.success) {
@@ -13097,6 +13485,7 @@
         programmerReviewRounds: normalizeProgrammerReviewRoundsValue(item.programmer_review_rounds || 2),
         permissionMode: normalizePermissionModeValue(item.permission_mode || ""),
         commandExecMode: normalizeCommandExecModeValue(item.command_exec_mode || ""),
+        assayTaskId: normalizeAssayTaskId(item.assay_task_id || ""),
         explicitSkillIds: Array.isArray(item.explicit_skill_ids) ? item.explicit_skill_ids : [],
         approvalRetry: options.approvalRetry === true,
         pendingEvent: resumedPendingEvent
@@ -13239,7 +13628,7 @@
         firstId: response.queue_first_id || ""
       });
 
-      return executeQueuedItem(target.workspaceId, target.conversationId, response.item).then(function () {
+      return executeQueuedItem(target.workspaceId, target.conversationId, normalizeQueueListItem(response.item)).then(function () {
         return drainQueuedRuns();
       });
     });
@@ -13407,7 +13796,7 @@
         firstId: response.queue_first_id || "",
         lastStatus: "running"
       });
-      return executeQueuedItem(wsId, convId, response.item, { approvalRetry: true }).then(function () {
+      return executeQueuedItem(wsId, convId, normalizeQueueListItem(response.item), { approvalRetry: true }).then(function () {
         return true;
       });
     });

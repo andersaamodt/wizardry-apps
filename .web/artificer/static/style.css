@@ -5111,6 +5111,17 @@ select:focus {
   line-height: 1.25;
 }
 
+.assay-task-metrics {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.assay-task-focus {
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
 @media (max-width: 640px) {
   .assay-actions {
     grid-template-columns: auto auto;
