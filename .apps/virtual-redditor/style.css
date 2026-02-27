@@ -4536,6 +4536,16 @@ input.range-input-invalid[type='number'] {
   align-items: center;
   gap: 8px;
   margin-top: 8px;
+  width: 100%;
+}
+
+#delete-modal .rename-actions,
+#extract-norms-modal .extract-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .extract-actions {
