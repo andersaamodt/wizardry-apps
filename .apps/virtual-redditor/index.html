@@ -6947,7 +6947,8 @@
         }
       });
       document.getElementById('btn-relationships-manual-override').addEventListener('click', function () {
-        openRelationshipOverrideDrawer();
+        if (state.relationshipOverrideOpen) closeRelationshipOverrideDrawer();
+        else openRelationshipOverrideDrawer();
       });
       document.getElementById('btn-relationship-drawer-close').addEventListener('click', function () {
         closeRelationshipOverrideDrawer();
