@@ -52,7 +52,6 @@
     publishNowButton: document.getElementById('btn-publish-now'),
     mirrorNostrButton: document.getElementById('btn-mirror-nostr'),
     bindPasskeyButton: document.getElementById('btn-bind-passkey'),
-    migrateNostrKeyButton: document.getElementById('btn-migrate-nostr-key'),
     generateSshButton: document.getElementById('btn-generate-ssh'),
     linkSshButton: document.getElementById('btn-link-ssh'),
     imagePicker: document.getElementById('image-picker'),
@@ -1203,15 +1202,6 @@
           .catch(function (err) {
             setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
           });
-      });
-    }
-    if (els.migrateNostrKeyButton) {
-      els.migrateNostrKeyButton.addEventListener('click', function () {
-        setOutput(
-          els.outputAccount,
-          'Nostr key migration is intentionally gated. It requires proof of control for both old and new keys before any account rebind. This flow is not enabled yet.',
-          'warn'
-        );
       });
     }
     if (els.generateSshButton) {

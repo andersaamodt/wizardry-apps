@@ -310,9 +310,6 @@ title: Blog Admin
 <label for="account-nostr-pubkey"><strong>Nostr Pubkey</strong></label>
 <input type="text" id="account-nostr-pubkey" readonly>
 <p class="muted account-note">This key is account-bound and cannot be edited directly.</p>
-<div class="account-row">
-<button id="btn-migrate-nostr-key" type="button" class="danger">Migrate Nostr Key...</button>
-</div>
 </div>
 
 <div class="field-row">
