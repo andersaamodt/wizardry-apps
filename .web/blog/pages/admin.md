@@ -255,7 +255,7 @@ title: Blog Admin
 <div class="field-row compose-release-row">
 <strong>Release Mode</strong>
 <div class="mode-row">
-<label><input type="radio" name="publish-mode" value="draft" checked> Draft</label>
+<label><input type="radio" name="publish-mode" value="immediate" checked> Immediate</label>
 <label><input type="radio" name="publish-mode" value="scheduled"> Scheduled Date</label>
 <label><input type="radio" name="publish-mode" value="drip"> Drip Queue <span id="drip-queue-pill" class="drip-queue-pill" hidden></span></label>
 </div>

@@ -139,6 +139,9 @@ case "$action" in
 
   autosave|save_draft|save)
     status=draft
+    if [ "$publish_mode" = "immediate" ]; then
+      publish_mode=draft
+    fi
     # Preserve existing queued/scheduled state during autosave so release mode does not silently downgrade.
     if [ "$action" = "autosave" ]; then
       if [ "$existing_publish_mode" = "drip" ] && [ "$existing_status" = "queued" ]; then

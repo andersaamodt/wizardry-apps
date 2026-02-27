@@ -567,16 +567,28 @@
 
   function getPublishMode() {
     const picked = publishModeInputs.find(function (input) { return input.checked; });
-    return picked ? picked.value : 'draft';
+    return picked ? picked.value : 'immediate';
+  }
+
+  function normalizeComposePublishMode(mode) {
+    const raw = String(mode || '').trim().toLowerCase();
+    if (raw === 'scheduled' || raw === 'drip' || raw === 'immediate') {
+      return raw;
+    }
+    if (raw === 'draft' || raw === '') {
+      return 'immediate';
+    }
+    return 'immediate';
   }
 
   function setPublishMode(mode) {
+    const normalized = normalizeComposePublishMode(mode);
     publishModeInputs.forEach(function (input) {
-      input.checked = input.value === mode;
+      input.checked = input.value === normalized;
     });
-    updatePrimaryPublishButton(mode);
-    updateScheduledRowVisibility(mode);
-    updateDripQueuePill(mode);
+    updatePrimaryPublishButton(normalized);
+    updateScheduledRowVisibility(normalized);
+    updateDripQueuePill(normalized);
   }
 
   function updatePrimaryPublishButton(mode) {
@@ -749,8 +761,8 @@
       mode = 'drip';
     } else if (status === 'scheduled') {
       mode = 'scheduled';
-    } else if (mode !== 'scheduled' && mode !== 'drip' && mode !== 'draft') {
-      mode = 'draft';
+    } else {
+      mode = normalizeComposePublishMode(mode);
     }
 
     state.suspendAutosave = true;
@@ -759,7 +771,7 @@
     setComposeTagsFromString(draft.tags || '');
     els.postContent.value = draft.content || '';
     els.postScheduleAt.value = isoToLocal(draft.scheduled_at || '');
-    setPublishMode(mode || 'draft');
+    setPublishMode(mode || 'immediate');
     renderPreview();
     refreshDraftLabel();
     setTimeout(function () {
@@ -773,7 +785,7 @@
     setComposeTags([]);
     els.postContent.value = '';
     els.postScheduleAt.value = '';
-    setPublishMode('draft');
+    setPublishMode('immediate');
     renderPreview();
     refreshDraftLabel();
   }
