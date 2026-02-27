@@ -970,7 +970,21 @@ h2 {
   padding: 0 11px;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+button:disabled,
+.toolbar-btn:disabled,
+.path-widget:disabled {
+  cursor: not-allowed;
+}
+
+.toolbar-btn:disabled,
+.path-widget:disabled {
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--line) 14%);
+  border-color: color-mix(in srgb, var(--line-strong) 78%, var(--text-muted) 22%);
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--line) 12%);
+  opacity: 0.58;
 }
 
 .split-anchor .split-btn {
@@ -1111,6 +1125,16 @@ h2 {
 .terminal-icon-btn svg {
   width: 22px;
   height: 22px;
+}
+
+.terminal-icon-btn:disabled,
+.changes-btn:disabled {
+  opacity: 0.52;
+  color: color-mix(in srgb, var(--text-muted) 90%, var(--line) 10%);
+}
+
+.terminal-icon-btn:disabled svg {
+  opacity: 0.7;
 }
 
 .terminal-icon-btn.on {
