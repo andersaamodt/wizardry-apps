@@ -548,19 +548,16 @@
         </section>
 
         <section class="tab-panel" id="panel-log">
-          <div class="status-line" id="mode-log-line">No mode log loaded yet.</div>
-          <div class="table-wrap mini-table-wrap">
-            <table class="table" id="mode-log-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Event</th>
-                  <th>Payload</th>
-                </tr>
-              </thead>
-              <tbody id="mode-log-body"></tbody>
-            </table>
+          <div class="mode-log-frame">
+            <div class="mode-log-head">
+              <span>Time</span>
+              <span>Event</span>
+              <span>Details</span>
+              <span></span>
+            </div>
+            <div id="mode-log-list" class="mode-log-list" role="table" aria-label="Mode events log"></div>
           </div>
+          <div class="mode-log-status" id="mode-log-line">No mode events loaded yet.</div>
           <div class="log-head-row">
             <div class="status-line">Standard Output</div>
             <button id="btn-log-clear-stdout" type="button" class="soft log-clear-btn">Clear</button>
@@ -4234,28 +4231,67 @@
       if (line) line.textContent = String(rows.length) + ' relationships loaded';
     }
 
+    function modeLogPayloadSummary(row) {
+      var eventName = String((row && row.event) || 'event');
+      var payload = (row && typeof row.payload === 'object' && row.payload) ? row.payload : {};
+      var toMode = String(payload.toMode || payload.to_mode || payload.current_mode || payload.mode || '');
+      var fromMode = String(payload.fromMode || payload.from_mode || '');
+      var user = String(payload.user || payload.user_id || payload.author || payload.target_user || '');
+      var action = String(payload.action || payload.action_name || payload.actionType || '');
+      var trigger = String(payload.trigger || payload.reason || payload.source || '');
+
+      if (eventName.indexOf('switch') >= 0 && toMode) {
+        var modePart = fromMode ? ('Mode ' + fromMode + ' -> ' + toMode) : ('Mode -> ' + toMode);
+        return user ? (modePart + ' for u/' + user + '.') : (modePart + '.');
+      }
+      if (eventName.indexOf('override') >= 0 && toMode) {
+        var overridePart = 'Manual override to ' + toMode;
+        return user ? (overridePart + ' for u/' + user + '.') : (overridePart + '.');
+      }
+      if (action) {
+        var actionPart = 'Action: ' + action + '.';
+        return user ? (actionPart + ' User: u/' + user + '.') : actionPart;
+      }
+      if (trigger) {
+        return 'Trigger: ' + trigger + '.';
+      }
+
+      var keys = Object.keys(payload || {});
+      if (!keys.length) return 'No payload details.';
+      var shown = keys.slice(0, 3).join(', ');
+      return 'Payload fields: ' + shown + (keys.length > 3 ? '…' : '') + '.';
+    }
+
     function renderModeLog() {
-      var body = document.getElementById('mode-log-body');
+      var list = document.getElementById('mode-log-list');
       var line = document.getElementById('mode-log-line');
       var rows = Array.isArray(state.modeLogEvents) ? state.modeLogEvents : [];
-      if (!body) return;
+      if (!list) return;
       var sig = stableStringify(rows);
       if (sig && sig === state.modeLogRenderSig) return;
       state.modeLogRenderSig = sig;
+      var previousScrollTop = list.scrollTop;
+      var wasPinnedToBottom = Math.abs((list.scrollHeight - list.clientHeight) - list.scrollTop) <= 8;
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="3" class="actions-empty-cell">No mode events yet.</td></tr>';
-        if (line) line.textContent = '0 mode events';
+        list.innerHTML = '<div class="mode-log-empty">No mode events yet.</div>';
+        if (line) line.textContent = '0 mode events loaded';
         return;
       }
-      body.innerHTML = rows.map(function (row) {
+      list.innerHTML = rows.map(function (row, idx) {
         return [
-          '<tr>',
-          '  <td>' + escapeHtml(formatTs(row.ts || '')) + '</td>',
-          '  <td>' + escapeHtml(String(row.event || 'event')) + '</td>',
-          '  <td><code class="inline-code">' + escapeHtml(stableStringify(row.payload || {})) + '</code></td>',
-          '</tr>'
+          '<div class="mode-log-row">',
+          '  <div class="mode-log-time">' + escapeHtml(formatTs(row.ts || '')) + '</div>',
+          '  <div class="mode-log-event">' + escapeHtml(String(row.event || 'event')) + '</div>',
+          '  <div class="mode-log-detail">' + escapeHtml(modeLogPayloadSummary(row)) + '</div>',
+          '  <button type="button" class="mode-log-copy-btn" data-mode-log-copy="' + String(idx) + '" title="Copy event JSON" aria-label="Copy event JSON">Copy</button>',
+          '</div>'
         ].join('');
       }).join('');
+      if (wasPinnedToBottom) {
+        list.scrollTop = list.scrollHeight;
+      } else {
+        list.scrollTop = Math.max(0, Math.min(previousScrollTop, Math.max(0, list.scrollHeight - list.clientHeight)));
+      }
       if (line) line.textContent = String(rows.length) + ' mode events loaded';
     }
 
@@ -5865,6 +5901,37 @@
       });
       document.getElementById('btn-log-clear-stderr').addEventListener('click', function () {
         document.getElementById('stderr-log').textContent = '';
+      });
+      document.getElementById('mode-log-list').addEventListener('click', async function (event) {
+        var copyBtn = event.target && event.target.closest('[data-mode-log-copy]');
+        if (!copyBtn) return;
+        var idx = parseInt(copyBtn.getAttribute('data-mode-log-copy') || '-1', 10);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= state.modeLogEvents.length) return;
+        var payload = '';
+        try {
+          payload = JSON.stringify(state.modeLogEvents[idx], null, 2);
+        } catch (_jsonErr) {
+          payload = stableStringify(state.modeLogEvents[idx]);
+        }
+        if (!payload) return;
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(payload);
+          } else {
+            var ta = document.createElement('textarea');
+            ta.value = payload;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+          }
+          showToast('Event JSON copied.', 'info');
+        } catch (_err) {
+          showToast('Could not copy event JSON.', 'warn');
+        }
       });
 
       document.addEventListener('click', function (event) {

@@ -2392,6 +2392,110 @@ label {
   margin-bottom: 8px;
 }
 
+.mode-log-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;
+  max-height: clamp(220px, 34vh, 340px);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--bg-panel) 88%, #fff 12%);
+  overflow: hidden;
+}
+
+.mode-log-head {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(110px, 0.6fr) minmax(0, 2.4fr) 62px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-subtle);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mode-log-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.mode-log-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(110px, 0.6fr) minmax(0, 2.4fr) 62px;
+  gap: 8px;
+  align-items: start;
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 56%, transparent);
+}
+
+.mode-log-row:last-child {
+  border-bottom: 0;
+}
+
+.mode-log-time,
+.mode-log-event,
+.mode-log-detail {
+  font-size: 0.76rem;
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mode-log-time {
+  color: color-mix(in srgb, var(--text-subtle) 86%, var(--text) 14%);
+  white-space: nowrap;
+}
+
+.mode-log-event {
+  color: color-mix(in srgb, var(--text) 88%, var(--text-subtle) 12%);
+  font-weight: 600;
+}
+
+.mode-log-detail {
+  color: color-mix(in srgb, var(--text) 92%, var(--bg-main) 8%);
+}
+
+.mode-log-copy-btn {
+  justify-self: end;
+  align-self: center;
+  min-height: 1.45rem;
+  min-width: 2.1rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0 0.4rem;
+  cursor: pointer;
+}
+
+.mode-log-copy-btn:hover,
+.mode-log-copy-btn:focus-visible {
+  background: color-mix(in srgb, var(--line) 56%, transparent);
+  color: var(--text);
+  outline: none;
+}
+
+.mode-log-empty {
+  padding: 10px 8px;
+  color: var(--text-subtle);
+  font-style: italic;
+  font-size: 0.76rem;
+}
+
+.mode-log-status {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 0.68rem;
+  color: color-mix(in srgb, var(--text-subtle) 82%, var(--bg-main) 18%);
+}
+
 .modes-save-actions {
   justify-content: flex-end;
 }
@@ -2438,21 +2542,6 @@ label {
 #relationships-table th:nth-child(7),
 #relationships-table td:nth-child(7) {
   width: 10%;
-}
-
-#mode-log-table th:nth-child(1),
-#mode-log-table td:nth-child(1) {
-  width: 16%;
-}
-
-#mode-log-table th:nth-child(2),
-#mode-log-table td:nth-child(2) {
-  width: 14%;
-}
-
-#mode-log-table th:nth-child(3),
-#mode-log-table td:nth-child(3) {
-  width: 70%;
 }
 
 .persona-layout {
