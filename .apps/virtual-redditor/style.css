@@ -2580,6 +2580,11 @@ label {
   min-width: 7ch;
 }
 
+.mode-detail-drawer .action-transition-controls input[data-transition-duration-action] {
+  width: 68px;
+  min-width: 68px;
+}
+
 .mode-detail-drawer .mode-expiry-input input[data-mode-drawer-default-expiry] {
   width: 72px;
   min-width: 72px;
