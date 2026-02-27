@@ -10,9 +10,6 @@ blog_init
 blog_read_request_body
 blog_send_html_headers
 
-# Promote due scheduled/drip posts before rendering.
-blog_run_scheduler >/dev/null 2>&1 || true
-
 page=$(blog_param page)
 case "$page" in ''|*[!0-9]*) page=1 ;; esac
 if [ "$page" -lt 1 ]; then

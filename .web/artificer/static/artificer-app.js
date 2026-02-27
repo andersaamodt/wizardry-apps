@@ -20761,6 +20761,19 @@
     });
 
     on(el.runPrompt, "keydown", function (event) {
+      var key = String((event && event.key) || "").toLowerCase();
+      if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+        if (
+          (!event.shiftKey && (key === "a" || key === "c" || key === "x" || key === "v" || key === "z" || key === "y")) ||
+          (event.shiftKey && key === "z")
+        ) {
+          // Keep native textarea editing shortcuts intact.
+          if (typeof event.stopPropagation === "function") {
+            event.stopPropagation();
+          }
+          return;
+        }
+      }
       if (event.key !== "Enter") {
         return;
       }

@@ -35,7 +35,13 @@
     nextDripExcerpt: '',
     configSaveTimer: null,
     nostrBridgeSaveTimer: null,
-    isLoadingConfig: false
+    isLoadingConfig: false,
+    queueItemCount: 0,
+    localDripWorkerTimer: null,
+    localDripWorkerBusy: false,
+    localDripLeader: false,
+    localDripTabId: '',
+    localDripLastTickAt: 0
   };
 
   const els = {
@@ -78,6 +84,8 @@
     togglePreviewButton: document.getElementById('btn-toggle-preview'),
     draftsList: document.getElementById('drafts-list'),
     queueList: document.getElementById('queue-list'),
+    queueLocalDripStatus: document.getElementById('queue-local-drip-status'),
+    queueLocalDripStatusText: document.getElementById('queue-local-drip-status-text'),
     postsList: document.getElementById('posts-list'),
     usersList: document.getElementById('users-list'),
     currentDraftLabel: document.getElementById('current-draft-label'),
@@ -99,6 +107,9 @@
   };
 
   const publishModeInputs = Array.from(document.querySelectorAll('input[name="publish-mode"]'));
+  const LOCAL_DRIP_LEASE_KEY = 'blog_local_drip_lease_v1';
+  const LOCAL_DRIP_LEASE_MS = 45000;
+  const LOCAL_DRIP_TICK_MS = 15000;
 
   function setAuthMessage(message, type) {
     if (!els.authStatus) {
@@ -237,6 +248,142 @@
     if (target) {
       target.innerHTML = '';
     }
+  }
+
+  function updateQueueLocalDripStatus() {
+    if (!els.queueLocalDripStatus) {
+      return;
+    }
+    if (!state.queueItemCount) {
+      els.queueLocalDripStatus.hidden = true;
+      return;
+    }
+    els.queueLocalDripStatus.hidden = false;
+    if (els.queueLocalDripStatusText) {
+      els.queueLocalDripStatusText.textContent = state.localDripLeader
+        ? 'Local drip running. Keep this tab open.'
+        : 'Queue active. Keep one admin tab open for local drip.';
+    }
+  }
+
+  function localDripLeaseRead() {
+    try {
+      const raw = localStorage.getItem(LOCAL_DRIP_LEASE_KEY) || '';
+      if (!raw) {
+        return null;
+      }
+      const data = JSON.parse(raw);
+      if (!data || typeof data.owner !== 'string') {
+        return null;
+      }
+      const expiresAt = Number(data.expires_at || 0);
+      if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
+        return null;
+      }
+      return { owner: data.owner, expires_at: expiresAt };
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  function localDripLeaseWrite(expiresAt) {
+    const payload = {
+      owner: state.localDripTabId,
+      expires_at: Math.max(0, Math.floor(expiresAt))
+    };
+    localStorage.setItem(LOCAL_DRIP_LEASE_KEY, JSON.stringify(payload));
+  }
+
+  function localDripTryAcquireLease() {
+    const now = Date.now();
+    const lease = localDripLeaseRead();
+    if (!lease || lease.expires_at <= now || lease.owner === state.localDripTabId) {
+      localDripLeaseWrite(now + LOCAL_DRIP_LEASE_MS);
+      return true;
+    }
+    return false;
+  }
+
+  function localDripReleaseLease() {
+    const lease = localDripLeaseRead();
+    if (!lease || lease.owner !== state.localDripTabId) {
+      return;
+    }
+    localStorage.removeItem(LOCAL_DRIP_LEASE_KEY);
+  }
+
+  function setLocalDripLeader(active) {
+    state.localDripLeader = !!active;
+    updateQueueLocalDripStatus();
+  }
+
+  async function localDripWorkerTick(force) {
+    if (!state.isAdmin || !state.sessionToken) {
+      setLocalDripLeader(false);
+      localDripReleaseLease();
+      return;
+    }
+    if (document.visibilityState !== 'visible') {
+      setLocalDripLeader(false);
+      localDripReleaseLease();
+      return;
+    }
+    if (state.localDripWorkerBusy) {
+      return;
+    }
+    if (!localDripTryAcquireLease()) {
+      setLocalDripLeader(false);
+      return;
+    }
+    setLocalDripLeader(true);
+    const now = Date.now();
+    if (!force && now - state.localDripLastTickAt < LOCAL_DRIP_TICK_MS - 500) {
+      return;
+    }
+    state.localDripLastTickAt = now;
+    state.localDripWorkerBusy = true;
+    try {
+      const data = await apiPost('/cgi/blog-run-scheduler', {}, true);
+      if (!data.success) {
+        throw new Error(data.error || 'Local drip tick failed');
+      }
+      const scheduled = Number(data.scheduled_published || 0);
+      const drip = Number(data.drip_published || 0);
+      if (scheduled > 0 || drip > 0) {
+        await Promise.all([loadDrafts(), loadQueue(), loadPosts()]);
+        setOutput(els.outputQueue, 'Local drip published queued content.', 'ok');
+      }
+    } catch (_err) {
+      // Local drip runs continuously; user-facing errors should stay on manual actions.
+    } finally {
+      state.localDripWorkerBusy = false;
+    }
+  }
+
+  function stopLocalDripWorker() {
+    if (state.localDripWorkerTimer) {
+      clearInterval(state.localDripWorkerTimer);
+      state.localDripWorkerTimer = null;
+    }
+    setLocalDripLeader(false);
+    localDripReleaseLease();
+  }
+
+  function startLocalDripWorker() {
+    if (!state.isAdmin || !state.sessionToken) {
+      stopLocalDripWorker();
+      return;
+    }
+    if (!state.localDripTabId) {
+      state.localDripTabId = String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+    }
+    if (state.localDripWorkerTimer) {
+      return;
+    }
+    state.localDripWorkerTimer = setInterval(function () {
+      localDripWorkerTick(false).catch(function () {});
+    }, LOCAL_DRIP_TICK_MS);
+    localDripWorkerTick(true).catch(function () {});
   }
 
   function lockNostrPubkeyField() {
@@ -864,6 +1011,7 @@
 
   async function checkAuth() {
     if (!state.sessionToken) {
+      stopLocalDripWorker();
       setAuthMessage('Not logged in. Use the Login button in the top navigation to sign in with Nostr.', 'error');
       return;
     }
@@ -873,6 +1021,7 @@
       if (!data.authenticated) {
         localStorage.removeItem('session_token');
         localStorage.removeItem('csrf_token');
+        stopLocalDripWorker();
         setAuthMessage('Session expired. Use the Login button in the top navigation to sign in again.', 'error');
         return;
       }
@@ -901,17 +1050,20 @@
       syncSshAccountActionState();
 
       if (!state.isAdmin) {
+        stopLocalDripWorker();
         setAccountOnlyMode(true);
         activateSection('account', true);
         return;
       }
 
+      startLocalDripWorker();
       setAccountOnlyMode(false);
       activateSection(getSectionFromHash(), false);
 
       await Promise.all([loadConfig(), loadUsers(), loadDrafts(), loadQueue(), loadPosts()]);
       renderPreview();
     } catch (err) {
+      stopLocalDripWorker();
       setAuthMessage('Authentication check failed: ' + err.message, 'error');
     }
   }
@@ -1398,9 +1550,11 @@
       throw new Error(data.error || 'Failed to load queue');
     }
     const queue = Array.isArray(data.queue) ? data.queue : [];
+    state.queueItemCount = queue.length;
     if (els.navQueueCount) {
       els.navQueueCount.textContent = '(' + queue.length + ')';
     }
+    updateQueueLocalDripStatus();
     const dripQueue = queue.filter(function (item) {
       return item && item.publish_mode === 'drip' && item.status === 'queued';
     });
@@ -2413,6 +2567,9 @@
       if (state.isAdmin && state.activeSection === 'posts' && !state.postsActionInFlight) {
         loadPosts().catch(function () {});
       }
+      if (state.isAdmin) {
+        localDripWorkerTick(true).catch(function () {});
+      }
     });
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
@@ -2424,6 +2581,21 @@
       if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'posts' && !state.postsActionInFlight) {
         loadPosts().catch(function () {});
       }
+      if (document.visibilityState === 'visible') {
+        localDripWorkerTick(true).catch(function () {});
+      } else {
+        localDripReleaseLease();
+        setLocalDripLeader(false);
+      }
+    });
+    window.addEventListener('storage', function (event) {
+      if (event && event.key === LOCAL_DRIP_LEASE_KEY) {
+        const lease = localDripLeaseRead();
+        setLocalDripLeader(!!(lease && lease.owner === state.localDripTabId));
+      }
+    });
+    window.addEventListener('beforeunload', function () {
+      localDripReleaseLease();
     });
 
     document.getElementById('btn-run-scheduler').addEventListener('click', runSchedulerNow);

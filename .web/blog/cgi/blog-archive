@@ -9,7 +9,6 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 blog_init
 blog_send_html_headers
 
-blog_run_scheduler >/dev/null 2>&1 || true
 
 posts_tmp=$(mktemp "${TMPDIR:-/tmp}/blog-archive-posts.XXXXXX")
 rows_tmp=$(mktemp "${TMPDIR:-/tmp}/blog-archive-rows.XXXXXX")

@@ -308,9 +308,13 @@ title: Blog Admin
 <div class="row-head">
 <div>
 <h3>Queue</h3>
-<p class="muted">See what will publish next and run the scheduler manually.</p>
+<p class="muted">See what will publish next. Drip runs locally while an admin tab stays open.</p>
 </div>
 <div class="row-actions">
+<div id="queue-local-drip-status" class="queue-local-drip-status" hidden>
+<span class="queue-local-drip-spinner" aria-hidden="true"></span>
+<span id="queue-local-drip-status-text">Local drip running. Keep this tab open.</span>
+</div>
 <button id="btn-mirror-nostr" type="button" title="Fetch events from configured Nostr relays and update local derived content.">Sync from Nostr</button>
 <button id="btn-run-scheduler" type="button" class="primary">Drip Now</button>
 </div>
@@ -1672,7 +1676,28 @@ body {
 
 .row-actions {
   display: flex;
+  align-items: center;
   gap: 0.48rem;
+}
+
+.queue-local-drip-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #4f5f78;
+  font-size: 0.8rem;
+  font-weight: 520;
+  margin-right: 0.22rem;
+}
+
+.queue-local-drip-spinner {
+  width: 0.78rem;
+  height: 0.78rem;
+  border: 2px solid #5b77ae;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: admin-spin 0.75s linear infinite;
+  flex: 0 0 auto;
 }
 
 #admin-panel .row-actions button.is-loading {
