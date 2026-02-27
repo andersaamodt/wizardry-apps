@@ -2713,7 +2713,7 @@ label {
 }
 
 #panel-persona #subreddit-input {
-  width: 210px;
+  width: var(--subreddit-input-width, 210px);
   font-size: 0.84rem;
 }
 
@@ -3091,6 +3091,7 @@ label {
 }
 
 .subreddit-field-row {
+  --subreddit-input-width: 210px;
   display: inline-flex;
   align-items: flex-start;
   gap: 6px;
@@ -3101,7 +3102,7 @@ label {
 .subreddit-input-stack {
   display: inline-flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 3px;
   min-width: 0;
 }
@@ -3115,6 +3116,7 @@ label {
 
 .subreddit-check-meta {
   display: block;
+  width: var(--subreddit-input-width, 210px);
   font-size: 0.72rem;
   color: var(--text-subtle);
   line-height: 1.2;
