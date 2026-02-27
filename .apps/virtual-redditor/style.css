@@ -2068,6 +2068,13 @@ label {
   margin-top: 0;
 }
 
+.enforcement-escalation-drawer #enforcement-notify-severity,
+.enforcement-escalation-drawer #enforcement-escalation-targets,
+.enforcement-escalation-drawer #enforcement-escalation-timing {
+  width: fit-content;
+  max-width: 100%;
+}
+
 .modes-main-pane {
   display: flex;
   flex-direction: column;

@@ -711,7 +711,10 @@
                       <select id="enforcement-escalation-targets">
                         <option value="modmail">Modmail</option>
                         <option value="personal_mail">Personal Mail</option>
-                        <option value="both">Both</option>
+                        <option value="chat">Chat</option>
+                        <option value="modmail+personal_mail">Modmail + Personal Mail</option>
+                        <option value="modmail+chat">Modmail + Chat</option>
+                        <option value="personal_mail+chat">Personal Mail + Chat</option>
                       </select>
                     </div>
                     <div class="mode-field-row">
@@ -3601,6 +3604,23 @@
       out.escalation.notifyOnSeverity = String(out.escalation.notifyOnSeverity || 'high').toLowerCase();
       if (['low', 'medium', 'high'].indexOf(out.escalation.notifyOnSeverity) < 0) {
         out.escalation.notifyOnSeverity = 'high';
+      }
+      var escalationTargets = String(out.escalation.targets || 'modmail').toLowerCase();
+      if (escalationTargets === 'both') escalationTargets = 'modmail+personal_mail';
+      if ([
+        'modmail',
+        'personal_mail',
+        'chat',
+        'modmail+personal_mail',
+        'modmail+chat',
+        'personal_mail+chat'
+      ].indexOf(escalationTargets) < 0) {
+        escalationTargets = 'modmail';
+      }
+      out.escalation.targets = escalationTargets;
+      out.escalation.timing = String(out.escalation.timing || 'enforce_then_escalate').toLowerCase();
+      if (['enforce_then_escalate', 'escalate_immediately'].indexOf(out.escalation.timing) < 0) {
+        out.escalation.timing = 'enforce_then_escalate';
       }
       delete out.escalation.onHighSeverity;
       out.banLevels = Object.assign({}, base.banLevels, src.banLevels || {});

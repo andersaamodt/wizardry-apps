@@ -2383,6 +2383,17 @@ process_comment() {
   escalation_notify_on=$(read_modes_config_json | jq -r '(.escalation.notifyOnSeverity // "high") | tostring | ascii_downcase' 2>/dev/null || printf 'high')
   escalation_targets=$(read_modes_config_json | jq -r '.escalation.targets // "modmail"' 2>/dev/null || printf 'modmail')
   escalation_timing=$(read_modes_config_json | jq -r '.escalation.timing // "enforce_then_escalate"' 2>/dev/null || printf 'enforce_then_escalate')
+  case "$(printf '%s' "$escalation_targets" | tr '[:upper:]' '[:lower:]')" in
+    both)
+      escalation_targets='modmail+personal_mail'
+      ;;
+    modmail|personal_mail|chat|modmail+personal_mail|modmail+chat|personal_mail+chat)
+      escalation_targets=$(printf '%s' "$escalation_targets" | tr '[:upper:]' '[:lower:]')
+      ;;
+    *)
+      escalation_targets='modmail'
+      ;;
+  esac
   escalation_active=false
   case "$escalation_notify_on" in
     low)
