@@ -6417,12 +6417,12 @@
     if (!isFinite(width) || width <= 0) {
       return 42;
     }
-    // Match CSS rhythm: about 3px bar + 2px gap.
-    var count = Math.floor((width + 1) / 3);
-    if (!isFinite(count) || count < 36) {
-      count = 36;
-    } else if (count > 180) {
-      count = 180;
+    // Match CSS rhythm: about 3px bar + 1px gap.
+    var count = Math.floor((width + 1) / 4);
+    if (!isFinite(count) || count < 28) {
+      count = 28;
+    } else if (count > 140) {
+      count = 140;
     }
     return count;
   }
@@ -6552,7 +6552,7 @@
     if (level > 1) {
       level = 1;
     }
-    if (level < 0.03) {
+    if (level < 0.035) {
       level = 0;
     }
     if (!dictationWaveSeenSignal && level >= 0.03) {
@@ -6635,35 +6635,35 @@
         }
         var rms = Math.sqrt(sum / dictationWaveData.length);
         // Dynamic gating to let quiet rooms return to near-zero while preserving headroom.
-        var rawLevel = (rms * 8.4) + (peak * 0.9);
+        var rawLevel = (rms * 10.6) + (peak * 0.46);
         if (!isFinite(rawLevel) || rawLevel < 0) {
           rawLevel = 0;
         }
-        if (rawLevel > 1.1) {
-          rawLevel = 1.1;
+        if (rawLevel > 1.2) {
+          rawLevel = 1.2;
         }
         var floor = Number(dictationWaveNoiseFloor || 0.04);
         if (!isFinite(floor) || floor < 0) {
           floor = 0.04;
         }
-        if (!dictationWaveSeenSignal || rawLevel <= floor + 0.045) {
-          floor = (floor * 0.94) + (rawLevel * 0.06);
+        if (!dictationWaveSeenSignal || rawLevel <= floor + 0.04) {
+          floor = (floor * 0.92) + (rawLevel * 0.08);
         }
-        if (floor < 0.008) {
-          floor = 0.008;
-        } else if (floor > 0.12) {
-          floor = 0.12;
+        if (floor < 0.006) {
+          floor = 0.006;
+        } else if (floor > 0.1) {
+          floor = 0.1;
         }
         dictationWaveNoiseFloor = floor;
-        var gate = floor + 0.018;
-        var normalized = (rawLevel - gate) / Math.max(0.05, 0.95 - gate);
+        var gate = floor + 0.028;
+        var normalized = (rawLevel - gate) / Math.max(0.06, 1 - gate);
         if (!isFinite(normalized) || normalized < 0) {
           normalized = 0;
         }
         if (normalized > 1) {
           normalized = 1;
         }
-        if (normalized < 0.028) {
+        if (normalized < 0.03) {
           normalized = 0;
         }
         dictationWaveMicLevel = normalized;
@@ -6800,8 +6800,8 @@
     var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 1;
-    var maxWaveHeight = 29;
-    var silenceGate = 0.032;
+    var maxWaveHeight = 39;
+    var silenceGate = 0.09;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -6815,12 +6815,14 @@
       }
       if (preSignalBaseline) {
         bar.classList.add("is-baseline");
-        bar.style.height = "1px";
+        bar.style.height = (i % 2 === 0) ? "1px" : "0px";
         continue;
       }
       var height = baselineHeight;
       if (unit <= silenceGate) {
         bar.classList.add("is-baseline");
+        bar.style.height = (i % 2 === 0) ? "1px" : "0px";
+        continue;
       } else {
         bar.classList.remove("is-baseline");
         var adjusted = (unit - silenceGate) / (1 - silenceGate);
@@ -6830,7 +6832,7 @@
           adjusted = 1;
         }
         var waveTravel = Math.max(1, maxWaveHeight - baselineHeight);
-        height = baselineHeight + Math.round(Math.pow(adjusted, 1.28) * waveTravel);
+        height = baselineHeight + Math.round(Math.pow(adjusted, 1.02) * waveTravel);
       }
       bar.style.height = String(height) + "px";
     }
