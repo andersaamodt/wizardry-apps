@@ -1087,6 +1087,14 @@ h2 {
   margin: 0 5px 0 7px;
 }
 
+.toolbar-right-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  margin: 0;
+  line-height: 1;
+}
+
 .terminal-icon-btn {
   width: 34px;
   height: 34px;
@@ -1101,8 +1109,8 @@ h2 {
 }
 
 .terminal-icon-btn svg {
-  width: 21px;
-  height: 21px;
+  width: 22px;
+  height: 22px;
 }
 
 .terminal-icon-btn.on {
