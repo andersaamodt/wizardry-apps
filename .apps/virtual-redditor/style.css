@@ -1861,6 +1861,7 @@ label {
 .relationships-main-pane {
   min-width: 0;
   overflow: auto;
+  padding: 10px 0 10px 12px;
 }
 
 .relationship-override-drawer .mode-field-row {
@@ -1987,17 +1988,19 @@ label {
 }
 
 .persona-main-pane,
-.relationships-main-pane,
 .replies-main-pane,
 .enforcement-main-pane,
 .modes-main-pane {
   padding: 10px 12px;
 }
 
-.relationships-head-row,
 .replies-head-row,
 .enforcement-head-row {
   padding: 10px 12px 8px;
+}
+
+.relationships-head-row {
+  padding: 0 12px 8px 0;
 }
 
 .enforcement-escalation-drawer {

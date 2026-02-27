@@ -542,12 +542,12 @@
         </section>
 
         <section class="tab-panel" id="panel-relationships">
-          <div class="relationships-head-row">
-            <div class="status-line" id="relationships-line">Relationships not loaded yet.</div>
-            <button id="btn-relationships-manual-override" type="button" class="soft relationships-override-btn" title="Open manual relationship override" aria-controls="relationship-override-drawer" aria-expanded="false">Manual override...</button>
-          </div>
           <div id="relationships-workarea" class="relationships-workarea">
             <div class="relationships-main-pane">
+              <div class="relationships-head-row">
+                <div class="status-line" id="relationships-line">Relationships not loaded yet.</div>
+                <button id="btn-relationships-manual-override" type="button" class="soft relationships-override-btn" title="Open manual relationship override" aria-controls="relationship-override-drawer" aria-expanded="false">Manual override...</button>
+              </div>
               <div class="table-wrap">
                 <table class="table" id="relationships-table">
                   <thead>
@@ -587,6 +587,13 @@
                     <div class="mode-field-row">
                       <label for="relationship-duration" class="mode-field-label">Duration (hours)</label>
                       <input id="relationship-duration" type="number" min="0" step="1" value="72">
+                    </div>
+                    <div class="mode-field-row">
+                      <label for="relationship-permanent" class="mode-field-label">No expiry</label>
+                      <label class="schedule-toggle" title="Set a permanent override with no expiry.">
+                        <input id="relationship-permanent" type="checkbox">
+                        <span>Permanent</span>
+                      </label>
                     </div>
                     <div class="mode-field-row">
                       <label class="mode-field-label">&nbsp;</label>
@@ -6062,6 +6069,17 @@
       document.getElementById('btn-relationship-drawer-close').addEventListener('click', function () {
         closeRelationshipOverrideDrawer();
       });
+      document.getElementById('relationship-permanent').addEventListener('change', function (event) {
+        var checked = !!(event && event.target && event.target.checked);
+        var durationInput = document.getElementById('relationship-duration');
+        if (!durationInput) return;
+        durationInput.disabled = checked;
+        if (checked) {
+          durationInput.value = '0';
+        } else if (String(durationInput.value || '').trim() === '0') {
+          durationInput.value = '72';
+        }
+      });
       document.getElementById('btn-relationship-apply').addEventListener('click', async function () {
         if (state.previewMode) {
           setControlMessage('Relationship override is available in the desktop app.', false);
@@ -6069,10 +6087,17 @@
         }
         var user = String((document.getElementById('relationship-user') || {}).value || '').trim();
         var mode = String((document.getElementById('relationship-mode') || {}).value || '').trim();
-        var duration = String((document.getElementById('relationship-duration') || {}).value || '0').trim();
+        var permanent = !!((document.getElementById('relationship-permanent') || {}).checked);
+        var duration = permanent ? '0' : String((document.getElementById('relationship-duration') || {}).value || '0').trim();
         if (!user || !mode) {
           setControlMessage('User and mode are required for override.', true);
           return;
+        }
+        if (!permanent) {
+          if (!/^\d+$/.test(duration) || Number(duration) < 1) {
+            setControlMessage('A duration of at least 1 hour is required unless no-expiry is enabled.', true);
+            return;
+          }
         }
         try {
           await backendJson('set-relationship', [user, mode, duration, 'manual-override']);
