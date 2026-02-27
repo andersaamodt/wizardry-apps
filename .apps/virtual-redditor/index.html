@@ -1509,7 +1509,7 @@
       } else if (!hasVerifiedSubreddit()) {
         setExtractNormsMessage('Enter a valid subreddit name first.', 'warn');
       } else if (!selectedProfileConnected()) {
-        setExtractNormsMessage('Connect your Reddit account first to extract social norms.', 'warn');
+        setExtractNormsMessage('A Reddit account connection is required to extract social norms.', 'warn');
       } else {
         setExtractNormsMessage('This will analyze r/' + subreddit + ' and append proposed norms.', 'info');
       }
@@ -1533,7 +1533,7 @@
         if (!hasVerifiedSubreddit()) {
           setExtractNormsMessage('Enter a valid subreddit name first.', 'warn');
         } else {
-          setExtractNormsMessage('Connect your Reddit account first to extract social norms.', 'warn');
+          setExtractNormsMessage('A Reddit account connection is required to extract social norms.', 'warn');
         }
         updateExtractNormsRunEnabled();
         return;
@@ -1566,7 +1566,7 @@
         if (low.indexOf('missing required reddit_client_id') >= 0 ||
             low.indexOf('missing required reddit_refresh_token') >= 0 ||
             low.indexOf('missing required reddit_username') >= 0) {
-          setExtractNormsMessage('Connect your Reddit account first to extract social norms.', 'warn');
+          setExtractNormsMessage('A Reddit account connection is required to extract social norms.', 'warn');
         } else {
           setExtractNormsMessage(normalizeUiErrorMessage(raw), 'error');
         }
@@ -5063,7 +5063,7 @@
         var subreddit = normalizeSubreddit(settings.subreddit || '');
         if (subreddit) {
           if (!selectedProfileConnected()) {
-            setExtractNormsMessage('Connect your Reddit account first to extract social norms.', 'warn');
+            setExtractNormsMessage('A Reddit account connection is required to extract social norms.', 'warn');
             return;
           }
           var value = String((document.getElementById('extract-norms-scope') || {}).value || 'full');
