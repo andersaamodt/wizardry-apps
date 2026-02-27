@@ -105,6 +105,14 @@ assert_preview_case \
   "git status --short"
 
 assert_preview_case \
+  "none-risk-phrase-without-risk-question" \
+  "none" \
+  "Proceed with this refactor now and keep changes minimal." \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case \
   "none-should-i-without-options" \
   "none" \
   "Should I continue with this refactor now?" \
@@ -151,6 +159,14 @@ assert_preview_case \
   "Do you approve this now?" \
   "assistant" \
   "curl https://example.com/health"
+
+assert_preview_case \
+  "precedence-missing-over-risk" \
+  "required-input-missing" \
+  "Use <PROD_API_KEY> before deleting production rows." \
+  "Which API key should I use before continuing?" \
+  "programming" \
+  "git status --short"
 
 assert_preview_case \
   "precedence-explicit-over-risk" \

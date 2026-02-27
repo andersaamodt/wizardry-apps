@@ -15962,8 +15962,13 @@ $fallback_output"
     fi
 
     assay_run_profile=0
+    assay_edit_root=""
     if [ -n "$assay_task_id" ]; then
       assay_run_profile=1
+      assay_edit_root=".assay-runs/$assay_task_id"
+    fi
+    if [ "$assay_run_profile" -eq 1 ] && [ -n "$assay_edit_root" ]; then
+      mkdir -p "$workspace_path/$assay_edit_root"
     fi
     prompt_lower_for_budget=$(printf '%s' "$user_prompt" | tr '[:upper:]' '[:lower:]')
     if [ "$assay_run_profile" -ne 1 ]; then
@@ -17005,6 +17010,8 @@ $run_mode_instruction"
 
 Assay mentoring contract:
 - Do not ask for user decisions; choose reasonable defaults and proceed.
+- Constrain all file edits to: ${assay_edit_root}/
+- If implementation needs files, create realistic minimal files under that path.
 - While thinking, emit short timestamp-friendly step updates.
 - End with sections: Outcome, Verification Evidence, Risks, Next Improvement."
     fi
@@ -18425,12 +18432,23 @@ EOF
             else
               touched_count=0
               invalid_path=""
+              assay_invalid_path=""
               while IFS= read -r rel_path; do
                 [ -n "$rel_path" ] || continue
                 touched_count=$((touched_count + 1))
                 if ! is_safe_relative_path "$rel_path"; then
                   invalid_path=$rel_path
                   break
+                fi
+                if [ "$assay_run_profile" -eq 1 ] && [ -n "$assay_edit_root" ]; then
+                  case "$rel_path" in
+                    "$assay_edit_root"/*)
+                      ;;
+                    *)
+                      assay_invalid_path=$rel_path
+                      break
+                      ;;
+                  esac
                 fi
               done < "$patch_paths_file"
 
@@ -18439,6 +18457,12 @@ EOF
                 append_failure_entry "$failures_file" "implement-iteration-$iteration" \
                   "Unsafe target path: $invalid_path" "Path traversal or invalid characters" \
                   "Restrict patch to safe relative workspace paths"
+              elif [ -n "$assay_invalid_path" ]; then
+                printf 'Assay patch out-of-scope path: %s (allowed prefix: %s/)\n' "$assay_invalid_path" "$assay_edit_root" > "$patch_report_file"
+                append_failure_entry "$failures_file" "implement-iteration-$iteration" \
+                  "Assay patch out of scope: $assay_invalid_path" \
+                  "Assay safety policy limits edits to $assay_edit_root/" \
+                  "Regenerate patch under the assay edit root"
               elif [ "$touched_count" -gt 5 ]; then
                 printf 'Patch touched too many files: %s\n' "$touched_count" > "$patch_report_file"
                 append_failure_entry "$failures_file" "implement-iteration-$iteration" \
