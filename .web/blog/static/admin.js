@@ -444,13 +444,41 @@
     els.dripQueuePill.hidden = false;
   }
 
-  function setAutosaveStatus(message) {
+  function setAutosaveStatus(kind, detail) {
     if (!els.autosaveStatus) {
       return;
     }
-    const text = String(message || '').trim();
-    els.autosaveStatus.textContent = text;
-    els.autosaveStatus.hidden = !text;
+    const mode = String(kind || '').trim();
+    if (!mode) {
+      els.autosaveStatus.hidden = true;
+      els.autosaveStatus.textContent = '';
+      els.autosaveStatus.removeAttribute('title');
+      els.autosaveStatus.classList.remove('is-saving', 'is-error');
+      return;
+    }
+    els.autosaveStatus.hidden = false;
+    els.autosaveStatus.classList.toggle('is-saving', mode === 'saving');
+    els.autosaveStatus.classList.toggle('is-error', mode === 'error');
+    if (mode === 'saving') {
+      els.autosaveStatus.textContent = 'Saving...';
+      els.autosaveStatus.removeAttribute('title');
+      return;
+    }
+    if (mode === 'saved') {
+      els.autosaveStatus.textContent = '✓ Saved';
+      if (detail) {
+        els.autosaveStatus.setAttribute('title', String(detail));
+      } else {
+        els.autosaveStatus.removeAttribute('title');
+      }
+      return;
+    }
+    els.autosaveStatus.textContent = 'Save failed';
+    if (detail) {
+      els.autosaveStatus.setAttribute('title', String(detail));
+    } else {
+      els.autosaveStatus.removeAttribute('title');
+    }
   }
 
   function setPreviewVisibility(visible) {
@@ -1512,7 +1540,7 @@
       }
 
       await Promise.all([loadDrafts(), loadQueue()]);
-      setAutosaveStatus('Saved at ' + new Date().toLocaleTimeString());
+      setAutosaveStatus('saved', 'Autosaved at ' + new Date().toLocaleString());
     } catch (err) {
       setOutput(els.outputCompose, 'Error: ' + err.message, 'error');
     }
@@ -1533,10 +1561,10 @@
       if (data.success && data.draft_id) {
         state.currentDraftId = data.draft_id;
         refreshDraftLabel();
-        setAutosaveStatus('Autosaved at ' + new Date().toLocaleTimeString());
+        setAutosaveStatus('saved', 'Autosaved at ' + new Date().toLocaleString());
       }
     } catch (err) {
-      setAutosaveStatus('Autosave failed (' + err.message + ')');
+      setAutosaveStatus('error', 'Autosave failed (' + err.message + ')');
     }
   }
 
@@ -1547,7 +1575,7 @@
     if (state.autosaveTimer) {
       clearTimeout(state.autosaveTimer);
     }
-    setAutosaveStatus(reason === 'typing' ? 'Typing...' : 'Saving...');
+    setAutosaveStatus('saving');
     state.autosaveTimer = setTimeout(autosave, 1500);
   }
 
@@ -2027,7 +2055,7 @@
   refreshDraftLabel();
   updatePrimaryPublishButton();
   updateScheduledRowVisibility();
-  setAutosaveStatus('');
+  setAutosaveStatus();
   setPreviewVisibility(state.previewVisible);
   renderPreview();
 })();

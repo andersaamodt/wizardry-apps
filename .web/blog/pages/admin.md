@@ -181,7 +181,7 @@ title: Blog Admin
 <div class="compose-editor">
 <div class="field-row">
 <label for="post-title"><strong>Post Title</strong></label>
-<input type="text" id="post-title" placeholder="My amazing post">
+<input type="text" id="post-title" placeholder="My post">
 </div>
 
 <div class="field-row">
@@ -234,6 +234,7 @@ title: Blog Admin
 </button>
 </div>
 <textarea id="post-content" rows="16" placeholder="# Write in Markdown\n\nDrop images anywhere on this page to upload + insert."></textarea>
+<div id="autosave-status" class="autosave-indicator" hidden></div>
 </div>
 </div>
 
@@ -287,7 +288,6 @@ title: Blog Admin
 <button id="btn-publish-now" type="button" class="primary">Publish Now</button>
 </div>
 
-<div id="autosave-status" class="muted" hidden></div>
 <div id="output-compose" class="output"></div>
 </div>
 </div>
@@ -808,6 +808,7 @@ body {
   border-radius: 12px;
   background: #f9fbff;
   overflow: hidden;
+  position: relative;
 }
 
 .grid-two {
@@ -1038,6 +1039,7 @@ body {
   box-shadow: none;
   display: block;
   inline-size: 100%;
+  padding-bottom: 2.15rem;
 }
 
 .editor-shell #post-content:focus {
@@ -1047,6 +1049,36 @@ body {
 .editor-shell:focus-within {
   border-color: #5b7ed8;
   box-shadow: 0 0 0 3px rgba(91, 126, 216, 0.18);
+}
+
+.autosave-indicator {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  border: 1px solid #bcd0f2;
+  background: #f3f7ff;
+  color: #2b4c86;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  z-index: 3;
+  cursor: default;
+}
+
+.autosave-indicator.is-saving {
+  border-color: #c6d3e9;
+  background: #f6f8fd;
+  color: #4f6180;
+}
+
+.autosave-indicator.is-error {
+  border-color: #e2b6b6;
+  background: #fff2f2;
+  color: #8a2e2e;
 }
 
 .tag-editor {
