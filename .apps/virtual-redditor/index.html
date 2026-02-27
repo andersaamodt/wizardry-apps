@@ -1180,6 +1180,7 @@
       modesRenderSig: '',
       modeDrawerModeId: '',
       modesConfigDirty: false,
+      modesConfigRefreshBlockedUntil: 0,
       relationshipOverrideOpen: false,
       repliesTemplatesOpen: false,
       enforcementEscalationOpen: false,
@@ -4142,6 +4143,19 @@
 
     function markModesConfigDirty() {
       state.modesConfigDirty = true;
+      var now = Date.now();
+      var holdUntil = now + 7000;
+      if (holdUntil > state.modesConfigRefreshBlockedUntil) {
+        state.modesConfigRefreshBlockedUntil = holdUntil;
+      }
+    }
+
+    function shouldDelayModesConfigRefresh() {
+      if (state.previewMode) return false;
+      if (state.modesConfigDirty) return true;
+      if (state.modesSaveInFlight || state.behaviorSaveInFlight || state.enforcementSaveInFlight || state.replyTemplatesSaveInFlight) return true;
+      if (state.modesSaveTimer || state.behaviorSaveTimer || state.enforcementSaveTimer || state.replyTemplatesSaveTimer) return true;
+      return Date.now() < (Number(state.modesConfigRefreshBlockedUntil) || 0);
     }
 
     function setActionTriggerRowPresentation(row) {
@@ -5091,6 +5105,11 @@
       var quiet = !!(options && options.quiet);
       var suppressConflictMessage = !!(options && options.suppressConflictMessage);
       var payload = collectModesConfigFromUi();
+      var now = Date.now();
+      var holdUntil = now + 7000;
+      if (holdUntil > state.modesConfigRefreshBlockedUntil) {
+        state.modesConfigRefreshBlockedUntil = holdUntil;
+      }
       var conflicts = validateModesConfigConflicts(payload);
       if (conflicts.length) {
         renderModesConflictBanner(conflicts);
@@ -5107,6 +5126,10 @@
       var out = await backendJson('save-modes-config', [JSON.stringify(payload)]);
       state.modesConfig = normalizeModesConfig((out || {}).config || payload);
       state.modesConfigDirty = false;
+      var postSaveHoldUntil = Date.now() + 7000;
+      if (postSaveHoldUntil > state.modesConfigRefreshBlockedUntil) {
+        state.modesConfigRefreshBlockedUntil = postSaveHoldUntil;
+      }
       renderModesDrivenPanels();
       if (!quiet) setControlMessage(okMessage || 'Saved.', false);
     }
@@ -5139,7 +5162,11 @@
       }, Math.max(0, parseInt(delayMs, 10) || 380));
     }
 
-    async function refreshModesConfig() {
+    async function refreshModesConfig(options) {
+      var opts = options || {};
+      if (!opts.force && shouldDelayModesConfigRefresh()) {
+        return;
+      }
       if (state.previewMode) {
         state.modesConfig = normalizeModesConfig(state.modesConfig || defaultModesConfigClient());
         renderModesDrivenPanels();
