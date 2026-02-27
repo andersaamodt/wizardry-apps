@@ -1985,6 +1985,14 @@ label {
   opacity: 1;
 }
 
+.relationship-override-drawer #btn-relationship-apply {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.28rem 0.5rem;
+  font-size: 0.74rem;
+  line-height: 1.1;
+}
+
 .replies-head-row {
   display: flex;
   align-items: center;
