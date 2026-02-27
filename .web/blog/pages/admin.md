@@ -1345,10 +1345,10 @@ body {
 }
 
 #admin-panel button.quiet-toggle {
-  border: 0;
+  border: 1px solid #b8c9ea;
   border-radius: 8px;
-  background: transparent;
-  color: #29457f;
+  background: #f8fbff;
+  color: #24457f;
   font-size: 0.8rem;
   font-weight: 620;
   width: 2rem;
@@ -1362,7 +1362,21 @@ body {
 
 #admin-panel button.quiet-toggle:hover {
   background: #e9f1ff;
+  border-color: #9fb9ea;
   color: #1e3f7b;
+}
+
+#admin-panel button.quiet-toggle[aria-pressed="true"] {
+  background: #dbe8ff;
+  border-color: #7ea2e6;
+  color: #153b76;
+  box-shadow: inset 0 0 0 1px rgba(126, 162, 230, 0.25);
+}
+
+#admin-panel button.quiet-toggle[aria-pressed="true"]:hover {
+  background: #d3e3ff;
+  border-color: #739bdd;
+  color: #12376f;
 }
 
 #admin-panel button.quiet-toggle .preview-icon {
