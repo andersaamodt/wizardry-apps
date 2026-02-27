@@ -2282,7 +2282,7 @@ label {
 .mode-drawer-section-title {
   font-size: 0.75rem;
   color: color-mix(in srgb, var(--text-subtle) 88%, var(--text) 12%);
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.02em;
 }
 
@@ -2427,12 +2427,16 @@ label {
 .mode-detail-drawer select {
   font-size: 0.76rem;
   padding: 0.34rem 18px 0.34rem 0.44rem;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .mode-detail-drawer input:not([type='checkbox']):not([type='radio']):not([type='range']),
 .mode-detail-drawer textarea {
   font-size: 0.76rem;
   padding: 0.34rem 0.44rem;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .mode-detail-drawer .mode-dropdown-btn {
@@ -2460,16 +2464,17 @@ label {
 .mode-detail-drawer .action-trigger-row {
   gap: 6px;
   padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--bg-main) 92%, var(--bg-panel) 8%);
+  padding: 6px 7px;
 }
 
 .mode-detail-drawer .action-transition-row {
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: 9px;
+  padding: 6px 7px;
+  background: color-mix(in srgb, var(--bg-main) 92%, var(--bg-panel) 8%);
 }
 
 .mode-detail-drawer .modes-grid-head {
@@ -2479,14 +2484,14 @@ label {
 .mode-detail-drawer .action-trigger-row input[type='text'],
 .mode-detail-drawer .action-trigger-row input[type='number'],
 .mode-detail-drawer .action-trigger-row select {
-  flex: 1 1 100% !important;
-  min-width: 0 !important;
-  width: 100% !important;
+  flex: 0 1 auto !important;
+  width: fit-content !important;
+  max-width: 100% !important;
 }
 
 .mode-detail-drawer .action-trigger-row .mini-toggle,
 .mode-detail-drawer .action-trigger-row .mini-remove-btn {
-  width: 100%;
+  width: fit-content;
   justify-content: flex-start;
 }
 
@@ -2500,13 +2505,48 @@ label {
 
 .mode-detail-drawer .mini-input input,
 .mode-detail-drawer .mini-input select {
-  width: 100%;
+  width: fit-content;
   max-width: 100%;
 }
 
 .mode-detail-drawer .action-transition-controls .mini-toggle {
   white-space: normal;
-  width: 100%;
+  width: fit-content;
+}
+
+.mode-detail-drawer .action-transition-controls select,
+.mode-detail-drawer .action-transition-controls input[type='number'] {
+  width: fit-content;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+
+.mode-detail-drawer .action-trigger-row .trigger-label-input,
+.mode-detail-drawer .action-trigger-row .trigger-template-input,
+.mode-detail-drawer .action-trigger-row .trigger-match-input {
+  min-width: 16ch;
+}
+
+.mode-detail-drawer .action-trigger-row .trigger-label-input {
+  min-width: 12ch;
+}
+
+.mode-detail-drawer .action-trigger-row .trigger-rate-limit-input,
+.mode-detail-drawer .action-trigger-row .trigger-duration-input,
+.mode-detail-drawer .action-transition-controls input[type='number'] {
+  min-width: 7ch;
+}
+
+.mode-detail-drawer .ban-notice-style-shell {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 180ms ease, opacity 160ms ease;
+}
+
+.mode-detail-drawer .ban-notice-style-shell.is-open {
+  max-height: 3.2rem;
+  opacity: 1;
 }
 
 #ban-levels-table .ban-duration-range {

@@ -4465,7 +4465,7 @@
         var decayValue = transitionEnabled ? String(transition.decayTo || '') : '';
         var announceChecked = (transitionEnabled && transition.announce) ? ' checked' : '';
         var styleControl = actionName === 'Post Ban Notice'
-          ? ('<div class="action-transition-controls action-transition-controls-single">' +
+          ? ('<div class="action-transition-controls action-transition-controls-single ban-notice-style-shell' + (allowChecked ? ' is-open' : '') + '" data-ban-notice-style-shell>' +
              '<label class="mini-input" title="Style used when the bot posts a ban notice in this mode">Style<select data-mode-drawer-ban-style title="Style used when the bot posts a ban notice in this mode">' +
              banNoticeStyleOptionsHtml(banNoticeStyle) +
              '</select></label>' +
@@ -4483,7 +4483,7 @@
           '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action">' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
           '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode">',
           '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '" title="Mode to decay to when transition duration expires">' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
-          '    <label class="mini-toggle" title="Post a notice when this transition applies"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
+          '    <label class="mini-toggle" title="Post a reply announcing the mode switch to the affected user"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + '><span>Announce</span></label>',
           '  </div>',
           '</div>'
         ].join('');
@@ -4521,7 +4521,7 @@
           '    <select data-transition-to-mode-action="' + escapeHtml(actionName) + '" title="Mode to switch to after this action"' + disabledAttr + '>' + modeOptionsHtml(modeOpts, toModeValue, false, '') + '</select>',
           '    <input type="number" min="0" step="1" data-transition-duration-action="' + escapeHtml(actionName) + '" value="' + escapeHtml(String(durationValue)) + '" title="Duration in hours for the switched mode"' + disabledAttr + '>',
           '    <select data-transition-decay-to-action="' + escapeHtml(actionName) + '" title="Mode to decay to when transition duration expires"' + disabledAttr + '>' + modeOptionsHtml(modeOpts, decayValue, true, 'Default decay mode') + '</select>',
-          '    <label class="mini-toggle" title="Post a notice when this transition applies"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + disabledAttr + '><span>Announce</span></label>',
+          '    <label class="mini-toggle" title="Post a reply announcing the mode switch to the affected user"><input type="checkbox" data-transition-announce-action="' + escapeHtml(actionName) + '"' + announceChecked + disabledAttr + '><span>Announce</span></label>',
           '  </div>',
           '</div>'
         ].join('');
@@ -4566,7 +4566,11 @@
         ].join('');
       }).join('');
 
-      title.textContent = modeDisplayId(String(mode.id || 'Mode')) + ' details';
+      var modeTitleId = modeDisplayId(String(mode.id || 'Mode'));
+      var modeTitle = modeTitleId.replace(/\b([A-Z0-9])([A-Z0-9]*)\b/g, function (_all, first, rest) {
+        return first + rest.toLowerCase();
+      });
+      title.textContent = modeTitle + ' details';
       if (statePill) {
         var modeEnabled = (mode.enabled !== false);
         statePill.textContent = modeEnabled ? 'Enabled' : 'Disabled';
@@ -6195,6 +6199,14 @@
           updateModeFromDrawerField(event);
           var target = event && event.target;
           if (!target) return;
+          if (target.hasAttribute('data-mode-drawer-allow')) {
+            var actionName = String(target.getAttribute('data-mode-drawer-allow') || '');
+            if (actionName === 'Post Ban Notice') {
+              var rowForStyle = target.closest('[data-action-transition-row]');
+              var styleShell = rowForStyle ? rowForStyle.querySelector('[data-ban-notice-style-shell]') : null;
+              if (styleShell) styleShell.classList.toggle('is-open', !!target.checked);
+            }
+          }
           if (target.hasAttribute('data-transition-enabled-action')) {
             var row = target.closest('[data-action-transition-row]');
             if (row) row.classList.toggle('transition-enabled', !!target.checked);
