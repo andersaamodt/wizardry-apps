@@ -568,13 +568,11 @@ header h1 {
   background: #f8fbff;
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 1rem 1rem 1.2rem;
   box-shadow: 0 22px 50px rgba(15, 23, 42, 0.3);
   opacity: 0;
   transform: translateY(10px) scale(0.985);
   transition: opacity 0.2s ease, transform 0.2s ease;
-  max-height: calc(100vh - 4rem);
-  overflow: auto;
+  overflow: hidden;
 }
 
 .auth-modal.is-open .auth-modal-panel {
@@ -582,10 +580,19 @@ header h1 {
   transform: translateY(0) scale(1);
 }
 
+.auth-modal-scroll {
+  max-height: calc(100vh - 4rem);
+  overflow: auto;
+  border-radius: inherit;
+  padding: 1rem 1rem 1.2rem;
+  scrollbar-gutter: stable;
+}
+
 .auth-modal-close {
   position: absolute;
   top: 0.55rem;
   right: 0.65rem;
+  z-index: 2;
   border: 0;
   background: transparent;
   color: #334155;

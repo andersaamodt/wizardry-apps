@@ -86,6 +86,7 @@
   <div class="auth-modal-backdrop" data-close-auth-modal></div>
   <div class="auth-modal-panel" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
     <button class="auth-modal-close" type="button" aria-label="Close login" data-close-auth-modal>&times;</button>
+    <div class="auth-modal-scroll">
     <h2 id="auth-modal-title">Sign in</h2>
     <p class="auth-modal-help">Accounts are Nostr-key based only. No email, password, or recovery. If your Nostr key is lost, the account is lost by design.</p>
     <p class="auth-modal-help">Desktop login uses NIP-07 when available. Phone login uses NIP-46 pairing via QR/deep-link.</p>
@@ -142,7 +143,7 @@
         <button id="auth-manual-submit" class="auth-primary-btn" type="button">Submit signed login</button>
       </div>
     </div>
-
+    </div>
   </div>
 </div>
 
@@ -150,10 +151,12 @@
   <div class="auth-modal-backdrop" data-close-auth-info></div>
   <div class="auth-modal-panel auth-info-modal-panel" role="dialog" aria-modal="true" aria-labelledby="nostr-info-modal-title">
     <button class="auth-modal-close" type="button" aria-label="Close Nostr info" data-close-auth-info>&times;</button>
+    <div class="auth-modal-scroll">
     <h2 id="nostr-info-modal-title">Nostr Sign-In</h2>
     <p class="auth-modal-help">Your account identity is your Nostr public key. The site verifies signed events and never asks for private keys.</p>
     <p class="auth-modal-help">Desktop sign-in uses a NIP-07 extension. Phone sign-in uses Nostr Connect (NIP-46) pairing via QR/deep link.</p>
     <p class="auth-modal-help">For full details, visit <a class="auth-inline-link" href="https://github.com/nostr-protocol/nips" target="_blank" rel="noopener noreferrer">the official Nostr NIPs repository</a>.</p>
+    </div>
   </div>
 </div>
 
