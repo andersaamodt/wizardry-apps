@@ -19565,10 +19565,24 @@
       if ((meta || ctrl) && !alt && !shift && (key === "a" || key === "c" || key === "x" || key === "v" || key === "z" || key === "y")) {
         return true;
       }
+      if (meta && !ctrl && !alt && shift && key === "z") {
+        return true;
+      }
       if (meta && ctrl && !alt && !shift && (code === "Space" || key === " ")) {
         return true;
       }
       if (ctrl && !meta && !alt && !shift && (code === "Period" || key === ".")) {
+        return true;
+      }
+      return false;
+    }
+
+    function shouldPreserveEditableDictationModifier(event, trigger) {
+      if (!isEditableTarget(event && event.target)) {
+        return false;
+      }
+      var t = String(trigger || "");
+      if (t === "meta" || t === "control" || t === "alt" || t === "shift") {
         return true;
       }
       return false;
@@ -19611,6 +19625,9 @@
         return;
       }
       var dictationKeyTrigger = dictationShortcutKeyboardTrigger(event);
+      if (shouldPreserveEditableDictationModifier(event, dictationKeyTrigger)) {
+        return;
+      }
       if (dictationKeyTrigger) {
         if (!event.repeat) {
           onDictationShortcutDown(dictationKeyTrigger, event);
@@ -19684,6 +19701,9 @@
         return;
       }
       var dictationKeyTrigger = dictationShortcutKeyboardTrigger(event);
+      if (shouldPreserveEditableDictationModifier(event, dictationKeyTrigger)) {
+        return;
+      }
       if (!dictationKeyTrigger) {
         return;
       }
