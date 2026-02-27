@@ -2640,6 +2640,8 @@ label {
 
 #ban-levels-table {
   table-layout: auto;
+  width: calc(100% - 8px);
+  margin: 0 4px;
 }
 
 #ban-levels-table th,
@@ -2654,20 +2656,29 @@ label {
 
 #ban-levels-table th:nth-child(1),
 #ban-levels-table td:nth-child(1) {
+  width: 28px;
+  white-space: nowrap;
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#ban-levels-table th:nth-child(2),
+#ban-levels-table td:nth-child(2) {
   width: 1%;
   white-space: nowrap;
   padding-right: 8px;
 }
 
-#ban-levels-table th:nth-child(2),
-#ban-levels-table td:nth-child(2) {
+#ban-levels-table th:nth-child(3),
+#ban-levels-table td:nth-child(3) {
   width: auto;
 }
 
 #ban-levels-table input[data-ban-duration-min],
 #ban-levels-table input[data-ban-duration-max] {
-  width: 50px;
-  min-width: 50px;
+  width: 56px;
+  min-width: 56px;
 }
 
 #ban-levels-table select[data-ban-duration-unit] {
@@ -2680,6 +2691,22 @@ label {
   font-size: 0.72rem;
   color: var(--text-subtle);
   white-space: nowrap;
+}
+
+#ban-levels-table .ban-level-enabled-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#ban-levels-table .ban-level-enabled-toggle input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+}
+
+#ban-levels-table .ban-duration-static {
+  display: block;
+  text-align: center;
 }
 
 #ban-levels-table .ban-level-error {
