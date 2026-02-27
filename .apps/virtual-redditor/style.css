@@ -4210,6 +4210,7 @@ label {
 .settings-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   margin-top: 10px;
 }
@@ -4221,9 +4222,23 @@ label {
   padding: 0.32rem 0.5rem;
 }
 
-#settings-global-msg {
-  margin-top: 8px;
+.settings-inline-msg {
+  margin-left: auto;
   min-height: 1.1rem;
+  font-size: 0.82rem;
+  color: var(--text-subtle);
+}
+
+.settings-inline-msg.is-pending {
+  color: var(--warn);
+}
+
+.settings-inline-msg.is-success {
+  color: var(--ok);
+}
+
+.settings-inline-msg.is-error {
+  color: var(--danger);
 }
 
 .oauth-sheet {

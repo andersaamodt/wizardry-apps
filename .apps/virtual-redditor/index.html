@@ -854,8 +854,8 @@
       <div class="settings-actions">
         <button id="btn-settings-install-toggle" type="button" class="soft">Install daemon</button>
         <button id="btn-settings-run-toggle" type="button" class="soft">Start daemon</button>
+        <span id="settings-global-msg" class="settings-inline-msg" aria-live="polite"></span>
       </div>
-      <div id="settings-global-msg" class="status-line"></div>
     </div>
   </div>
 
@@ -1882,12 +1882,17 @@
       }
     }
 
-    function setGlobalSettingsMessage(msg, isError) {
+    function setGlobalSettingsMessage(msg, kind) {
       var line = document.getElementById('settings-global-msg');
       if (!line) return;
       line.textContent = msg || '';
-      line.classList.toggle('error-line', !!isError);
-      line.classList.toggle('status-line', !isError);
+      var k = kind;
+      if (k === true) k = 'error';
+      if (k === false) k = (msg ? 'success' : '');
+      if (k !== 'pending' && k !== 'success' && k !== 'error') k = '';
+      line.classList.remove('is-pending', 'is-success', 'is-error');
+      if (!k) return;
+      line.classList.add('is-' + k);
     }
 
     function renderGlobalSettingsModal() {
@@ -6233,17 +6238,30 @@
       document.getElementById('btn-settings-install-toggle').addEventListener('click', function () {
         var launchd = (((state.status || {}).launchd) || {});
         var installed = !!launchd.installed;
+        var loaded = !!launchd.loaded;
         var action = installed ? 'uninstall' : 'install';
         var pendingMsg = installed ? 'Uninstalling daemon...' : 'Installing daemon...';
         var doneMsg = installed ? 'Daemon uninstalled.' : 'Daemon installed.';
-        setGlobalSettingsMessage(pendingMsg, false);
-        backendJson(action, []).then(function () {
+        setGlobalSettingsMessage(pendingMsg, 'pending');
+        var sequence = Promise.resolve();
+        if (installed && loaded) {
+          sequence = sequence.then(function () { return backendJson('stop', []); });
+        }
+        sequence = sequence.then(function () { return backendJson(action, []); });
+        sequence.then(function () {
+          if (!state.status) state.status = {};
+          if (!state.status.launchd) state.status.launchd = {};
+          state.status.launchd.installed = !installed;
+          state.status.launchd.loaded = false;
+          renderGlobalSettingsModal();
           return fullRefresh();
         }).then(function () {
           renderGlobalSettingsModal();
-          setGlobalSettingsMessage(doneMsg, false);
+          setGlobalSettingsMessage(doneMsg, 'success');
         }).catch(function (error) {
-          setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+          setGlobalSettingsMessage(String(error && error.message ? error.message : error), 'error');
+        }).finally(function () {
+          renderGlobalSettingsModal();
         });
       });
       document.getElementById('btn-settings-run-toggle').addEventListener('click', function () {
@@ -6252,18 +6270,25 @@
         var action = loaded ? 'stop' : 'start';
         var pendingMsg = loaded ? 'Stopping daemon...' : 'Starting daemon...';
         var doneMsg = loaded ? 'Daemon stopped.' : 'Daemon started.';
-        setGlobalSettingsMessage(pendingMsg, false);
+        setGlobalSettingsMessage(pendingMsg, 'pending');
         var run = function () { return backendJson(action, []); };
         var sequence = loaded
           ? run()
           : backendJson('set-setting', ['RUN_ENABLED', '0']).then(run);
         sequence.then(function () {
+          if (!state.status) state.status = {};
+          if (!state.status.launchd) state.status.launchd = {};
+          state.status.launchd.loaded = !loaded;
+          if (!loaded) state.status.launchd.installed = true;
+          renderGlobalSettingsModal();
           return fullRefresh();
         }).then(function () {
           renderGlobalSettingsModal();
-          setGlobalSettingsMessage(doneMsg, false);
+          setGlobalSettingsMessage(doneMsg, 'success');
         }).catch(function (error) {
-          setGlobalSettingsMessage(String(error && error.message ? error.message : error), true);
+          setGlobalSettingsMessage(String(error && error.message ? error.message : error), 'error');
+        }).finally(function () {
+          renderGlobalSettingsModal();
         });
       });
       document.getElementById('btn-rename-close').addEventListener('click', function () {
