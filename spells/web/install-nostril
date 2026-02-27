@@ -7,7 +7,7 @@ case "${1-}" in
   cat <<'USAGE'
 Usage: install-nostril
 
-Ensures the nostril CLI is available for server-side Nostr signature verification.
+Ensures the nostril CLI and verifier dependency are available for server-side Nostr signature verification.
 USAGE
   exit 0
   ;;
@@ -16,21 +16,98 @@ esac
 set -eu
 . env-clear
 
-if has nostril; then
-  success "nostril is already installed"
+install_bin_dir() {
+  for candidate in /usr/local/bin /opt/homebrew/bin "${XDG_BIN_HOME:-$HOME/.local/bin}"; do
+    [ -d "$candidate" ] || continue
+    if [ -w "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  printf '%s\n' "${XDG_BIN_HOME:-$HOME/.local/bin}"
+}
+
+install_nak_verifier() {
+  if has nak; then
+    return 0
+  fi
+  if has brew; then
+    step "Installing nak verifier via Homebrew..."
+    if brew install nak >/dev/null 2>&1; then
+      has nak && return 0
+    fi
+  fi
+  return 1
+}
+
+install_nostril_binary() {
+  if has nostril; then
+    return 0
+  fi
+  if ! has git; then
+    return 1
+  fi
+  if ! has make || ! command make -v >/dev/null 2>&1; then
+    return 1
+  fi
+  if ! has cc; then
+    return 1
+  fi
+
+  if ! has autoreconf && has brew; then
+    step "Installing nostril build prerequisites via Homebrew..."
+    brew install autoconf automake libtool >/dev/null 2>&1 || true
+  fi
+  has autoreconf || return 1
+
+  build_root="${XDG_CACHE_HOME:-$HOME/.cache}/wizardry/nostril-src"
+  repo_dir="$build_root/nostril"
+  target_bin_dir=$(install_bin_dir)
+
+  mkdir -p "$build_root"
+  if [ -d "$repo_dir/.git" ]; then
+    (
+      cd "$repo_dir"
+      command git fetch --depth 1 origin >/dev/null 2>&1 || true
+      command git reset --hard FETCH_HEAD >/dev/null 2>&1 || true
+    )
+  else
+    command git clone --depth 1 https://github.com/jb55/nostril.git "$repo_dir" >/dev/null 2>&1 || return 1
+  fi
+
+  (
+    cd "$repo_dir"
+    command git submodule update --init --recursive >/dev/null 2>&1 || return 1
+    command make nostril >/dev/null 2>&1 || return 1
+  ) || return 1
+
+  mkdir -p "$target_bin_dir"
+  cp "$repo_dir/nostril" "$target_bin_dir/nostril" || return 1
+  chmod +x "$target_bin_dir/nostril"
+  if [ -f "$repo_dir/nostril-query" ]; then
+    cp "$repo_dir/nostril-query" "$target_bin_dir/nostril-query" || true
+    chmod +x "$target_bin_dir/nostril-query" || true
+  fi
+
+  has nostril
+}
+
+if has nostril && has nak; then
+  success "nostril tooling is already installed"
   exit 0
 fi
 
-if ! has cargo; then
-  die "install-nostril: cargo is required. Install Rust toolchain first, then run install-nostril."
+if ! install_nostril_binary; then
+  die "install-nostril: could not install nostril binary."
 fi
 
-step "Installing nostril via cargo..."
-if cargo install --locked nostril >/dev/null 2>&1; then
-  if has nostril; then
-    success "Installed nostril"
-    exit 0
-  fi
+if ! install_nak_verifier; then
+  die "install-nostril: could not install verifier dependency (nak). Install nak, then retry."
 fi
 
-die "install-nostril: installation failed. Try running 'cargo install --locked nostril' directly for details."
+if has nostril && has nak; then
+  success "Installed nostril tooling"
+  exit 0
+fi
+
+die "install-nostril: installation incomplete. Ensure both nostril and nak are on PATH."

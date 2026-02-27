@@ -11,7 +11,7 @@ blog_read_request_body
 blog_send_json_headers
 
 if ! blog_nostr_verifier_available; then
-  blog_json_error "Nostr signature verification requires a server-side verifier. Install nak (recommended) or a nostril build that supports verify." "nostr_verifier_required"
+  blog_json_error "Nostr signature verification requires nostril tooling on the server. Run: web-wizardry install-nostril" "nostril_required"
   exit 0
 fi
 if ! command -v jq >/dev/null 2>&1; then

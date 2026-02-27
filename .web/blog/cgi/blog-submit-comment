@@ -19,7 +19,7 @@ if ! blog_require_session false; then
 fi
 
 if ! blog_nostr_verifier_available; then
-  blog_json_error "Comment signing verification requires a server-side verifier (nak recommended)." "nostr_verifier_required"
+  blog_json_error "Comment signing verification requires nostril tooling on the server. Run: web-wizardry install-nostril" "nostril_required"
   exit 0
 fi
 if ! command -v jq >/dev/null 2>&1; then

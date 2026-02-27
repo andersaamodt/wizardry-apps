@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Redditor</title>
-  <link rel="stylesheet" href="style.css?v=vr20260227g">
+  <link rel="stylesheet" href="style.css?v=vr20260227h">
   <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
 </head>
 <body class="is-booting">
@@ -188,9 +188,9 @@
                 </div>
                 <div class="manifesto-editor-wrap">
                   <textarea id="manifesto-input" class="custom-instructions-input" spellcheck="false" placeholder="No instructions yet. See Settings for shared instructions."></textarea>
-                  <div id="manifesto-save-indicator" class="manifesto-save-indicator hidden" aria-live="polite">
-                    <span class="manifesto-save-spinner" aria-hidden="true"></span>
-                    <span id="manifesto-save-text">Saving</span>
+                  <div id="manifesto-save-indicator" class="autosave-indicator hidden" aria-live="polite">
+                    <span class="autosave-icon" aria-hidden="true"></span>
+                    <span id="manifesto-save-text">saving</span>
                   </div>
                 </div>
                 <textarea id="norms-input" class="custom-instructions-input norms-raw-input" spellcheck="false" aria-hidden="true"></textarea>
@@ -460,8 +460,9 @@
                       <textarea id="reply-template-neutral-ban" class="custom-instructions-input compact-template-input"></textarea>
                     </div>
                   </div>
-                  <div class="settings-actions modes-save-actions">
-                    <button id="btn-save-reply-templates" type="button" class="primary">Save templates</button>
+                  <div id="reply-templates-save-indicator" class="autosave-indicator hidden" aria-live="polite">
+                    <span class="autosave-icon" aria-hidden="true"></span>
+                    <span id="reply-templates-save-text">saving</span>
                   </div>
                 </div>
               </div>
@@ -475,9 +476,6 @@
             <button id="btn-enforcement-escalation-settings" type="button" class="inline-link-btn enforcement-escalation-link" title="Open enforcement settings">Enforcement settings...</button>
           </div>
           <div id="enforcement-workarea" class="enforcement-workarea">
-            <div class="settings-card subpanel-card enforcement-main-card">
-              <div class="settings-empty-note">Configure ban ladder and moderator notifications in <strong>Enforcement settings...</strong>.</div>
-            </div>
             <aside id="enforcement-escalation-drawer" class="mode-detail-drawer enforcement-escalation-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div class="mode-detail-drawer-title">Enforcement settings</div>
@@ -884,6 +882,9 @@
       enforcementSaveTimer: null,
       enforcementSaveInFlight: false,
       enforcementSaveQueued: false,
+      replyTemplatesSaveTimer: null,
+      replyTemplatesSaveInFlight: false,
+      replyTemplatesSaveQueued: false,
       passIntervalSaveTimer: null,
       threadInitiateSaveTimer: null,
       usernameSaveTimer: null,
@@ -2402,9 +2403,9 @@
       el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
     }
 
-    function setManifestoSaveIndicator(mode) {
-      var root = document.getElementById('manifesto-save-indicator');
-      var text = document.getElementById('manifesto-save-text');
+    function setAutosaveIndicator(rootId, textId, mode) {
+      var root = document.getElementById(rootId);
+      var text = document.getElementById(textId);
       if (!root || !text) return;
       var normalized = String(mode || '').trim().toLowerCase();
       if (normalized !== 'saving' && normalized !== 'saved') normalized = '';
@@ -2415,7 +2416,15 @@
       }
       root.classList.remove('hidden');
       root.classList.add(normalized);
-      text.textContent = normalized === 'saving' ? 'Saving' : 'Saved';
+      text.textContent = normalized === 'saving' ? 'saving' : 'saved';
+    }
+
+    function setManifestoSaveIndicator(mode) {
+      setAutosaveIndicator('manifesto-save-indicator', 'manifesto-save-text', mode);
+    }
+
+    function setReplyTemplatesSaveIndicator(mode) {
+      setAutosaveIndicator('reply-templates-save-indicator', 'reply-templates-save-text', mode);
     }
 
     function setProfilesMessage(msg, isError) {
@@ -4185,6 +4194,7 @@
       if (warning) warning.value = String(templates.warningTemplate || '');
       if (sw) sw.value = String(templates.modeSwitchTemplate || '');
       if (neutral) neutral.value = String(templates.neutralBanTemplate || '');
+      setReplyTemplatesSaveIndicator('');
     }
 
     function renderRelationships() {
@@ -4433,6 +4443,37 @@
         state.enforcementSaveTimer = null;
         runEnforcementAutosave();
       }, Math.max(0, parseInt(delayMs, 10) || 420));
+    }
+
+    async function runReplyTemplatesAutosave() {
+      if (state.replyTemplatesSaveInFlight) {
+        state.replyTemplatesSaveQueued = true;
+        return;
+      }
+      state.replyTemplatesSaveInFlight = true;
+      try {
+        setReplyTemplatesSaveIndicator('saving');
+        await saveModesConfigWithFeedback('', { quiet: true });
+        state.modesConfigDirty = false;
+        setReplyTemplatesSaveIndicator('saved');
+      } catch (error) {
+        setReplyTemplatesSaveIndicator('');
+        setControlMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.replyTemplatesSaveInFlight = false;
+        if (state.replyTemplatesSaveQueued) {
+          state.replyTemplatesSaveQueued = false;
+          queueReplyTemplatesAutosave(120);
+        }
+      }
+    }
+
+    function queueReplyTemplatesAutosave(delayMs) {
+      if (state.replyTemplatesSaveTimer) clearTimeout(state.replyTemplatesSaveTimer);
+      state.replyTemplatesSaveTimer = setTimeout(function () {
+        state.replyTemplatesSaveTimer = null;
+        runReplyTemplatesAutosave();
+      }, Math.max(0, parseInt(delayMs, 10) || 500));
     }
 
     function addModeActionTriggerRow() {
@@ -4969,7 +5010,7 @@
       setDoctrineMessage('', false);
       setManifestoSaveIndicator('saving');
       if (state.doctrineSaveTimer) clearTimeout(state.doctrineSaveTimer);
-      state.doctrineSaveTimer = setTimeout(function () { saveDoctrine(); }, 650);
+      state.doctrineSaveTimer = setTimeout(function () { saveDoctrine(); }, 500);
     }
 
     function setActiveTab(tab) {
@@ -5114,13 +5155,6 @@
       document.getElementById('btn-replies-drawer-close').addEventListener('click', function () {
         closeReplyTemplatesDrawer();
       });
-      document.getElementById('btn-save-reply-templates').addEventListener('click', function () {
-        saveModesConfigWithFeedback('Reply templates saved.').then(function () {
-          closeReplyTemplatesDrawer();
-        }).catch(function (error) {
-          setControlMessage(String(error && error.message ? error.message : error), true);
-        });
-      });
       document.getElementById('btn-enforcement-escalation-settings').addEventListener('click', function () {
         openEnforcementEscalationDrawer();
       });
@@ -5251,6 +5285,8 @@
           target.id === 'reply-template-neutral-ban'
         ) {
           markModesConfigDirty();
+          setReplyTemplatesSaveIndicator('saving');
+          queueReplyTemplatesAutosave(500);
         }
       });
       document.getElementById('btn-relationships-manual-override').addEventListener('click', function () {

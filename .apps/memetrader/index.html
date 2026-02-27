@@ -129,11 +129,6 @@
     var entryPath = '/pages/index.html';
 
     var commands = {
-      siteReady: [
-        'sh',
-        '-c',
-        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/' + siteName + '/site.conf"; built="$root/' + siteName + '/build/pages/index.html"; if [ -f "$cfg" ] && [ -f "$built" ]; then printf "yes"; else printf "no"; fi'
-      ],
       ensureSite: [
         'sh',
         '-c',
@@ -244,11 +239,7 @@
     }
 
     async function ensureSiteIfNeeded() {
-      var res = await bridgeExec(commands.siteReady);
-      var ready = String((res && res.stdout) || '').trim() === 'yes';
-      if (!ready) {
-        await bridgeExec(commands.ensureSite);
-      }
+      await bridgeExec(commands.ensureSite);
     }
 
     async function startWithFallbackPort() {

@@ -1767,6 +1767,16 @@ label {
   resize: vertical;
 }
 
+.reply-templates-drawer .mode-drawer-block {
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.reply-templates-drawer .autosave-indicator {
+  right: 8px;
+  bottom: 8px;
+}
+
 .enforcement-head-row {
   display: flex;
   align-items: center;
@@ -1785,7 +1795,7 @@ label {
   align-items: stretch;
   column-gap: 0;
   overflow: hidden;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   transition: grid-template-columns 200ms ease, column-gap 200ms ease;
 }
@@ -1799,6 +1809,10 @@ label {
   width: 100%;
   max-width: none;
   margin-bottom: 0;
+}
+
+.enforcement-escalation-drawer {
+  grid-column: 2;
 }
 
 .enforcement-escalation-drawer .mode-field-row {
@@ -3010,51 +3024,56 @@ label {
   padding-bottom: 1.55rem;
 }
 
-.manifesto-save-indicator {
+.autosave-indicator {
   position: absolute;
   right: 10px;
   bottom: 18px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 7px;
-  border-radius: 999px;
+  gap: 4px;
   font-size: 0.72rem;
   line-height: 1;
-  color: color-mix(in srgb, var(--text-subtle) 72%, var(--bg-panel) 28%);
-  background: color-mix(in srgb, var(--bg-soft) 82%, var(--bg-panel) 18%);
-  border: 1px solid color-mix(in srgb, var(--line) 66%, transparent);
+  font-style: italic;
+  color: color-mix(in srgb, var(--text-subtle) 84%, var(--bg-panel) 16%);
   pointer-events: none;
 }
 
-.manifesto-save-indicator.hidden {
+.autosave-indicator.hidden {
   display: none;
 }
 
-.manifesto-save-spinner {
+.autosave-icon {
   display: inline-block;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   box-sizing: border-box;
   flex-shrink: 0;
-  border-radius: 999px;
-  border: 2px solid var(--line);
-  border-top-color: var(--accent);
-  opacity: 0;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--line) 74%, var(--text-subtle) 26%);
+  border-top-color: color-mix(in srgb, var(--text-subtle) 76%, var(--line) 24%);
+  opacity: 1;
 }
 
-.manifesto-save-indicator.saving .manifesto-save-spinner {
-  opacity: 1;
+.autosave-indicator.saving .autosave-icon {
   animation: vr-loading-spin 0.8s linear infinite;
 }
 
-.manifesto-save-indicator.saved .manifesto-save-spinner {
-  opacity: 0;
+.autosave-indicator.saved .autosave-icon {
   animation: none;
+  border: 0;
+  width: auto;
+  height: auto;
 }
 
-.manifesto-save-indicator.saved {
-  color: color-mix(in srgb, var(--ok) 78%, var(--text-subtle) 22%);
+.autosave-indicator.saved .autosave-icon::before {
+  content: '✓';
+  font-style: normal;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--text-subtle) 86%, var(--bg-panel) 14%);
+}
+
+.autosave-indicator.saved {
+  color: color-mix(in srgb, var(--text-subtle) 86%, var(--bg-panel) 14%);
 }
 
 .norms-raw-input {

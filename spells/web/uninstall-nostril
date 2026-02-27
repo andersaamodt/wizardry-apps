@@ -7,7 +7,7 @@ case "${1-}" in
   cat <<'USAGE'
 Usage: uninstall-nostril
 
-Removes the nostril CLI installed for server-side Nostr signature verification.
+Removes the nostril CLI and verifier dependency used for server-side Nostr signature verification.
 USAGE
   exit 0
   ;;
@@ -16,27 +16,42 @@ esac
 set -eu
 . env-clear
 
-if ! has nostril; then
-  info "nostril is not installed"
-  exit 0
-fi
+removed_any=0
 
-if has cargo; then
-  step "Removing nostril via cargo..."
-  if cargo uninstall nostril >/dev/null 2>&1; then
-    success "Uninstalled nostril"
-    exit 0
+for path in "$(command -v nostril 2>/dev/null || printf '')" \
+            "${XDG_BIN_HOME:-$HOME/.local/bin}/nostril" \
+            "/usr/local/bin/nostril" \
+            "/opt/homebrew/bin/nostril"; do
+  [ -n "$path" ] || continue
+  if [ -f "$path" ]; then
+    step "Removing nostril binary at $path"
+    rm -f "$path"
+    removed_any=1
+  fi
+done
+
+for qpath in "${XDG_BIN_HOME:-$HOME/.local/bin}/nostril-query" \
+             "/usr/local/bin/nostril-query" \
+             "/opt/homebrew/bin/nostril-query"; do
+  [ -f "$qpath" ] || continue
+  rm -f "$qpath"
+done
+
+if has brew; then
+  if brew list --formula nak >/dev/null 2>&1; then
+    step "Removing nak verifier via Homebrew..."
+    brew uninstall nak >/dev/null 2>&1 || true
+    removed_any=1
   fi
 fi
 
-nostril_path=$(command -v nostril 2>/dev/null || printf '')
-if [ -n "$nostril_path" ] && [ -f "$nostril_path" ]; then
-  step "Removing nostril binary at $nostril_path"
-  rm -f "$nostril_path"
+if has nostril || has nak; then
+  die "uninstall-nostril: nostril tooling is still present on PATH"
 fi
 
-if has nostril; then
-  die "uninstall-nostril: nostril is still present on PATH"
+if [ "$removed_any" -eq 0 ]; then
+  info "nostril tooling is not installed"
+  exit 0
 fi
 
-success "Uninstalled nostril"
+success "Uninstalled nostril tooling"

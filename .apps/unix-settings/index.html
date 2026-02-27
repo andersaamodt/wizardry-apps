@@ -81,7 +81,7 @@
       ensureSite: [
         'sh',
         '-c',
-        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/' + siteName + '"; cfg="$site/site.conf"; built="$site/build/pages/index.html"; if [ ! -f "$cfg" ]; then create-from-template ' + siteName + ' unix-settings; web-wizardry build ' + siteName + '; elif [ ! -f "$built" ]; then web-wizardry build ' + siteName + '; fi'
+        'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/' + siteName + '"; cfg="$site/site.conf"; if [ ! -f "$cfg" ]; then create-from-template ' + siteName + ' unix-settings; fi; web-wizardry build ' + siteName
       ],
       start: ['web-wizardry', 'serve', siteName],
       stop: ['web-wizardry', 'stop', siteName],
@@ -185,10 +185,10 @@
       try {
         await waitForBridge(4000);
 
+        setStatus('Preparing UNIX Settings…', false);
+        await bridgeExec(commands.ensureSite);
         wasRunningAtBoot = await isRunning();
         if (!wasRunningAtBoot) {
-          setStatus('Preparing UNIX Settings…', false);
-          await bridgeExec(commands.ensureSite);
           setStatus('Starting UNIX Settings…', false);
           await startWithFallbackPort();
           launchedServer = true;
