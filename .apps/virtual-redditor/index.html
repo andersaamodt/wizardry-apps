@@ -3336,6 +3336,7 @@
       var passIntervalUnit = document.getElementById('pass-interval-unit');
       var obeyAdmins = document.getElementById('obey-admins');
       var threadInitiateMaxInput = document.getElementById('thread-initiate-max-pct');
+      var passesChecked = false;
 
       if (titleUsername && document.activeElement !== titleUsername && !state.usernameEditing) {
         titleUsername.value = String(settings.redditUsername || '');
@@ -3348,15 +3349,17 @@
       if (subredditInput && document.activeElement !== subredditInput) scheduleSubredditCheck(0, false);
       if (passesEnabled) {
         if (typeof state.passesTogglePendingValue === 'boolean') {
-          passesEnabled.checked = state.passesTogglePendingValue;
+          passesChecked = state.passesTogglePendingValue;
+          passesEnabled.checked = passesChecked;
           passesEnabled.disabled = true;
         } else {
-          passesEnabled.checked = botRunning;
+          passesChecked = !!settings.runEnabled;
+          passesEnabled.checked = passesChecked;
           passesEnabled.disabled = false;
         }
       }
       if (passIntervalControls) {
-        passIntervalControls.classList.toggle('hidden', !(passesEnabled && passesEnabled.checked));
+        passIntervalControls.classList.toggle('hidden', !passesChecked);
       }
       if (passIntervalInput && passIntervalUnit &&
           document.activeElement !== passIntervalInput &&
@@ -6498,7 +6501,10 @@
         schedulePassIntervalSave();
       });
       document.getElementById('passes-enabled').addEventListener('change', function (event) {
-        toggleBackgroundPasses(!!(event && event.target && event.target.checked));
+        var checked = !!(event && event.target && event.target.checked);
+        var controls = document.getElementById('pass-interval-controls');
+        if (controls) controls.classList.toggle('hidden', !checked);
+        toggleBackgroundPasses(checked);
       });
       document.getElementById('obey-admins').addEventListener('change', function (event) {
         var enabled = !!(event && event.target && event.target.checked);
