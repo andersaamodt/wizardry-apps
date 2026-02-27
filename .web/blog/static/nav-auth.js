@@ -1746,6 +1746,7 @@
     bindUiEvents();
     window.blogAuth = window.blogAuth || {};
     window.blogAuth.openLoginModal = showAuthModal;
+    window.blogAuth.showToast = showNavToast;
     flushRememberedNavToast();
     loadTheme();
     checkAuth();

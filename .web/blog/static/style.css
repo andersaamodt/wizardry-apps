@@ -531,6 +531,18 @@ header h1 {
   color: #14532d;
 }
 
+.nav-top-toast.is-warn {
+  border-color: #efcf87;
+  background: rgba(255, 250, 236, 0.98);
+  color: #8a5a00;
+}
+
+.nav-top-toast.is-error {
+  border-color: #e8a2a1;
+  background: rgba(255, 241, 241, 0.98);
+  color: #9c2f2f;
+}
+
 .auth-modal[hidden] {
   display: none;
 }

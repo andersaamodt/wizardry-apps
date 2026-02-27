@@ -28,7 +28,6 @@
     outputQueue: document.getElementById('output-queue'),
     outputAccount: document.getElementById('output-account'),
     outputUsers: document.getElementById('output-users'),
-    accountToastHost: document.getElementById('account-toast-host'),
     siteTitle: document.getElementById('site-title'),
     adminTheme: document.getElementById('admin-theme'),
     registrationEnabled: document.getElementById('registration-enabled'),
@@ -155,55 +154,51 @@
     });
   }
 
-  function setOutput(target, message, kind) {
-    if (target === els.outputAccount && message) {
-      showAccountToast(message, kind);
-      target.innerHTML = '';
+  function showGlobalToast(message, kind) {
+    const text = String(message || '').trim();
+    if (!text) {
       return;
     }
-    const bg = kind === 'ok' ? '#e8f5e9' : (kind === 'warn' ? '#fff8e1' : '#ffebee');
-    const border = kind === 'ok' ? '#4caf50' : (kind === 'warn' ? '#f9a825' : '#e53935');
-    target.innerHTML = '<div class="notice" style="background:' + bg + ';border-color:' + border + ';">' + message + '</div>';
-  }
-
-  let accountToastHideTimer = null;
-  let accountToastRemoveTimer = null;
-
-  function clearAccountToastTimers() {
-    if (accountToastHideTimer) {
-      clearTimeout(accountToastHideTimer);
-      accountToastHideTimer = null;
-    }
-    if (accountToastRemoveTimer) {
-      clearTimeout(accountToastRemoveTimer);
-      accountToastRemoveTimer = null;
-    }
-  }
-
-  function showAccountToast(message, kind) {
-    if (!els.accountToastHost) {
+    const tone = kind === 'ok' ? 'ok' : (kind === 'warn' ? 'warn' : 'error');
+    if (window.blogAuth && typeof window.blogAuth.showToast === 'function') {
+      window.blogAuth.showToast(text, tone, 4200);
       return;
     }
-    clearAccountToastTimers();
-
-    const flavor = kind === 'ok' ? 'is-ok' : (kind === 'warn' ? 'is-warn' : 'is-error');
-    els.accountToastHost.innerHTML = '<div class="account-toast ' + flavor + '">' + message + '</div>';
-    const toast = els.accountToastHost.firstElementChild;
-    if (!toast) {
-      return;
+    let host = document.getElementById('nav-top-toast-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'nav-top-toast-host';
+      host.className = 'nav-top-toast-host';
+      host.setAttribute('aria-live', 'polite');
+      host.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(host);
     }
-
+    host.innerHTML = '';
+    const toast = document.createElement('div');
+    toast.className = 'nav-top-toast';
+    if (tone) {
+      toast.classList.add('is-' + tone);
+    }
+    toast.textContent = text;
+    host.appendChild(toast);
     requestAnimationFrame(function () {
       toast.classList.add('is-visible');
     });
+    setTimeout(function () {
+      toast.classList.add('is-closing');
+      setTimeout(function () {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 230);
+    }, 4200);
+  }
 
-    accountToastHideTimer = setTimeout(function () {
-      toast.classList.remove('is-visible');
-      toast.classList.add('is-hiding');
-      accountToastRemoveTimer = setTimeout(function () {
-        els.accountToastHost.innerHTML = '';
-      }, 260);
-    }, 5400);
+  function setOutput(target, message, kind) {
+    showGlobalToast(message, kind);
+    if (target) {
+      target.innerHTML = '';
+    }
   }
 
   function lockNostrPubkeyField() {
@@ -1181,7 +1176,7 @@
       }
 
       if (action === 'publish_now') {
-        setOutput(els.outputCompose, 'Published: <code>' + escapeHtml(data.filename || '') + '</code>', 'ok');
+        setOutput(els.outputCompose, 'Published: ' + String(data.filename || ''), 'ok');
         resetComposer();
       } else {
         setOutput(els.outputCompose, data.message || 'Saved.', 'ok');
