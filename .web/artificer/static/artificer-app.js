@@ -10269,7 +10269,13 @@
       if (!response.success) {
         throw new Error(response.error || "Failed to load themes");
       }
-      state.themes = normalizeThemes(response.themes || []);
+      var loadedThemes = normalizeThemes(response.themes || []);
+      // If backend returns a sparse set (for example stale site assets),
+      // merge with the known shared catalog so users still get full theme access.
+      if (loadedThemes.length <= 1) {
+        loadedThemes = normalizeThemes(loadedThemes.concat(themeNameListFallback()));
+      }
+      state.themes = loadedThemes;
       ensureActiveThemeInList();
       applyTheme(state.activeTheme);
     }).catch(function () {

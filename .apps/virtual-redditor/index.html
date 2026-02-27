@@ -841,9 +841,12 @@
       <div class="settings-form-grid">
         <div class="settings-global-instructions-row">
           <label for="settings-global-instructions">Shared Instructions</label>
-          <textarea id="settings-global-instructions" class="settings-global-instructions" spellcheck="false" placeholder="Used for every virtual Redditor unless you customize it."></textarea>
-          <div class="settings-global-instructions-actions">
-            <button id="btn-settings-save-global-instructions" type="button" class="soft">Save shared instructions</button>
+          <div class="settings-global-instructions-wrap">
+            <textarea id="settings-global-instructions" class="settings-global-instructions" spellcheck="false" placeholder="Used for every virtual Redditor unless you customize it."></textarea>
+            <div id="settings-global-instructions-save-indicator" class="autosave-indicator settings-global-save-indicator hidden" aria-live="polite">
+              <span class="autosave-icon" aria-hidden="true"></span>
+              <span id="settings-global-instructions-save-text">saving</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1248,6 +1251,8 @@
       obeyAdminsPendingValue: null,
       globalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS,
       globalInstructionsRemote: DEFAULT_GLOBAL_INSTRUCTIONS,
+      globalInstructionsSaveTimer: null,
+      globalInstructionsSaveQueued: false,
       globalInstructionsSaving: false
     };
 

@@ -10870,11 +10870,31 @@ EOF
 }
 
 emit_themes() {
-  theme_root="$WIZARDRY_DIR/.web/.themes"
+  app_theme_dir="$ARTIFICER_SCRIPT_DIR/../static/themes"
+  repo_theme_root=""
+  global_theme_root=""
+  wizardry_theme_root=""
   themes=""
 
-  if [ -d "$theme_root" ]; then
-    themes=$(find "$theme_root" -maxdepth 1 -type f -name '*.css' 2>/dev/null \
+  if repo_root=$(CDPATH= cd -- "$ARTIFICER_SCRIPT_DIR/../../.." 2>/dev/null && pwd); then
+    repo_theme_root="$repo_root/.web/.themes"
+  fi
+
+  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -d "$WIZARDRY_APPS_ROOT/.web/.themes" ]; then
+    global_theme_root="$WIZARDRY_APPS_ROOT/.web/.themes"
+  fi
+
+  wizardry_theme_root="$WIZARDRY_DIR/.web/.themes"
+
+  mkdir -p "$app_theme_dir"
+  for theme_root in "$global_theme_root" "$repo_theme_root" "$wizardry_theme_root"; do
+    [ -n "$theme_root" ] || continue
+    [ -d "$theme_root" ] || continue
+    cp -f "$theme_root"/*.css "$app_theme_dir/" 2>/dev/null || true
+  done
+
+  if [ -d "$app_theme_dir" ]; then
+    themes=$(find "$app_theme_dir" -maxdepth 1 -type f -name '*.css' 2>/dev/null \
       | awk -F/ '{ print $NF }' \
       | sed 's/\.css$//' \
       | awk '/^[a-z0-9_-]+$/' \
