@@ -526,6 +526,7 @@
                 </div>
               </div>
               <div id="modes-list" class="modes-list"></div>
+              <div id="modes-list-summary" class="mode-list-status mode-summary-meta-text"></div>
             </div>
             <div class="drawer-resizer" data-drawer-resizer="modes" aria-hidden="true"></div>
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
@@ -3817,6 +3818,11 @@
       return modeId === 'SHADE' ? 'CHAT' : modeId;
     }
 
+    function modeDisplayTitle(rawId) {
+      var text = String(modeDisplayId(rawId) || '').toLowerCase();
+      return text.replace(/\b[a-z]/g, function (ch) { return ch.toUpperCase(); });
+    }
+
     function modeOptions(config) {
       var cfg = normalizeModesConfig(config || state.modesConfig);
       return (cfg.modes || []).filter(function (m) { return !!m && !!m.id; }).map(function (m) {
@@ -3831,7 +3837,7 @@
       var useIdOnly = !!idOnly;
       select.innerHTML = options.map(function (opt) {
         var selected = String(selectedValue || '') === opt.id ? ' selected' : '';
-        var displayId = modeDisplayId(opt.id);
+        var displayId = useIdOnly ? modeDisplayTitle(opt.id) : modeDisplayId(opt.id);
         var text = useIdOnly ? displayId : (displayId + ' - ' + opt.label);
         return '<option value="' + escapeHtml(opt.id) + '"' + selected + '>' + escapeHtml(text) + '</option>';
       }).join('');
@@ -4636,6 +4642,7 @@
     function renderModesPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
       var list = document.getElementById('modes-list');
+      var summaryLine = document.getElementById('modes-list-summary');
       if (!list) return;
 
       fillModeSelect('modes-starting-mode', cfg.startingMode || '', true);
@@ -4654,9 +4661,9 @@
       var summaryText = String(modeCount) + ' ' + (modeCount === 1 ? 'mode' : 'modes') + ' • ' +
         String(triggerCount) + ' ' + (triggerCount === 1 ? 'action trigger' : 'action triggers') + ' • ' +
         String(transitionCount) + ' ' + (transitionCount === 1 ? 'post-action transition' : 'post-action transitions');
-      var summaryFooterHtml = '<div class="mode-list-status mode-summary-meta-text">' + escapeHtml(summaryText) + '</div>';
+      if (summaryLine) summaryLine.textContent = summaryText;
       if (!modes.length) {
-        list.innerHTML = '<div class="settings-empty-note">No modes configured.</div>' + summaryFooterHtml;
+        list.innerHTML = '<div class="settings-empty-note">No modes configured.</div>';
       } else {
         list.innerHTML = modes.map(function (mode) {
           var modeId = String(mode.id || '');
@@ -4692,10 +4699,10 @@
             '      <span class="mode-summary-state' + ((mode.enabled === false) ? ' disabled' : '') + '" title="Current enabled state for this mode">' + ((mode.enabled === false) ? 'Disabled' : 'Enabled') + '</span>',
             '      <button type="button" class="soft mode-edit-inline-btn" data-edit-mode="' + escapeHtml(modeId) + '" title="Open mode details">Edit</button>',
             '    </div>',
-          '  </div>',
+            '  </div>',
             '</article>'
           ].join('');
-        }).join('') + summaryFooterHtml;
+        }).join('');
       }
 
       renderModeDrawer(cfg, actionChoices);
