@@ -333,7 +333,16 @@ title: Blog Admin
 
 <div class="field-row">
 <label for="account-nostr-pubkey"><strong>Nostr Pubkey</strong></label>
+<div class="account-row account-nostr-row">
 <input type="text" id="account-nostr-pubkey" readonly>
+<button id="btn-account-pubkey-copy" type="button" class="account-icon-button" aria-label="Copy Nostr pubkey" title="Copy Nostr pubkey">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<path d="M9 9H19V19H9V9Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+<path d="M5 15H4.8C3.8 15 3 14.2 3 13.2V4.8C3 3.8 3.8 3 4.8 3H13.2C14.2 3 15 3.8 15 4.8V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>
+</button>
+<button id="btn-account-pubkey-toggle" type="button">Show</button>
+</div>
 <p class="muted account-note">This key is account-bound and cannot be edited directly.</p>
 </div>
 
@@ -353,7 +362,8 @@ title: Blog Admin
 </div>
 
 <details class="account-ssh-optional">
-<summary>Optional: SSH key for MUD and terminal login</summary>
+<summary>SSH key for MUD and terminal login</summary>
+<p class="muted account-ssh-description">Link your SSH public key for terminal access.</p>
 <div class="field-row">
 <label for="account-ssh-public-key"><strong>SSH Public Key</strong></label>
 <textarea id="account-ssh-public-key" rows="3" placeholder="ssh-ed25519 AAAA..."></textarea>
@@ -809,10 +819,46 @@ body {
   color: #334155;
   border-style: dashed;
   cursor: not-allowed;
+  filter: blur(1.7px);
+  transition: filter 0.15s ease;
+}
+
+[data-admin-section="account"] #account-nostr-pubkey.is-visible {
+  filter: none;
+}
+
+[data-admin-section="account"] .account-nostr-row {
+  align-items: stretch;
+  gap: 0.36rem;
+}
+
+[data-admin-section="account"] .account-nostr-row #account-nostr-pubkey {
+  min-width: min(100%, 32rem);
+}
+
+#admin-panel button.account-icon-button {
+  min-width: 2.15rem;
+  width: 2.15rem;
+  height: 2.15rem;
+  padding: 0;
+  border-radius: 8px;
+}
+
+#admin-panel button.account-icon-button svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+#admin-panel #btn-account-pubkey-toggle {
+  min-width: 4.1rem;
 }
 
 .account-ssh-optional {
-  margin-top: 0.35rem;
+  margin-top: 0.74rem;
+}
+
+.account-ssh-description {
+  margin: 0.32rem 0 0.42rem;
 }
 
 .account-row {

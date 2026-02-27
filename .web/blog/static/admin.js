@@ -58,6 +58,8 @@
     currentDraftLabel: document.getElementById('current-draft-label'),
     accountPlayerName: document.getElementById('account-player-name'),
     accountNostrPubkey: document.getElementById('account-nostr-pubkey'),
+    accountNostrPubkeyCopyButton: document.getElementById('btn-account-pubkey-copy'),
+    accountNostrPubkeyToggleButton: document.getElementById('btn-account-pubkey-toggle'),
     accountSshPublicKey: document.getElementById('account-ssh-public-key'),
     autosaveStatus: document.getElementById('autosave-status'),
     publishNowButton: document.getElementById('btn-publish-now'),
@@ -225,6 +227,63 @@
         els.accountNostrPubkey.value = lockedValue;
       }
     });
+    setNostrPubkeyVisibility(false);
+    syncNostrPubkeyActionState();
+  }
+
+  function setNostrPubkeyVisibility(visible) {
+    if (!els.accountNostrPubkey) {
+      return;
+    }
+    const shown = !!visible;
+    els.accountNostrPubkey.classList.toggle('is-visible', shown);
+    if (els.accountNostrPubkeyToggleButton) {
+      els.accountNostrPubkeyToggleButton.textContent = shown ? 'Hide' : 'Show';
+    }
+  }
+
+  async function copyTextToClipboard(text) {
+    const value = String(text || '');
+    if (!value) {
+      return false;
+    }
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      try {
+        await navigator.clipboard.writeText(value);
+        return true;
+      } catch (_) {
+        // Fall back to execCommand path below.
+      }
+    }
+    const area = document.createElement('textarea');
+    area.value = value;
+    area.setAttribute('readonly', 'readonly');
+    area.style.position = 'fixed';
+    area.style.top = '-9999px';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch (_) {
+      ok = false;
+    }
+    area.remove();
+    return ok;
+  }
+
+  function syncNostrPubkeyActionState() {
+    const hasKey = !!(els.accountNostrPubkey && String(els.accountNostrPubkey.value || '').trim());
+    if (els.accountNostrPubkeyCopyButton) {
+      els.accountNostrPubkeyCopyButton.disabled = !hasKey;
+    }
+    if (els.accountNostrPubkeyToggleButton) {
+      els.accountNostrPubkeyToggleButton.disabled = !hasKey;
+      if (!hasKey) {
+        els.accountNostrPubkeyToggleButton.textContent = 'Show';
+      }
+    }
   }
 
   function applyThemePreview(theme) {
@@ -1659,6 +1718,20 @@
         syncSshAccountActionState();
       });
       syncSshAccountActionState();
+    }
+    if (els.accountNostrPubkeyCopyButton) {
+      els.accountNostrPubkeyCopyButton.addEventListener('click', function () {
+        copyTextToClipboard(els.accountNostrPubkey ? els.accountNostrPubkey.value : '')
+          .then(function (ok) {
+            setOutput(els.outputAccount, ok ? 'Nostr pubkey copied.' : 'Could not copy Nostr pubkey.', ok ? 'ok' : 'warn');
+          });
+      });
+    }
+    if (els.accountNostrPubkeyToggleButton) {
+      els.accountNostrPubkeyToggleButton.addEventListener('click', function () {
+        const currentlyVisible = !!(els.accountNostrPubkey && els.accountNostrPubkey.classList.contains('is-visible'));
+        setNostrPubkeyVisibility(!currentlyVisible);
+      });
     }
 
     document.querySelectorAll('[data-toolbar]').forEach(function (btn) {
