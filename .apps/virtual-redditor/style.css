@@ -2914,6 +2914,13 @@ label {
   flex-wrap: wrap;
 }
 
+#btn-bigfive-customize {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  line-height: 1;
+}
+
 .bigfive-summary {
   display: inline-flex;
   align-items: stretch;
