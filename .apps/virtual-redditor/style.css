@@ -2420,6 +2420,24 @@ label {
   width: 100%;
 }
 
+.mode-detail-drawer select {
+  font-size: 0.76rem;
+  padding: 0.34rem 18px 0.34rem 0.44rem;
+}
+
+.mode-detail-drawer .mode-dropdown-btn {
+  font-size: 0.76rem;
+  padding: 0.34rem 1.78rem 0.36rem 0.5rem;
+}
+
+.mode-detail-drawer .mode-selected-name {
+  font-size: 0.76rem;
+}
+
+.mode-detail-drawer .mode-selected-desc {
+  font-size: 0.7rem;
+}
+
 .mode-detail-drawer .mode-field-row {
   grid-template-columns: 1fr;
   row-gap: 4px;
