@@ -6534,12 +6534,7 @@
       dictationWaveSeenSignal = true;
     }
     var barCount = dictationWaveTargetBarCount();
-    var existing = Array.isArray(state.dictateWaveLevels) ? state.dictateWaveLevels.slice(0, barCount) : [];
-    if (existing.length < barCount) {
-      while (existing.length < barCount) {
-        existing.push(0);
-      }
-    }
+    var existing = syncDictationWaveLevelsLength(barCount).slice();
     var shifted = existing.slice(1);
     shifted.push(level);
     state.dictateWaveLevels = shifted;
