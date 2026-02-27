@@ -2805,12 +2805,14 @@ button:disabled,
   border-top: 1px solid var(--line);
 }
 
-.composer-row.dictation-mode-active > :not(.dictation-mode) {
+.composer-row.dictation-mode-active > :not(.dictation-mode):not(#attach-btn):not(#attachment-picker) {
   display: none !important;
 }
 
 .dictation-mode {
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
   min-height: 30px;
   border: 0;
   border-radius: 999px;
