@@ -2784,6 +2784,10 @@ label {
   min-width: 0;
 }
 
+.persona-card.persona-main-pane {
+  overflow: auto;
+}
+
 .persona-card h3 {
   margin: 0 0 8px;
   font-size: 0.86rem;
