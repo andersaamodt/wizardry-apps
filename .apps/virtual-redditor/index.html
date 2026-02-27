@@ -289,6 +289,7 @@
                 <textarea id="norms-input" class="custom-instructions-input norms-raw-input" spellcheck="false" aria-hidden="true"></textarea>
               </div>
             </section>
+            <div class="drawer-resizer" data-drawer-resizer="persona" aria-hidden="true"></div>
             <aside id="persona-bigfive-drawer" class="mode-detail-drawer persona-bigfive-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div class="mode-detail-drawer-title">Big Five</div>
@@ -525,6 +526,7 @@
               <div class="persona-section-title modes-subtitle">Per-mode Permissions</div>
               <div id="modes-list" class="modes-list"></div>
             </div>
+            <div class="drawer-resizer" data-drawer-resizer="modes" aria-hidden="true"></div>
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div id="mode-detail-drawer-title" class="mode-detail-drawer-title">Mode details</div>
@@ -562,6 +564,7 @@
                 </table>
               </div>
             </div>
+            <div class="drawer-resizer" data-drawer-resizer="relationships" aria-hidden="true"></div>
             <aside id="relationship-override-drawer" class="mode-detail-drawer relationship-override-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div class="mode-detail-drawer-title">Manual override</div>
@@ -604,6 +607,7 @@
             <div class="replies-main-pane">
               <div id="replies-list"></div>
             </div>
+            <div class="drawer-resizer" data-drawer-resizer="replies" aria-hidden="true"></div>
             <aside id="reply-templates-drawer" class="mode-detail-drawer reply-templates-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div class="mode-detail-drawer-title">Reply templates</div>
@@ -660,6 +664,7 @@
                 </table>
               </div>
             </div>
+            <div class="drawer-resizer" data-drawer-resizer="enforcement" aria-hidden="true"></div>
             <aside id="enforcement-escalation-drawer" class="mode-detail-drawer enforcement-escalation-drawer" aria-hidden="true">
               <div class="mode-detail-drawer-head">
                 <div class="mode-detail-drawer-title">Enforcement settings</div>
@@ -1156,6 +1161,13 @@
       activeModel: 'llama3.1:8b',
       activeTheme: 'psionic',
       leftRailWidth: 320,
+      drawerWidths: {
+        persona: 320,
+        modes: 320,
+        relationships: 320,
+        replies: 320,
+        enforcement: 320
+      },
       uiPrefs: {},
       refreshInFlight: false,
       statusRenderSig: '',
@@ -2107,6 +2119,32 @@
       saveStorage(LEFT_RAIL_WIDTH_KEY, String(next));
       var grid = document.getElementById('main-grid');
       if (grid) grid.style.setProperty('--left-rail-width', next + 'px');
+    }
+
+    function drawerWidthBounds() {
+      var min = 240;
+      var max = Math.min(640, Math.max(min, (window.innerWidth || 1200) - 420));
+      return { min: min, max: max };
+    }
+
+    function setDrawerWidth(drawerKey, width) {
+      var key = String(drawerKey || '').trim();
+      if (!key || !state.drawerWidths || !Object.prototype.hasOwnProperty.call(state.drawerWidths, key)) return;
+      var next = parseInt(width, 10);
+      if (!Number.isFinite(next)) next = 320;
+      var bounds = drawerWidthBounds();
+      if (next < bounds.min) next = bounds.min;
+      if (next > bounds.max) next = bounds.max;
+      state.drawerWidths[key] = next;
+      var workarea = document.getElementById(key + '-workarea');
+      if (workarea) workarea.style.setProperty('--drawer-width', next + 'px');
+    }
+
+    function applyDrawerWidths() {
+      if (!state.drawerWidths) return;
+      Object.keys(state.drawerWidths).forEach(function (key) {
+        setDrawerWidth(key, state.drawerWidths[key]);
+      });
     }
 
     function normalizeUsername(value) {
@@ -6199,6 +6237,48 @@
         });
       }
 
+      document.querySelectorAll('[data-drawer-resizer]').forEach(function (resizer) {
+        resizer.addEventListener('pointerdown', function (event) {
+          var drawerKey = String(resizer.getAttribute('data-drawer-resizer') || '').trim();
+          var workarea = document.getElementById(drawerKey + '-workarea');
+          if (!drawerKey || !workarea || !workarea.classList.contains('drawer-open')) return;
+          event.preventDefault();
+          var startX = event.clientX;
+          var startWidth = (state.drawerWidths && state.drawerWidths[drawerKey]) ? state.drawerWidths[drawerKey] : 320;
+          document.body.classList.add('is-resizing');
+          if (resizer.setPointerCapture) {
+            try { resizer.setPointerCapture(event.pointerId); } catch (_) {}
+          }
+
+          function cleanupDrawerResize(upEvent) {
+            document.body.classList.remove('is-resizing');
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onCancel);
+            if (resizer.releasePointerCapture && upEvent && typeof upEvent.pointerId !== 'undefined') {
+              try { resizer.releasePointerCapture(upEvent.pointerId); } catch (_) {}
+            }
+          }
+
+          function onMove(moveEvent) {
+            var delta = moveEvent.clientX - startX;
+            setDrawerWidth(drawerKey, startWidth - delta);
+          }
+
+          function onUp(upEvent) {
+            cleanupDrawerResize(upEvent);
+          }
+
+          function onCancel(cancelEvent) {
+            cleanupDrawerResize(cancelEvent);
+          }
+
+          window.addEventListener('pointermove', onMove);
+          window.addEventListener('pointerup', onUp);
+          window.addEventListener('pointercancel', onCancel);
+        });
+      });
+
       document.getElementById('btn-change-username').addEventListener('click', function () {
         setUsernameEditing(true);
       });
@@ -6596,6 +6676,7 @@
       window.addEventListener('resize', positionModeMenus);
       window.addEventListener('resize', function () {
         setLeftRailWidth(state.leftRailWidth);
+        applyDrawerWidths();
       });
       window.addEventListener('blur', function () {
         document.body.classList.remove('is-resizing');
@@ -6699,6 +6780,7 @@
       updatePatrolModeDescriptions(DEFAULT_PATROL_MODE);
       applyTheme(state.activeTheme);
       setLeftRailWidth(state.leftRailWidth);
+      applyDrawerWidths();
       wireEvents();
       syncControlAndLabelTooltips();
       updateToolbarButtonStates();
