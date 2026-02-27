@@ -701,8 +701,8 @@
                   <table class="table" id="ban-levels-table">
                     <thead>
                       <tr>
+                        <th aria-label="Enabled"></th>
                         <th>Level</th>
-                        <th>Enabled</th>
                         <th>Default duration</th>
                       </tr>
                     </thead>
@@ -4882,14 +4882,18 @@
       ];
       var body = document.getElementById('ban-levels-body');
       if (!body) return;
+      function banEnabledTooltip(isEnabled) {
+        return isEnabled ? 'Enabled. Click to disable.' : 'Disabled. Click to enable.';
+      }
       body.innerHTML = levels.map(function (level) {
         var row = ((cfg.banLevels || {})[level.key]) || {};
-        var enabled = row.enabled === false ? '' : ' checked';
+        var enabledBool = row.enabled !== false;
+        var enabled = enabledBool ? ' checked' : '';
         var duration = (row.durationHours == null) ? 0 : Number(row.durationHours);
         return [
           '<tr data-ban-level="' + escapeHtml(level.key) + '">',
+          '  <td><label class="mini-toggle" title="' + escapeHtml(banEnabledTooltip(enabledBool)) + '"><input type="checkbox" data-ban-enabled' + enabled + ' title="' + escapeHtml(banEnabledTooltip(enabledBool)) + '"><span></span></label></td>',
           '  <td>' + escapeHtml(level.label) + '</td>',
-          '  <td><label class="mini-toggle"><input type="checkbox" data-ban-enabled' + enabled + '><span></span></label></td>',
           '  <td>' + (level.key === 'permanent'
             ? '<span class="micro">Permanent</span>'
             : '<input type="number" min="1" step="1" data-ban-duration value="' + escapeHtml(String(duration || 0)) + '">') + '</td>',
@@ -6232,6 +6236,12 @@
       document.getElementById('panel-enforcement').addEventListener('change', function (event) {
         var target = event && event.target;
         if (!target) return;
+        if (target.hasAttribute('data-ban-enabled')) {
+          var nextTitle = target.checked ? 'Enabled. Click to disable.' : 'Disabled. Click to enable.';
+          target.setAttribute('title', nextTitle);
+          var wrap = target.closest('label');
+          if (wrap) wrap.setAttribute('title', nextTitle);
+        }
         if (
           target.hasAttribute('data-ban-enabled') ||
           target.id === 'enforcement-notify-severity' ||
