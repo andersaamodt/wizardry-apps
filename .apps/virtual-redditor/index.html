@@ -4412,6 +4412,30 @@
       var cfg = normalizeModesConfig(state.modesConfig);
       var mode = findModeById(cfg, modeId);
       if (!mode) return;
+      if (!cfg.postActionTransitions || typeof cfg.postActionTransitions !== 'object') {
+        cfg.postActionTransitions = {};
+      }
+
+      function upsertTransitionFromRow(actionName, rowNode) {
+        if (!actionName || !rowNode) return;
+        var toModeEl = rowNode.querySelector('[data-transition-to-mode-action]');
+        var durationEl = rowNode.querySelector('[data-transition-duration-action]');
+        var unitEl = rowNode.querySelector('[data-transition-duration-unit-action]');
+        var announceEl = rowNode.querySelector('[data-transition-announce-action]');
+        var toMode = String((toModeEl && toModeEl.value) || '').trim();
+        if (!toMode) {
+          toMode = String(cfg.defaultDecayMode || cfg.startingMode || '');
+        }
+        var durationRaw = Math.max(0, parseInt((durationEl && durationEl.value) || '0', 10) || 0);
+        var unit = normalizeHoursOrDaysUnit((unitEl && unitEl.value) || 'hours');
+        cfg.postActionTransitions[actionName] = {
+          toMode: toMode,
+          durationHours: durationHoursFromUi(durationRaw, unit),
+          durationUnit: unit,
+          decayTo: '',
+          announce: !!((announceEl && announceEl.checked) || false)
+        };
+      }
 
       if (target.hasAttribute('data-mode-drawer-default-expiry') || target.hasAttribute('data-mode-drawer-default-expiry-unit')) {
         var expiryInput = target.hasAttribute('data-mode-drawer-default-expiry')
@@ -4459,6 +4483,24 @@
         }
       } else if (target.hasAttribute('data-mode-drawer-ban-style')) {
         mode.banNoticeStyle = normalizeBanNoticeStyle(target.value || '');
+      } else if (
+        target.hasAttribute('data-transition-enabled-action') ||
+        target.hasAttribute('data-transition-to-mode-action') ||
+        target.hasAttribute('data-transition-duration-action') ||
+        target.hasAttribute('data-transition-duration-unit-action') ||
+        target.hasAttribute('data-transition-announce-action')
+      ) {
+        var rowNode = target.closest('[data-action-transition-row]');
+        if (!rowNode) return;
+        var actionNameForTransition = String(rowNode.getAttribute('data-action-transition-row') || '').trim();
+        if (!actionNameForTransition) return;
+        var enabledToggle = rowNode.querySelector('[data-transition-enabled-action]');
+        var isEnabled = !!((enabledToggle && enabledToggle.checked) || false);
+        if (!isEnabled) {
+          delete cfg.postActionTransitions[actionNameForTransition];
+        } else {
+          upsertTransitionFromRow(actionNameForTransition, rowNode);
+        }
       } else {
         return;
       }
