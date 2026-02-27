@@ -5171,6 +5171,92 @@ decision_request_json_for_conversation() {
   printf ']}'
 }
 
+lowercase_text() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+decision_prompt_requests_explicit_choice() {
+  prompt_lower=$(lowercase_text "$1")
+  case "$prompt_lower" in
+    *which*|*choose*|*choice*|*option*|*prefer*|*should\ i*|*do\ you\ want*|*pick\ one*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+decision_prompt_has_missing_required_inputs() {
+  prompt_raw=$1
+  prompt_lower=$(lowercase_text "$prompt_raw")
+  if printf '%s' "$prompt_raw" | grep -Eq '<[^>]{2,}>|\{\{[^}]{2,}\}\}|\[\[?[A-Z_ -]{3,}\]?\]|\?\?\?'; then
+    return 0
+  fi
+  if printf '%s' "$prompt_lower" | grep -Eq 'missing|required[^.\n]{0,40}(input|value|detail|parameter|field|secret|credential)|not provided|unknown|unspecified|tbd|todo|redacted|provide later|ask me'; then
+    return 0
+  fi
+  return 1
+}
+
+decision_question_looks_required_input() {
+  question_lower=$(lowercase_text "$1")
+  if printf '%s' "$question_lower" | grep -Eq 'which|what|provide|enter|confirm|select'; then
+    if printf '%s' "$question_lower" | grep -Eq 'path|file|folder|directory|workspace|repo|branch|environment|env|url|domain|host|port|model|provider|token|api key|key|credential|secret|password|username|email'; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+decision_question_looks_risk_gate() {
+  question_lower=$(lowercase_text "$1")
+  if printf '%s' "$question_lower" | grep -Eq 'approve|permission|proceed|continue|authorize|external|network|production|publish|deploy|delete|drop|migrate|irreversible'; then
+    return 0
+  fi
+  return 1
+}
+
+decision_commands_trigger_external_gate() {
+  commands_lower=$(lowercase_text "$1")
+  if printf '%s' "$commands_lower" | grep -Eq '\bcurl\b|\bwget\b|\bnc\b|\bssh\b|\bscp\b|\bsftp\b|\bftp\b|\btelnet\b'; then
+    return 0
+  fi
+  return 1
+}
+
+decision_request_category_for_prompt() {
+  prompt_text=$1
+  question_text=$2
+  run_mode_text=$(normalize_run_mode_name "$3")
+  commands_text=$4
+
+  if decision_prompt_requests_explicit_choice "$prompt_text"; then
+    printf '%s' "explicit-choice"
+    return 0
+  fi
+  if decision_prompt_has_missing_required_inputs "$prompt_text" && decision_question_looks_required_input "$question_text"; then
+    printf '%s' "required-input-missing"
+    return 0
+  fi
+  if [ "$run_mode_text" = "assistant" ] && decision_commands_trigger_external_gate "$commands_text"; then
+    printf '%s' "external-action-gate"
+    return 0
+  fi
+  if decision_question_looks_risk_gate "$question_text"; then
+    printf '%s' "risk-acknowledgement"
+    return 0
+  fi
+
+  printf '%s' "none"
+}
+
+should_allow_model_decision_request() {
+  category=$(decision_request_category_for_prompt "$1" "$2" "$3" "$4")
+  if [ "$category" = "none" ]; then
+    return 1
+  fi
+  return 0
+}
+
 workspace_draft_file_for() {
   workspace_id=$1
   printf '%s/%s/draft-first-message.txt' "$workspaces_dir" "$workspace_id"
@@ -5934,11 +6020,20 @@ dictation_live_level_for_session() {
     return 0
   fi
 
-  # Prefer RMS-derived telemetry for steadier silence behavior.
+  # Prefer Overall RMS-derived telemetry for steadier behavior.
   # Newer ffmpeg astats emits `RMS_peak` instead of `RMS_level`.
   # Some ffmpeg builds include NUL bytes in ametadata output; strip binary bytes first.
   recent_levels=$(tail -n 320 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
-  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | tail -n 1 || true)
+  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' | tail -n 1 || true)
+  if [ -z "$level_line" ]; then
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_level' | tail -n 1 || true)
+  fi
+  if [ -z "$level_line" ]; then
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_peak' | tail -n 1 || true)
+  fi
+  if [ -z "$level_line" ]; then
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | tail -n 1 || true)
+  fi
   if [ -z "$level_line" ]; then
     level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_(level|count)' | tail -n 1 || true)
   fi
@@ -5955,9 +6050,9 @@ dictation_live_level_for_session() {
     BEGIN {
       v = db + 0.0
       if (v < -74) v = -74
-      if (v > -8) v = -8
-      level = (v + 74) / 66
-      # Stronger curve keeps ambient room noise near baseline while preserving speech peaks.
+      if (v > -18) v = -18
+      level = (v + 74) / 56
+      # Keep ambient room noise near baseline while lifting normal speech variance.
       level = level * level
       if (level < 0) level = 0
       if (level > 1) level = 1
@@ -5976,7 +6071,16 @@ dictation_live_levels_json_for_session() {
   # Emit recent RMS-derived levels so the UI can draw per-bar history without a rolling-average look.
   # Newer ffmpeg astats emits `RMS_peak` instead of `RMS_level`.
   recent_levels=$(tail -n 960 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
-  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' || true)
+  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_level' || true)
+  if [ -z "$rms_lines" ]; then
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_peak' || true)
+  fi
+  if [ -z "$rms_lines" ]; then
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_level' || true)
+  fi
+  if [ -z "$rms_lines" ]; then
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_peak' || true)
+  fi
   if [ -z "$rms_lines" ]; then
     rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_(level|count)' || true)
   fi
@@ -5985,48 +6089,38 @@ dictation_live_levels_json_for_session() {
     return 0
   fi
 
-  levels_json=$(printf '%s\n' "$rms_lines" | awk '
-    function to_level(raw,   v, level) {
-      if (raw ~ /inf/i) {
-        return ""
+  raw_levels=$(printf '%s\n' "$rms_lines" \
+    | sed -nE 's/.*(RMS_(level|peak)|Peak_(level|count))[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\4/Ip' \
+    | tail -n 24)
+  if [ -z "$raw_levels" ]; then
+    printf '%s' "[]"
+    return 0
+  fi
+
+  levels_json=$(printf '%s\n' "$raw_levels" | awk '
+    BEGIN {
+      first = 1
+      printf "["
+    }
+    {
+      raw = $0
+      if (raw ~ /[iI][nN][fF]/) {
+        next
       }
       v = raw + 0.0
       if (v < -74) v = -74
-      if (v > -8) v = -8
-      level = (v + 74) / 66
+      if (v > -18) v = -18
+      level = (v + 74) / 56
       level = level * level
       if (level < 0) level = 0
       if (level > 1) level = 1
-      return sprintf("%.5f", level)
-    }
-    {
-      line = $0
-      raw = ""
-      if (line ~ /(RMS_(level|peak)|Peak_(level|count))/) {
-        raw = line
-        sub(/.*(RMS_(level|peak)|Peak_(level|count))[^-0-9iInNfF]*/, "", raw)
-        sub(/[^-0-9iInNfF.].*$/, "", raw)
+      if (!first) {
+        printf ","
       }
-      mapped = to_level(raw)
-      if (mapped != "") {
-        vals[count] = mapped
-        count += 1
-      }
+      printf "%.5f", level
+      first = 0
     }
     END {
-      start = count - 14
-      if (start < 0) {
-        start = 0
-      }
-      printf "["
-      out = 0
-      for (i = start; i < count; i += 1) {
-        if (out > 0) {
-          printf ","
-        }
-        printf "%s", vals[i]
-        out += 1
-      }
       printf "]"
     }
   ')
@@ -17250,22 +17344,19 @@ EOF
       decision_options_file=$(mktemp)
       printf '%s\n' "$decision_section" | sed -n 's/^option=//p' > "$decision_options_file"
       decision_requested=0
+      decision_surface_category="none"
       if [ -n "$decision_question" ] && [ "$decision_question" != "NONE" ] && [ -s "$decision_options_file" ]; then
         decision_requested=1
       fi
       if [ "$decision_requested" -eq 1 ]; then
-        allow_model_decision_request=0
-        case "$(printf '%s' "$augmented_user_prompt" | tr '[:upper:]' '[:lower:]')" in
-          *which*|*choose*|*choice*|*option*|*prefer*|*should\ i*|*do\ you\ want*|*pick\ one*)
-            allow_model_decision_request=1
-            ;;
-        esac
-        if [ "$allow_model_decision_request" -ne 1 ]; then
+        decision_surface_category=$(decision_request_category_for_prompt "$augmented_user_prompt" "$decision_question" "$run_mode" "$commands_text")
+        if ! should_allow_model_decision_request "$augmented_user_prompt" "$decision_question" "$run_mode" "$commands_text"; then
           append_failure_entry "$failures_file" "decision-request-iteration-$iteration" \
             "Ignored unsolicited decision request" \
             "Model requested a user decision for a prompt that did not ask for a choice" \
             "Proceed autonomously with implementation"
           decision_requested=0
+          decision_surface_category="none"
         fi
       fi
 
@@ -17310,6 +17401,27 @@ EOF
 EOF
 )
       append_compliance_entry "$compliance_file" "$run_mode" "$state_mode" "$compliance_status" "$compliance_checks_text" "$compliance_findings" "$compliance_gate" "$compliance_next"
+
+      if [ "$decision_requested" -eq 0 ] && [ "$gate_check" = "required" ] && decision_commands_trigger_external_gate "$commands_text"; then
+        decision_question="External/network actions are implied. Which path should I take?"
+        cat > "$decision_options_file" <<'EOF'
+Proceed with local-only analysis and no external execution
+Approve external/network actions for this run
+Stop and return a risk summary only
+EOF
+        decision_requested=1
+        decision_surface_category="external-action-gate"
+      fi
+      if [ "$decision_requested" -eq 0 ] && decision_prompt_has_missing_required_inputs "$augmented_user_prompt"; then
+        decision_question="Required inputs appear missing. How should I continue?"
+        cat > "$decision_options_file" <<'EOF'
+Proceed with sensible defaults and clearly label assumptions
+Pause and ask me for the exact missing values first
+Generate a template of required inputs, then continue after I fill it in
+EOF
+        decision_requested=1
+        decision_surface_category="required-input-missing"
+      fi
 
       target_update=$(printf '%s\n' "$mode_update" | sed -n 's/^target=//p' | sed -n '1p')
       blocking_update=$(printf '%s\n' "$mode_update" | sed -n 's/^blocking=//p' | sed -n '1p')
@@ -17377,7 +17489,7 @@ Options:
 $decision_options_preview"
           next_mode="DONE"
           transition_reason_runtime="awaiting user decision"
-          state_set "$state_file" "blocking" "decision required"
+          state_set "$state_file" "blocking" "decision required (${decision_surface_category})"
           assistant_output="I need your decision before I can continue."
           loop_feedback=$iteration_report
         else

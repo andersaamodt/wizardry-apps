@@ -3667,17 +3667,22 @@ input.range-input-invalid[type='number'] {
 
 .schedule-interval-controls {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   min-height: 30px;
-  margin-top: -1px;
+  margin-top: 0;
+}
+
+#pass-interval-controls {
+  position: relative;
+  top: -2px;
 }
 
 #pass-interval-controls .schedule-inline {
   display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  line-height: 1;
+  align-items: baseline;
+  min-height: 0;
+  line-height: 1.2;
 }
 
 .schedule-toggle {

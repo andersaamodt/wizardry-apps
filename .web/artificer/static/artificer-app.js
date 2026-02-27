@@ -7137,43 +7137,15 @@
     } else if (raw > 1) {
       raw = 1;
     }
-    var floor = Number(dictationWaveBackendFloor || 0.018);
-    if (!isFinite(floor) || floor < 0) {
-      floor = 0.018;
-    }
-    if (raw <= floor + 0.012) {
-      // Follow quieter ambient baseline quickly.
-      floor = (floor * 0.74) + (raw * 0.26);
-    } else if (raw >= floor + 0.09) {
-      // Avoid floor chasing normal speech peaks.
-      floor = (floor * 0.996) + (raw * 0.004);
-    } else {
-      floor = (floor * 0.985) + (raw * 0.015);
-    }
-    if (floor < 0.001) {
-      floor = 0.001;
-    } else if (floor > 0.08) {
-      floor = 0.08;
-    }
-    dictationWaveBackendFloor = floor;
-    var gate = floor + 0.0014;
-    var normalized = (raw - gate) / Math.max(0.01, 0.45 - gate);
+    var gate = 0.01;
+    var normalized = (raw - gate) / 0.24;
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.75);
-    }
-    if (normalized <= 0 && raw > 0.01) {
-      // Backend fallback: never collapse persistent non-zero telemetry to flat zero bars.
-      normalized = (raw - 0.008) / 0.22;
-      if (!isFinite(normalized) || normalized < 0) {
-        normalized = 0;
-      } else if (normalized > 1) {
-        normalized = 1;
-      }
+      normalized = Math.pow(normalized, 0.88);
     }
     if (normalized < 0.0012) {
       normalized = 0;
@@ -7220,6 +7192,9 @@
   }
 
   function pumpDictationWaveFromBackend() {
+    if (dictationWavePollTimer && (Date.now() - Number(dictationWaveBackendLevelAt || 0) < 260)) {
+      return;
+    }
     if (dictationWaveBackendPumpBusy) {
       return;
     }
