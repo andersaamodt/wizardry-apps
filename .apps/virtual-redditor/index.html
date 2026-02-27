@@ -3734,9 +3734,15 @@
       var profilesPayload = s.profiles || {};
       var counts = metrics.counts || {};
       var runtime = metrics.runtime || {};
+      var actionsCount = Math.max(0, parseInt(counts.actions, 10) || 0);
+      var repliesCount = Math.max(0, parseInt(counts.replies, 10) || 0);
 
       var chips = [];
-      chips.push(statusChip('actions ' + String(counts.actions || 0) + ' • replies ' + String(counts.replies || 0)));
+      chips.push(statusChip(
+        String(actionsCount) + ' ' + (actionsCount === 1 ? 'action' : 'actions') +
+        ', ' +
+        String(repliesCount) + ' ' + (repliesCount === 1 ? 'reply' : 'replies')
+      ));
       var botRunning = isBotRunning(s);
       if (botRunning) {
         chips.push(statusChip('Bot running', 'ok'));
