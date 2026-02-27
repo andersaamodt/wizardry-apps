@@ -608,7 +608,7 @@ body {
 
 .settings-stack {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.08rem;
 }
 
 .sub-card {
@@ -616,13 +616,13 @@ body {
   border-top: 1px solid #d7e1f4;
   border-radius: 0;
   background: transparent;
-  padding: 0.3rem 0 0.08rem;
+  padding: 0.2rem 0 0.04rem;
   box-shadow: none;
 }
 
 .settings-stack .sub-card:first-child {
   border-top: 0;
-  padding-top: 0.02rem;
+  padding-top: 0;
 }
 
 .section-actions {
@@ -650,7 +650,8 @@ body {
   display: grid;
   grid-template-columns: minmax(12rem, max-content) minmax(0, 1fr);
   align-items: center;
-  gap: 0.1rem 0.6rem;
+  gap: 0.06rem 0.48rem;
+  margin-bottom: 0.14rem;
 }
 
 [data-admin-section="settings"] .field-row > label {
@@ -667,7 +668,7 @@ body {
   align-items: center;
   gap: 0.38rem;
   color: #1f335f;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -677,7 +678,7 @@ body {
   align-items: center;
   gap: 0.36rem;
   color: #1d3566;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
@@ -796,9 +797,27 @@ body {
 [data-admin-section="settings"] #drip-interval,
 [data-admin-section="settings"] #drip-randomness,
 [data-admin-section="settings"] #feed-items {
-  inline-size: 6.3rem !important;
-  width: 6.3rem !important;
-  max-inline-size: 6.3rem !important;
+  inline-size: 5.7rem !important;
+  width: 5.7rem !important;
+  max-inline-size: 5.7rem !important;
+}
+
+[data-admin-section="settings"] h4 {
+  margin-bottom: 0.26rem;
+}
+
+[data-admin-section="settings"] .grid-two {
+  gap: 0.3rem 0.62rem;
+}
+
+[data-admin-section="settings"] input[type="text"],
+[data-admin-section="settings"] input[type="number"],
+[data-admin-section="settings"] select {
+  font-size: 0.88rem;
+  line-height: 1.2;
+  padding: 0.34rem 0.56rem;
+  min-height: 2.06rem;
+  border-radius: 8px;
 }
 
 [data-admin-section="account"] #account-player-name {
