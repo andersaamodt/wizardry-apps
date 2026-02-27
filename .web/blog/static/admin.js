@@ -799,6 +799,9 @@
           { type: 'public-key', alg: -257 }
         ],
         authenticatorSelection: {
+          // Prefer hardware security keys over platform passkeys where supported.
+          authenticatorAttachment: 'cross-platform',
+          residentKey: 'discouraged',
           userVerification: 'preferred'
         },
         timeout: 60000,

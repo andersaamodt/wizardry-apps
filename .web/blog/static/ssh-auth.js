@@ -183,6 +183,8 @@
           { type: 'public-key', alg: -257 }
         ],
         authenticatorSelection: {
+          authenticatorAttachment: 'cross-platform',
+          residentKey: 'discouraged',
           userVerification: 'preferred'
         },
         timeout: 60000,
