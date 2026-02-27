@@ -7135,32 +7135,45 @@
     } else if (raw > 1) {
       raw = 1;
     }
-    var floor = Number(dictationWaveBackendFloor || 0.02);
+    var floor = Number(dictationWaveBackendFloor || 0.018);
     if (!isFinite(floor) || floor < 0) {
-      floor = 0.02;
+      floor = 0.018;
     }
-    if (raw <= floor + 0.02) {
-      floor = (floor * 0.62) + (raw * 0.38);
+    if (raw <= floor + 0.012) {
+      // Follow quieter ambient baseline quickly.
+      floor = (floor * 0.74) + (raw * 0.26);
+    } else if (raw >= floor + 0.09) {
+      // Avoid floor chasing normal speech peaks.
+      floor = (floor * 0.996) + (raw * 0.004);
     } else {
-      floor = (floor * 0.95) + (raw * 0.05);
+      floor = (floor * 0.985) + (raw * 0.015);
     }
-    if (floor < 0.0015) {
-      floor = 0.0015;
-    } else if (floor > 0.25) {
-      floor = 0.25;
+    if (floor < 0.001) {
+      floor = 0.001;
+    } else if (floor > 0.08) {
+      floor = 0.08;
     }
     dictationWaveBackendFloor = floor;
-    var gate = floor + 0.0035;
-    var normalized = ((raw - gate) * 2.35) / Math.max(0.012, 0.5 - gate);
+    var gate = floor + 0.0014;
+    var normalized = (raw - gate) / Math.max(0.01, 0.45 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.52);
+      normalized = Math.pow(normalized, 0.75);
     }
-    if (normalized < 0.0025) {
+    if (normalized <= 0 && raw > 0.01) {
+      // Backend fallback: never collapse persistent non-zero telemetry to flat zero bars.
+      normalized = (raw - 0.008) / 0.22;
+      if (!isFinite(normalized) || normalized < 0) {
+        normalized = 0;
+      } else if (normalized > 1) {
+        normalized = 1;
+      }
+    }
+    if (normalized < 0.0012) {
       normalized = 0;
     }
     return normalized;
@@ -7377,11 +7390,14 @@
           }
           dictationWaveBackendLevel = normalizedBackend;
           dictationWaveBackendLevelAt = Date.now();
-          if (!dictationWaveAnalyser || !dictationWaveData) {
-            if (normalizedSequence.length) {
-              applyDictationWaveHistoryLevels(normalizedSequence);
-            } else {
-              applyDictationWaveHistoryLevels([mergedDictationWaveLevel(normalizedBackend)]);
+          if (normalizedSequence.length) {
+            // Always ingest backend history. This prevents flatline regressions when
+            // WebAudio exists but produces stale/near-zero frames on some hosts.
+            applyDictationWaveHistoryLevels(normalizedSequence);
+          } else {
+            var mergedBackendLevel = mergedDictationWaveLevel(normalizedBackend);
+            if (!dictationWaveAnalyser || !dictationWaveData || mergedBackendLevel > 0) {
+              applyDictationWaveHistoryLevels([mergedBackendLevel]);
             }
           }
         }).catch(function () {
@@ -7473,7 +7489,11 @@
     }
     var levels = Array.isArray(state.dictateWaveLevels) ? state.dictateWaveLevels : [];
     var waveformActive = state.dictatePhase === "recording" || state.dictatePhase === "starting";
-    var preSignalBaseline = waveformActive && !dictationWaveSeenSignal && (Date.now() - Number(dictationWaveActivatedAt || 0) < 700);
+    var preSignalBaseline =
+      waveformActive &&
+      !dictationWaveSeenSignal &&
+      (Date.now() - Number(dictationWaveActivatedAt || 0) < 180) &&
+      (Date.now() - Number(dictationWaveBackendLevelAt || 0) > 220);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
     var silenceGate = 0.0018;
