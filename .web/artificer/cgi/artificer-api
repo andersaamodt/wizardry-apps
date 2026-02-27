@@ -5887,8 +5887,12 @@ dictation_live_level_for_session() {
     return 0
   fi
 
-  # ffmpeg metadata keys vary by build/platform. Prefer the newest RMS/Peak level line.
-  level_line=$(tail -n 260 "$levels_file" 2>/dev/null | tr -d '\r' | grep -E -i 'RMS_level|Peak_level' | tail -n 1 || true)
+  # Prefer RMS_level for steadier silence behavior; fall back to Peak_level when RMS is unavailable.
+  recent_levels=$(tail -n 320 "$levels_file" 2>/dev/null | tr -d '\r' || true)
+  level_line=$(printf '%s\n' "$recent_levels" | grep -E -i 'RMS_level' | tail -n 1 || true)
+  if [ -z "$level_line" ]; then
+    level_line=$(printf '%s\n' "$recent_levels" | grep -E -i 'Peak_level' | tail -n 1 || true)
+  fi
   level_db=$(printf '%s' "$level_line" | sed -E 's/.*(RMS_level|Peak_level)[^-0-9iInNfF]*(-?inf|-?[0-9]+(\.[0-9]+)?).*/\2/I')
   if [ -z "$level_db" ]; then
     printf '%s' "0"
@@ -5901,11 +5905,11 @@ dictation_live_level_for_session() {
   awk -v db="$level_db" '
     BEGIN {
       v = db + 0.0
-      if (v < -90) v = -90
-      if (v > -4) v = -4
-      level = (v + 90) / 86
-      # Keep dynamics real, but avoid persistent visual flatline on quieter voices.
-      level = sqrt(level)
+      if (v < -74) v = -74
+      if (v > -8) v = -8
+      level = (v + 74) / 66
+      # Stronger curve keeps ambient room noise near baseline while preserving speech peaks.
+      level = level * level
       if (level < 0) level = 0
       if (level > 1) level = 1
       printf "%.5f", level
@@ -15485,6 +15489,7 @@ $fallback_output"
     programmer_review_max_rounds=2
     programmer_review_rounds_completed=0
     programmer_review_last_signature=""
+    programmer_review_last_feedback=""
     allow_workspace_writes=1
     decision_request_json="null"
     forced_queue_status=""

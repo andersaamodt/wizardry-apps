@@ -416,6 +416,11 @@
     runModeMoreExpanded: false,
     reasoningEffort: storageGet("artificer.reasoningEffort", "medium"),
     computeBudget: storageGet("artificer.computeBudget", "auto"),
+    programmerReviewEnabled: storageGet("artificer.programmerReviewEnabled", "1") !== "0",
+    programmerReviewRounds: Number(storageGet("artificer.programmerReviewRounds", "2")),
+    assayCursor: Number(storageGet("artificer.assayCursor", "0")),
+    assayCyclesToQueue: Number(storageGet("artificer.assayCyclesToQueue", "1")),
+    assayCompletedCycles: Number(storageGet("artificer.assayCompletedCycles", "0")),
     gitByWorkspace: {},
     branchesByWorkspace: {},
     diffOpen: false,
@@ -655,6 +660,93 @@
   var DICTATION_LANGUAGE_DEFAULT_OPTIONS = [
     { value: "auto", label: "Auto-detect" }
   ];
+  var ASSAY_TASKS = [
+    {
+      id: "deterministic-tests",
+      title: "Deterministic Test Harness",
+      mode: "programming",
+      compute_budget: "long",
+      prompt: "Build a deterministic test harness for an existing flaky module. Add repeatable seed control, property tests, and a concise regression report."
+    },
+    {
+      id: "concurrency-race",
+      title: "Concurrency Race Hunt",
+      mode: "programming",
+      compute_budget: "long",
+      prompt: "Find and fix a likely race-condition class issue in this codebase. Reproduce with a stress test, patch it, and verify with repeated runs."
+    },
+    {
+      id: "api-hardening",
+      title: "API Contract Hardening",
+      mode: "programming",
+      compute_budget: "standard",
+      prompt: "Introduce strict input validation for one high-risk API path, include backward-compatible error handling, and add focused contract tests."
+    },
+    {
+      id: "migration-safe",
+      title: "Safe Data Migration",
+      mode: "programming",
+      compute_budget: "long",
+      prompt: "Design and implement an idempotent migration for a realistic schema change. Include rollback notes and a verification checklist."
+    },
+    {
+      id: "perf-regression",
+      title: "Performance Regression Guard",
+      mode: "programming",
+      compute_budget: "standard",
+      prompt: "Profile one slow path, optimize it without behavior drift, and add a benchmark-style guard so regressions are visible."
+    },
+    {
+      id: "security-audit",
+      title: "Security Weakness Audit",
+      mode: "programming",
+      compute_budget: "long",
+      prompt: "Audit this project for one concrete security weakness class, implement a fix, and add tests that fail before and pass after."
+    },
+    {
+      id: "refactor-boundaries",
+      title: "Boundary Refactor",
+      mode: "programming",
+      compute_budget: "standard",
+      prompt: "Refactor one tangled area into clear module boundaries with minimal behavior change, and prove parity with targeted tests."
+    },
+    {
+      id: "failure-recovery",
+      title: "Failure Recovery Drill",
+      mode: "programming",
+      compute_budget: "long",
+      prompt: "Add robust failure recovery for an external dependency path. Include retries, fallback behavior, and observable failure diagnostics."
+    },
+    {
+      id: "spec-to-code",
+      title: "Spec To Implementation",
+      mode: "programming",
+      compute_budget: "until-complete",
+      prompt: "Write a short implementation contract first, then implement and verify a medium-complexity feature end-to-end from that contract."
+    },
+    {
+      id: "report-trace",
+      title: "Run Trace Quality",
+      mode: "report",
+      compute_budget: "standard",
+      prompt: "Evaluate one recent run for conversation clarity and trace readability. Propose concrete improvements to step framing and summary quality."
+    },
+    {
+      id: "teacher-explain",
+      title: "Teach Back Challenge",
+      mode: "teacher",
+      compute_budget: "standard",
+      prompt: "Teach a difficult subsystem as a mini lesson with misconceptions, checkpoints, and spaced recall prompts."
+    },
+    {
+      id: "chat-planning",
+      title: "Ambiguous Request Planning",
+      mode: "chat",
+      compute_budget: "quick",
+      prompt: "Handle an ambiguous user request by clarifying assumptions, proposing options, and selecting a pragmatic execution path."
+    }
+  ];
+  var ASSAY_TASK_COUNT = ASSAY_TASKS.length;
   var stateGetInFlight = null;
   var stateGetInFlightKey = "";
   var dictationShortcutPressState = {};
@@ -673,8 +765,9 @@
   var dictationWaveMicLevelAt = 0;
   var dictationWaveBackendLevel = 0;
   var dictationWaveBackendLevelAt = 0;
+  var dictationWaveBackendFloor = 0.02;
   var dictationWaveSeenSignal = false;
-  var dictationWaveNoiseFloor = 0.004;
+  var dictationWaveNoiseFloor = 0.02;
   var dictationPreparePromise = null;
   var dictationPrepareReadyUntil = 0;
   var dictationPrepareLoopTimer = null;
@@ -735,6 +828,34 @@
   state.dictationLanguage = normalizeDictationLanguageValue(state.dictationLanguage, state.dictationLanguages);
   state.runMode = normalizeRunMode(state.runMode);
   state.assistantModeId = normalizeAssistantModeId(state.assistantModeId);
+  state.programmerReviewEnabled = !!state.programmerReviewEnabled;
+  if (!isFinite(state.programmerReviewRounds) || state.programmerReviewRounds < 1) {
+    state.programmerReviewRounds = 2;
+  } else if (state.programmerReviewRounds > 4) {
+    state.programmerReviewRounds = 4;
+  } else {
+    state.programmerReviewRounds = Math.floor(state.programmerReviewRounds);
+  }
+  if (!isFinite(state.assayCursor) || state.assayCursor < 0) {
+    state.assayCursor = 0;
+  } else {
+    state.assayCursor = Math.floor(state.assayCursor);
+  }
+  if (ASSAY_TASK_COUNT > 0 && state.assayCursor >= ASSAY_TASK_COUNT) {
+    state.assayCursor = state.assayCursor % ASSAY_TASK_COUNT;
+  }
+  if (!isFinite(state.assayCyclesToQueue) || state.assayCyclesToQueue < 1) {
+    state.assayCyclesToQueue = 1;
+  } else if (state.assayCyclesToQueue > 4) {
+    state.assayCyclesToQueue = 4;
+  } else {
+    state.assayCyclesToQueue = Math.floor(state.assayCyclesToQueue);
+  }
+  if (!isFinite(state.assayCompletedCycles) || state.assayCompletedCycles < 0) {
+    state.assayCompletedCycles = 0;
+  } else {
+    state.assayCompletedCycles = Math.floor(state.assayCompletedCycles);
+  }
   if (state.runMode === "instant") {
     state.agentLoopEnabled = false;
     state.reasoningEffort = "low";
@@ -933,6 +1054,15 @@
     dictationPrewarmRow: document.getElementById("dictation-prewarm-row"),
     dictationPrewarmToggle: document.getElementById("dictation-prewarm-toggle"),
     dictationPrewarmHint: document.getElementById("dictation-prewarm-hint"),
+    programmerReviewToggle: document.getElementById("programmer-review-toggle"),
+    programmerReviewRounds: document.getElementById("programmer-review-rounds"),
+    programmerReviewHint: document.getElementById("programmer-review-hint"),
+    assayCycleCount: document.getElementById("assay-cycle-count"),
+    assayCycleSummary: document.getElementById("assay-cycle-summary"),
+    assayTaskList: document.getElementById("assay-task-list"),
+    assayQueueNextBtn: document.getElementById("assay-queue-next-btn"),
+    assayQueueCycleBtn: document.getElementById("assay-queue-cycle-btn"),
+    assayResetBtn: document.getElementById("assay-reset-btn"),
     generateSshBtn: document.getElementById("generate-ssh-btn"),
     chooseSshBtn: document.getElementById("choose-ssh-btn"),
     clearSshBtn: document.getElementById("clear-ssh-btn"),
@@ -2658,6 +2788,8 @@
       compute_budget: normalizeComputeBudget(item.compute_budget || "auto"),
       command_exec_mode: normalizeCommandExecModeValue(item.command_exec_mode || ""),
       permission_mode: normalizePermissionModeValue(item.permission_mode || ""),
+      programmer_review: normalizeProgrammerReviewEnabledValue(item.programmer_review),
+      programmer_review_rounds: normalizeProgrammerReviewRoundsValue(item.programmer_review_rounds || 2),
       explicit_skill_ids: Array.isArray(item.explicit_skill_ids) ? item.explicit_skill_ids : []
     };
   }
@@ -6352,6 +6484,203 @@
     }
   }
 
+  function renderProgrammingSettings() {
+    if (el.programmerReviewToggle) {
+      el.programmerReviewToggle.checked = !!state.programmerReviewEnabled;
+    }
+    if (el.programmerReviewRounds) {
+      var roundsValue = String(normalizeProgrammerReviewRoundsValue(state.programmerReviewRounds));
+      if (el.programmerReviewRounds.value !== roundsValue) {
+        el.programmerReviewRounds.value = roundsValue;
+      }
+      el.programmerReviewRounds.disabled = !state.programmerReviewEnabled;
+    }
+    if (el.programmerReviewHint) {
+      var modeValue = normalizeRunMode(state.runMode);
+      if (!state.programmerReviewEnabled) {
+        el.programmerReviewHint.textContent = "Programming mode will skip built-in code review.";
+      } else if (modeValue === "programming") {
+        el.programmerReviewHint.textContent = "Programming mode will run a reviewer pass for up to " + state.programmerReviewRounds + " round" + (state.programmerReviewRounds === 1 ? "" : "s") + ".";
+      } else {
+        el.programmerReviewHint.textContent = "Applies whenever Run mode is Programming.";
+      }
+    }
+  }
+
+  function renderAssaySettings() {
+    if (!el.assayTaskList || !el.assayCycleSummary) {
+      return;
+    }
+    if (el.assayCycleCount) {
+      var cycleValue = String(normalizeAssayCyclesToQueue(state.assayCyclesToQueue));
+      if (el.assayCycleCount.value !== cycleValue) {
+        el.assayCycleCount.value = cycleValue;
+      }
+    }
+    var activeCursor = normalizeAssayCursor(state.assayCursor);
+    var nextTask = assayTaskAt(activeCursor);
+    var reviewLabel = state.programmerReviewEnabled
+      ? ("on (" + state.programmerReviewRounds + " rounds)")
+      : "off";
+    if (nextTask) {
+      el.assayCycleSummary.textContent = "Next task: #" + String(activeCursor + 1) + " " + nextTask.title + " | Completed cycles: " + String(state.assayCompletedCycles) + " | Programmer code review: " + reviewLabel + ".";
+    } else {
+      el.assayCycleSummary.textContent = "Assay tasks are unavailable.";
+    }
+
+    var html = "";
+    if (!ASSAY_TASK_COUNT) {
+      html = "<p class='empty-state'>No assay tasks configured.</p>";
+    } else {
+      for (var i = 0; i < ASSAY_TASKS.length; i += 1) {
+        var assayTask = ASSAY_TASKS[i] || {};
+        var rowClass = i === activeCursor ? " assay-task-row active" : " assay-task-row";
+        html += "<div class='" + rowClass + "'>";
+        html += "<span class='assay-task-index'>" + escHtml(String(i + 1)) + ".</span>";
+        html += "<div class='assay-task-main'>";
+        html += "<strong>" + escHtml(assayTask.title || ("Task " + String(i + 1))) + "</strong>";
+        html += "<span class='settings-hint'>" + escHtml(runModeLabel(assayTask.mode || "auto")) + " | " + escHtml(computeBudgetLabel(assayTask.compute_budget || "auto")) + "</span>";
+        html += "</div>";
+        html += "</div>";
+      }
+    }
+    el.assayTaskList.innerHTML = html;
+
+    var hasTarget = !!(
+      state.activeConversationId ||
+      state.activeDraftWorkspaceId ||
+      state.activeWorkspaceId
+    );
+    if (el.assayQueueNextBtn) {
+      el.assayQueueNextBtn.disabled = !hasTarget || ASSAY_TASK_COUNT < 1;
+    }
+    if (el.assayQueueCycleBtn) {
+      el.assayQueueCycleBtn.disabled = !hasTarget || ASSAY_TASK_COUNT < 1;
+    }
+    if (el.assayResetBtn) {
+      el.assayResetBtn.disabled = ASSAY_TASK_COUNT < 1;
+    }
+  }
+
+  function queueAssayTasks(totalCount) {
+    var requested = Number(totalCount || 0);
+    if (!isFinite(requested) || requested < 1) {
+      return Promise.reject(new Error("Assay queue count is invalid."));
+    }
+    if (ASSAY_TASK_COUNT < 1) {
+      return Promise.reject(new Error("Assay tasks are unavailable."));
+    }
+
+    var workspaceId = trim(String(state.activeWorkspaceId || ""));
+    if (!workspaceId && state.activeConversationId) {
+      workspaceId = trim(String(findWorkspaceIdForConversation(state.activeConversationId) || ""));
+      if (workspaceId) {
+        state.activeWorkspaceId = workspaceId;
+      }
+    }
+    if (!workspaceId && state.activeDraftWorkspaceId) {
+      workspaceId = trim(String(state.activeDraftWorkspaceId || ""));
+    }
+    if (!workspaceId) {
+      return Promise.reject(new Error("Select a project first."));
+    }
+    if (!state.activeConversationId && !state.activeDraftWorkspaceId) {
+      state.activeDraftWorkspaceId = workspaceId;
+    }
+
+    var startCursor = normalizeAssayCursor(state.assayCursor);
+    var queueCount = Math.max(1, Math.floor(requested));
+    var sequence = [];
+    for (var i = 0; i < queueCount; i += 1) {
+      var absoluteIndex = startCursor + i;
+      var task = assayTaskAt(absoluteIndex);
+      if (!task) {
+        continue;
+      }
+      sequence.push({
+        absoluteIndex: absoluteIndex,
+        task: task
+      });
+    }
+    if (!sequence.length) {
+      return Promise.reject(new Error("No assay tasks were selected."));
+    }
+
+    var firstPrompt = String((sequence[0] && sequence[0].task && sequence[0].task.prompt) || "");
+    return ensureConversationFromDraft(firstPrompt).then(function (conversationId) {
+      var resolvedWorkspace = trim(String(state.activeWorkspaceId || workspaceId));
+      var resolvedConversation = trim(String(conversationId || state.activeConversationId || ""));
+      if (!resolvedWorkspace || !resolvedConversation) {
+        throw new Error("Could not resolve an assay queue target conversation.");
+      }
+
+      function enqueueStep(index) {
+        if (index >= sequence.length) {
+          return Promise.resolve();
+        }
+        var entry = sequence[index] || {};
+        var taskDef = entry.task || {};
+        var taskMode = normalizeRunMode(taskDef.mode || "programming");
+        var taskPrompt = trim(String(taskDef.prompt || ""));
+        if (!taskPrompt) {
+          return enqueueStep(index + 1);
+        }
+        var taskAssistantMode = taskMode === "assistant" ? normalizeAssistantModeId(state.assistantModeId) : "";
+        var taskBudget = normalizeComputeBudget(taskDef.compute_budget || "auto");
+        return enqueuePrompt(
+          resolvedWorkspace,
+          resolvedConversation,
+          taskPrompt,
+          "tail",
+          [],
+          taskMode,
+          taskAssistantMode,
+          taskBudget,
+          [],
+          state.permissionMode,
+          state.commandExecMode,
+          state.programmerReviewEnabled,
+          state.programmerReviewRounds
+        ).then(function () {
+          return enqueueStep(index + 1);
+        });
+      }
+
+      return enqueueStep(0).then(function () {
+        var rawAdvanced = startCursor + sequence.length;
+        var advancedCycles = Math.floor(rawAdvanced / ASSAY_TASK_COUNT);
+        var nextCursor = normalizeAssayCursor(rawAdvanced);
+        saveAssayCursor(nextCursor);
+        if (advancedCycles > 0) {
+          saveAssayCompletedCycles(state.assayCompletedCycles + advancedCycles);
+        }
+        return loadConversation({ timeoutMs: 12000 }).catch(function () {
+          return null;
+        }).then(function () {
+          renderUi();
+          var cycleText = advancedCycles > 0 ? (" | cycles +" + String(advancedCycles)) : "";
+          showTransientNotice("Queued " + String(sequence.length) + " assay task" + (sequence.length === 1 ? "" : "s") + cycleText + ".");
+        });
+      });
+    });
+  }
+
+  function queueNextAssayTask() {
+    return queueAssayTasks(1);
+  }
+
+  function queueAssayCycles(cycles) {
+    var normalizedCycles = normalizeAssayCyclesToQueue(cycles);
+    return queueAssayTasks(normalizedCycles * ASSAY_TASK_COUNT);
+  }
+
+  function resetAssayCycleCursor() {
+    saveAssayCursor(0);
+    saveAssayCompletedCycles(0);
+    renderAssaySettings();
+    showTransientNotice("Assay cycle reset.");
+  }
+
   function renderRunButton() {
     if (!el.runBtn) {
       return;
@@ -6539,8 +6868,9 @@
     dictationWaveMicLevelAt = 0;
     dictationWaveBackendLevel = 0;
     dictationWaveBackendLevelAt = 0;
+    dictationWaveBackendFloor = 0.02;
     dictationWaveSeenSignal = false;
-    dictationWaveNoiseFloor = 0.004;
+    dictationWaveNoiseFloor = 0.02;
     state.dictateWaveLevels = [];
   }
 
@@ -6613,44 +6943,91 @@
     renderDictationWaveBars();
   }
 
+  function calibrateDictationWaveNoiseFloor(ambientProbe) {
+    var probe = Number(ambientProbe || 0);
+    if (!isFinite(probe) || probe < 0) {
+      probe = 0;
+    }
+    var floor = Number(dictationWaveNoiseFloor || 0.02);
+    if (!isFinite(floor) || floor < 0) {
+      floor = 0.02;
+    }
+    if (probe >= floor) {
+      floor = (floor * 0.9) + (probe * 0.1);
+    } else {
+      floor = (floor * 0.62) + (probe * 0.38);
+    }
+    if (floor < 0.0012) {
+      floor = 0.0012;
+    } else if (floor > 0.18) {
+      floor = 0.18;
+    }
+    dictationWaveNoiseFloor = floor;
+    return floor;
+  }
+
   function normalizedDictationWaveSliceLevel(rawLevel) {
     var raw = Number(rawLevel || 0);
     if (!isFinite(raw) || raw < 0) {
       raw = 0;
     }
-    var floor = Number(dictationWaveNoiseFloor || 0.004);
+    var floor = Number(dictationWaveNoiseFloor || 0.02);
     if (!isFinite(floor) || floor < 0) {
-      floor = 0.004;
+      floor = 0.02;
     }
-    if (raw <= floor + 0.012) {
-      // Drop quickly so ambient fan noise still resolves to a thin baseline.
-      floor = (floor * 0.68) + (raw * 0.32);
-    } else {
-      // Rise slowly to avoid collapsing dynamic range during speech.
-      floor = (floor * 0.9985) + (raw * 0.0015);
-    }
-    if (floor < 0.00035) {
-      floor = 0.00035;
-    } else if (floor > 0.05) {
-      floor = 0.05;
-    }
-    dictationWaveNoiseFloor = floor;
-
-    var gate = floor + 0.005;
+    var gate = floor + 0.011;
     var signal = raw - gate;
     if (signal < 0) {
       signal = 0;
     }
-    var normalized = signal / Math.max(0.03, 0.7 - gate);
+    var normalized = signal / Math.max(0.055, 0.92 - gate);
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.56);
+      normalized = Math.pow(normalized, 0.58);
     }
-    if (normalized < 0.018) {
+    if (normalized < 0.03) {
+      normalized = 0;
+    }
+    return normalized;
+  }
+
+  function normalizedDictationBackendLevel(levelValue) {
+    var raw = Number(levelValue || 0);
+    if (!isFinite(raw) || raw < 0) {
+      raw = 0;
+    } else if (raw > 1) {
+      raw = 1;
+    }
+    var floor = Number(dictationWaveBackendFloor || 0.02);
+    if (!isFinite(floor) || floor < 0) {
+      floor = 0.02;
+    }
+    if (raw <= floor + 0.02) {
+      floor = (floor * 0.62) + (raw * 0.38);
+    } else {
+      floor = (floor * 0.95) + (raw * 0.05);
+    }
+    if (floor < 0.0015) {
+      floor = 0.0015;
+    } else if (floor > 0.25) {
+      floor = 0.25;
+    }
+    dictationWaveBackendFloor = floor;
+    var gate = floor + 0.02;
+    var normalized = (raw - gate) / Math.max(0.08, 1 - gate);
+    if (!isFinite(normalized) || normalized < 0) {
+      normalized = 0;
+    } else if (normalized > 1) {
+      normalized = 1;
+    }
+    if (normalized > 0) {
+      normalized = Math.pow(normalized, 0.7);
+    }
+    if (normalized < 0.035) {
       normalized = 0;
     }
     return normalized;
@@ -6719,7 +7096,7 @@
         var sliceSamples = Math.max(24, Math.floor(windowSamples / barsPerFrame));
         var consumed = sliceSamples * barsPerFrame;
         var baseStart = Math.max(0, len - consumed);
-        var normalizedHistory = [];
+        var rawHistory = [];
         for (var slice = 0; slice < barsPerFrame; slice += 1) {
           var from = baseStart + (slice * sliceSamples);
           var to = from + sliceSamples;
@@ -6741,7 +7118,18 @@
           var rms = count > 0 ? Math.sqrt(sum / count) : 0;
           var crest = peak > rms ? (peak - rms) : 0;
           var rawLevel = (rms * 3.0) + (peak * 1.2) + (crest * 0.4);
-          normalizedHistory.push(normalizedDictationWaveSliceLevel(rawLevel));
+          rawHistory.push(rawLevel);
+        }
+        var floorProbe = 0;
+        if (rawHistory.length) {
+          var sortedProbe = rawHistory.slice().sort(function (a, b) { return a - b; });
+          var probeIndex = sortedProbe.length > 2 ? 1 : 0;
+          floorProbe = Number(sortedProbe[probeIndex] || 0);
+        }
+        calibrateDictationWaveNoiseFloor(floorProbe);
+        var normalizedHistory = [];
+        for (var hi = 0; hi < rawHistory.length; hi += 1) {
+          normalizedHistory.push(normalizedDictationWaveSliceLevel(rawHistory[hi]));
         }
         applyDictationWaveHistoryLevels(normalizedHistory);
         dictationWaveRafId = requestAnimationFrame(sample);
@@ -6778,13 +7166,11 @@
           if (polledLevel > 1) {
             polledLevel = 1;
           }
-          if (polledLevel < 0.02) {
-            polledLevel = 0;
-          }
-          dictationWaveBackendLevel = polledLevel;
+          var normalizedBackend = normalizedDictationBackendLevel(polledLevel);
+          dictationWaveBackendLevel = normalizedBackend;
           dictationWaveBackendLevelAt = Date.now();
           if (!dictationWaveAnalyser || !dictationWaveData) {
-            applyDictationWaveLevel(mergedDictationWaveLevel(polledLevel));
+            applyDictationWaveHistoryLevels([mergedDictationWaveLevel(normalizedBackend)]);
           }
         }).catch(function () {
           return null;
@@ -6878,7 +7264,7 @@
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.02;
+    var silenceGate = 0.03;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
@@ -7069,11 +7455,21 @@
   function queueItemMetaLabel(item, index) {
     var parts = [];
     parts.push("Queued #" + String(index + 1));
+    var modeValue = item && item.run_mode ? normalizeRunMode(item.run_mode) : "auto";
     if (item && item.run_mode) {
-      parts.push(runModeLabel(item.run_mode));
+      parts.push(runModeLabel(modeValue));
     }
     if (item && item.compute_budget) {
       parts.push(computeBudgetLabel(item.compute_budget));
+    }
+    if (modeValue === "programming") {
+      var reviewEnabled = normalizeProgrammerReviewEnabledValue(item && item.programmer_review);
+      if (reviewEnabled) {
+        var reviewRounds = normalizeProgrammerReviewRoundsValue(item && item.programmer_review_rounds);
+        parts.push("Code review x" + String(reviewRounds));
+      } else {
+        parts.push("Code review off");
+      }
     }
     if (item && Array.isArray(item.explicit_skill_ids) && item.explicit_skill_ids.length) {
       parts.push(String(item.explicit_skill_ids.length) + " skill" + (item.explicit_skill_ids.length === 1 ? "" : "s"));
@@ -9234,6 +9630,8 @@
     safeStep("renderOrganizeMenu", renderOrganizeMenu);
     safeStep("renderModelPickerButton", renderModelPickerButton);
     safeStep("renderRunControls", renderRunControls);
+    safeStep("renderProgrammingSettings", renderProgrammingSettings);
+    safeStep("renderAssaySettings", renderAssaySettings);
     safeStep("renderDictateButton", renderDictateButton);
     safeStep("renderDictationMode", renderDictationMode);
     safeStep("renderRunButton", renderRunButton);
@@ -9711,6 +10109,112 @@
     var next = normalizeComputeBudget(value);
     state.computeBudget = next;
     storageSet("artificer.computeBudget", next);
+  }
+
+  function normalizeProgrammerReviewEnabledValue(value) {
+    if (value === true || value === 1 || value === "1") {
+      return true;
+    }
+    var text = String(value || "").toLowerCase();
+    if (
+      text === "true" ||
+      text === "yes" ||
+      text === "on" ||
+      text === "enabled"
+    ) {
+      return true;
+    }
+    if (
+      text === "false" ||
+      text === "no" ||
+      text === "off" ||
+      text === "disabled" ||
+      text === "0"
+    ) {
+      return false;
+    }
+    return !!value;
+  }
+
+  function normalizeProgrammerReviewRoundsValue(value) {
+    var rounds = Number(value);
+    if (!isFinite(rounds) || rounds < 1) {
+      rounds = 2;
+    }
+    rounds = Math.floor(rounds);
+    if (rounds < 1) {
+      rounds = 1;
+    } else if (rounds > 4) {
+      rounds = 4;
+    }
+    return rounds;
+  }
+
+  function saveProgrammerReviewEnabled(enabled) {
+    state.programmerReviewEnabled = !!enabled;
+    storageSet("artificer.programmerReviewEnabled", state.programmerReviewEnabled ? "1" : "0");
+  }
+
+  function saveProgrammerReviewRounds(rounds) {
+    state.programmerReviewRounds = normalizeProgrammerReviewRoundsValue(rounds);
+    storageSet("artificer.programmerReviewRounds", String(state.programmerReviewRounds));
+  }
+
+  function normalizeAssayCyclesToQueue(value) {
+    var cycles = Number(value);
+    if (!isFinite(cycles) || cycles < 1) {
+      cycles = 1;
+    }
+    cycles = Math.floor(cycles);
+    if (cycles < 1) {
+      cycles = 1;
+    } else if (cycles > 4) {
+      cycles = 4;
+    }
+    return cycles;
+  }
+
+  function saveAssayCyclesToQueue(value) {
+    state.assayCyclesToQueue = normalizeAssayCyclesToQueue(value);
+    storageSet("artificer.assayCyclesToQueue", String(state.assayCyclesToQueue));
+  }
+
+  function normalizeAssayCursor(value) {
+    var cursor = Number(value);
+    if (!isFinite(cursor) || cursor < 0) {
+      cursor = 0;
+    }
+    cursor = Math.floor(cursor);
+    if (ASSAY_TASK_COUNT < 1) {
+      return 0;
+    }
+    if (cursor >= ASSAY_TASK_COUNT) {
+      cursor = cursor % ASSAY_TASK_COUNT;
+    }
+    return cursor;
+  }
+
+  function saveAssayCursor(value) {
+    state.assayCursor = normalizeAssayCursor(value);
+    storageSet("artificer.assayCursor", String(state.assayCursor));
+  }
+
+  function saveAssayCompletedCycles(value) {
+    var total = Number(value);
+    if (!isFinite(total) || total < 0) {
+      total = 0;
+    }
+    total = Math.floor(total);
+    state.assayCompletedCycles = total;
+    storageSet("artificer.assayCompletedCycles", String(total));
+  }
+
+  function assayTaskAt(index) {
+    if (ASSAY_TASK_COUNT < 1) {
+      return null;
+    }
+    var normalized = normalizeAssayCursor(index);
+    return ASSAY_TASKS[normalized] || null;
   }
 
   function computeBudgetLabel(value) {
@@ -11620,6 +12124,14 @@
     var explicitPermissionModeOverride = normalizePermissionModeValue(runOptions.permissionMode || "");
     var explicitCommandExecModeOverride = normalizeCommandExecModeValue(runOptions.commandExecMode || "");
     var explicitSkillIdsOverride = Array.isArray(runOptions.explicitSkillIds) ? runOptions.explicitSkillIds : [];
+    var explicitProgrammerReviewOverride = null;
+    var explicitProgrammerReviewRoundsOverride = null;
+    if (Object.prototype.hasOwnProperty.call(runOptions, "programmerReview")) {
+      explicitProgrammerReviewOverride = normalizeProgrammerReviewEnabledValue(runOptions.programmerReview);
+    }
+    if (Object.prototype.hasOwnProperty.call(runOptions, "programmerReviewRounds")) {
+      explicitProgrammerReviewRoundsOverride = normalizeProgrammerReviewRoundsValue(runOptions.programmerReviewRounds);
+    }
     if (explicitModeOverride) {
       explicitModeOverride = normalizeRunMode(explicitModeOverride);
     }
@@ -11724,6 +12236,18 @@
     var computeBudgetForRun = explicitComputeBudgetOverride || normalizeComputeBudget(runProfile.computeBudget || state.computeBudget);
     var permissionModeForRun = explicitPermissionModeOverride || normalizePermissionModeValue(state.permissionMode) || "default";
     var commandExecModeForRun = explicitCommandExecModeOverride || normalizeCommandExecModeValue(state.commandExecMode) || "ask-some";
+    var programmerReviewEnabledForRun = explicitProgrammerReviewOverride !== null
+      ? explicitProgrammerReviewOverride
+      : !!state.programmerReviewEnabled;
+    var programmerReviewRoundsForRun = explicitProgrammerReviewRoundsOverride !== null
+      ? explicitProgrammerReviewRoundsOverride
+      : normalizeProgrammerReviewRoundsValue(state.programmerReviewRounds);
+    if (normalizeRunMode(runProfile.mode) !== "programming") {
+      programmerReviewEnabledForRun = false;
+    }
+    if (!programmerReviewEnabledForRun) {
+      programmerReviewRoundsForRun = 0;
+    }
     var selectedIterations = Number(runProfile.maxIterations || 2);
     if (computeBudgetForRun === "long" && selectedIterations < 10) {
       selectedIterations += 2;
@@ -11819,6 +12343,8 @@
       run_mode: runProfile.mode,
       assistant_mode_id: assistantModeForRun,
       compute_budget: computeBudgetForRun,
+      programmer_review: programmerReviewEnabledForRun ? "1" : "0",
+      programmer_review_rounds: String(programmerReviewRoundsForRun),
       explicit_skill_ids: explicitSkillIdsForRun.join(","),
       reasoning_effort: runProfile.reasoning,
       max_iterations: String(selectedIterations),
@@ -11893,6 +12419,8 @@
               runMode: modeOverride,
               assistantModeId: assistantModeForRun,
               computeBudget: computeBudgetForRun,
+              programmerReview: programmerReviewEnabledForRun,
+              programmerReviewRounds: programmerReviewRoundsForRun,
               explicitSkillIds: explicitSkillIdsForRun,
               approvalRetry: true,
               pendingEvent: pendingEvent
@@ -12094,13 +12622,25 @@
     }
   }
 
-  function enqueuePrompt(workspaceId, conversationId, promptText, position, attachmentIds, runMode, assistantModeId, computeBudget, explicitSkillIds, permissionMode, commandExecMode) {
+  function enqueuePrompt(workspaceId, conversationId, promptText, position, attachmentIds, runMode, assistantModeId, computeBudget, explicitSkillIds, permissionMode, commandExecMode, programmerReviewEnabled, programmerReviewRounds) {
     var attachmentList = Array.isArray(attachmentIds) ? attachmentIds : [];
     var normalizedMode = normalizeRunMode(runMode || state.runMode);
     var normalizedAssistantMode = normalizedMode === "assistant" ? normalizeAssistantModeId(assistantModeId || state.assistantModeId) : "";
     var normalizedComputeBudget = normalizeComputeBudget(computeBudget || state.computeBudget);
     var normalizedPermissionMode = normalizePermissionModeValue(permissionMode || state.permissionMode) || "default";
     var normalizedCommandExecMode = normalizeCommandExecModeValue(commandExecMode || state.commandExecMode) || "ask-some";
+    var normalizedProgrammerReview = normalizeProgrammerReviewEnabledValue(
+      typeof programmerReviewEnabled === "undefined" ? state.programmerReviewEnabled : programmerReviewEnabled
+    );
+    var normalizedProgrammerReviewRounds = normalizeProgrammerReviewRoundsValue(
+      typeof programmerReviewRounds === "undefined" ? state.programmerReviewRounds : programmerReviewRounds
+    );
+    if (normalizedMode !== "programming") {
+      normalizedProgrammerReview = false;
+    }
+    if (!normalizedProgrammerReview) {
+      normalizedProgrammerReviewRounds = 0;
+    }
     var normalizedSkillIds = mergeSkillIdLists(explicitSkillIds, []);
     return apiPost("queue_enqueue", {
       workspace_id: workspaceId,
@@ -12113,6 +12653,8 @@
       compute_budget: normalizedComputeBudget,
       permission_mode: normalizedPermissionMode,
       command_exec_mode: normalizedCommandExecMode,
+      programmer_review: normalizedProgrammerReview ? "1" : "0",
+      programmer_review_rounds: String(normalizedProgrammerReviewRounds),
       explicit_skill_ids: normalizedSkillIds.join(",")
     }, { timeoutMs: 90000 }).then(function (response) {
       if (!response.success) {
@@ -12388,6 +12930,8 @@
         runMode: normalizeRunMode(item.run_mode || "auto"),
         assistantModeId: item.assistant_mode_id || "",
         computeBudget: normalizeComputeBudget(item.compute_budget || "auto"),
+        programmerReview: normalizeProgrammerReviewEnabledValue(item.programmer_review),
+        programmerReviewRounds: normalizeProgrammerReviewRoundsValue(item.programmer_review_rounds || 2),
         permissionMode: normalizePermissionModeValue(item.permission_mode || ""),
         commandExecMode: normalizeCommandExecModeValue(item.command_exec_mode || ""),
         explicitSkillIds: Array.isArray(item.explicit_skill_ids) ? item.explicit_skill_ids : [],
@@ -14976,6 +15520,8 @@
     state.commandRulesWorkspaceId = preferredWorkspace;
     renderCommandRulesSettings();
     renderDictationInstallSettings();
+    renderProgrammingSettings();
+    renderAssaySettings();
     var dictationBootstrap = Promise.all([
       loadAuthStatus().catch(function () {
         return null;
@@ -17161,7 +17707,9 @@
             queuedComputeBudget,
             queuedExplicitSkillIds,
             state.permissionMode,
-            state.commandExecMode
+            state.commandExecMode,
+            state.programmerReviewEnabled,
+            state.programmerReviewRounds
           ).then(function () {
             queueSubmissionAccepted = true;
             resetComposerAttachments();
@@ -18658,6 +19206,55 @@
             renderDictationInstallSettings();
           });
         });
+      });
+    }
+
+    if (el.programmerReviewToggle) {
+      on(el.programmerReviewToggle, "change", function () {
+        saveProgrammerReviewEnabled(!!el.programmerReviewToggle.checked);
+        renderProgrammingSettings();
+        renderAssaySettings();
+      });
+    }
+
+    if (el.programmerReviewRounds) {
+      on(el.programmerReviewRounds, "change", function () {
+        saveProgrammerReviewRounds(el.programmerReviewRounds.value);
+        renderProgrammingSettings();
+        renderAssaySettings();
+      });
+    }
+
+    if (el.assayCycleCount) {
+      on(el.assayCycleCount, "change", function () {
+        saveAssayCyclesToQueue(el.assayCycleCount.value);
+        renderAssaySettings();
+      });
+    }
+
+    if (el.assayQueueNextBtn) {
+      on(el.assayQueueNextBtn, "click", function () {
+        runWithControlPending(el.assayQueueNextBtn, function () {
+          return queueNextAssayTask().then(function () {
+            kickQueueWorker();
+          });
+        }).catch(showError);
+      });
+    }
+
+    if (el.assayQueueCycleBtn) {
+      on(el.assayQueueCycleBtn, "click", function () {
+        runWithControlPending(el.assayQueueCycleBtn, function () {
+          return queueAssayCycles(state.assayCyclesToQueue).then(function () {
+            kickQueueWorker();
+          });
+        }).catch(showError);
+      });
+    }
+
+    if (el.assayResetBtn) {
+      on(el.assayResetBtn, "click", function () {
+        resetAssayCycleCursor();
       });
     }
 

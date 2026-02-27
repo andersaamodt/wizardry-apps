@@ -401,6 +401,49 @@ pagetitle: "Artificer"
 <label class="dictation-shortcut-field" for="dictation-hold-shortcut"><span>Hold-to-Talk (Press)</span><select id="dictation-hold-shortcut"></select></label>
 <label class="dictation-shortcut-field" for="dictation-toggle-shortcut"><span>Toggle</span><select id="dictation-toggle-shortcut"></select></label>
 </div>
+<div class="settings-sep"></div>
+<div class="settings-rules">
+<div class="settings-rules-head">
+<strong>Programming mode</strong>
+</div>
+<label class="toggle-row" title="Run a built-in code reviewer pass after implementation verification in Programming mode.">
+<input id="programmer-review-toggle" type="checkbox" checked /> Programmer does code reviews
+</label>
+<label class="settings-inline-field" for="programmer-review-rounds">
+<span>Max review rounds</span>
+<select id="programmer-review-rounds">
+<option value="1">1</option>
+<option value="2" selected>2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+</select>
+</label>
+<p id="programmer-review-hint" class="settings-hint">Programming mode will run reviewer passes for high-signal issues only.</p>
+</div>
+<div class="settings-sep"></div>
+<div class="settings-rules">
+<div class="settings-rules-head">
+<strong>Capability assay cycle</strong>
+</div>
+<p class="settings-hint">Queue difficult benchmark tasks in sequence to stress intelligence, execution quality, and conversation flow.</p>
+<label class="settings-inline-field" for="assay-cycle-count">
+<span>Cycles to queue</span>
+<select id="assay-cycle-count">
+<option value="1" selected>1 cycle</option>
+<option value="2">2 cycles</option>
+<option value="3">3 cycles</option>
+<option value="4">4 cycles</option>
+</select>
+</label>
+<p id="assay-cycle-summary" class="settings-hint">Loading assay tasks...</p>
+<div class="modal-actions modal-actions-compact assay-actions">
+<button id="assay-queue-next-btn" type="button">Queue next task</button>
+<button id="assay-queue-cycle-btn" type="button">Queue cycle</button>
+<button id="assay-reset-btn" class="ghost" type="button">Reset cycle</button>
+</div>
+<div id="assay-task-list" class="assay-task-list"></div>
+</div>
+<div class="settings-sep"></div>
 <label for="github-username">GitHub username (optional)</label>
 <input id="github-username" placeholder="your-github-username" />
 <label for="ssh-email">SSH key email/comment (optional)</label>
@@ -562,4 +605,4 @@ pagetitle: "Artificer"
 </div>
 </div>
 
-<script src="/static/artificer-app.js?v=20260227-wavefix10"></script>
+<script src="/static/artificer-app.js?v=20260227-wavefix12"></script>

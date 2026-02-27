@@ -5036,6 +5036,82 @@ select:focus {
   max-width: max-content !important;
 }
 
+.settings-inline-field {
+  display: inline-grid;
+  gap: 4px;
+  justify-items: start;
+  align-items: start;
+  width: max-content;
+  max-width: 100%;
+}
+
+.settings-inline-field span {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.settings-inline-field select {
+  width: auto;
+  min-width: max-content;
+  max-width: 100%;
+}
+
+.assay-actions {
+  grid-template-columns: auto auto auto;
+  gap: 8px;
+}
+
+.assay-task-list {
+  display: grid;
+  gap: 6px;
+}
+
+.assay-task-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 90%, var(--surface-hover) 10%);
+  padding: 7px 8px;
+}
+
+.assay-task-row.active {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--line) 42%);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2) 90%);
+}
+
+.assay-task-index {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.2;
+  min-width: 1.3rem;
+}
+
+.assay-task-main {
+  display: grid;
+  gap: 2px;
+}
+
+.assay-task-main strong {
+  font-size: 0.84rem;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+@media (max-width: 640px) {
+  .assay-actions {
+    grid-template-columns: auto auto;
+  }
+
+  .assay-actions button:last-child {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
 .settings-links {
   margin: 0;
   font-size: 0.83rem;
