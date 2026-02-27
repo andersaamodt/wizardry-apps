@@ -16,6 +16,7 @@ fi
 
 action=$(blog_param action)
 username=$(blog_param username)
+after_username=$(blog_param after_username)
 
 if ! blog_validate_username "$username"; then
   blog_json_error "Invalid username" "invalid_username"
@@ -90,6 +91,38 @@ case "$action" in
     blog_users_move_before "$username" "$actor"
     blog_users_reindex
     printf '{"success":true,"message":"User promoted above you","username":"%s"}\n' "$(blog_json_escape "$username")"
+    ;;
+  move_after)
+    if [ "$username" = "$actor" ]; then
+      blog_json_error "Cannot move yourself" "invalid_target"
+      exit 0
+    fi
+    if ! blog_validate_username "$after_username"; then
+      blog_json_error "Invalid placement target" "invalid_target"
+      exit 0
+    fi
+    after_profile=$(blog_user_profile "$after_username")
+    if [ ! -f "$after_profile" ]; then
+      blog_json_error "Placement target not found" "not_found"
+      exit 0
+    fi
+    if [ "$after_username" = "$username" ]; then
+      printf '{"success":true,"message":"Order unchanged","username":"%s"}\n' "$(blog_json_escape "$username")"
+      exit 0
+    fi
+    if [ "$target_rank" -le "$actor_rank" ]; then
+      blog_json_error "You can only drag users who are below you in the list" "rank_forbidden"
+      exit 0
+    fi
+    after_rank=$(blog_user_rank_value "$after_username")
+    case "$after_rank" in ''|*[!0-9]*) after_rank=0 ;; esac
+    if [ "$after_username" != "$actor" ] && [ "$after_rank" -le "$actor_rank" ]; then
+      blog_json_error "You cannot move a user above your rank. Use Promote Above explicitly." "rank_forbidden"
+      exit 0
+    fi
+    blog_users_move_after "$username" "$after_username"
+    blog_users_reindex
+    printf '{"success":true,"message":"User reordered","username":"%s"}\n' "$(blog_json_escape "$username")"
     ;;
   move_up)
     if [ "$username" = "$actor" ]; then

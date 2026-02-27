@@ -17,7 +17,10 @@
     users: [],
     actorRank: 0,
     activeSection: '',
-    usersPollTimer: null
+    usersPollTimer: null,
+    userDragActive: false,
+    userDragUsername: '',
+    userDropAfterUsername: ''
   };
 
   const els = {
@@ -998,10 +1001,62 @@
     return '<button type="button"' + classes + ' data-user-action="' + escapeAttr(action) + '" data-username="' + escapeAttr(username) + '">' + label + '</button>';
   }
 
-  function renderUsersList() {
+  function userDropZone(afterUsername) {
+    return '<div class="user-drop-zone" data-user-drop-after="' + escapeAttr(afterUsername) + '" aria-hidden="true"></div>';
+  }
+
+  function captureUserCardRects() {
+    const map = {};
+    if (!els.usersList) {
+      return map;
+    }
+    const cards = Array.from(els.usersList.querySelectorAll('.user-card[data-username]'));
+    cards.forEach(function (card) {
+      const username = card.getAttribute('data-username');
+      if (!username) {
+        return;
+      }
+      map[username] = card.getBoundingClientRect();
+    });
+    return map;
+  }
+
+  function animateUsersFlip(previousRects) {
     if (!els.usersList) {
       return;
     }
+    requestAnimationFrame(function () {
+      const cards = Array.from(els.usersList.querySelectorAll('.user-card[data-username]'));
+      cards.forEach(function (card) {
+        const username = card.getAttribute('data-username');
+        if (!username || !previousRects[username]) {
+          return;
+        }
+        const oldRect = previousRects[username];
+        const newRect = card.getBoundingClientRect();
+        const dy = oldRect.top - newRect.top;
+        if (Math.abs(dy) < 1) {
+          return;
+        }
+        card.style.transition = 'none';
+        card.style.transform = 'translateY(' + dy + 'px)';
+        requestAnimationFrame(function () {
+          card.style.transition = 'transform 240ms ease';
+          card.style.transform = 'translateY(0)';
+          setTimeout(function () {
+            card.style.transition = '';
+            card.style.transform = '';
+          }, 260);
+        });
+      });
+    });
+  }
+
+  function renderUsersList(animate) {
+    if (!els.usersList) {
+      return;
+    }
+    const previousRects = animate ? captureUserCardRects() : {};
     if (!state.users.length) {
       els.usersList.innerHTML = '<p class="placeholder">No users found yet.</p>';
       return;
@@ -1009,15 +1064,21 @@
     let html = '';
     const actorName = state.username || '';
     const actorRank = Number(state.actorRank || 0);
+    let seenBelow = false;
     state.users.forEach(function (user) {
       const username = String(user.username || '');
       const rank = Number(user.rank || 0);
       const isSelf = !!user.is_self || username === actorName;
       const isAdmin = !!user.is_admin;
       const isBelow = actorRank > 0 && rank > actorRank;
-      const canReorder = !isSelf && (!isAdmin || isBelow);
+      const canDrag = !isSelf && isBelow;
+      const dragAttrs = canDrag ? ' draggable="true" data-can-drag="true"' : ' data-can-drag="false"';
+      if (!seenBelow && isBelow) {
+        html += userDropZone(actorName);
+        seenBelow = true;
+      }
 
-      html += '<div class="user-card">';
+      html += '<div class="user-card' + (canDrag ? ' is-draggable' : '') + '"' + dragAttrs + ' data-username="' + escapeAttr(username) + '" data-rank="' + escapeAttr(String(rank)) + '">';
       html += '<div class="user-card-main">';
       html += '<div class="user-card-name">' + escapeHtml(user.player_name || username) + ' <span class="user-pill' + (isAdmin ? ' is-admin' : '') + '">' + (isAdmin ? 'Admin' : 'User') + '</span></div>';
       html += '<div class="user-card-meta">@' + escapeHtml(username);
@@ -1027,20 +1088,16 @@
       html += '</div>';
       html += '</div>';
       html += '<div class="user-card-actions">';
-      if (!isSelf && !isAdmin) {
-        html += userCardActionButton('Grant Admin', 'grant_admin', username, 'primary');
-      }
-      if (!isSelf && isAdmin && isBelow) {
-        html += userCardActionButton('Remove Admin', 'remove_admin', username);
-      }
-      if (canReorder) {
-        html += userCardActionButton('↑', 'move_up', username);
-        html += userCardActionButton('↓', 'move_down', username);
-      }
       if (!isSelf && (isBelow || !isAdmin)) {
         html += '<div class="user-menu">';
         html += userCardActionButton('⋯', 'toggle_menu', username, 'user-menu-trigger');
         html += '<div class="user-menu-panel" data-user-menu-panel="' + escapeAttr(username) + '" hidden>';
+        if (!isAdmin) {
+          html += userCardActionButton('Grant Admin', 'grant_admin', username, '');
+        }
+        if (isAdmin && isBelow) {
+          html += userCardActionButton('Remove Admin', 'remove_admin', username, '');
+        }
         if (isBelow) {
           html += userCardActionButton('Promote Above Me...', 'promote_above', username, '');
         }
@@ -1050,8 +1107,14 @@
       }
       html += '</div>';
       html += '</div>';
+      if (isBelow) {
+        html += userDropZone(username);
+      }
     });
     els.usersList.innerHTML = html;
+    if (animate) {
+      animateUsersFlip(previousRects);
+    }
   }
 
   async function loadUsers() {
@@ -1061,7 +1124,7 @@
     }
     state.users = Array.isArray(data.users) ? data.users : [];
     state.actorRank = Number(data.actor_rank || 0);
-    renderUsersList();
+    renderUsersList(true);
   }
 
   function stopUsersPolling() {
@@ -1088,6 +1151,9 @@
     state.usersPollTimer = setInterval(function () {
       if (!(state.isAdmin && state.activeSection === 'users')) {
         stopUsersPolling();
+        return;
+      }
+      if (state.userDragActive) {
         return;
       }
       loadUsers().catch(function () {
@@ -1123,6 +1189,18 @@
     }
     await loadUsers();
     setOutput(els.outputUsers, data.message || 'User updated.', 'ok');
+  }
+
+  async function runUserMoveAfter(username, afterUsername) {
+    const data = await apiPost('/cgi/blog-manage-user', {
+      action: 'move_after',
+      username: username,
+      after_username: afterUsername
+    }, true);
+    if (!data.success) {
+      throw new Error(data.error || 'Reorder failed');
+    }
+    await loadUsers();
   }
 
   async function loadDraft(draftId) {
@@ -1413,6 +1491,89 @@
           setOutput(els.outputUsers, 'Error: ' + err.message, 'error');
         });
       });
+      els.usersList.addEventListener('dragstart', function (event) {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        const card = target.closest('.user-card[data-username][data-can-drag="true"]');
+        if (!(card instanceof HTMLElement)) {
+          return;
+        }
+        const username = card.getAttribute('data-username');
+        if (!username) {
+          return;
+        }
+        state.userDragActive = true;
+        state.userDragUsername = username;
+        state.userDropAfterUsername = '';
+        els.usersList.classList.add('is-dragging');
+        card.classList.add('is-dragging');
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', username);
+        }
+      });
+      els.usersList.addEventListener('dragend', function () {
+        state.userDragActive = false;
+        state.userDragUsername = '';
+        state.userDropAfterUsername = '';
+        els.usersList.classList.remove('is-dragging');
+        Array.from(els.usersList.querySelectorAll('.user-card.is-dragging')).forEach(function (node) {
+          node.classList.remove('is-dragging');
+        });
+        Array.from(els.usersList.querySelectorAll('.user-drop-zone.is-target')).forEach(function (node) {
+          node.classList.remove('is-target');
+        });
+      });
+      els.usersList.addEventListener('dragover', function (event) {
+        if (!state.userDragActive) {
+          return;
+        }
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        const zone = target.closest('.user-drop-zone[data-user-drop-after]');
+        if (!(zone instanceof HTMLElement)) {
+          return;
+        }
+        const afterUsername = zone.getAttribute('data-user-drop-after') || '';
+        if (!afterUsername || afterUsername === state.userDragUsername) {
+          return;
+        }
+        event.preventDefault();
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = 'move';
+        }
+        state.userDropAfterUsername = afterUsername;
+        Array.from(els.usersList.querySelectorAll('.user-drop-zone.is-target')).forEach(function (node) {
+          node.classList.remove('is-target');
+        });
+        zone.classList.add('is-target');
+      });
+      els.usersList.addEventListener('drop', function (event) {
+        if (!state.userDragActive) {
+          return;
+        }
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        const zone = target.closest('.user-drop-zone[data-user-drop-after]');
+        if (!(zone instanceof HTMLElement)) {
+          return;
+        }
+        event.preventDefault();
+        const dragged = state.userDragUsername;
+        const afterUsername = zone.getAttribute('data-user-drop-after') || '';
+        if (!dragged || !afterUsername || dragged === afterUsername) {
+          return;
+        }
+        runUserMoveAfter(dragged, afterUsername).catch(function (err) {
+          setOutput(els.outputUsers, 'Error: ' + err.message, 'error');
+        });
+      });
       document.addEventListener('click', function (event) {
         const target = event.target;
         if (!(target instanceof Element)) {
@@ -1427,12 +1588,12 @@
       });
     }
     window.addEventListener('focus', function () {
-      if (state.isAdmin && state.activeSection === 'users') {
+      if (state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
         loadUsers().catch(function () {});
       }
     });
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'users') {
+      if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
         loadUsers().catch(function () {});
       }
     });

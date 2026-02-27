@@ -376,8 +376,11 @@ test_blog_user_admin_management_ordering_rules() {
   run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=move_down&username=admin-above"
   case "$CGI_BODY" in *'rank_forbidden'*) ;; *) TEST_FAILURE_REASON="move_down should reject admin above actor"; teardown_blog_fixture; return 1 ;; esac
 
-  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=move_down&username=user-below"
-  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="move_down should allow reordering non-admin below actor"; teardown_blog_fixture; return 1 ;; esac
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=move_after&username=user-below&after_username=testadmin"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="move_after should allow placing below-user directly under actor"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=move_after&username=user-below&after_username=admin-above"
+  case "$CGI_BODY" in *'rank_forbidden'*) ;; *) TEST_FAILURE_REASON="move_after should reject moving below-user into above-actor region"; teardown_blog_fixture; return 1 ;; esac
 
   run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=promote_above&username=admin-below"
   case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="promote_above should allow promoting lower user above actor"; teardown_blog_fixture; return 1 ;; esac

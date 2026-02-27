@@ -1247,6 +1247,18 @@ body {
   gap: 0.65rem;
 }
 
+.users-list.is-dragging .user-card.is-draggable {
+  cursor: grabbing;
+}
+
+.user-card.is-draggable {
+  cursor: grab;
+}
+
+.user-card.is-dragging {
+  opacity: 0.58;
+}
+
 .user-card-main {
   min-width: 0;
   display: grid;
@@ -1338,6 +1350,22 @@ body {
 
 #admin-panel .user-menu-panel button.user-delete:hover {
   background: #fff1f1;
+}
+
+.user-drop-zone {
+  height: 0;
+  border-top: 2px solid transparent;
+  margin: 0;
+  transition: border-color 120ms ease, margin 120ms ease;
+}
+
+.users-list.is-dragging .user-drop-zone {
+  margin: -1px 0 6px;
+}
+
+.users-list.is-dragging .user-drop-zone.is-target {
+  border-top-color: #5a83d8;
+  margin: 5px 0 10px;
 }
 
 .draft-card-head {
