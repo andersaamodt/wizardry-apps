@@ -545,7 +545,7 @@
         <section class="tab-panel" id="panel-relationships">
           <div class="relationships-head-row">
             <div class="status-line" id="relationships-line">Relationships not loaded yet.</div>
-            <button id="btn-relationships-manual-override" type="button" class="soft relationships-override-btn" title="Open manual relationship override">Manual override...</button>
+            <button id="btn-relationships-manual-override" type="button" class="soft relationships-override-btn" title="Open manual relationship override" aria-controls="relationship-override-drawer" aria-expanded="false">Manual override...</button>
           </div>
           <div id="relationships-workarea" class="relationships-workarea">
             <div class="relationships-main-pane">
@@ -4072,22 +4072,32 @@
       state.relationshipOverrideOpen = false;
       var drawer = document.getElementById('relationship-override-drawer');
       var workarea = document.getElementById('relationships-workarea');
+      var triggerBtn = document.getElementById('btn-relationships-manual-override');
       if (drawer) {
         drawer.classList.remove('open');
         drawer.setAttribute('aria-hidden', 'true');
       }
       if (workarea) workarea.classList.remove('drawer-open');
+      if (triggerBtn) {
+        triggerBtn.classList.remove('is-active');
+        triggerBtn.setAttribute('aria-expanded', 'false');
+      }
     }
 
     function openRelationshipOverrideDrawer() {
       state.relationshipOverrideOpen = true;
       var drawer = document.getElementById('relationship-override-drawer');
       var workarea = document.getElementById('relationships-workarea');
+      var triggerBtn = document.getElementById('btn-relationships-manual-override');
       if (drawer) {
         drawer.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
       }
       if (workarea) workarea.classList.add('drawer-open');
+      if (triggerBtn) {
+        triggerBtn.classList.add('is-active');
+        triggerBtn.setAttribute('aria-expanded', 'true');
+      }
     }
 
     function closeReplyTemplatesDrawer() {
@@ -4716,11 +4726,16 @@
       var rows = Array.isArray(state.relationships) ? state.relationships : [];
       var drawer = document.getElementById('relationship-override-drawer');
       var workarea = document.getElementById('relationships-workarea');
+      var triggerBtn = document.getElementById('btn-relationships-manual-override');
       if (drawer) {
         drawer.classList.toggle('open', !!state.relationshipOverrideOpen);
         drawer.setAttribute('aria-hidden', state.relationshipOverrideOpen ? 'false' : 'true');
       }
       if (workarea) workarea.classList.toggle('drawer-open', !!state.relationshipOverrideOpen);
+      if (triggerBtn) {
+        triggerBtn.classList.toggle('is-active', !!state.relationshipOverrideOpen);
+        triggerBtn.setAttribute('aria-expanded', state.relationshipOverrideOpen ? 'true' : 'false');
+      }
       if (!body) return;
       var sig = stableStringify(rows);
       if (sig && sig === state.relationshipsRenderSig) return;

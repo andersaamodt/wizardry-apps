@@ -1832,6 +1832,13 @@ label {
   line-height: 1.1;
 }
 
+.relationships-override-btn.is-active,
+.relationships-override-btn[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-panel) 86%);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line) 50%);
+  color: var(--text);
+}
+
 .replies-workarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 0 0;
