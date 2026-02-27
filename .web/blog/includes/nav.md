@@ -99,48 +99,50 @@
 
     <div id="auth-modal-message" class="auth-modal-message" aria-live="polite"></div>
 
-    <div id="auth-register-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-register">
-      <p class="auth-modal-help">Accounts are created on first successful signer approval and are permanently tied to that Nostr key.</p>
-      <label for="auth-register-username"><strong>Username</strong></label>
-      <input id="auth-register-username" class="auth-input auth-username-input" type="text" maxlength="24" autocomplete="username" placeholder="optional (letters, numbers, ., _, -)">
-      <p class="auth-modal-help">Login is tied to your Nostr key, not your username. Usernames must be unique.</p>
-      <div class="auth-actions">
-        <button id="auth-register-btn" class="auth-primary-btn" type="button">Register with desktop signer</button>
-        <span class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://addons.mozilla.org/en-US/firefox/addon/nos2x-fox/" target="_blank" rel="noopener noreferrer">nos2x-fox</a></span>
+    <div class="auth-tab-frame">
+      <div id="auth-register-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-register">
+        <p class="auth-modal-help">Accounts are created on first successful signer approval and are permanently tied to that Nostr key.</p>
+        <label for="auth-register-username"><strong>Username</strong></label>
+        <input id="auth-register-username" class="auth-input auth-username-input" type="text" maxlength="24" autocomplete="username" placeholder="optional (letters, numbers, ., _, -)">
+        <p class="auth-modal-help">Login is tied to your Nostr key, not your username. Usernames must be unique.</p>
+        <div class="auth-actions">
+          <button id="auth-register-btn" class="auth-primary-btn" type="button">Register with desktop signer</button>
+          <span class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://addons.mozilla.org/en-US/firefox/addon/nos2x-fox/" target="_blank" rel="noopener noreferrer">nos2x-fox</a></span>
+        </div>
       </div>
-    </div>
 
-    <div id="auth-phone-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-phone" hidden>
-      <p class="auth-modal-help">Scan this with your phone signer app (Nostr Connect / NIP-46), or open via deep link.</p>
-      <div id="auth-nip46-qr" class="auth-qr" aria-label="Nostr Connect QR code"></div>
-      <a id="auth-nip46-open" class="auth-inline-link" href="#" target="_blank" rel="noopener noreferrer">Open nostrconnect:// link</a>
-      <p class="auth-nip46-uri" id="auth-nip46-uri"></p>
-      <div class="auth-actions">
-        <button id="auth-phone-connect-btn" class="auth-secondary-btn" type="button">Connect phone signer (QR)</button>
-        <button id="auth-phone-btn" class="auth-primary-btn" type="button" disabled>Continue with phone signer</button>
+      <div id="auth-phone-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-phone" hidden>
+        <p class="auth-modal-help">Scan this with your phone signer app (Nostr Connect / NIP-46), or open via deep link.</p>
+        <div id="auth-nip46-qr" class="auth-qr" aria-label="Nostr Connect QR code"></div>
+        <a id="auth-nip46-open" class="auth-inline-link" href="#" target="_blank" rel="noopener noreferrer">Open nostrconnect:// link</a>
+        <p class="auth-nip46-uri" id="auth-nip46-uri"></p>
+        <div class="auth-actions">
+          <button id="auth-phone-connect-btn" class="auth-secondary-btn" type="button">Connect phone signer (QR)</button>
+          <button id="auth-phone-btn" class="auth-primary-btn" type="button" disabled>Continue with phone signer</button>
+        </div>
+        <p class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst" target="_blank" rel="noopener noreferrer">Amethyst</a></p>
       </div>
-      <p class="auth-action-reco">Recommended: <a class="auth-inline-link" href="https://play.google.com/store/apps/details?id=com.vitorpamplona.amethyst" target="_blank" rel="noopener noreferrer">Amethyst</a></p>
-    </div>
 
-    <div id="auth-manual-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-manual" hidden>
-      <p class="auth-modal-help">Manual fallback: sign the challenge event outside this page and paste signed JSON.</p>
-      <div class="auth-actions">
-        <button id="auth-manual-start" class="auth-secondary-btn" type="button">Create challenge</button>
-      </div>
-      <div class="auth-manual-grid">
-        <label for="auth-manual-request-id"><strong>Request ID</strong></label>
-        <input class="auth-input" id="auth-manual-request-id" type="text" readonly>
-        <label for="auth-manual-challenge"><strong>Challenge</strong></label>
-        <input class="auth-input" id="auth-manual-challenge" type="text" readonly>
-        <label for="auth-manual-expires"><strong>Expires At (epoch)</strong></label>
-        <input class="auth-input" id="auth-manual-expires" type="text" readonly>
-      </div>
-      <label for="auth-manual-template"><strong>Unsigned Auth Event Template</strong></label>
-      <textarea id="auth-manual-template" class="auth-input auth-key-input" readonly></textarea>
-      <label for="auth-manual-event"><strong>Signed Auth Event JSON</strong></label>
-      <textarea id="auth-manual-event" class="auth-input auth-key-input" placeholder='{"kind":22242,...,"sig":"..."}'></textarea>
-      <div class="auth-actions">
-        <button id="auth-manual-submit" class="auth-primary-btn" type="button">Submit signed login</button>
+      <div id="auth-manual-panel" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-manual" hidden>
+        <p class="auth-modal-help">Manual fallback: sign the challenge event outside this page and paste signed JSON.</p>
+        <div class="auth-actions">
+          <button id="auth-manual-start" class="auth-secondary-btn" type="button">Create challenge</button>
+        </div>
+        <div class="auth-manual-grid">
+          <label for="auth-manual-request-id"><strong>Request ID</strong></label>
+          <input class="auth-input" id="auth-manual-request-id" type="text" readonly>
+          <label for="auth-manual-challenge"><strong>Challenge</strong></label>
+          <input class="auth-input" id="auth-manual-challenge" type="text" readonly>
+          <label for="auth-manual-expires"><strong>Expires At (epoch)</strong></label>
+          <input class="auth-input" id="auth-manual-expires" type="text" readonly>
+        </div>
+        <label for="auth-manual-template"><strong>Unsigned Auth Event Template</strong></label>
+        <textarea id="auth-manual-template" class="auth-input auth-key-input" readonly></textarea>
+        <label for="auth-manual-event"><strong>Signed Auth Event JSON</strong></label>
+        <textarea id="auth-manual-event" class="auth-input auth-key-input" placeholder='{"kind":22242,...,"sig":"..."}'></textarea>
+        <div class="auth-actions">
+          <button id="auth-manual-submit" class="auth-primary-btn" type="button">Submit signed login</button>
+        </div>
       </div>
     </div>
     </div>
