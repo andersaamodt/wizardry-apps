@@ -171,6 +171,31 @@
     return signer;
   }
 
+  function ensureAuthMessageEl() {
+    if (els.authMessage) {
+      return els.authMessage;
+    }
+    if (!els.authModal || !els.authModal.querySelector) {
+      return null;
+    }
+    var panel = els.authModal.querySelector('.auth-modal-panel');
+    if (!panel) {
+      return null;
+    }
+    var existing = panel.querySelector('#auth-modal-message');
+    if (existing) {
+      els.authMessage = existing;
+      return els.authMessage;
+    }
+    var node = document.createElement('div');
+    node.id = 'auth-modal-message';
+    node.className = 'auth-modal-message';
+    node.setAttribute('aria-live', 'polite');
+    panel.appendChild(node);
+    els.authMessage = node;
+    return els.authMessage;
+  }
+
   function setAuthMessage(message, kind) {
     var target = ensureAuthMessageEl();
     if (!target) {
@@ -1125,9 +1150,22 @@
 
   function loginWithNip07() {
     var signer = getBrowserSigner();
+    try {
+      if (typeof window.focus === 'function') {
+        window.focus();
+      }
+    } catch (_focusErr) {
+      // noop
+    }
     return signInWithSigner(
       function (template) {
-        return Promise.resolve(signer.signEvent(template));
+        var pendingHintTimer = setTimeout(function () {
+          setAuthMessage('Waiting for signer approval. If nos2x-fox is already open, switch to it and approve.', 'warn');
+        }, 1200);
+        return Promise.resolve(signer.signEvent(template))
+          .finally(function () {
+            clearTimeout(pendingHintTimer);
+          });
       },
       {
         getPubkeyFn: typeof signer.getPublicKey === 'function'
@@ -1597,27 +1635,3 @@
 
   document.addEventListener('DOMContentLoaded', bootstrap);
 })();
-  function ensureAuthMessageEl() {
-    if (els.authMessage) {
-      return els.authMessage;
-    }
-    if (!els.authModal || !els.authModal.querySelector) {
-      return null;
-    }
-    var panel = els.authModal.querySelector('.auth-modal-panel');
-    if (!panel) {
-      return null;
-    }
-    var existing = panel.querySelector('#auth-modal-message');
-    if (existing) {
-      els.authMessage = existing;
-      return els.authMessage;
-    }
-    var node = document.createElement('div');
-    node.id = 'auth-modal-message';
-    node.className = 'auth-modal-message';
-    node.setAttribute('aria-live', 'polite');
-    panel.appendChild(node);
-    els.authMessage = node;
-    return els.authMessage;
-  }
