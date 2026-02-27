@@ -5573,6 +5573,30 @@
       }
     }
 
+    function getVisibleTabsInOrder() {
+      var buttons = document.querySelectorAll('.tab-btn');
+      var tabs = [];
+      for (var i = 0; i < buttons.length; i += 1) {
+        if (buttons[i].classList.contains('hidden')) continue;
+        var tab = String(buttons[i].getAttribute('data-tab') || '');
+        if (!tab) continue;
+        tabs.push(tab);
+      }
+      return tabs;
+    }
+
+    function cycleTab(forward) {
+      var tabs = getVisibleTabsInOrder();
+      if (!tabs.length) return;
+      var current = String(state.activeTab || '');
+      var idx = tabs.indexOf(current);
+      if (idx < 0) idx = 0;
+      var nextIdx = forward
+        ? ((idx + 1) % tabs.length)
+        : ((idx - 1 + tabs.length) % tabs.length);
+      setActiveTab(tabs[nextIdx]);
+    }
+
     async function initBackendWithRetry(totalTimeoutMs, intervalMs) {
       var timeoutMs = Number(totalTimeoutMs) || 12000;
       var stepMs = Number(intervalMs) || 250;
@@ -6494,6 +6518,21 @@
         if (!inProfileMenu) closeProfileMenus();
       });
       document.addEventListener('keydown', function (event) {
+        var isCtrlTabCycle = !!(event.ctrlKey && !event.metaKey && event.key === 'Tab');
+        if (isCtrlTabCycle) {
+          var modalOpen = (
+            !document.getElementById('settings-modal').classList.contains('hidden') ||
+            !document.getElementById('rename-modal').classList.contains('hidden') ||
+            !document.getElementById('delete-modal').classList.contains('hidden') ||
+            !document.getElementById('extract-norms-modal').classList.contains('hidden') ||
+            !document.getElementById('oauth-modal').classList.contains('hidden')
+          );
+          if (!modalOpen) {
+            event.preventDefault();
+            cycleTab(!event.shiftKey);
+            return;
+          }
+        }
         if ((event.metaKey || event.ctrlKey) && isEditableTarget(event.target)) {
           // Preserve native text-edit shortcuts in all text fields.
           event.stopPropagation();
