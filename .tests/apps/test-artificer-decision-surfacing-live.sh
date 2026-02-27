@@ -113,6 +113,14 @@ assert_preview_case \
   "git status --short"
 
 assert_preview_case \
+  "none-production-wording-without-gate-question" \
+  "none" \
+  "Touch production-safe defaults and continue autonomously." \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case \
   "none-should-i-without-options" \
   "none" \
   "Should I continue with this refactor now?" \
@@ -173,6 +181,14 @@ assert_preview_case \
   "explicit-choice" \
   "Which outreach path should I use, email or forum?" \
   "Which outreach path should I choose?" \
+  "assistant" \
+  "curl https://example.com/health"
+
+assert_preview_case \
+  "precedence-external-over-missing-without-input-question" \
+  "external-action-gate" \
+  "Run outreach checks using <PROD_API_KEY> once possible." \
+  "Do you approve external network actions now?" \
   "assistant" \
   "curl https://example.com/health"
 
