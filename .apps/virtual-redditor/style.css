@@ -3098,8 +3098,12 @@ label {
   }
 
   .persona-style-secondary-grid {
-    grid-template-columns: repeat(2, minmax(0, max-content));
-    column-gap: 18px;
+    grid-template-columns: repeat(2, minmax(280px, max-content));
+    column-gap: 24px;
+  }
+
+  .persona-style-secondary-grid .mode-field-row {
+    min-width: 280px;
   }
 
   .persona-style-secondary-grid .mode-field-row:nth-child(1) {
