@@ -1988,16 +1988,22 @@ label {
   min-height: 96px;
   height: 112px;
   resize: vertical;
+  padding-bottom: 1.55rem;
 }
 
 .reply-templates-drawer .mode-drawer-block {
   padding-bottom: 8px;
 }
 
-.reply-templates-drawer .autosave-indicator {
-  position: static;
-  margin-top: 6px;
-  margin-left: auto;
+.reply-template-field-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+
+.reply-template-save-indicator {
+  right: 10px;
+  bottom: 8px;
   pointer-events: none;
 }
 

@@ -627,22 +627,36 @@
               <div class="mode-detail-drawer-body">
                 <div class="mode-drawer-block">
                   <div class="mode-fields-inline modes-grid">
-                    <div class="mode-field-row">
+                    <div class="mode-field-row reply-template-field-row">
                       <label for="reply-template-warning" class="mode-field-label">Warning template</label>
-                      <textarea id="reply-template-warning" class="custom-instructions-input compact-template-input"></textarea>
+                      <div class="reply-template-field-wrap">
+                        <textarea id="reply-template-warning" class="custom-instructions-input compact-template-input"></textarea>
+                        <div id="reply-template-warning-save-indicator" class="autosave-indicator reply-template-save-indicator hidden" aria-live="polite">
+                          <span class="autosave-icon" aria-hidden="true"></span>
+                          <span id="reply-template-warning-save-text">saving</span>
+                        </div>
+                      </div>
                     </div>
-                    <div class="mode-field-row">
+                    <div class="mode-field-row reply-template-field-row">
                       <label for="reply-template-switch" class="mode-field-label">Mode-switch template</label>
-                      <textarea id="reply-template-switch" class="custom-instructions-input compact-template-input"></textarea>
+                      <div class="reply-template-field-wrap">
+                        <textarea id="reply-template-switch" class="custom-instructions-input compact-template-input"></textarea>
+                        <div id="reply-template-switch-save-indicator" class="autosave-indicator reply-template-save-indicator hidden" aria-live="polite">
+                          <span class="autosave-icon" aria-hidden="true"></span>
+                          <span id="reply-template-switch-save-text">saving</span>
+                        </div>
+                      </div>
                     </div>
-                    <div class="mode-field-row">
+                    <div class="mode-field-row reply-template-field-row">
                       <label for="reply-template-neutral-ban" class="mode-field-label">Ban notice template</label>
-                      <textarea id="reply-template-neutral-ban" class="custom-instructions-input compact-template-input"></textarea>
+                      <div class="reply-template-field-wrap">
+                        <textarea id="reply-template-neutral-ban" class="custom-instructions-input compact-template-input"></textarea>
+                        <div id="reply-template-neutral-ban-save-indicator" class="autosave-indicator reply-template-save-indicator hidden" aria-live="polite">
+                          <span class="autosave-icon" aria-hidden="true"></span>
+                          <span id="reply-template-neutral-ban-save-text">saving</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div id="reply-templates-save-indicator" class="autosave-indicator hidden" aria-live="polite">
-                    <span class="autosave-icon" aria-hidden="true"></span>
-                    <span id="reply-templates-save-text">saving</span>
                   </div>
                 </div>
               </div>
@@ -2732,7 +2746,9 @@
     }
 
     function setReplyTemplatesSaveIndicator(mode) {
-      setAutosaveIndicator('reply-templates-save-indicator', 'reply-templates-save-text', mode);
+      setAutosaveIndicator('reply-template-warning-save-indicator', 'reply-template-warning-save-text', mode);
+      setAutosaveIndicator('reply-template-switch-save-indicator', 'reply-template-switch-save-text', mode);
+      setAutosaveIndicator('reply-template-neutral-ban-save-indicator', 'reply-template-neutral-ban-save-text', mode);
     }
 
     function setProfilesMessage(msg, isError) {
