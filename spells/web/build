@@ -446,6 +446,22 @@ build_site() {
   shared_theme_dir="$WIZARDRY_DIR/.web/.themes"
   site_template=$(config-get "$SITE_DIR/site.conf" template 2>/dev/null || printf '')
 
+  if [ "$site_template" = "blog" ]; then
+    if ! has nostril && ! has nak; then
+      if has install-nostr-verifier; then
+        info "Blog template requires Nostr verifier tooling; attempting install..."
+        install-nostr-verifier >/dev/null 2>&1 || true
+      fi
+    fi
+    if ! has nostril && ! has nak; then
+      if [ "${WIZARDRY_TEST_HELPERS_ONLY:-0}" = "1" ]; then
+        warn "build: missing Nostr verifier (nostril/nak) in test mode; continuing"
+      else
+        die "build: blog template requires Nostr verifier (nostril or nak). Run: web-wizardry install-nostr-verifier"
+      fi
+    fi
+  fi
+
   if [ "$site_template" = "blog" ] && [ -x "$SITE_DIR/cgi/blog-nostr-rebuild" ]; then
     if ! WIZARDRY_SITES_DIR="$SITES_DIR" WIZARDRY_SITE_NAME="$site_name" "$SITE_DIR/cgi/blog-nostr-rebuild" >/dev/null 2>&1; then
       warn "build: blog Nostr derived rebuild failed; continuing with existing local files"

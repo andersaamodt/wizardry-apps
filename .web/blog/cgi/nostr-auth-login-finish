@@ -10,8 +10,8 @@ blog_init
 blog_read_request_body
 blog_send_json_headers
 
-if ! command -v nostril >/dev/null 2>&1; then
-  blog_json_error "Nostr login requires nostril on the server" "nostril_required"
+if ! blog_nostr_verifier_available; then
+  blog_json_error "Nostr login requires server-side verifier tooling. Run: web-wizardry install-nostr-verifier" "nostr_verifier_required"
   exit 0
 fi
 if ! command -v jq >/dev/null 2>&1; then

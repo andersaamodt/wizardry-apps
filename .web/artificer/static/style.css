@@ -1912,12 +1912,18 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   pointer-events: auto;
-  background: color-mix(in srgb, var(--bg-panel) 8%, transparent);
+  background: color-mix(in srgb, var(--bg-panel) 6%, transparent);
   color: var(--text-muted);
   font-size: 0.86rem;
-  line-height: 1;
+  line-height: 1.2;
+}
+
+.conversation-switch-overlay-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .conversation-switch-overlay.hidden {

@@ -66,7 +66,44 @@ printf '%s\n' "// htmx stub" > "$lib_dir/htmx.min.js"
 printf '%s\n' "// idiomorph stub" > "$lib_dir/idiomorph-ext.min.js"
 EOF
 
-  chmod +x "$stub_dir/pandoc" "$stub_dir/install-htmx"
+  cat > "$stub_dir/nostril" <<'EOF'
+#!/bin/sh
+set -eu
+case "${1-}" in
+  verify|--verify)
+    cat >/dev/null
+    exit 0
+    ;;
+  --help|-h|help|"")
+    printf 'nostril stub\nverify\n'
+    exit 0
+    ;;
+  *)
+    cat >/dev/null || true
+    exit 0
+    ;;
+esac
+EOF
+
+  cat > "$stub_dir/nak" <<'EOF'
+#!/bin/sh
+set -eu
+case "${1-}" in
+  help|--help|-h|"")
+    printf 'nak stub\nverify\n'
+    exit 0
+    ;;
+  verify)
+    cat >/dev/null
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+EOF
+
+  chmod +x "$stub_dir/pandoc" "$stub_dir/install-htmx" "$stub_dir/nostril" "$stub_dir/nak"
   printf '%s\n' "$stub_dir"
 }
 

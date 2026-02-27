@@ -154,6 +154,9 @@ visibility: "public"  # Change from "draft"
 # Create a blog site
 web-wizardry create myblog blog
 
+# Ensure Nostr verifier tooling is present for Nostr auth flows
+web-wizardry install-nostr-verifier
+
 # Edit content
 vim ~/sites/myblog/site/pages/posts/2024-01-15-welcome.md
 
@@ -188,6 +191,16 @@ To enable Nostr bridge for a site, turn on “Enable Nostr Bridge” in `/pages/
 - **Optional SSH Link**: Attach SSH public key to your account for terminal/MUD workflows
 - **UNIX Group Permissions**: Admin access via `blog-admin` group
 - **Admin Panel**: Compose, publish, and manage posts
+
+### Auth Dependency Notes
+
+- Nostr login/revocation verification requires server-side verifier tooling.
+- Blog workflows accept either:
+  - `nostril` (preferred in this template), or
+  - `nak verify` (fallback).
+- Install via:
+  - `web-wizardry install-nostr-verifier`
+- `Build all & restart server` for blog sites attempts this installer automatically.
 - **Markdown Editor**: Live preview for easy writing
 - **Draft Management**: Save work-in-progress, publish when ready
 - **Configurable Registration**: Enable/disable new user registration
