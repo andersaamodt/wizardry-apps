@@ -6700,17 +6700,11 @@
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
         var barCount = dictationWaveTargetBarCount();
-        var samplesPerFrame = 3;
-        if (barCount < 56) {
-          samplesPerFrame = 2;
-        } else if (barCount > 120) {
-          samplesPerFrame = 4;
-        }
         var frameLevels = [];
         var maxBins = dictationWaveData.length;
-        for (var bi = 0; bi < samplesPerFrame; bi += 1) {
-          var from = Math.floor((bi * maxBins) / samplesPerFrame);
-          var to = Math.floor(((bi + 1) * maxBins) / samplesPerFrame);
+        for (var bi = 0; bi < barCount; bi += 1) {
+          var from = Math.floor((bi * maxBins) / barCount);
+          var to = Math.floor(((bi + 1) * maxBins) / barCount);
           if (to <= from) {
             to = from + 1;
           }
@@ -6731,20 +6725,20 @@
           }
           if (bandCount > 0) {
             var bandRms = Math.sqrt(bandSum / bandCount);
-            frameLevels.push((bandRms * 1.45) + (bandPeak * 0.42));
+            frameLevels.push((bandRms * 1.05) + (bandPeak * 0.28));
           } else {
             frameLevels.push(0);
           }
         }
 
+        var sortedLevels = frameLevels.slice().sort(function (a, b) { return a - b; });
         var floorProbe = 0;
-        if (frameLevels.length) {
-          floorProbe = frameLevels[0];
-          for (var fp = 1; fp < frameLevels.length; fp += 1) {
-            if (frameLevels[fp] < floorProbe) {
-              floorProbe = frameLevels[fp];
-            }
+        if (sortedLevels.length) {
+          var probeIndex = Math.floor((sortedLevels.length - 1) * 0.12);
+          if (probeIndex < 0) {
+            probeIndex = 0;
           }
+          floorProbe = Number(sortedLevels[probeIndex] || 0);
         }
         if (!isFinite(floorProbe) || floorProbe < 0) {
           floorProbe = 0;
@@ -6754,35 +6748,35 @@
           floor = 0.01;
         }
         if (floorProbe < floor) {
-          floor = (floor * 0.52) + (floorProbe * 0.48);
+          floor = (floor * 0.62) + (floorProbe * 0.38);
         } else {
-          floor = (floor * 0.997) + (floorProbe * 0.003);
+          floor = (floor * 0.9) + (floorProbe * 0.1);
         }
-        if (floor < 0.0015) {
-          floor = 0.0015;
+        if (floor < 0.001) {
+          floor = 0.001;
         } else if (floor > 0.085) {
           floor = 0.085;
         }
         dictationWaveNoiseFloor = floor;
 
-        var gate = floor + 0.016;
+        var gate = floor + 0.012;
         var normalizedBars = [];
         for (var ni = 0; ni < frameLevels.length; ni += 1) {
-          var normalized = (frameLevels[ni] - gate) / Math.max(0.08, 1 - gate);
+          var normalized = (frameLevels[ni] - gate) / Math.max(0.05, 0.62 - gate);
           if (!isFinite(normalized) || normalized < 0) {
             normalized = 0;
           } else if (normalized > 1) {
             normalized = 1;
           }
           if (normalized > 0) {
-            normalized = Math.pow(normalized, 0.8);
+            normalized = Math.pow(normalized, 0.74);
           }
-          if (normalized < 0.02) {
+          if (normalized < 0.015) {
             normalized = 0;
           }
           normalizedBars.push(normalized);
         }
-        applyDictationWaveHistoryLevels(normalizedBars);
+        applyDictationWaveFrameLevels(normalizedBars);
         dictationWaveRafId = requestAnimationFrame(sample);
       };
       dictationWaveRafId = requestAnimationFrame(sample);
@@ -6882,7 +6876,7 @@
           return false;
         }
         var analyser = context.createAnalyser();
-        analyser.fftSize = 1024;
+        analyser.fftSize = 2048;
         analyser.smoothingTimeConstant = 0.0;
         var source = context.createMediaStreamSource(stream);
         source.connect(analyser);
@@ -6917,7 +6911,7 @@
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal;
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.05;
+    var silenceGate = 0.08;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
