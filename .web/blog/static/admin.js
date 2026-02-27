@@ -742,13 +742,24 @@
   }
 
   function populateComposer(draft) {
+    const status = String((draft && draft.status) || '').trim().toLowerCase();
+    const rawMode = String((draft && draft.publish_mode) || '').trim().toLowerCase();
+    let mode = rawMode;
+    if (status === 'queued') {
+      mode = 'drip';
+    } else if (status === 'scheduled') {
+      mode = 'scheduled';
+    } else if (mode !== 'scheduled' && mode !== 'drip' && mode !== 'draft') {
+      mode = 'draft';
+    }
+
     state.suspendAutosave = true;
     state.currentDraftId = draft.draft_id || '';
     els.postTitle.value = draft.title || '';
     setComposeTagsFromString(draft.tags || '');
     els.postContent.value = draft.content || '';
     els.postScheduleAt.value = isoToLocal(draft.scheduled_at || '');
-    setPublishMode(draft.publish_mode || 'draft');
+    setPublishMode(mode || 'draft');
     renderPreview();
     refreshDraftLabel();
     setTimeout(function () {

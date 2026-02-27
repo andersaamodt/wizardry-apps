@@ -23,6 +23,8 @@ content=$(blog_param content)
 publish_mode=$(blog_param publish_mode)
 scheduled_at=$(blog_param scheduled_at)
 visibility=$(blog_param visibility)
+existing_publish_mode=""
+existing_status=""
 
 if [ -z "$action" ]; then
   case "$visibility" in
@@ -62,6 +64,8 @@ if [ -n "$draft_id" ] && blog_draft_exists "$draft_id"; then
   if [ -z "$scheduled_at" ]; then
     scheduled_at=$(config-get "$meta" scheduled_at 2>/dev/null || printf '')
   fi
+  existing_publish_mode=$(config-get "$meta" publish_mode 2>/dev/null || printf '')
+  existing_status=$(config-get "$meta" status 2>/dev/null || printf '')
 fi
 
 if [ -z "$title" ]; then
@@ -135,8 +139,19 @@ case "$action" in
 
   autosave|save_draft|save)
     status=draft
-    # Selecting release mode in Compose should not queue/schedule until explicit publish action.
-    if [ "$publish_mode" = "scheduled" ] || [ "$publish_mode" = "drip" ]; then
+    # Preserve existing queued/scheduled state during autosave so release mode does not silently downgrade.
+    if [ "$action" = "autosave" ]; then
+      if [ "$existing_publish_mode" = "drip" ] && [ "$existing_status" = "queued" ]; then
+        publish_mode=drip
+        status=queued
+        scheduled_at=""
+      elif [ "$existing_publish_mode" = "scheduled" ] && [ "$existing_status" = "scheduled" ]; then
+        publish_mode=scheduled
+        status=scheduled
+      fi
+    fi
+    # Saving a normal draft should not queue/schedule until explicit publish action.
+    if [ "$status" = "draft" ] && { [ "$publish_mode" = "scheduled" ] || [ "$publish_mode" = "drip" ]; }; then
       publish_mode=draft
     fi
     blog_save_draft "$draft_id" "$title" "$normalized_tags" "$summary" "$content" "$BLOG_SESSION_USERNAME" "$publish_mode" "$scheduled_at" "$status"
