@@ -1673,18 +1673,18 @@ label {
   min-height: 1.2rem;
   padding: 0 0.4rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--line));
-  color: color-mix(in srgb, var(--accent-strong) 82%, var(--text) 18%);
-  background: color-mix(in srgb, var(--accent) 15%, var(--bg-main) 85%);
+  border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--line) 40%);
+  color: color-mix(in srgb, var(--ok) 84%, var(--text) 16%);
+  background: color-mix(in srgb, var(--ok) 20%, var(--bg-main) 80%);
   font-size: 0.63rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .mode-summary-state.disabled {
-  border-color: color-mix(in srgb, var(--line) 78%, transparent);
-  color: color-mix(in srgb, var(--text-subtle) 86%, var(--text) 14%);
-  background: color-mix(in srgb, var(--bg-main) 88%, var(--line) 12%);
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
+  color: color-mix(in srgb, var(--danger) 82%, var(--text) 18%);
+  background: color-mix(in srgb, var(--danger) 18%, var(--bg-main) 82%);
 }
 
 .mode-summary-meta {
@@ -2213,18 +2213,18 @@ label {
   min-height: 1.2rem;
   padding: 0 0.5rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--line));
-  color: color-mix(in srgb, var(--accent-strong) 80%, var(--text) 20%);
-  background: color-mix(in srgb, var(--accent) 14%, var(--bg-main) 86%);
+  border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--line) 40%);
+  color: color-mix(in srgb, var(--ok) 84%, var(--text) 16%);
+  background: color-mix(in srgb, var(--ok) 20%, var(--bg-main) 80%);
   font-size: 0.62rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .mode-detail-drawer-state.disabled {
-  border-color: color-mix(in srgb, var(--line) 78%, transparent);
-  color: color-mix(in srgb, var(--text-subtle) 86%, var(--text) 14%);
-  background: color-mix(in srgb, var(--bg-main) 88%, var(--line) 12%);
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
+  color: color-mix(in srgb, var(--danger) 82%, var(--text) 18%);
+  background: color-mix(in srgb, var(--danger) 18%, var(--bg-main) 82%);
 }
 
 .mode-detail-drawer-title {
