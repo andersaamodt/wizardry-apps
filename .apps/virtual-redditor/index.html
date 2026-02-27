@@ -526,7 +526,6 @@
                 </div>
               </div>
               <div id="modes-list" class="modes-list"></div>
-              <div id="modes-list-summary" class="mode-list-status mode-summary-meta-text"></div>
             </div>
             <div class="drawer-resizer" data-drawer-resizer="modes" aria-hidden="true"></div>
             <aside id="mode-detail-drawer" class="mode-detail-drawer" aria-hidden="true">
@@ -4936,7 +4935,6 @@
     function renderModesPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
       var list = document.getElementById('modes-list');
-      var summaryLine = document.getElementById('modes-list-summary');
       if (!list) return;
 
       fillModeSelect('modes-starting-mode', cfg.startingMode || '', true);
@@ -4949,13 +4947,6 @@
       var actionTriggers = Array.isArray(cfg.actionTriggers) ? cfg.actionTriggers : [];
       var transitionSource = cfg.postActionTransitions || {};
       var transitionActionNames = Object.keys(transitionSource);
-      var modeCount = (cfg.modes || []).length;
-      var triggerCount = actionTriggers.length;
-      var transitionCount = transitionActionNames.length;
-      var summaryText = String(modeCount) + ' ' + (modeCount === 1 ? 'mode' : 'modes') + ' • ' +
-        String(triggerCount) + ' ' + (triggerCount === 1 ? 'action trigger' : 'action triggers') + ' • ' +
-        String(transitionCount) + ' ' + (transitionCount === 1 ? 'post-action transition' : 'post-action transitions');
-      if (summaryLine) summaryLine.textContent = summaryText;
       if (!modes.length) {
         list.innerHTML = '<div class="settings-empty-note">No modes configured.</div>';
       } else {
