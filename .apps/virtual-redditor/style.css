@@ -2781,19 +2781,32 @@ label {
 
 .subreddit-field-row {
   display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 6px;
   min-height: 30px;
   margin-bottom: 8px;
 }
 
+.subreddit-input-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.subreddit-input-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .subreddit-check-meta {
-  display: inline-block;
+  display: block;
   font-size: 0.72rem;
   color: var(--text-subtle);
   line-height: 1.2;
-  white-space: nowrap;
+  white-space: normal;
   overflow: visible;
   text-overflow: clip;
   max-width: none;

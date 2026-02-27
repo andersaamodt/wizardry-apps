@@ -1243,9 +1243,9 @@ check_subreddit_json() {
     [ -z "$display" ] && display=$name
     month_year=$(format_epoch_month_year "$created_utc")
     if [ -n "$month_year" ]; then
-      since="Community since $month_year"
+      since="community since $month_year"
     else
-      since="Community found"
+      since="community found"
     fi
     jq -cn \
       --arg name "$display" \
