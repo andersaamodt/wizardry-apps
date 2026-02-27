@@ -1639,7 +1639,7 @@
       });
     }
 
-    return Promise.reject(new Error('Fresh signer approval is required. Use Login with Nostr or phone signer first.'));
+    return Promise.reject(new Error('Fresh signer approval is required. Use Login or the phone signer flow first.'));
   }
 
   function goToAccountSettings() {
@@ -1745,7 +1745,7 @@
       els.loginBtn.addEventListener('click', function () {
         closeLoginMenu();
         startDesktopSignerLogin().catch(function (err) {
-          showAuthModal();
+          showAuthModal('register');
           setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
         });
       });
@@ -1763,30 +1763,24 @@
       });
     }
 
-    if (els.loginMenuDesktop) {
-      els.loginMenuDesktop.addEventListener('click', function () {
+    if (els.loginMenuRegister) {
+      els.loginMenuRegister.addEventListener('click', function () {
         closeLoginMenu();
-        startDesktopSignerLogin().catch(function (err) {
-          showAuthModal();
-          setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
-        });
+        showAuthModal('register');
       });
     }
 
     if (els.loginMenuPhone) {
       els.loginMenuPhone.addEventListener('click', function () {
         closeLoginMenu();
-        showAuthModal();
-        startPhonePairingFlow().catch(function (err) {
-          setAuthMessage(err.message || 'Phone pairing setup failed.', 'error');
-        });
+        showAuthModal('phone');
       });
     }
 
     if (els.loginMenuManual) {
       els.loginMenuManual.addEventListener('click', function () {
         closeLoginMenu();
-        showAuthModal();
+        showAuthModal('manual');
         setAuthControlsDisabled(true);
         prepareManualLogin().catch(function (err) {
           setAuthMessage(err.message || 'Failed to prepare manual login.', 'error');
@@ -1796,10 +1790,10 @@
       });
     }
 
-    if (els.loginMenuAdvanced) {
-      els.loginMenuAdvanced.addEventListener('click', function () {
+    if (els.loginMenuLearn) {
+      els.loginMenuLearn.addEventListener('click', function () {
         closeLoginMenu();
-        showAuthModal();
+        showInfoModal();
       });
     }
 
@@ -1807,6 +1801,13 @@
       els.authModal.addEventListener('click', function (event) {
         if (event.target && event.target.hasAttribute('data-close-auth-modal')) {
           hideAuthModal();
+        }
+      });
+    }
+    if (els.authInfoModal) {
+      els.authInfoModal.addEventListener('click', function (event) {
+        if (event.target && event.target.hasAttribute('data-close-auth-info')) {
+          hideInfoModal();
         }
       });
     }
@@ -1837,7 +1838,7 @@
         setAuthMessage('Preparing log out everywhere challenge...', 'warn');
         logoutEverywhere().catch(function (err) {
           setAuthMessage(err.message || 'Log out everywhere failed.', 'error');
-          showAuthModal();
+          showAuthModal('register');
         });
       });
     }
@@ -1882,6 +1883,10 @@
         hideAuthModal();
         return;
       }
+      if (event.key === 'Escape' && els.authInfoModal && !els.authInfoModal.hidden) {
+        hideInfoModal();
+        return;
+      }
       if (event.key === 'Escape' && els.loginMenu && !els.loginMenu.hidden) {
         closeLoginMenu();
       }
@@ -1897,11 +1902,27 @@
       els.authDelegationDays.addEventListener('input', refreshAuthIntentUi);
     }
 
-    if (els.authNip07Btn) {
-      els.authNip07Btn.addEventListener('click', function () {
+    if (els.authRegisterBtn) {
+      els.authRegisterBtn.addEventListener('click', function () {
         startDesktopSignerLogin().catch(function (err) {
           setAuthMessage(err.message || 'Desktop signer login failed.', 'error');
         });
+      });
+    }
+
+    if (els.authTabRegister) {
+      els.authTabRegister.addEventListener('click', function () {
+        setActiveAuthTab('register');
+      });
+    }
+    if (els.authTabPhone) {
+      els.authTabPhone.addEventListener('click', function () {
+        setActiveAuthTab('phone');
+      });
+    }
+    if (els.authTabManual) {
+      els.authTabManual.addEventListener('click', function () {
+        setActiveAuthTab('manual');
       });
     }
 
@@ -1919,17 +1940,6 @@
         setAuthControlsDisabled(true);
         loginWithPhoneSigner().catch(function (err) {
           setAuthMessage(err.message || 'Phone signer login failed.', 'error');
-        }).finally(function () {
-          setAuthControlsDisabled(false);
-        });
-      });
-    }
-
-    if (els.authPasteBtn) {
-      els.authPasteBtn.addEventListener('click', function () {
-        setAuthControlsDisabled(true);
-        prepareManualLogin().catch(function (err) {
-          setAuthMessage(err.message || 'Failed to prepare manual login.', 'error');
         }).finally(function () {
           setAuthControlsDisabled(false);
         });
