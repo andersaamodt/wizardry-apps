@@ -490,8 +490,8 @@ body {
 }
 
 .admin-nav-item:hover {
-  background: transparent;
-  color: #1e2d4e;
+  background: #e9f1ff;
+  color: #153878;
 }
 
 .admin-nav-item.is-active {
@@ -505,7 +505,7 @@ body {
 .admin-nav-item[aria-current="page"] {
   background: #c7d9ff;
   color: #0f326f;
-  box-shadow: inset 3px 0 0 #2c57a8;
+  box-shadow: none;
   font-weight: 700;
 }
 
@@ -520,8 +520,8 @@ body {
 
 #admin-panel .admin-nav-list .admin-nav-item:hover {
   border: 0 !important;
-  background: transparent !important;
-  color: #1e2d4e !important;
+  background: #e9f1ff !important;
+  color: #153878 !important;
   transform: none !important;
 }
 
@@ -534,9 +534,15 @@ body {
   border: 0 !important;
   background: #c7d9ff !important;
   color: #0f326f !important;
-  box-shadow: inset 3px 0 0 #2c57a8 !important;
+  box-shadow: none !important;
   transform: none !important;
   cursor: default !important;
+}
+
+#admin-panel .admin-nav-list .admin-nav-item[aria-selected="true"]:hover,
+#admin-panel .admin-nav-list .admin-nav-item[aria-current="page"]:hover {
+  background: #c7d9ff !important;
+  color: #0f326f !important;
 }
 
 .admin-content {
@@ -1317,19 +1323,32 @@ body {
 }
 
 .users-list {
-  display: grid;
-  gap: 0.34rem;
+  display: block;
+  border: 1px solid #d2def3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
 }
 
 .user-card {
-  border: 1px solid #d2def3;
-  border-radius: 12px;
+  border: 0;
+  border-bottom: 1px solid #d9e3f4;
+  border-radius: 0;
   background: #fff;
-  padding: 0.56rem 0.74rem;
+  padding: 0.5rem 0.68rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  min-height: 3rem;
+}
+
+.user-card:last-of-type {
+  border-bottom: 0;
+}
+
+.user-card.user-row-alt {
+  background: #f5f8ff;
 }
 
 .users-list.is-dragging .user-card.is-draggable {
@@ -1454,12 +1473,12 @@ body {
 }
 
 .users-list.is-dragging .user-drop-zone {
-  margin: -1px 0 6px;
+  margin: -1px 0 4px;
 }
 
 .users-list.is-dragging .user-drop-zone.is-target {
   border-top-color: #5a83d8;
-  margin: 5px 0 10px;
+  margin: 4px 0 7px;
 }
 
 .draft-card-head {

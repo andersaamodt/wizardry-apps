@@ -20,7 +20,9 @@
     usersPollTimer: null,
     userDragActive: false,
     userDragUsername: '',
-    userDropAfterUsername: ''
+    userDropAfterUsername: '',
+    usersMenuOpenFor: '',
+    usersActionInFlight: false
   };
 
   const els = {
@@ -1133,7 +1135,7 @@
     const actorName = state.username || '';
     const actorRank = Number(state.actorRank || 0);
     let seenBelow = false;
-    state.users.forEach(function (user) {
+    state.users.forEach(function (user, idx) {
       const username = String(user.username || '');
       const rank = Number(user.rank || 0);
       const isSelf = !!user.is_self || username === actorName;
@@ -1146,14 +1148,16 @@
         seenBelow = true;
       }
 
-      html += '<div class="user-card' + (canDrag ? ' is-draggable' : '') + '"' + dragAttrs + ' data-username="' + escapeAttr(username) + '" data-rank="' + escapeAttr(String(rank)) + '">';
+      html += '<div class="user-card' + (canDrag ? ' is-draggable' : '') + ((idx % 2) === 1 ? ' user-row-alt' : '') + '"' + dragAttrs + ' data-username="' + escapeAttr(username) + '" data-rank="' + escapeAttr(String(rank)) + '">';
       html += '<div class="user-card-main">';
-      html += '<div class="user-card-name">' + escapeHtml(user.player_name || username) + ' <span class="user-pill' + (isAdmin ? ' is-admin' : '') + '">' + (isAdmin ? 'Admin' : 'User') + '</span></div>';
-      html += '<div class="user-card-meta">@' + escapeHtml(username);
-      if (isSelf) {
-        html += ' · You';
+      html += '<div class="user-card-name">' + escapeHtml(user.player_name || username);
+      if (isAdmin) {
+        html += ' <span class="user-pill is-admin">Admin</span>';
       }
       html += '</div>';
+      if (isSelf) {
+        html += '<div class="user-card-meta">You</div>';
+      }
       html += '</div>';
       html += '<div class="user-card-actions">';
       if (!isSelf && (isBelow || !isAdmin)) {
@@ -1185,14 +1189,14 @@
     }
   }
 
-  async function loadUsers() {
+  async function loadUsers(animate) {
     const data = await apiPost('/cgi/blog-list-users', {}, true);
     if (!data.success) {
       throw new Error(data.error || 'Failed to load users');
     }
     state.users = Array.isArray(data.users) ? data.users : [];
     state.actorRank = Number(data.actor_rank || 0);
-    renderUsersList(true);
+    renderUsersList(!!animate);
   }
 
   function stopUsersPolling() {
@@ -1209,7 +1213,7 @@
       return;
     }
 
-    loadUsers().catch(function (err) {
+    loadUsers(false).catch(function (err) {
       setOutput(els.outputUsers, 'Error: ' + err.message, 'error');
     });
 
@@ -1221,16 +1225,19 @@
         stopUsersPolling();
         return;
       }
-      if (state.userDragActive) {
+      if (state.userDragActive || state.usersActionInFlight || state.usersMenuOpenFor) {
         return;
       }
-      loadUsers().catch(function () {
+      loadUsers(false).catch(function () {
         // Keep polling silently; avoid noisy toasts for transient failures.
       });
-    }, 5000);
+    }, 6000);
   }
 
   async function runUserAction(action, username) {
+    if (state.usersActionInFlight) {
+      return;
+    }
     const user = state.users.find(function (item) { return item.username === username; });
     if (!user) {
       throw new Error('User not found');
@@ -1248,27 +1255,42 @@
         return;
       }
     }
-    const data = await apiPost('/cgi/blog-manage-user', {
-      action: action,
-      username: username
-    }, true);
-    if (!data.success) {
-      throw new Error(data.error || 'User action failed');
+    state.usersActionInFlight = true;
+    try {
+      const data = await apiPost('/cgi/blog-manage-user', {
+        action: action,
+        username: username
+      }, true);
+      if (!data.success) {
+        throw new Error(data.error || 'User action failed');
+      }
+      state.usersMenuOpenFor = '';
+      await loadUsers(false);
+      setOutput(els.outputUsers, data.message || 'User updated.', 'ok');
+    } finally {
+      state.usersActionInFlight = false;
     }
-    await loadUsers();
-    setOutput(els.outputUsers, data.message || 'User updated.', 'ok');
   }
 
   async function runUserMoveAfter(username, afterUsername) {
-    const data = await apiPost('/cgi/blog-manage-user', {
-      action: 'move_after',
-      username: username,
-      after_username: afterUsername
-    }, true);
-    if (!data.success) {
-      throw new Error(data.error || 'Reorder failed');
+    if (state.usersActionInFlight) {
+      return;
     }
-    await loadUsers();
+    state.usersActionInFlight = true;
+    try {
+      const data = await apiPost('/cgi/blog-manage-user', {
+        action: 'move_after',
+        username: username,
+        after_username: afterUsername
+      }, true);
+      if (!data.success) {
+        throw new Error(data.error || 'Reorder failed');
+      }
+      state.usersMenuOpenFor = '';
+      await loadUsers(true);
+    } finally {
+      state.usersActionInFlight = false;
+    }
   }
 
   async function loadDraft(draftId) {
@@ -1550,13 +1572,19 @@
         }
         if (action === 'toggle_menu') {
           const panels = Array.from(els.usersList.querySelectorAll('[data-user-menu-panel]'));
+          let opened = '';
           panels.forEach(function (panel) {
             const thisUser = panel.getAttribute('data-user-menu-panel');
             if (!thisUser) {
               return;
             }
-            panel.hidden = (thisUser !== username) ? true : !panel.hidden;
+            const openThis = thisUser === username ? panel.hidden : false;
+            panel.hidden = !openThis;
+            if (openThis) {
+              opened = thisUser;
+            }
           });
+          state.usersMenuOpenFor = opened;
           return;
         }
         runUserAction(action, username).catch(function (err) {
@@ -1654,6 +1682,7 @@
         if (target.closest('.user-menu')) {
           return;
         }
+        state.usersMenuOpenFor = '';
         Array.from(els.usersList.querySelectorAll('[data-user-menu-panel]')).forEach(function (panel) {
           panel.hidden = true;
         });
@@ -1661,12 +1690,12 @@
     }
     window.addEventListener('focus', function () {
       if (state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
-        loadUsers().catch(function () {});
+        loadUsers(false).catch(function () {});
       }
     });
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'visible' && state.isAdmin && state.activeSection === 'users' && !state.userDragActive) {
-        loadUsers().catch(function () {});
+        loadUsers(false).catch(function () {});
       }
     });
 

@@ -157,7 +157,17 @@ case "$action" in
       blog_json_error "Cannot delete an admin above you" "rank_forbidden"
       exit 0
     fi
-    rm -rf "$(blog_user_dir "$username")"
+    target_dir=$(blog_user_dir "$username")
+    rm -rf "$target_dir"
+    if [ -e "$target_dir" ]; then
+      blog_json_error "Delete failed on server" "delete_failed"
+      exit 0
+    fi
+    profile=$(blog_user_profile "$username")
+    if [ -f "$profile" ]; then
+      blog_json_error "Delete failed on server" "delete_failed"
+      exit 0
+    fi
     blog_invalidate_user_sessions "$username" >/dev/null 2>&1 || true
     blog_users_reindex
     printf '{"success":true,"message":"User deleted","username":"%s"}\n' "$(blog_json_escape "$username")"
