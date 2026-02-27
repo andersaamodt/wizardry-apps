@@ -125,12 +125,9 @@ title: Blog Admin
 <section class="sub-card">
 <h4>Bridge</h4>
 <div class="field-row checkbox-row">
-<div class="setting-label" title="Enable local Nostr mirroring and signed Nostr event publishing.">
-<strong title="Enable local Nostr mirroring and signed Nostr event publishing.">Enable Nostr Bridge</strong>
-</div>
-<label class="checkbox-control" for="nostr-bridge-enabled" title="Turn Nostr bridge on or off for this site.">
+<label class="checkbox-control checkbox-control-plain" for="nostr-bridge-enabled" title="Turn Nostr bridge on or off for this site.">
 <input type="checkbox" id="nostr-bridge-enabled" title="Turn Nostr bridge on or off for this site.">
-<span title="Turn Nostr bridge on or off for this site.">Enabled</span>
+<span title="Turn Nostr bridge on or off for this site.">Enable Nostr Bridge</span>
 </label>
 </div>
 <div class="field-row">
@@ -794,7 +791,16 @@ body {
   color: #1d3566;
   font-size: 0.82rem;
   font-weight: 600;
-  margin-left: auto;
+  margin-left: 0;
+}
+
+[data-admin-section="nostr-bridge"] .checkbox-row .checkbox-control.checkbox-control-plain {
+  font-weight: 500;
+}
+
+[data-admin-section="nostr-bridge"] .checkbox-row .checkbox-control.checkbox-control-plain span {
+  font-weight: 500;
+  color: #1f335f;
 }
 
 .inline-tip {
