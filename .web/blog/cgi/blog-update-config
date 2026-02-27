@@ -134,7 +134,9 @@ if [ -n "$new_users_are_admins" ]; then
 fi
 
 if [ "$nostr_lists_update" = "true" ]; then
-  write_nostr_lines_file "$blog_nostr_authors_file" "$nostr_authors"
+  case "$BLOG_REQUEST_BODY" in
+    *nostr_authors=*) write_nostr_lines_file "$blog_nostr_authors_file" "$nostr_authors" ;;
+  esac
   write_nostr_lines_file "$blog_nostr_relays_file" "$nostr_relays"
   write_nostr_lines_file "$blog_nostr_blocklist_file" "$nostr_blocklist"
   if blog_nostr_bridge_enabled; then

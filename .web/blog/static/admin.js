@@ -50,7 +50,6 @@
     feedFullText: document.getElementById('feed-full-text'),
     feedItems: document.getElementById('feed-items'),
     nostrBridgeEnabled: document.getElementById('nostr-bridge-enabled'),
-    nostrAuthors: document.getElementById('nostr-authors'),
     nostrRelays: document.getElementById('nostr-relays'),
     nostrBlocklist: document.getElementById('nostr-blocklist'),
     newUsersAreAdmins: document.getElementById('new-users-are-admins'),
@@ -935,9 +934,6 @@
       if (els.nostrBridgeEnabled) {
         els.nostrBridgeEnabled.checked = state.nostrBridgeEnabled;
       }
-      if (els.nostrAuthors) {
-        els.nostrAuthors.value = Array.isArray(data.nostr_authors) ? data.nostr_authors.join('\n') : '';
-      }
       if (els.nostrRelays) {
         els.nostrRelays.value = Array.isArray(data.nostr_relays) ? data.nostr_relays.join('\n') : '';
       }
@@ -1004,7 +1000,6 @@
       const data = await apiPost('/cgi/blog-update-config', {
         nostr_lists_update: 'true',
         nostr_bridge_enabled: (els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked) ? 'true' : 'false',
-        nostr_authors: normalizeLineList(els.nostrAuthors ? els.nostrAuthors.value : ''),
         nostr_relays: normalizeLineList(els.nostrRelays ? els.nostrRelays.value : ''),
         nostr_blocklist: normalizeLineList(els.nostrBlocklist ? els.nostrBlocklist.value : '')
       }, true);
@@ -1064,7 +1059,7 @@
       els.nostrBridgeEnabled.addEventListener('change', function () { queueNostrBridgeAutosave(180); });
     }
 
-    [els.nostrAuthors, els.nostrRelays, els.nostrBlocklist].filter(Boolean).forEach(function (field) {
+    [els.nostrRelays, els.nostrBlocklist].filter(Boolean).forEach(function (field) {
       field.addEventListener('input', function () { queueNostrBridgeAutosave(850); });
       field.addEventListener('change', function () { queueNostrBridgeAutosave(250); });
       field.addEventListener('blur', function () { queueNostrBridgeAutosave(220); });
@@ -1482,6 +1477,9 @@
       if (isAdmin) {
         html += ' <span class="user-pill is-admin">Admin</span>';
       }
+      if (user.is_author) {
+        html += ' <span class="user-pill is-author">Author</span>';
+      }
       html += '</div>';
       html += '</div>';
       html += '<div class="user-card-actions">';
@@ -1489,6 +1487,13 @@
         html += '<div class="user-menu">';
         html += userCardActionButton('⋯', 'toggle_menu', username, 'user-menu-trigger');
         html += '<div class="user-menu-panel" data-user-menu-panel="' + escapeAttr(username) + '" hidden>';
+        if (state.nostrBridgeEnabled && user.nostr_pubkey) {
+          if (user.is_author) {
+            html += userCardActionButton('Revoke Author', 'remove_author', username, 'user-author-action');
+          } else {
+            html += userCardActionButton('Grant Author', 'grant_author', username, 'user-author-action');
+          }
+        }
         if (!isAdmin) {
           html += userCardActionButton('Grant Admin', 'grant_admin', username, '');
         }
@@ -1497,6 +1502,13 @@
         }
         if (isBelow) {
           html += userCardActionButton('Promote Above...', 'promote_above', username, '');
+        }
+        if (state.nostrBridgeEnabled && user.nostr_pubkey) {
+          if (user.is_blocked) {
+            html += userCardActionButton('Unblock Account', 'unblock_account', username, 'user-block-action');
+          } else {
+            html += userCardActionButton('Block Account...', 'block_account', username, 'user-block-action');
+          }
         }
         html += userCardActionButton(prioritiesTrashIconSvg() + '<span>Delete account...</span>', 'delete', username, 'user-delete');
         html += '</div>';
@@ -1580,11 +1592,19 @@
         return;
       }
     }
+    let deleteAccountWithBlock = false;
+    if (action === 'block_account') {
+      if (!window.confirm('Block this account for Nostr bridge content?')) {
+        return;
+      }
+      deleteAccountWithBlock = window.confirm('Also delete this local account now?');
+    }
     state.usersActionInFlight = true;
     try {
       const data = await apiPost('/cgi/blog-manage-user', {
         action: action,
-        username: username
+        username: username,
+        delete_account: deleteAccountWithBlock ? 'true' : 'false'
       }, true);
       if (!data.success) {
         throw new Error(data.error || 'User action failed');

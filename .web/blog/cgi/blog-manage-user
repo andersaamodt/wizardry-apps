@@ -17,6 +17,7 @@ fi
 action=$(blog_param action)
 username=$(blog_param username)
 after_username=$(blog_param after_username)
+delete_account=$(blog_param delete_account)
 
 if ! blog_validate_username "$username"; then
   blog_json_error "Invalid username" "invalid_username"
@@ -44,6 +45,7 @@ case "$target_rank" in ''|*[!0-9]*) target_rank=0 ;; esac
 
 target_admin=$(config-get "$profile" is_admin 2>/dev/null || printf 'false')
 case "$target_admin" in true|false) ;; *) target_admin=false ;; esac
+target_pubkey=$(blog_get_nostr_pubkey "$username" 2>/dev/null || printf '')
 
 require_below() {
   if [ "$target_rank" -le "$actor_rank" ]; then
@@ -53,6 +55,85 @@ require_below() {
 }
 
 case "$action" in
+  grant_author)
+    if [ "$username" = "$actor" ]; then
+      blog_json_error "Cannot change your own author status here" "invalid_target"
+      exit 0
+    fi
+    if [ -z "$target_pubkey" ]; then
+      blog_json_error "User has no Nostr pubkey" "missing_pubkey"
+      exit 0
+    fi
+    blog_nostr_list_add_value "$blog_nostr_authors_file" "$target_pubkey"
+    blog_nostr_list_remove_value "$blog_nostr_blocklist_file" "$target_pubkey"
+    if blog_nostr_bridge_enabled; then
+      blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+    fi
+    printf '{"success":true,"message":"Author granted","username":"%s"}\n' "$(blog_json_escape "$username")"
+    ;;
+  remove_author)
+    if [ "$username" = "$actor" ]; then
+      blog_json_error "Cannot change your own author status here" "invalid_target"
+      exit 0
+    fi
+    if [ -z "$target_pubkey" ]; then
+      blog_json_error "User has no Nostr pubkey" "missing_pubkey"
+      exit 0
+    fi
+    blog_nostr_list_remove_value "$blog_nostr_authors_file" "$target_pubkey"
+    if blog_nostr_bridge_enabled; then
+      blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+    fi
+    printf '{"success":true,"message":"Author removed","username":"%s"}\n' "$(blog_json_escape "$username")"
+    ;;
+  block_account)
+    if [ "$username" = "$actor" ]; then
+      blog_json_error "Cannot block your own account" "invalid_target"
+      exit 0
+    fi
+    if [ "$target_admin" = "true" ] && [ "$target_rank" -le "$actor_rank" ]; then
+      blog_json_error "Cannot block an admin above you" "rank_forbidden"
+      exit 0
+    fi
+    if [ -z "$target_pubkey" ]; then
+      blog_json_error "User has no Nostr pubkey" "missing_pubkey"
+      exit 0
+    fi
+    blog_nostr_list_add_value "$blog_nostr_blocklist_file" "$target_pubkey"
+    blog_nostr_list_remove_value "$blog_nostr_authors_file" "$target_pubkey"
+    config-set "$profile" updated_at "$(blog_now_iso)"
+    case "$delete_account" in true|1|yes|on) delete_account=true ;; *) delete_account=false ;; esac
+    if [ "$delete_account" = "true" ]; then
+      target_dir=$(blog_user_dir "$username")
+      rm -rf "$target_dir"
+      blog_invalidate_user_sessions "$username" >/dev/null 2>&1 || true
+      blog_users_reindex
+      if blog_nostr_bridge_enabled; then
+        blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+      fi
+      printf '{"success":true,"message":"Account blocked and deleted","username":"%s"}\n' "$(blog_json_escape "$username")"
+      exit 0
+    fi
+    if blog_nostr_bridge_enabled; then
+      blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+    fi
+    printf '{"success":true,"message":"Account blocked","username":"%s"}\n' "$(blog_json_escape "$username")"
+    ;;
+  unblock_account)
+    if [ "$username" = "$actor" ]; then
+      blog_json_error "Cannot unblock your own account here" "invalid_target"
+      exit 0
+    fi
+    if [ -z "$target_pubkey" ]; then
+      blog_json_error "User has no Nostr pubkey" "missing_pubkey"
+      exit 0
+    fi
+    blog_nostr_list_remove_value "$blog_nostr_blocklist_file" "$target_pubkey"
+    if blog_nostr_bridge_enabled; then
+      blog_nostr_rebuild_derived >/dev/null 2>&1 || true
+    fi
+    printf '{"success":true,"message":"Account unblocked","username":"%s"}\n' "$(blog_json_escape "$username")"
+    ;;
   grant_admin)
     if [ "$username" = "$actor" ]; then
       blog_json_error "You are already managing your own account" "invalid_target"

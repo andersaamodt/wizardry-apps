@@ -1214,6 +1214,8 @@
       subredditCheckMessage: '',
       createProfileInFlight: false,
       createProfileMode: false,
+      createProfileGhostId: '',
+      createProfilePrevActiveId: '',
       oauthPollTimer: null,
       oauthFinishing: false,
       oauthFlowActive: false,
@@ -1420,9 +1422,16 @@
 
     function saveProfilesCache() {
       try {
+        var profilesForCache = (Array.isArray(state.profiles) ? state.profiles : []).filter(function (p) {
+          return !(p && p._ghost);
+        });
+        var activeForCache = String(state.activeProfile || '');
+        if (activeForCache && activeForCache.indexOf('__new_profile__') === 0) {
+          activeForCache = String(state.createProfilePrevActiveId || '');
+        }
         saveStorage(PROFILES_CACHE_KEY, JSON.stringify({
-          activeProfile: String(state.activeProfile || ''),
-          profiles: Array.isArray(state.profiles) ? state.profiles : []
+          activeProfile: activeForCache,
+          profiles: profilesForCache
         }));
       } catch (_) {}
     }
@@ -3067,23 +3076,134 @@
       el.style.color = isError ? 'var(--danger)' : 'var(--ok)';
     }
 
+    function createProfileGhostId() {
+      return '__new_profile__' + String(Date.now());
+    }
+
+    function removeCreateProfileGhost(options) {
+      var opts = options || {};
+      var restoreActive = opts.restoreActive !== false;
+      var ghostId = String(state.createProfileGhostId || '');
+      if (ghostId) {
+        state.profiles = (Array.isArray(state.profiles) ? state.profiles : []).filter(function (p) {
+          return String((p && p.id) || '') !== ghostId;
+        });
+      }
+      if (restoreActive) {
+        var prevActive = String(state.createProfilePrevActiveId || '');
+        if (prevActive) {
+          state.activeProfile = prevActive;
+        }
+      }
+      state.createProfileGhostId = '';
+      state.createProfilePrevActiveId = '';
+      for (var i = 0; i < state.profiles.length; i += 1) {
+        var p = state.profiles[i] || {};
+        p.selected = (String(p.id || '') === String(state.activeProfile || ''));
+      }
+    }
+
+    function ensureCreateProfileGhost() {
+      if (state.createProfileGhostId) {
+        return String(state.createProfileGhostId);
+      }
+      var ghostId = createProfileGhostId();
+      state.createProfilePrevActiveId = String(state.activeProfile || '');
+      var ghost = {
+        id: ghostId,
+        name: 'New Virtual Redditor',
+        username: '',
+        subreddit: '',
+        connected: false,
+        selected: true,
+        _ghost: true
+      };
+      var profiles = Array.isArray(state.profiles) ? state.profiles : [];
+      for (var i = 0; i < profiles.length; i += 1) {
+        profiles[i].selected = false;
+      }
+      profiles.unshift(ghost);
+      state.profiles = profiles;
+      state.activeProfile = ghostId;
+      state.createProfileGhostId = ghostId;
+      return ghostId;
+    }
+
+    function applyDraftProfileDefaultsToUi() {
+      var titleUsername = document.getElementById('title-username');
+      if (titleUsername) titleUsername.value = '';
+      var subredditInput = document.getElementById('subreddit-input');
+      if (subredditInput) subredditInput.value = '';
+      state.subredditCheckedValue = '';
+      state.subredditCheckStatus = 'idle';
+      state.subredditCheckMessage = '';
+      setSubredditCheck('idle', '', '');
+
+      var modeSelect = document.getElementById('mode-select');
+      if (modeSelect) modeSelect.value = 'judicial';
+      updateModeDescriptions('judicial');
+
+      var patrolSelect = document.getElementById('patrol-mode-select');
+      if (patrolSelect) patrolSelect.value = DEFAULT_PATROL_MODE;
+      updatePatrolModeDescriptions(DEFAULT_PATROL_MODE);
+
+      var sampleInput = document.getElementById('sample-max-input');
+      if (sampleInput) sampleInput.value = '20';
+
+      var threadPct = document.getElementById('thread-initiate-max-pct');
+      if (threadPct) threadPct.value = '25';
+
+      var passToggle = document.getElementById('passes-enabled');
+      if (passToggle) passToggle.checked = false;
+      var passControls = document.getElementById('pass-interval-controls');
+      if (passControls) passControls.classList.add('hidden');
+      var passInput = document.getElementById('pass-interval-input');
+      var passUnit = document.getElementById('pass-interval-unit');
+      if (passInput) passInput.value = '1';
+      if (passUnit) passUnit.value = 'hours';
+      updatePassIntervalUnitLabels();
+
+      var obeyAdmins = document.getElementById('obey-admins');
+      if (obeyAdmins) obeyAdmins.checked = false;
+
+      applyDoctrineContent('', '');
+      state.actions = [];
+      state.replies = [];
+      state.relationships = [];
+      state.modeLogEvents = [];
+      state.modesConfig = defaultModesConfigClient();
+      renderModesDrivenPanels();
+      renderRelationships();
+      renderModeLog();
+      renderActions();
+      renderReplies();
+    }
+
     function openCreateProfilePane() {
       var pane = document.getElementById('create-profile-pane');
       if (pane) pane.classList.remove('hidden');
+      ensureCreateProfileGhost();
       state.createProfileMode = true;
       setCreateProfileMessage('', false);
       setActiveTab('persona');
+      applyDraftProfileDefaultsToUi();
+      renderProfiles();
       var username = document.getElementById('title-username');
       if (username) username.value = '';
       setUsernameEditing(true);
       updateContentEmptyState();
+      updateToolbarButtonStates();
       if (username && typeof username.focus === 'function') username.focus();
     }
 
-    function closeCreateProfilePane() {
+    function closeCreateProfilePane(options) {
+      var opts = options || {};
       var pane = document.getElementById('create-profile-pane');
       if (pane) pane.classList.add('hidden');
       state.createProfileMode = false;
+      removeCreateProfileGhost({ restoreActive: opts.restoreActive !== false });
+      renderProfiles();
+      updateToolbarButtonStates();
       setCreateProfileMessage('', false);
       updateContentEmptyState();
     }
@@ -3567,6 +3687,7 @@
         var name = escapeHtml(profile.name || profile.id || 'profile');
         var rawName = String(profile.name || profile.id || 'profile');
         var rawUsername = String(profile.username || '');
+        var isGhost = !!profile._ghost;
         var uname = escapeHtml(rawUsername);
         var subreddit = escapeHtml(profile.subreddit || '');
         var connected = !!profile.connected;
@@ -3582,11 +3703,11 @@
           (subredditLine ? ('    <span class="profile-row-sub">' + subredditLine + '</span>') : ''),
           '  </span>',
           '  <span class="profile-row-actions">',
-          '    <button type="button" class="profile-row-menu-trigger" data-profile-menu-trigger="' + id + '" aria-label="Profile actions" title="Profile actions">⋯</button>',
-          '    <div class="profile-row-menu hidden" data-profile-menu="' + id + '">',
-          '      <button type="button" data-profile-action="rename" data-profile-id="' + id + '">Rename</button>',
-          '      <button type="button" data-profile-action="delete" data-profile-id="' + id + '">Delete</button>',
-          '    </div>',
+          (isGhost ? '' : ('    <button type="button" class="profile-row-menu-trigger" data-profile-menu-trigger="' + id + '" aria-label="Profile actions" title="Profile actions">⋯</button>')),
+          (isGhost ? '' : ('    <div class="profile-row-menu hidden" data-profile-menu="' + id + '">')),
+          (isGhost ? '' : ('      <button type="button" data-profile-action="rename" data-profile-id="' + id + '">Rename</button>')),
+          (isGhost ? '' : ('      <button type="button" data-profile-action="delete" data-profile-id="' + id + '">Delete</button>')),
+          (isGhost ? '' : ('    </div>')),
           '  </span>',
           '</div>'
         ].join('');
@@ -3671,60 +3792,82 @@
       var threadInitiateMaxInput = document.getElementById('thread-initiate-max-pct');
       var passesChecked = false;
 
-      if (titleUsername && document.activeElement !== titleUsername && !state.usernameEditing) {
-        titleUsername.value = String(settings.redditUsername || '');
-      }
-      syncUsernameDisplay();
-      if (modeSelect) modeSelect.value = normalizeMode(settings.mode || 'judicial');
-      if (patrolSelect) patrolSelect.value = normalizePatrolMode(settings.patrolMode || DEFAULT_PATROL_MODE);
-      if (sampleInput && document.activeElement !== sampleInput) sampleInput.value = String(settings.patrolSampleMax || 20);
-      if (subredditInput && document.activeElement !== subredditInput) subredditInput.value = String(settings.subreddit || '');
-      if (subredditInput && document.activeElement !== subredditInput) scheduleSubredditCheck(0, false);
-      if (passesEnabled) {
-        if (typeof state.passesTogglePendingValue === 'boolean') {
-          passesChecked = state.passesTogglePendingValue;
-          passesEnabled.checked = passesChecked;
-        } else {
-          passesChecked = !!settings.runEnabled;
-          passesEnabled.checked = passesChecked;
+      if (!state.createProfileMode) {
+        if (titleUsername && document.activeElement !== titleUsername && !state.usernameEditing) {
+          titleUsername.value = String(settings.redditUsername || '');
         }
-      }
-      if (passIntervalControls) {
-        passIntervalControls.classList.toggle('hidden', !passesChecked);
-      }
-      if (passIntervalInput && passIntervalUnit &&
-          document.activeElement !== passIntervalInput &&
-          document.activeElement !== passIntervalUnit) {
-        var intervalUi = intervalUiFromSeconds(parseIntervalSecondsFromSettings(settings));
-        passIntervalInput.value = String(intervalUi.value);
-        passIntervalUnit.value = intervalUi.unit;
-      }
-      updatePassIntervalUnitLabels();
-      if (obeyAdmins) {
-        if (typeof state.obeyAdminsPendingValue === 'boolean') {
-          obeyAdmins.checked = state.obeyAdminsPendingValue;
-        } else {
-          obeyAdmins.checked = !!settings.obeyAdmins;
+        syncUsernameDisplay();
+        if (modeSelect) modeSelect.value = normalizeMode(settings.mode || 'judicial');
+        if (patrolSelect) patrolSelect.value = normalizePatrolMode(settings.patrolMode || DEFAULT_PATROL_MODE);
+        if (sampleInput && document.activeElement !== sampleInput) sampleInput.value = String(settings.patrolSampleMax || 20);
+        if (subredditInput && document.activeElement !== subredditInput) subredditInput.value = String(settings.subreddit || '');
+        if (subredditInput && document.activeElement !== subredditInput) scheduleSubredditCheck(0, false);
+        if (passesEnabled) {
+          if (typeof state.passesTogglePendingValue === 'boolean') {
+            passesChecked = state.passesTogglePendingValue;
+            passesEnabled.checked = passesChecked;
+          } else {
+            passesChecked = !!settings.runEnabled;
+            passesEnabled.checked = passesChecked;
+          }
         }
-      }
-      if (threadInitiateMaxInput && document.activeElement !== threadInitiateMaxInput) {
-        threadInitiateMaxInput.value = String(
-          typeof settings.threadInitiateMaxPct === 'number' ? settings.threadInitiateMaxPct : 25
-        );
-      }
-      updateModeDescriptions(normalizeMode(settings.mode || 'judicial'));
-      updatePatrolModeDescriptions(normalizePatrolMode(settings.patrolMode || DEFAULT_PATROL_MODE));
-      if (settings.ollamaModel) {
-        var activeFromSettings = String(settings.ollamaModel);
-        state.installedModels[activeFromSettings] = true;
-        saveInstalledModels();
-        applyModel(activeFromSettings, false);
+        if (passIntervalControls) {
+          passIntervalControls.classList.toggle('hidden', !passesChecked);
+        }
+        if (passIntervalInput && passIntervalUnit &&
+            document.activeElement !== passIntervalInput &&
+            document.activeElement !== passIntervalUnit) {
+          var intervalUi = intervalUiFromSeconds(parseIntervalSecondsFromSettings(settings));
+          passIntervalInput.value = String(intervalUi.value);
+          passIntervalUnit.value = intervalUi.unit;
+        }
+        updatePassIntervalUnitLabels();
+        if (obeyAdmins) {
+          if (typeof state.obeyAdminsPendingValue === 'boolean') {
+            obeyAdmins.checked = state.obeyAdminsPendingValue;
+          } else {
+            obeyAdmins.checked = !!settings.obeyAdmins;
+          }
+        }
+        if (threadInitiateMaxInput && document.activeElement !== threadInitiateMaxInput) {
+          threadInitiateMaxInput.value = String(
+            typeof settings.threadInitiateMaxPct === 'number' ? settings.threadInitiateMaxPct : 25
+          );
+        }
+        updateModeDescriptions(normalizeMode(settings.mode || 'judicial'));
+        updatePatrolModeDescriptions(normalizePatrolMode(settings.patrolMode || DEFAULT_PATROL_MODE));
+        if (settings.ollamaModel) {
+          var activeFromSettings = String(settings.ollamaModel);
+          state.installedModels[activeFromSettings] = true;
+          saveInstalledModels();
+          applyModel(activeFromSettings, false);
+        } else {
+          renderModelPicker();
+        }
       } else {
+        syncUsernameDisplay();
         renderModelPicker();
       }
 
-      state.profiles = Array.isArray(profilesPayload.profiles) ? profilesPayload.profiles : [];
-      state.activeProfile = String(profilesPayload.activeProfile || '');
+      var baseProfiles = Array.isArray(profilesPayload.profiles) ? profilesPayload.profiles.slice() : [];
+      if (state.createProfileMode && state.createProfileGhostId) {
+        for (var bp = 0; bp < baseProfiles.length; bp += 1) {
+          baseProfiles[bp].selected = false;
+        }
+        baseProfiles.unshift({
+          id: String(state.createProfileGhostId),
+          name: 'New Virtual Redditor',
+          username: '',
+          subreddit: '',
+          connected: false,
+          selected: true,
+          _ghost: true
+        });
+        state.activeProfile = String(state.createProfileGhostId);
+      } else {
+        state.activeProfile = String(profilesPayload.activeProfile || '');
+      }
+      state.profiles = baseProfiles;
       renderProfiles();
       syncControlAndLabelTooltips();
 
@@ -6197,6 +6340,7 @@
       }
       state.createProfileInFlight = true;
       if (state.previewMode) {
+        removeCreateProfileGhost({ restoreActive: false });
         var id = uname.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'profile';
         state.profiles.push({ id: id, name: uname, username: uname, subreddit: '', connected: false, selected: false });
         for (var p = 0; p < state.profiles.length; p += 1) {
@@ -6206,7 +6350,7 @@
         if (state.status && state.status.settings) {
           state.status.settings.redditUsername = uname;
         }
-        closeCreateProfilePane();
+        closeCreateProfilePane({ restoreActive: false });
         setUsernameEditing(false);
         state.doctrineRemoteManifesto = '';
         state.doctrineRemoteNorms = '';
@@ -6223,7 +6367,8 @@
         setCreateProfileMessage('Creating...', false);
         await backendJson('create-profile', [uname]);
         await backendJson('set-reddit-setting', ['REDDIT_USERNAME', uname]);
-        closeCreateProfilePane();
+        removeCreateProfileGhost({ restoreActive: false });
+        closeCreateProfilePane({ restoreActive: false });
         setUsernameEditing(false);
         setSettingsMessage('', false);
         await refreshStatus();

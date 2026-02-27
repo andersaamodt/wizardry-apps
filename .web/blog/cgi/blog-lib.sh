@@ -23,9 +23,12 @@ blog_nostr_dir="$blog_site_root/site/nostr"
 blog_nostr_state_dir="$blog_nostr_dir/state"
 blog_nostr_events_dir="$blog_nostr_dir/events"
 blog_nostr_derived_dir="$blog_nostr_dir/derived"
-blog_nostr_authors_file="$blog_nostr_state_dir/authors.txt"
-blog_nostr_relays_file="$blog_nostr_state_dir/relays.txt"
-blog_nostr_blocklist_file="$blog_nostr_state_dir/blocklist.txt"
+blog_nostr_authors_file="$blog_nostr_state_dir/authors"
+blog_nostr_relays_file="$blog_nostr_state_dir/relays"
+blog_nostr_blocklist_file="$blog_nostr_state_dir/blocklist"
+blog_nostr_authors_file_legacy="$blog_nostr_state_dir/authors.txt"
+blog_nostr_relays_file_legacy="$blog_nostr_state_dir/relays.txt"
+blog_nostr_blocklist_file_legacy="$blog_nostr_state_dir/blocklist.txt"
 blog_nostr_hidden_posts_file="$blog_nostr_state_dir/hidden_posts.txt"
 blog_nostr_secret_key_file="$blog_nostr_state_dir/secret.key"
 blog_nostr_posts_index="$blog_nostr_derived_dir/posts.json"
@@ -50,6 +53,15 @@ blog_init() {
   mkdir -p "$blog_posts_dir"
   mkdir -p "$blog_nostr_state_dir" "$blog_nostr_events_dir" "$blog_nostr_derived_dir"
   [ -f "$blog_nostr_delegation_revocations_file" ] || : > "$blog_nostr_delegation_revocations_file"
+  if [ ! -f "$blog_nostr_authors_file" ] && [ -f "$blog_nostr_authors_file_legacy" ]; then
+    cp "$blog_nostr_authors_file_legacy" "$blog_nostr_authors_file" 2>/dev/null || : > "$blog_nostr_authors_file"
+  fi
+  if [ ! -f "$blog_nostr_relays_file" ] && [ -f "$blog_nostr_relays_file_legacy" ]; then
+    cp "$blog_nostr_relays_file_legacy" "$blog_nostr_relays_file" 2>/dev/null || : > "$blog_nostr_relays_file"
+  fi
+  if [ ! -f "$blog_nostr_blocklist_file" ] && [ -f "$blog_nostr_blocklist_file_legacy" ]; then
+    cp "$blog_nostr_blocklist_file_legacy" "$blog_nostr_blocklist_file" 2>/dev/null || : > "$blog_nostr_blocklist_file"
+  fi
   [ -f "$blog_nostr_authors_file" ] || : > "$blog_nostr_authors_file"
   [ -f "$blog_nostr_relays_file" ] || : > "$blog_nostr_relays_file"
   [ -f "$blog_nostr_blocklist_file" ] || : > "$blog_nostr_blocklist_file"
@@ -422,6 +434,40 @@ blog_nostr_list_file_to_json_array() {
   done < "$json_tmp"
   printf ']'
   rm -f "$json_tmp"
+}
+
+blog_nostr_list_has_value() {
+  file=${1-}
+  value=${2-}
+  [ -n "$file" ] || return 1
+  [ -n "$value" ] || return 1
+  blog_nostr_list_file_lines "$file" | grep -Fqx "$value"
+}
+
+blog_nostr_list_add_value() {
+  file=${1-}
+  value=${2-}
+  [ -n "$file" ] || return 1
+  [ -n "$value" ] || return 1
+  if blog_nostr_list_has_value "$file" "$value"; then
+    return 0
+  fi
+  printf '%s\n' "$value" >> "$file"
+}
+
+blog_nostr_list_remove_value() {
+  file=${1-}
+  value=${2-}
+  [ -n "$file" ] || return 1
+  [ -n "$value" ] || return 1
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/blog-nostr-list-remove.XXXXXX")
+  blog_nostr_list_file_lines "$file" | awk -v remove="$value" '{
+    if ($0 != remove) {
+      print $0;
+    }
+  }' > "$tmp_file"
+  mv "$tmp_file" "$file"
+  chmod 644 "$file" 2>/dev/null || true
 }
 
 blog_nostr_event_uri() {

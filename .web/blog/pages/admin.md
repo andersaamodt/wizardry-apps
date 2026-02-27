@@ -125,35 +125,18 @@ title: Blog Admin
 <section class="sub-card">
 <h4>Bridge</h4>
 <div class="field-row checkbox-row">
-<div class="setting-label" title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">
-<strong title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">Enable Nostr Bridge</strong>
-<span class="inline-tip" tabindex="0" aria-label="When enabled, published posts are signed as Nostr events and local render indexes are rebuilt from mirrored events.">?</span>
+<div class="setting-label" title="Enable local Nostr mirroring and signed Nostr event publishing.">
+<strong title="Enable local Nostr mirroring and signed Nostr event publishing.">Enable Nostr Bridge</strong>
 </div>
-<label class="checkbox-control" for="nostr-bridge-enabled" title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">
-<input type="checkbox" id="nostr-bridge-enabled" title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">
-<span title="Enable local Nostr mirroring and signed Nostr event publishing for posts and comments.">Enabled</span>
+<label class="checkbox-control" for="nostr-bridge-enabled" title="Turn Nostr bridge on or off for this site.">
+<input type="checkbox" id="nostr-bridge-enabled" title="Turn Nostr bridge on or off for this site.">
+<span title="Turn Nostr bridge on or off for this site.">Enabled</span>
 </label>
 </div>
-</section>
-
-<section class="sub-card">
-<h4>Authors</h4>
-<div class="field-row">
-<label for="nostr-authors" title="Allowed author pubkeys for post mirroring. Use one hex pubkey per line."><strong title="Allowed author pubkeys for post mirroring. Use one hex pubkey per line.">Allowed Authors</strong></label>
-<textarea id="nostr-authors" class="bridge-textarea" rows="4" placeholder="hexpubkey1&#10;hexpubkey2" title="Allowed author pubkeys for post mirroring. Use one hex pubkey per line."></textarea>
-</div>
-</section>
-
-<section class="sub-card">
-<h4>Relays</h4>
 <div class="field-row">
 <label for="nostr-relays" title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line."><strong title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line.">Relay List</strong></label>
 <textarea id="nostr-relays" class="bridge-textarea" rows="4" placeholder="wss://relay.damus.io&#10;wss://relay.primal.net" title="Relays used for mirror fetch and Nostr bridge transport. Use one relay URL per line."></textarea>
 </div>
-</section>
-
-<section class="sub-card">
-<h4>Blocklist</h4>
 <div class="field-row">
 <label for="nostr-blocklist" title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line."><strong title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line.">Blocked Pubkeys</strong></label>
 <textarea id="nostr-blocklist" class="bridge-textarea" rows="4" placeholder="hexpubkey_to_block" title="Blocked pubkeys excluded from mirrored comments and derived content. Use one pubkey per line."></textarea>
@@ -161,7 +144,7 @@ title: Blog Admin
 </section>
 </div>
 
-<p class="muted">These settings are stored in <code>site/nostr/state/</code> as <code>authors.txt</code>, <code>relays.txt</code>, and <code>blocklist.txt</code>.</p>
+<p class="muted">These settings are stored in <code>site/&lt;site-name&gt;/nostr/state/</code> as <code>authors</code>, <code>relays</code>, and <code>blocklist</code>.</p>
 
 <div class="section-actions">
 <p class="muted">Changes save automatically.</p>
@@ -742,6 +725,14 @@ body {
   margin-bottom: 0.08rem;
 }
 
+[data-admin-section="nostr-bridge"] .checkbox-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 [data-admin-section="settings"] .field-row > label {
   margin-bottom: 0;
 }
@@ -787,6 +778,7 @@ body {
   color: #1d3566;
   font-size: 0.82rem;
   font-weight: 600;
+  margin-left: auto;
 }
 
 .inline-tip {
@@ -809,9 +801,9 @@ body {
 .inline-tip::after {
   content: attr(aria-label);
   position: absolute;
-  left: calc(100% + 0.45rem);
-  top: 50%;
-  transform: translateY(-50%);
+  right: 0;
+  top: calc(100% + 0.35rem);
+  transform: none;
   background: #102246;
   color: #fff;
   font-size: 0.75rem;
@@ -819,7 +811,8 @@ body {
   line-height: 1.3;
   padding: 0.35rem 0.45rem;
   border-radius: 7px;
-  white-space: nowrap;
+  white-space: normal;
+  max-inline-size: min(20rem, calc(100vw - 1.2rem));
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.14s ease;
@@ -1665,6 +1658,12 @@ body {
   background: #e8f0ff;
 }
 
+.user-pill.is-author {
+  border-color: #98d6a6;
+  color: #1f7d41;
+  background: #e8f8ee;
+}
+
 .user-card-meta {
   font-size: 0.81rem;
   color: #5e6d86;
@@ -1727,12 +1726,28 @@ body {
 #admin-panel .user-menu-panel button.user-delete .trash-icon-svg {
   width: 0.98rem;
   height: 0.98rem;
-  color: #111;
+  color: #a52c2a;
   flex: 0 0 auto;
 }
 
 #admin-panel .user-menu-panel button.user-delete:hover {
   background: #fff1f1;
+}
+
+#admin-panel .user-menu-panel button.user-author-action {
+  color: #1f7d41;
+}
+
+#admin-panel .user-menu-panel button.user-author-action:hover {
+  background: #ebf9f0;
+}
+
+#admin-panel .user-menu-panel button.user-block-action {
+  color: #8a4d00;
+}
+
+#admin-panel .user-menu-panel button.user-block-action:hover {
+  background: #fff6ea;
 }
 
 .user-drop-zone {

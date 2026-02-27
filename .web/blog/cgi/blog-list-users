@@ -34,6 +34,16 @@ for username in $(blog_users_sorted_usernames); do
   nostr_pubkey=$(blog_get_nostr_pubkey "$username" 2>/dev/null || printf '')
   is_admin=$(config-get "$profile" is_admin 2>/dev/null || printf 'false')
   case "$is_admin" in true|false) ;; *) is_admin=false ;; esac
+  is_author=false
+  is_blocked=false
+  if [ -n "$nostr_pubkey" ]; then
+    if blog_nostr_list_has_value "$blog_nostr_authors_file" "$nostr_pubkey"; then
+      is_author=true
+    fi
+    if blog_nostr_list_has_value "$blog_nostr_blocklist_file" "$nostr_pubkey"; then
+      is_blocked=true
+    fi
+  fi
   rank=$(blog_user_rank_value "$username")
   case "$rank" in ''|*[!0-9]*) rank=0 ;; esac
 
@@ -52,6 +62,8 @@ for username in $(blog_users_sorted_usernames); do
   printf '"player_name":"%s",' "$(blog_json_escape "$player_name")"
   printf '"nostr_pubkey":"%s",' "$(blog_json_escape "$nostr_pubkey")"
   printf '"is_admin":%s,' "$is_admin"
+  printf '"is_author":%s,' "$is_author"
+  printf '"is_blocked":%s,' "$is_blocked"
   printf '"rank":%s,' "$rank"
   printf '"is_self":%s' "$is_self"
   printf '}'
