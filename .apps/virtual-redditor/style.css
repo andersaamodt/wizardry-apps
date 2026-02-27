@@ -2429,6 +2429,12 @@ label {
   padding: 0.34rem 18px 0.34rem 0.44rem;
 }
 
+.mode-detail-drawer input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.mode-detail-drawer textarea {
+  font-size: 0.76rem;
+  padding: 0.34rem 0.44rem;
+}
+
 .mode-detail-drawer .mode-dropdown-btn {
   font-size: 0.76rem;
   padding: 0.34rem 1.78rem 0.36rem 0.5rem;
