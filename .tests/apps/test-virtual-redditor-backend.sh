@@ -24,6 +24,8 @@ grep -F "bridge.exec" "$app_dir/index.html" >/dev/null
 
 grep -F "launchd-install" "$daemon" >/dev/null
 grep -F "reply -> randomized delay -> ban" "$app_dir/README.md" >/dev/null
+grep -F "apply_reply_delay" "$daemon" >/dev/null
+grep -F "latencyJitterSec" "$daemon" >/dev/null
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "skip: jq not installed" >&2

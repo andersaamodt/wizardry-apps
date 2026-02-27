@@ -142,6 +142,24 @@ random_between() {
   printf '%s' $((min + (seed % span)))
 }
 
+reply_delay_seconds() {
+  reply_jitter_min=$(read_modes_config_json | jq -r '.behaviors.latencyJitterSec.min // empty' 2>/dev/null || printf '')
+  reply_jitter_max=$(read_modes_config_json | jq -r '.behaviors.latencyJitterSec.max // empty' 2>/dev/null || printf '')
+  reply_jitter_min=$(to_int "${reply_jitter_min:-0}" 0)
+  reply_jitter_max=$(to_int "${reply_jitter_max:-0}" 0)
+  [ "$reply_jitter_min" -lt 0 ] && reply_jitter_min=0
+  [ "$reply_jitter_max" -lt "$reply_jitter_min" ] && reply_jitter_max=$reply_jitter_min
+  random_between "$reply_jitter_min" "$reply_jitter_max"
+}
+
+apply_reply_delay() {
+  delay=$(reply_delay_seconds)
+  delay=$(to_int "$delay" 0)
+  if [ "$delay" -gt 0 ]; then
+    sleep "$delay"
+  fi
+}
+
 new_event_id() {
   prefix=$1
   ts=$(now_epoch)
@@ -2075,6 +2093,8 @@ truncate_reply() {
 post_reply() {
   thing_id=$1
   reply_text=$2
+
+  apply_reply_delay
 
   response=$(reddit_post "/api/comment" \
     --data-urlencode "api_type=json" \
