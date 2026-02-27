@@ -1789,6 +1789,32 @@ label {
   flex: 0 0 auto;
 }
 
+.modes-workarea.drawer-open .mode-summary-head {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.modes-workarea.drawer-open .mode-summary-left {
+  width: 100%;
+}
+
+.modes-workarea.drawer-open .mode-summary-right {
+  width: 100%;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.modes-workarea.drawer-open .mode-summary-title {
+  flex-wrap: wrap;
+}
+
+.modes-workarea.drawer-open .mode-summary-title strong,
+.modes-workarea.drawer-open .mode-summary-title span {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .mode-edit-inline-btn {
   min-height: 1.2rem;
   padding: 0 0.5rem;
