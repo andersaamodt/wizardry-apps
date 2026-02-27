@@ -3002,7 +3002,7 @@ label {
   color: var(--danger);
   font-style: normal;
   width: 100%;
-  max-width: 220px;
+  max-width: 180px;
 }
 
 .persona-style-hint {
@@ -3084,7 +3084,7 @@ label {
   .persona-style-main-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, max-content));
-    column-gap: 18px;
+    column-gap: 12px;
     row-gap: 8px;
     align-items: start;
   }
@@ -3116,12 +3116,14 @@ label {
   }
 
   .persona-style-secondary-grid {
-    grid-template-columns: repeat(2, minmax(280px, max-content));
-    column-gap: 24px;
+    grid-template-columns: repeat(2, minmax(248px, max-content));
+    column-gap: 16px;
   }
 
   .persona-style-secondary-grid .mode-field-row {
-    min-width: 280px;
+    min-width: 248px;
+    grid-template-columns: 82px minmax(0, max-content);
+    column-gap: 8px;
   }
 
   .persona-style-secondary-grid .mode-field-row:nth-child(1) {
