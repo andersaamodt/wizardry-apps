@@ -20,9 +20,9 @@ if [ -z "$draft_id" ]; then
   exit 0
 fi
 
-meta=$(blog_draft_meta_path "$draft_id")
-body_file=$(blog_draft_content_path "$draft_id")
-if [ ! -f "$meta" ] || [ ! -f "$body_file" ]; then
+meta=$(blog_draft_resolve_meta_path "$draft_id" 2>/dev/null || printf '')
+body_file=$(blog_draft_resolve_content_path "$draft_id" 2>/dev/null || printf '')
+if [ -z "$meta" ] || [ ! -f "$meta" ] || [ -z "$body_file" ] || [ ! -f "$body_file" ]; then
   blog_json_error "Draft not found" "not_found"
   exit 0
 fi
@@ -38,7 +38,9 @@ updated_at=$(config-get "$meta" updated_at 2>/dev/null || printf '')
 content=$(cat "$body_file" 2>/dev/null || printf '')
 
 printf '{"success":true,"draft":{'
-printf '"draft_id":"%s",' "$(blog_json_escape "$draft_id")"
+resolved_draft_id=$(config-get "$meta" draft_id 2>/dev/null || printf '')
+[ -n "$resolved_draft_id" ] || resolved_draft_id="$draft_id"
+printf '"draft_id":"%s",' "$(blog_json_escape "$resolved_draft_id")"
 printf '"title":"%s",' "$(blog_json_escape "$title")"
 printf '"tags":"%s",' "$(blog_json_escape "$tags")"
 printf '"summary":"%s",' "$(blog_json_escape "$summary")"

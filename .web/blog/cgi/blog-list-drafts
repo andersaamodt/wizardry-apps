@@ -14,9 +14,6 @@ if ! blog_require_session true; then
   exit 0
 fi
 
-# Run scheduler to keep queue state current.
-blog_run_scheduler >/dev/null 2>&1 || true
-
 tmp=$(mktemp "${TMPDIR:-/tmp}/blog-drafts.XXXXXX")
 blog_find_draft_meta | while IFS= read -r meta; do
   updated=$(config-get "$meta" updated_at 2>/dev/null || printf '1970-01-01T00:00:00Z')
@@ -38,6 +35,14 @@ while IFS="$tab" read -r _ meta; do
   scheduled_at=$(config-get "$meta" scheduled_at 2>/dev/null || printf '')
   created_at=$(config-get "$meta" created_at 2>/dev/null || printf '')
   updated_at=$(config-get "$meta" updated_at 2>/dev/null || printf '')
+  if [ "$status" != "draft" ] || [ "$publish_mode" != "draft" ]; then
+    continue
+  fi
+  body_file=$(dirname "$meta")/content.md
+  content_excerpt=""
+  if [ -f "$body_file" ]; then
+    content_excerpt=$(blog_auto_summary_from_content "$(cat "$body_file" 2>/dev/null || printf '')")
+  fi
 
   if [ "$first" -eq 0 ]; then
     printf ','
@@ -49,9 +54,7 @@ while IFS="$tab" read -r _ meta; do
   printf '"title":"%s",' "$(blog_json_escape "$title")"
   printf '"tags":"%s",' "$(blog_json_escape "$tags")"
   printf '"summary":"%s",' "$(blog_json_escape "$summary")"
-  printf '"publish_mode":"%s",' "$(blog_json_escape "$publish_mode")"
-  printf '"status":"%s",' "$(blog_json_escape "$status")"
-  printf '"scheduled_at":"%s",' "$(blog_json_escape "$scheduled_at")"
+  printf '"content_excerpt":"%s",' "$(blog_json_escape "$content_excerpt")"
   printf '"created_at":"%s",' "$(blog_json_escape "$created_at")"
   printf '"updated_at":"%s"' "$(blog_json_escape "$updated_at")"
   printf '}'

@@ -75,20 +75,6 @@ title: Blog Admin
 </section>
 
 <section class="sub-card">
-<h4>Publishing</h4>
-<div class="grid-two settings-inline">
-<div class="field-row">
-<label for="drip-interval"><strong>Drip Interval (hours)</strong></label>
-<input type="number" id="drip-interval" min="0.1" step="0.1" value="4">
-</div>
-<div class="field-row">
-<label for="drip-randomness"><strong>Drip Randomness (minutes)</strong></label>
-<input type="number" id="drip-randomness" min="0" step="1" value="0">
-</div>
-</div>
-</section>
-
-<section class="sub-card">
 <h4>Feeds</h4>
 <div class="grid-two">
 <div class="field-row checkbox-row">
@@ -298,9 +284,7 @@ title: Blog Admin
 <div class="row-head">
 <div>
 <h3>Drafts</h3>
-<p class="muted">Manage saved, scheduled, and queued drafts.</p>
 </div>
-<button id="btn-refresh-drafts" type="button">Refresh</button>
 </div>
 <div id="drafts-list"></div>
 </div>
@@ -314,9 +298,20 @@ title: Blog Admin
 <p class="muted">See what will publish next and run the scheduler manually.</p>
 </div>
 <div class="row-actions">
+<button id="btn-save-drip" type="button">Save Drip Settings</button>
 <button id="btn-refresh-queue" type="button">Refresh</button>
 <button id="btn-mirror-nostr" type="button">Mirror Nostr</button>
 <button id="btn-run-scheduler" type="button" class="primary">Run Scheduler</button>
+</div>
+</div>
+<div class="grid-two settings-inline queue-drip-settings">
+<div class="field-row">
+<label for="drip-interval"><strong>Drip Interval (hours)</strong></label>
+<input type="number" id="drip-interval" min="0.1" step="0.1" value="4">
+</div>
+<div class="field-row">
+<label for="drip-randomness"><strong>Drip Randomness (minutes)</strong></label>
+<input type="number" id="drip-randomness" min="0" step="1" value="0">
 </div>
 </div>
 <div id="queue-list"></div>
@@ -655,7 +650,7 @@ body {
   border-top: 1px solid #d7e1f4;
   border-radius: 0;
   background: transparent;
-  padding: 0.2rem 0 0.04rem;
+  padding: 0.14rem 0 0.02rem;
   box-shadow: none;
 }
 
@@ -669,7 +664,7 @@ body {
 }
 
 .field-row {
-  margin-bottom: 0.28rem;
+  margin-bottom: 0.18rem;
 }
 
 .field-row:last-child {
@@ -689,8 +684,8 @@ body {
   display: grid;
   grid-template-columns: minmax(12rem, max-content) minmax(0, 1fr);
   align-items: center;
-  gap: 0.06rem 0.48rem;
-  margin-bottom: 0.14rem;
+  gap: 0.04rem 0.44rem;
+  margin-bottom: 0.08rem;
 }
 
 [data-admin-section="settings"] .field-row > label {
@@ -834,8 +829,8 @@ body {
   inline-size: clamp(8.5rem, 13vw, 10.5rem);
 }
 
-[data-admin-section="settings"] #drip-interval,
-[data-admin-section="settings"] #drip-randomness,
+[data-admin-section="queue"] #drip-interval,
+[data-admin-section="queue"] #drip-randomness,
 [data-admin-section="settings"] #feed-items {
   inline-size: 5.7rem !important;
   width: 5.7rem !important;
@@ -848,6 +843,15 @@ body {
 
 [data-admin-section="settings"] .grid-two {
   gap: 0.3rem 0.62rem;
+}
+
+[data-admin-section="queue"] .queue-drip-settings {
+  margin: 0.1rem 0 0.5rem;
+  gap: 0.34rem 0.62rem;
+}
+
+[data-admin-section="queue"] .queue-drip-settings .field-row {
+  margin-bottom: 0;
 }
 
 [data-admin-section="settings"] input[type="text"],

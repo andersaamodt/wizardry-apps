@@ -1996,8 +1996,41 @@ blog_draft_content_path() {
   printf '%s/content.md\n' "$(blog_draft_dir "$1")"
 }
 
+blog_draft_resolve_meta_path() {
+  draft_id=${1-}
+  [ -n "$draft_id" ] || return 1
+  direct_meta=$(blog_draft_meta_path "$draft_id")
+  if [ -f "$direct_meta" ]; then
+    printf '%s\n' "$direct_meta"
+    return 0
+  fi
+  for meta in "$blog_drafts_dir"/*/meta.conf; do
+    [ -f "$meta" ] || continue
+    saved_id=$(config-get "$meta" draft_id 2>/dev/null || printf '')
+    if [ "$saved_id" = "$draft_id" ]; then
+      printf '%s\n' "$meta"
+      return 0
+    fi
+  done
+  return 1
+}
+
+blog_draft_resolve_dir() {
+  draft_id=${1-}
+  meta=$(blog_draft_resolve_meta_path "$draft_id" 2>/dev/null || printf '')
+  [ -n "$meta" ] || return 1
+  dirname "$meta"
+}
+
+blog_draft_resolve_content_path() {
+  draft_id=${1-}
+  dir=$(blog_draft_resolve_dir "$draft_id" 2>/dev/null || printf '')
+  [ -n "$dir" ] || return 1
+  printf '%s/content.md\n' "$dir"
+}
+
 blog_draft_exists() {
-  [ -f "$(blog_draft_meta_path "$1")" ]
+  [ -n "$(blog_draft_resolve_meta_path "$1" 2>/dev/null || printf '')" ]
 }
 
 blog_save_draft() {
@@ -2042,7 +2075,10 @@ blog_save_draft() {
 
 blog_delete_draft() {
   draft_id=$1
-  dir=$(blog_draft_dir "$draft_id")
+  dir=$(blog_draft_resolve_dir "$draft_id" 2>/dev/null || printf '')
+  if [ -z "$dir" ]; then
+    dir=$(blog_draft_dir "$draft_id")
+  fi
   rm -rf "$dir"
 }
 

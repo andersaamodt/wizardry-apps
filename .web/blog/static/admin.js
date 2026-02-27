@@ -18,6 +18,7 @@
     actorRank: 0,
     activeSection: '',
     usersPollTimer: null,
+    draftsPollTimer: null,
     userDragActive: false,
     userDragUsername: '',
     userDropAfterUsername: '',
@@ -138,6 +139,7 @@
       }
     }
     syncUsersAutoRefresh();
+    syncDraftsAutoRefresh();
   }
 
   function initSectionNavigation() {
@@ -1169,10 +1171,8 @@
     drafts.forEach(function (draft) {
       html += '<div class="draft-card">';
       html += '<div class="draft-card-head"><strong>' + escapeHtml(draft.title || 'Untitled') + '</strong></div>';
-      html += '<div class="muted">' + escapeHtml(draft.draft_id) + '</div>';
-      html += '<div class="muted">Mode: ' + escapeHtml(draft.publish_mode || 'draft') + ' | Status: ' + escapeHtml(draft.status || 'draft') + '</div>';
-      if (draft.scheduled_at) {
-        html += '<div class="muted">Scheduled: ' + escapeHtml(draft.scheduled_at) + '</div>';
+      if (draft.content_excerpt) {
+        html += '<div class="muted">' + escapeHtml(draft.content_excerpt) + '</div>';
       }
       html += '<div class="draft-actions">';
       html += '<button type="button" data-action="edit" data-id="' + escapeHtml(draft.draft_id) + '">Edit</button>';
@@ -1488,6 +1488,7 @@
       throw new Error(data.error || 'Failed to load draft');
     }
     populateComposer(data.draft);
+    activateSection('compose', true);
     setOutput(els.outputCompose, 'Draft loaded.', 'ok');
   }
 
@@ -1505,6 +1506,32 @@
     }
     await Promise.all([loadDrafts(), loadQueue()]);
     setOutput(els.outputCompose, 'Draft deleted.', 'ok');
+  }
+
+  function stopDraftsPolling() {
+    if (state.draftsPollTimer) {
+      clearInterval(state.draftsPollTimer);
+      state.draftsPollTimer = null;
+    }
+  }
+
+  function syncDraftsAutoRefresh() {
+    const draftsVisible = state.isAdmin && state.activeSection === 'drafts';
+    if (!draftsVisible) {
+      stopDraftsPolling();
+      return;
+    }
+    loadDrafts().catch(function () {});
+    if (state.draftsPollTimer) {
+      return;
+    }
+    state.draftsPollTimer = setInterval(function () {
+      if (!(state.isAdmin && state.activeSection === 'drafts')) {
+        stopDraftsPolling();
+        return;
+      }
+      loadDrafts().catch(function () {});
+    }, 6000);
   }
 
   async function saveComposer(action) {
@@ -1733,17 +1760,15 @@
       });
     }
 
-    document.getElementById('btn-refresh-drafts').addEventListener('click', function () {
-      loadDrafts().catch(function (err) {
-        setOutput(els.outputCompose, 'Error: ' + err.message, 'error');
-      });
-    });
-
     document.getElementById('btn-refresh-queue').addEventListener('click', function () {
       loadQueue().catch(function (err) {
         setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
       });
     });
+    const saveDripBtn = document.getElementById('btn-save-drip');
+    if (saveDripBtn) {
+      saveDripBtn.addEventListener('click', saveConfig);
+    }
     if (els.usersList) {
       els.usersList.addEventListener('click', function (event) {
         const target = event.target;
@@ -1998,11 +2023,15 @@
 
     els.draftsList.addEventListener('click', function (event) {
       const target = event.target;
-      if (!(target instanceof HTMLElement)) {
+      if (!(target instanceof Element)) {
         return;
       }
-      const action = target.getAttribute('data-action');
-      const draftId = target.getAttribute('data-id');
+      const actionNode = target.closest('[data-action][data-id]');
+      if (!(actionNode instanceof HTMLElement)) {
+        return;
+      }
+      const action = actionNode.getAttribute('data-action');
+      const draftId = actionNode.getAttribute('data-id');
       if (!action || !draftId) {
         return;
       }

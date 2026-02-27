@@ -41,8 +41,12 @@ if [ -z "$publish_mode" ]; then
 fi
 
 if [ -n "$draft_id" ] && blog_draft_exists "$draft_id"; then
-  meta=$(blog_draft_meta_path "$draft_id")
-  body_file=$(blog_draft_content_path "$draft_id")
+  meta=$(blog_draft_resolve_meta_path "$draft_id" 2>/dev/null || printf '')
+  body_file=$(blog_draft_resolve_content_path "$draft_id" 2>/dev/null || printf '')
+  if [ -z "$meta" ] || [ -z "$body_file" ]; then
+    blog_json_error "Draft not found" "not_found"
+    exit 0
+  fi
   if [ -z "$title" ]; then
     title=$(config-get "$meta" title 2>/dev/null || printf '')
   fi
