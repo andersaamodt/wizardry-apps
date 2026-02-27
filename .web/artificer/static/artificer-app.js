@@ -6777,7 +6777,7 @@
           if (normalized > 0) {
             normalized = Math.pow(normalized, 0.8);
           }
-          if (normalized < 0.03) {
+          if (normalized < 0.02) {
             normalized = 0;
           }
           normalizedBars.push(normalized);
