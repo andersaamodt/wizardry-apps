@@ -208,7 +208,7 @@ mode_default_config_json() {
         personalityStrength: "balanced",
         mirrorTone: "mirror_or_less",
         directness: "balanced",
-        warmth: "neutral",
+        warmth: "even",
         verbosity: "balanced",
         formality: "neutral",
         humorStyle: "dry",
@@ -1880,7 +1880,14 @@ compose_context_envelope() {
         ),
         mirrorTone: ($b.mirrorTone // "mirror_or_less"),
         directness: ($b.directness // "balanced"),
-        warmth: ($b.warmth // "neutral"),
+        warmth: (
+          if (($b.warmth // "even") == "neutral") then "even"
+          elif (($b.warmth // "even") == "icy") then "icy"
+          elif (($b.warmth // "even") == "cool") then "cool"
+          elif (($b.warmth // "even") == "warm") then "warm"
+          elif (($b.warmth // "even") == "affectionate") then "affectionate"
+          else "even" end
+        ),
         verbosity: ($b.verbosity // "balanced"),
         formality: ($b.formality // "neutral"),
         humorStyle: (
@@ -1917,7 +1924,7 @@ compose_context_envelope() {
         ),
         individualizedRelationships: (($b.individualizedRelationships // true) == true)
       }
-  ' 2>/dev/null || printf '{"personality":"typical_redditor","personalityStrength":"balanced","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"neutral","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","bigFive":{"enabled":false,"o":"medium","c":"medium","e":"medium","a":"medium","n":"medium"},"individualizedRelationships":true}')
+  ' 2>/dev/null || printf '{"personality":"typical_redditor","personalityStrength":"balanced","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"even","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","bigFive":{"enabled":false,"o":"medium","c":"medium","e":"medium","a":"medium","n":"medium"},"individualizedRelationships":true}')
   relationship_for_prompt_json=$(printf '%s' "$relationship_json" | jq -c --argjson behavior "$behavior_policy_json" '
     if ($behavior.individualizedRelationships // true) then .
     else

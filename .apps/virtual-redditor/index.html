@@ -214,9 +214,11 @@
                   <div class="mode-field-row persona-style-secondary-full">
                     <label for="behavior-warmth" class="mode-field-label">Warmth</label>
                     <select id="behavior-warmth">
+                      <option value="icy">Icy</option>
                       <option value="cool">Cool</option>
-                      <option value="neutral">Neutral</option>
+                      <option value="even">Even</option>
                       <option value="warm">Warm</option>
+                      <option value="affectionate">Affectionate</option>
                     </select>
                   </div>
                   <div class="mode-field-row">
@@ -3501,7 +3503,7 @@
           personalityStrength: 'balanced',
           mirrorTone: 'mirror_or_less',
           directness: 'balanced',
-          warmth: 'neutral',
+          warmth: 'even',
           verbosity: 'balanced',
           formality: 'neutral',
           humorStyle: 'dry',
@@ -3582,7 +3584,11 @@
         out.behaviors.personalityStrength = 'balanced';
       }
       out.behaviors.directness = String(out.behaviors.directness || 'balanced');
-      out.behaviors.warmth = String(out.behaviors.warmth || 'neutral');
+      out.behaviors.warmth = String(out.behaviors.warmth || 'even').toLowerCase();
+      if (out.behaviors.warmth === 'neutral') out.behaviors.warmth = 'even';
+      if (['icy', 'cool', 'even', 'warm', 'affectionate'].indexOf(out.behaviors.warmth) < 0) {
+        out.behaviors.warmth = 'even';
+      }
       out.behaviors.verbosity = String(out.behaviors.verbosity || 'balanced');
       out.behaviors.formality = String(out.behaviors.formality || 'neutral');
       out.behaviors.individualizedRelationships = (out.behaviors.individualizedRelationships !== false);
@@ -4592,7 +4598,7 @@
       if (personalityStrength) personalityStrength.value = String(behaviors.personalityStrength || 'balanced');
       if (mirror) mirror.value = String(behaviors.mirrorTone || 'mirror_or_less');
       if (directness) directness.value = String(behaviors.directness || 'balanced');
-      if (warmth) warmth.value = String(behaviors.warmth || 'neutral');
+      if (warmth) warmth.value = String(behaviors.warmth || 'even');
       if (verbosity) verbosity.value = String(behaviors.verbosity || 'balanced');
       if (formality) formality.value = String(behaviors.formality || 'neutral');
       if (humorStyle) humorStyle.value = String(behaviors.humorStyle || 'dry');
@@ -4836,7 +4842,7 @@
       cfg.behaviors.personalityStrength = String((document.getElementById('behavior-personality-strength') || {}).value || 'balanced');
       cfg.behaviors.mirrorTone = String((document.getElementById('behavior-mirror-tone') || {}).value || 'mirror_or_less');
       cfg.behaviors.directness = String((document.getElementById('behavior-directness') || {}).value || 'balanced');
-      cfg.behaviors.warmth = String((document.getElementById('behavior-warmth') || {}).value || 'neutral');
+      cfg.behaviors.warmth = String((document.getElementById('behavior-warmth') || {}).value || 'even');
       cfg.behaviors.verbosity = String((document.getElementById('behavior-verbosity') || {}).value || 'balanced');
       cfg.behaviors.formality = String((document.getElementById('behavior-formality') || {}).value || 'neutral');
       cfg.behaviors.humorStyle = String((document.getElementById('behavior-humor-style') || {}).value || 'dry');
