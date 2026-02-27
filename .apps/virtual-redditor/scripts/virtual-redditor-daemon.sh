@@ -2158,23 +2158,101 @@ PROMPT
 
 compiled_instructions_json() {
   behaviors_json=$(read_modes_config_json | jq -c '.behaviors // {}' 2>/dev/null || printf '{}')
-  compiled_text=$(cat <<TEXT
-Core default instructions:
-$(cat "$CORE_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+  core_text=$(cat "$CORE_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+  shared_text=$(cat "$SHARED_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+  manifesto_text=$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
+  norms_text=$(cat "$NORMS_FILE" 2>/dev/null || printf '')
 
-Shared instructions:
-$(cat "$SHARED_INSTRUCTIONS_FILE" 2>/dev/null || printf '')
+  behavior_summary=$(printf '%s' "$behaviors_json" | jq -r '
+    def val(k; d): (. [k] // d);
+    def label_personality(v):
+      if v == "typical_redditor" then "Typical Redditor"
+      elif v == "academic" then "Academic"
+      elif v == "helpful_peer" then "Helpful Peer"
+      elif v == "skeptical_debater" then "Skeptical Debater"
+      elif v == "builder_operator" then "Technical Pragmatist"
+      elif v == "community_regular" then "Community Regular"
+      elif v == "troll" then "Troll"
+      elif v == "other" then "Follow ethos"
+      else (v // "Typical Redditor")
+      end;
+    def label_strength(v):
+      if v == "subtle" then "Subtle"
+      elif v == "balanced" then "Moderate"
+      elif v == "strong" then "Intense"
+      else (v // "Moderate")
+      end;
+    def label_tone(v):
+      if v == "mirror_or_less" then "Mirror or less"
+      elif v == "deescalate_only" then "Always de-escalate"
+      elif v == "mirror_exact" then "Mirror exactly"
+      elif v == "escalate_when_appropriate" then "Escalate when appropriate"
+      else (v // "Mirror or less")
+      end;
+    def label_generic(v): ((v // "") | tostring | gsub("_"; " "));
+    def sec_to_human(n):
+      if (n|tonumber) >= 3600 then (((n/3600)|floor)|tostring) + "h"
+      elif (n|tonumber) >= 60 then (((n/60)|floor)|tostring) + "m"
+      else ((n|tostring) + "s")
+      end;
+    def range_human(o):
+      ((o.min // 0) | tonumber) as $min
+      | ((o.max // 0) | tonumber) as $max
+      | if ($min == 0 and $max == 0) then "none"
+        elif ($min == $max) then (sec_to_human($min))
+        else (sec_to_human($min) + " to " + sec_to_human($max))
+        end;
+    def bool_word(v): (if v then "enabled" else "disabled" end);
+    def bigfive(o):
+      if (o.enabled // false) then
+        "enabled (O=" + ((o.o // "medium")|tostring) +
+        ", C=" + ((o.c // "medium")|tostring) +
+        ", E=" + ((o.e // "medium")|tostring) +
+        ", A=" + ((o.a // "medium")|tostring) +
+        ", N=" + ((o.n // "medium")|tostring) + ")"
+      else "disabled"
+      end;
+    [
+      "- Personality: " + label_personality(val("personality"; "typical_redditor")) + " (" + label_strength(val("personalityStrength"; "balanced")) + ")",
+      "- Tone: " + label_tone(val("mirrorTone"; "mirror_or_less")),
+      "- Style: directness=" + label_generic(val("directness"; "balanced")) + ", warmth=" + label_generic(val("warmth"; "even")) + ", verbosity=" + label_generic(val("verbosity"; "balanced")) + ", formality=" + label_generic(val("formality"; "neutral")),
+      "- Humor: style=" + label_generic(val("humorStyle"; "dry")) + ", amount=" + label_generic(val("humorAmount"; "medium")),
+      "- Citations: " + label_generic(val("citations"; "as-needed")),
+      "- Big Five: " + bigfive((.bigFive // {})),
+      "- Reply delay: " + range_human((.latencyJitterSec // {})),
+      "- Ban delay: " + range_human((.banJitterSec // {})),
+      "- Summons: explicit " + bool_word((.summonable // false)) + ", implicit/context " + bool_word((.implicitSummons // false)),
+      "- Relationship memory: " + bool_word((.individualizedRelationships // false))
+    ] | join("\n")
+  ' 2>/dev/null || printf '')
 
-Per-redditor instructions (manifesto.md):
-$(cat "$MANIFESTO_FILE" 2>/dev/null || printf '')
+  compiled_text=''
+  append_compiled_section() {
+    section_title=$1
+    section_body=$2
+    if [ -z "$(printf '%s' "$section_body" | tr -d '[:space:]')" ]; then
+      return
+    fi
+    if [ -n "$compiled_text" ]; then
+      compiled_text="${compiled_text}
 
-Statutory doctrine (norms.jsonl):
-$(cat "$NORMS_FILE" 2>/dev/null || printf '')
+"
+    fi
+    compiled_text="${compiled_text}${section_title}
+${section_body}"
+  }
 
-Behavior policy (from modes config):
-$behaviors_json
-TEXT
-)
+  append_compiled_section "Core default instructions:" "$core_text"
+  append_compiled_section "Shared instructions:" "$shared_text"
+  append_compiled_section "Per-redditor instructions (manifesto.md):" "$manifesto_text"
+  append_compiled_section "Statutory doctrine (norms.jsonl):" "$norms_text"
+  append_compiled_section "Behavior policy (expanded):" "$behavior_summary"
+  append_compiled_section "Behavior policy (raw JSON):" "$behaviors_json"
+
+  if [ -z "$(printf '%s' "$compiled_text" | tr -d '[:space:]')" ]; then
+    compiled_text="(no compiled instructions available)"
+  fi
+
   jq -cn --arg compiled "$compiled_text" '{ok:true,compiled:$compiled}'
 }
 
