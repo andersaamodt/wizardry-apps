@@ -11,6 +11,7 @@ title: Blog Admin
 <div class="admin-nav-list" role="tablist" aria-label="Admin sections">
 <button type="button" class="admin-nav-item" data-admin-nav="account" aria-selected="false">Account</button>
 <button type="button" class="admin-nav-item is-active" data-admin-nav="settings" aria-selected="true">Site Settings</button>
+<button type="button" class="admin-nav-item" data-admin-nav="users" aria-selected="false">Users</button>
 <button type="button" class="admin-nav-item" data-admin-nav="compose" aria-selected="false">Compose</button>
 <button type="button" class="admin-nav-item" data-admin-nav="drafts" aria-selected="false">Drafts</button>
 <button type="button" class="admin-nav-item" data-admin-nav="queue" aria-selected="false">Queue</button>
@@ -121,12 +122,39 @@ title: Blog Admin
 </div>
 <p class="muted">Configure authors, relays, and blocklist in <code>site/nostr/state/</code>. Bridge actions are explicit and never run during page render.</p>
 </section>
+
+<section class="sub-card">
+<h4>Access Bootstrap</h4>
+<div class="field-row checkbox-row">
+<div class="setting-label">
+<strong>Newly Created Accounts Are Admins</strong>
+<span class="inline-tip" tabindex="0" aria-label="When enabled, newly registered Nostr accounts are granted admin automatically. Turn this off after bootstrapping your initial admin team.">?</span>
+</div>
+<label class="checkbox-control" for="new-users-are-admins">
+<input type="checkbox" id="new-users-are-admins">
+<span>Enabled</span>
+</label>
+</div>
+</section>
 </div>
 
 <div class="section-actions">
 <button id="btn-save-config" class="primary">Save Settings</button>
 </div>
 <div id="output-config" class="output"></div>
+</div>
+</section>
+
+<section class="admin-section" data-admin-section="users" hidden>
+<div class="demo-box admin-card">
+<div class="section-head">
+<h3>Users</h3>
+</div>
+<div class="users-toolbar">
+<button id="btn-refresh-users" type="button">Refresh Users</button>
+</div>
+<div id="users-list" class="users-list"></div>
+<div id="output-users" class="output"></div>
 </div>
 </section>
 
@@ -1258,6 +1286,123 @@ body {
   background: #fff;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
   padding: 0.8rem;
+}
+
+.users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+
+.users-list {
+  display: grid;
+  gap: 0.58rem;
+}
+
+.user-card {
+  border: 1px solid #d2def3;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.72rem 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.user-card-main {
+  min-width: 0;
+  display: grid;
+  gap: 0.14rem;
+}
+
+.user-card-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  font-weight: 700;
+  color: #163161;
+}
+
+.user-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid #c1d1f0;
+  color: #32508f;
+  background: #f2f6ff;
+}
+
+.user-pill.is-admin {
+  border-color: #95b2ea;
+  color: #1f3f7d;
+  background: #e8f0ff;
+}
+
+.user-card-meta {
+  font-size: 0.81rem;
+  color: #5e6d86;
+}
+
+.user-card-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+#admin-panel button.user-menu-trigger {
+  min-width: 2rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  padding: 0;
+}
+
+#admin-panel .user-menu {
+  position: relative;
+}
+
+#admin-panel .user-menu-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 13.5rem;
+  background: #fff;
+  border: 1px solid #c8d7f1;
+  border-radius: 10px;
+  box-shadow: 0 14px 30px rgba(16, 28, 56, 0.16);
+  padding: 0.3rem;
+}
+
+#admin-panel .user-menu-panel button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0.5rem 0.55rem;
+  font-weight: 620;
+}
+
+#admin-panel .user-menu-panel button:hover {
+  background: #eef4ff;
+}
+
+#admin-panel .user-menu-panel button.user-delete {
+  color: #a52c2a;
+}
+
+#admin-panel .user-menu-panel button.user-delete:hover {
+  background: #fff1f1;
 }
 
 .draft-card-head {

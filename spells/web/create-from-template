@@ -103,6 +103,7 @@ EOF
 if [ "$template" = "blog" ]; then
   cat >> "$SITE_DIR/site.conf" <<'EOF'
 nostr_bridge_enabled=false
+new_users_are_admins=true
 EOF
 fi
 

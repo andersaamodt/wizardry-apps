@@ -1,53 +1,112 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="artificer-booting">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Artificer</title>
   <style>
+    :root {
+      --boot-bg: #eceaf4;
+      --boot-fg: #2a2e47;
+      --boot-muted: #5d6486;
+      --boot-line: #d4d0e6;
+    }
+
     html, body {
       margin: 0;
       width: 100%;
       height: 100%;
-      background: #0b121a;
+      background: var(--boot-bg);
       overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     #app {
       width: 100%;
       height: 100%;
       border: 0;
-      background: #0b121a;
+      background: var(--boot-bg);
     }
 
-    #status {
+    body.artificer-booting #app {
+      visibility: hidden;
+    }
+
+    #boot-splash {
       position: fixed;
       inset: 0;
       display: grid;
       place-items: center;
-      background: #0b121a;
-      color: #9bb0c8;
-      font-size: 0.95rem;
+      background: var(--boot-bg);
       z-index: 10;
-      transition: opacity 120ms ease;
-    }
-
-    #status.hidden {
-      opacity: 0;
       pointer-events: none;
     }
 
-    #status.error {
-      color: #ffb4b4;
-      white-space: pre-wrap;
+    #boot-splash.hidden {
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 140ms ease;
+    }
+
+    .boot-card {
+      display: grid;
+      justify-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border: 1px solid color-mix(in srgb, var(--boot-line) 80%, transparent);
+      border-radius: 14px;
+      background: color-mix(in srgb, #ffffff 72%, var(--boot-bg));
+      box-shadow: 0 12px 34px rgba(27, 22, 56, 0.1);
+    }
+
+    .boot-icon {
+      width: 112px;
+      height: 112px;
+      object-fit: contain;
+      border-radius: 12px;
+    }
+
+    #status {
+      color: var(--boot-muted);
+      font-size: 0.92rem;
+      line-height: 1.35;
       text-align: center;
-      padding: 1rem;
+      max-width: 24rem;
+    }
+
+    #status.error {
+      color: #a14d5b;
+      white-space: pre-wrap;
+      padding: 0.15rem 0.35rem;
+      background: color-mix(in srgb, #ffffff 64%, transparent);
+      border: 1px solid color-mix(in srgb, #a14d5b 26%, transparent);
+      border-radius: 8px;
+    }
+
+    .boot-title {
+      margin: 0;
+      color: var(--boot-fg);
+      font-size: 0.96rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .boot-subtitle {
+      margin: 0;
+      color: var(--boot-muted);
+      font-size: 0.82rem;
     }
   </style>
 </head>
-<body>
-  <div id="status">Starting Artificer…</div>
+<body class="artificer-booting">
+  <div id="boot-splash" aria-live="polite" aria-busy="true">
+    <div class="boot-card">
+      <img class="boot-icon" src="assets/forge-icon.png" alt="Artificer">
+      <p class="boot-title">Artificer</p>
+      <p class="boot-subtitle">Preparing local runtime</p>
+      <div id="status">Starting Artificer…</div>
+    </div>
+  </div>
   <iframe id="app" src="about:blank" title="Artificer"></iframe>
 
   <script>
@@ -103,6 +162,9 @@
       ],
       getPort: ['sh', '-c', 'root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi']
     };
+    var hostBootReadySent = false;
+    var bootFailed = false;
+    var bootRevealTimer = null;
 
     function statusEl() {
       return document.getElementById('status');
@@ -114,8 +176,39 @@
       el.className = isError ? 'error' : '';
     }
 
-    function hideStatus() {
-      statusEl().classList.add('hidden');
+    function revealBootUi() {
+      if (bootFailed) {
+        return;
+      }
+      var splash = document.getElementById('boot-splash');
+      if (splash) {
+        splash.classList.add('hidden');
+      }
+      document.documentElement.classList.remove('artificer-booting');
+      document.body.classList.remove('artificer-booting');
+      if (hostBootReadySent) {
+        return;
+      }
+      hostBootReadySent = true;
+      if (!hasBridge()) {
+        return;
+      }
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          bridgeExec(['__wizardry_host_boot_ready']).catch(function () {
+            return;
+          });
+        });
+      });
+    }
+
+    function onAppFrameReady() {
+      bootFailed = false;
+      if (bootRevealTimer) {
+        clearTimeout(bootRevealTimer);
+        bootRevealTimer = null;
+      }
+      revealBootUi();
     }
 
     function hasBridge() {
@@ -209,7 +302,7 @@
 
         if (await isRunning()) {
           var hotPort = await resolvePort();
-          iframe.onload = hideStatus;
+          iframe.onload = onAppFrameReady;
           iframe.src = 'http://localhost:' + hotPort + entryPath + '?launch=' + encodeURIComponent(launchCacheKey);
           return;
         }
@@ -224,15 +317,21 @@
 
         var port = await resolvePort();
         var url = 'http://localhost:' + port + entryPath + '?launch=' + encodeURIComponent(launchCacheKey);
-        iframe.onload = hideStatus;
+        iframe.onload = onAppFrameReady;
         iframe.src = url;
       } catch (error) {
+        bootFailed = true;
+        if (bootRevealTimer) {
+          clearTimeout(bootRevealTimer);
+          bootRevealTimer = null;
+        }
         iframe.src = 'about:blank';
         setStatus('Error: ' + String(error && error.message ? error.message : error), true);
       }
     }
 
     window.addEventListener('DOMContentLoaded', function () {
+      bootRevealTimer = setTimeout(revealBootUi, 12000);
       setTimeout(boot, 20);
     });
   </script>

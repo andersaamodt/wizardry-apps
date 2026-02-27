@@ -184,6 +184,11 @@ fi
 fingerprint=$(printf '%s' "$user_pubkey" | blog_sha256)
 blog_save_user_profile "$username" "$fingerprint" ""
 blog_set_nostr_pubkey "$username" "$user_pubkey"
+if [ "$account_created" = "true" ] && blog_new_users_are_admins_enabled; then
+  profile=$(blog_user_profile "$username")
+  config-set "$profile" is_admin true
+  config-set "$profile" updated_at "$(blog_now_iso)"
+fi
 
 auth_method=nostr_direct
 if [ "$delegated_login" = "true" ]; then

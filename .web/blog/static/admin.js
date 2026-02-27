@@ -13,7 +13,9 @@
     suspendAutosave: false,
     previewVisible: localStorage.getItem('blog_admin_preview_hidden') !== '1',
     nostrBridgeEnabled: false,
-    lastLinkedSshKeyText: ''
+    lastLinkedSshKeyText: '',
+    users: [],
+    actorRank: 0
   };
 
   const els = {
@@ -23,6 +25,7 @@
     outputCompose: document.getElementById('output-compose'),
     outputQueue: document.getElementById('output-queue'),
     outputAccount: document.getElementById('output-account'),
+    outputUsers: document.getElementById('output-users'),
     accountToastHost: document.getElementById('account-toast-host'),
     siteTitle: document.getElementById('site-title'),
     adminTheme: document.getElementById('admin-theme'),
@@ -32,6 +35,7 @@
     feedFullText: document.getElementById('feed-full-text'),
     feedItems: document.getElementById('feed-items'),
     nostrBridgeEnabled: document.getElementById('nostr-bridge-enabled'),
+    newUsersAreAdmins: document.getElementById('new-users-are-admins'),
     postTitle: document.getElementById('post-title'),
     postTags: document.getElementById('post-tags'),
     postTagsInput: document.getElementById('post-tags-input'),
@@ -46,6 +50,7 @@
     togglePreviewButton: document.getElementById('btn-toggle-preview'),
     draftsList: document.getElementById('drafts-list'),
     queueList: document.getElementById('queue-list'),
+    usersList: document.getElementById('users-list'),
     currentDraftLabel: document.getElementById('current-draft-label'),
     accountPlayerName: document.getElementById('account-player-name'),
     accountNostrPubkey: document.getElementById('account-nostr-pubkey'),
@@ -636,7 +641,7 @@
       setAccountOnlyMode(false);
       activateSection(getSectionFromHash(), false);
 
-      await Promise.all([loadConfig(), loadDrafts(), loadQueue()]);
+      await Promise.all([loadConfig(), loadUsers(), loadDrafts(), loadQueue()]);
       renderPreview();
     } catch (err) {
       setAuthMessage('Authentication check failed: ' + err.message, 'error');
@@ -673,6 +678,9 @@
     if (els.nostrBridgeEnabled) {
       els.nostrBridgeEnabled.checked = state.nostrBridgeEnabled;
     }
+    if (els.newUsersAreAdmins) {
+      els.newUsersAreAdmins.checked = !!data.new_users_are_admins;
+    }
     if (els.mirrorNostrButton) {
       els.mirrorNostrButton.disabled = !state.nostrBridgeEnabled;
     }
@@ -688,7 +696,8 @@
         drip_randomness_minutes: els.dripRandomness.value.trim(),
         feed_full_text: els.feedFullText.checked ? 'true' : 'false',
         feed_items: els.feedItems.value.trim(),
-        nostr_bridge_enabled: (els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked) ? 'true' : 'false'
+        nostr_bridge_enabled: (els.nostrBridgeEnabled && els.nostrBridgeEnabled.checked) ? 'true' : 'false',
+        new_users_are_admins: (els.newUsersAreAdmins && els.newUsersAreAdmins.checked) ? 'true' : 'false'
       }, true);
       if (!data.success) {
         throw new Error(data.error || 'Failed to save config');
@@ -985,6 +994,106 @@
     renderQueue(data);
   }
 
+  function userCardActionButton(label, action, username, className) {
+    const classes = className ? ' class="' + className + '"' : '';
+    return '<button type="button"' + classes + ' data-user-action="' + escapeAttr(action) + '" data-username="' + escapeAttr(username) + '">' + label + '</button>';
+  }
+
+  function renderUsersList() {
+    if (!els.usersList) {
+      return;
+    }
+    if (!state.users.length) {
+      els.usersList.innerHTML = '<p class="placeholder">No users found yet.</p>';
+      return;
+    }
+    let html = '';
+    const actorName = state.username || '';
+    const actorRank = Number(state.actorRank || 0);
+    state.users.forEach(function (user) {
+      const username = String(user.username || '');
+      const rank = Number(user.rank || 0);
+      const isSelf = !!user.is_self || username === actorName;
+      const isAdmin = !!user.is_admin;
+      const isBelow = actorRank > 0 && rank > actorRank;
+      const canReorder = !isSelf && (!isAdmin || isBelow);
+
+      html += '<div class="user-card">';
+      html += '<div class="user-card-main">';
+      html += '<div class="user-card-name">' + escapeHtml(user.player_name || username) + ' <span class="user-pill' + (isAdmin ? ' is-admin' : '') + '">' + (isAdmin ? 'Admin' : 'User') + '</span></div>';
+      html += '<div class="user-card-meta">@' + escapeHtml(username) + ' · Rank ' + escapeHtml(String(rank));
+      if (isSelf) {
+        html += ' · You';
+      }
+      html += '</div>';
+      html += '</div>';
+      html += '<div class="user-card-actions">';
+      if (!isSelf && !isAdmin) {
+        html += userCardActionButton('Grant Admin', 'grant_admin', username, 'primary');
+      }
+      if (!isSelf && isAdmin && isBelow) {
+        html += userCardActionButton('Remove Admin', 'remove_admin', username);
+      }
+      if (canReorder) {
+        html += userCardActionButton('↑', 'move_up', username);
+        html += userCardActionButton('↓', 'move_down', username);
+      }
+      if (!isSelf && (isBelow || !isAdmin)) {
+        html += '<div class="user-menu">';
+        html += userCardActionButton('⋯', 'toggle_menu', username, 'user-menu-trigger');
+        html += '<div class="user-menu-panel" data-user-menu-panel="' + escapeAttr(username) + '" hidden>';
+        if (isBelow) {
+          html += userCardActionButton('Promote Above Me...', 'promote_above', username, '');
+        }
+        html += userCardActionButton('🗑 Delete...', 'delete', username, 'user-delete');
+        html += '</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    });
+    els.usersList.innerHTML = html;
+  }
+
+  async function loadUsers() {
+    const data = await apiPost('/cgi/blog-list-users', {}, true);
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to load users');
+    }
+    state.users = Array.isArray(data.users) ? data.users : [];
+    state.actorRank = Number(data.actor_rank || 0);
+    renderUsersList();
+  }
+
+  async function runUserAction(action, username) {
+    const user = state.users.find(function (item) { return item.username === username; });
+    if (!user) {
+      throw new Error('User not found');
+    }
+    if (action === 'promote_above') {
+      const warning = user.is_admin
+        ? 'Promote this admin above you? They will have power over you and you will not be able to remove their admin access.'
+        : 'Promote this user above you in the list?';
+      if (!window.confirm(warning)) {
+        return;
+      }
+    }
+    if (action === 'delete') {
+      if (!window.confirm('Delete this user account? This cannot be undone.')) {
+        return;
+      }
+    }
+    const data = await apiPost('/cgi/blog-manage-user', {
+      action: action,
+      username: username
+    }, true);
+    if (!data.success) {
+      throw new Error(data.error || 'User action failed');
+    }
+    await loadUsers();
+    setOutput(els.outputUsers, data.message || 'User updated.', 'ok');
+  }
+
   async function loadDraft(draftId) {
     const data = await apiPost('/cgi/blog-get-draft', { draft_id: draftId }, true);
     if (!data.success || !data.draft) {
@@ -1247,6 +1356,54 @@
         setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
       });
     });
+    const refreshUsersBtn = document.getElementById('btn-refresh-users');
+    if (refreshUsersBtn) {
+      refreshUsersBtn.addEventListener('click', function () {
+        loadUsers().catch(function (err) {
+          setOutput(els.outputUsers, 'Error: ' + err.message, 'error');
+        });
+      });
+    }
+
+    if (els.usersList) {
+      els.usersList.addEventListener('click', function (event) {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        const action = target.getAttribute('data-user-action');
+        const username = target.getAttribute('data-username');
+        if (!action || !username) {
+          return;
+        }
+        if (action === 'toggle_menu') {
+          const panels = Array.from(els.usersList.querySelectorAll('[data-user-menu-panel]'));
+          panels.forEach(function (panel) {
+            const thisUser = panel.getAttribute('data-user-menu-panel');
+            if (!thisUser) {
+              return;
+            }
+            panel.hidden = (thisUser !== username) ? true : !panel.hidden;
+          });
+          return;
+        }
+        runUserAction(action, username).catch(function (err) {
+          setOutput(els.outputUsers, 'Error: ' + err.message, 'error');
+        });
+      });
+      document.addEventListener('click', function (event) {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        if (target.closest('.user-menu')) {
+          return;
+        }
+        Array.from(els.usersList.querySelectorAll('[data-user-menu-panel]')).forEach(function (panel) {
+          panel.hidden = true;
+        });
+      });
+    }
 
     document.getElementById('btn-run-scheduler').addEventListener('click', runSchedulerNow);
     if (els.mirrorNostrButton) {

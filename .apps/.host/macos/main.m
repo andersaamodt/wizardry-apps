@@ -289,6 +289,43 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
 }
 
+- (void)loadArtificerBootPalette {
+    NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
+    NSString *configFile = xdgConfig.length
+        ? [xdgConfig stringByAppendingPathComponent:@"wizardry-apps/artificer-ui.conf"]
+        : [NSHomeDirectory() stringByAppendingPathComponent:@".config/wizardry-apps/artificer-ui.conf"];
+
+    NSString *theme = [[self readConfigValueForKey:@"theme" fromFile:configFile] lowercaseString];
+    if (!theme.length) {
+        theme = @"psionic";
+    }
+    NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyz0123456789_-"];
+    if ([[theme stringByTrimmingCharactersInSet:allowed] length] > 0) {
+        theme = @"psionic";
+    }
+
+    NSString *themeFile = @"";
+    NSString *appThemePath = [[self.appPath stringByAppendingPathComponent:@"themes"] stringByAppendingPathComponent:[theme stringByAppendingString:@".css"]];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:appThemePath]) {
+        themeFile = appThemePath;
+    } else {
+        NSString *repoRoot = [self.appPath stringByDeletingLastPathComponent];
+        repoRoot = [repoRoot stringByDeletingLastPathComponent];
+        NSString *repoThemePath = [[[repoRoot stringByAppendingPathComponent:@".web/artificer/static/themes"] stringByAppendingPathComponent:theme] stringByAppendingString:@".css"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:repoThemePath]) {
+            themeFile = repoThemePath;
+        }
+    }
+
+    NSDictionary<NSString *, NSString *> *vars = [self readThemeVariablesFromFile:themeFile];
+    NSColor *bg = [self parseCSSColorToken:vars[@"bg"]];
+    NSColor *text = [self parseCSSColorToken:vars[@"text"]];
+    NSColor *muted = [self parseCSSColorToken:vars[@"light-text"]];
+
+    self.prioritiesBootBgColor = bg ?: [NSColor colorWithSRGBRed:0.925 green:0.918 blue:0.957 alpha:1.0];
+    self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.365 green:0.392 blue:0.525 alpha:1.0];
+}
+
 - (void)showNativeBootSplashInView:(NSView *)rootView {
     if (!rootView || self.nativeBootSplashView) {
         return;
@@ -468,12 +505,16 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     NSString *appSlug = [appComponent lowercaseString];
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
+    BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
+    BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
-    self.enableNativeBootSplash = self.enableNativeViewMenu || [appSlug isEqualToString:@"forge"];
+    self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp;
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
-    self.bootSplashLogoSize = [appSlug isEqualToString:@"forge"] ? 156.0 : 192.0;
+    self.bootSplashLogoSize = isForgeApp ? 156.0 : (isArtificerApp ? 176.0 : 192.0);
     if (self.enableNativeViewMenu) {
         [self loadPrioritiesBootPalette];
+    } else if (isArtificerApp) {
+        [self loadArtificerBootPalette];
     } else if (self.enableNativeBootSplash) {
         [self loadForgeBootPalette];
     }

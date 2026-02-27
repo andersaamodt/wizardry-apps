@@ -303,6 +303,12 @@ test_blog_config_and_queue_metadata() {
   case "$CGI_BODY" in *'"drip_randomness_minutes":2'*) ;; *) TEST_FAILURE_REASON="drip randomness should be 2"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *'"feed_full_text":false'*) ;; *) TEST_FAILURE_REASON="feed_full_text should be false"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *'"feed_items":7'*) ;; *) TEST_FAILURE_REASON="feed_items should be 7"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *'"new_users_are_admins":true'*) ;; *) TEST_FAILURE_REASON="new_users_are_admins should default to true in fresh blog site config"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-update-config" "$(auth_body_prefix)&new_users_are_admins=false"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="blog-update-config should allow toggling new_users_are_admins"; teardown_blog_fixture; return 1 ;; esac
+  run_cgi_get "$cgi_dir/blog-get-config" ""
+  case "$CGI_BODY" in *'"new_users_are_admins":false'*) ;; *) TEST_FAILURE_REASON="new_users_are_admins should persist after update"; teardown_blog_fixture; return 1 ;; esac
 
   run_cgi_post "$cgi_dir/blog-save-post" "$(auth_body_prefix)&action=queue_scheduled&title=Queue+Meta&content=queued&scheduled_at=2999-01-01T00%3A00%3A00Z"
   case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="queue_scheduled should succeed"; teardown_blog_fixture; return 1 ;; esac
@@ -313,6 +319,91 @@ test_blog_config_and_queue_metadata() {
   case "$CGI_BODY" in *'"drip_interval_minutes":15'*) ;; *) TEST_FAILURE_REASON="queue response should include updated drip interval"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *'"drip_randomness_minutes":2'*) ;; *) TEST_FAILURE_REASON="queue response should include updated drip randomness"; teardown_blog_fixture; return 1 ;; esac
   case "$CGI_BODY" in *"$queued_id"*) ;; *) TEST_FAILURE_REASON="queued draft should appear in queue listing"; teardown_blog_fixture; return 1 ;; esac
+
+  teardown_blog_fixture
+}
+
+test_blog_user_admin_management_ordering_rules() {
+  setup_blog_fixture || return $?
+
+  config-set "$data_dir/ssh-auth/users/testadmin/profile.conf" user_rank 3
+
+  mkdir -p "$data_dir/ssh-auth/users/admin-above/delegates"
+  admin_above_profile="$data_dir/ssh-auth/users/admin-above/profile.conf"
+  config-set "$admin_above_profile" username admin-above
+  config-set "$admin_above_profile" is_admin true
+  config-set "$admin_above_profile" user_rank 1
+
+  mkdir -p "$data_dir/ssh-auth/users/user-above/delegates"
+  user_above_profile="$data_dir/ssh-auth/users/user-above/profile.conf"
+  config-set "$user_above_profile" username user-above
+  config-set "$user_above_profile" is_admin false
+  config-set "$user_above_profile" user_rank 2
+
+  mkdir -p "$data_dir/ssh-auth/users/user-below/delegates"
+  user_below_profile="$data_dir/ssh-auth/users/user-below/profile.conf"
+  config-set "$user_below_profile" username user-below
+  config-set "$user_below_profile" is_admin false
+  config-set "$user_below_profile" user_rank 4
+
+  mkdir -p "$data_dir/ssh-auth/users/admin-below/delegates"
+  admin_below_profile="$data_dir/ssh-auth/users/admin-below/profile.conf"
+  config-set "$admin_below_profile" username admin-below
+  config-set "$admin_below_profile" is_admin true
+  config-set "$admin_below_profile" user_rank 5
+
+  run_cgi_post "$cgi_dir/blog-list-users" "$(auth_body_prefix)"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="blog-list-users should succeed for admin"; teardown_blog_fixture; return 1 ;; esac
+  case "$CGI_BODY" in *'"actor_rank":3'*) ;; *) TEST_FAILURE_REASON="blog-list-users should include actor rank"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=remove_admin&username=admin-above"
+  case "$CGI_BODY" in *'rank_forbidden'*) ;; *) TEST_FAILURE_REASON="remove_admin should reject target admin above actor"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=grant_admin&username=user-above"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="grant_admin should succeed for non-admin user"; teardown_blog_fixture; return 1 ;; esac
+  user_above_is_admin=$(config-get "$user_above_profile" is_admin 2>/dev/null || printf 'false')
+  case "$user_above_is_admin" in true) ;; *) TEST_FAILURE_REASON="grant_admin should persist is_admin=true"; teardown_blog_fixture; return 1 ;; esac
+  user_above_rank=$(config-get "$user_above_profile" user_rank 2>/dev/null || printf '0')
+  actor_rank_after_grant=$(config-get "$data_dir/ssh-auth/users/testadmin/profile.conf" user_rank 2>/dev/null || printf '0')
+  case "$user_above_rank" in ''|*[!0-9]*) user_above_rank=0 ;; esac
+  case "$actor_rank_after_grant" in ''|*[!0-9]*) actor_rank_after_grant=0 ;; esac
+  if [ "$user_above_rank" -le "$actor_rank_after_grant" ]; then
+    TEST_FAILURE_REASON="grant_admin should move above-target below actor before granting admin"
+    teardown_blog_fixture
+    return 1
+  fi
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=move_down&username=admin-above"
+  case "$CGI_BODY" in *'rank_forbidden'*) ;; *) TEST_FAILURE_REASON="move_down should reject admin above actor"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=move_down&username=user-below"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="move_down should allow reordering non-admin below actor"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=promote_above&username=admin-below"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="promote_above should allow promoting lower user above actor"; teardown_blog_fixture; return 1 ;; esac
+  admin_below_rank=$(config-get "$admin_below_profile" user_rank 2>/dev/null || printf '0')
+  actor_rank_after_promote=$(config-get "$data_dir/ssh-auth/users/testadmin/profile.conf" user_rank 2>/dev/null || printf '0')
+  case "$admin_below_rank" in ''|*[!0-9]*) admin_below_rank=0 ;; esac
+  case "$actor_rank_after_promote" in ''|*[!0-9]*) actor_rank_after_promote=0 ;; esac
+  if [ "$admin_below_rank" -ge "$actor_rank_after_promote" ]; then
+    TEST_FAILURE_REASON="promote_above should move target above actor rank"
+    teardown_blog_fixture
+    return 1
+  fi
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=remove_admin&username=admin-below"
+  case "$CGI_BODY" in *'rank_forbidden'*) ;; *) TEST_FAILURE_REASON="remove_admin should reject admin after promote_above"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=delete&username=admin-above"
+  case "$CGI_BODY" in *'rank_forbidden'*) ;; *) TEST_FAILURE_REASON="delete should reject admin above actor"; teardown_blog_fixture; return 1 ;; esac
+
+  run_cgi_post "$cgi_dir/blog-manage-user" "$(auth_body_prefix)&action=delete&username=user-below"
+  case "$CGI_BODY" in *'"success":true'*) ;; *) TEST_FAILURE_REASON="delete should allow deleting non-admin user"; teardown_blog_fixture; return 1 ;; esac
+  if [ -e "$data_dir/ssh-auth/users/user-below/profile.conf" ]; then
+    TEST_FAILURE_REASON="delete should remove user profile"
+    teardown_blog_fixture
+    return 1
+  fi
 
   teardown_blog_fixture
 }
@@ -882,5 +973,6 @@ run_test_case "blog nostr auth endpoints enforce identity requirements" test_blo
 run_test_case "blog open-post redirects to post html" test_blog_open_post_redirects
 run_test_case "blog account update persists player name" test_blog_account_update_and_player_name
 run_test_case "blog force-interactive blocks delegated mutations" test_blog_force_interactive_blocks_mutating_delegated_sessions
+run_test_case "blog user management enforces ordered admin authority" test_blog_user_admin_management_ordering_rules
 
 finish_tests

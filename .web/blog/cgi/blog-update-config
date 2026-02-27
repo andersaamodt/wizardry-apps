@@ -24,6 +24,7 @@ drip_jitter_legacy=$(blog_param drip_jitter_minutes)
 feed_full_text=$(blog_param feed_full_text)
 feed_items=$(blog_param feed_items)
 nostr_bridge_enabled=$(blog_param nostr_bridge_enabled)
+new_users_are_admins=$(blog_param new_users_are_admins)
 
 if [ -n "$registration_enabled" ]; then
   case "$registration_enabled" in
@@ -110,6 +111,12 @@ if [ -n "$nostr_bridge_enabled" ]; then
         blog_nostr_rebuild_derived >/dev/null 2>&1 || true
       fi
       ;;
+  esac
+fi
+
+if [ -n "$new_users_are_admins" ]; then
+  case "$new_users_are_admins" in
+    true|false) config-set "$blog_site_conf" new_users_are_admins "$new_users_are_admins" ;;
   esac
 fi
 

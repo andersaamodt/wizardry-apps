@@ -529,12 +529,238 @@ blog_validate_nostr_pubkey() {
   return 1
 }
 
+blog_new_users_are_admins_enabled() {
+  enabled=$(config-get "$blog_site_conf" new_users_are_admins 2>/dev/null || printf 'false')
+  [ "$enabled" = "true" ]
+}
+
 blog_user_dir() {
   printf '%s/%s\n' "$blog_users_dir" "$1"
 }
 
 blog_user_profile() {
   printf '%s/profile.conf\n' "$(blog_user_dir "$1")"
+}
+
+blog_user_rank_value() {
+  rank_user=${1-}
+  [ -n "$rank_user" ] || {
+    printf '0\n'
+    return 0
+  }
+  rank_profile=$(blog_user_profile "$rank_user")
+  if [ ! -f "$rank_profile" ]; then
+    printf '0\n'
+    return 0
+  fi
+  rank=$(config-get "$rank_profile" user_rank 2>/dev/null || printf '0')
+  case "$rank" in
+    ''|*[!0-9]*) rank=0 ;;
+  esac
+  printf '%s\n' "$rank"
+}
+
+blog_next_user_rank() {
+  max=0
+  for next_profile in "$blog_users_dir"/*/profile.conf; do
+    [ -f "$next_profile" ] || continue
+    rank=$(config-get "$next_profile" user_rank 2>/dev/null || printf '0')
+    case "$rank" in ''|*[!0-9]*) rank=0 ;; esac
+    if [ "$rank" -gt "$max" ]; then
+      max=$rank
+    fi
+  done
+  printf '%s\n' $((max + 1))
+}
+
+blog_ensure_user_rank() {
+  ensure_user=${1-}
+  [ -n "$ensure_user" ] || return 1
+  ensure_profile=$(blog_user_profile "$ensure_user")
+  [ -f "$ensure_profile" ] || return 1
+  rank=$(config-get "$ensure_profile" user_rank 2>/dev/null || printf '0')
+  case "$rank" in
+    ''|*[!0-9]*) rank=0 ;;
+  esac
+  if [ "$rank" -gt 0 ]; then
+    printf '%s\n' "$rank"
+    return 0
+  fi
+  ensure_rank=$(blog_next_user_rank)
+  config-set "$ensure_profile" user_rank "$ensure_rank"
+  printf '%s\n' "$ensure_rank"
+}
+
+blog_users_reindex() {
+  tmp=$(mktemp "${TMPDIR:-/tmp}/blog-users-reindex.XXXXXX")
+
+  for re_profile in "$blog_users_dir"/*/profile.conf; do
+    [ -f "$re_profile" ] || continue
+    re_username=$(config-get "$re_profile" username 2>/dev/null || printf '')
+    if [ -z "$re_username" ]; then
+      re_username=$(basename "$(dirname "$re_profile")")
+      config-set "$re_profile" username "$re_username"
+    fi
+    re_rank=$(config-get "$re_profile" user_rank 2>/dev/null || printf '0')
+    case "$re_rank" in ''|*[!0-9]*) re_rank=0 ;; esac
+    if [ "$re_rank" -le 0 ]; then
+      re_rank=999999999
+    fi
+    printf '%s\t%s\t%s\n' "$re_rank" "$re_username" "$re_profile" >> "$tmp"
+  done
+
+  if [ -s "$tmp" ]; then
+    sorted=$(mktemp "${TMPDIR:-/tmp}/blog-users-reindex-sorted.XXXXXX")
+    sort -n -k1,1 -k2,2 "$tmp" > "$sorted"
+    seq=1
+    while IFS="$(printf '\t')" read -r _rank _username re_sorted_profile || [ -n "$re_sorted_profile" ]; do
+      [ -n "$re_sorted_profile" ] || continue
+      config-set "$re_sorted_profile" user_rank "$seq"
+      seq=$((seq + 1))
+    done < "$sorted"
+    rm -f "$sorted"
+  fi
+
+  rm -f "$tmp"
+}
+
+blog_users_sorted_usernames() {
+  blog_users_reindex
+  tmp=$(mktemp "${TMPDIR:-/tmp}/blog-users-sorted.XXXXXX")
+  for sorted_profile in "$blog_users_dir"/*/profile.conf; do
+    [ -f "$sorted_profile" ] || continue
+    sorted_username=$(config-get "$sorted_profile" username 2>/dev/null || printf '')
+    [ -n "$sorted_username" ] || sorted_username=$(basename "$(dirname "$sorted_profile")")
+    sorted_rank=$(config-get "$sorted_profile" user_rank 2>/dev/null || printf '0')
+    case "$sorted_rank" in ''|*[!0-9]*) sorted_rank=0 ;; esac
+    printf '%s\t%s\n' "$sorted_rank" "$sorted_username" >> "$tmp"
+  done
+  sort -n -k1,1 -k2,2 "$tmp" | awk -F '\t' '{print $2}'
+  rm -f "$tmp"
+}
+
+blog_users_apply_order_file() {
+  order_file=${1-}
+  [ -n "$order_file" ] || return 1
+  [ -f "$order_file" ] || return 1
+  seq=1
+  while IFS= read -r order_username || [ -n "$order_username" ]; do
+    [ -n "$order_username" ] || continue
+    order_profile=$(blog_user_profile "$order_username")
+    [ -f "$order_profile" ] || continue
+    config-set "$order_profile" user_rank "$seq"
+    seq=$((seq + 1))
+  done < "$order_file"
+}
+
+blog_users_move_before() {
+  move_target=${1-}
+  move_before=${2-}
+  [ -n "$move_target" ] || return 1
+  [ -n "$move_before" ] || return 1
+  [ "$move_target" != "$move_before" ] || return 0
+
+  src=$(mktemp "${TMPDIR:-/tmp}/blog-users-move-src.XXXXXX")
+  dst=$(mktemp "${TMPDIR:-/tmp}/blog-users-move-dst.XXXXXX")
+  blog_users_sorted_usernames > "$src"
+  inserted=0
+  while IFS= read -r move_username || [ -n "$move_username" ]; do
+    [ -n "$move_username" ] || continue
+    if [ "$move_username" = "$move_target" ]; then
+      continue
+    fi
+    if [ "$move_username" = "$move_before" ] && [ "$inserted" -eq 0 ]; then
+      printf '%s\n' "$move_target" >> "$dst"
+      inserted=1
+    fi
+    printf '%s\n' "$move_username" >> "$dst"
+  done < "$src"
+  if [ "$inserted" -eq 0 ]; then
+    printf '%s\n' "$move_target" >> "$dst"
+  fi
+  blog_users_apply_order_file "$dst"
+  rm -f "$src" "$dst"
+}
+
+blog_users_move_after() {
+  move_target=${1-}
+  move_after=${2-}
+  [ -n "$move_target" ] || return 1
+  [ -n "$move_after" ] || return 1
+  [ "$move_target" != "$move_after" ] || return 0
+
+  src=$(mktemp "${TMPDIR:-/tmp}/blog-users-move-src.XXXXXX")
+  dst=$(mktemp "${TMPDIR:-/tmp}/blog-users-move-dst.XXXXXX")
+  blog_users_sorted_usernames > "$src"
+  inserted=0
+  while IFS= read -r move_username || [ -n "$move_username" ]; do
+    [ -n "$move_username" ] || continue
+    if [ "$move_username" = "$move_target" ]; then
+      continue
+    fi
+    printf '%s\n' "$move_username" >> "$dst"
+    if [ "$move_username" = "$move_after" ] && [ "$inserted" -eq 0 ]; then
+      printf '%s\n' "$move_target" >> "$dst"
+      inserted=1
+    fi
+  done < "$src"
+  if [ "$inserted" -eq 0 ]; then
+    printf '%s\n' "$move_target" >> "$dst"
+  fi
+  blog_users_apply_order_file "$dst"
+  rm -f "$src" "$dst"
+}
+
+blog_users_move_up_one() {
+  move_target=${1-}
+  [ -n "$move_target" ] || return 1
+  src=$(mktemp "${TMPDIR:-/tmp}/blog-users-move-up-src.XXXXXX")
+  dst=$(mktemp "${TMPDIR:-/tmp}/blog-users-move-up-dst.XXXXXX")
+  blog_users_sorted_usernames > "$src"
+  awk -v t="$move_target" '
+    { a[NR] = $0 }
+    END {
+      for (i = 1; i <= NR; i++) {
+        if (a[i] == t && i > 1) {
+          tmp = a[i - 1]
+          a[i - 1] = a[i]
+          a[i] = tmp
+          break
+        }
+      }
+      for (i = 1; i <= NR; i++) {
+        print a[i]
+      }
+    }
+  ' "$src" > "$dst"
+  blog_users_apply_order_file "$dst"
+  rm -f "$src" "$dst"
+}
+
+blog_users_move_down_one() {
+  move_target=${1-}
+  [ -n "$move_target" ] || return 1
+  src=$(mktemp "${TMPDIR:-/tmp}/blog-users-move-down-src.XXXXXX")
+  dst=$(mktemp "${TMPDIR:-/tmp}/blog-users-move-down-dst.XXXXXX")
+  blog_users_sorted_usernames > "$src"
+  awk -v t="$move_target" '
+    { a[NR] = $0 }
+    END {
+      for (i = 1; i <= NR; i++) {
+        if (a[i] == t && i < NR) {
+          tmp = a[i + 1]
+          a[i + 1] = a[i]
+          a[i] = tmp
+          break
+        }
+      }
+      for (i = 1; i <= NR; i++) {
+        print a[i]
+      }
+    }
+  ' "$src" > "$dst"
+  blog_users_apply_order_file "$dst"
+  rm -f "$src" "$dst"
 }
 
 blog_get_nostr_pubkey() {
@@ -724,12 +950,20 @@ blog_save_user_profile() {
   config-set "$profile" fingerprint "$fingerprint"
   config-set "$profile" ssh_public_key "$ssh_public_key"
   config-set "$profile" updated_at "$(blog_now_iso)"
-
-  if blog_user_is_admin "$username"; then
-    config-set "$profile" is_admin true
-  else
-    config-set "$profile" is_admin false
-  fi
+  current_admin=$(config-get "$profile" is_admin 2>/dev/null || printf '')
+  case "$current_admin" in
+    true|false)
+      config-set "$profile" is_admin "$current_admin"
+      ;;
+    *)
+      if blog_user_is_admin "$username"; then
+        config-set "$profile" is_admin true
+      else
+        config-set "$profile" is_admin false
+      fi
+      ;;
+  esac
+  blog_ensure_user_rank "$username" >/dev/null 2>&1 || true
 }
 
 blog_session_path() {
