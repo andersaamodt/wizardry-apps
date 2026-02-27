@@ -7078,22 +7078,22 @@
     if (!isFinite(probe) || probe < 0) {
       probe = 0;
     }
-    var floor = Number(dictationWaveNoiseFloor || 0.02);
+    var floor = Number(dictationWaveNoiseFloor || 0.01);
     if (!isFinite(floor) || floor < 0) {
-      floor = 0.02;
+      floor = 0.01;
     }
-    if (probe >= floor + 0.03) {
-      // Prevent ambient floor from climbing into normal speech and flattening bars.
-      floor = (floor * 0.995) + (probe * 0.005);
-    } else if (probe >= floor) {
-      floor = (floor * 0.96) + (probe * 0.04);
+    if (probe >= floor) {
+      // Raise floor slowly so ambient fan noise is normalized out without
+      // erasing short speech transients.
+      floor = (floor * 0.992) + (probe * 0.008);
     } else {
-      floor = (floor * 0.62) + (probe * 0.38);
+      // Drop floor faster so silence can return to a thin baseline quickly.
+      floor = (floor * 0.8) + (probe * 0.2);
     }
-    if (floor < 0.0012) {
-      floor = 0.0012;
-    } else if (floor > 0.03) {
-      floor = 0.03;
+    if (floor < 0.0005) {
+      floor = 0.0005;
+    } else if (floor > 0.02) {
+      floor = 0.02;
     }
     dictationWaveNoiseFloor = floor;
     return floor;
@@ -7104,25 +7104,26 @@
     if (!isFinite(raw) || raw < 0) {
       raw = 0;
     }
-    var floor = Number(dictationWaveNoiseFloor || 0.02);
+    var floor = Number(dictationWaveNoiseFloor || 0.01);
     if (!isFinite(floor) || floor < 0) {
-      floor = 0.02;
+      floor = 0.01;
     }
-    var gate = floor + 0.0016;
+    var gate = (floor * 1.08) + 0.0003;
     var signal = raw - gate;
     if (signal < 0) {
       signal = 0;
     }
-    var normalized = (signal * 2.6) / Math.max(0.015, 0.5 - gate);
+    var dynamicRange = Math.max(0.0025, gate * 5.5);
+    var normalized = signal / dynamicRange;
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.46);
+      normalized = Math.pow(normalized, 0.58);
     }
-    if (normalized < 0.0025) {
+    if (normalized < 0.0015) {
       normalized = 0;
     }
     return normalized;
@@ -7197,8 +7198,8 @@
     if (micFresh && micLevel > merged) {
       merged = micLevel;
     }
-    // Backend levels are a fallback signal when live mic sampling is unavailable.
-    if (!micFresh && backendLevel > merged) {
+    // Backend levels also help recover signal when WebAudio frames momentarily flatten.
+    if (backendLevel > merged) {
       merged = backendLevel;
     }
     return merged;
@@ -7280,21 +7281,22 @@
         var normalizedHistory = [];
         for (var hi = 0; hi < rawHistory.length; hi += 1) {
           var normalizedSlice = normalizedDictationWaveSliceLevel(rawHistory[hi]);
-          if (normalizedSlice <= 0 && rawPeak > (dictationWaveNoiseFloor + 0.004)) {
-            var rescue = (rawHistory[hi] - dictationWaveNoiseFloor) * 1.8;
+          if (normalizedSlice <= 0 && rawPeak > (dictationWaveNoiseFloor + 0.0015)) {
+            var floorBase = Math.max(0.0005, Number(dictationWaveNoiseFloor || 0));
+            var rescue = ((rawHistory[hi] / floorBase) - 1) / 3.5;
             if (!isFinite(rescue) || rescue < 0) {
               rescue = 0;
             } else if (rescue > 1) {
               rescue = 1;
             }
-            if (rescue < 0.0025) {
+            if (rescue < 0.0015) {
               rescue = 0;
             }
             normalizedSlice = rescue;
           }
           normalizedHistory.push(normalizedSlice);
         }
-        if (!dictationWaveSeenSignal && rawPeak > (dictationWaveNoiseFloor + 0.004)) {
+        if (!dictationWaveSeenSignal && rawPeak > (dictationWaveNoiseFloor + 0.0015)) {
           dictationWaveSeenSignal = true;
         }
         applyDictationWaveHistoryLevels(normalizedHistory);
@@ -7475,7 +7477,7 @@
     var preSignalBaseline = waveformActive && !dictationWaveSeenSignal && (Date.now() - Number(dictationWaveActivatedAt || 0) < 700);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.006;
+    var silenceGate = 0.0018;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
