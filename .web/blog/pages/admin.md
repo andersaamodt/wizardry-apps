@@ -315,6 +315,15 @@ title: Blog Admin
 <span class="queue-local-drip-spinner" aria-hidden="true"></span>
 <span id="queue-local-drip-status-text">Local drip running. Keep this tab open.</span>
 </div>
+<button id="btn-local-drip-toggle" type="button" class="icon-toggle local-drip-toggle" aria-label="Pause local drip" title="Pause local drip" aria-pressed="true">
+<svg class="local-drip-icon local-drip-icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 5V19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+<path d="M16 5V19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>
+<svg class="local-drip-icon local-drip-icon-play" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<path d="M7 5L19 12L7 19V5Z" fill="currentColor"/>
+</svg>
+</button>
 <button id="btn-mirror-nostr" type="button" title="Fetch events from configured Nostr relays and update local derived content.">Sync from Nostr</button>
 <button id="btn-run-scheduler" type="button" class="primary">Drip Now</button>
 </div>
@@ -1690,6 +1699,12 @@ body {
   margin-right: 0.22rem;
 }
 
+.queue-local-drip-status.is-paused .queue-local-drip-spinner {
+  animation: none;
+  opacity: 0.45;
+  border-right-color: #5b77ae;
+}
+
 .queue-local-drip-spinner {
   width: 0.78rem;
   height: 0.78rem;
@@ -1698,6 +1713,37 @@ body {
   border-radius: 999px;
   animation: admin-spin 0.75s linear infinite;
   flex: 0 0 auto;
+}
+
+#admin-panel .local-drip-toggle {
+  min-width: 2rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid #b6c8ec;
+  border-radius: 8px;
+  background: #f6f9ff;
+  color: #1f4489;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#admin-panel .local-drip-toggle:hover {
+  background: #eaf1ff;
+  border-color: #99b5e6;
+}
+
+#admin-panel .local-drip-toggle .local-drip-icon-play {
+  display: none;
+}
+
+#admin-panel .local-drip-toggle[aria-pressed="false"] .local-drip-icon-pause {
+  display: none;
+}
+
+#admin-panel .local-drip-toggle[aria-pressed="false"] .local-drip-icon-play {
+  display: block;
 }
 
 #admin-panel .row-actions button.is-loading {

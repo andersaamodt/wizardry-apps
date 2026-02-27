@@ -40,6 +40,7 @@
     localDripWorkerTimer: null,
     localDripWorkerBusy: false,
     localDripLeader: false,
+    localDripEnabled: localStorage.getItem('blog_local_drip_enabled_v1') !== '0',
     localDripTabId: '',
     localDripLastTickAt: 0
   };
@@ -86,6 +87,7 @@
     queueList: document.getElementById('queue-list'),
     queueLocalDripStatus: document.getElementById('queue-local-drip-status'),
     queueLocalDripStatusText: document.getElementById('queue-local-drip-status-text'),
+    localDripToggleButton: document.getElementById('btn-local-drip-toggle'),
     postsList: document.getElementById('posts-list'),
     usersList: document.getElementById('users-list'),
     currentDraftLabel: document.getElementById('current-draft-label'),
@@ -108,6 +110,7 @@
 
   const publishModeInputs = Array.from(document.querySelectorAll('input[name="publish-mode"]'));
   const LOCAL_DRIP_LEASE_KEY = 'blog_local_drip_lease_v1';
+  const LOCAL_DRIP_ENABLED_KEY = 'blog_local_drip_enabled_v1';
   const LOCAL_DRIP_LEASE_MS = 45000;
   const LOCAL_DRIP_TICK_MS = 15000;
 
@@ -259,10 +262,36 @@
       return;
     }
     els.queueLocalDripStatus.hidden = false;
+    els.queueLocalDripStatus.classList.toggle('is-paused', !state.localDripEnabled);
     if (els.queueLocalDripStatusText) {
-      els.queueLocalDripStatusText.textContent = state.localDripLeader
+      els.queueLocalDripStatusText.textContent = !state.localDripEnabled
+        ? 'Local drip paused.'
+        : (state.localDripLeader
         ? 'Local drip running. Keep this tab open.'
-        : 'Queue active. Keep one admin tab open for local drip.';
+        : 'Queue active. Keep one admin tab open for local drip.');
+    }
+  }
+
+  function syncLocalDripToggleUi() {
+    if (!els.localDripToggleButton) {
+      return;
+    }
+    const enabled = !!state.localDripEnabled;
+    els.localDripToggleButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    els.localDripToggleButton.setAttribute('aria-label', enabled ? 'Pause local drip' : 'Resume local drip');
+    els.localDripToggleButton.setAttribute('title', enabled ? 'Pause local drip' : 'Resume local drip');
+  }
+
+  function setLocalDripEnabled(enabled) {
+    state.localDripEnabled = !!enabled;
+    localStorage.setItem(LOCAL_DRIP_ENABLED_KEY, state.localDripEnabled ? '1' : '0');
+    syncLocalDripToggleUi();
+    updateQueueLocalDripStatus();
+    if (state.localDripEnabled) {
+      startLocalDripWorker();
+      localDripWorkerTick(true).catch(function () {});
+    } else {
+      stopLocalDripWorker();
     }
   }
 
@@ -318,6 +347,11 @@
   }
 
   async function localDripWorkerTick(force) {
+    if (!state.localDripEnabled) {
+      setLocalDripLeader(false);
+      localDripReleaseLease();
+      return;
+    }
     if (!state.isAdmin || !state.sessionToken) {
       setLocalDripLeader(false);
       localDripReleaseLease();
@@ -370,7 +404,7 @@
   }
 
   function startLocalDripWorker() {
-    if (!state.isAdmin || !state.sessionToken) {
+    if (!state.localDripEnabled || !state.isAdmin || !state.sessionToken) {
       stopLocalDripWorker();
       return;
     }
@@ -1056,6 +1090,7 @@
         return;
       }
 
+      syncLocalDripToggleUi();
       startLocalDripWorker();
       setAccountOnlyMode(false);
       activateSection(getSectionFromHash(), false);
@@ -2589,7 +2624,22 @@
       }
     });
     window.addEventListener('storage', function (event) {
-      if (event && event.key === LOCAL_DRIP_LEASE_KEY) {
+      if (!event) {
+        return;
+      }
+      if (event.key === LOCAL_DRIP_ENABLED_KEY) {
+        state.localDripEnabled = localStorage.getItem(LOCAL_DRIP_ENABLED_KEY) !== '0';
+        syncLocalDripToggleUi();
+        updateQueueLocalDripStatus();
+        if (state.localDripEnabled) {
+          startLocalDripWorker();
+          localDripWorkerTick(true).catch(function () {});
+        } else {
+          stopLocalDripWorker();
+        }
+        return;
+      }
+      if (event.key === LOCAL_DRIP_LEASE_KEY) {
         const lease = localDripLeaseRead();
         setLocalDripLeader(!!(lease && lease.owner === state.localDripTabId));
       }
@@ -2598,6 +2648,12 @@
       localDripReleaseLease();
     });
 
+    if (els.localDripToggleButton) {
+      els.localDripToggleButton.addEventListener('click', function () {
+        setLocalDripEnabled(!state.localDripEnabled);
+      });
+      syncLocalDripToggleUi();
+    }
     document.getElementById('btn-run-scheduler').addEventListener('click', runSchedulerNow);
     if (els.mirrorNostrButton) {
       els.mirrorNostrButton.addEventListener('click', runNostrMirror);
