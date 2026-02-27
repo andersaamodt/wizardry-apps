@@ -5869,10 +5869,10 @@
         var trait = String(seg.getAttribute('data-bigfive-open') || '').toLowerCase();
         if (['o', 'c', 'e', 'a', 'n'].indexOf(trait) < 0) return;
         var traitInput = document.getElementById('behavior-bigfive-' + trait);
-        var order = ['low', 'medium', 'high'];
+        var order = ['medium', 'low', 'high'];
         var current = String((traitInput && traitInput.value) || 'medium').toLowerCase();
         var idx = order.indexOf(current);
-        if (idx < 0) idx = 1;
+        if (idx < 0) idx = 0;
         var next = order[(idx + 1) % order.length];
         if (traitInput) traitInput.value = next;
         if (enabled) enabled.checked = true;
