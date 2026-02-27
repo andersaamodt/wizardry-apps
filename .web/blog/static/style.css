@@ -280,7 +280,7 @@ header h1 {
   height: 2.25rem;
   padding: 0 0.04rem 0 0.18rem;
   border-radius: 9px;
-  color: #dce8ff;
+  color: #111;
   align-self: center;
 }
 
@@ -292,7 +292,7 @@ header h1 {
 
 .nav-compose-icon:hover,
 .nav-compose-icon.active {
-  color: #ffffff;
+  color: #111;
 }
 
 .nav-compose-cycle {
