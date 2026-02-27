@@ -956,6 +956,7 @@ h2 {
 }
 
 .path-widget.is-disabled {
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--line) 14%);
   opacity: 0.58;
   border-color: color-mix(in srgb, var(--line-strong) 78%, var(--text-muted) 22%);
   color: color-mix(in srgb, var(--text-muted) 88%, var(--line) 12%);
@@ -1026,6 +1027,7 @@ button:disabled,
 }
 
 .split-anchor .split-btn:has(.toolbar-btn:disabled) {
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--line) 14%);
   opacity: 0.58;
 }
 
@@ -1034,6 +1036,7 @@ button:disabled,
 }
 
 .split-anchor .split-btn.is-disabled {
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--line) 14%);
   opacity: 0.58;
   border-color: color-mix(in srgb, var(--line-strong) 78%, var(--text-muted) 22%);
 }
