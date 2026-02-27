@@ -754,6 +754,26 @@ EOF
   printf '%s' "$cleaned"
 }
 
+structured_incomplete_run_message() {
+  final_mode=$(trim "$1")
+  next_action_line=$(trim "$2")
+  risk_line=$(trim "$3")
+  if [ -z "$final_mode" ]; then
+    final_mode="UNKNOWN"
+  fi
+  if [ -z "$next_action_line" ]; then
+    next_action_line="continue from the failure ledger and retry with a narrower scope."
+  fi
+  if [ -z "$risk_line" ]; then
+    risk_line="The current result may be partial or stale because the loop ended before DONE mode."
+  fi
+  printf '%s\n%s\n%s\n%s' \
+    "Outcome: I couldn't complete the requested implementation in this run (mode: $final_mode)." \
+    "Verification Evidence: Review the run trace for executed steps, commands, and controller transitions." \
+    "Risks: $risk_line" \
+    "Next Improvement: $next_action_line"
+}
+
 is_simple_direct_prompt() {
   prompt_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
   prompt_trimmed=$(trim "$prompt_lower")
@@ -5177,11 +5197,11 @@ lowercase_text() {
 
 decision_prompt_requests_explicit_choice() {
   prompt_lower=$(lowercase_text "$1")
-  if printf '%s' "$prompt_lower" | grep -Eq '\bwhich\b|\bchoose\b|\bchoice\b|\bselect\b|\bpick[[:space:]]+one\b|\bshould[[:space:]]+i\b|\bdo[[:space:]]+you[[:space:]]+want\b'; then
+  if printf '%s' "$prompt_lower" | grep -Eq '\bwhich\b|\bchoose\b|\bchoice\b|\bselect\b|\bpick[[:space:]]+one\b'; then
     return 0
   fi
-  if printf '%s' "$prompt_lower" | grep -Eq '\bprefer\b|\boption(s)?\b'; then
-    if printf '%s' "$prompt_lower" | grep -Eq '\\?|[[:space:]]or[[:space:]]'; then
+  if printf '%s' "$prompt_lower" | grep -Eq '\bshould[[:space:]]+i\b|\bdo[[:space:]]+you[[:space:]]+want\b|\bprefer\b|\boption(s)?\b'; then
+    if printf '%s' "$prompt_lower" | grep -Eq '[[:space:]]or[[:space:]]|yes[[:space:]]+or[[:space:]]+no|either|option(s)?'; then
       return 0
     fi
   fi
@@ -16057,16 +16077,16 @@ $fallback_output"
           assay_iteration_cap=2
           ;;
         standard|auto)
-          assay_iteration_cap=2
+          assay_iteration_cap=3
           ;;
         long)
-          assay_iteration_cap=3
-          ;;
-        until-complete)
           assay_iteration_cap=4
           ;;
+        until-complete)
+          assay_iteration_cap=5
+          ;;
         *)
-          assay_iteration_cap=3
+          assay_iteration_cap=4
           ;;
       esac
       if [ "$max_iterations" -gt "$assay_iteration_cap" ]; then
@@ -16466,13 +16486,13 @@ EOF
           assay_runtime_ceiling=75
           ;;
         standard|auto)
-          assay_runtime_ceiling=75
-          ;;
-        long)
           assay_runtime_ceiling=105
           ;;
+        long)
+          assay_runtime_ceiling=150
+          ;;
         until-complete)
-          assay_runtime_ceiling=135
+          assay_runtime_ceiling=210
           ;;
         *)
           assay_runtime_ceiling=240
@@ -16974,6 +16994,14 @@ $web_context"
 Run mode directive:
 $run_mode_instruction"
     fi
+    if [ "$assay_run_profile" -eq 1 ]; then
+      augmented_user_prompt="${augmented_user_prompt}
+
+Assay mentoring contract:
+- Do not ask for user decisions; choose reasonable defaults and proceed.
+- While thinking, emit short timestamp-friendly step updates.
+- End with sections: Outcome, Verification Evidence, Risks, Next Improvement."
+    fi
     if [ -n "$(trim "$explicit_skill_context_text")" ]; then
       augmented_user_prompt="${augmented_user_prompt}
 
@@ -17390,6 +17418,10 @@ EOF
       printf '%s\n' "$decision_section" | sed -n 's/^option=//p' > "$decision_options_file"
       decision_requested=0
       decision_surface_category="none"
+      suppress_assay_decision_requests=0
+      if [ "$assay_run_profile" -eq 1 ] && [ "$run_mode" != "assistant" ]; then
+        suppress_assay_decision_requests=1
+      fi
       if [ -n "$decision_question" ] && [ "$decision_question" != "NONE" ] && [ -s "$decision_options_file" ]; then
         decision_requested=1
       fi
@@ -17403,6 +17435,14 @@ EOF
           decision_requested=0
           decision_surface_category="none"
         fi
+      fi
+      if [ "$decision_requested" -eq 1 ] && [ "$suppress_assay_decision_requests" -eq 1 ]; then
+        append_failure_entry "$failures_file" "decision-request-iteration-$iteration" \
+          "Suppressed decision request in assay run" \
+          "Assay mentoring contract requires autonomous default selection" \
+          "Proceed autonomously and surface assumptions in final sections"
+        decision_requested=0
+        decision_surface_category="none"
       fi
 
       prompt_lower_compliance=$(printf '%s' "$augmented_user_prompt" | tr '[:upper:]' '[:lower:]')
@@ -17447,7 +17487,7 @@ EOF
 )
       append_compliance_entry "$compliance_file" "$run_mode" "$state_mode" "$compliance_status" "$compliance_checks_text" "$compliance_findings" "$compliance_gate" "$compliance_next"
 
-      if [ "$decision_requested" -eq 0 ] && [ "$gate_check" = "required" ] && decision_commands_trigger_external_gate "$commands_text"; then
+      if [ "$decision_requested" -eq 0 ] && [ "$suppress_assay_decision_requests" -ne 1 ] && [ "$gate_check" = "required" ] && decision_commands_trigger_external_gate "$commands_text"; then
         decision_question="External/network actions are implied. Which path should I take?"
         cat > "$decision_options_file" <<'EOF'
 Proceed with local-only analysis and no external execution
@@ -17457,7 +17497,7 @@ EOF
         decision_requested=1
         decision_surface_category="external-action-gate"
       fi
-      if [ "$decision_requested" -eq 0 ] && decision_prompt_has_missing_required_inputs "$augmented_user_prompt"; then
+      if [ "$decision_requested" -eq 0 ] && [ "$suppress_assay_decision_requests" -ne 1 ] && decision_prompt_has_missing_required_inputs "$augmented_user_prompt"; then
         decision_question="Required inputs appear missing. How should I continue?"
         cat > "$decision_options_file" <<'EOF'
 Proceed with sensible defaults and clearly label assumptions
@@ -18626,7 +18666,7 @@ $iteration_report"
       if [ -z "$next_action_line" ]; then
         next_action_line="continue from the failure ledger and retry."
       fi
-      assistant_output="I couldn't complete the requested implementation in this run. Current mode: $final_state_mode. Next best step: $next_action_line"
+      assistant_output=$(structured_incomplete_run_message "$final_state_mode" "$next_action_line" "")
     fi
 
     if [ -z "$(trim "$assistant_output")" ] && grep -qi 'approval_required' "$failures_file"; then
@@ -18695,7 +18735,7 @@ EOF
 
     assistant_output=$(normalize_assistant_output "$assistant_output")
     if [ -n "$(trim "$assistant_output")" ] && ! printf '%s\n' "$assistant_output" | grep -Eq '[A-Za-z0-9]'; then
-      assistant_output="I couldn't complete the requested implementation in this run. Current mode: $final_state_mode. Next best step: continue from the failure ledger and retry."
+      assistant_output=$(structured_incomplete_run_message "$final_state_mode" "continue from the failure ledger and retry." "")
     fi
 
     if output_looks_derailed "$assistant_output"; then

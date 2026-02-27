@@ -105,6 +105,14 @@ assert_preview_case \
   "git status --short"
 
 assert_preview_case \
+  "none-should-i-without-options" \
+  "none" \
+  "Should I continue with this refactor now?" \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case \
   "none-missing-input-without-input-question" \
   "none" \
   "Deploy with <API_KEY> and <HOST>, values are missing." \
@@ -147,8 +155,8 @@ assert_preview_case \
 assert_preview_case \
   "precedence-explicit-over-risk" \
   "explicit-choice" \
-  "Should I continue with the production deletion workflow now?" \
-  "Should I continue now?" \
+  "For the production deletion workflow, should I continue now or stop and prepare a backup first?" \
+  "Should I continue now or stop and prepare backup first?" \
   "programming" \
   "git status --short"
 
