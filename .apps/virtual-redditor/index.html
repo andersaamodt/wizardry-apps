@@ -6252,7 +6252,27 @@
 
     async function toggleBackgroundPasses(enabled) {
       var shouldRun = !!enabled;
-      await toggleBotRun(shouldRun);
+      if (typeof state.passesTogglePendingValue === 'boolean') return;
+      try {
+        state.passesTogglePendingValue = shouldRun;
+        if (state.status && state.status.settings) {
+          state.status.settings.runEnabled = shouldRun;
+          renderStatus();
+        }
+        setSettingsMessage('Saving...', false);
+        if (state.previewMode) {
+          setSettingsMessage('', false);
+          return;
+        }
+        await backendJson('set-setting', ['RUN_ENABLED', shouldRun ? '1' : '0']);
+        setSettingsMessage('', false);
+        await refreshStatus();
+      } catch (error) {
+        setSettingsMessage(String(error && error.message ? error.message : error), true);
+      } finally {
+        state.passesTogglePendingValue = null;
+        renderStatus();
+      }
     }
 
     async function toggleObeyAdmins(enabled) {
