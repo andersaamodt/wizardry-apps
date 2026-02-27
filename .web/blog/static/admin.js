@@ -115,6 +115,11 @@
       const active = button.getAttribute('data-admin-nav') === sectionName;
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-selected', active ? 'true' : 'false');
+      if (active) {
+        button.setAttribute('aria-current', 'page');
+      } else {
+        button.removeAttribute('aria-current');
+      }
     });
     els.sections.forEach(function (section) {
       const active = section.getAttribute('data-admin-section') === sectionName;
