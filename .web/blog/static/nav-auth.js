@@ -172,14 +172,15 @@
   }
 
   function setAuthMessage(message, kind) {
-    if (!els.authMessage) {
+    var target = ensureAuthMessageEl();
+    if (!target) {
       return;
     }
     var text = String(message || '');
-    els.authMessage.textContent = text;
-    els.authMessage.className = 'auth-modal-message';
+    target.textContent = text;
+    target.className = 'auth-modal-message';
     if (text && kind) {
-      els.authMessage.classList.add('is-' + kind);
+      target.classList.add('is-' + kind);
     }
   }
 
@@ -1132,7 +1133,7 @@
         getPubkeyFn: typeof signer.getPublicKey === 'function'
           ? function () { return Promise.resolve(signer.getPublicKey()); }
           : null,
-        pubkeyHint: localStorage.getItem('last_auth_pubkey') || ''
+        pubkeyHint: ''
       }
     );
   }
@@ -1596,3 +1597,27 @@
 
   document.addEventListener('DOMContentLoaded', bootstrap);
 })();
+  function ensureAuthMessageEl() {
+    if (els.authMessage) {
+      return els.authMessage;
+    }
+    if (!els.authModal || !els.authModal.querySelector) {
+      return null;
+    }
+    var panel = els.authModal.querySelector('.auth-modal-panel');
+    if (!panel) {
+      return null;
+    }
+    var existing = panel.querySelector('#auth-modal-message');
+    if (existing) {
+      els.authMessage = existing;
+      return els.authMessage;
+    }
+    var node = document.createElement('div');
+    node.id = 'auth-modal-message';
+    node.className = 'auth-modal-message';
+    node.setAttribute('aria-live', 'polite');
+    panel.appendChild(node);
+    els.authMessage = node;
+    return els.authMessage;
+  }

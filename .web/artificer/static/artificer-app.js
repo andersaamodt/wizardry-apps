@@ -392,6 +392,7 @@
     activeConversation: null,
     activeConversationLoading: false,
     activeConversationLoadingKey: "",
+    conversationSwitchOverlay: false,
     activeConversationSelectedAt: 0,
     activeDraftWorkspaceId: "",
     draftTextByWorkspace: {},
@@ -805,6 +806,7 @@
 
     chatTitle: document.getElementById("chat-title"),
     chatLog: document.getElementById("chat-log"),
+    conversationSwitchOverlay: document.getElementById("conversation-switch-overlay"),
     chatJumpBottomBtn: document.getElementById("chat-jump-bottom-btn"),
     composerRow: document.getElementById("composer-row"),
     runForm: document.getElementById("run-form"),
@@ -7535,10 +7537,18 @@
     if (state.activeDraftWorkspaceId) {
       return false;
     }
-    if (state.activeConversationId && state.activeConversationLoading) {
-      return true;
-    }
     return !state.activeConversationId;
+  }
+
+  function renderConversationSwitchOverlay() {
+    if (!el.conversationSwitchOverlay) {
+      return;
+    }
+    var show = !!state.conversationSwitchOverlay &&
+      !!state.activeConversationId &&
+      !state.activeDraftWorkspaceId &&
+      !state.activeTriage;
+    el.conversationSwitchOverlay.classList.toggle("hidden", !show);
   }
 
   function renderRightPaneChrome() {
@@ -8497,11 +8507,7 @@
     }
 
     if (state.activeConversationLoading) {
-      var loadingMessagesMarkup = "<p class='empty-state empty-state-loading'><span class='run-spinner' aria-hidden='true'></span> Loading messages...</p>";
-      if (state.chatMarkupCache !== loadingMessagesMarkup) {
-        el.chatLog.innerHTML = loadingMessagesMarkup;
-        state.chatMarkupCache = loadingMessagesMarkup;
-      }
+      // Keep the currently visible thread while loading the next one.
       state.chatAutoScroll = true;
       state.chatLastKey = conversationKey;
       updateChatJumpButton();
@@ -8958,6 +8964,7 @@
     safeStep("renderDecisionRequestInline", renderDecisionRequestInline);
     safeStep("renderCommandApprovalInline", renderCommandApprovalInline);
     safeStep("renderChat", renderChat);
+    safeStep("renderConversationSwitchOverlay", renderConversationSwitchOverlay);
     safeStep("renderAttachmentStrip", renderAttachmentStrip);
     safeStep("renderRunTodoMonitor", renderRunTodoMonitor);
     safeStep("renderQueueTray", renderQueueTray);
@@ -10683,6 +10690,7 @@
   function selectWorkspace(workspaceId) {
     var selectionVersion = newSelectionVersion();
     state.chatAutoScroll = true;
+    state.conversationSwitchOverlay = false;
     rememberActiveComposerDraft();
     var workspace = getWorkspaceById(workspaceId);
     if (!workspace) {
@@ -10778,6 +10786,12 @@
     }
     state.chatAutoScroll = true;
     state.activeTriage = false;
+    var switchingConversation = (
+      String(state.activeWorkspaceId || "") !== String(workspaceId || "") ||
+      String(state.activeConversationId || "") !== String(conversationId || "") ||
+      !!state.activeDraftWorkspaceId
+    );
+    var previousConversation = switchingConversation ? cloneConversationData(state.activeConversation) : null;
     state.activeWorkspaceId = workspaceId;
     state.activeConversationId = conversationId;
     var workspace = getWorkspaceById(workspaceId);
@@ -10812,9 +10826,16 @@
     );
     var hasCachedDraft = hasComposerDraftForKey(outgoingKeyFor(workspaceId, conversationId, ""));
     var canRenderCachedConversation = hasCachedMessages && hasCachedDraft;
-    state.activeConversation = canRenderCachedConversation ? cachedConversation : null;
+    if (canRenderCachedConversation) {
+      state.activeConversation = cachedConversation;
+    } else if (switchingConversation && previousConversation) {
+      state.activeConversation = previousConversation;
+    } else {
+      state.activeConversation = null;
+    }
     state.activeConversationSelectedAt = Date.now();
     setActiveConversationLoading(workspaceId, conversationId, !canRenderCachedConversation);
+    state.conversationSwitchOverlay = switchingConversation && !canRenderCachedConversation;
     state.activeDraftWorkspaceId = "";
     state.openWorkspaceMenuWorkspaceId = "";
     state.expandedWorkspaceIds[workspaceId] = true;
@@ -10841,6 +10862,10 @@
             return loadConversation({ showLoading: !canRenderCachedConversation, applyComposerDraft: true });
           })
           .catch(function () {
+            if (isSelectionVersionCurrent(selectionVersion)) {
+              state.conversationSwitchOverlay = false;
+              renderUi();
+            }
             throw firstErr;
           });
       })
@@ -10848,6 +10873,7 @@
         if (!isSelectionVersionCurrent(selectionVersion)) {
           return;
         }
+        state.conversationSwitchOverlay = false;
         resetComposerAttachments();
         return refreshGitStatus().catch(function () {
           return null;
@@ -10889,6 +10915,7 @@
   function selectDraft(workspaceId) {
     var selectionVersion = newSelectionVersion();
     rememberActiveComposerDraft();
+    state.conversationSwitchOverlay = false;
     if (state.queueEdit.itemId) {
       clearQueueEditState();
     }
@@ -10940,6 +10967,7 @@
     rememberActiveComposerDraft();
     state.chatAutoScroll = true;
     state.activeTriage = false;
+    state.conversationSwitchOverlay = false;
     state.activeWorkspaceId = workspaceId;
     state.activeConversationId = "";
     state.activeConversation = null;
