@@ -209,6 +209,51 @@
     }
   }
 
+  function requestSignerApproval(signEventFn, template, waitingMessage, timeoutMs) {
+    var waitText = String(waitingMessage || 'Waiting for signer approval...');
+    var timeout = Number(timeoutMs || 70000);
+    if (!isFinite(timeout) || timeout < 1000) {
+      timeout = 70000;
+    }
+    var settled = false;
+    var hintTimer = setTimeout(function () {
+      if (settled) {
+        return;
+      }
+      setAuthMessage(waitText + ' If the signer window is already open, switch to it and approve.', 'warn');
+      try {
+        if (typeof window.focus === 'function') {
+          window.focus();
+        }
+      } catch (_focusErr) {
+        // noop
+      }
+    }, 1200);
+    var timeoutTimer = setTimeout(function () {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(hintTimer);
+    }, timeout);
+    return Promise.resolve(signEventFn(template)).then(function (result) {
+      if (settled) {
+        throw new Error('Signer approval timed out.');
+      }
+      settled = true;
+      clearTimeout(hintTimer);
+      clearTimeout(timeoutTimer);
+      return result;
+    }).catch(function (err) {
+      clearTimeout(hintTimer);
+      clearTimeout(timeoutTimer);
+      if (settled && (!err || !err.message)) {
+        throw new Error('Signer approval timed out.');
+      }
+      throw err;
+    });
+  }
+
   function setAuthControlsDisabled(disabled) {
     var isDisabled = !!disabled;
     [
@@ -1080,7 +1125,12 @@
           .then(function (begin) {
             var authTemplate = authEventTemplate(begin.challenge, 'login', pubkeyHint);
             setAuthMessage('Sign the login challenge event...', 'warn');
-            return Promise.resolve(signEventFn(authTemplate)).then(function (signedAuth) {
+            return requestSignerApproval(
+              signEventFn,
+              authTemplate,
+              'Step 1 of 2: approve login in your signer',
+              70000
+            ).then(function (signedAuth) {
               var userPubkey = signedEventPubkey(signedAuth);
               if (!userPubkey && getPubkeyFn) {
                 return Promise.resolve(getPubkeyFn()).then(function (fallbackPubkey) {
@@ -1109,8 +1159,13 @@
             if (intent.mode === 'approve') {
               state.pendingDeviceSession = createSessionRecord(payload.userPubkey, intent.days);
               var delegationTemplate = delegationEventTemplate(state.pendingDeviceSession, payload.userPubkey);
-              setAuthMessage('Sign delegation for approved device session...', 'warn');
-              return Promise.resolve(signEventFn(delegationTemplate)).then(function (signedDelegation) {
+              setAuthMessage('Step 2 of 2: approve device session delegation in your signer...', 'warn');
+              return requestSignerApproval(
+                signEventFn,
+                delegationTemplate,
+                'Step 2 of 2: approve device session delegation in your signer',
+                70000
+              ).then(function (signedDelegation) {
                 delegationSigned = signedDelegation;
                 return {
                   begin: payload.begin,
@@ -1161,13 +1216,7 @@
     }
     return signInWithSigner(
       function (template) {
-        var pendingHintTimer = setTimeout(function () {
-          setAuthMessage('Waiting for signer approval. If nos2x-fox is already open, switch to it and approve.', 'warn');
-        }, 1200);
-        return Promise.resolve(signer.signEvent(template))
-          .finally(function () {
-            clearTimeout(pendingHintTimer);
-          });
+        return Promise.resolve(signer.signEvent(template));
       },
       {
         getPubkeyFn: typeof signer.getPublicKey === 'function'

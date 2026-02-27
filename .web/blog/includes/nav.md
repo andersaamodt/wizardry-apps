@@ -58,6 +58,8 @@
       </label>
     </div>
 
+    <div id="auth-modal-message" class="auth-modal-message" aria-live="polite"></div>
+
     <div class="auth-actions auth-actions-primary auth-actions-stack">
       <div class="auth-action-row">
         <button id="auth-nip07-btn" class="auth-secondary-btn" type="button">Login with desktop signer</button>
@@ -108,10 +110,9 @@
       </div>
     </div>
 
-    <div id="auth-modal-message" class="auth-modal-message" aria-live="polite"></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/nostr-tools@2.7.2/lib/nostr.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-<script src="/static/nav-auth.js?v=20260227-loginflowfix4"></script>
+<script src="/static/nav-auth.js?v=20260227-loginflowfix5"></script>
