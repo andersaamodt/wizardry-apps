@@ -1167,7 +1167,7 @@
           html += userCardActionButton('Remove Admin', 'remove_admin', username, '');
         }
         if (isBelow) {
-          html += userCardActionButton('Promote Above Me...', 'promote_above', username, '');
+          html += userCardActionButton('Promote Above...', 'promote_above', username, '');
         }
         html += userCardActionButton(prioritiesTrashIconSvg() + '<span>Delete account...</span>', 'delete', username, 'user-delete');
         html += '</div>';
