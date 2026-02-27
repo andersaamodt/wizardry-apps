@@ -7049,10 +7049,6 @@
     if (!pushed.length) {
       return;
     }
-    if (pushed.length > 4) {
-      // Keep motion smooth by limiting bar-advance per update.
-      pushed = pushed.slice(pushed.length - 4);
-    }
     var framePeak = 0;
     for (var pi = 0; pi < pushed.length; pi += 1) {
       if (pushed[pi] > framePeak) {
@@ -7287,13 +7283,13 @@
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
         var sampleNow = Date.now();
-        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 32) {
+        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 16) {
           dictationWaveRafId = requestAnimationFrame(sample);
           return;
         }
         dictationWaveLastSampleAt = sampleNow;
         var len = dictationWaveData.length;
-        var barsPerFrame = 2;
+        var barsPerFrame = 8;
         var windowSamples = Math.min(128, len);
         var sliceSamples = Math.max(6, Math.floor(windowSamples / barsPerFrame));
         var consumed = sliceSamples * barsPerFrame;
@@ -7417,34 +7413,12 @@
           }
           var normalizedSequence = [];
           if (parsedIncoming.length) {
-            var prevSeq = Array.isArray(dictationWaveBackendRecentLevels) ? dictationWaveBackendRecentLevels : [];
-            var overlap = 0;
-            var maxOverlap = prevSeq.length < parsedIncoming.length ? prevSeq.length : parsedIncoming.length;
-            for (var oi = maxOverlap; oi > 0; oi -= 1) {
-              var matched = true;
-              for (var oj = 0; oj < oi; oj += 1) {
-                var prevValue = Number(prevSeq[prevSeq.length - oi + oj] || 0);
-                var nextValue = Number(parsedIncoming[oj] || 0);
-                if (Math.abs(prevValue - nextValue) > 0.00001) {
-                  matched = false;
-                  break;
-                }
-              }
-              if (matched) {
-                overlap = oi;
-                break;
-              }
-            }
-            var appended = parsedIncoming.slice(overlap);
-            for (var ni = 0; ni < appended.length; ni += 1) {
-              normalizedSequence.push(normalizedDictationBackendLevel(appended[ni]));
+            for (var ni = 0; ni < parsedIncoming.length; ni += 1) {
+              normalizedSequence.push(normalizedDictationBackendLevel(parsedIncoming[ni]));
             }
             dictationWaveBackendRecentLevels = parsedIncoming.slice(parsedIncoming.length - 18);
           }
           if (normalizedSequence.length) {
-            if (normalizedSequence.length > 4) {
-              normalizedSequence = normalizedSequence.slice(normalizedSequence.length - 4);
-            }
             normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
           }
           dictationWaveBackendLevel = normalizedBackend;
@@ -7462,7 +7436,7 @@
         }).catch(function () {
           return null;
         });
-      }, 34);
+      }, 24);
     }
 
     if (dictationWaveStream && dictationWaveAnalyser && dictationWaveData) {
