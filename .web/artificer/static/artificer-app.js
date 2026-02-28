@@ -7753,7 +7753,7 @@
     if (signal < 0) {
       signal = 0;
     }
-    var dynamicRange = Math.max(0.0025, gate * 4.6);
+    var dynamicRange = Math.max(0.0025, gate * 6.2);
     var normalized = signal / dynamicRange;
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
@@ -7761,7 +7761,7 @@
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.82);
+      normalized = Math.pow(normalized, 1.12);
     }
     if (normalized < 0.0032) {
       normalized = 0;
@@ -7784,18 +7784,18 @@
     if (raw > (floor * 2.0) + 0.016) {
       effectiveFloor = floor * 0.78;
     }
-    var gate = (effectiveFloor * 1.3) + 0.0012;
+    var gate = (effectiveFloor * 1.22) + 0.001;
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.012, (0.048 + (effectiveFloor * 0.95)));
+    var normalized = (raw - gate) / Math.max(0.016, (0.082 + (effectiveFloor * 1.4)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.8);
+      normalized = Math.pow(normalized, 1.08);
     }
     if (normalized < 0.0022) {
       normalized = 0;
@@ -7883,18 +7883,18 @@
       }
     } else {
       var speechPresent = speechProbe > (target + Math.max(0.01, target * 1.6));
-      var deadband = Math.max(0.0018, floor * 0.12);
+      var deadband = Math.max(0.0025, floor * 0.2);
       if (speechPresent) {
         if (target < floor - deadband) {
           // During speech, allow floor to drop (unlock), but never rise.
-          floor = (floor * 0.86) + (target * 0.14);
+          floor = (floor * 0.92) + (target * 0.08);
         }
       } else if (target > floor + deadband) {
         // Outside speech, rise slowly to avoid re-normalization churn.
-        floor = (floor * 0.97) + (target * 0.03);
+        floor = (floor * 0.99) + (target * 0.01);
       } else if (target < floor - deadband) {
         // Drop faster so silence can recover to near-zero quickly.
-        floor = (floor * 0.82) + (target * 0.18);
+        floor = (floor * 0.9) + (target * 0.1);
       }
     }
     if (floor < 0.0008) {
@@ -8080,22 +8080,13 @@
           return;
         }
         var avgRaw = dictationWaveBarSampleCount > 0 ? (dictationWaveBarSumRaw / dictationWaveBarSampleCount) : rawLevel;
-        var summarizedRaw = (avgRaw * 0.45) + (Number(dictationWaveBarPeakRaw || 0) * 0.55);
+        var summarizedRaw = (avgRaw * 0.68) + (Number(dictationWaveBarPeakRaw || 0) * 0.32);
         dictationWaveBarStartAt = sampleNow;
         dictationWaveBarPeakRaw = 0;
         dictationWaveBarSumRaw = 0;
         dictationWaveBarSampleCount = 0;
         calibrateDictationWaveNoiseFloor(summarizedRaw);
         var normalizedLevel = normalizedDictationWaveSliceLevel(summarizedRaw);
-        if (normalizedLevel <= 0 && summarizedRaw > (dictationWaveNoiseFloor + 0.0015)) {
-          var floorBase = Math.max(0.0005, Number(dictationWaveNoiseFloor || 0));
-          normalizedLevel = ((summarizedRaw / floorBase) - 1) / 3.5;
-          if (!isFinite(normalizedLevel) || normalizedLevel < 0) {
-            normalizedLevel = 0;
-          } else if (normalizedLevel > 1) {
-            normalizedLevel = 1;
-          }
-        }
         if (!dictationWaveSeenSignal && summarizedRaw > (dictationWaveNoiseFloor + 0.0015)) {
           dictationWaveSeenSignal = true;
         }
@@ -8204,8 +8195,8 @@
       }
       return navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
+          echoCancellation: true,
+          noiseSuppression: true,
           autoGainControl: false
         }
       }).then(function (stream) {
