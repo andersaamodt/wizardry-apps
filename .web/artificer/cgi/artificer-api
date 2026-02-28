@@ -6241,10 +6241,10 @@ dictation_live_level_for_session() {
   awk -v db="$level_db" '
     BEGIN {
       v = db + 0.0
-      if (v < -80) v = -80
+      if (v < -78) v = -78
       if (v > -6) v = -6
-      # Convert dBFS to linear amplitude; frontend handles adaptive gating.
-      level = 10 ^ (v / 20.0)
+      # Map dBFS to a UI-friendly 0..1 range; frontend handles adaptive gating.
+      level = (v + 78) / 72
       if (level < 0) level = 0
       if (level > 1) level = 1
       printf "%.5f", level
@@ -6301,9 +6301,9 @@ dictation_live_levels_json_for_session() {
         next
       }
       v = raw + 0.0
-      if (v < -80) v = -80
+      if (v < -78) v = -78
       if (v > -6) v = -6
-      level = 10 ^ (v / 20.0)
+      level = (v + 78) / 72
       if (level < 0) level = 0
       if (level > 1) level = 1
       if (!first) {
