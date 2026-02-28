@@ -7715,17 +7715,11 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var effectiveFloor = floor;
-    // When a clear speech transient appears above the learned floor, reduce
-    // floor influence so bars can recover quickly from a prior deep clamp.
-    if (raw > (floor * 2.2) + 0.015) {
-      effectiveFloor = floor * 0.72;
-    }
-    var gate = (effectiveFloor * 1.18) + 0.0008;
+    var gate = (floor * 1.12) + 0.0008;
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.012, (0.045 + (effectiveFloor * 1.1)));
+    var normalized = (raw - gate) / Math.max(0.01, (0.032 + (floor * 0.9)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
@@ -7734,7 +7728,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.58);
     }
-    if (normalized < 0.0035) {
+    if (normalized < 0.0024) {
       normalized = 0;
     }
     return normalized;
@@ -7766,20 +7760,13 @@
     var sorted = samples.slice().sort(function (a, b) {
       return a - b;
     });
-    var targetIdx = Math.floor((sorted.length - 1) * 0.15);
+    var targetIdx = Math.floor((sorted.length - 1) * 0.12);
     if (targetIdx < 0) {
       targetIdx = 0;
     } else if (targetIdx >= sorted.length) {
       targetIdx = sorted.length - 1;
     }
-    var speechIdx = Math.floor((sorted.length - 1) * 0.7);
-    if (speechIdx < 0) {
-      speechIdx = 0;
-    } else if (speechIdx >= sorted.length) {
-      speechIdx = sorted.length - 1;
-    }
     var target = Number(sorted[targetIdx] || 0);
-    var speechProbe = Number(sorted[speechIdx] || 0);
     if (!isFinite(target) || target < 0) {
       target = 0;
     }
@@ -7787,16 +7774,17 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var speechPresent = speechProbe > ((target * 2.0) + 0.01);
     if (target > floor) {
-      floor = speechPresent ? ((floor * 0.97) + (target * 0.03)) : ((floor * 0.9) + (target * 0.1));
+      // Rise slowly so speech transients do not flatten local dynamics.
+      floor = (floor * 0.9) + (target * 0.1);
     } else {
-      floor = speechPresent ? ((floor * 0.7) + (target * 0.3)) : ((floor * 0.6) + (target * 0.4));
+      // Fall faster so recovery from a high learned floor is quick and reversible.
+      floor = (floor * 0.72) + (target * 0.28);
     }
     if (floor < 0.0008) {
       floor = 0.0008;
-    } else if (floor > 0.12) {
-      floor = 0.12;
+    } else if (floor > 0.06) {
+      floor = 0.06;
     }
     dictationWaveBackendFloor = floor;
     return floor;
@@ -8178,7 +8166,7 @@
     var silencePhase = Number(dictationWaveSilencePhase || 0);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.006;
+    var silenceGate = 0.0048;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
