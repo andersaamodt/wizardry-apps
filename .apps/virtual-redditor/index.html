@@ -1972,6 +1972,7 @@
     function positionModeMenus() {
       positionInlineDropdownMenu(document.getElementById('mode-dropdown-menu'));
       positionInlineDropdownMenu(document.getElementById('patrol-mode-dropdown-menu'));
+      positionInlineDropdownMenu(document.getElementById('trait-predominance-menu'));
     }
 
     function openModeMenu() {
@@ -2004,6 +2005,24 @@
     function closePatrolModeMenu() {
       var menu = document.getElementById('patrol-mode-dropdown-menu');
       var button = document.getElementById('patrol-mode-dropdown-btn');
+      if (!menu || !button) return;
+      menu.classList.add('hidden');
+      menu.style.removeProperty('--menu-shift-x');
+      button.setAttribute('aria-expanded', 'false');
+    }
+
+    function openTraitPredominanceMenu() {
+      var menu = document.getElementById('trait-predominance-menu');
+      var button = document.getElementById('trait-predominance-btn');
+      if (!menu || !button) return;
+      menu.classList.remove('hidden');
+      positionInlineDropdownMenu(menu);
+      button.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeTraitPredominanceMenu() {
+      var menu = document.getElementById('trait-predominance-menu');
+      var button = document.getElementById('trait-predominance-btn');
       if (!menu || !button) return;
       menu.classList.add('hidden');
       menu.style.removeProperty('--menu-shift-x');
@@ -4655,9 +4674,22 @@
       out.behaviors.latencyJitterSec = Object.assign({}, base.behaviors.latencyJitterSec, ((src.behaviors || {}).latencyJitterSec) || {});
       out.behaviors.banJitterSec = Object.assign({}, base.behaviors.banJitterSec, ((src.behaviors || {}).banJitterSec) || {});
       out.behaviors.bigFive = Object.assign({}, base.behaviors.bigFive, ((src.behaviors || {}).bigFive) || {});
+      out.behaviors.traits = normalizeTraitsMap((out.behaviors || {}).traits);
+      out.behaviors.traitPredominance = normalizeTraitPredominance(out.behaviors.traitPredominance || 'blend');
+      out.behaviors.primaryTrait = normalizeTraitId(out.behaviors.primaryTrait || '');
+      var styleTraits = enabledTraitIds(out.behaviors.traits, 'style');
+      if (!styleTraits.length) {
+        out.behaviors.traits.typical_redditor = out.behaviors.traits.typical_redditor || { enabled: false, expression: 'style' };
+        out.behaviors.traits.typical_redditor.enabled = true;
+        out.behaviors.traits.typical_redditor.expression = 'style';
+        styleTraits = enabledTraitIds(out.behaviors.traits, 'style');
+      }
+      if (styleTraits.indexOf(out.behaviors.primaryTrait) < 0) {
+        out.behaviors.primaryTrait = styleTraits[0] || 'typical_redditor';
+      }
+      delete out.behaviors.personality;
       out.behaviors.humorStyle = String(out.behaviors.humorStyle || 'dry');
       out.behaviors.humorAmount = String(out.behaviors.humorAmount || 'medium');
-      out.behaviors.personality = String(out.behaviors.personality || 'typical_redditor');
       out.behaviors.personalityStrength = String(out.behaviors.personalityStrength || 'balanced').toLowerCase();
       if (['subtle', 'balanced', 'strong'].indexOf(out.behaviors.personalityStrength) < 0) {
         out.behaviors.personalityStrength = 'balanced';
@@ -5258,7 +5290,9 @@
     function openModeDrawer(modeId) {
       var wanted = String(modeId || '').trim();
       if (!wanted) return;
-      var cfg = normalizeModesConfig(state.modesConfig);
+      var cfg = document.getElementById('traits-editor-list')
+        ? collectModesConfigFromUi()
+        : normalizeModesConfig(state.modesConfig);
       if (!findModeById(cfg, wanted)) return;
       if (state.modeDrawerModeId !== wanted) state.modeDrawerTriggerEditIdx = -1;
       state.modeDrawerModeId = wanted;
@@ -5719,21 +5753,22 @@
     }
 
     function updatePersonaStyleWarnings() {
-      var personality = String((document.getElementById('behavior-personality') || {}).value || '');
       var tone = String((document.getElementById('behavior-mirror-tone') || {}).value || '');
       var humorStyle = String((document.getElementById('behavior-humor-style') || {}).value || '');
-
-      var personalityWarn = document.getElementById('behavior-personality-warning');
+      var traitsWarn = document.getElementById('behavior-traits-warning');
       var toneWarn = document.getElementById('behavior-tone-warning');
       var humorWarn = document.getElementById('behavior-humor-style-warning');
+      var cfg = normalizeModesConfig(state.modesConfig);
+      var traits = (((cfg || {}).behaviors || {}).traits) || {};
+      var trollEnabled = !!(traits.troll && traits.troll.enabled);
 
-      if (personalityWarn) {
-        if (personality === 'troll') {
-          personalityWarn.textContent = 'Warning: troll personas tend to get banned; you assume risk. Soften with other controls.';
-          personalityWarn.classList.remove('hidden');
+      if (traitsWarn) {
+        if (trollEnabled) {
+          traitsWarn.textContent = 'Warning: Troll traits tend to attract bans and reporting risk.';
+          traitsWarn.classList.remove('hidden');
         } else {
-          personalityWarn.textContent = '';
-          personalityWarn.classList.add('hidden');
+          traitsWarn.textContent = '';
+          traitsWarn.classList.add('hidden');
         }
       }
 
@@ -5756,6 +5791,122 @@
           humorWarn.classList.add('hidden');
         }
       }
+    }
+
+    function syncPersonaDrawerState() {
+      var workarea = document.getElementById('persona-workarea');
+      var bigfiveDrawer = document.getElementById('persona-bigfive-drawer');
+      var traitsDrawer = document.getElementById('persona-traits-drawer');
+      var anyOpen = !!(state.personaBigFiveOpen || state.personaTraitsOpen);
+      if (bigfiveDrawer) {
+        bigfiveDrawer.classList.toggle('open', !!state.personaBigFiveOpen);
+        bigfiveDrawer.setAttribute('aria-hidden', state.personaBigFiveOpen ? 'false' : 'true');
+      }
+      if (traitsDrawer) {
+        traitsDrawer.classList.toggle('open', !!state.personaTraitsOpen);
+        traitsDrawer.setAttribute('aria-hidden', state.personaTraitsOpen ? 'false' : 'true');
+      }
+      if (workarea) workarea.classList.toggle('drawer-open', anyOpen);
+    }
+
+    function renderTraitsSummary(behaviors) {
+      var summary = document.getElementById('traits-summary');
+      if (!summary) return;
+      var traitsMap = (behaviors && behaviors.traits) ? behaviors.traits : defaultTraitsMap();
+      var styleIds = enabledTraitIds(traitsMap, 'style');
+      var summonIds = enabledTraitIds(traitsMap, 'summons');
+      var preview = styleIds.slice(0, 2).map(function (id) { return traitLabel(id); }).join(', ');
+      if (!styleIds.length) {
+        summary.textContent = 'No style traits selected.';
+      } else if (styleIds.length <= 2) {
+        summary.textContent = preview;
+      } else {
+        summary.textContent = preview + ' +' + String(styleIds.length - 2);
+      }
+      summary.title = (
+        'Style traits: ' + (styleIds.length ? styleIds.map(traitLabel).join(', ') : 'none') +
+        ' • Summon traits: ' + (summonIds.length ? summonIds.map(traitLabel).join(', ') : 'none')
+      );
+    }
+
+    function fillTraitPrimarySelect(behaviors) {
+      var primary = document.getElementById('behavior-trait-primary');
+      if (!primary) return;
+      var traitsMap = (behaviors && behaviors.traits) ? behaviors.traits : defaultTraitsMap();
+      var styleIds = enabledTraitIds(traitsMap, 'style');
+      if (!styleIds.length) styleIds = ['typical_redditor'];
+      var selectedPrimary = normalizeTraitId((behaviors && behaviors.primaryTrait) || '');
+      if (styleIds.indexOf(selectedPrimary) < 0) selectedPrimary = styleIds[0];
+      primary.innerHTML = styleIds.map(function (id) {
+        return '<option value="' + escapeHtml(id) + '">' + escapeHtml(traitLabel(id)) + '</option>';
+      }).join('');
+      primary.value = selectedPrimary;
+      primary.title = 'Primary trait used when predominance requires a single lead trait.';
+    }
+
+    function updateTraitPrimaryVisibility() {
+      var shell = document.getElementById('trait-primary-shell');
+      if (!shell) return;
+      var predominance = normalizeTraitPredominance(String((document.getElementById('behavior-trait-predominance') || {}).value || 'blend'));
+      var show = predominance !== 'blend';
+      shell.classList.toggle('hidden', !show);
+      shell.setAttribute('aria-hidden', show ? 'false' : 'true');
+    }
+
+    function updateTraitPredominanceDropdown(value) {
+      var normalized = normalizeTraitPredominance(value || 'blend');
+      var input = document.getElementById('behavior-trait-predominance');
+      var button = document.getElementById('trait-predominance-btn');
+      if (input) input.value = normalized;
+      if (button) {
+        var meta = TRAIT_PREDOMINANCE_DESCRIPTIONS[normalized] || TRAIT_PREDOMINANCE_DESCRIPTIONS.blend;
+        button.innerHTML = '<span class="mode-selected-name">' + escapeHtml(meta.label) + '</span>';
+        button.title = meta.tooltip;
+      }
+      var rows = document.querySelectorAll('#trait-predominance-menu [data-trait-predominance-option]');
+      for (var i = 0; i < rows.length; i += 1) {
+        rows[i].classList.toggle('active', rows[i].getAttribute('data-trait-predominance-option') === normalized);
+      }
+      updateTraitPrimaryVisibility();
+    }
+
+    function renderTraitsSummonsWarning(behaviors) {
+      var warning = document.getElementById('traits-summons-warning');
+      if (!warning) return;
+      var summonToggle = document.getElementById('behavior-summonable');
+      var summonEnabled = summonToggle ? !!summonToggle.checked : !!((behaviors || {}).summonable);
+      if (!summonEnabled) {
+        warning.textContent = 'Summons are disabled on Behavior, so trait summon settings are inactive.';
+        warning.classList.remove('hidden');
+      } else {
+        warning.textContent = '';
+        warning.classList.add('hidden');
+      }
+    }
+
+    function renderPersonaTraitsPanel(behaviors) {
+      var list = document.getElementById('traits-editor-list');
+      if (!list) return;
+      var traitsMap = normalizeTraitsMap((behaviors || {}).traits);
+      list.innerHTML = TRAIT_CATALOG.map(function (meta) {
+        var row = traitsMap[meta.id] || { enabled: false, expression: 'style' };
+        var expression = normalizeTraitExpression(row.expression);
+        return [
+          '<div class="traits-editor-row" data-trait-row="' + escapeHtml(meta.id) + '">',
+          '  <label class="traits-editor-trait" title="' + escapeHtml(meta.hint) + '">',
+          '    <input type="checkbox" data-trait-enabled="' + escapeHtml(meta.id) + '"' + (row.enabled ? ' checked' : '') + '>',
+          '    <span>' + escapeHtml(meta.label) + '</span>',
+          '  </label>',
+          '  <select data-trait-expression="' + escapeHtml(meta.id) + '" title="' + escapeHtml(traitExpressionTooltip(expression)) + '">',
+          '    <option value="style"' + (expression === 'style' ? ' selected' : '') + '>Style</option>',
+          '    <option value="summons"' + (expression === 'summons' ? ' selected' : '') + '>Summons</option>',
+          '    <option value="both"' + (expression === 'both' ? ' selected' : '') + '>Both</option>',
+          '  </select>',
+          '</div>'
+        ].join('');
+      }).join('');
+      renderTraitsSummonsWarning(behaviors || {});
+      syncControlAndLabelTooltips(list);
     }
 
     function bigFiveSymbol(level) {
@@ -5798,25 +5949,14 @@
     function closePersonaBigFiveDrawer() {
       state.personaBigFiveOpen = false;
       state.personaBigFiveFocusTrait = '';
-      var drawer = document.getElementById('persona-bigfive-drawer');
-      var workarea = document.getElementById('persona-workarea');
-      if (drawer) {
-        drawer.classList.remove('open');
-        drawer.setAttribute('aria-hidden', 'true');
-      }
-      if (workarea) workarea.classList.remove('drawer-open');
+      syncPersonaDrawerState();
     }
 
     function openPersonaBigFiveDrawer(focusTrait) {
       state.personaBigFiveOpen = true;
+      state.personaTraitsOpen = false;
       state.personaBigFiveFocusTrait = String(focusTrait || '').toLowerCase();
-      var drawer = document.getElementById('persona-bigfive-drawer');
-      var workarea = document.getElementById('persona-workarea');
-      if (drawer) {
-        drawer.classList.add('open');
-        drawer.setAttribute('aria-hidden', 'false');
-      }
-      if (workarea) workarea.classList.add('drawer-open');
+      syncPersonaDrawerState();
       if (state.personaBigFiveFocusTrait) {
         var selector = '#behavior-bigfive-' + state.personaBigFiveFocusTrait;
         requestAnimationFrame(function () {
@@ -5824,6 +5964,21 @@
           if (focusEl && typeof focusEl.focus === 'function') focusEl.focus();
         });
       }
+    }
+
+    function closePersonaTraitsDrawer() {
+      state.personaTraitsOpen = false;
+      syncPersonaDrawerState();
+    }
+
+    function openPersonaTraitsDrawer() {
+      state.personaTraitsOpen = true;
+      state.personaBigFiveOpen = false;
+      syncPersonaDrawerState();
+      requestAnimationFrame(function () {
+        var focusEl = document.querySelector('#traits-editor-list [data-trait-enabled]');
+        if (focusEl && typeof focusEl.focus === 'function') focusEl.focus();
+      });
     }
 
     function renderBigFiveSummary(behaviors) {
@@ -5867,7 +6022,8 @@
     function renderBehaviorsPanel() {
       var cfg = normalizeModesConfig(state.modesConfig);
       var behaviors = cfg.behaviors || {};
-      var personality = document.getElementById('behavior-personality');
+      var traitPredominance = document.getElementById('behavior-trait-predominance');
+      var traitPrimary = document.getElementById('behavior-trait-primary');
       var personalityStrength = document.getElementById('behavior-personality-strength');
       var mirror = document.getElementById('behavior-mirror-tone');
       var directness = document.getElementById('behavior-directness');
@@ -5885,7 +6041,8 @@
       var latencyUnit = document.getElementById('behavior-latency-unit');
       var banMin = document.getElementById('behavior-ban-min');
       var banMax = document.getElementById('behavior-ban-max');
-      if (personality) personality.value = String(behaviors.personality || 'typical_redditor');
+      var normalizedTraits = normalizeTraitsMap(behaviors.traits);
+      behaviors.traits = normalizedTraits;
       if (personalityStrength) personalityStrength.value = String(behaviors.personalityStrength || 'balanced');
       if (mirror) mirror.value = String(behaviors.mirrorTone || 'mirror_or_less');
       if (directness) directness.value = String(behaviors.directness || 'balanced');
@@ -5907,8 +6064,15 @@
       if (latencyMax) latencyMax.value = String(latencyUiValueFromSeconds(latencyMaxSec, latencyUiUnit));
       if (banMin) banMin.value = String((((behaviors.banJitterSec || {}).min) || 7));
       if (banMax) banMax.value = String((((behaviors.banJitterSec || {}).max) || 45));
+      updateTraitPredominanceDropdown(String(behaviors.traitPredominance || 'blend'));
+      if (traitPredominance) traitPredominance.value = normalizeTraitPredominance(behaviors.traitPredominance || 'blend');
+      fillTraitPrimarySelect(behaviors);
+      if (traitPrimary) traitPrimary.value = normalizeTraitId(behaviors.primaryTrait || traitPrimary.value || '');
+      renderTraitsSummary(behaviors);
+      renderPersonaTraitsPanel(behaviors);
       renderBigFiveSummary(behaviors);
       renderPersonaBigFivePanel(behaviors);
+      syncPersonaDrawerState();
       updatePersonaStyleWarnings();
       validateBehaviorRangesUi();
     }
@@ -6278,7 +6442,29 @@
     function collectModesConfigFromUi() {
       var cfg = normalizeModesConfig(cloneJson(state.modesConfig));
 
-      cfg.behaviors.personality = String((document.getElementById('behavior-personality') || {}).value || 'typical_redditor');
+      var traitsMap = {};
+      for (var ti = 0; ti < TRAIT_CATALOG.length; ti += 1) {
+        var traitId = TRAIT_CATALOG[ti].id;
+        var enabledEl = document.querySelector('#traits-editor-list [data-trait-enabled="' + traitId + '"]');
+        var expressionEl = document.querySelector('#traits-editor-list [data-trait-expression="' + traitId + '"]');
+        var fallbackTrait = (((cfg.behaviors || {}).traits || {})[traitId]) || { enabled: false, expression: 'style' };
+        traitsMap[traitId] = {
+          enabled: enabledEl ? !!enabledEl.checked : !!fallbackTrait.enabled,
+          expression: normalizeTraitExpression(expressionEl ? expressionEl.value : fallbackTrait.expression)
+        };
+      }
+      cfg.behaviors.traits = normalizeTraitsMap(traitsMap);
+      cfg.behaviors.traitPredominance = normalizeTraitPredominance(String((document.getElementById('behavior-trait-predominance') || {}).value || 'blend'));
+      cfg.behaviors.primaryTrait = normalizeTraitId(String((document.getElementById('behavior-trait-primary') || {}).value || ''));
+      var styleTraitIds = enabledTraitIds(cfg.behaviors.traits, 'style');
+      if (!styleTraitIds.length) {
+        cfg.behaviors.traits.typical_redditor.enabled = true;
+        cfg.behaviors.traits.typical_redditor.expression = 'style';
+        styleTraitIds = enabledTraitIds(cfg.behaviors.traits, 'style');
+      }
+      if (styleTraitIds.indexOf(cfg.behaviors.primaryTrait) < 0) {
+        cfg.behaviors.primaryTrait = styleTraitIds[0] || 'typical_redditor';
+      }
       cfg.behaviors.personalityStrength = String((document.getElementById('behavior-personality-strength') || {}).value || 'balanced');
       cfg.behaviors.mirrorTone = String((document.getElementById('behavior-mirror-tone') || {}).value || 'mirror_or_less');
       cfg.behaviors.directness = String((document.getElementById('behavior-directness') || {}).value || 'balanced');
@@ -7437,8 +7623,67 @@
         markModesConfigDirty();
         queueBehaviorAutosave(120);
       });
+      document.getElementById('btn-traits-edit').addEventListener('click', function () {
+        openPersonaTraitsDrawer();
+      });
+      document.getElementById('btn-persona-traits-close').addEventListener('click', function () {
+        closePersonaTraitsDrawer();
+      });
+      document.getElementById('trait-predominance-btn').addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var menu = document.getElementById('trait-predominance-menu');
+        if (menu && menu.classList.contains('hidden')) openTraitPredominanceMenu();
+        else closeTraitPredominanceMenu();
+      });
+      document.getElementById('trait-predominance-btn').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          var menu = document.getElementById('trait-predominance-menu');
+          if (menu && menu.classList.contains('hidden')) openTraitPredominanceMenu();
+          else closeTraitPredominanceMenu();
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeTraitPredominanceMenu();
+        }
+      });
+      document.getElementById('trait-predominance-menu').addEventListener('click', function (event) {
+        var option = event.target && event.target.closest('[data-trait-predominance-option]');
+        if (!option) return;
+        var value = normalizeTraitPredominance(option.getAttribute('data-trait-predominance-option') || 'blend');
+        updateTraitPredominanceDropdown(value);
+        closeTraitPredominanceMenu();
+        markModesConfigDirty();
+        queueBehaviorAutosave(120);
+      });
+      document.getElementById('behavior-trait-primary').addEventListener('change', function () {
+        markModesConfigDirty();
+        queueBehaviorAutosave(120);
+      });
+      document.getElementById('traits-editor-list').addEventListener('change', function (event) {
+        var enabledToggle = event.target && event.target.closest('[data-trait-enabled]');
+        var expressionSelect = event.target && event.target.closest('[data-trait-expression]');
+        if (!enabledToggle && !expressionSelect) return;
+        var traitId = normalizeTraitId((enabledToggle || expressionSelect).getAttribute(enabledToggle ? 'data-trait-enabled' : 'data-trait-expression') || '');
+        if (!traitId) return;
+        var row = document.querySelector('#traits-editor-list [data-trait-row="' + traitId + '"]');
+        var expressionEl = row ? row.querySelector('[data-trait-expression]') : null;
+        if (expressionEl) {
+          expressionEl.title = traitExpressionTooltip(expressionEl.value);
+        }
+        var liveCfg = collectModesConfigFromUi();
+        fillTraitPrimarySelect(liveCfg.behaviors || {});
+        renderTraitsSummary(liveCfg.behaviors || {});
+        renderTraitsSummonsWarning(liveCfg.behaviors || {});
+        updatePersonaStyleWarnings();
+        markModesConfigDirty();
+        queueBehaviorAutosave(120);
+      });
       var behaviorAutoSaveFields = [
-        'behavior-personality',
+        'behavior-trait-predominance',
+        'behavior-trait-primary',
         'behavior-personality-strength',
         'behavior-mirror-tone',
         'behavior-directness',
@@ -7474,6 +7719,9 @@
           }
           if (target && String(target.id || '').indexOf('behavior-bigfive-') === 0) {
             renderBigFiveSummary(collectModesConfigFromUi().behaviors);
+          }
+          if (target && target.id === 'behavior-summonable') {
+            renderTraitsSummonsWarning(collectModesConfigFromUi().behaviors || {});
           }
           var rangeField = target && (
             target.id === 'behavior-latency-min' ||
@@ -8474,6 +8722,8 @@
         if (!inMode) closeModeMenu();
         var inPatrolMode = event.target.closest('#patrol-mode-dropdown-menu') || event.target.closest('#patrol-mode-dropdown-btn');
         if (!inPatrolMode) closePatrolModeMenu();
+        var inTraitPredominance = event.target.closest('#trait-predominance-menu') || event.target.closest('#trait-predominance-btn');
+        if (!inTraitPredominance) closeTraitPredominanceMenu();
         var inProfileMenu = event.target.closest('.profile-row-menu') || event.target.closest('.profile-row-menu-trigger');
         if (!inProfileMenu) closeProfileMenus();
       });
@@ -8532,6 +8782,7 @@
           closeModelMenu();
           closeModeMenu();
           closePatrolModeMenu();
+          closeTraitPredominanceMenu();
         }
       });
       window.addEventListener('resize', positionModelMenu);

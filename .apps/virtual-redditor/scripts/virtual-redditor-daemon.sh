@@ -216,7 +216,45 @@ mode_default_config_json() {
         {name:"Enforcer",startingMode:"ENFORCE"}
       ],
       behaviors: {
-        personality: "typical_redditor",
+        traits: {
+          typical_redditor: {enabled:true, expression:"style"},
+          academic: {enabled:false, expression:"style"},
+          helpful: {enabled:false, expression:"style"},
+          curious: {enabled:false, expression:"style"},
+          skeptical_debater: {enabled:false, expression:"style"},
+          technical_pragmatist: {enabled:false, expression:"style"},
+          community_regular: {enabled:false, expression:"style"},
+          inventive: {enabled:false, expression:"style"},
+          dreamer: {enabled:false, expression:"style"},
+          good_faith_critic: {enabled:false, expression:"style"},
+          anarchosyndicalist: {enabled:false, expression:"style"},
+          neighborly: {enabled:false, expression:"style"},
+          heroic: {enabled:false, expression:"style"},
+          campy: {enabled:false, expression:"style"},
+          religious: {enabled:false, expression:"style"},
+          poet: {enabled:false, expression:"style"},
+          adventurer: {enabled:false, expression:"style"},
+          group_loyal: {enabled:false, expression:"style"},
+          oracle: {enabled:false, expression:"style"},
+          storyteller: {enabled:false, expression:"style"},
+          minimalist: {enabled:false, expression:"style"},
+          magnanimous: {enabled:false, expression:"style"},
+          gardener: {enabled:false, expression:"style"},
+          connector: {enabled:false, expression:"style"},
+          maven: {enabled:false, expression:"style"},
+          salesman: {enabled:false, expression:"style"},
+          inventor: {enabled:false, expression:"style"},
+          catalyst: {enabled:false, expression:"style"},
+          diplomat: {enabled:false, expression:"style"},
+          reflective: {enabled:false, expression:"style"},
+          champion: {enabled:false, expression:"style"},
+          illuminative: {enabled:false, expression:"style"},
+          paraclete: {enabled:false, expression:"style"},
+          troll: {enabled:false, expression:"style"},
+          ethos_only: {enabled:false, expression:"style"}
+        },
+        traitPredominance: "blend",
+        primaryTrait: "typical_redditor",
         personalityStrength: "balanced",
         mirrorTone: "mirror_or_less",
         directness: "balanced",
@@ -1795,6 +1833,51 @@ is_summons_comment() {
   esac
 }
 
+trait_summons_signal_hit() {
+  comment_json=$1
+  if [ "$SUMMONS_ENABLED" -ne 1 ]; then
+    printf '%s' "0"
+    return 0
+  fi
+
+  hit=$(read_modes_config_json | jq -r --argjson comment "$comment_json" '
+    def expr(v):
+      if ((v // "style") | tostring | ascii_downcase) == "summons" then "summons"
+      elif ((v // "style") | tostring | ascii_downcase) == "both" then "both"
+      else "style" end;
+    def keyword_hit(body; trait):
+      if trait == "helpful" then (body | test("\\b(help|advice|guidance|can someone help|could someone help|need help)\\b"))
+      elif trait == "curious" then (body | test("\\b(why|how|what if|question|can anyone explain)\\b"))
+      elif trait == "good_faith_critic" then (body | test("\\b(critique|counterpoint|good faith|constructive criticism|devils advocate)\\b"))
+      elif trait == "academic" then (body | test("\\b(study|paper|citation|evidence|research)\\b"))
+      elif trait == "diplomat" then (body | test("\\b(mediate|middle ground|both sides|de-escalate|calm this)\\b"))
+      elif trait == "connector" then (body | test("\\b(connect|introduce|link up|resource)\\b"))
+      elif trait == "storyteller" then (body | test("\\b(story|anecdote|tell us)\\b"))
+      elif trait == "poet" then (body | test("\\b(poem|poetic|verse|lyric)\\b"))
+      elif trait == "religious" then (body | test("\\b(faith|religion|spiritual|pray|scripture)\\b"))
+      elif trait == "anarchosyndicalist" then (body | test("\\b(union|collective|worker|mutual aid|direct action)\\b"))
+      else (
+        (trait | gsub("_"; " ") | split(" ") | map(select(length >= 4))) as $words
+        | any($words[]?; body | test("\\b" + . + "\\b"))
+      )
+      end;
+    (($comment.body // "") | tostring | ascii_downcase) as $body
+    | ((.behaviors.traits // {})
+      | to_entries
+      | map(select((.value.enabled // false) == true and (expr(.value.expression) == "summons" or expr(.value.expression) == "both")) | .key)
+    ) as $traits
+    | if ($traits | length) == 0 then "0"
+      elif ($body | test("\\b(can anyone|could someone|can someone|need help|what do you think|thoughts\\?|any advice|who can|is anyone)\\b")) then "1"
+      elif any($traits[]; keyword_hit($body; .)) then "1"
+      else "0"
+      end
+  ' 2>/dev/null || printf '0')
+  case "$hit" in
+    1) printf '%s' "1" ;;
+    *) printf '%s' "0" ;;
+  esac
+}
+
 is_implicit_summons_comment() {
   cache_dir=$1
   comment_json=$2
@@ -1806,6 +1889,11 @@ is_implicit_summons_comment() {
 
   if [ "$(is_summons_comment "$comment_json")" = "1" ]; then
     printf '%s' "0"
+    return 0
+  fi
+
+  if [ "$(trait_summons_signal_hit "$comment_json")" = "1" ]; then
+    printf '%s' "1"
     return 0
   fi
 
@@ -2021,8 +2109,34 @@ compose_context_envelope() {
   ' 2>/dev/null || printf '{}')
   behavior_policy_json=$(read_modes_config_json | jq -c '
     (.behaviors // {}) as $b
+    | ($b.traits // {}) as $raw_traits
+    | [
+        "typical_redditor","academic","helpful","curious","skeptical_debater","technical_pragmatist","community_regular",
+        "inventive","dreamer","good_faith_critic","anarchosyndicalist","neighborly","heroic","campy","religious","poet",
+        "adventurer","group_loyal","oracle","storyteller","minimalist","magnanimous","gardener","connector","maven",
+        "salesman","inventor","catalyst","diplomat","reflective","champion","illuminative","paraclete","troll","ethos_only"
+      ] as $trait_ids
+    | def norm_expr(v):
+        if ((v // "style") | tostring | ascii_downcase) == "summons" then "summons"
+        elif ((v // "style") | tostring | ascii_downcase) == "both" then "both"
+        else "style" end;
     | {
-        personality: ($b.personality // "typical_redditor"),
+        traits: (
+          reduce $trait_ids[] as $id ({};
+            .[$id] = (
+              ($raw_traits[$id] // {}) as $t
+              | {
+                  enabled: (($t.enabled // false) == true),
+                  expression: norm_expr($t.expression // "style")
+                }
+            )
+          )
+        ),
+        traitPredominance: (
+          (($b.traitPredominance // "blend") | tostring | ascii_downcase) as $p
+          | if ($p == "contextual" or $p == "stable" or $p == "adaptive") then $p else "blend" end
+        ),
+        primaryTrait: ((($b.primaryTrait // "typical_redditor") | tostring | ascii_downcase | gsub("-"; "_"))),
         personalityStrength: (
           if (($b.personalityStrength // "balanced") == "subtle") then "subtle"
           elif (($b.personalityStrength // "balanced") == "strong") then "strong"
@@ -2055,7 +2169,70 @@ compose_context_envelope() {
         ),
         individualizedRelationships: (($b.individualizedRelationships // true) == true)
       }
-  ' 2>/dev/null || printf '{"personality":"typical_redditor","personalityStrength":"balanced","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"even","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","bigFive":{"enabled":false,"o":"medium","c":"medium","e":"medium","a":"medium","n":"medium"},"individualizedRelationships":true}')
+    | .styleTraits = ([.traits | to_entries[] | select(.value.enabled == true and (.value.expression == "style" or .value.expression == "both")) | .key])
+    | .summonTraits = ([.traits | to_entries[] | select(.value.enabled == true and (.value.expression == "summons" or .value.expression == "both")) | .key])
+    | if (.styleTraits | length) == 0 then
+        .traits.typical_redditor.enabled = true
+        | .traits.typical_redditor.expression = "style"
+        | .styleTraits = ["typical_redditor"]
+      else .
+      end
+    | (.primaryTrait // "typical_redditor") as $primary
+    | if (.styleTraits | index($primary)) == null then .primaryTrait = (.styleTraits[0]) else . end
+  ' 2>/dev/null || printf '{"traits":{"typical_redditor":{"enabled":true,"expression":"style"}},"traitPredominance":"blend","primaryTrait":"typical_redditor","personalityStrength":"balanced","mirrorTone":"mirror_or_less","directness":"balanced","warmth":"even","verbosity":"balanced","formality":"neutral","humorStyle":"dry","humorAmount":"medium","citations":"as-needed","bigFive":{"enabled":false,"o":"medium","c":"medium","e":"medium","a":"medium","n":"medium"},"individualizedRelationships":true,"styleTraits":["typical_redditor"],"summonTraits":[]}')
+  behavior_policy_json=$(printf '%s' "$behavior_policy_json" | jq -c --argjson comment "$comment_json" --argjson relationship "$relationship_json" '
+    def has(text): ((($comment.body // "") | tostring | ascii_downcase) | test(text));
+    def includes(list; key): any(list[]?; . == key);
+    (.styleTraits // []) as $style
+    | (.primaryTrait // ($style[0] // "typical_redditor")) as $primary
+    | (((($relationship.trait_adaptive_current // "") | tostring) | ascii_downcase)) as $adaptive_current
+    | (((($relationship.trait_adaptive_replies_since_switch // 0) | tonumber?) // 0)) as $adaptive_since
+    | (
+        if includes($style; "helpful") and has("\\b(help|advice|guidance|can someone help|could someone help|need help)\\b") then "helpful"
+        elif includes($style; "good_faith_critic") and has("\\b(counterpoint|critique|challenge this|good faith)\\b") then "good_faith_critic"
+        elif includes($style; "curious") and has("\\b(why|how|what if|question|can anyone explain)\\b") then "curious"
+        elif includes($style; "diplomat") and has("\\b(calm this|mediate|middle ground|both sides)\\b") then "diplomat"
+        elif includes($style; "connector") and has("\\b(connect|link up|introduce|resource)\\b") then "connector"
+        elif includes($style; "poet") and has("\\b(poem|poetic|verse|lyric)\\b") then "poet"
+        elif includes($style; "religious") and has("\\b(faith|religion|spiritual|pray|scripture)\\b") then "religious"
+        elif includes($style; "storyteller") and has("\\b(story|anecdote|tell us)\\b") then "storyteller"
+        elif includes($style; "anarchosyndicalist") and has("\\b(union|collective|worker|mutual aid|direct action)\\b") then "anarchosyndicalist"
+        elif includes($style; "academic") and has("\\b(study|paper|citation|evidence|research)\\b") then "academic"
+        else $primary
+        end
+      ) as $candidate
+    | (
+        has("\\b(disagree|wrong|nonsense|bad take|counterpoint)\\b")
+        or has("\\b(not sure|unclear|uncertain|maybe)\\b")
+        or has("\\b(new topic|different topic|switching gears|anyway)\\b")
+        or has("\\b(help|advice|guidance)\\b")
+      ) as $shift
+    | ((.traitPredominance // "blend") | tostring | ascii_downcase) as $pred
+    | if $pred == "stable" then
+        .leadTrait = $primary
+        | .adaptiveState = {current:$primary,repliesSinceSwitch:($adaptive_since + 1),shift:$shift}
+      elif $pred == "contextual" then
+        .leadTrait = $candidate
+        | .adaptiveState = {current:$candidate,repliesSinceSwitch:0,shift:$shift}
+      elif $pred == "adaptive" then
+        if ($adaptive_current == "") then
+          .leadTrait = $candidate
+          | .adaptiveState = {current:$candidate,repliesSinceSwitch:0,shift:$shift}
+        elif $candidate == $adaptive_current then
+          .leadTrait = $adaptive_current
+          | .adaptiveState = {current:$adaptive_current,repliesSinceSwitch:($adaptive_since + 1),shift:$shift}
+        elif ($adaptive_since >= 2 or $shift) then
+          .leadTrait = $candidate
+          | .adaptiveState = {current:$candidate,repliesSinceSwitch:0,shift:$shift}
+        else
+          .leadTrait = $adaptive_current
+          | .adaptiveState = {current:$adaptive_current,repliesSinceSwitch:($adaptive_since + 1),shift:$shift}
+        end
+      else
+        .leadTrait = ""
+        | .adaptiveState = {current:$adaptive_current,repliesSinceSwitch:$adaptive_since,shift:$shift}
+      end
+  ' 2>/dev/null || printf '%s' "$behavior_policy_json")
   relationship_for_prompt_json=$(printf '%s' "$relationship_json" | jq -c --argjson behavior "$behavior_policy_json" '
     if ($behavior.individualizedRelationships // true) then .
     else
@@ -2137,7 +2314,7 @@ Required policy constraints:
 - Judicial bans: reply must clearly cite the violated norm.
 - Capricious bans: reply must include a feeling-string.
 - Mixed bans: reply should reflect whichever causal pathway fired.
-- Apply `behavior_policy` from the context envelope for tone, humor style/amount, and citation behavior.
+- Apply `behavior_policy` from the context envelope for traits, predominance, tone, humor, citations, and summons policy.
 
 Return STRICT JSON only, no markdown, with this shape:
 {
@@ -2165,18 +2342,6 @@ compiled_instructions_json() {
 
   behavior_summary=$(printf '%s' "$behaviors_json" | jq -r '
     def val(k; d): (. [k] // d);
-    def label_personality(v):
-      if v == "typical_redditor" then "Typical Redditor"
-      elif v == "academic" then "Academic"
-      elif v == "helpful_peer" then "Helpful Peer"
-      elif v == "curious" then "Curious"
-      elif v == "skeptical_debater" then "Skeptical Debater"
-      elif v == "builder_operator" then "Technical Pragmatist"
-      elif v == "community_regular" then "Community Regular"
-      elif v == "troll" then "Troll"
-      elif v == "other" then "Ethos & Instructions only"
-      else (v // "Typical Redditor")
-      end;
     def label_strength(v):
       if v == "subtle" then "Subtle"
       elif v == "balanced" then "Moderate"
@@ -2213,8 +2378,40 @@ compiled_instructions_json() {
         ", N=" + ((o.n // "medium")|tostring) + ")"
       else "disabled"
       end;
+    def trait_label(v):
+      if v == "typical_redditor" then "Typical Redditor"
+      elif v == "academic" then "Academic"
+      elif v == "helpful" then "Helpful"
+      elif v == "curious" then "Curious"
+      elif v == "skeptical_debater" then "Skeptical Debater"
+      elif v == "technical_pragmatist" then "Technical Pragmatist"
+      elif v == "community_regular" then "Community Regular"
+      elif v == "good_faith_critic" then "Good-Faith Critic"
+      elif v == "anarchosyndicalist" then "Anarchosyndicalist"
+      elif v == "group_loyal" then "Group-Loyal"
+      elif v == "ethos_only" then "Ethos & Instructions only"
+      else ((v // "") | gsub("_"; " ") | split(" ") | map(if length > 0 then (.[0:1]|ascii_upcase) + (.[1:] // "") else . end) | join(" "))
+      end;
+    def expr_label(v):
+      if v == "both" then "both"
+      elif v == "summons" then "summons"
+      else "style"
+      end;
+    def selected_traits:
+      ((.traits // {}) | to_entries
+        | map(select((.value.enabled // false) == true))
+      );
+    def selected_traits_text:
+      (selected_traits
+        | if length == 0 then "none"
+          else map(trait_label(.key) + " (" + expr_label((.value.expression // "style")) + ")") | join(", ")
+          end
+      );
     [
-      "- Personality: " + label_personality(val("personality"; "typical_redditor")) + " (" + label_strength(val("personalityStrength"; "balanced")) + ")",
+      "- Traits: " + selected_traits_text,
+      "- Predominance: " + label_generic(val("traitPredominance"; "blend")),
+      (if (val("traitPredominance"; "blend") | tostring | ascii_downcase) == "blend" then empty else "- Primary trait: " + trait_label(val("primaryTrait"; "typical_redditor")) end),
+      "- Personality strength: " + label_strength(val("personalityStrength"; "balanced")),
       "- Tone: " + label_tone(val("mirrorTone"; "mirror_or_less")),
       "- Style: directness=" + label_generic(val("directness"; "balanced")) + ", warmth=" + label_generic(val("warmth"; "even")) + ", verbosity=" + label_generic(val("verbosity"; "balanced")) + ", formality=" + label_generic(val("formality"; "neutral")),
       "- Humor: style=" + label_generic(val("humorStyle"; "dry")) + ", amount=" + label_generic(val("humorAmount"; "medium")),
@@ -2584,6 +2781,17 @@ process_comment() {
   fi
 
   envelope=$(compose_context_envelope "$cache_dir" "$comment_json" "$relationship_row")
+  lead_trait=$(printf '%s' "$envelope" | jq -r '.behavior_policy.leadTrait // empty' 2>/dev/null || printf '')
+  adaptive_state=$(printf '%s' "$envelope" | jq -c '.behavior_policy.adaptiveState // {}' 2>/dev/null || printf '{}')
+  relationship_row=$(printf '%s' "$relationship_row" | jq -c --arg lead "$lead_trait" --argjson adaptive "$adaptive_state" '
+    .lead_trait = (if $lead == "" then null else $lead end)
+    | if (($adaptive.current // "") | tostring | length) > 0 then
+        .trait_adaptive_current = ($adaptive.current | tostring)
+      else .
+      end
+    | .trait_adaptive_replies_since_switch = ((($adaptive.repliesSinceSwitch // .trait_adaptive_replies_since_switch // 0) | tonumber?) // 0)
+    | .trait_adaptive_last_shift = (($adaptive.shift // false) == true)
+  ' 2>/dev/null || printf '%s' "$relationship_row")
   prompt=$(build_adjudication_prompt "$envelope")
 
   if ! model_response=$(ollama_generate "$prompt" 2>/dev/null); then
