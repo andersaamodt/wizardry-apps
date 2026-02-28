@@ -7715,20 +7715,24 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var gate = (floor * 1.12) + 0.0008;
+    var effectiveFloor = floor;
+    if (raw > (floor * 2.0) + 0.016) {
+      effectiveFloor = floor * 0.78;
+    }
+    var gate = (effectiveFloor * 1.3) + 0.0012;
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.01, (0.032 + (floor * 0.9)));
+    var normalized = (raw - gate) / Math.max(0.012, (0.048 + (effectiveFloor * 0.95)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.58);
+      normalized = Math.pow(normalized, 0.5);
     }
-    if (normalized < 0.0024) {
+    if (normalized < 0.0028) {
       normalized = 0;
     }
     return normalized;
@@ -7760,7 +7764,7 @@
     var sorted = samples.slice().sort(function (a, b) {
       return a - b;
     });
-    var targetIdx = Math.floor((sorted.length - 1) * 0.12);
+    var targetIdx = Math.floor((sorted.length - 1) * 0.18);
     if (targetIdx < 0) {
       targetIdx = 0;
     } else if (targetIdx >= sorted.length) {
@@ -7775,16 +7779,16 @@
       floor = 0.01;
     }
     if (target > floor) {
-      // Rise slowly so speech transients do not flatten local dynamics.
-      floor = (floor * 0.9) + (target * 0.1);
+      // Rise very slowly to avoid flattening speech variation into a fat baseline.
+      floor = (floor * 0.96) + (target * 0.04);
     } else {
-      // Fall faster so recovery from a high learned floor is quick and reversible.
-      floor = (floor * 0.72) + (target * 0.28);
+      // Fall faster so floor quickly unlocks sensitivity after over-normalization.
+      floor = (floor * 0.62) + (target * 0.38);
     }
     if (floor < 0.0008) {
       floor = 0.0008;
-    } else if (floor > 0.06) {
-      floor = 0.06;
+    } else if (floor > 0.08) {
+      floor = 0.08;
     }
     dictationWaveBackendFloor = floor;
     return floor;
@@ -8166,7 +8170,7 @@
     var silencePhase = Number(dictationWaveSilencePhase || 0);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.0048;
+    var silenceGate = 0.0062;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
