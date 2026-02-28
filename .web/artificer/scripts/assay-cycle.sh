@@ -184,7 +184,7 @@ run_cycle() {
     max_iterations=6
     case "$budget" in
       long) max_iterations=8 ;;
-      until-complete) max_iterations=12 ;;
+      until-complete) max_iterations=9999 ;;
       quick) max_iterations=3 ;;
       *) max_iterations=6 ;;
     esac

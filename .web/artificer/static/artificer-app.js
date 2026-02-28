@@ -13491,8 +13491,9 @@
     var selectedIterations = Number(runProfile.maxIterations || 2);
     if (computeBudgetForRun === "long" && selectedIterations < 10) {
       selectedIterations += 2;
-    } else if (computeBudgetForRun === "until-complete" && selectedIterations < 12) {
-      selectedIterations += 4;
+    } else if (computeBudgetForRun === "until-complete") {
+      // Keep "until-complete" effectively unbounded on iterations; backend runtime budget still applies.
+      selectedIterations = 9999;
     }
     if (explicitAssayTaskId) {
       var assayIterationCap = 3;

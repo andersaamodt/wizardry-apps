@@ -16206,8 +16206,9 @@ $fallback_output"
         fi
         ;;
       until-complete)
-        if [ "$run_mode" != "instant" ] && [ "$run_mode" != "chat" ] && [ "$max_iterations" -lt 12 ]; then
-          max_iterations=12
+        # "until-complete" should not be iteration-capped; rely on DONE transition or runtime budget.
+        if [ "$max_iterations" -lt 9999 ]; then
+          max_iterations=9999
         fi
         ;;
     esac
