@@ -8,6 +8,8 @@
   var seenConversationStorageKey = "artificer.conversationSeenUpdated";
   var workspaceStateCacheKey = "artificer.workspaceStateCache.v1";
   var runEventsStorageKey = "artificer.runEventsByConversation.v1";
+  var workspaceOrderStorageKey = "artificer.workspaceOrder.v1";
+  var conversationOrderStorageKey = "artificer.conversationOrderByWorkspace.v1";
 
   function storageGet(key, fallback) {
     try {
@@ -313,6 +315,105 @@
     }
   }
 
+  function normalizeOrderedIdList(list) {
+    var input = Array.isArray(list) ? list : [];
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < input.length; i += 1) {
+      var id = trim(String(input[i] || ""));
+      if (!id || seen[id]) {
+        continue;
+      }
+      seen[id] = true;
+      out.push(id);
+    }
+    return out;
+  }
+
+  function loadWorkspaceOrderState() {
+    var raw = "";
+    try {
+      raw = window.localStorage.getItem(workspaceOrderStorageKey) || "";
+    } catch (_err) {
+      return [];
+    }
+    if (!raw) {
+      return [];
+    }
+    var parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_err2) {
+      return [];
+    }
+    return normalizeOrderedIdList(parsed);
+  }
+
+  function saveWorkspaceOrderState(orderIds) {
+    try {
+      window.localStorage.setItem(workspaceOrderStorageKey, JSON.stringify(normalizeOrderedIdList(orderIds)));
+    } catch (_err) {
+      return;
+    }
+  }
+
+  function loadConversationOrderState() {
+    var raw = "";
+    try {
+      raw = window.localStorage.getItem(conversationOrderStorageKey) || "";
+    } catch (_err) {
+      return {};
+    }
+    if (!raw) {
+      return {};
+    }
+    var parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_err2) {
+      return {};
+    }
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+    var out = {};
+    var workspaceIds = Object.keys(parsed);
+    for (var i = 0; i < workspaceIds.length; i += 1) {
+      var workspaceId = trim(String(workspaceIds[i] || ""));
+      if (!workspaceId) {
+        continue;
+      }
+      var list = normalizeOrderedIdList(parsed[workspaceId]);
+      if (list.length) {
+        out[workspaceId] = list;
+      }
+    }
+    return out;
+  }
+
+  function saveConversationOrderState(conversationOrderByWorkspace) {
+    if (!conversationOrderByWorkspace || typeof conversationOrderByWorkspace !== "object") {
+      return;
+    }
+    var clean = {};
+    var workspaceIds = Object.keys(conversationOrderByWorkspace);
+    for (var i = 0; i < workspaceIds.length; i += 1) {
+      var workspaceId = trim(String(workspaceIds[i] || ""));
+      if (!workspaceId) {
+        continue;
+      }
+      var list = normalizeOrderedIdList(conversationOrderByWorkspace[workspaceId]);
+      if (list.length) {
+        clean[workspaceId] = list;
+      }
+    }
+    try {
+      window.localStorage.setItem(conversationOrderStorageKey, JSON.stringify(clean));
+    } catch (_err) {
+      return;
+    }
+  }
+
   function slugifyRoutePart(text) {
     var value = String(text || "").toLowerCase();
     value = value.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -387,6 +488,8 @@
 
   var initialSeenConversationState = loadSeenConversationState();
   var initialRunEventsState = loadRunEventsState();
+  var initialWorkspaceOrderState = loadWorkspaceOrderState();
+  var initialConversationOrderState = loadConversationOrderState();
 
   var state = {
     models: [],
@@ -470,6 +573,14 @@
     seenConversationBootstrapPending: !initialSeenConversationState.hasSaved,
     openWorkspaceMenuWorkspaceId: "",
     workspaceTreeMarkupCache: "",
+    workspaceOrderIds: initialWorkspaceOrderState,
+    conversationOrderIdsByWorkspace: initialConversationOrderState,
+    workspaceTreeDrag: {
+      active: false,
+      type: "",
+      workspaceId: "",
+      conversationId: ""
+    },
     pendingArchiveKey: "",
     pendingArchiveReadyAt: 0,
     pendingArchiveSubmittingKey: "",
@@ -3003,7 +3114,27 @@
 
   function getSortedWorkspaces() {
     var list = state.workspaces.slice();
+    var order = normalizeOrderedIdList(state.workspaceOrderIds);
+    var orderIndex = {};
+    for (var i = 0; i < order.length; i += 1) {
+      orderIndex[order[i]] = i;
+    }
     list.sort(function (a, b) {
+      var aid = String(a && a.id || "");
+      var bid = String(b && b.id || "");
+      var ai = Object.prototype.hasOwnProperty.call(orderIndex, aid) ? Number(orderIndex[aid]) : -1;
+      var bi = Object.prototype.hasOwnProperty.call(orderIndex, bid) ? Number(orderIndex[bid]) : -1;
+      if (ai >= 0 || bi >= 0) {
+        if (ai < 0) {
+          return 1;
+        }
+        if (bi < 0) {
+          return -1;
+        }
+        if (ai !== bi) {
+          return ai - bi;
+        }
+      }
       var au = state.sortMode === "created" ? workspaceCreatedScore(a) : workspaceUpdatedScore(a);
       var bu = state.sortMode === "created" ? workspaceCreatedScore(b) : workspaceUpdatedScore(b);
       if (au !== bu) {
@@ -3015,6 +3146,49 @@
   }
 
   function getSortedConversations(workspace) {
+    var workspaceId = String(workspace && workspace.id || "");
+    var list = workspace && workspace.conversations ? workspace.conversations.slice() : [];
+    var order = normalizeOrderedIdList(
+      workspaceId && state.conversationOrderIdsByWorkspace
+        ? state.conversationOrderIdsByWorkspace[workspaceId]
+        : []
+    );
+    var orderIndex = {};
+    for (var i = 0; i < order.length; i += 1) {
+      orderIndex[order[i]] = i;
+    }
+    list.sort(function (a, b) {
+      var aid = String(a && a.id || "");
+      var bid = String(b && b.id || "");
+      var ai = Object.prototype.hasOwnProperty.call(orderIndex, aid) ? Number(orderIndex[aid]) : -1;
+      var bi = Object.prototype.hasOwnProperty.call(orderIndex, bid) ? Number(orderIndex[bid]) : -1;
+      if (ai >= 0 || bi >= 0) {
+        if (ai < 0) {
+          return 1;
+        }
+        if (bi < 0) {
+          return -1;
+        }
+        if (ai !== bi) {
+          return ai - bi;
+        }
+      }
+      var aScore = state.sortMode === "created" ? conversationCreatedNumber(a) : conversationUpdatedNumber(a);
+      var bScore = state.sortMode === "created" ? conversationCreatedNumber(b) : conversationUpdatedNumber(b);
+      if (aScore !== bScore) {
+        return bScore - aScore;
+      }
+      return String(a.title || "").localeCompare(String(b.title || ""));
+    });
+    return list;
+  }
+
+  function persistWorkspaceOrderingState() {
+    saveWorkspaceOrderState(state.workspaceOrderIds);
+    saveConversationOrderState(state.conversationOrderIdsByWorkspace);
+  }
+
+  function baseConversationOrderIds(workspace) {
     var list = workspace && workspace.conversations ? workspace.conversations.slice() : [];
     list.sort(function (a, b) {
       var aScore = state.sortMode === "created" ? conversationCreatedNumber(a) : conversationUpdatedNumber(a);
@@ -3024,7 +3198,164 @@
       }
       return String(a.title || "").localeCompare(String(b.title || ""));
     });
-    return list;
+    var out = [];
+    for (var i = 0; i < list.length; i += 1) {
+      var id = trim(String(list[i] && list[i].id || ""));
+      if (id) {
+        out.push(id);
+      }
+    }
+    return out;
+  }
+
+  function syncWorkspaceOrderingWithState(options) {
+    var opts = options || {};
+    var prependUnknownWorkspaces = opts.prependUnknownWorkspaces !== false;
+    var workspaceIds = [];
+    for (var i = 0; i < state.workspaces.length; i += 1) {
+      var wsId = trim(String(state.workspaces[i] && state.workspaces[i].id || ""));
+      if (wsId) {
+        workspaceIds.push(wsId);
+      }
+    }
+
+    var knownWorkspaceOrder = normalizeOrderedIdList(state.workspaceOrderIds);
+    var knownWorkspaceSet = {};
+    for (var k = 0; k < knownWorkspaceOrder.length; k += 1) {
+      knownWorkspaceSet[knownWorkspaceOrder[k]] = true;
+    }
+    var missingWorkspaceIds = [];
+    for (var j = 0; j < workspaceIds.length; j += 1) {
+      if (!knownWorkspaceSet[workspaceIds[j]]) {
+        missingWorkspaceIds.push(workspaceIds[j]);
+      }
+    }
+    var nextWorkspaceOrder = prependUnknownWorkspaces
+      ? missingWorkspaceIds.concat(knownWorkspaceOrder)
+      : knownWorkspaceOrder.concat(missingWorkspaceIds);
+    var validWorkspaceOrder = [];
+    var validWorkspaceSet = {};
+    for (var w = 0; w < nextWorkspaceOrder.length; w += 1) {
+      var candidateWorkspaceId = nextWorkspaceOrder[w];
+      if (validWorkspaceSet[candidateWorkspaceId]) {
+        continue;
+      }
+      var exists = false;
+      for (var wx = 0; wx < workspaceIds.length; wx += 1) {
+        if (workspaceIds[wx] === candidateWorkspaceId) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) {
+        continue;
+      }
+      validWorkspaceSet[candidateWorkspaceId] = true;
+      validWorkspaceOrder.push(candidateWorkspaceId);
+    }
+    state.workspaceOrderIds = validWorkspaceOrder;
+
+    var nextConversationOrderByWorkspace = {};
+    var existingConversationOrderByWorkspace = state.conversationOrderIdsByWorkspace && typeof state.conversationOrderIdsByWorkspace === "object"
+      ? state.conversationOrderIdsByWorkspace
+      : {};
+    for (var si = 0; si < state.workspaces.length; si += 1) {
+      var workspace = state.workspaces[si] || {};
+      var workspaceId = trim(String(workspace.id || ""));
+      if (!workspaceId) {
+        continue;
+      }
+      var existingIds = normalizeOrderedIdList(existingConversationOrderByWorkspace[workspaceId]);
+      var conversationIds = [];
+      var conversationSet = {};
+      var conversations = Array.isArray(workspace.conversations) ? workspace.conversations : [];
+      for (var ci = 0; ci < conversations.length; ci += 1) {
+        var conversationId = trim(String(conversations[ci] && conversations[ci].id || ""));
+        if (!conversationId || conversationSet[conversationId]) {
+          continue;
+        }
+        conversationSet[conversationId] = true;
+        conversationIds.push(conversationId);
+      }
+      var validExistingIds = [];
+      var validExistingSet = {};
+      for (var ei = 0; ei < existingIds.length; ei += 1) {
+        var existingId = existingIds[ei];
+        if (conversationSet[existingId] && !validExistingSet[existingId]) {
+          validExistingSet[existingId] = true;
+          validExistingIds.push(existingId);
+        }
+      }
+      var missingConversationIds = [];
+      for (var mi = 0; mi < conversationIds.length; mi += 1) {
+        if (!validExistingSet[conversationIds[mi]]) {
+          missingConversationIds.push(conversationIds[mi]);
+        }
+      }
+      var orderedIds = validExistingIds.length
+        ? missingConversationIds.concat(validExistingIds)
+        : baseConversationOrderIds(workspace);
+      if (orderedIds.length) {
+        nextConversationOrderByWorkspace[workspaceId] = normalizeOrderedIdList(orderedIds);
+      }
+    }
+    state.conversationOrderIdsByWorkspace = nextConversationOrderByWorkspace;
+  }
+
+  function moveWorkspaceToFront(workspaceId, options) {
+    var wsId = trim(String(workspaceId || ""));
+    if (!wsId) {
+      return;
+    }
+    var next = [wsId];
+    var current = normalizeOrderedIdList(state.workspaceOrderIds);
+    for (var i = 0; i < current.length; i += 1) {
+      if (current[i] !== wsId) {
+        next.push(current[i]);
+      }
+    }
+    state.workspaceOrderIds = next;
+    if (!options || options.persist !== false) {
+      persistWorkspaceOrderingState();
+    }
+  }
+
+  function moveConversationToFront(workspaceId, conversationId, options) {
+    var wsId = trim(String(workspaceId || ""));
+    var convId = trim(String(conversationId || ""));
+    if (!wsId || !convId) {
+      return;
+    }
+    if (!state.conversationOrderIdsByWorkspace || typeof state.conversationOrderIdsByWorkspace !== "object") {
+      state.conversationOrderIdsByWorkspace = {};
+    }
+    var current = normalizeOrderedIdList(state.conversationOrderIdsByWorkspace[wsId]);
+    var next = [convId];
+    for (var i = 0; i < current.length; i += 1) {
+      if (current[i] !== convId) {
+        next.push(current[i]);
+      }
+    }
+    state.conversationOrderIdsByWorkspace[wsId] = next;
+    if (!options || options.persist !== false) {
+      persistWorkspaceOrderingState();
+    }
+  }
+
+  function markConversationActivity(workspaceId, conversationId) {
+    var wsId = trim(String(workspaceId || ""));
+    var convId = trim(String(conversationId || ""));
+    if (!wsId || !convId) {
+      return;
+    }
+    moveConversationToFront(wsId, convId, { persist: false });
+    moveWorkspaceToFront(wsId, { persist: false });
+    var workspace = getWorkspaceById(wsId);
+    var conversation = getConversationById(workspace, convId);
+    if (conversation) {
+      conversation.updated = String(Math.floor(Date.now() / 1000));
+    }
+    persistWorkspaceOrderingState();
   }
 
   function findNextQueuedConversation() {
@@ -5743,6 +6074,81 @@
     }
   }
 
+  function workspaceTreeNodeKey(node) {
+    if (!node || !node.getAttribute) {
+      return "";
+    }
+    if (node.classList && node.classList.contains("workspace-group")) {
+      var workspaceId = String(node.getAttribute("data-workspace-id") || "");
+      return workspaceId ? ("workspace:" + workspaceId) : "";
+    }
+    if (node.classList && node.classList.contains("conversation-row")) {
+      var wsId = String(node.getAttribute("data-workspace-id") || "");
+      var convId = String(node.getAttribute("data-conversation-id") || "");
+      if (wsId && convId) {
+        return "conversation:" + wsId + ":" + convId;
+      }
+    }
+    return "";
+  }
+
+  function snapshotWorkspaceTreePositions(selector) {
+    if (!el.workspaceTree) {
+      return {};
+    }
+    var query = trim(String(selector || ""));
+    if (!query) {
+      query = ".workspace-group[data-workspace-id], .conversation-row[data-workspace-id][data-conversation-id]";
+    }
+    var nodes = el.workspaceTree.querySelectorAll(query);
+    var out = {};
+    for (var i = 0; i < nodes.length; i += 1) {
+      var node = nodes[i];
+      var key = workspaceTreeNodeKey(node);
+      if (!key) {
+        continue;
+      }
+      out[key] = node.getBoundingClientRect();
+    }
+    return out;
+  }
+
+  function animateWorkspaceTreeFromSnapshot(snapshot, selector) {
+    if (!el.workspaceTree || !snapshot || typeof snapshot !== "object") {
+      return;
+    }
+    var query = trim(String(selector || ""));
+    if (!query) {
+      query = ".workspace-group[data-workspace-id], .conversation-row[data-workspace-id][data-conversation-id]";
+    }
+    var nodes = el.workspaceTree.querySelectorAll(query);
+    for (var i = 0; i < nodes.length; i += 1) {
+      var node = nodes[i];
+      var key = workspaceTreeNodeKey(node);
+      if (!key || !snapshot[key]) {
+        continue;
+      }
+      var previous = snapshot[key];
+      var next = node.getBoundingClientRect();
+      var dx = previous.left - next.left;
+      var dy = previous.top - next.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+        continue;
+      }
+      node.style.transition = "none";
+      node.style.transform = "translate(" + String(dx) + "px," + String(dy) + "px)";
+      node.getBoundingClientRect();
+      node.style.transition = "transform 220ms cubic-bezier(0.22, 0.9, 0.3, 1)";
+      node.style.transform = "";
+      (function (animatedNode) {
+        window.setTimeout(function () {
+          animatedNode.style.transition = "";
+          animatedNode.style.transform = "";
+        }, 240);
+      })(node);
+    }
+  }
+
   function isElementScrollAtBottom(element, tolerancePx) {
     if (!element) {
       return true;
@@ -5817,6 +6223,7 @@
     var workspaces = getSortedWorkspaces();
     var showRelevantOnly = state.organizeShow === "relevant";
     var showRunningOnly = state.organizeShow === "running";
+    var allowManualReorder = state.organizeMode === "project" && state.organizeShow === "all";
 
     if (state.organizeMode === "chrono") {
       var entries = [];
@@ -5925,7 +6332,10 @@
         }
 
         html += "<section class='" + groupClass + "' data-workspace-id='" + escHtml(workspaceId) + "'>";
-        html += "<div class='workspace-row' data-action='select-workspace' data-workspace-id='" + escHtml(workspaceId) + "'>";
+        html += "<div class='workspace-row' " + (allowManualReorder ? "draggable='true' data-drag-type='workspace' " : "") + "data-action='select-workspace' data-workspace-id='" + escHtml(workspaceId) + "'>";
+        if (allowManualReorder) {
+          html += "<button type='button' class='workspace-drag-handle' data-action='workspace-drag-handle' data-workspace-id='" + escHtml(workspaceId) + "' aria-label='Drag to reorder project' title='Drag to reorder project'>&#8942;&#8942;</button>";
+        }
         html += folderIcon;
         html += "<button type='button' class='workspace-caret' data-action='toggle-workspace' data-workspace-id='" + escHtml(workspaceId) + "' aria-label='Toggle' title='Expand or collapse project'><span aria-hidden='true'>&rsaquo;</span></button>";
         var bgResidentsCount = Number(workspace.multi_agent_background_residents || 0);
@@ -5983,7 +6393,10 @@
             indicatorClass += " pending";
           }
 
-          html += "<div class='conversation-row" + activeConv + "' role='button' tabindex='0' title='Open thread' data-action='select-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversation.id) + "'>";
+          html += "<div class='conversation-row" + activeConv + "' " + (allowManualReorder ? "draggable='true' data-drag-type='conversation' " : "") + "role='button' tabindex='0' title='Open thread' data-action='select-conversation' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversation.id) + "'>";
+          if (allowManualReorder) {
+            html += "<button type='button' class='conversation-drag-handle' data-action='conversation-drag-handle' data-workspace-id='" + escHtml(workspaceId) + "' data-conversation-id='" + escHtml(conversation.id) + "' aria-label='Drag to reorder thread' title='Drag to reorder thread'>&#8942;&#8942;</button>";
+          }
           html += "<span class='" + indicatorClass + "' aria-hidden='true'></span>";
           var statusMarkup = conversationStatusPillMarkup(workspaceId, conversation, queueRunning);
           var threadTooltip = threadFolderPathTooltip(workspaceId);
@@ -6014,8 +6427,10 @@
       return;
     }
 
+    var previousPositions = snapshotWorkspaceTreePositions();
     el.workspaceTree.innerHTML = html;
     state.workspaceTreeMarkupCache = html;
+    animateWorkspaceTreeFromSnapshot(previousPositions);
   }
 
   function findWorkspaceGroupElement(workspaceId) {
@@ -11344,6 +11759,8 @@
       if (state.activeTriage && Number(state.triage.count || 0) < 1) {
         state.activeTriage = false;
       }
+      syncWorkspaceOrderingWithState({ prependUnknownWorkspaces: true });
+      persistWorkspaceOrderingState();
       saveWorkspaceStateCache(state.workspaces);
       bootstrapSeenConversationsIfNeeded();
       pruneSeenConversationState();
@@ -12044,6 +12461,8 @@
       }
     }
     bootstrapSeenConversationsIfNeeded();
+    syncWorkspaceOrderingWithState({ prependUnknownWorkspaces: true });
+    persistWorkspaceOrderingState();
     pruneSeenConversationState();
     pruneRunEventsByKnownConversations();
     applyRouteSelectionIfPending();
@@ -12076,6 +12495,7 @@
           state.activeConversation = null;
           state.activeDraftWorkspaceId = "";
           state.expandedWorkspaceIds[response.workspace.id] = true;
+          moveWorkspaceToFront(response.workspace.id);
         }
         return refreshGitStatus().catch(function () {
           return null;
@@ -17419,6 +17839,12 @@
     var conversationId = target.getAttribute("data-conversation-id");
     var proposalId = target.getAttribute("data-proposal-id");
 
+    if (action === "workspace-drag-handle" || action === "conversation-drag-handle") {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     if (action === "select-triage") {
       state.triageOtherInputProposalId = "";
       state.activeTriage = true;
@@ -17732,6 +18158,221 @@
     }
     event.preventDefault();
     target.click();
+  }
+
+  function workspaceTreeDragAllowed() {
+    return state.organizeMode === "project" && state.organizeShow === "all";
+  }
+
+  function clearWorkspaceTreeDragClasses() {
+    if (!el.workspaceTree) {
+      return;
+    }
+    var draggingRows = el.workspaceTree.querySelectorAll(".workspace-row.workspace-row-dragging, .conversation-row.conversation-row-dragging");
+    for (var i = 0; i < draggingRows.length; i += 1) {
+      draggingRows[i].classList.remove("workspace-row-dragging");
+      draggingRows[i].classList.remove("conversation-row-dragging");
+    }
+  }
+
+  function stopWorkspaceTreeDrag() {
+    clearWorkspaceTreeDragClasses();
+    state.workspaceTreeDrag.active = false;
+    state.workspaceTreeDrag.type = "";
+    state.workspaceTreeDrag.workspaceId = "";
+    state.workspaceTreeDrag.conversationId = "";
+  }
+
+  function finalizeWorkspaceOrderFromTreeDom() {
+    if (!el.workspaceTree) {
+      return;
+    }
+    var groups = el.workspaceTree.querySelectorAll(".workspace-group[data-workspace-id]");
+    var order = [];
+    for (var i = 0; i < groups.length; i += 1) {
+      var workspaceId = trim(String(groups[i].getAttribute("data-workspace-id") || ""));
+      if (workspaceId) {
+        order.push(workspaceId);
+      }
+    }
+    state.workspaceOrderIds = normalizeOrderedIdList(order);
+  }
+
+  function finalizeConversationOrderFromTreeDom(workspaceId) {
+    var wsId = trim(String(workspaceId || ""));
+    if (!el.workspaceTree || !wsId) {
+      return;
+    }
+    var group = el.workspaceTree.querySelector(".workspace-group[data-workspace-id='" + escAttr(wsId) + "']");
+    if (!group) {
+      return;
+    }
+    var rows = group.querySelectorAll(".conversation-row[data-workspace-id][data-conversation-id]");
+    var orderedIds = [];
+    for (var i = 0; i < rows.length; i += 1) {
+      var rowWorkspaceId = trim(String(rows[i].getAttribute("data-workspace-id") || ""));
+      var rowConversationId = trim(String(rows[i].getAttribute("data-conversation-id") || ""));
+      if (rowWorkspaceId !== wsId || !rowConversationId) {
+        continue;
+      }
+      orderedIds.push(rowConversationId);
+    }
+    var current = normalizeOrderedIdList(state.conversationOrderIdsByWorkspace[wsId]);
+    for (var j = 0; j < current.length; j += 1) {
+      var existing = current[j];
+      var found = false;
+      for (var k = 0; k < orderedIds.length; k += 1) {
+        if (orderedIds[k] === existing) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        orderedIds.push(existing);
+      }
+    }
+    if (!state.conversationOrderIdsByWorkspace || typeof state.conversationOrderIdsByWorkspace !== "object") {
+      state.conversationOrderIdsByWorkspace = {};
+    }
+    state.conversationOrderIdsByWorkspace[wsId] = normalizeOrderedIdList(orderedIds);
+  }
+
+  function onWorkspaceTreeDragStart(event) {
+    if (!workspaceTreeDragAllowed()) {
+      return;
+    }
+    event.stopPropagation();
+    var handle = event.target.closest("[data-action='workspace-drag-handle'], [data-action='conversation-drag-handle']");
+    if (!handle) {
+      event.preventDefault();
+      return;
+    }
+    var row = event.target.closest(".workspace-row[data-drag-type='workspace'][data-workspace-id], .conversation-row[data-drag-type='conversation'][data-workspace-id][data-conversation-id]");
+    if (!row) {
+      event.preventDefault();
+      return;
+    }
+    var dragType = String(row.getAttribute("data-drag-type") || "");
+    var workspaceId = trim(String(row.getAttribute("data-workspace-id") || ""));
+    var conversationId = trim(String(row.getAttribute("data-conversation-id") || ""));
+    if (!workspaceId || (dragType === "conversation" && !conversationId)) {
+      event.preventDefault();
+      return;
+    }
+    state.workspaceTreeDrag.active = true;
+    state.workspaceTreeDrag.type = dragType;
+    state.workspaceTreeDrag.workspaceId = workspaceId;
+    state.workspaceTreeDrag.conversationId = conversationId;
+    row.classList.add(dragType === "workspace" ? "workspace-row-dragging" : "conversation-row-dragging");
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", dragType + ":" + workspaceId + ":" + conversationId);
+    }
+  }
+
+  function onWorkspaceTreeDragOver(event) {
+    if (!state.workspaceTreeDrag.active || !workspaceTreeDragAllowed() || !el.workspaceTree) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    var dragType = String(state.workspaceTreeDrag.type || "");
+    if (dragType === "workspace") {
+      var overWorkspaceRow = event.target.closest(".workspace-row[data-drag-type='workspace'][data-workspace-id]");
+      if (!overWorkspaceRow) {
+        return;
+      }
+      var dragWorkspaceId = String(state.workspaceTreeDrag.workspaceId || "");
+      var overWorkspaceId = String(overWorkspaceRow.getAttribute("data-workspace-id") || "");
+      if (!dragWorkspaceId || !overWorkspaceId || dragWorkspaceId === overWorkspaceId) {
+        return;
+      }
+      var dragGroup = el.workspaceTree.querySelector(".workspace-group[data-workspace-id='" + escAttr(dragWorkspaceId) + "']");
+      var overGroup = el.workspaceTree.querySelector(".workspace-group[data-workspace-id='" + escAttr(overWorkspaceId) + "']");
+      if (!dragGroup || !overGroup || dragGroup === overGroup) {
+        return;
+      }
+      var beforePositions = snapshotWorkspaceTreePositions(".workspace-group[data-workspace-id]");
+      var overRect = overWorkspaceRow.getBoundingClientRect();
+      var insertAfter = event.clientY > (overRect.top + overRect.height * 0.5);
+      if (insertAfter) {
+        if (overGroup.nextSibling !== dragGroup) {
+          el.workspaceTree.insertBefore(dragGroup, overGroup.nextSibling);
+        }
+      } else {
+        el.workspaceTree.insertBefore(dragGroup, overGroup);
+      }
+      animateWorkspaceTreeFromSnapshot(beforePositions, ".workspace-group[data-workspace-id]");
+      return;
+    }
+
+    if (dragType === "conversation") {
+      var overConversationRow = event.target.closest(".conversation-row[data-drag-type='conversation'][data-workspace-id][data-conversation-id]");
+      if (!overConversationRow) {
+        return;
+      }
+      var dragWorkspace = String(state.workspaceTreeDrag.workspaceId || "");
+      var dragConversation = String(state.workspaceTreeDrag.conversationId || "");
+      var overWorkspace = String(overConversationRow.getAttribute("data-workspace-id") || "");
+      var overConversation = String(overConversationRow.getAttribute("data-conversation-id") || "");
+      if (
+        !dragWorkspace ||
+        !dragConversation ||
+        dragWorkspace !== overWorkspace ||
+        !overConversation ||
+        dragConversation === overConversation
+      ) {
+        return;
+      }
+      var dragConversationRow = el.workspaceTree.querySelector(".conversation-row[data-workspace-id='" + escAttr(dragWorkspace) + "'][data-conversation-id='" + escAttr(dragConversation) + "']");
+      if (!dragConversationRow || dragConversationRow === overConversationRow) {
+        return;
+      }
+      var shell = overConversationRow.closest(".conversation-shell");
+      if (!shell || shell !== dragConversationRow.closest(".conversation-shell")) {
+        return;
+      }
+      var beforeConversationPositions = snapshotWorkspaceTreePositions(
+        ".conversation-row[data-workspace-id='" + escAttr(dragWorkspace) + "'][data-conversation-id]"
+      );
+      var overConversationRect = overConversationRow.getBoundingClientRect();
+      var insertConversationAfter = event.clientY > (overConversationRect.top + overConversationRect.height * 0.5);
+      if (insertConversationAfter) {
+        if (overConversationRow.nextSibling !== dragConversationRow) {
+          shell.insertBefore(dragConversationRow, overConversationRow.nextSibling);
+        }
+      } else {
+        shell.insertBefore(dragConversationRow, overConversationRow);
+      }
+      animateWorkspaceTreeFromSnapshot(
+        beforeConversationPositions,
+        ".conversation-row[data-workspace-id='" + escAttr(dragWorkspace) + "'][data-conversation-id]"
+      );
+    }
+  }
+
+  function onWorkspaceTreeDrop(event) {
+    if (!state.workspaceTreeDrag.active || !workspaceTreeDragAllowed()) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    var dragType = String(state.workspaceTreeDrag.type || "");
+    if (dragType === "workspace") {
+      finalizeWorkspaceOrderFromTreeDom();
+    } else if (dragType === "conversation") {
+      finalizeConversationOrderFromTreeDom(state.workspaceTreeDrag.workspaceId);
+    }
+    persistWorkspaceOrderingState();
+    stopWorkspaceTreeDrag();
+    renderUi();
+  }
+
+  function onWorkspaceTreeDragEnd() {
+    if (!state.workspaceTreeDrag.active) {
+      return;
+    }
+    stopWorkspaceTreeDrag();
   }
 
   function handleAttachmentStripClick(event) {
@@ -18425,6 +19066,7 @@
         if (!workspaceId || !conversationId) {
           throw new Error("Choose a project thread first.");
         }
+        markConversationActivity(workspaceId, conversationId);
         var conversationKey = outgoingKeyFor(workspaceId, conversationId, "");
         movePendingOutgoing(pendingKey, conversationKey, pendingId);
         pendingKey = conversationKey;
@@ -18660,6 +19302,18 @@
     });
     on(el.workspaceTree, "keydown", function (event) {
       handleWorkspaceTreeKeydown(event);
+    });
+    on(el.workspaceTree, "dragstart", function (event) {
+      onWorkspaceTreeDragStart(event);
+    });
+    on(el.workspaceTree, "dragover", function (event) {
+      onWorkspaceTreeDragOver(event);
+    });
+    on(el.workspaceTree, "drop", function (event) {
+      onWorkspaceTreeDrop(event);
+    });
+    on(el.workspaceTree, "dragend", function () {
+      onWorkspaceTreeDragEnd();
     });
 
     on(el.addWorkspaceBtn, "click", function () {
