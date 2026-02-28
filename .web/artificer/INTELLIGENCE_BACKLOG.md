@@ -48,6 +48,7 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - No visible completion state before content is actually available.
   - Progress:
     - Added assistant-delivery watch logic so finalizing feedback remains visible until assistant content lands (or fallback is inserted).
+    - Strengthened finalizing-status rendering so the latest completed run keeps showing "Finalizing response..." until assistant output is actually present, reducing false-idle model-only states.
 
 - INT-007 Thread/workspace ordering ergonomics
   - Goal: Improve recency-based thread placement and drag-reorder fluidity.

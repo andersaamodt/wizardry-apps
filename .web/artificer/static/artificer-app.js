@@ -6372,10 +6372,24 @@
     var queueAwaitingDecision = queueLastStatus === "awaiting_decision" || !!normalizeDecisionRequest(conversation && conversation.decision_request);
     var pendingAssistantDelivery = assistantDeliveryPendingCount(workspaceId, conversationId) > 0;
     var hasAssistantAfterAnchor = conversationHasAssistantAfterAnchor(workspaceId, conversationId, event.message_anchor);
+    var latestRunEvent = findLatestRunEventByStatus(conversationId, ["running", "done", "awaiting_decision", "awaiting_approval", "error", "cancelled"]);
+    var isLatestRunEvent = !!(
+      latestRunEvent &&
+      String(latestRunEvent.id || "") &&
+      String(latestRunEvent.id || "") === String(event.id || "")
+    );
     var finishedAtMs = Date.parse(String(event.finished_at || ""));
     var recentlyFinishedWithoutAssistant = false;
     if (isFinite(finishedAtMs) && finishedAtMs > 0 && !hasAssistantAfterAnchor) {
       recentlyFinishedWithoutAssistant = (Date.now() - finishedAtMs) <= 90000;
+    }
+    var shouldShowFinalizingLine = false;
+    if (!hasAssistantAfterAnchor) {
+      if (pendingAssistantDelivery || recentlyFinishedWithoutAssistant) {
+        shouldShowFinalizingLine = true;
+      } else if (isLatestRunEvent && !queueRunning && queuePending < 1 && !queueAwaitingApproval && !queueAwaitingDecision) {
+        shouldShowFinalizingLine = true;
+      }
     }
     html = "<article class='" + runClass + " run-narrative'>";
     if (queueRunning || queuePending > 0) {
@@ -6384,7 +6398,7 @@
       html += "<p class='run-line subtle'>Run paused. Awaiting command approval.</p>";
     } else if (queueAwaitingDecision) {
       html += "<p class='run-line subtle'>Run paused. Awaiting your decision.</p>";
-    } else if ((pendingAssistantDelivery || recentlyFinishedWithoutAssistant) && !hasAssistantAfterAnchor) {
+    } else if (shouldShowFinalizingLine) {
       html += "<p class='run-line subtle'><span class='run-spinner' aria-hidden='true'></span>Finalizing response...</p>";
     } else if (runModelText) {
       html += "<p class='run-line subtle'>Model: " + escHtml(runModelText) + "</p>";

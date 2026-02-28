@@ -2377,6 +2377,10 @@ button:disabled,
   display: none;
 }
 
+.run-details > summary::before {
+  content: none;
+}
+
 .run-details > summary::after {
   content: "\203A";
   margin-left: auto;
