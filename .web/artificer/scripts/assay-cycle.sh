@@ -8,7 +8,7 @@ OUT_DIR="$ROOT_DIR/.web/artificer/.assay-reports"
 usage() {
   cat <<'EOF'
 Usage:
-  assay-cycle.sh run [--label NAME] [--timeout-sec N] [--run-budget-sec N] [--attempts N]
+  assay-cycle.sh run [--label NAME] [--timeout-sec N] [--run-budget-sec N] [--attempts N] [--mentor-from FILE]
   assay-cycle.sh compare --before FILE --after FILE
 
 Examples:
@@ -49,6 +49,42 @@ status_rank() {
     running) printf '%s' "1" ;;
     *) printf '%s' "0" ;;
   esac
+}
+
+mentor_suffix_for_task() {
+  task_id=$1
+  mentor_file=$2
+  if [ -z "$mentor_file" ] || [ ! -f "$mentor_file" ]; then
+    return 0
+  fi
+  line=$(awk -F '\t' -v t="$task_id" 'NR>1 && $1==t {print; exit}' "$mentor_file")
+  [ -n "$line" ] || return 0
+  iq=$(printf '%s' "$line" | awk -F '\t' '{print $13+0}')
+  flow=$(printf '%s' "$line" | awk -F '\t' '{print $14+0}')
+  sections=$(printf '%s' "$line" | awk -F '\t' '{print $9+0}')
+  control=$(printf '%s' "$line" | awk -F '\t' '{print $10+0}')
+  verify=$(printf '%s' "$line" | awk -F '\t' '{print $11+0}')
+  runtime_line=$(printf '%s' "$line" | awk -F '\t' '{print $12+0}')
+
+  printf '\n\nAssay mentor guidance from prior cycle:\n'
+  if [ "$iq" -lt 60 ]; then
+    printf -- '- Raise intelligence score by increasing concrete execution depth and explicit verification.\n'
+  fi
+  if [ "$flow" -lt 60 ]; then
+    printf -- '- Raise flow score with concise timestamp-style step updates and a cleaner final structure.\n'
+  fi
+  if [ "$sections" -lt 1 ]; then
+    printf -- '- Mandatory final sections: Outcome, Verification Evidence, Risks, Next Improvement.\n'
+  fi
+  if [ "$control" -lt 1 ]; then
+    printf -- '- Include explicit planning scaffold updates while running.\n'
+  fi
+  if [ "$verify" -lt 1 ]; then
+    printf -- '- Include concrete verification evidence before DONE.\n'
+  fi
+  if [ "$runtime_line" -lt 1 ]; then
+    printf -- '- Include explicit runtime line: Worked for Xm Ys.\n'
+  fi
 }
 
 task_table() {
@@ -126,6 +162,7 @@ run_cycle() {
   task_timeout_sec=$2
   run_budget_sec=$3
   attempts=$4
+  mentor_from=$5
   mkdir -p "$OUT_DIR"
   out_file="$OUT_DIR/$label.tsv"
   tmp_tasks=$(mktemp)
@@ -184,7 +221,12 @@ run_cycle() {
         budget_this=$((budget_this + (attempt - 1) * 10))
       fi
 
-      body="action=run&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")&prompt=$(urlenc "$prompt")&run_mode=$(urlenc "$mode")&compute_budget=$(urlenc "$budget")&advanced_loop=1&max_iterations=$max_iterations&programmer_review=1&programmer_review_rounds=2&assay_task_id=$(urlenc "$task")"
+      mentor_suffix=$(mentor_suffix_for_task "$task" "$mentor_from" || true)
+      prompt_for_run=$prompt
+      if [ -n "$mentor_suffix" ]; then
+        prompt_for_run=$(printf '%s\n%s' "$prompt" "$mentor_suffix")
+      fi
+      body="action=run&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")&prompt=$(urlenc "$prompt_for_run")&run_mode=$(urlenc "$mode")&compute_budget=$(urlenc "$budget")&advanced_loop=1&max_iterations=$max_iterations&programmer_review=1&programmer_review_rounds=2&assay_task_id=$(urlenc "$task")"
       timed_out=0
       if ! run_with_timeout "$timeout_this" sh -c "ARTIFICER_RUN_TIME_BUDGET_SEC=$budget_this REQUEST_METHOD=POST \"$API\" <<'EOF' >/dev/null
 $body
@@ -275,6 +317,7 @@ case "$mode" in
     task_timeout_sec=210
     run_budget_sec=120
     attempts=2
+    mentor_from=""
     while [ $# -gt 0 ]; do
       case "$1" in
         --label)
@@ -293,6 +336,10 @@ case "$mode" in
           attempts=$2
           shift 2
           ;;
+        --mentor-from)
+          mentor_from=$2
+          shift 2
+          ;;
         *)
           echo "Unknown arg: $1" >&2
           usage
@@ -300,7 +347,7 @@ case "$mode" in
           ;;
       esac
     done
-    run_cycle "$label" "$task_timeout_sec" "$run_budget_sec" "$attempts"
+    run_cycle "$label" "$task_timeout_sec" "$run_budget_sec" "$attempts" "$mentor_from"
     ;;
   compare)
     before=""
