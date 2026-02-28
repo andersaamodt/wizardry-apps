@@ -68,6 +68,7 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Added file-backed controller variant store with baseline + proposal-derived candidates, manual promote/rollback gates, and per-variant quality aggregates.
     - Wired run-time variant selection into controller prompt construction and recorded run-level telemetry for before/after quality deltas.
     - Surfaced controller variant state and promote/rollback controls in Mode Runtime settings.
+    - Injected runtime learning summaries (latest failure taxonomy signals + quality scorecard trend) into each controller loop prompt so active runs can adapt to recent regressions.
 
 - INT-009 Security specialist modes
   - Goal: Strengthen `pentest` and `security-audit` modes with stricter evidence contracts.

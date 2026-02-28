@@ -599,6 +599,63 @@ mr_failure_taxonomy_state_json() {
     "$(mr_failure_taxonomy_recent_json "16")"
 }
 
+mr_failure_taxonomy_recent_summary_text() {
+  max_rows=$1
+  case "$max_rows" in ""|*[!0-9]*) max_rows=6 ;; esac
+  if [ "$max_rows" -lt 1 ]; then
+    max_rows=1
+  fi
+
+  events_file=$(mr_failure_taxonomy_events_file)
+  if [ ! -s "$events_file" ]; then
+    printf '%s' "none"
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  latest_row=$(tail -n 1 "$events_file" 2>/dev/null || true)
+  latest_category=$(printf '%s' "$latest_row" | awk -F"$tab_char" '{ print $3 }')
+  latest_severity=$(printf '%s' "$latest_row" | awk -F"$tab_char" '{ print $5 }')
+  latest_mode=$(printf '%s' "$latest_row" | awk -F"$tab_char" '{ print $6 }')
+  latest_category=$(trim "$latest_category")
+  latest_severity=$(trim "$latest_severity")
+  latest_mode=$(trim "$latest_mode")
+  [ -n "$latest_category" ] || latest_category="unknown"
+  [ -n "$latest_severity" ] || latest_severity="unknown"
+  [ -n "$latest_mode" ] || latest_mode="unknown"
+  latest_label=$(mr_failure_taxonomy_category_label "$latest_category")
+
+  recent_file=$(mktemp)
+  tail -n "$max_rows" "$events_file" > "$recent_file" 2>/dev/null || : > "$recent_file"
+  top_categories=$(awk -F"$tab_char" '
+    NF >= 3 {
+      category = $3
+      if (category == "") {
+        category = "unknown"
+      }
+      counts[category] += 1
+    }
+    END {
+      for (category in counts) {
+        printf "%s\t%s\n", counts[category], category
+      }
+    }
+  ' "$recent_file" | sort -t "$tab_char" -k1,1nr -k2,2 | head -n 2 | awk -F"$tab_char" '
+    BEGIN { out = "" }
+    NF >= 2 {
+      if (out != "") {
+        out = out ", "
+      }
+      out = out $2 "=" $1
+    }
+    END { printf "%s", out }
+  ')
+  rm -f "$recent_file"
+  [ -n "$top_categories" ] || top_categories="none"
+
+  printf '%s' "latest=${latest_label} (severity=${latest_severity}, mode=${latest_mode}); recent_top=${top_categories}"
+}
+
 mr_improvement_proposal_exists_for_category() {
   category_id=$1
   [ -n "$category_id" ] || return 1
@@ -1839,6 +1896,56 @@ mr_quality_scorecard_state_json() {
     "$(json_escape "$markdown_file")" \
     "$(json_escape "$markdown_preview")" \
     "$(mr_quality_scorecard_recent_json "8")"
+}
+
+mr_quality_scorecard_recent_summary_text() {
+  max_rows=$1
+  case "$max_rows" in ""|*[!0-9]*) max_rows=8 ;; esac
+  if [ "$max_rows" -lt 1 ]; then
+    max_rows=1
+  fi
+
+  entries_file=$(mr_quality_scorecard_entries_file)
+  if [ ! -s "$entries_file" ]; then
+    printf '%s' "none"
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  last_row=$(tail -n 1 "$entries_file" 2>/dev/null || true)
+  last_mode=$(printf '%s' "$last_row" | awk -F"$tab_char" '{ print $5 }')
+  last_queue_status=$(printf '%s' "$last_row" | awk -F"$tab_char" '{ print $6 }')
+  last_final_state=$(printf '%s' "$last_row" | awk -F"$tab_char" '{ print $7 }')
+  last_quality=$(printf '%s' "$last_row" | awk -F"$tab_char" '{ print $8 }')
+  last_delta=$(printf '%s' "$last_row" | awk -F"$tab_char" '{ print $9 }')
+  last_mode=$(trim "$last_mode")
+  last_queue_status=$(trim "$last_queue_status")
+  last_final_state=$(trim "$last_final_state")
+  last_quality=$(trim "$last_quality")
+  last_delta=$(trim "$last_delta")
+  [ -n "$last_mode" ] || last_mode="unknown"
+  [ -n "$last_queue_status" ] || last_queue_status="unknown"
+  [ -n "$last_final_state" ] || last_final_state="unknown"
+  [ -n "$last_quality" ] || last_quality="0.000"
+  [ -n "$last_delta" ] || last_delta="0.000"
+
+  recent_avg=$(tail -n "$max_rows" "$entries_file" 2>/dev/null | awk -F"$tab_char" '
+    NF >= 8 {
+      sum += ($8 + 0.0)
+      count += 1
+    }
+    END {
+      if (count <= 0) {
+        printf "0.000"
+      } else {
+        printf "%.3f", sum / count
+      }
+    }
+  ')
+  recent_count=$(tail -n "$max_rows" "$entries_file" 2>/dev/null | wc -l | tr -d '[:space:]')
+  case "$recent_count" in ""|*[!0-9]*) recent_count=0 ;; esac
+
+  printf '%s' "last_mode=${last_mode}; last_quality=${last_quality}; last_delta=${last_delta}; last_status=${last_queue_status}/${last_final_state}; recent_avg=${recent_avg} (n=${recent_count})"
 }
 
 mr_controller_variant_bootstrap_default() {

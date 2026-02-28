@@ -18050,6 +18050,22 @@ Controller variant:
 EOF
 )
       fi
+      runtime_failure_summary="none"
+      if command -v mr_failure_taxonomy_recent_summary_text >/dev/null 2>&1; then
+        runtime_failure_summary=$(mr_failure_taxonomy_recent_summary_text "6")
+      fi
+      runtime_failure_summary=$(printf '%s' "$runtime_failure_summary" | tr '\n\r' '  ' | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')
+      if [ -z "$(trim "$runtime_failure_summary")" ]; then
+        runtime_failure_summary="none"
+      fi
+      runtime_quality_summary="none"
+      if command -v mr_quality_scorecard_recent_summary_text >/dev/null 2>&1; then
+        runtime_quality_summary=$(mr_quality_scorecard_recent_summary_text "8")
+      fi
+      runtime_quality_summary=$(printf '%s' "$runtime_quality_summary" | tr '\n\r' '  ' | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')
+      if [ -z "$(trim "$runtime_quality_summary")" ]; then
+        runtime_quality_summary="none"
+      fi
       workspace_context_block=""
       if [ -n "$(trim "$workspace_context_text")" ]; then
         workspace_context_block=$(cat <<EOF
@@ -18077,6 +18093,10 @@ $mode_hint
 $run_mode_policy_text
 
 $controller_variant_prompt_block
+
+Runtime learning signals:
+- failure_taxonomy: $runtime_failure_summary
+- quality_scorecard: $runtime_quality_summary
 
 Explicit skill actuator context:
 $explicit_skill_prompt_text

@@ -115,6 +115,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - `controller-variants/telemetry.tsv` run-level A/B quality telemetry used for promotion/rollback decisions
   - `quality-scorecard/entries.tsv` run quality timeline with deltas
   - `quality-scorecard/scorecard.md` human-readable trend summary
+  - Controller loop prompts consume condensed runtime learning signals from failure taxonomy and quality scorecard summaries.
 - Run-mode picker includes a `More modes` expander that surfaces all runtime governance modes with blurbs, and selecting one applies `Assistant` run mode with that focus profile.
 - `pentest` and `security-audit` modes now enforce structured findings output with explicit `Severity`, `Evidence`, `Remediation`, and follow-up verification guidance.
 - Composer now separates `Reasoning depth` from `Compute/time budget`:
