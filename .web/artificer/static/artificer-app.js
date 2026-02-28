@@ -883,6 +883,8 @@
   var dictationWaveBackendLevelAt = 0;
   var dictationWaveBackendRecentLevels = [];
   var dictationWaveBackendFloor = 0.02;
+  var dictationWaveBackendFloorCalibrating = true;
+  var dictationWaveBackendFloorSeedSamples = [];
   var dictationWaveSeenSignal = false;
   var dictationWaveNoiseFloor = 0.02;
   var dictationWaveActivatedAt = 0;
@@ -7626,6 +7628,8 @@
     dictationWaveBackendLevelAt = 0;
     dictationWaveBackendRecentLevels = [];
     dictationWaveBackendFloor = 0.02;
+    dictationWaveBackendFloorCalibrating = true;
+    dictationWaveBackendFloorSeedSamples = [];
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
     dictationWaveLastSampleAt = 0;
@@ -7829,26 +7833,73 @@
     var sorted = samples.slice().sort(function (a, b) {
       return a - b;
     });
-    var targetIdx = Math.floor((sorted.length - 1) * 0.18);
+    var targetIdx = Math.floor((sorted.length - 1) * 0.12);
     if (targetIdx < 0) {
       targetIdx = 0;
     } else if (targetIdx >= sorted.length) {
       targetIdx = sorted.length - 1;
     }
+    var speechIdx = Math.floor((sorted.length - 1) * 0.75);
+    if (speechIdx < 0) {
+      speechIdx = 0;
+    } else if (speechIdx >= sorted.length) {
+      speechIdx = sorted.length - 1;
+    }
     var target = Number(sorted[targetIdx] || 0);
+    var speechProbe = Number(sorted[speechIdx] || 0);
     if (!isFinite(target) || target < 0) {
       target = 0;
+    }
+    if (!isFinite(speechProbe) || speechProbe < 0) {
+      speechProbe = 0;
     }
     var floor = Number(dictationWaveBackendFloor || 0.01);
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    if (target > floor) {
-      // Rise very slowly to avoid flattening speech variation into a fat baseline.
-      floor = (floor * 0.96) + (target * 0.04);
+    var now = Date.now();
+    var activatedAt = Number(dictationWaveActivatedAt || 0);
+    var inStartupWindow = activatedAt > 0 && (now - activatedAt) <= 700;
+    if (dictationWaveBackendFloorCalibrating) {
+      for (var si = 0; si < sorted.length; si += 1) {
+        dictationWaveBackendFloorSeedSamples.push(sorted[si]);
+      }
+      if (dictationWaveBackendFloorSeedSamples.length > 280) {
+        dictationWaveBackendFloorSeedSamples = dictationWaveBackendFloorSeedSamples.slice(dictationWaveBackendFloorSeedSamples.length - 280);
+      }
+      var seedSorted = dictationWaveBackendFloorSeedSamples.slice().sort(function (a, b) {
+        return a - b;
+      });
+      var seedIdx = Math.floor((seedSorted.length - 1) * 0.25);
+      if (seedIdx < 0) {
+        seedIdx = 0;
+      } else if (seedIdx >= seedSorted.length) {
+        seedIdx = seedSorted.length - 1;
+      }
+      var seededTarget = Number(seedSorted[seedIdx] || target);
+      if (!isFinite(seededTarget) || seededTarget < 0) {
+        seededTarget = target;
+      }
+      // Calibrate aggressively at startup so baseline is sensible from the start.
+      floor = (floor * 0.28) + (seededTarget * 0.72);
+      if (!inStartupWindow || seedSorted.length >= 56) {
+        dictationWaveBackendFloorCalibrating = false;
+      }
     } else {
-      // Fall faster so floor quickly unlocks sensitivity after over-normalization.
-      floor = (floor * 0.62) + (target * 0.38);
+      var speechPresent = speechProbe > (target + Math.max(0.01, target * 1.6));
+      var deadband = Math.max(0.0018, floor * 0.12);
+      if (speechPresent) {
+        if (target < floor - deadband) {
+          // During speech, allow floor to drop (unlock), but never rise.
+          floor = (floor * 0.86) + (target * 0.14);
+        }
+      } else if (target > floor + deadband) {
+        // Outside speech, rise slowly to avoid re-normalization churn.
+        floor = (floor * 0.97) + (target * 0.03);
+      } else if (target < floor - deadband) {
+        // Drop faster so silence can recover to near-zero quickly.
+        floor = (floor * 0.82) + (target * 0.18);
+      }
     }
     if (floor < 0.0008) {
       floor = 0.0008;
@@ -8235,7 +8286,7 @@
     var silencePhase = Number(dictationWaveSilencePhase || 0);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.0062;
+    var silenceGate = 0.0056;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
