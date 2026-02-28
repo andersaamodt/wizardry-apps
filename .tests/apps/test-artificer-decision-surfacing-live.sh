@@ -48,6 +48,155 @@ assert_preview_case() {
   fi
 }
 
+assert_preview_case_with_signals() {
+  case_name=$1
+  expected_category=$2
+  expected_allow=$3
+  expected_explicit=$4
+  expected_missing=$5
+  expected_risk=$6
+  expected_external=$7
+  prompt=$8
+  question=$9
+  run_mode=${10}
+  commands=${11}
+  response=$(post_preview "$prompt" "$question" "$run_mode" "$commands")
+  actual_category=$(printf '%s' "$response" | jq -r '.category // ""')
+  allow=$(printf '%s' "$response" | jq -r '.allow_decision_request')
+  signal_explicit=$(printf '%s' "$response" | jq -r '.signals.explicit_choice')
+  signal_missing=$(printf '%s' "$response" | jq -r '.signals.missing_required_inputs')
+  signal_risk=$(printf '%s' "$response" | jq -r '.signals.risk_gate_question')
+  signal_external=$(printf '%s' "$response" | jq -r '.signals.external_commands')
+  if [ "$actual_category" != "$expected_category" ]; then
+    printf '%s\n' "signal case '$case_name' expected category '$expected_category' but got '$actual_category'" >&2
+    exit 1
+  fi
+  if [ "$allow" != "$expected_allow" ]; then
+    printf '%s\n' "signal case '$case_name' expected allow_decision_request=$expected_allow but got '$allow'" >&2
+    exit 1
+  fi
+  if [ "$signal_explicit" != "$expected_explicit" ]; then
+    printf '%s\n' "signal case '$case_name' expected explicit_choice=$expected_explicit but got '$signal_explicit'" >&2
+    exit 1
+  fi
+  if [ "$signal_missing" != "$expected_missing" ]; then
+    printf '%s\n' "signal case '$case_name' expected missing_required_inputs=$expected_missing but got '$signal_missing'" >&2
+    exit 1
+  fi
+  if [ "$signal_risk" != "$expected_risk" ]; then
+    printf '%s\n' "signal case '$case_name' expected risk_gate_question=$expected_risk but got '$signal_risk'" >&2
+    exit 1
+  fi
+  if [ "$signal_external" != "$expected_external" ]; then
+    printf '%s\n' "signal case '$case_name' expected external_commands=$expected_external but got '$signal_external'" >&2
+    exit 1
+  fi
+}
+
+assert_preview_case_with_signals \
+  "signals-explicit-choice" \
+  "explicit-choice" \
+  "true" \
+  "1" \
+  "0" \
+  "0" \
+  "0" \
+  "Which rollout path should I choose, blue-green or canary?" \
+  "Which rollout path should I use?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-required-input-missing" \
+  "required-input-missing" \
+  "true" \
+  "0" \
+  "1" \
+  "1" \
+  "0" \
+  "Deploy this with <PROD_DB_URL> and <PROD_API_KEY>; values are not provided." \
+  "Which production database URL and API key should I use?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-external-action-gate-precedence" \
+  "external-action-gate" \
+  "true" \
+  "0" \
+  "0" \
+  "1" \
+  "1" \
+  "Create a launch plan and run outreach checks." \
+  "Do you approve external network actions now?" \
+  "assistant" \
+  "curl https://example.com/health"
+
+assert_preview_case_with_signals \
+  "signals-risk-acknowledgement" \
+  "risk-acknowledgement" \
+  "true" \
+  "0" \
+  "0" \
+  "1" \
+  "0" \
+  "Proceed with irreversible data deletion if needed." \
+  "Do you approve deleting production rows now?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-none-clean" \
+  "none" \
+  "false" \
+  "0" \
+  "0" \
+  "0" \
+  "0" \
+  "Refactor this module and continue autonomously." \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-none-assistant-no-external-command" \
+  "none" \
+  "false" \
+  "0" \
+  "0" \
+  "0" \
+  "0" \
+  "Prepare external messaging guidance but do not run any outreach actions." \
+  "Need anything else?" \
+  "assistant" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-precedence-required-over-risk" \
+  "required-input-missing" \
+  "true" \
+  "0" \
+  "1" \
+  "1" \
+  "0" \
+  "Use <PROD_API_KEY> before deleting production rows." \
+  "Which API key should I use before deleting production rows?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-precedence-explicit-over-missing" \
+  "explicit-choice" \
+  "true" \
+  "1" \
+  "1" \
+  "1" \
+  "0" \
+  "Which deployment path should I choose for <PROD_HOST>, blue-green or canary?" \
+  "Which deployment path should I use?" \
+  "programming" \
+  "git status --short"
+
 assert_preview_case \
   "explicit-choice" \
   "explicit-choice" \

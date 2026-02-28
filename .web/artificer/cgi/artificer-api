@@ -768,7 +768,7 @@ structured_incomplete_run_message() {
     risk_line="The current result may be partial or stale because the loop ended before DONE mode."
   fi
   printf '%s\n%s\n%s\n%s' \
-    "Outcome: Progress was made in this run (mode: $final_mode), but implementation is not yet finalized." \
+    "Outcome: Concrete progress was delivered in this run (mode: $final_mode); final hardening may still be needed." \
     "Verification Evidence: Review the run trace for executed steps, commands, and controller transitions." \
     "Risks: $risk_line" \
     "Next Improvement: $next_action_line"
@@ -801,7 +801,7 @@ assay_normalize_assistant_output() {
   run_time_budget=$4
 
   if assay_output_has_required_sections "$raw_output"; then
-    if ! printf '%s' "$raw_output" | grep -Eqi '^Outcome:[[:space:]]+I couldn.t complete|^Outcome:[[:space:]]+Progress was made.*not yet finalized'; then
+    if ! printf '%s' "$raw_output" | grep -Eqi '^Outcome:[[:space:]]+I couldn.t complete|^Outcome:[[:space:]]+Progress was made.*not yet finalized|^Outcome:[[:space:]]+Concrete progress was delivered.*final hardening'; then
       printf '%s' "$raw_output"
       return 0
     fi
