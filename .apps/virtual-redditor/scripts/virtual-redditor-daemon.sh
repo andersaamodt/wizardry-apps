@@ -2169,11 +2169,12 @@ compiled_instructions_json() {
       if v == "typical_redditor" then "Typical Redditor"
       elif v == "academic" then "Academic"
       elif v == "helpful_peer" then "Helpful Peer"
+      elif v == "curious" then "Curious"
       elif v == "skeptical_debater" then "Skeptical Debater"
       elif v == "builder_operator" then "Technical Pragmatist"
       elif v == "community_regular" then "Community Regular"
       elif v == "troll" then "Troll"
-      elif v == "other" then "Follow ethos"
+      elif v == "other" then "Ethos & Instructions only"
       else (v // "Typical Redditor")
       end;
     def label_strength(v):
