@@ -13510,8 +13510,8 @@
     if (computeBudgetForRun === "long" && selectedIterations < 10) {
       selectedIterations += 2;
     } else if (computeBudgetForRun === "until-complete") {
-      // Keep "until-complete" effectively unbounded on iterations; backend runtime budget still applies.
-      selectedIterations = 9999;
+      // 0 is the backend sentinel for unbounded iterations (still bounded by runtime budget).
+      selectedIterations = 0;
     }
     var streamSession = String(Date.now()) + "-" + String(Math.floor(Math.random() * 1000000));
     var streamOffset = 0;

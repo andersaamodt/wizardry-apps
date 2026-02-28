@@ -16749,14 +16749,12 @@ $fallback_output"
         fi
         ;;
       until-complete)
-        # "until-complete" should not be iteration-capped; rely on DONE transition or runtime budget.
-        if [ "$max_iterations" -lt 9999 ]; then
-          max_iterations=9999
-        fi
+        # "until-complete" uses 0 as an unlimited-iteration sentinel.
+        max_iterations=0
         ;;
     esac
 
-    if [ "$max_iterations" -lt 1 ]; then
+    if [ "$compute_budget" != "until-complete" ] && [ "$max_iterations" -lt 1 ]; then
       max_iterations=1
     fi
     max_iterations_cap=$(compute_budget_iteration_cap "$compute_budget")
@@ -17326,12 +17324,16 @@ EOF
     printf '%s\n' "$programmer_review_enabled" > "$queue_last_programmer_review_file"
     printf '%s\n' "$programmer_review_max_rounds" > "$queue_last_programmer_review_rounds_file"
     printf '%s\n' "$assay_task_id" > "$queue_last_assay_task_id_file"
+    max_iterations_label=$max_iterations
+    if [ "$max_iterations" -le 0 ]; then
+      max_iterations_label="unbounded"
+    fi
     if [ -n "$assistant_mode_id" ]; then
-      stream_emit_line "$stream_output_file" "Run mode: $run_mode (assistant_mode=$assistant_mode_id, advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations)"
+      stream_emit_line "$stream_output_file" "Run mode: $run_mode (assistant_mode=$assistant_mode_id, advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations_label)"
     elif [ "$run_mode" = "programming" ] || [ "$run_mode" = "pentest" ] || [ "$run_mode" = "security-audit" ]; then
-      stream_emit_line "$stream_output_file" "Run mode: $run_mode (advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations, code_review=${programmer_review_enabled}, review_rounds=${programmer_review_max_rounds})"
+      stream_emit_line "$stream_output_file" "Run mode: $run_mode (advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations_label, code_review=${programmer_review_enabled}, review_rounds=${programmer_review_max_rounds})"
     else
-      stream_emit_line "$stream_output_file" "Run mode: $run_mode (advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations)"
+      stream_emit_line "$stream_output_file" "Run mode: $run_mode (advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations_label)"
     fi
     stream_emit_line "$stream_output_file" "Run time budget: ${run_time_budget}s"
     explicit_skill_context_text=""
@@ -17858,7 +17860,10 @@ $teacher_model_snapshot"
     assistant_output=""
 
     iteration=1
-    while [ "$iteration" -le "$max_iterations" ]; do
+    while :; do
+      if [ "$max_iterations" -gt 0 ] && [ "$iteration" -gt "$max_iterations" ]; then
+        break
+      fi
       stream_emit_line "$stream_output_file" "Iteration $iteration started."
       if [ -f "$running_stop_file" ]; then
         forced_queue_status="cancelled"

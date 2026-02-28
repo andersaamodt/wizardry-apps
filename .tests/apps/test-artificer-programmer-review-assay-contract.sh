@@ -55,6 +55,9 @@ assert_contains "$api" "programmer_review_rounds_raw=\$(trim \"\$(param \"progra
 assert_contains "$api" "programmer_review_last_feedback=\"\""
 assert_contains "$api" "Code review round \$review_round/\$programmer_review_max_rounds started."
 assert_contains "$api" "code_review=\${programmer_review_enabled}, review_rounds=\${programmer_review_max_rounds}"
+assert_contains "$api" "\"until-complete\" uses 0 as an unlimited-iteration sentinel."
+assert_contains "$api" "max_iterations_label=\"unbounded\""
+assert_contains "$api" 'if [ "$max_iterations" -gt 0 ] && [ "$iteration" -gt "$max_iterations" ]; then'
 
 # Frontend contract: programmer-review settings and run payload wiring.
 assert_contains "$ui_js" "programmerReviewEnabled: storageGet(\"artificer.programmerReviewEnabled\", \"1\") !== \"0\","
@@ -64,6 +67,7 @@ assert_contains "$ui_js" "programmer_review: programmerReviewEnabledForRun ? \"1
 assert_contains "$ui_js" "programmer_review_rounds: String(programmerReviewRoundsForRun),"
 assert_contains "$ui_js" "programmer_review: normalizedProgrammerReview ? \"1\" : \"0\","
 assert_contains "$ui_js" "programmer_review_rounds: String(normalizedProgrammerReviewRounds),"
+assert_contains "$ui_js" "selectedIterations = 0;"
 assert_contains "$ui_js" "safeStep(\"renderProgrammingSettings\", renderProgrammingSettings);"
 assert_contains "$ui_js" "function synthesizeRunTimelineEntries(event)"
 assert_contains "$ui_js" "function runTimelineEntries(event)"
