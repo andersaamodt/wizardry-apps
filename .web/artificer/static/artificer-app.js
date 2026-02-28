@@ -2964,7 +2964,6 @@
       permission_mode: normalizePermissionModeValue(item.permission_mode || ""),
       programmer_review: normalizeProgrammerReviewEnabledValue(item.programmer_review),
       programmer_review_rounds: normalizeProgrammerReviewRoundsValue(item.programmer_review_rounds || 2),
-      assay_task_id: normalizeAssayTaskId(item.assay_task_id || ""),
       explicit_skill_ids: Array.isArray(item.explicit_skill_ids) ? item.explicit_skill_ids : []
     };
   }
@@ -4184,9 +4183,6 @@
     }
     if (!trim(merged.session_log || "") && trim(fallback.session_log || "")) {
       merged.session_log = fallback.session_log;
-    }
-    if (!trim(merged.assay_task_id || "") && trim(fallback.assay_task_id || "")) {
-      merged.assay_task_id = fallback.assay_task_id;
     }
     return merged;
   }
@@ -13570,7 +13566,6 @@
     var explicitPermissionModeOverride = normalizePermissionModeValue(runOptions.permissionMode || "");
     var explicitCommandExecModeOverride = normalizeCommandExecModeValue(runOptions.commandExecMode || "");
     var explicitSkillIdsOverride = Array.isArray(runOptions.explicitSkillIds) ? runOptions.explicitSkillIds : [];
-    var explicitAssayTaskId = normalizeAssayTaskId(runOptions.assayTaskId || "");
     var explicitProgrammerReviewOverride = null;
     var explicitProgrammerReviewRoundsOverride = null;
     if (Object.prototype.hasOwnProperty.call(runOptions, "programmerReview")) {
@@ -13661,8 +13656,7 @@
         status: "running",
         started_at: new Date().toISOString(),
         stream_text: "",
-        message_anchor: runAnchor,
-        assay_task_id: explicitAssayTaskId
+        message_anchor: runAnchor
       });
     } else {
       if (preferredEventId && String(pendingEvent.id || "") !== preferredEventId) {
@@ -13671,9 +13665,6 @@
       var pendingAnchor = Number(pendingEvent.message_anchor);
       if (!isFinite(pendingAnchor) || pendingAnchor < 0) {
         pendingEvent.message_anchor = runAnchor;
-      }
-      if (explicitAssayTaskId) {
-        pendingEvent.assay_task_id = explicitAssayTaskId;
       }
       persistRunEventsSoon();
     }
@@ -13710,22 +13701,6 @@
     } else if (computeBudgetForRun === "until-complete") {
       // Keep "until-complete" effectively unbounded on iterations; backend runtime budget still applies.
       selectedIterations = 9999;
-    }
-    if (explicitAssayTaskId) {
-      var assayIterationCap = 3;
-      if (computeBudgetForRun === "quick") {
-        assayIterationCap = 2;
-      } else if (computeBudgetForRun === "long") {
-        assayIterationCap = 4;
-      } else if (computeBudgetForRun === "until-complete") {
-        assayIterationCap = 0;
-      }
-      if (assayIterationCap > 0 && selectedIterations > assayIterationCap) {
-        selectedIterations = assayIterationCap;
-      }
-      if (selectedIterations < 1) {
-        selectedIterations = 1;
-      }
     }
     var streamSession = String(Date.now()) + "-" + String(Math.floor(Math.random() * 1000000));
     var streamOffset = 0;
@@ -13821,7 +13796,6 @@
       explicit_skill_ids: explicitSkillIdsForRun.join(","),
       reasoning_effort: runProfile.reasoning,
       max_iterations: String(selectedIterations),
-      assay_task_id: explicitAssayTaskId,
       stream_session: streamSession,
       run_event_id: pendingEvent && pendingEvent.id ? String(pendingEvent.id) : "",
       run_message_anchor: String(Math.max(0, Math.floor(Number(runAnchor || 0))))
@@ -14116,7 +14090,6 @@
     if (!normalizedProgrammerReview) {
       normalizedProgrammerReviewRounds = 0;
     }
-    var normalizedAssayTaskId = normalizeAssayTaskId(assayTaskId || "");
     var normalizedSkillIds = mergeSkillIdLists(explicitSkillIds, []);
     return apiPost("queue_enqueue", {
       workspace_id: workspaceId,
@@ -14131,7 +14104,6 @@
       command_exec_mode: normalizedCommandExecMode,
       programmer_review: normalizedProgrammerReview ? "1" : "0",
       programmer_review_rounds: String(normalizedProgrammerReviewRounds),
-      assay_task_id: normalizedAssayTaskId,
       explicit_skill_ids: normalizedSkillIds.join(",")
     }, { timeoutMs: 90000 }).then(function (response) {
       if (!response.success) {
@@ -14411,7 +14383,6 @@
         programmerReviewRounds: normalizeProgrammerReviewRoundsValue(item.programmer_review_rounds || 2),
         permissionMode: normalizePermissionModeValue(item.permission_mode || ""),
         commandExecMode: normalizeCommandExecModeValue(item.command_exec_mode || ""),
-        assayTaskId: normalizeAssayTaskId(item.assay_task_id || ""),
         explicitSkillIds: Array.isArray(item.explicit_skill_ids) ? item.explicit_skill_ids : [],
         approvalRetry: options.approvalRetry === true,
         pendingEvent: resumedPendingEvent

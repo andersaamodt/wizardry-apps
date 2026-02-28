@@ -3710,16 +3710,8 @@ normalize_programmer_review_rounds_value() {
 }
 
 normalize_assay_task_id_value() {
-  raw_value=$(trim "$1")
-  raw_value=$(printf '%s' "$raw_value" | tr '[:upper:]' '[:lower:]')
-  if [ -z "$raw_value" ]; then
-    printf '%s' ""
-    return 0
-  fi
-  if valid_id "$raw_value"; then
-    printf '%s' "$raw_value"
-    return 0
-  fi
+  # Assay-specific runtime routing is retired from Artificer.
+  # Keep this normalizer as a compatibility shim that always disables assay ids.
   printf '%s' ""
 }
 
@@ -5406,8 +5398,11 @@ decision_request_category_for_prompt() {
     return 0
   fi
   if decision_prompt_has_missing_required_inputs "$prompt_text"; then
-    printf '%s' "required-input-missing"
-    return 0
+    question_trimmed=$(trim "$question_text")
+    if [ -z "$question_trimmed" ] || decision_question_looks_required_input "$question_trimmed"; then
+      printf '%s' "required-input-missing"
+      return 0
+    fi
   fi
   if [ "$run_mode_text" = "assistant" ] && decision_commands_trigger_external_gate "$commands_text"; then
     printf '%s' "external-action-gate"
