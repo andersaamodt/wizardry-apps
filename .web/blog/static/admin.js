@@ -2178,13 +2178,21 @@
       }
 
       if (action === 'publish_now') {
-        setOutput(els.outputCompose, 'Published: ' + String(data.filename || ''), 'ok');
+        const filename = String(data.filename || '').trim();
+        const baseMessage = data.message
+          ? String(data.message)
+          : ('Published: ' + (filename || 'post'));
+        setOutput(
+          els.outputCompose,
+          baseMessage + ' Updating front page/search can take a few seconds while rebuild finishes.',
+          'ok'
+        );
         resetComposer();
       } else {
         setOutput(els.outputCompose, data.message || 'Saved.', 'ok');
       }
 
-      await Promise.all([loadDrafts(), loadQueue()]);
+      await Promise.all([loadDrafts(), loadQueue(), loadPosts()]);
       setAutosaveStatus('saved', 'Autosaved at ' + new Date().toLocaleString());
     } catch (err) {
       setOutput(els.outputCompose, 'Error: ' + err.message, 'error');
@@ -2238,7 +2246,7 @@
       if (!data.success) {
         throw new Error(data.error || 'Scheduler failed');
       }
-      await Promise.all([loadDrafts(), loadQueue()]);
+      await Promise.all([loadDrafts(), loadQueue(), loadPosts()]);
       setOutput(els.outputQueue, 'Drip run complete. Scheduled published: ' + data.scheduled_published + ', drip published: ' + data.drip_published + '.', 'ok');
     } catch (err) {
       setOutput(els.outputQueue, 'Error: ' + err.message, 'error');
