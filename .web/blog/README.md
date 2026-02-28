@@ -75,9 +75,11 @@ blog/
 │       ├── index.md         # Blog homepage
 │       ├── about.md         # About page
 │       ├── tags.md          # Tag index
-│       └── posts/           # Blog posts
+│       └── posts/           # Symlink mount to canonical post storage
 │           ├── 2024-01-15-welcome.md
 │           └── 2024-01-20-second-post.md
+│
+├── .sitedata/<site>/blog/posts/   # Canonical post storage (survives template recopy)
 └── static/
     └── style.css            # Blog styling
 ```

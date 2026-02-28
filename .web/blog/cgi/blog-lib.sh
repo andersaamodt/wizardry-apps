@@ -9,6 +9,7 @@ blog_site_root="$blog_sites_dir/$blog_site_name"
 blog_site_data="$blog_sites_dir/.sitedata/$blog_site_name"
 blog_site_conf="$blog_site_root/site.conf"
 blog_posts_dir="$blog_site_root/site/pages/posts"
+blog_posts_store_dir="$blog_site_data/blog/posts"
 blog_auth_dir="$blog_site_data/ssh-auth"
 blog_users_dir="$blog_auth_dir/users"
 blog_sessions_dir="$blog_auth_dir/sessions"
@@ -48,9 +49,53 @@ BLOG_SESSION_DELEGATION_ID=${BLOG_SESSION_DELEGATION_ID-}
 BLOG_SESSION_AUTH_METHOD=${BLOG_SESSION_AUTH_METHOD-}
 BLOG_SESSION_FORCE_INTERACTIVE=${BLOG_SESSION_FORCE_INTERACTIVE-}
 
+blog_posts_store_is_empty() {
+  if [ ! -d "$blog_posts_store_dir" ]; then
+    return 0
+  fi
+  first=$(find "$blog_posts_store_dir" -mindepth 1 -print -quit 2>/dev/null || printf '')
+  [ -z "$first" ]
+}
+
+blog_ensure_posts_mount() {
+  pages_dir=$(dirname "$blog_posts_dir")
+  mkdir -p "$pages_dir" "$blog_posts_store_dir"
+
+  if [ -L "$blog_posts_dir" ]; then
+    target=$(readlink "$blog_posts_dir" 2>/dev/null || printf '')
+    if [ "$target" = "$blog_posts_store_dir" ]; then
+      return 0
+    fi
+    rm -f "$blog_posts_dir"
+  fi
+
+  if [ -d "$blog_posts_dir" ] && [ ! -L "$blog_posts_dir" ]; then
+    if blog_posts_store_is_empty; then
+      if command -v rsync >/dev/null 2>&1; then
+        rsync -a "$blog_posts_dir"/ "$blog_posts_store_dir"/ >/dev/null 2>&1 || true
+      else
+        cp -R "$blog_posts_dir"/. "$blog_posts_store_dir"/ 2>/dev/null || true
+      fi
+      rm -rf "$blog_posts_dir"
+    else
+      recovered_root="$blog_site_data/blog/recovered"
+      ts=$(date +%Y%m%d-%H%M%S)
+      recovered_dir="$recovered_root/template-copy-posts-$ts"
+      mkdir -p "$recovered_root"
+      mv "$blog_posts_dir" "$recovered_dir" 2>/dev/null || rm -rf "$blog_posts_dir"
+    fi
+  elif [ -e "$blog_posts_dir" ] && [ ! -L "$blog_posts_dir" ]; then
+    rm -f "$blog_posts_dir"
+  fi
+
+  if [ ! -e "$blog_posts_dir" ]; then
+    ln -s "$blog_posts_store_dir" "$blog_posts_dir"
+  fi
+}
+
 blog_init() {
-  mkdir -p "$blog_auth_dir" "$blog_users_dir" "$blog_sessions_dir" "$blog_nostr_login_requests_dir" "$blog_nostr_delegations_dir" "$blog_nostr_rate_limits_dir" "$blog_state_dir" "$blog_drafts_dir" "$blog_uploads_dir"
-  mkdir -p "$blog_posts_dir"
+  mkdir -p "$blog_auth_dir" "$blog_users_dir" "$blog_sessions_dir" "$blog_nostr_login_requests_dir" "$blog_nostr_delegations_dir" "$blog_nostr_rate_limits_dir" "$blog_state_dir" "$blog_drafts_dir" "$blog_uploads_dir" "$blog_posts_store_dir"
+  blog_ensure_posts_mount
   mkdir -p "$blog_nostr_state_dir" "$blog_nostr_events_dir" "$blog_nostr_derived_dir"
   [ -f "$blog_nostr_delegation_revocations_file" ] || : > "$blog_nostr_delegation_revocations_file"
   if [ ! -f "$blog_nostr_authors_file" ] && [ -f "$blog_nostr_authors_file_legacy" ]; then
