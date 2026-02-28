@@ -789,6 +789,7 @@
   var dictationWaveBackendLevelAt = 0;
   var dictationWaveBackendRecentLevels = [];
   var dictationWaveBackendFloor = 0.01;
+  var dictationWaveBackendRange = 0.22;
   var dictationWaveBackendCeil = 0.24;
   var dictationWaveBackendFloorCalibrating = true;
   var dictationWaveSeenSignal = false;
@@ -7326,6 +7327,7 @@
     dictationWaveBackendLevelAt = 0;
     dictationWaveBackendRecentLevels = [];
     dictationWaveBackendFloor = 0.01;
+    dictationWaveBackendRange = 0.22;
     dictationWaveBackendCeil = 0.24;
     dictationWaveBackendFloorCalibrating = true;
     dictationWaveSeenSignal = false;
@@ -7564,17 +7566,17 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var ceil = Number(dictationWaveBackendCeil || 0.24);
-    if (!isFinite(ceil) || ceil <= floor) {
-      ceil = floor + 0.2;
+    var range = Number(dictationWaveBackendRange || 0.22);
+    if (!isFinite(range) || range <= 0) {
+      range = 0.22;
     }
-    var gate = floor + Math.max(0.00035, floor * 0.08);
+    var gate = floor + Math.max(0.0002, floor * 0.03);
     if (raw <= gate) {
       return 0;
     }
-    var span = ceil - gate;
-    if (!isFinite(span) || span < 0.14) {
-      span = 0.14;
+    var span = range * 0.95;
+    if (!isFinite(span) || span < 0.05) {
+      span = 0.05;
     }
     var normalized = (raw - gate) / span;
     if (!isFinite(normalized) || normalized < 0) {
@@ -7583,9 +7585,9 @@
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.72);
+      normalized = Math.pow(normalized, 0.62);
     }
-    if (normalized < 0.0012) {
+    if (normalized < 0.0007) {
       normalized = 0;
     }
     return normalized;
@@ -7617,13 +7619,13 @@
     var sorted = samples.slice().sort(function (a, b) {
       return a - b;
     });
-    var floorIdx = Math.floor((sorted.length - 1) * 0.16);
+    var floorIdx = Math.floor((sorted.length - 1) * 0.12);
     if (floorIdx < 0) {
       floorIdx = 0;
     } else if (floorIdx >= sorted.length) {
       floorIdx = sorted.length - 1;
     }
-    var highIdx = Math.floor((sorted.length - 1) * 0.9);
+    var highIdx = Math.floor((sorted.length - 1) * 0.88);
     if (highIdx < 0) {
       highIdx = 0;
     } else if (highIdx >= sorted.length) {
@@ -7652,13 +7654,17 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var ceil = Number(dictationWaveBackendCeil || 0.24);
-    if (!isFinite(ceil) || ceil <= floor) {
-      ceil = floor + 0.2;
+    var range = Number(dictationWaveBackendRange || 0.22);
+    if (!isFinite(range) || range <= 0) {
+      range = 0.22;
+    }
+    var rangeTarget = dynamicHigh - floorTarget;
+    if (!isFinite(rangeTarget) || rangeTarget < 0.03) {
+      rangeTarget = 0.03;
     }
     if (dictationWaveBackendFloorCalibrating) {
       floor = (floor * 0.3) + (floorTarget * 0.7);
-      ceil = (ceil * 0.45) + (dynamicHigh * 0.55);
+      range = (range * 0.45) + (rangeTarget * 0.55);
       dictationWaveBackendFloorCalibrating = false;
     } else {
       // Floor should drop quickly when room noise drops, rise slowly otherwise.
@@ -7667,23 +7673,29 @@
       } else {
         floor = (floor * 0.95) + (floorTarget * 0.05);
       }
-      if (dynamicHigh > ceil) {
-        ceil = (ceil * 0.7) + (dynamicHigh * 0.3);
+      if (rangeTarget > range) {
+        range = (range * 0.7) + (rangeTarget * 0.3);
       } else {
-        ceil = (ceil * 0.9) + (dynamicHigh * 0.1);
+        range = (range * 0.9) + (rangeTarget * 0.1);
       }
     }
     if (floor < 0.0008) {
       floor = 0.0008;
-    } else if (floor > 0.18) {
-      floor = 0.18;
+    } else if (floor > 0.12) {
+      floor = 0.12;
     }
-    if (ceil < floor + 0.16) {
-      ceil = floor + 0.16;
-    } else if (ceil > 1) {
+    if (range < 0.05) {
+      range = 0.05;
+    } else if (range > 0.85) {
+      range = 0.85;
+    }
+    var ceil = floor + range;
+    if (ceil > 1) {
       ceil = 1;
+      range = ceil - floor;
     }
     dictationWaveBackendFloor = floor;
+    dictationWaveBackendRange = range;
     dictationWaveBackendCeil = ceil;
     return floor;
   }

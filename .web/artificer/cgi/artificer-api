@@ -6209,13 +6209,13 @@ dictation_live_level_for_session() {
     return 0
   fi
 
-  # Prefer per-frame (non-Overall) peak telemetry for fast, sensitive UI updates.
-  # Newer ffmpeg astats emits `RMS_peak` instead of `RMS_level`.
+  # Prefer per-frame Peak telemetry for fast, sensitive UI updates.
+  # Fall back to RMS variants when Peak fields are unavailable.
   # Some ffmpeg builds include NUL bytes in ametadata output; strip binary bytes first.
   recent_levels=$(tail -n 320 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
-  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | grep -aE -iv 'Overall\.(RMS_level|RMS_peak)' | tail -n 1 || true)
+  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' | tail -n 1 || true)
   if [ -z "$level_line" ]; then
-    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' | tail -n 1 || true)
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | grep -aE -iv 'Overall\.(RMS_level|RMS_peak)' | tail -n 1 || true)
   fi
   if [ -z "$level_line" ]; then
     level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' | tail -n 1 || true)
@@ -6260,11 +6260,11 @@ dictation_live_levels_json_for_session() {
     return 0
   fi
 
-  # Emit recent per-frame peak-derived levels so UI bars react at finer temporal granularity.
+  # Emit recent per-frame Peak-derived levels so UI bars react at finer temporal granularity.
   recent_levels=$(tail -n 960 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
-  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | grep -aE -iv 'Overall\.(RMS_level|RMS_peak)' || true)
+  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' || true)
   if [ -z "$rms_lines" ]; then
-    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' || true)
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | grep -aE -iv 'Overall\.(RMS_level|RMS_peak)' || true)
   fi
   if [ -z "$rms_lines" ]; then
     rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' || true)
