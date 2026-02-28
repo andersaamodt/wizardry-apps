@@ -3284,6 +3284,7 @@ input.range-input-invalid[type='number'] {
 }
 
 .persona-card.persona-main-pane {
+  padding: 10px 0 10px 12px;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -3527,9 +3528,21 @@ input.range-input-invalid[type='number'] {
 }
 
 #btn-traits-edit {
-  min-height: 30px;
-  line-height: 1;
-  margin-top: -3px;
+  min-height: auto;
+  line-height: 1.1;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.persona-row-traits,
+.persona-row-strength {
+  align-items: center;
+}
+
+.persona-row-traits .mode-field-label,
+.persona-row-strength .mode-field-label {
+  margin-top: 0;
 }
 
 .persona-predominance-inline {
@@ -3654,6 +3667,10 @@ input.range-input-invalid[type='number'] {
   text-transform: uppercase;
 }
 
+.traits-editor-head > span {
+  text-align: center;
+}
+
 .traits-editor-list {
   display: grid;
   gap: 2px;
@@ -3671,9 +3688,11 @@ input.range-input-invalid[type='number'] {
 }
 
 .traits-editor-trait {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: 7px;
+  width: 100%;
   margin: 0;
   min-width: 0;
   color: var(--text);
@@ -3682,6 +3701,8 @@ input.range-input-invalid[type='number'] {
 
 .traits-editor-trait span {
   min-width: 0;
+  justify-self: start;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

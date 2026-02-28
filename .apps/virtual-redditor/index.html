@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Redditor</title>
-  <link rel="stylesheet" href="style.css?v=vr20260228c">
+  <link rel="stylesheet" href="style.css?v=vr20260228d">
   <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
 </head>
 <body class="is-booting">
@@ -1413,7 +1413,7 @@
       activeTheme: 'psionic',
       leftRailWidth: 320,
       drawerWidths: {
-        persona: 320,
+        persona: 280,
         modes: 320,
         relationships: 320,
         replies: 320,
@@ -5797,16 +5797,20 @@
       var workarea = document.getElementById('persona-workarea');
       var bigfiveDrawer = document.getElementById('persona-bigfive-drawer');
       var traitsDrawer = document.getElementById('persona-traits-drawer');
+      var personaMainPane = document.querySelector('#panel-persona .persona-main-pane');
       var anyOpen = !!(state.personaBigFiveOpen || state.personaTraitsOpen);
       if (bigfiveDrawer) {
         bigfiveDrawer.classList.toggle('open', !!state.personaBigFiveOpen);
         bigfiveDrawer.setAttribute('aria-hidden', state.personaBigFiveOpen ? 'false' : 'true');
+        bigfiveDrawer.scrollLeft = 0;
       }
       if (traitsDrawer) {
         traitsDrawer.classList.toggle('open', !!state.personaTraitsOpen);
         traitsDrawer.setAttribute('aria-hidden', state.personaTraitsOpen ? 'false' : 'true');
+        traitsDrawer.scrollLeft = 0;
       }
       if (workarea) workarea.classList.toggle('drawer-open', anyOpen);
+      if (personaMainPane) personaMainPane.scrollLeft = 0;
     }
 
     function renderTraitsSummary(behaviors) {
