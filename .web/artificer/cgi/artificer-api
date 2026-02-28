@@ -18834,6 +18834,16 @@ Reason: $transition_reason_runtime"
       loop_summary="${loop_summary}
 Iteration $iteration ($state_mode -> $next_mode):
 $iteration_report"
+      stream_emit_line "$stream_output_file" "Step $iteration: $state_mode -> $next_mode ($transition_reason_runtime)"
+      checkpoint_stream=$(single_line_snippet "$checkpoint_trimmed")
+      if [ -n "$checkpoint_stream" ] && [ "$checkpoint_stream" != "NONE" ]; then
+        stream_emit_line "$stream_output_file" "Step $iteration checkpoint: $checkpoint_stream"
+      fi
+      plan_update_head=$(printf '%s\n' "$plan_update" | sed -n '1p')
+      plan_update_head=$(trim "$plan_update_head")
+      if [ -n "$plan_update_head" ]; then
+        stream_emit_line "$stream_output_file" "Step $iteration next: $plan_update_head"
+      fi
 
       if [ "$next_mode" = "DONE" ]; then
         if [ -z "$(trim "$assistant_output")" ] || [ "$assistant_output" = "NONE" ]; then
@@ -19029,6 +19039,24 @@ EOF
       clear_approval_request "$conv_dir"
     fi
     queue_finalize_for_run_item "$conv_dir" "$queue_item_id" "$queue_status_from_run" ""
+    run_elapsed_sec=0
+    case "$run_started_epoch" in
+      ""|*[!0-9]*)
+        run_started_epoch=0
+        ;;
+    esac
+    run_finished_epoch=$(date +%s 2>/dev/null || printf '0')
+    case "$run_finished_epoch" in
+      ""|*[!0-9]*)
+        run_finished_epoch=0
+        ;;
+    esac
+    if [ "$run_started_epoch" -gt 0 ] && [ "$run_finished_epoch" -ge "$run_started_epoch" ]; then
+      run_elapsed_sec=$((run_finished_epoch - run_started_epoch))
+    fi
+    run_elapsed_min=$((run_elapsed_sec / 60))
+    run_elapsed_rem=$((run_elapsed_sec % 60))
+    stream_emit_line "$stream_output_file" "Worked for ${run_elapsed_min}m ${run_elapsed_rem}s."
     stream_emit_line "$stream_output_file" "Run finalized with status: $queue_status_from_run"
     run_finished_iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     run_stream_preview=$(sed -n '1,360p' "$stream_output_file" 2>/dev/null || true)

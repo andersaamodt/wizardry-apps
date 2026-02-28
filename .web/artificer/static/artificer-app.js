@@ -11139,8 +11139,14 @@
     var planText = trim(String(event && event.plan || ""));
     var streamText = String(event && event.stream_text || "");
     var sessionText = String(event && event.session_log || "");
+    var assistantText = String(event && event.assistant || "");
     var controlScaffold = /MODE_UPDATE:|PLAN_UPDATE:|Next Action:|Completion Criteria:|Transition:/i.test(streamText + "\n" + planText + "\n" + sessionText);
     var verificationSignals = /verified|verification|regression|tests?\s+(pass|passed)|DONE_CLAIM:\s*yes/i.test(streamText + "\n" + sessionText + "\n" + String(event && event.state || ""));
+    var structuredSections = /Outcome:/i.test(assistantText) &&
+      /Verification Evidence:/i.test(assistantText) &&
+      /Risks:/i.test(assistantText) &&
+      /Next Improvement:/i.test(assistantText);
+    var runtimeLine = /Worked for\s+\d+[sm]|\bWorked for\s+\d+m\s+\d+s/i.test(streamText + "\n" + assistantText);
     var taskStatus = normalizeRunTaskStatusSnapshot(event && event.task_status);
     var completionRatio = 0;
     if (taskStatus && taskStatus.total > 0) {
@@ -11165,6 +11171,11 @@
     }
     if (verificationSignals) {
       intelligence += 9;
+    }
+    if (structuredSections) {
+      intelligence += 8;
+    } else if (status === "done") {
+      intelligence -= 6;
     }
     if (completionRatio >= 0.8) {
       intelligence += 10;
@@ -11206,6 +11217,9 @@
     if (verificationSignals) {
       flow += 6;
     }
+    if (runtimeLine) {
+      flow += 4;
+    }
     if (durationSeconds >= 45) {
       flow += 5;
     }
@@ -11227,6 +11241,11 @@
       strengths.push({ id: "verification_evidence", label: "Verification evidence was visible in trace output." });
     } else {
       focus.push({ id: "verification_evidence", label: "Add explicit verification evidence before DONE." });
+    }
+    if (structuredSections) {
+      strengths.push({ id: "final_structure", label: "Final response kept Outcome/Evidence/Risks/Next Improvement structure." });
+    } else {
+      focus.push({ id: "final_structure", label: "Use explicit Outcome/Evidence/Risks/Next Improvement sections in final response." });
     }
     if (stepCount >= 8) {
       strengths.push({ id: "step_coverage", label: "Step coverage stayed detailed through the run." });
@@ -11346,6 +11365,7 @@
     lines.push("Assay output contract:");
     lines.push("- While thinking, emit short timestamp-friendly step updates (what changed and why).");
     lines.push("- Keep updates readable: one action per step, avoid long paragraph dumps.");
+    lines.push("- Include one explicit runtime line at the end: Worked for Xm Ys.");
     lines.push("- End with explicit sections: Outcome, Verification Evidence, Risks, Next Improvement.");
     lines.push("- If blocked, state the blocker and best fallback attempted.");
     if (mentor && Number(mentor.runs || 0) >= 1) {
