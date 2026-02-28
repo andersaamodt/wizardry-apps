@@ -113,6 +113,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - `controller-variants/variants/<variant-id>/` versioned controller prompt variants (`meta.env`, `guidance.md`)
   - `controller-variants/telemetry.tsv` run-level A/B quality telemetry used for promotion/rollback decisions
 - Run-mode picker includes a `More modes` expander that surfaces all runtime governance modes with blurbs, and selecting one applies `Assistant` run mode with that focus profile.
+- `pentest` and `security-audit` modes now enforce structured findings output with explicit `Severity`, `Evidence`, `Remediation`, and follow-up verification guidance.
 - Composer now separates `Reasoning depth` from `Compute/time budget`:
   - Reasoning controls planning depth/effort per step.
   - Compute budget controls run/queue time ceilings (`Auto`, `Quick`, `Standard`, `Long`, `Until Complete`), is persisted per queued item, and is enforced backend-side.

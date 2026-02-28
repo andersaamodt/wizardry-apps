@@ -73,6 +73,9 @@ This backlog tracks concrete implementation work for improving Artificer intelli
   - Acceptance:
     - Mode policies emit structured finding reports (severity, evidence, remediation).
     - Unsafe offensive behavior remains policy-blocked.
+  - Progress:
+    - Added post-run security output normalization that enforces structured findings with Severity, Evidence, Remediation, and Status when model output is underspecified.
+    - Added stronger synthesis contract prompts for `pentest` and `security-audit` finalization paths.
 
 - INT-010 Quality scorecard automation
   - Goal: Continuously track intelligence and flow quality trends.
