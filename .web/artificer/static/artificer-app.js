@@ -892,6 +892,7 @@
   var dictationWaveBarSampleCount = 0;
   var DICTATION_WAVE_BAR_INTERVAL_MS = 84;
   var dictationWaveBackendLastEmitAt = 0;
+  var dictationWaveBackendEmitQueue = [];
   var dictationWaveBackendPumpBusy = false;
   var dictationWaveBackendPumpAt = 0;
   var dictationPreparePromise = null;
@@ -7566,6 +7567,7 @@
     dictationWaveBarSumRaw = 0;
     dictationWaveBarSampleCount = 0;
     dictationWaveBackendLastEmitAt = 0;
+    dictationWaveBackendEmitQueue = [];
     state.dictateWaveLevels = [];
   }
 
@@ -7803,6 +7805,12 @@
       }
       if (normalizedSequence.length) {
         normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
+        for (var qi = 0; qi < normalizedSequence.length; qi += 1) {
+          dictationWaveBackendEmitQueue.push(normalizedSequence[qi]);
+        }
+        if (dictationWaveBackendEmitQueue.length > 160) {
+          dictationWaveBackendEmitQueue = dictationWaveBackendEmitQueue.slice(dictationWaveBackendEmitQueue.length - 160);
+        }
       }
       dictationWaveBackendLevel = normalizedBackend;
       dictationWaveBackendLevelAt = Date.now();
@@ -7810,7 +7818,12 @@
       var emitNow = Date.now();
       if (emitNow - Number(dictationWaveBackendLastEmitAt || 0) >= DICTATION_WAVE_BAR_INTERVAL_MS) {
         dictationWaveBackendLastEmitAt = emitNow;
-        applyDictationWaveLevel(lifted);
+        var queuedLevel = Number(dictationWaveBackendEmitQueue.length ? dictationWaveBackendEmitQueue.shift() : lifted);
+        if (!isFinite(queuedLevel) || queuedLevel < 0) {
+          queuedLevel = lifted;
+        }
+        var emittedLevel = (queuedLevel * 0.8) + (lifted * 0.2);
+        applyDictationWaveLevel(emittedLevel);
       }
     }).catch(function () {
       return null;
@@ -7962,7 +7975,12 @@
               var emitNow = Date.now();
               if (emitNow - Number(dictationWaveBackendLastEmitAt || 0) >= DICTATION_WAVE_BAR_INTERVAL_MS) {
                 dictationWaveBackendLastEmitAt = emitNow;
-                applyDictationWaveLevel(mergedBackendLevel);
+                var queuedLevel = Number(dictationWaveBackendEmitQueue.length ? dictationWaveBackendEmitQueue.shift() : mergedBackendLevel);
+                if (!isFinite(queuedLevel) || queuedLevel < 0) {
+                  queuedLevel = mergedBackendLevel;
+                }
+                var emittedLevel = (queuedLevel * 0.8) + (mergedBackendLevel * 0.2);
+                applyDictationWaveLevel(emittedLevel);
               }
             }
           }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Redditor</title>
-  <link rel="stylesheet" href="style.css?v=vr20260227o">
+  <link rel="stylesheet" href="style.css?v=vr20260228a">
   <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
 </head>
 <body class="is-booting">
@@ -1288,8 +1288,13 @@
       compiledInstructionsText: '',
       themeTypeaheadBuffer: '',
       themeTypeaheadTs: 0,
-      themeTypeaheadResetTimer: null
+      themeTypeaheadResetTimer: null,
+      profileSwitchToken: 0,
+      profileSwitchOverlayHideTimer: 0,
+      profileSwitchOverlayShowFrame: 0
     };
+
+    var PROFILE_SWITCH_OVERLAY_FADE_OUT_MS = 85;
 
     function currentProfileScope() {
       return String(state.activeProfile || '');
@@ -3445,8 +3450,48 @@
       state.profileSwitchLoading = !!loading;
       var overlay = document.getElementById('profile-switch-overlay');
       if (!overlay) return;
-      overlay.classList.toggle('hidden', !state.profileSwitchLoading);
       overlay.setAttribute('aria-hidden', state.profileSwitchLoading ? 'false' : 'true');
+      if (state.profileSwitchLoading) {
+        if (state.profileSwitchOverlayHideTimer) {
+          clearTimeout(state.profileSwitchOverlayHideTimer);
+          state.profileSwitchOverlayHideTimer = 0;
+        }
+        if (state.profileSwitchOverlayShowFrame) {
+          cancelAnimationFrame(state.profileSwitchOverlayShowFrame);
+          state.profileSwitchOverlayShowFrame = 0;
+        }
+        overlay.classList.remove('hidden');
+        overlay.classList.remove('is-hiding');
+        if (!overlay.classList.contains('is-visible')) {
+          state.profileSwitchOverlayShowFrame = window.requestAnimationFrame(function () {
+            state.profileSwitchOverlayShowFrame = 0;
+            var node = document.getElementById('profile-switch-overlay');
+            if (!node || !state.profileSwitchLoading) return;
+            node.classList.add('is-visible');
+          });
+        }
+        return;
+      }
+      if (state.profileSwitchOverlayShowFrame) {
+        cancelAnimationFrame(state.profileSwitchOverlayShowFrame);
+        state.profileSwitchOverlayShowFrame = 0;
+      }
+      overlay.classList.remove('is-visible');
+      if (overlay.classList.contains('hidden')) {
+        overlay.classList.remove('is-hiding');
+        return;
+      }
+      overlay.classList.add('is-hiding');
+      if (state.profileSwitchOverlayHideTimer) {
+        clearTimeout(state.profileSwitchOverlayHideTimer);
+      }
+      state.profileSwitchOverlayHideTimer = window.setTimeout(function () {
+        state.profileSwitchOverlayHideTimer = 0;
+        var node = document.getElementById('profile-switch-overlay');
+        if (!node || state.profileSwitchLoading) return;
+        node.classList.add('hidden');
+        node.classList.remove('is-hiding');
+      }, PROFILE_SWITCH_OVERLAY_FADE_OUT_MS + 10);
     }
 
     function setBootLoading(loading) {
@@ -6733,6 +6778,9 @@
       var targetId = String(profileId || '');
       if (!targetId) return;
       if (String(state.activeProfile || '') === targetId) return;
+      var switchToken = (Number(state.profileSwitchToken) || 0) + 1;
+      state.profileSwitchToken = switchToken;
+      setProfileSwitchLoading(true);
 
       var previousActive = String(state.activeProfile || '');
       var previousSelected = Array.isArray(state.profiles) ? state.profiles.map(function (p) {
@@ -6762,16 +6810,27 @@
           state.status.profiles.profiles = state.profiles;
           state.status.profiles.activeProfile = targetId;
         }
+        setProfileSwitchLoading(false);
         return;
       }
-      if (!cachedDoctrine) setProfileSwitchLoading(true);
+      var releasedOverlay = false;
       try {
         await backendJson('select-profile', [targetId]);
-        await Promise.all([
-          refreshStatus(),
-          refreshDoctrine(true)
-        ]);
+        if (switchToken !== state.profileSwitchToken) return;
+        await refreshStatus();
+        if (switchToken !== state.profileSwitchToken) return;
+        setProfileSwitchLoading(false);
+        releasedOverlay = true;
+        var backgroundTasks = [];
+        if (state.activeTab === 'persona') {
+          backgroundTasks.push(refreshDoctrine(true));
+        } else {
+          backgroundTasks.push(refreshForActiveTab());
+          backgroundTasks.push(refreshDoctrine(true));
+        }
+        Promise.allSettled(backgroundTasks).catch(function () {});
       } catch (error) {
+        if (switchToken !== state.profileSwitchToken) return;
         state.activeProfile = previousActive;
         for (var y = 0; y < state.profiles.length; y += 1) {
           var p = state.profiles[y] || {};
@@ -6787,8 +6846,12 @@
         updateToolbarButtonStates();
         setProfilesMessage(String(error && error.message ? error.message : error), true);
       } finally {
-        setProfileSwitchLoading(false);
-        setBootLoading(false);
+        if (switchToken === state.profileSwitchToken && !releasedOverlay) {
+          setProfileSwitchLoading(false);
+        }
+        if (switchToken === state.profileSwitchToken) {
+          setBootLoading(false);
+        }
       }
     }
 

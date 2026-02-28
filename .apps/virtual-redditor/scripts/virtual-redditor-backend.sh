@@ -648,7 +648,9 @@ select_profile_json() {
   ACTIVE_PROFILE_ID=$profile_id
   CURRENT_STATE_DIR=$dir
   refresh_paths
-  run_daemon bootstrap >/dev/null 2>&1 || true
+  (
+    run_daemon bootstrap >/dev/null 2>&1 || true
+  ) &
 
   jq -cn --arg active "$ACTIVE_PROFILE_ID" '{ok:true,activeProfile:$active}'
 }

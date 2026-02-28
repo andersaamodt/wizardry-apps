@@ -7556,13 +7556,38 @@ Next Improvement: Resume from this checkpoint with a narrower scope or higher co
 EOF
 )
   fi
+  stop_commands_json="[]"
+  ws_dir=$(dirname "$(dirname "$conv_dir")")
+  workspace_id=$(basename "$ws_dir")
+  workspace_path=$(workspace_path_for_id "$workspace_id")
+  if [ -n "$workspace_path" ] && [ -d "$workspace_path" ]; then
+    stop_cmd1="git status --short"
+    stop_cmd2="find . -maxdepth 2 -type f"
+    stop_cmd1_output=$(
+      cd "$workspace_path" && {
+        git status --short 2>/dev/null || printf '%s\n' "Not a git repository."
+      } | sed -n '1,80p'
+    )
+    stop_cmd2_output=$(
+      cd "$workspace_path" && {
+        find . -maxdepth 2 -type f 2>/dev/null | sed 's|^\./||' || true
+      } | sed -n '1,80p'
+    )
+    stop_commands_json=$(printf '[{"command":"%s","status":"%s","output":"%s"},{"command":"%s","status":"%s","output":"%s"}]' \
+      "$(json_escape "$stop_cmd1")" \
+      "$(json_escape "ok")" \
+      "$(json_escape "$stop_cmd1_output")" \
+      "$(json_escape "$stop_cmd2")" \
+      "$(json_escape "ok")" \
+      "$(json_escape "$stop_cmd2_output")")
+  fi
   event_json=$(build_run_event_json \
     "cancelled" \
     "$started_iso" \
     "$finished_iso" \
     "$model_name" \
     "" \
-    "[]" \
+    "$stop_commands_json" \
     "$stream_preview" \
     "$stop_note" \
     "" \
