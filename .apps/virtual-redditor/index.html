@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Redditor</title>
-  <link rel="stylesheet" href="style.css?v=vr20260228b">
+  <link rel="stylesheet" href="style.css?v=vr20260228c">
   <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
 </head>
 <body class="is-booting">
@@ -5815,14 +5815,8 @@
       var traitsMap = (behaviors && behaviors.traits) ? behaviors.traits : defaultTraitsMap();
       var styleIds = enabledTraitIds(traitsMap, 'style');
       var summonIds = enabledTraitIds(traitsMap, 'summons');
-      var preview = styleIds.slice(0, 2).map(function (id) { return traitLabel(id); }).join(', ');
-      if (!styleIds.length) {
-        summary.textContent = 'No style traits selected.';
-      } else if (styleIds.length <= 2) {
-        summary.textContent = preview;
-      } else {
-        summary.textContent = preview + ' +' + String(styleIds.length - 2);
-      }
+      var count = styleIds.length;
+      summary.textContent = count === 1 ? '1 trait' : String(count) + ' traits';
       summary.title = (
         'Style traits: ' + (styleIds.length ? styleIds.map(traitLabel).join(', ') : 'none') +
         ' • Summon traits: ' + (summonIds.length ? summonIds.map(traitLabel).join(', ') : 'none')

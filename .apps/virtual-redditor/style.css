@@ -3284,7 +3284,8 @@ input.range-input-invalid[type='number'] {
 }
 
 .persona-card.persona-main-pane {
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .persona-card h3 {
@@ -3519,7 +3520,7 @@ input.range-input-invalid[type='number'] {
 .traits-summary {
   font-size: 0.72rem;
   color: var(--text-subtle);
-  max-width: 220px;
+  max-width: 140px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
