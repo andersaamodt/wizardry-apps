@@ -10,6 +10,7 @@ usage() {
 Usage:
   assay-cycle.sh run [--label NAME] [--timeout-sec N] [--run-budget-sec N] [--attempts N] [--mentor-from FILE]
   assay-cycle.sh compare --before FILE --after FILE
+  assay-cycle.sh decisions [--label NAME]
 
 Examples:
   .web/artificer/scripts/assay-cycle.sh run --label baseline
@@ -304,6 +305,53 @@ compare_cycles() {
   echo "$report"
 }
 
+decision_matrix() {
+  label=$1
+  mkdir -p "$OUT_DIR"
+  out_file="$OUT_DIR/$label.tsv"
+  printf 'case\tkind\texpected_category\tactual_category\tallow\tpass\n' > "$out_file"
+
+  run_case() {
+    case_id=$1
+    kind=$2
+    expected=$3
+    prompt=$4
+    question=$5
+    commands=$6
+    run_mode=${7:-assistant}
+    raw=$(post_api "action=decision_surface_preview&prompt=$(urlenc "$prompt")&question=$(urlenc "$question")&commands=$(urlenc "$commands")&run_mode=$(urlenc "$run_mode")" | json_only)
+    actual=$(printf '%s' "$raw" | jq -r '.category // "none"')
+    allow=$(printf '%s' "$raw" | jq -r '.allow_decision_request // false')
+    pass=0
+    if [ "$actual" = "$expected" ]; then
+      pass=1
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$case_id" "$kind" "$expected" "$actual" "$allow" "$pass" >> "$out_file"
+  }
+
+  run_case "explicit-choice-trigger" "trigger" "explicit-choice" \
+    "Choose one approach: ship now or delay for reliability?" "" ""
+  run_case "explicit-choice-near" "near-miss" "none" \
+    "Please proceed with your best approach." "" ""
+
+  run_case "required-input-trigger" "trigger" "required-input-missing" \
+    "Write a migration for my database." "" ""
+  run_case "required-input-near" "near-miss" "none" \
+    "Write a migration for PostgreSQL table users add column last_login TIMESTAMP default now()." "" ""
+
+  run_case "external-action-trigger" "trigger" "external-action-gate" \
+    "" "" "curl -X POST https://api.mailgun.net/send"
+  run_case "external-action-near" "near-miss" "none" \
+    "" "" "grep -R \"TODO\" ."
+
+  run_case "risk-ack-trigger" "trigger" "risk-acknowledgement" \
+    "" "This action can delete production data. Continue anyway?" ""
+  run_case "risk-ack-near" "near-miss" "none" \
+    "" "Ready to continue with the next implementation step?" ""
+
+  echo "$out_file"
+}
+
 mode=${1:-}
 if [ -z "$mode" ]; then
   usage
@@ -374,6 +422,23 @@ case "$mode" in
       exit 1
     fi
     compare_cycles "$before" "$after"
+    ;;
+  decisions)
+    label="decisions-$(date +%Y%m%d-%H%M%S)"
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --label)
+          label=$2
+          shift 2
+          ;;
+        *)
+          echo "Unknown arg: $1" >&2
+          usage
+          exit 1
+          ;;
+      esac
+    done
+    decision_matrix "$label"
     ;;
   *)
     usage

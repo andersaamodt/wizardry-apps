@@ -93,6 +93,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - `.web/artificer/scripts/assay-cycle.sh run --label baseline --attempts 2`
   - `.web/artificer/scripts/assay-cycle.sh run --label after --attempts 2 --mentor-from .web/artificer/.assay-reports/baseline.tsv`
   - `.web/artificer/scripts/assay-cycle.sh compare --before .web/artificer/.assay-reports/baseline.tsv --after .web/artificer/.assay-reports/after.tsv`
+  - `.web/artificer/scripts/assay-cycle.sh decisions --label decisions-baseline`
 - Mode Runtime stores state in `mode-runtime/` under site data:
   - `modes/<mode-id>/` (governance policy, state, long-horizon memory namespace)
   - `skills/<skill-id>/` bundles with `policy.md`, `trigger.yaml`, `tools.json`, `output.schema.json`
