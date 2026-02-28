@@ -55,6 +55,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
 - `controller_variants_state` (GET)
 - `controller_variant_promote` (POST)
 - `controller_variant_rollback` (POST)
+- `quality_scorecard_state` (GET)
 - `models` (GET)
 - `pick_workspace` (GET, macOS native chooser)
 - `add_workspace` (POST)
@@ -112,6 +113,8 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - `improvement-proposals/<proposal-id>/` manually reviewed improvement proposals (`meta.env`, `proposal.md`)
   - `controller-variants/variants/<variant-id>/` versioned controller prompt variants (`meta.env`, `guidance.md`)
   - `controller-variants/telemetry.tsv` run-level A/B quality telemetry used for promotion/rollback decisions
+  - `quality-scorecard/entries.tsv` run quality timeline with deltas
+  - `quality-scorecard/scorecard.md` human-readable trend summary
 - Run-mode picker includes a `More modes` expander that surfaces all runtime governance modes with blurbs, and selecting one applies `Assistant` run mode with that focus profile.
 - `pentest` and `security-audit` modes now enforce structured findings output with explicit `Severity`, `Evidence`, `Remediation`, and follow-up verification guidance.
 - Composer now separates `Reasoning depth` from `Compute/time budget`:

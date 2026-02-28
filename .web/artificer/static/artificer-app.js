@@ -1110,6 +1110,7 @@
     modeRuntimeFailureTaxonomy: document.getElementById("mode-runtime-failure-taxonomy"),
     modeRuntimeImprovementProposals: document.getElementById("mode-runtime-improvement-proposals"),
     modeRuntimeControllerVariants: document.getElementById("mode-runtime-controller-variants"),
+    modeRuntimeQualityScorecard: document.getElementById("mode-runtime-quality-scorecard"),
     assistantModeSelect: document.getElementById("assistant-mode-select"),
     assistantModeApplyBtn: document.getElementById("assistant-mode-apply-btn"),
     modeRuntimeSkillInvokeForm: document.getElementById("mode-runtime-skill-invoke-form"),
@@ -2421,6 +2422,9 @@
     var controllerCompareState = controllerVariantsState.quality_compare && typeof controllerVariantsState.quality_compare === "object"
       ? controllerVariantsState.quality_compare
       : {};
+    var qualityScorecardState = source.quality_scorecard && typeof source.quality_scorecard === "object"
+      ? source.quality_scorecard
+      : {};
     var modesRaw = asArrayCopy(source.modes);
     var skillsRaw = asArrayCopy(source.skills);
     var panelsRaw = asArrayCopy(source.panels);
@@ -2429,6 +2433,7 @@
     var failureRecentRaw = asArrayCopy(failureTaxonomy.recent);
     var proposalItemsRaw = asArrayCopy(proposalState.items);
     var controllerVariantsItemsRaw = asArrayCopy(controllerVariantsState.items);
+    var qualityRecentRaw = asArrayCopy(qualityScorecardState.recent);
     var modes = [];
     var skills = [];
     var panels = [];
@@ -2437,6 +2442,7 @@
     var failureRecent = [];
     var proposalItems = [];
     var controllerVariantItems = [];
+    var qualityRecentItems = [];
 
     for (var i = 0; i < modesRaw.length; i += 1) {
       var mode = modesRaw[i];
@@ -2626,6 +2632,33 @@
       });
     }
 
+    for (var qr = 0; qr < qualityRecentRaw.length; qr += 1) {
+      var qualityRecentItem = qualityRecentRaw[qr];
+      if (!qualityRecentItem || typeof qualityRecentItem !== "object") {
+        continue;
+      }
+      var qualityTimestamp = trim(String(qualityRecentItem.timestamp || ""));
+      var qualityRunMode = trim(String(qualityRecentItem.run_mode || ""));
+      var qualityScore = trim(String(qualityRecentItem.quality_score || ""));
+      if (!qualityTimestamp && !qualityRunMode && !qualityScore) {
+        continue;
+      }
+      qualityRecentItems.push({
+        timestamp: qualityTimestamp,
+        variant_id: trim(String(qualityRecentItem.variant_id || "")),
+        run_id: trim(String(qualityRecentItem.run_id || "")),
+        run_mode: qualityRunMode,
+        queue_status: trim(String(qualityRecentItem.queue_status || "")),
+        final_state: trim(String(qualityRecentItem.final_state || "")),
+        quality_score: qualityScore,
+        delta_score: trim(String(qualityRecentItem.delta_score || "0.000")),
+        run_elapsed_sec: trim(String(qualityRecentItem.run_elapsed_sec || "0")),
+        iteration_count: trim(String(qualityRecentItem.iteration_count || "0")),
+        failure_count: trim(String(qualityRecentItem.failure_count || "0")),
+        decision_requested: Number(qualityRecentItem.decision_requested || 0) > 0 || qualityRecentItem.decision_requested === true
+      });
+    }
+
     modes.sort(function (a, b) {
       var priorityDiff = Number(b.priority || 0) - Number(a.priority || 0);
       if (priorityDiff !== 0) {
@@ -2667,6 +2700,9 @@
         }
       }
       return String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || ""));
+    });
+    qualityRecentItems.sort(function (a, b) {
+      return String(b.timestamp || "").localeCompare(String(a.timestamp || ""));
     });
 
     return {
@@ -2724,6 +2760,14 @@
           recommendation: trim(String(controllerCompareState.recommendation || "insufficient-data"))
         },
         items: controllerVariantItems
+      },
+      quality_scorecard: {
+        total_runs: trim(String(qualityScorecardState.total_runs || "0")),
+        overall_avg_quality: trim(String(qualityScorecardState.overall_avg_quality || "0.000")),
+        last_updated: trim(String(qualityScorecardState.last_updated || "")),
+        scorecard_path: trim(String(qualityScorecardState.scorecard_path || "")),
+        markdown_preview: trim(String(qualityScorecardState.markdown_preview || "")),
+        recent: qualityRecentItems
       }
     };
   }
@@ -16925,6 +16969,43 @@
       }
       variantsHtml += "</section>";
       el.modeRuntimeControllerVariants.innerHTML = variantsHtml;
+    }
+
+    if (el.modeRuntimeQualityScorecard) {
+      var scorecard = runtime.quality_scorecard && typeof runtime.quality_scorecard === "object"
+        ? runtime.quality_scorecard
+        : {};
+      var scorecardRecent = Array.isArray(scorecard.recent) ? scorecard.recent : [];
+      var scorecardHtml = "";
+      scorecardHtml += "<section class='mode-runtime-group'>";
+      scorecardHtml += "<div class='mode-runtime-group-head'><p class='command-rules-group-title'>Intelligence quality scorecard</p></div>";
+      scorecardHtml += "<p class='settings-hint'>Tracks run-quality deltas over time and can raise improvement proposals when regressions appear.</p>";
+      scorecardHtml += "<div class='mode-runtime-metrics'>";
+      scorecardHtml += "<span class='mode-runtime-metric'><em>Total scored runs</em><strong>" + escHtml(String(scorecard.total_runs || "0")) + "</strong></span>";
+      scorecardHtml += "<span class='mode-runtime-metric'><em>Overall avg</em><strong>" + escHtml(String(scorecard.overall_avg_quality || "0.000")) + "</strong></span>";
+      scorecardHtml += "<span class='mode-runtime-metric'><em>Last updated</em><strong>" + escHtml(String(scorecard.last_updated || "n/a")) + "</strong></span>";
+      scorecardHtml += "</div>";
+      if (scorecard.scorecard_path) {
+        scorecardHtml += "<p class='settings-hint'>Scorecard file: " + escHtml(String(scorecard.scorecard_path || "")) + "</p>";
+      }
+      if (!scorecardRecent.length) {
+        scorecardHtml += "<p class='empty-state'>No quality-scorecard entries yet.</p>";
+      } else {
+        scorecardHtml += "<div class='mode-runtime-proposal-list'>";
+        for (var qs = 0; qs < scorecardRecent.length && qs < 8; qs += 1) {
+          var scoreEntry = scorecardRecent[qs] || {};
+          scorecardHtml += "<article class='mode-runtime-proposal-item'>";
+          scorecardHtml += "<div class='mode-runtime-mode-head'><strong>" + escHtml(String(scoreEntry.run_mode || "run")) + "</strong><span class='mode-runtime-chip'>" + escHtml(String(scoreEntry.quality_score || "0.000")) + "</span></div>";
+          scorecardHtml += "<p class='settings-hint'>delta: " + escHtml(String(scoreEntry.delta_score || "0.000")) + " | status: " + escHtml(String(scoreEntry.queue_status || "unknown")) + "/" + escHtml(String(scoreEntry.final_state || "unknown")) + " | variant: " + escHtml(String(scoreEntry.variant_id || "n/a")) + "</p>";
+          scorecardHtml += "<p class='settings-hint'>iterations: " + escHtml(String(scoreEntry.iteration_count || "0")) + " | failures: " + escHtml(String(scoreEntry.failure_count || "0")) + " | elapsed: " + escHtml(String(scoreEntry.run_elapsed_sec || "0")) + "s</p>";
+          if (scoreEntry.timestamp) {
+            scorecardHtml += "<p class='settings-hint'>timestamp: " + escHtml(String(scoreEntry.timestamp || "")) + "</p>";
+          }
+          scorecardHtml += "</article>";
+        }
+        scorecardHtml += "</div>";
+      }
+      el.modeRuntimeQualityScorecard.innerHTML = scorecardHtml;
     }
 
     if (el.assistantModeSelect) {

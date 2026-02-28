@@ -90,6 +90,18 @@ mr_controller_variant_notes_file() {
   printf '%s/guidance.md' "$(mr_controller_variant_dir_for "$variant_id")"
 }
 
+mr_quality_scorecard_dir() {
+  printf '%s/quality-scorecard' "$(mr_runtime_root)"
+}
+
+mr_quality_scorecard_entries_file() {
+  printf '%s/entries.tsv' "$(mr_quality_scorecard_dir)"
+}
+
+mr_quality_scorecard_markdown_file() {
+  printf '%s/scorecard.md' "$(mr_quality_scorecard_dir)"
+}
+
 mr_scheduler_state_file() {
   printf '%s/state.env' "$(mr_scheduler_dir)"
 }
@@ -1355,6 +1367,252 @@ mr_controller_variant_record_run() {
   mr_env_set "$meta_file" "avg_quality" "$new_avg"
   mr_env_set "$meta_file" "last_seen_at" "$now_iso"
   mr_env_set "$meta_file" "updated_at" "$now_iso"
+
+  if command -v mr_quality_scorecard_record_entry >/dev/null 2>&1; then
+    mr_quality_scorecard_record_entry \
+      "$variant_id" \
+      "$run_id" \
+      "$run_mode" \
+      "$queue_status" \
+      "$final_state" \
+      "$quality_score" \
+      "$run_elapsed_sec" \
+      "$iteration_count" \
+      "$decision_requested" \
+      "$failure_count" >/dev/null 2>&1 || true
+  fi
+}
+
+mr_failure_taxonomy_latest_category_id() {
+  events_file=$(mr_failure_taxonomy_events_file)
+  if [ ! -s "$events_file" ]; then
+    printf '%s' "unknown"
+    return 0
+  fi
+  tab_char=$(printf '\t')
+  category_id=$(tail -n 1 "$events_file" 2>/dev/null | awk -F"$tab_char" '{ print $3 }')
+  category_id=$(trim "$category_id")
+  if [ -z "$category_id" ]; then
+    category_id="unknown"
+  fi
+  printf '%s' "$category_id"
+}
+
+mr_quality_scorecard_last_quality_for_mode() {
+  run_mode=$1
+  run_id_exclude=$2
+  entries_file=$(mr_quality_scorecard_entries_file)
+  if [ ! -s "$entries_file" ]; then
+    printf '%s' ""
+    return 0
+  fi
+  tab_char=$(printf '\t')
+  awk -F"$tab_char" -v run_mode="$run_mode" -v run_id_exclude="$run_id_exclude" '
+    NF >= 12 {
+      entry_mode = $5
+      entry_run_id = $4
+      quality = $8
+      if (entry_mode != run_mode) {
+        next
+      }
+      if (run_id_exclude != "" && entry_run_id == run_id_exclude) {
+        next
+      }
+      last = quality
+    }
+    END {
+      if (last != "") {
+        printf "%s", last
+      }
+    }
+  ' "$entries_file"
+}
+
+mr_quality_scorecard_refresh_markdown() {
+  entries_file=$(mr_quality_scorecard_entries_file)
+  markdown_file=$(mr_quality_scorecard_markdown_file)
+  now_iso=$(mr_now_iso)
+  if [ ! -s "$entries_file" ]; then
+    cat > "$markdown_file" <<EOF
+# Intelligence Quality Scorecard
+
+Updated: $now_iso
+
+- No scorecard entries recorded yet.
+EOF
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  total_runs=$(wc -l < "$entries_file" 2>/dev/null | tr -d '[:space:]' || printf '0')
+  case "$total_runs" in ""|*[!0-9]*) total_runs=0 ;; esac
+
+  overall_avg=$(awk -F"$tab_char" '
+    NF >= 8 {
+      sum += ($8 + 0.0)
+      count += 1
+    }
+    END {
+      if (count <= 0) {
+        printf "0.000"
+      } else {
+        printf "%.3f", sum / count
+      }
+    }
+  ' "$entries_file")
+
+  recent_file=$(mktemp)
+  tail -n 8 "$entries_file" > "$recent_file" 2>/dev/null || : > "$recent_file"
+  top_modes_file=$(mktemp)
+  awk -F"$tab_char" '
+    NF >= 8 {
+      mode = $5
+      if (mode == "") {
+        mode = "unknown"
+      }
+      sum[mode] += ($8 + 0.0)
+      count[mode] += 1
+    }
+    END {
+      for (mode in count) {
+        avg = 0.0
+        if (count[mode] > 0) {
+          avg = sum[mode] / count[mode]
+        }
+        printf "%s\t%s\t%.3f\n", count[mode], mode, avg
+      }
+    }
+  ' "$entries_file" | sort -t "$tab_char" -k1,1nr -k2,2 > "$top_modes_file"
+
+  {
+    printf '# Intelligence Quality Scorecard\n\n'
+    printf 'Updated: %s\n\n' "$now_iso"
+    printf '## Summary\n'
+    printf -- '- Total runs scored: %s\n' "$total_runs"
+    printf -- '- Overall average quality: %s\n\n' "$overall_avg"
+    printf '## Top Modes by Volume\n'
+    modes_shown=0
+    while IFS="$tab_char" read -r mode_count mode_name mode_avg || [ -n "$mode_name" ]; do
+      [ -n "$mode_name" ] || continue
+      modes_shown=$((modes_shown + 1))
+      if [ "$modes_shown" -gt 6 ]; then
+        break
+      fi
+      printf -- '- %s: avg %s (n=%s)\n' "$mode_name" "$mode_avg" "$mode_count"
+    done < "$top_modes_file"
+    if [ "$modes_shown" -eq 0 ]; then
+      printf -- '- none\n'
+    fi
+    printf '\n## Recent Entries\n'
+    recent_shown=0
+    while IFS="$tab_char" read -r epoch_value iso_value variant_id run_id run_mode queue_status final_state quality_score delta_score run_elapsed iteration_count failure_count || [ -n "$iso_value$run_mode$quality_score" ]; do
+      [ -n "$iso_value$run_mode$quality_score" ] || continue
+      recent_shown=$((recent_shown + 1))
+      printf -- '- %s | mode=%s | quality=%s | delta=%s | status=%s/%s | variant=%s\n' \
+        "$iso_value" "$run_mode" "$quality_score" "$delta_score" "$queue_status" "$final_state" "$variant_id"
+    done < "$recent_file"
+    if [ "$recent_shown" -eq 0 ]; then
+      printf -- '- none\n'
+    fi
+  } > "$markdown_file"
+
+  rm -f "$recent_file" "$top_modes_file"
+}
+
+mr_quality_scorecard_maybe_raise_regression_proposal() {
+  run_mode=$1
+  quality_score=$2
+  delta_score=$3
+  queue_status=$4
+  final_state=$5
+  case "$run_mode" in
+    ""|unknown)
+      return 0
+      ;;
+  esac
+  if [ "$queue_status" = "awaiting_decision" ] || [ "$queue_status" = "awaiting_approval" ]; then
+    return 0
+  fi
+  should_raise=$(awk -v quality_score="$quality_score" -v delta_score="$delta_score" -v final_state="$final_state" '
+    BEGIN {
+      q = quality_score + 0.0
+      d = delta_score + 0.0
+      if (final_state != "DONE" && q < 0.55) {
+        print "1"
+      } else if (d <= -0.080 && q < 0.60) {
+        print "1"
+      } else {
+        print "0"
+      }
+    }
+  ')
+  if [ "$should_raise" != "1" ]; then
+    return 0
+  fi
+  category_id=$(mr_failure_taxonomy_latest_category_id)
+  if [ -n "$category_id" ] && mr_improvement_proposal_exists_for_category "$category_id"; then
+    return 0
+  fi
+  title_text="Investigate quality regression in ${run_mode} mode"
+  rationale_text="Quality score regressed (quality=${quality_score}, delta=${delta_score}) with final_state=${final_state}."
+  change_text="Review recent failures and tighten controller policy/verification flow for ${run_mode} mode to recover quality and reduce repeated breakdowns."
+  scope_text="controller-loop"
+  risk_text="medium"
+  mr_improvement_proposal_create "$title_text" "$rationale_text" "$change_text" "$scope_text" "$risk_text" "quality-scorecard" "$category_id" >/dev/null 2>&1 || true
+}
+
+mr_quality_scorecard_record_entry() {
+  variant_id=$(mr_sanitize_inline "$1")
+  run_id=$(trim "$2")
+  run_mode=$(mr_sanitize_inline "$3")
+  queue_status=$(mr_sanitize_inline "$4")
+  final_state=$(mr_sanitize_inline "$5")
+  quality_score=$(trim "$6")
+  run_elapsed_sec=$(mr_nonnegative_int_or "$7" "0")
+  iteration_count=$(mr_nonnegative_int_or "$8" "0")
+  decision_requested=$(mr_bool_norm "$9")
+  failure_count=$(mr_nonnegative_int_or "${10}" "0")
+
+  [ -n "$variant_id" ] || variant_id="$(mr_controller_variant_active_id)"
+  [ -n "$run_mode" ] || run_mode="unknown"
+  case "$quality_score" in
+    ""|*[!0-9.]*)
+      quality_score="0.000"
+      ;;
+  esac
+
+  entries_file=$(mr_quality_scorecard_entries_file)
+  [ -f "$entries_file" ] || : > "$entries_file"
+  previous_quality=$(mr_quality_scorecard_last_quality_for_mode "$run_mode" "$run_id")
+  if [ -z "$previous_quality" ]; then
+    previous_quality="0.000"
+  fi
+  delta_score=$(awk -v quality_score="$quality_score" -v previous_quality="$previous_quality" '
+    BEGIN {
+      delta = (quality_score + 0.0) - (previous_quality + 0.0)
+      printf "%.3f", delta
+    }
+  ')
+
+  now_epoch=$(mr_now_epoch)
+  now_iso=$(mr_now_iso)
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$now_epoch" \
+    "$now_iso" \
+    "$variant_id" \
+    "$run_id" \
+    "$run_mode" \
+    "$queue_status" \
+    "$final_state" \
+    "$quality_score" \
+    "$delta_score" \
+    "$run_elapsed_sec" \
+    "$iteration_count" \
+    "$failure_count" \
+    "$decision_requested" >> "$entries_file"
+
+  mr_quality_scorecard_refresh_markdown
+  mr_quality_scorecard_maybe_raise_regression_proposal "$run_mode" "$quality_score" "$delta_score" "$queue_status" "$final_state"
 }
 
 mr_controller_variants_items_json() {
@@ -1504,6 +1762,83 @@ mr_controller_variants_state_json() {
     "$(json_escape "$updated_at")" \
     "$(mr_controller_variants_compare_json)" \
     "$(mr_controller_variants_items_json "30")"
+}
+
+mr_quality_scorecard_recent_json() {
+  max_rows=$1
+  case "$max_rows" in ""|*[!0-9]*) max_rows=8 ;; esac
+  if [ "$max_rows" -lt 1 ]; then
+    max_rows=1
+  fi
+  entries_file=$(mr_quality_scorecard_entries_file)
+  if [ ! -s "$entries_file" ]; then
+    printf '[]'
+    return 0
+  fi
+  recent_file=$(mktemp)
+  tail -n "$max_rows" "$entries_file" > "$recent_file" 2>/dev/null || : > "$recent_file"
+  tab_char=$(printf '\t')
+  printf '['
+  first=1
+  while IFS="$tab_char" read -r epoch_value iso_value variant_id run_id run_mode queue_status final_state quality_score delta_score run_elapsed iteration_count failure_count decision_requested || [ -n "$iso_value$run_mode$quality_score" ]; do
+    [ -n "$iso_value$run_mode$quality_score" ] || continue
+    if [ "$first" -eq 0 ]; then
+      printf ','
+    fi
+    first=0
+    printf '{"timestamp":"%s","variant_id":"%s","run_id":"%s","run_mode":"%s","queue_status":"%s","final_state":"%s","quality_score":"%s","delta_score":"%s","run_elapsed_sec":"%s","iteration_count":"%s","failure_count":"%s","decision_requested":%s}' \
+      "$(json_escape "$iso_value")" \
+      "$(json_escape "$variant_id")" \
+      "$(json_escape "$run_id")" \
+      "$(json_escape "$run_mode")" \
+      "$(json_escape "$queue_status")" \
+      "$(json_escape "$final_state")" \
+      "$(json_escape "$quality_score")" \
+      "$(json_escape "$delta_score")" \
+      "$(json_escape "$run_elapsed")" \
+      "$(json_escape "$iteration_count")" \
+      "$(json_escape "$failure_count")" \
+      "$(mr_bool_norm "$decision_requested")"
+  done < "$recent_file"
+  printf ']'
+  rm -f "$recent_file"
+}
+
+mr_quality_scorecard_state_json() {
+  entries_file=$(mr_quality_scorecard_entries_file)
+  markdown_file=$(mr_quality_scorecard_markdown_file)
+  total_runs=0
+  overall_avg="0.000"
+  last_updated=""
+  if [ -f "$entries_file" ]; then
+    total_runs=$(wc -l < "$entries_file" 2>/dev/null | tr -d '[:space:]' || printf '0')
+    case "$total_runs" in ""|*[!0-9]*) total_runs=0 ;; esac
+    if [ "$total_runs" -gt 0 ]; then
+      tab_char=$(printf '\t')
+      last_updated=$(tail -n 1 "$entries_file" 2>/dev/null | awk -F"$tab_char" '{ print $2 }')
+      overall_avg=$(awk -F"$tab_char" '
+        NF >= 8 { sum += ($8 + 0.0); count += 1 }
+        END {
+          if (count <= 0) {
+            printf "0.000"
+          } else {
+            printf "%.3f", sum / count
+          }
+        }
+      ' "$entries_file")
+    fi
+  fi
+  markdown_preview=""
+  if [ -f "$markdown_file" ]; then
+    markdown_preview=$(sed -n '1,80p' "$markdown_file" 2>/dev/null || true)
+  fi
+  printf '{"total_runs":"%s","overall_avg_quality":"%s","last_updated":"%s","scorecard_path":"%s","markdown_preview":"%s","recent":%s}' \
+    "$(json_escape "$total_runs")" \
+    "$(json_escape "$overall_avg")" \
+    "$(json_escape "$last_updated")" \
+    "$(json_escape "$markdown_file")" \
+    "$(json_escape "$markdown_preview")" \
+    "$(mr_quality_scorecard_recent_json "8")"
 }
 
 mr_controller_variant_bootstrap_default() {
@@ -1842,6 +2177,7 @@ mode_runtime_bootstrap() {
   mkdir -p "$(mr_improvement_proposals_dir)"
   mkdir -p "$(mr_controller_variants_root)"
   mkdir -p "$(mr_controller_variants_dir)"
+  mkdir -p "$(mr_quality_scorecard_dir)"
 
   scheduler_state=$(mr_scheduler_state_file)
   if [ ! -f "$scheduler_state" ]; then
@@ -1918,7 +2254,24 @@ EOF_PROP
 EOF_CTRL
   fi
 
+  quality_entries_file=$(mr_quality_scorecard_entries_file)
+  if [ ! -f "$quality_entries_file" ]; then
+    : > "$quality_entries_file"
+  fi
+
+  quality_readme_file="$(mr_quality_scorecard_dir)/README.md"
+  if [ ! -f "$quality_readme_file" ]; then
+    cat > "$quality_readme_file" <<'EOF_SCORE'
+# Quality Scorecard Store
+
+- `entries.tsv` stores run-level intelligence quality snapshots and deltas.
+- `scorecard.md` stores a human-readable summary of trends and recent runs.
+- Regressions can trigger manually-reviewable improvement proposals tagged to recent failure categories.
+EOF_SCORE
+  fi
+
   mr_controller_variant_bootstrap_default
+  mr_quality_scorecard_refresh_markdown >/dev/null 2>&1 || true
 
   mr_mode_seed_rows | while IFS='|' read -r mode_id mode_name mode_priority mode_cadence mode_interrupt mode_desc mode_subscriptions mode_caps mode_skills; do
     [ -n "$mode_id" ] || continue
@@ -3154,8 +3507,9 @@ mode_runtime_state_json() {
   failure_taxonomy_state=$(mr_failure_taxonomy_state_json)
   improvement_proposals_state=$(mr_improvement_proposals_state_json)
   controller_variants_state=$(mr_controller_variants_state_json)
+  quality_scorecard_state=$(mr_quality_scorecard_state_json)
 
-  printf '{"scheduler":{"last_tick":"%s","last_tick_iso":"%s","ticks":"%s","last_due_modes":"%s","last_injections":"%s","last_directives_received":"%s","last_directives_emitted":"%s","summary":"%s"},"modes":%s,"skills":%s,"panels":%s,"cooperation":{"pending_total":"%s","modes_with_pending":"%s","recent":%s},"failure_taxonomy":%s,"improvement_proposals":%s,"controller_variants":%s}' \
+  printf '{"scheduler":{"last_tick":"%s","last_tick_iso":"%s","ticks":"%s","last_due_modes":"%s","last_injections":"%s","last_directives_received":"%s","last_directives_emitted":"%s","summary":"%s"},"modes":%s,"skills":%s,"panels":%s,"cooperation":{"pending_total":"%s","modes_with_pending":"%s","recent":%s},"failure_taxonomy":%s,"improvement_proposals":%s,"controller_variants":%s,"quality_scorecard":%s}' \
     "$(json_escape "$last_tick")" \
     "$(json_escape "$last_tick_iso")" \
     "$(json_escape "$ticks")" \
@@ -3172,7 +3526,8 @@ mode_runtime_state_json() {
     "$cooperation_recent" \
     "$failure_taxonomy_state" \
     "$improvement_proposals_state" \
-    "$controller_variants_state"
+    "$controller_variants_state" \
+    "$quality_scorecard_state"
 }
 
 mr_skill_capabilities() {
@@ -3568,6 +3923,12 @@ mr_improvement_proposals_state_response() {
 mr_controller_variants_state_response() {
   printf '{"success":true,"controller_variants":%s,"mode_runtime":%s}\n' \
     "$(mr_controller_variants_state_json)" \
+    "$(mode_runtime_state_json)"
+}
+
+mr_quality_scorecard_state_response() {
+  printf '{"success":true,"quality_scorecard":%s,"mode_runtime":%s}\n' \
+    "$(mr_quality_scorecard_state_json)" \
     "$(mode_runtime_state_json)"
 }
 

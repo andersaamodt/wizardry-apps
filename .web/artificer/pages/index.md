@@ -2,7 +2,7 @@
 title: ""
 pagetitle: "Artificer"
 ---
-<link rel="stylesheet" href="/static/style.css?v=20260228-corementor4" />
+<link rel="stylesheet" href="/static/style.css?v=20260228-corementor5" />
 <link id="artificer-theme-stylesheet" rel="stylesheet" href="/static/themes/psionic.css" />
 <div class="forge-shell" id="forge-shell">
 <aside class="workspace-sidebar" id="workspace-dropzone" tabindex="0">
@@ -465,6 +465,7 @@ pagetitle: "Artificer"
 <div id="mode-runtime-failure-taxonomy" class="mode-runtime-failure-taxonomy"></div>
 <div id="mode-runtime-improvement-proposals" class="mode-runtime-improvement-proposals"></div>
 <div id="mode-runtime-controller-variants" class="mode-runtime-controller-variants"></div>
+<div id="mode-runtime-quality-scorecard" class="mode-runtime-quality-scorecard"></div>
 <div class="mode-runtime-manager">
 <p class="settings-hint">Use the run-mode menu <strong>More modes</strong> expander to choose Assistant focus modes inline while composing.</p>
 <label for="assistant-mode-select">Assistant focus mode</label>
@@ -601,7 +602,7 @@ pagetitle: "Artificer"
     launchKey = String(Date.now());
   }
   var script = document.createElement("script");
-  script.src = "/static/artificer-app.js?v=20260228-wavefix6&launch=" + encodeURIComponent(launchKey);
+  script.src = "/static/artificer-app.js?v=20260228-wavefix7&launch=" + encodeURIComponent(launchKey);
   document.body.appendChild(script);
 })();
 </script>

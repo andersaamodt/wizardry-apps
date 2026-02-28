@@ -82,3 +82,6 @@ This backlog tracks concrete implementation work for improving Artificer intelli
   - Acceptance:
     - Scorecard file updates per cycle with before/after deltas.
     - Regressions auto-create proposals tagged to affected failure categories.
+  - Progress:
+    - Added file-backed quality scorecard entries and markdown summary refresh on each scored run.
+    - Added regression-triggered proposal generation from scorecard deltas, tagged to recent failure taxonomy categories.
