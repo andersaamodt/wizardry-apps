@@ -16569,6 +16569,9 @@ $fallback_output"
 
     printf '%s\n' "$run_started_iso" > "$(queue_running_started_iso_file_for "$conv_dir")"
     rm -f "$(queue_running_stream_session_file_for "$conv_dir")"
+    if [ -z "$stream_session" ] && [ "$assay_run_profile" -eq 1 ]; then
+      stream_session="assay-$(new_id)"
+    fi
     if [ -n "$stream_session" ]; then
       if valid_id "$stream_session"; then
         stream_dir=$(stream_session_dir_for "$conv_dir" "$stream_session")
@@ -17986,7 +17989,7 @@ EOF
       decision_requested=0
       decision_surface_category="none"
       suppress_assay_decision_requests=0
-      if [ "$assay_run_profile" -eq 1 ] && [ "$run_mode" != "assistant" ]; then
+      if [ "$assay_run_profile" -eq 1 ]; then
         suppress_assay_decision_requests=1
       fi
       if [ -n "$decision_question" ] && [ "$decision_question" != "NONE" ] && [ -s "$decision_options_file" ]; then

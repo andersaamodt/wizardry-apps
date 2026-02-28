@@ -1,0 +1,9 @@
+case	kind	expected_category	actual_category	allow	pass
+explicit-choice-trigger	trigger	explicit-choice	explicit-choice	true	1
+explicit-choice-near	near-miss	none	none	false	1
+required-input-trigger	trigger	required-input-missing	required-input-missing	true	1
+required-input-near	near-miss	none	none	false	1
+external-action-trigger	trigger	external-action-gate	external-action-gate	true	1
+external-action-near	near-miss	none	none	false	1
+risk-ack-trigger	trigger	risk-acknowledgement	risk-acknowledgement	true	1
+risk-ack-near	near-miss	none	none	false	1
