@@ -4701,8 +4701,98 @@
     return count;
   }
 
+  function synthesizeRunTimelineEntries(event) {
+    var entries = [];
+    var seen = {};
+
+    function pushEntry(timeLabel, textLabel) {
+      var text = trim(String(textLabel || ""));
+      if (!text) {
+        return;
+      }
+      text = text.replace(/\s+/g, " ");
+      var key = text.toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(seen, key)) {
+        return;
+      }
+      seen[key] = true;
+      entries.push({
+        time: trim(String(timeLabel || "")),
+        text: text
+      });
+    }
+
+    var commands = Array.isArray(event && event.commands) ? event.commands : [];
+    for (var i = 0; i < commands.length; i += 1) {
+      var command = commands[i] || {};
+      var cmdText = trim(String(command.command || ""));
+      if (!cmdText) {
+        continue;
+      }
+      var statusText = trim(String(command.status || ""));
+      var line = humanizeRunCommand(cmdText);
+      if (statusText && statusText !== "ok") {
+        line += " (" + statusText + ")";
+      }
+      pushEntry("step", line);
+      if (statusText && statusText !== "ok") {
+        var issueLine = trim(String(command.output || "")).split(/\r?\n/)[0] || "";
+        issueLine = trim(issueLine);
+        if (issueLine) {
+          pushEntry("step", "Issue: " + issueLine);
+        }
+      }
+      if (entries.length >= 120) {
+        return entries;
+      }
+    }
+
+    var sessionText = normalizeRunNarrativeText(event && event.session_log);
+    if (sessionText) {
+      var sessionLines = sessionText.split(/\n+/);
+      for (var j = 0; j < sessionLines.length; j += 1) {
+        var sessionLine = trim(sessionLines[j] || "");
+        if (!sessionLine) {
+          continue;
+        }
+        if (!/^(Checkpoint:|Transition:|Reason:|Action:|Error:|Next Attempt:|Assumption:|Current mode:|Command:|Status:)/i.test(sessionLine)) {
+          continue;
+        }
+        if (sessionLine.length > 220) {
+          sessionLine = sessionLine.slice(0, 217) + "...";
+        }
+        pushEntry("step", sessionLine);
+        if (entries.length >= 120) {
+          return entries;
+        }
+      }
+    }
+
+    var planText = normalizeRunNarrativeText(event && event.plan);
+    if (planText) {
+      var nextActionMatch = planText.match(/Next Action:\s*([^\n]+)/i);
+      if (nextActionMatch && trim(nextActionMatch[1] || "")) {
+        pushEntry("step", "Planned next action: " + trim(nextActionMatch[1] || ""));
+      }
+      var completionMatch = planText.match(/Completion Criteria:\s*([^\n]+)/i);
+      if (completionMatch && trim(completionMatch[1] || "")) {
+        pushEntry("step", "Completion criteria: " + trim(completionMatch[1] || ""));
+      }
+    }
+
+    return entries;
+  }
+
+  function runTimelineEntries(event) {
+    var streamEntries = splitRunStreamEntries(event && event.stream_text);
+    if (streamEntries.length) {
+      return streamEntries;
+    }
+    return synthesizeRunTimelineEntries(event);
+  }
+
   function runTraceStepCount(event) {
-    return splitRunStreamEntries(event && event.stream_text).length;
+    return runTimelineEntries(event).length;
   }
 
   function runTraceReviewRoundCount(event) {
@@ -4998,7 +5088,7 @@
 
   function formatRunActivityDigest(event, isRunning) {
     var commands = Array.isArray(event && event.commands) ? event.commands : [];
-    var streamEntries = splitRunStreamEntries(event && event.stream_text);
+    var streamEntries = runTimelineEntries(event);
     var durationSeconds = runDurationSeconds(event && event.started_at, isRunning ? "" : (event && event.finished_at));
     var counts = {
       reads: 0,
@@ -5068,7 +5158,7 @@
   }
 
   function formatRunStreamFeed(event, isRunning) {
-    var entries = splitRunStreamEntries(event && event.stream_text);
+    var entries = runTimelineEntries(event);
     var maxEntries = isRunning ? 220 : 320;
     var clippedCount = 0;
     if (entries.length > maxEntries) {
@@ -5097,7 +5187,7 @@
   }
 
   function formatRunInlineTimeline(event, isRunning, maxItems) {
-    var entries = splitRunStreamEntries(event && event.stream_text);
+    var entries = runTimelineEntries(event);
     if (!entries.length) {
       return "";
     }
@@ -5320,7 +5410,7 @@
       return true;
     }
     var duration = runDurationSeconds(event.started_at, event.finished_at);
-    var streamEntries = splitRunStreamEntries(event.stream_text);
+    var streamEntries = runTimelineEntries(event);
     var commandCount = Array.isArray(event.commands) ? event.commands.length : 0;
     var planLength = trim(String(event.plan || "")).length;
     var failureLength = trim(String(event.failures || "")).length;
@@ -7300,87 +7390,59 @@
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
         var sampleNow = Date.now();
-        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 16) {
+        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 18) {
           dictationWaveRafId = requestAnimationFrame(sample);
           return;
         }
         dictationWaveLastSampleAt = sampleNow;
         var len = dictationWaveData.length;
-        var barsPerFrame = 8;
-        var windowSamples = Math.min(128, len);
-        var sliceSamples = Math.max(6, Math.floor(windowSamples / barsPerFrame));
-        var consumed = sliceSamples * barsPerFrame;
-        var baseStart = Math.max(0, len - consumed);
-        var rawHistory = [];
-        for (var slice = 0; slice < barsPerFrame; slice += 1) {
-          var from = baseStart + (slice * sliceSamples);
-          var to = from + sliceSamples;
-          if (slice === barsPerFrame - 1 || to > len) {
-            to = len;
+        var windowSamples = Math.min(192, len);
+        var from = Math.max(0, len - windowSamples);
+        var sum = 0;
+        var peak = 0;
+        var maxPos = -1;
+        var minNeg = 1;
+        var absSum = 0;
+        var count = 0;
+        for (var si = from; si < len; si += 1) {
+          var centered = (Number(dictationWaveData[si] || 128) - 128) / 128;
+          var mag = centered < 0 ? -centered : centered;
+          sum += mag * mag;
+          absSum += mag;
+          if (mag > peak) {
+            peak = mag;
           }
-          var sum = 0;
-          var peak = 0;
-          var maxPos = -1;
-          var minNeg = 1;
-          var absSum = 0;
-          var count = 0;
-          for (var si = from; si < to; si += 1) {
-            var centered = (Number(dictationWaveData[si] || 128) - 128) / 128;
-            var mag = centered < 0 ? -centered : centered;
-            sum += mag * mag;
-            absSum += mag;
-            if (mag > peak) {
-              peak = mag;
-            }
-            if (centered > maxPos) {
-              maxPos = centered;
-            }
-            if (centered < minNeg) {
-              minNeg = centered;
-            }
-            count += 1;
+          if (centered > maxPos) {
+            maxPos = centered;
           }
-          var rms = count > 0 ? Math.sqrt(sum / count) : 0;
-          var meanAbs = count > 0 ? absSum / count : 0;
-          var peakToPeak = maxPos - minNeg;
-          if (!isFinite(peakToPeak) || peakToPeak < 0) {
-            peakToPeak = 0;
+          if (centered < minNeg) {
+            minNeg = centered;
           }
-          var crest = peak > rms ? (peak - rms) : 0;
-          var rawLevel = (meanAbs * 3.4) + (peakToPeak * 2.1) + (peak * 1.2) + (crest * 0.8);
-          rawHistory.push(rawLevel);
+          count += 1;
         }
-        var floorProbe = 0;
-        var rawPeak = 0;
-        if (rawHistory.length) {
-          var sortedProbe = rawHistory.slice().sort(function (a, b) { return a - b; });
-          var probeIndex = sortedProbe.length > 2 ? 1 : 0;
-          floorProbe = Number(sortedProbe[probeIndex] || 0);
-          rawPeak = Number(sortedProbe[sortedProbe.length - 1] || 0);
+        var rms = count > 0 ? Math.sqrt(sum / count) : 0;
+        var meanAbs = count > 0 ? absSum / count : 0;
+        var peakToPeak = maxPos - minNeg;
+        if (!isFinite(peakToPeak) || peakToPeak < 0) {
+          peakToPeak = 0;
         }
-        calibrateDictationWaveNoiseFloor(floorProbe);
-        var normalizedHistory = [];
-        for (var hi = 0; hi < rawHistory.length; hi += 1) {
-          var normalizedSlice = normalizedDictationWaveSliceLevel(rawHistory[hi]);
-          if (normalizedSlice <= 0 && rawPeak > (dictationWaveNoiseFloor + 0.0015)) {
-            var floorBase = Math.max(0.0005, Number(dictationWaveNoiseFloor || 0));
-            var rescue = ((rawHistory[hi] / floorBase) - 1) / 3.5;
-            if (!isFinite(rescue) || rescue < 0) {
-              rescue = 0;
-            } else if (rescue > 1) {
-              rescue = 1;
-            }
-            if (rescue < 0.0015) {
-              rescue = 0;
-            }
-            normalizedSlice = rescue;
+        var crest = peak > rms ? (peak - rms) : 0;
+        var rawLevel = (meanAbs * 3.4) + (peakToPeak * 2.1) + (peak * 1.2) + (crest * 0.8);
+        calibrateDictationWaveNoiseFloor(rawLevel);
+        var normalizedLevel = normalizedDictationWaveSliceLevel(rawLevel);
+        if (normalizedLevel <= 0 && rawLevel > (dictationWaveNoiseFloor + 0.0015)) {
+          var floorBase = Math.max(0.0005, Number(dictationWaveNoiseFloor || 0));
+          normalizedLevel = ((rawLevel / floorBase) - 1) / 3.5;
+          if (!isFinite(normalizedLevel) || normalizedLevel < 0) {
+            normalizedLevel = 0;
+          } else if (normalizedLevel > 1) {
+            normalizedLevel = 1;
           }
-          normalizedHistory.push(normalizedSlice);
         }
-        if (!dictationWaveSeenSignal && rawPeak > (dictationWaveNoiseFloor + 0.0015)) {
+        if (!dictationWaveSeenSignal && rawLevel > (dictationWaveNoiseFloor + 0.0015)) {
           dictationWaveSeenSignal = true;
         }
-        applyDictationWaveHistoryLevels(normalizedHistory);
+        applyDictationWaveLevel(normalizedLevel);
         dictationWaveRafId = requestAnimationFrame(sample);
       };
       dictationWaveRafId = requestAnimationFrame(sample);
@@ -7440,14 +7502,15 @@
           }
           dictationWaveBackendLevel = normalizedBackend;
           dictationWaveBackendLevelAt = Date.now();
-          if (normalizedSequence.length) {
-            // Always ingest backend history. This prevents flatline regressions when
-            // WebAudio exists but produces stale/near-zero frames on some hosts.
-            applyDictationWaveHistoryLevels(normalizedSequence);
-          } else {
-            var mergedBackendLevel = mergedDictationWaveLevel(normalizedBackend);
-            if (!dictationWaveAnalyser || !dictationWaveData || mergedBackendLevel > 0) {
-              applyDictationWaveHistoryLevels([mergedBackendLevel]);
+          var hasMicAnalyser = !!(dictationWaveAnalyser && dictationWaveData);
+          if (!hasMicAnalyser) {
+            if (normalizedSequence.length) {
+              applyDictationWaveHistoryLevels(normalizedSequence);
+            } else {
+              var mergedBackendLevel = mergedDictationWaveLevel(normalizedBackend);
+              if (mergedBackendLevel > 0) {
+                applyDictationWaveHistoryLevels([mergedBackendLevel]);
+              }
             }
           }
         }).catch(function () {
