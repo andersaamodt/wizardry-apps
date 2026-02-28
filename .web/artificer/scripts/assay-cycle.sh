@@ -189,10 +189,10 @@ run_cycle() {
     fi
     max_iterations=6
     case "$budget" in
-      long) max_iterations=8 ;;
+      long) max_iterations=4 ;;
       until-complete) max_iterations=9999 ;;
-      quick) max_iterations=3 ;;
-      *) max_iterations=6 ;;
+      quick) max_iterations=2 ;;
+      *) max_iterations=3 ;;
     esac
 
     best_row=""
@@ -211,20 +211,24 @@ run_cycle() {
         break
       fi
 
-      timeout_this=$task_timeout_sec
       budget_this=$run_budget_sec
       case "$budget" in
         long)
-          timeout_this=$((timeout_this + 12))
-          budget_this=$((budget_this + 15))
+          budget_this=$((budget_this + 10))
           ;;
         until-complete)
-          timeout_this=$((timeout_this + 18))
-          budget_this=$((budget_this + 20))
+          budget_this=$((budget_this + 15))
           ;;
       esac
+      timeout_this=$((budget_this + 140))
+      if [ "$timeout_this" -lt "$task_timeout_sec" ]; then
+        timeout_this=$task_timeout_sec
+      fi
+      if [ "$timeout_this" -gt 420 ]; then
+        timeout_this=420
+      fi
       if [ "$attempt" -gt 1 ]; then
-        timeout_this=$((timeout_this + (attempt - 1) * 10))
+        timeout_this=$((timeout_this + (attempt - 1) * 15))
         budget_this=$((budget_this + (attempt - 1) * 10))
       fi
 
@@ -247,8 +251,12 @@ EOF
       fi
 
       settle_try=0
+      settle_limit=20
+      if [ "$timed_out" -eq 1 ]; then
+        settle_limit=45
+      fi
       state_json=""
-      while [ "$settle_try" -lt 20 ]; do
+      while [ "$settle_try" -lt "$settle_limit" ]; do
         queue_json=$(post_api "action=queue_list&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" | json_only)
         queue_running=$(printf '%s' "$queue_json" | jq -r '.queue_running // 0')
         if [ "$queue_running" != "1" ]; then
@@ -377,8 +385,8 @@ shift
 case "$mode" in
   run)
     label="cycle-$(date +%Y%m%d-%H%M%S)"
-    task_timeout_sec=210
-    run_budget_sec=120
+    task_timeout_sec=220
+    run_budget_sec=90
     attempts=2
     mentor_from=""
     max_tasks=0

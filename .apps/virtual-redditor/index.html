@@ -3535,9 +3535,19 @@
           cancelAnimationFrame(state.profileSwitchOverlayShowFrame);
           state.profileSwitchOverlayShowFrame = 0;
         }
+        var needsFadeIn = overlay.classList.contains('hidden') ||
+          overlay.classList.contains('is-hiding') ||
+          !overlay.classList.contains('is-visible');
         overlay.classList.remove('hidden');
         overlay.classList.remove('is-hiding');
-        overlay.classList.add('is-visible');
+        if (needsFadeIn) {
+          overlay.classList.remove('is-visible');
+          // Force a measurable pre-visible paint so CSS transition fades in.
+          void overlay.offsetWidth;
+          overlay.classList.add('is-visible');
+        } else {
+          overlay.classList.add('is-visible');
+        }
         return;
       }
       if (state.profileSwitchOverlayShowFrame) {
