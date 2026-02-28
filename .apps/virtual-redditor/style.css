@@ -16,6 +16,7 @@
   --shadow: 0 18px 44px rgba(17, 34, 58, 0.14);
   --menu-bg: color-mix(in srgb, var(--bg-panel) 88%, #fff);
   --menu-line: var(--line);
+  --duration-number-width: 72px;
 }
 
 * {
@@ -1980,7 +1981,8 @@ label {
 }
 
 .relationship-override-drawer #relationship-duration {
-  width: 92px;
+  width: var(--duration-number-width);
+  min-width: var(--duration-number-width);
   max-width: 100%;
 }
 
@@ -2649,13 +2651,13 @@ label {
 }
 
 .mode-detail-drawer .action-transition-controls input[data-transition-duration-action] {
-  width: 68px;
-  min-width: 68px;
+  width: var(--duration-number-width);
+  min-width: var(--duration-number-width);
 }
 
 .mode-detail-drawer .mode-expiry-input input[data-mode-drawer-default-expiry] {
-  width: 72px;
-  min-width: 72px;
+  width: var(--duration-number-width);
+  min-width: var(--duration-number-width);
 }
 
 .mode-detail-drawer .mode-drawer-inline select[data-mode-drawer-default-expiry-unit] {
@@ -2726,8 +2728,8 @@ label {
 
 #ban-levels-table input[data-ban-duration-min],
 #ban-levels-table input[data-ban-duration-max] {
-  width: 56px;
-  min-width: 56px;
+  width: var(--duration-number-width);
+  min-width: var(--duration-number-width);
 }
 
 #ban-levels-table select[data-ban-duration-unit] {
@@ -2938,7 +2940,11 @@ input.range-input-invalid[type='number'] {
   min-width: 142px;
 }
 
-.action-trigger-row .trigger-duration-input,
+.action-trigger-row .trigger-duration-input {
+  width: var(--duration-number-width);
+  min-width: var(--duration-number-width);
+}
+
 .action-trigger-row .trigger-rate-limit-input {
   width: 56px;
   min-width: 56px;
@@ -3716,13 +3722,14 @@ input.range-input-invalid[type='number'] {
 #behavior-latency-max,
 #behavior-ban-min,
 #behavior-ban-max {
-  width: 56px;
-  min-width: 56px;
+  width: var(--duration-number-width);
+  min-width: var(--duration-number-width);
   font-size: 0.82rem;
 }
 
 #pass-interval-input {
-  width: 76px;
+  width: var(--duration-number-width);
+  min-width: var(--duration-number-width);
   min-height: 30px;
   font-size: 0.84rem;
   font-family: inherit;
