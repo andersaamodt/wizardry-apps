@@ -78,6 +78,51 @@
       '</section>';
   }
 
+  function ensureSinglePostCard(current) {
+    var anchor = document.querySelector('#main-content') || document.body;
+    if (!anchor) {
+      return null;
+    }
+    var existingCard = anchor.querySelector('.post-single-item');
+    if (existingCard) {
+      return {
+        anchor: anchor,
+        card: existingCard,
+        body: existingCard.querySelector('.post-single-body') || existingCard
+      };
+    }
+
+    var card = document.createElement('article');
+    card.className = 'post-item post-single-item';
+
+    var head = document.createElement('div');
+    head.className = 'post-head';
+    head.innerHTML =
+      '<div class="post-head-main">' +
+      '<h1 class="post-title">' + escapeHtml(current.title || document.title || 'Untitled') + '</h1>' +
+      '<div class="post-author">' + escapeHtml(current.author || 'Blog Author') + '</div>' +
+      '</div>' +
+      '<div class="post-meta"><span class="post-date">' + escapeHtml(current.published_date || '') + '</span></div>';
+
+    var body = document.createElement('div');
+    body.className = 'post-single-body';
+
+    while (anchor.firstChild) {
+      body.appendChild(anchor.firstChild);
+    }
+
+    var oldHeading = body.querySelector('h1[id], h1');
+    if (oldHeading) {
+      oldHeading.remove();
+    }
+
+    card.appendChild(head);
+    card.appendChild(body);
+    anchor.appendChild(card);
+
+    return { anchor: anchor, card: card, body: body };
+  }
+
   function renderNostrProof(nostr) {
     if (!nostr || !nostr.id) {
       return '';
@@ -374,28 +419,28 @@
   }
 
   function applyEnhancements(payload) {
-    if (!payload || !payload.current || document.querySelector('.post-context-card')) {
+    if (!payload || !payload.current) {
       return;
     }
 
-    var heading = document.querySelector('h1[id]') || document.querySelector('h1');
-    if (!heading) {
+    var layout = ensureSinglePostCard(payload.current);
+    if (!layout || !layout.body) {
       return;
     }
 
-    heading.insertAdjacentHTML('afterend', renderPostMeta(payload.current));
+    if (!layout.body.querySelector('.post-context-card')) {
+      layout.body.insertAdjacentHTML('afterbegin', renderPostMeta(payload.current));
+    }
 
-    if (!document.querySelector('.post-end-tags')) {
+    if (!layout.body.querySelector('.post-end-tags')) {
       var tagsHtml = renderPostEndTags(payload.current.tags);
       if (tagsHtml) {
-        var tagAnchor = document.querySelector('#main-content') || document.body;
-        tagAnchor.insertAdjacentHTML('beforeend', tagsHtml);
+        layout.body.insertAdjacentHTML('beforeend', tagsHtml);
       }
     }
 
-    if (!document.querySelector('.post-nav-enhanced')) {
-      var anchor = document.querySelector('#main-content') || document.body;
-      anchor.insertAdjacentHTML('beforeend', renderPostNav(payload));
+    if (!layout.body.querySelector('.post-nav-enhanced')) {
+      layout.body.insertAdjacentHTML('beforeend', renderPostNav(payload));
     }
 
     if (payload.current.nostr && !document.querySelector('.post-nostr-proof')) {

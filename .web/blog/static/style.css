@@ -1192,6 +1192,38 @@ a:hover {
     0 1px 0 rgba(255, 255, 255, 0.9) inset;
 }
 
+.post-single-item {
+  margin: 1rem auto 0.75rem;
+  max-width: min(100%, 54rem);
+  min-height: 0;
+  padding-bottom: 1rem;
+}
+
+.post-single-item .post-head {
+  margin-bottom: 0.8rem;
+}
+
+.post-single-item .post-single-body {
+  margin-top: 0.15rem;
+}
+
+.post-single-item .post-single-body > :first-child {
+  margin-top: 0.15rem;
+}
+
+.post-single-item .tag {
+  filter: none;
+  background: #eef3ff;
+  border-color: #d4def7;
+  color: #4f6090;
+}
+
+.post-single-item .tag:hover {
+  background: #e6eeff;
+  color: #42537f;
+  filter: none;
+}
+
 .post-head {
   display: flex;
   justify-content: space-between;
