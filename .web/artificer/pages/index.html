@@ -1073,6 +1073,22 @@ Decision filters</label>
 </div>
 </div>
 </div>
-<script src="/static/artificer-app.js?v=20260228-assaymentor4"></script>
+<script>
+(function loadArtificerBundle() {
+  var launchKey = "";
+  try {
+    var search = new URLSearchParams(window.location.search || "");
+    launchKey = String(search.get("launch") || "");
+  } catch (_err) {
+    launchKey = "";
+  }
+  if (!launchKey) {
+    launchKey = String(Date.now());
+  }
+  var script = document.createElement("script");
+  script.src = "/static/artificer-app.js?v=20260228-assaymentor4&launch=" + encodeURIComponent(launchKey);
+  document.body.appendChild(script);
+})();
+</script>
 </body>
 </html>
