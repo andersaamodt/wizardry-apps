@@ -7830,9 +7830,9 @@
           setSettingsMessage('', false);
           return;
         }
+        setSettingsOverride('subreddit', value);
+        renderStatus();
         backendJson('set-reddit-setting', ['SUBREDDIT', value]).then(function () {
-          setSettingsOverride('subreddit', value);
-          renderStatus();
           return refreshStatus();
         }).then(function () {
           setSettingsMessage('', false);
