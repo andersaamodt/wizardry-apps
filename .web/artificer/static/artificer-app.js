@@ -780,6 +780,7 @@
   var dictationWaveBarSumRaw = 0;
   var dictationWaveBarSampleCount = 0;
   var DICTATION_WAVE_BAR_INTERVAL_MS = 84;
+  var dictationWaveBackendLastEmitAt = 0;
   var dictationWaveBackendPumpBusy = false;
   var dictationWaveBackendPumpAt = 0;
   var dictationPreparePromise = null;
@@ -7120,6 +7121,7 @@
     dictationWaveBarPeakRaw = 0;
     dictationWaveBarSumRaw = 0;
     dictationWaveBarSampleCount = 0;
+    dictationWaveBackendLastEmitAt = 0;
     state.dictateWaveLevels = [];
   }
 
@@ -7360,11 +7362,11 @@
       }
       dictationWaveBackendLevel = normalizedBackend;
       dictationWaveBackendLevelAt = Date.now();
-      if (normalizedSequence.length) {
-        applyDictationWaveHistoryLevels(normalizedSequence);
-      } else {
-        var lifted = mergedDictationWaveLevel(Math.max(normalizedBackend, polledLevel * 0.9));
-        applyDictationWaveHistoryLevels([lifted]);
+      var lifted = mergedDictationWaveLevel(Math.max(normalizedBackend, polledLevel * 0.9));
+      var emitNow = Date.now();
+      if (emitNow - Number(dictationWaveBackendLastEmitAt || 0) >= DICTATION_WAVE_BAR_INTERVAL_MS) {
+        dictationWaveBackendLastEmitAt = emitNow;
+        applyDictationWaveLevel(lifted);
       }
     }).catch(function () {
       return null;
@@ -7511,12 +7513,12 @@
           dictationWaveBackendLevelAt = Date.now();
           var hasMicAnalyser = !!(dictationWaveAnalyser && dictationWaveData);
           if (!hasMicAnalyser) {
-            if (normalizedSequence.length) {
-              applyDictationWaveHistoryLevels(normalizedSequence);
-            } else {
-              var mergedBackendLevel = mergedDictationWaveLevel(normalizedBackend);
-              if (mergedBackendLevel > 0) {
-                applyDictationWaveHistoryLevels([mergedBackendLevel]);
+            var mergedBackendLevel = mergedDictationWaveLevel(normalizedBackend);
+            if (mergedBackendLevel > 0 || normalizedSequence.length) {
+              var emitNow = Date.now();
+              if (emitNow - Number(dictationWaveBackendLastEmitAt || 0) >= DICTATION_WAVE_BAR_INTERVAL_MS) {
+                dictationWaveBackendLastEmitAt = emitNow;
+                applyDictationWaveLevel(mergedBackendLevel);
               }
             }
           }
