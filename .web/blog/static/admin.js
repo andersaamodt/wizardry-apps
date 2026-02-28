@@ -1341,8 +1341,8 @@
     let renameAuthoredPosts = false;
     if (nextName && currentName && nextName !== currentName) {
       renameAuthoredPosts = window.confirm(
-        'Update authored posts too?\n\n' +
-        'This will replace author "' + currentName + '" with "' + nextName + '" on all matching posts.'
+        'Also rename author on your existing posts?\n\n' +
+        'If you continue, this will update the post metadata field author: "' + currentName + '" to author: "' + nextName + '" on every post that currently matches your old name.'
       );
     }
     try {
