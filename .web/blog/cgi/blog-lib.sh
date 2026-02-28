@@ -935,6 +935,22 @@ blog_set_player_name() {
   config-set "$profile" updated_at "$(blog_now_iso)"
 }
 
+blog_author_display_name() {
+  raw_author=${1-}
+  if [ -z "$raw_author" ]; then
+    printf '%s\n' ''
+    return 0
+  fi
+  if blog_validate_username "$raw_author"; then
+    profile=$(blog_user_profile "$raw_author")
+    if [ -f "$profile" ]; then
+      blog_get_player_name "$raw_author" 2>/dev/null || printf '%s\n' "$raw_author"
+      return 0
+    fi
+  fi
+  printf '%s\n' "$raw_author"
+}
+
 blog_rename_authored_posts() {
   old_author=${1-}
   new_author=${2-}
@@ -2486,7 +2502,11 @@ blog_run_scheduler() {
       title=$(config-get "$meta" title 2>/dev/null || printf 'Untitled')
       tags=$(config-get "$meta" tags 2>/dev/null || printf '')
       summary=$(config-get "$meta" summary 2>/dev/null || printf '')
-      author=$(config-get "$meta" author 2>/dev/null || printf 'author')
+      author=$(config-get "$meta" author 2>/dev/null || printf '')
+      author=$(blog_author_display_name "$author")
+      if [ -z "$author" ]; then
+        author='author'
+      fi
       content=$(cat "$body" 2>/dev/null || printf '')
       if ! published_file=$(blog_publish_content "$title" "$tags" "$summary" "$content" "$author" "$draft_id" scheduled "$now_iso"); then
         continue
@@ -2525,7 +2545,11 @@ blog_run_scheduler() {
         title=$(config-get "$meta" title 2>/dev/null || printf 'Untitled')
         tags=$(config-get "$meta" tags 2>/dev/null || printf '')
         summary=$(config-get "$meta" summary 2>/dev/null || printf '')
-        author=$(config-get "$meta" author 2>/dev/null || printf 'author')
+        author=$(config-get "$meta" author 2>/dev/null || printf '')
+        author=$(blog_author_display_name "$author")
+        if [ -z "$author" ]; then
+          author='author'
+        fi
         content=$(cat "$body" 2>/dev/null || printf '')
         if ! published_file=$(blog_publish_content "$title" "$tags" "$summary" "$content" "$author" "$draft_id" drip ""); then
           continue

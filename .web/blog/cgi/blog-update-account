@@ -25,10 +25,16 @@ if ! blog_validate_player_name "$player_name"; then
 fi
 
 old_player_name=$(blog_get_player_name "$BLOG_SESSION_USERNAME" 2>/dev/null || printf '%s' "$BLOG_SESSION_USERNAME")
+legacy_username="$BLOG_SESSION_USERNAME"
 rename_candidate_count=0
 if [ "$old_player_name" != "$player_name" ]; then
   rename_candidate_count=$(blog_count_authored_posts_by_author "$old_player_name")
   case "$rename_candidate_count" in ''|*[!0-9]*) rename_candidate_count=0 ;; esac
+  if [ "$legacy_username" != "$old_player_name" ]; then
+    legacy_count=$(blog_count_authored_posts_by_author "$legacy_username")
+    case "$legacy_count" in ''|*[!0-9]*) legacy_count=0 ;; esac
+    rename_candidate_count=$((rename_candidate_count + legacy_count))
+  fi
 fi
 
 if [ "$preview_rename" = "true" ]; then
@@ -46,6 +52,11 @@ renamed_posts=0
 if [ "$rename_authored_posts" = "true" ] && [ "$rename_candidate_count" -gt 0 ] && [ "$old_player_name" != "$player_name" ]; then
   renamed_posts=$(blog_rename_authored_posts "$old_player_name" "$player_name")
   case "$renamed_posts" in ''|*[!0-9]*) renamed_posts=0 ;; esac
+  if [ "$legacy_username" != "$old_player_name" ]; then
+    renamed_legacy=$(blog_rename_authored_posts "$legacy_username" "$player_name")
+    case "$renamed_legacy" in ''|*[!0-9]*) renamed_legacy=0 ;; esac
+    renamed_posts=$((renamed_posts + renamed_legacy))
+  fi
   if [ "$renamed_posts" -gt 0 ]; then
     blog_run_build_async
   fi
