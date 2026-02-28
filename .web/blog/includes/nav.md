@@ -25,7 +25,7 @@
 </svg>
 </a>
 <button id="compose-icon-prev-btn" class="nav-compose-cycle" type="button" aria-label="Previous compose icon" title="Previous compose icon">&#x2039;</button>
-<button id="compose-icon-cycle-btn" class="nav-compose-cycle" type="button" aria-label="Cycle compose icon" title="Cycle compose icon">↺</button>
+<button id="compose-icon-cycle-btn" class="nav-compose-cycle" type="button" aria-label="Next compose icon" title="Next compose icon">&#x203A;</button>
 </div>
 <span id="compose-icon-name" class="nav-compose-name" aria-live="polite"></span>
 </div>
