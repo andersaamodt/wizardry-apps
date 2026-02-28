@@ -794,15 +794,69 @@ assay_next_action_from_plan() {
   printf '%s' "$next_action_line"
 }
 
+assay_runtime_summary_line() {
+  elapsed_sec=$1
+  case "$elapsed_sec" in
+    ""|*[!0-9]*)
+      elapsed_sec=0
+      ;;
+  esac
+  if [ "$elapsed_sec" -lt 0 ]; then
+    elapsed_sec=0
+  fi
+  elapsed_minutes=$((elapsed_sec / 60))
+  elapsed_seconds=$((elapsed_sec % 60))
+  if [ "$elapsed_minutes" -gt 0 ]; then
+    printf 'Worked for %sm %ss.' "$elapsed_minutes" "$elapsed_seconds"
+  else
+    printf 'Worked for %ss.' "$elapsed_seconds"
+  fi
+}
+
+assay_ensure_runtime_evidence() {
+  output_text=$1
+  runtime_line=$2
+  if [ -z "$runtime_line" ]; then
+    printf '%s' "$output_text"
+    return 0
+  fi
+  if printf '%s\n' "$output_text" | grep -Eqi 'Worked for[[:space:]]+[0-9]+m[[:space:]]+[0-9]+s|Worked for[[:space:]]+[0-9]+s'; then
+    printf '%s' "$output_text"
+    return 0
+  fi
+  if printf '%s\n' "$output_text" | grep -q '^Verification Evidence:'; then
+    printf '%s\n' "$output_text" | awk -v rt="$runtime_line" '
+      BEGIN { updated = 0 }
+      {
+        if (updated == 0 && $0 ~ /^Verification Evidence:/) {
+          print $0 " " rt
+          updated = 1
+          next
+        }
+        print
+      }
+      END {
+        if (updated == 0) {
+          print "Verification Evidence: " rt
+        }
+      }
+    '
+    return 0
+  fi
+  printf '%s\nVerification Evidence: %s' "$output_text" "$runtime_line"
+}
+
 assay_normalize_assistant_output() {
   raw_output=$(trim "$1")
   final_mode=$(trim "$2")
   plan_text=$3
   run_time_budget=$4
+  run_elapsed_sec=${5:-0}
+  runtime_line=$(assay_runtime_summary_line "$run_elapsed_sec")
 
   if assay_output_has_required_sections "$raw_output"; then
     if ! printf '%s' "$raw_output" | grep -Eqi '^Outcome:[[:space:]]+I couldn.t complete|^Outcome:[[:space:]]+Progress was made.*not yet finalized|^Outcome:[[:space:]]+Concrete progress was delivered.*final hardening'; then
-      printf '%s' "$raw_output"
+      assay_ensure_runtime_evidence "$raw_output" "$runtime_line"
       return 0
     fi
   fi
@@ -813,7 +867,8 @@ assay_normalize_assistant_output() {
   fi
 
   if [ -z "$raw_output" ]; then
-    structured_incomplete_run_message "$final_mode" "$next_action_line" ""
+    normalized_output=$(structured_incomplete_run_message "$final_mode" "$next_action_line" "")
+    assay_ensure_runtime_evidence "$normalized_output" "$runtime_line"
     return 0
   fi
 
@@ -822,7 +877,8 @@ assay_normalize_assistant_output() {
     if printf '%s' "$raw_output" | grep -Eqi 'time budget|timed out'; then
       risk_line="Run reached the time budget (${run_time_budget}s) before DONE mode."
     fi
-    structured_incomplete_run_message "$final_mode" "$next_action_line" "$risk_line"
+    normalized_output=$(structured_incomplete_run_message "$final_mode" "$next_action_line" "$risk_line")
+    assay_ensure_runtime_evidence "$normalized_output" "$runtime_line"
     return 0
   fi
 
@@ -838,11 +894,12 @@ assay_normalize_assistant_output() {
     risk_line="The run ended in mode: $final_mode, so details may still require follow-up verification."
   fi
 
-  printf '%s\n%s\n%s\n%s' \
+  normalized_output=$(printf '%s\n%s\n%s\n%s' \
     "Outcome: $outcome_line" \
     "Verification Evidence: Review the run trace for executed steps, commands, and controller transitions." \
     "Risks: $risk_line" \
-    "Next Improvement: $next_action_line"
+    "Next Improvement: $next_action_line")
+  assay_ensure_runtime_evidence "$normalized_output" "$runtime_line"
 }
 
 is_simple_direct_prompt() {
@@ -19313,7 +19370,17 @@ EOF
     fi
 
     if [ "$assay_run_profile" -eq 1 ]; then
-      assistant_output=$(assay_normalize_assistant_output "$assistant_output" "$final_state_mode" "$plan_text" "$run_time_budget")
+      run_finished_epoch=$(date +%s 2>/dev/null || printf '0')
+      case "$run_finished_epoch" in
+        ""|*[!0-9]*)
+          run_finished_epoch=$run_started_epoch
+          ;;
+      esac
+      run_elapsed_sec=$((run_finished_epoch - run_started_epoch))
+      if [ "$run_elapsed_sec" -lt 0 ]; then
+        run_elapsed_sec=0
+      fi
+      assistant_output=$(assay_normalize_assistant_output "$assistant_output" "$final_state_mode" "$plan_text" "$run_time_budget" "$run_elapsed_sec")
     fi
 
     if [ "$run_mode" = "teacher" ]; then
