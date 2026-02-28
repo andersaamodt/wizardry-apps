@@ -1199,8 +1199,8 @@ a:hover {
   min-height: 22rem;
   padding: 1.35rem 1.45rem 1.1rem;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.72) 100%),
-    var(--light-bg);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%),
+    linear-gradient(180deg, rgba(224, 231, 255, 0.14) 0%, rgba(224, 231, 255, 0.08) 100%);
   border-color: #afbdd8;
   box-shadow:
     0 18px 36px rgba(15, 23, 42, 0.09),
