@@ -2360,7 +2360,6 @@ button:disabled,
 
 .run-details {
   margin-top: 7px;
-  border-top: 1px solid var(--line);
 }
 
 .run-details > summary {
@@ -2394,13 +2393,6 @@ button:disabled,
   color: var(--text-muted);
 }
 
-.run-rollup-line {
-  flex: 1;
-  min-width: 20px;
-  height: 1px;
-  background: var(--line);
-}
-
 .run-rollup > summary {
   font-size: 0.83rem;
 }
@@ -2426,6 +2418,7 @@ button:disabled,
 
 .run-thinking {
   margin-top: 7px;
+  border-top: 1px solid var(--line);
 }
 
 .run-thinking > summary {

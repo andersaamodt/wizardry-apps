@@ -668,6 +668,7 @@
     chatMarkupCache: "",
     runDetailsOpenByEventId: {},
     runDigestOpenByEventId: {},
+    pendingAssistantDeliveryCountByConversation: {},
     runStreamAutoFollowByEventId: {},
     runStreamScrollTopByEventId: {},
     runTodoMonitorOpenByConversation: {},
@@ -2673,6 +2674,48 @@
     }
     var key = conversationReadKey(workspaceId, conversationId);
     return !!state.awaitingApprovalByConversation[key];
+  }
+
+  function markAssistantDeliveryPending(workspaceId, conversationId) {
+    var key = conversationReadKey(workspaceId, conversationId);
+    if (!key) {
+      return false;
+    }
+    var nextCount = Number(state.pendingAssistantDeliveryCountByConversation[key] || 0);
+    if (!isFinite(nextCount) || nextCount < 0) {
+      nextCount = 0;
+    }
+    state.pendingAssistantDeliveryCountByConversation[key] = nextCount + 1;
+    return true;
+  }
+
+  function clearAssistantDeliveryPending(workspaceId, conversationId) {
+    var key = conversationReadKey(workspaceId, conversationId);
+    if (!key) {
+      return false;
+    }
+    var count = Number(state.pendingAssistantDeliveryCountByConversation[key] || 0);
+    if (!isFinite(count) || count <= 0) {
+      return false;
+    }
+    if (count <= 1) {
+      delete state.pendingAssistantDeliveryCountByConversation[key];
+      return true;
+    }
+    state.pendingAssistantDeliveryCountByConversation[key] = count - 1;
+    return true;
+  }
+
+  function assistantDeliveryPendingCount(workspaceId, conversationId) {
+    var key = conversationReadKey(workspaceId, conversationId);
+    if (!key) {
+      return 0;
+    }
+    var count = Number(state.pendingAssistantDeliveryCountByConversation[key] || 0);
+    if (!isFinite(count) || count < 0) {
+      return 0;
+    }
+    return Math.floor(count);
   }
 
   function updateAwaitingApprovalFromQueueSnapshot(workspaceId, conversationId, snapshot) {
@@ -5828,7 +5871,7 @@
     if (isRunning) {
       summaryInner = "<span class='run-spinner' aria-hidden='true'></span><span class='run-summary-label meta-glimmer'>" + escHtml(summaryLabel) + "</span>";
     } else {
-      summaryInner = "<span class='run-rollup-line' aria-hidden='true'></span><span class='run-summary-label'>" + escHtml(summaryLabel) + "</span><span class='run-rollup-line' aria-hidden='true'></span>";
+      summaryInner = "<span class='run-summary-label'>" + escHtml(summaryLabel) + "</span>";
     }
     return "<details class='" + detailsClass + "' data-event-id='" + escAttr(eventId) + "'" + openAttr + startedAttr + "><summary>" + summaryInner + "</summary>" + sections + "</details>";
   }
@@ -5978,6 +6021,26 @@
       !!conversationApprovalRequest(conversation)
     );
     var queueAwaitingDecision = queueLastStatus === "awaiting_decision" || !!normalizeDecisionRequest(conversation && conversation.decision_request);
+    var pendingAssistantDelivery = assistantDeliveryPendingCount(workspaceId, conversationId) > 0;
+    var hasAssistantAfterAnchor = false;
+    var anchorIndex = Number(event.message_anchor);
+    if (!isFinite(anchorIndex) || anchorIndex < 0) {
+      anchorIndex = 0;
+    } else {
+      anchorIndex = Math.floor(anchorIndex);
+    }
+    if (conversation && Array.isArray(conversation.messages)) {
+      for (var msgIndex = anchorIndex; msgIndex < conversation.messages.length; msgIndex += 1) {
+        var anchoredMessage = conversation.messages[msgIndex] || {};
+        if (String(anchoredMessage.role || "") !== "assistant") {
+          continue;
+        }
+        if (trim(String(anchoredMessage.content || ""))) {
+          hasAssistantAfterAnchor = true;
+          break;
+        }
+      }
+    }
     html = "<article class='" + runClass + " run-narrative'>";
     if (queueRunning || queuePending > 0) {
       html += "<p class='run-line subtle'>Run step complete. Continuing...</p>";
@@ -5985,6 +6048,8 @@
       html += "<p class='run-line subtle'>Run paused. Awaiting command approval.</p>";
     } else if (queueAwaitingDecision) {
       html += "<p class='run-line subtle'>Run paused. Awaiting your decision.</p>";
+    } else if (pendingAssistantDelivery && !hasAssistantAfterAnchor) {
+      html += "<p class='run-line subtle'><span class='run-spinner' aria-hidden='true'></span>Finalizing response...</p>";
     } else if (runModelText) {
       html += "<p class='run-line subtle'>Model: " + escHtml(runModelText) + "</p>";
     }
@@ -13487,6 +13552,7 @@
     if (!promptForRun) {
       return Promise.reject(new Error("Prompt is empty."));
     }
+    markAssistantDeliveryPending(workspaceId, conversationId);
 
     for (var i = 0; i < attachmentList.length; i += 1) {
       var item = attachmentList[i] || {};
@@ -13885,6 +13951,9 @@
       })
       .finally(function () {
         stopStreamPoll();
+        if (clearAssistantDeliveryPending(workspaceId, conversationId)) {
+          renderUi();
+        }
       });
   }
 
