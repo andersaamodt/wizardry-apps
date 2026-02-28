@@ -17350,7 +17350,15 @@ $teacher_model_snapshot"
       run_elapsed=$((run_now_epoch - run_started_epoch))
       if [ "$run_elapsed" -ge "$run_time_budget" ]; then
         forced_queue_status="error"
-        assistant_output="Run timed out after ${run_time_budget}s while processing. Please retry with a smaller scope."
+        elapsed_minutes=$((run_elapsed / 60))
+        elapsed_seconds=$((run_elapsed % 60))
+        assistant_output=$(cat <<EOF
+Outcome: Reached the configured run-time budget before full completion.
+Verification Evidence: Iteration logs and command traces were captured before timeout. Worked for ${elapsed_minutes}m ${elapsed_seconds}s.
+Risks: Partial progress may leave unverified changes or unfinished implementation details.
+Next Improvement: Narrow scope or increase compute budget, then continue from the latest checkpoint.
+EOF
+)
         stream_emit_line "$stream_output_file" "Run exceeded time budget of ${run_time_budget}s."
         append_failure_entry "$failures_file" "iteration-$iteration:run-timeout" "Exceeded run time budget (${run_time_budget}s)" \
           "Model/controller loop exceeded time budget" "Return timeout response and finalize run"

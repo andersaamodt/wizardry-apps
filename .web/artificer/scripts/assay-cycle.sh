@@ -8,7 +8,7 @@ OUT_DIR="$ROOT_DIR/.web/artificer/.assay-reports"
 usage() {
   cat <<'EOF'
 Usage:
-  assay-cycle.sh run [--label NAME] [--timeout-sec N] [--run-budget-sec N] [--attempts N] [--mentor-from FILE]
+  assay-cycle.sh run [--label NAME] [--timeout-sec N] [--run-budget-sec N] [--attempts N] [--mentor-from FILE] [--max-tasks N]
   assay-cycle.sh compare --before FILE --after FILE
   assay-cycle.sh decisions [--label NAME]
 
@@ -164,6 +164,7 @@ run_cycle() {
   run_budget_sec=$3
   attempts=$4
   mentor_from=$5
+  max_tasks=$6
   mkdir -p "$OUT_DIR"
   out_file="$OUT_DIR/$label.tsv"
   tmp_tasks=$(mktemp)
@@ -179,8 +180,12 @@ run_cycle() {
 
   printf 'task\tmode\tbudget\tstatus\tcommands\tsteps\tstream_len\tassistant_len\tsections\tcontrol\tverification\truntime_line\tintelligence\tflow\n' > "$out_file"
 
+  processed_count=0
   while IFS='	' read -r task mode budget prompt; do
     [ -n "$task" ] || continue
+    if [ "$max_tasks" -gt 0 ] && [ "$processed_count" -ge "$max_tasks" ]; then
+      break
+    fi
     max_iterations=6
     case "$budget" in
       long) max_iterations=8 ;;
@@ -278,6 +283,7 @@ EOF
     [ -n "$best_row" ] || best_row="error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0"
     printf '%s\t%s\t%s\t%s\n' "$task" "$mode" "$budget" "$best_row" >> "$out_file"
     echo "cycle[$label] done: $task"
+    processed_count=$((processed_count + 1))
   done < "$tmp_tasks"
 
   rm -f "$tmp_tasks"
@@ -366,6 +372,7 @@ case "$mode" in
     run_budget_sec=120
     attempts=2
     mentor_from=""
+    max_tasks=0
     while [ $# -gt 0 ]; do
       case "$1" in
         --label)
@@ -388,6 +395,10 @@ case "$mode" in
           mentor_from=$2
           shift 2
           ;;
+        --max-tasks)
+          max_tasks=$2
+          shift 2
+          ;;
         *)
           echo "Unknown arg: $1" >&2
           usage
@@ -395,7 +406,12 @@ case "$mode" in
           ;;
       esac
     done
-    run_cycle "$label" "$task_timeout_sec" "$run_budget_sec" "$attempts" "$mentor_from"
+    case "$max_tasks" in
+      ""|*[!0-9]*)
+        max_tasks=0
+        ;;
+    esac
+    run_cycle "$label" "$task_timeout_sec" "$run_budget_sec" "$attempts" "$mentor_from" "$max_tasks"
     ;;
   compare)
     before=""
