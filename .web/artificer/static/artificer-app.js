@@ -779,7 +779,7 @@
   var dictationWaveBarPeakRaw = 0;
   var dictationWaveBarSumRaw = 0;
   var dictationWaveBarSampleCount = 0;
-  var DICTATION_WAVE_BAR_INTERVAL_MS = 72;
+  var DICTATION_WAVE_BAR_INTERVAL_MS = 84;
   var dictationWaveBackendPumpBusy = false;
   var dictationWaveBackendPumpAt = 0;
   var dictationPreparePromise = null;
@@ -7405,38 +7405,18 @@
         }
         dictationWaveLastSampleAt = sampleNow;
         var len = dictationWaveData.length;
-        var windowSamples = Math.min(192, len);
-        var from = Math.max(0, len - windowSamples);
+        var from = 0;
         var sum = 0;
-        var peak = 0;
-        var maxPos = -1;
-        var minNeg = 1;
-        var absSum = 0;
         var count = 0;
         for (var si = from; si < len; si += 1) {
           var centered = (Number(dictationWaveData[si] || 128) - 128) / 128;
           var mag = centered < 0 ? -centered : centered;
           sum += mag * mag;
-          absSum += mag;
-          if (mag > peak) {
-            peak = mag;
-          }
-          if (centered > maxPos) {
-            maxPos = centered;
-          }
-          if (centered < minNeg) {
-            minNeg = centered;
-          }
           count += 1;
         }
         var rms = count > 0 ? Math.sqrt(sum / count) : 0;
-        var meanAbs = count > 0 ? absSum / count : 0;
-        var peakToPeak = maxPos - minNeg;
-        if (!isFinite(peakToPeak) || peakToPeak < 0) {
-          peakToPeak = 0;
-        }
-        var crest = peak > rms ? (peak - rms) : 0;
-        var rawLevel = (meanAbs * 3.4) + (peakToPeak * 2.1) + (peak * 1.2) + (crest * 0.8);
+        // Envelope-only extraction (RMS) avoids phase/oscilloscope artifacts.
+        var rawLevel = rms * 3.6;
         if (rawLevel > Number(dictationWaveBarPeakRaw || 0)) {
           dictationWaveBarPeakRaw = rawLevel;
         }
@@ -7598,7 +7578,7 @@
         }
         var analyser = context.createAnalyser();
         analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.0;
+        analyser.smoothingTimeConstant = 0.35;
         var source = context.createMediaStreamSource(stream);
         source.connect(analyser);
         var data = new Uint8Array(analyser.fftSize);
