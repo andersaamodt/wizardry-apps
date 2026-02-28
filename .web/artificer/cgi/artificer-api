@@ -7532,27 +7532,36 @@ append_cancelled_run_event_for_stop() {
   if [ -z "$reason_clean" ]; then
     reason_clean="Run stopped."
   fi
+  now_epoch=$(date +%s 2>/dev/null || printf '0')
+  case "$now_epoch" in
+    ""|*[!0-9]*)
+      now_epoch=0
+      ;;
+  esac
+  elapsed=0
+  if [ "$running_started_epoch" -gt 0 ] && [ "$now_epoch" -gt "$running_started_epoch" ]; then
+    elapsed=$((now_epoch - running_started_epoch))
+  fi
+  elapsed_minutes=$((elapsed / 60))
+  elapsed_seconds=$((elapsed % 60))
   stop_note=$reason_clean
   summary_text=$reason_clean
   if ! printf '%s' "$reason_clean" | grep -Eq '^Outcome:[[:space:]]*'; then
-    now_epoch=$(date +%s 2>/dev/null || printf '0')
-    case "$now_epoch" in
-      ""|*[!0-9]*)
-        now_epoch=0
-        ;;
-    esac
-    elapsed=0
-    if [ "$running_started_epoch" -gt 0 ] && [ "$now_epoch" -gt "$running_started_epoch" ]; then
-      elapsed=$((now_epoch - running_started_epoch))
-    fi
-    elapsed_minutes=$((elapsed / 60))
-    elapsed_seconds=$((elapsed % 60))
     summary_text=$(cat <<EOF
 Outcome: Run was interrupted before full completion.
 Verification Evidence: Queue stop was applied while the run was active. Worked for ${elapsed_minutes}m ${elapsed_seconds}s.
 Risks: Partial progress may leave unverified changes or unfinished implementation details.
 Next Action: Resume from this checkpoint and prioritize one verifiable sub-goal first.
 Next Improvement: Resume from this checkpoint with a narrower scope or higher compute budget.
+EOF
+)
+  fi
+  if [ -z "$(trim "$stream_preview")" ]; then
+    ts_now=$(date +"%H:%M:%S" 2>/dev/null || printf '%s' "00:00:00")
+    stream_preview=$(cat <<EOF
+[$ts_now] Run interrupted before completion; checkpoint snapshot captured.
+[$ts_now] queue_stop executed to stop lingering run safely.
+[$ts_now] Worked for ${elapsed_minutes}m ${elapsed_seconds}s; next action recorded for resume.
 EOF
 )
   fi
