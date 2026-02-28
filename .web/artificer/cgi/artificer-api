@@ -7977,6 +7977,86 @@ extract_command_lines() {
   '
 }
 
+sanitize_controller_command_candidate() {
+  candidate_raw=$(trim "$1")
+  state_mode_hint=$(trim "$2")
+  if [ -z "$candidate_raw" ]; then
+    printf '%s' ""
+    return 0
+  fi
+
+  candidate=$(printf '%s\n' "$candidate_raw" | sed -E 's/^[[:space:]]*(command|cmd|run)[[:space:]]*:[[:space:]]*//I')
+  candidate=$(trim "$candidate")
+  if [ -z "$candidate" ]; then
+    printf '%s' ""
+    return 0
+  fi
+
+  lower=$(printf '%s' "$candidate" | tr '[:upper:]' '[:lower:]')
+  case "$lower" in
+    git\ checkout*|git\ switch*|git\ pull*|git\ push*|git\ merge*|git\ rebase*|git\ commit*)
+      printf '%s' "git status --short"
+      return 0
+      ;;
+    npm\ install*|pnpm\ install*|yarn\ install*|bun\ install*|pip\ install*|pip3\ install*)
+      if [ "$state_mode_hint" = "VERIFY" ]; then
+        printf '%s' "git status --short"
+      else
+        printf '%s' "find . -maxdepth 2 -type f"
+      fi
+      return 0
+      ;;
+  esac
+
+  first_word=$(printf '%s\n' "$candidate" | awk '{print $1}')
+  second_word=$(printf '%s\n' "$candidate" | awk '{print $2}')
+  if [ "$first_word" = "node" ] && [ -n "$second_word" ] && is_safe_relative_path "$second_word"; then
+    printf '%s' "node --check $second_word"
+    return 0
+  fi
+
+  candidate=$(printf '%s\n' "$candidate" | sed -E 's/[[:space:]]+(and[[:space:]]+then|then).*$//I')
+  candidate=$(trim "$candidate")
+  printf '%s' "$candidate"
+}
+
+sanitize_plan_update_text() {
+  raw_plan=$1
+  if [ -z "$(trim "$raw_plan")" ]; then
+    printf '%s' "$raw_plan"
+    return 0
+  fi
+  printf '%s\n' "$raw_plan" | awk '
+    BEGIN {
+      in_next_action = 0
+    }
+    function trim_local(value) {
+      gsub(/^[[:space:]]+/, "", value)
+      gsub(/[[:space:]]+$/, "", value)
+      return value
+    }
+    {
+      line = $0
+      if (line ~ /^Next Action:[[:space:]]*$/) {
+        in_next_action = 1
+        print line
+        next
+      }
+      if (in_next_action == 1 && line ~ /^[A-Z][A-Za-z ]+:[[:space:]]*$/) {
+        in_next_action = 0
+      }
+      if (in_next_action == 1) {
+        lower = tolower(trim_local(line))
+        if (lower ~ /\b(git checkout|git switch|npm install|yarn install|pnpm install|pip install)\b/) {
+          print "- Run safe read-only inspection commands, then refine implementation based on concrete findings."
+          next
+        }
+      }
+      print line
+    }
+  '
+}
+
 allowed_command() {
   cmd=$1
 
@@ -17607,6 +17687,7 @@ EOF
       patch_text=$(normalize_patch_text "$patch_section")
       done_claim=$(extract_section "DONE_CLAIM" "$iteration_output" | sed -n '1p' | tr 'A-Z' 'a-z' | awk '{print $1}')
       plan_update=$(extract_section "PLAN_UPDATE" "$iteration_output")
+      plan_update=$(sanitize_plan_update_text "$plan_update")
       checkpoint_text=$(extract_section "CHECKPOINT" "$iteration_output")
       decision_section=$(extract_section "DECISION_REQUEST" "$iteration_output")
       final_section=$(extract_section "FINAL" "$iteration_output")
@@ -17794,16 +17875,24 @@ $decision_options_preview"
           while IFS= read -r candidate_line; do
             candidate_line=$(trim "$candidate_line")
             [ -n "$candidate_line" ] || continue
+            original_candidate_line=$candidate_line
             candidate_line=$(normalize_workspace_paths_in_command "$candidate_line" "$workspace_path")
+            candidate_line=$(sanitize_controller_command_candidate "$candidate_line" "$state_mode")
             candidate_line=$(trim "$candidate_line")
             [ -n "$candidate_line" ] || continue
             if allowed_command "$candidate_line"; then
               printf '%s\n' "$candidate_line" >> "$command_lines_sanitized"
+              if [ "$candidate_line" != "$original_candidate_line" ]; then
+                append_failure_entry "$failures_file" "command-parse-iteration-$iteration" \
+                  "Rewrote command candidate to safe equivalent: $original_candidate_line -> $candidate_line" \
+                  "Controller proposed a command outside the mediated allowlist" \
+                  "Continue with rewritten safe command"
+              fi
             else
               append_failure_entry "$failures_file" "command-parse-iteration-$iteration" \
-                "Discarded malformed command candidate: $candidate_line" \
-                "Controller output included non-command text in COMMANDS section" \
-                "Use strict shell commands only or fallback defaults"
+                "Discarded disallowed command candidate: $candidate_line" \
+                "Controller output included commands outside the mediated allowlist" \
+                "Use strict read-only mediated commands or fallback defaults"
             fi
           done < "$command_lines_file"
           mv "$command_lines_sanitized" "$command_lines_file"
