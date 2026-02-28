@@ -9558,7 +9558,18 @@ execute_mediated_command() {
   command_mode=${6:-ask-some}
   blocked_file=${7:-}
   decision_hint_file=${8:-}
-  command_timeout_sec=25
+  command_timeout_sec=${ARTIFICER_COMMAND_TIMEOUT_SEC:-25}
+  case "$command_timeout_sec" in
+    ""|*[!0-9]*)
+      command_timeout_sec=25
+      ;;
+  esac
+  if [ "$command_timeout_sec" -lt 5 ]; then
+    command_timeout_sec=5
+  fi
+  if [ "$command_timeout_sec" -gt 90 ]; then
+    command_timeout_sec=90
+  fi
   first_word=$(printf '%s\n' "$tool_command" | awk '{print $1}')
 
   decision_file=$(mktemp)
@@ -16432,19 +16443,19 @@ $fallback_output"
     if [ "$assay_run_profile" -eq 1 ]; then
       case "$compute_budget" in
         quick)
-          assay_iteration_cap=3
+          assay_iteration_cap=2
           ;;
         standard|auto)
-          assay_iteration_cap=4
+          assay_iteration_cap=3
           ;;
         long)
-          assay_iteration_cap=5
+          assay_iteration_cap=3
           ;;
         until-complete)
           assay_iteration_cap=0
           ;;
         *)
-          assay_iteration_cap=5
+          assay_iteration_cap=3
           ;;
       esac
       if [ "$assay_iteration_cap" -gt 0 ] && [ "$max_iterations" -gt "$assay_iteration_cap" ]; then
@@ -16786,8 +16797,12 @@ EOF
         run_time_budget=900
         ;;
     esac
-    if [ "$run_time_budget" -lt 120 ]; then
-      run_time_budget=120
+    run_time_budget_floor=120
+    if [ "$assay_run_profile" -eq 1 ]; then
+      run_time_budget_floor=45
+    fi
+    if [ "$run_time_budget" -lt "$run_time_budget_floor" ]; then
+      run_time_budget=$run_time_budget_floor
     fi
     prompt_lower_budget_runtime=$(printf '%s' "$user_prompt" | tr '[:upper:]' '[:lower:]')
     if [ "$assay_run_profile" -ne 1 ]; then
@@ -16854,26 +16869,26 @@ EOF
     if [ "$assay_run_profile" -eq 1 ]; then
       case "$compute_budget" in
         quick)
-          assay_runtime_ceiling=90
+          assay_runtime_ceiling=70
           ;;
         standard|auto)
-          assay_runtime_ceiling=120
+          assay_runtime_ceiling=95
           ;;
         long)
-          assay_runtime_ceiling=180
+          assay_runtime_ceiling=125
           ;;
         until-complete)
-          assay_runtime_ceiling=260
+          assay_runtime_ceiling=160
           ;;
         *)
-          assay_runtime_ceiling=280
+          assay_runtime_ceiling=180
           ;;
       esac
       if printf '%s' "$prompt_lower_budget_runtime" | grep -Eq 'race|concurren|migration|idempotent|rollback|security|audit|failure recovery|fallback|benchmark|stress|flaky|end[- ]to[- ]end|contract tests?'; then
-        assay_runtime_ceiling=$((assay_runtime_ceiling + 30))
+        assay_runtime_ceiling=$((assay_runtime_ceiling + 20))
       fi
-      if [ "$assay_runtime_ceiling" -gt 300 ]; then
-        assay_runtime_ceiling=300
+      if [ "$assay_runtime_ceiling" -gt 220 ]; then
+        assay_runtime_ceiling=220
       fi
       if [ "$run_time_budget" -gt "$assay_runtime_ceiling" ]; then
         run_time_budget=$assay_runtime_ceiling
@@ -16883,15 +16898,22 @@ EOF
       run_time_budget=86400
     fi
     model_timeout_scale=1
-    case "$compute_budget" in
-      long)
-        model_timeout_scale=2
-        ;;
-      until-complete)
-        model_timeout_scale=3
-        ;;
-    esac
+    if [ "$assay_run_profile" -ne 1 ]; then
+      case "$compute_budget" in
+        long)
+          model_timeout_scale=2
+          ;;
+        until-complete)
+          model_timeout_scale=3
+          ;;
+      esac
+    fi
     export ARTIFICER_MODEL_TIMEOUT_SCALE=$model_timeout_scale
+    if [ "$assay_run_profile" -eq 1 ]; then
+      export ARTIFICER_COMMAND_TIMEOUT_SEC=14
+    else
+      unset ARTIFICER_COMMAND_TIMEOUT_SEC 2>/dev/null || true
+    fi
 
     quick_mode=${ARTIFICER_QUICK_MODE:-0}
     simple_direct_prompt=0

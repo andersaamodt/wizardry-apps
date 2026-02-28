@@ -1235,6 +1235,7 @@
       },
       uiPrefs: {},
       refreshInFlight: false,
+      statusRefreshSeq: 0,
       statusRenderSig: '',
       profilesRenderSig: '',
       actionsRenderSig: '',
@@ -6468,7 +6469,10 @@
     }
 
     async function refreshStatus() {
+      var reqSeq = (Number(state.statusRefreshSeq) || 0) + 1;
+      state.statusRefreshSeq = reqSeq;
       var nextStatus = await backendJson('status');
+      if (reqSeq !== state.statusRefreshSeq) return;
       var statusSig = stableStringify(nextStatus);
       if (statusSig && statusSig === state.statusRenderSig) return;
       state.statusRenderSig = statusSig;
