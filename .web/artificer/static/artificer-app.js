@@ -800,11 +800,7 @@
   var dictationWaveBarSumRaw = 0;
   var dictationWaveBarSampleCount = 0;
   var DICTATION_WAVE_BAR_INTERVAL_MS = 84;
-  var DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS = 3;
-  var DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE = 1;
   var dictationWaveBackendLastEmitAt = 0;
-  var dictationWaveBackendEmitQueue = [];
-  var dictationWaveBackendLastNormalized = 0;
   var dictationWaveSilencePhase = 0;
   var dictationWavePollInFlight = false;
   var dictationWaveBackendPumpBusy = false;
@@ -7340,8 +7336,6 @@
     dictationWaveBarSumRaw = 0;
     dictationWaveBarSampleCount = 0;
     dictationWaveBackendLastEmitAt = 0;
-    dictationWaveBackendEmitQueue = [];
-    dictationWaveBackendLastNormalized = 0;
     dictationWaveSilencePhase = 0;
     dictationWavePollInFlight = false;
     state.dictateWaveLevels = [];
@@ -7417,18 +7411,11 @@
     renderDictationWaveBars();
   }
 
-  function enqueueDictationWaveBackendLevels(normalizedLevelsInput) {
-    var incoming = Array.isArray(normalizedLevelsInput) ? normalizedLevelsInput : [];
-    if (!incoming.length) {
-      return;
-    }
-    var shapedIncoming = [];
-    var prevNormalized = Number(dictationWaveBackendLastNormalized || 0);
-    if (!isFinite(prevNormalized) || prevNormalized < 0) {
-      prevNormalized = 0;
-    } else if (prevNormalized > 1) {
-      prevNormalized = 1;
-    }
+  function applyDictationWaveBatch(levelsInput) {
+    var barCount = dictationWaveTargetBarCount();
+    var existing = syncDictationWaveLevelsLength(barCount).slice();
+    var incoming = Array.isArray(levelsInput) ? levelsInput : [];
+    var pushed = [];
     for (var i = 0; i < incoming.length; i += 1) {
       var level = Number(incoming[i] || 0);
       if (!isFinite(level) || level < 0) {
@@ -7436,38 +7423,75 @@
       } else if (level > 1) {
         level = 1;
       }
-      var delta = level - prevNormalized;
-      if (!isFinite(delta)) {
-        delta = 0;
-      } else if (delta < 0) {
-        delta = -delta;
+      if (level < 0.006) {
+        level = 0;
       }
-      // Slight transient emphasis makes adjacent bars reflect fast level changes.
-      var shaped = level + (delta * 0.52);
-      if (shaped > 1) {
-        shaped = 1;
+      pushed.push(level);
+    }
+    if (!pushed.length) {
+      return;
+    }
+    var framePeak = 0;
+    for (var pi = 0; pi < pushed.length; pi += 1) {
+      if (pushed[pi] > framePeak) {
+        framePeak = pushed[pi];
       }
-      shapedIncoming.push(shaped);
-      prevNormalized = level;
     }
-    dictationWaveBackendLastNormalized = prevNormalized;
-    if (shapedIncoming.length > DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS) {
-      shapedIncoming = shapedIncoming.slice(shapedIncoming.length - DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS);
+    if (!dictationWaveSeenSignal && framePeak >= 0.008) {
+      dictationWaveSeenSignal = true;
     }
-    var retained = Array.isArray(dictationWaveBackendEmitQueue) ? dictationWaveBackendEmitQueue.slice() : [];
-    var incomingFirst = Number(shapedIncoming[0] || 0);
-    var retainedLast = Number(retained.length ? retained[retained.length - 1] : 0);
-    if (isFinite(incomingFirst) && isFinite(retainedLast) && (incomingFirst - retainedLast > 0.08 || retainedLast - incomingFirst > 0.08)) {
-      // Large level jump: drop stale queued bars so UI reacts immediately.
-      retained = [];
+    var shift = pushed.length;
+    if (shift > barCount) {
+      pushed = pushed.slice(shift - barCount);
+      shift = pushed.length;
     }
-    if (retained.length > DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE) {
-      retained = retained.slice(retained.length - DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE);
+    var out = existing.slice(shift);
+    for (var ai = 0; ai < pushed.length; ai += 1) {
+      out.push(pushed[ai]);
     }
-    dictationWaveBackendEmitQueue = retained.concat(shapedIncoming);
-    if (dictationWaveBackendEmitQueue.length > DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS) {
-      dictationWaveBackendEmitQueue = dictationWaveBackendEmitQueue.slice(dictationWaveBackendEmitQueue.length - DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS);
+    while (out.length < barCount) {
+      out.unshift(0);
     }
+    state.dictateWaveLevels = out;
+    renderDictationWaveBars();
+  }
+
+  function emitDictationBackendBars(levelsInput, fallbackLevel) {
+    var now = Date.now();
+    var lastEmit = Number(dictationWaveBackendLastEmitAt || 0);
+    if (!isFinite(lastEmit) || lastEmit <= 0) {
+      dictationWaveBackendLastEmitAt = now;
+      return false;
+    }
+    var elapsed = now - lastEmit;
+    var barsDue = Math.floor(elapsed / DICTATION_WAVE_BAR_INTERVAL_MS);
+    if (!isFinite(barsDue) || barsDue < 1) {
+      return false;
+    }
+    if (barsDue > 4) {
+      barsDue = 4;
+    }
+    var source = Array.isArray(levelsInput) ? levelsInput : [];
+    var emit = [];
+    if (source.length) {
+      var start = source.length - barsDue;
+      if (start < 0) {
+        start = 0;
+      }
+      emit = source.slice(start);
+    }
+    var fallback = Number(fallbackLevel || 0);
+    if (!isFinite(fallback) || fallback < 0) {
+      fallback = 0;
+    } else if (fallback > 1) {
+      fallback = 1;
+    }
+    while (emit.length < barsDue) {
+      emit.unshift(fallback);
+    }
+    applyDictationWaveBatch(emit);
+    dictationWaveBackendLastEmitAt = now - (elapsed - (barsDue * DICTATION_WAVE_BAR_INTERVAL_MS));
+    return true;
   }
 
   function calibrateDictationWaveNoiseFloor(ambientProbe) {
@@ -7757,20 +7781,11 @@
       }
       if (normalizedSequence.length) {
         normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
-        enqueueDictationWaveBackendLevels(normalizedSequence);
       }
       dictationWaveBackendLevel = normalizedBackend;
       dictationWaveBackendLevelAt = Date.now();
       var lifted = mergedDictationWaveLevel(normalizedBackend);
-      var emitNow = Date.now();
-      if (emitNow - Number(dictationWaveBackendLastEmitAt || 0) >= DICTATION_WAVE_BAR_INTERVAL_MS) {
-        dictationWaveBackendLastEmitAt = emitNow;
-        var queuedLevel = Number(dictationWaveBackendEmitQueue.length ? dictationWaveBackendEmitQueue.shift() : lifted);
-        if (!isFinite(queuedLevel) || queuedLevel < 0) {
-          queuedLevel = lifted;
-        }
-        applyDictationWaveLevel(queuedLevel);
-      }
+      emitDictationBackendBars(normalizedSequence, lifted);
     }).catch(function () {
       return null;
     }).finally(function () {
@@ -7904,7 +7919,6 @@
               normalizedSequence.push(normalizedDictationBackendLevel(parsedIncoming[ni]));
             }
             dictationWaveBackendRecentLevels = parsedIncoming.slice(parsedIncoming.length - 18);
-            enqueueDictationWaveBackendLevels(normalizedSequence);
           }
           if (normalizedSequence.length) {
             normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
@@ -7914,15 +7928,7 @@
           var hasMicAnalyser = !!(dictationWaveAnalyser && dictationWaveData);
           if (!hasMicAnalyser) {
             var mergedBackendLevel = mergedDictationWaveLevel(normalizedBackend);
-            var emitNow = Date.now();
-            if (emitNow - Number(dictationWaveBackendLastEmitAt || 0) >= DICTATION_WAVE_BAR_INTERVAL_MS) {
-              dictationWaveBackendLastEmitAt = emitNow;
-              var queuedLevel = Number(dictationWaveBackendEmitQueue.length ? dictationWaveBackendEmitQueue.shift() : mergedBackendLevel);
-              if (!isFinite(queuedLevel) || queuedLevel < 0) {
-                queuedLevel = mergedBackendLevel;
-              }
-              applyDictationWaveLevel(queuedLevel);
-            }
+            emitDictationBackendBars(normalizedSequence, mergedBackendLevel);
           }
         }).catch(function () {
           return null;
