@@ -5374,7 +5374,7 @@ decision_prompt_has_missing_required_inputs() {
 decision_question_looks_required_input() {
   question_lower=$(lowercase_text "$1")
   if printf '%s' "$question_lower" | grep -Eq 'which|what|provide|enter|confirm|select'; then
-    if printf '%s' "$question_lower" | grep -Eq 'path|file|folder|directory|workspace|repo|branch|environment|env|url|domain|host|port|model|provider|token|api key|key|credential|secret|password|username|email'; then
+    if printf '%s' "$question_lower" | grep -Eq 'path|file|folder|directory|workspace|repo|branch|environment|env|url|domain|host|port|model|provider|token|api key|key|credential|secret|password|username|email|latency|throughput|slo|sla|target|baseline|region|tenant|service|schema|table'; then
       return 0
     fi
   fi

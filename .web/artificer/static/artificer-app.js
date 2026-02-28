@@ -13218,7 +13218,6 @@
             ) {
               assistantText = structuredRunFallbackMessage(fallbackAttemptCount);
               appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
-              cacheActiveConversationSnapshot(workspaceId, conversationId);
             }
             return null;
           })
