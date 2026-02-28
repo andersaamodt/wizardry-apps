@@ -6,7 +6,14 @@
   var submitInFlight = false;
 
   function isPostPage(pathname) {
-    return /^\/pages\/posts\/.+\.html$/.test(pathname || '');
+    var path = String(pathname || '');
+    if (/^\/pages\/posts\/.+\.html$/.test(path)) {
+      return true;
+    }
+    if (path === '/cgi/blog-open-post') {
+      return true;
+    }
+    return false;
   }
 
   function escapeHtml(value) {
@@ -54,7 +61,10 @@
 
   function renderPostMeta(current) {
     var summary = current.summary ? '<p class="post-context-summary">' + escapeHtml(current.summary) + '</p>' : '';
+    var author = current.author ? '<span class="post-context-author">' + escapeHtml(current.author) + '</span>' : '';
     var detail = [
+      author,
+      author ? '<span aria-hidden="true">•</span>' : '',
       '<span class="post-context-date">' + escapeHtml(current.published_date || '') + '</span>',
       '<span aria-hidden="true">•</span>',
       '<span class="post-context-reading">' + escapeHtml(String(current.reading_minutes || 1)) + ' min read</span>',
@@ -410,8 +420,19 @@
     if (!isPostPage(window.location.pathname)) {
       return;
     }
-
-    currentRelPath = window.location.pathname.replace(/^\/pages\/posts\//, '');
+    if (window.location.pathname === '/cgi/blog-open-post') {
+      var query = new URLSearchParams(window.location.search || '');
+      currentRelPath = query.get('path') || '';
+      currentRelPath = String(currentRelPath || '')
+        .replace(/^https?:\/\/[^/]+\//, '')
+        .replace(/^pages\/posts\//, '')
+        .replace(/^posts\//, '');
+    } else {
+      currentRelPath = window.location.pathname.replace(/^\/pages\/posts\//, '');
+    }
+    if (!currentRelPath) {
+      return;
+    }
     fetch('/cgi/blog-post-context?path=' + encodeURIComponent(currentRelPath), { credentials: 'same-origin' })
       .then(function (res) { return res.json(); })
       .then(function (data) {
