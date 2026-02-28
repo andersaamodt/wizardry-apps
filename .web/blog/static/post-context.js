@@ -93,10 +93,8 @@
     }
 
     var heading = document.querySelector('h1.title, h1');
-    if (!heading) {
-      return null;
-    }
     var footer = document.querySelector('.site-footer');
+    var nav = document.querySelector('.site-nav');
 
     var card = document.createElement('article');
     card.className = 'post-item post-single-item';
@@ -108,18 +106,34 @@
       '<h1 id="main-content" class="post-title">' + escapeHtml(current.title || document.title || 'Untitled') + '</h1>' +
       '<div class="post-author">' + escapeHtml(current.author || 'Blog Author') + '</div>' +
       '</div>' +
-      '<div class="post-meta"><span class="post-date">' + escapeHtml(current.published_date || '') + '</span></div>';
+      '<div class="post-meta"><span class="post-date">' + escapeHtml(current.published_date || '') + '</span> <span aria-hidden="true">•</span> <span class="post-context-reading">' + escapeHtml(String(current.reading_minutes || 1)) + ' min read</span></div>';
 
     var body = document.createElement('div');
     body.className = 'post-single-body';
 
-    var node = heading.nextSibling;
+    var node = nav ? nav.nextSibling : root.firstChild;
     while (node && node !== footer) {
       var next = node.nextSibling;
-      body.appendChild(node);
+      if (!(node.nodeType === 1 && node.classList && node.classList.contains('site-footer'))) {
+        body.appendChild(node);
+      }
       node = next;
     }
-    heading.remove();
+
+    var titleBlock = body.querySelector('#title-block-header');
+    if (titleBlock) {
+      titleBlock.remove();
+    }
+
+    if (heading && heading.parentNode && heading.parentNode !== card && heading.parentNode !== body) {
+      heading.remove();
+    }
+
+    Array.prototype.forEach.call(body.querySelectorAll('h1.title, p.author, p.date'), function (el) {
+      if (el && el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+    });
 
     card.appendChild(head);
     card.appendChild(body);
@@ -435,10 +449,6 @@
     var layout = ensureSinglePostCard(payload.current);
     if (!layout || !layout.body) {
       return;
-    }
-
-    if (!layout.body.querySelector('.post-context-card')) {
-      layout.body.insertAdjacentHTML('afterbegin', renderPostMeta(payload.current));
     }
 
     if (!layout.body.querySelector('.post-end-tags')) {
