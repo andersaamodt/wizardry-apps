@@ -7537,7 +7537,7 @@ normalize_run_event_status() {
 normalize_run_mode_name() {
   mode_value=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '\r')
   case "$mode_value" in
-    instant|auto|programming|chat|teacher|report|assistant)
+    instant|auto|programming|pentest|security-audit|chat|teacher|report|assistant)
       printf '%s' "$mode_value"
       ;;
     *)
@@ -7592,7 +7592,7 @@ compute_budget_iteration_cap() {
       printf '%s' "24"
       ;;
     until-complete)
-      printf '%s' "40"
+      printf '%s' "0"
       ;;
     *)
       printf '%s' "16"
@@ -7704,6 +7704,12 @@ run_mode_from_slash_tag() {
       ;;
     task|programming|program|code|dev)
       printf '%s' "programming"
+      ;;
+    pentest|redteam|red-team)
+      printf '%s' "pentest"
+      ;;
+    security-audit|security|audit|sec-audit)
+      printf '%s' "security-audit"
       ;;
     report)
       printf '%s' "report"
@@ -8792,6 +8798,24 @@ seed_missing_initial_message_if_needed() {
   if [ "$created" != "$updated" ]; then
     return 0
   fi
+  # Prevent duplicate-first-message races on freshly created threads.
+  now_epoch=$(date +%s 2>/dev/null || printf '0')
+  case "$created" in
+    ""|*[!0-9]*)
+      created=0
+      ;;
+  esac
+  case "$now_epoch" in
+    ""|*[!0-9]*)
+      now_epoch=0
+      ;;
+  esac
+  if [ "$created" -gt 0 ] && [ "$now_epoch" -gt 0 ]; then
+    created_age=$((now_epoch - created))
+    if [ "$created_age" -lt 180 ]; then
+      return 0
+    fi
+  fi
 
   queue_info=$(queue_state_for_conversation "$conv_dir")
   queue_pending=$(kv_get "pending" "$queue_info")
@@ -9778,6 +9802,24 @@ Run mode policy:
 - aggressively compress context to retain only actionable architecture state and open risks.
 EOF
       ;;
+    pentest)
+      cat <<'EOF'
+Run mode policy:
+- prioritize adversarial testing depth: enumerate exploit paths, abuse cases, and boundary failures.
+- pair each credible attack path with concrete mitigations and verification checks.
+- keep all testing scoped to safe internal validation; do not enable real-world abuse.
+- report findings with impact level, evidence, and remediation status.
+EOF
+      ;;
+    security-audit)
+      cat <<'EOF'
+Run mode policy:
+- prioritize systematic security review across auth, validation, secrets, and dependency risk.
+- produce auditable findings with severity, evidence, and mitigation guidance.
+- prefer least-privilege and defense-in-depth changes that are testable and reversible.
+- avoid speculative claims and clearly mark uncertainty when evidence is incomplete.
+EOF
+      ;;
     report)
       cat <<'EOF'
 Run mode policy:
@@ -9882,6 +9924,12 @@ refresh_context_memory_file() {
   case "$run_mode" in
     programming)
       mode_focus="- Preserve architecture quality and verify each step on large codebases."
+      ;;
+    pentest)
+      mode_focus="- Drive adversarial testing with explicit exploit-path evidence and mitigation closure."
+      ;;
+    security-audit)
+      mode_focus="- Audit security posture systematically and convert findings into verified hardening actions."
       ;;
     report)
       mode_focus="- Gather evidence, synthesize findings, and keep claims auditable."
@@ -15989,7 +16037,7 @@ $fallback_output"
     if [ "$run_mode" != "assistant" ]; then
       assistant_mode_id=""
     fi
-    if [ "$run_mode" != "programming" ]; then
+    if [ "$run_mode" != "programming" ] && [ "$run_mode" != "pentest" ] && [ "$run_mode" != "security-audit" ]; then
       programmer_review_enabled=0
       programmer_review_max_rounds=0
     fi
@@ -16081,6 +16129,22 @@ $fallback_output"
             max_iterations=8
           fi
           ;;
+        pentest)
+          reasoning_effort="extra-high"
+          if [ "$max_iterations" -lt 8 ]; then
+            max_iterations=8
+          fi
+          ;;
+        security-audit)
+          case "$reasoning_effort" in
+            low|medium)
+              reasoning_effort="high"
+              ;;
+          esac
+          if [ "$max_iterations" -lt 8 ]; then
+            max_iterations=8
+          fi
+          ;;
         chat)
           case "$reasoning_effort" in
             low) reasoning_effort="medium" ;;
@@ -16141,7 +16205,7 @@ $fallback_output"
       max_iterations=1
     fi
     max_iterations_cap=$(compute_budget_iteration_cap "$compute_budget")
-    if [ "$max_iterations" -gt "$max_iterations_cap" ]; then
+    if [ "$max_iterations_cap" -gt 0 ] && [ "$max_iterations" -gt "$max_iterations_cap" ]; then
       max_iterations=$max_iterations_cap
     fi
     if [ "$assay_run_profile" -eq 1 ]; then
@@ -16156,13 +16220,13 @@ $fallback_output"
           assay_iteration_cap=5
           ;;
         until-complete)
-          assay_iteration_cap=6
+          assay_iteration_cap=0
           ;;
         *)
           assay_iteration_cap=5
           ;;
       esac
-      if [ "$max_iterations" -gt "$assay_iteration_cap" ]; then
+      if [ "$assay_iteration_cap" -gt 0 ] && [ "$max_iterations" -gt "$assay_iteration_cap" ]; then
         max_iterations=$assay_iteration_cap
       fi
     fi
@@ -16524,6 +16588,16 @@ EOF
             run_time_budget=420
           fi
           ;;
+        pentest)
+          if [ "$run_time_budget" -lt 900 ]; then
+            run_time_budget=900
+          fi
+          ;;
+        security-audit)
+          if [ "$run_time_budget" -lt 900 ]; then
+            run_time_budget=900
+          fi
+          ;;
         report)
           if [ "$run_time_budget" -lt 900 ]; then
             run_time_budget=900
@@ -16631,6 +16705,14 @@ EOF
         quick_mode=0
         force_agent_execution=1
         ;;
+      pentest)
+        quick_mode=0
+        force_agent_execution=1
+        ;;
+      security-audit)
+        quick_mode=0
+        force_agent_execution=1
+        ;;
       chat)
         quick_mode=1
         simple_direct_prompt=1
@@ -16677,7 +16759,7 @@ EOF
     printf '%s\n' "$assay_task_id" > "$queue_last_assay_task_id_file"
     if [ -n "$assistant_mode_id" ]; then
       stream_emit_line "$stream_output_file" "Run mode: $run_mode (assistant_mode=$assistant_mode_id, advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations)"
-    elif [ "$run_mode" = "programming" ]; then
+    elif [ "$run_mode" = "programming" ] || [ "$run_mode" = "pentest" ] || [ "$run_mode" = "security-audit" ]; then
       stream_emit_line "$stream_output_file" "Run mode: $run_mode (advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations, code_review=${programmer_review_enabled}, review_rounds=${programmer_review_max_rounds})"
     else
       stream_emit_line "$stream_output_file" "Run mode: $run_mode (advanced_loop=${advanced_loop_raw:-auto}, reasoning=$reasoning_effort, compute_budget=$compute_budget, max_iterations=$max_iterations)"
@@ -16770,6 +16852,17 @@ EOF
       stream_emit_line "$stream_output_file" "Quick response mode selected."
       history_text=$(conversation_history "$conv_dir" | sed -n '1,160p')
       snapshot_text=$(workspace_snapshot "$workspace_path" | sed -n '1,160p')
+      quick_structure_hint=""
+      if printf '%s' "$user_prompt" | tr '[:upper:]' '[:lower:]' | grep -Eq 'build|design|implement|audit|test|fix|refactor|migration|security|pentest|verify|report|teach|challenge|hardening|failure|recovery'; then
+        quick_structure_hint=$(cat <<'EOF'
+For non-trivial requests, structure the reply with short headings:
+- Outcome:
+- Verification Evidence:
+- Risks:
+- Next Improvement:
+EOF
+)
+      fi
       quick_plan=$(cat <<EOF
 Goal:
 - $user_prompt
@@ -16798,6 +16891,7 @@ Output rules:
 - return only assistant reply text
 - do not prefix with "Assistant:" or "User:"
 - do not output control tokens like <end_of_text>
+$quick_structure_hint
 
 User request:
 $user_message_text
@@ -16813,6 +16907,7 @@ Output rules:
 - return only assistant reply text
 - do not prefix with "Assistant:" or "User:"
 - do not output control tokens like <end_of_text>
+$quick_structure_hint
 
 User request:
 $user_message_text
@@ -16828,6 +16923,7 @@ Output rules:
 - return only assistant reply text
 - do not prefix with "Assistant:" or "User:"
 - do not output control tokens like <end_of_text>
+$quick_structure_hint
 
 User request:
 $user_message_text

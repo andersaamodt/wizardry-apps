@@ -814,7 +814,7 @@
     {
       id: "security-audit",
       title: "Security Weakness Audit",
-      mode: "programming",
+      mode: "security-audit",
       compute_budget: "long",
       prompt: "Audit this project for one concrete security weakness class, implement a fix, and add tests that fail before and pass after."
     },
@@ -854,11 +854,11 @@
       prompt: "Teach a difficult subsystem as a mini lesson with misconceptions, checkpoints, and spaced recall prompts."
     },
     {
-      id: "chat-planning",
-      title: "Ambiguous Request Planning",
-      mode: "chat",
-      compute_budget: "quick",
-      prompt: "Handle an ambiguous user request by clarifying assumptions, proposing options, and selecting a pragmatic execution path."
+      id: "pentest-simulation",
+      title: "Adversarial Pentest Simulation",
+      mode: "pentest",
+      compute_budget: "long",
+      prompt: "Run a safe internal pentest simulation against likely attack surfaces in this project, propose concrete exploit paths, then implement and verify high-signal mitigations."
     }
   ];
   var ASSAY_TASK_COUNT = ASSAY_TASKS.length;
@@ -7132,10 +7132,10 @@
       var modeValue = normalizeRunMode(state.runMode);
       if (!state.programmerReviewEnabled) {
         el.programmerReviewHint.textContent = "Programming mode will skip built-in code review.";
-      } else if (modeValue === "programming") {
-        el.programmerReviewHint.textContent = "Programming mode will run a reviewer pass for up to " + state.programmerReviewRounds + " round" + (state.programmerReviewRounds === 1 ? "" : "s") + ".";
+      } else if (modeValue === "programming" || modeValue === "pentest" || modeValue === "security-audit") {
+        el.programmerReviewHint.textContent = "Current build mode will run a reviewer pass for up to " + state.programmerReviewRounds + " round" + (state.programmerReviewRounds === 1 ? "" : "s") + ".";
       } else {
-        el.programmerReviewHint.textContent = "Applies whenever Run mode is Programming.";
+        el.programmerReviewHint.textContent = "Applies whenever Run mode is Programming, Pentest, or Security Audit.";
       }
     }
   }
@@ -10577,6 +10577,12 @@
     if (value === "task" || value === "programming" || value === "program" || value === "code" || value === "dev") {
       return "programming";
     }
+    if (value === "pentest" || value === "redteam" || value === "red-team") {
+      return "pentest";
+    }
+    if (value === "security-audit" || value === "security" || value === "audit" || value === "sec-audit") {
+      return "security-audit";
+    }
     if (value === "report") {
       return "report";
     }
@@ -10754,6 +10760,8 @@
       value !== "instant" &&
       value !== "auto" &&
       value !== "programming" &&
+      value !== "pentest" &&
+      value !== "security-audit" &&
       value !== "chat" &&
       value !== "teacher" &&
       value !== "report" &&
@@ -10771,6 +10779,12 @@
     }
     if (value === "programming") {
       return "Programming";
+    }
+    if (value === "pentest") {
+      return "Pentest";
+    }
+    if (value === "security-audit") {
+      return "Security Audit";
     }
     if (value === "chat") {
       return "Chat";
@@ -10799,6 +10813,12 @@
     if (value === "programming") {
       return "Code-specialized loop with stronger execution and verification defaults. Inline tag: /task";
     }
+    if (value === "pentest") {
+      return "Adversarial security testing mode for exploit-path discovery and mitigation validation. Inline tag: /pentest";
+    }
+    if (value === "security-audit") {
+      return "Systematic security audit mode for risk analysis, hardening, and evidence-backed remediation. Inline tag: /security-audit";
+    }
     if (value === "chat") {
       return "Human conversation mode. Direct assistant-style responses. Inline tag: /chat";
     }
@@ -10825,6 +10845,12 @@
     }
     if (value === "programming") {
       return { advancedLoop: true, reasoning: "high", minIterations: 6, maxIterations: 12 };
+    }
+    if (value === "pentest") {
+      return { advancedLoop: true, reasoning: "extra-high", minIterations: 8, maxIterations: 16 };
+    }
+    if (value === "security-audit") {
+      return { advancedLoop: true, reasoning: "high", minIterations: 8, maxIterations: 16 };
     }
     if (value === "chat") {
       return { advancedLoop: false, reasoning: "medium", minIterations: 1, maxIterations: 2 };
@@ -11151,13 +11177,13 @@
     if (reviewRounds > 0) {
       intelligence += 5;
     }
-    if ((mode === "programming" || mode === "report") && commandCount >= 2) {
+    if ((mode === "programming" || mode === "report" || mode === "pentest" || mode === "security-audit") && commandCount >= 2) {
       intelligence += 10;
     }
-    if ((mode === "programming" || mode === "report") && commandCount >= 6) {
+    if ((mode === "programming" || mode === "report" || mode === "pentest" || mode === "security-audit") && commandCount >= 6) {
       intelligence += 6;
     }
-    if ((mode === "programming" || mode === "report") && commandCount === 0 && status === "done") {
+    if ((mode === "programming" || mode === "report" || mode === "pentest" || mode === "security-audit") && commandCount === 0 && status === "done") {
       intelligence -= 8;
     }
 
@@ -11207,7 +11233,7 @@
     } else {
       focus.push({ id: "step_coverage", label: "Increase step-by-step trace coverage while thinking." });
     }
-    if ((mode === "programming" || mode === "report") && commandCount < 2) {
+    if ((mode === "programming" || mode === "report" || mode === "pentest" || mode === "security-audit") && commandCount < 2) {
       focus.push({ id: "execution_depth", label: "Increase concrete command-level execution depth." });
     }
     if (status === "error" || status === "cancelled" || status === "awaiting_approval" || status === "awaiting_decision") {
@@ -12948,12 +12974,12 @@
         state.activeConversationId = response.conversation.id;
         state.activeConversation = null;
 
-        return loadState().then(function () {
+        // Avoid loading the brand-new thread before enqueue: backend recovery seeding
+        // can create a duplicate first user message when the queue write follows.
+        return loadState({ fast: true }).then(function () {
           state.activeWorkspaceId = workspaceId;
           state.activeConversationId = response.conversation.id;
-          return loadConversation().then(function () {
-            return response.conversation.id;
-          });
+          return response.conversation.id;
         });
       });
     });
@@ -13374,7 +13400,11 @@
     var programmerReviewRoundsForRun = explicitProgrammerReviewRoundsOverride !== null
       ? explicitProgrammerReviewRoundsOverride
       : normalizeProgrammerReviewRoundsValue(state.programmerReviewRounds);
-    if (normalizeRunMode(runProfile.mode) !== "programming") {
+    if (
+      normalizeRunMode(runProfile.mode) !== "programming" &&
+      normalizeRunMode(runProfile.mode) !== "pentest" &&
+      normalizeRunMode(runProfile.mode) !== "security-audit"
+    ) {
       programmerReviewEnabledForRun = false;
     }
     if (!programmerReviewEnabledForRun) {
@@ -13393,9 +13423,9 @@
       } else if (computeBudgetForRun === "long") {
         assayIterationCap = 4;
       } else if (computeBudgetForRun === "until-complete") {
-        assayIterationCap = 5;
+        assayIterationCap = 0;
       }
-      if (selectedIterations > assayIterationCap) {
+      if (assayIterationCap > 0 && selectedIterations > assayIterationCap) {
         selectedIterations = assayIterationCap;
       }
       if (selectedIterations < 1) {
@@ -13782,7 +13812,7 @@
     var normalizedProgrammerReviewRounds = normalizeProgrammerReviewRoundsValue(
       typeof programmerReviewRounds === "undefined" ? state.programmerReviewRounds : programmerReviewRounds
     );
-    if (normalizedMode !== "programming") {
+    if (normalizedMode !== "programming" && normalizedMode !== "pentest" && normalizedMode !== "security-audit") {
       normalizedProgrammerReview = false;
     }
     if (!normalizedProgrammerReview) {
