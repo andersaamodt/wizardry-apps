@@ -5288,6 +5288,17 @@ decision_prompt_has_missing_required_inputs() {
   if printf '%s' "$prompt_lower" | grep -Eq 'missing|required[^.\n]{0,40}(input|value|detail|parameter|field|secret|credential)|not provided|unknown|unspecified|tbd|todo|redacted|provide later|ask me'; then
     return 0
   fi
+  # Domain-specific missing-context heuristics for high-order tasks.
+  if printf '%s' "$prompt_lower" | grep -Eq '\b(migration|migrate|schema change|db migration|database migration)\b'; then
+    if ! printf '%s' "$prompt_lower" | grep -Eq '\b(postgres|postgresql|mysql|mariadb|sqlite|mongodb|dynamodb|table|column|index|constraint|from[[:space:]]+v?[0-9]+|to[[:space:]]+v?[0-9]+|version|ddl)\b'; then
+      return 0
+    fi
+  fi
+  if printf '%s' "$prompt_lower" | grep -Eq '\b(legal filing|contract|regulatory filing|compliance letter)\b'; then
+    if ! printf '%s' "$prompt_lower" | grep -Eq '\b(jurisdiction|state|country|agency|court|deadline|statute|case number)\b'; then
+      return 0
+    fi
+  fi
   return 1
 }
 
@@ -5327,7 +5338,7 @@ decision_request_category_for_prompt() {
     printf '%s' "explicit-choice"
     return 0
   fi
-  if decision_prompt_has_missing_required_inputs "$prompt_text" && decision_question_looks_required_input "$question_text"; then
+  if decision_prompt_has_missing_required_inputs "$prompt_text"; then
     printf '%s' "required-input-missing"
     return 0
   fi
