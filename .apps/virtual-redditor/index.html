@@ -123,26 +123,19 @@
                 </div>
               </div>
 
-              <div class="persona-section-title">Persona Style</div>
+              <div class="persona-section-title">Personality</div>
               <div class="mode-fields-inline modes-grid persona-style-main-grid">
-                <div class="mode-field-row">
-                  <label for="behavior-personality" class="mode-field-label">Personality</label>
+                <div class="mode-field-row persona-row-traits">
+                  <label for="btn-traits-edit" class="mode-field-label" title="Select personality traits that shape style and contextual summons.">Traits</label>
                   <div class="mode-field-control-wrap">
-                    <select id="behavior-personality">
-                      <option value="typical_redditor">Typical Redditor</option>
-                      <option value="academic">Academic</option>
-                      <option value="helpful_peer">Helpful Peer</option>
-                      <option value="curious">Curious</option>
-                      <option value="skeptical_debater">Skeptical Debater</option>
-                      <option value="builder_operator">Technical Pragmatist</option>
-                      <option value="community_regular">Community Regular</option>
-                      <option value="troll">Troll</option>
-                      <option value="other">Ethos &amp; Instructions only</option>
-                    </select>
-                    <div id="behavior-personality-warning" class="persona-style-warning hidden"></div>
+                    <div class="traits-inline">
+                      <div id="traits-summary" class="traits-summary" title="Currently selected personality traits.">No traits selected.</div>
+                      <button id="btn-traits-edit" type="button" class="inline-link-btn" title="Edit personality traits">Edit traits...</button>
+                    </div>
+                    <div id="behavior-traits-warning" class="persona-style-warning hidden"></div>
                   </div>
                 </div>
-                <div class="mode-field-row">
+                <div class="mode-field-row persona-row-strength">
                   <label for="behavior-personality-strength" class="mode-field-label">Personality strength</label>
                   <select id="behavior-personality-strength">
                     <option value="subtle">Subtle</option>
@@ -150,7 +143,38 @@
                     <option value="strong">Intense</option>
                   </select>
                 </div>
-                <div class="mode-field-row">
+                <div class="mode-field-row persona-row-predominance">
+                  <label for="trait-predominance-btn" class="mode-field-label" title="How selected traits combine during replies.">Predominance</label>
+                  <div class="persona-predominance-inline">
+                    <input id="behavior-trait-predominance" type="hidden" value="blend">
+                    <div id="trait-predominance-dropdown" class="mode-dropdown">
+                      <button id="trait-predominance-btn" type="button" class="mode-dropdown-btn" aria-haspopup="menu" aria-expanded="false" title="How selected traits combine during replies."></button>
+                      <div id="trait-predominance-menu" class="mode-dropdown-menu hidden" role="menu" aria-label="Trait predominance options">
+                        <button type="button" class="mode-option" data-trait-predominance-option="blend" title="No single lead; selected traits co-express.">
+                          <span class="mode-option-name">Blend</span>
+                          <span class="mode-option-desc">No lead trait; all co-express.</span>
+                        </button>
+                        <button type="button" class="mode-option" data-trait-predominance-option="contextual" title="Selects a lead trait per reply from context.">
+                          <span class="mode-option-name">Contextual</span>
+                          <span class="mode-option-desc">Lead trait chosen per reply.</span>
+                        </button>
+                        <button type="button" class="mode-option" data-trait-predominance-option="stable" title="Keeps one lead trait for all replies.">
+                          <span class="mode-option-name">Stable</span>
+                          <span class="mode-option-desc">Same lead trait each reply.</span>
+                        </button>
+                        <button type="button" class="mode-option" data-trait-predominance-option="adaptive" title="Keeps a lead trait, then changes only when context shifts.">
+                          <span class="mode-option-name">Adaptive</span>
+                          <span class="mode-option-desc">Keeps lead style; shifts on context change.</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div id="trait-primary-shell" class="trait-primary-shell hidden">
+                      <label for="behavior-trait-primary" class="mode-field-label" title="Primary trait used when predominance needs one.">Primary</label>
+                      <select id="behavior-trait-primary" title="Primary trait used when predominance needs one."></select>
+                    </div>
+                  </div>
+                </div>
+                <div class="mode-field-row persona-row-humor-style">
                   <label for="behavior-humor-style" class="mode-field-label">Humor style</label>
                   <div class="mode-field-control-wrap">
                     <select id="behavior-humor-style">
@@ -165,7 +189,7 @@
                     <div id="behavior-humor-style-warning" class="persona-style-warning hidden"></div>
                   </div>
                 </div>
-                <div class="mode-field-row">
+                <div class="mode-field-row persona-row-humor-amount">
                   <label for="behavior-humor-amount" class="mode-field-label">Humor amount</label>
                   <select id="behavior-humor-amount">
                     <option value="none">None</option>
@@ -175,7 +199,7 @@
                     <option value="always">Always</option>
                   </select>
                 </div>
-                <div class="mode-field-row">
+                <div class="mode-field-row persona-row-tone">
                   <label for="behavior-mirror-tone" class="mode-field-label">Tone</label>
                   <div class="mode-field-control-wrap">
                     <select id="behavior-mirror-tone">
@@ -231,7 +255,7 @@
                     </select>
                   </div>
                 </div>
-                <div class="mode-field-row">
+                <div class="mode-field-row persona-row-bigfive">
                   <label for="behavior-bigfive-enabled" class="mode-field-label">Big Five</label>
                   <div class="bigfive-inline">
                     <label class="schedule-toggle" title="Enable OCEAN personality controls for this bot.">
@@ -353,6 +377,25 @@
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </aside>
+            <aside id="persona-traits-drawer" class="mode-detail-drawer persona-traits-drawer" aria-hidden="true">
+              <div class="mode-detail-drawer-head">
+                <div class="mode-detail-drawer-title">Personality Traits</div>
+                <div class="mode-detail-drawer-head-right">
+                  <button id="btn-persona-traits-close" type="button" class="mode-detail-drawer-close" aria-label="Close personality traits panel" title="Close personality traits panel">✕</button>
+                </div>
+              </div>
+              <div class="mode-detail-drawer-body">
+                <div id="traits-summons-warning" class="traits-summons-warning hidden" role="status"></div>
+                <div class="mode-drawer-block">
+                  <div class="mode-drawer-helper">Enable traits and choose whether each trait affects style, summons, or both.</div>
+                  <div class="traits-editor-head">
+                    <span>Trait</span>
+                    <span>Expression</span>
+                  </div>
+                  <div id="traits-editor-list" class="traits-editor-list"></div>
                 </div>
               </div>
             </aside>
