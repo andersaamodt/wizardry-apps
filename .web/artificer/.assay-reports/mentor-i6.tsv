@@ -1,0 +1,13 @@
+task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
+deterministic-tests	report	standard	done	3	43	2835	436	1	1	1	1	100	85
+concurrency-race	assistant	standard	done	3	48	2634	390	1	1	1	1	100	85
+api-hardening	programming	standard	error	3	57	2419	369	1	1	1	1	61	85
+migration-safe	assistant	standard	done	3	46	2596	436	1	1	1	1	100	85
+perf-regression	report	standard	done	4	42	2700	390	1	1	1	1	100	85
+security-audit	security-audit	standard	error	4	91	2776	401	1	1	1	1	61	85
+refactor-boundaries	assistant	standard	done	5	61	2786	435	1	1	1	1	100	85
+failure-recovery	programming	standard	error	4	68	2799	369	1	1	1	1	61	85
+spec-to-code	assistant	standard	done	6	51	2582	436	1	1	1	1	100	85
+report-trace	report	standard	done	2	53	2479	390	1	1	1	1	100	85
+teacher-explain	teacher	standard	done	5	48	2242	436	1	1	1	1	100	85
+pentest-simulation	pentest	standard	error	4	73	2753	369	1	1	1	1	61	85

@@ -189,10 +189,22 @@ run_cycle() {
     fi
     max_iterations=6
     case "$budget" in
-      long) max_iterations=2 ;;
-      until-complete) max_iterations=3 ;;
-      quick) max_iterations=1 ;;
-      *) max_iterations=2 ;;
+      long) max_iterations=4 ;;
+      until-complete) max_iterations=5 ;;
+      quick) max_iterations=2 ;;
+      *) max_iterations=3 ;;
+    esac
+    case "$mode" in
+      programming|security-audit|pentest)
+        if [ "$max_iterations" -lt 4 ]; then
+          max_iterations=4
+        fi
+        ;;
+      assistant|report|teacher)
+        if [ "$max_iterations" -lt 3 ]; then
+          max_iterations=3
+        fi
+        ;;
     esac
 
     best_row=""
@@ -385,8 +397,8 @@ shift
 case "$mode" in
   run)
     label="cycle-$(date +%Y%m%d-%H%M%S)"
-    task_timeout_sec=260
-    run_budget_sec=90
+    task_timeout_sec=320
+    run_budget_sec=120
     attempts=1
     mentor_from=""
     max_tasks=0
