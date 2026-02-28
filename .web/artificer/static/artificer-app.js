@@ -7680,7 +7680,10 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var gate = (floor * 1.08) + 0.0003;
+    var gate = (floor * 1.18) + 0.0004;
+    if (raw <= gate) {
+      return 0;
+    }
     var signal = raw - gate;
     if (signal < 0) {
       signal = 0;
@@ -7695,7 +7698,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.5);
     }
-    if (normalized < 0.0015) {
+    if (normalized < 0.0022) {
       normalized = 0;
     }
     return normalized;
@@ -7712,7 +7715,10 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var gate = (floor * 1.18) + 0.0006;
+    var gate = (floor * 1.36) + 0.001;
+    if (raw <= gate) {
+      return 0;
+    }
     var normalized = (raw - gate) / Math.max(0.01, (0.072 + (floor * 2.4)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
@@ -7722,7 +7728,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.58);
     }
-    if (normalized < 0.0012) {
+    if (normalized < 0.002) {
       normalized = 0;
     }
     return normalized;
@@ -7793,7 +7799,7 @@
     var now = Date.now();
     var micLevel = 0;
     var backendLevel = 0;
-    var micFresh = now - Number(dictationWaveMicLevelAt || 0) <= 220;
+    var micFresh = now - Number(dictationWaveMicLevelAt || 0) <= 150;
     if (micFresh) {
       micLevel = Number(dictationWaveMicLevel || 0);
       if (!isFinite(micLevel) || micLevel < 0) {
@@ -7802,7 +7808,7 @@
         micLevel = 1;
       }
     }
-    if (now - Number(dictationWaveBackendLevelAt || 0) <= 280) {
+    if (now - Number(dictationWaveBackendLevelAt || 0) <= 170) {
       backendLevel = Number(dictationWaveBackendLevel || 0);
       if (!isFinite(backendLevel) || backendLevel < 0) {
         backendLevel = 0;
@@ -7882,7 +7888,7 @@
       }
       dictationWaveBackendLevel = normalizedBackend;
       dictationWaveBackendLevelAt = Date.now();
-      var lifted = mergedDictationWaveLevel(Math.max(normalizedBackend, polledLevel * 0.9));
+      var lifted = mergedDictationWaveLevel(normalizedBackend);
       var emitNow = Date.now();
       if (emitNow - Number(dictationWaveBackendLastEmitAt || 0) >= DICTATION_WAVE_BAR_INTERVAL_MS) {
         dictationWaveBackendLastEmitAt = emitNow;
