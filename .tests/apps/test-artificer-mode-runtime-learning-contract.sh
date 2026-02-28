@@ -46,6 +46,7 @@ assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_query_response()"
 assert_contains "$mode_runtime_lib" "controller-stagnation"
 assert_contains "$mode_runtime_lib" "mr_improvement_proposal_generate_from_taxonomy_json()"
 assert_contains "$mode_runtime_lib" "mr_improvement_proposal_set_status()"
+assert_contains "$mode_runtime_lib" "mr_improvement_proposal_exists_for_category_and_mode()"
 assert_contains "$mode_runtime_lib" "manual_confirm=1 is required for apply"
 assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_dir()"
 assert_contains "$mode_runtime_lib" "mr_improvement_proposals_dir()"
@@ -59,6 +60,7 @@ assert_contains "$mode_runtime_lib" "mr_quality_scorecard_maybe_raise_regression
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_recent_regression_stats_for_mode()"
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_regression_cooldown_remaining_sec()"
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_set_regression_cooldown_for_mode()"
+assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_top_category_for_mode()"
 assert_contains "$mode_runtime_lib" "regression-proposal-cooldowns.tsv"
 assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_recent_summary_text()"
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_recent_summary_text()"
@@ -86,6 +88,8 @@ assert_contains "$api" "mr_controller_variant_record_run"
 assert_contains "$api" "stagnation_repeat_count=0"
 assert_contains "$api" "Loop stagnation detected; injecting anti-repeat guardrail."
 assert_contains "$api" 'iteration-$iteration:loop-stagnation'
+assert_contains "$mode_runtime_lib" 'category_id=$(mr_failure_taxonomy_top_category_for_mode "$run_mode" "24")'
+assert_contains "$mode_runtime_lib" 'mr_improvement_proposal_exists_for_category_and_mode "$category_id" "$run_mode" "quality-scorecard"'
 assert_contains "$api" 'runtime_failure_summary=$(mr_failure_taxonomy_recent_summary_text "6")'
 assert_contains "$api" 'runtime_quality_summary=$(mr_quality_scorecard_recent_summary_text "8")'
 assert_contains "$api" 'runtime_guardrails=$(mr_runtime_learning_guardrails_text)'
@@ -114,6 +118,7 @@ assert_contains "$ui_js" "data-action='mode-runtime-controller-rollback'"
 assert_contains "$ui_js" "manual_apply_only"
 assert_contains "$ui_js" "failure_taxonomy"
 assert_contains "$ui_js" "improvement_proposals"
+assert_contains "$ui_js" "source_mode"
 assert_contains "$ui_js" "controller_variants"
 assert_contains "$ui_js" "quality_scorecard"
 

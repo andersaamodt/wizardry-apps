@@ -2613,6 +2613,7 @@
         risk_level: trim(String(proposalItem.risk_level || "medium")),
         status: trim(String(proposalItem.status || "proposed")),
         source: trim(String(proposalItem.source || "manual")),
+        source_mode: trim(String(proposalItem.source_mode || "")),
         created_at: trim(String(proposalItem.created_at || "")),
         updated_at: trim(String(proposalItem.updated_at || "")),
         applied_at: trim(String(proposalItem.applied_at || "")),
@@ -17150,9 +17151,13 @@
         for (var p = 0; p < proposalItems.length && p < 14; p += 1) {
           var proposal = proposalItems[p] || {};
           var proposalStatus = trim(String(proposal.status || "proposed")).toLowerCase();
+          var proposalSourceSummary = "source: " + String(proposal.source || "manual");
+          if (proposal.source_mode) {
+            proposalSourceSummary += " (" + String(proposal.source_mode) + " mode)";
+          }
           proposalHtml += "<article class='mode-runtime-proposal-item'>";
           proposalHtml += "<div class='mode-runtime-mode-head'><strong>" + escHtml(proposal.title || proposal.id || "Proposal") + "</strong><span class='mode-runtime-chip'>" + escHtml(proposalStatus) + "</span></div>";
-          proposalHtml += "<p class='settings-hint'>scope: " + escHtml(String(proposal.scope || "other")) + " | risk: " + escHtml(String(proposal.risk_level || "medium")) + " | source: " + escHtml(String(proposal.source || "manual")) + "</p>";
+          proposalHtml += "<p class='settings-hint'>scope: " + escHtml(String(proposal.scope || "other")) + " | risk: " + escHtml(String(proposal.risk_level || "medium")) + " | " + escHtml(proposalSourceSummary) + "</p>";
           if (proposal.taxonomy_category_label) {
             proposalHtml += "<p class='settings-hint'>taxonomy: " + escHtml(String(proposal.taxonomy_category_label || proposal.taxonomy_category || "")) + "</p>";
           }

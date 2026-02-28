@@ -898,24 +898,55 @@ mr_failure_taxonomy_recent_guardrails_text() {
   printf '%s' "$out"
 }
 
-mr_improvement_proposal_exists_for_category() {
-  category_id=$1
-  [ -n "$category_id" ] || return 1
+mr_improvement_proposal_exists_for_category_and_mode() {
+  category_id=$(trim "${1:-}")
+  mode_filter=$(trim "${2:-}")
+  source_filter=$(trim "${3:-}")
+  [ -n "$category_id$mode_filter$source_filter" ] || return 1
   for proposal_dir in "$(mr_improvement_proposals_dir)"/*; do
     [ -d "$proposal_dir" ] || continue
     meta_file="$proposal_dir/meta.env"
     [ -f "$meta_file" ] || continue
     proposal_category=$(mr_env_get "$meta_file" "taxonomy_category" "")
     proposal_status=$(mr_env_get "$meta_file" "status" "proposed")
-    if [ "$proposal_category" = "$category_id" ]; then
-      case "$proposal_status" in
-        proposed|accepted|applied)
-          return 0
-          ;;
-      esac
+    proposal_source=$(mr_env_get "$meta_file" "source" "manual")
+    proposal_mode=$(mr_env_get "$meta_file" "source_mode" "")
+    proposal_title=$(mr_env_get "$meta_file" "title" "")
+    case "$proposal_status" in
+      proposed|accepted|applied) ;;
+      *)
+        continue
+        ;;
+    esac
+    if [ -n "$source_filter" ] && [ "$proposal_source" != "$source_filter" ]; then
+      continue
     fi
+    if [ -n "$category_id" ] && [ "$proposal_category" != "$category_id" ]; then
+      continue
+    fi
+    if [ -n "$mode_filter" ]; then
+      if [ -n "$proposal_mode" ]; then
+        if [ "$proposal_mode" != "$mode_filter" ]; then
+          continue
+        fi
+      else
+        case "$proposal_title" in
+          *"in ${mode_filter} mode"*) ;;
+          *)
+            continue
+            ;;
+        esac
+      fi
+    fi
+    return 0
   done
   return 1
+}
+
+mr_improvement_proposal_exists_for_category() {
+  category_id=$1
+  [ -n "$category_id" ] || return 1
+  mr_improvement_proposal_exists_for_category_and_mode "$category_id" "" ""
 }
 
 mr_improvement_proposal_create() {
@@ -926,6 +957,7 @@ mr_improvement_proposal_create() {
   risk_level_text=$(mr_sanitize_inline "$5")
   source_text=$(mr_sanitize_inline "$6")
   category_id=$(trim "${7:-}")
+  source_mode=$(mr_sanitize_inline "${8:-}")
 
   [ -n "$title_text" ] || title_text="Untitled improvement proposal"
   [ -n "$rationale_text" ] || rationale_text="No rationale supplied."
@@ -942,6 +974,9 @@ mr_improvement_proposal_create() {
   esac
   if [ -n "$category_id" ] && ! valid_id "$category_id"; then
     category_id=""
+  fi
+  if [ -n "$source_mode" ] && ! valid_id "$source_mode"; then
+    source_mode=""
   fi
 
   proposal_id=$(printf '%s' "proposal-$(mr_new_id)" | tr -cd 'a-zA-Z0-9._-')
@@ -967,6 +1002,7 @@ mr_improvement_proposal_create() {
     printf 'updated_at=%s\n' "$now_iso"
     printf 'applied_at=\n'
     printf 'taxonomy_category=%s\n' "$category_id"
+    printf 'source_mode=%s\n' "$source_mode"
     printf 'rationale=%s\n' "$rationale_text"
     printf 'proposed_change=%s\n' "$proposed_change_text"
   } > "$meta_file"
@@ -980,6 +1016,9 @@ mr_improvement_proposal_create() {
     printf 'Source: %s\n' "$source_text"
     if [ -n "$category_id" ]; then
       printf 'Taxonomy category: %s\n' "$category_id"
+    fi
+    if [ -n "$source_mode" ]; then
+      printf 'Source mode: %s\n' "$source_mode"
     fi
     printf 'Created: %s\n\n' "$now_iso"
     printf '## Rationale\n- %s\n\n' "$rationale_text"
@@ -1055,6 +1094,7 @@ mr_improvement_proposals_items_json() {
       risk_level_text=$(mr_env_get "$meta_file" "risk_level" "medium")
       status_value=$(mr_env_get "$meta_file" "status" "proposed")
       source_text=$(mr_env_get "$meta_file" "source" "manual")
+      source_mode=$(mr_env_get "$meta_file" "source_mode" "")
       created_at=$(mr_env_get "$meta_file" "created_at" "")
       updated_at=$(mr_env_get "$meta_file" "updated_at" "")
       applied_at=$(mr_env_get "$meta_file" "applied_at" "")
@@ -1066,13 +1106,14 @@ mr_improvement_proposals_items_json() {
         printf ','
       fi
       first=0
-      printf '{"id":"%s","title":"%s","scope":"%s","risk_level":"%s","status":"%s","source":"%s","created_at":"%s","updated_at":"%s","applied_at":"%s","taxonomy_category":"%s","taxonomy_category_label":"%s","rationale":"%s","proposed_change":"%s"}' \
+      printf '{"id":"%s","title":"%s","scope":"%s","risk_level":"%s","status":"%s","source":"%s","source_mode":"%s","created_at":"%s","updated_at":"%s","applied_at":"%s","taxonomy_category":"%s","taxonomy_category_label":"%s","rationale":"%s","proposed_change":"%s"}' \
         "$(json_escape "$proposal_id")" \
         "$(json_escape "$title_text")" \
         "$(json_escape "$scope_text")" \
         "$(json_escape "$risk_level_text")" \
         "$(json_escape "$status_value")" \
         "$(json_escape "$source_text")" \
+        "$(json_escape "$source_mode")" \
         "$(json_escape "$created_at")" \
         "$(json_escape "$updated_at")" \
         "$(json_escape "$applied_at")" \
@@ -1705,6 +1746,85 @@ mr_failure_taxonomy_latest_category_id() {
   printf '%s' "$category_id"
 }
 
+mr_failure_taxonomy_top_category_for_mode() {
+  run_mode_filter=$(trim "${1:-}")
+  max_rows_raw=${2:-24}
+  max_rows=$(mr_positive_int_or "$max_rows_raw" "24")
+  if [ "$max_rows" -gt 120 ]; then
+    max_rows=120
+  fi
+  events_file=$(mr_failure_taxonomy_events_file)
+  if [ ! -s "$events_file" ]; then
+    printf '%s' "unknown"
+    return 0
+  fi
+  if [ -z "$run_mode_filter" ] || [ "$run_mode_filter" = "unknown" ]; then
+    mr_failure_taxonomy_latest_category_id
+    return 0
+  fi
+  run_mode_filter=$(printf '%s' "$run_mode_filter" | tr '[:upper:]' '[:lower:]')
+  recent_file=$(mktemp)
+  mode_events_file=$(mktemp)
+  stats_file=$(mktemp)
+  tab_char=$(printf '\t')
+  awk -F"$tab_char" -v run_mode_filter="$run_mode_filter" '
+    NF >= 6 {
+      mode_value = tolower($6)
+      if (mode_value == run_mode_filter) {
+        print
+      }
+    }
+  ' "$events_file" > "$mode_events_file"
+  if [ -s "$mode_events_file" ]; then
+    tail -n "$max_rows" "$mode_events_file" > "$recent_file" 2>/dev/null || : > "$recent_file"
+  else
+    : > "$recent_file"
+  fi
+  awk -F"$tab_char" -v run_mode_filter="$run_mode_filter" '
+    NF >= 6 {
+      mode_value = tolower($6)
+      if (mode_value != run_mode_filter) {
+        next
+      }
+      category = $3
+      if (category == "") {
+        category = "unknown"
+      }
+      severity = tolower($5)
+      sev_rank = 1
+      if (severity == "high") {
+        sev_rank = 3
+      } else if (severity == "medium") {
+        sev_rank = 2
+      }
+      counts[category] += 1
+      if (sev_rank > sev[category]) {
+        sev[category] = sev_rank
+      }
+      epoch_value = $1 + 0
+      if (epoch_value > last_epoch[category]) {
+        last_epoch[category] = epoch_value
+      }
+    }
+    END {
+      for (category in counts) {
+        printf "%s\t%s\t%s\t%s\n", counts[category], sev[category], last_epoch[category], category
+      }
+    }
+  ' "$recent_file" | sort -t "$tab_char" -k1,1nr -k2,2nr -k3,3nr -k4,4 > "$stats_file"
+
+  top_category=""
+  if [ -s "$stats_file" ]; then
+    top_category=$(awk -F"$tab_char" 'NF >= 4 { print $4; exit }' "$stats_file")
+  fi
+  rm -f "$recent_file" "$mode_events_file" "$stats_file"
+  top_category=$(trim "$top_category")
+  if [ -z "$top_category" ]; then
+    top_category="unknown"
+  fi
+  printf '%s' "$top_category"
+}
+
 mr_quality_scorecard_last_quality_for_mode() {
   run_mode=$1
   run_id_exclude=$2
@@ -2053,16 +2173,26 @@ mr_quality_scorecard_maybe_raise_regression_proposal() {
     return 0
   fi
 
-  category_id=$(mr_failure_taxonomy_latest_category_id)
-  if [ -n "$category_id" ] && mr_improvement_proposal_exists_for_category "$category_id"; then
+  category_id=$(mr_failure_taxonomy_top_category_for_mode "$run_mode" "24")
+  category_id=$(trim "$category_id")
+  if [ "$category_id" = "unknown" ]; then
+    category_id=""
+  fi
+  if [ -n "$category_id" ] && mr_improvement_proposal_exists_for_category_and_mode "$category_id" "$run_mode" "quality-scorecard"; then
     return 0
   fi
   title_text="Investigate quality regression in ${run_mode} mode"
   rationale_text="Quality score regressed (quality=${quality_score}, delta=${delta_score}) with final_state=${final_state}; recent_window=${regression_window} total=${recent_total} regressive=${recent_regressive} severe=${recent_severe} avg_delta=${recent_avg_delta}."
   change_text="Review recent failures and tighten controller policy/verification flow for ${run_mode} mode to recover quality and reduce repeated breakdowns."
   scope_text="controller-loop"
+  if [ "$category_id" = "verification-regression" ]; then
+    scope_text="verification"
+  fi
   risk_text="medium"
-  proposal_id=$(mr_improvement_proposal_create "$title_text" "$rationale_text" "$change_text" "$scope_text" "$risk_text" "quality-scorecard" "$category_id" 2>/dev/null || true)
+  if [ "$current_severe" = "1" ]; then
+    risk_text="high"
+  fi
+  proposal_id=$(mr_improvement_proposal_create "$title_text" "$rationale_text" "$change_text" "$scope_text" "$risk_text" "quality-scorecard" "$category_id" "$run_mode" 2>/dev/null || true)
   if [ -n "$proposal_id" ]; then
     mr_quality_scorecard_set_regression_cooldown_for_mode "$run_mode" >/dev/null 2>&1 || true
   fi
