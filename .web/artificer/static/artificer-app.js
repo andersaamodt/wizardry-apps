@@ -800,8 +800,8 @@
   var dictationWaveBarSumRaw = 0;
   var dictationWaveBarSampleCount = 0;
   var DICTATION_WAVE_BAR_INTERVAL_MS = 84;
-  var DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS = 6;
-  var DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE = 2;
+  var DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS = 3;
+  var DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE = 1;
   var dictationWaveBackendLastEmitAt = 0;
   var dictationWaveBackendEmitQueue = [];
   var dictationWaveBackendLastNormalized = 0;
@@ -7443,7 +7443,7 @@
         delta = -delta;
       }
       // Slight transient emphasis makes adjacent bars reflect fast level changes.
-      var shaped = level + (delta * 0.38);
+      var shaped = level + (delta * 0.52);
       if (shaped > 1) {
         shaped = 1;
       }
@@ -7455,6 +7455,12 @@
       shapedIncoming = shapedIncoming.slice(shapedIncoming.length - DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS);
     }
     var retained = Array.isArray(dictationWaveBackendEmitQueue) ? dictationWaveBackendEmitQueue.slice() : [];
+    var incomingFirst = Number(shapedIncoming[0] || 0);
+    var retainedLast = Number(retained.length ? retained[retained.length - 1] : 0);
+    if (isFinite(incomingFirst) && isFinite(retainedLast) && (incomingFirst - retainedLast > 0.08 || retainedLast - incomingFirst > 0.08)) {
+      // Large level jump: drop stale queued bars so UI reacts immediately.
+      retained = [];
+    }
     if (retained.length > DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE) {
       retained = retained.slice(retained.length - DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE);
     }
