@@ -8272,15 +8272,6 @@
         parts.push("Code review off");
       }
     }
-    var assayTaskId = normalizeAssayTaskId(item && item.assay_task_id);
-    if (assayTaskId) {
-      var assayTask = assayTaskById(assayTaskId);
-      if (assayTask && assayTask.title) {
-        parts.push("Assay: " + assayTask.title);
-      } else {
-        parts.push("Assay: " + assayTaskId);
-      }
-    }
     if (item && Array.isArray(item.explicit_skill_ids) && item.explicit_skill_ids.length) {
       parts.push(String(item.explicit_skill_ids.length) + " skill" + (item.explicit_skill_ids.length === 1 ? "" : "s"));
     }
