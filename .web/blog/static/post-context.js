@@ -79,18 +79,24 @@
   }
 
   function ensureSinglePostCard(current) {
-    var anchor = document.querySelector('#main-content') || document.body;
-    if (!anchor) {
+    var root = document.body;
+    if (!root) {
       return null;
     }
-    var existingCard = anchor.querySelector('.post-single-item');
+    var existingCard = root.querySelector('.post-single-item');
     if (existingCard) {
       return {
-        anchor: anchor,
+        anchor: root,
         card: existingCard,
         body: existingCard.querySelector('.post-single-body') || existingCard
       };
     }
+
+    var heading = document.querySelector('h1.title, h1');
+    if (!heading) {
+      return null;
+    }
+    var footer = document.querySelector('.site-footer');
 
     var card = document.createElement('article');
     card.className = 'post-item post-single-item';
@@ -99,7 +105,7 @@
     head.className = 'post-head';
     head.innerHTML =
       '<div class="post-head-main">' +
-      '<h1 class="post-title">' + escapeHtml(current.title || document.title || 'Untitled') + '</h1>' +
+      '<h1 id="main-content" class="post-title">' + escapeHtml(current.title || document.title || 'Untitled') + '</h1>' +
       '<div class="post-author">' + escapeHtml(current.author || 'Blog Author') + '</div>' +
       '</div>' +
       '<div class="post-meta"><span class="post-date">' + escapeHtml(current.published_date || '') + '</span></div>';
@@ -107,20 +113,23 @@
     var body = document.createElement('div');
     body.className = 'post-single-body';
 
-    while (anchor.firstChild) {
-      body.appendChild(anchor.firstChild);
+    var node = heading.nextSibling;
+    while (node && node !== footer) {
+      var next = node.nextSibling;
+      body.appendChild(node);
+      node = next;
     }
-
-    var oldHeading = body.querySelector('h1[id], h1');
-    if (oldHeading) {
-      oldHeading.remove();
-    }
+    heading.remove();
 
     card.appendChild(head);
     card.appendChild(body);
-    anchor.appendChild(card);
+    if (footer && footer.parentNode) {
+      footer.parentNode.insertBefore(card, footer);
+    } else {
+      root.appendChild(card);
+    }
 
-    return { anchor: anchor, card: card, body: body };
+    return { anchor: root, card: card, body: body };
   }
 
   function renderNostrProof(nostr) {
