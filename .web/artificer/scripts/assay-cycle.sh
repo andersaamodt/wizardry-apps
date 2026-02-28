@@ -8,7 +8,7 @@ OUT_DIR="$ROOT_DIR/.web/artificer/.assay-reports"
 usage() {
   cat <<'EOF'
 Usage:
-  assay-cycle.sh run [--label NAME] [--timeout-sec N] [--run-budget-sec N]
+  assay-cycle.sh run [--label NAME] [--timeout-sec N] [--run-budget-sec N] [--attempts N]
   assay-cycle.sh compare --before FILE --after FILE
 
 Examples:
@@ -37,6 +37,18 @@ run_with_timeout() {
   timeout_sec=$1
   shift
   perl -e 'alarm shift @ARGV; exec @ARGV' "$timeout_sec" "$@"
+}
+
+status_rank() {
+  case "$1" in
+    done) printf '%s' "6" ;;
+    awaiting_approval|awaiting_decision) printf '%s' "5" ;;
+    error) printf '%s' "4" ;;
+    cancelled) printf '%s' "3" ;;
+    timeout) printf '%s' "2" ;;
+    running) printf '%s' "1" ;;
+    *) printf '%s' "0" ;;
+  esac
 }
 
 task_table() {
@@ -113,6 +125,7 @@ run_cycle() {
   label=$1
   task_timeout_sec=$2
   run_budget_sec=$3
+  attempts=$4
   mkdir -p "$OUT_DIR"
   out_file="$OUT_DIR/$label.tsv"
   tmp_tasks=$(mktemp)
@@ -130,13 +143,6 @@ run_cycle() {
 
   while IFS='	' read -r task mode budget prompt; do
     [ -n "$task" ] || continue
-    conv_json=$(post_api "action=new_conversation&workspace_id=$(urlenc "$ws_id")&title=$(urlenc "$task")" | json_only)
-    conv_id=$(printf '%s' "$conv_json" | jq -r '.conversation.id')
-    if [ -z "$conv_id" ] || [ "$conv_id" = "null" ]; then
-      printf '%s\t%s\t%s\terror\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\n' "$task" "$mode" "$budget" >> "$out_file"
-      continue
-    fi
-
     max_iterations=6
     case "$budget" in
       long) max_iterations=8 ;;
@@ -145,42 +151,89 @@ run_cycle() {
       *) max_iterations=6 ;;
     esac
 
-    body="action=run&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")&prompt=$(urlenc "$prompt")&run_mode=$(urlenc "$mode")&compute_budget=$(urlenc "$budget")&advanced_loop=1&max_iterations=$max_iterations&programmer_review=1&programmer_review_rounds=2&assay_task_id=$(urlenc "$task")"
-    timed_out=0
-    if ! run_with_timeout "$task_timeout_sec" sh -c "ARTIFICER_RUN_TIME_BUDGET_SEC=$run_budget_sec REQUEST_METHOD=POST \"$API\" <<'EOF' >/dev/null
+    best_row=""
+    best_rank=-1
+    attempt=1
+    while [ "$attempt" -le "$attempts" ]; do
+      conv_json=$(post_api "action=new_conversation&workspace_id=$(urlenc "$ws_id")&title=$(urlenc "$task")" | json_only)
+      conv_id=$(printf '%s' "$conv_json" | jq -r '.conversation.id')
+      if [ -z "$conv_id" ] || [ "$conv_id" = "null" ]; then
+        row="error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0"
+        current_rank=$(status_rank "error")
+        if [ "$current_rank" -gt "$best_rank" ]; then
+          best_rank=$current_rank
+          best_row=$row
+        fi
+        break
+      fi
+
+      timeout_this=$task_timeout_sec
+      budget_this=$run_budget_sec
+      case "$budget" in
+        long)
+          timeout_this=$((timeout_this + 12))
+          budget_this=$((budget_this + 15))
+          ;;
+        until-complete)
+          timeout_this=$((timeout_this + 18))
+          budget_this=$((budget_this + 20))
+          ;;
+      esac
+      if [ "$attempt" -gt 1 ]; then
+        timeout_this=$((timeout_this + (attempt - 1) * 10))
+        budget_this=$((budget_this + (attempt - 1) * 10))
+      fi
+
+      body="action=run&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")&prompt=$(urlenc "$prompt")&run_mode=$(urlenc "$mode")&compute_budget=$(urlenc "$budget")&advanced_loop=1&max_iterations=$max_iterations&programmer_review=1&programmer_review_rounds=2&assay_task_id=$(urlenc "$task")"
+      timed_out=0
+      if ! run_with_timeout "$timeout_this" sh -c "ARTIFICER_RUN_TIME_BUDGET_SEC=$budget_this REQUEST_METHOD=POST \"$API\" <<'EOF' >/dev/null
 $body
 EOF
 " 2>/dev/null; then
-      timed_out=1
-    fi
+        timed_out=1
+      fi
 
-    if [ "$timed_out" -eq 1 ]; then
-      post_api "action=queue_stop&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" >/dev/null || true
-    fi
+      if [ "$timed_out" -eq 1 ]; then
+        post_api "action=queue_stop&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" >/dev/null || true
+      fi
 
-    settle_try=0
-    state_json=""
-    while [ "$settle_try" -lt 8 ]; do
+      settle_try=0
+      state_json=""
+      while [ "$settle_try" -lt 8 ]; do
+        queue_json=$(post_api "action=queue_list&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" | json_only)
+        queue_running=$(printf '%s' "$queue_json" | jq -r '.queue_running // 0')
+        if [ "$queue_running" != "1" ]; then
+          break
+        fi
+        sleep 0.4
+        settle_try=$((settle_try + 1))
+      done
       queue_json=$(post_api "action=queue_list&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" | json_only)
-      queue_running=$(printf '%s' "$queue_json" | jq -r '.queue_running // 0')
-      if [ "$queue_running" != "1" ]; then
+      queue_last_status=$(printf '%s' "$queue_json" | jq -r '.queue_last_status // "unknown"')
+      state_json=$(post_api "action=get_conversation&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" | json_only)
+      event_json=$(printf '%s' "$state_json" | jq -c '.conversation.run_events[-1] // {}')
+      row=$(printf '%s' "$event_json" | score_row_from_event_json)
+      event_status=$(printf '%s' "$event_json" | jq -r '.status // "unknown"')
+      if [ "$event_status" = "running" ] && [ -n "$queue_last_status" ] && [ "$queue_last_status" != "running" ] && [ "$queue_last_status" != "unknown" ]; then
+        row=$(printf '%s' "$row" | awk -F '\t' -v s="$queue_last_status" 'BEGIN{OFS=FS}{$1=s; print}')
+      elif [ "$event_status" = "running" ] && [ "$timed_out" -eq 1 ]; then
+        row=$(printf '%s' "$row" | awk -F '\t' 'BEGIN{OFS=FS}{$1="timeout"; print}')
+      fi
+
+      this_status=$(printf '%s' "$row" | awk -F '\t' '{print $1}')
+      this_rank=$(status_rank "$this_status")
+      if [ "$this_rank" -gt "$best_rank" ]; then
+        best_rank=$this_rank
+        best_row=$row
+      fi
+      if [ "$this_status" = "done" ]; then
         break
       fi
-      sleep 0.4
-      settle_try=$((settle_try + 1))
+      attempt=$((attempt + 1))
     done
-    queue_json=$(post_api "action=queue_list&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" | json_only)
-    queue_last_status=$(printf '%s' "$queue_json" | jq -r '.queue_last_status // "unknown"')
-    state_json=$(post_api "action=get_conversation&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" | json_only)
-    event_json=$(printf '%s' "$state_json" | jq -c '.conversation.run_events[-1] // {}')
-    row=$(printf '%s' "$event_json" | score_row_from_event_json)
-    event_status=$(printf '%s' "$event_json" | jq -r '.status // "unknown"')
-    if [ "$event_status" = "running" ] && [ -n "$queue_last_status" ] && [ "$queue_last_status" != "running" ] && [ "$queue_last_status" != "unknown" ]; then
-      row=$(printf '%s' "$row" | awk -F '\t' -v s="$queue_last_status" 'BEGIN{OFS=FS}{$1=s; print}')
-    elif [ "$event_status" = "running" ] && [ "$timed_out" -eq 1 ]; then
-      row=$(printf '%s' "$row" | awk -F '\t' 'BEGIN{OFS=FS}{$1="timeout"; print}')
-    fi
-    printf '%s\t%s\t%s\t%s\n' "$task" "$mode" "$budget" "$row" >> "$out_file"
+
+    [ -n "$best_row" ] || best_row="error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0"
+    printf '%s\t%s\t%s\t%s\n' "$task" "$mode" "$budget" "$best_row" >> "$out_file"
     echo "cycle[$label] done: $task"
   done < "$tmp_tasks"
 
@@ -221,6 +274,7 @@ case "$mode" in
     label="cycle-$(date +%Y%m%d-%H%M%S)"
     task_timeout_sec=210
     run_budget_sec=120
+    attempts=2
     while [ $# -gt 0 ]; do
       case "$1" in
         --label)
@@ -235,6 +289,10 @@ case "$mode" in
           run_budget_sec=$2
           shift 2
           ;;
+        --attempts)
+          attempts=$2
+          shift 2
+          ;;
         *)
           echo "Unknown arg: $1" >&2
           usage
@@ -242,7 +300,7 @@ case "$mode" in
           ;;
       esac
     done
-    run_cycle "$label" "$task_timeout_sec" "$run_budget_sec"
+    run_cycle "$label" "$task_timeout_sec" "$run_budget_sec" "$attempts"
     ;;
   compare)
     before=""
