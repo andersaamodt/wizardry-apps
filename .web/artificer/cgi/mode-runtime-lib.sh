@@ -555,6 +555,17 @@ mr_failure_taxonomy_recent_json() {
 
   recent_file=$(mktemp)
   tail -n "$max_rows" "$events_file" > "$recent_file" 2>/dev/null || : > "$recent_file"
+  rows_json=$(mr_failure_taxonomy_rows_file_to_json "$recent_file")
+  rm -f "$recent_file"
+  printf '%s' "$rows_json"
+}
+
+mr_failure_taxonomy_rows_file_to_json() {
+  rows_file=$1
+  if [ ! -s "$rows_file" ]; then
+    printf '[]'
+    return 0
+  fi
   tab_char=$(printf '\t')
 
   printf '['
@@ -578,13 +589,13 @@ mr_failure_taxonomy_recent_json() {
       "$(json_escape "$error_text")" \
       "$(json_escape "$hypothesis_text")" \
       "$(json_escape "$next_text")"
-  done < "$recent_file"
+  done < "$rows_file"
   printf ']'
-  rm -f "$recent_file"
 }
 
 mr_failure_taxonomy_state_json() {
   events_file=$(mr_failure_taxonomy_events_file)
+  events_path="$events_file"
   total_entries=0
   last_recorded_at=""
   if [ -f "$events_file" ]; then
@@ -598,11 +609,135 @@ mr_failure_taxonomy_state_json() {
     fi
   fi
 
-  printf '{"total":"%s","last_recorded_at":"%s","categories":%s,"recent":%s}' \
+  printf '{"total":"%s","last_recorded_at":"%s","events_path":"%s","categories":%s,"recent":%s}' \
     "$(json_escape "$total_entries")" \
     "$(json_escape "$last_recorded_at")" \
+    "$(json_escape "$events_path")" \
     "$(mr_failure_taxonomy_categories_json "12")" \
     "$(mr_failure_taxonomy_recent_json "16")"
+}
+
+mr_failure_taxonomy_query_json() {
+  category_filter=$(trim "${1:-}")
+  severity_filter=$(trim "${2:-}")
+  surface_filter=$(trim "${3:-}")
+  mode_filter=$(trim "${4:-}")
+  since_epoch_raw=$(trim "${5:-}")
+  limit_raw=$(trim "${6:-50}")
+
+  category_filter=$(printf '%s' "$category_filter" | tr '[:upper:]' '[:lower:]')
+  severity_filter=$(printf '%s' "$severity_filter" | tr '[:upper:]' '[:lower:]')
+  surface_filter=$(printf '%s' "$surface_filter" | tr '[:upper:]' '[:lower:]')
+  mode_filter=$(printf '%s' "$mode_filter" | tr '[:upper:]' '[:lower:]')
+  case "$category_filter" in
+    ""|all) category_filter="" ;;
+  esac
+  case "$severity_filter" in
+    ""|all|low|medium|high) ;;
+    *) severity_filter="" ;;
+  esac
+  case "$surface_filter" in
+    ""|all) surface_filter="" ;;
+  esac
+  case "$mode_filter" in
+    ""|all) mode_filter="" ;;
+  esac
+
+  since_epoch=$(mr_nonnegative_int_or "$since_epoch_raw" "0")
+  limit_value=$(mr_positive_int_or "$limit_raw" "50")
+  if [ "$limit_value" -gt 250 ]; then
+    limit_value=250
+  fi
+
+  events_file=$(mr_failure_taxonomy_events_file)
+  events_path="$events_file"
+  if [ ! -s "$events_file" ]; then
+    printf '{"filters":{"category":"%s","severity":"%s","surface":"%s","mode":"%s","since_epoch":"%s","limit":"%s"},"events_path":"%s","matched_total":"0","returned":"0","events":[]}' \
+      "$(json_escape "$category_filter")" \
+      "$(json_escape "$severity_filter")" \
+      "$(json_escape "$surface_filter")" \
+      "$(json_escape "$mode_filter")" \
+      "$(json_escape "$since_epoch")" \
+      "$(json_escape "$limit_value")" \
+      "$(json_escape "$events_path")"
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  matched_file=$(mktemp)
+  sliced_file=$(mktemp)
+  ordered_file=$(mktemp)
+
+  awk -F"$tab_char" \
+    -v category_filter="$category_filter" \
+    -v severity_filter="$severity_filter" \
+    -v surface_filter="$surface_filter" \
+    -v mode_filter="$mode_filter" \
+    -v since_epoch="$since_epoch" '
+    NF >= 10 {
+      epoch_value = $1 + 0
+      category_value = tolower($3)
+      surface_value = tolower($4)
+      severity_value = tolower($5)
+      mode_value = tolower($6)
+
+      if (since_epoch > 0 && epoch_value < since_epoch) {
+        next
+      }
+      if (category_filter != "" && category_value != category_filter) {
+        next
+      }
+      if (severity_filter != "" && severity_value != severity_filter) {
+        next
+      }
+      if (surface_filter != "" && surface_value != surface_filter) {
+        next
+      }
+      if (mode_filter != "" && mode_value != mode_filter) {
+        next
+      }
+      print $0
+    }
+  ' "$events_file" > "$matched_file"
+
+  matched_total=$(wc -l < "$matched_file" 2>/dev/null | tr -d '[:space:]')
+  case "$matched_total" in
+    ""|*[!0-9]*) matched_total=0 ;;
+  esac
+
+  if [ "$matched_total" -gt 0 ]; then
+    tail -n "$limit_value" "$matched_file" > "$sliced_file" 2>/dev/null || : > "$sliced_file"
+    awk '
+      { rows[NR] = $0 }
+      END {
+        for (i = NR; i >= 1; i--) {
+          print rows[i]
+        }
+      }
+    ' "$sliced_file" > "$ordered_file"
+  else
+    : > "$ordered_file"
+  fi
+
+  returned_total=$(wc -l < "$ordered_file" 2>/dev/null | tr -d '[:space:]')
+  case "$returned_total" in
+    ""|*[!0-9]*) returned_total=0 ;;
+  esac
+
+  events_json=$(mr_failure_taxonomy_rows_file_to_json "$ordered_file")
+  rm -f "$matched_file" "$sliced_file" "$ordered_file"
+
+  printf '{"filters":{"category":"%s","severity":"%s","surface":"%s","mode":"%s","since_epoch":"%s","limit":"%s"},"events_path":"%s","matched_total":"%s","returned":"%s","events":%s}' \
+    "$(json_escape "$category_filter")" \
+    "$(json_escape "$severity_filter")" \
+    "$(json_escape "$surface_filter")" \
+    "$(json_escape "$mode_filter")" \
+    "$(json_escape "$since_epoch")" \
+    "$(json_escape "$limit_value")" \
+    "$(json_escape "$events_path")" \
+    "$(json_escape "$matched_total")" \
+    "$(json_escape "$returned_total")" \
+    "$events_json"
 }
 
 mr_failure_taxonomy_recent_summary_text() {
@@ -4244,6 +4379,17 @@ mr_mode_runtime_tick_response() {
 
 mr_failure_taxonomy_state_response() {
   printf '{"success":true,"failure_taxonomy":%s}\n' "$(mr_failure_taxonomy_state_json)"
+}
+
+mr_failure_taxonomy_query_response() {
+  category_filter=$(trim "$(param "category")")
+  severity_filter=$(trim "$(param "severity")")
+  surface_filter=$(trim "$(param "surface")")
+  mode_filter=$(trim "$(param "mode")")
+  since_epoch=$(trim "$(param "since_epoch")")
+  limit_value=$(trim "$(param "limit")")
+  printf '{"success":true,"failure_taxonomy_query":%s}\n' \
+    "$(mr_failure_taxonomy_query_json "$category_filter" "$severity_filter" "$surface_filter" "$mode_filter" "$since_epoch" "$limit_value")"
 }
 
 mr_improvement_proposals_state_response() {

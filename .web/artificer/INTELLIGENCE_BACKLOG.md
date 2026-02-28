@@ -10,6 +10,8 @@ This backlog tracks concrete implementation work for improving Artificer intelli
   - Acceptance:
     - Each failure ledger append writes one taxonomy row.
     - Taxonomy categories, severity, and recent events are queryable through API.
+  - Progress:
+    - Added `failure_taxonomy_query` API support with category/severity/surface/mode/time filters plus bounded result windows for deterministic analysis tooling.
 
 - INT-002 User-visible learning memory
   - Goal: Surface taxonomy state in settings so users can inspect failure patterns.

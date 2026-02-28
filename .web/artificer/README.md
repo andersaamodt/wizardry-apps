@@ -48,6 +48,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
 - `mode_runtime_skill_create` (POST)
 - `mode_runtime_skill_install` (POST)
 - `failure_taxonomy_state` (GET)
+- `failure_taxonomy_query` (GET/POST; filters: `category`, `severity`, `surface`, `mode`, `since_epoch`, `limit`)
 - `improvement_proposals_state` (GET)
 - `improvement_proposal_generate` (POST)
 - `improvement_proposal_decide` (POST)
