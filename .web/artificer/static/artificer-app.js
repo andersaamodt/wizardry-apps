@@ -7437,8 +7437,8 @@
     if (!isFinite(width) || width <= 0) {
       return 42;
     }
-    // Match fixed bar geometry (2.5px bar + 1px gap) so the lane fills fully.
-    var count = Math.floor((width + 1) / 3.5);
+    // Match fixed bar geometry (2px bar + 1px gap) so the lane fills fully.
+    var count = Math.floor((width + 1) / 3);
     if (!isFinite(count) || count < 32) {
       count = 32;
     } else if (count > 180) {
@@ -7680,7 +7680,7 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var gate = (floor * 1.18) + 0.0004;
+    var gate = (floor * 1.28) + 0.0007;
     if (raw <= gate) {
       return 0;
     }
@@ -7698,7 +7698,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.5);
     }
-    if (normalized < 0.0022) {
+    if (normalized < 0.0032) {
       normalized = 0;
     }
     return normalized;
@@ -7715,7 +7715,7 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var gate = (floor * 1.36) + 0.001;
+    var gate = (floor * 1.55) + 0.0015;
     if (raw <= gate) {
       return 0;
     }
@@ -7728,7 +7728,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.58);
     }
-    if (normalized < 0.002) {
+    if (normalized < 0.003) {
       normalized = 0;
     }
     return normalized;
@@ -8164,7 +8164,7 @@
     var silencePhase = Number(dictationWaveSilencePhase || 0);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.0018;
+    var silenceGate = 0.004;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
