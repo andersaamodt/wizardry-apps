@@ -7715,11 +7715,17 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var gate = (floor * 1.04) + 0.0006;
+    var effectiveFloor = floor;
+    // When a clear speech transient appears above the learned floor, reduce
+    // floor influence so bars can recover quickly from a prior deep clamp.
+    if (raw > (floor * 2.2) + 0.015) {
+      effectiveFloor = floor * 0.72;
+    }
+    var gate = (effectiveFloor * 1.18) + 0.0008;
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.01, (0.03 + (floor * 0.8)));
+    var normalized = (raw - gate) / Math.max(0.012, (0.045 + (effectiveFloor * 1.1)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
@@ -7728,7 +7734,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.58);
     }
-    if (normalized < 0.004) {
+    if (normalized < 0.0035) {
       normalized = 0;
     }
     return normalized;
@@ -7760,13 +7766,20 @@
     var sorted = samples.slice().sort(function (a, b) {
       return a - b;
     });
-    var idx = Math.floor((sorted.length - 1) * 0.08);
-    if (idx < 0) {
-      idx = 0;
-    } else if (idx >= sorted.length) {
-      idx = sorted.length - 1;
+    var targetIdx = Math.floor((sorted.length - 1) * 0.15);
+    if (targetIdx < 0) {
+      targetIdx = 0;
+    } else if (targetIdx >= sorted.length) {
+      targetIdx = sorted.length - 1;
     }
-    var target = Number(sorted[idx] || 0);
+    var speechIdx = Math.floor((sorted.length - 1) * 0.7);
+    if (speechIdx < 0) {
+      speechIdx = 0;
+    } else if (speechIdx >= sorted.length) {
+      speechIdx = sorted.length - 1;
+    }
+    var target = Number(sorted[targetIdx] || 0);
+    var speechProbe = Number(sorted[speechIdx] || 0);
     if (!isFinite(target) || target < 0) {
       target = 0;
     }
@@ -7774,15 +7787,16 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
+    var speechPresent = speechProbe > ((target * 2.0) + 0.01);
     if (target > floor) {
-      floor = (floor * 0.62) + (target * 0.38);
+      floor = speechPresent ? ((floor * 0.97) + (target * 0.03)) : ((floor * 0.9) + (target * 0.1));
     } else {
-      floor = (floor * 0.36) + (target * 0.64);
+      floor = speechPresent ? ((floor * 0.7) + (target * 0.3)) : ((floor * 0.6) + (target * 0.4));
     }
     if (floor < 0.0008) {
       floor = 0.0008;
-    } else if (floor > 0.85) {
-      floor = 0.85;
+    } else if (floor > 0.12) {
+      floor = 0.12;
     }
     dictationWaveBackendFloor = floor;
     return floor;
