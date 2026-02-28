@@ -55,6 +55,9 @@ assert_contains "$mode_runtime_lib" "mr_quality_scorecard_state_json()"
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_maybe_raise_regression_proposal()"
 assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_recent_summary_text()"
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_recent_summary_text()"
+assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_recent_guardrails_text()"
+assert_contains "$mode_runtime_lib" "mr_quality_scorecard_guardrail_text()"
+assert_contains "$mode_runtime_lib" "mr_runtime_learning_guardrails_text()"
 assert_contains "$mode_runtime_lib" "manual_confirm=1 is required for promote"
 assert_contains "$mode_runtime_lib" "manual_confirm=1 is required for rollback"
 assert_contains "$mode_runtime_lib" "\"controller_variants\":%s"
@@ -74,9 +77,12 @@ assert_contains "$api" "mr_controller_variant_select_for_run"
 assert_contains "$api" "mr_controller_variant_record_run"
 assert_contains "$api" 'runtime_failure_summary=$(mr_failure_taxonomy_recent_summary_text "6")'
 assert_contains "$api" 'runtime_quality_summary=$(mr_quality_scorecard_recent_summary_text "8")'
+assert_contains "$api" 'runtime_guardrails=$(mr_runtime_learning_guardrails_text)'
 assert_contains "$api" "Runtime learning signals:"
 assert_contains "$api" '- failure_taxonomy: $runtime_failure_summary'
 assert_contains "$api" '- quality_scorecard: $runtime_quality_summary'
+assert_contains "$api" "Runtime adaptation guardrails:"
+assert_contains "$api" '- $runtime_guardrails'
 
 # Frontend contracts: new state normalization and UI actions exist.
 assert_contains "$ui_js" "modeRuntimeFailureTaxonomy: document.getElementById(\"mode-runtime-failure-taxonomy\")"

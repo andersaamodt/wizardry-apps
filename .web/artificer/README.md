@@ -116,6 +116,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - `quality-scorecard/entries.tsv` run quality timeline with deltas
   - `quality-scorecard/scorecard.md` human-readable trend summary
   - Controller loop prompts consume condensed runtime learning signals from failure taxonomy and quality scorecard summaries.
+  - Controller loop prompts also receive runtime adaptation guardrails synthesized from recent failure/quality regressions.
 - Run-mode picker includes a `More modes` expander that surfaces all runtime governance modes with blurbs, and selecting one applies `Assistant` run mode with that focus profile.
 - `pentest` and `security-audit` modes now enforce structured findings output with explicit `Severity`, `Evidence`, `Remediation`, and follow-up verification guidance.
 - Composer now separates `Reasoning depth` from `Compute/time budget`:

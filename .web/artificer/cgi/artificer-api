@@ -18066,6 +18066,14 @@ EOF
       if [ -z "$(trim "$runtime_quality_summary")" ]; then
         runtime_quality_summary="none"
       fi
+      runtime_guardrails="none"
+      if command -v mr_runtime_learning_guardrails_text >/dev/null 2>&1; then
+        runtime_guardrails=$(mr_runtime_learning_guardrails_text)
+      fi
+      runtime_guardrails=$(printf '%s' "$runtime_guardrails" | tr '\n\r' '  ' | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')
+      if [ -z "$(trim "$runtime_guardrails")" ]; then
+        runtime_guardrails="none"
+      fi
       workspace_context_block=""
       if [ -n "$(trim "$workspace_context_text")" ]; then
         workspace_context_block=$(cat <<EOF
@@ -18097,6 +18105,9 @@ $controller_variant_prompt_block
 Runtime learning signals:
 - failure_taxonomy: $runtime_failure_summary
 - quality_scorecard: $runtime_quality_summary
+
+Runtime adaptation guardrails:
+- $runtime_guardrails
 
 Explicit skill actuator context:
 $explicit_skill_prompt_text

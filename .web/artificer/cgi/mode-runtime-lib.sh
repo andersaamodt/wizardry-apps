@@ -656,6 +656,100 @@ mr_failure_taxonomy_recent_summary_text() {
   printf '%s' "latest=${latest_label} (severity=${latest_severity}, mode=${latest_mode}); recent_top=${top_categories}"
 }
 
+mr_failure_taxonomy_guardrail_for_category() {
+  category_id=$1
+  case "$category_id" in
+    command-policy-block)
+      printf '%s' "Front-load read-only reconnaissance and state approval-required actions before attempting them."
+      ;;
+    timeout-budget)
+      printf '%s' "Reduce scope per iteration and prioritize a verifiable partial completion over broad unfinished work."
+      ;;
+    decision-gate)
+      printf '%s' "Surface high-impact user decisions early with concrete options before implementation proceeds."
+      ;;
+    parser-contract)
+      printf '%s' "Keep controller output strictly section-structured and schema-compliant to avoid orchestration recovery paths."
+      ;;
+    verification-regression)
+      printf '%s' "Increase verification density after each change and do not claim completion without passing evidence."
+      ;;
+    implementation-failure)
+      printf '%s' "Constrain patch surface area and validate target files/paths before writing changes."
+      ;;
+    missing-artifact)
+      printf '%s' "Confirm required files/paths and context up front instead of assuming artifact availability."
+      ;;
+    external-dependency)
+      printf '%s' "Isolate dependency-sensitive steps and provide graceful fallback plans when environment/network calls fail."
+      ;;
+    *)
+      printf '%s' "Maintain small verifiable steps and explicit assumptions to reduce repeated failure loops."
+      ;;
+  esac
+}
+
+mr_failure_taxonomy_recent_guardrails_text() {
+  max_rows=$1
+  max_items=$2
+  case "$max_rows" in ""|*[!0-9]*) max_rows=8 ;; esac
+  case "$max_items" in ""|*[!0-9]*) max_items=2 ;; esac
+  if [ "$max_rows" -lt 1 ]; then
+    max_rows=1
+  fi
+  if [ "$max_items" -lt 1 ]; then
+    max_items=1
+  fi
+
+  events_file=$(mr_failure_taxonomy_events_file)
+  if [ ! -s "$events_file" ]; then
+    printf '%s' "none"
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  recent_file=$(mktemp)
+  top_file=$(mktemp)
+  tail -n "$max_rows" "$events_file" > "$recent_file" 2>/dev/null || : > "$recent_file"
+  awk -F"$tab_char" '
+    NF >= 3 {
+      category = $3
+      if (category == "") {
+        category = "unknown"
+      }
+      counts[category] += 1
+    }
+    END {
+      for (category in counts) {
+        printf "%s\t%s\n", counts[category], category
+      }
+    }
+  ' "$recent_file" | sort -t "$tab_char" -k1,1nr -k2,2 > "$top_file"
+
+  out=""
+  shown=0
+  while IFS="$tab_char" read -r count category_id || [ -n "$category_id" ]; do
+    [ -n "$category_id" ] || continue
+    hint=$(mr_failure_taxonomy_guardrail_for_category "$category_id")
+    hint=$(trim "$hint")
+    [ -n "$hint" ] || continue
+    if [ -n "$out" ]; then
+      out="${out}; "
+    fi
+    out="${out}${category_id}: ${hint}"
+    shown=$((shown + 1))
+    if [ "$shown" -ge "$max_items" ]; then
+      break
+    fi
+  done < "$top_file"
+
+  rm -f "$recent_file" "$top_file"
+  if [ -z "$out" ]; then
+    out="none"
+  fi
+  printf '%s' "$out"
+}
+
 mr_improvement_proposal_exists_for_category() {
   category_id=$1
   [ -n "$category_id" ] || return 1
@@ -1946,6 +2040,118 @@ mr_quality_scorecard_recent_summary_text() {
   case "$recent_count" in ""|*[!0-9]*) recent_count=0 ;; esac
 
   printf '%s' "last_mode=${last_mode}; last_quality=${last_quality}; last_delta=${last_delta}; last_status=${last_queue_status}/${last_final_state}; recent_avg=${recent_avg} (n=${recent_count})"
+}
+
+mr_quality_scorecard_guardrail_text() {
+  max_rows=$1
+  case "$max_rows" in ""|*[!0-9]*) max_rows=8 ;; esac
+  if [ "$max_rows" -lt 1 ]; then
+    max_rows=1
+  fi
+
+  entries_file=$(mr_quality_scorecard_entries_file)
+  if [ ! -s "$entries_file" ]; then
+    printf '%s' "none"
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  metrics=$(tail -n "$max_rows" "$entries_file" 2>/dev/null | awk -F"$tab_char" '
+    NF >= 9 {
+      sum += ($8 + 0.0)
+      count += 1
+      if (($9 + 0.0) < 0) {
+        neg += 1
+      }
+      last_quality = ($8 + 0.0)
+      last_delta = ($9 + 0.0)
+      last_queue = $6
+      last_final = $7
+    }
+    END {
+      if (count <= 0) {
+        printf "0.000\t0\t0\t0.000\t0.000\tunknown\tunknown"
+      } else {
+        printf "%.3f\t%d\t%d\t%.3f\t%.3f\t%s\t%s", sum / count, count, neg, last_quality, last_delta, last_queue, last_final
+      }
+    }
+  ')
+
+  avg_quality="0.000"
+  count_rows=0
+  neg_count=0
+  last_quality="0.000"
+  last_delta="0.000"
+  last_queue="unknown"
+  last_final="unknown"
+  IFS="$(printf '\t')" read -r avg_quality count_rows neg_count last_quality last_delta last_queue last_final <<EOF
+$metrics
+EOF
+
+  concern=0
+  reasons=""
+  if awk -v q="$last_quality" 'BEGIN { exit ((q + 0.0) < 0.55 ? 0 : 1) }'; then
+    concern=1
+    reasons="last_quality<0.55"
+  fi
+  if awk -v d="$last_delta" 'BEGIN { exit ((d + 0.0) <= -0.080 ? 0 : 1) }'; then
+    concern=1
+    if [ -n "$reasons" ]; then
+      reasons="${reasons},"
+    fi
+    reasons="${reasons}last_delta<=-0.080"
+  fi
+  if [ "$count_rows" -gt 0 ] && [ $((neg_count * 2)) -ge "$count_rows" ]; then
+    concern=1
+    if [ -n "$reasons" ]; then
+      reasons="${reasons},"
+    fi
+    reasons="${reasons}negative-delta-majority"
+  fi
+  if awk -v q="$avg_quality" 'BEGIN { exit ((q + 0.0) < 0.62 ? 0 : 1) }'; then
+    concern=1
+    if [ -n "$reasons" ]; then
+      reasons="${reasons},"
+    fi
+    reasons="${reasons}recent_avg<0.62"
+  fi
+
+  if [ "$concern" != "1" ]; then
+    printf '%s' "none"
+    return 0
+  fi
+
+  printf '%s' "Quality regression pressure (${reasons}). Tighten completion criteria, verify each change slice, and avoid DONE_CLAIM until evidence is explicit."
+}
+
+mr_runtime_learning_guardrails_text() {
+  failure_guardrails=$(mr_failure_taxonomy_recent_guardrails_text "8" "2")
+  quality_guardrail=$(mr_quality_scorecard_guardrail_text "8")
+  failure_guardrails=$(trim "$failure_guardrails")
+  quality_guardrail=$(trim "$quality_guardrail")
+
+  if [ -z "$failure_guardrails" ] || [ "$failure_guardrails" = "none" ]; then
+    failure_guardrails=""
+  fi
+  if [ -z "$quality_guardrail" ] || [ "$quality_guardrail" = "none" ]; then
+    quality_guardrail=""
+  fi
+
+  if [ -z "$failure_guardrails$quality_guardrail" ]; then
+    printf '%s' "none"
+    return 0
+  fi
+
+  if [ -n "$failure_guardrails" ] && [ -n "$quality_guardrail" ]; then
+    printf '%s' "failure=${failure_guardrails}; quality=${quality_guardrail}"
+    return 0
+  fi
+
+  if [ -n "$failure_guardrails" ]; then
+    printf '%s' "failure=${failure_guardrails}"
+    return 0
+  fi
+  printf '%s' "quality=${quality_guardrail}"
 }
 
 mr_controller_variant_bootstrap_default() {
