@@ -2600,6 +2600,42 @@
     return Math.floor(count);
   }
 
+  function conversationHasAssistantAfterAnchor(workspaceId, conversationId, messageAnchor) {
+    var wsId = String(workspaceId || "");
+    var convId = String(conversationId || "");
+    if (!wsId || !convId) {
+      return false;
+    }
+    var anchorIndex = Number(messageAnchor);
+    if (!isFinite(anchorIndex) || anchorIndex < 0) {
+      anchorIndex = 0;
+    } else {
+      anchorIndex = Math.floor(anchorIndex);
+    }
+    var workspace = getWorkspaceById(wsId);
+    var conversation = getConversationById(workspace, convId);
+    if (
+      state.activeConversation &&
+      String(state.activeWorkspaceId || "") === wsId &&
+      String(state.activeConversationId || "") === convId
+    ) {
+      conversation = state.activeConversation;
+    }
+    if (!conversation || !Array.isArray(conversation.messages)) {
+      return false;
+    }
+    for (var msgIndex = anchorIndex; msgIndex < conversation.messages.length; msgIndex += 1) {
+      var anchoredMessage = conversation.messages[msgIndex] || {};
+      if (String(anchoredMessage.role || "") !== "assistant") {
+        continue;
+      }
+      if (trim(String(anchoredMessage.content || ""))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function updateAwaitingApprovalFromQueueSnapshot(workspaceId, conversationId, snapshot) {
     var wsId = String(workspaceId || "");
     var convId = String(conversationId || "");
@@ -5900,24 +5936,11 @@
     );
     var queueAwaitingDecision = queueLastStatus === "awaiting_decision" || !!normalizeDecisionRequest(conversation && conversation.decision_request);
     var pendingAssistantDelivery = assistantDeliveryPendingCount(workspaceId, conversationId) > 0;
-    var hasAssistantAfterAnchor = false;
-    var anchorIndex = Number(event.message_anchor);
-    if (!isFinite(anchorIndex) || anchorIndex < 0) {
-      anchorIndex = 0;
-    } else {
-      anchorIndex = Math.floor(anchorIndex);
-    }
-    if (conversation && Array.isArray(conversation.messages)) {
-      for (var msgIndex = anchorIndex; msgIndex < conversation.messages.length; msgIndex += 1) {
-        var anchoredMessage = conversation.messages[msgIndex] || {};
-        if (String(anchoredMessage.role || "") !== "assistant") {
-          continue;
-        }
-        if (trim(String(anchoredMessage.content || ""))) {
-          hasAssistantAfterAnchor = true;
-          break;
-        }
-      }
+    var hasAssistantAfterAnchor = conversationHasAssistantAfterAnchor(workspaceId, conversationId, event.message_anchor);
+    var finishedAtMs = Date.parse(String(event.finished_at || ""));
+    var recentlyFinishedWithoutAssistant = false;
+    if (isFinite(finishedAtMs) && finishedAtMs > 0 && !hasAssistantAfterAnchor) {
+      recentlyFinishedWithoutAssistant = (Date.now() - finishedAtMs) <= 90000;
     }
     html = "<article class='" + runClass + " run-narrative'>";
     if (queueRunning || queuePending > 0) {
@@ -5926,7 +5949,7 @@
       html += "<p class='run-line subtle'>Run paused. Awaiting command approval.</p>";
     } else if (queueAwaitingDecision) {
       html += "<p class='run-line subtle'>Run paused. Awaiting your decision.</p>";
-    } else if (pendingAssistantDelivery && !hasAssistantAfterAnchor) {
+    } else if ((pendingAssistantDelivery || recentlyFinishedWithoutAssistant) && !hasAssistantAfterAnchor) {
       html += "<p class='run-line subtle'><span class='run-spinner' aria-hidden='true'></span>Finalizing response...</p>";
     } else if (runModelText) {
       html += "<p class='run-line subtle'>Model: " + escHtml(runModelText) + "</p>";
@@ -13094,15 +13117,16 @@
           }
           assistantText = "";
         }
+        var fallbackAttemptCount = 0;
         if (!assistantText) {
-          var attemptCount = runTraceAttemptCount(response || {});
-          if (!attemptCount && pendingEvent) {
-            attemptCount = runTraceAttemptCount(pendingEvent);
+          fallbackAttemptCount = runTraceAttemptCount(response || {});
+          if (!fallbackAttemptCount && pendingEvent) {
+            fallbackAttemptCount = runTraceAttemptCount(pendingEvent);
           }
-          assistantText = structuredRunFallbackMessage(attemptCount);
         }
-
-        appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
+        if (assistantText) {
+          appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
+        }
 
         var blockedCommands = Array.isArray(response.blocked_commands) ? response.blocked_commands : [];
         if (blockedCommands.length && !queueItemId) {
@@ -13183,6 +13207,20 @@
               }
               return null;
             });
+          })
+          .then(function () {
+            if (
+              !assistantText &&
+              state.activeConversation &&
+              state.activeWorkspaceId === workspaceId &&
+              state.activeConversation.id === conversationId &&
+              !conversationHasAssistantAfterAnchor(workspaceId, conversationId, runAnchor)
+            ) {
+              assistantText = structuredRunFallbackMessage(fallbackAttemptCount);
+              appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
+              cacheActiveConversationSnapshot(workspaceId, conversationId);
+            }
+            return null;
           })
           .then(function () {
             return refreshGitStatus().catch(function () {

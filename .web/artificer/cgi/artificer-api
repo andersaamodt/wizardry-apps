@@ -5358,6 +5358,16 @@ decision_prompt_has_missing_required_inputs() {
       return 0
     fi
   fi
+  if printf '%s' "$prompt_lower" | grep -Eq '\b(incident response|security incident|breach response|forensics|containment|compromise)\b'; then
+    if ! printf '%s' "$prompt_lower" | grep -Eq '\b(service|system|host|endpoint|environment|env|production|staging|tenant|account|region|timeline|time window|ioc|indicator|artifact|log source)\b'; then
+      return 0
+    fi
+  fi
+  if printf '%s' "$prompt_lower" | grep -Eq '\b(performance test|load test|benchmark|perf regression|latency optimization)\b'; then
+    if ! printf '%s' "$prompt_lower" | grep -Eq '\b(p50|p95|p99|latency|throughput|qps|rps|slo|sla|cpu|memory|target|budget|baseline)\b'; then
+      return 0
+    fi
+  fi
   return 1
 }
 
@@ -5381,7 +5391,7 @@ decision_question_looks_risk_gate() {
 
 decision_commands_trigger_external_gate() {
   commands_lower=$(lowercase_text "$1")
-  if printf '%s' "$commands_lower" | grep -Eq '\bcurl\b|\bwget\b|\bnc\b|\bssh\b|\bscp\b|\bsftp\b|\bftp\b|\btelnet\b'; then
+  if printf '%s' "$commands_lower" | grep -Eq '\bcurl\b|\bwget\b|\bnc\b|\bssh\b|\bscp\b|\bsftp\b|\bftp\b|\btelnet\b|\bgit[[:space:]]+push\b|\bgh[[:space:]]+(release|api)\b|\bdocker[[:space:]]+push\b|\bnpm[[:space:]]+publish\b|\btwine[[:space:]]+upload\b|\bkubectl[[:space:]]+(apply|delete|patch|rollout|scale)\b|\bterraform[[:space:]]+apply\b|\bnetlify[[:space:]]+deploy\b|\bvercel([[:space:]]+deploy)?\b'; then
     return 0
   fi
   return 1

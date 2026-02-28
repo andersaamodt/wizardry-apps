@@ -1933,10 +1933,12 @@ label {
   min-width: 0;
   height: 100%;
   overflow: auto;
+  grid-row: 1;
 }
 
 .persona-bigfive-drawer {
   grid-column: 3;
+  grid-row: 1;
 }
 
 .persona-bigfive-drawer .mode-field-row {
@@ -2212,6 +2214,7 @@ label {
 
 .drawer-resizer {
   grid-column: 2;
+  grid-row: 1;
   position: relative;
   width: 8px;
   min-width: 8px;
@@ -3628,6 +3631,7 @@ input.range-input-invalid[type='number'] {
 
 .persona-traits-drawer {
   grid-column: 3;
+  grid-row: 1;
 }
 
 .traits-summons-warning {

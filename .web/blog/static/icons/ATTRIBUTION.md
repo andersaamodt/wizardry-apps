@@ -1,46 +1,54 @@
 ## Compose Icon Attribution
 
-These compose-cycler icons are sourced from 20 different Iconify collections, with a page+quill/page+writing motif.
+These compose-cycler icons are sourced from Iconify collections with a quill-and-inkwell or quill-and-page focus.
 
-1. `mdi:file-document-edit` (Material Design Icons)
-   Source: https://icon-sets.iconify.design/mdi/file-document-edit/
-2. `game-icons:quill` (Game Icons)
-   Source: https://icon-sets.iconify.design/game-icons/quill/
-3. `icomoon-free:quill` (IcoMoon Free)
-   Source: https://icon-sets.iconify.design/icomoon-free/quill/
-4. `mingcute:quill-pen-line` (MingCute)
-   Source: https://icon-sets.iconify.design/mingcute/quill-pen-line/
-5. `ri:quill-pen-line` (Remix Icon)
-   Source: https://icon-sets.iconify.design/ri/quill-pen-line/
-6. `tdesign:pen-quill` (TDesign Icons)
-   Source: https://icon-sets.iconify.design/tdesign/pen-quill/
-7. `hugeicons:quill-write-01` (Huge Icons)
-   Source: https://icon-sets.iconify.design/hugeicons/quill-write-01/
-8. `streamline-freehand:notes-quill` (Streamline Freehand)
-   Source: https://icon-sets.iconify.design/streamline-freehand/notes-quill/
-9. `streamline-pixel:content-files-quill-ink` (Streamline Pixel)
+1. `streamline-pixel:content-files-quill-ink`
    Source: https://icon-sets.iconify.design/streamline-pixel/content-files-quill-ink/
-10. `lucide:file-pen` (Lucide)
-    Source: https://icon-sets.iconify.design/lucide/file-pen/
-11. `tabler:file-pencil` (Tabler Icons)
-    Source: https://icon-sets.iconify.design/tabler/file-pencil/
-12. `lineicons:file-pencil` (Lineicons)
-    Source: https://icon-sets.iconify.design/lineicons/file-pencil/
-13. `prime:file-edit` (Prime Icons)
-    Source: https://icon-sets.iconify.design/prime/file-edit/
-14. `ci:file-edit` (Coolicons)
-    Source: https://icon-sets.iconify.design/ci/file-edit/
-15. `uil:file-edit-alt` (Unicons)
-    Source: https://icon-sets.iconify.design/uil/file-edit-alt/
-16. `icon-park-outline:file-editing` (IconPark Outline)
-    Source: https://icon-sets.iconify.design/icon-park-outline/file-editing/
-17. `material-symbols:edit-note` (Material Symbols)
-    Source: https://icon-sets.iconify.design/material-symbols/edit-note/
-18. `fluent:document-edit-24-regular` (Fluent UI System Icons)
-    Source: https://icon-sets.iconify.design/fluent/document-edit-24-regular/
-19. `clarity:note-edit-line` (Clarity)
-    Source: https://icon-sets.iconify.design/clarity/note-edit-line/
-20. `ix:edit-document` (Siemens Industrial Experience Icons)
-    Source: https://icon-sets.iconify.design/ix/edit-document/
+2. `mdi:quill`
+   Source: https://icon-sets.iconify.design/mdi/quill/
+3. `streamline-cyber:quill`
+   Source: https://icon-sets.iconify.design/streamline-cyber/quill/
+4. `game-icons:quill`
+   Source: https://icon-sets.iconify.design/game-icons/quill/
+5. `icomoon-free:quill`
+   Source: https://icon-sets.iconify.design/icomoon-free/quill/
+6. `mingcute:quill-pen-fill`
+   Source: https://icon-sets.iconify.design/mingcute/quill-pen-fill/
+7. `mingcute:quill-pen-line`
+   Source: https://icon-sets.iconify.design/mingcute/quill-pen-line/
+8. `ri:quill-pen-fill`
+   Source: https://icon-sets.iconify.design/ri/quill-pen-fill/
+9. `ri:quill-pen-line`
+   Source: https://icon-sets.iconify.design/ri/quill-pen-line/
+10. `tdesign:pen-quill`
+   Source: https://icon-sets.iconify.design/tdesign/pen-quill/
+11. `tdesign:pen-quill-filled`
+   Source: https://icon-sets.iconify.design/tdesign/pen-quill-filled/
+12. `game-icons:quill-ink`
+   Source: https://icon-sets.iconify.design/game-icons/quill-ink/
+13. `streamline-freehand:notes-quill`
+   Source: https://icon-sets.iconify.design/streamline-freehand/notes-quill/
+14. `streamline-kameleon-color:quill-paper`
+   Source: https://icon-sets.iconify.design/streamline-kameleon-color/quill-paper/
+15. `streamline-kameleon-color:quill-paper-duo`
+   Source: https://icon-sets.iconify.design/streamline-kameleon-color/quill-paper-duo/
+16. `mingcute:quill-pen-ai-fill`
+   Source: https://icon-sets.iconify.design/mingcute/quill-pen-ai-fill/
+17. `mingcute:quill-pen-ai-line`
+   Source: https://icon-sets.iconify.design/mingcute/quill-pen-ai-line/
+18. `ri:quill-pen-ai-fill`
+   Source: https://icon-sets.iconify.design/ri/quill-pen-ai-fill/
+19. `ri:quill-pen-ai-line`
+   Source: https://icon-sets.iconify.design/ri/quill-pen-ai-line/
+20. `game-icons:scroll-quill`
+   Source: https://icon-sets.iconify.design/game-icons/scroll-quill/
+21. `hugeicons:quill-write-01`
+   Source: https://icon-sets.iconify.design/hugeicons/quill-write-01/
+22. `hugeicons:quill-write-02`
+   Source: https://icon-sets.iconify.design/hugeicons/quill-write-02/
+23. `streamline-freehand:design-tool-quill`
+   Source: https://icon-sets.iconify.design/streamline-freehand/design-tool-quill/
+24. `streamline-freehand:edit-quill-feather-1`
+   Source: https://icon-sets.iconify.design/streamline-freehand/edit-quill-feather-1/
 
 Usage note: The app renders each icon monochrome black in the navbar compose icon cycler.
