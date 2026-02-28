@@ -2399,6 +2399,9 @@ button:disabled,
 
 .run-rollup > summary {
   font-size: 0.83rem;
+  justify-content: flex-start;
+  border: 0;
+  background: transparent;
 }
 
 .run-rollup > summary:hover .run-summary-label,

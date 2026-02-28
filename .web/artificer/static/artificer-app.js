@@ -176,6 +176,10 @@
       failures: clipTextForStorage(event.failures || "", 7000),
       session_log: clipTextForStorage(event.session_log || "", 7000)
     };
+    var awaitingAssistantRaw = Number(event.awaiting_assistant);
+    if (isFinite(awaitingAssistantRaw) && awaitingAssistantRaw > 0) {
+      cleaned.awaiting_assistant = 1;
+    }
     var anchorRaw = Number(event.message_anchor);
     if (isFinite(anchorRaw) && anchorRaw >= 0) {
       cleaned.message_anchor = Math.floor(anchorRaw);
@@ -2999,6 +3003,17 @@
         pollTimer = null;
       }
       delete assistantDeliveryWatchByKey[watchKey];
+      var matchedEvent = null;
+      if (eventId) {
+        matchedEvent = findRunEventByIdForConversation(convId, eventId);
+      }
+      if (!matchedEvent) {
+        matchedEvent = findLatestRunEventByStatus(convId, ["done", "running", "awaiting_decision", "awaiting_approval", "error"]);
+      }
+      if (matchedEvent && Number(matchedEvent.awaiting_assistant || 0) > 0) {
+        matchedEvent.awaiting_assistant = 0;
+        persistRunEventsSoon();
+      }
       var opts = options && typeof options === "object" ? options : {};
       if (opts.clearPending === false) {
         return;
@@ -4534,6 +4549,11 @@
     }
     if (!trim(merged.session_log || "") && trim(fallback.session_log || "")) {
       merged.session_log = fallback.session_log;
+    }
+    var mergedAwaitingAssistant = Number(merged.awaiting_assistant);
+    var fallbackAwaitingAssistant = Number(fallback.awaiting_assistant);
+    if ((!isFinite(mergedAwaitingAssistant) || mergedAwaitingAssistant < 1) && isFinite(fallbackAwaitingAssistant) && fallbackAwaitingAssistant > 0) {
+      merged.awaiting_assistant = 1;
     }
     return merged;
   }
@@ -6370,6 +6390,7 @@
       !!conversationApprovalRequest(conversation)
     );
     var queueAwaitingDecision = queueLastStatus === "awaiting_decision" || !!normalizeDecisionRequest(conversation && conversation.decision_request);
+    var eventAwaitingAssistant = Number(event.awaiting_assistant || 0) > 0;
     var pendingAssistantDelivery = assistantDeliveryPendingCount(workspaceId, conversationId) > 0;
     var hasAssistantAfterAnchor = conversationHasAssistantAfterAnchor(workspaceId, conversationId, event.message_anchor);
     var latestRunEvent = findLatestRunEventByStatus(conversationId, ["running", "done", "awaiting_decision", "awaiting_approval", "error", "cancelled"]);
@@ -6385,7 +6406,7 @@
     }
     var shouldShowFinalizingLine = false;
     if (!hasAssistantAfterAnchor) {
-      if (pendingAssistantDelivery || recentlyFinishedWithoutAssistant) {
+      if (eventAwaitingAssistant || pendingAssistantDelivery || recentlyFinishedWithoutAssistant) {
         shouldShowFinalizingLine = true;
       } else if (isLatestRunEvent && !queueRunning && queuePending < 1 && !queueAwaitingApproval && !queueAwaitingDecision) {
         shouldShowFinalizingLine = true;
@@ -13467,6 +13488,7 @@
         status: "running",
         started_at: new Date().toISOString(),
         stream_text: "",
+        awaiting_assistant: 0,
         message_anchor: runAnchor
       });
     } else {
@@ -13477,6 +13499,7 @@
       if (!isFinite(pendingAnchor) || pendingAnchor < 0) {
         pendingEvent.message_anchor = runAnchor;
       }
+      pendingEvent.awaiting_assistant = 0;
       persistRunEventsSoon();
     }
 
@@ -13663,6 +13686,9 @@
         assistantDeliveryFallbackAttempts = fallbackAttemptCount;
         if (assistantText) {
           appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
+          if (pendingEvent) {
+            pendingEvent.awaiting_assistant = 0;
+          }
           if (conversationHasAssistantAfterAnchor(workspaceId, conversationId, runAnchor)) {
             if (clearAssistantDeliveryPending(workspaceId, conversationId)) {
               assistantDeliveryCleared = true;
@@ -13705,6 +13731,7 @@
           pendingEvent.failures = response.failures || "";
           pendingEvent.session_log = response.session_log || "";
           pendingEvent.task_status = normalizeRunTaskStatusSnapshot(response.task_status);
+          pendingEvent.awaiting_assistant = (!assistantText && !awaitingApproval && !awaitingDecision) ? 1 : 0;
           pendingEvent.finished_at = new Date().toISOString();
           pendingEvent.decision_hint = trim(String(response.decision_hint || ""));
           if (pendingEvent.id) {
@@ -13761,6 +13788,10 @@
               assistantText = structuredRunFallbackMessage(fallbackAttemptCount);
               appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
               assistantDeliveryFallbackAttempts = fallbackAttemptCount;
+              if (pendingEvent) {
+                pendingEvent.awaiting_assistant = 0;
+                persistRunEventsSoon();
+              }
             }
             return null;
           })
@@ -13796,6 +13827,7 @@
         if (pendingEvent) {
           pendingEvent.status = "error";
           pendingEvent.error = err && err.message ? err.message : String(err);
+          pendingEvent.awaiting_assistant = 0;
           pendingEvent.finished_at = new Date().toISOString();
           if (pendingEvent.id) {
             delete state.runDetailsOpenByEventId[String(pendingEvent.id)];
@@ -13814,10 +13846,18 @@
           !conversationHasAssistantAfterAnchor(workspaceId, conversationId, runAnchor)
         );
         if (assistantDeliveryCleared) {
+          if (pendingEvent && Number(pendingEvent.awaiting_assistant || 0) > 0) {
+            pendingEvent.awaiting_assistant = 0;
+            persistRunEventsSoon();
+          }
           renderUi();
           return;
         }
         if (needsAssistantDeliveryWatch) {
+          if (pendingEvent && Number(pendingEvent.awaiting_assistant || 0) < 1) {
+            pendingEvent.awaiting_assistant = 1;
+            persistRunEventsSoon();
+          }
           startAssistantDeliveryWatch(
             workspaceId,
             conversationId,
@@ -13827,6 +13867,10 @@
           );
           renderUi();
           return;
+        }
+        if (pendingEvent && Number(pendingEvent.awaiting_assistant || 0) > 0) {
+          pendingEvent.awaiting_assistant = 0;
+          persistRunEventsSoon();
         }
         if (clearAssistantDeliveryPending(workspaceId, conversationId)) {
           assistantDeliveryCleared = true;
