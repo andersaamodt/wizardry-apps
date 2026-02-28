@@ -775,6 +775,11 @@
   var dictationWaveNoiseFloor = 0.02;
   var dictationWaveActivatedAt = 0;
   var dictationWaveLastSampleAt = 0;
+  var dictationWaveBarStartAt = 0;
+  var dictationWaveBarPeakRaw = 0;
+  var dictationWaveBarSumRaw = 0;
+  var dictationWaveBarSampleCount = 0;
+  var DICTATION_WAVE_BAR_INTERVAL_MS = 72;
   var dictationWaveBackendPumpBusy = false;
   var dictationWaveBackendPumpAt = 0;
   var dictationPreparePromise = null;
@@ -7111,6 +7116,10 @@
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
     dictationWaveLastSampleAt = 0;
+    dictationWaveBarStartAt = 0;
+    dictationWaveBarPeakRaw = 0;
+    dictationWaveBarSumRaw = 0;
+    dictationWaveBarSampleCount = 0;
     state.dictateWaveLevels = [];
   }
 
@@ -7390,7 +7399,7 @@
         }
         dictationWaveAnalyser.getByteTimeDomainData(dictationWaveData);
         var sampleNow = Date.now();
-        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 18) {
+        if (sampleNow - Number(dictationWaveLastSampleAt || 0) < 12) {
           dictationWaveRafId = requestAnimationFrame(sample);
           return;
         }
@@ -7428,18 +7437,36 @@
         }
         var crest = peak > rms ? (peak - rms) : 0;
         var rawLevel = (meanAbs * 3.4) + (peakToPeak * 2.1) + (peak * 1.2) + (crest * 0.8);
-        calibrateDictationWaveNoiseFloor(rawLevel);
-        var normalizedLevel = normalizedDictationWaveSliceLevel(rawLevel);
-        if (normalizedLevel <= 0 && rawLevel > (dictationWaveNoiseFloor + 0.0015)) {
+        if (rawLevel > Number(dictationWaveBarPeakRaw || 0)) {
+          dictationWaveBarPeakRaw = rawLevel;
+        }
+        dictationWaveBarSumRaw += rawLevel;
+        dictationWaveBarSampleCount += 1;
+        if (!dictationWaveBarStartAt) {
+          dictationWaveBarStartAt = sampleNow;
+        }
+        if (sampleNow - Number(dictationWaveBarStartAt || 0) < DICTATION_WAVE_BAR_INTERVAL_MS) {
+          dictationWaveRafId = requestAnimationFrame(sample);
+          return;
+        }
+        var avgRaw = dictationWaveBarSampleCount > 0 ? (dictationWaveBarSumRaw / dictationWaveBarSampleCount) : rawLevel;
+        var summarizedRaw = (avgRaw * 0.62) + (Number(dictationWaveBarPeakRaw || 0) * 0.38);
+        dictationWaveBarStartAt = sampleNow;
+        dictationWaveBarPeakRaw = 0;
+        dictationWaveBarSumRaw = 0;
+        dictationWaveBarSampleCount = 0;
+        calibrateDictationWaveNoiseFloor(summarizedRaw);
+        var normalizedLevel = normalizedDictationWaveSliceLevel(summarizedRaw);
+        if (normalizedLevel <= 0 && summarizedRaw > (dictationWaveNoiseFloor + 0.0015)) {
           var floorBase = Math.max(0.0005, Number(dictationWaveNoiseFloor || 0));
-          normalizedLevel = ((rawLevel / floorBase) - 1) / 3.5;
+          normalizedLevel = ((summarizedRaw / floorBase) - 1) / 3.5;
           if (!isFinite(normalizedLevel) || normalizedLevel < 0) {
             normalizedLevel = 0;
           } else if (normalizedLevel > 1) {
             normalizedLevel = 1;
           }
         }
-        if (!dictationWaveSeenSignal && rawLevel > (dictationWaveNoiseFloor + 0.0015)) {
+        if (!dictationWaveSeenSignal && summarizedRaw > (dictationWaveNoiseFloor + 0.0015)) {
           dictationWaveSeenSignal = true;
         }
         applyDictationWaveLevel(normalizedLevel);
