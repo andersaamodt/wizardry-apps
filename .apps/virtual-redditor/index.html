@@ -1072,6 +1072,105 @@
       return PATROL_MODE_DESCRIPTIONS[mode] ? mode : DEFAULT_PATROL_MODE;
     }
 
+    function traitMetaById(value) {
+      var id = String(value || '').trim().toLowerCase();
+      for (var i = 0; i < TRAIT_CATALOG.length; i += 1) {
+        if (TRAIT_CATALOG[i].id === id) return TRAIT_CATALOG[i];
+      }
+      return null;
+    }
+
+    function normalizeTraitId(value) {
+      var id = String(value || '').trim().toLowerCase().replace(/-/g, '_');
+      if (id === 'helpful_peer') id = 'helpful';
+      if (id === 'builder_operator') id = 'technical_pragmatist';
+      if (id === 'other') id = 'ethos_only';
+      return traitMetaById(id) ? id : '';
+    }
+
+    function normalizeTraitExpression(value) {
+      var normalized = String(value || '').trim().toLowerCase();
+      if (normalized === 'summons' || normalized === 'both') return normalized;
+      return 'style';
+    }
+
+    function normalizeTraitPredominance(value) {
+      var normalized = String(value || '').trim().toLowerCase();
+      if (normalized === 'contextual' || normalized === 'stable' || normalized === 'adaptive') return normalized;
+      return 'blend';
+    }
+
+    function defaultTraitsMap() {
+      var map = {};
+      for (var i = 0; i < TRAIT_CATALOG.length; i += 1) {
+        var traitId = TRAIT_CATALOG[i].id;
+        map[traitId] = {
+          enabled: traitId === 'typical_redditor',
+          expression: 'style'
+        };
+      }
+      return map;
+    }
+
+    function normalizeTraitsMap(raw) {
+      var input = (raw && typeof raw === 'object') ? raw : {};
+      var out = defaultTraitsMap();
+      for (var i = 0; i < TRAIT_CATALOG.length; i += 1) {
+        var traitId = TRAIT_CATALOG[i].id;
+        var source = input[traitId];
+        if (!source || typeof source !== 'object') continue;
+        out[traitId] = {
+          enabled: !!source.enabled,
+          expression: normalizeTraitExpression(source.expression)
+        };
+      }
+
+      // Accept legacy single-personality values from older local configs.
+      var legacyPersonality = normalizeTraitId(input.personality || '');
+      if (!legacyPersonality && typeof input === 'object' && input.personality) {
+        legacyPersonality = normalizeTraitId(input.personality);
+      }
+      if (!legacyPersonality && typeof raw === 'object' && raw && raw.personality) {
+        legacyPersonality = normalizeTraitId(raw.personality);
+      }
+      if (legacyPersonality && out[legacyPersonality]) {
+        out[legacyPersonality].enabled = true;
+      }
+      return out;
+    }
+
+    function traitExpressionMatches(entry, mode) {
+      var expression = normalizeTraitExpression((entry || {}).expression);
+      if (mode === 'style') return expression === 'style' || expression === 'both';
+      if (mode === 'summons') return expression === 'summons' || expression === 'both';
+      return true;
+    }
+
+    function enabledTraitIds(traitsMap, mode) {
+      var out = [];
+      var map = (traitsMap && typeof traitsMap === 'object') ? traitsMap : {};
+      for (var i = 0; i < TRAIT_CATALOG.length; i += 1) {
+        var traitId = TRAIT_CATALOG[i].id;
+        var row = map[traitId];
+        if (!row || row.enabled !== true) continue;
+        if (!traitExpressionMatches(row, mode)) continue;
+        out.push(traitId);
+      }
+      return out;
+    }
+
+    function traitLabel(id) {
+      var meta = traitMetaById(id);
+      return meta ? String(meta.label || id) : String(id || '');
+    }
+
+    function traitExpressionTooltip(expression) {
+      var value = normalizeTraitExpression(expression);
+      if (value === 'summons') return 'Trait will affect contextual summons only, not writing style.';
+      if (value === 'both') return 'Trait will affect both writing style and contextual summons.';
+      return 'Trait will affect style only, not contextual summons.';
+    }
+
     function parseIntervalSecondsFromSettings(settings) {
       var s = settings || {};
       var minVal = Number(s.patrolIntervalMin || 0);
@@ -1342,6 +1441,7 @@
       modesSaveQueued: false,
       personaBigFiveOpen: false,
       personaBigFiveFocusTrait: '',
+      personaTraitsOpen: false,
       relationshipsRenderSig: '',
       modeLogRenderSig: '',
       logsAvailable: false,
@@ -4498,7 +4598,9 @@
           'Remove Content', 'Lock Thread', 'Post Ban Notice'
         ],
         behaviors: {
-          personality: 'typical_redditor',
+          traits: defaultTraitsMap(),
+          traitPredominance: 'blend',
+          primaryTrait: 'typical_redditor',
           personalityStrength: 'balanced',
           mirrorTone: 'mirror_or_less',
           directness: 'balanced',
