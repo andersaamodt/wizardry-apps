@@ -7715,11 +7715,11 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var gate = (floor * 1.55) + 0.0015;
+    var gate = (floor * 1.04) + 0.0006;
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.01, (0.072 + (floor * 2.4)));
+    var normalized = (raw - gate) / Math.max(0.01, (0.03 + (floor * 0.8)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
@@ -7728,7 +7728,7 @@
     if (normalized > 0) {
       normalized = Math.pow(normalized, 0.58);
     }
-    if (normalized < 0.003) {
+    if (normalized < 0.004) {
       normalized = 0;
     }
     return normalized;
@@ -7760,7 +7760,7 @@
     var sorted = samples.slice().sort(function (a, b) {
       return a - b;
     });
-    var idx = Math.floor((sorted.length - 1) * 0.2);
+    var idx = Math.floor((sorted.length - 1) * 0.08);
     if (idx < 0) {
       idx = 0;
     } else if (idx >= sorted.length) {
@@ -7775,14 +7775,14 @@
       floor = 0.01;
     }
     if (target > floor) {
-      floor = (floor * 0.86) + (target * 0.14);
+      floor = (floor * 0.62) + (target * 0.38);
     } else {
-      floor = (floor * 0.5) + (target * 0.5);
+      floor = (floor * 0.36) + (target * 0.64);
     }
     if (floor < 0.0008) {
       floor = 0.0008;
-    } else if (floor > 0.05) {
-      floor = 0.05;
+    } else if (floor > 0.85) {
+      floor = 0.85;
     }
     dictationWaveBackendFloor = floor;
     return floor;
@@ -8164,7 +8164,7 @@
     var silencePhase = Number(dictationWaveSilencePhase || 0);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.004;
+    var silenceGate = 0.006;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
