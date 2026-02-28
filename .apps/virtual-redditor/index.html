@@ -1291,10 +1291,15 @@
       themeTypeaheadResetTimer: null,
       profileSwitchToken: 0,
       profileSwitchOverlayHideTimer: 0,
-      profileSwitchOverlayShowFrame: 0
+      profileSwitchOverlayShowFrame: 0,
+      profileSwitchOverlayShownAt: 0,
+      profileSwitchTargetId: '',
+      pendingCreatedProfileId: '',
+      profileSettingsCacheById: {}
     };
 
     var PROFILE_SWITCH_OVERLAY_FADE_OUT_MS = 85;
+    var PROFILE_SWITCH_OVERLAY_MIN_VISIBLE_MS = 140;
 
     function currentProfileScope() {
       return String(state.activeProfile || '');
@@ -3213,6 +3218,74 @@
       state.pendingProfileDeleteIds = keep;
     }
 
+    function copySettingsSnapshot(raw) {
+      var source = raw || {};
+      return {
+        mode: normalizeMode(source.mode || 'judicial'),
+        patrolMode: normalizePatrolMode(source.patrolMode || DEFAULT_PATROL_MODE),
+        patrolSampleMax: Number(source.patrolSampleMax || 20) || 20,
+        patrolIntervalMin: Number(source.patrolIntervalMin || 3600) || 3600,
+        patrolIntervalMax: Number(source.patrolIntervalMax || 3600) || 3600,
+        threadInitiateMaxPct: Number(source.threadInitiateMaxPct || 25) || 25,
+        ollamaModel: String(source.ollamaModel || ''),
+        subreddit: String(source.subreddit || ''),
+        redditUsername: String(source.redditUsername || ''),
+        runEnabled: !!source.runEnabled,
+        obeyAdmins: !!source.obeyAdmins
+      };
+    }
+
+    function cacheProfileSettings(profileId, settings) {
+      var id = String(profileId || '');
+      if (!id || String(id).indexOf('__new_profile__') === 0) return;
+      state.profileSettingsCacheById = Object.assign({}, state.profileSettingsCacheById || {});
+      state.profileSettingsCacheById[id] = copySettingsSnapshot(settings || {});
+    }
+
+    function applyProfileSwitchPreview(targetId) {
+      var id = String(targetId || '');
+      if (!id || !state.status) return;
+      if (!state.status.settings) state.status.settings = {};
+      if (!state.status.profiles) state.status.profiles = { profiles: [], activeProfile: id };
+      var cached = (state.profileSettingsCacheById || {})[id];
+      if (cached && typeof cached === 'object') {
+        var keys = Object.keys(cached);
+        for (var i = 0; i < keys.length; i += 1) {
+          state.status.settings[keys[i]] = cached[keys[i]];
+        }
+      } else {
+        var profiles = Array.isArray(state.profiles) ? state.profiles : [];
+        for (var p = 0; p < profiles.length; p += 1) {
+          var row = profiles[p] || {};
+          if (String(row.id || '') !== id) continue;
+          if (row.username) state.status.settings.redditUsername = String(row.username || '');
+          if (row.subreddit) state.status.settings.subreddit = String(row.subreddit || '');
+          break;
+        }
+      }
+      var statusProfiles = Array.isArray(state.status.profiles.profiles) ? state.status.profiles.profiles.slice() : [];
+      if (!statusProfiles.length) {
+        statusProfiles = (Array.isArray(state.profiles) ? state.profiles : []).map(function (row) {
+          return {
+            id: String((row && row.id) || ''),
+            name: String((row && row.name) || ''),
+            username: String((row && row.username) || ''),
+            subreddit: String((row && row.subreddit) || ''),
+            connected: !!(row && row.connected),
+            selected: String((row && row.id) || '') === id
+          };
+        });
+      } else {
+        for (var j = 0; j < statusProfiles.length; j += 1) {
+          var sRow = statusProfiles[j] || {};
+          sRow.selected = (String(sRow.id || '') === id);
+        }
+      }
+      state.status.profiles.profiles = statusProfiles;
+      state.status.profiles.activeProfile = id;
+      renderStatus();
+    }
+
     function setCreateProfileMessage(msg, isError) {
       var el = document.getElementById('settings-msg');
       if (!el) return;
@@ -3452,6 +3525,7 @@
       if (!overlay) return;
       overlay.setAttribute('aria-hidden', state.profileSwitchLoading ? 'false' : 'true');
       if (state.profileSwitchLoading) {
+        state.profileSwitchOverlayShownAt = Date.now();
         if (state.profileSwitchOverlayHideTimer) {
           clearTimeout(state.profileSwitchOverlayHideTimer);
           state.profileSwitchOverlayHideTimer = 0;
@@ -3462,36 +3536,36 @@
         }
         overlay.classList.remove('hidden');
         overlay.classList.remove('is-hiding');
-        if (!overlay.classList.contains('is-visible')) {
-          state.profileSwitchOverlayShowFrame = window.requestAnimationFrame(function () {
-            state.profileSwitchOverlayShowFrame = 0;
-            var node = document.getElementById('profile-switch-overlay');
-            if (!node || !state.profileSwitchLoading) return;
-            node.classList.add('is-visible');
-          });
-        }
+        overlay.classList.add('is-visible');
         return;
       }
       if (state.profileSwitchOverlayShowFrame) {
         cancelAnimationFrame(state.profileSwitchOverlayShowFrame);
         state.profileSwitchOverlayShowFrame = 0;
       }
-      overlay.classList.remove('is-visible');
-      if (overlay.classList.contains('hidden')) {
-        overlay.classList.remove('is-hiding');
-        return;
-      }
-      overlay.classList.add('is-hiding');
       if (state.profileSwitchOverlayHideTimer) {
         clearTimeout(state.profileSwitchOverlayHideTimer);
       }
+      var elapsedMs = Math.max(0, Date.now() - (Number(state.profileSwitchOverlayShownAt) || 0));
+      var minDelayMs = Math.max(0, PROFILE_SWITCH_OVERLAY_MIN_VISIBLE_MS - elapsedMs);
       state.profileSwitchOverlayHideTimer = window.setTimeout(function () {
         state.profileSwitchOverlayHideTimer = 0;
         var node = document.getElementById('profile-switch-overlay');
         if (!node || state.profileSwitchLoading) return;
-        node.classList.add('hidden');
-        node.classList.remove('is-hiding');
-      }, PROFILE_SWITCH_OVERLAY_FADE_OUT_MS + 10);
+        node.classList.remove('is-visible');
+        if (node.classList.contains('hidden')) {
+          node.classList.remove('is-hiding');
+          return;
+        }
+        node.classList.add('is-hiding');
+        state.profileSwitchOverlayHideTimer = window.setTimeout(function () {
+          state.profileSwitchOverlayHideTimer = 0;
+          var inner = document.getElementById('profile-switch-overlay');
+          if (!inner || state.profileSwitchLoading) return;
+          inner.classList.add('hidden');
+          inner.classList.remove('is-hiding');
+        }, PROFILE_SWITCH_OVERLAY_FADE_OUT_MS + 10);
+      }, minDelayMs);
     }
 
     function setBootLoading(loading) {
@@ -4126,6 +4200,7 @@
         });
       }
       baseProfiles = orderProfilesLikePrevious(baseProfiles);
+      var resolvedActiveProfileId = '';
       if (state.createProfileMode && state.createProfileGhostId) {
         for (var bp = 0; bp < baseProfiles.length; bp += 1) {
           baseProfiles[bp].selected = false;
@@ -4139,20 +4214,39 @@
           selected: true,
           _ghost: true
         });
-        state.activeProfile = String(state.createProfileGhostId);
+        resolvedActiveProfileId = String(state.createProfileGhostId);
+        state.activeProfile = resolvedActiveProfileId;
       } else {
         var statusActive = String(profilesPayload.activeProfile || '');
         if (pendingDeleteIds.indexOf(statusActive) >= 0) {
           statusActive = '';
         }
+        var switchTarget = String(state.profileSwitchTargetId || '');
+        if (state.profileSwitchLoading && switchTarget && baseProfiles.some(function (p) { return String(((p || {}).id) || '') === switchTarget; })) {
+          statusActive = switchTarget;
+        }
+        var pendingCreated = String(state.pendingCreatedProfileId || '');
+        if (pendingCreated && baseProfiles.some(function (p) { return String(((p || {}).id) || '') === pendingCreated; })) {
+          statusActive = pendingCreated;
+          if (String(profilesPayload.activeProfile || '') === pendingCreated) {
+            state.pendingCreatedProfileId = '';
+            if (String(state.profileSwitchTargetId || '') === pendingCreated) {
+              state.profileSwitchTargetId = '';
+            }
+          }
+        }
         if (!statusActive || baseProfiles.every(function (p) { return String(((p || {}).id) || '') !== statusActive; })) {
           statusActive = String(((baseProfiles[0] || {}).id) || '');
         }
+        resolvedActiveProfileId = statusActive;
         state.activeProfile = statusActive;
       }
       state.profiles = baseProfiles;
       renderProfiles();
       syncControlAndLabelTooltips();
+      if (resolvedActiveProfileId) {
+        cacheProfileSettings(resolvedActiveProfileId, settings);
+      }
 
       var runToggle = document.getElementById('btn-run-toggle');
       var runIcon = document.getElementById('run-toggle-icon');
@@ -6413,6 +6507,7 @@
     async function fullRefresh(options) {
       var opts = options || {};
       var poll = !!opts.poll;
+      if (poll && (state.profileSwitchLoading || state.createProfileInFlight)) return;
       if (state.refreshInFlight) return;
       state.refreshInFlight = true;
       try {
@@ -6755,6 +6850,10 @@
         var createdId = String((((created || {}).profile) || {}).id || '');
         var createdName = String((((created || {}).profile) || {}).name || uname);
         materializeCreateProfileGhost(createdId, createdName, uname);
+        if (createdId) {
+          state.pendingCreatedProfileId = createdId;
+          state.profileSwitchTargetId = createdId;
+        }
         state.createProfileMode = false;
         var pane = document.getElementById('create-profile-pane');
         if (pane) pane.classList.add('hidden');
@@ -6764,7 +6863,10 @@
         setUsernameEditing(false);
         setSettingsMessage('', false);
         await refreshStatus();
+        state.profileSwitchTargetId = '';
       } catch (error) {
+        state.pendingCreatedProfileId = '';
+        state.profileSwitchTargetId = '';
         setSettingsMessage(String(error && error.message ? error.message : error), true);
       } finally {
         state.createProfileInFlight = false;
@@ -6780,6 +6882,8 @@
       if (String(state.activeProfile || '') === targetId) return;
       var switchToken = (Number(state.profileSwitchToken) || 0) + 1;
       state.profileSwitchToken = switchToken;
+      state.profileSwitchTargetId = targetId;
+      state.pendingCreatedProfileId = '';
       setProfileSwitchLoading(true);
 
       var previousActive = String(state.activeProfile || '');
@@ -6799,10 +6903,10 @@
       renderProfiles();
       updateToolbarButtonStates();
       setProfilesMessage('', false);
+      applyProfileSwitchPreview(targetId);
       var cachedDoctrine = state.doctrineCacheByProfile[targetId];
       if (cachedDoctrine && typeof cachedDoctrine === 'object') {
         applyDoctrineContent(cachedDoctrine.manifesto || '', cachedDoctrine.norms || '');
-        setProfileSwitchLoading(false);
       }
 
       if (state.previewMode) {
@@ -6810,18 +6914,17 @@
           state.status.profiles.profiles = state.profiles;
           state.status.profiles.activeProfile = targetId;
         }
+        state.profileSwitchTargetId = '';
         setProfileSwitchLoading(false);
         return;
       }
-      var releasedOverlay = false;
       try {
         await backendJson('select-profile', [targetId]);
         if (switchToken !== state.profileSwitchToken) return;
-        await refreshStatus();
-        if (switchToken !== state.profileSwitchToken) return;
+        state.profileSwitchTargetId = '';
         setProfileSwitchLoading(false);
-        releasedOverlay = true;
         var backgroundTasks = [];
+        backgroundTasks.push(refreshStatus());
         if (state.activeTab === 'persona') {
           backgroundTasks.push(refreshDoctrine(true));
         } else {
@@ -6831,6 +6934,7 @@
         Promise.allSettled(backgroundTasks).catch(function () {});
       } catch (error) {
         if (switchToken !== state.profileSwitchToken) return;
+        state.profileSwitchTargetId = '';
         state.activeProfile = previousActive;
         for (var y = 0; y < state.profiles.length; y += 1) {
           var p = state.profiles[y] || {};
@@ -6846,10 +6950,9 @@
         updateToolbarButtonStates();
         setProfilesMessage(String(error && error.message ? error.message : error), true);
       } finally {
-        if (switchToken === state.profileSwitchToken && !releasedOverlay) {
-          setProfileSwitchLoading(false);
-        }
         if (switchToken === state.profileSwitchToken) {
+          state.profileSwitchTargetId = '';
+          setProfileSwitchLoading(false);
           setBootLoading(false);
         }
       }
