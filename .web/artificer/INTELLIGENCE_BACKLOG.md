@@ -94,3 +94,4 @@ This backlog tracks concrete implementation work for improving Artificer intelli
   - Progress:
     - Added file-backed quality scorecard entries and markdown summary refresh on each scored run.
     - Added regression-triggered proposal generation from scorecard deltas, tagged to recent failure taxonomy categories.
+    - Added sustained-regression gating plus per-mode cooldown suppression to reduce repeated low-signal proposal spam while still escalating severe regressions.

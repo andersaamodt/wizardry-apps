@@ -102,6 +102,10 @@ mr_quality_scorecard_markdown_file() {
   printf '%s/scorecard.md' "$(mr_quality_scorecard_dir)"
 }
 
+mr_quality_scorecard_regression_cooldowns_file() {
+  printf '%s/regression-proposal-cooldowns.tsv' "$(mr_quality_scorecard_dir)"
+}
+
 mr_scheduler_state_file() {
   printf '%s/state.env' "$(mr_scheduler_dir)"
 }
@@ -1731,6 +1735,156 @@ mr_quality_scorecard_last_quality_for_mode() {
   ' "$entries_file"
 }
 
+mr_quality_scorecard_recent_regression_stats_for_mode() {
+  run_mode=$1
+  window_raw=${2:-6}
+  case "$run_mode" in
+    "")
+      printf '%s\t%s\t%s\t%s' "0" "0" "0" "0.000"
+      return 0
+      ;;
+  esac
+  window_size=$(mr_positive_int_or "$window_raw" "6")
+  if [ "$window_size" -gt 24 ]; then
+    window_size=24
+  fi
+  entries_file=$(mr_quality_scorecard_entries_file)
+  if [ ! -s "$entries_file" ]; then
+    printf '%s\t%s\t%s\t%s' "0" "0" "0" "0.000"
+    return 0
+  fi
+  tab_char=$(printf '\t')
+  awk -F"$tab_char" -v run_mode="$run_mode" -v window_size="$window_size" '
+    NF >= 10 {
+      entry_mode = $5
+      if (entry_mode != run_mode) {
+        next
+      }
+      rows[++row_count] = $0
+    }
+    END {
+      if (row_count <= 0) {
+        printf "0\t0\t0\t0.000"
+        exit
+      }
+      start = row_count - window_size + 1
+      if (start < 1) {
+        start = 1
+      }
+      total = 0
+      regressive = 0
+      severe = 0
+      sum_delta = 0.0
+      for (i = start; i <= row_count; i++) {
+        split(rows[i], fields, "\t")
+        final_state = fields[7]
+        quality = fields[8] + 0.0
+        delta = fields[9] + 0.0
+        total += 1
+        sum_delta += delta
+        if ((final_state != "DONE" && quality < 0.55) || (delta <= -0.080 && quality < 0.60)) {
+          regressive += 1
+        }
+        if ((final_state != "DONE" && quality < 0.50) || (delta <= -0.120 && quality < 0.55)) {
+          severe += 1
+        }
+      }
+      avg_delta = 0.0
+      if (total > 0) {
+        avg_delta = sum_delta / total
+      }
+      printf "%s\t%s\t%s\t%.3f", total, regressive, severe, avg_delta
+    }
+  ' "$entries_file"
+}
+
+mr_quality_scorecard_regression_cooldown_last_epoch_for_mode() {
+  run_mode=$1
+  cooldowns_file=$(mr_quality_scorecard_regression_cooldowns_file)
+  if [ ! -s "$cooldowns_file" ]; then
+    printf '%s' "0"
+    return 0
+  fi
+  tab_char=$(printf '\t')
+  last_epoch=$(awk -F"$tab_char" -v run_mode="$run_mode" '
+    NF >= 1 {
+      mode_value = $1
+      epoch_value = $2
+      if (mode_value != run_mode) {
+        next
+      }
+      if (epoch_value ~ /^[0-9]+$/) {
+        last = epoch_value
+      }
+    }
+    END {
+      if (last == "") {
+        printf "0"
+      } else {
+        printf "%s", last
+      }
+    }
+  ' "$cooldowns_file")
+  case "$last_epoch" in
+    ""|*[!0-9]*) last_epoch="0" ;;
+  esac
+  printf '%s' "$last_epoch"
+}
+
+mr_quality_scorecard_set_regression_cooldown_for_mode() {
+  run_mode=$1
+  now_epoch_raw=${2:-}
+  case "$run_mode" in
+    "") return 0 ;;
+  esac
+  now_epoch=$(mr_nonnegative_int_or "$now_epoch_raw" "$(mr_now_epoch)")
+  now_iso=$(mr_now_iso)
+  cooldowns_file=$(mr_quality_scorecard_regression_cooldowns_file)
+  [ -f "$cooldowns_file" ] || : > "$cooldowns_file"
+  tab_char=$(printf '\t')
+  tmp_file=$(mktemp)
+  while IFS="$tab_char" read -r mode_value epoch_value iso_value || [ -n "$mode_value$epoch_value$iso_value" ]; do
+    [ -n "$mode_value$epoch_value$iso_value" ] || continue
+    if [ "$mode_value" = "$run_mode" ]; then
+      continue
+    fi
+    printf '%s\t%s\t%s\n' "$mode_value" "$epoch_value" "$iso_value" >> "$tmp_file"
+  done < "$cooldowns_file"
+  printf '%s\t%s\t%s\n' "$run_mode" "$now_epoch" "$now_iso" >> "$tmp_file"
+  mv "$tmp_file" "$cooldowns_file"
+}
+
+mr_quality_scorecard_regression_cooldown_remaining_sec() {
+  run_mode=$1
+  cooldown_sec_raw=${2:-3600}
+  now_epoch_raw=${3:-}
+  case "$run_mode" in
+    "")
+      printf '%s' "0"
+      return 0
+      ;;
+  esac
+  cooldown_sec=$(mr_positive_int_or "$cooldown_sec_raw" "3600")
+  now_epoch=$(mr_nonnegative_int_or "$now_epoch_raw" "$(mr_now_epoch)")
+  last_epoch=$(mr_quality_scorecard_regression_cooldown_last_epoch_for_mode "$run_mode")
+  case "$last_epoch" in
+    ""|*[!0-9]*) last_epoch="0" ;;
+  esac
+  if [ "$last_epoch" -le 0 ]; then
+    printf '%s' "0"
+    return 0
+  fi
+  elapsed=$((now_epoch - last_epoch))
+  if [ "$elapsed" -lt 0 ]; then
+    elapsed=0
+  fi
+  remaining=$((cooldown_sec - elapsed))
+  if [ "$remaining" -lt 0 ]; then
+    remaining=0
+  fi
+  printf '%s' "$remaining"
+}
+
 mr_quality_scorecard_refresh_markdown() {
   entries_file=$(mr_quality_scorecard_entries_file)
   markdown_file=$(mr_quality_scorecard_markdown_file)
@@ -1828,6 +1982,8 @@ mr_quality_scorecard_maybe_raise_regression_proposal() {
   delta_score=$3
   queue_status=$4
   final_state=$5
+  regression_window=6
+  regression_cooldown_sec=3600
   case "$run_mode" in
     ""|unknown)
       return 0
@@ -1852,16 +2008,64 @@ mr_quality_scorecard_maybe_raise_regression_proposal() {
   if [ "$should_raise" != "1" ]; then
     return 0
   fi
+
+  current_severe=$(awk -v quality_score="$quality_score" -v delta_score="$delta_score" -v final_state="$final_state" '
+    BEGIN {
+      q = quality_score + 0.0
+      d = delta_score + 0.0
+      if ((final_state != "DONE" && q < 0.50) || (d <= -0.120 && q < 0.55)) {
+        print "1"
+      } else {
+        print "0"
+      }
+    }
+  ')
+  if [ "$current_severe" != "1" ]; then
+    stats_row=$(mr_quality_scorecard_recent_regression_stats_for_mode "$run_mode" "$regression_window")
+    tab_char=$(printf '\t')
+    recent_total=0
+    recent_regressive=0
+    recent_severe=0
+    recent_avg_delta="0.000"
+    old_ifs=$IFS
+    IFS="$tab_char"
+    set -- $stats_row
+    IFS=$old_ifs
+    recent_total=$(mr_nonnegative_int_or "${1:-0}" "0")
+    recent_regressive=$(mr_nonnegative_int_or "${2:-0}" "0")
+    recent_severe=$(mr_nonnegative_int_or "${3:-0}" "0")
+    recent_avg_delta=$(trim "${4:-0.000}")
+    if [ "$recent_total" -lt 4 ] || [ "$recent_regressive" -lt 2 ]; then
+      return 0
+    fi
+  else
+    recent_total=0
+    recent_regressive=0
+    recent_severe=0
+    recent_avg_delta="0.000"
+  fi
+
+  cooldown_remaining=$(mr_quality_scorecard_regression_cooldown_remaining_sec "$run_mode" "$regression_cooldown_sec")
+  case "$cooldown_remaining" in
+    ""|*[!0-9]*) cooldown_remaining=0 ;;
+  esac
+  if [ "$cooldown_remaining" -gt 0 ]; then
+    return 0
+  fi
+
   category_id=$(mr_failure_taxonomy_latest_category_id)
   if [ -n "$category_id" ] && mr_improvement_proposal_exists_for_category "$category_id"; then
     return 0
   fi
   title_text="Investigate quality regression in ${run_mode} mode"
-  rationale_text="Quality score regressed (quality=${quality_score}, delta=${delta_score}) with final_state=${final_state}."
+  rationale_text="Quality score regressed (quality=${quality_score}, delta=${delta_score}) with final_state=${final_state}; recent_window=${regression_window} total=${recent_total} regressive=${recent_regressive} severe=${recent_severe} avg_delta=${recent_avg_delta}."
   change_text="Review recent failures and tighten controller policy/verification flow for ${run_mode} mode to recover quality and reduce repeated breakdowns."
   scope_text="controller-loop"
   risk_text="medium"
-  mr_improvement_proposal_create "$title_text" "$rationale_text" "$change_text" "$scope_text" "$risk_text" "quality-scorecard" "$category_id" >/dev/null 2>&1 || true
+  proposal_id=$(mr_improvement_proposal_create "$title_text" "$rationale_text" "$change_text" "$scope_text" "$risk_text" "quality-scorecard" "$category_id" 2>/dev/null || true)
+  if [ -n "$proposal_id" ]; then
+    mr_quality_scorecard_set_regression_cooldown_for_mode "$run_mode" >/dev/null 2>&1 || true
+  fi
 }
 
 mr_quality_scorecard_record_entry() {
@@ -2723,6 +2927,10 @@ EOF_CTRL
   if [ ! -f "$quality_entries_file" ]; then
     : > "$quality_entries_file"
   fi
+  quality_cooldowns_file=$(mr_quality_scorecard_regression_cooldowns_file)
+  if [ ! -f "$quality_cooldowns_file" ]; then
+    : > "$quality_cooldowns_file"
+  fi
 
   quality_readme_file="$(mr_quality_scorecard_dir)/README.md"
   if [ ! -f "$quality_readme_file" ]; then
@@ -2731,6 +2939,7 @@ EOF_CTRL
 
 - `entries.tsv` stores run-level intelligence quality snapshots and deltas.
 - `scorecard.md` stores a human-readable summary of trends and recent runs.
+- `regression-proposal-cooldowns.tsv` stores per-mode cooldown state that prevents repeated proposal spam.
 - Regressions can trigger manually-reviewable improvement proposals tagged to recent failure categories.
 EOF_SCORE
   fi
