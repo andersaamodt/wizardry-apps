@@ -2489,6 +2489,8 @@ blog_run_scheduler() {
 blog_collect_public_posts() {
   # Writes sorted markdown file paths to output file argument.
   out_file=$1
+  candidates_tmp=$(mktemp "${TMPDIR:-/tmp}/blog-post-candidates.XXXXXX")
+  temp=$(mktemp "${TMPDIR:-/tmp}/blog-posts.XXXXXX")
 
   if blog_nostr_bridge_enabled; then
     blog_nostr_rebuild_derived >/dev/null 2>&1 || true
@@ -2499,13 +2501,14 @@ blog_collect_public_posts() {
         if [ -f "$file" ]; then
           printf '%s\n' "$file"
         fi
-      done > "$out_file"
-      return 0
+      done >> "$candidates_tmp"
     fi
   fi
 
-  temp=$(mktemp "${TMPDIR:-/tmp}/blog-posts.XXXXXX")
-  find "$blog_posts_dir" -type f -name '*.md' 2>/dev/null | while IFS= read -r file; do
+  find "$blog_posts_dir" -type f -name '*.md' 2>/dev/null >> "$candidates_tmp"
+
+  sort -u "$candidates_tmp" | while IFS= read -r file; do
+    [ -f "$file" ] || continue
     visibility=$(blog_read_front_matter_value "$file" visibility 2>/dev/null || printf '')
     if [ -z "$visibility" ]; then
       visibility="public"
@@ -2523,7 +2526,7 @@ blog_collect_public_posts() {
   done | sort -r > "$temp"
 
   awk -F'|' '{print $2}' "$temp" > "$out_file"
-  rm -f "$temp"
+  rm -f "$temp" "$candidates_tmp"
 }
 
 blog_base_url() {
