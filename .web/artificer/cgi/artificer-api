@@ -17858,6 +17858,8 @@ $teacher_model_snapshot"
     loop_feedback="No prior action in this run."
     loop_summary=""
     assistant_output=""
+    stagnation_last_signature=""
+    stagnation_repeat_count=0
 
     iteration=1
     while :; do
@@ -19605,6 +19607,43 @@ $checkpoint_trimmed"
 Transition: $state_mode -> $next_mode
 Reason: $transition_reason_runtime"
       loop_feedback=$iteration_report
+
+      stagnation_plan_head=$(printf '%s\n' "$plan_update" | sed -n '1,2p')
+      stagnation_plan_head=$(single_line_snippet "$stagnation_plan_head")
+      if [ -z "$stagnation_plan_head" ]; then
+        stagnation_plan_head="none"
+      fi
+      stagnation_checkpoint=$(single_line_snippet "$checkpoint_trimmed")
+      if [ -z "$stagnation_checkpoint" ]; then
+        stagnation_checkpoint="none"
+      fi
+      stagnation_signature_src=$(printf '%s|%s|%s|%s|%s|%s' \
+        "$state_mode" "$next_mode" "$transition_reason_runtime" "$done_claim" "$stagnation_plan_head" "$stagnation_checkpoint")
+      stagnation_signature=$(printf '%s' "$stagnation_signature_src" | cksum | awk '{print $1}')
+      if [ -n "$stagnation_last_signature" ] && [ "$stagnation_signature" = "$stagnation_last_signature" ]; then
+        stagnation_repeat_count=$((stagnation_repeat_count + 1))
+      else
+        stagnation_repeat_count=0
+      fi
+      stagnation_last_signature=$stagnation_signature
+      if [ "$next_mode" != "DONE" ] && [ "$stagnation_repeat_count" -ge 2 ]; then
+        stagnation_note="Loop stagnation detected: repeated transition signature with limited forward progress."
+        loop_feedback="${loop_feedback}
+
+Stagnation guardrail:
+- Recent iterations repeated the same transition signature.
+- Do not repeat identical plan/command output.
+- Either emit DECISION_REQUEST for truly required missing inputs, or choose explicit assumptions and advance with verifiable progress."
+        if [ "$stagnation_repeat_count" -eq 2 ]; then
+          append_failure_entry "$failures_file" "iteration-$iteration:loop-stagnation" \
+            "Loop stagnation detected" \
+            "Repeated transition signature without forward progress" \
+            "Switch strategy via explicit assumptions or early decision checkpoint"
+          stream_emit_line "$stream_output_file" "Loop stagnation detected; injecting anti-repeat guardrail."
+          iteration_report="${iteration_report}
+$stagnation_note"
+        fi
+      fi
 
       append_session_entry "$session_log_file" "iteration $iteration ($state_mode -> $next_mode)" "$iteration_report"
       loop_summary="${loop_summary}

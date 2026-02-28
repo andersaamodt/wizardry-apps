@@ -41,6 +41,7 @@ assert_file "$backlog"
 # Backend contracts: failure taxonomy and manual proposal governance exist.
 assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_record()"
 assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_state_json()"
+assert_contains "$mode_runtime_lib" "controller-stagnation"
 assert_contains "$mode_runtime_lib" "mr_improvement_proposal_generate_from_taxonomy_json()"
 assert_contains "$mode_runtime_lib" "mr_improvement_proposal_set_status()"
 assert_contains "$mode_runtime_lib" "manual_confirm=1 is required for apply"
@@ -75,6 +76,9 @@ assert_contains "$api" "quality_scorecard_state)"
 assert_contains "$api" 'mr_failure_taxonomy_record "$action_text"'
 assert_contains "$api" "mr_controller_variant_select_for_run"
 assert_contains "$api" "mr_controller_variant_record_run"
+assert_contains "$api" "stagnation_repeat_count=0"
+assert_contains "$api" "Loop stagnation detected; injecting anti-repeat guardrail."
+assert_contains "$api" 'iteration-$iteration:loop-stagnation'
 assert_contains "$api" 'runtime_failure_summary=$(mr_failure_taxonomy_recent_summary_text "6")'
 assert_contains "$api" 'runtime_quality_summary=$(mr_quality_scorecard_recent_summary_text "8")'
 assert_contains "$api" 'runtime_guardrails=$(mr_runtime_learning_guardrails_text)'

@@ -366,6 +366,10 @@ mr_failure_taxonomy_category_for_entry() {
     printf '%s' "timeout-budget"
     return 0
   fi
+  if printf '%s' "$combined" | grep -Eq 'stagnation|repeated transition signature|loop repeating|no forward progress|anti-repeat guardrail'; then
+    printf '%s' "controller-stagnation"
+    return 0
+  fi
   if printf '%s' "$combined" | grep -Eq 'decision required|decision-request|decision request|required-input-missing|external-action-gate|destructive-action-gate'; then
     printf '%s' "decision-gate"
     return 0
@@ -398,6 +402,7 @@ mr_failure_taxonomy_category_label() {
   case "$category_id" in
     command-policy-block) printf '%s' "Command policy / approval gate" ;;
     timeout-budget) printf '%s' "Run timeout / budget exhaustion" ;;
+    controller-stagnation) printf '%s' "Controller loop stagnation" ;;
     decision-gate) printf '%s' "Decision surfacing gate" ;;
     parser-contract) printf '%s' "Controller parse/contract failure" ;;
     verification-regression) printf '%s' "Verification regression" ;;
@@ -413,6 +418,7 @@ mr_failure_taxonomy_surface_for_category() {
   case "$category_id" in
     command-policy-block) printf '%s' "policy" ;;
     timeout-budget) printf '%s' "runtime" ;;
+    controller-stagnation) printf '%s' "reasoning" ;;
     decision-gate) printf '%s' "governance" ;;
     parser-contract) printf '%s' "reasoning" ;;
     verification-regression) printf '%s' "verification" ;;
@@ -426,7 +432,7 @@ mr_failure_taxonomy_surface_for_category() {
 mr_failure_taxonomy_severity_for_category() {
   category_id=$1
   case "$category_id" in
-    timeout-budget|verification-regression|implementation-failure)
+    timeout-budget|verification-regression|implementation-failure|controller-stagnation)
       printf '%s' "high"
       ;;
     decision-gate|parser-contract|missing-artifact|external-dependency)
@@ -664,6 +670,9 @@ mr_failure_taxonomy_guardrail_for_category() {
       ;;
     timeout-budget)
       printf '%s' "Reduce scope per iteration and prioritize a verifiable partial completion over broad unfinished work."
+      ;;
+    controller-stagnation)
+      printf '%s' "Do not repeat the prior transition/plan pattern; switch strategy by making explicit assumptions or surfacing a concrete decision gate."
       ;;
     decision-gate)
       printf '%s' "Surface high-impact user decisions early with concrete options before implementation proceeds."
@@ -953,6 +962,14 @@ mr_improvement_proposal_template_for_category() {
         "Add an early decomposition checkpoint and emit partial-deliverable summaries before heavy implementation phases." \
         "controller-loop" \
         "low"
+      ;;
+    controller-stagnation)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Break repeated controller-loop stagnation patterns" \
+        "Consecutive iterations are repeating the same transition signature without forward progress." \
+        "Add anti-repeat guardrails that force either explicit assumptions with verifiable progress or an early decision checkpoint." \
+        "controller-loop" \
+        "medium"
       ;;
     command-policy-block)
       printf '%s\t%s\t%s\t%s\t%s' \

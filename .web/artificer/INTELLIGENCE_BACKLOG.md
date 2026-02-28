@@ -71,6 +71,7 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Surfaced controller variant state and promote/rollback controls in Mode Runtime settings.
     - Injected runtime learning summaries (latest failure taxonomy signals + quality scorecard trend) into each controller loop prompt so active runs can adapt to recent regressions.
     - Added runtime adaptation guardrails derived from recent taxonomy/quality patterns, feeding actionable anti-regression instructions directly into controller prompts.
+    - Added loop-stagnation detection that records repeated-transition failures and injects anti-repeat guardrails into subsequent controller iterations.
 
 - INT-009 Security specialist modes
   - Goal: Strengthen `pentest` and `security-audit` modes with stricter evidence contracts.
