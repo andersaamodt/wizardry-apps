@@ -7703,20 +7703,78 @@
     } else if (raw > 1) {
       raw = 1;
     }
-    var gate = 0.01;
-    var normalized = (raw - gate) / 0.24;
+    var floor = Number(dictationWaveBackendFloor || 0.01);
+    if (!isFinite(floor) || floor < 0) {
+      floor = 0.01;
+    }
+    var gate = (floor * 1.18) + 0.0006;
+    var normalized = (raw - gate) / Math.max(0.012, (0.09 + (floor * 2.8)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.88);
+      normalized = Math.pow(normalized, 0.7);
     }
     if (normalized < 0.0012) {
       normalized = 0;
     }
     return normalized;
+  }
+
+  function updateDictationBackendFloorWithSamples(levelSamples, fallbackSample) {
+    var samples = [];
+    var arr = Array.isArray(levelSamples) ? levelSamples : [];
+    for (var i = 0; i < arr.length; i += 1) {
+      var v = Number(arr[i]);
+      if (!isFinite(v) || v < 0) {
+        continue;
+      }
+      if (v > 1) {
+        v = 1;
+      }
+      samples.push(v);
+    }
+    var fallback = Number(fallbackSample);
+    if (isFinite(fallback) && fallback >= 0) {
+      if (fallback > 1) {
+        fallback = 1;
+      }
+      samples.push(fallback);
+    }
+    if (!samples.length) {
+      return Number(dictationWaveBackendFloor || 0.01);
+    }
+    var sorted = samples.slice().sort(function (a, b) {
+      return a - b;
+    });
+    var idx = Math.floor((sorted.length - 1) * 0.2);
+    if (idx < 0) {
+      idx = 0;
+    } else if (idx >= sorted.length) {
+      idx = sorted.length - 1;
+    }
+    var target = Number(sorted[idx] || 0);
+    if (!isFinite(target) || target < 0) {
+      target = 0;
+    }
+    var floor = Number(dictationWaveBackendFloor || 0.01);
+    if (!isFinite(floor) || floor < 0) {
+      floor = 0.01;
+    }
+    if (target > floor) {
+      floor = (floor * 0.86) + (target * 0.14);
+    } else {
+      floor = (floor * 0.5) + (target * 0.5);
+    }
+    if (floor < 0.0008) {
+      floor = 0.0008;
+    } else if (floor > 0.05) {
+      floor = 0.05;
+    }
+    dictationWaveBackendFloor = floor;
+    return floor;
   }
 
   function mergedDictationWaveLevel(candidateLevel) {
@@ -7790,18 +7848,23 @@
       } else if (polledLevel > 1) {
         polledLevel = 1;
       }
-      var normalizedBackend = normalizedDictationBackendLevel(polledLevel);
       var incomingLevels = Array.isArray(response.levels) ? response.levels : [];
-      var normalizedSequence = [];
-      for (var li = 0; li < incomingLevels.length; li += 1) {
-        var seqLevel = Number(incomingLevels[li]);
-        if (!isFinite(seqLevel) || seqLevel < 0) {
+      var parsedIncoming = [];
+      for (var pi = 0; pi < incomingLevels.length; pi += 1) {
+        var parsedValue = Number(incomingLevels[pi]);
+        if (!isFinite(parsedValue) || parsedValue < 0) {
           continue;
         }
-        if (seqLevel > 1) {
-          seqLevel = 1;
+        if (parsedValue > 1) {
+          parsedValue = 1;
         }
-        normalizedSequence.push(normalizedDictationBackendLevel(seqLevel));
+        parsedIncoming.push(parsedValue);
+      }
+      updateDictationBackendFloorWithSamples(parsedIncoming, polledLevel);
+      var normalizedBackend = normalizedDictationBackendLevel(polledLevel);
+      var normalizedSequence = [];
+      for (var li = 0; li < parsedIncoming.length; li += 1) {
+        normalizedSequence.push(normalizedDictationBackendLevel(parsedIncoming[li]));
       }
       if (normalizedSequence.length) {
         normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
@@ -7822,8 +7885,7 @@
         if (!isFinite(queuedLevel) || queuedLevel < 0) {
           queuedLevel = lifted;
         }
-        var emittedLevel = (queuedLevel * 0.8) + (lifted * 0.2);
-        applyDictationWaveLevel(emittedLevel);
+        applyDictationWaveLevel(queuedLevel);
       }
     }).catch(function () {
       return null;
@@ -7889,7 +7951,7 @@
           return;
         }
         var avgRaw = dictationWaveBarSampleCount > 0 ? (dictationWaveBarSumRaw / dictationWaveBarSampleCount) : rawLevel;
-        var summarizedRaw = (avgRaw * 0.62) + (Number(dictationWaveBarPeakRaw || 0) * 0.38);
+        var summarizedRaw = (avgRaw * 0.18) + (Number(dictationWaveBarPeakRaw || 0) * 0.82);
         dictationWaveBarStartAt = sampleNow;
         dictationWaveBarPeakRaw = 0;
         dictationWaveBarSumRaw = 0;
@@ -7943,7 +8005,6 @@
           if (polledLevel > 1) {
             polledLevel = 1;
           }
-          var normalizedBackend = normalizedDictationBackendLevel(polledLevel);
           var incomingLevels = Array.isArray(response.levels) ? response.levels : [];
           var parsedIncoming = [];
           for (var li = 0; li < incomingLevels.length; li += 1) {
@@ -7956,12 +8017,20 @@
             }
             parsedIncoming.push(seqLevel);
           }
+          updateDictationBackendFloorWithSamples(parsedIncoming, polledLevel);
+          var normalizedBackend = normalizedDictationBackendLevel(polledLevel);
           var normalizedSequence = [];
           if (parsedIncoming.length) {
             for (var ni = 0; ni < parsedIncoming.length; ni += 1) {
               normalizedSequence.push(normalizedDictationBackendLevel(parsedIncoming[ni]));
             }
             dictationWaveBackendRecentLevels = parsedIncoming.slice(parsedIncoming.length - 18);
+            for (var qi = 0; qi < normalizedSequence.length; qi += 1) {
+              dictationWaveBackendEmitQueue.push(normalizedSequence[qi]);
+            }
+            if (dictationWaveBackendEmitQueue.length > 160) {
+              dictationWaveBackendEmitQueue = dictationWaveBackendEmitQueue.slice(dictationWaveBackendEmitQueue.length - 160);
+            }
           }
           if (normalizedSequence.length) {
             normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
@@ -7979,8 +8048,7 @@
                 if (!isFinite(queuedLevel) || queuedLevel < 0) {
                   queuedLevel = mergedBackendLevel;
                 }
-                var emittedLevel = (queuedLevel * 0.8) + (mergedBackendLevel * 0.2);
-                applyDictationWaveLevel(emittedLevel);
+                applyDictationWaveLevel(queuedLevel);
               }
             }
           }
@@ -8042,7 +8110,7 @@
         }
         var analyser = context.createAnalyser();
         analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.35;
+        analyser.smoothingTimeConstant = 0.08;
         var source = context.createMediaStreamSource(stream);
         source.connect(analyser);
         var data = new Uint8Array(analyser.fftSize);

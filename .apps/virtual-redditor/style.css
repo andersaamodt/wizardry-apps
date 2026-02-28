@@ -1364,24 +1364,55 @@ label {
   position: absolute;
   inset: 0;
   z-index: 120;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--bg-main) 70%, transparent);
-  backdrop-filter: blur(1px);
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in srgb, color-mix(in srgb, var(--bg-main) 74%, var(--text-subtle) 26%) 52%, transparent);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  transition:
+    opacity 180ms ease-out,
+    backdrop-filter 180ms ease-out,
+    -webkit-backdrop-filter 180ms ease-out;
+}
+
+.profile-switch-overlay.hidden {
+  display: none !important;
+}
+
+.profile-switch-overlay.is-visible {
+  pointer-events: auto;
+  opacity: 1;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.profile-switch-overlay.is-hiding {
+  pointer-events: none;
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  transition-duration: 85ms;
+  transition-timing-function: ease-in;
 }
 
 .profile-switch-overlay-card {
-  display: inline-flex;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 44%;
+  transform: translateY(-50%);
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 0.48rem 0.72rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
-  background: color-mix(in srgb, var(--bg-panel) 90%, transparent);
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--text-subtle);
   font-size: 0.8rem;
   font-style: italic;
+  white-space: nowrap;
 }
 
 .tabbar {
