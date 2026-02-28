@@ -983,6 +983,24 @@ blog_rename_authored_posts() {
   printf '%s\n' "$renamed"
 }
 
+blog_count_authored_posts_by_author() {
+  author_name=${1-}
+  if [ -z "$author_name" ]; then
+    printf '0\n'
+    return 0
+  fi
+  mkdir -p "$blog_posts_dir"
+  count=0
+  for file in "$blog_posts_dir"/*.md; do
+    [ -f "$file" ] || continue
+    author=$(blog_read_front_matter_value "$file" author 2>/dev/null || printf '')
+    if [ "$author" = "$author_name" ]; then
+      count=$((count + 1))
+    fi
+  done
+  printf '%s\n' "$count"
+}
+
 blog_find_username_by_fingerprint() {
   fingerprint=${1-}
   if [ -z "$fingerprint" ] || [ ! -d "$blog_users_dir" ]; then

@@ -1339,13 +1339,27 @@
     const nextName = els.accountPlayerName.value.trim();
     const currentName = String(state.playerName || state.username || '').trim();
     let renameAuthoredPosts = false;
-    if (nextName && currentName && nextName !== currentName) {
-      renameAuthoredPosts = window.confirm(
-        'Also rename author on your existing posts?\n\n' +
-        'If you continue, this will update the post metadata field author: "' + currentName + '" to author: "' + nextName + '" on every post that currently matches your old name.'
-      );
-    }
     try {
+      if (nextName && currentName && nextName !== currentName) {
+        const preview = await apiPost('/cgi/blog-update-account', {
+          player_name: nextName,
+          preview_rename: 'true'
+        }, true);
+        if (!preview.success) {
+          throw new Error(preview.error || 'Could not check authored posts');
+        }
+        const candidateCount = Number(preview.rename_candidate_count || 0);
+        const oldNameForPrompt = String(preview.old_player_name || currentName || '').trim();
+        if (candidateCount > 0) {
+          renameAuthoredPosts = window.confirm(
+            'Posts were found authored under your old name.\n\n' +
+            'Would you like to update the author field of all these posts to your new name?\n\n' +
+            'Old name: "' + oldNameForPrompt + '"\n' +
+            'New name: "' + nextName + '"\n' +
+            'Matching posts: ' + candidateCount
+          );
+        }
+      }
       const data = await apiPost('/cgi/blog-update-account', {
         player_name: nextName,
         rename_authored_posts: renameAuthoredPosts ? 'true' : 'false'
