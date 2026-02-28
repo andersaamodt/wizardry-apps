@@ -5511,13 +5511,42 @@
     if (clippedCount > 0) {
       html += "<p class='run-feed-clip'>Showing latest " + escHtml(String(entries.length)) + " steps (" + escHtml(String(clippedCount)) + " earlier steps hidden).</p>";
     }
-    for (var i = 0; i < entries.length; i += 1) {
-      var entry = entries[i] || {};
-      var tone = runStepTone(entry.text);
-      html += "<div class='run-step " + escHtml(tone) + "'>";
-      html += "<span class='run-step-time'>" + escHtml(entry.time || "step") + "</span>";
-      html += "<span class='run-step-text'>" + escHtml(entry.text || "") + "</span>";
-      html += "</div>";
+    function renderStep(entry) {
+      var stepEntry = entry || {};
+      var tone = runStepTone(stepEntry.text);
+      return (
+        "<div class='run-step " + escHtml(tone) + "'>" +
+          "<span class='run-step-time'>" + escHtml(stepEntry.time || "step") + "</span>" +
+          "<span class='run-step-text'>" + escHtml(stepEntry.text || "") + "</span>" +
+        "</div>"
+      );
+    }
+
+    var collapseMiddle = !isRunning && entries.length > 14;
+    if (collapseMiddle) {
+      var leadCount = 3;
+      var tailCount = 8;
+      var hiddenCount = entries.length - leadCount - tailCount;
+      if (hiddenCount < 1) {
+        collapseMiddle = false;
+      } else {
+        for (var h = 0; h < leadCount; h += 1) {
+          html += renderStep(entries[h]);
+        }
+        html += "<details class='run-feed-fold'><summary>Earlier steps (" + escHtml(String(hiddenCount)) + ")</summary><div class='run-feed-fold-body'>";
+        for (var m = leadCount; m < entries.length - tailCount; m += 1) {
+          html += renderStep(entries[m]);
+        }
+        html += "</div></details>";
+        for (var t = entries.length - tailCount; t < entries.length; t += 1) {
+          html += renderStep(entries[t]);
+        }
+      }
+    }
+    if (!collapseMiddle) {
+      for (var i = 0; i < entries.length; i += 1) {
+        html += renderStep(entries[i]);
+      }
     }
     html += "</div>";
     return html;

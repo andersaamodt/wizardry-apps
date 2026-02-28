@@ -2579,6 +2579,29 @@ button:disabled,
   color: var(--success);
 }
 
+.run-feed-fold {
+  border-top: 1px dashed color-mix(in srgb, var(--line) 75%, transparent);
+  margin-top: 2px;
+  padding-top: 4px;
+}
+
+.run-feed-fold > summary {
+  cursor: pointer;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.run-feed-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.run-feed-fold-body {
+  margin-top: 5px;
+  display: grid;
+  gap: 5px;
+}
+
 .run-diff-view {
   max-height: 230px;
   padding: 0 0 8px;
