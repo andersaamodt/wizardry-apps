@@ -7433,7 +7433,7 @@
     if (signal < 0) {
       signal = 0;
     }
-    var dynamicRange = Math.max(0.0025, gate * 6.2);
+    var dynamicRange = Math.max(0.0025, gate * 7.0);
     var normalized = signal / dynamicRange;
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
@@ -7441,7 +7441,7 @@
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 1.12);
+      normalized = Math.pow(normalized, 1.04);
     }
     if (normalized < 0.0032) {
       normalized = 0;
@@ -7468,14 +7468,14 @@
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.016, (0.082 + (effectiveFloor * 1.4)));
+    var normalized = (raw - gate) / Math.max(0.016, (0.096 + (effectiveFloor * 1.55)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 1.08);
+      normalized = Math.pow(normalized, 1.0);
     }
     if (normalized < 0.0022) {
       normalized = 0;
@@ -7760,7 +7760,7 @@
           return;
         }
         var avgRaw = dictationWaveBarSampleCount > 0 ? (dictationWaveBarSumRaw / dictationWaveBarSampleCount) : rawLevel;
-        var summarizedRaw = (avgRaw * 0.56) + (Number(dictationWaveBarPeakRaw || 0) * 0.44);
+        var summarizedRaw = (avgRaw * 0.52) + (Number(dictationWaveBarPeakRaw || 0) * 0.48);
         dictationWaveBarStartAt = sampleNow;
         dictationWaveBarPeakRaw = 0;
         dictationWaveBarSumRaw = 0;
@@ -7953,7 +7953,7 @@
     var silencePhase = Number(dictationWaveSilencePhase || 0);
     var baselineHeight = 1;
     var maxWaveHeight = 39;
-    var silenceGate = 0.0056;
+    var silenceGate = 0.0054;
     for (var i = 0; i < bars.length; i += 1) {
       var bar = bars[i];
       var unit = Number(levels[i] || 0);
