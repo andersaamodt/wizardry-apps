@@ -1,3 +1,8 @@
 task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
 deterministic-tests	report	standard	error	2	11	0	384	1	1	1	1	61	67
 concurrency-race	assistant	standard	awaiting_decision	0	1	0	332	1	1	1	1	57	37
+api-hardening	programming	standard	error	2	11	0	384	1	1	1	1	61	67
+migration-safe	assistant	standard	awaiting_decision	0	1	0	316	1	1	1	1	57	37
+perf-regression	report	standard	error	5	6	0	410	1	1	1	1	61	59
+security-audit	security-audit	standard	error	2	16	0	394	1	1	1	1	61	67
+refactor-boundaries	assistant	standard	awaiting_decision	0	1	0	313	1	1	1	1	57	37
