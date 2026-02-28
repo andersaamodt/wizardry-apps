@@ -1826,7 +1826,7 @@ blog_nostr_clear_projection_posts() {
   if [ ! -d "$blog_posts_dir" ]; then
     return 0
   fi
-  find "$blog_posts_dir" -type f -name '*.md' 2>/dev/null | while IFS= read -r post_file; do
+  find -L "$blog_posts_dir" -type f -name '*.md' 2>/dev/null | while IFS= read -r post_file; do
     marker=$(blog_read_front_matter_value "$post_file" nostr_projection 2>/dev/null || printf '')
     if [ "$marker" = "true" ]; then
       rm -f "$post_file"
@@ -2617,7 +2617,7 @@ blog_collect_public_posts() {
     fi
   fi
 
-  find "$blog_posts_dir" -type f -name '*.md' 2>/dev/null >> "$candidates_tmp"
+  find -L "$blog_posts_dir" -type f -name '*.md' 2>/dev/null >> "$candidates_tmp"
 
   sort -u "$candidates_tmp" | while IFS= read -r file; do
     [ -f "$file" ] || continue
