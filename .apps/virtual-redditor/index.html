@@ -1261,6 +1261,7 @@
       actionsPrimed: false,
       pendingProfileDeleteIds: [],
       profilesRefreshSeq: 0,
+      settingsUiOverrides: {},
       normRows: [],
       normPendingEmptyRow: false,
       doctrineCacheByProfile: {},
@@ -3096,6 +3097,65 @@
       showToast(text, !!isError);
     }
 
+    function statusFieldForSettingKey(key) {
+      var k = String(key || '');
+      if (k === 'MODE') return 'mode';
+      if (k === 'PATROL_MODE') return 'patrolMode';
+      if (k === 'PATROL_SAMPLE_MAX') return 'patrolSampleMax';
+      if (k === 'PATROL_INTERVAL_MIN') return 'patrolIntervalMin';
+      if (k === 'PATROL_INTERVAL_MAX') return 'patrolIntervalMax';
+      if (k === 'THREAD_INITIATE_MAX_PCT') return 'threadInitiateMaxPct';
+      if (k === 'OBEY_ADMINS') return 'obeyAdmins';
+      if (k === 'OLLAMA_MODEL') return 'ollamaModel';
+      if (k === 'RUN_ENABLED') return 'runEnabled';
+      return '';
+    }
+
+    function normalizeStatusFieldValue(field, value) {
+      if (field === 'obeyAdmins' || field === 'runEnabled') {
+        return String(value || '') === '1' || value === true;
+      }
+      if (
+        field === 'patrolSampleMax' ||
+        field === 'patrolIntervalMin' ||
+        field === 'patrolIntervalMax' ||
+        field === 'threadInitiateMaxPct'
+      ) {
+        var n = Number(value);
+        return Number.isFinite(n) ? n : 0;
+      }
+      return value;
+    }
+
+    function setSettingsOverride(field, value) {
+      var key = String(field || '');
+      if (!key) return;
+      state.settingsUiOverrides = Object.assign({}, state.settingsUiOverrides || {});
+      state.settingsUiOverrides[key] = value;
+      if (state.status && state.status.settings) {
+        state.status.settings[key] = value;
+      }
+    }
+
+    function clearSettingsOverride(field) {
+      var key = String(field || '');
+      if (!key) return;
+      if (!state.settingsUiOverrides || !Object.prototype.hasOwnProperty.call(state.settingsUiOverrides, key)) return;
+      var next = Object.assign({}, state.settingsUiOverrides);
+      delete next[key];
+      state.settingsUiOverrides = next;
+    }
+
+    function effectiveSettings(settings) {
+      var base = Object.assign({}, settings || {});
+      var overrides = state.settingsUiOverrides || {};
+      var keys = Object.keys(overrides);
+      for (var i = 0; i < keys.length; i += 1) {
+        base[keys[i]] = overrides[keys[i]];
+      }
+      return base;
+    }
+
     function setCreateProfileMessage(msg, isError) {
       var el = document.getElementById('settings-msg');
       if (!el) return;
@@ -3832,7 +3892,8 @@
       }
 
       var launchd = s.launchd || {};
-      var settings = s.settings || {};
+      var settingsRaw = s.settings || {};
+      var settings = effectiveSettings(settingsRaw);
       var metrics = s.metrics || {};
       var profilesPayload = s.profiles || {};
       var counts = metrics.counts || {};
@@ -3961,6 +4022,13 @@
       }
 
       var baseProfiles = Array.isArray(profilesPayload.profiles) ? profilesPayload.profiles.slice() : [];
+      var pendingDeleteIds = Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : [];
+      if (pendingDeleteIds.length) {
+        baseProfiles = baseProfiles.filter(function (p) {
+          var id = String(((p || {}).id) || '');
+          return pendingDeleteIds.indexOf(id) < 0;
+        });
+      }
       baseProfiles = orderProfilesLikePrevious(baseProfiles);
       if (state.createProfileMode && state.createProfileGhostId) {
         for (var bp = 0; bp < baseProfiles.length; bp += 1) {
@@ -3977,7 +4045,14 @@
         });
         state.activeProfile = String(state.createProfileGhostId);
       } else {
-        state.activeProfile = String(profilesPayload.activeProfile || '');
+        var statusActive = String(profilesPayload.activeProfile || '');
+        if (pendingDeleteIds.indexOf(statusActive) >= 0) {
+          statusActive = '';
+        }
+        if (!statusActive || baseProfiles.every(function (p) { return String(((p || {}).id) || '') !== statusActive; })) {
+          statusActive = String(((baseProfiles[0] || {}).id) || '');
+        }
+        state.activeProfile = statusActive;
       }
       state.profiles = baseProfiles;
       renderProfiles();
