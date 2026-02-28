@@ -3156,6 +3156,58 @@
       return base;
     }
 
+    function applySettingOverrideForKey(key, value) {
+      var field = statusFieldForSettingKey(key);
+      if (!field) return;
+      setSettingsOverride(field, normalizeStatusFieldValue(field, value));
+    }
+
+    function clearSettingOverrideForKey(key) {
+      var field = statusFieldForSettingKey(key);
+      if (!field) return;
+      clearSettingsOverride(field);
+    }
+
+    function reconcileSettingsOverridesFromStatus(settings) {
+      var raw = settings || {};
+      var overrides = state.settingsUiOverrides || {};
+      var keys = Object.keys(overrides);
+      if (!keys.length) return;
+      var changed = false;
+      var next = Object.assign({}, overrides);
+      for (var i = 0; i < keys.length; i += 1) {
+        var field = keys[i];
+        if (!Object.prototype.hasOwnProperty.call(raw, field)) continue;
+        var overrideValue = normalizeStatusFieldValue(field, overrides[field]);
+        var statusValue = normalizeStatusFieldValue(field, raw[field]);
+        if (statusValue === overrideValue) {
+          delete next[field];
+          changed = true;
+        }
+      }
+      if (changed) state.settingsUiOverrides = next;
+    }
+
+    function prunePendingProfileDeletes(rawProfiles) {
+      var pending = Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : [];
+      if (!pending.length) return;
+      var profiles = Array.isArray(rawProfiles) ? rawProfiles : [];
+      var keep = [];
+      for (var i = 0; i < pending.length; i += 1) {
+        var id = String(pending[i] || '');
+        if (!id) continue;
+        var stillPresent = false;
+        for (var j = 0; j < profiles.length; j += 1) {
+          if (String(((profiles[j] || {}).id) || '') === id) {
+            stillPresent = true;
+            break;
+          }
+        }
+        if (stillPresent) keep.push(id);
+      }
+      state.pendingProfileDeleteIds = keep;
+    }
+
     function setCreateProfileMessage(msg, isError) {
       var el = document.getElementById('settings-msg');
       if (!el) return;
@@ -3796,9 +3848,6 @@
       backendJson('delete-profile', [String(profileId)]).then(function () {
         return fullRefresh();
       }).then(function () {
-        state.pendingProfileDeleteIds = (Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : []).filter(function (id) {
-          return String(id || '') !== String(profileId);
-        });
         return refreshDoctrine(true);
       }).catch(function (error) {
         state.pendingProfileDeleteIds = (Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : []).filter(function (id) {
@@ -3893,6 +3942,7 @@
 
       var launchd = s.launchd || {};
       var settingsRaw = s.settings || {};
+      reconcileSettingsOverridesFromStatus(settingsRaw);
       var settings = effectiveSettings(settingsRaw);
       var metrics = s.metrics || {};
       var profilesPayload = s.profiles || {};
@@ -4022,6 +4072,7 @@
       }
 
       var baseProfiles = Array.isArray(profilesPayload.profiles) ? profilesPayload.profiles.slice() : [];
+      prunePendingProfileDeletes(baseProfiles);
       var pendingDeleteIds = Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : [];
       if (pendingDeleteIds.length) {
         baseProfiles = baseProfiles.filter(function (p) {
@@ -6228,6 +6279,7 @@
       if (reqSeq !== state.profilesRefreshSeq) return;
       var payload = out && out.profiles ? out : { profiles: [] };
       var profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
+      prunePendingProfileDeletes(profiles);
       var pendingDeleteIds = Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : [];
       if (pendingDeleteIds.length) {
         profiles = profiles.filter(function (p) {
@@ -6424,11 +6476,15 @@
         setSettingsMessage('', false);
         return;
       }
+      applySettingOverrideForKey(key, value);
+      renderStatus();
       try {
         await backendJson('set-setting', [key, value]);
         setSettingsMessage('', false);
         await refreshStatus();
       } catch (error) {
+        clearSettingOverrideForKey(key);
+        await refreshStatus();
         setSettingsMessage(String(error && error.message ? error.message : error), true);
       }
     }
@@ -6489,11 +6545,17 @@
           return;
         }
         try {
+          applySettingOverrideForKey('PATROL_INTERVAL_MIN', String(seconds));
+          applySettingOverrideForKey('PATROL_INTERVAL_MAX', String(seconds));
+          renderStatus();
           await backendJson('set-setting', ['PATROL_INTERVAL_MIN', String(seconds)]);
           await backendJson('set-setting', ['PATROL_INTERVAL_MAX', String(seconds)]);
           setSettingsMessage('', false);
           await refreshStatus();
         } catch (error) {
+          clearSettingOverrideForKey('PATROL_INTERVAL_MIN');
+          clearSettingOverrideForKey('PATROL_INTERVAL_MAX');
+          await refreshStatus();
           setSettingsMessage(String(error && error.message ? error.message : error), true);
         }
       }, 300);
@@ -6504,6 +6566,7 @@
       if (typeof state.passesTogglePendingValue === 'boolean') return;
       try {
         state.passesTogglePendingValue = shouldRun;
+        applySettingOverrideForKey('RUN_ENABLED', shouldRun ? '1' : '0');
         if (state.status && state.status.settings) {
           state.status.settings.runEnabled = shouldRun;
           renderStatus();
@@ -6517,6 +6580,8 @@
         setSettingsMessage('', false);
         await refreshStatus();
       } catch (error) {
+        clearSettingOverrideForKey('RUN_ENABLED');
+        await refreshStatus();
         setSettingsMessage(String(error && error.message ? error.message : error), true);
       } finally {
         state.passesTogglePendingValue = null;
@@ -6537,12 +6602,15 @@
       }
       try {
         state.obeyAdminsPendingValue = shouldEnable;
+        applySettingOverrideForKey('OBEY_ADMINS', shouldEnable ? '1' : '0');
         renderStatus();
         setSettingsMessage('Saving...', false);
         await backendJson('set-setting', ['OBEY_ADMINS', shouldEnable ? '1' : '0']);
         setSettingsMessage('', false);
         await refreshStatus();
       } catch (error) {
+        clearSettingOverrideForKey('OBEY_ADMINS');
+        await refreshStatus();
         setSettingsMessage(String(error && error.message ? error.message : error), true);
       } finally {
         state.obeyAdminsPendingValue = null;
@@ -6583,11 +6651,15 @@
         return;
       }
       try {
+        setSettingsOverride('redditUsername', username);
+        renderStatus();
         await backendJson('set-reddit-setting', ['REDDIT_USERNAME', username]);
         setUsernameEditing(false);
         setSettingsMessage('', false);
         await refreshStatus();
       } catch (error) {
+        clearSettingsOverride('redditUsername');
+        await refreshStatus();
         setSettingsMessage(String(error && error.message ? error.message : error), true);
       }
     }
@@ -7759,9 +7831,14 @@
           return;
         }
         backendJson('set-reddit-setting', ['SUBREDDIT', value]).then(function () {
+          setSettingsOverride('subreddit', value);
+          renderStatus();
+          return refreshStatus();
+        }).then(function () {
           setSettingsMessage('', false);
-          refreshStatus();
         }).catch(function (error) {
+          clearSettingsOverride('subreddit');
+          refreshStatus();
           setSettingsMessage(String(error && error.message ? error.message : error), true);
         });
       });
