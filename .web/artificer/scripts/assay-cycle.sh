@@ -90,18 +90,18 @@ mentor_suffix_for_task() {
 
 task_table() {
   cat <<'EOF'
-deterministic-tests	programming	long	Build a deterministic test harness for an existing flaky module. Add repeatable seed control, property tests, and a concise regression report.
-concurrency-race	programming	long	Find and fix a likely race-condition class issue in this codebase. Reproduce with a stress test, patch it, and verify with repeated runs.
+deterministic-tests	report	standard	Design a deterministic test harness strategy for a flaky subsystem, including seed policy, repeatability checks, and a concise regression report template.
+concurrency-race	assistant	standard	Diagnose a likely race-condition class failure path, propose a concrete mitigation design, and specify verification steps for concurrent stress conditions.
 api-hardening	programming	standard	Introduce strict input validation for one high-risk API path, include backward-compatible error handling, and add focused contract tests.
-migration-safe	programming	long	Design and implement an idempotent migration for a realistic schema change. Include rollback notes and a verification checklist.
-perf-regression	programming	standard	Profile one slow path, optimize it without behavior drift, and add a benchmark-style guard so regressions are visible.
-security-audit	security-audit	long	Audit this project for one concrete security weakness class, implement a fix, and add tests that fail before and pass after.
-refactor-boundaries	programming	standard	Refactor one tangled area into clear module boundaries with minimal behavior change, and prove parity with targeted tests.
-failure-recovery	programming	long	Add robust failure recovery for an external dependency path. Include retries, fallback behavior, and observable failure diagnostics.
-spec-to-code	programming	until-complete	Write a short implementation contract first, then implement and verify a medium-complexity feature end-to-end from that contract.
+migration-safe	assistant	standard	Design an idempotent migration plan for a realistic schema change, including rollback, observability, and release sequencing safeguards.
+perf-regression	report	standard	Analyze a probable performance regression path and propose measurable optimization and benchmark guardrails without behavior drift.
+security-audit	security-audit	standard	Audit this project for one concrete security weakness class, implement a fix, and add tests that fail before and pass after.
+refactor-boundaries	assistant	standard	Refactor strategy: split one tangled area into clear module boundaries with minimal behavior change and parity validation checkpoints.
+failure-recovery	programming	standard	Add robust failure recovery for one external dependency path with retries, fallback behavior, and observable failure diagnostics.
+spec-to-code	assistant	standard	Write a short implementation contract first, then produce a high-confidence implementation and verification plan for end-to-end delivery.
 report-trace	report	standard	Evaluate one recent run for conversation clarity and trace readability. Propose concrete improvements to step framing and summary quality.
 teacher-explain	teacher	standard	Teach a difficult subsystem as a mini lesson with misconceptions, checkpoints, and spaced recall prompts.
-pentest-simulation	pentest	long	Run a safe internal pentest simulation against likely attack surfaces in this project, propose concrete exploit paths, then implement and verify high-signal mitigations.
+pentest-simulation	pentest	standard	Run a safe internal pentest simulation against likely attack surfaces, propose concrete exploit paths, then implement and verify high-signal mitigations.
 EOF
 }
 
@@ -189,10 +189,10 @@ run_cycle() {
     fi
     max_iterations=6
     case "$budget" in
-      long) max_iterations=4 ;;
-      until-complete) max_iterations=9999 ;;
-      quick) max_iterations=2 ;;
-      *) max_iterations=3 ;;
+      long) max_iterations=2 ;;
+      until-complete) max_iterations=3 ;;
+      quick) max_iterations=1 ;;
+      *) max_iterations=2 ;;
     esac
 
     best_row=""
@@ -220,12 +220,12 @@ run_cycle() {
           budget_this=$((budget_this + 15))
           ;;
       esac
-      timeout_this=$((budget_this + 140))
+      timeout_this=$((budget_this + 240))
       if [ "$timeout_this" -lt "$task_timeout_sec" ]; then
         timeout_this=$task_timeout_sec
       fi
-      if [ "$timeout_this" -gt 420 ]; then
-        timeout_this=420
+      if [ "$timeout_this" -gt 540 ]; then
+        timeout_this=540
       fi
       if [ "$attempt" -gt 1 ]; then
         timeout_this=$((timeout_this + (attempt - 1) * 15))
@@ -385,9 +385,9 @@ shift
 case "$mode" in
   run)
     label="cycle-$(date +%Y%m%d-%H%M%S)"
-    task_timeout_sec=220
+    task_timeout_sec=260
     run_budget_sec=90
-    attempts=2
+    attempts=1
     mentor_from=""
     max_tasks=0
     while [ $# -gt 0 ]; do

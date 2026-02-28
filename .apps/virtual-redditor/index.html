@@ -1296,6 +1296,7 @@
       profileSwitchOverlayShownAt: 0,
       profileSwitchTargetId: '',
       pendingCreatedProfileId: '',
+      pendingCreatedProfileDraft: null,
       profileSettingsCacheById: {}
     };
 
@@ -3965,11 +3966,18 @@
       var pendingDeletes = Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds.slice() : [];
       if (pendingDeletes.indexOf(profileId) < 0) pendingDeletes.push(profileId);
       state.pendingProfileDeleteIds = pendingDeletes;
+      var fallbackActiveId = '';
       state.profiles = previousProfiles.filter(function (p) {
         return String((p || {}).id || '') !== String(profileId);
       });
       if (previousActive === profileId) {
-        state.activeProfile = String(((state.profiles[0] || {}).id) || '');
+        fallbackActiveId = String(((state.profiles[0] || {}).id) || '');
+        state.activeProfile = fallbackActiveId;
+        if (fallbackActiveId) {
+          state.profileSwitchTargetId = fallbackActiveId;
+          setProfileSwitchLoading(true);
+          applyProfileSwitchPreview(fallbackActiveId);
+        }
       }
       renderProfiles();
       updateToolbarButtonStates();
@@ -3978,11 +3986,15 @@
       backendJson('delete-profile', [String(profileId)]).then(function () {
         return fullRefresh();
       }).then(function () {
+        state.profileSwitchTargetId = '';
+        setProfileSwitchLoading(false);
         return refreshDoctrine(true);
       }).catch(function (error) {
         state.pendingProfileDeleteIds = (Array.isArray(state.pendingProfileDeleteIds) ? state.pendingProfileDeleteIds : []).filter(function (id) {
           return String(id || '') !== String(profileId);
         });
+        state.profileSwitchTargetId = '';
+        setProfileSwitchLoading(false);
         state.profiles = previousProfiles;
         state.activeProfile = previousActive;
         renderProfiles();
@@ -4212,6 +4224,39 @@
       }
       baseProfiles = orderProfilesLikePrevious(baseProfiles);
       var resolvedActiveProfileId = '';
+      var pendingCreated = String(state.pendingCreatedProfileId || '');
+      var hasPendingCreated = false;
+      if (pendingCreated) {
+        hasPendingCreated = baseProfiles.some(function (p) { return String(((p || {}).id) || '') === pendingCreated; });
+        if (!hasPendingCreated) {
+          var pendingDraft = null;
+          var currentProfiles = Array.isArray(state.profiles) ? state.profiles : [];
+          for (var cp = 0; cp < currentProfiles.length; cp += 1) {
+            var currentRow = currentProfiles[cp] || {};
+            if (String(currentRow.id || '') === pendingCreated) {
+              pendingDraft = {
+                id: pendingCreated,
+                name: String(currentRow.name || pendingCreated),
+                username: String(currentRow.username || ''),
+                subreddit: String(currentRow.subreddit || ''),
+                connected: !!currentRow.connected,
+                selected: true
+              };
+              break;
+            }
+          }
+          if (!pendingDraft && state.pendingCreatedProfileDraft && String(state.pendingCreatedProfileDraft.id || '') === pendingCreated) {
+            pendingDraft = Object.assign({}, state.pendingCreatedProfileDraft, { id: pendingCreated, selected: true });
+          }
+          if (pendingDraft) {
+            for (var pd = 0; pd < baseProfiles.length; pd += 1) {
+              baseProfiles[pd].selected = false;
+            }
+            baseProfiles.push(pendingDraft);
+            hasPendingCreated = true;
+          }
+        }
+      }
       if (state.createProfileMode && state.createProfileGhostId) {
         for (var bp = 0; bp < baseProfiles.length; bp += 1) {
           baseProfiles[bp].selected = false;
@@ -4236,11 +4281,11 @@
         if (state.profileSwitchLoading && switchTarget && baseProfiles.some(function (p) { return String(((p || {}).id) || '') === switchTarget; })) {
           statusActive = switchTarget;
         }
-        var pendingCreated = String(state.pendingCreatedProfileId || '');
-        if (pendingCreated && baseProfiles.some(function (p) { return String(((p || {}).id) || '') === pendingCreated; })) {
+        if (pendingCreated && hasPendingCreated) {
           statusActive = pendingCreated;
           if (String(profilesPayload.activeProfile || '') === pendingCreated) {
             state.pendingCreatedProfileId = '';
+            state.pendingCreatedProfileDraft = null;
             if (String(state.profileSwitchTargetId || '') === pendingCreated) {
               state.profileSwitchTargetId = '';
             }
@@ -6866,6 +6911,14 @@
         materializeCreateProfileGhost(createdId, createdName, uname);
         if (createdId) {
           state.pendingCreatedProfileId = createdId;
+          state.pendingCreatedProfileDraft = {
+            id: createdId,
+            name: String(createdName || uname || createdId),
+            username: String(uname || ''),
+            subreddit: String((document.getElementById('subreddit-input') || {}).value || ''),
+            connected: false,
+            selected: true
+          };
           state.profileSwitchTargetId = createdId;
         }
         state.createProfileMode = false;
@@ -6877,9 +6930,11 @@
         setUsernameEditing(false);
         setSettingsMessage('', false);
         await refreshStatus();
+        state.pendingCreatedProfileDraft = null;
         state.profileSwitchTargetId = '';
       } catch (error) {
         state.pendingCreatedProfileId = '';
+        state.pendingCreatedProfileDraft = null;
         state.profileSwitchTargetId = '';
         setSettingsMessage(String(error && error.message ? error.message : error), true);
       } finally {
@@ -6898,6 +6953,7 @@
       state.profileSwitchToken = switchToken;
       state.profileSwitchTargetId = targetId;
       state.pendingCreatedProfileId = '';
+      state.pendingCreatedProfileDraft = null;
       setProfileSwitchLoading(true);
 
       var previousActive = String(state.activeProfile || '');
