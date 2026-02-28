@@ -628,7 +628,24 @@
       scheduler: {},
       modes: [],
       skills: [],
-      panels: []
+      panels: [],
+      failure_taxonomy: {
+        total: "0",
+        last_recorded_at: "",
+        categories: [],
+        recent: []
+      },
+      improvement_proposals: {
+        manual_apply_only: true,
+        counts: {
+          total: "0",
+          proposed: "0",
+          accepted: "0",
+          applied: "0",
+          rejected: "0"
+        },
+        items: []
+      }
     },
     triage: {
       count: "0",
@@ -788,12 +805,12 @@
   var dictationWaveBackendLevel = 0;
   var dictationWaveBackendLevelAt = 0;
   var dictationWaveBackendRecentLevels = [];
-  var dictationWaveBackendFloor = 0.01;
-  var dictationWaveBackendRange = 0.22;
-  var dictationWaveBackendCeil = 0.24;
+  var dictationWaveBackendFloor = 0.02;
   var dictationWaveBackendFloorCalibrating = true;
+  var dictationWaveBackendFloorSeedSamples = [];
   var dictationWaveSeenSignal = false;
   var dictationWaveNoiseFloor = 0.02;
+  var dictationWaveSignalCeil = 0.12;
   var dictationWaveActivatedAt = 0;
   var dictationWaveLastSampleAt = 0;
   var dictationWaveBarStartAt = 0;
@@ -1089,6 +1106,8 @@
     modeRuntimePanels: document.getElementById("mode-runtime-panels"),
     modeRuntimeModes: document.getElementById("mode-runtime-modes"),
     modeRuntimeSkills: document.getElementById("mode-runtime-skills"),
+    modeRuntimeFailureTaxonomy: document.getElementById("mode-runtime-failure-taxonomy"),
+    modeRuntimeImprovementProposals: document.getElementById("mode-runtime-improvement-proposals"),
     assistantModeSelect: document.getElementById("assistant-mode-select"),
     assistantModeApplyBtn: document.getElementById("assistant-mode-apply-btn"),
     modeRuntimeSkillInvokeForm: document.getElementById("mode-runtime-skill-invoke-form"),
@@ -2391,14 +2410,23 @@
     var source = payload && typeof payload === "object" ? payload : {};
     var scheduler = source.scheduler && typeof source.scheduler === "object" ? source.scheduler : {};
     var cooperation = source.cooperation && typeof source.cooperation === "object" ? source.cooperation : {};
+    var failureTaxonomy = source.failure_taxonomy && typeof source.failure_taxonomy === "object" ? source.failure_taxonomy : {};
+    var proposalState = source.improvement_proposals && typeof source.improvement_proposals === "object" ? source.improvement_proposals : {};
+    var proposalCounts = proposalState.counts && typeof proposalState.counts === "object" ? proposalState.counts : {};
     var modesRaw = asArrayCopy(source.modes);
     var skillsRaw = asArrayCopy(source.skills);
     var panelsRaw = asArrayCopy(source.panels);
     var directivesRaw = asArrayCopy(cooperation.recent);
+    var failureCategoriesRaw = asArrayCopy(failureTaxonomy.categories);
+    var failureRecentRaw = asArrayCopy(failureTaxonomy.recent);
+    var proposalItemsRaw = asArrayCopy(proposalState.items);
     var modes = [];
     var skills = [];
     var panels = [];
     var directives = [];
+    var failureCategories = [];
+    var failureRecent = [];
+    var proposalItems = [];
 
     for (var i = 0; i < modesRaw.length; i += 1) {
       var mode = modesRaw[i];
@@ -2488,6 +2516,77 @@
       });
     }
 
+    for (var fc = 0; fc < failureCategoriesRaw.length; fc += 1) {
+      var failureCategory = failureCategoriesRaw[fc];
+      if (!failureCategory || typeof failureCategory !== "object") {
+        continue;
+      }
+      var failureCategoryId = trim(String(failureCategory.id || ""));
+      if (!failureCategoryId) {
+        continue;
+      }
+      failureCategories.push({
+        id: failureCategoryId,
+        label: trim(String(failureCategory.label || failureCategoryId)),
+        count: trim(String(failureCategory.count || "0")),
+        last_seen: trim(String(failureCategory.last_seen || "")),
+        surface: trim(String(failureCategory.surface || "")),
+        severity: trim(String(failureCategory.severity || ""))
+      });
+    }
+
+    for (var fr = 0; fr < failureRecentRaw.length; fr += 1) {
+      var failureEvent = failureRecentRaw[fr];
+      if (!failureEvent || typeof failureEvent !== "object") {
+        continue;
+      }
+      var failureTimestamp = trim(String(failureEvent.timestamp || ""));
+      var failureCategoryIdRecent = trim(String(failureEvent.category || ""));
+      var failureAction = trim(String(failureEvent.action || ""));
+      var failureError = trim(String(failureEvent.error || ""));
+      if (!failureTimestamp && !failureCategoryIdRecent && !failureAction && !failureError) {
+        continue;
+      }
+      failureRecent.push({
+        timestamp: failureTimestamp,
+        category: failureCategoryIdRecent,
+        category_label: trim(String(failureEvent.category_label || failureCategoryIdRecent)),
+        surface: trim(String(failureEvent.surface || "")),
+        severity: trim(String(failureEvent.severity || "")),
+        mode: trim(String(failureEvent.mode || "")),
+        action: failureAction,
+        error: failureError,
+        hypothesis: trim(String(failureEvent.hypothesis || "")),
+        next_attempt: trim(String(failureEvent.next_attempt || ""))
+      });
+    }
+
+    for (var pi = 0; pi < proposalItemsRaw.length; pi += 1) {
+      var proposalItem = proposalItemsRaw[pi];
+      if (!proposalItem || typeof proposalItem !== "object") {
+        continue;
+      }
+      var proposalId = trim(String(proposalItem.id || ""));
+      if (!proposalId) {
+        continue;
+      }
+      proposalItems.push({
+        id: proposalId,
+        title: trim(String(proposalItem.title || proposalId)),
+        scope: trim(String(proposalItem.scope || "other")),
+        risk_level: trim(String(proposalItem.risk_level || "medium")),
+        status: trim(String(proposalItem.status || "proposed")),
+        source: trim(String(proposalItem.source || "manual")),
+        created_at: trim(String(proposalItem.created_at || "")),
+        updated_at: trim(String(proposalItem.updated_at || "")),
+        applied_at: trim(String(proposalItem.applied_at || "")),
+        taxonomy_category: trim(String(proposalItem.taxonomy_category || "")),
+        taxonomy_category_label: trim(String(proposalItem.taxonomy_category_label || "")),
+        rationale: trim(String(proposalItem.rationale || "")),
+        proposed_change: trim(String(proposalItem.proposed_change || ""))
+      });
+    }
+
     modes.sort(function (a, b) {
       var priorityDiff = Number(b.priority || 0) - Number(a.priority || 0);
       if (priorityDiff !== 0) {
@@ -2497,6 +2596,19 @@
     });
     skills.sort(function (a, b) {
       return String(a.name || a.id || "").localeCompare(String(b.name || b.id || ""));
+    });
+    failureCategories.sort(function (a, b) {
+      var countDiff = Number(b.count || 0) - Number(a.count || 0);
+      if (countDiff !== 0) {
+        return countDiff;
+      }
+      return String(a.label || a.id || "").localeCompare(String(b.label || b.id || ""));
+    });
+    failureRecent.sort(function (a, b) {
+      return String(b.timestamp || "").localeCompare(String(a.timestamp || ""));
+    });
+    proposalItems.sort(function (a, b) {
+      return String(b.created_at || "").localeCompare(String(a.created_at || ""));
     });
 
     return {
@@ -2517,6 +2629,23 @@
         pending_total: trim(String(cooperation.pending_total || "0")),
         modes_with_pending: trim(String(cooperation.modes_with_pending || "0")),
         recent: directives
+      },
+      failure_taxonomy: {
+        total: trim(String(failureTaxonomy.total || "0")),
+        last_recorded_at: trim(String(failureTaxonomy.last_recorded_at || "")),
+        categories: failureCategories,
+        recent: failureRecent
+      },
+      improvement_proposals: {
+        manual_apply_only: proposalState.manual_apply_only !== false,
+        counts: {
+          total: trim(String(proposalCounts.total || "0")),
+          proposed: trim(String(proposalCounts.proposed || "0")),
+          accepted: trim(String(proposalCounts.accepted || "0")),
+          applied: trim(String(proposalCounts.applied || "0")),
+          rejected: trim(String(proposalCounts.rejected || "0"))
+        },
+        items: proposalItems
       }
     };
   }
@@ -7326,12 +7455,12 @@
     dictationWaveBackendLevel = 0;
     dictationWaveBackendLevelAt = 0;
     dictationWaveBackendRecentLevels = [];
-    dictationWaveBackendFloor = 0.01;
-    dictationWaveBackendRange = 0.22;
-    dictationWaveBackendCeil = 0.24;
+    dictationWaveBackendFloor = 0.02;
     dictationWaveBackendFloorCalibrating = true;
+    dictationWaveBackendFloorSeedSamples = [];
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
+    dictationWaveSignalCeil = 0.12;
     dictationWaveLastSampleAt = 0;
     dictationWaveBarStartAt = 0;
     dictationWaveBarPeakRaw = 0;
@@ -7515,11 +7644,39 @@
     }
     if (floor < 0.0005) {
       floor = 0.0005;
-    } else if (floor > 0.02) {
-      floor = 0.02;
+    } else if (floor > 0.06) {
+      floor = 0.06;
     }
     dictationWaveNoiseFloor = floor;
     return floor;
+  }
+
+  function updateDictationWaveSignalCeil(levelProbe) {
+    var probe = Number(levelProbe || 0);
+    if (!isFinite(probe) || probe < 0) {
+      probe = 0;
+    }
+    var floor = Number(dictationWaveNoiseFloor || 0.01);
+    if (!isFinite(floor) || floor < 0) {
+      floor = 0.01;
+    }
+    var ceil = Number(dictationWaveSignalCeil || 0.12);
+    if (!isFinite(ceil) || ceil <= 0) {
+      ceil = Math.max(0.08, floor + 0.08);
+    }
+    if (probe > ceil) {
+      ceil = (ceil * 0.52) + (probe * 0.48);
+    } else {
+      ceil = (ceil * 0.985) + (probe * 0.015);
+    }
+    var minCeil = floor + Math.max(0.03, floor * 1.8);
+    if (ceil < minCeil) {
+      ceil = minCeil;
+    } else if (ceil > 0.9) {
+      ceil = 0.9;
+    }
+    dictationWaveSignalCeil = ceil;
+    return ceil;
   }
 
   function normalizedDictationWaveSliceLevel(rawLevel) {
@@ -7531,7 +7688,11 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var gate = (floor * 1.28) + 0.0007;
+    var ceil = Number(dictationWaveSignalCeil || 0.12);
+    if (!isFinite(ceil) || ceil <= floor) {
+      ceil = floor + 0.08;
+    }
+    var gate = (floor * 1.15) + 0.0005;
     if (raw <= gate) {
       return 0;
     }
@@ -7539,7 +7700,7 @@
     if (signal < 0) {
       signal = 0;
     }
-    var dynamicRange = Math.max(0.0025, gate * 7.0);
+    var dynamicRange = Math.max(0.02, ceil - gate);
     var normalized = signal / dynamicRange;
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
@@ -7547,9 +7708,9 @@
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 1.04);
+      normalized = Math.pow(normalized, 0.88);
     }
-    if (normalized < 0.0032) {
+    if (normalized < 0.0018) {
       normalized = 0;
     }
     return normalized;
@@ -7566,28 +7727,24 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var range = Number(dictationWaveBackendRange || 0.22);
-    if (!isFinite(range) || range <= 0) {
-      range = 0.22;
+    var effectiveFloor = floor;
+    if (raw > (floor * 2.0) + 0.016) {
+      effectiveFloor = floor * 0.78;
     }
-    var gate = floor + Math.max(0.0002, floor * 0.03);
+    var gate = (effectiveFloor * 1.22) + 0.001;
     if (raw <= gate) {
       return 0;
     }
-    var span = range * 0.95;
-    if (!isFinite(span) || span < 0.05) {
-      span = 0.05;
-    }
-    var normalized = (raw - gate) / span;
+    var normalized = (raw - gate) / Math.max(0.016, (0.082 + (effectiveFloor * 1.4)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.62);
+      normalized = Math.pow(normalized, 1.08);
     }
-    if (normalized < 0.0007) {
+    if (normalized < 0.0022) {
       normalized = 0;
     }
     return normalized;
@@ -7619,84 +7776,76 @@
     var sorted = samples.slice().sort(function (a, b) {
       return a - b;
     });
-    var floorIdx = Math.floor((sorted.length - 1) * 0.12);
-    if (floorIdx < 0) {
-      floorIdx = 0;
-    } else if (floorIdx >= sorted.length) {
-      floorIdx = sorted.length - 1;
+    var targetIdx = Math.floor((sorted.length - 1) * 0.12);
+    if (targetIdx < 0) {
+      targetIdx = 0;
+    } else if (targetIdx >= sorted.length) {
+      targetIdx = sorted.length - 1;
     }
-    var highIdx = Math.floor((sorted.length - 1) * 0.88);
-    if (highIdx < 0) {
-      highIdx = 0;
-    } else if (highIdx >= sorted.length) {
-      highIdx = sorted.length - 1;
+    var speechIdx = Math.floor((sorted.length - 1) * 0.75);
+    if (speechIdx < 0) {
+      speechIdx = 0;
+    } else if (speechIdx >= sorted.length) {
+      speechIdx = sorted.length - 1;
     }
-    var floorTarget = Number(sorted[floorIdx] || 0);
-    var highProbe = Number(sorted[highIdx] || 0);
-    var peakProbe = Number(sorted[sorted.length - 1] || highProbe);
-    if (!isFinite(floorTarget) || floorTarget < 0) {
-      floorTarget = 0;
+    var target = Number(sorted[targetIdx] || 0);
+    var speechProbe = Number(sorted[speechIdx] || 0);
+    if (!isFinite(target) || target < 0) {
+      target = 0;
     }
-    if (!isFinite(highProbe) || highProbe < 0) {
-      highProbe = 0;
-    }
-    if (!isFinite(peakProbe) || peakProbe < 0) {
-      peakProbe = highProbe;
-    }
-    if (peakProbe < highProbe) {
-      peakProbe = highProbe;
-    }
-    var dynamicHigh = (highProbe * 0.7) + (peakProbe * 0.3);
-    if (!isFinite(dynamicHigh) || dynamicHigh < 0) {
-      dynamicHigh = highProbe;
+    if (!isFinite(speechProbe) || speechProbe < 0) {
+      speechProbe = 0;
     }
     var floor = Number(dictationWaveBackendFloor || 0.01);
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var range = Number(dictationWaveBackendRange || 0.22);
-    if (!isFinite(range) || range <= 0) {
-      range = 0.22;
-    }
-    var rangeTarget = dynamicHigh - floorTarget;
-    if (!isFinite(rangeTarget) || rangeTarget < 0.03) {
-      rangeTarget = 0.03;
-    }
+    var now = Date.now();
+    var activatedAt = Number(dictationWaveActivatedAt || 0);
+    var inStartupWindow = activatedAt > 0 && (now - activatedAt) <= 700;
     if (dictationWaveBackendFloorCalibrating) {
-      floor = (floor * 0.3) + (floorTarget * 0.7);
-      range = (range * 0.45) + (rangeTarget * 0.55);
-      dictationWaveBackendFloorCalibrating = false;
-    } else {
-      // Floor should drop quickly when room noise drops, rise slowly otherwise.
-      if (floorTarget < floor) {
-        floor = (floor * 0.68) + (floorTarget * 0.32);
-      } else {
-        floor = (floor * 0.95) + (floorTarget * 0.05);
+      for (var si = 0; si < sorted.length; si += 1) {
+        dictationWaveBackendFloorSeedSamples.push(sorted[si]);
       }
-      if (rangeTarget > range) {
-        range = (range * 0.7) + (rangeTarget * 0.3);
-      } else {
-        range = (range * 0.9) + (rangeTarget * 0.1);
+      if (dictationWaveBackendFloorSeedSamples.length > 280) {
+        dictationWaveBackendFloorSeedSamples = dictationWaveBackendFloorSeedSamples.slice(dictationWaveBackendFloorSeedSamples.length - 280);
+      }
+      var seedSorted = dictationWaveBackendFloorSeedSamples.slice().sort(function (a, b) {
+        return a - b;
+      });
+      var seedIdx = Math.floor((seedSorted.length - 1) * 0.25);
+      if (seedIdx < 0) {
+        seedIdx = 0;
+      } else if (seedIdx >= seedSorted.length) {
+        seedIdx = seedSorted.length - 1;
+      }
+      var seededTarget = Number(seedSorted[seedIdx] || target);
+      if (!isFinite(seededTarget) || seededTarget < 0) {
+        seededTarget = target;
+      }
+      floor = (floor * 0.28) + (seededTarget * 0.72);
+      if (!inStartupWindow || seedSorted.length >= 56) {
+        dictationWaveBackendFloorCalibrating = false;
+      }
+    } else {
+      var speechPresent = speechProbe > (target + Math.max(0.01, target * 1.6));
+      var deadband = Math.max(0.0025, floor * 0.2);
+      if (speechPresent) {
+        if (target < floor - deadband) {
+          floor = (floor * 0.92) + (target * 0.08);
+        }
+      } else if (target > floor + deadband) {
+        floor = (floor * 0.99) + (target * 0.01);
+      } else if (target < floor - deadband) {
+        floor = (floor * 0.9) + (target * 0.1);
       }
     }
     if (floor < 0.0008) {
       floor = 0.0008;
-    } else if (floor > 0.12) {
-      floor = 0.12;
-    }
-    if (range < 0.05) {
-      range = 0.05;
-    } else if (range > 0.85) {
-      range = 0.85;
-    }
-    var ceil = floor + range;
-    if (ceil > 1) {
-      ceil = 1;
-      range = ceil - floor;
+    } else if (floor > 0.08) {
+      floor = 0.08;
     }
     dictationWaveBackendFloor = floor;
-    dictationWaveBackendRange = range;
-    dictationWaveBackendCeil = ceil;
     return floor;
   }
 
@@ -7860,12 +8009,13 @@
           return;
         }
         var avgRaw = dictationWaveBarSampleCount > 0 ? (dictationWaveBarSumRaw / dictationWaveBarSampleCount) : rawLevel;
-        var summarizedRaw = (avgRaw * 0.52) + (Number(dictationWaveBarPeakRaw || 0) * 0.48);
+        var summarizedRaw = (Number(dictationWaveBarPeakRaw || rawLevel) * 0.9) + (avgRaw * 0.1);
         dictationWaveBarStartAt = sampleNow;
         dictationWaveBarPeakRaw = 0;
         dictationWaveBarSumRaw = 0;
         dictationWaveBarSampleCount = 0;
         calibrateDictationWaveNoiseFloor(summarizedRaw);
+        updateDictationWaveSignalCeil(summarizedRaw);
         var normalizedLevel = normalizedDictationWaveSliceLevel(summarizedRaw);
         if (!dictationWaveSeenSignal && summarizedRaw > (dictationWaveNoiseFloor + 0.0015)) {
           dictationWaveSeenSignal = true;
@@ -16058,6 +16208,49 @@
     });
   }
 
+  function modeRuntimeGenerateImprovementProposals() {
+    return apiPost("improvement_proposal_generate", {}).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not generate proposals");
+      }
+      if (response.mode_runtime) {
+        state.modeRuntime = normalizeModeRuntime(response.mode_runtime);
+        reconcileAssistantModeId();
+        state.modeRuntimeError = "";
+        renderModeRuntimeSettings();
+      }
+      return response;
+    });
+  }
+
+  function modeRuntimeDecideImprovementProposal(proposalId, decision, noteText) {
+    var safeId = trim(String(proposalId || ""));
+    var safeDecision = trim(String(decision || "")).toLowerCase();
+    if (!safeId) {
+      return Promise.reject(new Error("proposal_id is required"));
+    }
+    if (safeDecision !== "accept" && safeDecision !== "apply" && safeDecision !== "reject") {
+      return Promise.reject(new Error("invalid decision"));
+    }
+    return apiPost("improvement_proposal_decide", {
+      proposal_id: safeId,
+      decision: safeDecision,
+      note: trim(String(noteText || "")),
+      manual_confirm: safeDecision === "apply" ? "1" : "0"
+    }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not update proposal");
+      }
+      if (response.mode_runtime) {
+        state.modeRuntime = normalizeModeRuntime(response.mode_runtime);
+        reconcileAssistantModeId();
+        state.modeRuntimeError = "";
+        renderModeRuntimeSettings();
+      }
+      return response;
+    });
+  }
+
   function renderModeRuntimeSettings() {
     if (!el.modeRuntimeSummary || !el.modeRuntimePanels || !el.modeRuntimeModes || !el.modeRuntimeSkills) {
       return;
@@ -16235,6 +16428,107 @@
       skillsHtml += "</section>";
     }
     el.modeRuntimeSkills.innerHTML = skillsHtml;
+
+    if (el.modeRuntimeFailureTaxonomy) {
+      var taxonomy = runtime.failure_taxonomy && typeof runtime.failure_taxonomy === "object" ? runtime.failure_taxonomy : {};
+      var taxonomyCategories = Array.isArray(taxonomy.categories) ? taxonomy.categories : [];
+      var taxonomyRecent = Array.isArray(taxonomy.recent) ? taxonomy.recent : [];
+      var taxonomyHtml = "";
+      taxonomyHtml += "<section class='mode-runtime-group'>";
+      taxonomyHtml += "<div class='mode-runtime-group-head'><p class='command-rules-group-title'>Failure taxonomy</p></div>";
+      taxonomyHtml += "<p class='settings-hint'>File-backed failure memory used to identify recurring breakdowns and improve planning behavior over time.</p>";
+      taxonomyHtml += "<div class='mode-runtime-metrics'>";
+      taxonomyHtml += "<span class='mode-runtime-metric'><em>Total failures</em><strong>" + escHtml(String(taxonomy.total || "0")) + "</strong></span>";
+      taxonomyHtml += "<span class='mode-runtime-metric'><em>Last recorded</em><strong>" + escHtml(String(taxonomy.last_recorded_at || "n/a")) + "</strong></span>";
+      taxonomyHtml += "</div>";
+      if (!taxonomyCategories.length) {
+        taxonomyHtml += "<p class='empty-state'>No failure taxonomy entries yet.</p>";
+      } else {
+        taxonomyHtml += "<div class='mode-runtime-taxonomy-list'>";
+        for (var t = 0; t < taxonomyCategories.length && t < 10; t += 1) {
+          var category = taxonomyCategories[t] || {};
+          taxonomyHtml += "<article class='mode-runtime-taxonomy-row'>";
+          taxonomyHtml += "<div class='mode-runtime-taxonomy-head'><strong>" + escHtml(category.label || category.id || "Category") + "</strong><span class='mode-runtime-chip'>" + escHtml(String(category.count || "0")) + "</span></div>";
+          taxonomyHtml += "<p class='settings-hint'>surface: " + escHtml(String(category.surface || "unknown")) + " | severity: " + escHtml(String(category.severity || "unknown")) + "</p>";
+          if (category.last_seen) {
+            taxonomyHtml += "<p class='settings-hint'>last seen: " + escHtml(String(category.last_seen || "")) + "</p>";
+          }
+          taxonomyHtml += "</article>";
+        }
+        taxonomyHtml += "</div>";
+      }
+      if (taxonomyRecent.length) {
+        taxonomyHtml += "<details class='mode-runtime-taxonomy-recent'><summary>Recent failure events</summary><div class='mode-runtime-directive-list'>";
+        for (var tr = 0; tr < taxonomyRecent.length && tr < 6; tr += 1) {
+          var recentEvent = taxonomyRecent[tr] || {};
+          var recentPrefix = trim(String(recentEvent.category_label || recentEvent.category || "failure"));
+          taxonomyHtml += "<p class='settings-hint mode-runtime-directive-item'><strong>" + escHtml(recentPrefix) + "</strong>: " + escHtml(String(recentEvent.error || recentEvent.action || "event"));
+          if (recentEvent.timestamp) {
+            taxonomyHtml += " <span class='mode-runtime-directive-time'>" + escHtml(String(recentEvent.timestamp || "")) + "</span>";
+          }
+          taxonomyHtml += "</p>";
+        }
+        taxonomyHtml += "</div></details>";
+      }
+      taxonomyHtml += "</section>";
+      el.modeRuntimeFailureTaxonomy.innerHTML = taxonomyHtml;
+    }
+
+    if (el.modeRuntimeImprovementProposals) {
+      var proposalState = runtime.improvement_proposals && typeof runtime.improvement_proposals === "object" ? runtime.improvement_proposals : {};
+      var proposalCounts = proposalState.counts && typeof proposalState.counts === "object" ? proposalState.counts : {};
+      var proposalItems = Array.isArray(proposalState.items) ? proposalState.items : [];
+      var proposalHtml = "";
+      proposalHtml += "<section class='mode-runtime-group'>";
+      proposalHtml += "<div class='mode-runtime-group-head'><p class='command-rules-group-title'>Improvement proposals</p><button type='button' data-action='mode-runtime-proposal-generate'>Generate from failures</button></div>";
+      proposalHtml += "<p class='settings-hint'>Contained self-improvement: proposals are generated from failure patterns but only changed when manually reviewed.</p>";
+      proposalHtml += "<div class='mode-runtime-metrics'>";
+      proposalHtml += "<span class='mode-runtime-metric'><em>Proposed</em><strong>" + escHtml(String(proposalCounts.proposed || "0")) + "</strong></span>";
+      proposalHtml += "<span class='mode-runtime-metric'><em>Accepted</em><strong>" + escHtml(String(proposalCounts.accepted || "0")) + "</strong></span>";
+      proposalHtml += "<span class='mode-runtime-metric'><em>Applied</em><strong>" + escHtml(String(proposalCounts.applied || "0")) + "</strong></span>";
+      proposalHtml += "<span class='mode-runtime-metric'><em>Rejected</em><strong>" + escHtml(String(proposalCounts.rejected || "0")) + "</strong></span>";
+      proposalHtml += "</div>";
+      if (!proposalItems.length) {
+        proposalHtml += "<p class='empty-state'>No improvement proposals yet.</p>";
+      } else {
+        proposalHtml += "<div class='mode-runtime-proposal-list'>";
+        for (var p = 0; p < proposalItems.length && p < 14; p += 1) {
+          var proposal = proposalItems[p] || {};
+          var proposalStatus = trim(String(proposal.status || "proposed")).toLowerCase();
+          proposalHtml += "<article class='mode-runtime-proposal-item'>";
+          proposalHtml += "<div class='mode-runtime-mode-head'><strong>" + escHtml(proposal.title || proposal.id || "Proposal") + "</strong><span class='mode-runtime-chip'>" + escHtml(proposalStatus) + "</span></div>";
+          proposalHtml += "<p class='settings-hint'>scope: " + escHtml(String(proposal.scope || "other")) + " | risk: " + escHtml(String(proposal.risk_level || "medium")) + " | source: " + escHtml(String(proposal.source || "manual")) + "</p>";
+          if (proposal.taxonomy_category_label) {
+            proposalHtml += "<p class='settings-hint'>taxonomy: " + escHtml(String(proposal.taxonomy_category_label || proposal.taxonomy_category || "")) + "</p>";
+          }
+          if (proposal.rationale) {
+            proposalHtml += "<p class='settings-hint'><strong>Rationale:</strong> " + escHtml(String(proposal.rationale || "")) + "</p>";
+          }
+          if (proposal.proposed_change) {
+            proposalHtml += "<p class='settings-hint'><strong>Change:</strong> " + escHtml(String(proposal.proposed_change || "")) + "</p>";
+          }
+          if (proposal.created_at) {
+            proposalHtml += "<p class='settings-hint'>created: " + escHtml(String(proposal.created_at || "")) + "</p>";
+          }
+          if (proposalStatus === "proposed" || proposalStatus === "accepted") {
+            proposalHtml += "<div class='mode-runtime-actions'>";
+            if (proposalStatus === "proposed") {
+              proposalHtml += "<button type='button' data-action='mode-runtime-proposal-decision' data-proposal-id='" + escAttr(proposal.id || "") + "' data-decision='accept'>Accept</button>";
+            }
+            proposalHtml += "<button type='button' data-action='mode-runtime-proposal-decision' data-proposal-id='" + escAttr(proposal.id || "") + "' data-decision='apply'>Apply</button>";
+            proposalHtml += "<button type='button' class='ghost' data-action='mode-runtime-proposal-decision' data-proposal-id='" + escAttr(proposal.id || "") + "' data-decision='reject'>Reject</button>";
+            proposalHtml += "</div>";
+          }
+          proposalHtml += "</article>";
+        }
+        proposalHtml += "</div>";
+      }
+      if (proposalState.manual_apply_only !== false) {
+        proposalHtml += "<p class='settings-hint'>Safety guard: applying a proposal updates proposal state only; it does not autonomously rewrite pipelines.</p>";
+      }
+      proposalHtml += "</section>";
+      el.modeRuntimeImprovementProposals.innerHTML = proposalHtml;
+    }
 
     if (el.assistantModeSelect) {
       var assistantValue = normalizeAssistantModeId(state.assistantModeId);
@@ -19753,6 +20047,47 @@
         var modeInjectionAllow = modeInjectionBtn.getAttribute("data-allow") === "1";
         runWithControlPending(modeInjectionBtn, function () {
           return modeRuntimeUpdate(modeInjectionId, { allow_queue_injection: modeInjectionAllow });
+        }, { spinner: false }).catch(showError);
+        return;
+      }
+      var proposalGenerateBtn = event.target && event.target.closest
+        ? event.target.closest("button[data-action='mode-runtime-proposal-generate']")
+        : null;
+      if (proposalGenerateBtn) {
+        runWithControlPending(proposalGenerateBtn, function () {
+          return modeRuntimeGenerateImprovementProposals().then(function (response) {
+            var created = response && response.result && Array.isArray(response.result.created) ? response.result.created : [];
+            showTransientNotice(
+              created.length
+                ? ("Generated " + String(created.length) + " proposal" + (created.length === 1 ? "" : "s"))
+                : "No new proposals generated"
+            );
+          });
+        }, { spinner: false }).catch(showError);
+        return;
+      }
+      var proposalDecisionBtn = event.target && event.target.closest
+        ? event.target.closest("button[data-action='mode-runtime-proposal-decision'][data-proposal-id][data-decision]")
+        : null;
+      if (proposalDecisionBtn) {
+        var proposalId = trim(String(proposalDecisionBtn.getAttribute("data-proposal-id") || ""));
+        var proposalDecision = trim(String(proposalDecisionBtn.getAttribute("data-decision") || "")).toLowerCase();
+        if (!proposalId || !proposalDecision) {
+          return;
+        }
+        if (proposalDecision === "apply") {
+          var applyConfirmed = window.confirm("Apply this proposal state? This does not auto-edit pipelines.");
+          if (!applyConfirmed) {
+            return;
+          }
+        }
+        runWithControlPending(proposalDecisionBtn, function () {
+          return modeRuntimeDecideImprovementProposal(proposalId, proposalDecision).then(function () {
+            var decisionLabel = proposalDecision === "apply"
+              ? "applied"
+              : (proposalDecision === "accept" ? "accepted" : "rejected");
+            showTransientNotice("Proposal " + decisionLabel);
+          });
         }, { spinner: false }).catch(showError);
         return;
       }

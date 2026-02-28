@@ -47,6 +47,11 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
 - `mode_runtime_skill_invoke` (POST)
 - `mode_runtime_skill_create` (POST)
 - `mode_runtime_skill_install` (POST)
+- `failure_taxonomy_state` (GET)
+- `improvement_proposals_state` (GET)
+- `improvement_proposal_generate` (POST)
+- `improvement_proposal_decide` (POST)
+- `improvement_proposal_create` (POST)
 - `models` (GET)
 - `pick_workspace` (GET, macOS native chooser)
 - `add_workspace` (POST)
@@ -100,6 +105,8 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - `invocation-bus/` skill invocation requests/results (stateless skill execution records)
   - `invocation-bus/directives/` cooperative mode-to-mode governance directives
   - `dashboard/` composite panel substrate and scheduler snapshots
+  - `failure-taxonomy/events.tsv` persistent run failure taxonomy records
+  - `improvement-proposals/<proposal-id>/` manually reviewed improvement proposals (`meta.env`, `proposal.md`)
 - Run-mode picker includes a `More modes` expander that surfaces all runtime governance modes with blurbs, and selecting one applies `Assistant` run mode with that focus profile.
 - Composer now separates `Reasoning depth` from `Compute/time budget`:
   - Reasoning controls planning depth/effort per step.

@@ -5388,7 +5388,9 @@ select:focus {
 
 .mode-runtime-panels,
 .mode-runtime-modes,
-.mode-runtime-skills {
+.mode-runtime-skills,
+.mode-runtime-failure-taxonomy,
+.mode-runtime-improvement-proposals {
   display: grid;
   gap: 8px;
 }
@@ -5516,6 +5518,40 @@ select:focus {
 
 .mode-runtime-manager .terminal-output.error {
   color: var(--danger);
+}
+
+.mode-runtime-taxonomy-list,
+.mode-runtime-proposal-list {
+  display: grid;
+  gap: 7px;
+}
+
+.mode-runtime-taxonomy-row,
+.mode-runtime-proposal-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 84%, var(--surface-hover) 16%);
+  padding: 8px 9px;
+  display: grid;
+  gap: 5px;
+}
+
+.mode-runtime-taxonomy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mode-runtime-taxonomy-recent {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.mode-runtime-taxonomy-recent summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.82rem;
 }
 
 #selected-ssh-path,

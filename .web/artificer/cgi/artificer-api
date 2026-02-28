@@ -6209,22 +6209,22 @@ dictation_live_level_for_session() {
     return 0
   fi
 
-  # Prefer per-frame Peak telemetry for fast, sensitive UI updates.
-  # Fall back to RMS variants when Peak fields are unavailable.
+  # Prefer Overall peak/RMS telemetry for stable level extraction.
+  # Newer ffmpeg astats emits `RMS_peak` instead of `RMS_level`.
   # Some ffmpeg builds include NUL bytes in ametadata output; strip binary bytes first.
   recent_levels=$(tail -n 320 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
-  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' | tail -n 1 || true)
+  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' | tail -n 1 || true)
   if [ -z "$level_line" ]; then
-    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | grep -aE -iv 'Overall\.(RMS_level|RMS_peak)' | tail -n 1 || true)
-  fi
-  if [ -z "$level_line" ]; then
-    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' | tail -n 1 || true)
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' | tail -n 1 || true)
   fi
   if [ -z "$level_line" ]; then
     level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_level' | tail -n 1 || true)
   fi
   if [ -z "$level_line" ]; then
     level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_peak' | tail -n 1 || true)
+  fi
+  if [ -z "$level_line" ]; then
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | tail -n 1 || true)
   fi
   if [ -z "$level_line" ]; then
     level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_(level|count)' | tail -n 1 || true)
@@ -6241,11 +6241,11 @@ dictation_live_level_for_session() {
   awk -v db="$level_db" '
     BEGIN {
       v = db + 0.0
-      if (v < -78) v = -78
-      if (v > -3) v = -3
-      level = (v + 78) / 75
-      # Keep a mostly linear envelope; frontend handles adaptive noise floor.
-      level = level ^ 1.0
+      if (v < -74) v = -74
+      if (v > -18) v = -18
+      level = (v + 74) / 56
+      # Keep ambient room noise near baseline while lifting normal speech variance.
+      level = level * level
       if (level < 0) level = 0
       if (level > 1) level = 1
       printf "%.5f", level
@@ -6260,17 +6260,17 @@ dictation_live_levels_json_for_session() {
     return 0
   fi
 
-  # Emit recent per-frame Peak-derived levels so UI bars react at finer temporal granularity.
+  # Emit recent levels for fine-grained UI bar updates.
   recent_levels=$(tail -n 960 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
-  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' || true)
+  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' || true)
   if [ -z "$rms_lines" ]; then
-    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | grep -aE -iv 'Overall\.(RMS_level|RMS_peak)' || true)
-  fi
-  if [ -z "$rms_lines" ]; then
-    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' || true)
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' || true)
   fi
   if [ -z "$rms_lines" ]; then
     rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_level' || true)
+  fi
+  if [ -z "$rms_lines" ]; then
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' || true)
   fi
   if [ -z "$rms_lines" ]; then
     rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_peak' || true)
@@ -6302,10 +6302,10 @@ dictation_live_levels_json_for_session() {
         next
       }
       v = raw + 0.0
-      if (v < -78) v = -78
-      if (v > -3) v = -3
-      level = (v + 78) / 75
-      level = level ^ 1.0
+      if (v < -74) v = -74
+      if (v > -18) v = -18
+      level = (v + 74) / 56
+      level = level * level
       if (level < 0) level = 0
       if (level > 1) level = 1
       if (!first) {
@@ -9904,6 +9904,13 @@ append_failure_entry() {
     printf 'Hypothesis: %s\n' "$hypothesis_text"
     printf 'Next Attempt: %s\n\n' "$next_text"
   } >> "$ledger_file"
+
+  if command -v mr_failure_taxonomy_record >/dev/null 2>&1; then
+    ensure_mode_runtime_bootstrap
+    active_run_mode=$(trim "${ARTIFICER_ACTIVE_RUN_MODE:-unknown}")
+    [ -n "$active_run_mode" ] || active_run_mode="unknown"
+    mr_failure_taxonomy_record "$action_text" "$error_text" "$hypothesis_text" "$next_text" "$active_run_mode" >/dev/null 2>&1 || true
+  fi
 }
 
 append_session_entry() {
@@ -11933,6 +11940,56 @@ case "$action" in
     if command -v mr_mode_runtime_skill_install_response >/dev/null 2>&1; then
       ensure_mode_runtime_bootstrap
       mr_mode_runtime_skill_install_response
+    else
+      emit_error "mode runtime is unavailable"
+    fi
+    exit 0
+    ;;
+
+  failure_taxonomy_state)
+    if command -v mr_failure_taxonomy_state_response >/dev/null 2>&1; then
+      ensure_mode_runtime_bootstrap
+      mr_failure_taxonomy_state_response
+    else
+      emit_error "mode runtime is unavailable"
+    fi
+    exit 0
+    ;;
+
+  improvement_proposals_state)
+    if command -v mr_improvement_proposals_state_response >/dev/null 2>&1; then
+      ensure_mode_runtime_bootstrap
+      mr_improvement_proposals_state_response
+    else
+      emit_error "mode runtime is unavailable"
+    fi
+    exit 0
+    ;;
+
+  improvement_proposal_create)
+    if command -v mr_improvement_proposal_create_response >/dev/null 2>&1; then
+      ensure_mode_runtime_bootstrap
+      mr_improvement_proposal_create_response
+    else
+      emit_error "mode runtime is unavailable"
+    fi
+    exit 0
+    ;;
+
+  improvement_proposal_generate)
+    if command -v mr_improvement_proposal_generate_response >/dev/null 2>&1; then
+      ensure_mode_runtime_bootstrap
+      mr_improvement_proposal_generate_response
+    else
+      emit_error "mode runtime is unavailable"
+    fi
+    exit 0
+    ;;
+
+  improvement_proposal_decide)
+    if command -v mr_improvement_proposal_decide_response >/dev/null 2>&1; then
+      ensure_mode_runtime_bootstrap
+      mr_improvement_proposal_decide_response
     else
       emit_error "mode runtime is unavailable"
     fi
@@ -16377,6 +16434,8 @@ $fallback_output"
     if [ "$programmer_review_enabled" -ne 1 ]; then
       programmer_review_max_rounds=0
     fi
+    ARTIFICER_ACTIVE_RUN_MODE=$run_mode
+    export ARTIFICER_ACTIVE_RUN_MODE
 
     request_explicit_skills_file=$(mktemp)
     prompt_explicit_skills_file=$(mktemp)

@@ -2,7 +2,7 @@
 title: ""
 pagetitle: "Artificer"
 ---
-<link rel="stylesheet" href="/static/style.css?v=20260228-corementor1" />
+<link rel="stylesheet" href="/static/style.css?v=20260228-corementor2" />
 <link id="artificer-theme-stylesheet" rel="stylesheet" href="/static/themes/psionic.css" />
 <div class="forge-shell" id="forge-shell">
 <aside class="workspace-sidebar" id="workspace-dropzone" tabindex="0">
@@ -462,6 +462,8 @@ pagetitle: "Artificer"
 <div id="mode-runtime-panels" class="mode-runtime-panels"></div>
 <div id="mode-runtime-modes" class="mode-runtime-modes"></div>
 <div id="mode-runtime-skills" class="mode-runtime-skills"></div>
+<div id="mode-runtime-failure-taxonomy" class="mode-runtime-failure-taxonomy"></div>
+<div id="mode-runtime-improvement-proposals" class="mode-runtime-improvement-proposals"></div>
 <div class="mode-runtime-manager">
 <p class="settings-hint">Use the run-mode menu <strong>More modes</strong> expander to choose Assistant focus modes inline while composing.</p>
 <label for="assistant-mode-select">Assistant focus mode</label>
@@ -598,7 +600,7 @@ pagetitle: "Artificer"
     launchKey = String(Date.now());
   }
   var script = document.createElement("script");
-  script.src = "/static/artificer-app.js?v=20260228-corementor1&launch=" + encodeURIComponent(launchKey);
+  script.src = "/static/artificer-app.js?v=20260228-corementor2&launch=" + encodeURIComponent(launchKey);
   document.body.appendChild(script);
 })();
 </script>

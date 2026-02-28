@@ -284,6 +284,636 @@ mr_csv_to_json_array() {
   printf ']'
 }
 
+mr_new_id() {
+  if command -v new_id >/dev/null 2>&1; then
+    new_id
+    return 0
+  fi
+  now=$(mr_now_epoch)
+  rand=$(awk 'BEGIN { srand(); printf "%06d", rand()*1000000 }')
+  printf '%s-%s-%s' "$now" "$$" "$rand"
+}
+
+mr_failure_taxonomy_category_for_entry() {
+  action_text=$(mr_sanitize_inline "$1")
+  error_text=$(mr_sanitize_inline "$2")
+  hypothesis_text=$(mr_sanitize_inline "$3")
+  next_text=$(mr_sanitize_inline "$4")
+  mode_text=$(mr_sanitize_inline "${5:-}")
+  combined=$(printf '%s %s %s %s %s' "$action_text" "$error_text" "$hypothesis_text" "$next_text" "$mode_text" | tr '[:upper:]' '[:lower:]')
+
+  if printf '%s' "$combined" | grep -Eq 'safety policy|blocked by safety|approval required|approval_required|permission denied'; then
+    printf '%s' "command-policy-block"
+    return 0
+  fi
+  if printf '%s' "$combined" | grep -Eq 'run-time budget|timed out|timeout|stale timeout|exceeded'; then
+    printf '%s' "timeout-budget"
+    return 0
+  fi
+  if printf '%s' "$combined" | grep -Eq 'decision required|decision-request|decision request|required-input-missing|external-action-gate|destructive-action-gate'; then
+    printf '%s' "decision-gate"
+    return 0
+  fi
+  if printf '%s' "$combined" | grep -Eq 'controller-format|command-parse|parse|schema|malformed|invalid format'; then
+    printf '%s' "parser-contract"
+    return 0
+  fi
+  if printf '%s' "$combined" | grep -Eq 'verify-|verification|regression|test failed|assert'; then
+    printf '%s' "verification-regression"
+    return 0
+  fi
+  if printf '%s' "$combined" | grep -Eq 'implement-iteration|patch|promotion|scratch|write failed|apply'; then
+    printf '%s' "implementation-failure"
+    return 0
+  fi
+  if printf '%s' "$combined" | grep -Eq 'not found|no such file|missing|unavailable'; then
+    printf '%s' "missing-artifact"
+    return 0
+  fi
+  if printf '%s' "$combined" | grep -Eq 'network|dns|http|fetch|ssl|connection'; then
+    printf '%s' "external-dependency"
+    return 0
+  fi
+  printf '%s' "unknown"
+}
+
+mr_failure_taxonomy_category_label() {
+  category_id=$1
+  case "$category_id" in
+    command-policy-block) printf '%s' "Command policy / approval gate" ;;
+    timeout-budget) printf '%s' "Run timeout / budget exhaustion" ;;
+    decision-gate) printf '%s' "Decision surfacing gate" ;;
+    parser-contract) printf '%s' "Controller parse/contract failure" ;;
+    verification-regression) printf '%s' "Verification regression" ;;
+    implementation-failure) printf '%s' "Implementation failure" ;;
+    missing-artifact) printf '%s' "Missing artifact or context" ;;
+    external-dependency) printf '%s' "External dependency failure" ;;
+    *) printf '%s' "Uncategorized failure" ;;
+  esac
+}
+
+mr_failure_taxonomy_surface_for_category() {
+  category_id=$1
+  case "$category_id" in
+    command-policy-block) printf '%s' "policy" ;;
+    timeout-budget) printf '%s' "runtime" ;;
+    decision-gate) printf '%s' "governance" ;;
+    parser-contract) printf '%s' "reasoning" ;;
+    verification-regression) printf '%s' "verification" ;;
+    implementation-failure) printf '%s' "implementation" ;;
+    missing-artifact) printf '%s' "context" ;;
+    external-dependency) printf '%s' "environment" ;;
+    *) printf '%s' "unknown" ;;
+  esac
+}
+
+mr_failure_taxonomy_severity_for_category() {
+  category_id=$1
+  case "$category_id" in
+    timeout-budget|verification-regression|implementation-failure)
+      printf '%s' "high"
+      ;;
+    decision-gate|parser-contract|missing-artifact|external-dependency)
+      printf '%s' "medium"
+      ;;
+    command-policy-block)
+      printf '%s' "low"
+      ;;
+    *)
+      printf '%s' "low"
+      ;;
+  esac
+}
+
+mr_failure_taxonomy_record() {
+  action_text=$(mr_sanitize_inline "$1")
+  error_text=$(mr_sanitize_inline "$2")
+  hypothesis_text=$(mr_sanitize_inline "$3")
+  next_text=$(mr_sanitize_inline "$4")
+  mode_text=$(mr_sanitize_inline "${5:-unknown}")
+
+  category_id=$(mr_failure_taxonomy_category_for_entry "$action_text" "$error_text" "$hypothesis_text" "$next_text" "$mode_text")
+  surface_value=$(mr_failure_taxonomy_surface_for_category "$category_id")
+  severity_value=$(mr_failure_taxonomy_severity_for_category "$category_id")
+
+  mkdir -p "$(mr_failure_taxonomy_dir)"
+  events_file=$(mr_failure_taxonomy_events_file)
+  [ -f "$events_file" ] || : > "$events_file"
+
+  now_epoch=$(mr_now_epoch)
+  now_iso=$(mr_now_iso)
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$now_epoch" \
+    "$now_iso" \
+    "$category_id" \
+    "$surface_value" \
+    "$severity_value" \
+    "$mode_text" \
+    "$action_text" \
+    "$error_text" \
+    "$hypothesis_text" \
+    "$next_text" >> "$events_file"
+}
+
+mr_failure_taxonomy_categories_json() {
+  max_categories=$1
+  case "$max_categories" in
+    ""|*[!0-9]*) max_categories=12 ;;
+  esac
+  if [ "$max_categories" -lt 1 ]; then
+    max_categories=1
+  fi
+
+  events_file=$(mr_failure_taxonomy_events_file)
+  if [ ! -s "$events_file" ]; then
+    printf '[]'
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  stats_file=$(mktemp)
+  awk -F'\t' '
+    NF >= 6 {
+      category = $3
+      if (category == "") {
+        category = "unknown"
+      }
+      counts[category] += 1
+      last_seen[category] = $2
+      surface[category] = $4
+      severity[category] = $5
+    }
+    END {
+      for (category in counts) {
+        printf "%s\t%s\t%s\t%s\t%s\n", counts[category], category, last_seen[category], surface[category], severity[category]
+      }
+    }
+  ' "$events_file" | sort -t "$tab_char" -k1,1nr -k2,2 > "$stats_file"
+
+  printf '['
+  first=1
+  shown=0
+  while IFS="$tab_char" read -r count category_id last_seen surface_value severity_value || [ -n "$category_id" ]; do
+    [ -n "$category_id" ] || continue
+    shown=$((shown + 1))
+    if [ "$shown" -gt "$max_categories" ]; then
+      break
+    fi
+    category_label=$(mr_failure_taxonomy_category_label "$category_id")
+    if [ "$first" -eq 0 ]; then
+      printf ','
+    fi
+    first=0
+    printf '{"id":"%s","label":"%s","count":"%s","last_seen":"%s","surface":"%s","severity":"%s"}' \
+      "$(json_escape "$category_id")" \
+      "$(json_escape "$category_label")" \
+      "$(json_escape "$count")" \
+      "$(json_escape "$last_seen")" \
+      "$(json_escape "$surface_value")" \
+      "$(json_escape "$severity_value")"
+  done < "$stats_file"
+  printf ']'
+  rm -f "$stats_file"
+}
+
+mr_failure_taxonomy_recent_json() {
+  max_rows=$1
+  case "$max_rows" in
+    ""|*[!0-9]*) max_rows=16 ;;
+  esac
+  if [ "$max_rows" -lt 1 ]; then
+    max_rows=1
+  fi
+
+  events_file=$(mr_failure_taxonomy_events_file)
+  if [ ! -s "$events_file" ]; then
+    printf '[]'
+    return 0
+  fi
+
+  recent_file=$(mktemp)
+  tail -n "$max_rows" "$events_file" > "$recent_file" 2>/dev/null || : > "$recent_file"
+  tab_char=$(printf '\t')
+
+  printf '['
+  first=1
+  while IFS="$tab_char" read -r epoch_value iso_value category_id surface_value severity_value mode_value action_text error_text hypothesis_text next_text || [ -n "$iso_value$category_id$action_text$error_text" ]; do
+    [ -n "$category_id$action_text$error_text$next_text" ] || continue
+    category_label=$(mr_failure_taxonomy_category_label "$category_id")
+    if [ "$first" -eq 0 ]; then
+      printf ','
+    fi
+    first=0
+    printf '{"timestamp":"%s","epoch":"%s","category":"%s","category_label":"%s","surface":"%s","severity":"%s","mode":"%s","action":"%s","error":"%s","hypothesis":"%s","next_attempt":"%s"}' \
+      "$(json_escape "$iso_value")" \
+      "$(json_escape "$epoch_value")" \
+      "$(json_escape "$category_id")" \
+      "$(json_escape "$category_label")" \
+      "$(json_escape "$surface_value")" \
+      "$(json_escape "$severity_value")" \
+      "$(json_escape "$mode_value")" \
+      "$(json_escape "$action_text")" \
+      "$(json_escape "$error_text")" \
+      "$(json_escape "$hypothesis_text")" \
+      "$(json_escape "$next_text")"
+  done < "$recent_file"
+  printf ']'
+  rm -f "$recent_file"
+}
+
+mr_failure_taxonomy_state_json() {
+  events_file=$(mr_failure_taxonomy_events_file)
+  total_entries=0
+  last_recorded_at=""
+  if [ -f "$events_file" ]; then
+    total_entries=$(wc -l < "$events_file" 2>/dev/null | tr -d '[:space:]' || printf '0')
+    case "$total_entries" in
+      ""|*[!0-9]*) total_entries=0 ;;
+    esac
+    if [ "$total_entries" -gt 0 ]; then
+      tab_char=$(printf '\t')
+      last_recorded_at=$(tail -n 1 "$events_file" 2>/dev/null | awk -F"$tab_char" '{ print $2 }')
+    fi
+  fi
+
+  printf '{"total":"%s","last_recorded_at":"%s","categories":%s,"recent":%s}' \
+    "$(json_escape "$total_entries")" \
+    "$(json_escape "$last_recorded_at")" \
+    "$(mr_failure_taxonomy_categories_json "12")" \
+    "$(mr_failure_taxonomy_recent_json "16")"
+}
+
+mr_improvement_proposal_exists_for_category() {
+  category_id=$1
+  [ -n "$category_id" ] || return 1
+  for proposal_dir in "$(mr_improvement_proposals_dir)"/*; do
+    [ -d "$proposal_dir" ] || continue
+    meta_file="$proposal_dir/meta.env"
+    [ -f "$meta_file" ] || continue
+    proposal_category=$(mr_env_get "$meta_file" "taxonomy_category" "")
+    proposal_status=$(mr_env_get "$meta_file" "status" "proposed")
+    if [ "$proposal_category" = "$category_id" ]; then
+      case "$proposal_status" in
+        proposed|accepted|applied)
+          return 0
+          ;;
+      esac
+    fi
+  done
+  return 1
+}
+
+mr_improvement_proposal_create() {
+  title_text=$(mr_sanitize_inline "$1")
+  rationale_text=$(mr_sanitize_inline "$2")
+  proposed_change_text=$(mr_sanitize_inline "$3")
+  scope_text=$(mr_sanitize_inline "$4")
+  risk_level_text=$(mr_sanitize_inline "$5")
+  source_text=$(mr_sanitize_inline "$6")
+  category_id=$(trim "${7:-}")
+
+  [ -n "$title_text" ] || title_text="Untitled improvement proposal"
+  [ -n "$rationale_text" ] || rationale_text="No rationale supplied."
+  [ -n "$proposed_change_text" ] || proposed_change_text="No change proposal supplied."
+  [ -n "$source_text" ] || source_text="manual"
+
+  case "$scope_text" in
+    controller-loop|conversation-flow|decision-surfacing|verification|tooling|other) ;;
+    *) scope_text="other" ;;
+  esac
+  case "$risk_level_text" in
+    low|medium|high) ;;
+    *) risk_level_text="medium" ;;
+  esac
+  if [ -n "$category_id" ] && ! valid_id "$category_id"; then
+    category_id=""
+  fi
+
+  proposal_id=$(printf '%s' "proposal-$(mr_new_id)" | tr -cd 'a-zA-Z0-9._-')
+  [ -n "$proposal_id" ] || proposal_id="proposal-$(mr_now_epoch)-$$"
+
+  proposal_dir=$(mr_improvement_proposal_dir_for "$proposal_id")
+  if [ -d "$proposal_dir" ]; then
+    proposal_id="${proposal_id}-$(awk 'BEGIN { srand(); printf "%04d", rand()*10000 }')"
+    proposal_dir=$(mr_improvement_proposal_dir_for "$proposal_id")
+  fi
+  mkdir -p "$proposal_dir"
+
+  now_iso=$(mr_now_iso)
+  meta_file=$(mr_improvement_proposal_meta_file "$proposal_id")
+  {
+    printf 'id=%s\n' "$proposal_id"
+    printf 'title=%s\n' "$title_text"
+    printf 'scope=%s\n' "$scope_text"
+    printf 'risk_level=%s\n' "$risk_level_text"
+    printf 'source=%s\n' "$source_text"
+    printf 'status=proposed\n'
+    printf 'created_at=%s\n' "$now_iso"
+    printf 'updated_at=%s\n' "$now_iso"
+    printf 'applied_at=\n'
+    printf 'taxonomy_category=%s\n' "$category_id"
+    printf 'rationale=%s\n' "$rationale_text"
+    printf 'proposed_change=%s\n' "$proposed_change_text"
+  } > "$meta_file"
+
+  proposal_file=$(mr_improvement_proposal_body_file "$proposal_id")
+  {
+    printf '# %s\n\n' "$title_text"
+    printf 'Status: proposed\n'
+    printf 'Scope: %s\n' "$scope_text"
+    printf 'Risk: %s\n' "$risk_level_text"
+    printf 'Source: %s\n' "$source_text"
+    if [ -n "$category_id" ]; then
+      printf 'Taxonomy category: %s\n' "$category_id"
+    fi
+    printf 'Created: %s\n\n' "$now_iso"
+    printf '## Rationale\n- %s\n\n' "$rationale_text"
+    printf '## Proposed Change\n- %s\n\n' "$proposed_change_text"
+    printf '## Safety Gate\n- Manual apply only. This proposal does not auto-edit execution pipelines.\n'
+  } > "$proposal_file"
+
+  printf '%s' "$proposal_id"
+}
+
+mr_improvement_proposal_status_counts_json() {
+  proposed_count=0
+  accepted_count=0
+  applied_count=0
+  rejected_count=0
+  total_count=0
+
+  for proposal_dir in "$(mr_improvement_proposals_dir)"/*; do
+    [ -d "$proposal_dir" ] || continue
+    meta_file="$proposal_dir/meta.env"
+    [ -f "$meta_file" ] || continue
+    total_count=$((total_count + 1))
+    status_value=$(mr_env_get "$meta_file" "status" "proposed")
+    case "$status_value" in
+      accepted)
+        accepted_count=$((accepted_count + 1))
+        ;;
+      applied)
+        applied_count=$((applied_count + 1))
+        ;;
+      rejected)
+        rejected_count=$((rejected_count + 1))
+        ;;
+      *)
+        proposed_count=$((proposed_count + 1))
+        ;;
+    esac
+  done
+
+  printf '{"total":"%s","proposed":"%s","accepted":"%s","applied":"%s","rejected":"%s"}' \
+    "$(json_escape "$total_count")" \
+    "$(json_escape "$proposed_count")" \
+    "$(json_escape "$accepted_count")" \
+    "$(json_escape "$applied_count")" \
+    "$(json_escape "$rejected_count")"
+}
+
+mr_improvement_proposals_items_json() {
+  max_rows=$1
+  case "$max_rows" in
+    ""|*[!0-9]*) max_rows=40 ;;
+  esac
+  if [ "$max_rows" -lt 1 ]; then
+    max_rows=1
+  fi
+
+  proposal_dirs=$(find "$(mr_improvement_proposals_dir)" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -r)
+  printf '['
+  first=1
+  shown=0
+  if [ -n "$proposal_dirs" ]; then
+    printf '%s\n' "$proposal_dirs" | while IFS= read -r proposal_dir; do
+      [ -d "$proposal_dir" ] || continue
+      meta_file="$proposal_dir/meta.env"
+      [ -f "$meta_file" ] || continue
+      shown=$((shown + 1))
+      if [ "$shown" -gt "$max_rows" ]; then
+        break
+      fi
+      proposal_id=$(mr_env_get "$meta_file" "id" "$(basename "$proposal_dir")")
+      title_text=$(mr_env_get "$meta_file" "title" "$proposal_id")
+      scope_text=$(mr_env_get "$meta_file" "scope" "other")
+      risk_level_text=$(mr_env_get "$meta_file" "risk_level" "medium")
+      status_value=$(mr_env_get "$meta_file" "status" "proposed")
+      source_text=$(mr_env_get "$meta_file" "source" "manual")
+      created_at=$(mr_env_get "$meta_file" "created_at" "")
+      updated_at=$(mr_env_get "$meta_file" "updated_at" "")
+      applied_at=$(mr_env_get "$meta_file" "applied_at" "")
+      category_id=$(mr_env_get "$meta_file" "taxonomy_category" "")
+      rationale_text=$(mr_env_get "$meta_file" "rationale" "")
+      proposed_change_text=$(mr_env_get "$meta_file" "proposed_change" "")
+      category_label=$(mr_failure_taxonomy_category_label "$category_id")
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '{"id":"%s","title":"%s","scope":"%s","risk_level":"%s","status":"%s","source":"%s","created_at":"%s","updated_at":"%s","applied_at":"%s","taxonomy_category":"%s","taxonomy_category_label":"%s","rationale":"%s","proposed_change":"%s"}' \
+        "$(json_escape "$proposal_id")" \
+        "$(json_escape "$title_text")" \
+        "$(json_escape "$scope_text")" \
+        "$(json_escape "$risk_level_text")" \
+        "$(json_escape "$status_value")" \
+        "$(json_escape "$source_text")" \
+        "$(json_escape "$created_at")" \
+        "$(json_escape "$updated_at")" \
+        "$(json_escape "$applied_at")" \
+        "$(json_escape "$category_id")" \
+        "$(json_escape "$category_label")" \
+        "$(json_escape "$rationale_text")" \
+        "$(json_escape "$proposed_change_text")"
+    done
+  fi
+  printf ']'
+}
+
+mr_improvement_proposals_state_json() {
+  printf '{"manual_apply_only":true,"counts":%s,"items":%s}' \
+    "$(mr_improvement_proposal_status_counts_json)" \
+    "$(mr_improvement_proposals_items_json "40")"
+}
+
+mr_improvement_proposal_template_for_category() {
+  category_id=$1
+  case "$category_id" in
+    timeout-budget)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Reduce run timeout failures via earlier decomposition" \
+        "Runs are spending too much budget before producing stable partial output." \
+        "Add an early decomposition checkpoint and emit partial-deliverable summaries before heavy implementation phases." \
+        "controller-loop" \
+        "low"
+      ;;
+    command-policy-block)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Improve command preflight to reduce approval deadlocks" \
+        "Frequent policy blocks indicate command plans are not preflighted early enough." \
+        "Add preflight command planning that rewrites unsafe command intents into policy-compliant alternatives before execution." \
+        "decision-surfacing" \
+        "medium"
+      ;;
+    decision-gate)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Surface high-impact decisions earlier in runs" \
+        "Decision requests are appearing late, causing rework." \
+        "Promote an early decision-checkpoint that requests missing high-impact choices before implementation starts." \
+        "decision-surfacing" \
+        "low"
+      ;;
+    parser-contract)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Harden controller output parsing contract" \
+        "Parser/format failures reduce iteration quality and waste context." \
+        "Strengthen parser guards and add fallback normalization for malformed controller sections." \
+        "tooling" \
+        "medium"
+      ;;
+    verification-regression)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Tighten verification-first loop behavior" \
+        "Verification regressions suggest tests are not leading implementation flow enough." \
+        "Require verification plan refresh before each implementation step and block promotion when test evidence is stale." \
+        "verification" \
+        "medium"
+      ;;
+    implementation-failure)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Shrink implementation batch size after repeated failures" \
+        "Implementation failures indicate overly large patch scope per iteration." \
+        "Automatically split implementation tasks into smaller files/steps when failures repeat within the same run." \
+        "controller-loop" \
+        "medium"
+      ;;
+    missing-artifact)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Strengthen context acquisition for missing artifacts" \
+        "Missing-file/context failures indicate weak discovery before edits." \
+        "Add a mandatory context probe phase when referenced files cannot be found, then regenerate the plan from discovered paths." \
+        "conversation-flow" \
+        "low"
+      ;;
+    external-dependency)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Add resilient fallback for external dependency failures" \
+        "External dependency failures can stall runs that would otherwise make progress offline." \
+        "Add offline fallback behavior and explicit uncertainty messaging when network/external dependencies fail." \
+        "controller-loop" \
+        "low"
+      ;;
+    *)
+      printf '%s\t%s\t%s\t%s\t%s' \
+        "Investigate uncategorized failure cluster" \
+        "A recurring uncategorized failure pattern needs explicit handling." \
+        "Capture exemplar failures and define a dedicated category plus mitigation strategy." \
+        "other" \
+        "low"
+      ;;
+  esac
+}
+
+mr_improvement_proposal_generate_from_taxonomy_json() {
+  events_file=$(mr_failure_taxonomy_events_file)
+  if [ ! -s "$events_file" ]; then
+    printf '{"created":[],"skipped":[],"note":"No failures recorded yet."}'
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  stats_file=$(mktemp)
+  awk -F'\t' '
+    NF >= 3 {
+      category = $3
+      if (category == "") {
+        category = "unknown"
+      }
+      counts[category] += 1
+    }
+    END {
+      for (category in counts) {
+        printf "%s\t%s\n", counts[category], category
+      }
+    }
+  ' "$events_file" | sort -t "$tab_char" -k1,1nr -k2,2 > "$stats_file"
+
+  created_csv=""
+  skipped_csv=""
+  generated_count=0
+  while IFS="$tab_char" read -r count_value category_id || [ -n "$category_id" ]; do
+    [ -n "$category_id" ] || continue
+    case "$count_value" in
+      ""|*[!0-9]*) count_value=0 ;;
+    esac
+    if [ "$count_value" -lt 2 ]; then
+      continue
+    fi
+    if [ "$generated_count" -ge 4 ]; then
+      break
+    fi
+    if mr_improvement_proposal_exists_for_category "$category_id"; then
+      if [ -n "$skipped_csv" ]; then
+        skipped_csv="$skipped_csv,$category_id"
+      else
+        skipped_csv="$category_id"
+      fi
+      continue
+    fi
+    template_row=$(mr_improvement_proposal_template_for_category "$category_id")
+    title_text=$(printf '%s' "$template_row" | awk -F"$tab_char" '{ print $1 }')
+    rationale_text=$(printf '%s' "$template_row" | awk -F"$tab_char" '{ print $2 }')
+    change_text=$(printf '%s' "$template_row" | awk -F"$tab_char" '{ print $3 }')
+    scope_text=$(printf '%s' "$template_row" | awk -F"$tab_char" '{ print $4 }')
+    risk_text=$(printf '%s' "$template_row" | awk -F"$tab_char" '{ print $5 }')
+    proposal_id=$(mr_improvement_proposal_create "$title_text" "$rationale_text" "$change_text" "$scope_text" "$risk_text" "failure-taxonomy" "$category_id")
+    if [ -n "$proposal_id" ]; then
+      generated_count=$((generated_count + 1))
+      if [ -n "$created_csv" ]; then
+        created_csv="$created_csv,$proposal_id"
+      else
+        created_csv="$proposal_id"
+      fi
+    fi
+  done < "$stats_file"
+  rm -f "$stats_file"
+
+  printf '{"created":%s,"skipped":%s}' \
+    "$(mr_csv_to_json_array "$created_csv")" \
+    "$(mr_csv_to_json_array "$skipped_csv")"
+}
+
+mr_improvement_proposal_set_status() {
+  proposal_id=$(trim "$1")
+  status_value=$(trim "$2")
+  note_text=$(mr_sanitize_inline "${3:-}")
+  if ! valid_id "$proposal_id"; then
+    return 1
+  fi
+  case "$status_value" in
+    accepted|applied|rejected) ;;
+    *) return 1 ;;
+  esac
+  proposal_dir=$(mr_improvement_proposal_dir_for "$proposal_id")
+  if [ ! -d "$proposal_dir" ]; then
+    return 1
+  fi
+  meta_file=$(mr_improvement_proposal_meta_file "$proposal_id")
+  [ -f "$meta_file" ] || return 1
+
+  now_iso=$(mr_now_iso)
+  mr_env_set "$meta_file" "status" "$status_value"
+  mr_env_set "$meta_file" "updated_at" "$now_iso"
+  if [ "$status_value" = "applied" ]; then
+    mr_env_set "$meta_file" "applied_at" "$now_iso"
+  fi
+
+  decisions_file="$(mr_improvement_proposals_dir)/decisions.tsv"
+  [ -f "$decisions_file" ] || : > "$decisions_file"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$(mr_now_epoch)" "$now_iso" "$proposal_id" "$status_value" "$note_text" >> "$decisions_file"
+  return 0
+}
+
 mr_mode_seed_rows() {
   cat <<'EOF_ROWS'
 mastermind-agency-composer|Mastermind / Agency-Composer|9|900|1|Allocates and composes agencies, dashboards, and cross-mode orchestration.|queue,git,run_events,mode_runtime|filesystem,network,agent_spawn|agent-spawner,panel-integrator,dashboard-builder
@@ -581,6 +1211,8 @@ mode_runtime_bootstrap() {
   mkdir -p "$(mr_scheduler_dir)"
   mkdir -p "$(mr_telemetry_dir)"
   mkdir -p "$(mr_interrupts_dir)"
+  mkdir -p "$(mr_failure_taxonomy_dir)"
+  mkdir -p "$(mr_improvement_proposals_dir)"
 
   scheduler_state=$(mr_scheduler_state_file)
   if [ ! -f "$scheduler_state" ]; then
@@ -599,6 +1231,33 @@ mode_runtime_bootstrap() {
   cooperation_log=$(mr_cooperation_log_file)
   if [ ! -f "$cooperation_log" ]; then
     : > "$cooperation_log"
+  fi
+
+  failure_events_file=$(mr_failure_taxonomy_events_file)
+  if [ ! -f "$failure_events_file" ]; then
+    : > "$failure_events_file"
+  fi
+
+  failure_readme_file="$(mr_failure_taxonomy_dir)/README.md"
+  if [ ! -f "$failure_readme_file" ]; then
+    cat > "$failure_readme_file" <<'EOF_FAIL'
+# Failure Taxonomy Store
+
+- `events.tsv` stores normalized failure records from run loops.
+- Rows are tab-separated: epoch, timestamp, category, surface, severity, mode, action, error, hypothesis, next-attempt.
+- This store is read-only from the user UI and used to derive improvement proposals.
+EOF_FAIL
+  fi
+
+  proposals_readme_file="$(mr_improvement_proposals_dir)/README.md"
+  if [ ! -f "$proposals_readme_file" ]; then
+    cat > "$proposals_readme_file" <<'EOF_PROP'
+# Improvement Proposals Store
+
+- Each proposal lives in `<proposal-id>/` with `meta.env` and `proposal.md`.
+- Proposals are manually reviewed and manually applied from the UI.
+- This subsystem does not auto-edit execution pipelines.
+EOF_PROP
   fi
 
   mr_mode_seed_rows | while IFS='|' read -r mode_id mode_name mode_priority mode_cadence mode_interrupt mode_desc mode_subscriptions mode_caps mode_skills; do
@@ -1832,8 +2491,10 @@ mode_runtime_state_json() {
   cooperation_pending_total=$(printf '%s' "$cooperation_stats" | cut -d'|' -f1)
   cooperation_modes_pending=$(printf '%s' "$cooperation_stats" | cut -d'|' -f2)
   cooperation_recent=$(mr_cooperation_recent_json "24")
+  failure_taxonomy_state=$(mr_failure_taxonomy_state_json)
+  improvement_proposals_state=$(mr_improvement_proposals_state_json)
 
-  printf '{"scheduler":{"last_tick":"%s","last_tick_iso":"%s","ticks":"%s","last_due_modes":"%s","last_injections":"%s","last_directives_received":"%s","last_directives_emitted":"%s","summary":"%s"},"modes":%s,"skills":%s,"panels":%s,"cooperation":{"pending_total":"%s","modes_with_pending":"%s","recent":%s}}' \
+  printf '{"scheduler":{"last_tick":"%s","last_tick_iso":"%s","ticks":"%s","last_due_modes":"%s","last_injections":"%s","last_directives_received":"%s","last_directives_emitted":"%s","summary":"%s"},"modes":%s,"skills":%s,"panels":%s,"cooperation":{"pending_total":"%s","modes_with_pending":"%s","recent":%s},"failure_taxonomy":%s,"improvement_proposals":%s}' \
     "$(json_escape "$last_tick")" \
     "$(json_escape "$last_tick_iso")" \
     "$(json_escape "$ticks")" \
@@ -1847,7 +2508,9 @@ mode_runtime_state_json() {
     "$(mr_dashboard_panels_json)" \
     "$(json_escape "$cooperation_pending_total")" \
     "$(json_escape "$cooperation_modes_pending")" \
-    "$cooperation_recent"
+    "$cooperation_recent" \
+    "$failure_taxonomy_state" \
+    "$improvement_proposals_state"
 }
 
 mr_skill_capabilities() {
@@ -2230,6 +2893,80 @@ mr_mode_runtime_tick_response() {
 
   tick_json=$(mr_mode_scheduler_tick_json "$workspace_id" "$conversation_id")
   printf '{"success":true,"tick":%s,"mode_runtime":%s}\n' "$tick_json" "$(mode_runtime_state_json)"
+}
+
+mr_failure_taxonomy_state_response() {
+  printf '{"success":true,"failure_taxonomy":%s}\n' "$(mr_failure_taxonomy_state_json)"
+}
+
+mr_improvement_proposals_state_response() {
+  printf '{"success":true,"improvement_proposals":%s}\n' "$(mr_improvement_proposals_state_json)"
+}
+
+mr_improvement_proposal_create_response() {
+  title_text=$(trim "$(param "title")")
+  rationale_text=$(trim "$(param "rationale")")
+  proposed_change_text=$(trim "$(param "proposed_change")")
+  scope_text=$(trim "$(param "scope")")
+  risk_level_text=$(trim "$(param "risk_level")")
+
+  if [ -z "$title_text" ]; then
+    printf '{"success":false,"error":"title is required"}\n'
+    return 0
+  fi
+  proposal_id=$(mr_improvement_proposal_create "$title_text" "$rationale_text" "$proposed_change_text" "$scope_text" "$risk_level_text" "manual")
+  printf '{"success":true,"proposal_id":"%s","mode_runtime":%s}\n' \
+    "$(json_escape "$proposal_id")" \
+    "$(mode_runtime_state_json)"
+}
+
+mr_improvement_proposal_generate_response() {
+  generated_json=$(mr_improvement_proposal_generate_from_taxonomy_json)
+  printf '{"success":true,"result":%s,"mode_runtime":%s}\n' "$generated_json" "$(mode_runtime_state_json)"
+}
+
+mr_improvement_proposal_decide_response() {
+  proposal_id=$(trim "$(param "proposal_id")")
+  decision_raw=$(trim "$(param "decision")")
+  decision_note=$(param "note")
+  manual_confirm=$(mr_bool_norm "$(param "manual_confirm")")
+  decision_value="accepted"
+
+  if ! valid_id "$proposal_id"; then
+    printf '{"success":false,"error":"invalid proposal_id"}\n'
+    return 0
+  fi
+
+  case "$decision_raw" in
+    accept|accepted)
+      decision_value="accepted"
+      ;;
+    apply|applied)
+      decision_value="applied"
+      ;;
+    reject|rejected|dismiss|dismissed)
+      decision_value="rejected"
+      ;;
+    *)
+      printf '{"success":false,"error":"invalid decision"}\n'
+      return 0
+      ;;
+  esac
+
+  if [ "$decision_value" = "applied" ] && [ "$manual_confirm" != "1" ]; then
+    printf '{"success":false,"error":"manual_confirm=1 is required for apply"}\n'
+    return 0
+  fi
+
+  if ! mr_improvement_proposal_set_status "$proposal_id" "$decision_value" "$decision_note"; then
+    printf '{"success":false,"error":"proposal not found"}\n'
+    return 0
+  fi
+
+  printf '{"success":true,"proposal_id":"%s","decision":"%s","mode_runtime":%s}\n' \
+    "$(json_escape "$proposal_id")" \
+    "$(json_escape "$decision_value")" \
+    "$(mode_runtime_state_json)"
 }
 
 mr_mode_runtime_skill_invoke_response() {
