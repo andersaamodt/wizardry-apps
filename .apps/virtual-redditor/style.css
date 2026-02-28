@@ -17,6 +17,7 @@
   --menu-bg: color-mix(in srgb, var(--bg-panel) 88%, #fff);
   --menu-line: var(--line);
   --duration-number-width: 57px;
+  --checkbox-size: 16px;
 }
 
 * {
@@ -3714,12 +3715,16 @@ input.range-input-invalid[type='number'] {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 10px;
   width: 100%;
   margin: 0;
   min-width: 0;
   color: var(--text);
   font-size: 0.76rem;
+}
+
+.traits-editor-trait input[type='checkbox'] {
+  margin-right: 1px;
 }
 
 .traits-editor-trait span {
@@ -3911,9 +3916,17 @@ input.range-input-invalid[type='number'] {
 }
 
 .schedule-toggle input[type='checkbox'] {
-  width: 14px;
-  height: 14px;
+  width: var(--checkbox-size);
+  height: var(--checkbox-size);
   margin: 0;
+}
+
+.mode-detail-drawer input[type='checkbox'],
+.traits-editor-trait input[type='checkbox'],
+#ban-levels-table .ban-level-enabled-toggle input[type='checkbox'],
+.mode-row-enabled input[type='checkbox'] {
+  width: var(--checkbox-size);
+  height: var(--checkbox-size);
 }
 
 .schedule-inline {

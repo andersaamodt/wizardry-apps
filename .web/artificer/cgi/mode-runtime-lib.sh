@@ -32,6 +32,33 @@ mr_interrupts_dir() {
   printf '%s/interrupts' "$(mr_runtime_root)"
 }
 
+mr_failure_taxonomy_dir() {
+  printf '%s/failure-taxonomy' "$(mr_runtime_root)"
+}
+
+mr_failure_taxonomy_events_file() {
+  printf '%s/events.tsv' "$(mr_failure_taxonomy_dir)"
+}
+
+mr_improvement_proposals_dir() {
+  printf '%s/improvement-proposals' "$(mr_runtime_root)"
+}
+
+mr_improvement_proposal_dir_for() {
+  proposal_id=$1
+  printf '%s/%s' "$(mr_improvement_proposals_dir)" "$proposal_id"
+}
+
+mr_improvement_proposal_meta_file() {
+  proposal_id=$1
+  printf '%s/meta.env' "$(mr_improvement_proposal_dir_for "$proposal_id")"
+}
+
+mr_improvement_proposal_body_file() {
+  proposal_id=$1
+  printf '%s/proposal.md' "$(mr_improvement_proposal_dir_for "$proposal_id")"
+}
+
 mr_scheduler_state_file() {
   printf '%s/state.env' "$(mr_scheduler_dir)"
 }

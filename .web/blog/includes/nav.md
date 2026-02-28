@@ -24,6 +24,7 @@
 <path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4l10-10-4-4L4 16v4zM13 7l4 4"/>
 </svg>
 </a>
+<button id="compose-icon-prev-btn" class="nav-compose-cycle" type="button" aria-label="Previous compose icon" title="Previous compose icon">&#x2039;</button>
 <button id="compose-icon-cycle-btn" class="nav-compose-cycle" type="button" aria-label="Cycle compose icon" title="Cycle compose icon">↺</button>
 </div>
 <span id="compose-icon-name" class="nav-compose-name" aria-live="polite"></span>
