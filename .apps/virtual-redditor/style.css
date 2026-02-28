@@ -1930,13 +1930,14 @@ label {
 }
 
 .persona-main-pane {
+  grid-column: 1;
   min-width: 0;
   height: 100%;
   overflow: auto;
   grid-row: 1;
 }
 
-.persona-bigfive-drawer {
+.persona-workarea > .mode-detail-drawer {
   grid-column: 3;
   grid-row: 1;
 }
@@ -3627,11 +3628,6 @@ input.range-input-invalid[type='number'] {
 .persona-bigfive-drawer select {
   width: fit-content;
   min-width: 88px;
-}
-
-.persona-traits-drawer {
-  grid-column: 3;
-  grid-row: 1;
 }
 
 .traits-summons-warning {
