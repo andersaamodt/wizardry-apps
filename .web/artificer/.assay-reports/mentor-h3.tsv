@@ -3,3 +3,7 @@ deterministic-tests	programming	long	timeout	2	1	0	414	1	1	1	1	49	37
 concurrency-race	programming	long	timeout	2	1	0	414	1	1	1	1	49	37
 api-hardening	programming	standard	timeout	2	1	0	414	1	1	1	1	49	37
 migration-safe	programming	long	timeout	2	1	0	414	1	1	1	1	49	37
+perf-regression	programming	standard	timeout	2	1	0	414	1	1	1	1	49	37
+security-audit	security-audit	long	timeout	2	1	0	414	1	1	1	1	49	37
+refactor-boundaries	programming	standard	timeout	2	1	0	414	1	1	1	1	49	37
+failure-recovery	programming	long	timeout	2	1	0	414	1	1	1	1	49	37
