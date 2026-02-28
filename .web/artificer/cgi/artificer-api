@@ -5460,7 +5460,7 @@ decision_prompt_requests_explicit_choice() {
 decision_prompt_has_missing_required_inputs() {
   prompt_raw=$1
   prompt_lower=$(lowercase_text "$prompt_raw")
-  if printf '%s' "$prompt_raw" | grep -Eq '<[^>]{2,}>|\{\{[^}]{2,}\}\}|\[\[?[A-Z_ -]{3,}\]?\]|\?\?\?'; then
+  if printf '%s' "$prompt_raw" | grep -Eq '<[^>]{2,}>|\{\{[^}]{2,}\}\}|\[\[?[A-Z_ -]{3,}\]?\]|\?\?\?|<<[^>]{2,}>>|\$\{[A-Z_]*(TOKEN|KEY|SECRET|PASSWORD|CRED|ID|URL|HOST|REGION|TENANT)[A-Z0-9_]*\}|REDACTED_[A-Z_]{2,}'; then
     return 0
   fi
   if printf '%s' "$prompt_lower" | grep -Eq 'missing|required[^.\n]{0,40}(input|value|detail|parameter|field|secret|credential)|not provided|unknown|unspecified|tbd|todo|redacted|provide later|ask me'; then
@@ -5487,13 +5487,28 @@ decision_prompt_has_missing_required_inputs() {
       return 0
     fi
   fi
+  deploy_scope_missing_check=0
+  if printf '%s' "$prompt_lower" | grep -Eq '\b(deploy|rollout|hotfix|rollback)\b'; then
+    deploy_scope_missing_check=1
+  elif printf '%s' "$prompt_lower" | grep -Eq '\brelease\b'; then
+    if printf '%s' "$prompt_lower" | grep -Eq '\b(deploy|ship|publish|promote|launch|go[- ]live)\b'; then
+      deploy_scope_missing_check=1
+    fi
+  fi
+  if [ "$deploy_scope_missing_check" -eq 1 ]; then
+    if ! printf '%s' "$prompt_lower" | grep -Eq '\b(check|checks|checklist|plan|preview|dry-run|analysis|document)\b'; then
+      if ! printf '%s' "$prompt_lower" | grep -Eq '\b(prod|production|staging|dev|qa|environment|service|app|cluster|namespace|window|slo|rollback|canary|blue[- ]green)\b'; then
+        return 0
+      fi
+    fi
+  fi
   return 1
 }
 
 decision_question_looks_required_input() {
   question_lower=$(lowercase_text "$1")
   if printf '%s' "$question_lower" | grep -Eq 'which|what|provide|enter|confirm|select'; then
-    if printf '%s' "$question_lower" | grep -Eq 'path|file|folder|directory|workspace|repo|branch|environment|env|url|domain|host|port|model|provider|token|api key|key|credential|secret|password|username|email|latency|throughput|slo|sla|target|baseline|region|tenant|service|schema|table'; then
+    if printf '%s' "$question_lower" | grep -Eq 'path|file|folder|directory|workspace|repo|branch|environment|env|url|domain|host|port|model|provider|token|api key|key|credential|secret|password|username|email|latency|throughput|slo|sla|target|baseline|region|tenant|service|schema|table|jurisdiction|deadline|cluster|namespace|change window|rollback window'; then
       return 0
     fi
   fi
@@ -5502,7 +5517,7 @@ decision_question_looks_required_input() {
 
 decision_question_looks_risk_gate() {
   question_lower=$(lowercase_text "$1")
-  if printf '%s' "$question_lower" | grep -Eq 'approve|permission|authorize|external|network|production|publish|deploy|delete|drop|migrate|irreversible|destructive|force'; then
+  if printf '%s' "$question_lower" | grep -Eq 'approve|permission|authorize|external|network|production|publish|deploy|delete|drop|migrate|irreversible|destructive|force|legal|compliance|privacy|pii|gdpr|hipaa|waiver|policy exception'; then
     return 0
   fi
   return 1
@@ -5510,7 +5525,7 @@ decision_question_looks_risk_gate() {
 
 decision_commands_trigger_external_gate() {
   commands_lower=$(lowercase_text "$1")
-  if printf '%s' "$commands_lower" | grep -Eq '\bcurl\b|\bwget\b|\bnc\b|\bssh\b|\bscp\b|\bsftp\b|\bftp\b|\btelnet\b|\bgit[[:space:]]+push\b|\bgh[[:space:]]+(release|api)\b|\bdocker[[:space:]]+push\b|\bnpm[[:space:]]+publish\b|\btwine[[:space:]]+upload\b|\bkubectl[[:space:]]+(apply|delete|patch|rollout|scale)\b|\bterraform[[:space:]]+apply\b|\bnetlify[[:space:]]+deploy\b|\bvercel([[:space:]]+deploy)?\b'; then
+  if printf '%s' "$commands_lower" | grep -Eq '\bcurl\b|\bwget\b|\bnc\b|\bssh\b|\bscp\b|\bsftp\b|\bftp\b|\btelnet\b|\bgit[[:space:]]+push\b|\bgh[[:space:]]+(release|api)\b|\bdocker[[:space:]]+push\b|\bnpm[[:space:]]+publish\b|\btwine[[:space:]]+upload\b|\bkubectl[[:space:]]+(apply|delete|patch|rollout|scale|replace)\b|\bterraform[[:space:]]+apply\b|\bnetlify[[:space:]]+deploy\b|\bvercel([[:space:]]+deploy)?\b|\bansible-playbook\b|\bhelm[[:space:]]+(install|upgrade|uninstall|delete)\b|\baws[[:space:]]+(s3|ecs|eks|lambda|rds|cloudformation)\b|\bgcloud[[:space:]]+(run|functions|deploy|app|compute)\b|\baz[[:space:]]+(deployment|webapp|functionapp|aks)\b|\brsync[[:space:]].*(@|:)'; then
     return 0
   fi
   return 1
@@ -5518,7 +5533,7 @@ decision_commands_trigger_external_gate() {
 
 decision_commands_trigger_destructive_gate() {
   commands_lower=$(lowercase_text "$1")
-  if printf '%s' "$commands_lower" | grep -Eq '\brm[[:space:]]+-rf\b|\brm[[:space:]]+-fr\b|\bsudo[[:space:]]+rm\b|\bmkfs\b|\bdd[[:space:]].*of=/dev/|\bdiskutil[[:space:]]+erase(disk|volume)\b|\bgit[[:space:]]+reset[[:space:]]+--hard\b|\bgit[[:space:]]+clean[[:space:]]+-fdx\b|\bterraform[[:space:]]+destroy\b|\bkubectl[[:space:]]+delete\b|\bdrop[[:space:]]+(table|database|schema)\b|\btruncate[[:space:]]+table\b'; then
+  if printf '%s' "$commands_lower" | grep -Eq '\brm[[:space:]]+-rf\b|\brm[[:space:]]+-fr\b|\bsudo[[:space:]]+rm\b|\bmkfs\b|\bdd[[:space:]].*of=/dev/|\bdiskutil[[:space:]]+erase(disk|volume)\b|\bgit[[:space:]]+reset[[:space:]]+--hard\b|\bgit[[:space:]]+clean[[:space:]]+-fdx\b|\bterraform[[:space:]]+destroy\b|\bkubectl[[:space:]]+delete\b|\bkubectl[[:space:]]+replace[[:space:]]+--force\b|\bhelm[[:space:]]+uninstall\b|\baws[[:space:]]+rds[[:space:]]+delete-db-instance\b|\baws[[:space:]]+s3[[:space:]]+rm[[:space:]]+s3://[^[:space:]]+[[:space:]]+--recursive\b|\bshred\b|\bdrop[[:space:]]+(table|database|schema)\b|\btruncate[[:space:]]+table\b'; then
     return 0
   fi
   return 1

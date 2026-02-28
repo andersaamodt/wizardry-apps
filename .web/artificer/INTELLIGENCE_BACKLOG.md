@@ -40,6 +40,7 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Add regression tests ensuring category-specific routing remains stable.
   - Progress:
     - Added a fixture-driven live decision-surfacing test pack for deterministic category/signal validation.
+    - Expanded high-order heuristics/fixtures for compliance-risk questions, deployment scope gaps, cloud/orchestration external actions, and destructive near-neighbor command cases.
 
 - INT-006 Conversation flow latency and completion signaling
   - Goal: Remove dead-air gaps between run completion markers and assistant text rendering.
