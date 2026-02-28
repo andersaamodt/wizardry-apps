@@ -800,8 +800,11 @@
   var dictationWaveBarSumRaw = 0;
   var dictationWaveBarSampleCount = 0;
   var DICTATION_WAVE_BAR_INTERVAL_MS = 84;
+  var DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS = 6;
+  var DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE = 2;
   var dictationWaveBackendLastEmitAt = 0;
   var dictationWaveBackendEmitQueue = [];
+  var dictationWaveBackendLastNormalized = 0;
   var dictationWaveSilencePhase = 0;
   var dictationWavePollInFlight = false;
   var dictationWaveBackendPumpBusy = false;
@@ -7338,6 +7341,7 @@
     dictationWaveBarSampleCount = 0;
     dictationWaveBackendLastEmitAt = 0;
     dictationWaveBackendEmitQueue = [];
+    dictationWaveBackendLastNormalized = 0;
     dictationWaveSilencePhase = 0;
     dictationWavePollInFlight = false;
     state.dictateWaveLevels = [];
@@ -7411,6 +7415,53 @@
     }
     state.dictateWaveLevels = out;
     renderDictationWaveBars();
+  }
+
+  function enqueueDictationWaveBackendLevels(normalizedLevelsInput) {
+    var incoming = Array.isArray(normalizedLevelsInput) ? normalizedLevelsInput : [];
+    if (!incoming.length) {
+      return;
+    }
+    var shapedIncoming = [];
+    var prevNormalized = Number(dictationWaveBackendLastNormalized || 0);
+    if (!isFinite(prevNormalized) || prevNormalized < 0) {
+      prevNormalized = 0;
+    } else if (prevNormalized > 1) {
+      prevNormalized = 1;
+    }
+    for (var i = 0; i < incoming.length; i += 1) {
+      var level = Number(incoming[i] || 0);
+      if (!isFinite(level) || level < 0) {
+        level = 0;
+      } else if (level > 1) {
+        level = 1;
+      }
+      var delta = level - prevNormalized;
+      if (!isFinite(delta)) {
+        delta = 0;
+      } else if (delta < 0) {
+        delta = -delta;
+      }
+      // Slight transient emphasis makes adjacent bars reflect fast level changes.
+      var shaped = level + (delta * 0.38);
+      if (shaped > 1) {
+        shaped = 1;
+      }
+      shapedIncoming.push(shaped);
+      prevNormalized = level;
+    }
+    dictationWaveBackendLastNormalized = prevNormalized;
+    if (shapedIncoming.length > DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS) {
+      shapedIncoming = shapedIncoming.slice(shapedIncoming.length - DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS);
+    }
+    var retained = Array.isArray(dictationWaveBackendEmitQueue) ? dictationWaveBackendEmitQueue.slice() : [];
+    if (retained.length > DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE) {
+      retained = retained.slice(retained.length - DICTATION_WAVE_BACKEND_KEEP_BARS_ON_UPDATE);
+    }
+    dictationWaveBackendEmitQueue = retained.concat(shapedIncoming);
+    if (dictationWaveBackendEmitQueue.length > DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS) {
+      dictationWaveBackendEmitQueue = dictationWaveBackendEmitQueue.slice(dictationWaveBackendEmitQueue.length - DICTATION_WAVE_BACKEND_MAX_QUEUE_BARS);
+    }
   }
 
   function calibrateDictationWaveNoiseFloor(ambientProbe) {
@@ -7700,12 +7751,7 @@
       }
       if (normalizedSequence.length) {
         normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
-        for (var qi = 0; qi < normalizedSequence.length; qi += 1) {
-          dictationWaveBackendEmitQueue.push(normalizedSequence[qi]);
-        }
-        if (dictationWaveBackendEmitQueue.length > 160) {
-          dictationWaveBackendEmitQueue = dictationWaveBackendEmitQueue.slice(dictationWaveBackendEmitQueue.length - 160);
-        }
+        enqueueDictationWaveBackendLevels(normalizedSequence);
       }
       dictationWaveBackendLevel = normalizedBackend;
       dictationWaveBackendLevelAt = Date.now();
@@ -7852,12 +7898,7 @@
               normalizedSequence.push(normalizedDictationBackendLevel(parsedIncoming[ni]));
             }
             dictationWaveBackendRecentLevels = parsedIncoming.slice(parsedIncoming.length - 18);
-            for (var qi = 0; qi < normalizedSequence.length; qi += 1) {
-              dictationWaveBackendEmitQueue.push(normalizedSequence[qi]);
-            }
-            if (dictationWaveBackendEmitQueue.length > 160) {
-              dictationWaveBackendEmitQueue = dictationWaveBackendEmitQueue.slice(dictationWaveBackendEmitQueue.length - 160);
-            }
+            enqueueDictationWaveBackendLevels(normalizedSequence);
           }
           if (normalizedSequence.length) {
             normalizedBackend = normalizedSequence[normalizedSequence.length - 1];
