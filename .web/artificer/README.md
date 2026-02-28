@@ -117,7 +117,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - `quality-scorecard/entries.tsv` run quality timeline with deltas
   - `quality-scorecard/scorecard.md` human-readable trend summary
   - `quality-scorecard/regression-proposal-cooldowns.tsv` per-mode cooldown state to suppress repeated regression proposal spam
-  - Controller loop prompts consume condensed runtime learning signals from failure taxonomy and quality scorecard summaries.
+  - Controller loop prompts consume condensed runtime learning signals from failure taxonomy, quality scorecard, and accepted/applied improvement proposal summaries.
   - Controller loop prompts also receive runtime adaptation guardrails synthesized from recent failure/quality regressions.
   - Repeated transition signatures now emit loop-stagnation failures and inject anti-repeat guardrails into subsequent controller iterations.
 - Run-mode picker includes a `More modes` expander that surfaces all runtime governance modes with blurbs, and selecting one applies `Assistant` run mode with that focus profile.

@@ -18098,6 +18098,14 @@ EOF
       if [ -z "$(trim "$runtime_quality_summary")" ]; then
         runtime_quality_summary="none"
       fi
+      runtime_proposal_summary="none"
+      if command -v mr_improvement_proposals_recent_summary_text >/dev/null 2>&1; then
+        runtime_proposal_summary=$(mr_improvement_proposals_recent_summary_text "$run_mode" "12" "3")
+      fi
+      runtime_proposal_summary=$(printf '%s' "$runtime_proposal_summary" | tr '\n\r' '  ' | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')
+      if [ -z "$(trim "$runtime_proposal_summary")" ]; then
+        runtime_proposal_summary="none"
+      fi
       runtime_guardrails="none"
       if command -v mr_runtime_learning_guardrails_text >/dev/null 2>&1; then
         runtime_guardrails=$(mr_runtime_learning_guardrails_text)
@@ -18137,6 +18145,7 @@ $controller_variant_prompt_block
 Runtime learning signals:
 - failure_taxonomy: $runtime_failure_summary
 - quality_scorecard: $runtime_quality_summary
+- improvement_proposals: $runtime_proposal_summary
 
 Runtime adaptation guardrails:
 - $runtime_guardrails

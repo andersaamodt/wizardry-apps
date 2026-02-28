@@ -76,6 +76,7 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Wired run-time variant selection into controller prompt construction and recorded run-level telemetry for before/after quality deltas.
     - Surfaced controller variant state and promote/rollback controls in Mode Runtime settings.
     - Injected runtime learning summaries (latest failure taxonomy signals + quality scorecard trend) into each controller loop prompt so active runs can adapt to recent regressions.
+    - Added mode-filtered accepted/applied proposal summaries as an additional runtime learning signal in controller prompts, including legacy title fallback when older proposals are missing explicit `source_mode`.
     - Added runtime adaptation guardrails derived from recent taxonomy/quality patterns, feeding actionable anti-regression instructions directly into controller prompts.
     - Added loop-stagnation detection that records repeated-transition failures and injects anti-repeat guardrails into subsequent controller iterations.
 

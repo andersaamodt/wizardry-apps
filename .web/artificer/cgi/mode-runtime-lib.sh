@@ -1132,6 +1132,112 @@ mr_improvement_proposals_state_json() {
     "$(mr_improvement_proposals_items_json "40")"
 }
 
+mr_improvement_proposals_recent_summary_text() {
+  run_mode_filter=$(trim "${1:-}")
+  max_rows_raw=${2:-12}
+  max_items_raw=${3:-3}
+  max_rows=$(mr_positive_int_or "$max_rows_raw" "12")
+  max_items=$(mr_positive_int_or "$max_items_raw" "3")
+  if [ "$max_rows" -gt 120 ]; then
+    max_rows=120
+  fi
+  if [ "$max_items" -gt 8 ]; then
+    max_items=8
+  fi
+
+  proposals_dir=$(mr_improvement_proposals_dir)
+  if [ ! -d "$proposals_dir" ]; then
+    printf '%s' "none"
+    return 0
+  fi
+
+  mode_filter_lc=$(printf '%s' "$run_mode_filter" | tr '[:upper:]' '[:lower:]')
+  dirs_file=$(mktemp)
+  find "$proposals_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -r > "$dirs_file"
+
+  accepted_count=0
+  applied_count=0
+  scanned=0
+  shown=0
+  out=""
+  while IFS= read -r proposal_dir || [ -n "$proposal_dir" ]; do
+    [ -d "$proposal_dir" ] || continue
+    meta_file="$proposal_dir/meta.env"
+    [ -f "$meta_file" ] || continue
+    scanned=$((scanned + 1))
+    if [ "$scanned" -gt "$max_rows" ]; then
+      break
+    fi
+
+    status_value=$(mr_env_get "$meta_file" "status" "proposed")
+    case "$status_value" in
+      accepted|applied) ;;
+      *)
+        continue
+        ;;
+    esac
+
+    proposal_mode=$(trim "$(mr_env_get "$meta_file" "source_mode" "")")
+    proposal_mode_lc=$(printf '%s' "$proposal_mode" | tr '[:upper:]' '[:lower:]')
+    proposal_title=$(mr_env_get "$meta_file" "title" "")
+    if [ -n "$mode_filter_lc" ] && [ "$mode_filter_lc" != "unknown" ]; then
+      if [ -n "$proposal_mode_lc" ]; then
+        if [ "$proposal_mode_lc" != "$mode_filter_lc" ]; then
+          continue
+        fi
+      else
+        case "$proposal_title" in
+          *"in ${mode_filter_lc} mode"*) ;;
+          *"in ${run_mode_filter} mode"*) ;;
+          *)
+            continue
+            ;;
+        esac
+      fi
+    fi
+
+    if [ "$status_value" = "accepted" ]; then
+      accepted_count=$((accepted_count + 1))
+    else
+      applied_count=$((applied_count + 1))
+    fi
+
+    if [ "$shown" -lt "$max_items" ]; then
+      scope_value=$(mr_env_get "$meta_file" "scope" "other")
+      risk_value=$(mr_env_get "$meta_file" "risk_level" "medium")
+      source_value=$(mr_env_get "$meta_file" "source" "manual")
+      category_value=$(trim "$(mr_env_get "$meta_file" "taxonomy_category" "")")
+      if [ -z "$category_value" ]; then
+        category_value="unknown"
+      fi
+      entry_mode="$proposal_mode_lc"
+      if [ -z "$entry_mode" ]; then
+        if [ -n "$mode_filter_lc" ] && [ "$mode_filter_lc" != "unknown" ]; then
+          entry_mode="$mode_filter_lc"
+        else
+          entry_mode="unknown"
+        fi
+      fi
+      entry_text="${status_value}:${scope_value}/${risk_value}@${category_value}[${source_value}|mode=${entry_mode}]"
+      if [ -n "$out" ]; then
+        out="${out}; "
+      fi
+      out="${out}${entry_text}"
+      shown=$((shown + 1))
+    fi
+  done < "$dirs_file"
+  rm -f "$dirs_file"
+
+  if [ "$accepted_count" -eq 0 ] && [ "$applied_count" -eq 0 ]; then
+    printf '%s' "none"
+    return 0
+  fi
+  if [ -z "$out" ]; then
+    out="none"
+  fi
+  printf 'accepted=%s; applied=%s; recent=%s' "$accepted_count" "$applied_count" "$out"
+}
+
 mr_improvement_proposal_template_for_category() {
   category_id=$1
   case "$category_id" in

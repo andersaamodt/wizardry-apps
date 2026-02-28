@@ -61,6 +61,7 @@ assert_contains "$mode_runtime_lib" "mr_quality_scorecard_recent_regression_stat
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_regression_cooldown_remaining_sec()"
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_set_regression_cooldown_for_mode()"
 assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_top_category_for_mode()"
+assert_contains "$mode_runtime_lib" "mr_improvement_proposals_recent_summary_text()"
 assert_contains "$mode_runtime_lib" "regression-proposal-cooldowns.tsv"
 assert_contains "$mode_runtime_lib" "mr_failure_taxonomy_recent_summary_text()"
 assert_contains "$mode_runtime_lib" "mr_quality_scorecard_recent_summary_text()"
@@ -92,10 +93,12 @@ assert_contains "$mode_runtime_lib" 'category_id=$(mr_failure_taxonomy_top_categ
 assert_contains "$mode_runtime_lib" 'mr_improvement_proposal_exists_for_category_and_mode "$category_id" "$run_mode" "quality-scorecard"'
 assert_contains "$api" 'runtime_failure_summary=$(mr_failure_taxonomy_recent_summary_text "6")'
 assert_contains "$api" 'runtime_quality_summary=$(mr_quality_scorecard_recent_summary_text "8")'
+assert_contains "$api" 'runtime_proposal_summary=$(mr_improvement_proposals_recent_summary_text "$run_mode" "12" "3")'
 assert_contains "$api" 'runtime_guardrails=$(mr_runtime_learning_guardrails_text)'
 assert_contains "$api" "Runtime learning signals:"
 assert_contains "$api" '- failure_taxonomy: $runtime_failure_summary'
 assert_contains "$api" '- quality_scorecard: $runtime_quality_summary'
+assert_contains "$api" '- improvement_proposals: $runtime_proposal_summary'
 assert_contains "$api" "Runtime adaptation guardrails:"
 assert_contains "$api" '- $runtime_guardrails'
 
