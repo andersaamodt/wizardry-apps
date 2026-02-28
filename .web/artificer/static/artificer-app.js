@@ -13015,20 +13015,49 @@
       if (!response.success || !response.conversation || !response.conversation.id) {
         throw new Error(response.error || "Failed to create thread from draft");
       }
+      var createdConversation = response.conversation;
 
       return saveDraft(workspaceId, "").catch(function () {
         return null;
       }).then(function () {
         state.activeDraftWorkspaceId = "";
-        state.activeConversationId = response.conversation.id;
+        state.activeConversationId = createdConversation.id;
         state.activeConversation = null;
 
         // Avoid loading the brand-new thread before enqueue: backend recovery seeding
         // can create a duplicate first user message when the queue write follows.
-        return loadState({ fast: true }).then(function () {
+        return loadState({ fast: true, fresh: true, timeoutMs: 30000 }).catch(function () {
+          // If state refresh races or fails, keep the created thread visible locally.
+          var ws = getWorkspaceById(workspaceId);
+          if (ws) {
+            if (!Array.isArray(ws.conversations)) {
+              ws.conversations = [];
+            }
+            if (!getConversationById(ws, createdConversation.id)) {
+              ws.conversations.unshift({
+                id: String(createdConversation.id || ""),
+                title: String(createdConversation.title || "New Conversation"),
+                model: String(createdConversation.model || ""),
+                created: String(Math.floor(Date.now() / 1000)),
+                updated: String(Math.floor(Date.now() / 1000)),
+                queue_pending: "0",
+                queue_running: "0",
+                queue_done: "0",
+                queue_last_status: "",
+                queue_first_id: "",
+                decision_request: null,
+                approval_request: null
+              });
+              moveConversationToFront(workspaceId, createdConversation.id, { persist: false });
+              moveWorkspaceToFront(workspaceId, { persist: false });
+              persistWorkspaceOrderingState();
+            }
+          }
+          return null;
+        }).then(function () {
           state.activeWorkspaceId = workspaceId;
-          state.activeConversationId = response.conversation.id;
-          return response.conversation.id;
+          state.activeConversationId = createdConversation.id;
+          return createdConversation.id;
         });
       });
     });
