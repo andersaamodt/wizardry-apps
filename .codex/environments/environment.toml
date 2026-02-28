@@ -22,3 +22,12 @@ sh /Users/andersaamodt/git/wizardry-apps/install-forge --system
 # 3) Run Forge
 sh /Users/andersaamodt/git/wizardry-apps/run-forge
 '''
+
+[[actions]]
+name = "restart blog"
+icon = "debug"
+command = '''
+update-from-template ssh-blog
+build "ssh-blog" --full && stop-site "ssh-blog" && serve-site "ssh-blog"
+open "http://localhost:$(config-get "$HOME/sites/ssh-blog/site.conf" port 2>/dev/null || printf '8080')"
+'''
