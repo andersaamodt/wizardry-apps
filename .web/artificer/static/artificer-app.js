@@ -1109,6 +1109,7 @@
     modeRuntimeSkills: document.getElementById("mode-runtime-skills"),
     modeRuntimeFailureTaxonomy: document.getElementById("mode-runtime-failure-taxonomy"),
     modeRuntimeImprovementProposals: document.getElementById("mode-runtime-improvement-proposals"),
+    modeRuntimeControllerVariants: document.getElementById("mode-runtime-controller-variants"),
     assistantModeSelect: document.getElementById("assistant-mode-select"),
     assistantModeApplyBtn: document.getElementById("assistant-mode-apply-btn"),
     modeRuntimeSkillInvokeForm: document.getElementById("mode-runtime-skill-invoke-form"),
@@ -2414,6 +2415,12 @@
     var failureTaxonomy = source.failure_taxonomy && typeof source.failure_taxonomy === "object" ? source.failure_taxonomy : {};
     var proposalState = source.improvement_proposals && typeof source.improvement_proposals === "object" ? source.improvement_proposals : {};
     var proposalCounts = proposalState.counts && typeof proposalState.counts === "object" ? proposalState.counts : {};
+    var controllerVariantsState = source.controller_variants && typeof source.controller_variants === "object"
+      ? source.controller_variants
+      : {};
+    var controllerCompareState = controllerVariantsState.quality_compare && typeof controllerVariantsState.quality_compare === "object"
+      ? controllerVariantsState.quality_compare
+      : {};
     var modesRaw = asArrayCopy(source.modes);
     var skillsRaw = asArrayCopy(source.skills);
     var panelsRaw = asArrayCopy(source.panels);
@@ -2421,6 +2428,7 @@
     var failureCategoriesRaw = asArrayCopy(failureTaxonomy.categories);
     var failureRecentRaw = asArrayCopy(failureTaxonomy.recent);
     var proposalItemsRaw = asArrayCopy(proposalState.items);
+    var controllerVariantsItemsRaw = asArrayCopy(controllerVariantsState.items);
     var modes = [];
     var skills = [];
     var panels = [];
@@ -2428,6 +2436,7 @@
     var failureCategories = [];
     var failureRecent = [];
     var proposalItems = [];
+    var controllerVariantItems = [];
 
     for (var i = 0; i < modesRaw.length; i += 1) {
       var mode = modesRaw[i];
@@ -2588,6 +2597,35 @@
       });
     }
 
+    for (var cv = 0; cv < controllerVariantsItemsRaw.length; cv += 1) {
+      var variantItem = controllerVariantsItemsRaw[cv];
+      if (!variantItem || typeof variantItem !== "object") {
+        continue;
+      }
+      var variantId = trim(String(variantItem.id || ""));
+      if (!variantId) {
+        continue;
+      }
+      controllerVariantItems.push({
+        id: variantId,
+        name: trim(String(variantItem.name || variantId)),
+        status: trim(String(variantItem.status || "standby")),
+        kind: trim(String(variantItem.kind || "manual")),
+        parent_id: trim(String(variantItem.parent_id || "")),
+        source_proposal: trim(String(variantItem.source_proposal || "")),
+        scope: trim(String(variantItem.scope || "other")),
+        risk_level: trim(String(variantItem.risk_level || "medium")),
+        created_at: trim(String(variantItem.created_at || "")),
+        updated_at: trim(String(variantItem.updated_at || "")),
+        last_seen_at: trim(String(variantItem.last_seen_at || "")),
+        instructions: trim(String(variantItem.instructions || "")),
+        runs: trim(String(variantItem.runs || "0")),
+        successes: trim(String(variantItem.successes || "0")),
+        avg_quality: trim(String(variantItem.avg_quality || "0.000")),
+        success_rate_pct: trim(String(variantItem.success_rate_pct || "0.0"))
+      });
+    }
+
     modes.sort(function (a, b) {
       var priorityDiff = Number(b.priority || 0) - Number(a.priority || 0);
       if (priorityDiff !== 0) {
@@ -2610,6 +2648,25 @@
     });
     proposalItems.sort(function (a, b) {
       return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+    });
+    controllerVariantItems.sort(function (a, b) {
+      var statusA = String(a.status || "");
+      var statusB = String(b.status || "");
+      if (statusA !== statusB) {
+        if (statusA === "active") {
+          return -1;
+        }
+        if (statusB === "active") {
+          return 1;
+        }
+        if (statusA === "candidate") {
+          return -1;
+        }
+        if (statusB === "candidate") {
+          return 1;
+        }
+      }
+      return String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || ""));
     });
 
     return {
@@ -2647,6 +2704,26 @@
           rejected: trim(String(proposalCounts.rejected || "0"))
         },
         items: proposalItems
+      },
+      controller_variants: {
+        active_variant_id: trim(String(controllerVariantsState.active_variant_id || "")),
+        previous_active_variant_id: trim(String(controllerVariantsState.previous_active_variant_id || "")),
+        sample_rate_percent: trim(String(controllerVariantsState.sample_rate_percent || "0")),
+        max_sample_size: trim(String(controllerVariantsState.max_sample_size || "0")),
+        sample_min_runs_for_promotion: trim(String(controllerVariantsState.sample_min_runs_for_promotion || "0")),
+        updated_at: trim(String(controllerVariantsState.updated_at || "")),
+        quality_compare: {
+          active_id: trim(String(controllerCompareState.active_id || "")),
+          candidate_id: trim(String(controllerCompareState.candidate_id || "")),
+          active_runs: trim(String(controllerCompareState.active_runs || "0")),
+          candidate_runs: trim(String(controllerCompareState.candidate_runs || "0")),
+          active_avg_quality: trim(String(controllerCompareState.active_avg_quality || "0.000")),
+          candidate_avg_quality: trim(String(controllerCompareState.candidate_avg_quality || "0.000")),
+          quality_delta: trim(String(controllerCompareState.quality_delta || "0.000")),
+          sample_min_runs_for_promotion: trim(String(controllerCompareState.sample_min_runs_for_promotion || "0")),
+          recommendation: trim(String(controllerCompareState.recommendation || "insufficient-data"))
+        },
+        items: controllerVariantItems
       }
     };
   }
@@ -16467,6 +16544,45 @@
     });
   }
 
+  function modeRuntimePromoteControllerVariant(variantId) {
+    var safeId = trim(String(variantId || ""));
+    if (!safeId) {
+      return Promise.reject(new Error("variant_id is required"));
+    }
+    return apiPost("controller_variant_promote", {
+      variant_id: safeId,
+      manual_confirm: "1"
+    }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not promote controller variant");
+      }
+      if (response.mode_runtime) {
+        state.modeRuntime = normalizeModeRuntime(response.mode_runtime);
+        reconcileAssistantModeId();
+        state.modeRuntimeError = "";
+        renderModeRuntimeSettings();
+      }
+      return response;
+    });
+  }
+
+  function modeRuntimeRollbackControllerVariant() {
+    return apiPost("controller_variant_rollback", {
+      manual_confirm: "1"
+    }).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not rollback controller variant");
+      }
+      if (response.mode_runtime) {
+        state.modeRuntime = normalizeModeRuntime(response.mode_runtime);
+        reconcileAssistantModeId();
+        state.modeRuntimeError = "";
+        renderModeRuntimeSettings();
+      }
+      return response;
+    });
+  }
+
   function renderModeRuntimeSettings() {
     if (!el.modeRuntimeSummary || !el.modeRuntimePanels || !el.modeRuntimeModes || !el.modeRuntimeSkills) {
       return;
@@ -16744,6 +16860,71 @@
       }
       proposalHtml += "</section>";
       el.modeRuntimeImprovementProposals.innerHTML = proposalHtml;
+    }
+
+    if (el.modeRuntimeControllerVariants) {
+      var controllerVariantsState = runtime.controller_variants && typeof runtime.controller_variants === "object"
+        ? runtime.controller_variants
+        : {};
+      var compare = controllerVariantsState.quality_compare && typeof controllerVariantsState.quality_compare === "object"
+        ? controllerVariantsState.quality_compare
+        : {};
+      var variants = Array.isArray(controllerVariantsState.items) ? controllerVariantsState.items : [];
+      var variantsHtml = "";
+      variantsHtml += "<section class='mode-runtime-group'>";
+      variantsHtml += "<div class='mode-runtime-group-head'><p class='command-rules-group-title'>Controller variants</p></div>";
+      variantsHtml += "<p class='settings-hint'>Versioned controller prompt variants with guarded A/B sampling and manual promote/rollback.</p>";
+      variantsHtml += "<div class='mode-runtime-metrics'>";
+      variantsHtml += "<span class='mode-runtime-metric'><em>Active</em><strong>" + escHtml(String(controllerVariantsState.active_variant_id || "none")) + "</strong></span>";
+      variantsHtml += "<span class='mode-runtime-metric'><em>Sample rate</em><strong>" + escHtml(String(controllerVariantsState.sample_rate_percent || "0")) + "%</strong></span>";
+      variantsHtml += "<span class='mode-runtime-metric'><em>Max candidate samples</em><strong>" + escHtml(String(controllerVariantsState.max_sample_size || "0")) + "</strong></span>";
+      variantsHtml += "</div>";
+      if (compare && (compare.active_id || compare.candidate_id)) {
+        variantsHtml += "<p class='settings-hint'>Compare: active " + escHtml(String(compare.active_id || "none")) + " (" + escHtml(String(compare.active_avg_quality || "0.000")) + ", n=" + escHtml(String(compare.active_runs || "0")) + ")";
+        variantsHtml += " vs candidate " + escHtml(String(compare.candidate_id || "none")) + " (" + escHtml(String(compare.candidate_avg_quality || "0.000")) + ", n=" + escHtml(String(compare.candidate_runs || "0")) + ")";
+        variantsHtml += " | delta " + escHtml(String(compare.quality_delta || "0.000"));
+        if (compare.recommendation) {
+          variantsHtml += " | recommendation: " + escHtml(String(compare.recommendation || ""));
+        }
+        variantsHtml += "</p>";
+      }
+      if (compare && compare.candidate_id) {
+        variantsHtml += "<div class='mode-runtime-actions'>";
+        variantsHtml += "<button type='button' data-action='mode-runtime-controller-promote' data-variant-id='" + escAttr(String(compare.candidate_id || "")) + "'>Promote candidate</button>";
+        variantsHtml += "<button type='button' class='ghost' data-action='mode-runtime-controller-rollback'>Rollback active</button>";
+        variantsHtml += "</div>";
+      } else {
+        variantsHtml += "<p class='settings-hint'>No candidate variant is queued right now. Accept/apply proposals to mint new candidates.</p>";
+      }
+      if (!variants.length) {
+        variantsHtml += "<p class='empty-state'>No controller variants found.</p>";
+      } else {
+        variantsHtml += "<div class='mode-runtime-proposal-list'>";
+        for (var cv = 0; cv < variants.length && cv < 12; cv += 1) {
+          var variant = variants[cv] || {};
+          var variantId = trim(String(variant.id || ""));
+          if (!variantId) {
+            continue;
+          }
+          variantsHtml += "<article class='mode-runtime-proposal-item'>";
+          variantsHtml += "<div class='mode-runtime-mode-head'><strong>" + escHtml(String(variant.name || variantId)) + "</strong><span class='mode-runtime-chip'>" + escHtml(String(variant.status || "standby")) + "</span></div>";
+          variantsHtml += "<p class='settings-hint'>id: " + escHtml(variantId) + " | kind: " + escHtml(String(variant.kind || "manual")) + " | scope: " + escHtml(String(variant.scope || "other")) + " | risk: " + escHtml(String(variant.risk_level || "medium")) + "</p>";
+          variantsHtml += "<p class='settings-hint'>quality " + escHtml(String(variant.avg_quality || "0.000")) + " | success " + escHtml(String(variant.success_rate_pct || "0.0")) + "% | runs " + escHtml(String(variant.runs || "0")) + "</p>";
+          if (variant.source_proposal) {
+            variantsHtml += "<p class='settings-hint'>source proposal: " + escHtml(String(variant.source_proposal || "")) + "</p>";
+          }
+          if (variant.instructions) {
+            variantsHtml += "<p class='settings-hint'><strong>Guidance:</strong> " + escHtml(String(variant.instructions || "")) + "</p>";
+          }
+          if (variant.status !== "active") {
+            variantsHtml += "<div class='mode-runtime-actions'><button type='button' data-action='mode-runtime-controller-promote' data-variant-id='" + escAttr(variantId) + "'>Promote</button></div>";
+          }
+          variantsHtml += "</article>";
+        }
+        variantsHtml += "</div>";
+      }
+      variantsHtml += "</section>";
+      el.modeRuntimeControllerVariants.innerHTML = variantsHtml;
     }
 
     if (el.assistantModeSelect) {
@@ -20303,6 +20484,38 @@
               ? "applied"
               : (proposalDecision === "accept" ? "accepted" : "rejected");
             showTransientNotice("Proposal " + decisionLabel);
+          });
+        }, { spinner: false }).catch(showError);
+        return;
+      }
+      var controllerPromoteBtn = event.target && event.target.closest
+        ? event.target.closest("button[data-action='mode-runtime-controller-promote'][data-variant-id]")
+        : null;
+      if (controllerPromoteBtn) {
+        var promoteVariantId = trim(String(controllerPromoteBtn.getAttribute("data-variant-id") || ""));
+        if (!promoteVariantId) {
+          return;
+        }
+        if (!window.confirm("Promote this controller variant to active?")) {
+          return;
+        }
+        runWithControlPending(controllerPromoteBtn, function () {
+          return modeRuntimePromoteControllerVariant(promoteVariantId).then(function () {
+            showTransientNotice("Controller variant promoted");
+          });
+        }, { spinner: false }).catch(showError);
+        return;
+      }
+      var controllerRollbackBtn = event.target && event.target.closest
+        ? event.target.closest("button[data-action='mode-runtime-controller-rollback']")
+        : null;
+      if (controllerRollbackBtn) {
+        if (!window.confirm("Rollback controller variant to previous active?")) {
+          return;
+        }
+        runWithControlPending(controllerRollbackBtn, function () {
+          return modeRuntimeRollbackControllerVariant().then(function () {
+            showTransientNotice("Controller variant rolled back");
           });
         }, { spinner: false }).catch(showError);
         return;

@@ -59,6 +59,37 @@ mr_improvement_proposal_body_file() {
   printf '%s/proposal.md' "$(mr_improvement_proposal_dir_for "$proposal_id")"
 }
 
+mr_controller_variants_root() {
+  printf '%s/controller-variants' "$(mr_runtime_root)"
+}
+
+mr_controller_variants_dir() {
+  printf '%s/variants' "$(mr_controller_variants_root)"
+}
+
+mr_controller_variants_state_file() {
+  printf '%s/state.env' "$(mr_controller_variants_root)"
+}
+
+mr_controller_variants_telemetry_file() {
+  printf '%s/telemetry.tsv' "$(mr_controller_variants_root)"
+}
+
+mr_controller_variant_dir_for() {
+  variant_id=$1
+  printf '%s/%s' "$(mr_controller_variants_dir)" "$variant_id"
+}
+
+mr_controller_variant_meta_file() {
+  variant_id=$1
+  printf '%s/meta.env' "$(mr_controller_variant_dir_for "$variant_id")"
+}
+
+mr_controller_variant_notes_file() {
+  variant_id=$1
+  printf '%s/guidance.md' "$(mr_controller_variant_dir_for "$variant_id")"
+}
+
 mr_scheduler_state_file() {
   printf '%s/state.env' "$(mr_scheduler_dir)"
 }
@@ -100,6 +131,19 @@ mr_positive_int_or() {
       else
         printf '%s' "$value"
       fi
+      ;;
+  esac
+}
+
+mr_nonnegative_int_or() {
+  value=$(trim "$1")
+  fallback=$2
+  case "$value" in
+    ""|*[!0-9]*)
+      printf '%s' "$fallback"
+      ;;
+    *)
+      printf '%s' "$value"
       ;;
   esac
 }
@@ -911,7 +955,590 @@ mr_improvement_proposal_set_status() {
   decisions_file="$(mr_improvement_proposals_dir)/decisions.tsv"
   [ -f "$decisions_file" ] || : > "$decisions_file"
   printf '%s\t%s\t%s\t%s\t%s\n' "$(mr_now_epoch)" "$now_iso" "$proposal_id" "$status_value" "$note_text" >> "$decisions_file"
+
+  if [ "$status_value" = "accepted" ] || [ "$status_value" = "applied" ]; then
+    mr_controller_variant_create_from_proposal "$proposal_id" >/dev/null 2>&1 || true
+  fi
   return 0
+}
+
+mr_controller_variant_default_id() {
+  printf '%s' "controller-default"
+}
+
+mr_controller_variant_exists() {
+  variant_id=$1
+  if ! valid_id "$variant_id"; then
+    return 1
+  fi
+  [ -f "$(mr_controller_variant_meta_file "$variant_id")" ]
+}
+
+mr_controller_variant_active_id() {
+  state_file=$(mr_controller_variants_state_file)
+  active_id=$(mr_env_get "$state_file" "active_variant_id" "$(mr_controller_variant_default_id)")
+  if ! valid_id "$active_id"; then
+    active_id=$(mr_controller_variant_default_id)
+  fi
+  if ! mr_controller_variant_exists "$active_id"; then
+    active_id=$(mr_controller_variant_default_id)
+  fi
+  printf '%s' "$active_id"
+}
+
+mr_controller_variant_previous_active_id() {
+  state_file=$(mr_controller_variants_state_file)
+  previous_id=$(mr_env_get "$state_file" "previous_active_variant_id" "")
+  if ! valid_id "$previous_id"; then
+    previous_id=""
+  fi
+  if [ -n "$previous_id" ] && ! mr_controller_variant_exists "$previous_id"; then
+    previous_id=""
+  fi
+  printf '%s' "$previous_id"
+}
+
+mr_controller_variant_sample_rate_percent() {
+  state_file=$(mr_controller_variants_state_file)
+  raw_value=$(mr_env_get "$state_file" "sample_rate_percent" "35")
+  sample_rate=$(mr_nonnegative_int_or "$raw_value" "35")
+  if [ "$sample_rate" -gt 100 ]; then
+    sample_rate=100
+  fi
+  printf '%s' "$sample_rate"
+}
+
+mr_controller_variant_max_sample_size() {
+  state_file=$(mr_controller_variants_state_file)
+  raw_value=$(mr_env_get "$state_file" "max_sample_size" "40")
+  max_sample_size=$(mr_positive_int_or "$raw_value" "40")
+  printf '%s' "$max_sample_size"
+}
+
+mr_controller_variant_sample_min_runs_for_promotion() {
+  state_file=$(mr_controller_variants_state_file)
+  raw_value=$(mr_env_get "$state_file" "sample_min_runs_for_promotion" "6")
+  min_runs=$(mr_positive_int_or "$raw_value" "6")
+  printf '%s' "$min_runs"
+}
+
+mr_controller_variant_status_set() {
+  variant_id=$1
+  status_value=$2
+  if ! mr_controller_variant_exists "$variant_id"; then
+    return 1
+  fi
+  case "$status_value" in
+    active|candidate|standby|retired) ;;
+    *) return 1 ;;
+  esac
+  meta_file=$(mr_controller_variant_meta_file "$variant_id")
+  mr_env_set "$meta_file" "status" "$status_value"
+  mr_env_set "$meta_file" "updated_at" "$(mr_now_iso)"
+  return 0
+}
+
+mr_controller_variant_id_for_proposal() {
+  proposal_id=$1
+  if ! valid_id "$proposal_id"; then
+    printf '%s' ""
+    return 0
+  fi
+  for variant_dir in "$(mr_controller_variants_dir)"/*; do
+    [ -d "$variant_dir" ] || continue
+    meta_file="$variant_dir/meta.env"
+    [ -f "$meta_file" ] || continue
+    source_proposal=$(mr_env_get "$meta_file" "source_proposal" "")
+    if [ "$source_proposal" = "$proposal_id" ]; then
+      printf '%s' "$(basename "$variant_dir")"
+      return 0
+    fi
+  done
+  printf '%s' ""
+}
+
+mr_controller_variant_create_from_proposal() {
+  proposal_id=$(trim "$1")
+  if ! valid_id "$proposal_id"; then
+    printf '%s' ""
+    return 0
+  fi
+
+  proposal_meta=$(mr_improvement_proposal_meta_file "$proposal_id")
+  if [ ! -f "$proposal_meta" ]; then
+    printf '%s' ""
+    return 0
+  fi
+
+  existing_variant_id=$(mr_controller_variant_id_for_proposal "$proposal_id")
+  if [ -n "$existing_variant_id" ] && mr_controller_variant_exists "$existing_variant_id"; then
+    printf '%s' "$existing_variant_id"
+    return 0
+  fi
+
+  proposal_title=$(mr_env_get "$proposal_meta" "title" "$proposal_id")
+  proposal_scope=$(mr_env_get "$proposal_meta" "scope" "other")
+  proposal_risk=$(mr_env_get "$proposal_meta" "risk_level" "medium")
+  proposal_rationale=$(mr_env_get "$proposal_meta" "rationale" "")
+  proposal_change=$(mr_env_get "$proposal_meta" "proposed_change" "")
+  parent_id=$(mr_controller_variant_active_id)
+
+  variant_id=$(printf '%s' "controller-variant-$(mr_new_id)" | tr -cd 'a-zA-Z0-9._-')
+  [ -n "$variant_id" ] || variant_id="controller-variant-$(mr_now_epoch)-$$"
+  variant_dir=$(mr_controller_variant_dir_for "$variant_id")
+  if [ -d "$variant_dir" ]; then
+    variant_id="${variant_id}-$(awk 'BEGIN { srand(); printf "%04d", rand()*10000 }')"
+    variant_dir=$(mr_controller_variant_dir_for "$variant_id")
+  fi
+
+  now_iso=$(mr_now_iso)
+  guidance_text=$(mr_sanitize_inline "$(cat <<EOF
+Source proposal: $proposal_title. Scope: $proposal_scope. Proposed controller adaptation: $proposal_change. Rationale: $proposal_rationale. Keep safety, deterministic section formatting, verifiable execution, and concise user-facing synthesis.
+EOF
+)")
+  if [ -z "$guidance_text" ]; then
+    guidance_text="Source proposal: $proposal_title. Keep safety, deterministic section formatting, and verifiable delivery."
+  fi
+
+  mkdir -p "$variant_dir"
+  meta_file=$(mr_controller_variant_meta_file "$variant_id")
+  {
+    printf 'id=%s\n' "$variant_id"
+    printf 'name=%s\n' "$(mr_sanitize_inline "Variant from $proposal_title")"
+    printf 'status=candidate\n'
+    printf 'kind=proposal-derived\n'
+    printf 'parent_id=%s\n' "$parent_id"
+    printf 'source_proposal=%s\n' "$proposal_id"
+    printf 'scope=%s\n' "$proposal_scope"
+    printf 'risk_level=%s\n' "$proposal_risk"
+    printf 'created_at=%s\n' "$now_iso"
+    printf 'updated_at=%s\n' "$now_iso"
+    printf 'last_seen_at=\n'
+    printf 'instructions=%s\n' "$guidance_text"
+    printf 'runs=0\n'
+    printf 'successes=0\n'
+    printf 'avg_quality=0.000\n'
+  } > "$meta_file"
+
+  notes_file=$(mr_controller_variant_notes_file "$variant_id")
+  {
+    printf '# Controller Variant: %s\n\n' "$variant_id"
+    printf 'Source proposal: %s\n' "$proposal_id"
+    printf 'Parent variant: %s\n' "$parent_id"
+    printf 'Created: %s\n\n' "$now_iso"
+    printf '## Guidance\n- %s\n' "$guidance_text"
+  } > "$notes_file"
+
+  printf '%s' "$variant_id"
+}
+
+mr_controller_variant_latest_candidate_id() {
+  latest_id=""
+  for variant_dir in "$(mr_controller_variants_dir)"/*; do
+    [ -d "$variant_dir" ] || continue
+    meta_file="$variant_dir/meta.env"
+    [ -f "$meta_file" ] || continue
+    status_value=$(mr_env_get "$meta_file" "status" "standby")
+    case "$status_value" in
+      candidate)
+        latest_id=$(basename "$variant_dir")
+        ;;
+    esac
+  done
+  if [ -n "$latest_id" ] && ! mr_controller_variant_exists "$latest_id"; then
+    latest_id=""
+  fi
+  printf '%s' "$latest_id"
+}
+
+mr_controller_variant_promote() {
+  variant_id=$(trim "$1")
+  if ! valid_id "$variant_id"; then
+    return 1
+  fi
+  if ! mr_controller_variant_exists "$variant_id"; then
+    return 1
+  fi
+  state_file=$(mr_controller_variants_state_file)
+  current_active=$(mr_controller_variant_active_id)
+  if [ "$current_active" = "$variant_id" ]; then
+    return 0
+  fi
+
+  mr_env_set "$state_file" "previous_active_variant_id" "$current_active"
+  mr_env_set "$state_file" "active_variant_id" "$variant_id"
+  mr_env_set "$state_file" "updated_at" "$(mr_now_iso)"
+  if [ -n "$current_active" ] && mr_controller_variant_exists "$current_active"; then
+    mr_controller_variant_status_set "$current_active" "standby" >/dev/null 2>&1 || true
+  fi
+  mr_controller_variant_status_set "$variant_id" "active" >/dev/null 2>&1 || true
+  return 0
+}
+
+mr_controller_variant_rollback() {
+  state_file=$(mr_controller_variants_state_file)
+  current_active=$(mr_controller_variant_active_id)
+  rollback_target=$(mr_controller_variant_previous_active_id)
+  if [ -z "$rollback_target" ]; then
+    rollback_target=$(mr_controller_variant_default_id)
+  fi
+  if ! mr_controller_variant_exists "$rollback_target"; then
+    rollback_target=$(mr_controller_variant_default_id)
+  fi
+  if ! mr_controller_variant_exists "$rollback_target"; then
+    return 1
+  fi
+  mr_env_set "$state_file" "previous_active_variant_id" "$current_active"
+  mr_env_set "$state_file" "active_variant_id" "$rollback_target"
+  mr_env_set "$state_file" "updated_at" "$(mr_now_iso)"
+  if [ -n "$current_active" ] && [ "$current_active" != "$rollback_target" ] && mr_controller_variant_exists "$current_active"; then
+    mr_controller_variant_status_set "$current_active" "standby" >/dev/null 2>&1 || true
+  fi
+  mr_controller_variant_status_set "$rollback_target" "active" >/dev/null 2>&1 || true
+  return 0
+}
+
+mr_controller_variant_guidance_for() {
+  variant_id=$(trim "$1")
+  if ! mr_controller_variant_exists "$variant_id"; then
+    printf '%s' ""
+    return 0
+  fi
+  meta_file=$(mr_controller_variant_meta_file "$variant_id")
+  printf '%s' "$(mr_env_get "$meta_file" "instructions" "")"
+}
+
+mr_controller_variant_select_for_run() {
+  run_id=$(trim "$1")
+  active_id=$(mr_controller_variant_active_id)
+  selected_id=$active_id
+  sample_bucket=0
+  candidate_id=$(mr_controller_variant_latest_candidate_id)
+  if [ -n "$candidate_id" ] && [ "$candidate_id" != "$active_id" ] && mr_controller_variant_exists "$candidate_id"; then
+    sample_rate=$(mr_controller_variant_sample_rate_percent)
+    max_sample_size=$(mr_controller_variant_max_sample_size)
+    candidate_meta=$(mr_controller_variant_meta_file "$candidate_id")
+    candidate_runs=$(mr_nonnegative_int_or "$(mr_env_get "$candidate_meta" "runs" "0")" "0")
+    if [ "$candidate_runs" -lt "$max_sample_size" ] && [ "$sample_rate" -gt 0 ]; then
+      if [ -z "$run_id" ]; then
+        run_id="$(mr_now_epoch)-$$"
+      fi
+      sample_bucket=$(printf '%s' "$run_id" | cksum | awk '{ print $1 % 100 }')
+      case "$sample_bucket" in ""|*[!0-9]*) sample_bucket=0 ;; esac
+      if [ "$sample_bucket" -lt "$sample_rate" ]; then
+        selected_id=$candidate_id
+      fi
+    fi
+  fi
+  printf '%s|%s|%s|%s' "$selected_id" "$sample_bucket" "$active_id" "$candidate_id"
+}
+
+mr_controller_variant_quality_score() {
+  queue_status=$(trim "$1")
+  final_state=$(trim "$2")
+  run_elapsed_sec=$(mr_nonnegative_int_or "$3" "0")
+  decision_requested=$(mr_bool_norm "$4")
+  failure_count=$(mr_nonnegative_int_or "$5" "0")
+  awk -v queue_status="$queue_status" -v final_state="$final_state" -v run_elapsed_sec="$run_elapsed_sec" -v decision_requested="$decision_requested" -v failure_count="$failure_count" '
+    BEGIN {
+      score = 0.15
+      if (queue_status == "done") {
+        score += 0.45
+      } else if (queue_status == "awaiting_decision") {
+        score += 0.18
+      } else if (queue_status == "awaiting_approval") {
+        score += 0.22
+      } else {
+        score += 0.05
+      }
+      if (final_state == "DONE") {
+        score += 0.25
+      } else {
+        score -= 0.08
+      }
+      if (decision_requested == "1") {
+        score -= 0.04
+      }
+      penalty = failure_count * 0.035
+      if (penalty > 0.30) {
+        penalty = 0.30
+      }
+      score -= penalty
+      if (run_elapsed_sec > 0 && run_elapsed_sec < 180) {
+        score += 0.05
+      } else if (run_elapsed_sec > 900) {
+        score -= 0.04
+      }
+      if (score < 0) {
+        score = 0
+      }
+      if (score > 1) {
+        score = 1
+      }
+      printf "%.3f", score
+    }
+  '
+}
+
+mr_controller_variant_record_run() {
+  variant_id=$(trim "$1")
+  run_id=$(trim "$2")
+  queue_status=$(mr_sanitize_inline "$3")
+  final_state=$(mr_sanitize_inline "$4")
+  run_elapsed_sec=$(mr_nonnegative_int_or "$5" "0")
+  iteration_count=$(mr_nonnegative_int_or "$6" "0")
+  decision_requested=$(mr_bool_norm "$7")
+  failure_count=$(mr_nonnegative_int_or "$8" "0")
+  run_mode=$(mr_sanitize_inline "$9")
+  model_name=$(mr_sanitize_inline "${10}")
+
+  if ! valid_id "$variant_id" || ! mr_controller_variant_exists "$variant_id"; then
+    variant_id=$(mr_controller_variant_active_id)
+  fi
+  if [ -z "$run_id" ]; then
+    run_id="$(mr_now_epoch)-$$"
+  fi
+  if ! valid_id "$run_id"; then
+    run_id=$(printf '%s' "$run_id" | tr -cd 'a-zA-Z0-9._-')
+  fi
+  [ -n "$run_id" ] || run_id="$(mr_now_epoch)-$$"
+
+  quality_score=$(mr_controller_variant_quality_score "$queue_status" "$final_state" "$run_elapsed_sec" "$decision_requested" "$failure_count")
+  now_epoch=$(mr_now_epoch)
+  now_iso=$(mr_now_iso)
+
+  telemetry_file=$(mr_controller_variants_telemetry_file)
+  [ -f "$telemetry_file" ] || : > "$telemetry_file"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$now_epoch" \
+    "$now_iso" \
+    "$variant_id" \
+    "$run_id" \
+    "$queue_status" \
+    "$final_state" \
+    "$run_mode" \
+    "$model_name" \
+    "$iteration_count" \
+    "$run_elapsed_sec" \
+    "$decision_requested" \
+    "$quality_score" >> "$telemetry_file"
+
+  meta_file=$(mr_controller_variant_meta_file "$variant_id")
+  current_runs=$(mr_nonnegative_int_or "$(mr_env_get "$meta_file" "runs" "0")" "0")
+  current_successes=$(mr_nonnegative_int_or "$(mr_env_get "$meta_file" "successes" "0")" "0")
+  current_avg=$(mr_env_get "$meta_file" "avg_quality" "0.000")
+  new_runs=$((current_runs + 1))
+  run_success=0
+  if [ "$queue_status" = "done" ] && [ "$final_state" = "DONE" ]; then
+    run_success=1
+  fi
+  new_successes=$((current_successes + run_success))
+  new_avg=$(awk -v current_avg="$current_avg" -v current_runs="$current_runs" -v quality_score="$quality_score" '
+    BEGIN {
+      if (current_runs <= 0) {
+        avg = quality_score + 0.0
+      } else {
+        avg = ((current_avg + 0.0) * current_runs + (quality_score + 0.0)) / (current_runs + 1)
+      }
+      if (avg < 0) {
+        avg = 0
+      }
+      if (avg > 1) {
+        avg = 1
+      }
+      printf "%.3f", avg
+    }
+  ')
+
+  mr_env_set "$meta_file" "runs" "$new_runs"
+  mr_env_set "$meta_file" "successes" "$new_successes"
+  mr_env_set "$meta_file" "avg_quality" "$new_avg"
+  mr_env_set "$meta_file" "last_seen_at" "$now_iso"
+  mr_env_set "$meta_file" "updated_at" "$now_iso"
+}
+
+mr_controller_variants_items_json() {
+  max_rows=$1
+  case "$max_rows" in
+    ""|*[!0-9]*) max_rows=30 ;;
+  esac
+  if [ "$max_rows" -lt 1 ]; then
+    max_rows=1
+  fi
+
+  variant_dirs=$(find "$(mr_controller_variants_dir)" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -r)
+  printf '['
+  first=1
+  shown=0
+  if [ -n "$variant_dirs" ]; then
+    printf '%s\n' "$variant_dirs" | while IFS= read -r variant_dir; do
+      [ -d "$variant_dir" ] || continue
+      meta_file="$variant_dir/meta.env"
+      [ -f "$meta_file" ] || continue
+      shown=$((shown + 1))
+      if [ "$shown" -gt "$max_rows" ]; then
+        break
+      fi
+      variant_id=$(mr_env_get "$meta_file" "id" "$(basename "$variant_dir")")
+      variant_name=$(mr_env_get "$meta_file" "name" "$variant_id")
+      variant_status=$(mr_env_get "$meta_file" "status" "standby")
+      variant_kind=$(mr_env_get "$meta_file" "kind" "manual")
+      parent_id=$(mr_env_get "$meta_file" "parent_id" "")
+      source_proposal=$(mr_env_get "$meta_file" "source_proposal" "")
+      scope_value=$(mr_env_get "$meta_file" "scope" "other")
+      risk_value=$(mr_env_get "$meta_file" "risk_level" "medium")
+      created_at=$(mr_env_get "$meta_file" "created_at" "")
+      updated_at=$(mr_env_get "$meta_file" "updated_at" "")
+      last_seen_at=$(mr_env_get "$meta_file" "last_seen_at" "")
+      instructions=$(mr_env_get "$meta_file" "instructions" "")
+      runs=$(mr_nonnegative_int_or "$(mr_env_get "$meta_file" "runs" "0")" "0")
+      successes=$(mr_nonnegative_int_or "$(mr_env_get "$meta_file" "successes" "0")" "0")
+      avg_quality=$(mr_env_get "$meta_file" "avg_quality" "0.000")
+      success_rate=$(awk -v runs="$runs" -v successes="$successes" '
+        BEGIN {
+          if (runs <= 0) {
+            printf "0.0"
+          } else {
+            printf "%.1f", (successes * 100.0) / runs
+          }
+        }
+      ')
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '{"id":"%s","name":"%s","status":"%s","kind":"%s","parent_id":"%s","source_proposal":"%s","scope":"%s","risk_level":"%s","created_at":"%s","updated_at":"%s","last_seen_at":"%s","instructions":"%s","runs":"%s","successes":"%s","avg_quality":"%s","success_rate_pct":"%s"}' \
+        "$(json_escape "$variant_id")" \
+        "$(json_escape "$variant_name")" \
+        "$(json_escape "$variant_status")" \
+        "$(json_escape "$variant_kind")" \
+        "$(json_escape "$parent_id")" \
+        "$(json_escape "$source_proposal")" \
+        "$(json_escape "$scope_value")" \
+        "$(json_escape "$risk_value")" \
+        "$(json_escape "$created_at")" \
+        "$(json_escape "$updated_at")" \
+        "$(json_escape "$last_seen_at")" \
+        "$(json_escape "$instructions")" \
+        "$(json_escape "$runs")" \
+        "$(json_escape "$successes")" \
+        "$(json_escape "$avg_quality")" \
+        "$(json_escape "$success_rate")"
+    done
+  fi
+  printf ']'
+}
+
+mr_controller_variants_compare_json() {
+  active_id=$(mr_controller_variant_active_id)
+  candidate_id=$(mr_controller_variant_latest_candidate_id)
+  min_runs=$(mr_controller_variant_sample_min_runs_for_promotion)
+
+  active_runs=0
+  active_avg="0.000"
+  if mr_controller_variant_exists "$active_id"; then
+    active_meta=$(mr_controller_variant_meta_file "$active_id")
+    active_runs=$(mr_nonnegative_int_or "$(mr_env_get "$active_meta" "runs" "0")" "0")
+    active_avg=$(mr_env_get "$active_meta" "avg_quality" "0.000")
+  fi
+
+  candidate_runs=0
+  candidate_avg="0.000"
+  if [ -n "$candidate_id" ] && mr_controller_variant_exists "$candidate_id"; then
+    candidate_meta=$(mr_controller_variant_meta_file "$candidate_id")
+    candidate_runs=$(mr_nonnegative_int_or "$(mr_env_get "$candidate_meta" "runs" "0")" "0")
+    candidate_avg=$(mr_env_get "$candidate_meta" "avg_quality" "0.000")
+  fi
+
+  quality_delta=$(awk -v candidate_avg="$candidate_avg" -v active_avg="$active_avg" '
+    BEGIN {
+      delta = (candidate_avg + 0.0) - (active_avg + 0.0)
+      printf "%.3f", delta
+    }
+  ')
+  recommendation="insufficient-data"
+  if [ -z "$candidate_id" ]; then
+    recommendation="no-candidate"
+  elif [ "$candidate_runs" -lt "$min_runs" ]; then
+    recommendation="collect-more-samples"
+  else
+    recommendation=$(awk -v quality_delta="$quality_delta" '
+      BEGIN {
+        if ((quality_delta + 0.0) >= 0.03) {
+          printf "promote-candidate"
+        } else if ((quality_delta + 0.0) <= -0.03) {
+          printf "rollback-candidate"
+        } else {
+          printf "hold"
+        }
+      }
+    ')
+  fi
+
+  printf '{"active_id":"%s","candidate_id":"%s","active_runs":"%s","candidate_runs":"%s","active_avg_quality":"%s","candidate_avg_quality":"%s","quality_delta":"%s","sample_min_runs_for_promotion":"%s","recommendation":"%s"}' \
+    "$(json_escape "$active_id")" \
+    "$(json_escape "$candidate_id")" \
+    "$(json_escape "$active_runs")" \
+    "$(json_escape "$candidate_runs")" \
+    "$(json_escape "$active_avg")" \
+    "$(json_escape "$candidate_avg")" \
+    "$(json_escape "$quality_delta")" \
+    "$(json_escape "$min_runs")" \
+    "$(json_escape "$recommendation")"
+}
+
+mr_controller_variants_state_json() {
+  state_file=$(mr_controller_variants_state_file)
+  active_variant_id=$(mr_controller_variant_active_id)
+  previous_variant_id=$(mr_controller_variant_previous_active_id)
+  sample_rate_percent=$(mr_controller_variant_sample_rate_percent)
+  max_sample_size=$(mr_controller_variant_max_sample_size)
+  min_runs_for_promotion=$(mr_controller_variant_sample_min_runs_for_promotion)
+  updated_at=$(mr_env_get "$state_file" "updated_at" "")
+  printf '{"active_variant_id":"%s","previous_active_variant_id":"%s","sample_rate_percent":"%s","max_sample_size":"%s","sample_min_runs_for_promotion":"%s","updated_at":"%s","quality_compare":%s,"items":%s}' \
+    "$(json_escape "$active_variant_id")" \
+    "$(json_escape "$previous_variant_id")" \
+    "$(json_escape "$sample_rate_percent")" \
+    "$(json_escape "$max_sample_size")" \
+    "$(json_escape "$min_runs_for_promotion")" \
+    "$(json_escape "$updated_at")" \
+    "$(mr_controller_variants_compare_json)" \
+    "$(mr_controller_variants_items_json "30")"
+}
+
+mr_controller_variant_bootstrap_default() {
+  default_id=$(mr_controller_variant_default_id)
+  if mr_controller_variant_exists "$default_id"; then
+    return 0
+  fi
+  default_dir=$(mr_controller_variant_dir_for "$default_id")
+  mkdir -p "$default_dir"
+  now_iso=$(mr_now_iso)
+  default_guidance=$(mr_sanitize_inline "Baseline typed-state controller policy: keep deterministic section formatting, safe mediated commands, small verifiable steps, and concise user-facing synthesis.")
+  default_meta=$(mr_controller_variant_meta_file "$default_id")
+  {
+    printf 'id=%s\n' "$default_id"
+    printf 'name=%s\n' "Default controller baseline"
+    printf 'status=active\n'
+    printf 'kind=baseline\n'
+    printf 'parent_id=\n'
+    printf 'source_proposal=\n'
+    printf 'scope=controller-loop\n'
+    printf 'risk_level=low\n'
+    printf 'created_at=%s\n' "$now_iso"
+    printf 'updated_at=%s\n' "$now_iso"
+    printf 'last_seen_at=\n'
+    printf 'instructions=%s\n' "$default_guidance"
+    printf 'runs=0\n'
+    printf 'successes=0\n'
+    printf 'avg_quality=0.000\n'
+  } > "$default_meta"
+  default_notes=$(mr_controller_variant_notes_file "$default_id")
+  {
+    printf '# Controller Variant: %s\n\n' "$default_id"
+    printf 'Created: %s\n\n' "$now_iso"
+    printf '## Guidance\n- %s\n' "$default_guidance"
+  } > "$default_notes"
 }
 
 mr_mode_seed_rows() {
@@ -1213,6 +1840,8 @@ mode_runtime_bootstrap() {
   mkdir -p "$(mr_interrupts_dir)"
   mkdir -p "$(mr_failure_taxonomy_dir)"
   mkdir -p "$(mr_improvement_proposals_dir)"
+  mkdir -p "$(mr_controller_variants_root)"
+  mkdir -p "$(mr_controller_variants_dir)"
 
   scheduler_state=$(mr_scheduler_state_file)
   if [ ! -f "$scheduler_state" ]; then
@@ -1259,6 +1888,37 @@ EOF_FAIL
 - This subsystem does not auto-edit execution pipelines.
 EOF_PROP
   fi
+
+  controller_state_file=$(mr_controller_variants_state_file)
+  if [ ! -f "$controller_state_file" ]; then
+    {
+      printf 'active_variant_id=%s\n' "$(mr_controller_variant_default_id)"
+      printf 'previous_active_variant_id=\n'
+      printf 'sample_rate_percent=35\n'
+      printf 'max_sample_size=40\n'
+      printf 'sample_min_runs_for_promotion=6\n'
+      printf 'updated_at=%s\n' "$(mr_now_iso)"
+    } > "$controller_state_file"
+  fi
+
+  controller_telemetry_file=$(mr_controller_variants_telemetry_file)
+  if [ ! -f "$controller_telemetry_file" ]; then
+    : > "$controller_telemetry_file"
+  fi
+
+  controller_readme_file="$(mr_controller_variants_root)/README.md"
+  if [ ! -f "$controller_readme_file" ]; then
+    cat > "$controller_readme_file" <<'EOF_CTRL'
+# Controller Variants Store
+
+- `variants/<variant-id>/meta.env` stores versioned controller prompt-variant metadata and quality aggregates.
+- `variants/<variant-id>/guidance.md` stores human-readable variant intent.
+- `state.env` stores active/previous variant ids plus A/B sampling configuration.
+- `telemetry.tsv` stores run-level quality telemetry for before/after comparison.
+EOF_CTRL
+  fi
+
+  mr_controller_variant_bootstrap_default
 
   mr_mode_seed_rows | while IFS='|' read -r mode_id mode_name mode_priority mode_cadence mode_interrupt mode_desc mode_subscriptions mode_caps mode_skills; do
     [ -n "$mode_id" ] || continue
@@ -2493,8 +3153,9 @@ mode_runtime_state_json() {
   cooperation_recent=$(mr_cooperation_recent_json "24")
   failure_taxonomy_state=$(mr_failure_taxonomy_state_json)
   improvement_proposals_state=$(mr_improvement_proposals_state_json)
+  controller_variants_state=$(mr_controller_variants_state_json)
 
-  printf '{"scheduler":{"last_tick":"%s","last_tick_iso":"%s","ticks":"%s","last_due_modes":"%s","last_injections":"%s","last_directives_received":"%s","last_directives_emitted":"%s","summary":"%s"},"modes":%s,"skills":%s,"panels":%s,"cooperation":{"pending_total":"%s","modes_with_pending":"%s","recent":%s},"failure_taxonomy":%s,"improvement_proposals":%s}' \
+  printf '{"scheduler":{"last_tick":"%s","last_tick_iso":"%s","ticks":"%s","last_due_modes":"%s","last_injections":"%s","last_directives_received":"%s","last_directives_emitted":"%s","summary":"%s"},"modes":%s,"skills":%s,"panels":%s,"cooperation":{"pending_total":"%s","modes_with_pending":"%s","recent":%s},"failure_taxonomy":%s,"improvement_proposals":%s,"controller_variants":%s}' \
     "$(json_escape "$last_tick")" \
     "$(json_escape "$last_tick_iso")" \
     "$(json_escape "$ticks")" \
@@ -2510,7 +3171,8 @@ mode_runtime_state_json() {
     "$(json_escape "$cooperation_modes_pending")" \
     "$cooperation_recent" \
     "$failure_taxonomy_state" \
-    "$improvement_proposals_state"
+    "$improvement_proposals_state" \
+    "$controller_variants_state"
 }
 
 mr_skill_capabilities() {
@@ -2901,6 +3563,45 @@ mr_failure_taxonomy_state_response() {
 
 mr_improvement_proposals_state_response() {
   printf '{"success":true,"improvement_proposals":%s}\n' "$(mr_improvement_proposals_state_json)"
+}
+
+mr_controller_variants_state_response() {
+  printf '{"success":true,"controller_variants":%s,"mode_runtime":%s}\n' \
+    "$(mr_controller_variants_state_json)" \
+    "$(mode_runtime_state_json)"
+}
+
+mr_controller_variant_promote_response() {
+  variant_id=$(trim "$(param "variant_id")")
+  manual_confirm=$(mr_bool_norm "$(param "manual_confirm")")
+  if ! valid_id "$variant_id"; then
+    printf '{"success":false,"error":"invalid variant_id"}\n'
+    return 0
+  fi
+  if [ "$manual_confirm" != "1" ]; then
+    printf '{"success":false,"error":"manual_confirm=1 is required for promote"}\n'
+    return 0
+  fi
+  if ! mr_controller_variant_promote "$variant_id"; then
+    printf '{"success":false,"error":"variant not found"}\n'
+    return 0
+  fi
+  printf '{"success":true,"variant_id":"%s","mode_runtime":%s}\n' \
+    "$(json_escape "$variant_id")" \
+    "$(mode_runtime_state_json)"
+}
+
+mr_controller_variant_rollback_response() {
+  manual_confirm=$(mr_bool_norm "$(param "manual_confirm")")
+  if [ "$manual_confirm" != "1" ]; then
+    printf '{"success":false,"error":"manual_confirm=1 is required for rollback"}\n'
+    return 0
+  fi
+  if ! mr_controller_variant_rollback; then
+    printf '{"success":false,"error":"rollback target unavailable"}\n'
+    return 0
+  fi
+  printf '{"success":true,"mode_runtime":%s}\n' "$(mode_runtime_state_json)"
 }
 
 mr_improvement_proposal_create_response() {

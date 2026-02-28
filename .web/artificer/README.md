@@ -52,6 +52,9 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
 - `improvement_proposal_generate` (POST)
 - `improvement_proposal_decide` (POST)
 - `improvement_proposal_create` (POST)
+- `controller_variants_state` (GET)
+- `controller_variant_promote` (POST)
+- `controller_variant_rollback` (POST)
 - `models` (GET)
 - `pick_workspace` (GET, macOS native chooser)
 - `add_workspace` (POST)
@@ -107,6 +110,8 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - `dashboard/` composite panel substrate and scheduler snapshots
   - `failure-taxonomy/events.tsv` persistent run failure taxonomy records
   - `improvement-proposals/<proposal-id>/` manually reviewed improvement proposals (`meta.env`, `proposal.md`)
+  - `controller-variants/variants/<variant-id>/` versioned controller prompt variants (`meta.env`, `guidance.md`)
+  - `controller-variants/telemetry.tsv` run-level A/B quality telemetry used for promotion/rollback decisions
 - Run-mode picker includes a `More modes` expander that surfaces all runtime governance modes with blurbs, and selecting one applies `Assistant` run mode with that focus profile.
 - Composer now separates `Reasoning depth` from `Compute/time budget`:
   - Reasoning controls planning depth/effort per step.

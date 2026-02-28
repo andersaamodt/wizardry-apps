@@ -5390,7 +5390,8 @@ select:focus {
 .mode-runtime-modes,
 .mode-runtime-skills,
 .mode-runtime-failure-taxonomy,
-.mode-runtime-improvement-proposals {
+.mode-runtime-improvement-proposals,
+.mode-runtime-controller-variants {
   display: grid;
   gap: 8px;
 }

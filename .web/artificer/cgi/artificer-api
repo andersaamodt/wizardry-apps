@@ -11964,6 +11964,36 @@ case "$action" in
     exit 0
     ;;
 
+  controller_variants_state)
+    if command -v mr_controller_variants_state_response >/dev/null 2>&1; then
+      ensure_mode_runtime_bootstrap
+      mr_controller_variants_state_response
+    else
+      emit_error "mode runtime is unavailable"
+    fi
+    exit 0
+    ;;
+
+  controller_variant_promote)
+    if command -v mr_controller_variant_promote_response >/dev/null 2>&1; then
+      ensure_mode_runtime_bootstrap
+      mr_controller_variant_promote_response
+    else
+      emit_error "mode runtime is unavailable"
+    fi
+    exit 0
+    ;;
+
+  controller_variant_rollback)
+    if command -v mr_controller_variant_rollback_response >/dev/null 2>&1; then
+      ensure_mode_runtime_bootstrap
+      mr_controller_variant_rollback_response
+    else
+      emit_error "mode runtime is unavailable"
+    fi
+    exit 0
+    ;;
+
   improvement_proposal_create)
     if command -v mr_improvement_proposal_create_response >/dev/null 2>&1; then
       ensure_mode_runtime_bootstrap
@@ -16308,6 +16338,11 @@ $fallback_output"
     run_finished_iso=""
     run_event_id=""
     run_message_anchor=""
+    controller_variant_id=""
+    controller_variant_bucket="0"
+    controller_variant_active_id=""
+    controller_variant_candidate_id=""
+    controller_variant_guidance=""
 
     if ! valid_id "$workspace_id"; then
       emit_error "invalid workspace_id"
@@ -17533,6 +17568,23 @@ $explicit_skill_context_text"
     esac
 
     ensure_mode_runtime_bootstrap
+    if command -v mr_controller_variant_select_for_run >/dev/null 2>&1; then
+      controller_variant_selection=$(mr_controller_variant_select_for_run "$run_event_id")
+      controller_variant_id=$(printf '%s' "$controller_variant_selection" | cut -d'|' -f1)
+      controller_variant_bucket=$(printf '%s' "$controller_variant_selection" | cut -d'|' -f2)
+      controller_variant_active_id=$(printf '%s' "$controller_variant_selection" | cut -d'|' -f3)
+      controller_variant_candidate_id=$(printf '%s' "$controller_variant_selection" | cut -d'|' -f4)
+      if [ -n "$controller_variant_id" ] && command -v mr_controller_variant_guidance_for >/dev/null 2>&1; then
+        controller_variant_guidance=$(mr_controller_variant_guidance_for "$controller_variant_id")
+      fi
+      if [ -n "$controller_variant_id" ]; then
+        variant_stream_note="Controller variant: $controller_variant_id"
+        if [ -n "$controller_variant_candidate_id" ] && [ "$controller_variant_id" = "$controller_variant_candidate_id" ]; then
+          variant_stream_note="$variant_stream_note (candidate bucket=$controller_variant_bucket)"
+        fi
+        stream_emit_line "$stream_output_file" "$variant_stream_note"
+      fi
+    fi
     if [ "$run_mode" = "assistant" ] && [ -n "$assistant_mode_id" ] && command -v mr_mode_exists >/dev/null 2>&1 && mr_mode_exists "$assistant_mode_id"; then
       assistant_manifest_file=$(mr_mode_manifest_file "$assistant_mode_id")
       assistant_policy_file=$(mr_mode_policy_file "$assistant_mode_id")
@@ -17857,6 +17909,18 @@ EOF
       if [ -z "$(trim "$explicit_skill_prompt_text")" ]; then
         explicit_skill_prompt_text="NONE"
       fi
+      controller_variant_prompt_block="Controller variant guidance: NONE"
+      if [ -n "$(trim "$controller_variant_id")" ]; then
+        controller_variant_prompt_block=$(cat <<EOF
+Controller variant:
+- selected_id: $controller_variant_id
+- active_id: ${controller_variant_active_id:-none}
+- candidate_id: ${controller_variant_candidate_id:-none}
+- sample_bucket: ${controller_variant_bucket:-0}
+- guidance: ${controller_variant_guidance:-baseline policy only}
+EOF
+)
+      fi
       workspace_context_block=""
       if [ -n "$(trim "$workspace_context_text")" ]; then
         workspace_context_block=$(cat <<EOF
@@ -17882,6 +17946,8 @@ Typed state:
 $mode_hint
 
 $run_mode_policy_text
+
+$controller_variant_prompt_block
 
 Explicit skill actuator context:
 $explicit_skill_prompt_text
@@ -19611,6 +19677,29 @@ EOF
     fi
     run_elapsed_min=$((run_elapsed_sec / 60))
     run_elapsed_rem=$((run_elapsed_sec % 60))
+    decision_requested_for_variant=0
+    if [ "$decision_request_json" != "null" ]; then
+      decision_requested_for_variant=1
+    fi
+    failure_count_for_variant=$(grep -c '^## ' "$failures_file" 2>/dev/null || printf '0')
+    case "$failure_count_for_variant" in
+      ""|*[!0-9]*)
+        failure_count_for_variant=0
+        ;;
+    esac
+    if [ -n "$controller_variant_id" ] && command -v mr_controller_variant_record_run >/dev/null 2>&1; then
+      mr_controller_variant_record_run \
+        "$controller_variant_id" \
+        "$run_event_id" \
+        "$queue_status_from_run" \
+        "$final_state_mode" \
+        "$run_elapsed_sec" \
+        "$iteration" \
+        "$decision_requested_for_variant" \
+        "$failure_count_for_variant" \
+        "$run_mode" \
+        "$model" >/dev/null 2>&1 || true
+    fi
     stream_emit_line "$stream_output_file" "Worked for ${run_elapsed_min}m ${run_elapsed_rem}s."
     stream_emit_line "$stream_output_file" "Run finalized with status: $queue_status_from_run"
     run_finished_iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -19623,6 +19712,13 @@ EOF
     run_error_text=""
     if [ "$queue_status_from_run" = "error" ]; then
       run_error_text=$assistant_output
+    fi
+    controller_variant_event_hint=""
+    if [ -n "$controller_variant_id" ]; then
+      controller_variant_event_hint="controller_variant=$controller_variant_id"
+      if [ -n "$controller_variant_candidate_id" ] && [ "$controller_variant_id" = "$controller_variant_candidate_id" ]; then
+        controller_variant_event_hint="${controller_variant_event_hint} (candidate)"
+      fi
     fi
     agent_event_json=$(build_run_event_json \
       "$queue_status_from_run" \
@@ -19638,7 +19734,7 @@ EOF
       "$git_status" \
       "$git_diff" \
       "$run_error_text" \
-      "" \
+      "$controller_variant_event_hint" \
       "$run_event_id" \
       "$final_task_status_json" \
       "$run_message_anchor" \
