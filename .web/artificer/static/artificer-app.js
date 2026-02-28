@@ -791,7 +791,6 @@
   var dictationWaveBackendFloor = 0.01;
   var dictationWaveBackendCeil = 0.24;
   var dictationWaveBackendFloorCalibrating = true;
-  var dictationWaveBackendFloorSeedSamples = [];
   var dictationWaveSeenSignal = false;
   var dictationWaveNoiseFloor = 0.02;
   var dictationWaveActivatedAt = 0;
@@ -7329,7 +7328,6 @@
     dictationWaveBackendFloor = 0.01;
     dictationWaveBackendCeil = 0.24;
     dictationWaveBackendFloorCalibrating = true;
-    dictationWaveBackendFloorSeedSamples = [];
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
     dictationWaveLastSampleAt = 0;
