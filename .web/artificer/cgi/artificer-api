@@ -7526,10 +7526,6 @@ active_run_event_json_for_conversation() {
   model_name=$(read_file_line "$conv_dir/model" "$(default_model)")
   running_meta_file=$(queue_running_meta_file_for "$conv_dir")
   assay_task_id=$(queue_meta_assay_task_id_from_file "$running_meta_file")
-  assay_task_json=""
-  if [ -n "$assay_task_id" ]; then
-    assay_task_json=",\"assay_task_id\":\"$(json_escape "$assay_task_id")\""
-  fi
   tasks_dir=$(tasks_dir_for_conversation "$conv_dir")
   state_preview=$(sed -n '1,60p' "$conv_dir/agent/.state" 2>/dev/null || true)
   task_status_json=$(task_status_json_from_tasks_dir "$tasks_dir" "running" "$state_preview")
@@ -7542,12 +7538,11 @@ active_run_event_json_for_conversation() {
       ;;
   esac
 
-  printf '{"id":"%s","status":"running","started_at":"%s","finished_at":"","model":"%s","plan":"","commands":[],"stream_text":"%s","failures":"","session_log":"","state":"","git_status":"","git_diff":"","error":"","decision_hint":""%s%s,"task_status":%s}' \
+  printf '{"id":"%s","status":"running","started_at":"%s","finished_at":"","model":"%s","plan":"","commands":[],"stream_text":"%s","failures":"","session_log":"","state":"","git_status":"","git_diff":"","error":"","decision_hint":""%s,"task_status":%s}' \
     "$(json_escape "$run_event_id")" \
     "$(json_escape "$running_started_iso")" \
     "$(json_escape "$model_name")" \
     "$(json_escape "$stream_preview")" \
-    "$assay_task_json" \
     "$message_anchor_json" \
     "$task_status_json"
 }
@@ -7984,11 +7979,6 @@ build_run_event_json() {
       message_anchor_json=",\"message_anchor\":$message_anchor_override"
       ;;
   esac
-  assay_task_json=""
-  assay_task_id=$(normalize_assay_task_id_value "$assay_task_id_override")
-  if [ -n "$assay_task_id" ]; then
-    assay_task_json=",\"assay_task_id\":\"$(json_escape "$assay_task_id")\""
-  fi
   event_id_json=$(json_escape "$event_id")
   status_json=$(json_escape "$run_status")
   started_json=$(json_escape "$started_at")
@@ -8004,8 +7994,8 @@ build_run_event_json() {
   error_json=$(json_escape "$safe_error")
   hint_json=$(json_escape "$safe_hint")
 
-  printf '{"id":"%s","status":"%s","started_at":"%s","finished_at":"%s","model":"%s","plan":"%s","commands":%s,"stream_text":"%s","failures":"%s","session_log":"%s","state":"%s","git_status":"%s","git_diff":"%s","error":"%s","decision_hint":"%s"%s%s,"task_status":%s}' \
-    "$event_id_json" "$status_json" "$started_json" "$finished_json" "$model_json" "$plan_json" "$commands_json" "$stream_json" "$failures_json" "$session_json" "$state_json" "$git_status_json" "$git_diff_json" "$error_json" "$hint_json" "$assay_task_json" "$message_anchor_json" "$task_status_json"
+  printf '{"id":"%s","status":"%s","started_at":"%s","finished_at":"%s","model":"%s","plan":"%s","commands":%s,"stream_text":"%s","failures":"%s","session_log":"%s","state":"%s","git_status":"%s","git_diff":"%s","error":"%s","decision_hint":"%s"%s,"task_status":%s}' \
+    "$event_id_json" "$status_json" "$started_json" "$finished_json" "$model_json" "$plan_json" "$commands_json" "$stream_json" "$failures_json" "$session_json" "$state_json" "$git_status_json" "$git_diff_json" "$error_json" "$hint_json" "$message_anchor_json" "$task_status_json"
 }
 
 append_run_event_json() {
@@ -13414,8 +13404,6 @@ EOF
       queued_permission_mode=$(queue_meta_permission_mode_from_file "$queued_meta")
       queued_programmer_review=$(queue_meta_programmer_review_from_file "$queued_meta")
       queued_programmer_review_rounds=$(queue_meta_programmer_review_rounds_from_file "$queued_meta")
-      queued_assay_task_id=$(queue_meta_assay_task_id_from_file "$queued_meta")
-
       queued_mode_json=$(json_escape "$queued_mode")
       queued_assistant_mode_json=$(json_escape "$queued_assistant_mode")
       queued_compute_budget_json=$(json_escape "$queued_compute_budget")
@@ -13423,7 +13411,6 @@ EOF
       queued_permission_mode_json=$(json_escape "$queued_permission_mode")
       queued_programmer_review_json=$(json_escape "$queued_programmer_review")
       queued_programmer_review_rounds_json=$(json_escape "$queued_programmer_review_rounds")
-      queued_assay_task_id_json=$(json_escape "$queued_assay_task_id")
 
       queued_skills_file=$(mktemp)
       queue_meta_explicit_skills_to_file "$queued_meta" "$queued_skills_file"
@@ -13433,7 +13420,7 @@ EOF
       if [ "$queue_items_count" -gt 0 ]; then
         queue_items_json="$queue_items_json,"
       fi
-      queue_items_json="$queue_items_json{\"id\":\"$queued_item_id_json\",\"order\":\"$queued_order_json\",\"prompt\":\"$queued_prompt_json\",\"run_mode\":\"$queued_mode_json\",\"assistant_mode_id\":\"$queued_assistant_mode_json\",\"compute_budget\":\"$queued_compute_budget_json\",\"command_exec_mode\":\"$queued_command_exec_mode_json\",\"permission_mode\":\"$queued_permission_mode_json\",\"programmer_review\":\"$queued_programmer_review_json\",\"programmer_review_rounds\":\"$queued_programmer_review_rounds_json\",\"assay_task_id\":\"$queued_assay_task_id_json\",\"explicit_skill_ids\":$queued_skills_json}"
+      queue_items_json="$queue_items_json{\"id\":\"$queued_item_id_json\",\"order\":\"$queued_order_json\",\"prompt\":\"$queued_prompt_json\",\"run_mode\":\"$queued_mode_json\",\"assistant_mode_id\":\"$queued_assistant_mode_json\",\"compute_budget\":\"$queued_compute_budget_json\",\"command_exec_mode\":\"$queued_command_exec_mode_json\",\"permission_mode\":\"$queued_permission_mode_json\",\"programmer_review\":\"$queued_programmer_review_json\",\"programmer_review_rounds\":\"$queued_programmer_review_rounds_json\",\"explicit_skill_ids\":$queued_skills_json}"
       queue_items_count=$((queue_items_count + 1))
     done < "$queue_paths_file"
     rm -f "$queue_paths_file"
@@ -13784,7 +13771,6 @@ EOF
     item_permission_mode=$(queue_meta_permission_mode_from_file "$running_meta_file")
     item_programmer_review=$(queue_meta_programmer_review_from_file "$running_meta_file")
     item_programmer_review_rounds=$(queue_meta_programmer_review_rounds_from_file "$running_meta_file")
-    item_assay_task_id=$(queue_meta_assay_task_id_from_file "$running_meta_file")
     item_run_mode_json=$(json_escape "$item_run_mode")
     item_assistant_mode_json=$(json_escape "$item_assistant_mode")
     item_compute_budget_json=$(json_escape "$item_compute_budget")
@@ -13792,10 +13778,9 @@ EOF
     item_permission_mode_json=$(json_escape "$item_permission_mode")
     item_programmer_review_json=$(json_escape "$item_programmer_review")
     item_programmer_review_rounds_json=$(json_escape "$item_programmer_review_rounds")
-    item_assay_task_id_json=$(json_escape "$item_assay_task_id")
 
-    printf '{"success":true,"busy":false,"has_item":true,"item":{"id":"%s","prompt":"%s","attachments":%s,"run_mode":"%s","assistant_mode_id":"%s","compute_budget":"%s","command_exec_mode":"%s","permission_mode":"%s","programmer_review":"%s","programmer_review_rounds":"%s","assay_task_id":"%s","explicit_skill_ids":%s},"queue_pending":%s,"queue_running":1,"queue_done":0,"queue_first_id":"%s","queue_last_status":"running"}\n' \
-      "$item_id_json" "$prompt_json" "$attachments_json" "$item_run_mode_json" "$item_assistant_mode_json" "$item_compute_budget_json" "$item_command_exec_mode_json" "$item_permission_mode_json" "$item_programmer_review_json" "$item_programmer_review_rounds_json" "$item_assay_task_id_json" "$explicit_skills_json" "$queue_pending" "$queue_first_id_json"
+    printf '{"success":true,"busy":false,"has_item":true,"item":{"id":"%s","prompt":"%s","attachments":%s,"run_mode":"%s","assistant_mode_id":"%s","compute_budget":"%s","command_exec_mode":"%s","permission_mode":"%s","programmer_review":"%s","programmer_review_rounds":"%s","explicit_skill_ids":%s},"queue_pending":%s,"queue_running":1,"queue_done":0,"queue_first_id":"%s","queue_last_status":"running"}\n' \
+      "$item_id_json" "$prompt_json" "$attachments_json" "$item_run_mode_json" "$item_assistant_mode_json" "$item_compute_budget_json" "$item_command_exec_mode_json" "$item_permission_mode_json" "$item_programmer_review_json" "$item_programmer_review_rounds_json" "$explicit_skills_json" "$queue_pending" "$queue_first_id_json"
     exit 0
     ;;
 

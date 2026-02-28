@@ -1017,6 +1017,49 @@
       full: 'Scan all available recent comments each pass.',
       sample: 'Scan only up to Max samples each pass.'
     };
+    var TRAIT_CATALOG = [
+      { id: 'typical_redditor', label: 'Typical Redditor', hint: 'Default everyday Reddit voice.' },
+      { id: 'academic', label: 'Academic', hint: 'Analytical and evidence-oriented framing.' },
+      { id: 'helpful', label: 'Helpful', hint: 'Practical help-first orientation.' },
+      { id: 'curious', label: 'Curious', hint: 'Asks clarifying questions and explores.' },
+      { id: 'skeptical_debater', label: 'Skeptical Debater', hint: 'Tests claims and assumptions.' },
+      { id: 'technical_pragmatist', label: 'Technical Pragmatist', hint: 'Build-focused and concrete execution style.' },
+      { id: 'community_regular', label: 'Community Regular', hint: 'Norm-savvy frequent community participant.' },
+      { id: 'inventive', label: 'Inventive', hint: 'Generates novel practical ideas.' },
+      { id: 'dreamer', label: 'Dreamer', hint: 'Imaginative and future-facing style.' },
+      { id: 'good_faith_critic', label: 'Good-Faith Critic', hint: 'Critical but fair and constructive.' },
+      { id: 'anarchosyndicalist', label: 'Anarchosyndicalist', hint: 'Collective-action and anti-hierarchy framing.' },
+      { id: 'neighborly', label: 'Neighborly', hint: 'Friendly, local, and socially grounded.' },
+      { id: 'heroic', label: 'Heroic', hint: 'Courage-forward and duty-driven framing.' },
+      { id: 'campy', label: 'Campy', hint: 'Playful theatrical exaggeration and flair.' },
+      { id: 'religious', label: 'Religious', hint: 'Faith-centered framing and references.' },
+      { id: 'poet', label: 'Poet', hint: 'Lyrical, image-rich expression style.' },
+      { id: 'adventurer', label: 'Adventurer', hint: 'Risk-tolerant, exploratory orientation.' },
+      { id: 'group_loyal', label: 'Group-Loyal', hint: 'Protective of in-group bonds.' },
+      { id: 'oracle', label: 'Oracle', hint: 'Aphoristic, prophetic-style framing.' },
+      { id: 'storyteller', label: 'Storyteller', hint: 'Narrative-driven communication style.' },
+      { id: 'minimalist', label: 'Minimalist', hint: 'Sparse and essential wording.' },
+      { id: 'magnanimous', label: 'Magnanimous', hint: 'Generous and high-road responses.' },
+      { id: 'gardener', label: 'Gardener', hint: 'Nurtures discussion growth over time.' },
+      { id: 'connector', label: 'Connector', hint: 'Links people, ideas, and resources.' },
+      { id: 'maven', label: 'Maven', hint: 'Deep specialist knowledge sharing.' },
+      { id: 'salesman', label: 'Salesman', hint: 'Persuasive and benefit-led framing.' },
+      { id: 'inventor', label: 'Inventor', hint: 'Turns concepts into workable constructs.' },
+      { id: 'catalyst', label: 'Catalyst', hint: 'Accelerates change and momentum.' },
+      { id: 'diplomat', label: 'Diplomat', hint: 'Balances tensions and bridges sides.' },
+      { id: 'reflective', label: 'Reflective', hint: 'Introspective and metacognitive tone.' },
+      { id: 'champion', label: 'Champion', hint: 'Advocates strongly for chosen causes.' },
+      { id: 'illuminative', label: 'Illuminative', hint: 'Clarifies complexity into insight.' },
+      { id: 'paraclete', label: 'Paraclete', hint: 'Comforting advocate under pressure.' },
+      { id: 'troll', label: 'Troll', hint: 'Provocative style with elevated risk.' },
+      { id: 'ethos_only', label: 'Ethos & Instructions only', hint: 'No preset persona trait guidance.' }
+    ];
+    var TRAIT_PREDOMINANCE_DESCRIPTIONS = {
+      blend: { label: 'Blend', short: 'No lead trait; all co-express.', tooltip: 'No single trait leads; selected traits co-express.' },
+      contextual: { label: 'Contextual', short: 'Lead trait chosen per reply.', tooltip: 'Selects a primary style for each reply based on the situation.' },
+      stable: { label: 'Stable', short: 'Same lead trait each reply.', tooltip: 'Uses one primary trait for all replies.' },
+      adaptive: { label: 'Adaptive', short: 'Keeps lead style; shifts on context change.', tooltip: 'Keeps a primary style across replies, but may change it if the conversation evolves.' }
+    };
     var DEFAULT_PATROL_MODE = 'full';
 
     function normalizeMode(value) {

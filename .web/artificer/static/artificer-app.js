@@ -8080,7 +8080,7 @@
           return;
         }
         var avgRaw = dictationWaveBarSampleCount > 0 ? (dictationWaveBarSumRaw / dictationWaveBarSampleCount) : rawLevel;
-        var summarizedRaw = (avgRaw * 0.68) + (Number(dictationWaveBarPeakRaw || 0) * 0.32);
+        var summarizedRaw = (avgRaw * 0.56) + (Number(dictationWaveBarPeakRaw || 0) * 0.44);
         dictationWaveBarStartAt = sampleNow;
         dictationWaveBarPeakRaw = 0;
         dictationWaveBarSumRaw = 0;
@@ -8305,7 +8305,7 @@
           adjusted = 1;
         }
         var waveTravel = Math.max(1, maxWaveHeight - baselineHeight);
-        height = baselineHeight + Math.round(Math.pow(adjusted, 0.96) * waveTravel);
+        height = baselineHeight + (Math.pow(adjusted, 1.04) * waveTravel);
       }
       bar.style.height = String(height) + "px";
     }
