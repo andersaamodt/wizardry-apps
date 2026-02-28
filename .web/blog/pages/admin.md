@@ -1836,6 +1836,20 @@ body {
   padding: 0 0.7rem;
 }
 
+[data-admin-section="users"] .demo-box {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+[data-admin-section="users"] {
+  margin-left: calc(-1 * var(--admin-content-pad-left, 0.7rem));
+  margin-right: calc(-1 * var(--admin-content-pad-right, 0.72rem));
+}
+
+[data-admin-section="users"] .row-head {
+  padding: 0 0.7rem;
+}
+
 .draft-rows {
   display: block;
   border-top: 1px solid #d2def3;
