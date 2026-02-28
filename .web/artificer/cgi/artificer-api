@@ -17361,6 +17361,11 @@ $teacher_model_snapshot"
       history_text=$(conversation_history "$conv_dir" | sed -n '1,220p')
       snapshot_text=$(workspace_snapshot "$workspace_path" | sed -n '1,220p')
       workspace_context_text=$(workspace_shared_context "$ws_dir" "$conversation_id" | sed -n '1,320p')
+      if [ "$assay_run_profile" -eq 1 ]; then
+        history_text=$(printf '%s\n' "$history_text" | sed -n '1,140p')
+        snapshot_text=$(printf '%s\n' "$snapshot_text" | sed -n '1,140p')
+        workspace_context_text=""
+      fi
       contract_context_text=$(sed -n '1,220p' "$contract_file" 2>/dev/null || true)
       failures_tail=$(tail -n 80 "$failures_file" 2>/dev/null || sed -n '1,80p' "$failures_file")
       session_tail=$(tail -n 80 "$session_log_file" 2>/dev/null || sed -n '1,80p' "$session_log_file")
@@ -17400,6 +17405,9 @@ $teacher_model_snapshot"
           fi
           ;;
       esac
+      if [ "$assay_run_profile" -eq 1 ] && [ "$context_prompt_budget" -gt 2000 ]; then
+        context_prompt_budget=2000
+      fi
       ratio_total=136
       plan_budget=$((context_prompt_budget * 12 / ratio_total))
       contract_budget=$((context_prompt_budget * 10 / ratio_total))
@@ -17499,6 +17507,14 @@ $teacher_model_snapshot"
       explicit_skill_prompt_text=$explicit_skill_context_text
       if [ -z "$(trim "$explicit_skill_prompt_text")" ]; then
         explicit_skill_prompt_text="NONE"
+      fi
+      workspace_context_block=""
+      if [ -n "$(trim "$workspace_context_text")" ]; then
+        workspace_context_block=$(cat <<EOF
+$workspace_context_block
+
+EOF
+)
       fi
 
       controller_prompt=$(cat <<EOF
