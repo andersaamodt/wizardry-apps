@@ -6244,8 +6244,8 @@ dictation_live_level_for_session() {
       if (v < -78) v = -78
       if (v > -3) v = -3
       level = (v + 78) / 75
-      # Suppress ambient noise while preserving speech transients.
-      level = level ^ 1.35
+      # Keep a mostly linear envelope; frontend handles adaptive noise floor.
+      level = level ^ 1.0
       if (level < 0) level = 0
       if (level > 1) level = 1
       printf "%.5f", level
@@ -6305,7 +6305,7 @@ dictation_live_levels_json_for_session() {
       if (v < -78) v = -78
       if (v > -3) v = -3
       level = (v + 78) / 75
-      level = level ^ 1.35
+      level = level ^ 1.0
       if (level < 0) level = 0
       if (level > 1) level = 1
       if (!first) {

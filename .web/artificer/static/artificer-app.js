@@ -788,8 +788,8 @@
   var dictationWaveBackendLevel = 0;
   var dictationWaveBackendLevelAt = 0;
   var dictationWaveBackendRecentLevels = [];
-  var dictationWaveBackendFloor = 0.02;
-  var dictationWaveBackendCeil = 0.2;
+  var dictationWaveBackendFloor = 0.01;
+  var dictationWaveBackendCeil = 0.24;
   var dictationWaveBackendFloorCalibrating = true;
   var dictationWaveBackendFloorSeedSamples = [];
   var dictationWaveSeenSignal = false;
@@ -7326,8 +7326,8 @@
     dictationWaveBackendLevel = 0;
     dictationWaveBackendLevelAt = 0;
     dictationWaveBackendRecentLevels = [];
-    dictationWaveBackendFloor = 0.02;
-    dictationWaveBackendCeil = 0.2;
+    dictationWaveBackendFloor = 0.01;
+    dictationWaveBackendCeil = 0.24;
     dictationWaveBackendFloorCalibrating = true;
     dictationWaveBackendFloorSeedSamples = [];
     dictationWaveSeenSignal = false;
@@ -7566,17 +7566,17 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var ceil = Number(dictationWaveBackendCeil || 0.2);
+    var ceil = Number(dictationWaveBackendCeil || 0.24);
     if (!isFinite(ceil) || ceil <= floor) {
-      ceil = floor + 0.08;
+      ceil = floor + 0.2;
     }
-    var gate = (floor * 1.04) + 0.0004;
+    var gate = floor + Math.max(0.00035, floor * 0.08);
     if (raw <= gate) {
       return 0;
     }
     var span = ceil - gate;
-    if (!isFinite(span) || span < 0.035) {
-      span = 0.035;
+    if (!isFinite(span) || span < 0.14) {
+      span = 0.14;
     }
     var normalized = (raw - gate) / span;
     if (!isFinite(normalized) || normalized < 0) {
@@ -7585,9 +7585,9 @@
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.9);
+      normalized = Math.pow(normalized, 0.72);
     }
-    if (normalized < 0.0018) {
+    if (normalized < 0.0012) {
       normalized = 0;
     }
     return normalized;
@@ -7619,111 +7619,69 @@
     var sorted = samples.slice().sort(function (a, b) {
       return a - b;
     });
-    var targetIdx = Math.floor((sorted.length - 1) * 0.12);
-    if (targetIdx < 0) {
-      targetIdx = 0;
-    } else if (targetIdx >= sorted.length) {
-      targetIdx = sorted.length - 1;
+    var floorIdx = Math.floor((sorted.length - 1) * 0.16);
+    if (floorIdx < 0) {
+      floorIdx = 0;
+    } else if (floorIdx >= sorted.length) {
+      floorIdx = sorted.length - 1;
     }
-    var speechIdx = Math.floor((sorted.length - 1) * 0.75);
-    if (speechIdx < 0) {
-      speechIdx = 0;
-    } else if (speechIdx >= sorted.length) {
-      speechIdx = sorted.length - 1;
-    }
-    var target = Number(sorted[targetIdx] || 0);
-    var speechProbe = Number(sorted[speechIdx] || 0);
-    var highIdx = Math.floor((sorted.length - 1) * 0.92);
+    var highIdx = Math.floor((sorted.length - 1) * 0.9);
     if (highIdx < 0) {
       highIdx = 0;
     } else if (highIdx >= sorted.length) {
       highIdx = sorted.length - 1;
     }
+    var floorTarget = Number(sorted[floorIdx] || 0);
     var highProbe = Number(sorted[highIdx] || 0);
-    if (!isFinite(target) || target < 0) {
-      target = 0;
-    }
-    if (!isFinite(speechProbe) || speechProbe < 0) {
-      speechProbe = 0;
+    var peakProbe = Number(sorted[sorted.length - 1] || highProbe);
+    if (!isFinite(floorTarget) || floorTarget < 0) {
+      floorTarget = 0;
     }
     if (!isFinite(highProbe) || highProbe < 0) {
       highProbe = 0;
+    }
+    if (!isFinite(peakProbe) || peakProbe < 0) {
+      peakProbe = highProbe;
+    }
+    if (peakProbe < highProbe) {
+      peakProbe = highProbe;
+    }
+    var dynamicHigh = (highProbe * 0.7) + (peakProbe * 0.3);
+    if (!isFinite(dynamicHigh) || dynamicHigh < 0) {
+      dynamicHigh = highProbe;
     }
     var floor = Number(dictationWaveBackendFloor || 0.01);
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var ceil = Number(dictationWaveBackendCeil || 0.2);
+    var ceil = Number(dictationWaveBackendCeil || 0.24);
     if (!isFinite(ceil) || ceil <= floor) {
-      ceil = floor + 0.08;
+      ceil = floor + 0.2;
     }
-    var now = Date.now();
-    var activatedAt = Number(dictationWaveActivatedAt || 0);
-    var inStartupWindow = activatedAt > 0 && (now - activatedAt) <= 700;
     if (dictationWaveBackendFloorCalibrating) {
-      for (var si = 0; si < sorted.length; si += 1) {
-        dictationWaveBackendFloorSeedSamples.push(sorted[si]);
-      }
-      if (dictationWaveBackendFloorSeedSamples.length > 280) {
-        dictationWaveBackendFloorSeedSamples = dictationWaveBackendFloorSeedSamples.slice(dictationWaveBackendFloorSeedSamples.length - 280);
-      }
-      var seedSorted = dictationWaveBackendFloorSeedSamples.slice().sort(function (a, b) {
-        return a - b;
-      });
-      var seedIdx = Math.floor((seedSorted.length - 1) * 0.25);
-      if (seedIdx < 0) {
-        seedIdx = 0;
-      } else if (seedIdx >= seedSorted.length) {
-        seedIdx = seedSorted.length - 1;
-      }
-      var seededTarget = Number(seedSorted[seedIdx] || target);
-      if (!isFinite(seededTarget) || seededTarget < 0) {
-        seededTarget = target;
-      }
-      var seedHighIdx = Math.floor((seedSorted.length - 1) * 0.9);
-      if (seedHighIdx < 0) {
-        seedHighIdx = 0;
-      } else if (seedHighIdx >= seedSorted.length) {
-        seedHighIdx = seedSorted.length - 1;
-      }
-      var seedHigh = Number(seedSorted[seedHighIdx] || highProbe);
-      if (!isFinite(seedHigh) || seedHigh < 0) {
-        seedHigh = highProbe;
-      }
-      // Calibrate aggressively at startup so baseline is sensible from the start.
-      floor = (floor * 0.28) + (seededTarget * 0.72);
-      ceil = (ceil * 0.4) + (seedHigh * 0.6);
-      if (!inStartupWindow || seedSorted.length >= 56) {
-        dictationWaveBackendFloorCalibrating = false;
-      }
+      floor = (floor * 0.3) + (floorTarget * 0.7);
+      ceil = (ceil * 0.45) + (dynamicHigh * 0.55);
+      dictationWaveBackendFloorCalibrating = false;
     } else {
-      var speechPresent = speechProbe > (target + Math.max(0.01, target * 1.6));
-      var deadband = Math.max(0.0025, floor * 0.2);
-      if (speechPresent) {
-        if (target < floor - deadband) {
-          // During speech, allow floor to drop (unlock), but never rise.
-          floor = (floor * 0.92) + (target * 0.08);
-        }
-      } else if (target > floor + deadband) {
-        // Outside speech, rise slowly to avoid re-normalization churn.
-        floor = (floor * 0.99) + (target * 0.01);
-      } else if (target < floor - deadband) {
-        // Drop faster so silence can recover to near-zero quickly.
-        floor = (floor * 0.9) + (target * 0.1);
-      }
-      if (highProbe > ceil) {
-        ceil = (ceil * 0.7) + (highProbe * 0.3);
+      // Floor should drop quickly when room noise drops, rise slowly otherwise.
+      if (floorTarget < floor) {
+        floor = (floor * 0.68) + (floorTarget * 0.32);
       } else {
-        ceil = (ceil * 0.96) + (highProbe * 0.04);
+        floor = (floor * 0.95) + (floorTarget * 0.05);
+      }
+      if (dynamicHigh > ceil) {
+        ceil = (ceil * 0.7) + (dynamicHigh * 0.3);
+      } else {
+        ceil = (ceil * 0.9) + (dynamicHigh * 0.1);
       }
     }
     if (floor < 0.0008) {
       floor = 0.0008;
-    } else if (floor > 0.08) {
-      floor = 0.08;
+    } else if (floor > 0.18) {
+      floor = 0.18;
     }
-    if (ceil < floor + 0.035) {
-      ceil = floor + 0.035;
+    if (ceil < floor + 0.16) {
+      ceil = floor + 0.16;
     } else if (ceil > 1) {
       ceil = 1;
     }
