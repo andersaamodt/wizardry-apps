@@ -935,6 +935,54 @@ blog_set_player_name() {
   config-set "$profile" updated_at "$(blog_now_iso)"
 }
 
+blog_rename_authored_posts() {
+  old_author=${1-}
+  new_author=${2-}
+  if [ -z "$old_author" ] || [ -z "$new_author" ] || [ "$old_author" = "$new_author" ]; then
+    printf '0\n'
+    return 0
+  fi
+  mkdir -p "$blog_posts_dir"
+  renamed=0
+  escaped_new=$(blog_yaml_escape "$new_author")
+  for file in "$blog_posts_dir"/*.md; do
+    [ -f "$file" ] || continue
+    author=$(blog_read_front_matter_value "$file" author 2>/dev/null || printf '')
+    if [ "$author" != "$old_author" ]; then
+      continue
+    fi
+    tmp=$(mktemp "${TMPDIR:-/tmp}/blog-author-rename.XXXXXX")
+    if awk -v repl="author: \"$escaped_new\"" '
+      BEGIN { in_fm = 0; fm_closed = 0; replaced = 0; }
+      {
+        if (fm_closed == 0 && $0 == "---") {
+          if (in_fm == 0) {
+            in_fm = 1;
+            print $0;
+            next;
+          }
+          in_fm = 0;
+          fm_closed = 1;
+          print $0;
+          next;
+        }
+        if (in_fm == 1 && replaced == 0 && $0 ~ /^author:[[:space:]]*/) {
+          print repl;
+          replaced = 1;
+          next;
+        }
+        print $0;
+      }
+    ' "$file" > "$tmp"; then
+      mv "$tmp" "$file"
+      renamed=$((renamed + 1))
+    else
+      rm -f "$tmp"
+    fi
+  done
+  printf '%s\n' "$renamed"
+}
+
 blog_find_username_by_fingerprint() {
   fingerprint=${1-}
   if [ -z "$fingerprint" ] || [ ! -d "$blog_users_dir" ]; then

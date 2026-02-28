@@ -1336,9 +1336,19 @@
     if (!els.accountPlayerName) {
       return;
     }
+    const nextName = els.accountPlayerName.value.trim();
+    const currentName = String(state.playerName || state.username || '').trim();
+    let renameAuthoredPosts = false;
+    if (nextName && currentName && nextName !== currentName) {
+      renameAuthoredPosts = window.confirm(
+        'Update authored posts too?\n\n' +
+        'This will replace author "' + currentName + '" with "' + nextName + '" on all matching posts.'
+      );
+    }
     try {
       const data = await apiPost('/cgi/blog-update-account', {
-        player_name: els.accountPlayerName.value.trim()
+        player_name: nextName,
+        rename_authored_posts: renameAuthoredPosts ? 'true' : 'false'
       }, true);
       if (!data.success) {
         throw new Error(data.error || 'Failed to save account');
@@ -1348,7 +1358,18 @@
       if (navName) {
         navName.textContent = state.playerName;
       }
-      setOutput(els.outputAccount, 'Account updated.', 'ok');
+      const renamedPosts = Number(data.renamed_posts || 0);
+      if (renameAuthoredPosts) {
+        setOutput(
+          els.outputAccount,
+          renamedPosts > 0
+            ? ('Account updated. Author name updated on ' + renamedPosts + ' post' + (renamedPosts === 1 ? '' : 's') + '.')
+            : 'Account updated. No authored posts matched your old name.',
+          'ok'
+        );
+      } else {
+        setOutput(els.outputAccount, 'Account updated.', 'ok');
+      }
     } catch (err) {
       setOutput(els.outputAccount, 'Error: ' + err.message, 'error');
     }
