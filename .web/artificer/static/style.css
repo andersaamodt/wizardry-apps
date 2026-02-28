@@ -2418,7 +2418,7 @@ button:disabled,
 
 .run-thinking {
   margin-top: 7px;
-  border-top: 1px solid var(--line);
+  border-top: 0;
 }
 
 .run-thinking > summary {

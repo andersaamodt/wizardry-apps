@@ -789,6 +789,7 @@
   var dictationWaveBackendLevelAt = 0;
   var dictationWaveBackendRecentLevels = [];
   var dictationWaveBackendFloor = 0.02;
+  var dictationWaveBackendCeil = 0.2;
   var dictationWaveBackendFloorCalibrating = true;
   var dictationWaveBackendFloorSeedSamples = [];
   var dictationWaveSeenSignal = false;
@@ -7326,6 +7327,7 @@
     dictationWaveBackendLevelAt = 0;
     dictationWaveBackendRecentLevels = [];
     dictationWaveBackendFloor = 0.02;
+    dictationWaveBackendCeil = 0.2;
     dictationWaveBackendFloorCalibrating = true;
     dictationWaveBackendFloorSeedSamples = [];
     dictationWaveSeenSignal = false;
@@ -7564,24 +7566,28 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var effectiveFloor = floor;
-    if (raw > (floor * 2.0) + 0.016) {
-      effectiveFloor = floor * 0.78;
+    var ceil = Number(dictationWaveBackendCeil || 0.2);
+    if (!isFinite(ceil) || ceil <= floor) {
+      ceil = floor + 0.08;
     }
-    var gate = (effectiveFloor * 1.22) + 0.001;
+    var gate = (floor * 1.04) + 0.0004;
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.016, (0.096 + (effectiveFloor * 1.55)));
+    var span = ceil - gate;
+    if (!isFinite(span) || span < 0.035) {
+      span = 0.035;
+    }
+    var normalized = (raw - gate) / span;
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 1.0);
+      normalized = Math.pow(normalized, 0.9);
     }
-    if (normalized < 0.0022) {
+    if (normalized < 0.0018) {
       normalized = 0;
     }
     return normalized;
@@ -7627,15 +7633,29 @@
     }
     var target = Number(sorted[targetIdx] || 0);
     var speechProbe = Number(sorted[speechIdx] || 0);
+    var highIdx = Math.floor((sorted.length - 1) * 0.92);
+    if (highIdx < 0) {
+      highIdx = 0;
+    } else if (highIdx >= sorted.length) {
+      highIdx = sorted.length - 1;
+    }
+    var highProbe = Number(sorted[highIdx] || 0);
     if (!isFinite(target) || target < 0) {
       target = 0;
     }
     if (!isFinite(speechProbe) || speechProbe < 0) {
       speechProbe = 0;
     }
+    if (!isFinite(highProbe) || highProbe < 0) {
+      highProbe = 0;
+    }
     var floor = Number(dictationWaveBackendFloor || 0.01);
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
+    }
+    var ceil = Number(dictationWaveBackendCeil || 0.2);
+    if (!isFinite(ceil) || ceil <= floor) {
+      ceil = floor + 0.08;
     }
     var now = Date.now();
     var activatedAt = Number(dictationWaveActivatedAt || 0);
@@ -7660,8 +7680,19 @@
       if (!isFinite(seededTarget) || seededTarget < 0) {
         seededTarget = target;
       }
+      var seedHighIdx = Math.floor((seedSorted.length - 1) * 0.9);
+      if (seedHighIdx < 0) {
+        seedHighIdx = 0;
+      } else if (seedHighIdx >= seedSorted.length) {
+        seedHighIdx = seedSorted.length - 1;
+      }
+      var seedHigh = Number(seedSorted[seedHighIdx] || highProbe);
+      if (!isFinite(seedHigh) || seedHigh < 0) {
+        seedHigh = highProbe;
+      }
       // Calibrate aggressively at startup so baseline is sensible from the start.
       floor = (floor * 0.28) + (seededTarget * 0.72);
+      ceil = (ceil * 0.4) + (seedHigh * 0.6);
       if (!inStartupWindow || seedSorted.length >= 56) {
         dictationWaveBackendFloorCalibrating = false;
       }
@@ -7680,13 +7711,24 @@
         // Drop faster so silence can recover to near-zero quickly.
         floor = (floor * 0.9) + (target * 0.1);
       }
+      if (highProbe > ceil) {
+        ceil = (ceil * 0.7) + (highProbe * 0.3);
+      } else {
+        ceil = (ceil * 0.96) + (highProbe * 0.04);
+      }
     }
     if (floor < 0.0008) {
       floor = 0.0008;
     } else if (floor > 0.08) {
       floor = 0.08;
     }
+    if (ceil < floor + 0.035) {
+      ceil = floor + 0.035;
+    } else if (ceil > 1) {
+      ceil = 1;
+    }
     dictationWaveBackendFloor = floor;
+    dictationWaveBackendCeil = ceil;
     return floor;
   }
 

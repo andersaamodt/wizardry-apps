@@ -93,6 +93,33 @@ assert_preview_case_with_signals() {
   fi
 }
 
+assert_preview_case_with_destructive_signal() {
+  case_name=$1
+  expected_category=$2
+  expected_allow=$3
+  expected_destructive=$4
+  prompt=$5
+  question=$6
+  run_mode=$7
+  commands=$8
+  response=$(post_preview "$prompt" "$question" "$run_mode" "$commands")
+  actual_category=$(printf '%s' "$response" | jq -r '.category // ""')
+  allow=$(printf '%s' "$response" | jq -r '.allow_decision_request')
+  signal_destructive=$(printf '%s' "$response" | jq -r '.signals.destructive_commands')
+  if [ "$actual_category" != "$expected_category" ]; then
+    printf '%s\n' "destructive case '$case_name' expected category '$expected_category' but got '$actual_category'" >&2
+    exit 1
+  fi
+  if [ "$allow" != "$expected_allow" ]; then
+    printf '%s\n' "destructive case '$case_name' expected allow_decision_request=$expected_allow but got '$allow'" >&2
+    exit 1
+  fi
+  if [ "$signal_destructive" != "$expected_destructive" ]; then
+    printf '%s\n' "destructive case '$case_name' expected destructive_commands=$expected_destructive but got '$signal_destructive'" >&2
+    exit 1
+  fi
+}
+
 assert_preview_case_with_signals \
   "signals-explicit-choice" \
   "explicit-choice" \
@@ -222,6 +249,36 @@ assert_preview_case_with_signals \
   "Proceed with external actions now?" \
   "assistant" \
   "git push origin main"
+
+assert_preview_case_with_destructive_signal \
+  "signals-destructive-rmrf-gate" \
+  "destructive-action-gate" \
+  "true" \
+  "1" \
+  "Clean the workspace and continue." \
+  "Proceed with cleanup?" \
+  "programming" \
+  "rm -rf ./build"
+
+assert_preview_case_with_destructive_signal \
+  "signals-destructive-kubectl-delete-gate" \
+  "destructive-action-gate" \
+  "true" \
+  "1" \
+  "Resolve production incident with cluster operations." \
+  "Proceed now?" \
+  "assistant" \
+  "kubectl delete pod payments-api-7f9d"
+
+assert_preview_case_with_destructive_signal \
+  "signals-destructive-near-miss-none" \
+  "none" \
+  "false" \
+  "0" \
+  "Clean generated artifacts and continue autonomously." \
+  "Need anything else?" \
+  "programming" \
+  "rm -r ./tmp-cache"
 
 assert_preview_case_with_signals \
   "signals-precedence-required-over-risk" \
@@ -416,5 +473,21 @@ assert_preview_case \
   "Should I continue now or stop and prepare backup first?" \
   "programming" \
   "git status --short"
+
+assert_preview_case \
+  "precedence-explicit-over-destructive" \
+  "explicit-choice" \
+  "Which path should I choose, safe mode or destructive cleanup mode?" \
+  "Which path should I choose?" \
+  "programming" \
+  "rm -rf ./build"
+
+assert_preview_case \
+  "precedence-required-over-destructive" \
+  "required-input-missing" \
+  "Run cleanup with <TARGET_PATH> and continue." \
+  "Which target path should I use?" \
+  "programming" \
+  "rm -rf ./build"
 
 printf '%s\n' "artificer decision-surfacing live tests passed"

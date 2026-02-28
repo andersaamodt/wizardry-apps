@@ -5397,6 +5397,14 @@ decision_commands_trigger_external_gate() {
   return 1
 }
 
+decision_commands_trigger_destructive_gate() {
+  commands_lower=$(lowercase_text "$1")
+  if printf '%s' "$commands_lower" | grep -Eq '\brm[[:space:]]+-rf\b|\brm[[:space:]]+-fr\b|\bsudo[[:space:]]+rm\b|\bmkfs\b|\bdd[[:space:]].*of=/dev/|\bdiskutil[[:space:]]+erase(disk|volume)\b|\bgit[[:space:]]+reset[[:space:]]+--hard\b|\bgit[[:space:]]+clean[[:space:]]+-fdx\b|\bterraform[[:space:]]+destroy\b|\bkubectl[[:space:]]+delete\b|\bdrop[[:space:]]+(table|database|schema)\b|\btruncate[[:space:]]+table\b'; then
+    return 0
+  fi
+  return 1
+}
+
 decision_request_category_for_prompt() {
   prompt_text=$1
   question_text=$2
@@ -5413,6 +5421,10 @@ decision_request_category_for_prompt() {
       printf '%s' "required-input-missing"
       return 0
     fi
+  fi
+  if decision_commands_trigger_destructive_gate "$commands_text"; then
+    printf '%s' "destructive-action-gate"
+    return 0
   fi
   if [ "$run_mode_text" = "assistant" ] && decision_commands_trigger_external_gate "$commands_text"; then
     printf '%s' "external-action-gate"
@@ -14141,14 +14153,19 @@ EOF
     if decision_commands_trigger_external_gate "$commands_text"; then
       external_gate=1
     fi
+    destructive_gate=0
+    if decision_commands_trigger_destructive_gate "$commands_text"; then
+      destructive_gate=1
+    fi
 
-    printf '{"success":true,"allow_decision_request":%s,"category":"%s","signals":{"explicit_choice":%s,"missing_required_inputs":%s,"risk_gate_question":%s,"external_commands":%s}}\n' \
+    printf '{"success":true,"allow_decision_request":%s,"category":"%s","signals":{"explicit_choice":%s,"missing_required_inputs":%s,"risk_gate_question":%s,"external_commands":%s,"destructive_commands":%s}}\n' \
       "$allow_json" \
       "$(json_escape "$category")" \
       "$explicit_choice" \
       "$missing_required" \
       "$risk_gate" \
-      "$external_gate"
+      "$external_gate" \
+      "$destructive_gate"
     exit 0
     ;;
 
@@ -18070,6 +18087,15 @@ EOF
         compliance_gate="Require user approval before any external-network side effects."
         compliance_next="Use local analysis until user approves external actions."
       fi
+      if decision_commands_trigger_destructive_gate "$commands_text"; then
+        compliance_status="caution"
+        compliance_findings="${compliance_findings} Proposed commands include destructive local operations."
+        if [ "$gate_check" = "none" ]; then
+          gate_check="required"
+        fi
+        compliance_gate="Require explicit approval before destructive local actions."
+        compliance_next="Pause and surface safe alternatives plus rollback implications."
+      fi
       if printf '%s' "$patch_lower_compliance" | grep -Eq 'spam|phish|credential stuffing|captcha bypass|ddos|malware|exploit'; then
         ethical_check="fail"
         compliance_status="blocked"
@@ -18085,6 +18111,16 @@ EOF
 )
       append_compliance_entry "$compliance_file" "$run_mode" "$state_mode" "$compliance_status" "$compliance_checks_text" "$compliance_findings" "$compliance_gate" "$compliance_next"
 
+      if [ "$decision_requested" -eq 0 ] && [ "$suppress_assay_decision_requests" -ne 1 ] && decision_commands_trigger_destructive_gate "$commands_text"; then
+        decision_question="Potentially destructive actions are implied. How should I proceed?"
+        cat > "$decision_options_file" <<'EOF'
+Pause and provide a non-destructive dry-run plan
+Proceed only with explicit rollback steps and backups
+Stop and return a risk assessment only
+EOF
+        decision_requested=1
+        decision_surface_category="destructive-action-gate"
+      fi
       if [ "$decision_requested" -eq 0 ] && [ "$suppress_assay_decision_requests" -ne 1 ] && [ "$gate_check" = "required" ] && decision_commands_trigger_external_gate "$commands_text"; then
         decision_question="External/network actions are implied. Which path should I take?"
         cat > "$decision_options_file" <<'EOF'

@@ -3,6 +3,7 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 app="$root/.web/artificer/static/artificer-app.js"
+style="$root/.web/artificer/static/style.css"
 
 assert_contains() {
   file=$1
@@ -25,5 +26,7 @@ assert_contains "$app" "!conversationHasAssistantAfterAnchor(workspaceId, conver
 assert_contains "$app" "assistantText = structuredRunFallbackMessage(fallbackAttemptCount);"
 assert_contains "$app" "if (assistantText) {"
 assert_contains "$app" "appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);"
+assert_contains "$style" ".run-thinking {"
+assert_contains "$style" "border-top: 0;"
 
 printf '%s\n' "artificer run-finalization flow contract tests passed"
