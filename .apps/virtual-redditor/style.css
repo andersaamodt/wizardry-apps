@@ -1323,6 +1323,18 @@ select {
   padding: 0.38rem 20px 0.3rem 0.44rem;
 }
 
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+select:disabled {
+  cursor: not-allowed;
+  color: color-mix(in srgb, var(--text-subtle) 80%, var(--text) 20%);
+  background-color: color-mix(in srgb, var(--bg-soft) 90%, var(--bg-panel) 10%);
+  border-color: color-mix(in srgb, var(--line) 88%, var(--text-subtle) 12%);
+  opacity: 0.7;
+}
+
 input[type='number'] {
   font-size: 0.76rem;
   line-height: 1.2;
@@ -1944,12 +1956,12 @@ label {
 }
 
 .persona-workarea.drawer-open {
-  grid-template-columns: minmax(0, 1fr) 8px var(--drawer-width, 320px);
+  grid-template-columns: minmax(0, 1fr) 0 var(--drawer-width, 320px);
   column-gap: 0;
 }
 
 .modes-workarea.drawer-open {
-  grid-template-columns: minmax(0, 1fr) 8px var(--drawer-width, 320px);
+  grid-template-columns: minmax(0, 1fr) 0 var(--drawer-width, 320px);
   column-gap: 0;
 }
 
@@ -2010,7 +2022,7 @@ label {
 }
 
 .relationships-workarea.drawer-open {
-  grid-template-columns: minmax(0, 1fr) 8px var(--drawer-width, 320px);
+  grid-template-columns: minmax(0, 1fr) 0 var(--drawer-width, 320px);
   column-gap: 0;
 }
 
@@ -2119,7 +2131,7 @@ label {
 }
 
 .replies-workarea.drawer-open {
-  grid-template-columns: minmax(0, 1fr) 8px var(--drawer-width, 320px);
+  grid-template-columns: minmax(0, 1fr) 0 var(--drawer-width, 320px);
   column-gap: 0;
 }
 
@@ -2191,7 +2203,7 @@ label {
 }
 
 .enforcement-workarea.drawer-open {
-  grid-template-columns: minmax(0, 1fr) 8px var(--drawer-width, 320px);
+  grid-template-columns: minmax(0, 1fr) 0 var(--drawer-width, 320px);
   column-gap: 0;
 }
 
@@ -2241,13 +2253,14 @@ label {
   grid-column: 2;
   grid-row: 1;
   position: relative;
-  width: 8px;
-  min-width: 8px;
+  width: 0;
+  min-width: 0;
   cursor: col-resize;
   user-select: none;
   touch-action: none;
   opacity: 0;
   pointer-events: none;
+  z-index: 6;
 }
 
 .drawer-resizer::before {
@@ -2255,9 +2268,9 @@ label {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
+  left: -4px;
+  width: 8px;
+  transform: none;
   background: transparent;
 }
 
@@ -3681,7 +3694,7 @@ input.range-input-invalid[type='number'] {
 
 .traits-editor-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) 92px;
   gap: 10px;
   margin-bottom: 4px;
   padding: 0 8px;
@@ -3702,7 +3715,7 @@ input.range-input-invalid[type='number'] {
 
 .traits-editor-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) 92px;
   align-items: center;
   gap: 10px;
   border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
@@ -3737,7 +3750,7 @@ input.range-input-invalid[type='number'] {
 }
 
 .traits-editor-row select {
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
 }
 

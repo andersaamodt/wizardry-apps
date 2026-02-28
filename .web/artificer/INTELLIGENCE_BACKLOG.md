@@ -38,12 +38,16 @@ This backlog tracks concrete implementation work for improving Artificer intelli
   - Acceptance:
     - Add deterministic prompt fixtures for each decision type and near-miss variants.
     - Add regression tests ensuring category-specific routing remains stable.
+  - Progress:
+    - Added a fixture-driven live decision-surfacing test pack for deterministic category/signal validation.
 
 - INT-006 Conversation flow latency and completion signaling
   - Goal: Remove dead-air gaps between run completion markers and assistant text rendering.
   - Acceptance:
     - UI always shows a live status until final assistant content is committed.
     - No visible completion state before content is actually available.
+  - Progress:
+    - Added assistant-delivery watch logic so finalizing feedback remains visible until assistant content lands (or fallback is inserted).
 
 - INT-007 Thread/workspace ordering ergonomics
   - Goal: Improve recency-based thread placement and drag-reorder fluidity.

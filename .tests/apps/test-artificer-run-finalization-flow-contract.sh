@@ -19,11 +19,15 @@ assert_contains() {
 # - run narrative keeps a short grace-period finalizing hint even if pending flags race
 # - structured fallback is deferred until after conversation reload check
 assert_contains "$app" "function conversationHasAssistantAfterAnchor(workspaceId, conversationId, messageAnchor)"
+assert_contains "$app" "function startAssistantDeliveryWatch(workspaceId, conversationId, messageAnchor, runEventId, fallbackAttemptHint)"
+assert_contains "$app" "stopAssistantDeliveryWatchesForConversation(workspaceId, conversationId);"
 assert_contains "$app" "recentlyFinishedWithoutAssistant = (Date.now() - finishedAtMs) <= 90000;"
 assert_contains "$app" "(pendingAssistantDelivery || recentlyFinishedWithoutAssistant) && !hasAssistantAfterAnchor"
 assert_contains "$app" "!assistantText &&"
 assert_contains "$app" "!conversationHasAssistantAfterAnchor(workspaceId, conversationId, runAnchor)"
 assert_contains "$app" "assistantText = structuredRunFallbackMessage(fallbackAttemptCount);"
+assert_contains "$app" "needsAssistantDeliveryWatch = ("
+assert_contains "$app" "startAssistantDeliveryWatch("
 assert_contains "$app" "if (assistantText) {"
 assert_contains "$app" "appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);"
 assert_contains "$style" ".run-thinking {"

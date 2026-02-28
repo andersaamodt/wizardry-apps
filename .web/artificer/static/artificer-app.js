@@ -2803,6 +2803,27 @@
     return stopAssistantDeliveryWatchByKey(watchKey, options || {});
   }
 
+  function stopAssistantDeliveryWatchesForConversation(workspaceId, conversationId, options) {
+    var wsId = String(workspaceId || "");
+    var convId = String(conversationId || "");
+    if (!wsId || !convId) {
+      return 0;
+    }
+    var prefix = wsId + "::" + convId + "::";
+    var keys = Object.keys(assistantDeliveryWatchByKey || {});
+    var stopped = 0;
+    for (var i = 0; i < keys.length; i += 1) {
+      var key = String(keys[i] || "");
+      if (!key || key.indexOf(prefix) !== 0) {
+        continue;
+      }
+      if (stopAssistantDeliveryWatchByKey(key, options || {})) {
+        stopped += 1;
+      }
+    }
+    return stopped;
+  }
+
   function findRunEventByIdForConversation(conversationId, eventId) {
     var convId = String(conversationId || "");
     var id = String(eventId || "");
@@ -13252,6 +13273,7 @@
     if (!promptForRun) {
       return Promise.reject(new Error("Prompt is empty."));
     }
+    stopAssistantDeliveryWatchesForConversation(workspaceId, conversationId);
     markAssistantDeliveryPending(workspaceId, conversationId);
 
     for (var i = 0; i < attachmentList.length; i += 1) {
@@ -13503,8 +13525,14 @@
             fallbackAttemptCount = runTraceAttemptCount(pendingEvent);
           }
         }
+        assistantDeliveryFallbackAttempts = fallbackAttemptCount;
         if (assistantText) {
           appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
+          if (conversationHasAssistantAfterAnchor(workspaceId, conversationId, runAnchor)) {
+            if (clearAssistantDeliveryPending(workspaceId, conversationId)) {
+              assistantDeliveryCleared = true;
+            }
+          }
         }
 
         var blockedCommands = Array.isArray(response.blocked_commands) ? response.blocked_commands : [];
@@ -13597,6 +13625,7 @@
             ) {
               assistantText = structuredRunFallbackMessage(fallbackAttemptCount);
               appendAssistantMessageOptimistic(workspaceId, conversationId, assistantText);
+              assistantDeliveryFallbackAttempts = fallbackAttemptCount;
             }
             return null;
           })
@@ -13644,7 +13673,28 @@
       })
       .finally(function () {
         stopStreamPoll();
+        var currentStatus = pendingEvent ? String(pendingEvent.status || "") : "";
+        var needsAssistantDeliveryWatch = (
+          currentStatus === "done" &&
+          !conversationHasAssistantAfterAnchor(workspaceId, conversationId, runAnchor)
+        );
+        if (assistantDeliveryCleared) {
+          renderUi();
+          return;
+        }
+        if (needsAssistantDeliveryWatch) {
+          startAssistantDeliveryWatch(
+            workspaceId,
+            conversationId,
+            runAnchor,
+            pendingEvent && pendingEvent.id ? String(pendingEvent.id) : "",
+            assistantDeliveryFallbackAttempts
+          );
+          renderUi();
+          return;
+        }
         if (clearAssistantDeliveryPending(workspaceId, conversationId)) {
+          assistantDeliveryCleared = true;
           renderUi();
         }
       });
