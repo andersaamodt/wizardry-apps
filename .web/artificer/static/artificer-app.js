@@ -7735,16 +7735,16 @@
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.016, (0.082 + (effectiveFloor * 1.4)));
+    var normalized = (raw - gate) / Math.max(0.026, (0.06 + (effectiveFloor * 1.1)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 1.08);
+      normalized = Math.pow(normalized, 0.9);
     }
-    if (normalized < 0.0022) {
+    if (normalized < 0.0015) {
       normalized = 0;
     }
     return normalized;

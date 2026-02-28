@@ -3684,11 +3684,11 @@ input.range-input-invalid[type='number'] {
   grid-template-columns: minmax(0, 1fr) max-content;
   gap: 10px;
   margin-bottom: 4px;
-  padding: 0 2px;
+  padding: 0 8px;
   color: color-mix(in srgb, var(--text-subtle) 88%, var(--text) 12%);
   font-size: 0.64rem;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .traits-editor-head > span {

@@ -6209,22 +6209,22 @@ dictation_live_level_for_session() {
     return 0
   fi
 
-  # Prefer Overall peak/RMS telemetry for stable level extraction.
+  # Prefer per-frame (non-Overall) telemetry so bars vary each step.
   # Newer ffmpeg astats emits `RMS_peak` instead of `RMS_level`.
   # Some ffmpeg builds include NUL bytes in ametadata output; strip binary bytes first.
   recent_levels=$(tail -n 320 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
-  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' | tail -n 1 || true)
+  level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' | tail -n 1 || true)
   if [ -z "$level_line" ]; then
-    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' | tail -n 1 || true)
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | grep -aE -iv 'Overall\.(RMS_level|RMS_peak)' | tail -n 1 || true)
+  fi
+  if [ -z "$level_line" ]; then
+    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' | tail -n 1 || true)
   fi
   if [ -z "$level_line" ]; then
     level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_level' | tail -n 1 || true)
   fi
   if [ -z "$level_line" ]; then
     level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_peak' | tail -n 1 || true)
-  fi
-  if [ -z "$level_line" ]; then
-    level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | tail -n 1 || true)
   fi
   if [ -z "$level_line" ]; then
     level_line=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_(level|count)' | tail -n 1 || true)
@@ -6241,11 +6241,10 @@ dictation_live_level_for_session() {
   awk -v db="$level_db" '
     BEGIN {
       v = db + 0.0
-      if (v < -74) v = -74
-      if (v > -18) v = -18
-      level = (v + 74) / 56
-      # Keep ambient room noise near baseline while lifting normal speech variance.
-      level = level * level
+      if (v < -80) v = -80
+      if (v > -6) v = -6
+      # Convert dBFS to linear amplitude; frontend handles adaptive gating.
+      level = 10 ^ (v / 20.0)
       if (level < 0) level = 0
       if (level > 1) level = 1
       printf "%.5f", level
@@ -6260,17 +6259,17 @@ dictation_live_levels_json_for_session() {
     return 0
   fi
 
-  # Emit recent levels for fine-grained UI bar updates.
+  # Emit recent per-frame levels for fine-grained UI bar updates.
   recent_levels=$(tail -n 960 "$levels_file" 2>/dev/null | tr -d '\000\r' || true)
-  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' || true)
+  rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' | grep -aE -iv 'Overall\.Peak_level' || true)
   if [ -z "$rms_lines" ]; then
-    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Peak_level' || true)
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' | grep -aE -iv 'Overall\.(RMS_level|RMS_peak)' || true)
+  fi
+  if [ -z "$rms_lines" ]; then
+    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.Peak_level' || true)
   fi
   if [ -z "$rms_lines" ]; then
     rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_level' || true)
-  fi
-  if [ -z "$rms_lines" ]; then
-    rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'RMS_(level|peak)' || true)
   fi
   if [ -z "$rms_lines" ]; then
     rms_lines=$(printf '%s\n' "$recent_levels" | grep -aE -i 'Overall\.RMS_peak' || true)
@@ -6302,10 +6301,9 @@ dictation_live_levels_json_for_session() {
         next
       }
       v = raw + 0.0
-      if (v < -74) v = -74
-      if (v > -18) v = -18
-      level = (v + 74) / 56
-      level = level * level
+      if (v < -80) v = -80
+      if (v > -6) v = -6
+      level = 10 ^ (v / 20.0)
       if (level < 0) level = 0
       if (level > 1) level = 1
       if (!first) {

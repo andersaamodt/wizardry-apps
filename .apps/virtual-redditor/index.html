@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Redditor</title>
-  <link rel="stylesheet" href="style.css?v=vr20260228f">
+  <link rel="stylesheet" href="style.css?v=vr20260228g">
   <link id="vr-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=vr20260221a">
 </head>
 <body class="is-booting">
@@ -5895,7 +5895,7 @@
           '    <input type="checkbox" data-trait-enabled="' + escapeHtml(meta.id) + '"' + (row.enabled ? ' checked' : '') + '>',
           '    <span>' + escapeHtml(meta.label) + '</span>',
           '  </label>',
-          '  <select data-trait-expression="' + escapeHtml(meta.id) + '" title="' + escapeHtml(traitExpressionTooltip(expression)) + '">',
+          '  <select data-trait-expression="' + escapeHtml(meta.id) + '" title="' + escapeHtml(traitExpressionTooltip(expression)) + '"' + (row.enabled ? '' : ' disabled') + '>',
           '    <option value="style"' + (expression === 'style' ? ' selected' : '') + '>Style</option>',
           '    <option value="summons"' + (expression === 'summons' ? ' selected' : '') + '>Summons</option>',
           '    <option value="both"' + (expression === 'both' ? ' selected' : '') + '>Both</option>',
@@ -7669,6 +7669,7 @@
         var row = document.querySelector('#traits-editor-list [data-trait-row="' + traitId + '"]');
         var expressionEl = row ? row.querySelector('[data-trait-expression]') : null;
         if (expressionEl) {
+          if (enabledToggle) expressionEl.disabled = !enabledToggle.checked;
           expressionEl.title = traitExpressionTooltip(expressionEl.value);
         }
         var liveCfg = collectModesConfigFromUi();
