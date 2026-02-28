@@ -727,6 +727,29 @@ body.is-resizing [contenteditable='true'] {
   max-height: unset;
 }
 
+#panel-persona .persona-main-pane,
+#panel-persona .mode-detail-drawer {
+  scrollbar-color: color-mix(in srgb, var(--line-strong) 68%, var(--accent) 32%) transparent;
+}
+
+#panel-persona .persona-main-pane::-webkit-scrollbar,
+#panel-persona .mode-detail-drawer::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+#panel-persona .persona-main-pane::-webkit-scrollbar-track,
+#panel-persona .mode-detail-drawer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#panel-persona .persona-main-pane::-webkit-scrollbar-thumb,
+#panel-persona .mode-detail-drawer::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--line-strong) 68%, var(--accent) 32%);
+  border-radius: 999px;
+  border: 0;
+}
+
 .profiles-empty {
   font-size: 0.8rem;
   color: var(--text-subtle);
