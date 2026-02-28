@@ -701,6 +701,7 @@
   var dictationInstallPollSession = 0;
   var dictationShortcutPrefsRevision = 0;
   var dictationShortcutPrefsLoadSeq = 0;
+  var assistantDeliveryWatchByKey = {};
   var modelAutoRefreshTimer = null;
   var modelAutoRefreshBusy = false;
   var modelAutoRefreshLastAt = 0;
@@ -2763,6 +2764,169 @@
       }
     }
     return false;
+  }
+
+  function assistantDeliveryWatchKeyForRun(workspaceId, conversationId, messageAnchor, runEventId) {
+    var wsId = String(workspaceId || "");
+    var convId = String(conversationId || "");
+    if (!wsId || !convId) {
+      return "";
+    }
+    var anchor = Number(messageAnchor);
+    if (!isFinite(anchor) || anchor < 0) {
+      anchor = 0;
+    } else {
+      anchor = Math.floor(anchor);
+    }
+    var eventId = trim(String(runEventId || ""));
+    return wsId + "::" + convId + "::" + String(anchor) + "::" + eventId;
+  }
+
+  function stopAssistantDeliveryWatchByKey(watchKey, options) {
+    var key = String(watchKey || "");
+    if (!key) {
+      return false;
+    }
+    var watch = assistantDeliveryWatchByKey[key];
+    if (!watch || typeof watch.stop !== "function") {
+      return false;
+    }
+    watch.stop(options || {});
+    return true;
+  }
+
+  function stopAssistantDeliveryWatch(workspaceId, conversationId, messageAnchor, runEventId, options) {
+    var watchKey = assistantDeliveryWatchKeyForRun(workspaceId, conversationId, messageAnchor, runEventId);
+    if (!watchKey) {
+      return false;
+    }
+    return stopAssistantDeliveryWatchByKey(watchKey, options || {});
+  }
+
+  function findRunEventByIdForConversation(conversationId, eventId) {
+    var convId = String(conversationId || "");
+    var id = String(eventId || "");
+    if (!convId || !id) {
+      return null;
+    }
+    var events = runEventsForConversation(convId);
+    if (!Array.isArray(events) || !events.length) {
+      return null;
+    }
+    for (var i = events.length - 1; i >= 0; i -= 1) {
+      var event = events[i] || {};
+      if (String(event.id || "") === id) {
+        return event;
+      }
+    }
+    return null;
+  }
+
+  function startAssistantDeliveryWatch(workspaceId, conversationId, messageAnchor, runEventId, fallbackAttemptHint) {
+    var wsId = String(workspaceId || "");
+    var convId = String(conversationId || "");
+    if (!wsId || !convId) {
+      return "";
+    }
+    var anchor = Number(messageAnchor);
+    if (!isFinite(anchor) || anchor < 0) {
+      anchor = 0;
+    } else {
+      anchor = Math.floor(anchor);
+    }
+    var eventId = trim(String(runEventId || ""));
+    var watchKey = assistantDeliveryWatchKeyForRun(wsId, convId, anchor, eventId);
+    if (!watchKey) {
+      return "";
+    }
+
+    stopAssistantDeliveryWatchByKey(watchKey, { clearPending: false });
+
+    var active = true;
+    var pollBusy = false;
+    var pollTimer = null;
+    var deadlineMs = Date.now() + 90000;
+
+    function finish(options) {
+      if (!active) {
+        return;
+      }
+      active = false;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      delete assistantDeliveryWatchByKey[watchKey];
+      var opts = options && typeof options === "object" ? options : {};
+      if (opts.clearPending === false) {
+        return;
+      }
+      if (clearAssistantDeliveryPending(wsId, convId)) {
+        renderUi();
+      }
+    }
+
+    function ensureFallbackMessage() {
+      if (conversationHasAssistantAfterAnchor(wsId, convId, anchor)) {
+        return false;
+      }
+      var attempts = Number(fallbackAttemptHint || 0);
+      if (!isFinite(attempts) || attempts < 0) {
+        attempts = 0;
+      }
+      var matchedEvent = findRunEventByIdForConversation(convId, eventId);
+      if (!matchedEvent) {
+        matchedEvent = findLatestRunEventByStatus(convId, ["done", "running", "awaiting_decision", "awaiting_approval", "error"]);
+      }
+      if (matchedEvent) {
+        var eventAttempts = runTraceAttemptCount(matchedEvent);
+        if (eventAttempts > attempts) {
+          attempts = eventAttempts;
+        }
+      }
+      return appendAssistantMessageOptimistic(wsId, convId, structuredRunFallbackMessage(attempts));
+    }
+
+    function tick() {
+      if (!active) {
+        return;
+      }
+      if (conversationHasAssistantAfterAnchor(wsId, convId, anchor)) {
+        finish();
+        return;
+      }
+      if (Date.now() >= deadlineMs) {
+        ensureFallbackMessage();
+        finish();
+        return;
+      }
+      if (pollBusy) {
+        return;
+      }
+      pollBusy = true;
+      loadConversation({
+        workspaceId: wsId,
+        conversationId: convId,
+        timeoutMs: 15000,
+        markSeen: false
+      })
+        .catch(function () {
+          return null;
+        })
+        .finally(function () {
+          pollBusy = false;
+          if (active && conversationHasAssistantAfterAnchor(wsId, convId, anchor)) {
+            finish();
+          }
+        });
+    }
+
+    assistantDeliveryWatchByKey[watchKey] = {
+      stop: finish
+    };
+    pollTimer = setInterval(tick, 3000);
+    setTimeout(tick, 250);
+    return watchKey;
   }
 
   function updateAwaitingApprovalFromQueueSnapshot(workspaceId, conversationId, snapshot) {
@@ -13079,6 +13243,8 @@
     var attachmentList = Array.isArray(runOptions.attachments) ? runOptions.attachments : [];
     var attachmentIds = [];
     var attachmentNames = [];
+    var assistantDeliveryCleared = false;
+    var assistantDeliveryFallbackAttempts = 0;
 
     if (!workspaceId || !conversationId) {
       return Promise.reject(new Error("Choose a project thread first."));
