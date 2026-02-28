@@ -17,6 +17,7 @@
 </button>
 </form>
 <div class="nav-compose-tools" id="nav-compose-tools" style="display:none;">
+<div class="nav-compose-row">
 <a href="/pages/admin.html#compose" class="nav-compose nav-compose-icon" aria-label="Compose post" title="Compose post">
 <!-- Default icon is replaced by nav-auth.js icon cycler -->
 <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -24,6 +25,8 @@
 </svg>
 </a>
 <button id="compose-icon-cycle-btn" class="nav-compose-cycle" type="button" aria-label="Cycle compose icon" title="Cycle compose icon">↺</button>
+</div>
+<span id="compose-icon-name" class="nav-compose-name" aria-live="polite"></span>
 </div>
 <span id="nav-user-name" class="nav-username" style="display:none;"></span>
 <div class="nav-user-menu" id="nav-user-menu" style="display:none;">
