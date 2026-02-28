@@ -172,6 +172,58 @@ assert_preview_case_with_signals \
   "git status --short"
 
 assert_preview_case_with_signals \
+  "signals-required-security-scope-missing" \
+  "required-input-missing" \
+  "true" \
+  "0" \
+  "1" \
+  "0" \
+  "0" \
+  "Run a security incident response drill for breach response and continue autonomously." \
+  "Which environment and service should I scope first?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-none-security-scope-near-miss" \
+  "none" \
+  "false" \
+  "0" \
+  "1" \
+  "0" \
+  "0" \
+  "Run a security incident response drill for breach response and continue autonomously." \
+  "Need anything else?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-required-performance-baseline-missing" \
+  "required-input-missing" \
+  "true" \
+  "0" \
+  "1" \
+  "0" \
+  "0" \
+  "Run a load test and resolve this perf regression." \
+  "Which latency target and baseline should I optimize for?" \
+  "programming" \
+  "git status --short"
+
+assert_preview_case_with_signals \
+  "signals-external-git-push-gate" \
+  "external-action-gate" \
+  "true" \
+  "0" \
+  "0" \
+  "1" \
+  "1" \
+  "Prepare release notes and execute release actions." \
+  "Proceed with external actions now?" \
+  "assistant" \
+  "git push origin main"
+
+assert_preview_case_with_signals \
   "signals-precedence-required-over-risk" \
   "required-input-missing" \
   "true" \

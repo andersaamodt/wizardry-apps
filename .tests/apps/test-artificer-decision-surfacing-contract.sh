@@ -28,6 +28,11 @@ assert_contains "$api" "\"explicit-choice\""
 assert_contains "$api" "\"required-input-missing\""
 assert_contains "$api" "\"external-action-gate\""
 assert_contains "$api" "\"risk-acknowledgement\""
+assert_contains "$api" "incident response|security incident|breach response|forensics|containment|compromise"
+assert_contains "$api" "performance test|load test|benchmark|perf regression|latency optimization"
+assert_contains "$api" "git[[:space:]]+push"
+assert_contains "$api" "kubectl[[:space:]]+(apply|delete|patch|rollout|scale)"
+assert_contains "$api" "latency|throughput|slo|sla|target|baseline"
 
 # Contract coverage: loop integrates category-aware handling and fallback surfacing.
 assert_contains "$api" "decision_surface_category=\"none\""
