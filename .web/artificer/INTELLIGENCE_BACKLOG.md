@@ -18,6 +18,8 @@ This backlog tracks concrete implementation work for improving Artificer intelli
   - Acceptance:
     - Settings show totals, top categories, and recent failures.
     - Data updates after new failures without app restart.
+  - Progress:
+    - Added settings-side taxonomy query controls (category/severity/surface/mode/since/limit) backed by `failure_taxonomy_query` for targeted pattern inspection.
 
 - INT-003 Contained self-improvement proposals
   - Goal: Generate improvement proposals from recurring failure categories.

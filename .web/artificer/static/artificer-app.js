@@ -651,6 +651,22 @@
         items: []
       }
     },
+    modeRuntimeTaxonomyQuery: {
+      hasQueried: false,
+      loading: false,
+      error: "",
+      filters: {
+        category: "",
+        severity: "",
+        surface: "",
+        mode: "",
+        since_epoch: "0",
+        limit: "12"
+      },
+      matched_total: "0",
+      returned: "0",
+      events: []
+    },
     triage: {
       count: "0",
       cards: []
@@ -16515,6 +16531,148 @@
       });
   }
 
+  function defaultModeRuntimeTaxonomyQueryFilters() {
+    return {
+      category: "",
+      severity: "",
+      surface: "",
+      mode: "",
+      since_epoch: "0",
+      limit: "12"
+    };
+  }
+
+  function normalizeModeRuntimeTaxonomyQueryFilters(rawFilters) {
+    var source = rawFilters && typeof rawFilters === "object" ? rawFilters : {};
+    var normalized = defaultModeRuntimeTaxonomyQueryFilters();
+    normalized.category = trim(String(source.category || "")).toLowerCase();
+    normalized.surface = trim(String(source.surface || "")).toLowerCase();
+    normalized.mode = trim(String(source.mode || "")).toLowerCase();
+    normalized.severity = trim(String(source.severity || "")).toLowerCase();
+    if (
+      normalized.severity !== "" &&
+      normalized.severity !== "all" &&
+      normalized.severity !== "low" &&
+      normalized.severity !== "medium" &&
+      normalized.severity !== "high"
+    ) {
+      normalized.severity = "";
+    }
+    if (normalized.category === "all") {
+      normalized.category = "";
+    }
+    if (normalized.surface === "all") {
+      normalized.surface = "";
+    }
+    if (normalized.mode === "all") {
+      normalized.mode = "";
+    }
+    if (normalized.severity === "all") {
+      normalized.severity = "";
+    }
+    var sinceEpoch = Number(source.since_epoch || source.sinceEpoch || 0);
+    if (!isFinite(sinceEpoch) || sinceEpoch < 0) {
+      sinceEpoch = 0;
+    }
+    normalized.since_epoch = String(Math.floor(sinceEpoch));
+    var limitValue = Number(source.limit || 12);
+    if (!isFinite(limitValue) || limitValue <= 0) {
+      limitValue = 12;
+    }
+    limitValue = Math.floor(limitValue);
+    if (limitValue > 250) {
+      limitValue = 250;
+    }
+    normalized.limit = String(limitValue);
+    return normalized;
+  }
+
+  function modeRuntimeTaxonomyFiltersFromDom() {
+    var container = el.modeRuntimeFailureTaxonomy;
+    if (!container) {
+      return normalizeModeRuntimeTaxonomyQueryFilters(state.modeRuntimeTaxonomyQuery && state.modeRuntimeTaxonomyQuery.filters);
+    }
+    var categoryInput = container.querySelector("[data-role='mode-runtime-taxonomy-category']");
+    var severitySelect = container.querySelector("[data-role='mode-runtime-taxonomy-severity']");
+    var surfaceInput = container.querySelector("[data-role='mode-runtime-taxonomy-surface']");
+    var modeInput = container.querySelector("[data-role='mode-runtime-taxonomy-mode']");
+    var sinceInput = container.querySelector("[data-role='mode-runtime-taxonomy-since-epoch']");
+    var limitSelect = container.querySelector("[data-role='mode-runtime-taxonomy-limit']");
+    return normalizeModeRuntimeTaxonomyQueryFilters({
+      category: categoryInput ? categoryInput.value : "",
+      severity: severitySelect ? severitySelect.value : "",
+      surface: surfaceInput ? surfaceInput.value : "",
+      mode: modeInput ? modeInput.value : "",
+      since_epoch: sinceInput ? sinceInput.value : "",
+      limit: limitSelect ? limitSelect.value : ""
+    });
+  }
+
+  function normalizeFailureTaxonomyQueryEvents(rawEvents) {
+    var list = Array.isArray(rawEvents) ? rawEvents : [];
+    var events = [];
+    for (var i = 0; i < list.length; i += 1) {
+      var row = list[i];
+      if (!row || typeof row !== "object") {
+        continue;
+      }
+      var timestamp = trim(String(row.timestamp || ""));
+      var categoryId = trim(String(row.category || ""));
+      var actionText = trim(String(row.action || ""));
+      var errorText = trim(String(row.error || ""));
+      if (!timestamp && !categoryId && !actionText && !errorText) {
+        continue;
+      }
+      events.push({
+        timestamp: timestamp,
+        category: categoryId,
+        category_label: trim(String(row.category_label || categoryId)),
+        surface: trim(String(row.surface || "")),
+        severity: trim(String(row.severity || "")),
+        mode: trim(String(row.mode || "")),
+        action: actionText,
+        error: errorText,
+        hypothesis: trim(String(row.hypothesis || "")),
+        next_attempt: trim(String(row.next_attempt || ""))
+      });
+    }
+    return events;
+  }
+
+  function modeRuntimeQueryFailureTaxonomy(filterOverrides) {
+    var baseFilters = state.modeRuntimeTaxonomyQuery && state.modeRuntimeTaxonomyQuery.filters
+      ? state.modeRuntimeTaxonomyQuery.filters
+      : defaultModeRuntimeTaxonomyQueryFilters();
+    var mergedFilters = Object.assign({}, baseFilters, filterOverrides && typeof filterOverrides === "object" ? filterOverrides : {});
+    var normalizedFilters = normalizeModeRuntimeTaxonomyQueryFilters(mergedFilters);
+    state.modeRuntimeTaxonomyQuery.filters = normalizedFilters;
+    state.modeRuntimeTaxonomyQuery.loading = true;
+    state.modeRuntimeTaxonomyQuery.error = "";
+    renderModeRuntimeSettings();
+    return apiGet("failure_taxonomy_query", normalizedFilters).then(function (response) {
+      if (!response || !response.success) {
+        throw new Error((response && response.error) || "Could not query failure taxonomy");
+      }
+      var payload = response.failure_taxonomy_query && typeof response.failure_taxonomy_query === "object"
+        ? response.failure_taxonomy_query
+        : {};
+      var payloadFilters = normalizeModeRuntimeTaxonomyQueryFilters(payload.filters || normalizedFilters);
+      state.modeRuntimeTaxonomyQuery.hasQueried = true;
+      state.modeRuntimeTaxonomyQuery.filters = payloadFilters;
+      state.modeRuntimeTaxonomyQuery.matched_total = trim(String(payload.matched_total || "0"));
+      state.modeRuntimeTaxonomyQuery.returned = trim(String(payload.returned || "0"));
+      state.modeRuntimeTaxonomyQuery.events = normalizeFailureTaxonomyQueryEvents(payload.events);
+      state.modeRuntimeTaxonomyQuery.error = "";
+      return response;
+    }).catch(function (error) {
+      state.modeRuntimeTaxonomyQuery.error = error && error.message ? error.message : "Could not query failure taxonomy";
+      throw error;
+    }).finally(function () {
+      state.modeRuntimeTaxonomyQuery.loading = false;
+      renderModeRuntimeSettings();
+    });
+  }
+
   function setModeRuntimeSkillResult(text, isError) {
     if (!el.modeRuntimeSkillResult) {
       return;
@@ -16867,6 +17025,26 @@
       var taxonomy = runtime.failure_taxonomy && typeof runtime.failure_taxonomy === "object" ? runtime.failure_taxonomy : {};
       var taxonomyCategories = Array.isArray(taxonomy.categories) ? taxonomy.categories : [];
       var taxonomyRecent = Array.isArray(taxonomy.recent) ? taxonomy.recent : [];
+      var taxonomyQueryState = state.modeRuntimeTaxonomyQuery && typeof state.modeRuntimeTaxonomyQuery === "object"
+        ? state.modeRuntimeTaxonomyQuery
+        : {};
+      var taxonomyQueryFilters = normalizeModeRuntimeTaxonomyQueryFilters(taxonomyQueryState.filters || defaultModeRuntimeTaxonomyQueryFilters());
+      var taxonomyQueryEvents = Array.isArray(taxonomyQueryState.events) ? taxonomyQueryState.events : [];
+      var taxonomyQueryHasQueried = taxonomyQueryState.hasQueried === true;
+      var taxonomyQueryLoading = taxonomyQueryState.loading === true;
+      var taxonomyQueryError = trim(String(taxonomyQueryState.error || ""));
+      var taxonomyQueryMatched = trim(String(taxonomyQueryState.matched_total || "0"));
+      var taxonomyQueryReturned = trim(String(taxonomyQueryState.returned || "0"));
+      var taxonomyQueryDisplayEvents = taxonomyQueryHasQueried ? taxonomyQueryEvents : taxonomyRecent;
+      var taxonomySurfaceMap = {};
+      for (var ts = 0; ts < taxonomyCategories.length; ts += 1) {
+        var surfaceValue = trim(String((taxonomyCategories[ts] && taxonomyCategories[ts].surface) || "")).toLowerCase();
+        if (!surfaceValue) {
+          continue;
+        }
+        taxonomySurfaceMap[surfaceValue] = true;
+      }
+      var taxonomySurfaceOptions = Object.keys(taxonomySurfaceMap).sort();
       var taxonomyHtml = "";
       taxonomyHtml += "<section class='mode-runtime-group'>";
       taxonomyHtml += "<div class='mode-runtime-group-head'><p class='command-rules-group-title'>Failure taxonomy</p></div>";
@@ -16891,10 +17069,53 @@
         }
         taxonomyHtml += "</div>";
       }
-      if (taxonomyRecent.length) {
-        taxonomyHtml += "<details class='mode-runtime-taxonomy-recent'><summary>Recent failure events</summary><div class='mode-runtime-directive-list'>";
-        for (var tr = 0; tr < taxonomyRecent.length && tr < 6; tr += 1) {
-          var recentEvent = taxonomyRecent[tr] || {};
+      taxonomyHtml += "<div class='mode-runtime-taxonomy-query-controls'>";
+      taxonomyHtml += "<p class='settings-hint'><strong>Query taxonomy</strong> for targeted failure patterns.</p>";
+      taxonomyHtml += "<div class='mode-runtime-taxonomy-query-grid'>";
+      taxonomyHtml += "<input data-role='mode-runtime-taxonomy-category' placeholder='category id (optional)' value='" + escAttr(String(taxonomyQueryFilters.category || "")) + "' />";
+      taxonomyHtml += "<select data-role='mode-runtime-taxonomy-severity'>";
+      taxonomyHtml += "<option value='' " + (taxonomyQueryFilters.severity ? "" : "selected") + ">all severities</option>";
+      taxonomyHtml += "<option value='low' " + (taxonomyQueryFilters.severity === "low" ? "selected" : "") + ">low</option>";
+      taxonomyHtml += "<option value='medium' " + (taxonomyQueryFilters.severity === "medium" ? "selected" : "") + ">medium</option>";
+      taxonomyHtml += "<option value='high' " + (taxonomyQueryFilters.severity === "high" ? "selected" : "") + ">high</option>";
+      taxonomyHtml += "</select>";
+      taxonomyHtml += "<select data-role='mode-runtime-taxonomy-surface'>";
+      taxonomyHtml += "<option value='' " + (taxonomyQueryFilters.surface ? "" : "selected") + ">all surfaces</option>";
+      for (var tso = 0; tso < taxonomySurfaceOptions.length; tso += 1) {
+        var surfaceOption = String(taxonomySurfaceOptions[tso] || "");
+        if (!surfaceOption) {
+          continue;
+        }
+        taxonomyHtml += "<option value='" + escAttr(surfaceOption) + "' " + (taxonomyQueryFilters.surface === surfaceOption ? "selected" : "") + ">" + escHtml(surfaceOption) + "</option>";
+      }
+      taxonomyHtml += "</select>";
+      taxonomyHtml += "<input data-role='mode-runtime-taxonomy-mode' placeholder='mode id (optional)' value='" + escAttr(String(taxonomyQueryFilters.mode || "")) + "' />";
+      taxonomyHtml += "<input data-role='mode-runtime-taxonomy-since-epoch' inputmode='numeric' placeholder='since epoch' value='" + escAttr(String(taxonomyQueryFilters.since_epoch || "0")) + "' />";
+      taxonomyHtml += "<select data-role='mode-runtime-taxonomy-limit'>";
+      taxonomyHtml += "<option value='12' " + (taxonomyQueryFilters.limit === "12" ? "selected" : "") + ">12 rows</option>";
+      taxonomyHtml += "<option value='25' " + (taxonomyQueryFilters.limit === "25" ? "selected" : "") + ">25 rows</option>";
+      taxonomyHtml += "<option value='50' " + (taxonomyQueryFilters.limit === "50" ? "selected" : "") + ">50 rows</option>";
+      taxonomyHtml += "<option value='100' " + (taxonomyQueryFilters.limit === "100" ? "selected" : "") + ">100 rows</option>";
+      taxonomyHtml += "</select>";
+      taxonomyHtml += "<div class='mode-runtime-actions'>";
+      taxonomyHtml += "<button type='button' data-action='mode-runtime-taxonomy-query'>Run query</button>";
+      taxonomyHtml += "<button type='button' class='ghost' data-action='mode-runtime-taxonomy-query-reset'>Reset</button>";
+      taxonomyHtml += "</div>";
+      taxonomyHtml += "</div>";
+      taxonomyHtml += "</div>";
+      if (taxonomyQueryLoading) {
+        taxonomyHtml += "<p class='settings-hint'>Querying failure taxonomy...</p>";
+      }
+      if (taxonomyQueryError) {
+        taxonomyHtml += "<p class='settings-hint mode-runtime-query-error'>" + escHtml(taxonomyQueryError) + "</p>";
+      }
+      if (taxonomyQueryHasQueried && !taxonomyQueryLoading) {
+        taxonomyHtml += "<p class='settings-hint'>Filtered result: matched " + escHtml(taxonomyQueryMatched || "0") + ", returned " + escHtml(taxonomyQueryReturned || "0") + ".</p>";
+      }
+      if (taxonomyQueryDisplayEvents.length) {
+        taxonomyHtml += "<details class='mode-runtime-taxonomy-recent'><summary>" + (taxonomyQueryHasQueried ? "Filtered failure events" : "Recent failure events") + "</summary><div class='mode-runtime-directive-list'>";
+        for (var tr = 0; tr < taxonomyQueryDisplayEvents.length && tr < 12; tr += 1) {
+          var recentEvent = taxonomyQueryDisplayEvents[tr] || {};
           var recentPrefix = trim(String(recentEvent.category_label || recentEvent.category || "failure"));
           taxonomyHtml += "<p class='settings-hint mode-runtime-directive-item'><strong>" + escHtml(recentPrefix) + "</strong>: " + escHtml(String(recentEvent.error || recentEvent.action || "event"));
           if (recentEvent.timestamp) {
@@ -20583,6 +20804,33 @@
         var modeInjectionAllow = modeInjectionBtn.getAttribute("data-allow") === "1";
         runWithControlPending(modeInjectionBtn, function () {
           return modeRuntimeUpdate(modeInjectionId, { allow_queue_injection: modeInjectionAllow });
+        }, { spinner: false }).catch(showError);
+        return;
+      }
+      var taxonomyQueryBtn = event.target && event.target.closest
+        ? event.target.closest("button[data-action='mode-runtime-taxonomy-query']")
+        : null;
+      if (taxonomyQueryBtn) {
+        var taxonomyFilters = modeRuntimeTaxonomyFiltersFromDom();
+        runWithControlPending(taxonomyQueryBtn, function () {
+          return modeRuntimeQueryFailureTaxonomy(taxonomyFilters).then(function () {
+            var shownCount = Number(state.modeRuntimeTaxonomyQuery.returned || 0);
+            if (!isFinite(shownCount) || shownCount < 0) {
+              shownCount = 0;
+            }
+            showTransientNotice("Failure query returned " + String(shownCount) + " event" + (shownCount === 1 ? "" : "s"));
+          });
+        }, { spinner: false }).catch(showError);
+        return;
+      }
+      var taxonomyQueryResetBtn = event.target && event.target.closest
+        ? event.target.closest("button[data-action='mode-runtime-taxonomy-query-reset']")
+        : null;
+      if (taxonomyQueryResetBtn) {
+        runWithControlPending(taxonomyQueryResetBtn, function () {
+          return modeRuntimeQueryFailureTaxonomy(defaultModeRuntimeTaxonomyQueryFilters()).then(function () {
+            showTransientNotice("Failure query filters reset");
+          });
         }, { spinner: false }).catch(showError);
         return;
       }

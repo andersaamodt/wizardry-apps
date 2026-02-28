@@ -5557,6 +5557,36 @@ select:focus {
   padding-top: 8px;
 }
 
+.mode-runtime-taxonomy-query-controls {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  display: grid;
+  gap: 7px;
+}
+
+.mode-runtime-taxonomy-query-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.mode-runtime-taxonomy-query-grid input,
+.mode-runtime-taxonomy-query-grid select {
+  width: auto;
+  min-width: 120px;
+  max-width: 220px;
+}
+
+.mode-runtime-taxonomy-query-grid input[data-role='mode-runtime-taxonomy-since-epoch'] {
+  min-width: 110px;
+  max-width: 150px;
+}
+
+.mode-runtime-query-error {
+  color: var(--danger);
+}
+
 .mode-runtime-taxonomy-recent summary {
   cursor: pointer;
   color: var(--text-muted);
