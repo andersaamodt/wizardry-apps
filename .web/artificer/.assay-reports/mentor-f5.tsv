@@ -1,0 +1,2 @@
+task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
+deterministic-tests	programming	long	timeout	0	1	0	327	1	0	1	1	31	28

@@ -112,14 +112,15 @@ score_row_from_event_json() {
     ($e.stream_text // "") as $stream |
     ($e.plan // "") as $plan |
     ($e.session_log // "") as $session |
-    ($e.assistant // "") as $assistant |
+    ($e.failures // "") as $failures |
+    (if (($e.assistant // "") | length) > 0 then ($e.assistant // "") else ($e.error // "") end) as $assistant |
     ([($e.commands // [])[]] | length) as $cmd |
-    ([($stream | split("\n"))[] | select(length > 0)] | length) as $steps |
+    ([((($stream + "\n" + $failures) | split("\n")))[] | select(length > 0)] | length) as $steps |
     ([($stream | split("\n"))[] | select(test("^\\[[0-9]{2}:[0-9]{2}:[0-9]{2}\\]"))] | length) as $ts_steps |
-    (((($stream + "\n" + $plan + "\n" + $session) | test("MODE_UPDATE:|PLAN_UPDATE:|Next Action:|Completion Criteria:|Transition:"; "i")))) as $control |
-    (((($stream + "\n" + $session + "\n" + ($e.state // "")) | test("verified|verification|tests?\\s+(pass|passed)|DONE_CLAIM:\\s*yes"; "i")))) as $verify |
+    (((($stream + "\n" + $plan + "\n" + $session + "\n" + $failures + "\n" + $assistant) | test("MODE_UPDATE:|PLAN_UPDATE:|Next Action:|Completion Criteria:|Transition:"; "i")))) as $control |
+    (((($stream + "\n" + $session + "\n" + ($e.state // "") + "\n" + $failures + "\n" + $assistant) | test("verified|verification|tests?\\s+(pass|passed)|DONE_CLAIM:\\s*yes"; "i")))) as $verify |
     ((($assistant | test("Outcome:"; "i")) and ($assistant | test("Verification Evidence:"; "i")) and ($assistant | test("Risks:"; "i")) and ($assistant | test("Next Improvement:"; "i")))) as $sections |
-    (($stream + "\n" + $assistant) | test("Worked for\\s+[0-9]+m\\s+[0-9]+s|Worked for\\s+[0-9]+s"; "i")) as $runtime_line |
+    (($stream + "\n" + $assistant + "\n" + $failures) | test("Worked for\\s+[0-9]+m\\s+[0-9]+s|Worked for\\s+[0-9]+s"; "i")) as $runtime_line |
     (
       44
       + (if $status == "done" then 24 elif $status == "error" then -26 elif $status == "cancelled" then -18 elif ($status == "awaiting_approval" or $status == "awaiting_decision") then -8 else 0 end)
@@ -247,7 +248,7 @@ EOF
 
       settle_try=0
       state_json=""
-      while [ "$settle_try" -lt 8 ]; do
+      while [ "$settle_try" -lt 20 ]; do
         queue_json=$(post_api "action=queue_list&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" | json_only)
         queue_running=$(printf '%s' "$queue_json" | jq -r '.queue_running // 0')
         if [ "$queue_running" != "1" ]; then
@@ -260,6 +261,10 @@ EOF
       queue_last_status=$(printf '%s' "$queue_json" | jq -r '.queue_last_status // "unknown"')
       state_json=$(post_api "action=get_conversation&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")" | json_only)
       event_json=$(printf '%s' "$state_json" | jq -c '.conversation.run_events[-1] // {}')
+      assistant_from_messages=$(printf '%s' "$state_json" | jq -r '.conversation.messages | map(select(.role=="assistant")) | last | .content // ""')
+      if [ -n "$assistant_from_messages" ]; then
+        event_json=$(printf '%s' "$event_json" | jq -c --arg a "$assistant_from_messages" '.assistant = (if ((.assistant // "") | length) > 0 then .assistant else $a end)')
+      fi
       row=$(printf '%s' "$event_json" | score_row_from_event_json)
       event_status=$(printf '%s' "$event_json" | jq -r '.status // "unknown"')
       if [ "$event_status" = "running" ] && [ -n "$queue_last_status" ] && [ "$queue_last_status" != "running" ] && [ "$queue_last_status" != "unknown" ]; then
@@ -269,6 +274,10 @@ EOF
       fi
 
       this_status=$(printf '%s' "$row" | awk -F '\t' '{print $1}')
+      if [ "$timed_out" -eq 1 ] && [ "$this_status" != "done" ]; then
+        row=$(printf '%s' "$row" | awk -F '\t' 'BEGIN{OFS=FS}{$1="timeout"; print}')
+        this_status="timeout"
+      fi
       this_rank=$(status_rank "$this_status")
       if [ "$this_rank" -gt "$best_rank" ]; then
         best_rank=$this_rank

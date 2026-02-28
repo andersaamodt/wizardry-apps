@@ -1,0 +1,13 @@
+task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
+deterministic-tests	programming	long	timeout	0	1	0	414	1	1	1	1	39	37
+concurrency-race	programming	long	timeout	0	1	0	414	1	1	1	1	39	37
+api-hardening	programming	standard	timeout	0	1	0	414	1	1	1	1	39	37
+migration-safe	programming	long	timeout	0	1	0	414	1	1	1	1	39	37
+perf-regression	programming	standard	timeout	0	1	0	414	1	1	1	1	39	37
+security-audit	security-audit	long	timeout	0	1	0	414	1	1	1	1	39	37
+refactor-boundaries	programming	standard	timeout	0	1	0	414	1	1	1	1	39	37
+failure-recovery	programming	long	timeout	0	1	0	414	1	1	1	1	39	37
+spec-to-code	programming	until-complete	timeout	0	1	0	414	1	1	1	1	39	37
+report-trace	report	standard	timeout	0	1	0	414	1	1	1	1	39	37
+teacher-explain	teacher	standard	timeout	0	1	0	414	1	1	1	1	39	37
+pentest-simulation	pentest	long	timeout	0	1	0	414	1	1	1	1	39	37
