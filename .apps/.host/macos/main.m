@@ -34,6 +34,7 @@
 @property (strong) NSColor *prioritiesBootTextColor;
 @property (assign) BOOL enableNativeViewMenu;
 @property (assign) BOOL enableNativeBootSplash;
+@property (assign) BOOL enableForgeAppMenu;
 @property (assign) BOOL prefersWideDragStrip;
 @property (assign) CGFloat bootSplashLogoSize;
 @property (strong) NSView *prioritiesTopDragStrip;
@@ -390,6 +391,26 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     [appMenu addItemWithTitle:aboutTitle action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];
     [appMenu addItem:[NSMenuItem separatorItem]];
 
+    if (self.enableForgeAppMenu) {
+        NSMenuItem *prefs = [appMenu addItemWithTitle:@"Settings…"
+                                               action:@selector(nativeForgeOpenSettings:)
+                                        keyEquivalent:@","];
+        [prefs setTarget:self];
+
+        NSMenuItem *createMode = [appMenu addItemWithTitle:@"Create App Workflow"
+                                                    action:@selector(nativeForgeOpenCreateWorkflow:)
+                                             keyEquivalent:@"2"];
+        [createMode setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+        [createMode setTarget:self];
+
+        NSMenuItem *pipelineMode = [appMenu addItemWithTitle:@"App Pipeline Workflow"
+                                                      action:@selector(nativeForgeOpenPipelineWorkflow:)
+                                               keyEquivalent:@"1"];
+        [pipelineMode setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+        [pipelineMode setTarget:self];
+        [appMenu addItem:[NSMenuItem separatorItem]];
+    }
+
     NSMenuItem *hideItem = [appMenu addItemWithTitle:[NSString stringWithFormat:@"Hide %@", appName]
                                              action:@selector(hide:)
                                       keyEquivalent:@"h"];
@@ -407,6 +428,32 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     [appMenu addItemWithTitle:quitTitle action:@selector(terminate:) keyEquivalent:@"q"];
 
     [appMenuItem setSubmenu:appMenu];
+
+    if (self.enableForgeAppMenu) {
+        NSMenuItem *projectMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+        [mainMenu addItem:projectMenuItem];
+        NSMenu *projectMenu = [[NSMenu alloc] initWithTitle:@"Project"];
+
+        NSMenuItem *runCurrent = [projectMenu addItemWithTitle:@"Run Current Project"
+                                                         action:@selector(nativeForgeRunCurrentProject:)
+                                                  keyEquivalent:@"r"];
+        [runCurrent setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+        [runCurrent setTarget:self];
+
+        NSMenuItem *serveWebHost = [projectMenu addItemWithTitle:@"Serve Web Host"
+                                                           action:@selector(nativeForgeServeWebHost:)
+                                                    keyEquivalent:@"r"];
+        [serveWebHost setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagShift)];
+        [serveWebHost setTarget:self];
+
+        NSMenuItem *buildEnabled = [projectMenu addItemWithTitle:@"Build Enabled Targets"
+                                                           action:@selector(nativeForgeBuildEnabledTargets:)
+                                                    keyEquivalent:@"b"];
+        [buildEnabled setKeyEquivalentModifierMask:NSEventModifierFlagCommand];
+        [buildEnabled setTarget:self];
+
+        [projectMenuItem setSubmenu:projectMenu];
+    }
 
     NSMenuItem *windowMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
     [mainMenu addItem:windowMenuItem];
@@ -452,6 +499,14 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     [self.webView evaluateJavaScript:js completionHandler:nil];
 }
 
+- (void)dispatchForgeMenuAction:(NSString *)actionName {
+    if (!self.webView || !actionName.length) {
+        return;
+    }
+    NSString *js = [NSString stringWithFormat:@"if (window && typeof window.forgeHostAction === 'function') { window.forgeHostAction('%@'); }", actionName];
+    [self.webView evaluateJavaScript:js completionHandler:nil];
+}
+
 - (void)nativeIncreaseTextSize:(id)sender {
     (void)sender;
     [self dispatchPrioritiesViewAction:@"increase-text-size"];
@@ -465,6 +520,36 @@ completionHandler:(void (^)(BOOL result))completionHandler {
 - (void)nativeResetTextSize:(id)sender {
     (void)sender;
     [self dispatchPrioritiesViewAction:@"reset-text-size"];
+}
+
+- (void)nativeForgeRunCurrentProject:(id)sender {
+    (void)sender;
+    [self dispatchForgeMenuAction:@"run-current"];
+}
+
+- (void)nativeForgeBuildEnabledTargets:(id)sender {
+    (void)sender;
+    [self dispatchForgeMenuAction:@"build-enabled"];
+}
+
+- (void)nativeForgeServeWebHost:(id)sender {
+    (void)sender;
+    [self dispatchForgeMenuAction:@"serve-web-host"];
+}
+
+- (void)nativeForgeOpenSettings:(id)sender {
+    (void)sender;
+    [self dispatchForgeMenuAction:@"open-settings"];
+}
+
+- (void)nativeForgeOpenCreateWorkflow:(id)sender {
+    (void)sender;
+    [self dispatchForgeMenuAction:@"open-create-workflow"];
+}
+
+- (void)nativeForgeOpenPipelineWorkflow:(id)sender {
+    (void)sender;
+    [self dispatchForgeMenuAction:@"open-pipeline-workflow"];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
@@ -508,6 +593,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
+    self.enableForgeAppMenu = isForgeApp;
     self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp;
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
     self.bootSplashLogoSize = isForgeApp ? 156.0 : (isArtificerApp ? 176.0 : 192.0);

@@ -10307,7 +10307,9 @@ EOF
     chat)
       cat <<'EOF'
 Run mode policy:
+- prioritize continuity across turns: keep the active thread and user framing corrections intact.
 - prioritize clarity, empathy, and concise direct help.
+- prefer insight and concrete distinctions over generic platitudes.
 - avoid unnecessary tooling loops when a straightforward response is sufficient.
 EOF
       ;;
@@ -17309,7 +17311,6 @@ EOF
         ;;
       chat)
         quick_mode=1
-        simple_direct_prompt=1
         ;;
       report)
         quick_mode=0
@@ -17478,25 +17479,44 @@ Completion Criteria:
 EOF
 )
 
-      if [ "$simple_direct_prompt" = "1" ]; then
-        if [ "$run_mode" = "chat" ]; then
-          quick_prompt=$(cat <<EOF
-You are a conversational assistant.
-Respond naturally, helpfully, and clearly to the latest user message.
+      if [ "$run_mode" = "chat" ]; then
+        chat_history_text=$(conversation_history "$conv_dir" | sed -n '1,220p')
+        chat_history_text=$(compact_text_block "Recent conversation" "$chat_history_text" 1800)
+        if [ -z "$(trim "$chat_history_text")" ]; then
+          chat_history_text="(no prior turns)"
+        fi
+        chat_followup_hint=""
+        user_message_lower=$(printf '%s' "$user_message_text" | tr '[:upper:]' '[:lower:]')
+        if printf '%s' "$user_message_lower" | grep -Eq '^(no|not exactly|not quite|that.s not|i mean|rather)\b|^no,|^no\.'; then
+          chat_followup_hint="- user signaled the prior framing was off; restate the corrected framing before answering."
+        fi
+        quick_prompt=$(cat <<EOF
+You are a high-quality conversational assistant.
+Primary objective: answer the latest user message while preserving continuity with recent turns.
+Conversation quality rules:
+- treat the latest message as a refinement of the same thread, not a topic reset.
+- if the user corrects framing, acknowledge the correction briefly and continue with the corrected framing.
+- prefer concrete conceptual reasoning over generic wellness or productivity platitudes unless explicitly requested.
+- avoid procedural onboarding/setup assumptions unless the user explicitly asks for implementation steps.
+- keep the response concise but insight-dense.
+$quick_structure_hint
+$chat_followup_hint
 Reasoning effort preference: $reasoning_effort
 Compute budget preference: $compute_budget
 Output rules:
 - return only assistant reply text
 - do not prefix with "Assistant:" or "User:"
 - do not output control tokens like <end_of_text>
-$quick_structure_hint
 
 User request:
 $user_message_text
+
+Recent conversation (most recent last):
+$chat_history_text
 EOF
 )
-        else
-          quick_prompt=$(cat <<EOF
+      elif [ "$simple_direct_prompt" = "1" ]; then
+        quick_prompt=$(cat <<EOF
 You are a helpful assistant.
 Respond directly and concisely to the latest user message.
 Reasoning effort preference: $reasoning_effort
@@ -17511,7 +17531,6 @@ User request:
 $user_message_text
 EOF
 )
-        fi
       else
         quick_prompt=$(cat <<EOF
 You are a coding assistant. Respond concisely and concretely.
@@ -17542,14 +17561,14 @@ Other threads in this same workspace:
 $workspace_context_text"
       fi
 
-      if [ "$simple_direct_prompt" != "1" ] && [ -n "$(trim "$attachment_context")" ]; then
+      if { [ "$simple_direct_prompt" != "1" ] || [ "$run_mode" = "chat" ]; } && [ -n "$(trim "$attachment_context")" ]; then
         quick_prompt="${quick_prompt}
 
 Attachment context:
 $attachment_context"
       fi
 
-      if [ "$simple_direct_prompt" != "1" ] && [ -n "$(trim "$web_context")" ]; then
+      if { [ "$simple_direct_prompt" != "1" ] || [ "$run_mode" = "chat" ]; } && [ -n "$(trim "$web_context")" ]; then
         quick_prompt="${quick_prompt}
 
 Web context:

@@ -3952,6 +3952,60 @@
         }
       }
 
+      function runPrimaryActionFromToolbar() {
+        if (!els.actionRun) {
+          return false;
+        }
+        els.actionRun.click();
+        return true;
+      }
+
+      function buildPrimaryActionFromToolbar() {
+        if (!els.actionBuild) {
+          return false;
+        }
+        els.actionBuild.click();
+        return true;
+      }
+
+      function runServeWebHostAction() {
+        if (state.route === 'create') {
+          return false;
+        }
+        var selected = selectedCatalogItem();
+        if (!selected || !hasEnabledHostedWebTarget(selected)) {
+          return false;
+        }
+        perform('Serve web host', function () { return runPipelineAction('serve-web-host'); }, { swallow: true });
+        return true;
+      }
+
+      function handleForgeHostAction(actionName) {
+        var action = String(actionName || '');
+        if (action === 'run-current') {
+          return runPrimaryActionFromToolbar();
+        }
+        if (action === 'build-enabled') {
+          return buildPrimaryActionFromToolbar();
+        }
+        if (action === 'serve-web-host') {
+          return runServeWebHostAction();
+        }
+        if (action === 'open-settings') {
+          setPanel('settings', true);
+          return true;
+        }
+        if (action === 'open-create-workflow') {
+          setWorkflowMode('create');
+          return true;
+        }
+        if (action === 'open-pipeline-workflow') {
+          setWorkflowMode('pipeline');
+          return true;
+        }
+        return false;
+      }
+
       function bindKeyboardShortcuts() {
         document.addEventListener('keydown', function (event) {
           if (event.key === 'Escape' && state.settingsOpen) {
@@ -4004,6 +4058,37 @@
             }
             event.preventDefault();
             perform('Build enabled targets', function () { return runPipelineAction('build'); }, { swallow: true });
+            return;
+          }
+
+          if (key === 'r') {
+            if (event.shiftKey) {
+              if (runServeWebHostAction()) {
+                event.preventDefault();
+              }
+              return;
+            }
+            if (runPrimaryActionFromToolbar()) {
+              event.preventDefault();
+            }
+            return;
+          }
+
+          if (!event.shiftKey && key === ',') {
+            event.preventDefault();
+            setPanel('settings', true);
+            return;
+          }
+
+          if (!event.shiftKey && key === '1') {
+            event.preventDefault();
+            setWorkflowMode('pipeline');
+            return;
+          }
+
+          if (!event.shiftKey && key === '2') {
+            event.preventDefault();
+            setWorkflowMode('create');
           }
         });
       }
@@ -4207,6 +4292,7 @@
           syncLogClearVisibility();
           bindButtons();
           bindKeyboardShortcuts();
+          window.forgeHostAction = handleForgeHostAction;
           startAutoRefresh();
           setPanel('settings', false);
           setArtifacts([]);

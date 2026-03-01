@@ -56,6 +56,7 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Strengthened finalizing-status rendering so the latest completed run keeps showing "Finalizing response..." until assistant output is actually present, reducing false-idle model-only states.
     - Updated `until-complete` to run with unbounded iteration sentinel semantics (runtime-budget bounded) instead of a hard numeric loop cap.
     - Added event-level `awaiting_assistant` signaling so completed runs continue surfacing finalization feedback even when pending counters race or clear out of order.
+    - Upgraded `chat` quick-prompt construction to include recent conversation context, correction-aware follow-up guidance, and anti-platitude constraints to improve multi-turn conceptual continuity.
 
 - INT-007 Thread/workspace ordering ergonomics
   - Goal: Improve recency-based thread placement and drag-reorder fluidity.

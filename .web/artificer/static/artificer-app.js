@@ -831,7 +831,7 @@
   var dictationWaveBackendFloorSeedSamples = [];
   var dictationWaveSeenSignal = false;
   var dictationWaveNoiseFloor = 0.02;
-  var dictationWaveSignalCeil = 0.12;
+  var dictationWaveSignalCeil = 0.16;
   var dictationWaveActivatedAt = 0;
   var dictationWaveLastSampleAt = 0;
   var dictationWaveBarStartAt = 0;
@@ -7818,7 +7818,7 @@
     dictationWaveBackendFloorSeedSamples = [];
     dictationWaveSeenSignal = false;
     dictationWaveNoiseFloor = 0.02;
-    dictationWaveSignalCeil = 0.12;
+    dictationWaveSignalCeil = 0.16;
     dictationWaveLastSampleAt = 0;
     dictationWaveBarStartAt = 0;
     dictationWaveBarPeakRaw = 0;
@@ -8018,16 +8018,18 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var ceil = Number(dictationWaveSignalCeil || 0.12);
+    var ceil = Number(dictationWaveSignalCeil || 0.16);
     if (!isFinite(ceil) || ceil <= 0) {
-      ceil = Math.max(0.08, floor + 0.08);
+      ceil = Math.max(0.12, floor + 0.12);
     }
     if (probe > ceil) {
-      ceil = (ceil * 0.52) + (probe * 0.48);
+      // Track upward loudness quickly to avoid temporary max-lock plateaus.
+      ceil = (ceil * 0.2) + (probe * 0.8);
     } else {
-      ceil = (ceil * 0.985) + (probe * 0.015);
+      // Decay slowly so brief quieter spans do not immediately collapse headroom.
+      ceil = (ceil * 0.992) + (probe * 0.008);
     }
-    var minCeil = floor + Math.max(0.03, floor * 1.8);
+    var minCeil = floor + Math.max(0.04, floor * 1.9);
     if (ceil < minCeil) {
       ceil = minCeil;
     } else if (ceil > 0.9) {
@@ -8046,9 +8048,9 @@
     if (!isFinite(floor) || floor < 0) {
       floor = 0.01;
     }
-    var ceil = Number(dictationWaveSignalCeil || 0.12);
+    var ceil = Number(dictationWaveSignalCeil || 0.16);
     if (!isFinite(ceil) || ceil <= floor) {
-      ceil = floor + 0.08;
+      ceil = floor + 0.12;
     }
     var gate = (floor * 1.15) + 0.0005;
     if (raw <= gate) {
@@ -8058,15 +8060,15 @@
     if (signal < 0) {
       signal = 0;
     }
-    var dynamicRange = Math.max(0.02, ceil - gate);
+    var dynamicRange = Math.max(0.03, (ceil - gate) * 0.95);
     var normalized = signal / dynamicRange;
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
-    } else if (normalized > 1) {
-      normalized = 1;
     }
+    // Soft-knee compression preserves bar-to-bar variance at loud segments.
+    normalized = Math.tanh(normalized * 0.95);
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.88);
+      normalized = Math.pow(normalized, 0.9);
     }
     if (normalized < 0.0018) {
       normalized = 0;
@@ -8367,7 +8369,7 @@
           return;
         }
         var avgRaw = dictationWaveBarSampleCount > 0 ? (dictationWaveBarSumRaw / dictationWaveBarSampleCount) : rawLevel;
-        var summarizedRaw = (Number(dictationWaveBarPeakRaw || rawLevel) * 0.9) + (avgRaw * 0.1);
+        var summarizedRaw = (Number(dictationWaveBarPeakRaw || rawLevel) * 0.76) + (avgRaw * 0.24);
         dictationWaveBarStartAt = sampleNow;
         dictationWaveBarPeakRaw = 0;
         dictationWaveBarSumRaw = 0;

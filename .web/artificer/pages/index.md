@@ -602,7 +602,7 @@ pagetitle: "Artificer"
     launchKey = String(Date.now());
   }
   var script = document.createElement("script");
-  script.src = "/static/artificer-app.js?v=20260228-wavefix9&launch=" + encodeURIComponent(launchKey);
+  script.src = "/static/artificer-app.js?v=20260228-wavefix10&launch=" + encodeURIComponent(launchKey);
   document.body.appendChild(script);
 })();
 </script>
