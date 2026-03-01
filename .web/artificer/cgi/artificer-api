@@ -3614,6 +3614,33 @@ output_looks_derailed() {
   return 1
 }
 
+chat_output_looks_off_topic() {
+  user_prompt_raw=$1
+  assistant_raw=$2
+  prompt_lower=$(printf '%s' "$user_prompt_raw" | tr '[:upper:]' '[:lower:]')
+  assistant_lower=$(printf '%s' "$assistant_raw" | tr '[:upper:]' '[:lower:]')
+
+  # Strong mismatch: conceptual self-modeling request answered as app onboarding mechanics.
+  if printf '%s' "$prompt_lower" | grep -Eq 'prior to|higher-order|self|identity|values'; then
+    if printf '%s' "$assistant_lower" | grep -Eq 'onboarding|registration|sign[ -]?up|create (an )?account|user profile|profile setup'; then
+      return 0
+    fi
+  fi
+
+  # Correction follow-up ("no, ...") followed by generic wellness list indicates derailment.
+  if printf '%s' "$prompt_lower" | grep -Eq '^(no|not exactly|not quite|that.s not|i mean|rather)\b|^no,|^no\.'; then
+    generic_hits=$(printf '%s\n' "$assistant_lower" | grep -Eo 'mindfulness|journaling|meditation|stress management|anxiety reduction|trusted friends|books and online resources|dialogue with others|well-being' | wc -l | tr -d '[:space:]' || printf '0')
+    case "$generic_hits" in
+      ""|*[!0-9]*) generic_hits=0 ;;
+    esac
+    if [ "$generic_hits" -ge 3 ]; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 salvage_direct_response() {
   model_name=$1
   user_prompt=$2
@@ -3629,6 +3656,39 @@ Do not include planning scaffolding, role prefixes, or tool/control sections.
 
 User message:
 $user_prompt
+EOF
+)
+  repaired=$(run_model "$salvage_model" "$fallback_prompt" || true)
+  repaired=$(normalize_assistant_output "$repaired")
+  printf '%s' "$repaired"
+}
+
+salvage_chat_response() {
+  model_name=$1
+  user_prompt=$2
+  recent_history=$3
+  salvage_model=$model_name
+  preferred_model=$(preferred_chat_model || true)
+  if [ -n "$preferred_model" ]; then
+    salvage_model=$preferred_model
+  fi
+  fallback_prompt=$(cat <<EOF
+You are a high-quality conversational assistant in a multi-turn thread.
+Answer the latest user message while preserving conversation continuity.
+Hard constraints:
+- Treat the latest user message as an in-thread refinement.
+- If the user corrects framing, acknowledge the correction briefly and answer with the corrected framing.
+- Avoid generic wellness/productivity lists unless explicitly requested.
+- Prefer concise conceptual distinctions over broad platitudes.
+- Do not switch to app onboarding/setup unless the user asks for implementation details.
+
+Latest user message:
+$user_prompt
+
+Recent conversation:
+$recent_history
+
+Return only assistant reply text.
 EOF
 )
   repaired=$(run_model "$salvage_model" "$fallback_prompt" || true)
@@ -7362,6 +7422,7 @@ preferred_chat_model() {
   [ -n "$(trim "$models")" ] || return 0
 
   preferred=""
+  preferred_score=-9999
   while IFS= read -r model_name; do
     [ -n "$model_name" ] || continue
     lower=$(printf '%s' "$model_name" | tr '[:upper:]' '[:lower:]')
@@ -7370,12 +7431,50 @@ preferred_chat_model() {
         continue
         ;;
     esac
+    score=0
     case "$lower" in
-      *instruct*|*chat*|qwen*|*qwen*|*llama*|*mistral*|*deepseek*|*gemma*|*phi*)
-        preferred=$model_name
-        break
+      llama3.1*|*llama3.1*|llama3*|*llama3*)
+        score=120
+        ;;
+      qwen2.5*|*qwen2.5*|qwen3*|*qwen3*|qwen*|*qwen*)
+        score=115
+        ;;
+      mistral*|*mistral*)
+        score=108
+        ;;
+      phi3*|*phi3*|phi4*|*phi4*|gemma2*|*gemma2*)
+        score=102
+        ;;
+      deepseek-r1*|*deepseek-r1*|deepseek-v3*|*deepseek-v3*)
+        score=98
+        ;;
+      deepseek*|*deepseek*)
+        score=88
+        ;;
+      codellama*|*codellama*|starcoder*|*starcoder*)
+        score=72
+        ;;
+      *instruct*|*chat*)
+        score=96
+        ;;
+      *)
+        score=80
         ;;
     esac
+    case "$lower" in
+      *coder*|*code*)
+        score=$((score - 14))
+        ;;
+    esac
+    case "$lower" in
+      *instruct*|*chat*)
+        score=$((score + 4))
+        ;;
+    esac
+    if [ -z "$preferred" ] || [ "$score" -gt "$preferred_score" ]; then
+      preferred=$model_name
+      preferred_score=$score
+    fi
   done <<EOF
 $models
 EOF
@@ -17619,6 +17718,11 @@ $explicit_skill_context_text"
         repaired_output=$(salvage_direct_response "$model" "$user_prompt")
         if [ -n "$(trim "$repaired_output")" ]; then
           assistant_output=$repaired_output
+        fi
+      elif [ "$run_mode" = "chat" ] && chat_output_looks_off_topic "$user_message_text" "$assistant_output"; then
+        repaired_chat_output=$(salvage_chat_response "$model" "$user_message_text" "$chat_history_text")
+        if [ -n "$(trim "$repaired_chat_output")" ]; then
+          assistant_output=$repaired_chat_output
         fi
       fi
 

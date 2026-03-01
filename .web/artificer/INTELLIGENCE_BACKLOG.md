@@ -57,6 +57,8 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Updated `until-complete` to run with unbounded iteration sentinel semantics (runtime-budget bounded) instead of a hard numeric loop cap.
     - Added event-level `awaiting_assistant` signaling so completed runs continue surfacing finalization feedback even when pending counters race or clear out of order.
     - Upgraded `chat` quick-prompt construction to include recent conversation context, correction-aware follow-up guidance, and anti-platitude constraints to improve multi-turn conceptual continuity.
+    - Added chat-specific off-topic detection + salvage reroute for correction turns (e.g., onboarding/non-sequitur drift, generic platitude lists) to improve relevance under weaker conversational models.
+    - Upgraded conversational model preference scoring so `chat` fallback/salvage prefers general conversational strength over coder-specialized models when both are installed.
 
 - INT-007 Thread/workspace ordering ergonomics
   - Goal: Improve recency-based thread placement and drag-reorder fluidity.

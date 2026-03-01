@@ -121,6 +121,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
   - Controller loop prompts also receive runtime adaptation guardrails synthesized from recent failure/quality regressions.
   - Repeated transition signatures now emit loop-stagnation failures and inject anti-repeat guardrails into subsequent controller iterations.
 - Run-mode picker includes a `More modes` expander that surfaces all runtime governance modes with blurbs, and selecting one applies `Assistant` run mode with that focus profile.
+- `chat` mode now preserves recent thread continuity in quick responses, applies correction-aware follow-up guidance, and can trigger chat-specific salvage when responses drift off-topic.
 - `pentest` and `security-audit` modes now enforce structured findings output with explicit `Severity`, `Evidence`, `Remediation`, and follow-up verification guidance.
 - Composer now separates `Reasoning depth` from `Compute/time budget`:
   - Reasoning controls planning depth/effort per step.
