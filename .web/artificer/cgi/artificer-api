@@ -9137,6 +9137,46 @@ conversation_history() {
   rm -f "$temp_list"
 }
 
+recent_user_turns_for_conversation() {
+  conv_dir=$1
+  max_turns_raw=${2:-4}
+  msg_dir="$conv_dir/messages"
+  [ -d "$msg_dir" ] || return 0
+  case "$max_turns_raw" in
+    ""|*[!0-9]*)
+      max_turns=4
+      ;;
+    *)
+      max_turns=$max_turns_raw
+      ;;
+  esac
+  if [ "$max_turns" -lt 1 ]; then
+    max_turns=1
+  fi
+  if [ "$max_turns" -gt 8 ]; then
+    max_turns=8
+  fi
+
+  temp_list=$(mktemp)
+  temp_user=$(mktemp)
+  find "$msg_dir" -maxdepth 1 -type f -name '*.txt' 2>/dev/null | sort | tail -n 24 > "$temp_list"
+  : > "$temp_user"
+  while IFS= read -r msg_file; do
+    [ -f "$msg_file" ] || continue
+    msg_name=$(basename "$msg_file")
+    role=$(printf '%s' "$msg_name" | sed 's/^[0-9][0-9][0-9][0-9]-//;s/\.txt$//')
+    [ "$role" = "user" ] || continue
+    content=$(cat "$msg_file")
+    content=$(printf '%s' "$content" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')
+    [ -n "$content" ] || continue
+    printf '%s\n' "$content" >> "$temp_user"
+  done < "$temp_list"
+  if [ -s "$temp_user" ]; then
+    tail -n "$max_turns" "$temp_user" | awk '{ printf "%d. %s\n", NR, $0 }'
+  fi
+  rm -f "$temp_list" "$temp_user"
+}
+
 single_line_snippet() {
   text=$1
   printf '%s' "$text" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g;s/^ //;s/ $//' | cut -c1-220
@@ -17714,6 +17754,10 @@ EOF
         if [ -z "$(trim "$chat_history_text")" ]; then
           chat_history_text="(no prior turns)"
         fi
+        chat_focus_anchors=$(recent_user_turns_for_conversation "$conv_dir" "4" | sed -n '1,8p')
+        if [ -z "$(trim "$chat_focus_anchors")" ]; then
+          chat_focus_anchors="1. (no prior user turns)"
+        fi
         chat_followup_hint=""
         user_message_lower=$(printf '%s' "$user_message_text" | tr '[:upper:]' '[:lower:]')
         if printf '%s' "$user_message_lower" | grep -Eq '^(no|not exactly|not quite|that.s not|i mean|rather)\b|^no,|^no\.'; then
@@ -17739,6 +17783,9 @@ Output rules:
 
 User request:
 $user_message_text
+
+Thread focus anchors (recent user turns):
+$chat_focus_anchors
 
 Recent conversation (most recent last):
 $chat_history_text

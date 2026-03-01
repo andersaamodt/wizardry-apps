@@ -59,6 +59,7 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Upgraded `chat` quick-prompt construction to include recent conversation context, correction-aware follow-up guidance, and anti-platitude constraints to improve multi-turn conceptual continuity.
     - Added chat-specific off-topic detection + salvage reroute for correction turns (e.g., onboarding/non-sequitur drift, generic platitude lists) to improve relevance under weaker conversational models.
     - Upgraded conversational model preference scoring so `chat` fallback/salvage prefers general conversational strength over coder-specialized models when both are installed.
+    - Added thread-focus anchors (recent user-turn summaries) to chat prompts so follow-up answers better preserve conceptual throughlines.
 
 - INT-007 Thread/workspace ordering ergonomics
   - Goal: Improve recency-based thread placement and drag-reorder fluidity.
