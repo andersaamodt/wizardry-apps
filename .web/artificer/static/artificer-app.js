@@ -8089,20 +8089,20 @@
     if (raw > (floor * 2.0) + 0.016) {
       effectiveFloor = floor * 0.78;
     }
-    var gate = (effectiveFloor * 0.8) + 0.00035;
+    var gate = (effectiveFloor * 1.22) + 0.001;
     if (raw <= gate) {
       return 0;
     }
-    var normalized = (raw - gate) / Math.max(0.06, (0.26 + (effectiveFloor * 1.05)));
+    var normalized = (raw - gate) / Math.max(0.016, (0.096 + (effectiveFloor * 1.55)));
     if (!isFinite(normalized) || normalized < 0) {
       normalized = 0;
     } else if (normalized > 1) {
       normalized = 1;
     }
     if (normalized > 0) {
-      normalized = Math.pow(normalized, 0.82);
+      normalized = Math.pow(normalized, 1.0);
     }
-    if (normalized < 0.0012) {
+    if (normalized < 0.0022) {
       normalized = 0;
     }
     return normalized;
@@ -8200,8 +8200,8 @@
     }
     if (floor < 0.0008) {
       floor = 0.0008;
-    } else if (floor > 0.05) {
-      floor = 0.05;
+    } else if (floor > 0.08) {
+      floor = 0.08;
     }
     dictationWaveBackendFloor = floor;
     return floor;
