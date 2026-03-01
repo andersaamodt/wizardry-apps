@@ -67,6 +67,15 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Thread moves to top on send with smooth reorder animation.
     - Workspace/thread drag reorder persists and remains stable on reload.
 
+- INT-011 Mode-aware model recommendation and routing
+  - Goal: Improve run quality by selecting models better matched to `chat` vs coding-heavy tasks.
+  - Acceptance:
+    - Backend can rank installed models per mode (conversation vs programming).
+    - Chat fallback/salvage prefers high-conversation models over coder-specialized models when available.
+  - Progress:
+    - Added mode-aware model scoring and `model_recommendations` API output with ranked installed-model lists for `chat` and `programming`.
+    - Wired conversational salvage to use the improved chat-preference selector.
+
 ## P2 (Scale)
 
 - INT-008 Multi-run learning loop for controller prompts

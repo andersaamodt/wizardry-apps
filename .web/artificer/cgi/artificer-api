@@ -7417,6 +7417,109 @@ list_models_from_workspace_data() {
   done | awk '!seen[$0]++'
 }
 
+model_is_text_generation_model() {
+  lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  case "$lower" in
+    *embed*|*embedding*|*nomic-embed*|*bge-*|*e5-*|*minilm*|*clip*|*whisper*)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+model_preference_score_for_mode() {
+  model_name=$1
+  mode_name=$2
+  lower=$(printf '%s' "$model_name" | tr '[:upper:]' '[:lower:]')
+  if ! model_is_text_generation_model "$model_name"; then
+    printf '%s' "-9999"
+    return 0
+  fi
+
+  score=0
+  case "$mode_name" in
+    chat)
+      case "$lower" in
+        llama3.1*|*llama3.1*|llama3*|*llama3*)
+          score=120
+          ;;
+        qwen2.5*|*qwen2.5*|qwen3*|*qwen3*|qwen*|*qwen*)
+          score=124
+          ;;
+        mistral*|*mistral*)
+          score=108
+          ;;
+        phi3*|*phi3*|phi4*|*phi4*|gemma2*|*gemma2*)
+          score=102
+          ;;
+        deepseek-r1*|*deepseek-r1*|deepseek-v3*|*deepseek-v3*)
+          score=98
+          ;;
+        deepseek*|*deepseek*)
+          score=88
+          ;;
+        codellama*|*codellama*|starcoder*|*starcoder*)
+          score=72
+          ;;
+        *instruct*|*chat*)
+          score=96
+          ;;
+        *)
+          score=80
+          ;;
+      esac
+      case "$lower" in
+        *coder*|*code*)
+          score=$((score - 14))
+          ;;
+      esac
+      case "$lower" in
+        *instruct*|*chat*)
+          score=$((score + 4))
+          ;;
+      esac
+      ;;
+    programming)
+      case "$lower" in
+        deepseek-coder*|*deepseek-coder*)
+          score=122
+          ;;
+        qwen2.5-coder*|*qwen2.5-coder*|qwen-coder*|*qwen-coder*)
+          score=116
+          ;;
+        starcoder*|*starcoder*)
+          score=108
+          ;;
+        codellama*|*codellama*)
+          score=103
+          ;;
+        qwen*|*qwen*)
+          score=100
+          ;;
+        llama3.1*|*llama3.1*|llama3*|*llama3*)
+          score=96
+          ;;
+        mistral*|*mistral*)
+          score=94
+          ;;
+        *)
+          score=84
+          ;;
+      esac
+      case "$lower" in
+        *coder*|*code*)
+          score=$((score + 10))
+          ;;
+      esac
+      ;;
+    *)
+      score=80
+      ;;
+  esac
+
+  printf '%s' "$score"
+}
+
 preferred_chat_model() {
   models=$(list_models_raw || true)
   [ -n "$(trim "$models")" ] || return 0
@@ -7425,50 +7528,13 @@ preferred_chat_model() {
   preferred_score=-9999
   while IFS= read -r model_name; do
     [ -n "$model_name" ] || continue
-    lower=$(printf '%s' "$model_name" | tr '[:upper:]' '[:lower:]')
-    case "$lower" in
-      *embed*|*embedding*|*nomic-embed*|*bge-*|*e5-*|*minilm*|*clip*|*whisper*)
-        continue
-        ;;
-    esac
-    score=0
-    case "$lower" in
-      llama3.1*|*llama3.1*|llama3*|*llama3*)
-        score=120
-        ;;
-      qwen2.5*|*qwen2.5*|qwen3*|*qwen3*|qwen*|*qwen*)
-        score=115
-        ;;
-      mistral*|*mistral*)
-        score=108
-        ;;
-      phi3*|*phi3*|phi4*|*phi4*|gemma2*|*gemma2*)
-        score=102
-        ;;
-      deepseek-r1*|*deepseek-r1*|deepseek-v3*|*deepseek-v3*)
-        score=98
-        ;;
-      deepseek*|*deepseek*)
-        score=88
-        ;;
-      codellama*|*codellama*|starcoder*|*starcoder*)
-        score=72
-        ;;
-      *instruct*|*chat*)
-        score=96
-        ;;
-      *)
-        score=80
-        ;;
-    esac
-    case "$lower" in
-      *coder*|*code*)
-        score=$((score - 14))
-        ;;
-    esac
-    case "$lower" in
-      *instruct*|*chat*)
-        score=$((score + 4))
+    if ! model_is_text_generation_model "$model_name"; then
+      continue
+    fi
+    score=$(model_preference_score_for_mode "$model_name" "chat")
+    case "$score" in
+      ""|*[!0-9-]*)
+        score=0
         ;;
     esac
     if [ -z "$preferred" ] || [ "$score" -gt "$preferred_score" ]; then
@@ -7486,17 +7552,76 @@ EOF
 
   while IFS= read -r model_name; do
     [ -n "$model_name" ] || continue
-    lower=$(printf '%s' "$model_name" | tr '[:upper:]' '[:lower:]')
-    case "$lower" in
-      *embed*|*embedding*|*nomic-embed*|*bge-*|*e5-*|*minilm*|*clip*|*whisper*)
-        continue
-        ;;
-    esac
+    if ! model_is_text_generation_model "$model_name"; then
+      continue
+    fi
     printf '%s' "$model_name"
     return 0
   done <<EOF
 $models
 EOF
+}
+
+ranked_models_json_for_mode() {
+  mode_name=$1
+  models=$(list_models_raw || true)
+  if [ -z "$(trim "$models")" ]; then
+    models=$(list_models_from_workspace_data || true)
+  fi
+  if [ -z "$(trim "$models")" ]; then
+    printf '[]'
+    return 0
+  fi
+
+  tab_char=$(printf '\t')
+  rank_tmp=$(mktemp)
+  while IFS= read -r model_name; do
+    model_name=$(trim "$model_name")
+    [ -n "$model_name" ] || continue
+    if ! model_is_text_generation_model "$model_name"; then
+      continue
+    fi
+    score=$(model_preference_score_for_mode "$model_name" "$mode_name")
+    case "$score" in
+      ""|*[!0-9-]*)
+        score=0
+        ;;
+    esac
+    printf '%s%s%s\n' "$score" "$tab_char" "$model_name" >> "$rank_tmp"
+  done <<EOF
+$models
+EOF
+
+  if [ ! -s "$rank_tmp" ]; then
+    rm -f "$rank_tmp"
+    printf '[]'
+    return 0
+  fi
+
+  sorted_tmp=$(mktemp)
+  sort -t "$tab_char" -k1,1nr -k2,2 "$rank_tmp" > "$sorted_tmp"
+  rm -f "$rank_tmp"
+
+  printf '['
+  first=1
+  while IFS="$tab_char" read -r score model_name || [ -n "$model_name" ]; do
+    [ -n "$model_name" ] || continue
+    if [ "$first" -eq 0 ]; then
+      printf ','
+    fi
+    first=0
+    printf '{"name":"%s","score":"%s"}' \
+      "$(json_escape "$model_name")" \
+      "$(json_escape "$score")"
+  done < "$sorted_tmp"
+  printf ']'
+  rm -f "$sorted_tmp"
+}
+
+emit_model_recommendations() {
+  printf '{"success":true,"recommendations":{"chat":%s,"programming":%s}}\n' \
+    "$(ranked_models_json_for_mode "chat")" \
+    "$(ranked_models_json_for_mode "programming")"
 }
 
 default_model() {
@@ -12611,6 +12736,11 @@ case "$action" in
 
   models)
     emit_models
+    exit 0
+    ;;
+
+  model_recommendations)
+    emit_model_recommendations
     exit 0
     ;;
 

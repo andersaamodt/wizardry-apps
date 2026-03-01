@@ -58,6 +58,7 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
 - `controller_variant_rollback` (POST)
 - `quality_scorecard_state` (GET)
 - `models` (GET)
+- `model_recommendations` (GET; ranked installed-model recommendations for `chat` and `programming`)
 - `pick_workspace` (GET, macOS native chooser)
 - `add_workspace` (POST)
 - `delete_workspace` (POST)
