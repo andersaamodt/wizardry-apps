@@ -1,0 +1,87 @@
+#!/bin/sh
+
+print_usage() {
+  cat <<'USAGE'
+Usage: forge-menu [--root ROOT_DIR]
+
+Displays an interactive App Forge command console.
+USAGE
+}
+
+case "${1-}" in
+--help|--usage|-h)
+  print_usage
+  exit 0
+  ;;
+esac
+
+require-wizardry || exit 1
+
+set -eu
+. env-clear
+
+if ! require menu "App Forge menu requires the 'menu' command."; then
+  exit 1
+fi
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
+
+root_hint=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --root)
+      root_hint=${2-}
+      if [ -z "$root_hint" ]; then
+        printf '%s\n' "forge-menu: --root requires ROOT_DIR" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
+    --help|--usage|-h)
+      print_usage
+      exit 0
+      ;;
+    *)
+      printf '%s\n' "forge-menu: unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+root=${root_hint:-${WIZARDRY_APPS_ROOT:-$repo_root}}
+
+if [ ! -x "$root/.apps/forge/scripts/forge-backend.sh" ]; then
+  printf '%s\n' "forge-menu: invalid wizardry-apps root: $root" >&2
+  exit 1
+fi
+
+trap 'exit 130' INT
+trap 'exit 0' TERM
+
+while :; do
+  exit_label=$(exit-label)
+  menu_title="App Forge console (root: $root)"
+
+  menu "$menu_title" \
+    "Doctor workspace%sh $script_dir/forge-backend.sh doctor $root" \
+    "List builtin apps%sh $script_dir/forge-backend.sh list-apps $root" \
+    "List templates%sh $script_dir/forge-backend.sh list-templates $root" \
+    "List workspaces%sh $script_dir/forge-backend.sh list-workspaces $root" \
+    "List themes%sh $script_dir/forge-backend.sh list-themes $root" \
+    "List Godot tools%sh $script_dir/forge-backend.sh list-godot-tools $root" \
+    "---" \
+    "Run App Forge (desktop)%sh $script_dir/forge-backend.sh run-desktop $root forge" \
+    "Build App Forge (desktop)%sh $script_dir/forge-backend.sh build-desktop $root forge" \
+    "Stage mobile assets%sh $script_dir/forge-backend.sh stage-mobile $root forge" \
+    "Build Android debug%sh $script_dir/forge-backend.sh build-android-debug $root forge" \
+    "Build iOS smoke%sh $script_dir/forge-backend.sh build-ios-smoke $root forge" \
+    "---" \
+    "Install App Forge launcher%sh $repo_root/tools/forge/install-forge.sh --root $root" \
+    "Uninstall App Forge launcher%sh $repo_root/tools/forge/uninstall-forge.sh" \
+    "Launch App Forge GUI%sh $repo_root/tools/forge/launch-forge.sh --root $root" \
+    "${exit_label}%kill -TERM \$PPID" || menu_status=$?
+
+  menu_status=${menu_status:-0}
+  [ "$menu_status" -eq 130 ] && exit 0
+done
