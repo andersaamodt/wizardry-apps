@@ -19,3 +19,14 @@ external_assistant_aws_ecs|external-action-gate|true|0|0|0|1|0|assistant|Ship th
 destructive_helm_uninstall|destructive-action-gate|true|0|0|0|1|1|assistant|Clean up a stale release if needed.|Need anything else?|helm uninstall payments --namespace prod
 destructive_kubectl_force_replace|destructive-action-gate|true|0|0|0|1|1|assistant|Repair deployment state quickly.|Need anything else?|kubectl replace --force -f deploy.yaml
 none_near_miss_shell_var_doc|none|false|0|0|0|0|0|assistant|Document shell syntax for ${HOME} and ${PATH} in markdown examples.|Need anything else?|git status --short
+explicit_programming_three_way|explicit-choice|true|1|0|0|0|0|programming|Pick one remediation track for service payments in production: quick patch, staged rollout, or full rewrite.|Which track should I choose?|git status --short
+explicit_near_miss_decide_wording|none|false|0|0|0|0|0|assistant|Decide the best refactor path yourself and proceed autonomously.|Need anything else?|git status --short
+required_missing_legal_scope|required-input-missing|true|0|1|0|0|0|assistant|Draft a compliance letter for a legal filing and continue autonomously.|Which jurisdiction and deadline should I use?|git status --short
+required_legal_scope_present_near|none|false|0|0|0|0|0|assistant|Draft a compliance letter for a legal filing in California with deadline March 20, 2026.|Need anything else?|git status --short
+external_assistant_kubectl_scale|external-action-gate|true|0|0|0|1|0|assistant|Scale service capacity once checks pass.|Need anything else?|kubectl scale deploy/api --replicas=6
+near_miss_assistant_kubectl_get|none|false|0|0|0|0|0|assistant|Inspect cluster status only and continue autonomously.|Need anything else?|kubectl get pods -n prod
+destructive_git_reset_hard|destructive-action-gate|true|0|0|0|0|1|programming|Revert local state aggressively if needed.|Need anything else?|git reset --hard HEAD~1
+near_miss_git_reset_soft|none|false|0|0|0|0|0|programming|Revert local state cautiously if needed.|Need anything else?|git reset --soft HEAD~1
+destructive_aws_s3_recursive|destructive-action-gate|true|0|0|0|1|1|assistant|Clean obsolete bucket artifacts now.|Need anything else?|aws s3 rm s3://prod-logs --recursive
+risk_ack_deploy_exception|risk-acknowledgement|true|0|0|1|0|0|assistant|Prepare a release checklist only.|Do you authorize a production deploy waiver?|git status --short
+risk_ack_near_checklist|none|false|0|0|0|0|0|assistant|Prepare a release checklist only.|Ready for the next implementation step?|git status --short

@@ -5698,6 +5698,26 @@
     return pieces;
   }
 
+  function prettifyRunStepText(rawText) {
+    var text = trim(String(rawText || ""));
+    if (!text) {
+      return "";
+    }
+    text = text.replace(/^\*\*([^*]+)\*\*$/g, "$1");
+    text = text.replace(/^MODE_UPDATE:\s*/i, "Mode update: ");
+    text = text.replace(/^PLAN_UPDATE:\s*/i, "Plan update: ");
+    text = text.replace(/^CHECKPOINT:\s*/i, "Checkpoint: ");
+    text = text.replace(/^COMMANDS:\s*/i, "Command batch: ");
+    text = text.replace(/^CONTRACT:\s*/i, "Contract note: ");
+    text = text.replace(/^PATCH:\s*/i, "Patch update: ");
+    text = text.replace(/^DECISION_REQUEST:\s*/i, "Decision request: ");
+    text = text.replace(/^FINAL:\s*/i, "Final summary: ");
+    text = text.replace(/^DONE_CLAIM:\s*yes\b/i, "Completion check: done");
+    text = text.replace(/^DONE_CLAIM:\s*no\b/i, "Completion check: not yet");
+    text = text.replace(/\s{2,}/g, " ");
+    return trim(text);
+  }
+
   function splitNarrativeFragments(lineText) {
     var line = String(lineText || "");
     if (!trim(line)) {
@@ -5715,7 +5735,7 @@
       }
       var longParts = splitLongNarrativePart(coarse, 220);
       for (var j = 0; j < longParts.length; j += 1) {
-        var item = trim(longParts[j] || "");
+        var item = prettifyRunStepText(longParts[j] || "");
         if (item) {
           parts.push(item);
         }
@@ -5796,10 +5816,10 @@
     if (/(run finalized|done|completed|success|verified|pass)/.test(lower)) {
       return "success";
     }
-    if (/(current mode|mode_update|transition)/.test(lower)) {
+    if (/(current mode|mode[_ ]update|transition)/.test(lower)) {
       return "mode";
     }
-    if (/(iteration\s+\d+\s+started|requesting model output|starting|compacted)/.test(lower)) {
+    if (/(iteration\s+\d+\s+started|requesting model output|starting|compacted|plan update|checkpoint)/.test(lower)) {
       return "progress";
     }
     return "info";
@@ -6319,7 +6339,7 @@
 
     var status = event.status || "done";
     var defaultCompletedTraceOpen = !shouldAutoCollapseCompletedRunTrace(event);
-    if (status === "done" || status === "cancelled") {
+    if (status !== "running" && status !== "awaiting_approval" && status !== "awaiting_decision") {
       defaultCompletedTraceOpen = false;
     }
     var decisionHint = trim(String(event.decision_hint || ""));

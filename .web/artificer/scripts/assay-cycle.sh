@@ -4,17 +4,20 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 API="$ROOT_DIR/.web/artificer/cgi/artificer-api"
 OUT_DIR="$ROOT_DIR/.web/artificer/.assay-reports"
+DECISION_FIXTURE_FILE="$ROOT_DIR/.tests/apps/fixtures/artificer-decision-surfacing-fixtures.psv"
 
 usage() {
   cat <<'EOF'
 Usage:
   assay-cycle.sh run [--label NAME] [--timeout-sec N] [--run-budget-sec N] [--attempts N] [--mentor-from FILE] [--max-tasks N]
+  assay-cycle.sh mentor [--label NAME] [--cycles N] [--timeout-sec N] [--run-budget-sec N] [--attempts N] [--mentor-from FILE] [--max-tasks N]
   assay-cycle.sh compare --before FILE --after FILE
-  assay-cycle.sh decisions [--label NAME]
+  assay-cycle.sh decisions [--label NAME] [--fixtures FILE]
 
 Examples:
   .web/artificer/scripts/assay-cycle.sh run --label baseline
   .web/artificer/scripts/assay-cycle.sh run --label after
+  .web/artificer/scripts/assay-cycle.sh mentor --label mentor --cycles 2 --attempts 2
   .web/artificer/scripts/assay-cycle.sh compare --before .web/artificer/.assay-reports/baseline.tsv --after .web/artificer/.assay-reports/after.tsv
 EOF
 }
@@ -52,6 +55,15 @@ status_rank() {
   esac
 }
 
+decision_fixture_file() {
+  override_file=$1
+  if [ -n "$override_file" ]; then
+    printf '%s' "$override_file"
+    return 0
+  fi
+  printf '%s' "$DECISION_FIXTURE_FILE"
+}
+
 mentor_suffix_for_task() {
   task_id=$1
   mentor_file=$2
@@ -60,6 +72,7 @@ mentor_suffix_for_task() {
   fi
   line=$(awk -F '\t' -v t="$task_id" 'NR>1 && $1==t {print; exit}' "$mentor_file")
   [ -n "$line" ] || return 0
+  prior_status=$(printf '%s' "$line" | awk -F '\t' '{print $4}')
   iq=$(printf '%s' "$line" | awk -F '\t' '{print $13+0}')
   flow=$(printf '%s' "$line" | awk -F '\t' '{print $14+0}')
   sections=$(printf '%s' "$line" | awk -F '\t' '{print $9+0}')
@@ -68,6 +81,9 @@ mentor_suffix_for_task() {
   runtime_line=$(printf '%s' "$line" | awk -F '\t' '{print $12+0}')
 
   printf '\n\nAssay mentor guidance from prior cycle:\n'
+  if [ "$prior_status" != "done" ]; then
+    printf -- '- Prior cycle ended with status "%s"; tighten scope, assume missing inputs, and drive to a concrete best-effort completion.\n' "$prior_status"
+  fi
   if [ "$iq" -lt 60 ]; then
     printf -- '- Raise intelligence score by increasing concrete execution depth and explicit verification.\n'
   fi
@@ -86,6 +102,7 @@ mentor_suffix_for_task() {
   if [ "$runtime_line" -lt 1 ]; then
     printf -- '- Include explicit runtime line: Worked for Xm Ys.\n'
   fi
+  printf -- '- Keep all edits and generated artifacts inside .assay-runs/%s/.\n' "$task_id"
 }
 
 task_table() {
@@ -246,8 +263,17 @@ run_cycle() {
 
       mentor_suffix=$(mentor_suffix_for_task "$task" "$mentor_from" || true)
       prompt_for_run=$prompt
+      assay_scope_suffix=$(cat <<EOF
+
+Assay execution scope:
+- Work only inside .assay-runs/$task/
+- If required context is missing, choose explicit assumptions and continue autonomously.
+- Keep streaming concise timestamp-style progress updates.
+EOF
+)
+      prompt_for_run=$(printf '%s\n%s' "$prompt_for_run" "$assay_scope_suffix")
       if [ -n "$mentor_suffix" ]; then
-        prompt_for_run=$(printf '%s\n%s' "$prompt" "$mentor_suffix")
+        prompt_for_run=$(printf '%s\n%s' "$prompt_for_run" "$mentor_suffix")
       fi
       body="action=run&workspace_id=$(urlenc "$ws_id")&conversation_id=$(urlenc "$conv_id")&prompt=$(urlenc "$prompt_for_run")&run_mode=$(urlenc "$mode")&compute_budget=$(urlenc "$budget")&advanced_loop=1&max_iterations=$max_iterations&programmer_review=1&programmer_review_rounds=2&assay_task_id=$(urlenc "$task")"
       timed_out=0
@@ -311,7 +337,7 @@ EOF
 
     [ -n "$best_row" ] || best_row="error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0"
     printf '%s\t%s\t%s\t%s\n' "$task" "$mode" "$budget" "$best_row" >> "$out_file"
-    echo "cycle[$label] done: $task"
+    echo "cycle[$label] done: $task" >&2
     processed_count=$((processed_count + 1))
   done < "$tmp_tasks"
 
@@ -342,49 +368,162 @@ compare_cycles() {
 
 decision_matrix() {
   label=$1
+  fixtures_override=${2:-}
+  fixture_file=$(decision_fixture_file "$fixtures_override")
   mkdir -p "$OUT_DIR"
   out_file="$OUT_DIR/$label.tsv"
-  printf 'case\tkind\texpected_category\tactual_category\tallow\tpass\n' > "$out_file"
+  printf 'case\tkind\texpected_category\tactual_category\texpected_allow\tactual_allow\texpected_explicit\tactual_explicit\texpected_missing\tactual_missing\texpected_risk\tactual_risk\texpected_external\tactual_external\texpected_destructive\tactual_destructive\tpass\n' > "$out_file"
 
-  run_case() {
-    case_id=$1
-    kind=$2
-    expected=$3
-    prompt=$4
-    question=$5
-    commands=$6
-    run_mode=${7:-assistant}
-    raw=$(post_api "action=decision_surface_preview&prompt=$(urlenc "$prompt")&question=$(urlenc "$question")&commands=$(urlenc "$commands")&run_mode=$(urlenc "$run_mode")" | json_only)
-    actual=$(printf '%s' "$raw" | jq -r '.category // "none"')
-    allow=$(printf '%s' "$raw" | jq -r '.allow_decision_request // false')
-    pass=0
-    if [ "$actual" = "$expected" ]; then
-      pass=1
+  if [ ! -f "$fixture_file" ]; then
+    echo "Decision fixture file not found: $fixture_file" >&2
+    exit 1
+  fi
+
+  while IFS='|' read -r case_id expected_category expected_allow expected_explicit expected_missing expected_risk expected_external expected_destructive run_mode prompt question commands || [ -n "$case_id" ]; do
+    case_id=$(printf '%s' "$case_id" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    [ -n "$case_id" ] || continue
+    case "$case_id" in
+      \#*) continue ;;
+    esac
+
+    kind="trigger"
+    if [ "$expected_category" = "none" ]; then
+      kind="near-miss"
     fi
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$case_id" "$kind" "$expected" "$actual" "$allow" "$pass" >> "$out_file"
-  }
 
-  run_case "explicit-choice-trigger" "trigger" "explicit-choice" \
-    "Choose one approach: ship now or delay for reliability?" "" ""
-  run_case "explicit-choice-near" "near-miss" "none" \
-    "Please proceed with your best approach." "" ""
+    raw=$(post_api "action=decision_surface_preview&prompt=$(urlenc "$prompt")&question=$(urlenc "$question")&commands=$(urlenc "$commands")&run_mode=$(urlenc "$run_mode")" | json_only)
+    actual_category=$(printf '%s' "$raw" | jq -r '.category // "none"')
+    actual_allow=$(printf '%s' "$raw" | jq -r '.allow_decision_request // false')
+    actual_explicit=$(printf '%s' "$raw" | jq -r '.signals.explicit_choice // 0')
+    actual_missing=$(printf '%s' "$raw" | jq -r '.signals.missing_required_inputs // 0')
+    actual_risk=$(printf '%s' "$raw" | jq -r '.signals.risk_gate_question // 0')
+    actual_external=$(printf '%s' "$raw" | jq -r '.signals.external_commands // 0')
+    actual_destructive=$(printf '%s' "$raw" | jq -r '.signals.destructive_commands // 0')
 
-  run_case "required-input-trigger" "trigger" "required-input-missing" \
-    "Write a migration for my database." "" ""
-  run_case "required-input-near" "near-miss" "none" \
-    "Write a migration for PostgreSQL table users add column last_login TIMESTAMP default now()." "" ""
+    pass=1
+    if [ "$actual_category" != "$expected_category" ]; then pass=0; fi
+    if [ "$actual_allow" != "$expected_allow" ]; then pass=0; fi
+    if [ "$actual_explicit" != "$expected_explicit" ]; then pass=0; fi
+    if [ "$actual_missing" != "$expected_missing" ]; then pass=0; fi
+    if [ "$actual_risk" != "$expected_risk" ]; then pass=0; fi
+    if [ "$actual_external" != "$expected_external" ]; then pass=0; fi
+    if [ "$actual_destructive" != "$expected_destructive" ]; then pass=0; fi
 
-  run_case "external-action-trigger" "trigger" "external-action-gate" \
-    "" "" "curl -X POST https://api.mailgun.net/send"
-  run_case "external-action-near" "near-miss" "none" \
-    "" "" "grep -R \"TODO\" ."
-
-  run_case "risk-ack-trigger" "trigger" "risk-acknowledgement" \
-    "" "This action can delete production data. Continue anyway?" ""
-  run_case "risk-ack-near" "near-miss" "none" \
-    "" "Ready to continue with the next implementation step?" ""
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$case_id" "$kind" "$expected_category" "$actual_category" \
+      "$expected_allow" "$actual_allow" \
+      "$expected_explicit" "$actual_explicit" \
+      "$expected_missing" "$actual_missing" \
+      "$expected_risk" "$actual_risk" \
+      "$expected_external" "$actual_external" \
+      "$expected_destructive" "$actual_destructive" \
+      "$pass" >> "$out_file"
+  done < "$fixture_file"
 
   echo "$out_file"
+}
+
+cycle_metrics_for_file() {
+  result_file=$1
+  awk -F '\t' '
+    NR==1 { next }
+    {
+      total += 1
+      status = $4
+      if (status == "done") done += 1
+      if (status == "error") errors += 1
+      if (status == "timeout") timeout += 1
+      if (status == "awaiting_decision" || status == "awaiting_approval") blocking += 1
+      iq += ($13 + 0)
+      flow += ($14 + 0)
+    }
+    END {
+      if (total < 1) {
+        printf "0\t0\t0\t0\t0\t0\t0\n"
+        exit
+      }
+      printf "%d\t%d\t%d\t%d\t%d\t%d\t%d\n", total, done, errors, timeout, blocking, int((iq / total) + 0.5), int((flow / total) + 0.5)
+    }
+  ' "$result_file"
+}
+
+decision_metrics_for_file() {
+  result_file=$1
+  awk -F '\t' '
+    NR==1 { next }
+    {
+      total += 1
+      if ($17 == "1") passed += 1
+      if ($2 == "trigger") triggers += 1
+      if ($2 == "near-miss") near += 1
+    }
+    END {
+      if (total < 1) {
+        printf "0\t0\t0\t0\n"
+        exit
+      }
+      printf "%d\t%d\t%d\t%d\n", total, passed, triggers, near
+    }
+  ' "$result_file"
+}
+
+mentor_series() {
+  label=$1
+  cycles=$2
+  task_timeout_sec=$3
+  run_budget_sec=$4
+  attempts=$5
+  mentor_from=$6
+  max_tasks=$7
+  decisions_fixture_override=$8
+
+  mkdir -p "$OUT_DIR"
+  report_file="$OUT_DIR/$label-series.md"
+  printf '# Assay Mentor Series: %s\n\n' "$label" > "$report_file"
+  printf '| Iteration | Tasks Done | Avg IQ | Avg Flow | Decision Pass | Decisions Trigger/Near | Result TSV | Decisions TSV | Compare |\n' >> "$report_file"
+  printf '|---|---:|---:|---:|---:|---:|---|---|---|\n' >> "$report_file"
+
+  previous_cycle_file=""
+  prior_for_guidance=$mentor_from
+  cycle_index=1
+  while [ "$cycle_index" -le "$cycles" ]; do
+    cycle_label="$label-i$cycle_index"
+    decision_label="$label-decisions-i$cycle_index"
+    cycle_file=$(run_cycle "$cycle_label" "$task_timeout_sec" "$run_budget_sec" "$attempts" "$prior_for_guidance" "$max_tasks")
+    decision_file=$(decision_matrix "$decision_label" "$decisions_fixture_override")
+    cycle_metrics=$(cycle_metrics_for_file "$cycle_file")
+    decision_metrics=$(decision_metrics_for_file "$decision_file")
+
+    task_total=$(printf '%s' "$cycle_metrics" | awk -F '\t' '{print $1+0}')
+    task_done=$(printf '%s' "$cycle_metrics" | awk -F '\t' '{print $2+0}')
+    avg_iq=$(printf '%s' "$cycle_metrics" | awk -F '\t' '{print $6+0}')
+    avg_flow=$(printf '%s' "$cycle_metrics" | awk -F '\t' '{print $7+0}')
+
+    decision_total=$(printf '%s' "$decision_metrics" | awk -F '\t' '{print $1+0}')
+    decision_passed=$(printf '%s' "$decision_metrics" | awk -F '\t' '{print $2+0}')
+    decision_trigger_count=$(printf '%s' "$decision_metrics" | awk -F '\t' '{print $3+0}')
+    decision_near_count=$(printf '%s' "$decision_metrics" | awk -F '\t' '{print $4+0}')
+    decision_pass_rate="0%"
+    if [ "$decision_total" -gt 0 ]; then
+      decision_pass_rate=$(awk -v p="$decision_passed" -v t="$decision_total" 'BEGIN { printf "%.0f%%", (p * 100.0) / t }')
+    fi
+
+    compare_text="-"
+    if [ -n "$previous_cycle_file" ] && [ -f "$previous_cycle_file" ]; then
+      compare_file=$(compare_cycles "$previous_cycle_file" "$cycle_file")
+      compare_text=$(basename "$compare_file")
+    fi
+
+    printf '| %s | %d/%d | %d | %d | %s (%d/%d) | %d/%d | %s | %s | %s |\n' \
+      "$cycle_label" "$task_done" "$task_total" "$avg_iq" "$avg_flow" "$decision_pass_rate" "$decision_passed" "$decision_total" \
+      "$decision_trigger_count" "$decision_near_count" "$(basename "$cycle_file")" "$(basename "$decision_file")" "$compare_text" >> "$report_file"
+
+    previous_cycle_file=$cycle_file
+    prior_for_guidance=$cycle_file
+    cycle_index=$((cycle_index + 1))
+  done
+
+  echo "$report_file"
 }
 
 mode=${1:-}
@@ -442,6 +581,69 @@ case "$mode" in
     esac
     run_cycle "$label" "$task_timeout_sec" "$run_budget_sec" "$attempts" "$mentor_from" "$max_tasks"
     ;;
+  mentor)
+    label="mentor-$(date +%Y%m%d-%H%M%S)"
+    cycles=2
+    task_timeout_sec=320
+    run_budget_sec=120
+    attempts=1
+    mentor_from=""
+    max_tasks=0
+    decisions_fixtures=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --label)
+          label=$2
+          shift 2
+          ;;
+        --cycles)
+          cycles=$2
+          shift 2
+          ;;
+        --timeout-sec)
+          task_timeout_sec=$2
+          shift 2
+          ;;
+        --run-budget-sec)
+          run_budget_sec=$2
+          shift 2
+          ;;
+        --attempts)
+          attempts=$2
+          shift 2
+          ;;
+        --mentor-from)
+          mentor_from=$2
+          shift 2
+          ;;
+        --max-tasks)
+          max_tasks=$2
+          shift 2
+          ;;
+        --fixtures)
+          decisions_fixtures=$2
+          shift 2
+          ;;
+        *)
+          echo "Unknown arg: $1" >&2
+          usage
+          exit 1
+          ;;
+      esac
+    done
+    case "$cycles" in
+      ""|*[!0-9]*|0)
+        echo "Invalid --cycles: $cycles" >&2
+        exit 1
+        ;;
+    esac
+    case "$max_tasks" in
+      ""|*[!0-9]*)
+        max_tasks=0
+        ;;
+    esac
+    mentor_series "$label" "$cycles" "$task_timeout_sec" "$run_budget_sec" "$attempts" "$mentor_from" "$max_tasks" "$decisions_fixtures"
+    ;;
   compare)
     before=""
     after=""
@@ -470,10 +672,15 @@ case "$mode" in
     ;;
   decisions)
     label="decisions-$(date +%Y%m%d-%H%M%S)"
+    fixture_file=""
     while [ $# -gt 0 ]; do
       case "$1" in
         --label)
           label=$2
+          shift 2
+          ;;
+        --fixtures)
+          fixture_file=$2
           shift 2
           ;;
         *)
@@ -483,7 +690,7 @@ case "$mode" in
           ;;
       esac
     done
-    decision_matrix "$label"
+    decision_matrix "$label" "$fixture_file"
     ;;
   *)
     usage

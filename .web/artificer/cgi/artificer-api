@@ -46,6 +46,13 @@ mkdir -p "$mode_runtime_root"
 mkdir -p "$llm_settings_dir"
 mkdir -p "$dictation_settings_dir"
 
+DICTATION_MAX_RECORDING_SECONDS=${DICTATION_MAX_RECORDING_SECONDS:-600}
+case "$DICTATION_MAX_RECORDING_SECONDS" in
+  ""|*[!0-9]*)
+    DICTATION_MAX_RECORDING_SECONDS=600
+    ;;
+esac
+
 json_escape() {
   printf '%s' "$1" | awk '
     BEGIN {
@@ -1061,6 +1068,24 @@ requires_agent_execution_prompt() {
       return 0
       ;;
   esac
+
+  return 1
+}
+
+chat_prompt_needs_deep_reasoning() {
+  prompt_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  prompt_trimmed=$(trim "$prompt_lower")
+  [ -n "$prompt_trimmed" ] || return 1
+
+  if printf '%s' "$prompt_trimmed" | grep -Eq 'higher[- ]?order|meta[- ]?cogn|metacogn|epistem|ontology|theorize|theorise|axiom|first principles|identity|self|values|meaning|purpose|worldview|core belief|beliefs'; then
+    return 0
+  fi
+  if printf '%s' "$prompt_trimmed" | grep -Eq 'what would be prior to|what is prior to|prior to .* app|more prior|more fundamental|center of who i am|centre of who i am'; then
+    return 0
+  fi
+  if printf '%s' "$prompt_trimmed" | grep -Eq '^(no|not exactly|not quite|that.s not|i mean|rather)\b|^no,|^no\.'; then
+    return 0
+  fi
 
   return 1
 }
@@ -7518,6 +7543,72 @@ model_preference_score_for_mode() {
   esac
 
   printf '%s' "$score"
+}
+
+best_model_for_mode() {
+  mode_name=$1
+  models=$(list_models_raw || true)
+  if [ -z "$(trim "$models")" ]; then
+    models=$(list_models_from_workspace_data || true)
+  fi
+  [ -n "$(trim "$models")" ] || return 0
+
+  best_model=""
+  best_score=-9999
+  while IFS= read -r model_name; do
+    model_name=$(trim "$model_name")
+    [ -n "$model_name" ] || continue
+    if ! model_is_text_generation_model "$model_name"; then
+      continue
+    fi
+    score=$(model_preference_score_for_mode "$model_name" "$mode_name")
+    case "$score" in
+      ""|*[!0-9-]*)
+        score=0
+        ;;
+    esac
+    if [ -z "$best_model" ] || [ "$score" -gt "$best_score" ]; then
+      best_model=$model_name
+      best_score=$score
+    fi
+  done <<EOF
+$models
+EOF
+  printf '%s' "$best_model"
+}
+
+chat_autoroute_model() {
+  current_model=$(trim "$1")
+  [ -n "$current_model" ] || return 0
+
+  best_chat_model=$(best_model_for_mode "chat")
+  [ -n "$best_chat_model" ] || return 0
+  if [ "$best_chat_model" = "$current_model" ]; then
+    return 0
+  fi
+
+  current_score=$(model_preference_score_for_mode "$current_model" "chat")
+  best_score=$(model_preference_score_for_mode "$best_chat_model" "chat")
+  case "$current_score" in ""|*[!0-9-]*) current_score=0 ;; esac
+  case "$best_score" in ""|*[!0-9-]*) best_score=0 ;; esac
+  score_gap=$((best_score - current_score))
+
+  current_lower=$(printf '%s' "$current_model" | tr '[:upper:]' '[:lower:]')
+  coder_like=0
+  case "$current_lower" in
+    *coder*|*code*|starcoder*|*starcoder*|codellama*|*codellama*|deepseek-coder*|*deepseek-coder*)
+      coder_like=1
+      ;;
+  esac
+
+  if [ "$coder_like" -eq 1 ] && [ "$score_gap" -ge 12 ]; then
+    printf '%s' "$best_chat_model"
+    return 0
+  fi
+  if [ "$current_score" -lt 90 ] && [ "$score_gap" -ge 20 ]; then
+    printf '%s' "$best_chat_model"
+    return 0
+  fi
 }
 
 preferred_chat_model() {
@@ -15459,21 +15550,21 @@ case "$os_name" in
   Darwin)
     exec ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-      -f avfoundation -i ":0" \
+      -f avfoundation -i ":0" -t "$DICTATION_MAX_RECORDING_SECONDS" \
       -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     ;;
   Linux)
     if ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-      -f pulse -i default \
+      -f pulse -i default -t "$DICTATION_MAX_RECORDING_SECONDS" \
       -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1; then
       :
     else
       ffmpeg -nostdin -hide_banner -loglevel error \
-        -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-        -f alsa -i default \
+      -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
+        -f alsa -i default -t "$DICTATION_MAX_RECORDING_SECONDS" \
         -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
         -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     fi
@@ -15630,21 +15721,21 @@ case "$os_name" in
   Darwin)
     exec ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-      -f avfoundation -i ":0" \
+      -f avfoundation -i ":0" -t "$DICTATION_MAX_RECORDING_SECONDS" \
       -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     ;;
   Linux)
     if ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-      -f pulse -i default \
+      -f pulse -i default -t "$DICTATION_MAX_RECORDING_SECONDS" \
       -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1; then
       :
     else
       ffmpeg -nostdin -hide_banner -loglevel error \
-        -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-        -f alsa -i default \
+      -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
+        -f alsa -i default -t "$DICTATION_MAX_RECORDING_SECONDS" \
         -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
         -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     fi
@@ -16998,10 +17089,28 @@ $fallback_output"
           fi
           ;;
         chat)
+          chat_deep_reasoning=0
+          if chat_prompt_needs_deep_reasoning "$user_prompt"; then
+            chat_deep_reasoning=1
+          fi
           case "$reasoning_effort" in
-            low) reasoning_effort="medium" ;;
+            low)
+              reasoning_effort="medium"
+              ;;
           esac
-          if [ "$max_iterations" -gt 2 ]; then
+          if [ "$chat_deep_reasoning" -eq 1 ]; then
+            case "$reasoning_effort" in
+              low|medium)
+                reasoning_effort="high"
+                ;;
+            esac
+            if [ "$max_iterations" -gt 3 ]; then
+              max_iterations=3
+            fi
+            if [ "$max_iterations" -lt 2 ]; then
+              max_iterations=2
+            fi
+          elif [ "$max_iterations" -gt 2 ]; then
             max_iterations=2
           fi
           ;;
@@ -17166,6 +17275,15 @@ $fallback_output"
     if [ -z "$model" ]; then
       model=$(default_model)
       printf '%s\n' "$model" > "$conv_dir/model"
+    fi
+    if [ "$run_mode" = "chat" ]; then
+      routed_chat_model=$(chat_autoroute_model "$model")
+      if [ -n "$routed_chat_model" ] && [ "$routed_chat_model" != "$model" ]; then
+        prior_chat_model=$model
+        model=$routed_chat_model
+        printf '%s\n' "$model" > "$conv_dir/model"
+        stream_emit_line "$stream_output_file" "Auto-selected conversational model: $prior_chat_model -> $model."
+      fi
     fi
 
     ALLOW_NETWORK=0

@@ -45,6 +45,8 @@ This backlog tracks concrete implementation work for improving Artificer intelli
   - Progress:
     - Added a fixture-driven live decision-surfacing test pack for deterministic category/signal validation.
     - Expanded high-order heuristics/fixtures for compliance-risk questions, deployment scope gaps, cloud/orchestration external actions, and destructive near-neighbor command cases.
+    - Expanded fixture coverage with additional trigger/near-miss precedence cases and wired assay `decisions` runs to score full fixture signal parity (category + allow + all signal flags).
+    - Added a multi-iteration assay mentor runner that executes full task panels per cycle, records decision-matrix outcomes per cycle, and produces cycle-over-cycle report tables.
 
 - INT-006 Conversation flow latency and completion signaling
   - Goal: Remove dead-air gaps between run completion markers and assistant text rendering.
@@ -60,6 +62,8 @@ This backlog tracks concrete implementation work for improving Artificer intelli
     - Added chat-specific off-topic detection + salvage reroute for correction turns (e.g., onboarding/non-sequitur drift, generic platitude lists) to improve relevance under weaker conversational models.
     - Upgraded conversational model preference scoring so `chat` fallback/salvage prefers general conversational strength over coder-specialized models when both are installed.
     - Added thread-focus anchors (recent user-turn summaries) to chat prompts so follow-up answers better preserve conceptual throughlines.
+    - Added run-step text normalization so controller scaffolding markers render as cleaner human-readable timeline lines during live trace viewing.
+    - Forced terminal run traces into collapsed rollup state by default to keep finished conversations scan-friendly while preserving expandable detail.
 
 - INT-007 Thread/workspace ordering ergonomics
   - Goal: Improve recency-based thread placement and drag-reorder fluidity.

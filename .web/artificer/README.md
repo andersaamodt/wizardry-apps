@@ -103,8 +103,9 @@ All actions are handled by `/cgi/artificer-api` with `action=`:
 - Local assay cycle runner:
   - `.web/artificer/scripts/assay-cycle.sh run --label baseline --attempts 2`
   - `.web/artificer/scripts/assay-cycle.sh run --label after --attempts 2 --mentor-from .web/artificer/.assay-reports/baseline.tsv`
+  - `.web/artificer/scripts/assay-cycle.sh mentor --label mentor --cycles 3 --attempts 2 --mentor-from .web/artificer/.assay-reports/baseline.tsv`
   - `.web/artificer/scripts/assay-cycle.sh compare --before .web/artificer/.assay-reports/baseline.tsv --after .web/artificer/.assay-reports/after.tsv`
-  - `.web/artificer/scripts/assay-cycle.sh decisions --label decisions-baseline`
+  - `.web/artificer/scripts/assay-cycle.sh decisions --label decisions-baseline --fixtures .tests/apps/fixtures/artificer-decision-surfacing-fixtures.psv`
 - Mode Runtime stores state in `mode-runtime/` under site data:
   - `modes/<mode-id>/` (governance policy, state, long-horizon memory namespace)
   - `skills/<skill-id>/` bundles with `policy.md`, `trigger.yaml`, `tools.json`, `output.schema.json`

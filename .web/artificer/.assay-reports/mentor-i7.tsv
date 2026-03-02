@@ -1,0 +1,13 @@
+task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
+deterministic-tests	report	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+concurrency-race	assistant	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+api-hardening	programming	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+migration-safe	assistant	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+perf-regression	report	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+security-audit	security-audit	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+refactor-boundaries	assistant	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+failure-recovery	programming	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+spec-to-code	assistant	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+report-trace	report	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+teacher-explain	teacher	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
+pentest-simulation	pentest	standard	error\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0
