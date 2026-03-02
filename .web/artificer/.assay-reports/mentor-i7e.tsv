@@ -1,0 +1,4 @@
+task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
+deterministic-tests	report	standard	awaiting_decision	0	6	0	43	0	1	0	0	52	49
+concurrency-race	assistant	standard	awaiting_decision	0	1	0	43	0	1	0	0	40	27
+api-hardening	programming	standard	awaiting_decision	0	1	0	43	0	1	0	0	40	27

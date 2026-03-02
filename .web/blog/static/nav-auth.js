@@ -123,57 +123,31 @@
   }
 
   function composeIconSvgPaths() {
-    function fmt(num) {
-      return Number(num).toFixed(2).replace(/\.00$/, '');
-    }
-
-    function makePaperQuillBody(seed) {
-      var x = 2.9 + ((seed % 3) * 0.18);
-      var y = 2.6 + (((seed + 1) % 3) * 0.16);
-      var w = 12.6 + ((seed % 4) * 0.22);
-      var h = 17.1 - (((seed + 2) % 3) * 0.28);
-      var fold = 2.3 + ((seed % 5) * 0.24);
-      var qx1 = 16.7 + (((seed % 5) - 2) * 0.19);
-      var qy1 = 1.9 + (((seed + 2) % 4) * 0.12);
-      var qx2 = 11.1 + (((seed + 3) % 5) * 0.15);
-      var qy2 = 8.8 + (((seed + 1) % 4) * 0.17);
-      var midY = y + h - (4.3 + ((seed % 3) * 0.22));
-      var underlineW = w - (6.2 + ((seed % 4) * 0.18));
-      var c1x = qx1 - (0.55 + ((seed % 3) * 0.12));
-      var c1y = qy1 + (1.4 + ((seed % 4) * 0.1));
-      var c2x = qx2 + (1.05 + ((seed % 4) * 0.11));
-      var c2y = qy2 - (1.05 + ((seed % 3) * 0.08));
-      var fx = qx2 - (0.25 + ((seed % 3) * 0.08));
-      var fy = qy2 + (0.55 + ((seed % 4) * 0.08));
-      var lx = qx2 - (0.95 + ((seed % 2) * 0.14));
-      var ly = qy2 + (1.7 + ((seed % 3) * 0.12));
-      return '' +
-        '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.45">' +
-        '<rect x="' + fmt(x) + '" y="' + fmt(y) + '" width="' + fmt(w) + '" height="' + fmt(h) + '" rx="2.2"/>' +
-        '<path d="M' + fmt(x + w - fold) + ' ' + fmt(y) + 'h' + fmt(fold) + 'v' + fmt(fold) + '"/>' +
-        '<path d="M' + fmt(qx1) + ' ' + fmt(qy1) + 'L' + fmt(qx2) + ' ' + fmt(qy2) + '"/>' +
-        '<path d="M' + fmt(qx1) + ' ' + fmt(qy1) + 'C' + fmt(c1x) + ' ' + fmt(c1y) + ' ' + fmt(c2x) + ' ' + fmt(c2y) + ' ' + fmt(fx) + ' ' + fmt(fy) + '"/>' +
-        '<path d="M' + fmt(qx1 - 0.2) + ' ' + fmt(qy1 + 0.25) + 'C' + fmt(qx1 + 0.95) + ' ' + fmt(qy1 + 0.65) + ' ' + fmt(qx2 - 0.35) + ' ' + fmt(qy2 - 0.85) + ' ' + fmt(qx2 - 0.55) + ' ' + fmt(qy2 + 0.22) + '"/>' +
-        '<path d="M' + fmt(lx) + ' ' + fmt(ly) + 'L' + fmt(qx2) + ' ' + fmt(qy2) + '"/>' +
-        '<path d="M' + fmt(x + 2.55) + ' ' + fmt(midY) + 'h' + fmt(underlineW) + '"/>' +
-        '</g>';
-    }
-
-    var icons = [
-      { id: "streamline-pixel:content-files-quill-ink", viewBox: "0 0 32 32", body: "<path fill=\"currentColor\" d=\"M27.435 3.05h1.52V1.52h1.52V0h-9.14v1.52h6.1zm-1.53 0h1.53v1.52h-1.53Zm-1.52 1.52h1.52V6.1h-1.52Zm-1.52 1.53h1.52v1.52h-1.52Zm-1.53 1.52h1.53v3.05h-1.53Zm0-4.57h1.53v1.52h-1.53Zm-1.52 7.62h1.52v1.52h-1.52Zm0-6.1h1.52V6.1h-1.52Z\"/><path fill=\"currentColor\" d=\"M18.285 1.52h3.05v1.53h-3.05Zm0 4.58h1.53v1.52h-1.53Zm-1.52 6.09h3.05v1.53h-3.05Zm0-4.57h1.52v1.52h-1.52Zm0-4.57h1.52v1.52h-1.52ZM3.055 32h13.71v-1.52h1.52v-6.1h-1.52v1.53h-7.62v-1.53H6.1v-1.52H3.055v1.52h-1.53v6.1h1.53Zm1.52-6.09H6.1v3.04h3.05v1.53H6.1v-1.53H4.575Zm10.67-16.77h1.52v1.53h-1.52Zm0-4.57h1.52V6.1h-1.52Z\"/><path fill=\"currentColor\" d=\"M13.715 22.86h3.05v1.52h-3.05Zm3.05-9.14h-3.05v-1.53h-1.52v-1.52h-1.52v4.57h6.09z\"/><path fill=\"currentColor\" d=\"M13.715 10.67h1.53v1.52h-1.53Zm0-4.57h1.53v1.52h-1.53Zm-1.52 1.52h1.52v3.05h-1.52Zm-4.57 12.19h4.57v3.05h1.52v-3.05h1.53v-1.52h-4.57v-3.05h-1.53v3.05h-4.57v1.52h1.52v3.05h1.53z\"/>" },
-      { id: "hugeicons:quill-write-02", viewBox: "0 0 24 24", body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.5\"><path d=\"M10.55 3c-3.852.007-5.87.102-7.159 1.39C2 5.783 2 8.022 2 12.5s0 6.717 1.391 8.109C4.783 22 7.021 22 11.501 22c4.478 0 6.717 0 8.108-1.391c1.29-1.29 1.384-3.307 1.391-7.16\"/><path d=\"M11.056 13C10.332 3.866 16.802 1.276 21.98 2.164c.209 3.027-1.273 4.16-4.093 4.684c.545.57 1.507 1.286 1.403 2.18c-.074.638-.506.95-1.372 1.576c-1.896 1.37-4.093 2.234-6.863 2.396\"/><path d=\"M9 17c2-5.5 3.96-7.364 6-9\"/></g>" }
+    return [
+      { id: "streamline-pixel:content-files-quill-ink", viewBox: "0 0 32 32", body: '<path fill="currentColor" d="M27.435 3.05h1.52V1.52h1.52V0h-9.14v1.52h6.1zm-1.53 0h1.53v1.52h-1.53Zm-1.52 1.52h1.52V6.1h-1.52Zm-1.52 1.53h1.52v1.52h-1.52Zm-1.53 1.52h1.53v3.05h-1.53Zm0-4.57h1.53v1.52h-1.53Zm-1.52 7.62h1.52v1.52h-1.52Zm0-6.1h1.52V6.1h-1.52Z"/><path fill="currentColor" d="M18.285 1.52h3.05v1.53h-3.05Zm0 4.58h1.53v1.52h-1.53Zm-1.52 6.09h3.05v1.53h-3.05Zm0-4.57h1.52v1.52h-1.52Zm0-4.57h1.52v1.52h-1.52ZM3.055 32h13.71v-1.52h1.52v-6.1h-1.52v1.53h-7.62v-1.53H6.1v-1.52H3.055v1.52h-1.53v6.1h1.53Zm1.52-6.09H6.1v3.04h3.05v1.53H6.1v-1.53H4.575Zm10.67-16.77h1.52v1.53h-1.52Zm0-4.57h1.52V6.1h-1.52Z"/><path fill="currentColor" d="M13.715 22.86h3.05v1.52h-3.05Zm3.05-9.14h-3.05v-1.53h-1.52v-1.52h-1.52v4.57h6.09z"/><path fill="currentColor" d="M13.715 10.67h1.53v1.52h-1.53Zm0-4.57h1.53v1.52h-1.53Zm-1.52 1.52h1.52v3.05h-1.52Zm-4.57 12.19h4.57v3.05h1.52v-3.05h1.53v-1.52h-4.57v-3.05h-1.53v3.05h-4.57v1.52h1.52v3.05h1.53z"/>' },
+      { id: "hugeicons:quill-write-02", viewBox: "0 0 24 24", body: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M10.55 3c-3.852.007-5.87.102-7.159 1.39C2 5.783 2 8.022 2 12.5s0 6.717 1.391 8.109C4.783 22 7.021 22 11.501 22c4.478 0 6.717 0 8.108-1.391c1.29-1.29 1.384-3.307 1.391-7.16"/><path d="M11.056 13C10.332 3.866 16.802 1.276 21.98 2.164c.209 3.027-1.273 4.16-4.093 4.684c.545.57 1.507 1.286 1.403 2.18c-.074.638-.506.95-1.372 1.576c-1.896 1.37-4.093 2.234-6.863 2.396"/><path d="M9 17c2-5.5 3.96-7.364 6-9"/></g>' },
+      { id: "custom:quill-icon-01", src: "/static/icons/quill-icon-01.svg", name: "quill-icon-01" },
+      { id: "custom:quill-icon-02", src: "/static/icons/quill-icon-02.svg", name: "quill-icon-02" },
+      { id: "custom:quill-icon-03", src: "/static/icons/quill-icon-03.svg", name: "quill-icon-03" },
+      { id: "custom:quill-icon-04", src: "/static/icons/quill-icon-04.svg", name: "quill-icon-04" },
+      { id: "custom:quill-icon-05", src: "/static/icons/quill-icon-05.svg", name: "quill-icon-05" },
+      { id: "custom:quill-icon-06", src: "/static/icons/quill-icon-06.svg", name: "quill-icon-06" },
+      { id: "custom:quill-icon-07", src: "/static/icons/quill-icon-07.svg", name: "quill-icon-07" },
+      { id: "custom:quill-icon-08", src: "/static/icons/quill-icon-08.svg", name: "quill-icon-08" },
+      { id: "custom:quill-icon-09", src: "/static/icons/quill-icon-09.svg", name: "quill-icon-09" },
+      { id: "custom:quill-icon-10", src: "/static/icons/quill-icon-10.svg", name: "quill-icon-10" },
+      { id: "custom:quill-icon-11", src: "/static/icons/quill-icon-11.svg", name: "quill-icon-11" },
+      { id: "custom:quill-icon-12", src: "/static/icons/quill-icon-12.svg", name: "quill-icon-12" },
+      { id: "custom:quill-icon-13", src: "/static/icons/quill-icon-13.svg", name: "quill-icon-13" },
+      { id: "custom:quill-icon-14", src: "/static/icons/quill-icon-14.svg", name: "quill-icon-14" },
+      { id: "custom:quill-icon-15", src: "/static/icons/quill-icon-15.svg", name: "quill-icon-15" },
+      { id: "custom:quill-icon-16", src: "/static/icons/quill-icon-16.svg", name: "quill-icon-16" },
+      { id: "custom:quill-icon-17", src: "/static/icons/quill-icon-17.svg", name: "quill-icon-17" },
+      { id: "custom:quill-icon-18", src: "/static/icons/quill-icon-18.svg", name: "quill-icon-18" },
+      { id: "custom:quill-icon-19", src: "/static/icons/quill-icon-19.svg", name: "quill-icon-19" },
+      { id: "custom:quill-icon-20", src: "/static/icons/quill-icon-20.svg", name: "quill-icon-20" }
     ];
-    for (var i = 1; i <= 20; i += 1) {
-      icons.push({
-        id: "custom:quill-page-" + (i < 10 ? "0" + i : i),
-        viewBox: "0 0 24 24",
-        body: makePaperQuillBody(i),
-        name: "quill-page-" + (i < 10 ? "0" + i : i)
-      });
-    }
-    return icons;
   }
-
   function composeIconShortName(id) {
     var raw = String(id || '').trim();
     if (!raw) {
