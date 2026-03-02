@@ -64,7 +64,6 @@ while :; do
   menu_title="App Forge console (root: $root)"
 
   menu "$menu_title" \
-    "Usage:" \
     "Quick cycle (build+run)%sh \"$script_dir/forge-backend.sh\" run-desktop \"$root\" forge bundle" \
     "Run App Forge (desktop)%sh \"$script_dir/forge-backend.sh\" run-desktop \"$root\" forge" \
     "Doctor workspace%sh \"$script_dir/forge-backend.sh\" doctor \"$root\"" \
@@ -74,13 +73,11 @@ while :; do
     "List themes%sh \"$script_dir/forge-backend.sh\" list-themes \"$root\"" \
     "List Godot tools%sh \"$script_dir/forge-backend.sh\" list-godot-tools \"$root\"" \
     "---" \
-    "Build artifacts:" \
     "Build App Forge (desktop)%sh \"$script_dir/forge-backend.sh\" build-desktop \"$root\" forge" \
     "Stage mobile assets%sh \"$script_dir/forge-backend.sh\" stage-mobile \"$root\" forge" \
     "Build Android debug%sh \"$script_dir/forge-backend.sh\" build-android-debug \"$root\" forge" \
     "Build iOS smoke%sh \"$script_dir/forge-backend.sh\" build-ios-smoke \"$root\" forge" \
     "---" \
-    "Install/setup:" \
     "Install App Forge launcher%sh \"$repo_root/tools/forge/install-forge.sh\" --root \"$root\"" \
     "Uninstall App Forge launcher%sh \"$repo_root/tools/forge/uninstall-forge.sh\"" \
     "Launch App Forge GUI%sh \"$repo_root/tools/forge/launch-forge.sh\" --root \"$root\"" \

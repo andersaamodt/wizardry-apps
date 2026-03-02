@@ -27,11 +27,9 @@ web_arcana_dir="$repo_root/spells/.arcana/web-wizardry"
 while true; do
   exit_label=$(exit-label)
   menu "wizardry-apps web admin" \
-    "Usage:" \
     "Web component manager%\"$web_arcana_dir/web-wizardry-menu\"" \
     "Web status%\"$script_dir/wizardry-apps-status\" --section web" \
     "---" \
-    "Checks:" \
     "Adapter smoke tests%sh \"$repo_root/.tests/adapters/test-http-cgi.sh\"" \
     "${exit_label}%kill -TERM \$PPID" || menu_status=$?
   menu_status=${menu_status:-0}

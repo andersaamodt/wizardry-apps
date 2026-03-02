@@ -26,10 +26,8 @@ repo_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
 while true; do
   exit_label=$(exit-label)
   menu "wizardry-apps mobile admin" \
-    "Usage:" \
     "Mobile status%\"$script_dir/wizardry-apps-status\" --section mobile" \
     "---" \
-    "Checks:" \
     "iOS promotion dry-run test%sh \"$repo_root/.tests/release/test-ios-promotion-script.sh\"" \
     "Manifest validation%sh \"$repo_root/tools/validate-manifest.sh\"" \
     "${exit_label}%kill -TERM \$PPID" || menu_status=$?
