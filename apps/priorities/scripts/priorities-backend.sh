@@ -41,7 +41,7 @@ is_workspace_root() {
   [ -n "$root" ] || return 1
   [ -f "$root/config/apps.manifest.json" ] || return 1
   [ -d "$root/apps" ] || return 1
-  [ -d "$root/.web" ] || return 1
+  [ -d "$root/web" ] || return 1
 }
 
 find_root_from() {
