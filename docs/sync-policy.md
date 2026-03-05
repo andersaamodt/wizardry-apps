@@ -9,12 +9,12 @@ Only `tools/sync-from-wizardry.sh` may import code from the wizardry repository.
 The sync script imports only:
 - `spells/web`
 - `spells/.arcana/web-wizardry`
-- `.web`
-- `.apps`
+- `web`
+- `apps`
 - `.tests/web`
 - `.tests/.arcana/web-wizardry`
 
-For `.apps`, the sync excludes `.apps/.host` so native packaging hosts remain owned by `wizardry-apps`.
+For `apps`, the sync excludes `apps/.host` so native packaging hosts remain owned by `wizardry-apps`.
 
 ## Direction
 

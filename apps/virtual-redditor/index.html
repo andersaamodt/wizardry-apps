@@ -3115,10 +3115,10 @@
       if (state.backendScriptPath) return state.backendScriptPath;
       try {
         var p = decodeURIComponent(String((window.location && window.location.pathname) || ''));
-        var marker = '/.apps/virtual-redditor/';
+        var marker = '/apps/virtual-redditor/';
         var idx = p.lastIndexOf(marker);
         if (idx > 0) {
-          state.backendScriptPath = p.slice(0, idx) + '/.apps/virtual-redditor/scripts/virtual-redditor-backend.sh';
+          state.backendScriptPath = p.slice(0, idx) + '/apps/virtual-redditor/scripts/virtual-redditor-backend.sh';
           return state.backendScriptPath;
         }
       } catch (_) {
@@ -3137,7 +3137,7 @@
         argv = [
           'sh',
           '-c',
-          'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/.apps/virtual-redditor/scripts/virtual-redditor-backend.sh" "$@"',
+          'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/apps/virtual-redditor/scripts/virtual-redditor-backend.sh" "$@"',
           'virtual-redditor-backend',
           action
         ].concat(args);

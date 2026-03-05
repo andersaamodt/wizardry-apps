@@ -23,8 +23,8 @@ wizardry-apps follows wizardry ethos:
 
 - `spells/web` and `spells/.arcana/web-wizardry` are migrated from `~/.wizardry`
 - `spells/.arcana/wizardry-apps` provides the top-level app pipeline arcana and menus
-- `.web` templates are migrated from `~/.wizardry/.web`
-- `.apps` desktop app surfaces are migrated from `~/.wizardry/.apps`
+- `web` templates are migrated from `~/.wizardry/.web`
+- `apps` desktop app surfaces are migrated from `~/.wizardry/.apps`
 - manifests in `config/` define production release allowlists
 - contracts in `schemas/` define RPC/events/metadata formats
 - CI workflows in `.github/workflows/` implement lint/test/build/release gates
@@ -94,7 +94,7 @@ spells/.arcana/wizardry-apps/wizardry-apps mobile-admin
 ./uninstall-forge
 
 # Inspect backend directly:
-sh .apps/forge/scripts/forge-backend.sh --help
+sh apps/forge/scripts/forge-backend.sh --help
 ```
 
 After `./install-forge`:
@@ -110,7 +110,7 @@ The macOS app bundle is first-class:
 
 ```sh
 # Stage app assets for native hosts
-sh tools/release/stage-web-assets.sh artificer .apps/.host/android/app/src/main/assets
+sh tools/release/stage-web-assets.sh artificer apps/.host/android/app/src/main/assets
 
 # iOS simulator smoke artifact
 sh tools/release/build-ios-app.sh artificer dist/ios smoke
@@ -120,4 +120,4 @@ sh tools/release/build-ios-app.sh artificer dist/ios smoke
 
 Use `tools/sync-from-wizardry.sh` for all upstream imports from `~/.wizardry`.
 No other import path is considered canonical.
-The sync preserves local `.apps/.host` ownership for native desktop/mobile hosts.
+The sync preserves local `apps/.host` ownership for native desktop/mobile hosts.

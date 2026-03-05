@@ -8,8 +8,8 @@ case "${1-}" in
 Usage: stage-web-assets.sh APP_SLUG DEST_DIR
 
 Copies:
-  .apps/APP_SLUG/* -> DEST_DIR/app/
-  .apps/.host/shared/* -> DEST_DIR/app/.host/shared/
+  apps/APP_SLUG/* -> DEST_DIR/app/
+  apps/.host/shared/* -> DEST_DIR/app/.host/shared/
   core/include + core/src -> DEST_DIR/core/
 USAGE
   exit 0
@@ -27,8 +27,8 @@ if [ -z "$slug" ] || [ -z "$dest" ]; then
 fi
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-app_dir="$ROOT_DIR/.apps/$slug"
-shared_dir="$ROOT_DIR/.apps/.host/shared"
+app_dir="$ROOT_DIR/apps/$slug"
+shared_dir="$ROOT_DIR/apps/.host/shared"
 
 [ -d "$app_dir" ] || {
   printf '%s\n' "stage-web-assets: app not found: $slug" >&2

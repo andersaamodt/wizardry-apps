@@ -40,7 +40,7 @@ is_workspace_root() {
   root=${1-}
   [ -n "$root" ] || return 1
   [ -f "$root/config/apps.manifest.json" ] || return 1
-  [ -d "$root/.apps" ] || return 1
+  [ -d "$root/apps" ] || return 1
   [ -d "$root/.web" ] || return 1
 }
 
@@ -94,8 +94,8 @@ emit_theme_names() {
   app_theme_dir="$SCRIPT_DIR/../themes"
   theme_root=''
   root=$(resolve_wizardry_root 2>/dev/null || true)
-  if [ -n "$root" ] && [ -d "$root/.web/.themes" ]; then
-    theme_root="$root/.web/.themes"
+  if [ -n "$root" ] && [ -d "$root/web/.themes" ]; then
+    theme_root="$root/web/.themes"
     mkdir -p "$app_theme_dir"
     cp -f "$theme_root"/*.css "$app_theme_dir/" 2>/dev/null || true
   fi

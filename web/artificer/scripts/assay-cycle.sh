@@ -2,8 +2,8 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
-API="$ROOT_DIR/.web/artificer/cgi/artificer-api"
-OUT_DIR="$ROOT_DIR/.web/artificer/.assay-reports"
+API="$ROOT_DIR/web/artificer/cgi/artificer-api"
+OUT_DIR="$ROOT_DIR/web/artificer/.assay-reports"
 DECISION_FIXTURE_FILE="$ROOT_DIR/.tests/apps/fixtures/artificer-decision-surfacing-fixtures.psv"
 
 usage() {
@@ -15,10 +15,10 @@ Usage:
   assay-cycle.sh decisions [--label NAME] [--fixtures FILE]
 
 Examples:
-  .web/artificer/scripts/assay-cycle.sh run --label baseline
-  .web/artificer/scripts/assay-cycle.sh run --label after
-  .web/artificer/scripts/assay-cycle.sh mentor --label mentor --cycles 2 --attempts 2
-  .web/artificer/scripts/assay-cycle.sh compare --before .web/artificer/.assay-reports/baseline.tsv --after .web/artificer/.assay-reports/after.tsv
+  web/artificer/scripts/assay-cycle.sh run --label baseline
+  web/artificer/scripts/assay-cycle.sh run --label after
+  web/artificer/scripts/assay-cycle.sh mentor --label mentor --cycles 2 --attempts 2
+  web/artificer/scripts/assay-cycle.sh compare --before web/artificer/.assay-reports/baseline.tsv --after web/artificer/.assay-reports/after.tsv
 EOF
 }
 

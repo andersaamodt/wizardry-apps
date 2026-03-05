@@ -1654,7 +1654,7 @@
             context: app.context,
             projectType: inferProjectTypeFromContext(app.context).toLowerCase(),
             targets: app.targets || '',
-            path: state.rootHint ? (state.rootHint + '/.apps/' + app.id) : ''
+            path: state.rootHint ? (state.rootHint + '/apps/' + app.id) : ''
           };
         });
         var workspaces = state.workspaces.map(function (ws) {

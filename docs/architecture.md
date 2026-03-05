@@ -9,7 +9,7 @@
 
 - Hosted web remains shell/CGI reference semantics.
 - Desktop/mobile use embedded `wizardry-core` for fast-path operations.
-- `App Forge` (`.apps/forge`) is the desktop control-plane app for build/run/scaffold workflows, implemented as WebView UI + POSIX shell backend.
+- `App Forge` (`apps/forge`) is the desktop control-plane app for build/run/scaffold workflows, implemented as WebView UI + POSIX shell backend.
 - Core API contract is transport-agnostic JSON-RPC 2.0.
 - Core v1 methods implemented in repository:
   - `core.ping`, `vault.mount`, `vault.info`

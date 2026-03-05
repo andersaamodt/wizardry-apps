@@ -34,7 +34,7 @@ USAGE
   esac
 done
 
-if [ ! -d "$root/.apps/forge" ] || [ ! -x "$root/.apps/forge/scripts/forge-backend.sh" ]; then
+if [ ! -d "$root/apps/forge" ] || [ ! -x "$root/apps/forge/scripts/forge-backend.sh" ]; then
   printf '%s\n' "launch-forge: invalid wizardry-apps root: $root" >&2
   exit 1
 fi
@@ -93,7 +93,7 @@ log_file="$state_dir/forge-launch.log"
 mkdir -p "$state_dir"
 
 set +e
-out=$(sh "$root/.apps/forge/scripts/forge-backend.sh" run-desktop "$root" forge 2>&1)
+out=$(sh "$root/apps/forge/scripts/forge-backend.sh" run-desktop "$root" forge 2>&1)
 status=$?
 set -e
 

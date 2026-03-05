@@ -64,7 +64,7 @@ Manual values in `reddit.env` are:
 
 The desktop UI calls:
 
-- `.apps/virtual-redditor/scripts/virtual-redditor-backend.sh`
+- `apps/virtual-redditor/scripts/virtual-redditor-backend.sh`
 
 Main actions:
 
@@ -90,11 +90,11 @@ Main actions:
 
 The daemon script can install a user LaunchAgent:
 
-- `.apps/virtual-redditor/scripts/virtual-redditor-daemon.sh launchd-install`
+- `apps/virtual-redditor/scripts/virtual-redditor-daemon.sh launchd-install`
 
 It runs:
 
-- `.apps/virtual-redditor/scripts/virtual-redditor-daemon.sh run`
+- `apps/virtual-redditor/scripts/virtual-redditor-daemon.sh run`
 
 with `KeepAlive` and log files under the state directory.
 In multi-profile mode, launchd labels are per profile/state directory so bots can be started/stopped independently.

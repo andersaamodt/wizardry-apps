@@ -55,8 +55,8 @@ is_workspace_root() {
   [ -n "$root" ] || return 1
   [ -f "$root/config/apps.manifest.json" ] || return 1
   [ -f "$root/config/templates.manifest.json" ] || return 1
-  [ -d "$root/.apps" ] || return 1
-  [ -d "$root/.web" ] || return 1
+  [ -d "$root/apps" ] || return 1
+  [ -d "$root/web" ] || return 1
 }
 
 find_root_from() {
@@ -258,7 +258,7 @@ validate_site_name() {
 app_exists() {
   root=$1
   slug=$2
-  [ -d "$root/.apps/$slug" ]
+  [ -d "$root/apps/$slug" ]
 }
 
 require_jq() {
@@ -283,7 +283,7 @@ ensure_macos_host() {
   require_tool clang
 
   host_bin="$root/_tmp/workbench/bin/wizardry-host-macos"
-  host_src="$root/.apps/.host/macos/main.m"
+  host_src="$root/apps/.host/macos/main.m"
   module_cache="$root/_tmp/workbench/clang-module-cache"
 
   mkdir -p "$(dirname "$host_bin")"
@@ -321,7 +321,7 @@ ensure_linux_host() {
   require_tool pkg-config
 
   host_bin="$root/_tmp/workbench/bin/wizardry-host-linux"
-  host_src="$root/.apps/.host/linux/main.c"
+  host_src="$root/apps/.host/linux/main.c"
 
   mkdir -p "$(dirname "$host_bin")"
   cc -O2 "$host_src" -o "$host_bin" $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.1)
@@ -545,7 +545,7 @@ cmd_list_apps() {
           targets="$targets,android"
           ;;
       esac
-      if [ -d "$root/.web/$slug" ]; then
+      if [ -d "$root/web/$slug" ]; then
         targets="hosted-web,$targets"
       fi
     fi
@@ -562,7 +562,7 @@ cmd_list_templates() {
   jq -r '.templates[] | [.slug, (if .publish then "true" else "false" end)] | @tsv' "$manifest" |
   while IFS="$(printf '\t')" read -r slug publish; do
     exists=0
-    [ -d "$root/.web/$slug" ] && exists=1
+    [ -d "$root/web/$slug" ] && exists=1
     printf '%s\t%s\t%s\n' "$slug" "$publish" "$exists"
   done
 }
@@ -579,8 +579,8 @@ theme_names_from_dir() {
 
 cmd_list_themes() {
   root=$(require_root "${1-}")
-  theme_root="$root/.web/.themes"
-  app_theme_dir="$root/.apps/forge/themes"
+  theme_root="$root/web/.themes"
+  app_theme_dir="$root/apps/forge/themes"
 
   if [ -d "$theme_root" ]; then
     mkdir -p "$app_theme_dir"
@@ -855,7 +855,7 @@ cmd_set_app_icon() {
     exit 2
   }
   validate_slug "$slug"
-  app_dir="$root/.apps/$slug"
+  app_dir="$root/apps/$slug"
   [ -d "$app_dir" ] || {
     printf '%s\n' "forge-backend: app not found: $slug" >&2
     exit 1
@@ -892,7 +892,7 @@ cmd_build_desktop() {
   }
   validate_slug "$slug"
 
-  app_dir="$root/.apps/$slug"
+  app_dir="$root/apps/$slug"
   [ -d "$app_dir" ] || {
     printf '%s\n' "forge-backend: app not found: $slug" >&2
     exit 1
@@ -915,7 +915,7 @@ cmd_build_desktop() {
 
       cp -R "$app_dir"/. "$bundle/Contents/Resources/$slug/"
       mkdir -p "$bundle/Contents/Resources/$slug/.host"
-      cp -R "$root/.apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
+      cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
       cp -R "$root/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
       cp -R "$root/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
       cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
@@ -987,7 +987,7 @@ PLIST
 
       cp -R "$app_dir"/. "$appdir/usr/share/$slug/"
       mkdir -p "$appdir/usr/share/$slug/.host"
-      cp -R "$root/.apps/.host/shared" "$appdir/usr/share/$slug/.host/"
+      cp -R "$root/apps/.host/shared" "$appdir/usr/share/$slug/.host/"
       cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
       cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
       cp "$host_bin" "$appdir/usr/bin/wizardry-host"
@@ -1193,7 +1193,7 @@ cmd_run_desktop() {
     run_mode=host
   fi
 
-  app_dir="$root/.apps/$slug"
+  app_dir="$root/apps/$slug"
   [ -d "$app_dir" ] || {
     printf '%s\n' "forge-backend: app not found: $slug" >&2
     exit 1
@@ -1480,7 +1480,7 @@ cmd_serve_hosted_web() {
     builtin)
       slug=$ref
       validate_slug "$slug"
-      template_dir="$root/.web/$slug"
+      template_dir="$root/web/$slug"
       [ -d "$template_dir" ] || {
         printf '%s\n' "forge-backend: hosted web template not found for app: $slug" >&2
         exit 1
@@ -1603,18 +1603,18 @@ cmd_build_android_debug() {
   app_name=$(app_name_from_manifest "$root" "$slug")
   app_id=$(bundle_id_from_manifest "$root" android "$slug")
 
-  sh "$root/tools/release/stage-web-assets.sh" "$slug" "$root/.apps/.host/android/app/src/main/assets"
+  sh "$root/tools/release/stage-web-assets.sh" "$slug" "$root/apps/.host/android/app/src/main/assets"
 
   version_name="0.0.0-local"
   version_code=$(date +%s)
 
-  gradle -p "$root/.apps/.host/android" :app:assembleDebug \
+  gradle -p "$root/apps/.host/android" :app:assembleDebug \
     -PwizardryApplicationId="$app_id" \
     -PwizardryAppName="$app_name" \
     -PwizardryVersionName="$version_name" \
     -PwizardryVersionCode="$version_code"
 
-  apk=$(find "$root/.apps/.host/android/app/build/outputs/apk/debug" -type f -name '*.apk' | head -n 1)
+  apk=$(find "$root/apps/.host/android/app/build/outputs/apk/debug" -type f -name '*.apk' | head -n 1)
   [ -n "$apk" ] || {
     printf '%s\n' "forge-backend: debug APK not found" >&2
     exit 1
@@ -1940,7 +1940,7 @@ cmd_scaffold_app() {
   validate_slug "$slug"
   require_jq
 
-  app_dir="$root/.apps/$slug"
+  app_dir="$root/apps/$slug"
   [ ! -e "$app_dir" ] || {
     printf '%s\n' "forge-backend: app path already exists: $app_dir" >&2
     exit 1
@@ -1954,7 +1954,7 @@ cmd_scaffold_app() {
         exit 2
       }
       validate_slug "$source_app"
-      source_dir="$root/.apps/$source_app"
+      source_dir="$root/apps/$source_app"
       [ -d "$source_dir" ] || {
         printf '%s\n' "forge-backend: source app not found: $source_app" >&2
         exit 1
@@ -2057,7 +2057,7 @@ cmd_scaffold_workspace() {
             exit 2
           }
           validate_slug "$source"
-          source_dir="$root/.apps/$source"
+          source_dir="$root/apps/$source"
           [ -d "$source_dir" ] || {
             printf '%s\n' "forge-backend: source app not found: $source" >&2
             exit 1
@@ -2199,7 +2199,7 @@ cmd_scaffold_site() {
     dest_root="$HOME/sites"
   fi
 
-  template_dir="$root/.web/$template"
+  template_dir="$root/web/$template"
   [ -d "$template_dir" ] || {
     printf '%s\n' "forge-backend: template not found: $template" >&2
     exit 1
@@ -2229,9 +2229,9 @@ cmd_scaffold_site() {
     mv "$site_dir/includes" "$site_dir/site/"
   fi
 
-  if [ -d "$root/.web/.themes" ]; then
+  if [ -d "$root/web/.themes" ]; then
     mkdir -p "$site_dir/site/static/themes"
-    cp -f "$root/.web/.themes"/*.css "$site_dir/site/static/themes/" 2>/dev/null || true
+    cp -f "$root/web/.themes"/*.css "$site_dir/site/static/themes/" 2>/dev/null || true
   fi
 
   mkdir -p "$site_dir/site/uploads" "$site_dir/build"

@@ -19,7 +19,7 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
-backend="${WIZARDRY_APPS_ROOT:-$repo_root}/.apps/priorities/scripts/priorities-backend.sh"
+backend="${WIZARDRY_APPS_ROOT:-$repo_root}/apps/priorities/scripts/priorities-backend.sh"
 
 if [ ! -x "$backend" ]; then
   printf '%s\n' "copy-priorities: backend not found or not executable: $backend" >&2

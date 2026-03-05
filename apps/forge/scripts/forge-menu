@@ -51,7 +51,7 @@ done
 
 root=${root_hint:-${WIZARDRY_APPS_ROOT:-$repo_root}}
 
-if [ ! -x "$root/.apps/forge/scripts/forge-backend.sh" ]; then
+if [ ! -x "$root/apps/forge/scripts/forge-backend.sh" ]; then
   printf '%s\n' "forge-menu: invalid wizardry-apps root: $root" >&2
   exit 1
 fi

@@ -22,7 +22,7 @@ The GUI is organized around two primary use-cases:
 
 The GUI calls:
 
-- `.apps/forge/scripts/forge-backend.sh`
+- `apps/forge/scripts/forge-backend.sh`
 
 This backend is the CLI parity surface for all Forge actions.
 
@@ -69,14 +69,14 @@ Forge resolves `wizardry-apps` root using this order:
 
 ```sh
 # Inspect workspace + tool availability
-sh .apps/forge/scripts/forge-backend.sh doctor /path/to/wizardry-apps
+sh apps/forge/scripts/forge-backend.sh doctor /path/to/wizardry-apps
 
 # Build and run a desktop app
-sh .apps/forge/scripts/forge-backend.sh build-desktop /path/to/wizardry-apps artificer
-sh .apps/forge/scripts/forge-backend.sh run-desktop /path/to/wizardry-apps artificer
+sh apps/forge/scripts/forge-backend.sh build-desktop /path/to/wizardry-apps artificer
+sh apps/forge/scripts/forge-backend.sh run-desktop /path/to/wizardry-apps artificer
 
 # Scaffold a new app and a new site
-sh .apps/forge/scripts/forge-backend.sh scaffold-app /path/to/wizardry-apps my-tool "My Tool" minimal
-sh .apps/forge/scripts/forge-backend.sh scaffold-workspace /path/to/wizardry-apps my-tool "My Tool" web panel "hosted-web,macos,linux"
-sh .apps/forge/scripts/forge-backend.sh scaffold-site /path/to/wizardry-apps my-site demo "$HOME/sites"
+sh apps/forge/scripts/forge-backend.sh scaffold-app /path/to/wizardry-apps my-tool "My Tool" minimal
+sh apps/forge/scripts/forge-backend.sh scaffold-workspace /path/to/wizardry-apps my-tool "My Tool" web panel "hosted-web,macos,linux"
+sh apps/forge/scripts/forge-backend.sh scaffold-site /path/to/wizardry-apps my-site demo "$HOME/sites"
 ```

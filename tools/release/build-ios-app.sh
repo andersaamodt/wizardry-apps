@@ -35,7 +35,7 @@ case "$mode" in
 esac
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-IOS_ROOT="$ROOT_DIR/.apps/.host/ios"
+IOS_ROOT="$ROOT_DIR/apps/.host/ios"
 APP_NAME=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" "$slug")
 BUNDLE_ID=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" ios "$slug")
 VERSION_NAME=${RELEASE_VERSION:-0.1.0}

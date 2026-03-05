@@ -79,7 +79,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ ! -x "$root/tools/forge/launch-forge.sh" ] || [ ! -d "$root/.apps/forge" ]; then
+if [ ! -x "$root/tools/forge/launch-forge.sh" ] || [ ! -d "$root/apps/forge" ]; then
   printf '%s\n' "install-forge: invalid wizardry-apps root: $root" >&2
   exit 1
 fi

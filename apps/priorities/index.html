@@ -1054,10 +1054,10 @@
         if (appIdx > 0) {
           out.push(pagePath.slice(0, appIdx) + '/priorities/scripts/priorities-backend.sh');
         }
-        var marker = '/.apps/priorities/';
+        var marker = '/apps/priorities/';
         var idx = pagePath.lastIndexOf(marker);
         if (idx > 0) {
-          out.push(pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh');
+          out.push(pagePath.slice(0, idx) + '/apps/priorities/scripts/priorities-backend.sh');
         }
       } catch (_) {
         // Ignore detection failures.
@@ -1109,7 +1109,7 @@
       return bridgeExec([
         'sh',
         '-c',
-        'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/.apps/priorities/scripts/priorities-backend.sh" "$@"',
+        'root="${WIZARDRY_APPS_ROOT:-$HOME/git/wizardry-apps}"; exec sh "$root/apps/priorities/scripts/priorities-backend.sh" "$@"',
         'priorities-backend'
       ].concat(args));
     }

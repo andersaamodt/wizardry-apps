@@ -49,10 +49,10 @@ Desktop apps in wizardry follow a minimal, flat architecture:
 
 ## App Structure
 
-Each app lives in `.apps/<appname>/` with the following files:
+Each app lives in `apps/<appname>/` with the following files:
 
 ```
-.apps/my-app/
+apps/my-app/
 ├── index.html     # Entry point loaded into WebView (required)
 └── style.css      # Optional styling
 ```
@@ -197,7 +197,7 @@ launch-app chatroom
 
 ### menu-app
 
-See `.apps/menu-app/` for a simple example demonstrating:
+See `apps/menu-app/` for a simple example demonstrating:
 - WebView UI with buttons
 - Hardcoded commands in JavaScript
 - Output display
@@ -205,7 +205,7 @@ See `.apps/menu-app/` for a simple example demonstrating:
 
 ### chatroom
 
-See `.apps/chatroom/` for a real-world example demonstrating:
+See `apps/chatroom/` for a real-world example demonstrating:
 - Thin wrapper around existing web demo (reuses `.templates/demo/pages/chat.md`)
 - Integration with CGI scripts for backend communication
 - Server-Sent Events (SSE) for real-time updates
@@ -228,24 +228,24 @@ The chatroom app shows how desktop apps can be minimal frames around existing we
 
 ### unix-settings
 
-See `.apps/unix-settings/` for a focused system settings shell that:
+See `apps/unix-settings/` for a focused system settings shell that:
 - Wraps the `unix-settings` site template in a desktop frame
 - Provides explicit Build/Start/Stop controls
 - Keeps the interface strictly web-first, with commands hardcoded for security
 
 ### forge
 
-See `.apps/forge/` for the flagship wizardry-apps desktop control plane that:
+See `apps/forge/` for the flagship wizardry-apps desktop control plane that:
 - Builds and runs built-in wizardry apps from one GUI
 - Stages mobile host assets and triggers mobile debug/smoke builds when toolchains exist
-- Scaffolds new `.apps/<slug>/` directories from shell-backed templates
+- Scaffolds new `apps/<slug>/` directories from shell-backed templates
 - Scaffolds hosted sites from `.web` templates into user-selected roots
-- Exposes all actions through `.apps/forge/scripts/forge-backend.sh` for CLI parity
+- Exposes all actions through `apps/forge/scripts/forge-backend.sh` for CLI parity
 - Supports checkout-local run (`./run-forge`) and user-local install (`./install-forge`)
 
 ### virtual-redditor
 
-See `.apps/virtual-redditor/` for an autonomous moderation desktop app that:
+See `apps/virtual-redditor/` for an autonomous moderation desktop app that:
 - Runs a persistent POSIX `sh` patrol daemon supervised by user-level `launchd`
 - Reads subreddit comment streams with OAuth refresh-token auth via `curl`
 - Builds adjudication context envelopes and asks Ollama for mode-aware decisions
@@ -254,7 +254,7 @@ See `.apps/virtual-redditor/` for an autonomous moderation desktop app that:
 
 ## Development Workflow
 
-1. Create app directory: `mkdir -p .apps/my-app`
+1. Create app directory: `mkdir -p apps/my-app`
 2. Create `index.html` with UI and hardcoded commands
 3. Add styling in `style.css` (optional)
 4. Test with `launch-app my-app`

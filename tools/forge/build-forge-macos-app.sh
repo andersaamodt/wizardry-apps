@@ -66,9 +66,9 @@ done
 }
 
 for req in \
-  "$root/.apps/.host/macos/main.m" \
-  "$root/.apps/forge/index.html" \
-  "$root/.apps/.host/shared/wizardry-bridge.js"; do
+  "$root/apps/.host/macos/main.m" \
+  "$root/apps/forge/index.html" \
+  "$root/apps/.host/shared/wizardry-bridge.js"; do
   [ -f "$req" ] || {
     printf '%s\n' "build-forge-macos-app: missing required file: $req" >&2
     exit 1
@@ -81,7 +81,7 @@ command -v clang >/dev/null 2>&1 || {
 }
 
 cache_dir="$root/_tmp/forge-build-cache"
-host_src="$root/.apps/.host/macos/main.m"
+host_src="$root/apps/.host/macos/main.m"
 host_bin="$cache_dir/wizardry-host-macos"
 module_cache="$cache_dir/clang-module-cache"
 
@@ -106,9 +106,9 @@ trap cleanup EXIT HUP INT TERM
 mkdir -p "$macos_dir" "$resources_dir/forge" "$resources_dir/wizardry-apps/core"
 
 cp "$host_bin" "$macos_dir/wizardry-host"
-cp -R "$root/.apps/forge"/. "$resources_dir/forge/"
+cp -R "$root/apps/forge"/. "$resources_dir/forge/"
 mkdir -p "$resources_dir/forge/.host"
-cp -R "$root/.apps/.host/shared" "$resources_dir/forge/.host/"
+cp -R "$root/apps/.host/shared" "$resources_dir/forge/.host/"
 cp -R "$root/core/include" "$resources_dir/wizardry-apps/core/"
 cp -R "$root/core/src" "$resources_dir/wizardry-apps/core/"
 printf '%s\n' "$root" > "$resources_dir/wizardry-apps-root.txt"

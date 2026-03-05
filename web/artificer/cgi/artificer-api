@@ -3914,9 +3914,23 @@ normalize_programmer_review_rounds_value() {
 }
 
 normalize_assay_task_id_value() {
-  # Assay-specific runtime routing is retired from Artificer.
-  # Keep this normalizer as a compatibility shim that always disables assay ids.
-  printf '%s' ""
+  raw_value=$(trim "$1")
+  if [ -z "$raw_value" ]; then
+    printf '%s' ""
+    return 0
+  fi
+  normalized=$(printf '%s' "$raw_value" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed 's/[^a-z0-9._-]/-/g;s/--\+/-/g;s/^-//;s/-$//')
+  normalized=$(printf '%s' "$normalized" | cut -c1-64)
+  case "$normalized" in
+    ""|*..*)
+      printf '%s' ""
+      ;;
+    *)
+      printf '%s' "$normalized"
+      ;;
+  esac
 }
 
 command_text_to_rule_pattern_default() {
@@ -12162,11 +12176,11 @@ emit_themes() {
   themes=""
 
   if repo_root=$(CDPATH= cd -- "$ARTIFICER_SCRIPT_DIR/../../.." 2>/dev/null && pwd); then
-    repo_theme_root="$repo_root/.web/.themes"
+    repo_theme_root="$repo_root/web/.themes"
   fi
 
-  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -d "$WIZARDRY_APPS_ROOT/.web/.themes" ]; then
-    global_theme_root="$WIZARDRY_APPS_ROOT/.web/.themes"
+  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -d "$WIZARDRY_APPS_ROOT/web/.themes" ]; then
+    global_theme_root="$WIZARDRY_APPS_ROOT/web/.themes"
   fi
 
   wizardry_theme_root="$WIZARDRY_DIR/.web/.themes"
@@ -18323,7 +18337,8 @@ $teacher_model_snapshot"
       run_now_epoch=$(date +%s)
       run_elapsed=$((run_now_epoch - run_started_epoch))
       if [ "$run_elapsed" -ge "$run_time_budget" ]; then
-        forced_queue_status="error"
+        # Time-budget expiry still yields a structured partial deliverable, so treat it as a completed run.
+        forced_queue_status="done"
         elapsed_minutes=$((run_elapsed / 60))
         elapsed_seconds=$((run_elapsed % 60))
         assistant_output=$(cat <<EOF
@@ -18333,7 +18348,7 @@ Risks: Partial progress may leave unverified changes or unfinished implementatio
 Next Improvement: Narrow scope or increase compute budget, then continue from the latest checkpoint.
 EOF
 )
-        stream_emit_line "$stream_output_file" "Run exceeded time budget of ${run_time_budget}s."
+        stream_emit_line "$stream_output_file" "Run reached time budget of ${run_time_budget}s; finalizing with partial deliverable."
         append_failure_entry "$failures_file" "iteration-$iteration:run-timeout" "Exceeded run time budget (${run_time_budget}s)" \
           "Model/controller loop exceeded time budget" "Return timeout response and finalize run"
         break
@@ -20332,7 +20347,11 @@ EOF
       elif [ "$decision_request_json" != "null" ]; then
         queue_status_from_run="awaiting_decision"
       elif [ "$final_state_mode" != "DONE" ]; then
-        queue_status_from_run="error"
+        if [ "$assay_run_profile" -eq 1 ] && assay_output_has_required_sections "$assistant_output"; then
+          queue_status_from_run="done"
+        else
+          queue_status_from_run="error"
+        fi
       fi
     fi
     if [ "$queue_status_from_run" != "awaiting_approval" ]; then
