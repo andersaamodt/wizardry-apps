@@ -369,6 +369,14 @@ completionHandler:(void (^)(BOOL result))completionHandler {
 
     [rootView addSubview:overlay];
     self.nativeBootSplashView = overlay;
+
+    // Failsafe: never leave the native splash up forever if the web app cannot
+    // notify readiness (for example when startup bridge bootstrap fails).
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(20.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (self.nativeBootSplashView == overlay) {
+            [self hideNativeBootSplash];
+        }
+    });
 }
 
 - (void)hideNativeBootSplash {
