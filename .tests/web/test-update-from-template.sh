@@ -107,7 +107,7 @@ test_update_uses_web_template_directory() {
 
   test_web_root=$(temp-dir web-wizardry-test)
   fake_wizardry_root=$(temp-dir wizardry-template-root)
-  template_root="$fake_wizardry_root/.web/minimal"
+  template_root="$fake_wizardry_root/web/minimal"
 
   mkdir -p "$template_root/pages" "$template_root/static"
   cat > "$template_root/pages/index.md" <<'EOF'
@@ -132,13 +132,13 @@ EOF
   assert_success
 
   if grep -q "custom line" "$test_web_root/minisite/site/pages/index.md"; then
-    TEST_FAILURE_REASON="update-from-template did not overwrite from .web template"
+    TEST_FAILURE_REASON="update-from-template did not overwrite from web template"
     rm -rf "$test_web_root" "$fake_wizardry_root"
     return 1
   fi
 
   if ! grep -q "from template v2" "$test_web_root/minisite/site/pages/index.md"; then
-    TEST_FAILURE_REASON="updated template content not copied from .web"
+    TEST_FAILURE_REASON="updated template content not copied from web"
     rm -rf "$test_web_root" "$fake_wizardry_root"
     return 1
   fi
@@ -150,6 +150,6 @@ run_test_case "update-from-template shows help" test_help
 run_test_case "update-from-template updates files from template" test_updates_from_template
 run_test_case "update-from-template preserves uploads" test_preserves_uploads
 run_test_case "update-from-template fails for nonexistent site" test_fails_for_nonexistent_site
-run_test_case "update-from-template resolves templates from .web" test_update_uses_web_template_directory
+run_test_case "update-from-template resolves templates from web" test_update_uses_web_template_directory
 
 finish_tests

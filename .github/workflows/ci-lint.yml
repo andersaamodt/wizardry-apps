@@ -29,7 +29,7 @@ jobs:
       - name: Shell syntax check
         run: |
           set -eu
-          find spells tools adapters godot core .tests .apps -type f \( -name '*.sh' -o -perm -111 \) 2>/dev/null | while IFS= read -r file; do
+          find spells tools adapters godot core .tests apps -type f \( -name '*.sh' -o -perm -111 \) 2>/dev/null | while IFS= read -r file; do
             case "$file" in
               *.c|*.h|*.m|*.kt|*.swift|*.html|*.css|*.js|*.json|*.md|*.cfg)
                 continue

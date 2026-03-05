@@ -6,7 +6,7 @@ It provides a native WebView UI backed by POSIX shell scripts for:
 - building and running built-in wizardry apps
 - staging assets for mobile hosts
 - creating new workspaces through Create App (Application or Game project type)
-- scaffolding hosted web sites from `.web` templates
+- scaffolding hosted web sites from `web` templates
 - running core quality checks
 
 The GUI is organized around two primary use-cases:

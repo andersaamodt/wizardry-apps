@@ -154,7 +154,6 @@
         '-c',
         'sites="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; data="$sites/.sitedata"; target="$data/artificer/artificer"; target_ws="$target/workspaces"; [ -d "$target" ] || mkdir -p "$target"; needs_migrate=1; if [ -d "$target_ws" ] && find "$target_ws" -mindepth 1 -maxdepth 1 -type d | read x; then needs_migrate=0; fi; if [ "$needs_migrate" -ne 1 ]; then exit 0; fi; src_best=""; src_count=0; for sid in default daimon; do src="$data/$sid/artificer"; ws="$src/workspaces"; [ -d "$ws" ] || continue; count=$(find "$ws" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d " "); case "$count" in ""|*[!0-9]*) count=0;; esac; if [ "$count" -gt "$src_count" ]; then src_count="$count"; src_best="$src"; fi; done; if [ -n "$src_best" ] && [ "$src_count" -gt 0 ]; then cp -R "$src_best/." "$target/"; fi'
       ],
-      repairLegacyTemplateLinks: wizardryShellCommand('root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; for rel in README.md cgi site/pages site/static site/includes; do path="$site/$rel"; [ -L "$path" ] || continue; target=$(readlink "$path" 2>/dev/null || true); case "$target" in */.web/*) repl=$(printf "%s" "$target" | sed "s#/.web/#/web/#g"); [ "$repl" != "$target" ] || continue; [ -e "$repl" ] || continue; ln -snf "$repl" "$path" ;; esac; done'),
       ensureSite: wizardryShellCommand('apps_root="${WIZARDRY_APPS_ROOT:-$wiz}"; create_cmd="$apps_root/spells/web/create-from-template"; web_cmd="$apps_root/spells/web/web-wizardry"; [ -x "$create_cmd" ] || create_cmd="create-from-template"; [ -x "$web_cmd" ] || web_cmd="web-wizardry"; root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; site="$root/artificer"; cfg="$site/site.conf"; if [ ! -f "$cfg" ]; then "$create_cmd" artificer artificer; fi; "$web_cmd" build artificer'),
       startServe: wizardryShellCommand('apps_root="${WIZARDRY_APPS_ROOT:-$wiz}"; web_cmd="$apps_root/spells/web/web-wizardry"; [ -x "$web_cmd" ] || web_cmd="web-wizardry"; exec "$web_cmd" serve artificer'),
       ensureUsablePort: wizardryShellCommand('root="${WEB_WIZARDRY_ROOT:-$HOME/sites}"; cfg="$root/artificer/site.conf"; pidf="$root/artificer/nginx/nginx.pid"; nginx_cfg="$root/artificer/nginx/nginx.conf"; port=$(sed -n "s/^port=//p" "$cfg" 2>/dev/null | head -n 1); [ -n "$port" ] || port=8080; if command -v lsof >/dev/null 2>&1; then if ! lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then printf "$port"; exit 0; fi; p=8081; while [ "$p" -le 8120 ]; do if ! lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then change-site-port artificer "$p" >/dev/null 2>&1 && printf "$p" && exit 0; fi; p=$((p+1)); done; exit 1; fi; if [ -f "$pidf" ] && pid=$(cat "$pidf" 2>/dev/null) && [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && ps -p "$pid" -o command= 2>/dev/null | grep -F "$nginx_cfg" >/dev/null 2>&1; then printf "$port"; exit 0; fi; printf "$port"; exit 0'),
@@ -299,12 +298,6 @@
         } catch (_) {
           // Non-fatal: continue startup even if migration probe fails.
         }
-        try {
-          await bridgeExec(commands.repairLegacyTemplateLinks);
-        } catch (_) {
-          // Non-fatal: continue startup even if legacy link repair fails.
-        }
-
         setStatus('Preparing Artificer…', false);
         await ensureSiteIfNeeded();
 

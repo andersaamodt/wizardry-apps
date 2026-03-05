@@ -33,8 +33,8 @@ jobs:
             Imported scope:
             - spells/web
             - spells/.arcana/web-wizardry
-            - .web
-            - .apps
+            - web
+            - apps
             - .tests/web
             - .tests/.arcana/web-wizardry
           labels: |

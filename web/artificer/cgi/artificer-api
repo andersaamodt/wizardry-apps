@@ -12184,7 +12184,6 @@ emit_themes() {
   fi
 
   wizardry_theme_root="$WIZARDRY_DIR/web/.themes"
-  [ -d "$wizardry_theme_root" ] || wizardry_theme_root="$WIZARDRY_DIR/.web/.themes"
 
   mkdir -p "$app_theme_dir"
   for theme_root in "$global_theme_root" "$repo_theme_root" "$wizardry_theme_root"; do

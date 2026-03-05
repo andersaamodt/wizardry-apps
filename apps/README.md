@@ -239,7 +239,7 @@ See `apps/forge/` for the flagship wizardry-apps desktop control plane that:
 - Builds and runs built-in wizardry apps from one GUI
 - Stages mobile host assets and triggers mobile debug/smoke builds when toolchains exist
 - Scaffolds new `apps/<slug>/` directories from shell-backed templates
-- Scaffolds hosted sites from `.web` templates into user-selected roots
+- Scaffolds hosted sites from `web` templates into user-selected roots
 - Exposes all actions through `apps/forge/scripts/forge-backend.sh` for CLI parity
 - Supports checkout-local run (`./run-forge`) and user-local install (`./install-forge`)
 

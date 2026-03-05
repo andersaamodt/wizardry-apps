@@ -107,25 +107,25 @@ test_create_from_template_uses_web_directory() {
   test_web_root=$(temp-dir web-wizardry-test)
   fake_wizardry_root=$(temp-dir wizardry-template-root)
 
-  mkdir -p "$fake_wizardry_root/.web/minimal/pages"
-  mkdir -p "$fake_wizardry_root/.web/minimal/static"
-  cat > "$fake_wizardry_root/.web/minimal/pages/index.md" <<'EOF'
+  mkdir -p "$fake_wizardry_root/web/minimal/pages"
+  mkdir -p "$fake_wizardry_root/web/minimal/static"
+  cat > "$fake_wizardry_root/web/minimal/pages/index.md" <<'EOF'
 # Minimal Template
 EOF
-  cat > "$fake_wizardry_root/.web/minimal/static/style.css" <<'EOF'
+  cat > "$fake_wizardry_root/web/minimal/static/style.css" <<'EOF'
 body { font-family: sans-serif; }
 EOF
 
   WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
     run_spell spells/web/create-from-template mini minimal
   if [ "$STATUS" -ne 0 ]; then
-    TEST_FAILURE_REASON="create-from-template did not resolve templates from .web"
+    TEST_FAILURE_REASON="create-from-template did not resolve templates from web"
     rm -rf "$test_web_root" "$fake_wizardry_root"
     return 1
   fi
 
   [ -f "$test_web_root/mini/site/pages/index.md" ] || {
-    TEST_FAILURE_REASON="custom .web template index.md not copied"
+    TEST_FAILURE_REASON="custom web template index.md not copied"
     rm -rf "$test_web_root" "$fake_wizardry_root"
     return 1
   }
@@ -137,6 +137,6 @@ EOF
 run_test_case "create-from-template shows help" test_help
 run_test_case "blog template has sample posts" test_blog_template_has_sample_posts
 run_test_case "all templates create expected site structure" test_all_web_templates_create_expected_structure
-run_test_case "create-from-template resolves templates from .web" test_create_from_template_uses_web_directory
+run_test_case "create-from-template resolves templates from web" test_create_from_template_uses_web_directory
 
 finish_tests

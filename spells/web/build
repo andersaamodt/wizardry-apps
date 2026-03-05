@@ -56,32 +56,6 @@ if ! has pandoc; then
   die "build: pandoc is required but not installed"
 fi
 
-repair_legacy_site_link() {
-  link_path=$1
-  [ -L "$link_path" ] || return 0
-  target=$(readlink "$link_path" 2>/dev/null || printf '')
-  [ -n "$target" ] || return 0
-  case "$target" in
-    *"/.web/"*)
-      replacement=$(printf '%s' "$target" | sed 's#/.web/#/web/#g')
-      if [ "$replacement" != "$target" ] && [ -e "$replacement" ]; then
-        ln -snf "$replacement" "$link_path"
-      fi
-      ;;
-  esac
-}
-
-repair_legacy_site_layout_links() {
-  site_path=$1
-  repair_legacy_site_link "$site_path/README.md"
-  repair_legacy_site_link "$site_path/cgi"
-  repair_legacy_site_link "$site_path/site/pages"
-  repair_legacy_site_link "$site_path/site/static"
-  repair_legacy_site_link "$site_path/site/includes"
-}
-
-repair_legacy_site_layout_links "$SITE_DIR"
-
 extract_front_matter_value() {
   file=$1
   key=$2
@@ -470,7 +444,6 @@ prerender_blog_dynamic_sections() {
 build_site() {
   step "Building site: $site_name"
   shared_theme_root="$WIZARDRY_DIR/web"
-  [ -d "$shared_theme_root" ] || shared_theme_root="$WIZARDRY_DIR/.web"
   shared_theme_dir="$shared_theme_root/.themes"
   site_template=$(config-get "$SITE_DIR/site.conf" template 2>/dev/null || printf '')
 
