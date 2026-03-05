@@ -429,11 +429,8 @@ stop_host_instances_for_app() {
   # Match by app_dir path + wizardry host command so we also catch launcher/bundle variants.
   pids=$(
     ps -axo pid=,command= 2>/dev/null \
-      | awk -v app="$app_dir" -v host="$host_bin" '
-          index($0, app) > 0 && (
-            index($0, "wizardry-host") > 0 ||
-            (length(host) > 0 && index($0, host) > 0)
-          ) { print $1 }
+      | awk -v app="$app_dir" '
+          index($0, app) > 0 && index($0, "wizardry-host") > 0 { print $1 }
         ' \
       | tr '\n' ' ' \
       | sed 's/[[:space:]]*$//'
@@ -445,11 +442,8 @@ stop_host_instances_for_app() {
   sleep 0.2
   still=$(
     ps -axo pid=,command= 2>/dev/null \
-      | awk -v app="$app_dir" -v host="$host_bin" '
-          index($0, app) > 0 && (
-            index($0, "wizardry-host") > 0 ||
-            (length(host) > 0 && index($0, host) > 0)
-          ) { print $1 }
+      | awk -v app="$app_dir" '
+          index($0, app) > 0 && index($0, "wizardry-host") > 0 { print $1 }
         ' \
       | tr '\n' ' ' \
       | sed 's/[[:space:]]*$//'

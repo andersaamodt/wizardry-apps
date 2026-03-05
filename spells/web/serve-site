@@ -31,6 +31,16 @@ if [ ! -d "$SITE_DIR" ]; then
   die "serve-site: site '$site_name' not found"
 fi
 
+nginx_pid_active() {
+  pid_file="$SITE_DIR/nginx/nginx.pid"
+  nginx_cfg="$SITE_DIR/nginx/nginx.conf"
+  [ -f "$pid_file" ] || return 1
+  pid=$(cat "$pid_file" 2>/dev/null || echo "")
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  ps -p "$pid" -o command= 2>/dev/null | grep -F "$nginx_cfg" >/dev/null 2>&1 || return 1
+}
+
 run_priv() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
@@ -56,8 +66,8 @@ fi
 
 # Check if site is already running
 if [ -f "$SITE_DIR/nginx/nginx.pid" ]; then
-  pid=$(cat "$SITE_DIR/nginx/nginx.pid" 2>/dev/null || echo "")
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+  if nginx_pid_active; then
+    pid=$(cat "$SITE_DIR/nginx/nginx.pid" 2>/dev/null || echo "")
     warn "serve-site: $site_name is already running (PID $pid)"
     # Read port and show URL
     port=$(config-get "$SITE_DIR/site.conf" port 2>/dev/null || echo "8080")
@@ -83,12 +93,9 @@ domain=$(config-get "$SITE_DIR/site.conf" domain 2>/dev/null || echo "localhost"
 
 is_serving=0
 for _ in 1 2 3 4 5; do
-  if [ -f "$SITE_DIR/nginx/nginx.pid" ]; then
-    pid=$(cat "$SITE_DIR/nginx/nginx.pid" 2>/dev/null || echo "")
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-      is_serving=1
-      break
-    fi
+  if nginx_pid_active; then
+    is_serving=1
+    break
   fi
   sleep 1
 done
