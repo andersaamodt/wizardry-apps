@@ -7,7 +7,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "https://github.com/wizardry-apps/artificer.git",
+        "repo": "file:///Users/andersaamodt/git/artificer",
         "ref": "main",
         "subdir": "."
       },
@@ -28,7 +28,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "https://github.com/wizardry-apps/unix-settings.git",
+        "repo": "file:///Users/andersaamodt/git/unix-settings",
         "ref": "main",
         "subdir": "."
       },
@@ -73,7 +73,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "https://github.com/wizardry-apps/priorities.git",
+        "repo": "file:///Users/andersaamodt/git/priorities",
         "ref": "main",
         "subdir": "."
       },
@@ -90,7 +90,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "https://github.com/wizardry-apps/memetrader.git",
+        "repo": "file:///Users/andersaamodt/git/memetrader",
         "ref": "main",
         "subdir": "."
       },
@@ -107,7 +107,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "https://github.com/wizardry-apps/virtual-redditor.git",
+        "repo": "file:///Users/andersaamodt/git/virtual-redditor",
         "ref": "main",
         "subdir": "."
       },

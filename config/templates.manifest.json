@@ -11,7 +11,7 @@
       "publish": false,
       "distribution": "optional",
       "source": {
-        "repo": "https://github.com/wizardry-apps/blog-template.git",
+        "repo": "file:///Users/andersaamodt/git/blog-template",
         "ref": "main",
         "subdir": "."
       }
