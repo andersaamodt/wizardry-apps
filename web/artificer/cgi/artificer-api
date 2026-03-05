@@ -15564,21 +15564,21 @@ case "$os_name" in
   Darwin)
     exec ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-      -f avfoundation -i ":0" -t "$DICTATION_MAX_RECORDING_SECONDS" \
+      -f avfoundation -i ":0" -t "${DICTATION_MAX_RECORDING_SECONDS:-600}" \
       -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     ;;
   Linux)
     if ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-      -f pulse -i default -t "$DICTATION_MAX_RECORDING_SECONDS" \
+      -f pulse -i default -t "${DICTATION_MAX_RECORDING_SECONDS:-600}" \
       -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1; then
       :
     else
       ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-        -f alsa -i default -t "$DICTATION_MAX_RECORDING_SECONDS" \
+        -f alsa -i default -t "${DICTATION_MAX_RECORDING_SECONDS:-600}" \
         -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
         -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     fi
@@ -15735,21 +15735,21 @@ case "$os_name" in
   Darwin)
     exec ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-      -f avfoundation -i ":0" -t "$DICTATION_MAX_RECORDING_SECONDS" \
+      -f avfoundation -i ":0" -t "${DICTATION_MAX_RECORDING_SECONDS:-600}" \
       -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     ;;
   Linux)
     if ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-      -f pulse -i default -t "$DICTATION_MAX_RECORDING_SECONDS" \
+      -f pulse -i default -t "${DICTATION_MAX_RECORDING_SECONDS:-600}" \
       -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
       -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1; then
       :
     else
       ffmpeg -nostdin -hide_banner -loglevel error \
       -probesize 32 -analyzeduration 0 -fflags nobuffer -flags low_delay \
-        -f alsa -i default -t "$DICTATION_MAX_RECORDING_SECONDS" \
+        -f alsa -i default -t "${DICTATION_MAX_RECORDING_SECONDS:-600}" \
         -af "astats=metadata=1:reset=1,ametadata=mode=print:file=$levels_file" \
         -ac 1 -ar 16000 -f wav -y "$audio_file" >>"$log_file" 2>&1
     fi

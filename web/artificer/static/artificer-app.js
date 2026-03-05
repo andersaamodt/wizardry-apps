@@ -8564,10 +8564,10 @@
     var preSignalBaseline =
       waveformActive &&
       !dictationWaveSeenSignal &&
-      (Date.now() - Number(dictationWaveActivatedAt || 0) < 180) &&
+      (Date.now() - Number(dictationWaveActivatedAt || 0) < 1800) &&
       (Date.now() - Number(dictationWaveBackendLevelAt || 0) > 220);
     var silencePhase = Number(dictationWaveSilencePhase || 0);
-    var baselineHeight = 1;
+    var baselineHeight = 3;
     var maxWaveHeight = 39;
     var silenceGate = 0.0054;
     for (var i = 0; i < bars.length; i += 1) {
@@ -8583,14 +8583,14 @@
       }
       if (preSignalBaseline) {
         bar.classList.add("is-baseline");
-        bar.style.height = ((i + silencePhase) % 2 === 0) ? "1px" : "0px";
+        bar.style.height = ((i + silencePhase) % 2 === 0) ? "3px" : "1px";
         continue;
       }
       var height = baselineHeight;
       if (unit <= silenceGate) {
         // Running silence: keep dot height but use active (darker) color.
         bar.classList.remove("is-baseline");
-        bar.style.height = ((i + silencePhase) % 2 === 0) ? "1px" : "0px";
+        bar.style.height = ((i + silencePhase) % 2 === 0) ? "3px" : "1px";
         continue;
       } else {
         bar.classList.remove("is-baseline");
