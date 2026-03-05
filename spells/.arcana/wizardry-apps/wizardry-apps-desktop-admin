@@ -22,20 +22,21 @@ fi
 
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
+PATH="$repo_root/apps/forge/scripts:$repo_root/tools/forge:$PATH"
 
 while true; do
   exit_label=$(exit-label)
   menu "wizardry-apps desktop admin" \
-    "Quick cycle (Forge build+run)%sh \"$repo_root/apps/forge/scripts/forge-backend.sh\" run-desktop \"$repo_root\" forge bundle" \
-    "Run App Forge%sh \"$repo_root/apps/forge/scripts/forge-backend.sh\" run-desktop \"$repo_root\" forge" \
-    "App Forge doctor%sh \"$repo_root/apps/forge/scripts/forge-backend.sh\" doctor \"$repo_root\"" \
+    "Quick cycle (Forge build+run)%forge-backend run-desktop \"$repo_root\" forge bundle" \
+    "Run App Forge%forge-backend run-desktop \"$repo_root\" forge" \
+    "App Forge doctor%forge-backend doctor \"$repo_root\"" \
     "Desktop status%\"$script_dir/wizardry-apps-status\" --section desktop" \
     "---" \
     "Install App Forge launcher%\"$script_dir/install-app-forge\" \"$repo_root\"" \
     "Uninstall App Forge launcher%\"$script_dir/uninstall-app-forge\"" \
     "---" \
     "Desktop workflow sanity%[ -f \"$repo_root/.github/workflows/build-desktop.yml\" ] && printf 'build-desktop workflow present\\n'" \
-    "Release tooling self-check%sh \"$repo_root/.tests/release/test-release-tools.sh\"" \
+    "Release tooling self-check%\"$repo_root/.tests/release/test-release-tools.sh\"" \
     "${exit_label}%kill -TERM \$PPID" || menu_status=$?
   menu_status=${menu_status:-0}
   [ "$menu_status" -eq 130 ] && exit 0

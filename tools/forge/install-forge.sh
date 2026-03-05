@@ -15,7 +15,7 @@ home_explicit=0
 
 print_usage() {
   cat <<'USAGE'
-Usage: install-forge.sh [--root ROOT_DIR] [--home HOME_DIR] [--system|--user] [--app-dir APP_PATH]
+Usage: install-forge [--root ROOT_DIR] [--home HOME_DIR] [--system|--user] [--app-dir APP_PATH]
 
 Installs launchers for App Forge.
 
@@ -79,13 +79,13 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ ! -x "$root/tools/forge/launch-forge.sh" ] || [ ! -d "$root/apps/forge" ]; then
+if [ ! -x "$root/tools/forge/launch-forge" ] || [ ! -d "$root/apps/forge" ]; then
   printf '%s\n' "install-forge: invalid wizardry-apps root: $root" >&2
   exit 1
 fi
 
-[ -x "$root/tools/forge/build-forge-macos-app.sh" ] || {
-  printf '%s\n' "install-forge: missing build-forge-macos-app.sh" >&2
+[ -x "$root/tools/forge/build-forge-macos-app" ] || {
+  printf '%s\n' "install-forge: missing build-forge-macos-app" >&2
   exit 1
 }
 
@@ -97,7 +97,7 @@ config_file="$config_root/forge-root"
 cat > "$shim" <<SHIM
 #!/bin/sh
 set -eu
-exec sh "$root/tools/forge/launch-forge.sh" --root "$root" "\$@"
+exec "$root/tools/forge/launch-forge" --root "$root" "\$@"
 SHIM
 chmod +x "$shim"
 
@@ -110,7 +110,7 @@ install_macos_bundle() {
   target=$1
   stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-app.XXXXXX")
   stage_bundle="$stage_root/App Forge.app"
-  if ! sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$stage_bundle" >/dev/null 2>&1; then
+  if ! "$root/tools/forge/build-forge-macos-app" --root "$root" --out "$stage_bundle" >/dev/null 2>&1; then
     rm -rf "$stage_root"
     return 1
   fi
@@ -216,4 +216,4 @@ DESKTOP
     ;;
 esac
 
-printf '%s\n' "note=if repo root moves, rerun install-forge.sh"
+printf '%s\n' "note=if repo root moves, rerun install-forge"

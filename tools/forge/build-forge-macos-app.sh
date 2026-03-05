@@ -5,7 +5,7 @@
 case "${1-}" in
 --help|--usage|-h)
   cat <<'USAGE'
-Usage: build-forge-macos-app.sh [--root ROOT_DIR] [--out APP_BUNDLE] [--bundle-id BUNDLE_ID]
+Usage: build-forge-macos-app [--root ROOT_DIR] [--out APP_BUNDLE] [--bundle-id BUNDLE_ID]
 
 Builds a self-contained App Forge .app bundle with:
 - native WebKit host binary
@@ -141,8 +141,8 @@ APP
 chmod +x "$macos_dir/app-forge"
 
 icon_key=''
-if [ -x "$root/tools/forge/build-forge-icon.sh" ]; then
-  if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$resources_dir/forge.icns" >/dev/null 2>&1; then
+if [ -x "$root/tools/forge/build-forge-icon" ]; then
+  if "$root/tools/forge/build-forge-icon" --root "$root" --out "$resources_dir/forge.icns" >/dev/null 2>&1; then
     icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
   fi
 fi

@@ -13,7 +13,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|--usage|-h)
       cat <<'USAGE'
-Usage: launch-forge.sh [--root ROOT_DIR]
+Usage: launch-forge [--root ROOT_DIR]
 
 Launches the App Forge desktop app from this repository.
 USAGE
@@ -34,7 +34,7 @@ USAGE
   esac
 done
 
-if [ ! -d "$root/apps/forge" ] || [ ! -x "$root/apps/forge/scripts/forge-backend.sh" ]; then
+if [ ! -d "$root/apps/forge" ] || [ ! -x "$root/apps/forge/scripts/forge-backend" ]; then
   printf '%s\n' "launch-forge: invalid wizardry-apps root: $root" >&2
   exit 1
 fi
@@ -53,6 +53,7 @@ if [ "$os" = "Darwin" ]; then
     [ -d "$bundle" ] || return 1
     [ -x "$bundle/Contents/MacOS/app-forge" ] || return 1
     [ -x "$bundle/Contents/MacOS/wizardry-host" ] || return 1
+    [ -x "$bundle/Contents/Resources/forge/scripts/forge-backend" ] || return 1
     return 0
   }
 
@@ -68,7 +69,7 @@ if [ "$os" = "Darwin" ]; then
 
   if [ -z "$app_path" ]; then
     dev_app="$root/_tmp/workbench/dist/macos/App Forge.app"
-    sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$dev_app" >/dev/null
+    "$root/tools/forge/build-forge-macos-app" --root "$root" --out "$dev_app" >/dev/null
     app_path=$dev_app
   fi
 
@@ -93,7 +94,7 @@ log_file="$state_dir/forge-launch.log"
 mkdir -p "$state_dir"
 
 set +e
-out=$(sh "$root/apps/forge/scripts/forge-backend.sh" run-desktop "$root" forge 2>&1)
+out=$("$root/apps/forge/scripts/forge-backend" run-desktop "$root" forge 2>&1)
 status=$?
 set -e
 

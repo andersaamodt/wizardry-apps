@@ -50,8 +50,9 @@ while [ "$#" -gt 0 ]; do
 done
 
 root=${root_hint:-${WIZARDRY_APPS_ROOT:-$repo_root}}
+PATH="$root/apps/forge/scripts:$root/tools/forge:$PATH"
 
-if [ ! -x "$root/apps/forge/scripts/forge-backend.sh" ]; then
+if [ ! -x "$root/apps/forge/scripts/forge-backend" ]; then
   printf '%s\n' "forge-menu: invalid wizardry-apps root: $root" >&2
   exit 1
 fi
@@ -64,23 +65,23 @@ while :; do
   menu_title="App Forge console (root: $root)"
 
   menu "$menu_title" \
-    "Quick cycle (build+run)%sh \"$script_dir/forge-backend.sh\" run-desktop \"$root\" forge bundle" \
-    "Run App Forge (desktop)%sh \"$script_dir/forge-backend.sh\" run-desktop \"$root\" forge" \
-    "Doctor workspace%sh \"$script_dir/forge-backend.sh\" doctor \"$root\"" \
-    "List builtin apps%sh \"$script_dir/forge-backend.sh\" list-apps \"$root\"" \
-    "List workspaces%sh \"$script_dir/forge-backend.sh\" list-workspaces \"$root\"" \
-    "List templates%sh \"$script_dir/forge-backend.sh\" list-templates \"$root\"" \
-    "List themes%sh \"$script_dir/forge-backend.sh\" list-themes \"$root\"" \
-    "List Godot tools%sh \"$script_dir/forge-backend.sh\" list-godot-tools \"$root\"" \
+    "Quick cycle (build+run)%forge-backend run-desktop \"$root\" forge bundle" \
+    "Run App Forge (desktop)%forge-backend run-desktop \"$root\" forge" \
+    "Doctor workspace%forge-backend doctor \"$root\"" \
+    "List builtin apps%forge-backend list-apps \"$root\"" \
+    "List workspaces%forge-backend list-workspaces \"$root\"" \
+    "List templates%forge-backend list-templates \"$root\"" \
+    "List themes%forge-backend list-themes \"$root\"" \
+    "List Godot tools%forge-backend list-godot-tools \"$root\"" \
     "---" \
-    "Build App Forge (desktop)%sh \"$script_dir/forge-backend.sh\" build-desktop \"$root\" forge" \
-    "Stage mobile assets%sh \"$script_dir/forge-backend.sh\" stage-mobile \"$root\" forge" \
-    "Build Android debug%sh \"$script_dir/forge-backend.sh\" build-android-debug \"$root\" forge" \
-    "Build iOS smoke%sh \"$script_dir/forge-backend.sh\" build-ios-smoke \"$root\" forge" \
+    "Build App Forge (desktop)%forge-backend build-desktop \"$root\" forge" \
+    "Stage mobile assets%forge-backend stage-mobile \"$root\" forge" \
+    "Build Android debug%forge-backend build-android-debug \"$root\" forge" \
+    "Build iOS smoke%forge-backend build-ios-smoke \"$root\" forge" \
     "---" \
-    "Install App Forge launcher%sh \"$repo_root/tools/forge/install-forge.sh\" --root \"$root\"" \
-    "Uninstall App Forge launcher%sh \"$repo_root/tools/forge/uninstall-forge.sh\"" \
-    "Launch App Forge GUI%sh \"$repo_root/tools/forge/launch-forge.sh\" --root \"$root\"" \
+    "Install App Forge launcher%install-forge --root \"$root\"" \
+    "Uninstall App Forge launcher%uninstall-forge" \
+    "Launch App Forge GUI%launch-forge --root \"$root\"" \
     "${exit_label}%kill -TERM \$PPID" || menu_status=$?
 
   menu_status=${menu_status:-0}

@@ -1,16 +1,16 @@
-module.exports = {
-  async retryWithFallback(func, fallbackFunc, retries = 3, delay = 1000) {
-    for (let i = 0; i <= retries; i++) {
-      try {
-        return await func();
-      } catch (error) {
-        if (i === retries) {
-          console.error('All retry attempts failed. Fallback will be executed.');
-          return await fallbackFunc();
-        }
-        console.warn(`Attempt ${i + 1} failed, retrying in ${delay / 1000}s...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  },
-};
+const { retry } = require('async-retry');
+async function withRetries(fn, retries = 5, delay = 1000) {
+    try {
+        return await retry(async (bail) => {
+            try {
+                const result = await fn();
+                if (!result.success) {
+                    throw new Error(`Operation failed: ${JSON.stringify(result.error)}`);
+                }
+                return result;
+            } catch (error) {
+                if (retries === 0) {
+                    bail(error);
+                } else {
+                    retries--;
+                    console.warn(`Retrying (${retries} attempts

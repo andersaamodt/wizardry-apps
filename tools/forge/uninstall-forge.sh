@@ -10,9 +10,9 @@ app_dir=''
 
 print_usage() {
   cat <<'USAGE'
-Usage: uninstall-forge.sh [--home HOME_DIR] [--system|--user] [--app-dir APP_PATH]
+Usage: uninstall-forge [--home HOME_DIR] [--system|--user] [--app-dir APP_PATH]
 
-Removes launchers created by install-forge.sh.
+Removes launchers created by install-forge.
 
 Defaults on macOS:
   - Removes /Applications/App Forge.app when possible
