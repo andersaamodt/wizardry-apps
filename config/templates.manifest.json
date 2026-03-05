@@ -11,7 +11,7 @@
       "publish": false,
       "distribution": "optional",
       "source": {
-        "repo": "file:///Users/andersaamodt/git/blog-template",
+        "repo": "../blog-template",
         "ref": "main",
         "subdir": "."
       }

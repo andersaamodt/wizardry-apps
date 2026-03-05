@@ -535,6 +535,35 @@ download_into_cache() {
   trap - EXIT HUP INT TERM
 }
 
+resolve_source_repo() {
+  root=$1
+  repo=$2
+  case "$repo" in
+    '' )
+      printf '%s\n' ""
+      return 0
+      ;;
+    *://*)
+      printf '%s\n' "$repo"
+      return 0
+      ;;
+    /*)
+      printf '%s\n' "$repo"
+      return 0
+      ;;
+    *)
+      parent=$(dirname "$root/$repo")
+      base=$(basename "$root/$repo")
+      if abs_parent=$(CDPATH= cd -- "$parent" 2>/dev/null && pwd -P); then
+        printf '%s\n' "$abs_parent/$base"
+      else
+        printf '%s\n' "$root/$repo"
+      fi
+      return 0
+      ;;
+  esac
+}
+
 require_jq() {
   require_tool jq
 }
@@ -945,6 +974,7 @@ cmd_download_app() {
   }
   [ -n "$ref" ] || ref=main
   [ -n "$subdir" ] || subdir=.
+  repo=$(resolve_source_repo "$root" "$repo")
 
   dest_dir=$(app_cache_dir "$slug")
   lock_file="$dest_dir/.forge-source.lock"
@@ -1007,6 +1037,7 @@ cmd_download_template() {
   }
   [ -n "$ref" ] || ref=main
   [ -n "$subdir" ] || subdir=.
+  repo=$(resolve_source_repo "$root" "$repo")
 
   dest_dir=$(template_cache_dir "$slug")
   lock_file="$dest_dir/.forge-source.lock"

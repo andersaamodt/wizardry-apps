@@ -7,7 +7,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "file:///Users/andersaamodt/git/artificer",
+        "repo": "../artificer",
         "ref": "main",
         "subdir": "."
       },
@@ -28,7 +28,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "file:///Users/andersaamodt/git/unix-settings",
+        "repo": "../unix-settings",
         "ref": "main",
         "subdir": "."
       },
@@ -73,7 +73,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "file:///Users/andersaamodt/git/priorities",
+        "repo": "../priorities",
         "ref": "main",
         "subdir": "."
       },
@@ -90,7 +90,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "file:///Users/andersaamodt/git/memetrader",
+        "repo": "../memetrader",
         "ref": "main",
         "subdir": "."
       },
@@ -107,7 +107,7 @@
       "production": false,
       "distribution": "optional",
       "source": {
-        "repo": "file:///Users/andersaamodt/git/virtual-redditor",
+        "repo": "../virtual-redditor",
         "ref": "main",
         "subdir": "."
       },
