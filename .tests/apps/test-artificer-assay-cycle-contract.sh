@@ -2,7 +2,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
-script="$root/.web/artificer/scripts/assay-cycle.sh"
+script="$root/web/artificer/scripts/assay-cycle.sh"
 fixtures="$root/.tests/apps/fixtures/artificer-decision-surfacing-fixtures.psv"
 
 assert_contains() {

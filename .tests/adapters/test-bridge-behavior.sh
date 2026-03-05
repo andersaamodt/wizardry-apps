@@ -3,7 +3,7 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-bridge="$ROOT_DIR/.apps/.host/shared/wizardry-bridge.js"
+bridge="$ROOT_DIR/apps/.host/shared/wizardry-bridge.js"
 
 [ -f "$bridge" ] || {
   printf '%s\n' "bridge behavior checks failed: missing bridge source" >&2

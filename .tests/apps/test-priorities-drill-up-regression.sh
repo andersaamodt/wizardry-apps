@@ -3,7 +3,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-app="$root/.apps/priorities/index.html"
+app="$root/apps/priorities/index.html"
 
 [ -f "$app" ] || {
   printf '%s\n' "priorities app file missing: $app" >&2

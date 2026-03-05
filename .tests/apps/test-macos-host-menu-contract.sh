@@ -3,7 +3,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-host="$root/.apps/.host/macos/main.m"
+host="$root/apps/.host/macos/main.m"
 
 [ -f "$host" ]
 

@@ -3,7 +3,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-app_dir="$root/.apps/virtual-redditor"
+app_dir="$root/apps/virtual-redditor"
 backend="$app_dir/scripts/virtual-redditor-backend.sh"
 daemon="$app_dir/scripts/virtual-redditor-daemon.sh"
 extractor="$app_dir/scripts/extract_norms.sh"

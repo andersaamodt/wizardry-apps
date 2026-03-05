@@ -3,7 +3,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-app="$root/.apps/priorities/index.html"
+app="$root/apps/priorities/index.html"
 
 [ -f "$app" ] || {
   printf '%s\n' "priorities app file missing: $app" >&2
@@ -26,7 +26,7 @@ assert_contains() {
 assert_contains "function detectBackendScriptCandidates()"
 assert_contains "var appMarker = '/priorities/index.html';"
 assert_contains "out.push(pagePath.slice(0, appIdx) + '/priorities/scripts/priorities-backend.sh');"
-assert_contains "out.push(pagePath.slice(0, idx) + '/.apps/priorities/scripts/priorities-backend.sh');"
+assert_contains "out.push(pagePath.slice(0, idx) + '/apps/priorities/scripts/priorities-backend.sh');"
 assert_contains "function isMissingBackendScriptError(error)"
 
 # Copy button contract.

@@ -26,9 +26,9 @@ repo_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
 while true; do
   exit_label=$(exit-label)
   menu "wizardry-apps desktop admin" \
-    "Quick cycle (Forge build+run)%sh \"$repo_root/.apps/forge/scripts/forge-backend.sh\" run-desktop \"$repo_root\" forge bundle" \
-    "Run App Forge%sh \"$repo_root/.apps/forge/scripts/forge-backend.sh\" run-desktop \"$repo_root\" forge" \
-    "App Forge doctor%sh \"$repo_root/.apps/forge/scripts/forge-backend.sh\" doctor \"$repo_root\"" \
+    "Quick cycle (Forge build+run)%sh \"$repo_root/apps/forge/scripts/forge-backend.sh\" run-desktop \"$repo_root\" forge bundle" \
+    "Run App Forge%sh \"$repo_root/apps/forge/scripts/forge-backend.sh\" run-desktop \"$repo_root\" forge" \
+    "App Forge doctor%sh \"$repo_root/apps/forge/scripts/forge-backend.sh\" doctor \"$repo_root\"" \
     "Desktop status%\"$script_dir/wizardry-apps-status\" --section desktop" \
     "---" \
     "Install App Forge launcher%\"$script_dir/install-app-forge\" \"$repo_root\"" \

@@ -116,8 +116,8 @@ test_build_help() {
 test_build_generates_html_for_every_template() {
   skip-if-compiled || return $?
 
-  if [ ! -d "$ROOT_DIR/.web" ]; then
-    TEST_FAILURE_REASON="template directory missing: $ROOT_DIR/.web"
+  if [ ! -d "$ROOT_DIR/web" ]; then
+    TEST_FAILURE_REASON="template directory missing: $ROOT_DIR/web"
     return 1
   fi
 
@@ -125,7 +125,7 @@ test_build_generates_html_for_every_template() {
   stub_dir=$(make_build_stub_dir)
 
   found_template=0
-  for template_path in "$ROOT_DIR/.web"/*; do
+  for template_path in "$ROOT_DIR/web"/*; do
     [ -d "$template_path" ] || continue
     found_template=1
     template=$(basename "$template_path")
@@ -172,7 +172,7 @@ test_build_generates_html_for_every_template() {
   done
 
   if [ "$found_template" -ne 1 ]; then
-    TEST_FAILURE_REASON="no templates found in $ROOT_DIR/.web"
+    TEST_FAILURE_REASON="no templates found in $ROOT_DIR/web"
     rm -rf "$test_web_root" "$stub_dir"
     return 1
   fi

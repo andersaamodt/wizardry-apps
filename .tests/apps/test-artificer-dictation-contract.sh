@@ -3,13 +3,13 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-api="$root/.web/artificer/cgi/artificer-api"
-page_html="$root/.web/artificer/pages/index.html"
-page_md="$root/.web/artificer/pages/index.md"
-ui_js="$root/.web/artificer/static/artificer-app.js"
-ui_js_source="$root/.web/artificer/static/app.js"
-style="$root/.web/artificer/static/style.css"
-readme="$root/.web/artificer/README.md"
+api="$root/web/artificer/cgi/artificer-api"
+page_html="$root/web/artificer/pages/index.html"
+page_md="$root/web/artificer/pages/index.md"
+ui_js="$root/web/artificer/static/artificer-app.js"
+ui_js_source="$root/web/artificer/static/app.js"
+style="$root/web/artificer/static/style.css"
+readme="$root/web/artificer/README.md"
 
 fail() {
   printf '%s\n' "FAIL: $*" >&2

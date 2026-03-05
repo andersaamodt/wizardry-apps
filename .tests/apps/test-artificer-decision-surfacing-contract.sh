@@ -2,7 +2,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
-api="$root/.web/artificer/cgi/artificer-api"
+api="$root/web/artificer/cgi/artificer-api"
 
 assert_contains() {
   file=$1

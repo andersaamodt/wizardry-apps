@@ -2,7 +2,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-mode_runtime_lib="$root/.web/artificer/cgi/mode-runtime-lib.sh"
+mode_runtime_lib="$root/web/artificer/cgi/mode-runtime-lib.sh"
 
 trim() {
   printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'

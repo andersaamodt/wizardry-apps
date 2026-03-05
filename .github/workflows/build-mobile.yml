@@ -27,9 +27,9 @@ jobs:
         run: |
           set -eu
           sh tools/validate-manifest.sh
-          [ -f .apps/.host/android/app/src/main/java/com/wizardry/apps/host/MainActivity.kt ]
-          [ -f .apps/.host/ios/Host/WizardryHostApp.swift ]
-          [ -f .apps/.host/shared/wizardry-bridge.js ]
+          [ -f apps/.host/android/app/src/main/java/com/wizardry/apps/host/MainActivity.kt ]
+          [ -f apps/.host/ios/Host/WizardryHostApp.swift ]
+          [ -f apps/.host/shared/wizardry-bridge.js ]
 
   android-smoke:
     needs: validate
@@ -57,18 +57,18 @@ jobs:
             app_name=$(sh tools/release/get-app-name.sh "$app")
             app_id=$(sh tools/release/get-app-bundle-id.sh android "$app")
 
-            sh tools/release/stage-web-assets.sh "$app" ".apps/.host/android/app/src/main/assets"
+            sh tools/release/stage-web-assets.sh "$app" "apps/.host/android/app/src/main/assets"
 
-            gradle -p .apps/.host/android :app:assembleDebug \
+            gradle -p apps/.host/android :app:assembleDebug \
               -PwizardryApplicationId="$app_id" \
               -PwizardryAppName="$app_name" \
               -PwizardryVersionName="$version_name" \
               -PwizardryVersionCode="$version_code"
 
-            apk=$(find .apps/.host/android/app/build/outputs/apk/debug -type f -name '*.apk' | head -n 1)
+            apk=$(find apps/.host/android/app/build/outputs/apk/debug -type f -name '*.apk' | head -n 1)
             [ -n "$apk" ]
             cp "$apk" "dist/android/smoke/wizardry-$app-debug.apk"
-            rm -rf .apps/.host/android/app/build
+            rm -rf apps/.host/android/app/build
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -141,9 +141,9 @@ jobs:
             app_name=$(sh tools/release/get-app-name.sh "$app")
             app_id=$(sh tools/release/get-app-bundle-id.sh android "$app")
 
-            sh tools/release/stage-web-assets.sh "$app" ".apps/.host/android/app/src/main/assets"
+            sh tools/release/stage-web-assets.sh "$app" "apps/.host/android/app/src/main/assets"
 
-            gradle -p .apps/.host/android :app:bundleRelease \
+            gradle -p apps/.host/android :app:bundleRelease \
               -PwizardryApplicationId="$app_id" \
               -PwizardryAppName="$app_name" \
               -PwizardryVersionName="$version_name" \
@@ -153,10 +153,10 @@ jobs:
               -PandroidKeyAlias="$ANDROID_KEY_ALIAS" \
               -PandroidKeyPassword="$ANDROID_KEY_PASSWORD"
 
-            aab=$(find .apps/.host/android/app/build/outputs/bundle/release -type f -name '*.aab' | head -n 1)
+            aab=$(find apps/.host/android/app/build/outputs/bundle/release -type f -name '*.aab' | head -n 1)
             [ -n "$aab" ]
             cp "$aab" "dist/android/wizardry-$app-release.aab"
-            rm -rf .apps/.host/android/app/build
+            rm -rf apps/.host/android/app/build
           done
       - uses: actions/upload-artifact@v4
         with:

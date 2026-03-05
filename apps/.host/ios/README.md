@@ -6,7 +6,7 @@ Native iOS WKWebView host for wizardry apps.
 
 - iOS 16+
 - In-process JS bridge (`window.wizardry.rpc/subscribe/unsubscribe`)
-- Embedded HTML/CSS/JS assets from `.apps/<slug>`
+- Embedded HTML/CSS/JS assets from `apps/<slug>`
 
 ## Build
 
@@ -20,4 +20,4 @@ sh tools/release/build-ios-app.sh artificer dist/ios smoke
 sh tools/release/build-ios-app.sh artificer dist/ios release
 ```
 
-The script generates an Xcode project via `xcodegen` from `.apps/.host/ios/project-template.yml`.
+The script generates an Xcode project via `xcodegen` from `apps/.host/ios/project-template.yml`.

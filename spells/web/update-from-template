@@ -85,7 +85,8 @@ if [ -z "$template" ]; then
   
   # Get WIZARDRY_DIR to find templates
   WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
-  template_list_dir="$WIZARDRY_DIR/.web"
+  template_list_dir="$WIZARDRY_DIR/web"
+  [ -d "$template_list_dir" ] || template_list_dir="$WIZARDRY_DIR/.web"
   
   # Check if templates exist
   if [ ! -d "$template_list_dir" ] || [ -z "$(ls -A "$template_list_dir" 2>/dev/null)" ]; then
@@ -152,8 +153,10 @@ fi
 
 # Get WIZARDRY_DIR to find templates
 WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
-template_dir="$WIZARDRY_DIR/.web/$template"
-shared_theme_dir="$WIZARDRY_DIR/.web/.themes"
+template_root="$WIZARDRY_DIR/web"
+[ -d "$template_root" ] || template_root="$WIZARDRY_DIR/.web"
+template_dir="$template_root/$template"
+shared_theme_dir="$template_root/.themes"
 
 if [ ! -d "$template_dir" ]; then
   die "update-from-template: template '$template' not found at $template_dir"

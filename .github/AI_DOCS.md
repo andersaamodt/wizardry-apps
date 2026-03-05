@@ -4,7 +4,7 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/README.md` for repo stance and boundaries.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_ETHOS.md` for policy and tone.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md` for GUI execution rules.
-- Read app-local docs (for example `.apps/forge/README.md`) before changing an app.
+- Read app-local docs (for example `apps/forge/README.md`) before changing an app.
 
 ## Canonicality
 - Wizardry core ethos in `~/.wizardry/README.md` is upstream-canonical.

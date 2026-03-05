@@ -2,9 +2,9 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-api="$root/.web/artificer/cgi/artificer-api"
-backlog="$root/.web/artificer/INTELLIGENCE_BACKLOG.md"
-readme="$root/.web/artificer/README.md"
+api="$root/web/artificer/cgi/artificer-api"
+backlog="$root/web/artificer/INTELLIGENCE_BACKLOG.md"
+readme="$root/web/artificer/README.md"
 
 fail() {
   printf '%s\n' "FAIL: $*" >&2

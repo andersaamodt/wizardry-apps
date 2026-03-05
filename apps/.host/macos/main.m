@@ -312,7 +312,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     } else {
         NSString *repoRoot = [self.appPath stringByDeletingLastPathComponent];
         repoRoot = [repoRoot stringByDeletingLastPathComponent];
-        NSString *repoThemePath = [[[repoRoot stringByAppendingPathComponent:@".web/artificer/static/themes"] stringByAppendingPathComponent:theme] stringByAppendingString:@".css"];
+        NSString *repoThemePath = [[[repoRoot stringByAppendingPathComponent:@"web/artificer/static/themes"] stringByAppendingPathComponent:theme] stringByAppendingString:@".css"];
         if ([[NSFileManager defaultManager] fileExistsAtPath:repoThemePath]) {
             themeFile = repoThemePath;
         }

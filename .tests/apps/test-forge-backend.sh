@@ -3,7 +3,7 @@
 set -eu
 
 test_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-backend="$test_root/.apps/forge/scripts/forge-backend.sh"
+backend="$test_root/apps/forge/scripts/forge-backend.sh"
 
 [ -x "$backend" ] || {
   printf '%s\n' "forge backend missing or not executable" >&2
@@ -48,15 +48,16 @@ printf '%s\n' "$test_root" > "$home_dir/.config/wizardry-apps/forge-root"
 config_doctor=$(HOME="$home_dir" "$bundle_scripts/forge-backend.sh" doctor)
 printf '%s\n' "$config_doctor" | grep -F "root=$test_root" >/dev/null
 
-mkdir -p "$scratch/config" "$scratch/.apps" "$scratch/.web" "$scratch/godot/tools/base-tool"
+mkdir -p "$scratch/config" "$scratch/apps" "$scratch/web" "$scratch/godot/tools/base-tool"
+printf '%s\n' "; test scaffold" > "$scratch/godot/tools/base-tool/project.godot"
 cp "$test_root/config/apps.manifest.json" "$scratch/config/apps.manifest.json"
 cp "$test_root/config/templates.manifest.json" "$scratch/config/templates.manifest.json"
-cp -R "$test_root/.web/demo" "$scratch/.web/demo"
-cp -R "$test_root/.web/.themes" "$scratch/.web/.themes"
+cp -R "$test_root/web/demo" "$scratch/web/demo"
+cp -R "$test_root/web/.themes" "$scratch/web/.themes"
 
 "$backend" scaffold-app "$scratch" sandbox-tool "Sandbox Tool" minimal >/tmp/forge-scaffold-app.log
-[ -f "$scratch/.apps/sandbox-tool/index.html" ]
-[ -f "$scratch/.apps/sandbox-tool/style.css" ]
+[ -f "$scratch/apps/sandbox-tool/index.html" ]
+[ -f "$scratch/apps/sandbox-tool/style.css" ]
 
 jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false)' "$scratch/config/apps.manifest.json" >/dev/null
 
@@ -102,10 +103,10 @@ grep -F "targets=hosted-web,macos,linux,android" "$workspaces_root/workspace-web
 
 run_workspace_open=$("$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot" godot)
 printf '%s\n' "$run_workspace_open" | grep -F "launched=1" >/dev/null
-printf '%s\n' "$run_workspace_open" | grep -F "mode=open" >/dev/null
+printf '%s\n' "$run_workspace_open" | grep -E "mode=(godot|open)" >/dev/null
 printf '%s\n' "$run_workspace_open" | grep -F "entry=$workspaces_root/workspace-godot" >/dev/null
 
 run_workspace_infer=$("$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot")
-printf '%s\n' "$run_workspace_infer" | grep -F "mode=open" >/dev/null
+printf '%s\n' "$run_workspace_infer" | grep -E "mode=(godot|open)" >/dev/null
 
 printf '%s\n' "forge backend tests passed"

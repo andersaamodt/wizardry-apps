@@ -2,8 +2,8 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
-app="$root/.web/artificer/static/artificer-app.js"
-style="$root/.web/artificer/static/style.css"
+app="$root/web/artificer/static/artificer-app.js"
+style="$root/web/artificer/static/style.css"
 
 assert_contains() {
   file=$1

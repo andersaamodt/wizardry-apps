@@ -2,14 +2,14 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-api="$root/.web/artificer/cgi/artificer-api"
-mode_runtime_lib="$root/.web/artificer/cgi/mode-runtime-lib.sh"
-ui_js="$root/.web/artificer/static/artificer-app.js"
-page_md="$root/.web/artificer/pages/index.md"
-page_html="$root/.web/artificer/pages/index.html"
-style="$root/.web/artificer/static/style.css"
-readme="$root/.web/artificer/README.md"
-backlog="$root/.web/artificer/INTELLIGENCE_BACKLOG.md"
+api="$root/web/artificer/cgi/artificer-api"
+mode_runtime_lib="$root/web/artificer/cgi/mode-runtime-lib.sh"
+ui_js="$root/web/artificer/static/artificer-app.js"
+page_md="$root/web/artificer/pages/index.md"
+page_html="$root/web/artificer/pages/index.html"
+style="$root/web/artificer/static/style.css"
+readme="$root/web/artificer/README.md"
+backlog="$root/web/artificer/INTELLIGENCE_BACKLOG.md"
 
 fail() {
   printf '%s\n' "FAIL: $*" >&2

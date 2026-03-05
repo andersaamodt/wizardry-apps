@@ -70,9 +70,9 @@
 - Show the resolved runtime endpoint in the UI when it matters.
 
 ## File and Path Conventions
-- Keep app entrypoint at `.apps/<slug>/index.html`.
-- Keep app backend at `.apps/<slug>/scripts/<slug>-backend.sh` when backend logic exists.
-- Keep app-scoped docs in `.apps/<slug>/README.md` for runtime paths and operator notes.
+- Keep app entrypoint at `apps/<slug>/index.html`.
+- Keep app backend at `apps/<slug>/scripts/<slug>-backend.sh` when backend logic exists.
+- Keep app-scoped docs in `apps/<slug>/README.md` for runtime paths and operator notes.
 - Keep naming consistent with hyphenated app slugs.
 
 ## Accessibility and Input Ergonomics

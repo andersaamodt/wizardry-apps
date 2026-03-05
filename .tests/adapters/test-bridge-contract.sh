@@ -3,9 +3,9 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-bridge="$ROOT_DIR/.apps/.host/shared/wizardry-bridge.js"
-android="$ROOT_DIR/.apps/.host/android/app/src/main/java/com/wizardry/apps/host/MainActivity.kt"
-ios="$ROOT_DIR/.apps/.host/ios/Host/WizardryWebView.swift"
+bridge="$ROOT_DIR/apps/.host/shared/wizardry-bridge.js"
+android="$ROOT_DIR/apps/.host/android/app/src/main/java/com/wizardry/apps/host/MainActivity.kt"
+ios="$ROOT_DIR/apps/.host/ios/Host/WizardryWebView.swift"
 
 [ -f "$bridge" ]
 [ -f "$android" ]

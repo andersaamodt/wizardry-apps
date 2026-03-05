@@ -2,7 +2,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-api="$root/.web/artificer/cgi/artificer-api"
+api="$root/web/artificer/cgi/artificer-api"
 
 fail() {
   printf '%s\n' "FAIL: $*" >&2

@@ -443,7 +443,9 @@ prerender_blog_dynamic_sections() {
 
 build_site() {
   step "Building site: $site_name"
-  shared_theme_dir="$WIZARDRY_DIR/.web/.themes"
+  shared_theme_root="$WIZARDRY_DIR/web"
+  [ -d "$shared_theme_root" ] || shared_theme_root="$WIZARDRY_DIR/.web"
+  shared_theme_dir="$shared_theme_root/.themes"
   site_template=$(config-get "$SITE_DIR/site.conf" template 2>/dev/null || printf '')
 
   if [ "$site_template" = "blog" ]; then

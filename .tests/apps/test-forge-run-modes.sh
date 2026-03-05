@@ -3,8 +3,8 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-ui="$root/.apps/forge/index.html"
-backend="$root/.apps/forge/scripts/forge-backend.sh"
+ui="$root/apps/forge/index.html"
+backend="$root/apps/forge/scripts/forge-backend.sh"
 
 [ -f "$ui" ] || {
   printf '%s\n' "forge ui file missing: $ui" >&2

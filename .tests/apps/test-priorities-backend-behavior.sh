@@ -3,7 +3,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-backend="$root/.apps/priorities/scripts/priorities-backend.sh"
+backend="$root/apps/priorities/scripts/priorities-backend.sh"
 
 [ -x "$backend" ] || {
   printf '%s\n' "priorities backend missing or not executable: $backend" >&2

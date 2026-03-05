@@ -34,8 +34,8 @@ test_blog_template_has_sample_posts() {
 test_all_web_templates_create_expected_structure() {
   skip-if-compiled || return $?
 
-  if [ ! -d "$ROOT_DIR/.web" ]; then
-    TEST_FAILURE_REASON="template directory missing: $ROOT_DIR/.web"
+  if [ ! -d "$ROOT_DIR/web" ]; then
+    TEST_FAILURE_REASON="template directory missing: $ROOT_DIR/web"
     return 1
   fi
 
@@ -43,7 +43,7 @@ test_all_web_templates_create_expected_structure() {
   export WEB_WIZARDRY_ROOT="$test_web_root"
 
   found_template=0
-  for template_path in "$ROOT_DIR/.web"/*; do
+  for template_path in "$ROOT_DIR/web"/*; do
     [ -d "$template_path" ] || continue
     found_template=1
     template=$(basename "$template_path")
@@ -93,7 +93,7 @@ test_all_web_templates_create_expected_structure() {
   done
 
   if [ "$found_template" -ne 1 ]; then
-    TEST_FAILURE_REASON="no templates found in $ROOT_DIR/.web"
+    TEST_FAILURE_REASON="no templates found in $ROOT_DIR/web"
     rm -rf "$test_web_root"
     return 1
   fi
