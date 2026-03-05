@@ -62,7 +62,9 @@ fi
 
 png_icon="$root/apps/forge/assets/forge-icon.png"
 if [ -f "$png_icon" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-  iconset=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
+  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
+  iconset="${iconset_tmp}.iconset"
+  mv "$iconset_tmp" "$iconset"
   trap 'rm -rf "$iconset"' EXIT INT TERM
   for size in 16 32 128 256 512; do
     sips -z "$size" "$size" "$png_icon" --out "$iconset/icon_${size}x${size}.png" >/dev/null

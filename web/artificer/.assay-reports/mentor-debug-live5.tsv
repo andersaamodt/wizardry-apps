@@ -1,2 +1,0 @@
-task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
-deterministic-tests	report	standard	error	5	16	0	365	1	1	1	0	61	63

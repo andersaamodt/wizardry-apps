@@ -1,3 +1,0 @@
-task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
-deterministic-tests	report	standard	error	4	50	4137	404	1	1	1	1	61	85
-concurrency-race	assistant	standard	error	4	47	3013	401	1	1	1	1	61	85

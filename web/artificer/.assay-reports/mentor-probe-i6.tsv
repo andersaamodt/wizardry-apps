@@ -1,3 +1,0 @@
-task	mode	budget	status	commands	steps	stream_len	assistant_len	sections	control	verification	runtime_line	intelligence	flow
-deterministic-tests	report	standard	done	5	53	2977	436	1	1	1	1	100	85
-concurrency-race	assistant	standard	done	3	56	2874	436	1	1	1	1	100	85

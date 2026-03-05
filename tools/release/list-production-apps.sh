@@ -12,4 +12,4 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-jq -r '.apps[] | select(.production == true) | .slug' "$manifest" | sort
+jq -r '.apps[] | select((.production == true) and ((.distribution // "optional") == "core")) | .slug' "$manifest" | sort

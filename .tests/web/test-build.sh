@@ -315,6 +315,8 @@ test_build_cache_falls_back_to_site_data_only() {
 run_test_case "build --help works" test_build_help
 run_test_case "build generates output for every template" test_build_generates_html_for_every_template
 run_test_case "build cache falls back to site data cache" test_build_cache_falls_back_to_site_data_only
-run_test_case "blog build renders nested posts and feeds" test_build_blog_generates_posts_and_feeds
+if [ -d "$ROOT_DIR/web/blog" ]; then
+  run_test_case "blog build renders nested posts and feeds" test_build_blog_generates_posts_and_feeds
+fi
 
 finish_tests

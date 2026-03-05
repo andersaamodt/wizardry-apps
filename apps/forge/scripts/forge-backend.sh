@@ -11,6 +11,8 @@ Commands:
   doctor [ROOT_HINT]
   list-apps [ROOT_HINT]
   list-templates [ROOT_HINT]
+  app-status [ROOT_HINT] APP_SLUG
+  template-status [ROOT_HINT] TEMPLATE_SLUG
   list-themes [ROOT_HINT]
   list-godot-tools [ROOT_HINT]
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
@@ -20,6 +22,10 @@ Commands:
   set-workspace-targets [ROOT_HINT] WORKSPACE_PATH TARGETS
   set-app-icon [ROOT_HINT] APP_SLUG DATA_URL
   set-workspace-icon [ROOT_HINT] WORKSPACE_PATH DATA_URL
+  download-app [ROOT_HINT] APP_SLUG
+  remove-downloaded-app [ROOT_HINT] APP_SLUG
+  download-template [ROOT_HINT] TEMPLATE_SLUG
+  remove-downloaded-template [ROOT_HINT] TEMPLATE_SLUG
   build-desktop [ROOT_HINT] APP_SLUG
   install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID] [LINUX_INSTALL_MODE]
   run-desktop [ROOT_HINT] APP_SLUG [RUN_MODE]
@@ -258,7 +264,275 @@ validate_site_name() {
 app_exists() {
   root=$1
   slug=$2
-  [ -d "$root/apps/$slug" ]
+  resolve_app_dir "$root" "$slug" >/dev/null 2>&1
+}
+
+forge_catalog_root() {
+  base="${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps/forge/catalog"
+  mkdir -p "$base/apps" "$base/templates"
+  printf '%s\n' "$base"
+}
+
+forge_catalog_apps_dir() {
+  printf '%s\n' "$(forge_catalog_root)/apps"
+}
+
+forge_catalog_templates_dir() {
+  printf '%s\n' "$(forge_catalog_root)/templates"
+}
+
+manifest_app_exists() {
+  root=$1
+  slug=$2
+  jq -e --arg slug "$slug" '.apps[] | select(.slug == $slug)' "$root/config/apps.manifest.json" >/dev/null 2>&1
+}
+
+manifest_template_exists() {
+  root=$1
+  slug=$2
+  jq -e --arg slug "$slug" '.templates[] | select(.slug == $slug)' "$root/config/templates.manifest.json" >/dev/null 2>&1
+}
+
+app_distribution() {
+  root=$1
+  slug=$2
+  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.distribution // "optional")' "$root/config/apps.manifest.json"
+}
+
+template_distribution() {
+  root=$1
+  slug=$2
+  jq -r --arg slug "$slug" '.templates[] | select(.slug == $slug) | (.distribution // "optional")' "$root/config/templates.manifest.json"
+}
+
+app_source_field() {
+  root=$1
+  slug=$2
+  key=$3
+  jq -r --arg slug "$slug" --arg key "$key" '.apps[] | select(.slug == $slug) | (.source[$key] // "")' "$root/config/apps.manifest.json"
+}
+
+template_source_field() {
+  root=$1
+  slug=$2
+  key=$3
+  jq -r --arg slug "$slug" --arg key "$key" '.templates[] | select(.slug == $slug) | (.source[$key] // "")' "$root/config/templates.manifest.json"
+}
+
+app_hosted_web_mode() {
+  root=$1
+  slug=$2
+  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.hostedWeb.mode // "local")' "$root/config/apps.manifest.json"
+}
+
+app_hosted_web_path() {
+  root=$1
+  slug=$2
+  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.hostedWeb.path // "")' "$root/config/apps.manifest.json"
+}
+
+app_cache_dir() {
+  slug=$1
+  printf '%s\n' "$(forge_catalog_apps_dir)/$slug"
+}
+
+template_cache_dir() {
+  slug=$1
+  printf '%s\n' "$(forge_catalog_templates_dir)/$slug"
+}
+
+resolve_app_dir() {
+  root=$1
+  slug=$2
+  distribution=$(app_distribution "$root" "$slug")
+  case "$distribution" in
+    core)
+      dir="$root/apps/$slug"
+      [ -d "$dir" ] || return 1
+      printf '%s\n' "$dir"
+      return 0
+      ;;
+    optional)
+      dir=$(app_cache_dir "$slug")
+      [ -d "$dir" ] || return 1
+      printf '%s\n' "$dir"
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+app_status() {
+  root=$1
+  slug=$2
+  distribution=$(app_distribution "$root" "$slug")
+  case "$distribution" in
+    core)
+      path="$root/apps/$slug"
+      if [ -d "$path" ]; then
+        printf '%s\t%s\n' "core_present" "$path"
+      else
+        printf '%s\t%s\n' "core_missing" "$path"
+      fi
+      ;;
+    optional)
+      path=$(app_cache_dir "$slug")
+      if [ -d "$path" ]; then
+        printf '%s\t%s\n' "optional_downloaded" "$path"
+      else
+        printf '%s\t%s\n' "not_downloaded" ""
+      fi
+      ;;
+    *)
+      printf '%s\t%s\n' "unknown" ""
+      ;;
+  esac
+}
+
+resolve_template_dir() {
+  root=$1
+  slug=$2
+  distribution=$(template_distribution "$root" "$slug")
+  case "$distribution" in
+    core)
+      dir="$root/web/$slug"
+      [ -d "$dir" ] || return 1
+      printf '%s\n' "$dir"
+      return 0
+      ;;
+    optional)
+      dir=$(template_cache_dir "$slug")
+      [ -d "$dir" ] || return 1
+      printf '%s\n' "$dir"
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+template_status() {
+  root=$1
+  slug=$2
+  distribution=$(template_distribution "$root" "$slug")
+  case "$distribution" in
+    core)
+      path="$root/web/$slug"
+      if [ -d "$path" ]; then
+        printf '%s\t%s\n' "core_present" "$path"
+      else
+        printf '%s\t%s\n' "core_missing" "$path"
+      fi
+      ;;
+    optional)
+      path=$(template_cache_dir "$slug")
+      if [ -d "$path" ]; then
+        printf '%s\t%s\n' "optional_downloaded" "$path"
+      else
+        printf '%s\t%s\n' "not_downloaded" ""
+      fi
+      ;;
+    *)
+      printf '%s\t%s\n' "unknown" ""
+      ;;
+  esac
+}
+
+resolve_app_dir_or_error() {
+  root=$1
+  slug=$2
+  if path=$(resolve_app_dir "$root" "$slug" 2>/dev/null); then
+    printf '%s\n' "$path"
+    return 0
+  fi
+  status_line=$(app_status "$root" "$slug")
+  status=$(printf '%s\n' "$status_line" | cut -f1)
+  case "$status" in
+    not_downloaded)
+      printf '%s\n' "forge-backend: app not downloaded: $slug (run download-app)" >&2
+      ;;
+    core_missing)
+      printf '%s\n' "forge-backend: core app directory missing: $root/apps/$slug" >&2
+      ;;
+    *)
+      printf '%s\n' "forge-backend: app not found: $slug" >&2
+      ;;
+  esac
+  exit 1
+}
+
+resolve_template_dir_or_error() {
+  root=$1
+  slug=$2
+  if path=$(resolve_template_dir "$root" "$slug" 2>/dev/null); then
+    printf '%s\n' "$path"
+    return 0
+  fi
+  status_line=$(template_status "$root" "$slug")
+  status=$(printf '%s\n' "$status_line" | cut -f1)
+  case "$status" in
+    not_downloaded)
+      printf '%s\n' "forge-backend: template not downloaded: $slug (run download-template)" >&2
+      ;;
+    core_missing)
+      printf '%s\n' "forge-backend: core template directory missing: $root/web/$slug" >&2
+      ;;
+    *)
+      printf '%s\n' "forge-backend: template not found: $slug" >&2
+      ;;
+  esac
+  exit 1
+}
+
+write_source_lock() {
+  lock_file=$1
+  repo=$2
+  ref=$3
+  subdir=$4
+  commit=$5
+  now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  cat > "$lock_file" <<EOF
+repo=$repo
+ref=$ref
+subdir=$subdir
+commit=$commit
+fetched_at=$now
+EOF
+}
+
+download_into_cache() {
+  repo=$1
+  ref=$2
+  subdir=$3
+  dest_dir=$4
+  lock_file=$5
+
+  require_tool git
+  tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/forge-catalog.XXXXXX")
+  trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
+
+  if ! git clone --depth=1 --branch "$ref" "$repo" "$tmp_dir/repo" >/dev/null 2>&1; then
+    rm -rf "$tmp_dir/repo"
+    git clone "$repo" "$tmp_dir/repo" >/dev/null 2>&1
+    (cd "$tmp_dir/repo" && git checkout "$ref" >/dev/null 2>&1)
+  fi
+
+  commit=$(cd "$tmp_dir/repo" && git rev-parse HEAD)
+  [ -n "$subdir" ] || subdir=.
+  src_dir="$tmp_dir/repo/$subdir"
+  [ -d "$src_dir" ] || {
+    printf '%s\n' "forge-backend: source subdir not found in repo: $subdir" >&2
+    rm -rf "$tmp_dir"
+    trap - EXIT HUP INT TERM
+    exit 1
+  }
+
+  rm -rf "$dest_dir"
+  mkdir -p "$(dirname "$dest_dir")"
+  cp -R "$src_dir" "$dest_dir"
+  write_source_lock "$lock_file" "$repo" "$ref" "$subdir" "$commit"
+
+  rm -rf "$tmp_dir"
+  trap - EXIT HUP INT TERM
 }
 
 require_jq() {
@@ -518,12 +792,21 @@ cmd_list_apps() {
   require_jq
 
   manifest="$root/config/apps.manifest.json"
-  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (if has("targets") then (.targets // "") else "__FORGE_TARGETS_MISSING__" end)] | @tsv' "$manifest" |
-  while IFS="$(printf '\t')" read -r slug name production bundle_targets manifest_targets; do
+  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (if has("targets") then (.targets // "") else "__FORGE_TARGETS_MISSING__" end), (.distribution // "optional")] | @tsv' "$manifest" |
+  while IFS="$(printf '\t')" read -r slug name production bundle_targets manifest_targets distribution; do
+    status_line=$(app_status "$root" "$slug")
+    resolved_status=$(printf '%s\n' "$status_line" | cut -f1)
+    resolved_path=$(printf '%s\n' "$status_line" | cut -f2)
     exists=0
-    app_exists "$root" "$slug" && exists=1
+    case "$resolved_status" in
+      core_present|optional_downloaded)
+        exists=1
+        ;;
+    esac
     development_context=web
-    [ -d "$root/godot/tools/$slug" ] && development_context=godot
+    if [ "$distribution" = "core" ] && [ -d "$root/godot/tools/$slug" ]; then
+      development_context=godot
+    fi
 
     if [ "$manifest_targets" != "__FORGE_TARGETS_MISSING__" ]; then
       targets=$manifest_targets
@@ -544,7 +827,7 @@ cmd_list_apps() {
       fi
     fi
 
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path"
   done
 }
 
@@ -553,12 +836,209 @@ cmd_list_templates() {
   require_jq
 
   manifest="$root/config/templates.manifest.json"
-  jq -r '.templates[] | [.slug, (if .publish then "true" else "false" end)] | @tsv' "$manifest" |
-  while IFS="$(printf '\t')" read -r slug publish; do
+  jq -r '.templates[] | [.slug, (if .publish then "true" else "false" end), (.distribution // "optional")] | @tsv' "$manifest" |
+  while IFS="$(printf '\t')" read -r slug publish distribution; do
+    status_line=$(template_status "$root" "$slug")
+    resolved_status=$(printf '%s\n' "$status_line" | cut -f1)
+    resolved_path=$(printf '%s\n' "$status_line" | cut -f2)
     exists=0
-    [ -d "$root/web/$slug" ] && exists=1
-    printf '%s\t%s\t%s\n' "$slug" "$publish" "$exists"
+    case "$resolved_status" in
+      core_present|optional_downloaded)
+        exists=1
+        ;;
+    esac
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$publish" "$exists" "$distribution" "$resolved_status" "$resolved_path"
   done
+}
+
+cmd_app_status() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: app-status requires APP_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
+    exit 1
+  }
+
+  distribution=$(app_distribution "$root" "$slug")
+  status_line=$(app_status "$root" "$slug")
+  resolved_status=$(printf '%s\n' "$status_line" | cut -f1)
+  resolved_path=$(printf '%s\n' "$status_line" | cut -f2)
+  repo=$(app_source_field "$root" "$slug" repo)
+  ref=$(app_source_field "$root" "$slug" ref)
+  [ -n "$ref" ] || ref=main
+  subdir=$(app_source_field "$root" "$slug" subdir)
+  [ -n "$subdir" ] || subdir=.
+
+  printf 'slug=%s\n' "$slug"
+  printf 'distribution=%s\n' "$distribution"
+  printf 'status=%s\n' "$resolved_status"
+  [ -n "$resolved_path" ] && printf 'path=%s\n' "$resolved_path"
+  [ -n "$repo" ] && printf 'repo=%s\n' "$repo"
+  printf 'ref=%s\n' "$ref"
+  printf 'subdir=%s\n' "$subdir"
+}
+
+cmd_template_status() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: template-status requires TEMPLATE_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+  manifest_template_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: template not found in manifest: $slug" >&2
+    exit 1
+  }
+
+  distribution=$(template_distribution "$root" "$slug")
+  status_line=$(template_status "$root" "$slug")
+  resolved_status=$(printf '%s\n' "$status_line" | cut -f1)
+  resolved_path=$(printf '%s\n' "$status_line" | cut -f2)
+  repo=$(template_source_field "$root" "$slug" repo)
+  ref=$(template_source_field "$root" "$slug" ref)
+  [ -n "$ref" ] || ref=main
+  subdir=$(template_source_field "$root" "$slug" subdir)
+  [ -n "$subdir" ] || subdir=.
+
+  printf 'slug=%s\n' "$slug"
+  printf 'distribution=%s\n' "$distribution"
+  printf 'status=%s\n' "$resolved_status"
+  [ -n "$resolved_path" ] && printf 'path=%s\n' "$resolved_path"
+  [ -n "$repo" ] && printf 'repo=%s\n' "$repo"
+  printf 'ref=%s\n' "$ref"
+  printf 'subdir=%s\n' "$subdir"
+}
+
+cmd_download_app() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: download-app requires APP_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
+    exit 1
+  }
+
+  distribution=$(app_distribution "$root" "$slug")
+  [ "$distribution" = "optional" ] || {
+    printf '%s\n' "forge-backend: app is core; download-app only applies to optional apps: $slug" >&2
+    exit 1
+  }
+  repo=$(app_source_field "$root" "$slug" repo)
+  ref=$(app_source_field "$root" "$slug" ref)
+  subdir=$(app_source_field "$root" "$slug" subdir)
+  [ -n "$repo" ] || {
+    printf '%s\n' "forge-backend: optional app missing source.repo: $slug" >&2
+    exit 1
+  }
+  [ -n "$ref" ] || ref=main
+  [ -n "$subdir" ] || subdir=.
+
+  dest_dir=$(app_cache_dir "$slug")
+  lock_file="$dest_dir/.forge-source.lock"
+  download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file"
+  printf 'slug=%s\n' "$slug"
+  printf 'downloaded=%s\n' "$dest_dir"
+  printf 'lock=%s\n' "$lock_file"
+}
+
+cmd_remove_downloaded_app() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: remove-downloaded-app requires APP_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
+    exit 1
+  }
+
+  distribution=$(app_distribution "$root" "$slug")
+  [ "$distribution" = "optional" ] || {
+    printf '%s\n' "forge-backend: app is core; remove-downloaded-app only applies to optional apps: $slug" >&2
+    exit 1
+  }
+  dest_dir=$(app_cache_dir "$slug")
+  rm -rf "$dest_dir"
+  printf 'slug=%s\n' "$slug"
+  printf 'removed=%s\n' "$dest_dir"
+}
+
+cmd_download_template() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: download-template requires TEMPLATE_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+  manifest_template_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: template not found in manifest: $slug" >&2
+    exit 1
+  }
+
+  distribution=$(template_distribution "$root" "$slug")
+  [ "$distribution" = "optional" ] || {
+    printf '%s\n' "forge-backend: template is core; download-template only applies to optional templates: $slug" >&2
+    exit 1
+  }
+  repo=$(template_source_field "$root" "$slug" repo)
+  ref=$(template_source_field "$root" "$slug" ref)
+  subdir=$(template_source_field "$root" "$slug" subdir)
+  [ -n "$repo" ] || {
+    printf '%s\n' "forge-backend: optional template missing source.repo: $slug" >&2
+    exit 1
+  }
+  [ -n "$ref" ] || ref=main
+  [ -n "$subdir" ] || subdir=.
+
+  dest_dir=$(template_cache_dir "$slug")
+  lock_file="$dest_dir/.forge-source.lock"
+  download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file"
+  printf 'slug=%s\n' "$slug"
+  printf 'downloaded=%s\n' "$dest_dir"
+  printf 'lock=%s\n' "$lock_file"
+}
+
+cmd_remove_downloaded_template() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: remove-downloaded-template requires TEMPLATE_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+  manifest_template_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: template not found in manifest: $slug" >&2
+    exit 1
+  }
+
+  distribution=$(template_distribution "$root" "$slug")
+  [ "$distribution" = "optional" ] || {
+    printf '%s\n' "forge-backend: template is core; remove-downloaded-template only applies to optional templates: $slug" >&2
+    exit 1
+  }
+  dest_dir=$(template_cache_dir "$slug")
+  rm -rf "$dest_dir"
+  printf 'slug=%s\n' "$slug"
+  printf 'removed=%s\n' "$dest_dir"
 }
 
 theme_names_from_dir() {
@@ -849,11 +1329,12 @@ cmd_set_app_icon() {
     exit 2
   }
   validate_slug "$slug"
-  app_dir="$root/apps/$slug"
-  [ -d "$app_dir" ] || {
-    printf '%s\n' "forge-backend: app not found: $slug" >&2
+  require_jq
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
     exit 1
   }
+  app_dir=$(resolve_app_dir_or_error "$root" "$slug")
 
   write_project_icon_from_data_url "$app_dir" "$data_url"
   printf 'slug=%s\n' "$slug"
@@ -886,11 +1367,11 @@ cmd_build_desktop() {
   }
   validate_slug "$slug"
 
-  app_dir="$root/apps/$slug"
-  [ -d "$app_dir" ] || {
-    printf '%s\n' "forge-backend: app not found: $slug" >&2
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
     exit 1
   }
+  app_dir=$(resolve_app_dir_or_error "$root" "$slug")
 
   require_jq
   os=$(os_id)
@@ -1187,11 +1668,12 @@ cmd_run_desktop() {
     run_mode=host
   fi
 
-  app_dir="$root/apps/$slug"
-  [ -d "$app_dir" ] || {
-    printf '%s\n' "forge-backend: app not found: $slug" >&2
+  require_jq
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
     exit 1
   }
+  app_dir=$(resolve_app_dir_or_error "$root" "$slug")
 
   if [ "$run_mode" = "bundle" ]; then
     bundle_build_out=$(cmd_build_desktop "$root" "$slug")
@@ -1474,11 +1956,29 @@ cmd_serve_hosted_web() {
     builtin)
       slug=$ref
       validate_slug "$slug"
-      template_dir="$root/web/$slug"
-      [ -d "$template_dir" ] || {
-        printf '%s\n' "forge-backend: hosted web template not found for app: $slug" >&2
+      require_jq
+      manifest_app_exists "$root" "$slug" || {
+        printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
         exit 1
       }
+      hosted_mode=$(app_hosted_web_mode "$root" "$slug")
+      case "$hosted_mode" in
+        local)
+          template_dir="$root/web/$slug"
+          [ -d "$template_dir" ] || {
+            printf '%s\n' "forge-backend: hosted web template not found for app: $slug" >&2
+            exit 1
+          }
+          ;;
+        external)
+          printf '%s\n' "forge-backend: hosted web serve for external hostedWeb apps is not yet available in this repository clone" >&2
+          exit 1
+          ;;
+        *)
+          printf '%s\n' "forge-backend: unknown hostedWeb mode for app: $slug" >&2
+          exit 1
+          ;;
+      esac
 
       web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
       site_name="forge-$slug"
@@ -1542,6 +2042,16 @@ cmd_stage_mobile() {
     exit 2
   }
   validate_slug "$slug"
+  require_jq
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
+    exit 1
+  }
+  distribution=$(app_distribution "$root" "$slug")
+  [ "$distribution" = "core" ] || {
+    printf '%s\n' "forge-backend: stage-mobile currently supports core apps only: $slug" >&2
+    exit 1
+  }
   app_exists "$root" "$slug" || {
     printf '%s\n' "forge-backend: app not found: $slug" >&2
     exit 1
@@ -1560,6 +2070,12 @@ cmd_build_ios_smoke() {
     exit 2
   }
   validate_slug "$slug"
+  require_jq
+  distribution=$(app_distribution "$root" "$slug")
+  [ "$distribution" = "core" ] || {
+    printf '%s\n' "forge-backend: build-ios-smoke currently supports core apps only: $slug" >&2
+    exit 1
+  }
   app_exists "$root" "$slug" || {
     printf '%s\n' "forge-backend: app not found: $slug" >&2
     exit 1
@@ -1586,6 +2102,12 @@ cmd_build_android_debug() {
     exit 2
   }
   validate_slug "$slug"
+  require_jq
+  distribution=$(app_distribution "$root" "$slug")
+  [ "$distribution" = "core" ] || {
+    printf '%s\n' "forge-backend: build-android-debug currently supports core apps only: $slug" >&2
+    exit 1
+  }
   app_exists "$root" "$slug" || {
     printf '%s\n' "forge-backend: app not found: $slug" >&2
     exit 1
@@ -1909,6 +2431,7 @@ append_manifest_app() {
       "slug": $slug,
       "name": $name,
       "production": false,
+      "distribution": "core",
       "bundleIds": {
         "macos": ("com.wizardry.apps." + $slug + ".macos"),
         "ios": ("com.wizardry.apps." + $slug + ".ios"),
@@ -1948,11 +2471,12 @@ cmd_scaffold_app() {
         exit 2
       }
       validate_slug "$source_app"
-      source_dir="$root/apps/$source_app"
-      [ -d "$source_dir" ] || {
-        printf '%s\n' "forge-backend: source app not found: $source_app" >&2
+      require_jq
+      manifest_app_exists "$root" "$source_app" || {
+        printf '%s\n' "forge-backend: source app not found in manifest: $source_app" >&2
         exit 1
       }
+      source_dir=$(resolve_app_dir_or_error "$root" "$source_app")
       ;;
     *)
       printf '%s\n' "forge-backend: unknown app template: $template" >&2
@@ -2051,11 +2575,12 @@ cmd_scaffold_workspace() {
             exit 2
           }
           validate_slug "$source"
-          source_dir="$root/apps/$source"
-          [ -d "$source_dir" ] || {
-            printf '%s\n' "forge-backend: source app not found: $source" >&2
+          require_jq
+          manifest_app_exists "$root" "$source" || {
+            printf '%s\n' "forge-backend: source app not found in manifest: $source" >&2
             exit 1
           }
+          source_dir=$(resolve_app_dir_or_error "$root" "$source")
           rm -rf "$app_dir"
           mkdir -p "$app_dir"
           cp -R "$source_dir"/. "$app_dir/"
@@ -2193,11 +2718,12 @@ cmd_scaffold_site() {
     dest_root="$HOME/sites"
   fi
 
-  template_dir="$root/web/$template"
-  [ -d "$template_dir" ] || {
-    printf '%s\n' "forge-backend: template not found: $template" >&2
+  require_jq
+  manifest_template_exists "$root" "$template" || {
+    printf '%s\n' "forge-backend: template not found in manifest: $template" >&2
     exit 1
   }
+  template_dir=$(resolve_template_dir_or_error "$root" "$template")
 
   site_dir="$dest_root/$site_name"
   [ ! -e "$site_dir" ] || {
@@ -2313,6 +2839,12 @@ case "$cmd" in
   list-templates)
     cmd_list_templates "${2-}"
     ;;
+  app-status)
+    cmd_app_status "${2-}" "${3-}"
+    ;;
+  template-status)
+    cmd_template_status "${2-}" "${3-}"
+    ;;
   list-themes)
     cmd_list_themes "${2-}"
     ;;
@@ -2339,6 +2871,18 @@ case "$cmd" in
     ;;
   set-workspace-icon)
     cmd_set_workspace_icon "${2-}" "${3-}" "${4-}"
+    ;;
+  download-app)
+    cmd_download_app "${2-}" "${3-}"
+    ;;
+  remove-downloaded-app)
+    cmd_remove_downloaded_app "${2-}" "${3-}"
+    ;;
+  download-template)
+    cmd_download_template "${2-}" "${3-}"
+    ;;
+  remove-downloaded-template)
+    cmd_remove_downloaded_template "${2-}" "${3-}"
     ;;
   build-desktop)
     cmd_build_desktop "${2-}" "${3-}"

@@ -32,7 +32,7 @@ printf '%s\n' "$install_out" | grep -F "workspace_root_file=$fake_home/.config/w
 
 shim="$fake_home/.local/bin/app-forge"
 [ -x "$shim" ]
-printf '%s\n' "$(cat "$shim")" | grep -F "$root/tools/forge/launch-forge.sh" >/dev/null
+printf '%s\n' "$(cat "$shim")" | grep -F "$root/tools/forge/launch-forge" >/dev/null
 [ -f "$fake_home/.config/wizardry-apps/forge-root" ]
 [ "$(head -n 1 "$fake_home/.config/wizardry-apps/forge-root")" = "$root" ]
 

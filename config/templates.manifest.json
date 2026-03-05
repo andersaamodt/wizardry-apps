@@ -3,11 +3,18 @@
   "templates": [
     {
       "slug": "demo",
-      "publish": true
+      "publish": true,
+      "distribution": "core"
     },
     {
       "slug": "blog",
-      "publish": true
+      "publish": false,
+      "distribution": "optional",
+      "source": {
+        "repo": "https://github.com/wizardry-apps/blog-template.git",
+        "ref": "main",
+        "subdir": "."
+      }
     }
   ]
 }

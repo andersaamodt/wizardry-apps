@@ -4,7 +4,17 @@
     {
       "slug": "artificer",
       "name": "Artificer",
-      "production": true,
+      "production": false,
+      "distribution": "optional",
+      "source": {
+        "repo": "https://github.com/wizardry-apps/artificer.git",
+        "ref": "main",
+        "subdir": "."
+      },
+      "hostedWeb": {
+        "mode": "external",
+        "path": "web/artificer"
+      },
       "bundleIds": {
         "macos": "com.wizardry.apps.artificer.macos",
         "ios": "com.wizardry.apps.artificer.ios",
@@ -15,7 +25,17 @@
     {
       "slug": "unix-settings",
       "name": "UNIX Settings",
-      "production": true,
+      "production": false,
+      "distribution": "optional",
+      "source": {
+        "repo": "https://github.com/wizardry-apps/unix-settings.git",
+        "ref": "main",
+        "subdir": "."
+      },
+      "hostedWeb": {
+        "mode": "external",
+        "path": "web/unix-settings"
+      },
       "bundleIds": {
         "macos": "com.wizardry.apps.unixsettings.macos",
         "ios": "com.wizardry.apps.unixsettings.ios",
@@ -27,6 +47,7 @@
       "slug": "forge",
       "name": "App Forge",
       "production": true,
+      "distribution": "core",
       "bundleIds": {
         "macos": "com.wizardry.apps.forge.macos",
         "ios": "com.wizardry.apps.forge.ios",
@@ -38,6 +59,7 @@
       "slug": "chatroom",
       "name": "Chatroom",
       "production": false,
+      "distribution": "core",
       "bundleIds": {
         "macos": "com.wizardry.apps.chatroom.macos",
         "ios": "com.wizardry.apps.chatroom.ios",
@@ -48,7 +70,13 @@
     {
       "slug": "priorities",
       "name": "Priorities",
-      "production": true,
+      "production": false,
+      "distribution": "optional",
+      "source": {
+        "repo": "https://github.com/wizardry-apps/priorities.git",
+        "ref": "main",
+        "subdir": "."
+      },
       "bundleIds": {
         "macos": "com.wizardry.apps.priorities.macos",
         "ios": "com.wizardry.apps.priorities.ios",
@@ -60,6 +88,12 @@
       "slug": "memetrader",
       "name": "Memetrader",
       "production": false,
+      "distribution": "optional",
+      "source": {
+        "repo": "https://github.com/wizardry-apps/memetrader.git",
+        "ref": "main",
+        "subdir": "."
+      },
       "bundleIds": {
         "macos": "com.wizardry.apps.memetrader.macos",
         "ios": "com.wizardry.apps.memetrader.ios",
@@ -71,6 +105,12 @@
       "slug": "virtual-redditor",
       "name": "Virtual Redditor",
       "production": false,
+      "distribution": "optional",
+      "source": {
+        "repo": "https://github.com/wizardry-apps/virtual-redditor.git",
+        "ref": "main",
+        "subdir": "."
+      },
       "bundleIds": {
         "macos": "com.wizardry.apps.virtualredditor.macos",
         "ios": "com.wizardry.apps.virtualredditor.ios",

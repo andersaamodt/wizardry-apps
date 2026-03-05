@@ -13,7 +13,10 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 [ -x "$root/tools/forge/uninstall-forge.sh" ]
 [ -x "$root/tools/forge/build-forge-icon.sh" ]
 [ -x "$root/tools/forge/build-forge-macos-app.sh" ]
-[ -f "$root/apps/forge/assets/forge-icon.svg" ]
+if [ ! -f "$root/apps/forge/assets/forge-icon.svg" ] && [ ! -f "$root/apps/forge/assets/forge-icon.png" ]; then
+  printf '%s\n' "forge icon asset missing (expected forge-icon.svg or forge-icon.png)" >&2
+  exit 1
+fi
 [ -x "$root/run-forge" ]
 [ -x "$root/install-forge" ]
 [ -x "$root/uninstall-forge" ]

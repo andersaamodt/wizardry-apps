@@ -32,7 +32,7 @@ jobs:
         run: |
           set -eu
           mkdir -p dist/hosted-web
-          for template in $(jq -r '.templates[] | select(.publish == true) | .slug' config/templates.manifest.json); do
+          for template in $(jq -r '.templates[] | select((.publish == true) and ((.distribution // "optional") == "core")) | .slug' config/templates.manifest.json); do
             [ -d "web/$template" ] || { echo "missing template: $template" >&2; exit 1; }
             mkdir -p "dist/hosted-web/$template"
             cp -R "web/$template"/. "dist/hosted-web/$template/"

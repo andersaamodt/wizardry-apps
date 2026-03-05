@@ -1654,7 +1654,7 @@
             context: app.context,
             projectType: inferProjectTypeFromContext(app.context).toLowerCase(),
             targets: app.targets || '',
-            path: state.rootHint ? (state.rootHint + '/apps/' + app.id) : ''
+            path: app.resolvedPath || (state.rootHint ? (state.rootHint + '/apps/' + app.id) : '')
           };
         });
         var workspaces = state.workspaces.map(function (ws) {
@@ -1868,6 +1868,14 @@
             suiteDot.title = 'Wizardry suite';
             suiteDot.textContent = 'wizardry';
             nameWrap.appendChild(suiteDot);
+            var rowApp = appById(item.id);
+            if (rowApp && rowApp.distribution === 'optional' && rowApp.exists === false) {
+              var pendingDot = document.createElement('span');
+              pendingDot.className = 'suite-dot';
+              pendingDot.title = 'Not downloaded';
+              pendingDot.textContent = 'download';
+              nameWrap.appendChild(pendingDot);
+            }
           }
 
           line.appendChild(nameWrap);
@@ -1880,6 +1888,13 @@
             play.className = 'row-play';
             play.title = 'Run';
             play.textContent = '▶';
+            if (item.kind === 'builtin') {
+              var itemApp = appById(item.id);
+              if (itemApp && itemApp.distribution === 'optional' && itemApp.exists === false) {
+                play.disabled = true;
+                play.title = 'Download before run';
+              }
+            }
             play.addEventListener('click', function (event) {
               event.preventDefault();
               event.stopPropagation();
@@ -1945,6 +1960,24 @@
         }) || null;
       }
 
+      function appById(id) {
+        return state.apps.find(function (app) {
+          return app.id === id;
+        }) || null;
+      }
+
+      function selectedBuiltInEntry(selected) {
+        if (!selected || selected.kind !== 'builtin') {
+          return null;
+        }
+        return appById(selected.id);
+      }
+
+      function isBuiltInNotDownloaded(selected) {
+        var app = selectedBuiltInEntry(selected);
+        return !!(app && app.distribution === 'optional' && app.exists === false);
+      }
+
       function renderSelectedBuiltIn() {
         var selected = selectedCatalogItem();
         els.selectedAppGrid.innerHTML = '';
@@ -2003,6 +2036,54 @@
         if (els.selectedSuiteBadge) {
           els.selectedSuiteBadge.classList.toggle('hidden', selected.kind !== 'builtin');
         }
+        if (isBuiltInNotDownloaded(selected)) {
+          if (els.openSelectedPath) {
+            text(els.openSelectedPath, '');
+            delete els.openSelectedPath.dataset.path;
+            els.openSelectedPath.classList.add('hidden');
+          }
+          if (els.terminalSelectedPath) {
+            els.terminalSelectedPath.classList.add('hidden');
+          }
+          if (els.selectedTargetsEditor) {
+            els.selectedTargetsEditor.classList.add('hidden');
+          }
+          renderSelectedIconEditor(null);
+          els.selectedAppGrid.classList.remove('hidden');
+          var statusCard = document.createElement('div');
+          statusCard.className = 'kv-item';
+          var header = document.createElement('strong');
+          header.textContent = 'Optional app';
+          var body = document.createElement('div');
+          body.className = 'sub';
+          body.textContent = 'This app is listed in the catalog but not downloaded on this machine.';
+          statusCard.appendChild(header);
+          statusCard.appendChild(body);
+
+          var controls = document.createElement('div');
+          controls.style.display = 'flex';
+          controls.style.gap = '0.55rem';
+          controls.style.marginTop = '0.55rem';
+
+          var downloadBtn = document.createElement('button');
+          downloadBtn.type = 'button';
+          downloadBtn.className = 'action';
+          downloadBtn.textContent = 'Download ' + selected.title;
+          downloadBtn.disabled = state.busy;
+          downloadBtn.addEventListener('click', function () {
+            perform('Download app', async function () {
+              await backend('download-app', [selected.id]);
+              await refreshApps({ quiet: true });
+              renderCatalogList();
+              renderSelectedBuiltIn();
+            }, { swallow: true, keepResult: true });
+          });
+          controls.appendChild(downloadBtn);
+          statusCard.appendChild(controls);
+          els.selectedAppGrid.appendChild(statusCard);
+          scheduleWindowFit();
+          return;
+        }
         if (els.openSelectedPath) {
           if (selected.path) {
             var normalizedPath = String(selected.path).replace(/[\\/]+$/, '');
@@ -2051,6 +2132,9 @@
         if (!selected) {
           return false;
         }
+        if (isBuiltInNotDownloaded(selected)) {
+          return false;
+        }
         var active = activeTargetIds(selected);
         if (!active.length) {
           return false;
@@ -2087,6 +2171,9 @@
         if (!selected) {
           return false;
         }
+        if (isBuiltInNotDownloaded(selected)) {
+          return false;
+        }
         return true;
       }
 
@@ -2116,6 +2203,9 @@
         if (!selected) {
           return false;
         }
+        if (isBuiltInNotDownloaded(selected)) {
+          return false;
+        }
         var hostTarget = hostTargetId();
         if (!hostTarget) {
           return false;
@@ -2127,6 +2217,9 @@
 
       function hasEnabledHostedWebTarget(selected) {
         if (!selected) {
+          return false;
+        }
+        if (isBuiltInNotDownloaded(selected)) {
           return false;
         }
         var projectType = projectTypeKeyForContext(selected.context);
@@ -2981,7 +3074,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-apps', [], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 6);
+        var rows = parseTSV(res.stdout || '', 9);
         state.apps = rows.map(function (row) {
           return {
             id: row[0],
@@ -2989,7 +3082,10 @@
             production: row[2] === 'true',
             exists: row[3] === '1',
             context: row[4] || 'web',
-            targets: (typeof row[5] === 'string' ? row[5] : 'macos,linux')
+            targets: (typeof row[5] === 'string' ? row[5] : 'macos,linux'),
+            distribution: row[6] || 'optional',
+            resolvedStatus: row[7] || '',
+            resolvedPath: row[8] || ''
           };
         });
 
@@ -3065,6 +3161,9 @@
         var selected = selectedCatalogItem();
         if (!selected || selected.kind !== 'builtin') {
           throw new Error('Select an app first');
+        }
+        if (isBuiltInNotDownloaded(selected)) {
+          throw new Error('This app is optional and not downloaded yet.');
         }
         state.selectedBuiltIn = selected.id;
         var app = selectedBuiltInApp();
@@ -3207,6 +3306,9 @@
         var app = selectedBuiltInApp();
         if (!app) {
           throw new Error('Select a built-in app first');
+        }
+        if (app.distribution === 'optional' && app.exists === false) {
+          throw new Error('Download this app before running pipeline actions.');
         }
         var projectKey = 'builtin:' + app.id;
         var nativeTarget = state.os === 'darwin' ? 'macos' : 'linux';

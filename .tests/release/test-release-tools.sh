@@ -16,14 +16,14 @@ printf '%s' "$bundle_id" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-stage-assets.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
-sh "$ROOT_DIR/tools/release/stage-web-assets.sh" artificer "$tmp_dir/assets"
-[ -f "$tmp_dir/assets/app/index.html" ]
-[ -f "$tmp_dir/assets/app/.host/shared/wizardry-bridge.js" ]
-[ -d "$tmp_dir/assets/core/include" ]
-[ -d "$tmp_dir/assets/core/src" ]
-
 sh "$ROOT_DIR/tools/release/stage-web-assets.sh" forge "$tmp_dir/forge-assets"
 [ -f "$tmp_dir/forge-assets/app/index.html" ]
 [ -f "$tmp_dir/forge-assets/app/.host/shared/wizardry-bridge.js" ]
+[ -d "$tmp_dir/forge-assets/core/include" ]
+[ -d "$tmp_dir/forge-assets/core/src" ]
+
+sh "$ROOT_DIR/tools/release/stage-web-assets.sh" chatroom "$tmp_dir/chatroom-assets"
+[ -f "$tmp_dir/chatroom-assets/app/index.html" ]
+[ -f "$tmp_dir/chatroom-assets/app/.host/shared/wizardry-bridge.js" ]
 
 printf '%s\n' "release tools smoke passed"

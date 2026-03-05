@@ -9,7 +9,7 @@ test_help() {
   run_spell spells/web/create-from-template --help
   assert_success
   assert_output_contains "Usage:"
-  assert_output_contains "blog"
+  assert_output_contains "demo"
 }
 
 test_blog_template_has_sample_posts() {
@@ -135,7 +135,9 @@ EOF
 }
 
 run_test_case "create-from-template shows help" test_help
-run_test_case "blog template has sample posts" test_blog_template_has_sample_posts
+if [ -d "$ROOT_DIR/web/blog" ]; then
+  run_test_case "blog template has sample posts" test_blog_template_has_sample_posts
+fi
 run_test_case "all templates create expected site structure" test_all_web_templates_create_expected_structure
 run_test_case "create-from-template resolves templates from web" test_create_from_template_uses_web_directory
 

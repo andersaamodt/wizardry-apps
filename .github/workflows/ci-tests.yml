@@ -36,7 +36,13 @@ jobs:
           sh .tests/release/test-release-tools.sh
           sh .tests/release/test-godot-export-script.sh
           sh .tests/release/test-ios-promotion-script.sh
-          for t in .tests/apps/test-*.sh; do
+          for t in \
+            .tests/apps/test-forge-backend.sh \
+            .tests/apps/test-forge-install-launch.sh \
+            .tests/apps/test-forge-run-modes.sh \
+            .tests/apps/test-forge-ui-assets.sh \
+            .tests/apps/test-macos-host-menu-contract.sh \
+            .tests/apps/test-no-hardcoded-localhost-port.sh; do
             sh "$t"
           done
           for t in .tests/.arcana/wizardry-apps/test-*.sh; do
