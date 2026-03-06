@@ -1913,7 +1913,8 @@ cmd_run_workspace() {
   workspace_conf="$workspace_path/wizardry.workspace.conf"
   stop_host_instances_for_app "$host_bin" "$app_dir"
 
-  if [ "$os" = "darwin" ] && command -v open >/dev/null 2>&1; then
+  workspace_run_mode=${FORGE_WORKSPACE_RUN_MODE:-host}
+  if [ "$os" = "darwin" ] && [ "$workspace_run_mode" = "bundle" ] && command -v open >/dev/null 2>&1; then
     workspace_title=$(workspace_field "$workspace_conf" title "")
     [ -n "$workspace_title" ] || workspace_title=$(workspace_field "$workspace_conf" name "")
     [ -n "$workspace_title" ] || workspace_title=$(basename "$workspace_path")
@@ -1982,9 +1983,9 @@ PLIST
   fi
 
   if command -v nohup >/dev/null 2>&1; then
-    nohup "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+    nohup env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
   else
-    "$host_bin" "$app_dir" >"$log_path" 2>&1 &
+    env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
   fi
   pid=$!
 
