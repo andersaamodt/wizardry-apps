@@ -94,8 +94,8 @@
               <button id="organize-btn" class="icon-action" type="button" aria-haspopup="menu" aria-expanded="false" title="Organize"><span class="icon-glyph icon-glyph-organize" aria-hidden="true">☰</span></button>
               <div id="organize-menu" class="floating-menu organize-menu hidden" role="menu" aria-label="Organize apps">
                 <p class="organize-title organize-heading">Show</p>
-                <button type="button" data-organize-show="both"><span>Built-in and user-created</span><span class="check" aria-hidden="true">&check;</span></button>
-                <button type="button" data-organize-show="builtin"><span>Built-in only</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-show="both"><span>Wizardry apps and user-created</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-show="builtin"><span>Wizardry apps only</span><span class="check" aria-hidden="true">&check;</span></button>
                 <button type="button" data-organize-show="workspace"><span>User-created only</span><span class="check" aria-hidden="true">&check;</span></button>
                 <p class="organize-title organize-heading">Filter</p>
                 <button type="button" data-organize-sort="alphabetical"><span>Alphabetical</span><span class="check" aria-hidden="true">&check;</span></button>
@@ -103,7 +103,7 @@
                 <button type="button" data-organize-sort="oldest"><span>Oldest</span><span class="check" aria-hidden="true">&check;</span></button>
                 <label class="organize-checkbox" for="organize-builtin-first">
                   <input id="organize-builtin-first" type="checkbox" checked>
-                  <span>Built-in first</span>
+                  <span>Wizardry apps first</span>
                 </label>
               </div>
             </div>
@@ -990,10 +990,10 @@
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
         var showMode = state.organizeShow || 'both';
         var items = catalogItems().filter(function (item) {
-          if (showMode === 'builtin' && item.kind !== 'builtin') {
+          if (showMode === 'builtin' && item.listGroup !== 'wizardry') {
             return false;
           }
-          if (showMode === 'workspace' && item.kind !== 'workspace') {
+          if (showMode === 'workspace' && item.listGroup !== 'user') {
             return false;
           }
           if (!query) {
@@ -1006,8 +1006,8 @@
       }
 
       function compareCatalogItems(a, b) {
-        if (state.organizeBuiltinFirst && a.kind !== b.kind) {
-          return a.kind === 'builtin' ? -1 : 1;
+        if (state.organizeBuiltinFirst && a.listGroup !== b.listGroup) {
+          return a.listGroup === 'wizardry' ? -1 : 1;
         }
 
         var sortMode = state.organizeSort || 'alphabetical';
@@ -1695,10 +1695,19 @@
       }
 
       function catalogItems() {
+        function builtInListGroup(appId) {
+          if (appId === 'memetrader' || appId === 'priorities' || appId === 'virtual-redditor') {
+            return 'user';
+          }
+          return 'wizardry';
+        }
+
         var builtIn = state.apps.map(function (app) {
+          var listGroup = builtInListGroup(app.id);
           return {
             key: 'builtin:' + app.id,
             kind: 'builtin',
+            listGroup: listGroup,
             id: app.id,
             title: app.title,
             production: app.production,
@@ -1713,6 +1722,7 @@
           return {
             key: 'workspace:' + ws.id,
             kind: 'workspace',
+            listGroup: 'user',
             id: ws.id,
             title: ws.title,
             production: false,
@@ -1737,6 +1747,7 @@
         return {
           key: 'draft:create',
           kind: 'workspace',
+          listGroup: 'user',
           draft: true,
           id: folder,
           title: title,
@@ -1950,7 +1961,7 @@
           contextPill.classList.add(isGameContext ? 'game' : 'web');
           contextPill.textContent = isGameContext ? 'game' : 'web';
           nameWrap.appendChild(contextPill);
-          if (item.kind === 'builtin') {
+          if (item.kind === 'builtin' && item.listGroup === 'wizardry') {
             var suiteDot = document.createElement('span');
             suiteDot.className = 'suite-dot';
             suiteDot.setAttribute('aria-label', 'Wizardry suite app');
@@ -2123,7 +2134,7 @@
           els.selectedTypeBadge.classList.remove('hidden');
         }
         if (els.selectedSuiteBadge) {
-          els.selectedSuiteBadge.classList.toggle('hidden', selected.kind !== 'builtin');
+          els.selectedSuiteBadge.classList.toggle('hidden', !(selected.kind === 'builtin' && selected.listGroup === 'wizardry'));
         }
         if (isBuiltInNotDownloaded(selected)) {
           if (els.openSelectedPath) {
@@ -2924,7 +2935,7 @@
           throw new Error('Select an app first');
         }
         if (selected.kind !== 'builtin') {
-          throw new Error('Install is currently available for built-in apps only.');
+          throw new Error('Install is currently available for wizardry apps only.');
         }
         var hostTarget = hostTargetId();
         if (!hostTarget) {
@@ -3268,7 +3279,7 @@
         if (app) {
           return app;
         }
-        throw new Error('Select a built-in app first');
+        throw new Error('Select a wizardry app first');
       }
 
       function enabledTargetsForApp(app) {
@@ -3383,7 +3394,7 @@
         }
 
         if (kind === 'stage' || kind === 'ios' || kind === 'android') {
-          throw new Error('Mobile packaging actions are currently available for built-in apps.');
+          throw new Error('Mobile packaging actions are currently available for wizardry apps.');
         }
       }
 
@@ -3403,7 +3414,7 @@
         state.selectedBuiltIn = selected.id;
         var app = selectedBuiltInApp();
         if (!app) {
-          throw new Error('Select a built-in app first');
+          throw new Error('Select a wizardry app first');
         }
         if (app.distribution === 'optional' && app.exists === false) {
           throw new Error('Download this app before running pipeline actions.');

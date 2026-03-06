@@ -68,7 +68,7 @@ while :; do
     "Quick cycle (build+run)%forge-backend run-desktop \"$root\" forge bundle" \
     "Run App Forge (desktop)%forge-backend run-desktop \"$root\" forge" \
     "Doctor workspace%forge-backend doctor \"$root\"" \
-    "List builtin apps%forge-backend list-apps \"$root\"" \
+    "List wizardry apps%forge-backend list-apps \"$root\"" \
     "List workspaces%forge-backend list-workspaces \"$root\"" \
     "List templates%forge-backend list-templates \"$root\"" \
     "List themes%forge-backend list-themes \"$root\"" \
