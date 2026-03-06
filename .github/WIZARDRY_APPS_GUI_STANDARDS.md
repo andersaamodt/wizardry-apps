@@ -13,6 +13,57 @@
 - Never ship half-ass GUI work; finish layout, spacing, and state feedback details.
 - Always use app theme colors/tokens instead of ad-hoc hardcoded color choices.
 
+## Startup Splash Contract
+- Desktop apps use one standard splash treatment: centered app logo on the active theme background.
+- During splash, any underlying host/WebView regions must be pre-colored to the same theme surface so nothing flashes through.
+- Splash handoff must be an atomic flip from splash to ready UI with no fade, no crossfade, and no staggered reveal.
+- The main interface must stay hidden until initial data/theme/layout state is ready for first interaction.
+- After splash hides, no delayed boot-only animations should continue loading core interface structure.
+- Remove splash only after web UI signals readiness via bridge hook such as `__wizardry_host_boot_ready`.
+
+## Theme System Contract
+- Use centralized `wizardry-themes` palettes/tokens instead of creating app-specific theme systems.
+- Theme colors should drive nearly the entire interface, including panels, lines, controls, menus, and scrollbars.
+- Theme selection control must exist either on the main screen or in Settings for every theme-capable app.
+- Selecting a theme must apply instantly with no reload and no deferred repaint artifacts.
+- Opening and closing theme picker without changing value must preserve the current active selection state.
+- With theme picker focused, `ArrowUp` and `ArrowDown` must cycle themes immediately and apply each step instantly.
+- Persist selected theme via backend prefs for desktop apps; do not rely on browser-owned durability.
+
+## Button And Icon Style Contract
+- Use unobtrusive icon style for most minor icon-only actions (copy, reveal, overflow, helper actions).
+- Unobtrusive icon style is borderless/backgroundless at rest and gains opaque rounded background on hover/focus.
+- Use polite button style for most primary workflow buttons (Build, Run, Create, Save, Apply).
+- Polite button style is a simple outlined button with rounded corners and a clear hover highlight.
+- Polite toggle buttons must stay visibly highlighted while toggled on.
+- For in-field icon helpers, reserve input padding so text never overlaps the icon hit target.
+- Keep both button styles keyboard focusable with obvious focus-visible states.
+
+## Visual Hierarchy Contract
+- Prefer visual hierarchy with spacing, typography, and separating lines over heavy frame-within-frame boxes.
+- Use separators and section headers to create structure before adding extra borders.
+- Keep dense control groups compact, aligned, and scannable; avoid decorative wrappers that hide hierarchy.
+
+## Left-Right Panel Pattern
+- When one primary data type is being managed, use left-right split layout: list/select on left, details/workflow on right.
+- Left side should prioritize fast browsing/filtering and single-click selection.
+- Right side should focus on selected item context, actions, and result/log output.
+- In this pattern, place Settings icon at lower-left corner of the left rail.
+- Place theme and optional LLM dropdown controls to the right of Settings in the same bottom-left rail bar.
+- Keep left rail width bounded and persist user resize preference when a divider is provided.
+
+## Right-Side Menu Bar Pattern
+- For left-right apps, place a top bar above right pane containing item title, location/path widget, and primary actions.
+- Path widget behavior standard is click to copy path and double-click to open/reveal path.
+- Keep path text compact with ellipsis behavior and an icon-only fallback when horizontal space is tight.
+- Keep primary action buttons in the same bar so item context and actions are colocated.
+
+## Desktop Window Fit And GUI QA
+- Desktop UIs must fit fully in-window; no important controls should render off-screen or clip outside viewport.
+- Avoid layouts that force horizontal overflow for baseline app workflows.
+- Validate GUI layout and interaction quality with Safari automations for desktop app surfaces when making GUI changes.
+- Validate startup (no flicker), focus states, hover states, and split-pane behavior in that QA pass.
+
 ## Command and Bridge Rules
 - Bridge calls use explicit argv arrays passed to `wizardry.rpc('bridge.exec', { argv })`.
 - Commands are selected from code-defined allowlists, not free-form user text.
@@ -34,20 +85,12 @@
 - Gate sensitive actions behind explicit confirmation in the same interface.
 - Surface undo/revert actions when behavior is irreversible or high-impact.
 
-## Startup Boot Pattern
-- Desktop apps should avoid showing intermediate paints during startup.
-- Use a native host boot splash when first paint quality matters, centered on the app icon.
-- Match host window/root background to the active app theme background during boot.
-- Resolve boot palette from backend config/plaintext files, not browser `localStorage`.
-- Keep WebView background transparent while boot splash is active to avoid white/theme flashes.
-- Remove splash only after web UI signals readiness via a bridge hook (`__wizardry_host_boot_ready`).
-
 ## Feedback and Error Handling
 - Show command status, outcome, and stderr/stdout context in-app.
 - Keep status text factual and non-imperative.
 - Prefer progress + result messaging over silent background work.
 - Use short toasts for confirmation and durable panels for actionable errors.
-- Keep logs inspectable and copyable from the GUI.
+- Keep logs inspectable, keyboard-selectable, and copyable from the GUI.
 
 ## Discoverability and Navigation
 - Keep primary actions visible without deep nesting.
@@ -62,6 +105,17 @@
 - Keep each row concise, ideally one-line with compact pills for status/source metadata.
 - Put destructive or advanced actions behind a compact overflow menu to reduce visual noise.
 - Keep list pages live-updating when visible, but pause refresh while menus/actions/drag operations are active.
+
+## Live Refresh Safety
+- Background refresh loops should pause while high-risk interactions are active (active command, drag, open menu, modal input).
+- Refresh loops should run on visibility/focus regain for freshness without constant polling load.
+- Keep current selection stable across refreshes whenever the selected item still exists.
+
+## Host Drag-Region Geometry
+- Keep drag behavior in native-host geometry and click behavior in WebView controls.
+- Reserve drag-strip holes around interactive controls instead of placing drag layers over controls.
+- Recompute host drag geometry on resize and dynamic title/control width changes.
+- Keep a dedicated reserved width for right-side controls so host drag zones cannot steal clicks.
 
 ## Port and Runtime Safety
 - Never hardcode a fixed localhost port for embedded site URLs.
@@ -81,13 +135,6 @@
 - Avoid click-only critical actions; support keyboard submission where practical.
 - Avoid defaulting buttons and short text-entry inputs to `width: 100%`; size them to content or a bounded width unless full-width is required by layout.
 - Keep motion subtle and meaningful, never required for comprehension.
-
-## Button Patterns
-- Use an unobtrusive icon button pattern for low-emphasis in-field actions like copy/reveal helpers.
-- Unobtrusive icon buttons render with no border and no background at rest.
-- On hover/focus, unobtrusive icon buttons gain a compact opaque background and small rounded corners.
-- Keep unobtrusive icon buttons keyboard-focusable with a visible focus state.
-- Position in-field unobtrusive icon buttons inside the input wrapper with absolute positioning and preserve input text padding so content never overlaps the icon.
 
 ## AI Agent Delivery Rules
 - Prefer surgical edits that preserve each app’s existing visual language.
