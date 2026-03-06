@@ -221,10 +221,14 @@ body.forge-booting .forge-shell {
 }
 
 .organize-icon {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.88rem;
+  height: 0.88rem;
   display: block;
-  filter: grayscale(1) contrast(1.05) opacity(0.82);
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  opacity: 0.9;
 }
 
 #open-create-workflow {
