@@ -745,6 +745,28 @@ sanitize_bundle_component() {
   printf '%s\n' "$cleaned"
 }
 
+copy_tree_for_bundle() {
+  src=${1-}
+  dest=${2-}
+  [ -d "$src" ] || return 1
+  mkdir -p "$dest"
+  (
+    cd "$src" || exit 1
+    tar \
+      --exclude '.git' \
+      --exclude '*/.git' \
+      --exclude '.assay-runs' \
+      --exclude '*/.assay-runs' \
+      --exclude '.assay-reports' \
+      --exclude '*/.assay-reports' \
+      --exclude '.DS_Store' \
+      -cf - .
+  ) | (
+    cd "$dest" || exit 1
+    tar -xf -
+  )
+}
+
 stop_host_instances_for_app() {
   host_bin=${1-}
   app_dir=${2-}
@@ -1448,7 +1470,7 @@ cmd_build_desktop() {
       rm -rf "$bundle"
       mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$slug" "$bundle/Contents/Resources/wizardry-apps/core"
 
-      cp -R "$app_dir"/. "$bundle/Contents/Resources/$slug/"
+      copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$slug/"
       mkdir -p "$bundle/Contents/Resources/$slug/.host"
       cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
       cp -R "$root/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
@@ -1500,7 +1522,9 @@ PLIST
 
       if command -v ditto >/dev/null 2>&1; then
         rm -f "$zip_path"
-        ditto -c -k --sequesterRsrc --keepParent "$bundle" "$zip_path"
+        if ! ditto -c -k --sequesterRsrc --keepParent "$bundle" "$zip_path"; then
+          zip_path=''
+        fi
       else
         zip_path=''
       fi
@@ -1520,7 +1544,7 @@ PLIST
       rm -rf "$appdir"
       mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$slug" "$appdir/usr/share/wizardry-apps/core"
 
-      cp -R "$app_dir"/. "$appdir/usr/share/$slug/"
+      copy_tree_for_bundle "$app_dir" "$appdir/usr/share/$slug/"
       mkdir -p "$appdir/usr/share/$slug/.host"
       cp -R "$root/apps/.host/shared" "$appdir/usr/share/$slug/.host/"
       cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
