@@ -790,7 +790,10 @@ stop_desktop_instances_for_slug() {
   [ -n "$slug" ] || return 0
 
   if [ "$os_name" = "darwin" ] && [ -n "$app_name" ] && command -v osascript >/dev/null 2>&1; then
-    osascript -e "tell application \"$app_name\" to quit" >/dev/null 2>&1 || true
+    osascript \
+      -e "if application \"$app_name\" is running then" \
+      -e "tell application \"$app_name\" to quit" \
+      -e "end if" >/dev/null 2>&1 || true
   fi
 
   if command -v pkill >/dev/null 2>&1; then
