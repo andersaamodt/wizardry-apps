@@ -933,6 +933,12 @@ input[type="checkbox"]:disabled {
   letter-spacing: 0.08em;
 }
 
+.floating-menu p.organize-heading {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 0.74rem;
+}
+
 .floating-menu button {
   width: 100%;
   border: 1px solid transparent;
@@ -962,6 +968,23 @@ input[type="checkbox"]:disabled {
 .floating-menu button.active {
   background: color-mix(in srgb, var(--accent-soft, var(--accent)) 56%, transparent);
   border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+}
+
+.organize-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  margin: 0.26rem 0.34rem 0.14rem;
+  color: color-mix(in srgb, var(--text) 92%, transparent);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.organize-checkbox input {
+  width: auto;
+  margin: 0;
 }
 
 .menu-list {

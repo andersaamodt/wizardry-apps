@@ -167,6 +167,30 @@ os_id() {
   esac
 }
 
+path_mtime_epoch() {
+  path=${1-}
+  [ -n "$path" ] || {
+    printf '%s\n' "0"
+    return 0
+  }
+  [ -e "$path" ] || {
+    printf '%s\n' "0"
+    return 0
+  }
+
+  if ts=$(stat -f %m "$path" 2>/dev/null); then
+    printf '%s\n' "$ts"
+    return 0
+  fi
+
+  if ts=$(stat -c %Y "$path" 2>/dev/null); then
+    printf '%s\n' "$ts"
+    return 0
+  fi
+
+  printf '%s\n' "0"
+}
+
 resolve_godot_engine() {
   if [ -n "${GODOT_BIN-}" ] && [ -x "$GODOT_BIN" ]; then
     printf '%s\n' "$GODOT_BIN"
@@ -856,7 +880,8 @@ cmd_list_apps() {
       fi
     fi
 
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path"
+    mtime_epoch=$(path_mtime_epoch "$resolved_path")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path" "$mtime_epoch"
   done
 }
 
@@ -1195,7 +1220,8 @@ cmd_list_workspaces() {
     [ -n "$development_context" ] || development_context=$(workspace_field "$conf" context "web")
 
     targets=$(workspace_field "$conf" targets "")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$project_id" "$title" "$project_type" "$development_context" "$targets" "$path"
+    mtime_epoch=$(path_mtime_epoch "$path")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$project_id" "$title" "$project_type" "$development_context" "$targets" "$path" "$mtime_epoch"
   done | sort
 }
 

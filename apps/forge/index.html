@@ -93,10 +93,18 @@
             <div class="menu-anchor">
               <button id="organize-btn" class="icon-action" type="button" aria-haspopup="menu" aria-expanded="false" title="Organize"><span class="icon-glyph icon-glyph-organize" aria-hidden="true">☰</span></button>
               <div id="organize-menu" class="floating-menu organize-menu hidden" role="menu" aria-label="Organize apps">
-                <p class="organize-title">Show</p>
+                <p class="organize-title organize-heading">Show</p>
                 <button type="button" data-organize-show="both"><span>Built-in and user-created</span><span class="check" aria-hidden="true">&check;</span></button>
                 <button type="button" data-organize-show="builtin"><span>Built-in only</span><span class="check" aria-hidden="true">&check;</span></button>
                 <button type="button" data-organize-show="workspace"><span>User-created only</span><span class="check" aria-hidden="true">&check;</span></button>
+                <p class="organize-title organize-heading">Filter</p>
+                <button type="button" data-organize-sort="alphabetical"><span>Alphabetical</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-sort="newest"><span>Newest</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-sort="oldest"><span>Oldest</span><span class="check" aria-hidden="true">&check;</span></button>
+                <label class="organize-checkbox" for="organize-builtin-first">
+                  <input id="organize-builtin-first" type="checkbox" checked>
+                  <span>Built-in first</span>
+                </label>
               </div>
             </div>
             <button id="open-create-workflow" class="icon-action" type="button" title="Create App" aria-label="Create App"><span class="icon-glyph icon-glyph-create" aria-hidden="true">+</span></button>
@@ -316,6 +324,8 @@
       var ROOT_KEY = 'wizardry.forge.root';
       var PROJECTS_ROOT_KEY = 'wizardry.forge.projects.root';
       var ORGANIZE_SHOW_KEY = 'wizardry.forge.organize.show';
+      var ORGANIZE_SORT_KEY = 'wizardry.forge.organize.sort';
+      var ORGANIZE_BUILTIN_FIRST_KEY = 'wizardry.forge.organize.builtin_first';
       var THEME_KEY = 'wizardry.forge.theme';
       var LINUX_INSTALL_MODE_KEY = 'wizardry.forge.linux.install.mode';
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
@@ -325,6 +335,8 @@
         'wizardry.forge.root': 'root',
         'wizardry.forge.projects.root': 'projects_root',
         'wizardry.forge.organize.show': 'organize_show',
+        'wizardry.forge.organize.sort': 'organize_sort',
+        'wizardry.forge.organize.builtin_first': 'organize_builtin_first',
         'wizardry.forge.theme': 'theme',
         'wizardry.forge.left_rail.width': 'left_rail_width',
         'wizardry.forge.selected.catalog.v1': 'selected_catalog',
@@ -341,6 +353,8 @@
         apps: [],
         workspaces: [],
         organizeShow: 'both',
+        organizeSort: 'alphabetical',
+        organizeBuiltinFirst: true,
         linuxInstallMode: 'appdir-local-share',
         themes: ['psionic'],
         activeTheme: 'psionic',
@@ -975,7 +989,7 @@
       function filteredCatalogItems() {
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
         var showMode = state.organizeShow || 'both';
-        return catalogItems().filter(function (item) {
+        var items = catalogItems().filter(function (item) {
           if (showMode === 'builtin' && item.kind !== 'builtin') {
             return false;
           }
@@ -987,6 +1001,41 @@
           }
           return item.id.toLowerCase().indexOf(query) >= 0 || item.title.toLowerCase().indexOf(query) >= 0;
         });
+        items.sort(compareCatalogItems);
+        return items;
+      }
+
+      function compareCatalogItems(a, b) {
+        if (state.organizeBuiltinFirst && a.kind !== b.kind) {
+          return a.kind === 'builtin' ? -1 : 1;
+        }
+
+        var sortMode = state.organizeSort || 'alphabetical';
+        if (sortMode === 'newest' || sortMode === 'oldest') {
+          var aTs = parseInt(a.sortTimestamp, 10) || 0;
+          var bTs = parseInt(b.sortTimestamp, 10) || 0;
+          if (aTs !== bTs) {
+            return sortMode === 'newest' ? (bTs - aTs) : (aTs - bTs);
+          }
+        }
+
+        var aTitle = String(a.title || a.id || '').toLowerCase();
+        var bTitle = String(b.title || b.id || '').toLowerCase();
+        if (aTitle < bTitle) {
+          return -1;
+        }
+        if (aTitle > bTitle) {
+          return 1;
+        }
+        var aId = String(a.id || '').toLowerCase();
+        var bId = String(b.id || '').toLowerCase();
+        if (aId < bId) {
+          return -1;
+        }
+        if (aId > bId) {
+          return 1;
+        }
+        return 0;
       }
 
       function scheduleWindowFit() {
@@ -1060,6 +1109,8 @@
         state.rootHint = loadStorage(ROOT_KEY);
         state.projectsRoot = loadStorage(PROJECTS_ROOT_KEY);
         state.organizeShow = loadStorage(ORGANIZE_SHOW_KEY) || 'both';
+        state.organizeSort = normalizeOrganizeSort(loadStorage(ORGANIZE_SORT_KEY) || 'alphabetical');
+        state.organizeBuiltinFirst = loadStorage(ORGANIZE_BUILTIN_FIRST_KEY) !== 'false';
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
         state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
@@ -1654,7 +1705,8 @@
             context: app.context,
             projectType: inferProjectTypeFromContext(app.context).toLowerCase(),
             targets: app.targets || '',
-            path: app.resolvedPath || (state.rootHint ? (state.rootHint + '/apps/' + app.id) : '')
+            path: app.resolvedPath || (state.rootHint ? (state.rootHint + '/apps/' + app.id) : ''),
+            sortTimestamp: parseInt(app.sortTimestamp, 10) || 0
           };
         });
         var workspaces = state.workspaces.map(function (ws) {
@@ -1667,7 +1719,8 @@
             context: ws.context || 'web',
             projectType: ws.projectType || inferProjectTypeFromContext(ws.context).toLowerCase(),
             targets: ws.targets || '',
-            path: ws.path
+            path: ws.path,
+            sortTimestamp: parseInt(ws.sortTimestamp, 10) || 0
           };
         });
         if (state.createDraftActive) {
@@ -1691,7 +1744,8 @@
           context: context,
           projectType: projectType,
           targets: selectedTargets().join(','),
-          path: deriveCreatePath()
+          path: deriveCreatePath(),
+          sortTimestamp: Math.floor(Date.now() / 1000)
         };
       }
 
@@ -1716,6 +1770,27 @@
         renderCatalogList();
       }
 
+      function normalizeOrganizeSort(value) {
+        if (value === 'newest' || value === 'oldest' || value === 'alphabetical') {
+          return value;
+        }
+        return 'alphabetical';
+      }
+
+      function setOrganizeSort(mode) {
+        state.organizeSort = normalizeOrganizeSort(mode);
+        saveStorage(ORGANIZE_SORT_KEY, state.organizeSort);
+        renderOrganizeMenuState();
+        renderCatalogList();
+      }
+
+      function setOrganizeBuiltinFirst(enabled) {
+        state.organizeBuiltinFirst = !!enabled;
+        saveStorage(ORGANIZE_BUILTIN_FIRST_KEY, state.organizeBuiltinFirst ? 'true' : 'false');
+        renderOrganizeMenuState();
+        renderCatalogList();
+      }
+
       function renderOrganizeMenuState() {
         if (!els.organizeMenu) {
           return;
@@ -1724,6 +1799,13 @@
           var value = btn.getAttribute('data-organize-show');
           btn.classList.toggle('active', value === state.organizeShow);
         });
+        els.organizeMenu.querySelectorAll('button[data-organize-sort]').forEach(function (btn) {
+          var value = btn.getAttribute('data-organize-sort');
+          btn.classList.toggle('active', value === state.organizeSort);
+        });
+        if (els.organizeBuiltinFirst) {
+          els.organizeBuiltinFirst.checked = !!state.organizeBuiltinFirst;
+        }
       }
 
       function closeFloatingMenus() {
@@ -3074,7 +3156,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-apps', [], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 9);
+        var rows = parseTSV(res.stdout || '', 10);
         state.apps = rows.map(function (row) {
           return {
             id: row[0],
@@ -3085,7 +3167,8 @@
             targets: (typeof row[5] === 'string' ? row[5] : 'macos,linux'),
             distribution: row[6] || 'optional',
             resolvedStatus: row[7] || '',
-            resolvedPath: row[8] || ''
+            resolvedPath: row[8] || '',
+            sortTimestamp: row[9] || '0'
           };
         });
 
@@ -3119,7 +3202,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-workspaces', [state.projectsRoot], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 6);
+        var rows = parseTSV(res.stdout || '', 7);
         state.workspaces = rows.map(function (row) {
           return {
             id: row[0],
@@ -3127,7 +3210,8 @@
             projectType: row[2],
             context: row[3],
             targets: row[4],
-            path: row[5]
+            path: row[5],
+            sortTimestamp: row[6] || '0'
           };
         });
 
@@ -3573,11 +3657,20 @@
 
         els.organizeMenu.addEventListener('click', function (event) {
           var button = event.target.closest('button[data-organize-show]');
-          if (!button) {
+          if (button) {
+            setOrganizeShow(button.getAttribute('data-organize-show'));
+            closeFloatingMenus();
             return;
           }
-          setOrganizeShow(button.getAttribute('data-organize-show'));
-          closeFloatingMenus();
+          button = event.target.closest('button[data-organize-sort]');
+          if (button) {
+            setOrganizeSort(button.getAttribute('data-organize-sort'));
+            closeFloatingMenus();
+          }
+        });
+
+        els.organizeBuiltinFirst.addEventListener('change', function () {
+          setOrganizeBuiltinFirst(!!els.organizeBuiltinFirst.checked);
         });
 
         els.themePickerBtn.addEventListener('click', function (event) {
@@ -4303,6 +4396,7 @@
         els.catalogList = document.getElementById('catalog-list');
         els.organizeBtn = document.getElementById('organize-btn');
         els.organizeMenu = document.getElementById('organize-menu');
+        els.organizeBuiltinFirst = document.getElementById('organize-builtin-first');
         els.themePickerBtn = document.getElementById('theme-picker-btn');
         els.themePickerMenu = document.getElementById('theme-picker-menu');
         els.themePickerList = document.getElementById('theme-picker-list');
@@ -4405,6 +4499,8 @@
           applyTheme(state.activeTheme);
           renderThemePicker();
           setOrganizeShow(state.organizeShow);
+          setOrganizeSort(state.organizeSort);
+          setOrganizeBuiltinFirst(state.organizeBuiltinFirst);
           setLeftRailWidth(state.leftRailWidth);
           setWorkflowMode(state.route);
           closeFloatingMenus();
