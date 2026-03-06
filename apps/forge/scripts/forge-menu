@@ -65,7 +65,7 @@ while :; do
   menu_title="App Forge console (root: $root)"
 
   menu "$menu_title" \
-    "Quick cycle (run live host)%forge-backend run-desktop \"$root\" forge host" \
+    "Quick cycle (build+run)%forge-backend run-desktop \"$root\" forge bundle" \
     "Run App Forge (desktop)%forge-backend run-desktop \"$root\" forge" \
     "Doctor workspace%forge-backend doctor \"$root\"" \
     "List builtin apps%forge-backend list-apps \"$root\"" \

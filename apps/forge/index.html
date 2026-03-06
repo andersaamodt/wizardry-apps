@@ -1853,7 +1853,8 @@
           throw new Error('Select a user-created app to run');
         }
 
-        var res = await backend('run-workspace', [item.path, item.context]);
+        var requestedRunMode = workspaceRunModeForItem(item);
+        var res = await backend('run-workspace', [item.path, item.context, requestedRunMode]);
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || ('workspace:' + item.id);
         if (item.context === 'web') {
@@ -1869,9 +1870,15 @@
           setTargetRuntime(workspaceKey, 'macos', 'ready', out.entry || item.path || '');
         }
         renderSelectedTargetsEditor(selectedCatalogItem());
+        var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : 'host');
+        var launchedSummary = item.context === 'godot'
+          ? (item.title + ' launched in Godot.')
+          : (launchedMode === 'bundle'
+            ? (item.title + ' built and launched from the desktop app bundle.')
+            : (item.title + ' launched in native host.'));
         renderResult({
           status: 'ok',
-          summary: item.context === 'godot' ? (item.title + ' launched in Godot.') : (item.title + ' launched in native host.'),
+          summary: launchedSummary,
           paths: [
             out.entry ? { label: (item.context === 'godot' ? 'Godot project' : 'Entry folder'), path: out.entry, canReveal: true } : null,
             out.log ? { label: 'Launch log', path: out.log, canReveal: true } : null
@@ -1879,8 +1886,8 @@
           help: {
             title: item.context === 'godot' ? 'Game launch' : 'Workspace launch',
             body: item.context === 'godot'
-              ? ('Mode: ' + (out.mode || 'godot') + '\nPID: ' + (out.pid || '(managed by OS)'))
-              : ('Mode: ' + (out.mode || 'host') + '\nPID: ' + (out.pid || '(managed by OS)'))
+              ? ('Mode: ' + launchedMode + '\nPID: ' + (out.pid || '(managed by OS)'))
+              : ('Mode: ' + launchedMode + '\nPID: ' + (out.pid || '(managed by OS)'))
           }
         });
       }
@@ -2295,6 +2302,13 @@
         var projectType = projectTypeKeyForContext(selected.context);
         var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
         return activeTargets.indexOf(hostTarget) >= 0;
+      }
+
+      function workspaceRunModeForItem(item) {
+        if (!item || item.context === 'godot') {
+          return 'auto';
+        }
+        return hasEnabledHostRunTarget(item) ? 'bundle' : 'host';
       }
 
       function hasEnabledHostedWebTarget(selected) {
@@ -3349,7 +3363,7 @@
             return;
           }
 
-          var run = await backend('run-workspace', [selected.path, selected.context]);
+          var run = await backend('run-workspace', [selected.path, selected.context, workspaceRunModeForItem(selected)]);
           var runOut = kv(run.stdout || '');
           setTargetRuntime(projectKey, nativeTarget, 'ready', runOut.entry || selected.path || '');
           renderSelectedTargetsEditor(selectedCatalogItem());

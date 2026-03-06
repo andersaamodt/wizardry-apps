@@ -29,7 +29,7 @@ Commands:
   build-desktop [ROOT_HINT] APP_SLUG
   install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID] [LINUX_INSTALL_MODE]
   run-desktop [ROOT_HINT] APP_SLUG [RUN_MODE]
-  run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
+  run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT] [RUN_MODE]
   serve-hosted-web [ROOT_HINT] MODE REF
   stage-mobile [ROOT_HINT] APP_SLUG
   build-ios-smoke [ROOT_HINT] APP_SLUG
@@ -1816,6 +1816,7 @@ cmd_run_workspace() {
   root=$(require_root "${1-}")
   workspace_path=${2-}
   context_hint=${3-}
+  run_mode=${4-auto}
 
   [ -n "$workspace_path" ] || {
     printf '%s\n' "forge-backend: run-workspace requires WORKSPACE_PATH" >&2
@@ -1913,8 +1914,36 @@ cmd_run_workspace() {
   workspace_conf="$workspace_path/wizardry.workspace.conf"
   stop_host_instances_for_app "$host_bin" "$app_dir"
 
-  workspace_run_mode=${FORGE_WORKSPACE_RUN_MODE:-host}
-  if [ "$os" = "darwin" ] && [ "$workspace_run_mode" = "bundle" ] && command -v open >/dev/null 2>&1; then
+  case "$run_mode" in
+    ''|auto|bundle|host) ;;
+    *)
+      printf '%s\n' "forge-backend: run-workspace RUN_MODE must be host|bundle|auto" >&2
+      exit 2
+      ;;
+  esac
+
+  if [ "$run_mode" = "auto" ] || [ -z "$run_mode" ]; then
+    run_mode=bundle
+    host_target=''
+    case "$os" in
+      darwin) host_target='macos' ;;
+      linux) host_target='linux' ;;
+    esac
+    if [ -n "$host_target" ] && [ -f "$workspace_conf" ]; then
+      targets_csv=$(workspace_field "$workspace_conf" targets "")
+      if [ -n "$targets_csv" ]; then
+        case ",$targets_csv," in
+          *,"$host_target",*)
+            ;;
+          *)
+            run_mode=host
+            ;;
+        esac
+      fi
+    fi
+  fi
+
+  if [ "$os" = "darwin" ] && [ "$run_mode" = "bundle" ] && command -v open >/dev/null 2>&1; then
     workspace_title=$(workspace_field "$workspace_conf" title "")
     [ -n "$workspace_title" ] || workspace_title=$(workspace_field "$workspace_conf" name "")
     [ -n "$workspace_title" ] || workspace_title=$(basename "$workspace_path")
@@ -1932,7 +1961,7 @@ cmd_run_workspace() {
     cat > "$bundle/Contents/MacOS/$workspace_slug" <<APP
 #!/bin/sh
 set -eu
-exec "$host_bin" "$app_dir"
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir"
 APP
     chmod +x "$bundle/Contents/MacOS/$workspace_slug"
 
@@ -1978,6 +2007,43 @@ PLIST
     printf 'mode=bundle\n'
     printf 'artifact=%s\n' "$bundle"
     printf 'entry=%s\n' "$app_dir"
+    printf 'log=%s\n' "$log_path"
+    return 0
+  fi
+
+  if [ "$os" = "linux" ] && [ "$run_mode" = "bundle" ]; then
+    bundle_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
+    bundle_root="$root/_tmp/workbench/dist/linux-workspaces/$bundle_slug"
+    appdir="$bundle_root/AppDir"
+    rm -rf "$appdir"
+    mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$bundle_slug" "$appdir/usr/share/wizardry-apps/core"
+
+    cp -R "$app_dir"/. "$appdir/usr/share/$bundle_slug/"
+    mkdir -p "$appdir/usr/share/$bundle_slug/.host"
+    cp -R "$root/apps/.host/shared" "$appdir/usr/share/$bundle_slug/.host/"
+    cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
+    cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
+    cp "$host_bin" "$appdir/usr/bin/wizardry-host"
+
+    cat > "$appdir/AppRun" <<APP
+#!/bin/sh
+set -eu
+HERE=\$(CDPATH= cd -- "\$(dirname "\$0")" && pwd -P)
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$HERE/usr/bin/wizardry-host" "\$HERE/usr/share/$bundle_slug"
+APP
+    chmod +x "$appdir/AppRun"
+
+    if command -v nohup >/dev/null 2>&1; then
+      nohup "$appdir/AppRun" >"$log_path" 2>&1 &
+    else
+      "$appdir/AppRun" >"$log_path" 2>&1 &
+    fi
+    pid=$!
+    printf 'launched=1\n'
+    printf 'mode=bundle\n'
+    printf 'artifact=%s\n' "$appdir"
+    printf 'entry=%s\n' "$app_dir"
+    printf 'pid=%s\n' "$pid"
     printf 'log=%s\n' "$log_path"
     return 0
   fi
@@ -2952,7 +3018,7 @@ case "$cmd" in
     cmd_install_desktop "${2-}" "${3-}" "${4-}" "${5-}"
     ;;
   run-workspace)
-    cmd_run_workspace "${2-}" "${3-}" "${4-}"
+    cmd_run_workspace "${2-}" "${3-}" "${4-}" "${5-}"
     ;;
   serve-hosted-web)
     cmd_serve_hosted_web "${2-}" "${3-}" "${4-}"
