@@ -20,12 +20,103 @@ esac
 
 set -eu
 
+hash_stdin_sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 | awk '{ print $NF }'
+    return 0
+  fi
+  printf '%s\n' "build-forge-macos-app: sha256 tool not available (requires shasum, sha256sum, or openssl)" >&2
+  exit 1
+}
+
+hash_file_sha256() {
+  file=$1
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$file" | awk '{ print $NF }'
+    return 0
+  fi
+  printf '%s\n' "build-forge-macos-app: sha256 tool not available (requires shasum, sha256sum, or openssl)" >&2
+  exit 1
+}
+
+hash_path_sha256() {
+  path=$1
+  if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+    printf '%s\n' "missing"
+    return 0
+  fi
+
+  if [ -L "$path" ]; then
+    printf 'L %s\n' "$(readlink "$path")" | hash_stdin_sha256
+    return 0
+  fi
+
+  if [ -f "$path" ]; then
+    printf 'F %s\n' "$(hash_file_sha256 "$path")" | hash_stdin_sha256
+    return 0
+  fi
+
+  listing=$(mktemp "${TMPDIR:-/tmp}/forge-macos-path-hash.XXXXXX")
+  (
+    cd "$path" || exit 1
+    find . -mindepth 1 -print | LC_ALL=C sort
+  ) > "$listing"
+
+  {
+    while IFS= read -r rel; do
+      node=${rel#./}
+      abs="$path/$node"
+      if [ -L "$abs" ]; then
+        printf 'L %s %s\n' "$node" "$(readlink "$abs")"
+      elif [ -f "$abs" ]; then
+        printf 'F %s %s\n' "$node" "$(hash_file_sha256 "$abs")"
+      elif [ -d "$abs" ]; then
+        printf 'D %s\n' "$node"
+      else
+        printf 'X %s\n' "$node"
+      fi
+    done < "$listing"
+  } | hash_stdin_sha256
+
+  rm -f "$listing"
+}
+
+forge_bundle_input_hash() {
+  {
+    printf 'v=2\n'
+    printf 'bundle_id=%s\n' "$bundle_id"
+    printf 'host_src=%s\n' "$(hash_path_sha256 "$root/apps/.host/macos/main.m")"
+    printf 'forge_app=%s\n' "$(hash_path_sha256 "$root/apps/forge")"
+    printf 'shared=%s\n' "$(hash_path_sha256 "$root/apps/.host/shared")"
+    printf 'core_include=%s\n' "$(hash_path_sha256 "$root/core/include")"
+    printf 'core_src=%s\n' "$(hash_path_sha256 "$root/core/src")"
+    printf 'icon_builder=%s\n' "$(hash_path_sha256 "$root/tools/forge/build-forge-icon.sh")"
+    printf 'bundle_builder=%s\n' "$(hash_path_sha256 "$root/tools/forge/build-forge-macos-app.sh")"
+  } | hash_stdin_sha256
+}
+
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 DEFAULT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)
 
 root=$DEFAULT_ROOT
 out_bundle="$root/_tmp/workbench/dist/macos/App Forge.app"
-bundle_id="com.wizardry.apps.forge.local"
+bundle_id="com.wizardry.apps.forge.macos"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -92,6 +183,27 @@ if [ ! -x "$host_bin" ] || [ "$host_src" -nt "$host_bin" ]; then
     clang -O2 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit
 fi
 
+expected_hash=$(forge_bundle_input_hash)
+hash_file="$out_bundle/Contents/Resources/wizardry-build-input.sha256"
+root_file="$out_bundle/Contents/Resources/wizardry-apps-root.txt"
+plist_file="$out_bundle/Contents/Info.plist"
+
+if [ -d "$out_bundle" ] &&
+   [ -x "$out_bundle/Contents/MacOS/app-forge" ] &&
+   [ -x "$out_bundle/Contents/MacOS/wizardry-host" ] &&
+   [ -f "$hash_file" ] &&
+   [ -f "$root_file" ] &&
+   [ -f "$plist_file" ]; then
+  cached_hash=$(head -n 1 "$hash_file" 2>/dev/null | tr -d '\r')
+  cached_root=$(head -n 1 "$root_file" 2>/dev/null | tr -d '\r')
+  if [ "$cached_hash" = "$expected_hash" ] && [ "$cached_root" = "$root" ] && grep -F "<string>$bundle_id</string>" "$plist_file" >/dev/null 2>&1; then
+    printf '%s\n' "app_bundle=$out_bundle"
+    printf '%s\n' "host_binary=$host_bin"
+    printf '%s\n' "cache=hit"
+    exit 0
+  fi
+fi
+
 stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-build.XXXXXX")
 stage_bundle="$stage_root/App Forge.app"
 macos_dir="$stage_bundle/Contents/MacOS"
@@ -113,6 +225,7 @@ cp -R "$root/apps/.host/shared" "$resources_dir/.host/"
 cp -R "$root/core/include" "$resources_dir/wizardry-apps/core/"
 cp -R "$root/core/src" "$resources_dir/wizardry-apps/core/"
 printf '%s\n' "$root" > "$resources_dir/wizardry-apps-root.txt"
+printf '%s\n' "$expected_hash" > "$resources_dir/wizardry-build-input.sha256"
 
 cat > "$macos_dir/app-forge" <<'APP'
 #!/bin/sh
@@ -168,3 +281,4 @@ cp -R "$stage_bundle" "$out_bundle"
 
 printf '%s\n' "app_bundle=$out_bundle"
 printf '%s\n' "host_binary=$host_bin"
+printf '%s\n' "cache=miss"

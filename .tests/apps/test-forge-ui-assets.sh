@@ -57,6 +57,6 @@ grep -F "placeholder=\"Filter\"" "$root/apps/forge/index.html" >/dev/null
 grep -F -- "--accent" "$root/apps/forge/style.css" >/dev/null
 grep -F "scaffold-app" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "Install user-local launchers/integration" "$root/apps/forge/README.md" >/dev/null
-grep -F "is_valid_app_bundle" "$root/tools/forge/launch-forge.sh" >/dev/null
+grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-forge.sh" >/dev/null
 
 printf '%s\n' "forge UI asset tests passed"

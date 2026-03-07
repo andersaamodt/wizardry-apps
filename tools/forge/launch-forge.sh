@@ -45,50 +45,6 @@ mkdir -p "$config_root"
 printf '%s\n' "$root" > "$config_file"
 export WIZARDRY_APPS_ROOT="$root"
 
-os=$(uname -s 2>/dev/null || printf unknown)
-
-if [ "$os" = "Darwin" ]; then
-  is_valid_app_bundle() {
-    bundle=$1
-    [ -d "$bundle" ] || return 1
-    [ -x "$bundle/Contents/MacOS/app-forge" ] || return 1
-    [ -x "$bundle/Contents/MacOS/wizardry-host" ] || return 1
-    [ -x "$bundle/Contents/Resources/forge/scripts/forge-backend" ] || return 1
-    return 0
-  }
-
-  app_path=''
-  for candidate in \
-    "/Applications/App Forge.app" \
-    "$HOME/Applications/App Forge.app"; do
-    if is_valid_app_bundle "$candidate"; then
-      app_path=$candidate
-      break
-    fi
-  done
-
-  if [ -z "$app_path" ]; then
-    dev_app="$root/_tmp/workbench/dist/macos/App Forge.app"
-    "$root/tools/forge/build-forge-macos-app" --root "$root" --out "$dev_app" >/dev/null
-    app_path=$dev_app
-  fi
-
-  root_pointer="$app_path/Contents/Resources/wizardry-apps-root.txt"
-  pointer_dir=$(dirname "$root_pointer")
-  if [ -d "$pointer_dir" ] && [ -w "$pointer_dir" ]; then
-    printf '%s\n' "$root" > "$root_pointer" 2>/dev/null || true
-  fi
-
-  if command -v open >/dev/null 2>&1; then
-    if open -a "$app_path" >/dev/null 2>&1; then
-      printf '%s\n' "App Forge launched: $app_path"
-      exit 0
-    fi
-  fi
-
-  exec "$app_path/Contents/MacOS/app-forge"
-fi
-
 state_dir=${WIZARDRY_APPS_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps}
 log_file="$state_dir/forge-launch.log"
 mkdir -p "$state_dir"

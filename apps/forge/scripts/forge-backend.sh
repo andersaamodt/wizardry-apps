@@ -191,6 +191,146 @@ path_mtime_epoch() {
   printf '%s\n' "0"
 }
 
+hash_stdin_sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 | awk '{ print $NF }'
+    return 0
+  fi
+  printf '%s\n' "forge-backend: sha256 tool not available (requires shasum, sha256sum, or openssl)" >&2
+  exit 1
+}
+
+hash_file_sha256() {
+  file=${1-}
+  [ -n "$file" ] || {
+    printf '%s\n' "forge-backend: hash_file_sha256 requires FILE" >&2
+    exit 2
+  }
+  [ -f "$file" ] || {
+    printf '%s\n' "forge-backend: cannot hash missing file: $file" >&2
+    exit 1
+  }
+
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$file" | awk '{ print $NF }'
+    return 0
+  fi
+  printf '%s\n' "forge-backend: sha256 tool not available (requires shasum, sha256sum, or openssl)" >&2
+  exit 1
+}
+
+hash_path_sha256() {
+  path=${1-}
+  [ -n "$path" ] || {
+    printf '%s\n' "forge-backend: hash_path_sha256 requires PATH" >&2
+    exit 2
+  }
+
+  if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+    printf '%s\n' "missing"
+    return 0
+  fi
+
+  if [ -L "$path" ]; then
+    printf 'L %s\n' "$(readlink "$path")" | hash_stdin_sha256
+    return 0
+  fi
+
+  if [ -f "$path" ]; then
+    printf 'F %s\n' "$(hash_file_sha256 "$path")" | hash_stdin_sha256
+    return 0
+  fi
+
+  if [ -d "$path" ]; then
+    listing=$(mktemp "${TMPDIR:-/tmp}/forge-path-hash.XXXXXX")
+    (
+      cd "$path" || exit 1
+      find . -mindepth 1 -print | LC_ALL=C sort
+    ) > "$listing"
+
+    {
+      while IFS= read -r rel; do
+        node=${rel#./}
+        abs="$path/$node"
+        if [ -L "$abs" ]; then
+          printf 'L %s %s\n' "$node" "$(readlink "$abs")"
+        elif [ -f "$abs" ]; then
+          printf 'F %s %s\n' "$node" "$(hash_file_sha256 "$abs")"
+        elif [ -d "$abs" ]; then
+          printf 'D %s\n' "$node"
+        else
+          printf 'X %s\n' "$node"
+        fi
+      done < "$listing"
+    } | hash_stdin_sha256
+
+    rm -f "$listing"
+    return 0
+  fi
+
+  printf 'X %s\n' "$path" | hash_stdin_sha256
+}
+
+desktop_build_input_hash() {
+  root=${1-}
+  slug=${2-}
+  app_dir=${3-}
+  target=${4-}
+
+  [ -n "$root" ] || return 1
+  [ -n "$slug" ] || return 1
+  [ -n "$app_dir" ] || return 1
+  [ -n "$target" ] || return 1
+
+  host_src=''
+  bundle_target=''
+  case "$target" in
+    darwin)
+      host_src="$root/apps/.host/macos/main.m"
+      bundle_target='macos'
+      ;;
+    linux)
+      host_src="$root/apps/.host/linux/main.c"
+      bundle_target='linux'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  bundle_id=$(bundle_id_from_manifest "$root" "$bundle_target" "$slug")
+
+  {
+    printf 'v=2\n'
+    printf 'slug=%s\n' "$slug"
+    printf 'target=%s\n' "$target"
+    printf 'bundle_id=%s\n' "$bundle_id"
+    printf 'manifest=%s\n' "$(hash_path_sha256 "$root/config/apps.manifest.json")"
+    printf 'host=%s\n' "$(hash_path_sha256 "$host_src")"
+    printf 'app=%s\n' "$(hash_path_sha256 "$app_dir")"
+    printf 'shared=%s\n' "$(hash_path_sha256 "$root/apps/.host/shared")"
+    printf 'core_include=%s\n' "$(hash_path_sha256 "$root/core/include")"
+    printf 'core_src=%s\n' "$(hash_path_sha256 "$root/core/src")"
+    printf 'backend=%s\n' "$(hash_path_sha256 "$SCRIPT_DIR/forge-backend.sh")"
+  } | hash_stdin_sha256
+}
+
 resolve_godot_engine() {
   if [ -n "${GODOT_BIN-}" ] && [ -x "$GODOT_BIN" ]; then
     printf '%s\n' "$GODOT_BIN"
@@ -1456,49 +1596,66 @@ cmd_build_desktop() {
       dist_dir="$root/_tmp/workbench/dist/macos"
       bundle="$dist_dir/$app_name.app"
       zip_path="$dist_dir/$app_name.zip"
+      hash_path="$bundle/Contents/Resources/wizardry-build-input.sha256"
+      expected_hash=$(desktop_build_input_hash "$root" "$slug" "$app_dir" darwin)
+      cache_hit=false
 
-      rm -rf "$bundle"
-      mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$slug" "$bundle/Contents/Resources/.host" "$bundle/Contents/Resources/wizardry-apps/core"
+      if [ -d "$bundle" ] &&
+         [ -x "$bundle/Contents/MacOS/wizardry-host" ] &&
+         [ -x "$bundle/Contents/MacOS/$slug" ] &&
+         [ -f "$bundle/Contents/Resources/wizardry-apps-root.txt" ] &&
+         [ -f "$hash_path" ]; then
+        cached_hash=$(head -n 1 "$hash_path" 2>/dev/null | tr -d '\r')
+        cached_root=$(head -n 1 "$bundle/Contents/Resources/wizardry-apps-root.txt" 2>/dev/null | tr -d '\r')
+        if [ "$cached_hash" = "$expected_hash" ] && [ "$cached_root" = "$root" ]; then
+          cache_hit=true
+        fi
+      fi
 
-      copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$slug/"
-      mkdir -p "$bundle/Contents/Resources/$slug/.host"
-      cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
-      cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
-      printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
-      cp -R "$root/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
-      cp -R "$root/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
-      cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
+      if [ "$cache_hit" = false ]; then
+        rm -rf "$bundle"
+        mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$slug" "$bundle/Contents/Resources/.host" "$bundle/Contents/Resources/wizardry-apps/core"
 
-      cat > "$bundle/Contents/MacOS/$slug" <<APP
+        copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$slug/"
+        mkdir -p "$bundle/Contents/Resources/$slug/.host"
+        cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
+        cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
+        printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
+        printf '%s\n' "$expected_hash" > "$hash_path"
+        cp -R "$root/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
+        cp -R "$root/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
+        cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
+
+        cat > "$bundle/Contents/MacOS/$slug" <<APP
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
 exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$slug"
 APP
-      chmod +x "$bundle/Contents/MacOS/$slug"
+        chmod +x "$bundle/Contents/MacOS/$slug"
 
-      icon_key=''
-      if [ -f "$app_dir/assets/forge.icns" ]; then
-        cp "$app_dir/assets/forge.icns" "$bundle/Contents/Resources/forge.icns"
-        icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
-      elif [ -f "$app_dir/assets/forge-icon.png" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-        iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-iconset.XXXXXX")
-        iconset="${iconset_tmp}.iconset"
-        mv "$iconset_tmp" "$iconset"
-        for size in 16 32 128 256 512; do
-          sips -z "$size" "$size" "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-          sips -z $((size * 2)) $((size * 2)) "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
-        done
-        if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/forge.icns" >/dev/null 2>&1; then
+        icon_key=''
+        if [ -f "$app_dir/assets/forge.icns" ]; then
+          cp "$app_dir/assets/forge.icns" "$bundle/Contents/Resources/forge.icns"
           icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
+        elif [ -f "$app_dir/assets/forge-icon.png" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+          iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-iconset.XXXXXX")
+          iconset="${iconset_tmp}.iconset"
+          mv "$iconset_tmp" "$iconset"
+          for size in 16 32 128 256 512; do
+            sips -z "$size" "$size" "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+            sips -z $((size * 2)) $((size * 2)) "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+          done
+          if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/forge.icns" >/dev/null 2>&1; then
+            icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
+          fi
+          rm -rf "$iconset"
+        elif [ -f "$app_dir/assets/forge-icon.png" ]; then
+          cp "$app_dir/assets/forge-icon.png" "$bundle/Contents/Resources/forge-icon.png"
+          icon_key='<key>CFBundleIconFile</key><string>forge-icon.png</string>'
         fi
-        rm -rf "$iconset"
-      elif [ -f "$app_dir/assets/forge-icon.png" ]; then
-        cp "$app_dir/assets/forge-icon.png" "$bundle/Contents/Resources/forge-icon.png"
-        icon_key='<key>CFBundleIconFile</key><string>forge-icon.png</string>'
-      fi
 
-      cat > "$bundle/Contents/Info.plist" <<PLIST
+        cat > "$bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -1511,10 +1668,13 @@ APP
 $icon_key
 </dict></plist>
 PLIST
+      fi
 
       if command -v ditto >/dev/null 2>&1; then
-        rm -f "$zip_path"
-        if ! ditto -c -k --sequesterRsrc --keepParent "$bundle" "$zip_path"; then
+        if [ "$cache_hit" = false ] || [ ! -f "$zip_path" ]; then
+          rm -f "$zip_path"
+        fi
+        if [ ! -f "$zip_path" ] && ! ditto -c -k --sequesterRsrc --keepParent "$bundle" "$zip_path"; then
           zip_path=''
         fi
       else
@@ -1524,6 +1684,7 @@ PLIST
       printf 'app_name=%s\n' "$app_name"
       printf 'host=%s\n' "$host_bin"
       printf 'artifact=%s\n' "$bundle"
+      printf 'cache=%s\n' "$([ "$cache_hit" = true ] && printf hit || printf miss)"
       [ -n "$zip_path" ] && printf 'zip=%s\n' "$zip_path"
       ;;
 
@@ -1532,36 +1693,58 @@ PLIST
       dist_dir="$root/_tmp/workbench/dist/linux"
       appdir="$dist_dir/AppDir-$slug"
       artifact=''
+      hash_path="$appdir/usr/share/wizardry-build-input.sha256"
+      expected_hash=$(desktop_build_input_hash "$root" "$slug" "$app_dir" linux)
+      cache_hit=false
 
-      rm -rf "$appdir"
-      mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
+      if [ -d "$appdir" ] &&
+         [ -x "$appdir/usr/bin/wizardry-host" ] &&
+         [ -x "$appdir/AppRun" ] &&
+         [ -f "$appdir/usr/share/wizardry-apps-root.txt" ] &&
+         [ -f "$hash_path" ]; then
+        cached_hash=$(head -n 1 "$hash_path" 2>/dev/null | tr -d '\r')
+        cached_root=$(head -n 1 "$appdir/usr/share/wizardry-apps-root.txt" 2>/dev/null | tr -d '\r')
+        if [ "$cached_hash" = "$expected_hash" ] && [ "$cached_root" = "$root" ]; then
+          cache_hit=true
+        fi
+      fi
 
-      copy_tree_for_bundle "$app_dir" "$appdir/usr/share/$slug/"
-      mkdir -p "$appdir/usr/share/$slug/.host"
-      cp -R "$root/apps/.host/shared" "$appdir/usr/share/$slug/.host/"
-      cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
-      printf '%s\n' "$root" > "$appdir/usr/share/wizardry-apps-root.txt"
-      cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
-      cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
-      cp "$host_bin" "$appdir/usr/bin/wizardry-host"
+      if [ "$cache_hit" = false ]; then
+        rm -rf "$appdir"
+        mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
 
-      cat > "$appdir/AppRun" <<APP
+        copy_tree_for_bundle "$app_dir" "$appdir/usr/share/$slug/"
+        mkdir -p "$appdir/usr/share/$slug/.host"
+        cp -R "$root/apps/.host/shared" "$appdir/usr/share/$slug/.host/"
+        cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
+        printf '%s\n' "$root" > "$appdir/usr/share/wizardry-apps-root.txt"
+        printf '%s\n' "$expected_hash" > "$hash_path"
+        cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
+        cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
+        cp "$host_bin" "$appdir/usr/bin/wizardry-host"
+
+        cat > "$appdir/AppRun" <<APP
 #!/bin/sh
 set -eu
 HERE=\$(CDPATH= cd -- "\$(dirname "\$0")" && pwd -P)
 exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$HERE/usr/bin/wizardry-host" "\$HERE/usr/share/$slug"
 APP
-      chmod +x "$appdir/AppRun"
+        chmod +x "$appdir/AppRun"
+      fi
 
       if command -v appimagetool >/dev/null 2>&1; then
         mkdir -p "$dist_dir"
-        ARCH=x86_64 appimagetool "$appdir" "$dist_dir/wizardry-$slug-x86_64.AppImage" >/dev/null 2>&1
+        if [ "$cache_hit" = false ] || [ ! -f "$dist_dir/wizardry-$slug-x86_64.AppImage" ]; then
+          ARCH=x86_64 appimagetool "$appdir" "$dist_dir/wizardry-$slug-x86_64.AppImage" >/dev/null 2>&1
+        fi
         artifact="$dist_dir/wizardry-$slug-x86_64.AppImage"
       else
         mkdir -p "$dist_dir"
         tar_path="$dist_dir/wizardry-$slug-linux.tar.gz"
-        rm -f "$tar_path"
-        (cd "$dist_dir" && tar -czf "$tar_path" "AppDir-$slug")
+        if [ "$cache_hit" = false ] || [ ! -f "$tar_path" ]; then
+          rm -f "$tar_path"
+          (cd "$dist_dir" && tar -czf "$tar_path" "AppDir-$slug")
+        fi
         artifact="$tar_path"
       fi
 
@@ -1569,6 +1752,7 @@ APP
       printf 'host=%s\n' "$host_bin"
       printf 'appdir=%s\n' "$appdir"
       printf 'artifact=%s\n' "$artifact"
+      printf 'cache=%s\n' "$([ "$cache_hit" = true ] && printf hit || printf miss)"
       ;;
 
     *)
