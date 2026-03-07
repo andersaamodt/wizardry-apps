@@ -101,6 +101,18 @@ set_workspace_targets_out=$("$backend" set-workspace-targets "$scratch" "$worksp
 printf '%s\n' "$set_workspace_targets_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
 grep -F "targets=hosted-web,macos,linux,android" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 
+set_workspace_web_only_out=$("$backend" set-workspace-targets "$scratch" "$workspaces_root/workspace-web" "hosted-web")
+printf '%s\n' "$set_workspace_web_only_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
+grep -F "targets=hosted-web" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+
+run_workspace_web=$("$backend" run-workspace "$scratch" "$workspaces_root/workspace-web" web)
+printf '%s\n' "$run_workspace_web" | grep -F "mode=python-http" >/dev/null
+printf '%s\n' "$run_workspace_web" | grep -F "entry=$workspaces_root/workspace-web/app" >/dev/null
+printf '%s\n' "$run_workspace_web" | grep -E '^url=http://127\.0\.0\.1:[0-9]+$' >/dev/null
+printf '%s\n' "$run_workspace_web" | grep -E '^pid=[0-9]+$' >/dev/null
+workspace_web_pid=$(printf '%s\n' "$run_workspace_web" | awk -F= '/^pid=/{print $2; exit}')
+[ -n "$workspace_web_pid" ] && kill "$workspace_web_pid" >/dev/null 2>&1 || true
+
 run_workspace_open=$("$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot" godot)
 printf '%s\n' "$run_workspace_open" | grep -F "launched=1" >/dev/null
 printf '%s\n' "$run_workspace_open" | grep -E "mode=(godot|open)" >/dev/null

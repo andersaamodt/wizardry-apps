@@ -23,7 +23,8 @@ fi
 
 grep -F "App Forge" "$root/apps/forge/index.html" >/dev/null
 grep -F "forge-backend.sh" "$root/apps/forge/index.html" >/dev/null
-grep -F "window.wizardry.rpc('bridge.exec'" "$root/apps/forge/index.html" >/dev/null
+grep -F "window.wizardry.exec" "$root/apps/forge/index.html" >/dev/null
+! grep -F "window.wizardry.rpc('bridge.exec'" "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="toggle-settings-panel"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="organize-menu"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="open-create-workflow"' "$root/apps/forge/index.html" >/dev/null
