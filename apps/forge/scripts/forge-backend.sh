@@ -1473,7 +1473,7 @@ cmd_build_desktop() {
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
-exec "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$slug"
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$slug"
 APP
       chmod +x "$bundle/Contents/MacOS/$slug"
 
@@ -1549,7 +1549,7 @@ PLIST
 #!/bin/sh
 set -eu
 HERE=\$(CDPATH= cd -- "\$(dirname "\$0")" && pwd -P)
-exec "\$HERE/usr/bin/wizardry-host" "\$HERE/usr/share/$slug"
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$HERE/usr/bin/wizardry-host" "\$HERE/usr/share/$slug"
 APP
       chmod +x "$appdir/AppRun"
 
@@ -1925,18 +1925,24 @@ cmd_run_workspace() {
     bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
     bundle="$bundle_root/$workspace_title.app"
     rm -rf "$bundle"
-    mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources" "$bundle/Contents/Resources/.host"
+    mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$workspace_slug" "$bundle/Contents/Resources/.host"
+
+    copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$workspace_slug/"
+    mkdir -p "$bundle/Contents/Resources/$workspace_slug/.host"
+    cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$workspace_slug/.host/"
+    cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
+    printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
+    cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
 
     cat > "$bundle/Contents/MacOS/$workspace_slug" <<APP
 #!/bin/sh
 set -eu
-exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir"
+APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$workspace_slug"
 APP
     chmod +x "$bundle/Contents/MacOS/$workspace_slug"
 
     icon_source=''
-    cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
-
     if [ -f "$workspace_path/assets/forge-icon.png" ]; then
       icon_source="$workspace_path/assets/forge-icon.png"
     elif [ -f "$app_dir/assets/forge-icon.png" ]; then
@@ -1977,7 +1983,7 @@ PLIST
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$bundle"
-    printf 'entry=%s\n' "$app_dir"
+    printf 'entry=%s\n' "$bundle/Contents/Resources/$workspace_slug"
     printf 'log=%s\n' "$log_path"
     return 0
   fi

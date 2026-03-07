@@ -7,6 +7,9 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 [ -f "$root/apps/forge/index.html" ]
 [ -f "$root/apps/forge/style.css" ]
 [ -f "$root/apps/forge/README.md" ]
+[ -f "$root/apps/.host/shared/wizardry-bridge.js" ]
+[ -f "$root/apps/.host/macos/main.m" ]
+[ -f "$root/apps/.host/linux/main.c" ]
 [ -x "$root/apps/forge/scripts/forge-backend.sh" ]
 [ -x "$root/tools/forge/launch-forge.sh" ]
 [ -x "$root/tools/forge/install-forge.sh" ]
@@ -25,6 +28,13 @@ grep -F "App Forge" "$root/apps/forge/index.html" >/dev/null
 grep -F "forge-backend.sh" "$root/apps/forge/index.html" >/dev/null
 grep -F "window.wizardry.exec" "$root/apps/forge/index.html" >/dev/null
 ! grep -F "window.wizardry.rpc('bridge.exec'" "$root/apps/forge/index.html" >/dev/null
+grep -F "window.wizardry.exec" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
+grep -F "window.wizardry.rpc" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
+grep -F "method !== 'bridge.exec'" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
+grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/null
+grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/dev/null
+grep -F "DESKTOP_BRIDGE_BOOTSTRAP" "$root/apps/.host/linux/main.c" >/dev/null
+grep -F "window.wizardry.rpc = rpcBridge;" "$root/apps/.host/linux/main.c" >/dev/null
 grep -F 'id="toggle-settings-panel"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="organize-menu"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="open-create-workflow"' "$root/apps/forge/index.html" >/dev/null

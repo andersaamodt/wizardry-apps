@@ -15,6 +15,59 @@ typedef struct {
     char *app_path;
 } AppData;
 
+static const char *DESKTOP_BRIDGE_BOOTSTRAP =
+    "(function () {"
+    "  window.__wizardry_callbacks = window.__wizardry_callbacks || {};"
+    "  function nextId() { return Math.random().toString(36).slice(2); }"
+    "  function post(message) {"
+    "    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.wizardry) {"
+    "      window.webkit.messageHandlers.wizardry.postMessage(message);"
+    "      return true;"
+    "    }"
+    "    if (window.WizardryBridge && typeof window.WizardryBridge.postMessage === 'function') {"
+    "      window.WizardryBridge.postMessage(JSON.stringify(message));"
+    "      return true;"
+    "    }"
+    "    return false;"
+    "  }"
+    "  function execCommand(argv) {"
+    "    if (!Array.isArray(argv)) {"
+    "      return Promise.reject(new Error('argv must be an array'));"
+    "    }"
+    "    return new Promise(function (resolve) {"
+    "      var id = nextId();"
+    "      window.__wizardry_callbacks[id] = function (payload) {"
+    "        resolve(payload || { stdout: '', stderr: '', exit_code: 0, error: null });"
+    "      };"
+    "      if (!post({ id: id, command: argv })) {"
+    "        setTimeout(function () {"
+    "          if (window.__wizardry_callbacks[id]) {"
+    "            window.__wizardry_callbacks[id]({ stdout: '', stderr: 'native bridge unavailable', exit_code: 1, error: null });"
+    "            delete window.__wizardry_callbacks[id];"
+    "          }"
+    "        }, 0);"
+    "      }"
+    "    });"
+    "  }"
+    "  function rpcBridge(method, payload) {"
+    "    if (method !== 'bridge.exec') {"
+    "      return Promise.reject(new Error('unsupported rpc method: ' + String(method || '')));"
+    "    }"
+    "    var argv = payload;"
+    "    if (payload && typeof payload === 'object' && Array.isArray(payload.argv)) {"
+    "      argv = payload.argv;"
+    "    }"
+    "    return execCommand(argv);"
+    "  }"
+    "  window.wizardry = window.wizardry || {};"
+    "  if (typeof window.wizardry.exec !== 'function') {"
+    "    window.wizardry.exec = execCommand;"
+    "  }"
+    "  if (typeof window.wizardry.rpc !== 'function') {"
+    "    window.wizardry.rpc = rpcBridge;"
+    "  }"
+    "})();";
+
 // Escape string for JSON
 char* escape_json(const char *str) {
     if (!str) return strdup("");
@@ -209,6 +262,14 @@ int main(int argc, char *argv[]) {
     // Create WebView with message handler
     WebKitUserContentManager *content_manager = webkit_user_content_manager_new();
     webkit_user_content_manager_register_script_message_handler(content_manager, "wizardry");
+    WebKitUserScript *bridge_bootstrap = webkit_user_script_new(
+        DESKTOP_BRIDGE_BOOTSTRAP,
+        WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
+        WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
+        NULL,
+        NULL);
+    webkit_user_content_manager_add_script(content_manager, bridge_bootstrap);
+    webkit_user_script_unref(bridge_bootstrap);
     
     AppData *app_data = malloc(sizeof(AppData));
     app_data->app_path = app_path;

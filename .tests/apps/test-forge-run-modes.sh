@@ -59,5 +59,10 @@ grep -F "\"\$bundle/Contents/Resources/wizardry-apps-root.txt\"" "$backend" >/de
 grep -F "\"\$appdir/usr/share/wizardry-apps-root.txt\"" "$backend" >/dev/null
 grep -F "\"\$bundle/Contents/Resources/.host/\"" "$backend" >/dev/null
 grep -F "\"\$appdir/usr/share/.host/\"" "$backend" >/dev/null
+grep -F 'WIZARDRY_APPS_ROOT="$root"' "$backend" >/dev/null
+grep -F 'WIZARDRY_DIR="$root"' "$backend" >/dev/null
+grep -F "copy_tree_for_bundle \"\$app_dir\" \"\$bundle/Contents/Resources/\$workspace_slug/\"" "$backend" >/dev/null
+grep -F "\"\\\$APPDIR/MacOS/wizardry-host\" \"\\\$APPDIR/Resources/\$workspace_slug\"" "$backend" >/dev/null
+grep -F "\"\\\$APPDIR/Resources/\$workspace_slug\"" "$backend" >/dev/null
 
 printf '%s\n' "forge standardized run/install pipeline tests passed"

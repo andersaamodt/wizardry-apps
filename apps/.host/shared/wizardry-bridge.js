@@ -1,8 +1,4 @@
 (function () {
-  if (window.wizardry && typeof window.wizardry.exec === 'function') {
-    return;
-  }
-
   window.__wizardry_callbacks = window.__wizardry_callbacks || {};
 
   function nextId() {
@@ -51,6 +47,22 @@
     });
   }
 
+  function rpcBridge(method, payload) {
+    if (method !== 'bridge.exec') {
+      return Promise.reject(new Error('unsupported rpc method: ' + String(method || '')));
+    }
+    var argv = payload;
+    if (payload && typeof payload === 'object' && Array.isArray(payload.argv)) {
+      argv = payload.argv;
+    }
+    return execCommand(argv);
+  }
+
   window.wizardry = window.wizardry || {};
-  window.wizardry.exec = execCommand;
+  if (typeof window.wizardry.exec !== 'function') {
+    window.wizardry.exec = execCommand;
+  }
+  if (typeof window.wizardry.rpc !== 'function') {
+    window.wizardry.rpc = rpcBridge;
+  }
 })();
