@@ -232,28 +232,45 @@
 
   <script>
     
-    // Hardcoded commands for security - these are executed via native bridge
     const MODE_KEY = 'mode';
     const CHAT_URL_KEY = 'chat_url';
     const chatPath = '/pages/chat.html';
-
-    const commands = {
-      'get-ip': ['sh', '-c', "ip route get 1 2>/dev/null | awk '{print $7}' | head -1 || hostname -I | awk '{print $1}'"],
-      'get-tor': ['sh', '-c', 'cat /var/lib/tor/hidden_service/hostname 2>/dev/null || cat /usr/local/var/lib/tor/hidden_service/hostname 2>/dev/null'],
-      'check-server': ['sh', '-c', 'pgrep -f "nginx.*demo" > /dev/null && echo "running" || echo "stopped"'],
-      'get-port': ['sh', '-c', 'cfg="$HOME/sites/demo/site.conf"; if [ -f "$cfg" ]; then sed -n "s/^port=//p" "$cfg" | head -n 1; fi'],
-      'create-demo': ['sh', '-c', 'cd ~/.wizardry && [ -d ~/sites/demo ] || (echo "Creating demo site..." && web-wizardry create demo --template demo)'],
-      'start-server': ['sh', '-c', 'cd ~/.wizardry && web-wizardry serve demo'],
-      'stop-server': ['sh', '-c', 'web-wizardry stop demo']
-    };
     
     let serverRunning = false;
     let serverPort = '';
     let currentMode = 'client'; // default to client mode
-    
-    function backendScriptPath() {
-      const p = decodeURIComponent(window.location.pathname || '');
-      return p.replace(/\/settings\.html$/, '/scripts/chatroom-backend.sh');
+
+    let backendScriptCache = '';
+
+    function detectBackendScriptCandidates() {
+      const out = [];
+      try {
+        const pagePath = decodeURIComponent(String(window.location.pathname || ''));
+        const appMarker = '/chatroom/settings.html';
+        const appIdx = pagePath.lastIndexOf(appMarker);
+        if (appIdx > 0) {
+          out.push(pagePath.slice(0, appIdx) + '/chatroom/scripts/chatroom-backend.sh');
+        }
+        const bundleMarker = '/settings.html';
+        const bundleIdx = pagePath.lastIndexOf(bundleMarker);
+        if (bundleIdx > 0) {
+          out.push(pagePath.slice(0, bundleIdx) + '/scripts/chatroom-backend.sh');
+        }
+        const repoMarker = '/apps/chatroom/';
+        const repoIdx = pagePath.lastIndexOf(repoMarker);
+        if (repoIdx > 0) {
+          out.push(pagePath.slice(0, repoIdx) + '/apps/chatroom/scripts/chatroom-backend.sh');
+        }
+      } catch (_err) {
+        // Ignore path detection failures.
+      }
+      return out.filter((value, index, arr) => value && arr.indexOf(value) === index);
+    }
+
+    function isMissingBackendScriptError(error) {
+      const msg = String(error && error.message ? error.message : error).toLowerCase();
+      return msg.indexOf('chatroom-backend.sh') >= 0
+        && (msg.indexOf('no such file') >= 0 || msg.indexOf('cannot open') >= 0 || msg.indexOf('not found') >= 0);
     }
 
     function parseKeyValue(text) {
@@ -271,12 +288,40 @@
       if (!window.wizardry || !window.wizardry.exec) {
         return '';
       }
-      const argv = ['sh', backendScriptPath(), action].concat(args);
-      const result = await window.wizardry.exec(argv);
-      if (typeof result.exit_code !== 'undefined' && result.exit_code !== 0) {
-        throw new Error((result.stderr || result.stdout || 'backend error').trim());
+      const candidates = [];
+      if (backendScriptCache) {
+        candidates.push(backendScriptCache);
       }
-      return String((result && result.stdout) || '');
+      detectBackendScriptCandidates().forEach((candidate) => {
+        if (candidates.indexOf(candidate) < 0) {
+          candidates.push(candidate);
+        }
+      });
+      for (const scriptPath of candidates) {
+        try {
+          const byPathResult = await window.wizardry.exec(['sh', scriptPath, action].concat(args));
+          if (typeof byPathResult.exit_code !== 'undefined' && byPathResult.exit_code !== 0) {
+            throw new Error((byPathResult.stderr || byPathResult.stdout || 'backend error').trim());
+          }
+          backendScriptCache = scriptPath;
+          return String((byPathResult && byPathResult.stdout) || '');
+        } catch (error) {
+          if (!isMissingBackendScriptError(error)) {
+            throw error;
+          }
+        }
+      }
+      const fallbackResult = await window.wizardry.exec([
+        'sh',
+        '-c',
+        'root="${WIZARDRY_APPS_ROOT:-}"; if [ -z "$root" ]; then if [ -n "${WIZARDRY_DIR:-}" ] && [ -x "$WIZARDRY_DIR/apps/chatroom/scripts/chatroom-backend.sh" ]; then root="$WIZARDRY_DIR"; elif [ -x "$HOME/git/wizardry-apps/apps/chatroom/scripts/chatroom-backend.sh" ]; then root="$HOME/git/wizardry-apps"; fi; fi; [ -n "$root" ] || { printf "chatroom backend root could not be resolved\\n" >&2; exit 1; }; exec sh "$root/apps/chatroom/scripts/chatroom-backend.sh" "$@"',
+        'chatroom-backend',
+        action
+      ].concat(args));
+      if (typeof fallbackResult.exit_code !== 'undefined' && fallbackResult.exit_code !== 0) {
+        throw new Error((fallbackResult.stderr || fallbackResult.stdout || 'backend error').trim());
+      }
+      return String((fallbackResult && fallbackResult.stdout) || '');
     }
 
     async function loadPrefs() {
@@ -437,17 +482,12 @@
       startBtn.disabled = true;
       
       try {
-        // In production: window.wizardry.exec(commands['create-demo'])
-        // For now in demo/development, we check if we can actually execute
         if (window.wizardry && window.wizardry.exec) {
-          // Create demo site if it doesn't exist
-          await window.wizardry.exec(commands['create-demo']);
-          // Start the server
-          await window.wizardry.exec(commands['start-server']);
+          await backendExec('start-server');
           
           // Wait a moment for server to start
           await new Promise(resolve => setTimeout(resolve, 2000));
-          checkServerStatus();
+          await checkServerStatus();
         } else {
           // Fallback for development/browser testing
           statusElement.textContent = 'Native bridge not available';
@@ -458,7 +498,7 @@
           alert('Server start requires native app integration.\n\nFor now, run in terminal:\n  web-wizardry serve demo\n\nOr create demo site first:\n  web-wizardry create demo --template demo');
         }
       } catch (error) {
-        statusElement.textContent = 'Error starting server';
+        statusElement.textContent = `Error starting server: ${String(error && error.message ? error.message : error)}`;
         statusElement.classList.remove('loading');
         statusElement.classList.add('error');
         console.error('Server start error:', error);
@@ -478,11 +518,11 @@
       
       try {
         if (window.wizardry && window.wizardry.exec) {
-          await window.wizardry.exec(commands['stop-server']);
+          await backendExec('stop-server');
           
           // Wait a moment for server to stop
           await new Promise(resolve => setTimeout(resolve, 1000));
-          checkServerStatus();
+          await checkServerStatus();
         } else {
           // Fallback for development
           statusElement.textContent = 'Native bridge not available';
@@ -492,7 +532,7 @@
           alert('Server stop requires native app integration.\n\nFor now, run in terminal:\n  web-wizardry stop demo');
         }
       } catch (error) {
-        statusElement.textContent = 'Error stopping server';
+        statusElement.textContent = `Error stopping server: ${String(error && error.message ? error.message : error)}`;
         statusElement.classList.remove('loading');
         statusElement.classList.add('error');
         console.error('Server stop error:', error);

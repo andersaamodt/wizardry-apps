@@ -87,9 +87,37 @@
     let iframeCheckInterval;
     let chatUrlCache = '';
 
-    function backendScriptPath() {
-      const p = decodeURIComponent(window.location.pathname || '');
-      return p.replace(/\/index\.html$/, '/scripts/chatroom-backend.sh');
+    let backendScriptCache = '';
+
+    function detectBackendScriptCandidates() {
+      const out = [];
+      try {
+        const pagePath = decodeURIComponent(String(window.location.pathname || ''));
+        const appMarker = '/chatroom/index.html';
+        const appIdx = pagePath.lastIndexOf(appMarker);
+        if (appIdx > 0) {
+          out.push(pagePath.slice(0, appIdx) + '/chatroom/scripts/chatroom-backend.sh');
+        }
+        const bundleMarker = '/index.html';
+        const bundleIdx = pagePath.lastIndexOf(bundleMarker);
+        if (bundleIdx > 0) {
+          out.push(pagePath.slice(0, bundleIdx) + '/scripts/chatroom-backend.sh');
+        }
+        const repoMarker = '/apps/chatroom/';
+        const repoIdx = pagePath.lastIndexOf(repoMarker);
+        if (repoIdx > 0) {
+          out.push(pagePath.slice(0, repoIdx) + '/apps/chatroom/scripts/chatroom-backend.sh');
+        }
+      } catch (_err) {
+        // Ignore path detection failures.
+      }
+      return out.filter((value, index, arr) => value && arr.indexOf(value) === index);
+    }
+
+    function isMissingBackendScriptError(error) {
+      const msg = String(error && error.message ? error.message : error).toLowerCase();
+      return msg.indexOf('chatroom-backend.sh') >= 0
+        && (msg.indexOf('no such file') >= 0 || msg.indexOf('cannot open') >= 0 || msg.indexOf('not found') >= 0);
     }
 
     function parseKeyValue(text) {
@@ -109,12 +137,40 @@
 
     async function backendExec(action, args = []) {
       if (!hasBridge()) return '';
-      const argv = ['sh', backendScriptPath(), action].concat(args);
-      const result = await window.wizardry.exec(argv);
-      if (typeof result.exit_code !== 'undefined' && result.exit_code !== 0) {
-        throw new Error((result.stderr || result.stdout || 'backend error').trim());
+      const candidates = [];
+      if (backendScriptCache) {
+        candidates.push(backendScriptCache);
       }
-      return String((result && result.stdout) || '');
+      detectBackendScriptCandidates().forEach((candidate) => {
+        if (candidates.indexOf(candidate) < 0) {
+          candidates.push(candidate);
+        }
+      });
+      for (const scriptPath of candidates) {
+        try {
+          const byPathResult = await window.wizardry.exec(['sh', scriptPath, action].concat(args));
+          if (typeof byPathResult.exit_code !== 'undefined' && byPathResult.exit_code !== 0) {
+            throw new Error((byPathResult.stderr || byPathResult.stdout || 'backend error').trim());
+          }
+          backendScriptCache = scriptPath;
+          return String((byPathResult && byPathResult.stdout) || '');
+        } catch (error) {
+          if (!isMissingBackendScriptError(error)) {
+            throw error;
+          }
+        }
+      }
+      const fallbackResult = await window.wizardry.exec([
+        'sh',
+        '-c',
+        'root="${WIZARDRY_APPS_ROOT:-}"; if [ -z "$root" ]; then if [ -n "${WIZARDRY_DIR:-}" ] && [ -x "$WIZARDRY_DIR/apps/chatroom/scripts/chatroom-backend.sh" ]; then root="$WIZARDRY_DIR"; elif [ -x "$HOME/git/wizardry-apps/apps/chatroom/scripts/chatroom-backend.sh" ]; then root="$HOME/git/wizardry-apps"; fi; fi; [ -n "$root" ] || { printf "chatroom backend root could not be resolved\\n" >&2; exit 1; }; exec sh "$root/apps/chatroom/scripts/chatroom-backend.sh" "$@"',
+        'chatroom-backend',
+        action
+      ].concat(args));
+      if (typeof fallbackResult.exit_code !== 'undefined' && fallbackResult.exit_code !== 0) {
+        throw new Error((fallbackResult.stderr || fallbackResult.stdout || 'backend error').trim());
+      }
+      return String((fallbackResult && fallbackResult.stdout) || '');
     }
 
     async function refreshChatUrlPref() {
