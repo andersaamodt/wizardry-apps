@@ -4,6 +4,8 @@
 - For header interactions, reserve click-safe holes only over truly interactive controls and make drag strips fill the remaining top-band area.
 - When drag and click compete, tune strip geometry incrementally with small width changes and verify in the live app, not just by static code review.
 - If a top control must support both drag-nearby and click-on-control, position drag strips around it rather than above it.
+- The default centered host drag strip will collide with centered tab bars; use side strips plus a dynamic center hole for those layouts.
+- For `__wizardry_host_priorities_drag_hole`, remember the hole arguments define the protected non-draggable area around center, so inverted math makes tabs draggable and surrounding header non-draggable.
 - Regression tests should guard known host-geometry contracts so drag-strip refactors do not silently reintroduce click interception.
 - For dynamic header text, compute drag-hole geometry from live DOM bounds and send it to the native host instead of hardcoding static hole widths.
 - A small debounced sync from web UI to host keeps drag zones stable while avoiding excessive bridge traffic during rapid layout changes.

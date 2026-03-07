@@ -36,6 +36,7 @@
 @property (assign) BOOL enableNativeBootSplash;
 @property (assign) BOOL enableForgeAppMenu;
 @property (assign) BOOL prefersWideDragStrip;
+@property (assign) BOOL enableHeaderDragHoles;
 @property (assign) CGFloat bootSplashLogoSize;
 @property (strong) NSView *prioritiesTopDragStrip;
 @property (strong) NSView *prioritiesLeftHeaderDragStrip;
@@ -95,7 +96,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
 }
 
 - (void)layoutPrioritiesDragStrips {
-    if (!self.enableNativeViewMenu || !self.hostRootView || !self.window) {
+    if (!self.enableHeaderDragHoles || !self.hostRootView || !self.window) {
         return;
     }
     NSRect frame = [self.window frame];
@@ -598,9 +599,11 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     NSString *appSlug = [appComponent lowercaseString];
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
+    BOOL prefersHeaderDragHoles = ([appSlug isEqualToString:@"headquarters"] || [appSlug isEqualToString:@"priorities"]);
     BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
+    self.enableHeaderDragHoles = prefersHeaderDragHoles;
     self.enableForgeAppMenu = isForgeApp;
     self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp;
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
@@ -777,7 +780,39 @@ completionHandler:(void (^)(BOOL result))completionHandler {
         [centerGapStrip setWantsLayer:YES];
         centerGapStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
         [rootView addSubview:centerGapStrip];
-    } else if (!self.enableNativeViewMenu) {
+    } else if (self.enableHeaderDragHoles) {
+        // Priorities and Headquarters need broad drag affordance in the top band,
+        // but interactive controls (tabs + right controls) must remain clickable.
+        if ([appSlug isEqualToString:@"headquarters"]) {
+            self.prioritiesTitleHoleLeftWidth = 240.0;
+            self.prioritiesTitleHoleRightWidth = 240.0;
+            self.prioritiesRightControlsReservedWidth = 200.0;
+        } else {
+            self.prioritiesTitleHoleLeftWidth = 36.0;
+            self.prioritiesTitleHoleRightWidth = 10.0;
+            self.prioritiesRightControlsReservedWidth = 168.0;
+        }
+
+        self.prioritiesTopDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
+        [self.prioritiesTopDragStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [self.prioritiesTopDragStrip setWantsLayer:YES];
+        self.prioritiesTopDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:self.prioritiesTopDragStrip];
+
+        self.prioritiesLeftHeaderDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
+        [self.prioritiesLeftHeaderDragStrip setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+        [self.prioritiesLeftHeaderDragStrip setWantsLayer:YES];
+        self.prioritiesLeftHeaderDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:self.prioritiesLeftHeaderDragStrip];
+
+        self.prioritiesRightHeaderDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
+        [self.prioritiesRightHeaderDragStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+        [self.prioritiesRightHeaderDragStrip setWantsLayer:YES];
+        self.prioritiesRightHeaderDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
+        [rootView addSubview:self.prioritiesRightHeaderDragStrip];
+
+        [self layoutPrioritiesDragStrips];
+    } else {
         CGFloat stripX = 0.0;
         CGFloat dragStripWidth = self.enableNativeViewMenu ? 140.0 : 320.0;
         NSUInteger stripMask = (NSViewMinXMargin | NSViewMaxXMargin | NSViewMinYMargin);
@@ -814,32 +849,6 @@ completionHandler:(void (^)(BOOL result))completionHandler {
         [dragStrip setWantsLayer:YES];
         dragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
         [rootView addSubview:dragStrip];
-    } else {
-        // Priorities needs broad drag affordance in the top band, but interactive
-        // controls (up button/title/snap buttons) must remain clickable.
-        self.prioritiesTitleHoleLeftWidth = 36.0;
-        self.prioritiesTitleHoleRightWidth = 10.0;
-        self.prioritiesRightControlsReservedWidth = 168.0;
-
-        self.prioritiesTopDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
-        [self.prioritiesTopDragStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
-        [self.prioritiesTopDragStrip setWantsLayer:YES];
-        self.prioritiesTopDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-        [rootView addSubview:self.prioritiesTopDragStrip];
-
-        self.prioritiesLeftHeaderDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
-        [self.prioritiesLeftHeaderDragStrip setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
-        [self.prioritiesLeftHeaderDragStrip setWantsLayer:YES];
-        self.prioritiesLeftHeaderDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-        [rootView addSubview:self.prioritiesLeftHeaderDragStrip];
-
-        self.prioritiesRightHeaderDragStrip = [[WizardryDragStripView alloc] initWithFrame:NSZeroRect];
-        [self.prioritiesRightHeaderDragStrip setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
-        [self.prioritiesRightHeaderDragStrip setWantsLayer:YES];
-        self.prioritiesRightHeaderDragStrip.layer.backgroundColor = [[NSColor clearColor] CGColor];
-        [rootView addSubview:self.prioritiesRightHeaderDragStrip];
-
-        [self layoutPrioritiesDragStrips];
     }
 
     if (self.enableNativeBootSplash) {

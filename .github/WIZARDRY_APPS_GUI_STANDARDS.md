@@ -116,6 +116,8 @@
 - Reserve drag-strip holes around interactive controls instead of placing drag layers over controls.
 - Recompute host drag geometry on resize and dynamic title/control width changes.
 - Keep a dedicated reserved width for right-side controls so host drag zones cannot steal clicks.
+- For centered top tab bars (for example Headquarters), do not use the generic centered drag strip; use host left/right strips with a dynamic center hole driven by live tab bounds.
+- The host command `__wizardry_host_priorities_drag_hole` takes `holeLeft`, `holeRight`, and `rightReserved` where `holeLeft/holeRight` are center-to-hole-edge distances (non-draggable), not drag-strip widths.
 
 ## Port and Runtime Safety
 - Never hardcode a fixed localhost port for embedded site URLs.
