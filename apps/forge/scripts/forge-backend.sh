@@ -2163,6 +2163,7 @@ $icon_key
 </dict></plist>
 PLIST
 
+    stop_desktop_instances_for_slug "$root" "$workspace_slug" "$workspace_title" "$os"
     open -na "$bundle"
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
