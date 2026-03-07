@@ -9,7 +9,7 @@ Explore browser APIs for running JavaScript in background threads without blocki
 Web Workers allow you to run JavaScript in background threads, separate from the main UI thread:
 
 <div class="demo-box">
-<h3>⚙️ Web Worker Demo</h3>
+<h3>Web Worker Demo</h3>
   
 <div style="margin-bottom: 1rem;">
 <label style="display: block; margin-bottom: 0.5rem;"><strong>Calculate Fibonacci Number:</strong></label>
