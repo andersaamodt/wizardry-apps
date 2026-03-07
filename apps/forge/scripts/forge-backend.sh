@@ -892,6 +892,10 @@ copy_tree_for_bundle() {
       --exclude '.assay-reports' \
       --exclude '*/.assay-reports' \
       --exclude '.DS_Store' \
+      --exclude 'target' \
+      --exclude '*/target' \
+      --exclude 'node_modules' \
+      --exclude '*/node_modules' \
       -cf - .
   ) | (
     cd "$dest" || exit 1
@@ -2046,6 +2050,10 @@ cmd_run_workspace() {
     printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
     exit 1
   }
+  app_entry_suffix=''
+  if [ "$app_dir" != "$workspace_path" ]; then
+    app_entry_suffix='/app'
+  fi
 
   workspace_conf="$workspace_path/wizardry.workspace.conf"
   targets_csv=''
@@ -2111,7 +2119,7 @@ cmd_run_workspace() {
     rm -rf "$bundle"
     mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$workspace_slug" "$bundle/Contents/Resources/.host"
 
-    copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$workspace_slug/"
+    copy_tree_for_bundle "$workspace_path" "$bundle/Contents/Resources/$workspace_slug/"
     mkdir -p "$bundle/Contents/Resources/$workspace_slug/.host"
     cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$workspace_slug/.host/"
     cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
@@ -2122,7 +2130,7 @@ cmd_run_workspace() {
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
-exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$workspace_slug"
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$workspace_slug$app_entry_suffix"
 APP
     chmod +x "$bundle/Contents/MacOS/$workspace_slug"
 
@@ -2168,7 +2176,7 @@ PLIST
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$bundle"
-    printf 'entry=%s\n' "$bundle/Contents/Resources/$workspace_slug"
+    printf 'entry=%s\n' "$bundle/Contents/Resources/$workspace_slug$app_entry_suffix"
     printf 'log=%s\n' "$log_path"
     return 0
   fi
@@ -2180,7 +2188,7 @@ PLIST
     rm -rf "$appdir"
     mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$bundle_slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
 
-    cp -R "$app_dir"/. "$appdir/usr/share/$bundle_slug/"
+    copy_tree_for_bundle "$workspace_path" "$appdir/usr/share/$bundle_slug/"
     mkdir -p "$appdir/usr/share/$bundle_slug/.host"
     cp -R "$root/apps/.host/shared" "$appdir/usr/share/$bundle_slug/.host/"
     cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
@@ -2192,7 +2200,7 @@ PLIST
 #!/bin/sh
 set -eu
 HERE=\$(CDPATH= cd -- "\$(dirname "\$0")" && pwd -P)
-exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$HERE/usr/bin/wizardry-host" "\$HERE/usr/share/$bundle_slug"
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$HERE/usr/bin/wizardry-host" "\$HERE/usr/share/$bundle_slug$app_entry_suffix"
 APP
     chmod +x "$appdir/AppRun"
 
@@ -2205,7 +2213,7 @@ APP
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$appdir"
-    printf 'entry=%s\n' "$app_dir"
+    printf 'entry=%s\n' "$appdir/usr/share/$bundle_slug$app_entry_suffix"
     printf 'pid=%s\n' "$pid"
     printf 'log=%s\n' "$log_path"
     return 0
