@@ -55,5 +55,7 @@ grep -F "printf 'install_mode=%s\\n' \"\$(normalize_linux_install_mode)\"" "$bac
 grep -F "install_root=\"\$HOME/.local/share/wizardry-apps/\$slug\"" "$backend" >/dev/null
 grep -F "launcher_path=\"\$launcher_dir/wizardry-\$slug\"" "$backend" >/dev/null
 grep -F "wizardry-apps-root.txt" "$backend" >/dev/null
+grep -F "\"\$bundle/Contents/Resources/wizardry-apps-root.txt\"" "$backend" >/dev/null
+grep -F "\"\$appdir/usr/share/wizardry-apps-root.txt\"" "$backend" >/dev/null
 
 printf '%s\n' "forge standardized run/install pipeline tests passed"
