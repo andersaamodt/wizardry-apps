@@ -356,9 +356,14 @@
       }
 
       try {
-        const res = await window.wizardry.exec(commands['get-port']);
-        const raw = (res.stdout || '').trim();
-        serverPort = /^[0-9]+$/.test(raw) ? raw : '';
+        const text = await backendExec('get-chat-endpoint');
+        const out = parseKeyValue(text);
+        const rawPort = String(out.port || '').trim();
+        const rawUrl = String(out.chat_url || '').trim();
+        serverPort = /^[0-9]+$/.test(rawPort) ? rawPort : '';
+        if (/^https?:\/\/[^ ]+\/pages\/chat\.html$/.test(rawUrl)) {
+          await saveChatUrl(rawUrl);
+        }
       } catch (_err) {
         serverPort = '';
       }
@@ -377,15 +382,29 @@
         return;
       }
 
-      fetch(url, { method: 'HEAD', mode: 'no-cors' })
-        .then(() => {
-          serverRunning = true;
-          updateServerStatus('running');
-        })
-        .catch(() => {
+      if (window.wizardry && window.wizardry.exec) {
+        try {
+          const text = await backendExec('check-chat', [url]);
+          const out = parseKeyValue(text);
+          const status = String(out.status || '').trim();
+          serverRunning = status === 'running';
+          updateServerStatus(serverRunning ? 'running' : 'stopped');
+          return;
+        } catch (_err) {
           serverRunning = false;
           updateServerStatus('stopped');
-        });
+          return;
+        }
+      }
+
+      try {
+        await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+        serverRunning = true;
+        updateServerStatus('running');
+      } catch (_err) {
+        serverRunning = false;
+        updateServerStatus('stopped');
+      }
     }
     
     function updateServerStatus(status) {

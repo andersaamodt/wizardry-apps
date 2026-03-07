@@ -132,32 +132,66 @@
       return chatUrlCache;
     }
     
+    async function detectDefaultChatUrl() {
+      try {
+        const text = await backendExec('get-chat-endpoint');
+        const out = parseKeyValue(text);
+        const value = String(out.chat_url || '').trim();
+        return /^https?:\/\/[^ ]+\/pages\/chat\.html$/.test(value) ? value : '';
+      } catch (_err) {
+        return '';
+      }
+    }
+
+    async function probeChat(url) {
+      try {
+        const text = await backendExec('check-chat', [url || '']);
+        return parseKeyValue(text);
+      } catch (_err) {
+        return { status: 'stopped', chat_url: '' };
+      }
+    }
+
     async function checkIframeLoaded() {
-      await refreshChatUrlPref();
       const iframe = document.getElementById('chat-frame');
       const errorMsg = document.getElementById('error-message');
-      const url = configuredChatUrl();
+
+      await refreshChatUrlPref();
+      let url = configuredChatUrl();
+      if (!url && hasBridge()) {
+        url = await detectDefaultChatUrl();
+      }
 
       if (!url) {
         iframe.style.display = 'none';
         errorMsg.style.display = 'block';
         return;
       }
-      
+
+      if (hasBridge()) {
+        const status = await probeChat(url);
+        const liveUrl = String(status.chat_url || url || '').trim();
+        if (String(status.status || '').trim() === 'running' && liveUrl) {
+          if (iframe.src !== liveUrl) {
+            iframe.src = liveUrl;
+          }
+          iframe.style.display = 'block';
+          errorMsg.style.display = 'none';
+          return;
+        }
+        iframe.style.display = 'none';
+        errorMsg.style.display = 'block';
+        return;
+      }
+
       try {
-        fetch(url, { method: 'HEAD', mode: 'no-cors' })
-          .then(() => {
-            if (iframe.src !== url) {
-              iframe.src = url;
-            }
-            iframe.style.display = 'block';
-            errorMsg.style.display = 'none';
-          })
-          .catch(() => {
-            iframe.style.display = 'none';
-            errorMsg.style.display = 'block';
-          });
-      } catch (e) {
+        await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+        if (iframe.src !== url) {
+          iframe.src = url;
+        }
+        iframe.style.display = 'block';
+        errorMsg.style.display = 'none';
+      } catch (_err) {
         iframe.style.display = 'none';
         errorMsg.style.display = 'block';
       }

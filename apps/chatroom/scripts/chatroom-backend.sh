@@ -8,6 +8,8 @@ Usage: chatroom-backend.sh ACTION [ARGS...]
 Actions:
   get-ui-prefs
   set-ui-pref KEY VALUE
+  get-chat-endpoint
+  check-chat [URL]
 USAGE
   exit 0
   ;;
@@ -35,6 +37,56 @@ validate_key() {
 
 sanitize_value() {
   printf '%s' "${1-}" | tr '\r\n' ' '
+}
+
+demo_site_conf() {
+  printf '%s\n' "$HOME/sites/demo/site.conf"
+}
+
+read_demo_port() {
+  cfg=$(demo_site_conf)
+  [ -f "$cfg" ] || return 1
+  port=$(awk -F= '
+    /^port=/ {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+      print $2
+      exit
+    }
+  ' "$cfg")
+  case "$port" in
+    ''|*[!0-9]*)
+      return 1
+      ;;
+  esac
+  printf '%s\n' "$port"
+}
+
+default_chat_url() {
+  port=$(read_demo_port) || return 1
+  printf 'http://localhost:%s/pages/chat.html\n' "$port"
+}
+
+is_http_url() {
+  value=${1-}
+  case "$value" in
+    http://*|https://*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+probe_url() {
+  url=${1-}
+  [ -n "$url" ] || return 1
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS --max-time 2 "$url" >/dev/null 2>&1 && return 0
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -q --spider --timeout=2 "$url" >/dev/null 2>&1 && return 0
+  fi
+  return 1
 }
 
 write_key_value_file() {
@@ -92,6 +144,40 @@ case "$action" in
     write_key_value_file "$cfg" "$key" "$value"
     printf 'key=%s\n' "$key"
     printf 'value=%s\n' "$value"
+    ;;
+  get-chat-endpoint)
+    port=''
+    url=''
+    if port=$(read_demo_port 2>/dev/null); then
+      url="http://localhost:$port/pages/chat.html"
+    fi
+    printf 'port=%s\n' "$port"
+    printf 'chat_url=%s\n' "$url"
+    ;;
+  check-chat)
+    requested=${1-}
+    port=''
+    default_url=''
+    url=''
+    status='stopped'
+
+    if port=$(read_demo_port 2>/dev/null); then
+      default_url="http://localhost:$port/pages/chat.html"
+    fi
+
+    if [ -n "$requested" ] && is_http_url "$requested"; then
+      url=$requested
+    else
+      url=$default_url
+    fi
+
+    if [ -n "$url" ] && probe_url "$url"; then
+      status='running'
+    fi
+
+    printf 'status=%s\n' "$status"
+    printf 'port=%s\n' "$port"
+    printf 'chat_url=%s\n' "$url"
     ;;
   *)
     printf '%s\n' "chatroom-backend: unknown action '$action'" >&2
