@@ -1458,11 +1458,12 @@ cmd_build_desktop() {
       zip_path="$dist_dir/$app_name.zip"
 
       rm -rf "$bundle"
-      mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$slug" "$bundle/Contents/Resources/wizardry-apps/core"
+      mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$slug" "$bundle/Contents/Resources/.host" "$bundle/Contents/Resources/wizardry-apps/core"
 
       copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$slug/"
       mkdir -p "$bundle/Contents/Resources/$slug/.host"
       cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
+      cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
       printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
       cp -R "$root/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
       cp -R "$root/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
@@ -1533,11 +1534,12 @@ PLIST
       artifact=''
 
       rm -rf "$appdir"
-      mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$slug" "$appdir/usr/share/wizardry-apps/core"
+      mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
 
       copy_tree_for_bundle "$app_dir" "$appdir/usr/share/$slug/"
       mkdir -p "$appdir/usr/share/$slug/.host"
       cp -R "$root/apps/.host/shared" "$appdir/usr/share/$slug/.host/"
+      cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
       printf '%s\n' "$root" > "$appdir/usr/share/wizardry-apps-root.txt"
       cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
       cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
@@ -1923,7 +1925,7 @@ cmd_run_workspace() {
     bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
     bundle="$bundle_root/$workspace_title.app"
     rm -rf "$bundle"
-    mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
+    mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources" "$bundle/Contents/Resources/.host"
 
     cat > "$bundle/Contents/MacOS/$workspace_slug" <<APP
 #!/bin/sh
@@ -1933,6 +1935,8 @@ APP
     chmod +x "$bundle/Contents/MacOS/$workspace_slug"
 
     icon_source=''
+    cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
+
     if [ -f "$workspace_path/assets/forge-icon.png" ]; then
       icon_source="$workspace_path/assets/forge-icon.png"
     elif [ -f "$app_dir/assets/forge-icon.png" ]; then
@@ -1983,11 +1987,12 @@ PLIST
     bundle_root="$root/_tmp/workbench/dist/linux-workspaces/$bundle_slug"
     appdir="$bundle_root/AppDir"
     rm -rf "$appdir"
-    mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$bundle_slug" "$appdir/usr/share/wizardry-apps/core"
+    mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$bundle_slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
 
     cp -R "$app_dir"/. "$appdir/usr/share/$bundle_slug/"
     mkdir -p "$appdir/usr/share/$bundle_slug/.host"
     cp -R "$root/apps/.host/shared" "$appdir/usr/share/$bundle_slug/.host/"
+    cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
     cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
     cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
     cp "$host_bin" "$appdir/usr/bin/wizardry-host"

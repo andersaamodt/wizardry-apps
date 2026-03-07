@@ -50,6 +50,7 @@ case "$os" in
     [ -x "$mac_build_out/Contents/MacOS/app-forge" ]
     [ -f "$mac_build_out/Contents/Resources/forge/index.html" ]
     [ -f "$mac_build_out/Contents/Resources/forge/.host/shared/wizardry-bridge.js" ]
+    [ -f "$mac_build_out/Contents/Resources/.host/shared/wizardry-bridge.js" ]
     [ -f "$mac_build_out/Contents/Resources/wizardry-apps-root.txt" ]
     [ "$(head -n 1 "$mac_build_out/Contents/Resources/wizardry-apps-root.txt")" = "$root" ]
     [ -f "$mac_build_out/Contents/Info.plist" ]
@@ -59,6 +60,7 @@ case "$os" in
     [ -f "$app_bundle/Contents/Info.plist" ]
     grep -F "<key>CFBundleIconFile</key>" "$app_bundle/Contents/Info.plist" >/dev/null
     [ -f "$app_bundle/Contents/Resources/forge.icns" ]
+    [ -f "$app_bundle/Contents/Resources/.host/shared/wizardry-bridge.js" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-apps-root.txt" ]
     [ "$(head -n 1 "$app_bundle/Contents/Resources/wizardry-apps-root.txt")" = "$root" ]
     ;;

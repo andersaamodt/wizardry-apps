@@ -103,12 +103,13 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-mkdir -p "$macos_dir" "$resources_dir/forge" "$resources_dir/wizardry-apps/core"
+mkdir -p "$macos_dir" "$resources_dir/forge" "$resources_dir/.host" "$resources_dir/wizardry-apps/core"
 
 cp "$host_bin" "$macos_dir/wizardry-host"
 cp -R "$root/apps/forge"/. "$resources_dir/forge/"
 mkdir -p "$resources_dir/forge/.host"
 cp -R "$root/apps/.host/shared" "$resources_dir/forge/.host/"
+cp -R "$root/apps/.host/shared" "$resources_dir/.host/"
 cp -R "$root/core/include" "$resources_dir/wizardry-apps/core/"
 cp -R "$root/core/src" "$resources_dir/wizardry-apps/core/"
 printf '%s\n' "$root" > "$resources_dir/wizardry-apps-root.txt"
