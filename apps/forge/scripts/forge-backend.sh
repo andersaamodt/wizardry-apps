@@ -728,6 +728,73 @@ resolve_source_repo() {
   esac
 }
 
+lock_field() {
+  file=$1
+  key=$2
+  [ -f "$file" ] || return 1
+  awk -F= -v k="$key" '
+    $1 == k {
+      sub(/^[^=]*=/, "", $0)
+      print
+      exit
+    }
+  ' "$file"
+}
+
+resolve_source_ref_commit() {
+  repo=$1
+  ref=$2
+  [ -n "$repo" ] || return 1
+  [ -n "$ref" ] || ref=HEAD
+  require_tool git
+
+  if [ -d "$repo/.git" ] || git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$repo" rev-parse "$ref" 2>/dev/null
+    return $?
+  fi
+
+  git ls-remote "$repo" "$ref" 2>/dev/null | awk 'NR == 1 { print $1 }'
+}
+
+maybe_refresh_optional_app_cache() {
+  root=$1
+  slug=$2
+
+  distribution=$(app_distribution "$root" "$slug")
+  [ "$distribution" = "optional" ] || return 0
+
+  repo=$(app_source_field "$root" "$slug" repo)
+  ref=$(app_source_field "$root" "$slug" ref)
+  subdir=$(app_source_field "$root" "$slug" subdir)
+  [ -n "$repo" ] || return 0
+  [ -n "$ref" ] || ref=main
+  [ -n "$subdir" ] || subdir=.
+
+  repo=$(resolve_source_repo "$root" "$repo")
+  dest_dir=$(app_cache_dir "$slug")
+  [ -d "$dest_dir" ] || return 0
+
+  lock_file="$dest_dir/.forge-source.lock"
+  if [ ! -f "$lock_file" ]; then
+    download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file"
+    return 0
+  fi
+
+  locked_repo=$(lock_field "$lock_file" repo || true)
+  locked_ref=$(lock_field "$lock_file" ref || true)
+  locked_subdir=$(lock_field "$lock_file" subdir || true)
+  locked_commit=$(lock_field "$lock_file" commit || true)
+  current_commit=$(resolve_source_ref_commit "$repo" "$ref" 2>/dev/null || true)
+
+  if [ -z "$current_commit" ]; then
+    return 0
+  fi
+
+  if [ "$locked_repo" != "$repo" ] || [ "$locked_ref" != "$ref" ] || [ "$locked_subdir" != "$subdir" ] || [ "$locked_commit" != "$current_commit" ]; then
+    download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file"
+  fi
+}
+
 require_jq() {
   require_tool jq
 }
@@ -1587,6 +1654,7 @@ cmd_build_desktop() {
     printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
     exit 1
   }
+  maybe_refresh_optional_app_cache "$root" "$slug"
   app_dir=$(resolve_app_dir_or_error "$root" "$slug")
 
   require_jq
