@@ -135,6 +135,8 @@
 - Use semantic controls and keyboard-operable interactions.
 - Keep focus states visible and modal escape paths obvious.
 - Avoid click-only critical actions; support keyboard submission where practical.
+- Preserve native text-editing shortcuts in text-entry controls; do not intercept `Ctrl/Cmd/Alt` combos for cut/copy/paste/select-all/undo/redo/navigation.
+- Global key handlers must early-return for editable targets with modifier keys instead of hardcoding app-level shortcut patches.
 - Avoid defaulting buttons and short text-entry inputs to `width: 100%`; size them to content or a bounded width unless full-width is required by layout.
 - Keep motion subtle and meaningful, never required for comprehension.
 

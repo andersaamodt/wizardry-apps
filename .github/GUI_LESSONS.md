@@ -13,3 +13,4 @@
 - Observe title cluster, drill-up button, and right controls with `ResizeObserver` so drag-hole geometry follows text-length and visibility changes automatically.
 - Keep a dedicated right-controls reserved width in host geometry to guarantee snap/settings buttons stay reliably clickable.
 - Do not maintain duplicate frontend bundles by hand; keep one canonical source and make any secondary path a generated artifact or compatibility alias.
+- App-level keydown handlers should early-return for editable targets with modifier keys so native text shortcuts keep working without per-shortcut hacks.
