@@ -11,6 +11,3 @@ Native host implementations for desktop and mobile packaging.
 Shared JS API:
 
 - `window.wizardry.exec(argv)` (canonical desktop command bridge)
-- `window.wizardry.rpc(method, params)` (compatibility layer)
-- `window.wizardry.subscribe(event, fn)`
-- `window.wizardry.unsubscribe(token)`

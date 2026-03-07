@@ -65,7 +65,7 @@
 - Validate startup (no flicker), focus states, hover states, and split-pane behavior in that QA pass.
 
 ## Command and Bridge Rules
-- Bridge calls use explicit argv arrays passed to `wizardry.rpc('bridge.exec', { argv })`.
+- Bridge calls use explicit argv arrays passed to `wizardry.exec(argv)`.
 - Commands are selected from code-defined allowlists, not free-form user text.
 - Avoid building shell fragments from user input; prefer positional args.
 - Keep backend entrypoints in `scripts/*-backend.sh` and expose stable action names.

@@ -35,26 +35,7 @@
     </footer>
   </div>
 
-  <script>
-    (function loadBridge() {
-      var candidates = [
-        './.host/shared/wizardry-bridge.js',
-        '../.host/shared/wizardry-bridge.js',
-        '../../.host/shared/wizardry-bridge.js'
-      ];
-      var i = 0;
-      function tryNext() {
-        if (i >= candidates.length) {
-          return;
-        }
-        var s = document.createElement('script');
-        s.src = candidates[i++];
-        s.onerror = tryNext;
-        document.head.appendChild(s);
-      }
-      tryNext();
-    })();
-  </script>
+  <script src="../.host/shared/wizardry-bridge.js"></script>
 
   <script>
     // Desktop apps execute commands via native bridge
