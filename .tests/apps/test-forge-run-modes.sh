@@ -54,5 +54,6 @@ grep -F 'if [ "$has_host_target" = false ] && [ "$has_hosted_web" = true ]; then
 grep -F "printf 'install_mode=%s\\n' \"\$(normalize_linux_install_mode)\"" "$backend" >/dev/null
 grep -F "install_root=\"\$HOME/.local/share/wizardry-apps/\$slug\"" "$backend" >/dev/null
 grep -F "launcher_path=\"\$launcher_dir/wizardry-\$slug\"" "$backend" >/dev/null
+grep -F "wizardry-apps-root.txt" "$backend" >/dev/null
 
 printf '%s\n' "forge standardized run/install pipeline tests passed"
