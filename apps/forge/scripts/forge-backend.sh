@@ -27,14 +27,14 @@ Commands:
   download-template [ROOT_HINT] TEMPLATE_SLUG
   remove-downloaded-template [ROOT_HINT] TEMPLATE_SLUG
   build-desktop [ROOT_HINT] APP_SLUG
-  install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID] [LINUX_INSTALL_MODE]
-  run-desktop [ROOT_HINT] APP_SLUG [RUN_MODE]
-  run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT] [RUN_MODE]
+  install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID]
+  run-desktop [ROOT_HINT] APP_SLUG
+  run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
   serve-hosted-web [ROOT_HINT] MODE REF
   stage-mobile [ROOT_HINT] APP_SLUG
   build-ios-smoke [ROOT_HINT] APP_SLUG
   build-android-debug [ROOT_HINT] APP_SLUG
-  scaffold-app [ROOT_HINT] APP_SLUG APP_NAME TEMPLATE [SOURCE_APP]   # legacy
+  scaffold-app [ROOT_HINT] APP_SLUG APP_NAME TEMPLATE [SOURCE_APP]
   scaffold-workspace [ROOT_HINT] APP_SLUG APP_NAME CONTEXT STARTER TARGETS [SOURCE] [PROJECT_ROOT]
   scaffold-site [ROOT_HINT] SITE_NAME TEMPLATE [DEST_ROOT]
   run-task [ROOT_HINT] TASK
@@ -46,7 +46,7 @@ TEMPLATE values for scaffold-app:
   minimal | panel | clone
 
 CONTEXT values for scaffold-workspace:
-  web | godot | application | game
+  web | godot
 USAGE
   exit 0
   ;;
@@ -725,15 +725,7 @@ kv_read() {
 }
 
 normalize_linux_install_mode() {
-  value=${1-}
-  case "$value" in
-    appimage-local-bin|appdir-local-share)
-      printf '%s\n' "$value"
-      ;;
-    *)
-      printf '%s\n' "appdir-local-share"
-      ;;
-  esac
+  printf '%s\n' "local-share"
 }
 
 sanitize_bundle_component() {
@@ -1238,11 +1230,9 @@ cmd_list_workspaces() {
     title=$(workspace_field "$conf" title "")
     [ -n "$title" ] || title=$(workspace_field "$conf" name "$project_id")
 
-    project_type=$(workspace_field "$conf" project_type "")
-    [ -n "$project_type" ] || project_type=$(workspace_field "$conf" context "application")
+    project_type=$(workspace_field "$conf" project_type "application")
 
-    development_context=$(workspace_field "$conf" development_context "")
-    [ -n "$development_context" ] || development_context=$(workspace_field "$conf" context "web")
+    development_context=$(workspace_field "$conf" development_context "web")
 
     targets=$(workspace_field "$conf" targets "")
     mtime_epoch=$(path_mtime_epoch "$path")
@@ -1588,7 +1578,6 @@ cmd_install_desktop() {
   root=$(require_root "${1-}")
   slug=${2-}
   target_id=${3-}
-  linux_install_mode=$(normalize_linux_install_mode "${4-}")
   [ -n "$slug" ] || {
     printf '%s\n' "forge-backend: install-desktop requires APP_SLUG" >&2
     exit 2
@@ -1650,47 +1639,31 @@ cmd_install_desktop() {
       launcher_dir="$HOME/.local/bin"
       launcher_path="$launcher_dir/wizardry-$slug"
       mkdir -p "$launcher_dir"
-
-      case "$linux_install_mode" in
-        appimage-local-bin)
-          case "$artifact" in
-            *.AppImage) ;;
-            *)
-              printf '%s\n' "forge-backend: Linux install mode appimage-local-bin requires appimagetool (artifact was: $artifact)" >&2
-              exit 1
-              ;;
-          esac
-          cp "$artifact" "$launcher_path"
-          chmod +x "$launcher_path"
-          install_path="$launcher_path"
-          ;;
-
-        appdir-local-share)
-          [ -n "$appdir" ] || {
-            printf '%s\n' "forge-backend: build-desktop did not return an AppDir path for Linux install" >&2
-            exit 1
-          }
-          [ -d "$appdir" ] || {
-            printf '%s\n' "forge-backend: Linux AppDir not found: $appdir" >&2
-            exit 1
-          }
-          install_root="$HOME/.local/share/wizardry-apps/$slug"
-          rm -rf "$install_root"
-          mkdir -p "$(dirname "$install_root")"
-          cp -R "$appdir" "$install_root"
-          cat > "$launcher_path" <<LAUNCHER
+[ -n "$appdir" ] || {
+        printf '%s\n' "forge-backend: build-desktop did not return an AppDir path for Linux install" >&2
+        exit 1
+      }
+      [ -d "$appdir" ] || {
+        printf '%s\n' "forge-backend: Linux AppDir not found: $appdir" >&2
+        exit 1
+      }
+      install_root="$HOME/.local/share/wizardry-apps/$slug"
+      rm -rf "$install_root"
+      mkdir -p "$(dirname "$install_root")"
+      cp -R "$appdir" "$install_root"
+      cat > "$launcher_path" <<LAUNCHER
 #!/bin/sh
 set -eu
 exec "$install_root/AppRun" "\$@"
 LAUNCHER
-          chmod +x "$launcher_path"
-          install_path="$install_root"
+      chmod +x "$launcher_path"
+      install_path="$install_root"
 
-          desktop_dir="$HOME/.local/share/applications"
-          desktop_file="$desktop_dir/wizardry-$slug.desktop"
-          mkdir -p "$desktop_dir"
-          icon_path="$install_root/usr/share/$slug/assets/forge-icon.png"
-          cat > "$desktop_file" <<DESKTOP
+      desktop_dir="$HOME/.local/share/applications"
+      desktop_file="$desktop_dir/wizardry-$slug.desktop"
+      mkdir -p "$desktop_dir"
+      icon_path="$install_root/usr/share/$slug/assets/forge-icon.png"
+      cat > "$desktop_file" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=$app_name
@@ -1699,12 +1672,10 @@ Terminal=false
 Categories=Development;
 Icon=$icon_path
 DESKTOP
-          ;;
-      esac
 
       printf 'status=ok\n'
       printf 'target=linux\n'
-      printf 'install_mode=%s\n' "$linux_install_mode"
+      printf 'install_mode=%s\n' "$(normalize_linux_install_mode)"
       printf 'artifact=%s\n' "$artifact"
       printf 'launcher=%s\n' "$launcher_path"
       printf 'installed=%s\n' "$install_path"
@@ -1717,88 +1688,54 @@ DESKTOP
 cmd_run_desktop() {
   root=$(require_root "${1-}")
   slug=${2-}
-  run_mode=${3-auto}
-  bundle_artifact=''
-  bundle_build_out=''
   [ -n "$slug" ] || {
     printf '%s\n' "forge-backend: run-desktop requires APP_SLUG" >&2
     exit 2
   }
   validate_slug "$slug"
-  case "$run_mode" in
-    ''|auto)
-      # Run should favor live source to avoid stale bundle confusion.
-      run_mode=host
-      ;;
-    host|bundle)
-      ;;
-    *)
-      printf '%s\n' "forge-backend: run-desktop RUN_MODE must be host|bundle|auto" >&2
-      exit 2
-      ;;
-  esac
-
-  # Memetrader is currently iterated rapidly from source and should always run
-  # the live host entry instead of a previously compiled bundle snapshot.
-  if [ "$slug" = "memetrader" ] && [ "$run_mode" != "bundle" ]; then
-    run_mode=host
-    # Ensure stale host windows do not linger on old in-memory assets.
-    if command -v pkill >/dev/null 2>&1; then
-      pkill -f "wizardry-host.*[/.]apps/memetrader" >/dev/null 2>&1 || true
-    fi
-  fi
-  # Priorities is actively iterated and should run from the live source folder.
-  if [ "$slug" = "priorities" ] && [ "$run_mode" != "bundle" ]; then
-    run_mode=host
-  fi
 
   require_jq
   manifest_app_exists "$root" "$slug" || {
     printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
     exit 1
   }
-  app_dir=$(resolve_app_dir_or_error "$root" "$slug")
-
-  if [ "$run_mode" = "bundle" ]; then
-    bundle_build_out=$(cmd_build_desktop "$root" "$slug")
-    bundle_artifact=$(printf '%s\n' "$bundle_build_out" | kv_read artifact)
-    [ -n "$bundle_artifact" ] || {
-      printf '%s\n' "forge-backend: build-desktop did not return a bundle artifact" >&2
-      exit 1
-    }
-  fi
+  build_out=$(cmd_build_desktop "$root" "$slug")
+  bundle_artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
+  appdir=$(printf '%s\n' "$build_out" | kv_read appdir)
+  [ -n "$bundle_artifact" ] || {
+    printf '%s\n' "forge-backend: build-desktop did not return an artifact" >&2
+    exit 1
+  }
 
   os=$(os_id)
-  host_bin=''
   case "$os" in
     darwin)
       app_name=$(app_name_from_manifest "$root" "$slug")
       stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
-      if [ -n "$bundle_artifact" ]; then
-        bundle=$bundle_artifact
-      else
-        bundle="$root/_tmp/workbench/dist/macos/$app_name.app"
-      fi
-      if [ "$run_mode" = "bundle" ]; then
-        [ -d "$bundle" ] || {
-          printf '%s\n' "forge-backend: built bundle artifact missing: $bundle" >&2
-          exit 1
-        }
-        command -v open >/dev/null 2>&1 || {
-          printf '%s\n' "forge-backend: open command not available on this system" >&2
-          exit 1
-        }
-        open -na "$bundle"
-        printf 'launched=1\n'
-        printf 'mode=bundle\n'
-        printf 'artifact=%s\n' "$bundle"
-        exit 0
-      fi
-      host_bin=$(ensure_macos_host "$root")
+      [ -d "$bundle_artifact" ] || {
+        printf '%s\n' "forge-backend: built bundle artifact missing: $bundle_artifact" >&2
+        exit 1
+      }
+      command -v open >/dev/null 2>&1 || {
+        printf '%s\n' "forge-backend: open command not available on this system" >&2
+        exit 1
+      }
+      open -na "$bundle_artifact"
+      printf 'launched=1\n'
+      printf 'mode=desktop-executable\n'
+      printf 'artifact=%s\n' "$bundle_artifact"
+      exit 0
       ;;
     linux)
       stop_desktop_instances_for_slug "$root" "$slug" "" "$os"
-      host_bin=$(ensure_linux_host "$root")
+      [ -n "$appdir" ] || {
+        printf '%s\n' "forge-backend: build-desktop did not return AppDir for Linux run" >&2
+        exit 1
+      }
+      [ -d "$appdir" ] || {
+        printf '%s\n' "forge-backend: Linux AppDir not found: $appdir" >&2
+        exit 1
+      }
       ;;
     *)
       printf '%s\n' "forge-backend: unsupported desktop OS: $os" >&2
@@ -1808,33 +1745,33 @@ cmd_run_desktop() {
 
   log_dir="$root/_tmp/workbench/log"
   mkdir -p "$log_dir"
-  log_path="$log_dir/$slug-host.log"
-
-  host_zoom=''
-  if [ "$slug" = "artificer" ]; then
-    host_zoom=${WIZARDRY_ARTIFICER_PAGE_ZOOM:-0.92}
-  fi
-
-  stop_host_instances_for_app "$host_bin" "$app_dir"
+  log_path="$log_dir/$slug-run.log"
 
   if command -v nohup >/dev/null 2>&1; then
-    if [ -n "$host_zoom" ]; then
-      nohup env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" WIZARDRY_PAGE_ZOOM="$host_zoom" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
-    else
-      nohup env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
-    fi
+    case "$bundle_artifact" in
+      *.AppImage)
+        nohup "$bundle_artifact" >"$log_path" 2>&1 &
+        ;;
+      *)
+        nohup "$appdir/AppRun" >"$log_path" 2>&1 &
+        ;;
+    esac
   else
-    if [ -n "$host_zoom" ]; then
-      env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" WIZARDRY_PAGE_ZOOM="$host_zoom" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
-    else
-      env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
-    fi
+    case "$bundle_artifact" in
+      *.AppImage)
+        "$bundle_artifact" >"$log_path" 2>&1 &
+        ;;
+      *)
+        "$appdir/AppRun" >"$log_path" 2>&1 &
+        ;;
+    esac
   fi
   pid=$!
 
   printf 'launched=1\n'
-  printf 'mode=host\n'
-  printf 'entry=%s\n' "$app_dir"
+  printf 'mode=desktop-executable\n'
+  printf 'entry=%s\n' "$appdir"
+  printf 'artifact=%s\n' "$bundle_artifact"
   printf 'pid=%s\n' "$pid"
   printf 'log=%s\n' "$log_path"
 }
@@ -1843,7 +1780,6 @@ cmd_run_workspace() {
   root=$(require_root "${1-}")
   workspace_path=${2-}
   context_hint=${3-}
-  run_mode=${4-auto}
 
   [ -n "$workspace_path" ] || {
     printf '%s\n' "forge-backend: run-workspace requires WORKSPACE_PATH" >&2
@@ -1857,12 +1793,11 @@ cmd_run_workspace() {
   context=$context_hint
   if [ -z "$context" ] && [ -f "$workspace_path/wizardry.workspace.conf" ]; then
     context=$(workspace_field "$workspace_path/wizardry.workspace.conf" development_context "")
-    [ -n "$context" ] || context=$(workspace_field "$workspace_path/wizardry.workspace.conf" context "")
   fi
   [ -n "$context" ] || context=web
 
   case "$context" in
-    godot|game)
+    godot)
       project_title=''
       if [ -f "$workspace_path/wizardry.workspace.conf" ]; then
         project_title=$(workspace_field "$workspace_path/wizardry.workspace.conf" title "")
@@ -1907,6 +1842,12 @@ cmd_run_workspace() {
       printf 'log=%s\n' "$log_path"
       return 0
       ;;
+    web)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: workspace context must be web or godot" >&2
+      exit 2
+      ;;
   esac
 
   app_dir="$workspace_path/app"
@@ -1917,6 +1858,36 @@ cmd_run_workspace() {
     printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
     exit 1
   }
+
+  workspace_conf="$workspace_path/wizardry.workspace.conf"
+  targets_csv=''
+  if [ -f "$workspace_conf" ]; then
+    targets_csv=$(workspace_field "$workspace_conf" targets "")
+  fi
+
+  host_target=''
+  case "$(os_id)" in
+    darwin) host_target='macos' ;;
+    linux) host_target='linux' ;;
+  esac
+
+  has_host_target=false
+  has_hosted_web=false
+  case ",$targets_csv," in
+    *,"$host_target",*) has_host_target=true ;;
+  esac
+  case ",$targets_csv," in
+    *,hosted-web,*) has_hosted_web=true ;;
+  esac
+
+  if [ "$has_host_target" = false ] && [ "$has_hosted_web" = true ]; then
+    cmd_serve_hosted_web "$root" workspace "$workspace_path"
+    return 0
+  fi
+  if [ "$has_host_target" = false ]; then
+    printf '%s\n' "forge-backend: workspace has no runnable target for this host (enable $host_target or hosted-web)" >&2
+    exit 1
+  fi
 
   os=$(os_id)
   host_bin=''
@@ -1936,47 +1907,14 @@ cmd_run_workspace() {
   workspace_id=$(basename "$workspace_path")
   log_dir="$root/_tmp/workbench/log"
   mkdir -p "$log_dir"
-  log_path="$log_dir/workspace-$workspace_id-host.log"
+  log_path="$log_dir/workspace-$workspace_id-run.log"
 
-  workspace_conf="$workspace_path/wizardry.workspace.conf"
-  stop_host_instances_for_app "$host_bin" "$app_dir"
-
-  case "$run_mode" in
-    ''|auto|bundle|host) ;;
-    *)
-      printf '%s\n' "forge-backend: run-workspace RUN_MODE must be host|bundle|auto" >&2
-      exit 2
-      ;;
-  esac
-
-  if [ "$run_mode" = "auto" ] || [ -z "$run_mode" ]; then
-    run_mode=bundle
-    host_target=''
-    case "$os" in
-      darwin) host_target='macos' ;;
-      linux) host_target='linux' ;;
-    esac
-    if [ -n "$host_target" ] && [ -f "$workspace_conf" ]; then
-      targets_csv=$(workspace_field "$workspace_conf" targets "")
-      if [ -n "$targets_csv" ]; then
-        case ",$targets_csv," in
-          *,"$host_target",*)
-            ;;
-          *)
-            run_mode=host
-            ;;
-        esac
-      fi
-    fi
-  fi
-
-  if [ "$os" = "darwin" ] && [ "$run_mode" = "bundle" ] && command -v open >/dev/null 2>&1; then
+  if [ "$os" = "darwin" ] && command -v open >/dev/null 2>&1; then
     workspace_title=$(workspace_field "$workspace_conf" title "")
     [ -n "$workspace_title" ] || workspace_title=$(workspace_field "$workspace_conf" name "")
     [ -n "$workspace_title" ] || workspace_title=$(basename "$workspace_path")
 
     workspace_slug=$(workspace_field "$workspace_conf" project_id "")
-    [ -n "$workspace_slug" ] || workspace_slug=$(workspace_field "$workspace_conf" slug "")
     [ -n "$workspace_slug" ] || workspace_slug=$(basename "$workspace_path")
     workspace_slug=$(sanitize_bundle_component "$workspace_slug")
 
@@ -2031,14 +1969,14 @@ PLIST
 
     open -na "$bundle"
     printf 'launched=1\n'
-    printf 'mode=bundle\n'
+    printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$bundle"
     printf 'entry=%s\n' "$app_dir"
     printf 'log=%s\n' "$log_path"
     return 0
   fi
 
-  if [ "$os" = "linux" ] && [ "$run_mode" = "bundle" ]; then
+  if [ "$os" = "linux" ]; then
     bundle_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
     bundle_root="$root/_tmp/workbench/dist/linux-workspaces/$bundle_slug"
     appdir="$bundle_root/AppDir"
@@ -2067,26 +2005,13 @@ APP
     fi
     pid=$!
     printf 'launched=1\n'
-    printf 'mode=bundle\n'
+    printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$appdir"
     printf 'entry=%s\n' "$app_dir"
     printf 'pid=%s\n' "$pid"
     printf 'log=%s\n' "$log_path"
     return 0
   fi
-
-  if command -v nohup >/dev/null 2>&1; then
-    nohup env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
-  else
-    env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "$host_bin" "$app_dir" >"$log_path" 2>&1 &
-  fi
-  pid=$!
-
-  printf 'launched=1\n'
-  printf 'mode=host\n'
-  printf 'entry=%s\n' "$app_dir"
-  printf 'pid=%s\n' "$pid"
-  printf 'log=%s\n' "$log_path"
 }
 
 cmd_serve_hosted_web() {
@@ -2174,8 +2099,46 @@ cmd_serve_hosted_web() {
       ;;
 
     workspace)
-      printf '%s\n' "forge-backend: hosted web serve currently supports built-in app templates only" >&2
-      exit 1
+      workspace_path=$ref
+      [ -d "$workspace_path" ] || {
+        printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+        exit 1
+      }
+      app_dir="$workspace_path/app"
+      if [ ! -f "$app_dir/index.html" ] && [ -f "$workspace_path/index.html" ]; then
+        app_dir="$workspace_path"
+      fi
+      [ -f "$app_dir/index.html" ] || {
+        printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
+        exit 1
+      }
+      command -v python3 >/dev/null 2>&1 || {
+        printf '%s\n' "forge-backend: python3 is required to serve workspace hosted web targets" >&2
+        exit 1
+      }
+      workspace_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
+      port=$(python3 - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+)
+      web_log="$root/_tmp/workbench/log/hosted-web/workspace-$workspace_slug-python.log"
+      mkdir -p "$(dirname "$web_log")"
+      if command -v nohup >/dev/null 2>&1; then
+        nohup python3 -m http.server "$port" --bind 127.0.0.1 --directory "$app_dir" >"$web_log" 2>&1 &
+      else
+        python3 -m http.server "$port" --bind 127.0.0.1 --directory "$app_dir" >"$web_log" 2>&1 &
+      fi
+      pid=$!
+      printf 'mode=python-http\n'
+      printf 'site=workspace-%s\n' "$workspace_slug"
+      printf 'entry=%s\n' "$app_dir"
+      printf 'url=%s\n' "http://127.0.0.1:$port"
+      printf 'pid=%s\n' "$pid"
+      printf 'log=%s\n' "$web_log"
       ;;
 
     *)
@@ -2332,31 +2295,16 @@ write_minimal_template() {
     <pre id="out">ready</pre>
   </main>
 
-  <script>
-    (function loadBridge() {
-      var candidates = ['./.host/shared/wizardry-bridge.js', '../.host/shared/wizardry-bridge.js'];
-      var i = 0;
-      function tryNext() {
-        if (i >= candidates.length) {
-          return;
-        }
-        var s = document.createElement('script');
-        s.src = candidates[i++];
-        s.onerror = tryNext;
-        document.head.appendChild(s);
-      }
-      tryNext();
-    })();
-  </script>
+  <script src="./.host/shared/wizardry-bridge.js"></script>
   <script>
     document.getElementById('ping').addEventListener('click', async function () {
       var out = document.getElementById('out');
-      if (!window.wizardry || !window.wizardry.rpc) {
+      if (!window.wizardry || !window.wizardry.exec) {
         out.textContent = 'wizardry bridge unavailable';
         return;
       }
       try {
-        var res = await window.wizardry.rpc('core.ping', {});
+        var res = await window.wizardry.exec(['sh', '-c', 'printf ping']);
         out.textContent = JSON.stringify(res, null, 2);
       } catch (err) {
         out.textContent = String(err && err.message ? err.message : err);
@@ -2453,22 +2401,7 @@ write_panel_template() {
 
   <pre id="out">ready</pre>
 
-  <script>
-    (function loadBridge() {
-      var candidates = ['./.host/shared/wizardry-bridge.js', '../.host/shared/wizardry-bridge.js'];
-      var i = 0;
-      function tryNext() {
-        if (i >= candidates.length) {
-          return;
-        }
-        var s = document.createElement('script');
-        s.src = candidates[i++];
-        s.onerror = tryNext;
-        document.head.appendChild(s);
-      }
-      tryNext();
-    })();
-  </script>
+  <script src="./.host/shared/wizardry-bridge.js"></script>
   <script>
     var out = document.getElementById('out');
     var site = 'demo';
@@ -2483,13 +2416,13 @@ write_panel_template() {
       btn.addEventListener('click', async function () {
         var key = btn.getAttribute('data-cmd');
         var argv = commands[key];
-        if (!window.wizardry || !window.wizardry.rpc) {
+        if (!window.wizardry || !window.wizardry.exec) {
           out.textContent = 'wizardry bridge unavailable';
           return;
         }
         out.textContent = 'running: ' + argv.join(' ');
         try {
-          var res = await window.wizardry.rpc('bridge.exec', { argv: argv });
+          var res = await window.wizardry.exec(argv);
           out.textContent = ['exit=' + res.exit_code, res.stdout || '', res.stderr || ''].filter(Boolean).join('\n');
         } catch (err) {
           out.textContent = String(err && err.message ? err.message : err);
@@ -2698,7 +2631,7 @@ cmd_scaffold_workspace() {
   }
 
   case "$context" in
-    web|application)
+    web)
       project_type=application
       development_context=web
 
@@ -2748,7 +2681,7 @@ Application workspace scaffolded by App Forge.
 README
       ;;
 
-    godot|game)
+    godot)
       project_type=game
       development_context=godot
 
@@ -2823,7 +2756,7 @@ README
       ;;
 
     *)
-      printf '%s\n' "forge-backend: scaffold-workspace context must be web/application or godot/game" >&2
+      printf '%s\n' "forge-backend: scaffold-workspace context must be web or godot" >&2
       exit 2
       ;;
   esac
@@ -2839,11 +2772,6 @@ starter=$starter
 targets=$targets
 source=${source-}
 root=$workspace_dir
-
-# Legacy keys preserved for compatibility.
-slug=$slug
-name=$app_name
-context=$development_context
 CONF
 
   printf 'created=%s\n' "$workspace_dir"
@@ -3039,13 +2967,13 @@ case "$cmd" in
     cmd_build_desktop "${2-}" "${3-}"
     ;;
   run-desktop)
-    cmd_run_desktop "${2-}" "${3-}" "${4-}"
+    cmd_run_desktop "${2-}" "${3-}"
     ;;
   install-desktop)
-    cmd_install_desktop "${2-}" "${3-}" "${4-}" "${5-}"
+    cmd_install_desktop "${2-}" "${3-}" "${4-}"
     ;;
   run-workspace)
-    cmd_run_workspace "${2-}" "${3-}" "${4-}" "${5-}"
+    cmd_run_workspace "${2-}" "${3-}" "${4-}"
     ;;
   serve-hosted-web)
     cmd_serve_hosted_web "${2-}" "${3-}" "${4-}"

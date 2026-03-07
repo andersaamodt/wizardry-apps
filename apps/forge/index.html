@@ -66,18 +66,6 @@
             <pre id="toolchain-summary" class="mono">Waiting for workspace check.</pre>
           </article>
 
-          <article id="linux-install-card" class="card hidden">
-            <h3>Linux Install</h3>
-            <p class="sub">Choose what Install does for Linux desktop targets on this machine.</p>
-            <label for="settings-linux-install-mode">Install behavior</label>
-            <div class="input-row">
-              <select id="settings-linux-install-mode">
-                <option value="appdir-local-share">AppDir in ~/.local/share + launcher</option>
-                <option value="appimage-local-bin">AppImage in ~/.local/bin launcher</option>
-              </select>
-            </div>
-          </article>
-
           <article class="card">
             <h3>Debug Info</h3>
             <pre id="doctor" class="mono">Waiting for workspace check.</pre>
@@ -317,7 +305,6 @@
       var ORGANIZE_SORT_KEY = 'wizardry.forge.organize.sort';
       var ORGANIZE_BUILTIN_FIRST_KEY = 'wizardry.forge.organize.builtin_first';
       var THEME_KEY = 'wizardry.forge.theme';
-      var LINUX_INSTALL_MODE_KEY = 'wizardry.forge.linux.install.mode';
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
       var ASSET_VERSION = 'forge20260218a';
@@ -329,8 +316,7 @@
         'wizardry.forge.organize.builtin_first': 'organize_builtin_first',
         'wizardry.forge.theme': 'theme',
         'wizardry.forge.left_rail.width': 'left_rail_width',
-        'wizardry.forge.selected.catalog.v1': 'selected_catalog',
-        'wizardry.forge.linux.install.mode': 'linux_install_mode'
+        'wizardry.forge.selected.catalog.v1': 'selected_catalog'
       };
 
       var state = {
@@ -345,7 +331,6 @@
         organizeShow: 'both',
         organizeSort: 'alphabetical',
         organizeBuiltinFirst: true,
-        linuxInstallMode: 'appdir-local-share',
         themes: ['psionic'],
         activeTheme: 'psionic',
         selectedBuiltIn: '',
@@ -448,13 +433,6 @@
         if (/^(builtin|workspace):/.test(state.selectedCatalog)) {
           saveStorage(SELECTED_CATALOG_KEY, state.selectedCatalog);
         }
-      }
-
-      function normalizeLinuxInstallMode(value) {
-        if (value === 'appimage-local-bin' || value === 'appdir-local-share') {
-          return value;
-        }
-        return 'appdir-local-share';
       }
 
       function backendScript() {
@@ -1104,7 +1082,6 @@
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
         state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
-        state.linuxInstallMode = normalizeLinuxInstallMode(loadStorage(LINUX_INSTALL_MODE_KEY));
       }
 
       function syncSettingsSaveButtons() {
@@ -1686,9 +1663,7 @@
 
       function catalogItems() {
         function builtInListGroup(appId) {
-          if (appId === 'memetrader' || appId === 'priorities' || appId === 'virtual-redditor') {
-            return 'user';
-          }
+          void appId;
           return 'wizardry';
         }
 
@@ -1716,7 +1691,7 @@
             id: ws.id,
             title: ws.title,
             production: false,
-            context: ws.context || 'web',
+            context: ws.context,
             projectType: ws.projectType || inferProjectTypeFromContext(ws.context).toLowerCase(),
             targets: ws.targets || '',
             path: ws.path,
@@ -1854,8 +1829,7 @@
           throw new Error('Select a user-created app to run');
         }
 
-        var requestedRunMode = workspaceRunModeForItem(item);
-        var res = await backend('run-workspace', [item.path, item.context, requestedRunMode]);
+        var res = await backend('run-workspace', [item.path, item.context]);
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || ('workspace:' + item.id);
         if (item.context === 'web') {
@@ -1871,12 +1845,12 @@
           setTargetRuntime(workspaceKey, 'macos', 'ready', out.entry || item.path || '');
         }
         renderSelectedTargetsEditor(selectedCatalogItem());
-        var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : 'host');
+        var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : 'desktop-executable');
         var launchedSummary = item.context === 'godot'
           ? (item.title + ' launched in Godot.')
-          : (launchedMode === 'bundle'
-            ? (item.title + ' built and launched from the desktop app bundle.')
-            : (item.title + ' launched in native host.'));
+          : (launchedMode === 'python-http'
+            ? (item.title + ' launched as hosted web.')
+            : (item.title + ' built and launched from the desktop app bundle.'));
         renderResult({
           status: 'ok',
           summary: launchedSummary,
@@ -2271,24 +2245,6 @@
         return state.os === 'darwin' ? 'macos' : (state.os === 'linux' ? 'linux' : '');
       }
 
-      function linuxInstallModeLabel(mode) {
-        if (mode === 'appimage-local-bin') {
-          return 'AppImage in ~/.local/bin';
-        }
-        return 'AppDir in ~/.local/share + launcher';
-      }
-
-      function syncLinuxInstallSettingsUI() {
-        var isLinux = state.os === 'linux';
-        if (els.linuxInstallCard) {
-          els.linuxInstallCard.classList.toggle('hidden', !isLinux);
-        }
-        if (!els.settingsLinuxInstallMode) {
-          return;
-        }
-        els.settingsLinuxInstallMode.value = normalizeLinuxInstallMode(state.linuxInstallMode);
-      }
-
       function hasEnabledHostRunTarget(selected) {
         if (!selected) {
           return false;
@@ -2303,13 +2259,6 @@
         var projectType = projectTypeKeyForContext(selected.context);
         var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
         return activeTargets.indexOf(hostTarget) >= 0;
-      }
-
-      function workspaceRunModeForItem(item) {
-        if (!item || item.context === 'godot') {
-          return 'auto';
-        }
-        return hasEnabledHostRunTarget(item) ? 'bundle' : 'host';
       }
 
       function hasEnabledHostedWebTarget(selected) {
@@ -2708,7 +2657,7 @@
             if (spec.id === 'macos') {
               installBtn.title = 'Install (auto-build latest) into /Applications';
             } else {
-              installBtn.title = 'Install (auto-build latest, ' + linuxInstallModeLabel(normalizeLinuxInstallMode(state.linuxInstallMode)) + ')';
+              installBtn.title = 'Install (auto-build latest) into ~/.local/share + ~/.local/bin launcher';
             }
             installBtn.setAttribute('aria-label', installBtn.title);
             installBtn.textContent = 'Install';
@@ -2939,11 +2888,7 @@
           throw new Error('Enable this target before installing.');
         }
 
-        var args = [selected.id, targetId];
-        if (state.os === 'linux') {
-          args.push(normalizeLinuxInstallMode(state.linuxInstallMode));
-        }
-        var res = await backend('install-desktop', args);
+        var res = await backend('install-desktop', [selected.id, targetId]);
         var out = kv(res.stdout || '');
         var installPath = String(out.installed || '').trim();
         var launcherPath = String(out.launcher || '').trim();
@@ -2954,7 +2899,7 @@
         var summary = selected.title + ' installed for ' + (targetId === 'macos' ? 'macOS' : 'Linux') + '.';
         var installHelp = targetId === 'macos'
           ? 'Install auto-builds latest output, then copies the .app bundle into /Applications.'
-          : ('Install auto-builds latest output.\nMode: ' + linuxInstallModeLabel(normalizeLinuxInstallMode(state.linuxInstallMode)) + '.');
+          : 'Install auto-builds latest output, then installs AppDir to ~/.local/share with a launcher in ~/.local/bin.';
         renderResult({
           status: 'ok',
           summary: summary,
@@ -3113,8 +3058,6 @@
         state.homeDir = info.home || '';
         state.tools = info;
         syncToolchainUI();
-        syncLinuxInstallSettingsUI();
-
         if (info.root) {
           setWorkspaceRoot(info.root);
         } else if (state.rootHint) {
@@ -3341,11 +3284,15 @@
 
         if (kind === 'run') {
           var hostTarget = hostTargetId();
-          if (!hostTarget || !hasEnabledHostRunTarget(selected)) {
-            throw new Error('Enable the ' + (state.os === 'darwin' ? 'macOS' : 'Linux') + ' target to run this project on the current platform.');
+          if (hostTarget && hasEnabledHostRunTarget(selected)) {
+            await runWorkspaceItem(selected);
+            return;
           }
-          await runWorkspaceItem(selected);
-          return;
+          if (hasEnabledHostedWebTarget(selected)) {
+            await runTargetAction(selected, 'hosted-web');
+            return;
+          }
+          throw new Error('Enable either Hosted Web or the current desktop target to run this project.');
         }
 
         if (kind === 'build') {
@@ -3364,7 +3311,7 @@
             return;
           }
 
-          var run = await backend('run-workspace', [selected.path, selected.context, workspaceRunModeForItem(selected)]);
+          var run = await backend('run-workspace', [selected.path, selected.context]);
           var runOut = kv(run.stdout || '');
           setTargetRuntime(projectKey, nativeTarget, 'ready', runOut.entry || selected.path || '');
           renderSelectedTargetsEditor(selectedCatalogItem());
@@ -3447,42 +3394,33 @@
         }
 
         if (kind === 'run') {
-          if (!enabledTargets[nativeTarget]) {
-            throw new Error('Enable the ' + (nativeTarget === 'macos' ? 'macOS' : 'Linux') + ' target to run this app on the current platform.');
-          }
-          var desktopBuild = await backend('build-desktop', [app.id]);
-          var desktopBuildOut = kv(desktopBuild.stdout || '');
-          setTargetRuntime(
-            projectKey,
-            nativeTarget,
-            'built',
-            desktopBuildOut.artifact || desktopBuildOut.zip || desktopBuildOut.host || ''
-          );
-          var runModeRequest = 'bundle';
-          var run = await backend('run-desktop', [app.id, runModeRequest]);
-          var runOut = kv(run.stdout || '');
-          var runMode = runOut.mode || 'bundle';
-          var runSummary = runMode === 'bundle'
-            ? app.title + ' built and launched from the compiled desktop app bundle.'
-            : app.title + ' launched in native host.';
+          if (enabledTargets[nativeTarget]) {
+            var run = await backend('run-desktop', [app.id]);
+            var runOut = kv(run.stdout || '');
 
-          renderResult({
-            status: 'ok',
-            summary: runSummary,
-            paths: [
-              runOut.artifact ? { label: 'Launched app bundle', path: runOut.artifact, canReveal: true } : null,
-              runOut.entry ? { label: 'App source folder', path: runOut.entry, canReveal: true } : null,
-              runOut.log ? { label: 'Launch log', path: runOut.log, canReveal: true } : null
-            ].filter(Boolean),
-            help: {
-              title: 'Launch details',
-              body: 'Mode: ' + runMode + '\nPID: ' + (runOut.pid || '(managed by OS)') + '\nRun builds and launches the native desktop executable for this platform.'
-            }
-          });
-          setTargetRuntime(projectKey, nativeTarget, 'running', runOut.artifact || runOut.entry || '');
-          setTargetRuntime(projectKey, 'hosted-web', 'ready', runOut.entry || '');
-          renderSelectedTargetsEditor(selectedCatalogItem());
-          return;
+            renderResult({
+              status: 'ok',
+              summary: app.title + ' built and launched from the compiled desktop app bundle.',
+              paths: [
+                runOut.artifact ? { label: 'Launched app bundle', path: runOut.artifact, canReveal: true } : null,
+                runOut.entry ? { label: 'App source folder', path: runOut.entry, canReveal: true } : null,
+                runOut.log ? { label: 'Launch log', path: runOut.log, canReveal: true } : null
+              ].filter(Boolean),
+              help: {
+                title: 'Launch details',
+                body: 'PID: ' + (runOut.pid || '(managed by OS)') + '\nRun builds and launches the native desktop executable for this platform.'
+              }
+            });
+            setTargetRuntime(projectKey, nativeTarget, 'running', runOut.artifact || runOut.entry || '');
+            setTargetRuntime(projectKey, 'hosted-web', 'ready', runOut.entry || '');
+            renderSelectedTargetsEditor(selectedCatalogItem());
+            return;
+          }
+          if (enabledTargets['hosted-web']) {
+            await runTargetAction(selected, 'hosted-web');
+            return;
+          }
+          throw new Error('Enable either Hosted Web or the current desktop target to run this app on this platform.');
         }
 
         if (kind === 'stage') {
@@ -4079,15 +4017,6 @@
           });
         }
 
-        if (els.settingsLinuxInstallMode) {
-          els.settingsLinuxInstallMode.addEventListener('change', function () {
-            state.linuxInstallMode = normalizeLinuxInstallMode(els.settingsLinuxInstallMode.value);
-            saveStorage(LINUX_INSTALL_MODE_KEY, state.linuxInstallMode);
-            syncLinuxInstallSettingsUI();
-            toast('Linux install behavior updated', 'ok');
-          });
-        }
-
         if (els.clearLog) {
           els.clearLog.addEventListener('click', function (event) {
             event.preventDefault();
@@ -4484,8 +4413,6 @@
         els.installXcodeClt = document.getElementById('install-xcode-clt');
         els.refreshToolchain = document.getElementById('refresh-toolchain');
         els.toolchainSummary = document.getElementById('toolchain-summary');
-        els.linuxInstallCard = document.getElementById('linux-install-card');
-        els.settingsLinuxInstallMode = document.getElementById('settings-linux-install-mode');
         els.doctor = document.getElementById('doctor');
 
         els.toast = document.getElementById('toast');
@@ -4499,7 +4426,6 @@
           document.body.classList.remove('layout-recovery');
           cacheElements();
           syncToolchainUI();
-          syncLinuxInstallSettingsUI();
           syncLogClearVisibility();
           bindButtons();
           bindKeyboardShortcuts();
