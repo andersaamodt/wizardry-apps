@@ -24,9 +24,40 @@
     return false;
   }
 
+  function execCommand(argv) {
+    return new Promise(function (resolve) {
+      var id = nextId();
+      window.__wizardry_callbacks[id] = function (payload) {
+        resolve(payload || {
+          stdout: '',
+          stderr: '',
+          exit_code: 0,
+          error: null
+        });
+      };
+
+      if (!post({ id: id, command: argv })) {
+        setTimeout(function () {
+          window.__wizardry_callbacks[id]({
+            stdout: '',
+            stderr: 'native bridge unavailable',
+            exit_code: 1,
+            error: null
+          });
+        }, 0);
+      }
+    });
+  }
+
   window.wizardry = {
     rpc: function (method, params) {
       return new Promise(function (resolve, reject) {
+        // Fast path: bridge.exec is served by the desktop command bridge.
+        if (method === 'bridge.exec' && params && Array.isArray(params.argv)) {
+          execCommand(params.argv).then(resolve, reject);
+          return;
+        }
+
         var id = nextId();
         window.__wizardry_callbacks[id] = function (payload) {
           if (payload && payload.error) {
@@ -42,21 +73,6 @@
 
           resolve(payload && payload.result ? payload.result : payload);
         };
-
-        // Compatibility path: existing desktop hosts understand {id, command:[...]}.
-        if (method === 'bridge.exec' && params && Array.isArray(params.argv)) {
-          if (!post({ id: id, command: params.argv })) {
-            setTimeout(function () {
-              window.__wizardry_callbacks[id]({
-                stdout: '',
-                stderr: 'native bridge unavailable',
-                exit_code: 1,
-                error: null
-              });
-            }, 0);
-          }
-          return;
-        }
 
         if (!post({ type: 'rpc', id: id, method: method, params: params || {} })) {
           setTimeout(function () {
@@ -83,9 +99,12 @@
       post({ type: 'unsubscribe', token: token });
     },
 
-    // Legacy convenience API expected by older apps.
+    // Canonical desktop command bridge.
     exec: function (argv) {
-      return this.rpc('bridge.exec', { argv: argv });
+      if (!Array.isArray(argv)) {
+        return Promise.reject(new Error('argv must be an array'));
+      }
+      return execCommand(argv);
     }
   };
 

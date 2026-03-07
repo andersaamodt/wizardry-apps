@@ -578,7 +578,7 @@
       }
 
       function bridgeAvailable() {
-        return !!(window.wizardry && window.wizardry.rpc);
+        return !!(window.wizardry && window.wizardry.exec);
       }
 
       function revealBootUi() {
@@ -634,7 +634,7 @@
           throw new Error('wizardry bridge unavailable; run this app in the native host');
         }
 
-        var result = await window.wizardry.rpc('bridge.exec', { argv: argv });
+        var result = await window.wizardry.exec(argv);
         if (typeof result.exit_code === 'undefined') {
           return result;
         }
