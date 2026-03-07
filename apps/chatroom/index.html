@@ -163,7 +163,7 @@
       const fallbackResult = await window.wizardry.exec([
         'sh',
         '-c',
-        'root="${WIZARDRY_APPS_ROOT:-}"; if [ -z "$root" ]; then if [ -n "${WIZARDRY_DIR:-}" ] && [ -x "$WIZARDRY_DIR/apps/chatroom/scripts/chatroom-backend.sh" ]; then root="$WIZARDRY_DIR"; elif [ -x "$HOME/git/wizardry-apps/apps/chatroom/scripts/chatroom-backend.sh" ]; then root="$HOME/git/wizardry-apps"; fi; fi; [ -n "$root" ] || { printf "chatroom backend root could not be resolved\\n" >&2; exit 1; }; exec sh "$root/apps/chatroom/scripts/chatroom-backend.sh" "$@"',
+        'root="${WIZARDRY_APPS_ROOT:-}"; if [ -z "$root" ]; then if [ -n "${WIZARDRY_DIR:-}" ] && [ -f "$WIZARDRY_DIR/apps/chatroom/scripts/chatroom-backend.sh" ]; then root="$WIZARDRY_DIR"; elif [ -f "$HOME/git/wizardry-apps/apps/chatroom/scripts/chatroom-backend.sh" ]; then root="$HOME/git/wizardry-apps"; fi; fi; [ -n "$root" ] || { printf "chatroom backend root could not be resolved\\n" >&2; exit 1; }; exec sh "$root/apps/chatroom/scripts/chatroom-backend.sh" "$@"',
         'chatroom-backend',
         action
       ].concat(args));
