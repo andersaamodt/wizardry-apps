@@ -105,6 +105,18 @@ set_workspace_web_only_out=$("$backend" set-workspace-targets "$scratch" "$works
 printf '%s\n' "$set_workspace_web_only_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
 grep -F "targets=hosted-web" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 
+icon_payload='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+8X8AAAAASUVORK5CYII='
+set_workspace_icon_out=$("$backend" set-workspace-icon "$scratch" "$workspaces_root/workspace-web" "$icon_payload")
+printf '%s\n' "$set_workspace_icon_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
+[ -s "$workspaces_root/workspace-web/assets/forge-icon.png" ]
+[ -s "$workspaces_root/workspace-web/app/assets/forge-icon.png" ]
+cmp "$workspaces_root/workspace-web/assets/forge-icon.png" "$workspaces_root/workspace-web/app/assets/forge-icon.png" >/dev/null
+
+clear_workspace_icon_out=$("$backend" set-workspace-icon "$scratch" "$workspaces_root/workspace-web" "")
+printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
+[ ! -f "$workspaces_root/workspace-web/assets/forge-icon.png" ]
+[ ! -f "$workspaces_root/workspace-web/app/assets/forge-icon.png" ]
+
 run_workspace_web=$("$backend" run-workspace "$scratch" "$workspaces_root/workspace-web" web)
 printf '%s\n' "$run_workspace_web" | grep -F "mode=python-http" >/dev/null
 printf '%s\n' "$run_workspace_web" | grep -F "entry=$workspaces_root/workspace-web/app" >/dev/null

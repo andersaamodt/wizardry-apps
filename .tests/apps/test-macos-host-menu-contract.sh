@@ -12,5 +12,7 @@ grep -F "Hide Others" "$host" >/dev/null
 grep -F "Close Window" "$host" >/dev/null
 grep -F "setMainMenu" "$host" >/dev/null
 grep -F "activateIgnoringOtherApps" "$host" >/dev/null
+grep -F "isNestedWorkspaceApp" "$host" >/dev/null
+grep -F "prefer the workspace-level icon" "$host" >/dev/null
 
 printf '%s\n' "macOS host menu contract tests passed"

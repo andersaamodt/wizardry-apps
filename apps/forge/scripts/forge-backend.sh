@@ -1643,6 +1643,12 @@ cmd_set_workspace_icon() {
   }
 
   write_project_icon_from_data_url "$workspace_path" "$data_url"
+  workspace_app_dir="$workspace_path/app"
+  if [ -f "$workspace_app_dir/index.html" ]; then
+    # Keep workspace root and nested app icon assets synchronized so runtime,
+    # splash, and bundle icon resolution cannot diverge.
+    write_project_icon_from_data_url "$workspace_app_dir" "$data_url" >/dev/null
+  fi
   printf 'workspace=%s\n' "$workspace_path"
 }
 

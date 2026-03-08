@@ -641,8 +641,10 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     }
     
     // Get app name from directory
-    NSString *appComponent = [self.appPath lastPathComponent];
-    if ([[appComponent lowercaseString] isEqualToString:@"app"]) {
+    NSString *appLeafComponent = [self.appPath lastPathComponent];
+    BOOL isNestedWorkspaceApp = [[appLeafComponent lowercaseString] isEqualToString:@"app"];
+    NSString *appComponent = appLeafComponent;
+    if (isNestedWorkspaceApp) {
         NSString *parent = [[self.appPath stringByDeletingLastPathComponent] lastPathComponent];
         if (parent.length > 0) {
             appComponent = parent;
@@ -671,12 +673,17 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     }
 
     [self setupMainMenuWithAppName:appName];
-    NSString *resolvedIconPath = customIconPath;
-    if (![[NSFileManager defaultManager] fileExistsAtPath:resolvedIconPath] &&
-        [[NSFileManager defaultManager] fileExistsAtPath:parentIconPath]) {
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *resolvedIconPath = nil;
+    if (isNestedWorkspaceApp && [fileManager fileExistsAtPath:parentIconPath]) {
+        // For workspace apps launched from .../app, prefer the workspace-level icon.
+        resolvedIconPath = parentIconPath;
+    } else if ([fileManager fileExistsAtPath:customIconPath]) {
+        resolvedIconPath = customIconPath;
+    } else if ([fileManager fileExistsAtPath:parentIconPath]) {
         resolvedIconPath = parentIconPath;
     }
-    if ([[NSFileManager defaultManager] fileExistsAtPath:resolvedIconPath]) {
+    if (resolvedIconPath && [fileManager fileExistsAtPath:resolvedIconPath]) {
         NSImage *iconImage = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
         if (iconImage) {
             self.appIconImage = iconImage;
