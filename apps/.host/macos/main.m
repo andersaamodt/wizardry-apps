@@ -653,7 +653,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     NSString *appSlug = [appComponent lowercaseString];
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
-    BOOL prefersHeaderDragHoles = ([appSlug isEqualToString:@"headquarters"] || [appSlug isEqualToString:@"priorities"]);
+    BOOL prefersHeaderDragHoles = ([appSlug isEqualToString:@"headquarters"] || [appSlug isEqualToString:@"priorities"] || [appSlug isEqualToString:@"serenity"]);
     BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
@@ -846,6 +846,10 @@ completionHandler:(void (^)(BOOL result))completionHandler {
             self.prioritiesTitleHoleLeftWidth = 240.0;
             self.prioritiesTitleHoleRightWidth = 240.0;
             self.prioritiesRightControlsReservedWidth = 200.0;
+        } else if ([appSlug isEqualToString:@"serenity"]) {
+            self.prioritiesTitleHoleLeftWidth = 420.0;
+            self.prioritiesTitleHoleRightWidth = 24.0;
+            self.prioritiesRightControlsReservedWidth = 320.0;
         } else {
             self.prioritiesTitleHoleLeftWidth = 36.0;
             self.prioritiesTitleHoleRightWidth = 10.0;
