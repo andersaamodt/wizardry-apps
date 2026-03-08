@@ -1,9 +1,10 @@
 // Wizardry Desktop Host - macOS native WebView wrapper
 // Minimal Objective-C implementation using Cocoa + WebKit
-// Build: clang -O2 -fobjc-arc -fmodules main.m -o wizardry-host -framework Cocoa -framework WebKit
+// Build: clang -O2 -fobjc-arc -fmodules main.m -o wizardry-host -framework Cocoa -framework WebKit -framework Carbon
 
 @import Cocoa;
 @import WebKit;
+@import Carbon;
 
 @interface WizardryDragStripView : NSView
 @end
@@ -44,7 +45,29 @@
 @property (assign) CGFloat prioritiesTitleHoleLeftWidth;
 @property (assign) CGFloat prioritiesTitleHoleRightWidth;
 @property (assign) CGFloat prioritiesRightControlsReservedWidth;
+@property (assign) EventHotKeyRef favoriteTrackHotKeyRef;
+@property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
+- (void)emitGlobalFavoriteTrackHotkey;
 @end
+
+static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, EventRef event, void *userData) {
+    (void)nextHandler;
+    if (!userData) return noErr;
+    AppDelegate *delegate = (__bridge AppDelegate *)userData;
+    EventHotKeyID hotKeyID;
+    OSStatus status = GetEventParameter(event,
+                                        kEventParamDirectObject,
+                                        typeEventHotKeyID,
+                                        NULL,
+                                        sizeof(hotKeyID),
+                                        NULL,
+                                        &hotKeyID);
+    if (status != noErr) return status;
+    if (hotKeyID.signature == 'WSHK' && hotKeyID.id == 1) {
+        [delegate emitGlobalFavoriteTrackHotkey];
+    }
+    return noErr;
+}
 
 @implementation AppDelegate
 
@@ -199,6 +222,126 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                                                                  dragStripHeight)];
         [self.prioritiesRightHeaderDragStrip setHidden:(rightStripWidth <= 0.0)];
     }
+}
+
+- (void)emitGlobalFavoriteTrackHotkey {
+    if (!self.webView) return;
+    NSString *js = @"if (window.__serenity_on_global_favorite_hotkey) { window.__serenity_on_global_favorite_hotkey(); } "
+                   @"if (window.__wizardry_emit) { window.__wizardry_emit('host.global_hotkey', { id: 'serenity.favoriteTrack' }); }";
+    [self.webView evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
+        (void)result;
+        if (error) {
+            NSLog(@"Global hotkey emit error: %@", error);
+        }
+    }];
+}
+
+- (void)clearFavoriteTrackHotkeyRegistration {
+    if (self.favoriteTrackHotKeyRef) {
+        UnregisterEventHotKey(self.favoriteTrackHotKeyRef);
+        self.favoriteTrackHotKeyRef = NULL;
+    }
+}
+
+- (BOOL)registerFavoriteTrackHotkey:(NSString *)hotkey errorMessage:(NSString **)errorMessage {
+    [self clearFavoriteTrackHotkeyRegistration];
+    NSString *trimmed = [[NSString stringWithString:(hotkey ?: @"")] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) {
+        return YES;
+    }
+
+    if (!self.favoriteTrackHotKeyHandlerRef) {
+        EventTypeSpec eventType;
+        eventType.eventClass = kEventClassKeyboard;
+        eventType.eventKind = kEventHotKeyPressed;
+        OSStatus installStatus = InstallEventHandler(GetApplicationEventTarget(),
+                                                     WizardryHandleGlobalHotKey,
+                                                     1,
+                                                     &eventType,
+                                                     (__bridge void *)self,
+                                                     &_favoriteTrackHotKeyHandlerRef);
+        if (installStatus != noErr) {
+            if (errorMessage) {
+                *errorMessage = [NSString stringWithFormat:@"InstallEventHandler failed (%d)", (int)installStatus];
+            }
+            return NO;
+        }
+    }
+
+    NSMutableArray<NSString *> *tokens = [NSMutableArray array];
+    for (NSString *part in [trimmed componentsSeparatedByString:@"+"]) {
+        NSString *token = [[part stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] uppercaseString];
+        if (token.length) [tokens addObject:token];
+    }
+    if (tokens.count == 0) {
+        if (errorMessage) *errorMessage = @"Hotkey is empty";
+        return NO;
+    }
+
+    static NSDictionary<NSString *, NSNumber *> *keyMap;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        keyMap = @{
+            @"A": @0, @"S": @1, @"D": @2, @"F": @3, @"H": @4, @"G": @5, @"Z": @6, @"X": @7, @"C": @8, @"V": @9, @"B": @11,
+            @"Q": @12, @"W": @13, @"E": @14, @"R": @15, @"Y": @16, @"T": @17,
+            @"1": @18, @"2": @19, @"3": @20, @"4": @21, @"6": @22, @"5": @23, @"=": @24, @"9": @25, @"7": @26, @"-": @27, @"8": @28, @"0": @29,
+            @"]": @30, @"O": @31, @"U": @32, @"[": @33, @"I": @34, @"P": @35, @"ENTER": @36, @"RETURN": @36,
+            @"L": @37, @"J": @38, @"'": @39, @"K": @40, @";": @41, @"\\": @42, @",": @43, @"/": @44, @"N": @45, @"M": @46, @".": @47,
+            @"TAB": @48, @"SPACE": @49, @"`": @50, @"BACKSPACE": @51, @"DELETE": @51, @"ESCAPE": @53, @"ESC": @53,
+            @"F1": @122, @"F2": @120, @"F3": @99, @"F4": @118, @"F5": @96, @"F6": @97, @"F7": @98, @"F8": @100, @"F9": @101, @"F10": @109, @"F11": @103, @"F12": @111
+        };
+    });
+
+    UInt32 modifiers = 0;
+    NSString *keyToken = @"";
+    for (NSString *token in tokens) {
+        if ([token isEqualToString:@"CMD"] || [token isEqualToString:@"COMMAND"] || [token isEqualToString:@"META"]) {
+            modifiers |= cmdKey;
+            continue;
+        }
+        if ([token isEqualToString:@"CTRL"] || [token isEqualToString:@"CONTROL"]) {
+            modifiers |= controlKey;
+            continue;
+        }
+        if ([token isEqualToString:@"ALT"] || [token isEqualToString:@"OPTION"] || [token isEqualToString:@"OPT"]) {
+            modifiers |= optionKey;
+            continue;
+        }
+        if ([token isEqualToString:@"SHIFT"]) {
+            modifiers |= shiftKey;
+            continue;
+        }
+        keyToken = token;
+    }
+
+    if (modifiers == 0 || keyToken.length == 0) {
+        if (errorMessage) *errorMessage = @"Hotkey must include at least one modifier and one key";
+        return NO;
+    }
+
+    NSNumber *keyCodeNumber = keyMap[keyToken];
+    if (!keyCodeNumber) {
+        if (errorMessage) *errorMessage = [NSString stringWithFormat:@"Unsupported hotkey key '%@'", keyToken];
+        return NO;
+    }
+
+    EventHotKeyID hotKeyID;
+    hotKeyID.signature = 'WSHK';
+    hotKeyID.id = 1;
+    OSStatus registerStatus = RegisterEventHotKey((UInt32)[keyCodeNumber unsignedIntValue],
+                                                  modifiers,
+                                                  hotKeyID,
+                                                  GetApplicationEventTarget(),
+                                                  0,
+                                                  &_favoriteTrackHotKeyRef);
+    if (registerStatus != noErr) {
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithFormat:@"RegisterEventHotKey failed (%d)", (int)registerStatus];
+        }
+        return NO;
+    }
+
+    return YES;
 }
 
 - (NSString *)readConfigValueForKey:(NSString *)key fromFile:(NSString *)filePath {
@@ -1144,6 +1287,23 @@ completionHandler:(void (^)(BOOL result))completionHandler {
             return;
         }
 
+        if ([program isEqualToString:@"__wizardry_host_set_global_hotkey"]) {
+            NSString *hotkey = @"";
+            if (args.count >= 1) {
+                hotkey = [NSString stringWithString:[NSString stringWithFormat:@"%@", args[0]]];
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *errorMessage = nil;
+                BOOL ok = [self registerFavoriteTrackHotkey:hotkey errorMessage:&errorMessage];
+                if (!ok) {
+                    [self sendResult:messageIdCopy stdout:@"" stderr:(errorMessage ?: @"hotkey registration failed") exitCode:1 error:nil];
+                    return;
+                }
+                [self sendResult:messageIdCopy stdout:hotkey stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
         NSTask *task = [[NSTask alloc] init];
         task.launchPath = @"/usr/bin/env";
 
@@ -1226,6 +1386,15 @@ completionHandler:(void (^)(BOOL result))completionHandler {
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     return YES;
+}
+
+- (void)applicationWillTerminate:(NSNotification *)notification {
+    (void)notification;
+    [self clearFavoriteTrackHotkeyRegistration];
+    if (self.favoriteTrackHotKeyHandlerRef) {
+        RemoveEventHandler(self.favoriteTrackHotKeyHandlerRef);
+        self.favoriteTrackHotKeyHandlerRef = NULL;
+    }
 }
 
 @end
