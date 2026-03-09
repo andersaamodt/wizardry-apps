@@ -1735,6 +1735,10 @@ APP
           icon_name="forge-${icon_hash}.icns"
           if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
             icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
+          else
+            icon_name="forge-icon-${icon_hash}.png"
+            cp "$app_dir/assets/forge-icon.png" "$bundle/Contents/Resources/$icon_name"
+            icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
           fi
           rm -rf "$iconset"
         elif [ -f "$app_dir/assets/forge-icon.png" ]; then
@@ -2253,6 +2257,10 @@ APP
       done
       icon_name="forge-${icon_hash}.icns"
       if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
+        icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
+      else
+        icon_name="forge-icon-${icon_hash}.png"
+        cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
         icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
       fi
       rm -rf "$iconset"

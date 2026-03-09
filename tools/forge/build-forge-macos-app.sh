@@ -258,7 +258,13 @@ icon_key=''
 if [ -x "$root/tools/forge/build-forge-icon" ]; then
   if "$root/tools/forge/build-forge-icon" --root "$root" --out "$resources_dir/forge.icns" >/dev/null 2>&1; then
     icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
+  elif [ -f "$root/apps/forge/assets/forge-icon.png" ]; then
+    cp "$root/apps/forge/assets/forge-icon.png" "$resources_dir/forge-icon.png"
+    icon_key='<key>CFBundleIconFile</key><string>forge-icon.png</string>'
   fi
+elif [ -f "$root/apps/forge/assets/forge-icon.png" ]; then
+  cp "$root/apps/forge/assets/forge-icon.png" "$resources_dir/forge-icon.png"
+  icon_key='<key>CFBundleIconFile</key><string>forge-icon.png</string>'
 fi
 
 cat > "$plist" <<PLIST
