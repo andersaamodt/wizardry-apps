@@ -445,6 +445,26 @@ forge_catalog_templates_dir() {
   printf '%s\n' "$(forge_catalog_root)/templates"
 }
 
+forge_catalog_icon_overrides_dir() {
+  printf '%s\n' "$(forge_catalog_root)/icon-overrides/apps"
+}
+
+app_icon_override_path() {
+  slug=$1
+  printf '%s\n' "$(forge_catalog_icon_overrides_dir)/$slug/forge-icon.png"
+}
+
+apply_optional_app_icon_override_if_present() {
+  slug=$1
+  dest_dir=$2
+  override_icon=$(app_icon_override_path "$slug")
+  if [ -f "$override_icon" ]; then
+    mkdir -p "$dest_dir/assets"
+    cp "$override_icon" "$dest_dir/assets/forge-icon.png"
+    rm -f "$dest_dir/assets/forge.icns"
+  fi
+}
+
 manifest_app_exists() {
   root=$1
   slug=$2
@@ -669,6 +689,7 @@ download_into_cache() {
   subdir=$3
   dest_dir=$4
   lock_file=$5
+  slug=${6-}
 
   require_tool git
   tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/forge-catalog.XXXXXX")
@@ -693,6 +714,9 @@ download_into_cache() {
   rm -rf "$dest_dir"
   mkdir -p "$(dirname "$dest_dir")"
   cp -R "$src_dir" "$dest_dir"
+  if [ -n "$slug" ]; then
+    apply_optional_app_icon_override_if_present "$slug" "$dest_dir"
+  fi
   write_source_lock "$lock_file" "$repo" "$ref" "$subdir" "$commit"
 
   rm -rf "$tmp_dir"
@@ -776,7 +800,7 @@ maybe_refresh_optional_app_cache() {
 
   lock_file="$dest_dir/.forge-source.lock"
   if [ ! -f "$lock_file" ]; then
-    download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file"
+    download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file" "$slug"
     return 0
   fi
 
@@ -791,7 +815,7 @@ maybe_refresh_optional_app_cache() {
   fi
 
   if [ "$locked_repo" != "$repo" ] || [ "$locked_ref" != "$ref" ] || [ "$locked_subdir" != "$subdir" ] || [ "$locked_commit" != "$current_commit" ]; then
-    download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file"
+    download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file" "$slug"
   fi
 }
 
@@ -1231,7 +1255,7 @@ cmd_download_app() {
 
   dest_dir=$(app_cache_dir "$slug")
   lock_file="$dest_dir/.forge-source.lock"
-  download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file"
+  download_into_cache "$repo" "$ref" "$subdir" "$dest_dir" "$lock_file" "$slug"
   printf 'slug=%s\n' "$slug"
   printf 'downloaded=%s\n' "$dest_dir"
   printf 'lock=%s\n' "$lock_file"
@@ -1623,8 +1647,26 @@ cmd_set_app_icon() {
     exit 1
   }
   app_dir=$(resolve_app_dir_or_error "$root" "$slug")
+  distribution=$(app_distribution "$root" "$slug")
+  override_icon=''
+  if [ "$distribution" = "optional" ]; then
+    override_icon=$(app_icon_override_path "$slug")
+  fi
+
+  if [ "$distribution" = "optional" ] && [ -z "${data_url-}" ]; then
+    rm -f "$override_icon"
+    cmd_download_app "$root" "$slug" >/dev/null
+    printf 'icon=%s\n' "$override_icon"
+    printf 'status=cleared\n'
+    printf 'slug=%s\n' "$slug"
+    return 0
+  fi
 
   write_project_icon_from_data_url "$app_dir" "$data_url"
+  if [ "$distribution" = "optional" ] && [ -n "$override_icon" ] && [ -f "$app_dir/assets/forge-icon.png" ]; then
+    mkdir -p "$(dirname "$override_icon")"
+    cp "$app_dir/assets/forge-icon.png" "$override_icon"
+  fi
   printf 'slug=%s\n' "$slug"
 }
 

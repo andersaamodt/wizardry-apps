@@ -2465,8 +2465,8 @@
                 resolve(String(reader.result || ''));
                 return;
               }
-              // Keep icon fidelity high while respecting backend argv limits.
-              var maxArgChars = 180000;
+              // Keep icon fidelity high while staying below practical argv limits.
+              var maxArgChars = 240000;
               var sizes = [1024, 768, 640, 512, 384, 256, 192, 128, 96];
               var output = '';
 
