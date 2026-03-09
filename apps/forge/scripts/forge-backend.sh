@@ -1717,8 +1717,7 @@ exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardr
 APP
         chmod +x "$bundle/Contents/MacOS/$slug"
 
-        icon_keys=''
-        icon_name=''
+        icon_key=''
         icon_hash=''
         if [ -f "$app_dir/assets/forge-icon.png" ]; then
           icon_hash=$(hash_path_sha256 "$app_dir/assets/forge-icon.png")
@@ -1735,17 +1734,17 @@ APP
           done
           icon_name="forge-${icon_hash}.icns"
           if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
-            icon_keys="<key>CFBundleIconFile</key><string>$icon_name</string><key>CFBundleIconName</key><string>${icon_name%.icns}</string>"
+            icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
           fi
           rm -rf "$iconset"
         elif [ -f "$app_dir/assets/forge-icon.png" ]; then
           icon_name="forge-icon-${icon_hash}.png"
           cp "$app_dir/assets/forge-icon.png" "$bundle/Contents/Resources/$icon_name"
-          icon_keys="<key>CFBundleIconFile</key><string>$icon_name</string><key>CFBundleIconName</key><string>${icon_name%.png}</string>"
+          icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
         elif [ -f "$app_dir/assets/forge.icns" ]; then
           icon_name="forge-${icon_hash}.icns"
           cp "$app_dir/assets/forge.icns" "$bundle/Contents/Resources/$icon_name"
-          icon_keys="<key>CFBundleIconFile</key><string>$icon_name</string><key>CFBundleIconName</key><string>${icon_name%.icns}</string>"
+          icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
         fi
 
         cat > "$bundle/Contents/Info.plist" <<PLIST
@@ -1758,7 +1757,7 @@ APP
 <key>CFBundleVersion</key><string>1.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>$slug</string>
-$icon_keys
+$icon_key
 </dict></plist>
 PLIST
       fi
@@ -2239,8 +2238,7 @@ APP
       icon_source_format='icns'
     fi
 
-    icon_keys=''
-    icon_name=''
+    icon_key=''
     icon_hash=''
     if [ -n "$icon_source" ]; then
       icon_hash=$(hash_path_sha256 "$icon_source")
@@ -2255,17 +2253,17 @@ APP
       done
       icon_name="forge-${icon_hash}.icns"
       if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
-        icon_keys="<key>CFBundleIconFile</key><string>$icon_name</string><key>CFBundleIconName</key><string>${icon_name%.icns}</string>"
+        icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
       fi
       rm -rf "$iconset"
     elif [ "$icon_source_format" = 'png' ]; then
       icon_name="forge-icon-${icon_hash}.png"
       cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
-      icon_keys="<key>CFBundleIconFile</key><string>$icon_name</string><key>CFBundleIconName</key><string>${icon_name%.png}</string>"
+      icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
     elif [ "$icon_source_format" = 'icns' ]; then
       icon_name="forge-${icon_hash}.icns"
       cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
-      icon_keys="<key>CFBundleIconFile</key><string>$icon_name</string><key>CFBundleIconName</key><string>${icon_name%.icns}</string>"
+      icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
     fi
 
     bundle_id="com.wizardry.workspace.$workspace_slug"
@@ -2279,7 +2277,7 @@ APP
 <key>CFBundleVersion</key><string>1.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>$workspace_slug</string>
-$icon_keys
+$icon_key
 </dict></plist>
 PLIST
 

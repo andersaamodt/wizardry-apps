@@ -34,8 +34,15 @@ if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ]; then
     printf '%s\n' "forge backend test: missing Info.plist in forge artifact" >&2
     exit 1
   }
-  /usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$forge_artifact/Contents/Info.plist" >/dev/null
-  /usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$forge_artifact/Contents/Info.plist" >/dev/null
+  forge_icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$forge_artifact/Contents/Info.plist")
+  [ -n "$forge_icon_file" ] || {
+    printf '%s\n' "forge backend test: missing CFBundleIconFile value" >&2
+    exit 1
+  }
+  [ -f "$forge_artifact/Contents/Resources/$forge_icon_file" ] || {
+    printf '%s\n' "forge backend test: icon file referenced by CFBundleIconFile is missing" >&2
+    exit 1
+  }
 fi
 
 apps=$("$backend" list-apps "$test_root")
