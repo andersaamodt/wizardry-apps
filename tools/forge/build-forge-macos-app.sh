@@ -256,15 +256,23 @@ chmod +x "$macos_dir/app-forge"
 
 icon_key=''
 if [ -x "$root/tools/forge/build-forge-icon" ]; then
-  if "$root/tools/forge/build-forge-icon" --root "$root" --out "$resources_dir/forge.icns" >/dev/null 2>&1; then
-    icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
+  built_icon_tmp="$stage_root/forge-icon-built.icns"
+  if "$root/tools/forge/build-forge-icon" --root "$root" --out "$built_icon_tmp" >/dev/null 2>&1; then
+    icon_hash=$(hash_file_sha256 "$built_icon_tmp")
+    icon_name="forge-${icon_hash}.icns"
+    cp "$built_icon_tmp" "$resources_dir/$icon_name"
+    icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
   elif [ -f "$root/apps/forge/assets/forge-icon.png" ]; then
-    cp "$root/apps/forge/assets/forge-icon.png" "$resources_dir/forge-icon.png"
-    icon_key='<key>CFBundleIconFile</key><string>forge-icon.png</string>'
+    icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/forge-icon.png")
+    icon_name="forge-icon-${icon_hash}.png"
+    cp "$root/apps/forge/assets/forge-icon.png" "$resources_dir/$icon_name"
+    icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
   fi
 elif [ -f "$root/apps/forge/assets/forge-icon.png" ]; then
-  cp "$root/apps/forge/assets/forge-icon.png" "$resources_dir/forge-icon.png"
-  icon_key='<key>CFBundleIconFile</key><string>forge-icon.png</string>'
+  icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/forge-icon.png")
+  icon_name="forge-icon-${icon_hash}.png"
+  cp "$root/apps/forge/assets/forge-icon.png" "$resources_dir/$icon_name"
+  icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
 fi
 
 cat > "$plist" <<PLIST
