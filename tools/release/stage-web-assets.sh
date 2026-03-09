@@ -48,4 +48,9 @@ cp -R "$shared_dir"/. "$dest/app/.host/shared/"
 cp -R "$ROOT_DIR/core/include" "$dest/core/include"
 cp -R "$ROOT_DIR/core/src" "$dest/core/src"
 
+if [ ! -f "$dest/app/assets/forge-icon.png" ] && [ -f "$ROOT_DIR/apps/forge/assets/forge-icon.png" ]; then
+  mkdir -p "$dest/app/assets"
+  cp "$ROOT_DIR/apps/forge/assets/forge-icon.png" "$dest/app/assets/forge-icon.png"
+fi
+
 printf '%s\n' "stage-web-assets: staged $slug -> $dest"

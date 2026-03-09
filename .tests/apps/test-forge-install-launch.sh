@@ -60,7 +60,9 @@ case "$os" in
     [ -x "$app_bundle/Contents/MacOS/app-forge" ]
     [ -f "$app_bundle/Contents/Info.plist" ]
     grep -F "<key>CFBundleIconFile</key>" "$app_bundle/Contents/Info.plist" >/dev/null
-    [ -f "$app_bundle/Contents/Resources/forge.icns" ]
+    app_icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app_bundle/Contents/Info.plist")
+    [ -n "$app_icon_file" ]
+    [ -f "$app_bundle/Contents/Resources/$app_icon_file" ]
     [ -f "$app_bundle/Contents/Resources/.host/shared/wizardry-bridge.js" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-build-input.sha256" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-apps-root.txt" ]

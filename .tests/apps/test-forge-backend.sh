@@ -77,10 +77,13 @@ cp "$test_root/config/apps.manifest.json" "$scratch/config/apps.manifest.json"
 cp "$test_root/config/templates.manifest.json" "$scratch/config/templates.manifest.json"
 cp -R "$test_root/web/demo" "$scratch/web/demo"
 cp -R "$test_root/web/.themes" "$scratch/web/.themes"
+mkdir -p "$scratch/apps/forge/assets"
+cp "$test_root/apps/forge/assets/forge-icon.png" "$scratch/apps/forge/assets/forge-icon.png"
 
 "$backend" scaffold-app "$scratch" sandbox-tool "Sandbox Tool" minimal >/tmp/forge-scaffold-app.log
 [ -f "$scratch/apps/sandbox-tool/index.html" ]
 [ -f "$scratch/apps/sandbox-tool/style.css" ]
+[ -f "$scratch/apps/sandbox-tool/assets/forge-icon.png" ]
 
 jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false)' "$scratch/config/apps.manifest.json" >/dev/null
 
@@ -99,6 +102,8 @@ workspace_web_out=$("$backend" scaffold-workspace "$scratch" workspace-web "Work
 printf '%s\n' "$workspace_web_out" | grep -F "created=$workspaces_root/workspace-web" >/dev/null
 [ -f "$workspaces_root/workspace-web/wizardry.workspace.conf" ]
 [ -f "$workspaces_root/workspace-web/app/index.html" ]
+[ -f "$workspaces_root/workspace-web/assets/forge-icon.png" ]
+[ -f "$workspaces_root/workspace-web/app/assets/forge-icon.png" ]
 grep -F "development_context=web" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 grep -F "project_type=application" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 grep -F "targets=hosted-web,macos,linux" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null

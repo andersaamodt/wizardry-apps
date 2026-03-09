@@ -324,6 +324,7 @@ desktop_build_input_hash() {
     printf 'manifest=%s\n' "$(hash_path_sha256 "$root/config/apps.manifest.json")"
     printf 'host=%s\n' "$(hash_path_sha256 "$host_src")"
     printf 'app=%s\n' "$(hash_path_sha256 "$app_dir")"
+    printf 'app_icon_override=%s\n' "$(hash_path_sha256 "$(app_icon_override_path "$slug")")"
     printf 'shared=%s\n' "$(hash_path_sha256 "$root/apps/.host/shared")"
     printf 'core_include=%s\n' "$(hash_path_sha256 "$root/core/include")"
     printf 'core_src=%s\n' "$(hash_path_sha256 "$root/core/src")"
@@ -452,6 +453,11 @@ forge_catalog_icon_overrides_dir() {
 app_icon_override_path() {
   slug=$1
   printf '%s\n' "$(forge_catalog_icon_overrides_dir)/$slug/forge-icon.png"
+}
+
+default_forge_icon_path() {
+  root=$1
+  printf '%s\n' "$root/apps/forge/assets/forge-icon.png"
 }
 
 apply_optional_app_icon_override_if_present() {
@@ -1759,37 +1765,52 @@ exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardr
 APP
         chmod +x "$bundle/Contents/MacOS/$slug"
 
+        icon_source=''
+        icon_source_format=''
+        icon_override=$(app_icon_override_path "$slug")
+        if [ -f "$icon_override" ]; then
+          icon_source="$icon_override"
+          icon_source_format='png'
+        elif [ -f "$app_dir/assets/forge-icon.png" ]; then
+          icon_source="$app_dir/assets/forge-icon.png"
+          icon_source_format='png'
+        elif [ -f "$app_dir/assets/forge.icns" ]; then
+          icon_source="$app_dir/assets/forge.icns"
+          icon_source_format='icns'
+        elif [ -f "$(default_forge_icon_path "$root")" ]; then
+          icon_source=$(default_forge_icon_path "$root")
+          icon_source_format='png'
+        fi
+
         icon_key=''
         icon_hash=''
-        if [ -f "$app_dir/assets/forge-icon.png" ]; then
-          icon_hash=$(hash_path_sha256 "$app_dir/assets/forge-icon.png")
-        elif [ -f "$app_dir/assets/forge.icns" ]; then
-          icon_hash=$(hash_path_sha256 "$app_dir/assets/forge.icns")
+        if [ -n "$icon_source" ]; then
+          icon_hash=$(hash_path_sha256 "$icon_source")
         fi
-        if [ -f "$app_dir/assets/forge-icon.png" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+        if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
           iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-iconset.XXXXXX")
           iconset="${iconset_tmp}.iconset"
           mv "$iconset_tmp" "$iconset"
           for size in 16 32 128 256 512; do
-            sips -z "$size" "$size" "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-            sips -z $((size * 2)) $((size * 2)) "$app_dir/assets/forge-icon.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+            sips -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+            sips -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
           done
           icon_name="forge-${icon_hash}.icns"
           if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
             icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
           else
             icon_name="forge-icon-${icon_hash}.png"
-            cp "$app_dir/assets/forge-icon.png" "$bundle/Contents/Resources/$icon_name"
+            cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
             icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
           fi
           rm -rf "$iconset"
-        elif [ -f "$app_dir/assets/forge-icon.png" ]; then
+        elif [ "$icon_source_format" = 'png' ]; then
           icon_name="forge-icon-${icon_hash}.png"
-          cp "$app_dir/assets/forge-icon.png" "$bundle/Contents/Resources/$icon_name"
+          cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
           icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
-        elif [ -f "$app_dir/assets/forge.icns" ]; then
+        elif [ "$icon_source_format" = 'icns' ]; then
           icon_name="forge-${icon_hash}.icns"
-          cp "$app_dir/assets/forge.icns" "$bundle/Contents/Resources/$icon_name"
+          cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
           icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
         fi
 
@@ -1852,6 +1873,19 @@ PLIST
         mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
 
         copy_tree_for_bundle "$app_dir" "$appdir/usr/share/$slug/"
+        icon_override=$(app_icon_override_path "$slug")
+        linux_icon_source=''
+        if [ -f "$icon_override" ]; then
+          linux_icon_source="$icon_override"
+        elif [ -f "$app_dir/assets/forge-icon.png" ]; then
+          linux_icon_source="$app_dir/assets/forge-icon.png"
+        elif [ -f "$(default_forge_icon_path "$root")" ]; then
+          linux_icon_source=$(default_forge_icon_path "$root")
+        fi
+        if [ -n "$linux_icon_source" ]; then
+          mkdir -p "$appdir/usr/share/$slug/assets"
+          cp "$linux_icon_source" "$appdir/usr/share/$slug/assets/forge-icon.png"
+        fi
         mkdir -p "$appdir/usr/share/$slug/.host"
         cp -R "$root/apps/.host/shared" "$appdir/usr/share/$slug/.host/"
         cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
@@ -2282,6 +2316,9 @@ APP
     elif [ -f "$app_dir/assets/forge.icns" ]; then
       icon_source="$app_dir/assets/forge.icns"
       icon_source_format='icns'
+    elif [ -f "$(default_forge_icon_path "$root")" ]; then
+      icon_source=$(default_forge_icon_path "$root")
+      icon_source_format='png'
     fi
 
     icon_key=''
@@ -2349,6 +2386,18 @@ PLIST
     mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$bundle_slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
 
     copy_tree_for_bundle "$workspace_path" "$appdir/usr/share/$bundle_slug/"
+    linux_ws_icon_source=''
+    if [ -f "$workspace_path/assets/forge-icon.png" ]; then
+      linux_ws_icon_source="$workspace_path/assets/forge-icon.png"
+    elif [ -f "$app_dir/assets/forge-icon.png" ]; then
+      linux_ws_icon_source="$app_dir/assets/forge-icon.png"
+    elif [ -f "$(default_forge_icon_path "$root")" ]; then
+      linux_ws_icon_source=$(default_forge_icon_path "$root")
+    fi
+    if [ -n "$linux_ws_icon_source" ]; then
+      mkdir -p "$appdir/usr/share/$bundle_slug/assets"
+      cp "$linux_ws_icon_source" "$appdir/usr/share/$bundle_slug/assets/forge-icon.png"
+    fi
     mkdir -p "$appdir/usr/share/$bundle_slug/.host"
     cp -R "$root/apps/.host/shared" "$appdir/usr/share/$bundle_slug/.host/"
     cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
@@ -2862,6 +2911,17 @@ pre {
 CSS
 }
 
+ensure_project_default_icon() {
+  root=$1
+  project_dir=$2
+  icon_path="$project_dir/assets/forge-icon.png"
+  [ -f "$icon_path" ] && return 0
+  default_icon=$(default_forge_icon_path "$root")
+  [ -f "$default_icon" ] || return 0
+  mkdir -p "$project_dir/assets"
+  cp "$default_icon" "$icon_path"
+}
+
 append_manifest_app() {
   root=$1
   slug=$2
@@ -2950,6 +3010,8 @@ cmd_scaffold_app() {
       ;;
   esac
 
+  ensure_project_default_icon "$root" "$app_dir"
+
   append_manifest_app "$root" "$slug" "$app_name"
 
   printf 'created=%s\n' "$app_dir"
@@ -3036,6 +3098,9 @@ cmd_scaffold_workspace() {
           cp -R "$source_dir"/. "$app_dir/"
           ;;
       esac
+
+      ensure_project_default_icon "$root" "$workspace_dir"
+      ensure_project_default_icon "$root" "$app_dir"
 
       cat > "$workspace_dir/README.md" <<README
 # $app_name
