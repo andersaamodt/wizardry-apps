@@ -254,10 +254,10 @@ exec "$APPDIR/MacOS/wizardry-host" "$APP_ENTRY"
 APP
 chmod +x "$macos_dir/app-forge"
 
-icon_key=''
+icon_keys=''
 if [ -x "$root/tools/forge/build-forge-icon" ]; then
   if "$root/tools/forge/build-forge-icon" --root "$root" --out "$resources_dir/forge.icns" >/dev/null 2>&1; then
-    icon_key='<key>CFBundleIconFile</key><string>forge.icns</string>'
+    icon_keys='<key>CFBundleIconFile</key><string>forge.icns</string><key>CFBundleIconName</key><string>forge</string>'
   fi
 fi
 
@@ -271,7 +271,7 @@ cat > "$plist" <<PLIST
 <key>CFBundleVersion</key><string>1.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>app-forge</string>
-$icon_key
+$icon_keys
 </dict></plist>
 PLIST
 

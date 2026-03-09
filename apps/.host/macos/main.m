@@ -817,20 +817,26 @@ completionHandler:(void (^)(BOOL result))completionHandler {
 
     [self setupMainMenuWithAppName:appName];
     NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSString *resolvedIconPath = nil;
-    if (isNestedWorkspaceApp && [fileManager fileExistsAtPath:parentIconPath]) {
-        // For workspace apps launched from .../app, prefer the workspace-level icon.
-        resolvedIconPath = parentIconPath;
-    } else if ([fileManager fileExistsAtPath:customIconPath]) {
-        resolvedIconPath = customIconPath;
-    } else if ([fileManager fileExistsAtPath:parentIconPath]) {
-        resolvedIconPath = parentIconPath;
-    }
-    if (resolvedIconPath && [fileManager fileExistsAtPath:resolvedIconPath]) {
-        NSImage *iconImage = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
-        if (iconImage) {
-            self.appIconImage = iconImage;
-            [NSApp setApplicationIconImage:self.appIconImage];
+    NSImage *bundleIcon = [NSApp applicationIconImage];
+    if (bundleIcon) {
+        // Prefer the bundle icon so Dock/Finder icon identity stays stable.
+        self.appIconImage = bundleIcon;
+    } else {
+        NSString *resolvedIconPath = nil;
+        if (isNestedWorkspaceApp && [fileManager fileExistsAtPath:parentIconPath]) {
+            // For workspace apps launched from .../app, prefer the workspace-level icon.
+            resolvedIconPath = parentIconPath;
+        } else if ([fileManager fileExistsAtPath:customIconPath]) {
+            resolvedIconPath = customIconPath;
+        } else if ([fileManager fileExistsAtPath:parentIconPath]) {
+            resolvedIconPath = parentIconPath;
+        }
+        if (resolvedIconPath && [fileManager fileExistsAtPath:resolvedIconPath]) {
+            NSImage *iconImage = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
+            if (iconImage) {
+                self.appIconImage = iconImage;
+                [NSApp setApplicationIconImage:self.appIconImage];
+            }
         }
     }
     [NSApp unhide:nil];
