@@ -22,6 +22,22 @@ out=$("$backend" doctor "$test_root")
 printf '%s\n' "$out" | grep -F "root=$test_root" >/dev/null
 printf '%s\n' "$out" | grep -F "os=" >/dev/null
 
+os_name=$(uname -s 2>/dev/null || printf unknown)
+if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ]; then
+  build_out=$("$backend" build-desktop "$test_root" forge)
+  forge_artifact=$(printf '%s\n' "$build_out" | awk -F= '/^artifact=/{print $2; exit}')
+  [ -n "$forge_artifact" ] || {
+    printf '%s\n' "forge backend test: missing build artifact path for forge" >&2
+    exit 1
+  }
+  [ -f "$forge_artifact/Contents/Info.plist" ] || {
+    printf '%s\n' "forge backend test: missing Info.plist in forge artifact" >&2
+    exit 1
+  }
+  /usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$forge_artifact/Contents/Info.plist" >/dev/null
+  /usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$forge_artifact/Contents/Info.plist" >/dev/null
+fi
+
 apps=$("$backend" list-apps "$test_root")
 printf '%s\n' "$apps" | grep -E '^artificer\t' >/dev/null
 printf '%s\n' "$apps" | grep -E '^forge\t' >/dev/null
