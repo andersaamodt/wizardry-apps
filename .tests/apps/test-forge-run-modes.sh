@@ -25,6 +25,8 @@ grep -F "if (enabledTargets[nativeTarget]) {" "$ui" >/dev/null
 grep -F "if (enabledTargets['hosted-web']) {" "$ui" >/dev/null
 grep -F "var context = projectType === 'game' ? 'godot' : 'web';" "$ui" >/dev/null
 grep -F "var args = [folder, title, context, starter, targets.join(',')];" "$ui" >/dev/null
+grep -F "var createdPath = normalizePathForCompare(out.created || '');" "$ui" >/dev/null
+grep -F "setSelectedCatalog('workspace:' + createdWorkspace.id);" "$ui" >/dev/null
 grep -F "perform('Import project folder'" "$ui" >/dev/null
 grep -F "backend('import-workspace'" "$ui" >/dev/null
 grep -F "public.file-url" "$ui" >/dev/null

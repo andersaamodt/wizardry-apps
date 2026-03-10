@@ -3841,8 +3841,18 @@
         });
 
         state.createDraftActive = false;
-        setSelectedCatalog('');
         await refreshWorkspaces();
+        var createdPath = normalizePathForCompare(out.created || '');
+        var createdWorkspace = state.workspaces.find(function (ws) {
+          if (createdPath && normalizePathForCompare(ws.path || '') === createdPath) {
+            return true;
+          }
+          return ws.id === folder;
+        }) || null;
+        if (createdWorkspace) {
+          setSelectedCatalog('workspace:' + createdWorkspace.id);
+          state.selectedWorkspace = createdWorkspace.id;
+        }
         setWorkflowMode('pipeline');
       }
 
