@@ -164,6 +164,25 @@ body {
   line-height: 1.45;
 }
 
+body.workspace-drop-active::after {
+  content: "Drop project folder to add it to the list";
+  position: fixed;
+  inset: 0.62rem;
+  border: 2px dashed color-mix(in srgb, var(--accent) 62%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-soft, var(--accent)) 28%, transparent);
+  color: color-mix(in srgb, var(--text) 86%, var(--accent-strong));
+  font-size: 0.84rem;
+  font-weight: 680;
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 1.1rem;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+
 /* Keep a stable boot backdrop so theme background swaps do not flash onscreen. */
 body.forge-booting {
   background: #edf2fa !important;

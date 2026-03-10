@@ -17,6 +17,7 @@ fi
 
 out=$("$backend" --help)
 printf '%s' "$out" | grep -F "Usage:" >/dev/null
+printf '%s\n' "$out" | grep -F "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]" >/dev/null
 
 out=$("$backend" doctor "$test_root")
 printf '%s\n' "$out" | grep -F "root=$test_root" >/dev/null
@@ -120,6 +121,44 @@ grep -F "starter=clone" "$workspaces_root/workspace-godot/wizardry.workspace.con
 workspaces=$("$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
 printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
+
+external_workspace="$scratch/external/plain-web"
+mkdir -p "$external_workspace/app"
+cat > "$external_workspace/app/index.html" <<'HTML'
+<!doctype html>
+<meta charset="utf-8">
+<title>Plain Web</title>
+HTML
+external_workspace_abs=$(CDPATH= cd -- "$external_workspace" && pwd -P)
+workspaces_root_abs=$(CDPATH= cd -- "$workspaces_root" && pwd -P)
+import_workspace_out=$("$backend" import-workspace "$scratch" "$external_workspace" "$workspaces_root")
+printf '%s\n' "$import_workspace_out" | grep -F "workspace=$external_workspace_abs" >/dev/null
+printf '%s\n' "$import_workspace_out" | grep -F "registered_path=$workspaces_root_abs/plain-web" >/dev/null
+printf '%s\n' "$import_workspace_out" | grep -F "mode=linked" >/dev/null
+printf '%s\n' "$import_workspace_out" | grep -F "profile_created=1" >/dev/null
+[ -L "$workspaces_root_abs/plain-web" ]
+[ -f "$external_workspace_abs/wizardry.workspace.conf" ]
+grep -F "project_type=application" "$external_workspace_abs/wizardry.workspace.conf" >/dev/null
+grep -F "development_context=web" "$external_workspace_abs/wizardry.workspace.conf" >/dev/null
+
+direct_workspace="$workspaces_root/direct-space"
+mkdir -p "$direct_workspace/app"
+cat > "$direct_workspace/app/index.html" <<'HTML'
+<!doctype html>
+<meta charset="utf-8">
+<title>Direct Space</title>
+HTML
+direct_workspace_abs=$(CDPATH= cd -- "$direct_workspace" && pwd -P)
+import_direct_out=$("$backend" import-workspace "$scratch" "$direct_workspace" "$workspaces_root")
+printf '%s\n' "$import_direct_out" | grep -F "workspace=$direct_workspace_abs" >/dev/null
+printf '%s\n' "$import_direct_out" | grep -F "registered_path=$direct_workspace_abs" >/dev/null
+printf '%s\n' "$import_direct_out" | grep -F "mode=direct" >/dev/null
+printf '%s\n' "$import_direct_out" | grep -F "profile_created=1" >/dev/null
+[ -f "$direct_workspace_abs/wizardry.workspace.conf" ]
+
+workspaces_after_import=$("$backend" list-workspaces "$scratch" "$workspaces_root")
+printf '%s\n' "$workspaces_after_import" | grep -E '^plain-web\t' >/dev/null
+printf '%s\n' "$workspaces_after_import" | grep -E '^direct-space\t' >/dev/null
 
 set_app_targets_out=$("$backend" set-app-targets "$scratch" sandbox-tool "hosted-web,macos,linux,ios,android")
 printf '%s\n' "$set_app_targets_out" | grep -F "slug=sandbox-tool" >/dev/null

@@ -25,6 +25,8 @@ grep -F "if (enabledTargets[nativeTarget]) {" "$ui" >/dev/null
 grep -F "if (enabledTargets['hosted-web']) {" "$ui" >/dev/null
 grep -F "var context = projectType === 'game' ? 'godot' : 'web';" "$ui" >/dev/null
 grep -F "var args = [folder, title, context, starter, targets.join(',')];" "$ui" >/dev/null
+grep -F "perform('Import project folder'" "$ui" >/dev/null
+grep -F "backend('import-workspace'" "$ui" >/dev/null
 
 # Desktop precedence in builtin run pipeline (desktop branch appears before hosted-web fallback).
 builtin_desktop_line=$(grep -nF "if (enabledTargets[nativeTarget]) {" "$ui" | head -n 1 | cut -d: -f1)
@@ -45,6 +47,7 @@ help_out=$("$backend" --help)
 printf '%s\n' "$help_out" | grep -F "install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID]" >/dev/null
 printf '%s\n' "$help_out" | grep -F "run-desktop [ROOT_HINT] APP_SLUG" >/dev/null
 printf '%s\n' "$help_out" | grep -F "run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]" >/dev/null
+printf '%s\n' "$help_out" | grep -F "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]" >/dev/null
 printf '%s\n' "$help_out" | grep -F "CONTEXT values for scaffold-workspace:" >/dev/null
 printf '%s\n' "$help_out" | grep -F "  web | godot" >/dev/null
 

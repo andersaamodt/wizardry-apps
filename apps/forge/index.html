@@ -356,7 +356,8 @@
         themeTypeahead: '',
         themeTypeaheadTimer: null,
         pathCompactTimer: null,
-        hostBootReadySent: false
+        hostBootReadySent: false,
+        workspaceDropDepth: 0
       };
 
       var els = {};
@@ -2287,6 +2288,204 @@
         return value;
       }
 
+      function normalizePathForCompare(path) {
+        return String(path || '').trim().replace(/\/+$/, '');
+      }
+
+      function parseFileUriPath(value) {
+        var raw = String(value || '').trim();
+        if (!raw) {
+          return '';
+        }
+        if (!/^file:\/\//i.test(raw)) {
+          return raw;
+        }
+        var path = raw.replace(/^file:\/\/localhost/i, 'file://').replace(/^file:\/\//i, '');
+        if (path && path.charAt(0) !== '/') {
+          path = '/' + path;
+        }
+        try {
+          return decodeURIComponent(path);
+        } catch (_err) {
+          return path;
+        }
+      }
+
+      function dropPathFromTransfer(dataTransfer) {
+        if (!dataTransfer) {
+          return '';
+        }
+        var uriList = String(dataTransfer.getData('text/uri-list') || '');
+        if (uriList) {
+          var uriLines = uriList.split(/\r?\n/);
+          for (var i = 0; i < uriLines.length; i += 1) {
+            var line = String(uriLines[i] || '').trim();
+            if (!line || line.charAt(0) === '#') {
+              continue;
+            }
+            var uriPath = parseFileUriPath(line);
+            if (uriPath) {
+              return uriPath;
+            }
+          }
+        }
+        var plain = String(dataTransfer.getData('text/plain') || '').trim();
+        if (plain) {
+          var plainPath = parseFileUriPath(plain);
+          if (plainPath) {
+            return plainPath;
+          }
+        }
+        var files = dataTransfer.files;
+        if (files && files.length) {
+          for (var n = 0; n < files.length; n += 1) {
+            var file = files[n];
+            if (file && typeof file.path === 'string' && file.path.trim()) {
+              return file.path.trim();
+            }
+          }
+        }
+        return '';
+      }
+
+      function dragPayloadLooksLikeFolderDrop(dataTransfer) {
+        if (!dataTransfer || !dataTransfer.types) {
+          return false;
+        }
+        var types = Array.prototype.slice.call(dataTransfer.types);
+        return types.indexOf('Files') >= 0
+          || types.indexOf('text/uri-list') >= 0
+          || types.indexOf('public.file-url') >= 0;
+      }
+
+      function isIconDropEvent(event) {
+        return !!(event && event.target && event.target.closest && event.target.closest('#selected-icon-drop'));
+      }
+
+      function setWorkspaceDropCue(active) {
+        document.body.classList.toggle('workspace-drop-active', !!active);
+      }
+
+      function clearWorkspaceDropCue() {
+        state.workspaceDropDepth = 0;
+        setWorkspaceDropCue(false);
+      }
+
+      async function importWorkspaceFromDropPath(path) {
+        requireRoot();
+        var folderPath = String(path || '').trim();
+        if (!folderPath) {
+          throw new Error('Drop a project folder to import.');
+        }
+
+        var res = await backend('import-workspace', [folderPath, state.projectsRoot]);
+        var out = kv(res.stdout || '');
+        await refreshWorkspaces({ quiet: true, render: false });
+
+        var byRegisteredPath = normalizePathForCompare(out.registered_path || '');
+        var bySourcePath = normalizePathForCompare(out.workspace || '');
+        var selectedWorkspace = state.workspaces.find(function (ws) {
+          var wsPath = normalizePathForCompare(ws.path || '');
+          if (byRegisteredPath && wsPath === byRegisteredPath) {
+            return true;
+          }
+          if (bySourcePath && wsPath === bySourcePath) {
+            return true;
+          }
+          return !!(out.project_id && ws.id === out.project_id);
+        }) || null;
+
+        if (selectedWorkspace) {
+          setSelectedCatalog('workspace:' + selectedWorkspace.id);
+          state.selectedWorkspace = selectedWorkspace.id;
+        } else if (out.project_id) {
+          setSelectedCatalog('workspace:' + out.project_id);
+          state.selectedWorkspace = out.project_id;
+        }
+
+        setWorkflowMode('pipeline');
+        renderCatalogList();
+        renderSelectedBuiltIn();
+
+        var resultPaths = [];
+        if (out.registered_path) {
+          resultPaths.push({ label: 'Registered project', path: out.registered_path, canReveal: true });
+        }
+        if (out.workspace && normalizePathForCompare(out.workspace) !== normalizePathForCompare(out.registered_path)) {
+          resultPaths.push({ label: 'Source folder', path: out.workspace, canReveal: true });
+        }
+        if (out.profile) {
+          resultPaths.push({ label: 'Project profile', path: out.profile, canReveal: true });
+        }
+
+        renderResult({
+          status: 'ok',
+          summary: (selectedWorkspace ? selectedWorkspace.title : (out.project_id || 'Project')) + ' added successfully.',
+          paths: resultPaths,
+          help: {
+            title: 'Project import',
+            body: 'Mode: ' + (out.mode || 'linked') + '\nProfile: ' + (out.profile_created === '1' ? 'Created' : 'Existing') + '\nProjects root: ' + (out.project_root || state.projectsRoot)
+          }
+        });
+      }
+
+      function bindWorkspaceFolderDrop() {
+        ['dragenter', 'dragover'].forEach(function (eventName) {
+          window.addEventListener(eventName, function (event) {
+            if (isIconDropEvent(event)) {
+              return;
+            }
+            if (!dragPayloadLooksLikeFolderDrop(event.dataTransfer)) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            if (eventName === 'dragenter') {
+              state.workspaceDropDepth += 1;
+            }
+            setWorkspaceDropCue(true);
+          });
+        });
+
+        window.addEventListener('dragleave', function (event) {
+          if (isIconDropEvent(event)) {
+            return;
+          }
+          if (state.workspaceDropDepth > 0) {
+            state.workspaceDropDepth -= 1;
+          }
+          if (state.workspaceDropDepth <= 0) {
+            clearWorkspaceDropCue();
+          }
+        });
+
+        window.addEventListener('dragend', function () {
+          clearWorkspaceDropCue();
+        });
+
+        window.addEventListener('drop', function (event) {
+          if (isIconDropEvent(event)) {
+            return;
+          }
+          var maybeFolderDrop = dragPayloadLooksLikeFolderDrop(event.dataTransfer);
+          var droppedPath = dropPathFromTransfer(event.dataTransfer);
+          if (!maybeFolderDrop && !droppedPath) {
+            clearWorkspaceDropCue();
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          clearWorkspaceDropCue();
+          if (!droppedPath) {
+            toast('Drop a project folder to import.', 'bad');
+            return;
+          }
+          perform('Import project folder', function () {
+            return importWorkspaceFromDropPath(droppedPath);
+          }, { swallow: true });
+        });
+      }
+
       function iconPathForItem(item) {
         if (!item || !item.path) {
           return '';
@@ -3958,6 +4157,8 @@
             }
           });
         }
+
+        bindWorkspaceFolderDrop();
 
         if (els.repoRoot) {
           els.repoRoot.addEventListener('input', syncSettingsSaveButtons);

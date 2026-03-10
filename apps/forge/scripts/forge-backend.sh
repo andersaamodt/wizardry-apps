@@ -16,6 +16,7 @@ Commands:
   list-themes [ROOT_HINT]
   list-godot-tools [ROOT_HINT]
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
+  import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]
   get-ui-prefs [ROOT_HINT]
   set-ui-pref [ROOT_HINT] KEY VALUE
   set-app-targets [ROOT_HINT] APP_SLUG TARGETS
@@ -1403,6 +1404,115 @@ workspace_default_root() {
   printf '%s\n' "$HOME/git"
 }
 
+expand_user_path() {
+  path=${1-}
+  case "$path" in
+    "~")
+      path=$HOME
+      ;;
+    "~/"*)
+      path=$HOME/${path#~/}
+      ;;
+  esac
+  printf '%s\n' "$path"
+}
+
+resolve_existing_dir_path() {
+  path=$(expand_user_path "${1-}")
+  [ -d "$path" ] || return 1
+  (CDPATH= cd -- "$path" && pwd -P)
+}
+
+ensure_dir_path() {
+  path=$(expand_user_path "${1-}")
+  mkdir -p "$path"
+  (CDPATH= cd -- "$path" && pwd -P)
+}
+
+derive_workspace_slug() {
+  name=${1-}
+  slug=$(printf '%s' "$name" \
+    | tr '[:upper:]' '[:lower:]' \
+    | tr -cs 'a-z0-9' '-' \
+    | sed 's/^-*//; s/-*$//; s/-\{2,\}/-/g')
+  [ -n "$slug" ] || slug=workspace
+  case "$slug" in
+    [a-z]*)
+      ;;
+    *)
+      slug="w-$slug"
+      ;;
+  esac
+  printf '%s\n' "$slug"
+}
+
+resolve_workspace_slug() {
+  conf_path=${1-}
+  workspace_path=${2-}
+  project_id=$(workspace_field "$conf_path" project_id "")
+  if [ -n "$project_id" ]; then
+    case "$project_id" in
+      [a-z][a-z0-9-]*)
+        case "$project_id" in
+          *-|*--*)
+            project_id=""
+            ;;
+        esac
+        ;;
+      *)
+        project_id=""
+        ;;
+    esac
+  fi
+  [ -n "$project_id" ] || project_id=$(derive_workspace_slug "$(basename "$workspace_path")")
+  printf '%s\n' "$project_id"
+}
+
+ensure_importable_workspace_profile() {
+  workspace_path=${1-}
+  conf_path="$workspace_path/wizardry.workspace.conf"
+  if [ -f "$conf_path" ]; then
+    printf '%s\t%s\n' "$conf_path" "0"
+    return 0
+  fi
+
+  if [ ! -w "$workspace_path" ]; then
+    printf '%s\n' "forge-backend: workspace profile missing and workspace is not writable: $workspace_path" >&2
+    exit 1
+  fi
+
+  context=""
+  project_type=""
+  targets=""
+  if [ -f "$workspace_path/project.godot" ] || [ -f "$workspace_path/game/project.godot" ] || [ -f "$workspace_path/tool_main.gd" ]; then
+    context="godot"
+    project_type="game"
+    targets="macos,linux,godot-desktop"
+  elif [ -f "$workspace_path/app/index.html" ] || [ -f "$workspace_path/index.html" ]; then
+    context="web"
+    project_type="application"
+    targets="hosted-web,macos,linux"
+  else
+    printf '%s\n' "forge-backend: workspace profile missing and no recognizable project entrypoint: $workspace_path" >&2
+    exit 1
+  fi
+
+  project_id=$(derive_workspace_slug "$(basename "$workspace_path")")
+  project_title=$(basename "$workspace_path")
+  cat > "$conf_path" <<CONF
+# Wizardry Apps workspace profile
+project_id=$project_id
+title=$project_title
+project_type=$project_type
+development_context=$context
+starter=import
+targets=$targets
+root=$workspace_path
+CONF
+
+  printf '%s\t%s\n' "$conf_path" "1"
+}
+
 forge_ui_prefs_file() {
   base="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps"
   mkdir -p "$base"
@@ -1474,6 +1584,78 @@ cmd_list_workspaces() {
     mtime_epoch=$(path_mtime_epoch "$path")
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$project_id" "$title" "$project_type" "$development_context" "$targets" "$path" "$mtime_epoch"
   done | sort
+}
+
+cmd_import_workspace() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  project_root=${3-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: import-workspace requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+
+  [ -n "$project_root" ] || project_root=$(workspace_default_root)
+  project_root_abs=$(ensure_dir_path "$project_root")
+
+  profile_meta=$(ensure_importable_workspace_profile "$workspace_abs")
+  profile_path=$(printf '%s\n' "$profile_meta" | cut -f1)
+  profile_created=$(printf '%s\n' "$profile_meta" | cut -f2)
+  workspace_id=$(resolve_workspace_slug "$profile_path" "$workspace_abs")
+  registration_mode="linked"
+  registered_path=""
+
+  workspace_parent=$(dirname "$workspace_abs")
+  if [ "$workspace_parent" = "$project_root_abs" ]; then
+    registration_mode="direct"
+    registered_path="$workspace_abs"
+  else
+    candidate_base="$project_root_abs/$workspace_id"
+    candidate_path="$candidate_base"
+    suffix=2
+    while :; do
+      if [ -e "$candidate_path" ] || [ -L "$candidate_path" ]; then
+        if [ -d "$candidate_path" ]; then
+          existing_target=$(resolve_existing_dir_path "$candidate_path" 2>/dev/null || true)
+          if [ -n "$existing_target" ] && [ "$existing_target" = "$workspace_abs" ]; then
+            registered_path="$candidate_path"
+            break
+          fi
+        fi
+        candidate_path="$candidate_base-$suffix"
+        suffix=$((suffix + 1))
+        continue
+      fi
+      ln -s "$workspace_abs" "$candidate_path"
+      registered_path="$candidate_path"
+      break
+    done
+  fi
+
+  [ -n "$registered_path" ] || {
+    printf '%s\n' "forge-backend: failed to register workspace: $workspace_abs" >&2
+    exit 1
+  }
+
+  [ -f "$registered_path/wizardry.workspace.conf" ] || {
+    printf '%s\n' "forge-backend: registered workspace is missing wizardry.workspace.conf: $registered_path" >&2
+    exit 1
+  }
+
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'registered_path=%s\n' "$registered_path"
+  printf 'project_root=%s\n' "$project_root_abs"
+  printf 'project_id=%s\n' "$workspace_id"
+  printf 'mode=%s\n' "$registration_mode"
+  printf 'profile=%s\n' "$profile_path"
+  printf 'profile_created=%s\n' "$profile_created"
+  printf 'root=%s\n' "$root"
 }
 
 write_key_value_file() {
@@ -3366,6 +3548,9 @@ case "$cmd" in
     ;;
   list-workspaces)
     cmd_list_workspaces "${2-}" "${3-}"
+    ;;
+  import-workspace)
+    cmd_import_workspace "${2-}" "${3-}" "${4-}"
     ;;
   get-ui-prefs)
     cmd_get_ui_prefs "${2-}"
