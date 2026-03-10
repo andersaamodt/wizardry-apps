@@ -2363,7 +2363,10 @@
       }
 
       function setWorkspaceDropCue(active) {
-        document.body.classList.toggle('workspace-drop-active', !!active);
+        if (!els.catalogList) {
+          return;
+        }
+        els.catalogList.classList.toggle('workspace-drop-active', !!active);
       }
 
       function clearWorkspaceDropCue() {
