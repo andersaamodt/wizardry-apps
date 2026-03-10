@@ -455,11 +455,6 @@ app_icon_override_path() {
   printf '%s\n' "$(forge_catalog_icon_overrides_dir)/$slug/forge-icon.png"
 }
 
-default_forge_icon_path() {
-  root=$1
-  printf '%s\n' "$root/apps/forge/assets/forge-icon.png"
-}
-
 apply_optional_app_icon_override_if_present() {
   slug=$1
   dest_dir=$2
@@ -1777,9 +1772,6 @@ APP
         elif [ -f "$app_dir/assets/forge.icns" ]; then
           icon_source="$app_dir/assets/forge.icns"
           icon_source_format='icns'
-        elif [ -f "$(default_forge_icon_path "$root")" ]; then
-          icon_source=$(default_forge_icon_path "$root")
-          icon_source_format='png'
         fi
 
         icon_key=''
@@ -1879,8 +1871,6 @@ PLIST
           linux_icon_source="$icon_override"
         elif [ -f "$app_dir/assets/forge-icon.png" ]; then
           linux_icon_source="$app_dir/assets/forge-icon.png"
-        elif [ -f "$(default_forge_icon_path "$root")" ]; then
-          linux_icon_source=$(default_forge_icon_path "$root")
         fi
         if [ -n "$linux_icon_source" ]; then
           mkdir -p "$appdir/usr/share/$slug/assets"
@@ -2316,9 +2306,6 @@ APP
     elif [ -f "$app_dir/assets/forge.icns" ]; then
       icon_source="$app_dir/assets/forge.icns"
       icon_source_format='icns'
-    elif [ -f "$(default_forge_icon_path "$root")" ]; then
-      icon_source=$(default_forge_icon_path "$root")
-      icon_source_format='png'
     fi
 
     icon_key=''
@@ -2391,8 +2378,6 @@ PLIST
       linux_ws_icon_source="$workspace_path/assets/forge-icon.png"
     elif [ -f "$app_dir/assets/forge-icon.png" ]; then
       linux_ws_icon_source="$app_dir/assets/forge-icon.png"
-    elif [ -f "$(default_forge_icon_path "$root")" ]; then
-      linux_ws_icon_source=$(default_forge_icon_path "$root")
     fi
     if [ -n "$linux_ws_icon_source" ]; then
       mkdir -p "$appdir/usr/share/$bundle_slug/assets"
@@ -2911,17 +2896,6 @@ pre {
 CSS
 }
 
-ensure_project_default_icon() {
-  root=$1
-  project_dir=$2
-  icon_path="$project_dir/assets/forge-icon.png"
-  [ -f "$icon_path" ] && return 0
-  default_icon=$(default_forge_icon_path "$root")
-  [ -f "$default_icon" ] || return 0
-  mkdir -p "$project_dir/assets"
-  cp "$default_icon" "$icon_path"
-}
-
 append_manifest_app() {
   root=$1
   slug=$2
@@ -3010,8 +2984,6 @@ cmd_scaffold_app() {
       ;;
   esac
 
-  ensure_project_default_icon "$root" "$app_dir"
-
   append_manifest_app "$root" "$slug" "$app_name"
 
   printf 'created=%s\n' "$app_dir"
@@ -3098,9 +3070,6 @@ cmd_scaffold_workspace() {
           cp -R "$source_dir"/. "$app_dir/"
           ;;
       esac
-
-      ensure_project_default_icon "$root" "$workspace_dir"
-      ensure_project_default_icon "$root" "$app_dir"
 
       cat > "$workspace_dir/README.md" <<README
 # $app_name

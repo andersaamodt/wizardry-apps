@@ -2312,17 +2312,6 @@
         return src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(String(version));
       }
 
-      function defaultForgeIconSrc() {
-        if (!state.appDir) {
-          return '';
-        }
-        var src = pathToIconSrc(String(state.appDir).replace(/\/+$/, '') + '/assets/forge-icon.png');
-        if (!src) {
-          return '';
-        }
-        return src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(String(ASSET_VERSION));
-      }
-
       function setItemIconVersion(item) {
         if (!item || !item.key) {
           return;
@@ -2347,24 +2336,15 @@
 
       function renderCatalogThumb(thumb, item) {
         var iconSrc = iconSrcForItem(item);
-        var fallbackSrc = defaultForgeIconSrc();
-        if (!iconSrc && !fallbackSrc) {
+        if (!iconSrc) {
           return;
         }
         var thumbImg = document.createElement('img');
         thumbImg.alt = '';
-        setImageSource(thumbImg, iconSrc || fallbackSrc, function () {
-          if (!fallbackSrc || thumbImg.src === fallbackSrc) {
-            if (thumbImg.parentNode === thumb) {
-              thumb.removeChild(thumbImg);
-            }
-            return;
+        setImageSource(thumbImg, iconSrc, function () {
+          if (thumbImg.parentNode === thumb) {
+            thumb.removeChild(thumbImg);
           }
-          setImageSource(thumbImg, fallbackSrc, function () {
-            if (thumbImg.parentNode === thumb) {
-              thumb.removeChild(thumbImg);
-            }
-          });
         });
         thumb.appendChild(thumbImg);
       }
@@ -2420,21 +2400,11 @@
           return;
         }
         var iconSrc = iconSrcForItem(selected);
-        var fallbackSrc = defaultForgeIconSrc();
-        if (iconSrc || fallbackSrc) {
+        if (iconSrc) {
           els.selectedIconPreview.classList.remove('hidden');
           els.selectedIconPlaceholder.classList.add('hidden');
           els.selectedIconClear.classList.remove('hidden');
-          setImageSource(els.selectedIconPreview, iconSrc || fallbackSrc, function () {
-            if (fallbackSrc && els.selectedIconPreview.src !== fallbackSrc) {
-              setImageSource(els.selectedIconPreview, fallbackSrc, function () {
-                els.selectedIconPreview.removeAttribute('src');
-                els.selectedIconPreview.classList.add('hidden');
-                els.selectedIconPlaceholder.classList.remove('hidden');
-                els.selectedIconClear.classList.add('hidden');
-              });
-              return;
-            }
+          setImageSource(els.selectedIconPreview, iconSrc, function () {
             els.selectedIconPreview.removeAttribute('src');
             els.selectedIconPreview.classList.add('hidden');
             els.selectedIconPlaceholder.classList.remove('hidden');
