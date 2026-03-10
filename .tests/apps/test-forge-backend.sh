@@ -39,7 +39,14 @@ if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ]; then
     printf '%s\n' "forge backend test: missing CFBundleIconFile value" >&2
     exit 1
   }
-  [ -f "$forge_artifact/Contents/Resources/$forge_icon_file" ] || {
+  forge_icon_path="$forge_artifact/Contents/Resources/$forge_icon_file"
+  if [ ! -f "$forge_icon_path" ] && [ -f "$forge_icon_path.icns" ]; then
+    forge_icon_path="$forge_icon_path.icns"
+  fi
+  if [ ! -f "$forge_icon_path" ] && [ -f "$forge_icon_path.png" ]; then
+    forge_icon_path="$forge_icon_path.png"
+  fi
+  [ -f "$forge_icon_path" ] || {
     printf '%s\n' "forge backend test: icon file referenced by CFBundleIconFile is missing" >&2
     exit 1
   }
@@ -134,6 +141,9 @@ printf '%s\n' "$set_workspace_icon_out" | grep -F "workspace=$workspaces_root/wo
 [ -s "$workspaces_root/workspace-web/assets/forge-icon.png" ]
 [ -s "$workspaces_root/workspace-web/app/assets/forge-icon.png" ]
 cmp "$workspaces_root/workspace-web/assets/forge-icon.png" "$workspaces_root/workspace-web/app/assets/forge-icon.png" >/dev/null
+if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ] && command -v sips >/dev/null 2>&1; then
+  sips -g pixelWidth "$workspaces_root/workspace-web/assets/forge-icon.png" | grep -E 'pixelWidth: 1024$' >/dev/null
+fi
 
 clear_workspace_icon_out=$("$backend" set-workspace-icon "$scratch" "$workspaces_root/workspace-web" "")
 printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null

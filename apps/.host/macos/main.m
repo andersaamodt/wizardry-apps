@@ -817,10 +817,27 @@ completionHandler:(void (^)(BOOL result))completionHandler {
 
     [self setupMainMenuWithAppName:appName];
     NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSImage *bundleIcon = [NSApp applicationIconImage];
-    if (bundleIcon) {
-        // Prefer the bundle icon so Dock/Finder icon identity stays stable.
-        self.appIconImage = bundleIcon;
+    NSImage *resolvedBundleIcon = nil;
+    NSBundle *mainBundle = [NSBundle mainBundle];
+    NSString *bundleIconFile = [[[mainBundle infoDictionary] objectForKey:@"CFBundleIconFile"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (bundleIconFile.length > 0) {
+        NSString *iconBase = [bundleIconFile stringByDeletingPathExtension];
+        NSString *iconExt = [bundleIconFile pathExtension];
+        if (iconExt.length == 0) {
+            iconExt = @"icns";
+        }
+        NSString *bundleIconPath = [mainBundle pathForResource:iconBase ofType:iconExt];
+        if (bundleIconPath.length > 0 && [fileManager fileExistsAtPath:bundleIconPath]) {
+            resolvedBundleIcon = [[NSImage alloc] initWithContentsOfFile:bundleIconPath];
+        }
+    }
+    if (!resolvedBundleIcon) {
+        resolvedBundleIcon = [NSApp applicationIconImage];
+    }
+    if (resolvedBundleIcon) {
+        // Prefer the packaged bundle icon so Dock/Finder and splash stay in sync.
+        self.appIconImage = resolvedBundleIcon;
+        [NSApp setApplicationIconImage:self.appIconImage];
     } else {
         NSString *resolvedIconPath = nil;
         if (isNestedWorkspaceApp && [fileManager fileExistsAtPath:parentIconPath]) {

@@ -261,7 +261,7 @@ if [ -x "$root/tools/forge/build-forge-icon" ]; then
     icon_hash=$(hash_file_sha256 "$built_icon_tmp")
     icon_name="forge-${icon_hash}.icns"
     cp "$built_icon_tmp" "$resources_dir/$icon_name"
-    icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
+    icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
   elif [ -f "$root/apps/forge/assets/forge-icon.png" ]; then
     icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/forge-icon.png")
     icon_name="forge-icon-${icon_hash}.png"
@@ -275,6 +275,9 @@ elif [ -f "$root/apps/forge/assets/forge-icon.png" ]; then
   icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
 fi
 
+bundle_version=$(printf '%s' "$expected_hash" | cksum | awk '{ print $1 }')
+[ -n "$bundle_version" ] || bundle_version=1
+
 cat > "$plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -282,7 +285,7 @@ cat > "$plist" <<PLIST
 <key>CFBundleName</key><string>App Forge</string>
 <key>CFBundleDisplayName</key><string>App Forge</string>
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
-<key>CFBundleVersion</key><string>1.0</string>
+<key>CFBundleVersion</key><string>$bundle_version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>app-forge</string>
 $icon_key

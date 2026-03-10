@@ -62,7 +62,14 @@ case "$os" in
     grep -F "<key>CFBundleIconFile</key>" "$app_bundle/Contents/Info.plist" >/dev/null
     app_icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app_bundle/Contents/Info.plist")
     [ -n "$app_icon_file" ]
-    [ -f "$app_bundle/Contents/Resources/$app_icon_file" ]
+    app_icon_path="$app_bundle/Contents/Resources/$app_icon_file"
+    if [ ! -f "$app_icon_path" ] && [ -f "$app_icon_path.icns" ]; then
+      app_icon_path="$app_icon_path.icns"
+    fi
+    if [ ! -f "$app_icon_path" ] && [ -f "$app_icon_path.png" ]; then
+      app_icon_path="$app_icon_path.png"
+    fi
+    [ -f "$app_icon_path" ]
     [ -f "$app_bundle/Contents/Resources/.host/shared/wizardry-bridge.js" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-build-input.sha256" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-apps-root.txt" ]

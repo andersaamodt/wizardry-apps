@@ -1600,10 +1600,23 @@ write_project_icon_from_data_url() {
   case "$data_url" in
     data:image/png\;base64,*)
       payload=${data_url#data:image/png;base64,}
+      image_ext=png
       ;;
     data:image/*\;base64,*)
+      image_type=${data_url#data:image/}
+      image_type=${image_type%%;base64,*}
       payload=${data_url#data:image/}
       payload=${payload#*;base64,}
+      case "$image_type" in
+        png) image_ext=png ;;
+        jpeg|jpg) image_ext=jpg ;;
+        webp) image_ext=webp ;;
+        gif) image_ext=gif ;;
+        bmp) image_ext=bmp ;;
+        tiff) image_ext=tiff ;;
+        svg+xml) image_ext=svg ;;
+        *) image_ext=img ;;
+      esac
       ;;
     *)
       printf '%s\n' "forge-backend: icon payload must be a base64 image data URL" >&2
@@ -1611,7 +1624,9 @@ write_project_icon_from_data_url() {
       ;;
   esac
 
-  tmp_icon=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon.XXXXXX")
+  tmp_icon_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon.XXXXXX")
+  tmp_icon="$tmp_icon_base.$image_ext"
+  mv "$tmp_icon_base" "$tmp_icon"
   if ! decode_base64_to_file "$payload" "$tmp_icon"; then
     rm -f "$tmp_icon"
     printf '%s\n' "forge-backend: failed to decode icon payload (base64 tool missing or invalid payload)" >&2
@@ -1624,7 +1639,20 @@ write_project_icon_from_data_url() {
     exit 1
   fi
 
-  mv "$tmp_icon" "$icon_path"
+  normalized_icon=$tmp_icon
+  if command -v sips >/dev/null 2>&1; then
+    resized_icon_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon-resized.XXXXXX")
+    resized_icon="$resized_icon_base.png"
+    rm -f "$resized_icon"
+    if sips -z 1024 1024 "$tmp_icon" --out "$resized_icon" >/dev/null 2>&1; then
+      normalized_icon=$resized_icon
+    else
+      rm -f "$resized_icon"
+    fi
+  fi
+
+  mv "$normalized_icon" "$icon_path"
+  [ "$normalized_icon" = "$tmp_icon" ] || rm -f "$tmp_icon"
   # A user-selected icon should always win. Remove stale handcrafted ICNS files
   # that would otherwise mask the new PNG in desktop bundle generation.
   rm -f "$legacy_icns_path"
@@ -1803,8 +1831,14 @@ APP
         elif [ "$icon_source_format" = 'icns' ]; then
           icon_name="forge-${icon_hash}.icns"
           cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
-          icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
+          icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
         fi
+        if [ -n "${icon_name-}" ] && [ "${icon_name##*.}" = "icns" ]; then
+          icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
+        fi
+
+        bundle_version=$(printf '%s' "$expected_hash" | cksum | awk '{ print $1 }')
+        [ -n "$bundle_version" ] || bundle_version=1
 
         cat > "$bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1813,7 +1847,7 @@ APP
 <key>CFBundleName</key><string>$app_name</string>
 <key>CFBundleDisplayName</key><string>$app_name</string>
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
-<key>CFBundleVersion</key><string>1.0</string>
+<key>CFBundleVersion</key><string>$bundle_version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>$slug</string>
 $icon_key
@@ -2323,7 +2357,7 @@ APP
       done
       icon_name="forge-${icon_hash}.icns"
       if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
-        icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
+        icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
       else
         icon_name="forge-icon-${icon_hash}.png"
         cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
@@ -2337,7 +2371,7 @@ APP
     elif [ "$icon_source_format" = 'icns' ]; then
       icon_name="forge-${icon_hash}.icns"
       cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
-      icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
+      icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
     fi
 
     bundle_id="com.wizardry.workspace.$workspace_slug"
