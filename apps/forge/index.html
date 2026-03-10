@@ -2311,31 +2311,55 @@
         }
       }
 
-      function dropPathFromTransfer(dataTransfer) {
+      function firstPathFromUriBlock(rawValue) {
+        var raw = String(rawValue || '').replace(/\0/g, '').trim();
+        if (!raw) {
+          return '';
+        }
+        var uriLines = raw.split(/\r?\n/);
+        for (var i = 0; i < uriLines.length; i += 1) {
+          var line = String(uriLines[i] || '').trim();
+          if (!line || line.charAt(0) === '#') {
+            continue;
+          }
+          var uriPath = parseFileUriPath(line);
+          if (uriPath) {
+            return uriPath;
+          }
+        }
+        return '';
+      }
+
+      function getDataTransferItemString(item) {
+        return new Promise(function (resolve) {
+          if (!item || typeof item.getAsString !== 'function') {
+            resolve('');
+            return;
+          }
+          try {
+            item.getAsString(function (value) {
+              resolve(String(value || ''));
+            });
+          } catch (_err) {
+            resolve('');
+          }
+        });
+      }
+
+      async function dropPathFromTransfer(dataTransfer) {
         if (!dataTransfer) {
           return '';
         }
-        var uriList = String(dataTransfer.getData('text/uri-list') || '');
-        if (uriList) {
-          var uriLines = uriList.split(/\r?\n/);
-          for (var i = 0; i < uriLines.length; i += 1) {
-            var line = String(uriLines[i] || '').trim();
-            if (!line || line.charAt(0) === '#') {
-              continue;
-            }
-            var uriPath = parseFileUriPath(line);
-            if (uriPath) {
-              return uriPath;
-            }
+
+        var directTypes = ['text/uri-list', 'public.file-url', 'text/plain'];
+        for (var t = 0; t < directTypes.length; t += 1) {
+          var payload = String(dataTransfer.getData(directTypes[t]) || '');
+          var directPath = firstPathFromUriBlock(payload);
+          if (directPath) {
+            return directPath;
           }
         }
-        var plain = String(dataTransfer.getData('text/plain') || '').trim();
-        if (plain) {
-          var plainPath = parseFileUriPath(plain);
-          if (plainPath) {
-            return plainPath;
-          }
-        }
+
         var files = dataTransfer.files;
         if (files && files.length) {
           for (var n = 0; n < files.length; n += 1) {
@@ -2345,6 +2369,34 @@
             }
           }
         }
+
+        var items = dataTransfer.items;
+        if (items && items.length) {
+          for (var k = 0; k < items.length; k += 1) {
+            var item = items[k];
+            if (!item) {
+              continue;
+            }
+            if (item.kind === 'file') {
+              var droppedFile = typeof item.getAsFile === 'function' ? item.getAsFile() : null;
+              if (droppedFile && typeof droppedFile.path === 'string' && droppedFile.path.trim()) {
+                return droppedFile.path.trim();
+              }
+              continue;
+            }
+            if (item.kind === 'string') {
+              var type = String(item.type || '');
+              if (type === 'text/uri-list' || type === 'public.file-url' || type === 'text/plain') {
+                var itemValue = await getDataTransferItemString(item);
+                var itemPath = firstPathFromUriBlock(itemValue);
+                if (itemPath) {
+                  return itemPath;
+                }
+              }
+            }
+          }
+        }
+
         return '';
       }
 
@@ -2466,19 +2518,18 @@
           clearWorkspaceDropCue();
         });
 
-        window.addEventListener('drop', function (event) {
+        window.addEventListener('drop', async function (event) {
           if (isIconDropEvent(event)) {
             return;
           }
           var maybeFolderDrop = dragPayloadLooksLikeFolderDrop(event.dataTransfer);
-          var droppedPath = dropPathFromTransfer(event.dataTransfer);
-          if (!maybeFolderDrop && !droppedPath) {
-            clearWorkspaceDropCue();
-            return;
-          }
           event.preventDefault();
           event.stopPropagation();
           clearWorkspaceDropCue();
+          var droppedPath = await dropPathFromTransfer(event.dataTransfer);
+          if (!maybeFolderDrop && !droppedPath) {
+            return;
+          }
           if (!droppedPath) {
             toast('Drop a project folder to import.', 'bad');
             return;

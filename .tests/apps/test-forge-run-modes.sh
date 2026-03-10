@@ -27,6 +27,8 @@ grep -F "var context = projectType === 'game' ? 'godot' : 'web';" "$ui" >/dev/nu
 grep -F "var args = [folder, title, context, starter, targets.join(',')];" "$ui" >/dev/null
 grep -F "perform('Import project folder'" "$ui" >/dev/null
 grep -F "backend('import-workspace'" "$ui" >/dev/null
+grep -F "public.file-url" "$ui" >/dev/null
+grep -F "getDataTransferItemString" "$ui" >/dev/null
 
 # Desktop precedence in builtin run pipeline (desktop branch appears before hosted-web fallback).
 builtin_desktop_line=$(grep -nF "if (enabledTargets[nativeTarget]) {" "$ui" | head -n 1 | cut -d: -f1)
