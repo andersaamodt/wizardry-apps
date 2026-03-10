@@ -2410,10 +2410,6 @@
           || types.indexOf('public.file-url') >= 0;
       }
 
-      function isIconDropEvent(event) {
-        return !!(event && event.target && event.target.closest && event.target.closest('#selected-icon-drop'));
-      }
-
       function setWorkspaceDropCue(active) {
         if (!els.catalogList) {
           return;
@@ -2485,11 +2481,13 @@
       }
 
       function bindWorkspaceFolderDrop() {
+        var dropTarget = els.catalogList;
+        if (!dropTarget) {
+          return;
+        }
+
         ['dragenter', 'dragover'].forEach(function (eventName) {
-          window.addEventListener(eventName, function (event) {
-            if (isIconDropEvent(event)) {
-              return;
-            }
+          dropTarget.addEventListener(eventName, function (event) {
             if (!dragPayloadLooksLikeFolderDrop(event.dataTransfer)) {
               return;
             }
@@ -2502,10 +2500,9 @@
           });
         });
 
-        window.addEventListener('dragleave', function (event) {
-          if (isIconDropEvent(event)) {
-            return;
-          }
+        dropTarget.addEventListener('dragleave', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
           if (state.workspaceDropDepth > 0) {
             state.workspaceDropDepth -= 1;
           }
@@ -2514,14 +2511,7 @@
           }
         });
 
-        window.addEventListener('dragend', function () {
-          clearWorkspaceDropCue();
-        });
-
-        window.addEventListener('drop', async function (event) {
-          if (isIconDropEvent(event)) {
-            return;
-          }
+        dropTarget.addEventListener('drop', async function (event) {
           var maybeFolderDrop = dragPayloadLooksLikeFolderDrop(event.dataTransfer);
           event.preventDefault();
           event.stopPropagation();
