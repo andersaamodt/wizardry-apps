@@ -75,5 +75,9 @@ grep -F 'WIZARDRY_APPS_ROOT="$root"' "$backend" >/dev/null
 grep -F 'WIZARDRY_DIR="$root"' "$backend" >/dev/null
 grep -F "copy_tree_for_bundle \"\$workspace_path\" \"\$bundle/Contents/Resources/\$workspace_slug/\"" "$backend" >/dev/null
 grep -F "\"\\\$APPDIR/MacOS/wizardry-host\" \"\\\$APPDIR/Resources/\$workspace_slug\$app_entry_suffix\"" "$backend" >/dev/null
+grep -F "sync_macos_install_for_slug" "$backend" >/dev/null
+grep -F "sync_existing_macos_installs_from_bundle" "$backend" >/dev/null
+grep -F "installed_synced=%s" "$backend" >/dev/null
+grep -F "built_artifact=%s" "$backend" >/dev/null
 
 printf '%s\n' "forge standardized run/install pipeline tests passed"

@@ -996,6 +996,63 @@ copy_tree_for_bundle() {
   )
 }
 
+copy_macos_bundle() {
+  src_bundle=${1-}
+  dest_bundle=${2-}
+  [ -d "$src_bundle" ] || return 1
+  [ -n "$dest_bundle" ] || return 1
+  rm -rf "$dest_bundle"
+  if command -v ditto >/dev/null 2>&1; then
+    ditto "$src_bundle" "$dest_bundle" || return 1
+  else
+    cp -R "$src_bundle" "$dest_bundle" || return 1
+  fi
+  touch "$dest_bundle" >/dev/null 2>&1 || :
+  touch "$dest_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
+  return 0
+}
+
+sync_existing_macos_installs_from_bundle() {
+  bundle_path=${1-}
+  app_name=${2-}
+  [ -d "$bundle_path" ] || return 1
+  [ -n "$app_name" ] || return 1
+
+  synced_path=''
+  for candidate in "/Applications/$app_name.app" "$HOME/Applications/$app_name.app"; do
+    [ -d "$candidate" ] || continue
+    if copy_macos_bundle "$bundle_path" "$candidate"; then
+      [ -n "$synced_path" ] || synced_path="$candidate"
+    fi
+  done
+
+  [ -n "$synced_path" ] || return 1
+  printf '%s\n' "$synced_path"
+}
+
+sync_macos_install_for_slug() {
+  root=${1-}
+  slug=${2-}
+  [ -n "$root" ] || return 1
+  [ -n "$slug" ] || return 1
+  [ "$(os_id)" = "darwin" ] || return 1
+
+  app_name=$(app_name_from_manifest "$root" "$slug")
+  has_install=0
+  for candidate in "/Applications/$app_name.app" "$HOME/Applications/$app_name.app"; do
+    if [ -d "$candidate" ]; then
+      has_install=1
+      break
+    fi
+  done
+  [ "$has_install" -eq 1 ] || return 1
+
+  build_out=$(cmd_build_desktop "$root" "$slug" 2>/dev/null || true)
+  bundle_path=$(printf '%s\n' "$build_out" | kv_read artifact)
+  [ -n "$bundle_path" ] || return 1
+  sync_existing_macos_installs_from_bundle "$bundle_path" "$app_name"
+}
+
 stop_host_instances_for_app() {
   host_bin=${1-}
   app_dir=${2-}
@@ -1867,8 +1924,10 @@ cmd_set_app_icon() {
   if [ "$distribution" = "optional" ] && [ -z "${data_url-}" ]; then
     rm -f "$override_icon"
     cmd_download_app "$root" "$slug" >/dev/null
+    synced_install=$(sync_macos_install_for_slug "$root" "$slug" 2>/dev/null || true)
     printf 'icon=%s\n' "$override_icon"
     printf 'status=cleared\n'
+    [ -n "$synced_install" ] && printf 'installed_synced=%s\n' "$synced_install"
     printf 'slug=%s\n' "$slug"
     return 0
   fi
@@ -1878,6 +1937,8 @@ cmd_set_app_icon() {
     mkdir -p "$(dirname "$override_icon")"
     cp "$app_dir/assets/forge-icon.png" "$override_icon"
   fi
+  synced_install=$(sync_macos_install_for_slug "$root" "$slug" 2>/dev/null || true)
+  [ -n "$synced_install" ] && printf 'installed_synced=%s\n' "$synced_install"
   printf 'slug=%s\n' "$slug"
 }
 
@@ -2282,14 +2343,21 @@ cmd_run_desktop() {
         printf '%s\n' "forge-backend: built bundle artifact missing: $bundle_artifact" >&2
         exit 1
       }
+      launch_bundle="$bundle_artifact"
+      synced_install=$(sync_existing_macos_installs_from_bundle "$bundle_artifact" "$app_name" 2>/dev/null || true)
+      if [ -n "$synced_install" ] && [ -d "$synced_install" ]; then
+        launch_bundle="$synced_install"
+      fi
       command -v open >/dev/null 2>&1 || {
         printf '%s\n' "forge-backend: open command not available on this system" >&2
         exit 1
       }
-      open -na "$bundle_artifact"
+      open -na "$launch_bundle"
       printf 'launched=1\n'
       printf 'mode=desktop-executable\n'
-      printf 'artifact=%s\n' "$bundle_artifact"
+      printf 'artifact=%s\n' "$launch_bundle"
+      printf 'built_artifact=%s\n' "$bundle_artifact"
+      [ -n "$synced_install" ] && printf 'installed_synced=%s\n' "$synced_install"
       exit 0
       ;;
     linux)
