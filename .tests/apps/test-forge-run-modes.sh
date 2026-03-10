@@ -23,6 +23,8 @@ backend="$root/apps/forge/scripts/forge-backend.sh"
 grep -F "built and launched from the compiled desktop app bundle." "$ui" >/dev/null
 grep -F "if (enabledTargets[nativeTarget]) {" "$ui" >/dev/null
 grep -F "if (enabledTargets['hosted-web']) {" "$ui" >/dev/null
+grep -F "var context = projectType === 'game' ? 'godot' : 'web';" "$ui" >/dev/null
+grep -F "var args = [folder, title, context, starter, targets.join(',')];" "$ui" >/dev/null
 
 # Desktop precedence in builtin run pipeline (desktop branch appears before hosted-web fallback).
 builtin_desktop_line=$(grep -nF "if (enabledTargets[nativeTarget]) {" "$ui" | head -n 1 | cut -d: -f1)
@@ -62,8 +64,7 @@ grep -F "\"\$bundle/Contents/Resources/.host/\"" "$backend" >/dev/null
 grep -F "\"\$appdir/usr/share/.host/\"" "$backend" >/dev/null
 grep -F 'WIZARDRY_APPS_ROOT="$root"' "$backend" >/dev/null
 grep -F 'WIZARDRY_DIR="$root"' "$backend" >/dev/null
-grep -F "copy_tree_for_bundle \"\$app_dir\" \"\$bundle/Contents/Resources/\$workspace_slug/\"" "$backend" >/dev/null
-grep -F "\"\\\$APPDIR/MacOS/wizardry-host\" \"\\\$APPDIR/Resources/\$workspace_slug\"" "$backend" >/dev/null
-grep -F "\"\\\$APPDIR/Resources/\$workspace_slug\"" "$backend" >/dev/null
+grep -F "copy_tree_for_bundle \"\$workspace_path\" \"\$bundle/Contents/Resources/\$workspace_slug/\"" "$backend" >/dev/null
+grep -F "\"\\\$APPDIR/MacOS/wizardry-host\" \"\\\$APPDIR/Resources/\$workspace_slug\$app_entry_suffix\"" "$backend" >/dev/null
 
 printf '%s\n' "forge standardized run/install pipeline tests passed"

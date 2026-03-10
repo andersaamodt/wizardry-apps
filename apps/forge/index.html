@@ -3562,7 +3562,8 @@
 
         setProjectsRoot(projectsRoot);
 
-        var args = [folder, title, projectType, starter, targets.join(',')];
+        var context = projectType === 'game' ? 'godot' : 'web';
+        var args = [folder, title, context, starter, targets.join(',')];
         if (starter === 'clone') {
           args.push(source);
         } else {
@@ -3582,7 +3583,7 @@
           ].filter(Boolean),
           help: {
             title: 'Project profile',
-            body: 'Type: ' + (out.project_type || projectType) + '\nDevelopment context: ' + (out.development_context || projectType) + '\nTargets: ' + (out.targets || targets.join(','))
+            body: 'Type: ' + (out.project_type || projectType) + '\nDevelopment context: ' + (out.development_context || context) + '\nTargets: ' + (out.targets || targets.join(','))
           }
         });
 
