@@ -3272,6 +3272,24 @@
         scheduleWindowFit();
       }
 
+      function resetCreateForm() {
+        if (els.createTitle) {
+          els.createTitle.value = '';
+        }
+        var applicationRadio = document.querySelector('input[name="project-type"][value="application"]');
+        if (applicationRadio) {
+          applicationRadio.checked = true;
+        }
+        if (els.starterApplicationSelect && els.starterApplicationSelect.options.length) {
+          els.starterApplicationSelect.selectedIndex = 0;
+        }
+        if (els.starterGameSelect && els.starterGameSelect.options.length) {
+          els.starterGameSelect.selectedIndex = 0;
+        }
+        state.lastProjectType = '';
+        syncCreateUI();
+      }
+
       function inferFolderFromTitle(title) {
         return title
           .toLowerCase()
@@ -3873,7 +3891,11 @@
         });
 
         els.openCreateWorkflow.addEventListener('click', function () {
+          resetCreateForm();
           setWorkflowMode('create');
+          if (els.createTitle) {
+            els.createTitle.focus();
+          }
         });
 
         els.builtinSearch.addEventListener('input', renderCatalogList);
