@@ -18,6 +18,7 @@ fi
 out=$(sh "$backend" --help)
 printf '%s' "$out" | grep -F "Usage:" >/dev/null
 printf '%s\n' "$out" | grep -F "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]" >/dev/null
+printf '%s\n' "$out" | grep -F "set-workspace-title [ROOT_HINT] WORKSPACE_PATH TITLE" >/dev/null
 
 out=$(sh "$backend" doctor "$test_root")
 printf '%s\n' "$out" | grep -F "root=$test_root" >/dev/null
@@ -189,6 +190,11 @@ grep -F "targets=hosted-web,macos,linux,android" "$workspaces_root/workspace-web
 set_workspace_web_only_out=$(sh "$backend" set-workspace-targets "$scratch" "$workspaces_root/workspace-web" "hosted-web")
 printf '%s\n' "$set_workspace_web_only_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
 grep -F "targets=hosted-web" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+
+set_workspace_title_out=$(sh "$backend" set-workspace-title "$scratch" "$workspaces_root/workspace-web" "Workspace Web Renamed")
+printf '%s\n' "$set_workspace_title_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
+printf '%s\n' "$set_workspace_title_out" | grep -F "title=Workspace Web Renamed" >/dev/null
+grep -F "title=Workspace Web Renamed" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 
 icon_payload='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+8X8AAAAASUVORK5CYII='
 set_workspace_icon_out=$(sh "$backend" set-workspace-icon "$scratch" "$workspaces_root/workspace-web" "$icon_payload")

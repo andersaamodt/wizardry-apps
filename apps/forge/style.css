@@ -789,6 +789,14 @@ input[type="checkbox"]:disabled {
   min-width: 0;
 }
 
+.catalog-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08rem;
+  flex: 0 0 auto;
+  position: relative;
+}
+
 .list-row:last-child {
   border-bottom: 0;
 }
@@ -911,10 +919,48 @@ input[type="checkbox"]:disabled {
   padding: 0;
 }
 
+.row-overflow {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in srgb, var(--text) 72%, var(--muted));
+  font-size: 0.88rem;
+  line-height: 1;
+  width: 1.3rem;
+  height: 1.45rem;
+  padding: 0;
+}
+
 .row-play:hover {
   border-color: transparent;
   background: color-mix(in srgb, var(--toolbar-accent-soft, var(--accent-soft, var(--bg-panel, var(--panel-solid, #fff)))) 78%, var(--toolbar-surface, var(--bg-panel, var(--panel-solid, #fff))));
   color: color-mix(in srgb, var(--text) 78%, var(--muted));
+}
+
+.row-overflow:hover {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--toolbar-accent-soft, var(--accent-soft, var(--bg-panel, var(--panel-solid, #fff)))) 74%, var(--toolbar-surface, var(--bg-panel, var(--panel-solid, #fff))));
+  color: color-mix(in srgb, var(--text) 78%, var(--muted));
+}
+
+.catalog-row-menu {
+  right: 0;
+  top: calc(100% + 0.2rem);
+  min-width: 116px;
+  padding: 0.24rem;
+}
+
+.catalog-inline-rename {
+  height: 1.34rem;
+  min-width: 0;
+  width: min(15.5rem, 100%);
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  background: color-mix(in srgb, var(--panel-solid, #fff) 97%, transparent);
+  color: color-mix(in srgb, var(--text) 94%, transparent);
+  padding: 0 0.35rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
 }
 
 .empty {

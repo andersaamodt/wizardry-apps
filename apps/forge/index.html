@@ -307,6 +307,7 @@
       var THEME_KEY = 'wizardry.forge.theme';
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
+      var HIDDEN_WORKSPACES_KEY = 'wizardry.forge.hidden.workspaces.v1';
       var ASSET_VERSION = 'forge20260218a';
       var BACKEND_PREF_BY_STORAGE_KEY = {
         'wizardry.forge.root': 'root',
@@ -316,7 +317,8 @@
         'wizardry.forge.organize.builtin_first': 'organize_builtin_first',
         'wizardry.forge.theme': 'theme',
         'wizardry.forge.left_rail.width': 'left_rail_width',
-        'wizardry.forge.selected.catalog.v1': 'selected_catalog'
+        'wizardry.forge.selected.catalog.v1': 'selected_catalog',
+        'wizardry.forge.hidden.workspaces.v1': 'hidden_workspaces'
       };
 
       var state = {
@@ -357,7 +359,9 @@
         themeTypeaheadTimer: null,
         pathCompactTimer: null,
         hostBootReadySent: false,
-        workspaceDropDepth: 0
+        workspaceDropDepth: 0,
+        activeCatalogRowMenuKey: '',
+        inlineRenameKey: ''
       };
 
       var els = {};
@@ -434,6 +438,60 @@
         if (/^(builtin|workspace):/.test(state.selectedCatalog)) {
           saveStorage(SELECTED_CATALOG_KEY, state.selectedCatalog);
         }
+      }
+
+      function parseHiddenWorkspaceList() {
+        var raw = loadStorage(HIDDEN_WORKSPACES_KEY);
+        if (!raw) {
+          return [];
+        }
+        try {
+          var parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) {
+            return [];
+          }
+          return parsed.map(function (entry) {
+            return normalizePathForCompare(entry);
+          }).filter(Boolean);
+        } catch (_err) {
+          return [];
+        }
+      }
+
+      function hiddenWorkspacePathSet() {
+        var out = {};
+        parseHiddenWorkspaceList().forEach(function (path) {
+          out[path] = true;
+        });
+        return out;
+      }
+
+      function setHiddenWorkspaceList(paths) {
+        var unique = {};
+        (paths || []).forEach(function (path) {
+          var normalized = normalizePathForCompare(path);
+          if (normalized) {
+            unique[normalized] = true;
+          }
+        });
+        saveStorage(HIDDEN_WORKSPACES_KEY, JSON.stringify(Object.keys(unique).sort()));
+      }
+
+      function hideWorkspacePath(path) {
+        var existing = parseHiddenWorkspaceList();
+        existing.push(path);
+        setHiddenWorkspaceList(existing);
+      }
+
+      function unhideWorkspacePath(path) {
+        var normalized = normalizePathForCompare(path);
+        if (!normalized) {
+          return;
+        }
+        var existing = parseHiddenWorkspaceList().filter(function (item) {
+          return item !== normalized;
+        });
+        setHiddenWorkspaceList(existing);
       }
 
       function backendScript() {
@@ -1888,6 +1946,12 @@
 
       function renderCatalogList() {
         var items = filteredCatalogItems();
+        if (state.activeCatalogRowMenuKey && !items.some(function (item) { return item.key === state.activeCatalogRowMenuKey; })) {
+          state.activeCatalogRowMenuKey = '';
+        }
+        if (state.inlineRenameKey && !items.some(function (item) { return item.key === state.inlineRenameKey; })) {
+          state.inlineRenameKey = '';
+        }
 
         els.catalogList.innerHTML = '';
         if (!items.length) {
@@ -1916,10 +1980,61 @@
 
           var nameWrap = document.createElement('span');
           nameWrap.className = 'name';
-          var title = document.createElement('span');
-          title.className = 'name-text';
-          title.textContent = item.title;
-          nameWrap.appendChild(title);
+          if (state.inlineRenameKey === item.key && item.kind === 'workspace' && !item.draft) {
+            var renameInput = document.createElement('input');
+            renameInput.type = 'text';
+            renameInput.className = 'catalog-inline-rename';
+            renameInput.value = item.title;
+            renameInput.setAttribute('aria-label', 'Rename project');
+            renameInput.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+            });
+            renameInput.addEventListener('keydown', function (event) {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                renameInput.blur();
+                return;
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                state.inlineRenameKey = '';
+                renderCatalogList();
+              }
+            });
+            renameInput.addEventListener('blur', function () {
+              var nextTitle = renameInput.value.trim();
+              if (!nextTitle || nextTitle === item.title) {
+                state.inlineRenameKey = '';
+                renderCatalogList();
+                return;
+              }
+              perform('Rename project', async function () {
+                await backend('set-workspace-title', [item.path, nextTitle], { quiet: true });
+                await refreshWorkspaces({ quiet: true, render: false });
+                var renamed = state.workspaces.find(function (ws) {
+                  return normalizePathForCompare(ws.path) === normalizePathForCompare(item.path);
+                });
+                if (renamed) {
+                  setSelectedCatalog('workspace:' + renamed.id);
+                  state.selectedWorkspace = renamed.id;
+                }
+                state.inlineRenameKey = '';
+                renderCatalogList();
+                renderSelectedBuiltIn();
+              }, { swallow: true, noToast: true, keepResult: true });
+            });
+            nameWrap.appendChild(renameInput);
+            setTimeout(function () {
+              renameInput.focus();
+              renameInput.select();
+            }, 0);
+          } else {
+            var title = document.createElement('span');
+            title.className = 'name-text';
+            title.textContent = item.title;
+            nameWrap.appendChild(title);
+          }
           var contextPill = document.createElement('span');
           contextPill.className = 'context-dot';
           var isGameContext = item.context === 'godot';
@@ -1948,6 +2063,8 @@
           content.className = 'catalog-content';
 
           if (!item.draft) {
+            var rowActions = document.createElement('span');
+            rowActions.className = 'catalog-row-actions menu-anchor';
             var play = document.createElement('button');
             play.type = 'button';
             play.className = 'row-play';
@@ -1974,13 +2091,94 @@
               renderCatalogList();
               renderSelectedBuiltIn();
             });
-            line.appendChild(play);
+            rowActions.appendChild(play);
+
+            var rowMenuBtn = document.createElement('button');
+            rowMenuBtn.type = 'button';
+            rowMenuBtn.className = 'row-overflow';
+            rowMenuBtn.title = 'More actions';
+            rowMenuBtn.setAttribute('aria-label', 'More actions');
+            rowMenuBtn.textContent = '⋮';
+            rowMenuBtn.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (state.activeCatalogRowMenuKey === item.key) {
+                state.activeCatalogRowMenuKey = '';
+              } else {
+                state.activeCatalogRowMenuKey = item.key;
+              }
+              renderCatalogList();
+            });
+            rowActions.appendChild(rowMenuBtn);
+
+            var rowMenu = document.createElement('div');
+            rowMenu.className = 'floating-menu catalog-row-menu' + (state.activeCatalogRowMenuKey === item.key ? '' : ' hidden');
+
+            var renameButton = document.createElement('button');
+            renameButton.type = 'button';
+            renameButton.textContent = 'Rename';
+            renameButton.disabled = item.kind !== 'workspace' || item.draft;
+            renameButton.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              state.activeCatalogRowMenuKey = '';
+              state.inlineRenameKey = item.key;
+              renderCatalogList();
+            });
+            rowMenu.appendChild(renameButton);
+
+            var removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.textContent = 'Remove';
+            removeButton.disabled = item.kind !== 'workspace' || item.draft;
+            removeButton.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              state.activeCatalogRowMenuKey = '';
+              if (item.kind !== 'workspace' || item.draft) {
+                return;
+              }
+              perform('Remove project from Forge', async function () {
+                var removedPath = item.path || '';
+                hideWorkspacePath(removedPath);
+                await refreshWorkspaces({ quiet: true, render: false });
+                if (state.selectedCatalog === item.key) {
+                  setSelectedCatalog('');
+                }
+                renderCatalogList();
+                renderSelectedBuiltIn();
+                renderResult({
+                  status: 'ok',
+                  summary: item.title + ' removed from Forge list.',
+                  paths: removedPath ? [{ label: 'Original folder (not deleted)', path: removedPath, canReveal: true }] : [],
+                  actions: removedPath ? [{
+                    label: 'Open Folder',
+                    run: function () { return openPath(removedPath, false); }
+                  }] : [],
+                  help: {
+                    title: 'Folder kept',
+                    body: 'Nothing was deleted. This only removed the item from Forge.'
+                  }
+                });
+                if (removedPath) {
+                  toast('Removed from Forge. Folder kept: ' + removedPath, 'ok');
+                } else {
+                  toast('Removed from Forge. Nothing was deleted.', 'ok');
+                }
+              }, { swallow: true, noToast: true, keepResult: true });
+            });
+            rowMenu.appendChild(removeButton);
+            rowActions.appendChild(rowMenu);
+            line.appendChild(rowActions);
           }
 
           content.appendChild(line);
           row.appendChild(thumb);
           row.appendChild(content);
           function selectItem() {
+            if (state.inlineRenameKey) {
+              return;
+            }
             if (item.draft) {
               setWorkflowMode('create');
               if (els.createTitle) {
@@ -2431,6 +2629,8 @@
 
         var res = await backend('import-workspace', [folderPath, state.projectsRoot]);
         var out = kv(res.stdout || '');
+        unhideWorkspacePath(out.workspace || '');
+        unhideWorkspacePath(out.registered_path || '');
         await refreshWorkspaces({ quiet: true, render: false });
 
         var byRegisteredPath = normalizePathForCompare(out.registered_path || '');
@@ -3439,6 +3639,7 @@
         var shouldRender = options.render !== false;
         var res = await backend('list-workspaces', [state.projectsRoot], { quiet: !!options.quiet });
         var rows = parseTSV(res.stdout || '', 7);
+        var hiddenPaths = hiddenWorkspacePathSet();
         state.workspaces = rows.map(function (row) {
           return {
             id: row[0],
@@ -3449,6 +3650,8 @@
             path: row[5],
             sortTimestamp: row[6] || '0'
           };
+        }).filter(function (ws) {
+          return !hiddenPaths[normalizePathForCompare(ws.path)];
         });
 
         if (shouldRender) {
@@ -3834,6 +4037,7 @@
 
         var res = await backend('scaffold-workspace', args);
         var out = kv(res.stdout || '');
+        unhideWorkspacePath(out.created || '');
 
         renderResult({
           status: 'ok',
@@ -4040,11 +4244,15 @@
             event.target.closest('#build-menu') ||
             event.target.closest('#action-build-menu') ||
             event.target.closest('#run-menu') ||
-            event.target.closest('#action-run-menu')
+            event.target.closest('#action-run-menu') ||
+            event.target.closest('.catalog-row-menu') ||
+            event.target.closest('.row-overflow')
           ) {
             return;
           }
+          state.activeCatalogRowMenuKey = '';
           closeFloatingMenus();
+          renderCatalogList();
         });
 
         if (els.settingsPanel) {

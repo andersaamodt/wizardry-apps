@@ -21,6 +21,7 @@ Commands:
   set-ui-pref [ROOT_HINT] KEY VALUE
   set-app-targets [ROOT_HINT] APP_SLUG TARGETS
   set-workspace-targets [ROOT_HINT] WORKSPACE_PATH TARGETS
+  set-workspace-title [ROOT_HINT] WORKSPACE_PATH TITLE
   set-app-icon [ROOT_HINT] APP_SLUG DATA_URL
   set-workspace-icon [ROOT_HINT] WORKSPACE_PATH DATA_URL
   download-app [ROOT_HINT] APP_SLUG
@@ -1861,6 +1862,37 @@ cmd_set_workspace_targets() {
   printf 'profile=%s\n' "$conf"
 }
 
+cmd_set_workspace_title() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  title=${3-}
+
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: set-workspace-title requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -d "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+  [ -n "$title" ] || {
+    printf '%s\n' "forge-backend: set-workspace-title requires TITLE" >&2
+    exit 2
+  }
+
+  conf="$workspace_path/wizardry.workspace.conf"
+  [ -f "$conf" ] || {
+    printf '%s\n' "forge-backend: workspace profile missing: $workspace_path" >&2
+    exit 1
+  }
+
+  write_key_value_file "$conf" title "$(printf '%s' "$title" | tr '\r\n' ' ')"
+  printf 'root=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_path"
+  printf 'title=%s\n' "$title"
+  printf 'profile=%s\n' "$conf"
+}
+
 decode_base64_to_file() {
   payload=$1
   out_file=$2
@@ -3695,6 +3727,9 @@ case "$cmd" in
     ;;
   set-workspace-targets)
     cmd_set_workspace_targets "${2-}" "${3-}" "${4-}"
+    ;;
+  set-workspace-title)
+    cmd_set_workspace_title "${2-}" "${3-}" "${4-}"
     ;;
   set-app-icon)
     cmd_set_app_icon "${2-}" "${3-}" "${4-}"
