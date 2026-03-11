@@ -1592,17 +1592,26 @@ ensure_importable_workspace_profile() {
   context=""
   project_type=""
   targets=""
+  starter="import"
+  profile_kind="detected"
   if [ -f "$workspace_path/project.godot" ] || [ -f "$workspace_path/game/project.godot" ] || [ -f "$workspace_path/tool_main.gd" ]; then
     context="godot"
     project_type="game"
     targets="macos,linux,godot-desktop"
+    starter="import-godot"
   elif [ -f "$workspace_path/app/index.html" ] || [ -f "$workspace_path/index.html" ]; then
     context="web"
     project_type="application"
     targets="hosted-web,macos,linux"
+    starter="import-web"
   else
-    printf '%s\n' "forge-backend: workspace profile missing and no recognizable project entrypoint: $workspace_path" >&2
-    exit 1
+    # Allow importing arbitrary repositories/folders so they appear in Forge.
+    # Keep targets empty until the user enables the ones they want.
+    context="web"
+    project_type="application"
+    targets=""
+    starter="import-generic"
+    profile_kind="generic"
   fi
 
   project_id=$(derive_workspace_slug "$(basename "$workspace_path")")
@@ -1613,7 +1622,8 @@ project_id=$project_id
 title=$project_title
 project_type=$project_type
 development_context=$context
-starter=import
+starter=$starter
+profile_kind=$profile_kind
 targets=$targets
 root=$workspace_path
 CONF

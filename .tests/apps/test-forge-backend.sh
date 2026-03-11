@@ -156,9 +156,25 @@ printf '%s\n' "$import_direct_out" | grep -F "mode=direct" >/dev/null
 printf '%s\n' "$import_direct_out" | grep -F "profile_created=1" >/dev/null
 [ -f "$direct_workspace_abs/wizardry.workspace.conf" ]
 
+generic_workspace="$scratch/external/generic-repo"
+mkdir -p "$generic_workspace/docs"
+printf '%s\n' "hello" > "$generic_workspace/README.md"
+generic_workspace_abs=$(CDPATH= cd -- "$generic_workspace" && pwd -P)
+import_generic_out=$(sh "$backend" import-workspace "$scratch" "$generic_workspace" "$workspaces_root")
+printf '%s\n' "$import_generic_out" | grep -F "workspace=$generic_workspace_abs" >/dev/null
+printf '%s\n' "$import_generic_out" | grep -F "mode=linked" >/dev/null
+printf '%s\n' "$import_generic_out" | grep -F "profile_created=1" >/dev/null
+[ -f "$generic_workspace_abs/wizardry.workspace.conf" ]
+grep -F "project_type=application" "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
+grep -F "development_context=web" "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
+grep -F "starter=import-generic" "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
+grep -F "profile_kind=generic" "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
+grep -E '^targets=$' "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
+
 workspaces_after_import=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces_after_import" | grep -E '^plain-web\t' >/dev/null
 printf '%s\n' "$workspaces_after_import" | grep -E '^direct-space\t' >/dev/null
+printf '%s\n' "$workspaces_after_import" | grep -E '^generic-repo\t' >/dev/null
 
 set_app_targets_out=$(sh "$backend" set-app-targets "$scratch" sandbox-tool "hosted-web,macos,linux,ios,android")
 printf '%s\n' "$set_app_targets_out" | grep -F "slug=sandbox-tool" >/dev/null
