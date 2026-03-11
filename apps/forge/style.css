@@ -2477,6 +2477,19 @@ input[type="checkbox"]:disabled {
   cursor: pointer;
 }
 
+.target-item input:disabled {
+  cursor: not-allowed;
+  filter: grayscale(1);
+  opacity: 0.42;
+}
+
+.target-row:has(input:disabled) .target-label,
+.target-row:has(input:disabled) .target-icon,
+.target-row:has(input:disabled) .target-status {
+  color: color-mix(in srgb, var(--section-muted) 84%, transparent);
+  opacity: 0.58;
+}
+
 .target-item button {
   cursor: pointer;
 }
