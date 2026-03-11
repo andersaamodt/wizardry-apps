@@ -795,6 +795,7 @@ input[type="checkbox"]:disabled {
   gap: 0.08rem;
   flex: 0 0 auto;
   position: relative;
+  margin-left: 0.26rem;
 }
 
 .list-row:last-child {
@@ -914,9 +915,10 @@ input[type="checkbox"]:disabled {
   color: color-mix(in srgb, var(--text) 78%, var(--muted));
   font-size: 0.72rem;
   line-height: 1;
-  width: 1.65rem;
+  width: 1.56rem;
   height: 1.45rem;
   padding: 0;
+  margin-left: 0.08rem;
 }
 
 .row-overflow {
@@ -929,6 +931,7 @@ input[type="checkbox"]:disabled {
   width: 1.3rem;
   height: 1.45rem;
   padding: 0;
+  margin-left: 0.04rem;
 }
 
 .row-play:hover {
