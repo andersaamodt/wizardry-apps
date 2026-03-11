@@ -25,6 +25,7 @@ grep -F "if (enabledTargets[nativeTarget]) {" "$ui" >/dev/null
 grep -F "if (enabledTargets['hosted-web']) {" "$ui" >/dev/null
 grep -F "var context = projectType === 'game' ? 'godot' : 'web';" "$ui" >/dev/null
 grep -F "var args = [folder, title, context, starter, targets.join(',')];" "$ui" >/dev/null
+grep -F "return ['sh', backendScript(), cmd, state.rootHint || ''];" "$ui" >/dev/null
 grep -F "var createdPath = normalizePathForCompare(out.created || '');" "$ui" >/dev/null
 grep -F "setSelectedCatalog('workspace:' + createdWorkspace.id);" "$ui" >/dev/null
 grep -F "function resetCreateForm() {" "$ui" >/dev/null
@@ -49,7 +50,7 @@ workspace_web_line=$(grep -nF "if (hasEnabledHostedWebTarget(selected)) {" "$ui"
 [ "$workspace_desktop_line" -lt "$workspace_web_line" ]
 
 # Backend CLI contract is strict and single-path.
-help_out=$("$backend" --help)
+help_out=$(sh "$backend" --help)
 printf '%s\n' "$help_out" | grep -F "install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID]" >/dev/null
 printf '%s\n' "$help_out" | grep -F "run-desktop [ROOT_HINT] APP_SLUG" >/dev/null
 printf '%s\n' "$help_out" | grep -F "run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]" >/dev/null

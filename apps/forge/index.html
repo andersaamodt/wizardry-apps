@@ -641,7 +641,7 @@
       }
 
       function rootArgv(cmd) {
-        return [backendScript(), cmd, state.rootHint || ''];
+        return ['sh', backendScript(), cmd, state.rootHint || ''];
       }
 
       async function backend(cmd, extraArgs, opts) {
