@@ -7,13 +7,44 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
-typedef struct {
-    WebKitWebView *web_view;
+#define WINDOW_MIN_WIDTH 420
+#define WINDOW_MIN_HEIGHT 320
+#define MAIN_DEFAULT_WIDTH 1024
+#define MAIN_DEFAULT_HEIGHT 768
+#define POPUP_DEFAULT_WIDTH 980
+#define POPUP_DEFAULT_HEIGHT 720
+
+typedef struct _AppState AppState;
+typedef struct _WindowContext WindowContext;
+
+struct _AppState {
     char *app_path;
-} AppData;
+    char *app_name;
+    char *index_uri;
+    GList *windows;
+};
+
+struct _WindowContext {
+    AppState *state;
+    GtkWidget *window;
+    WebKitWebView *web_view;
+};
+
+static void message_received_cb(WebKitUserContentManager *manager,
+                                WebKitJavascriptResult *js_result,
+                                gpointer user_data);
+static WebKitWebView *web_view_create_cb(WebKitWebView *web_view,
+                                         WebKitNavigationAction *navigation_action,
+                                         gpointer user_data);
+static void window_destroy_cb(GtkWidget *window, gpointer user_data);
+static WindowContext *create_window_context(AppState *state,
+                                            const char *title,
+                                            int width,
+                                            int height,
+                                            GtkWindow *transient_for);
 
 static const char *DESKTOP_BRIDGE_BOOTSTRAP =
     "(function () {"
@@ -68,200 +99,336 @@ static const char *DESKTOP_BRIDGE_BOOTSTRAP =
     "  }"
     "})();";
 
-// Escape string for JSON
-char* escape_json(const char *str) {
-    if (!str) return strdup("");
-    
+// Escape string for JSON usage in callback payloads.
+static char *escape_json(const char *str) {
+    if (!str) {
+        return g_strdup("");
+    }
+
     size_t len = strlen(str);
-    char *escaped = malloc(len * 2 + 1);  // Worst case: all chars need escaping
-    char *p = escaped;
-    
+    char *escaped = g_malloc(len * 2 + 1);
+    char *cursor = escaped;
     for (size_t i = 0; i < len; i++) {
         switch (str[i]) {
-            case '\\': *p++ = '\\'; *p++ = '\\'; break;
-            case '"':  *p++ = '\\'; *p++ = '"'; break;
-            case '\n': *p++ = '\\'; *p++ = 'n'; break;
-            case '\r': *p++ = '\\'; *p++ = 'r'; break;
-            case '\t': *p++ = '\\'; *p++ = 't'; break;
-            default:   *p++ = str[i]; break;
+            case '\\':
+                *cursor++ = '\\';
+                *cursor++ = '\\';
+                break;
+            case '"':
+                *cursor++ = '\\';
+                *cursor++ = '"';
+                break;
+            case '\n':
+                *cursor++ = '\\';
+                *cursor++ = 'n';
+                break;
+            case '\r':
+                *cursor++ = '\\';
+                *cursor++ = 'r';
+                break;
+            case '\t':
+                *cursor++ = '\\';
+                *cursor++ = 't';
+                break;
+            default:
+                *cursor++ = str[i];
+                break;
         }
     }
-    *p = '\0';
+    *cursor = '\0';
     return escaped;
 }
 
-// Execute command and capture output
-void execute_command(const char **argv, char **stdout_str, char **stderr_str, int *exit_code) {
-    int stdout_pipe[2], stderr_pipe[2];
-    pipe(stdout_pipe);
-    pipe(stderr_pipe);
-    
-    pid_t pid = fork();
-    if (pid == 0) {
-        // Child process
-        close(stdout_pipe[0]);
-        close(stderr_pipe[0]);
-        dup2(stdout_pipe[1], STDOUT_FILENO);
-        dup2(stderr_pipe[1], STDERR_FILENO);
-        close(stdout_pipe[1]);
-        close(stderr_pipe[1]);
-        
-        execvp(argv[0], (char **)argv);
-        perror("execvp failed");
-        exit(127);
+static int parse_dimension_or_default(const char *raw_value, int fallback, int minimum) {
+    if (!raw_value || !*raw_value) {
+        return fallback;
     }
-    
-    // Parent process
-    close(stdout_pipe[1]);
-    close(stderr_pipe[1]);
-    
-    // Read stdout
-    char stdout_buf[4096];
-    ssize_t stdout_len = read(stdout_pipe[0], stdout_buf, sizeof(stdout_buf) - 1);
-    if (stdout_len > 0) {
-        stdout_buf[stdout_len] = '\0';
-        *stdout_str = strdup(stdout_buf);
-    } else {
-        *stdout_str = strdup("");
+    char *end = NULL;
+    long parsed = strtol(raw_value, &end, 10);
+    if (end == raw_value || (end && *end != '\0')) {
+        return fallback;
     }
-    close(stdout_pipe[0]);
-    
-    // Read stderr
-    char stderr_buf[4096];
-    ssize_t stderr_len = read(stderr_pipe[0], stderr_buf, sizeof(stderr_buf) - 1);
-    if (stderr_len > 0) {
-        stderr_buf[stderr_len] = '\0';
-        *stderr_str = strdup(stderr_buf);
-    } else {
-        *stderr_str = strdup("");
+    if (parsed < minimum) {
+        return minimum;
     }
-    close(stderr_pipe[0]);
-    
-    // Wait for child
-    int status;
-    waitpid(pid, &status, 0);
-    *exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    if (parsed > 4000) {
+        return 4000;
+    }
+    return (int)parsed;
 }
 
-// Handle messages from JavaScript
-static void message_received_cb(WebKitUserContentManager *manager,
-                                 WebKitJavascriptResult *js_result,
-                                 gpointer user_data)
-{
-    AppData *app_data = (AppData *)user_data;
-    
-    JSCValue *value = webkit_javascript_result_get_js_value(js_result);
-    
-    // Parse the message { id: "...", command: ["cmd", "arg1", "arg2"] }
-    if (!jsc_value_is_object(value)) {
-        g_warning("Message is not an object");
+static void send_result_to_web_view(WebKitWebView *web_view,
+                                    const char *message_id,
+                                    const char *stdout_str,
+                                    const char *stderr_str,
+                                    int exit_code,
+                                    const char *error_str) {
+    if (!web_view || !message_id || !*message_id) {
         return;
     }
-    
-    JSCValue *id_val = jsc_value_object_get_property(value, "id");
-    JSCValue *cmd_val = jsc_value_object_get_property(value, "command");
-    
-    if (!jsc_value_is_string(id_val) || !jsc_value_is_array(cmd_val)) {
-        g_warning("Invalid message format");
-        g_object_unref(id_val);
-        g_object_unref(cmd_val);
-        return;
-    }
-    
-    char *msg_id = jsc_value_to_string(id_val);
-    
-    // Convert JSArray to C array
-    int cmd_len = jsc_value_to_int32(jsc_value_object_get_property(cmd_val, "length"));
-    if (cmd_len == 0) {
-        g_warning("Command array is empty");
-        g_free(msg_id);
-        g_object_unref(id_val);
-        g_object_unref(cmd_val);
-        return;
-    }
-    
-    const char **argv = malloc((cmd_len + 1) * sizeof(char *));
-    for (int i = 0; i < cmd_len; i++) {
-        char idx_str[16];
-        snprintf(idx_str, sizeof(idx_str), "%d", i);
-        JSCValue *elem = jsc_value_object_get_property(cmd_val, idx_str);
-        argv[i] = jsc_value_to_string(elem);
-        g_object_unref(elem);
-    }
-    argv[cmd_len] = NULL;
-    
-    // Execute command
-    char *stdout_str, *stderr_str;
-    int exit_code;
-    execute_command(argv, &stdout_str, &stderr_str, &exit_code);
-    
-    // Escape strings for JSON
+
+    char *esc_id = escape_json(message_id);
     char *esc_stdout = escape_json(stdout_str);
     char *esc_stderr = escape_json(stderr_str);
-    
-    // Build JavaScript callback
+    char *esc_error = error_str ? escape_json(error_str) : NULL;
+    char *error_payload = esc_error ? g_strdup_printf("\"%s\"", esc_error) : g_strdup("null");
+
     char *js_code = g_strdup_printf(
         "if (window.__wizardry_callbacks && window.__wizardry_callbacks['%s']) { "
         "  window.__wizardry_callbacks['%s']({ "
         "    stdout: \"%s\", "
         "    stderr: \"%s\", "
         "    exit_code: %d, "
-        "    error: null "
+        "    error: %s "
         "  }); "
         "  delete window.__wizardry_callbacks['%s']; "
         "}",
-        msg_id, msg_id, esc_stdout, esc_stderr, exit_code, msg_id);
-    
-    webkit_web_view_run_javascript(app_data->web_view, js_code, NULL, NULL, NULL);
-    
-    // Cleanup
-    free(stdout_str);
-    free(stderr_str);
-    free(esc_stdout);
-    free(esc_stderr);
+        esc_id,
+        esc_id,
+        esc_stdout,
+        esc_stderr,
+        exit_code,
+        error_payload,
+        esc_id);
+
+    webkit_web_view_run_javascript(web_view, js_code, NULL, NULL, NULL);
+
+    g_free(esc_id);
+    g_free(esc_stdout);
+    g_free(esc_stderr);
+    g_free(esc_error);
+    g_free(error_payload);
     g_free(js_code);
-    g_free(msg_id);
-    for (int i = 0; i < cmd_len; i++) {
-        g_free((void *)argv[i]);
+}
+
+static void execute_command(const char **argv,
+                            int argc,
+                            char **stdout_str,
+                            char **stderr_str,
+                            int *exit_code) {
+    gchar **spawn_argv = g_new0(gchar *, (gsize)argc + 1);
+    for (int i = 0; i < argc; i++) {
+        spawn_argv[i] = g_strdup(argv[i]);
     }
-    free(argv);
+    spawn_argv[argc] = NULL;
+
+    gchar *captured_stdout = NULL;
+    gchar *captured_stderr = NULL;
+    gint status = 0;
+    GError *error = NULL;
+    gboolean ok = g_spawn_sync(NULL,
+                               spawn_argv,
+                               NULL,
+                               G_SPAWN_SEARCH_PATH,
+                               NULL,
+                               NULL,
+                               &captured_stdout,
+                               &captured_stderr,
+                               &status,
+                               &error);
+
+    if (!ok) {
+        *stdout_str = g_strdup("");
+        *stderr_str = g_strdup((error && error->message) ? error->message : "failed to launch command");
+        *exit_code = 127;
+    } else {
+        *stdout_str = captured_stdout ? g_strdup(captured_stdout) : g_strdup("");
+        *stderr_str = captured_stderr ? g_strdup(captured_stderr) : g_strdup("");
+        if (WIFEXITED(status)) {
+            *exit_code = WEXITSTATUS(status);
+        } else {
+            *exit_code = -1;
+        }
+    }
+
+    if (error) {
+        g_error_free(error);
+    }
+    g_free(captured_stdout);
+    g_free(captured_stderr);
+    for (int i = 0; i < argc; i++) {
+        g_free(spawn_argv[i]);
+    }
+    g_free(spawn_argv);
+}
+
+static void free_argv(char **argv, int argc) {
+    if (!argv) {
+        return;
+    }
+    for (int i = 0; i < argc; i++) {
+        g_free(argv[i]);
+    }
+    g_free(argv);
+}
+
+static void handle_open_window_command(WindowContext *context,
+                                       const char *message_id,
+                                       char **argv,
+                                       int argc) {
+    const char *url = (argc >= 2) ? argv[1] : "";
+    if (!url || !*url) {
+        send_result_to_web_view(context->web_view, message_id, "", "missing window URL", 1, NULL);
+        return;
+    }
+
+    const char *fallback_title = gtk_window_get_title(GTK_WINDOW(context->window));
+    const char *title = (argc >= 3 && argv[2] && argv[2][0]) ? argv[2] : fallback_title;
+    int width = parse_dimension_or_default((argc >= 4) ? argv[3] : NULL, POPUP_DEFAULT_WIDTH, WINDOW_MIN_WIDTH);
+    int height = parse_dimension_or_default((argc >= 5) ? argv[4] : NULL, POPUP_DEFAULT_HEIGHT, WINDOW_MIN_HEIGHT);
+
+    WindowContext *popup = create_window_context(context->state,
+                                                 title,
+                                                 width,
+                                                 height,
+                                                 GTK_WINDOW(context->window));
+    if (!popup) {
+        send_result_to_web_view(context->web_view, message_id, "", "failed to create popup window", 1, NULL);
+        return;
+    }
+
+    webkit_web_view_load_uri(popup->web_view, url);
+    gtk_widget_show_all(popup->window);
+    gtk_window_present(GTK_WINDOW(popup->window));
+    send_result_to_web_view(context->web_view, message_id, "ok", "", 0, NULL);
+}
+
+static void message_received_cb(WebKitUserContentManager *manager,
+                                WebKitJavascriptResult *js_result,
+                                gpointer user_data) {
+    (void)manager;
+    WindowContext *context = (WindowContext *)user_data;
+    if (!context || !context->web_view) {
+        return;
+    }
+
+    JSCValue *value = webkit_javascript_result_get_js_value(js_result);
+    if (!jsc_value_is_object(value)) {
+        g_warning("wizardry bridge message is not an object");
+        return;
+    }
+
+    JSCValue *id_val = jsc_value_object_get_property(value, "id");
+    JSCValue *cmd_val = jsc_value_object_get_property(value, "command");
+    if (!jsc_value_is_string(id_val) || !jsc_value_is_array(cmd_val)) {
+        g_warning("wizardry bridge message has invalid shape");
+        g_object_unref(id_val);
+        g_object_unref(cmd_val);
+        return;
+    }
+
+    char *msg_id = jsc_value_to_string(id_val);
+    JSCValue *length_val = jsc_value_object_get_property(cmd_val, "length");
+    int cmd_len = jsc_value_to_int32(length_val);
+    g_object_unref(length_val);
+
+    if (cmd_len <= 0) {
+        send_result_to_web_view(context->web_view, msg_id, "", "command array is empty", 1, NULL);
+        g_free(msg_id);
+        g_object_unref(id_val);
+        g_object_unref(cmd_val);
+        return;
+    }
+
+    char **argv = g_new0(char *, (gsize)cmd_len + 1);
+    for (int i = 0; i < cmd_len; i++) {
+        char index_key[16];
+        snprintf(index_key, sizeof(index_key), "%d", i);
+        JSCValue *elem = jsc_value_object_get_property(cmd_val, index_key);
+        argv[i] = jsc_value_to_string(elem);
+        g_object_unref(elem);
+    }
+    argv[cmd_len] = NULL;
+
+    if (strcmp(argv[0], "__wizardry_host_open_window") == 0) {
+        handle_open_window_command(context, msg_id, argv, cmd_len);
+    } else {
+        char *stdout_str = NULL;
+        char *stderr_str = NULL;
+        int exit_code = 0;
+        execute_command((const char **)argv, cmd_len, &stdout_str, &stderr_str, &exit_code);
+        send_result_to_web_view(context->web_view, msg_id, stdout_str, stderr_str, exit_code, NULL);
+        g_free(stdout_str);
+        g_free(stderr_str);
+    }
+
+    free_argv(argv, cmd_len);
+    g_free(msg_id);
     g_object_unref(id_val);
     g_object_unref(cmd_val);
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <app-directory>\n", argv[0]);
-        return 1;
+static WebKitWebView *web_view_create_cb(WebKitWebView *web_view,
+                                         WebKitNavigationAction *navigation_action,
+                                         gpointer user_data) {
+    (void)web_view;
+    (void)navigation_action;
+    WindowContext *source = (WindowContext *)user_data;
+    if (!source || !source->state) {
+        return NULL;
     }
-    
-    char *app_path = argv[1];
-    char index_path[1024];
-    snprintf(index_path, sizeof(index_path), "%s/index.html", app_path);
-    
-    // Check if index.html exists
-    if (access(index_path, F_OK) != 0) {
-        fprintf(stderr, "Error: index.html not found at %s\n", index_path);
-        return 1;
+
+    const char *source_title = gtk_window_get_title(GTK_WINDOW(source->window));
+    WindowContext *popup = create_window_context(source->state,
+                                                 source_title,
+                                                 POPUP_DEFAULT_WIDTH,
+                                                 POPUP_DEFAULT_HEIGHT,
+                                                 GTK_WINDOW(source->window));
+    if (!popup) {
+        return NULL;
     }
-    
-    // Get app name from directory
-    char *app_name = strrchr(app_path, '/');
-    app_name = app_name ? app_name + 1 : app_path;
-    
-    gtk_init(&argc, &argv);
-    
-    // Create window
+
+    gtk_widget_show_all(popup->window);
+    gtk_window_present(GTK_WINDOW(popup->window));
+    return popup->web_view;
+}
+
+static void window_destroy_cb(GtkWidget *window, gpointer user_data) {
+    WindowContext *context = (WindowContext *)user_data;
+    if (!context || !context->state) {
+        g_free(context);
+        return;
+    }
+
+    context->state->windows = g_list_remove(context->state->windows, window);
+    if (context->state->windows == NULL) {
+        gtk_main_quit();
+    }
+    g_free(context);
+}
+
+static WindowContext *create_window_context(AppState *state,
+                                            const char *title,
+                                            int width,
+                                            int height,
+                                            GtkWindow *transient_for) {
+    if (!state) {
+        return NULL;
+    }
+
+    WindowContext *context = g_new0(WindowContext, 1);
+    context->state = state;
+
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    char title[256];
-    snprintf(title, sizeof(title), "Wizardry - %s", app_name);
-    gtk_window_set_title(GTK_WINDOW(window), title);
-    gtk_window_set_default_size(GTK_WINDOW(window), 1024, 768);
-    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
-    
-    // Create WebView with message handler
+    context->window = window;
+    gtk_window_set_title(GTK_WINDOW(window), (title && *title) ? title : "Wizardry");
+    gtk_window_set_default_size(GTK_WINDOW(window),
+                                width > WINDOW_MIN_WIDTH ? width : WINDOW_MIN_WIDTH,
+                                height > WINDOW_MIN_HEIGHT ? height : WINDOW_MIN_HEIGHT);
+    gtk_widget_set_size_request(window, WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT);
+    if (transient_for) {
+        gtk_window_set_transient_for(GTK_WINDOW(window), transient_for);
+    } else {
+        gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
+    }
+
+    g_signal_connect(window, "destroy", G_CALLBACK(window_destroy_cb), context);
+
     WebKitUserContentManager *content_manager = webkit_user_content_manager_new();
-    webkit_user_content_manager_register_script_message_handler(content_manager, "wizardry");
+    if (!webkit_user_content_manager_register_script_message_handler(content_manager, "wizardry")) {
+        g_warning("failed to register wizardry script message handler");
+    }
+
     WebKitUserScript *bridge_bootstrap = webkit_user_script_new(
         DESKTOP_BRIDGE_BOOTSTRAP,
         WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
@@ -270,27 +437,91 @@ int main(int argc, char *argv[]) {
         NULL);
     webkit_user_content_manager_add_script(content_manager, bridge_bootstrap);
     webkit_user_script_unref(bridge_bootstrap);
-    
-    AppData *app_data = malloc(sizeof(AppData));
-    app_data->app_path = app_path;
-    
-    g_signal_connect(content_manager, "script-message-received::wizardry",
-                     G_CALLBACK(message_received_cb), app_data);
-    
-    WebKitWebView *web_view = WEBKIT_WEB_VIEW(
-        webkit_web_view_new_with_user_content_manager(content_manager));
-    app_data->web_view = web_view;
-    
-    gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(web_view));
-    
-    // Load the HTML file
-    char uri[1024];
-    snprintf(uri, sizeof(uri), "file://%s", index_path);
-    webkit_web_view_load_uri(web_view, uri);
-    
-    gtk_widget_show_all(window);
+    g_signal_connect(content_manager,
+                     "script-message-received::wizardry",
+                     G_CALLBACK(message_received_cb),
+                     context);
+
+    context->web_view = WEBKIT_WEB_VIEW(webkit_web_view_new_with_user_content_manager(content_manager));
+    g_object_unref(content_manager);
+
+    if (!context->web_view) {
+        gtk_widget_destroy(window);
+        return NULL;
+    }
+
+    WebKitSettings *settings = webkit_web_view_get_settings(context->web_view);
+    if (settings) {
+        g_object_set(G_OBJECT(settings), "javascript-can-open-windows-automatically", TRUE, NULL);
+    }
+
+    g_signal_connect(context->web_view, "create", G_CALLBACK(web_view_create_cb), context);
+    gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(context->web_view));
+    state->windows = g_list_prepend(state->windows, window);
+    return context;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <app-directory>\n", argv[0]);
+        return 1;
+    }
+
+    const char *app_path = argv[1];
+    char *index_path = g_build_filename(app_path, "index.html", NULL);
+    if (access(index_path, F_OK) != 0) {
+        fprintf(stderr, "Error: index.html not found at %s\n", index_path);
+        g_free(index_path);
+        return 1;
+    }
+
+    const char *leaf = strrchr(app_path, '/');
+    const char *app_slug = leaf ? (leaf + 1) : app_path;
+    char *window_title = g_strdup_printf("Wizardry - %s", app_slug);
+
+    GError *uri_error = NULL;
+    char *index_uri = g_filename_to_uri(index_path, NULL, &uri_error);
+    if (!index_uri) {
+        fprintf(stderr, "Error: failed to resolve app URI: %s\n",
+                (uri_error && uri_error->message) ? uri_error->message : "unknown error");
+        if (uri_error) {
+            g_error_free(uri_error);
+        }
+        g_free(index_path);
+        g_free(window_title);
+        return 1;
+    }
+
+    gtk_init(&argc, &argv);
+
+    AppState state = {0};
+    state.app_path = g_strdup(app_path);
+    state.app_name = window_title;
+    state.index_uri = index_uri;
+    state.windows = NULL;
+
+    WindowContext *main_context = create_window_context(&state,
+                                                        state.app_name,
+                                                        MAIN_DEFAULT_WIDTH,
+                                                        MAIN_DEFAULT_HEIGHT,
+                                                        NULL);
+    if (!main_context) {
+        fprintf(stderr, "Error: failed to create main window\n");
+        g_free(state.index_uri);
+        g_free(state.app_name);
+        g_free(state.app_path);
+        g_free(index_path);
+        return 1;
+    }
+
+    webkit_web_view_load_uri(main_context->web_view, state.index_uri);
+    gtk_widget_show_all(main_context->window);
+    gtk_window_present(GTK_WINDOW(main_context->window));
     gtk_main();
-    
-    free(app_data);
+
+    g_free(state.index_uri);
+    g_free(state.app_name);
+    g_free(state.app_path);
+    g_free(index_path);
     return 0;
 }

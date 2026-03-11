@@ -27,6 +27,7 @@
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler, NSWindowDelegate, WKUIDelegate>
 @property (strong) NSWindow *window;
 @property (strong) WKWebView *webView;
+@property (strong) NSMutableArray<NSWindow *> *auxWindows;
 @property (strong) NSView *hostRootView;
 @property (strong) NSString *appPath;
 @property (strong) NSImage *appIconImage;
@@ -48,6 +49,11 @@
 @property (assign) EventHotKeyRef favoriteTrackHotKeyRef;
 @property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
 - (void)emitGlobalFavoriteTrackHotkey;
+- (WKWebView *)createAuxWindowWithConfiguration:(WKWebViewConfiguration *)configuration
+                                         request:(NSURLRequest *)request
+                                     windowTitle:(NSString *)windowTitle
+                                           width:(CGFloat)width
+                                          height:(CGFloat)height;
 @end
 
 static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, EventRef event, void *userData) {
@@ -165,6 +171,106 @@ completionHandler:(void (^)(BOOL result))completionHandler {
             }
         }];
     });
+}
+
+- (WKWebView *)createAuxWindowWithConfiguration:(WKWebViewConfiguration *)configuration
+                                         request:(NSURLRequest *)request
+                                     windowTitle:(NSString *)windowTitle
+                                           width:(CGFloat)width
+                                          height:(CGFloat)height
+{
+    WKWebViewConfiguration *resolvedConfiguration = configuration ?: [[WKWebViewConfiguration alloc] init];
+    if (resolvedConfiguration.preferences) {
+        resolvedConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = YES;
+    }
+    WKUserContentController *contentController = resolvedConfiguration.userContentController;
+    if (!contentController) {
+        contentController = [[WKUserContentController alloc] init];
+        resolvedConfiguration.userContentController = contentController;
+    }
+    @try {
+        [contentController addScriptMessageHandler:self name:@"wizardry"];
+    } @catch (NSException *exception) {
+        (void)exception;
+    }
+    WKUserScript *bridgeBootstrap =
+        [[WKUserScript alloc] initWithSource:[self desktopBridgeBootstrapSource]
+                               injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                            forMainFrameOnly:YES];
+    [contentController addUserScript:bridgeBootstrap];
+
+    CGFloat resolvedWidth = MAX(420.0, width);
+    CGFloat resolvedHeight = MAX(320.0, height);
+    NSRect frame = NSMakeRect(0.0, 0.0, resolvedWidth, resolvedHeight);
+    NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |
+                                   NSWindowStyleMaskClosable |
+                                   NSWindowStyleMaskMiniaturizable |
+                                   NSWindowStyleMaskResizable |
+                                   NSWindowStyleMaskFullSizeContentView;
+    NSWindow *childWindow = [[NSWindow alloc] initWithContentRect:frame
+                                                         styleMask:styleMask
+                                                           backing:NSBackingStoreBuffered
+                                                             defer:NO];
+    childWindow.delegate = self;
+    [childWindow setMinSize:NSMakeSize(380.0, 260.0)];
+    [childWindow setTitle:(windowTitle.length ? windowTitle : @"Wizardry")];
+    [childWindow setTitlebarAppearsTransparent:YES];
+    [childWindow setTitleVisibility:NSWindowTitleHidden];
+    [childWindow setBackgroundColor:[NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0]];
+    if (@available(macOS 11.0, *)) {
+        [childWindow setToolbarStyle:NSWindowToolbarStyleUnified];
+        [childWindow setTitlebarSeparatorStyle:NSTitlebarSeparatorStyleNone];
+    }
+
+    WKWebView *childWebView = [[WKWebView alloc] initWithFrame:frame configuration:resolvedConfiguration];
+    childWebView.UIDelegate = self;
+    @try {
+        [childWebView setValue:@NO forKey:@"drawsBackground"];
+    } @catch (NSException *exception) {
+        (void)exception;
+    }
+    if (@available(macOS 11.0, *)) {
+        childWebView.underPageBackgroundColor = [NSColor clearColor];
+    }
+    [childWebView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [childWindow setContentView:childWebView];
+
+    [childWindow makeKeyAndOrderFront:nil];
+    [childWindow orderFrontRegardless];
+    if (!self.auxWindows) {
+        self.auxWindows = [NSMutableArray array];
+    }
+    [self.auxWindows addObject:childWindow];
+
+    if (request) {
+        NSURL *url = request.URL;
+        if (url.isFileURL) {
+            NSURL *allowDir = [NSURL fileURLWithPath:@"/" isDirectory:YES];
+            [childWebView loadFileURL:url allowingReadAccessToURL:allowDir];
+        } else {
+            [childWebView loadRequest:request];
+        }
+    }
+
+    return childWebView;
+}
+
+- (WKWebView *)webView:(WKWebView *)webView
+createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration
+forNavigationAction:(WKNavigationAction *)navigationAction
+windowFeatures:(WKWindowFeatures *)windowFeatures {
+    (void)webView;
+    if (navigationAction.targetFrame && navigationAction.targetFrame.isMainFrame) {
+        return nil;
+    }
+    CGFloat width = windowFeatures.width ? MAX(420.0, windowFeatures.width.doubleValue) : 980.0;
+    CGFloat height = windowFeatures.height ? MAX(320.0, windowFeatures.height.doubleValue) : 720.0;
+    NSString *title = self.window ? self.window.title : @"Wizardry";
+    return [self createAuxWindowWithConfiguration:configuration
+                                          request:navigationAction.request
+                                      windowTitle:title
+                                            width:width
+                                           height:height];
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
@@ -922,6 +1028,9 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     }
     // Create WebView with message handler
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
+    if (config.preferences) {
+        config.preferences.javaScriptCanOpenWindowsAutomatically = YES;
+    }
     WKUserContentController *contentController = [[WKUserContentController alloc] init];
     [contentController addScriptMessageHandler:self name:@"wizardry"];
     WKUserScript *bridgeBootstrap =
@@ -1136,16 +1245,63 @@ completionHandler:(void (^)(BOOL result))completionHandler {
     }
     
     // Execute the command
-    [self executeCommand:command withId:messageId];
+    [self executeCommand:command withId:messageId fromWebView:(message.webView ?: self.webView)];
 }
 
-- (void)executeCommand:(NSArray *)command withId:(NSString *)messageId {
+- (void)executeCommand:(NSArray *)command withId:(NSString *)messageId fromWebView:(WKWebView *)sourceWebView {
     NSArray *commandCopy = [command copy];
     NSString *messageIdCopy = [messageId copy];
+    WKWebView *sourceWebViewCopy = sourceWebView ?: self.webView;
 
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *program = commandCopy[0];
         NSArray *args = (commandCopy.count > 1) ? [commandCopy subarrayWithRange:NSMakeRange(1, commandCopy.count - 1)] : @[];
+
+        if ([program isEqualToString:@"__wizardry_host_open_window"]) {
+            NSString *urlString = @"";
+            NSString *windowTitle = self.window ? self.window.title : @"Wizardry";
+            CGFloat width = 980.0;
+            CGFloat height = 720.0;
+            if (args.count >= 1) {
+                urlString = [NSString stringWithFormat:@"%@", args[0]];
+            }
+            if (args.count >= 2) {
+                windowTitle = [NSString stringWithFormat:@"%@", args[1]];
+            }
+            if (args.count >= 3) {
+                double parsedWidth = [[NSString stringWithFormat:@"%@", args[2]] doubleValue];
+                width = MAX(420.0, parsedWidth);
+            }
+            if (args.count >= 4) {
+                double parsedHeight = [[NSString stringWithFormat:@"%@", args[3]] doubleValue];
+                height = MAX(320.0, parsedHeight);
+            }
+            if (urlString.length == 0) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"missing window URL" exitCode:1 error:nil];
+                });
+                return;
+            }
+
+            NSURL *url = [NSURL URLWithString:urlString];
+            if (!url) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"invalid window URL" exitCode:1 error:nil];
+                });
+                return;
+            }
+
+            NSURLRequest *request = [NSURLRequest requestWithURL:url];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self createAuxWindowWithConfiguration:nil
+                                               request:request
+                                           windowTitle:windowTitle
+                                                 width:width
+                                                height:height];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"ok" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
 
         if ([program isEqualToString:@"__wizardry_host_resize"]) {
             CGFloat width = 1060.0;
@@ -1167,7 +1323,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                     [self.window setFrame:newFrame display:YES animate:NO];
                     [self layoutPrioritiesDragStrips];
                 }
-                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1186,7 +1342,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                         [self.window setFrame:frame display:YES animate:NO];
                     }
                 }
-                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1205,7 +1361,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                         [self.window setFrame:frame display:YES animate:NO];
                     }
                 }
-                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1225,7 +1381,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                         [self.window setFrame:frame display:YES animate:NO];
                     }
                 }
-                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1248,7 +1404,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                         [self.window setFrame:frame display:YES animate:NO];
                     }
                 }
-                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1274,7 +1430,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                         }
                     }
                 }
-                [self sendResult:messageIdCopy stdout:snapState stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:snapState stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1282,7 +1438,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
         if ([program isEqualToString:@"__wizardry_host_boot_ready"]) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self hideNativeBootSplash];
-                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1305,7 +1461,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                 self.prioritiesTitleHoleRightWidth = holeRight;
                 self.prioritiesRightControlsReservedWidth = rightReserved;
                 [self layoutPrioritiesDragStrips];
-                [self sendResult:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1319,10 +1475,10 @@ completionHandler:(void (^)(BOOL result))completionHandler {
                 NSString *errorMessage = nil;
                 BOOL ok = [self registerFavoriteTrackHotkey:hotkey errorMessage:&errorMessage];
                 if (!ok) {
-                    [self sendResult:messageIdCopy stdout:@"" stderr:(errorMessage ?: @"hotkey registration failed") exitCode:1 error:nil];
+                    [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:(errorMessage ?: @"hotkey registration failed") exitCode:1 error:nil];
                     return;
                 }
-                [self sendResult:messageIdCopy stdout:hotkey stderr:@"" exitCode:0 error:nil];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:hotkey stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
@@ -1344,7 +1500,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
             [task launch];
         } @catch (NSException *exception) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                [self sendError:messageIdCopy message:[NSString stringWithFormat:@"Failed to launch: %@", exception.reason]];
+                [self sendErrorToWebView:sourceWebViewCopy messageId:messageIdCopy message:[NSString stringWithFormat:@"Failed to launch: %@", exception.reason]];
             });
             return;
         }
@@ -1359,17 +1515,22 @@ completionHandler:(void (^)(BOOL result))completionHandler {
         int exitCode = [task terminationStatus];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self sendResult:messageIdCopy stdout:stdout stderr:stderr exitCode:exitCode error:nil];
+            [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:stdout stderr:stderr exitCode:exitCode error:nil];
         });
     });
 }
 
-- (void)sendResult:(NSString *)messageId 
-            stdout:(NSString *)stdout 
-            stderr:(NSString *)stderr 
-          exitCode:(int)exitCode 
-             error:(NSString *)error
+- (void)sendResultToWebView:(WKWebView *)targetWebView
+                   messageId:(NSString *)messageId
+                      stdout:(NSString *)stdout
+                      stderr:(NSString *)stderr
+                    exitCode:(int)exitCode
+                       error:(NSString *)error
 {
+    WKWebView *resolvedTarget = targetWebView ?: self.webView;
+    if (!resolvedTarget) {
+        return;
+    }
     // Escape strings for JSON
     NSString *escapedStdout = [self escapeJSON:stdout];
     NSString *escapedStderr = [self escapeJSON:stderr];
@@ -1387,15 +1548,28 @@ completionHandler:(void (^)(BOOL result))completionHandler {
         @"}",
         messageId, messageId, escapedStdout, escapedStderr, exitCode, escapedError, messageId];
     
-    [self.webView evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
+    [resolvedTarget evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
         if (error) {
             NSLog(@"Error evaluating JavaScript: %@", error);
         }
     }];
 }
 
+- (void)sendResult:(NSString *)messageId
+            stdout:(NSString *)stdout
+            stderr:(NSString *)stderr
+          exitCode:(int)exitCode
+             error:(NSString *)error
+{
+    [self sendResultToWebView:self.webView messageId:messageId stdout:stdout stderr:stderr exitCode:exitCode error:error];
+}
+
+- (void)sendErrorToWebView:(WKWebView *)targetWebView messageId:(NSString *)messageId message:(NSString *)message {
+    [self sendResultToWebView:targetWebView messageId:messageId stdout:@"" stderr:@"" exitCode:-1 error:message];
+}
+
 - (void)sendError:(NSString *)messageId message:(NSString *)message {
-    [self sendResult:messageId stdout:@"" stderr:@"" exitCode:-1 error:message];
+    [self sendErrorToWebView:self.webView messageId:messageId message:message];
 }
 
 - (NSString *)escapeJSON:(NSString *)string {
@@ -1409,6 +1583,17 @@ completionHandler:(void (^)(BOOL result))completionHandler {
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     return YES;
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    id object = notification.object;
+    if (![object isKindOfClass:[NSWindow class]]) {
+        return;
+    }
+    NSWindow *closingWindow = (NSWindow *)object;
+    if (self.auxWindows && closingWindow != self.window) {
+        [self.auxWindows removeObject:closingWindow];
+    }
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
