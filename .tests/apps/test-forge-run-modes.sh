@@ -33,7 +33,7 @@ grep -F "resetCreateForm();" "$ui" >/dev/null
 grep -F "perform('Import project folder'" "$ui" >/dev/null
 grep -F "backend('import-workspace'" "$ui" >/dev/null
 grep -F "catalog-row-menu" "$ui" >/dev/null
-grep -F "backend('set-workspace-title'" "$ui" >/dev/null
+grep -F "backend('rename-workspace'" "$ui" >/dev/null
 grep -F "hideWorkspacePath(" "$ui" >/dev/null
 grep -F "public.file-url" "$ui" >/dev/null
 grep -F "getDataTransferItemString" "$ui" >/dev/null
@@ -58,7 +58,7 @@ printf '%s\n' "$help_out" | grep -F "install-desktop [ROOT_HINT] APP_SLUG [TARGE
 printf '%s\n' "$help_out" | grep -F "run-desktop [ROOT_HINT] APP_SLUG" >/dev/null
 printf '%s\n' "$help_out" | grep -F "run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]" >/dev/null
 printf '%s\n' "$help_out" | grep -F "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]" >/dev/null
-printf '%s\n' "$help_out" | grep -F "set-workspace-title [ROOT_HINT] WORKSPACE_PATH TITLE" >/dev/null
+printf '%s\n' "$help_out" | grep -F "rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE" >/dev/null
 printf '%s\n' "$help_out" | grep -F "CONTEXT values for scaffold-workspace:" >/dev/null
 printf '%s\n' "$help_out" | grep -F "  web | godot" >/dev/null
 

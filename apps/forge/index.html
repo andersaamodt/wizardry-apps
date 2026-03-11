@@ -2010,9 +2010,18 @@
                 return;
               }
               perform('Rename project', async function () {
-                await backend('set-workspace-title', [item.path, nextTitle], { quiet: true });
+                var renameRes = await backend('rename-workspace', [item.path, nextTitle], { quiet: true });
+                var renameOut = kv(renameRes.stdout || '');
+                unhideWorkspacePath(renameOut.workspace || '');
+                unhideWorkspacePath(renameOut.old_workspace || '');
                 await refreshWorkspaces({ quiet: true, render: false });
                 var renamed = state.workspaces.find(function (ws) {
+                  if (renameOut.workspace && normalizePathForCompare(ws.path) === normalizePathForCompare(renameOut.workspace)) {
+                    return true;
+                  }
+                  if (renameOut.project_id && ws.id === renameOut.project_id) {
+                    return true;
+                  }
                   return normalizePathForCompare(ws.path) === normalizePathForCompare(item.path);
                 });
                 if (renamed) {

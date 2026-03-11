@@ -21,7 +21,7 @@ Commands:
   set-ui-pref [ROOT_HINT] KEY VALUE
   set-app-targets [ROOT_HINT] APP_SLUG TARGETS
   set-workspace-targets [ROOT_HINT] WORKSPACE_PATH TARGETS
-  set-workspace-title [ROOT_HINT] WORKSPACE_PATH TITLE
+  rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE
   set-app-icon [ROOT_HINT] APP_SLUG DATA_URL
   set-workspace-icon [ROOT_HINT] WORKSPACE_PATH DATA_URL
   download-app [ROOT_HINT] APP_SLUG
@@ -1862,13 +1862,13 @@ cmd_set_workspace_targets() {
   printf 'profile=%s\n' "$conf"
 }
 
-cmd_set_workspace_title() {
+cmd_rename_workspace() {
   root=$(require_root "${1-}")
   workspace_path=${2-}
   title=${3-}
 
   [ -n "$workspace_path" ] || {
-    printf '%s\n' "forge-backend: set-workspace-title requires WORKSPACE_PATH" >&2
+    printf '%s\n' "forge-backend: rename-workspace requires WORKSPACE_PATH" >&2
     exit 2
   }
   [ -d "$workspace_path" ] || {
@@ -1876,20 +1876,54 @@ cmd_set_workspace_title() {
     exit 1
   }
   [ -n "$title" ] || {
-    printf '%s\n' "forge-backend: set-workspace-title requires TITLE" >&2
+    printf '%s\n' "forge-backend: rename-workspace requires NEW_TITLE" >&2
     exit 2
   }
 
-  conf="$workspace_path/wizardry.workspace.conf"
-  [ -f "$conf" ] || {
-    printf '%s\n' "forge-backend: workspace profile missing: $workspace_path" >&2
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
     exit 1
   }
 
-  write_key_value_file "$conf" title "$(printf '%s' "$title" | tr '\r\n' ' ')"
+  conf="$workspace_abs/wizardry.workspace.conf"
+  [ -f "$conf" ] || {
+    printf '%s\n' "forge-backend: workspace profile missing: $workspace_abs" >&2
+    exit 1
+  }
+
+  cleaned_title=$(printf '%s' "$title" | tr '\r\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  [ -n "$cleaned_title" ] || {
+    printf '%s\n' "forge-backend: rename-workspace requires a non-empty NEW_TITLE" >&2
+    exit 2
+  }
+
+  old_path="$workspace_abs"
+  parent_dir=$(dirname "$workspace_abs")
+  new_slug=$(derive_workspace_slug "$cleaned_title")
+  target_path="$parent_dir/$new_slug"
+  moved=0
+
+  if [ "$workspace_abs" != "$target_path" ]; then
+    [ ! -e "$target_path" ] || {
+      printf '%s\n' "forge-backend: workspace path already exists: $target_path" >&2
+      exit 1
+    }
+    mv "$workspace_abs" "$target_path"
+    moved=1
+  fi
+
+  conf="$target_path/wizardry.workspace.conf"
+  write_key_value_file "$conf" title "$cleaned_title"
+  write_key_value_file "$conf" project_id "$new_slug"
+  write_key_value_file "$conf" root "$target_path"
+
   printf 'root=%s\n' "$root"
-  printf 'workspace=%s\n' "$workspace_path"
-  printf 'title=%s\n' "$title"
+  printf 'workspace=%s\n' "$target_path"
+  printf 'old_workspace=%s\n' "$old_path"
+  printf 'title=%s\n' "$cleaned_title"
+  printf 'project_id=%s\n' "$new_slug"
+  printf 'moved=%s\n' "$moved"
   printf 'profile=%s\n' "$conf"
 }
 
@@ -3728,8 +3762,8 @@ case "$cmd" in
   set-workspace-targets)
     cmd_set_workspace_targets "${2-}" "${3-}" "${4-}"
     ;;
-  set-workspace-title)
-    cmd_set_workspace_title "${2-}" "${3-}" "${4-}"
+  rename-workspace)
+    cmd_rename_workspace "${2-}" "${3-}" "${4-}"
     ;;
   set-app-icon)
     cmd_set_app_icon "${2-}" "${3-}" "${4-}"

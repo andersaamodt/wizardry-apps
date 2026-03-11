@@ -18,7 +18,7 @@ fi
 out=$(sh "$backend" --help)
 printf '%s' "$out" | grep -F "Usage:" >/dev/null
 printf '%s\n' "$out" | grep -F "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]" >/dev/null
-printf '%s\n' "$out" | grep -F "set-workspace-title [ROOT_HINT] WORKSPACE_PATH TITLE" >/dev/null
+printf '%s\n' "$out" | grep -F "rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE" >/dev/null
 
 out=$(sh "$backend" doctor "$test_root")
 printf '%s\n' "$out" | grep -F "root=$test_root" >/dev/null
@@ -191,29 +191,37 @@ set_workspace_web_only_out=$(sh "$backend" set-workspace-targets "$scratch" "$wo
 printf '%s\n' "$set_workspace_web_only_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
 grep -F "targets=hosted-web" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 
-set_workspace_title_out=$(sh "$backend" set-workspace-title "$scratch" "$workspaces_root/workspace-web" "Workspace Web Renamed")
-printf '%s\n' "$set_workspace_title_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
-printf '%s\n' "$set_workspace_title_out" | grep -F "title=Workspace Web Renamed" >/dev/null
-grep -F "title=Workspace Web Renamed" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+rename_workspace_out=$(sh "$backend" rename-workspace "$scratch" "$workspaces_root/workspace-web" "Workspace Web Renamed")
+renamed_workspace="$workspaces_root_abs/workspace-web-renamed"
+printf '%s\n' "$rename_workspace_out" | grep -F "workspace=$renamed_workspace" >/dev/null
+printf '%s\n' "$rename_workspace_out" | grep -F "old_workspace=$workspaces_root_abs/workspace-web" >/dev/null
+printf '%s\n' "$rename_workspace_out" | grep -F "title=Workspace Web Renamed" >/dev/null
+printf '%s\n' "$rename_workspace_out" | grep -F "project_id=workspace-web-renamed" >/dev/null
+printf '%s\n' "$rename_workspace_out" | grep -F "moved=1" >/dev/null
+[ -d "$renamed_workspace" ]
+[ ! -e "$workspaces_root/workspace-web" ]
+grep -F "title=Workspace Web Renamed" "$renamed_workspace/wizardry.workspace.conf" >/dev/null
+grep -F "project_id=workspace-web-renamed" "$renamed_workspace/wizardry.workspace.conf" >/dev/null
+grep -F "root=$renamed_workspace" "$renamed_workspace/wizardry.workspace.conf" >/dev/null
 
 icon_payload='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+8X8AAAAASUVORK5CYII='
-set_workspace_icon_out=$(sh "$backend" set-workspace-icon "$scratch" "$workspaces_root/workspace-web" "$icon_payload")
-printf '%s\n' "$set_workspace_icon_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
-[ -s "$workspaces_root/workspace-web/assets/forge-icon.png" ]
-[ -s "$workspaces_root/workspace-web/app/assets/forge-icon.png" ]
-cmp "$workspaces_root/workspace-web/assets/forge-icon.png" "$workspaces_root/workspace-web/app/assets/forge-icon.png" >/dev/null
+set_workspace_icon_out=$(sh "$backend" set-workspace-icon "$scratch" "$renamed_workspace" "$icon_payload")
+printf '%s\n' "$set_workspace_icon_out" | grep -F "workspace=$renamed_workspace" >/dev/null
+[ -s "$renamed_workspace/assets/forge-icon.png" ]
+[ -s "$renamed_workspace/app/assets/forge-icon.png" ]
+cmp "$renamed_workspace/assets/forge-icon.png" "$renamed_workspace/app/assets/forge-icon.png" >/dev/null
 if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ] && command -v sips >/dev/null 2>&1; then
-  sips -g pixelWidth "$workspaces_root/workspace-web/assets/forge-icon.png" | grep -E 'pixelWidth: 1024$' >/dev/null
+  sips -g pixelWidth "$renamed_workspace/assets/forge-icon.png" | grep -E 'pixelWidth: 1024$' >/dev/null
 fi
 
-clear_workspace_icon_out=$(sh "$backend" set-workspace-icon "$scratch" "$workspaces_root/workspace-web" "")
-printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
-[ ! -f "$workspaces_root/workspace-web/assets/forge-icon.png" ]
-[ ! -f "$workspaces_root/workspace-web/app/assets/forge-icon.png" ]
+clear_workspace_icon_out=$(sh "$backend" set-workspace-icon "$scratch" "$renamed_workspace" "")
+printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$renamed_workspace" >/dev/null
+[ ! -f "$renamed_workspace/assets/forge-icon.png" ]
+[ ! -f "$renamed_workspace/app/assets/forge-icon.png" ]
 
-run_workspace_web=$(sh "$backend" run-workspace "$scratch" "$workspaces_root/workspace-web" web)
+run_workspace_web=$(sh "$backend" run-workspace "$scratch" "$renamed_workspace" web)
 printf '%s\n' "$run_workspace_web" | grep -F "mode=python-http" >/dev/null
-printf '%s\n' "$run_workspace_web" | grep -F "entry=$workspaces_root/workspace-web/app" >/dev/null
+printf '%s\n' "$run_workspace_web" | grep -F "entry=$renamed_workspace/app" >/dev/null
 printf '%s\n' "$run_workspace_web" | grep -E '^url=http://127\.0\.0\.1:[0-9]+$' >/dev/null
 printf '%s\n' "$run_workspace_web" | grep -E '^pid=[0-9]+$' >/dev/null
 workspace_web_pid=$(printf '%s\n' "$run_workspace_web" | awk -F= '/^pid=/{print $2; exit}')
