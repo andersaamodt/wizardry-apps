@@ -1017,7 +1017,7 @@
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
         var showMode = state.organizeShow || 'both';
         var items = catalogItems().filter(function (item) {
-          if (showMode === 'builtin' && item.listGroup !== 'wizardry') {
+          if (showMode === 'builtin' && item.kind !== 'builtin') {
             return false;
           }
           if (showMode === 'workspace' && item.listGroup !== 'user') {
@@ -1033,8 +1033,8 @@
       }
 
       function compareCatalogItems(a, b) {
-        if (state.organizeBuiltinFirst && a.listGroup !== b.listGroup) {
-          return a.listGroup === 'wizardry' ? -1 : 1;
+        if (state.organizeBuiltinFirst && a.kind !== b.kind) {
+          return a.kind === 'builtin' ? -1 : 1;
         }
 
         var sortMode = state.organizeSort || 'alphabetical';
@@ -1722,7 +1722,14 @@
 
       function catalogItems() {
         function builtInListGroup(appId) {
-          void appId;
+          var nonWizardryBuiltIns = {
+            priorities: true,
+            memetrader: true,
+            'virtual-redditor': true
+          };
+          if (nonWizardryBuiltIns[String(appId || '').toLowerCase()]) {
+            return 'builtin';
+          }
           return 'wizardry';
         }
 
