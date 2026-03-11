@@ -918,7 +918,7 @@ input[type="checkbox"]:disabled {
   width: 1.34rem;
   height: 1.34rem;
   padding: 0;
-  margin-left: 0.06rem;
+  margin-left: 0.12rem;
 }
 
 .row-overflow {
@@ -926,9 +926,9 @@ input[type="checkbox"]:disabled {
   border-radius: 8px;
   background: transparent;
   color: color-mix(in srgb, var(--text) 72%, var(--muted));
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   line-height: 1;
-  width: 1.3rem;
+  width: 1.14rem;
   height: 1.45rem;
   padding: 0;
   margin-left: 0.04rem;
