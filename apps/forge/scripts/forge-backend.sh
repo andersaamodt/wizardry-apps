@@ -1089,6 +1089,57 @@ stop_host_instances_for_app() {
   fi
 }
 
+workspace_host_running_for_app_dir() {
+  app_dir=${1-}
+  [ -n "$app_dir" ] || return 1
+  command -v ps >/dev/null 2>&1 || return 1
+  ps -axo command= 2>/dev/null \
+    | awk -v app="$app_dir" '
+        index($0, app) > 0 && index($0, "wizardry-host") > 0 { found=1; exit }
+        END { if (found) exit 0; exit 1 }
+      '
+}
+
+wait_for_workspace_host_start() {
+  app_dir=${1-}
+  attempts=${2-}
+  [ -n "$app_dir" ] || return 1
+  [ -n "$attempts" ] || attempts=20
+  i=0
+  while [ "$i" -lt "$attempts" ]; do
+    if workspace_host_running_for_app_dir "$app_dir"; then
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 0.2
+  done
+  return 1
+}
+
+launch_workspace_bundle_macos() {
+  bundle=${1-}
+  launcher_exec=${2-}
+  app_dir=${3-}
+  [ -d "$bundle" ] || return 1
+  [ -n "$app_dir" ] || return 1
+
+  if command -v open >/dev/null 2>&1; then
+    if open -na "$bundle" >/dev/null 2>&1; then
+      if wait_for_workspace_host_start "$app_dir" 25; then
+        return 0
+      fi
+    fi
+  fi
+
+  [ -x "$launcher_exec" ] || return 1
+  if command -v nohup >/dev/null 2>&1; then
+    nohup "$launcher_exec" >/dev/null 2>&1 &
+  else
+    "$launcher_exec" >/dev/null 2>&1 &
+  fi
+  wait_for_workspace_host_start "$app_dir" 25
+}
+
 stop_desktop_instances_for_slug() {
   root=${1-}
   slug=${2-}
@@ -2640,7 +2691,10 @@ $icon_key
 PLIST
 
     stop_desktop_instances_for_slug "$root" "$workspace_slug" "$workspace_title" "$os"
-    open -na "$bundle"
+    if ! launch_workspace_bundle_macos "$bundle" "$bundle/Contents/MacOS/$workspace_slug" "$bundle/Contents/Resources/$workspace_slug$app_entry_suffix"; then
+      printf '%s\n' "forge-backend: failed to launch workspace bundle: $bundle" >&2
+      exit 1
+    fi
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$bundle"
