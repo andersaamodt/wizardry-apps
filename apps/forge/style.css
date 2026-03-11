@@ -772,7 +772,7 @@ input[type="checkbox"]:disabled {
   align-items: center;
   column-gap: 0.42rem;
   row-gap: 0;
-  padding: 0 0.48rem 0 0.4rem;
+  padding: 0 0.34rem 0 0.4rem;
   min-height: 1.9rem;
 }
 
@@ -915,10 +915,10 @@ input[type="checkbox"]:disabled {
   color: color-mix(in srgb, var(--text) 78%, var(--muted));
   font-size: 0.72rem;
   line-height: 1;
-  width: 1.56rem;
-  height: 1.45rem;
+  width: 1.34rem;
+  height: 1.34rem;
   padding: 0;
-  margin-left: 0.08rem;
+  margin-left: 0.06rem;
 }
 
 .row-overflow {
