@@ -1746,7 +1746,8 @@
             projectType: inferProjectTypeFromContext(app.context).toLowerCase(),
             targets: app.targets || '',
             path: app.resolvedPath || (state.rootHint ? (state.rootHint + '/apps/' + app.id) : ''),
-            sortTimestamp: parseInt(app.sortTimestamp, 10) || 0
+            sortTimestamp: parseInt(app.sortTimestamp, 10) || 0,
+            runnable: true
           };
         });
         var workspaces = state.workspaces.map(function (ws) {
@@ -1761,7 +1762,8 @@
             projectType: ws.projectType || inferProjectTypeFromContext(ws.context).toLowerCase(),
             targets: ws.targets || '',
             path: ws.path,
-            sortTimestamp: parseInt(ws.sortTimestamp, 10) || 0
+            sortTimestamp: parseInt(ws.sortTimestamp, 10) || 0,
+            runnable: ws.runnable !== false
           };
         });
         if (state.createDraftActive) {
@@ -1899,11 +1901,7 @@
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || ('workspace:' + item.id);
         var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : 'desktop-executable');
-        var openedWorkspace = launchedMode.indexOf('open') === 0;
-        if (item.context === 'web' && openedWorkspace) {
-          setTargetRuntime(workspaceKey, 'hosted-web', 'ready', out.entry || item.path || '');
-          setTargetRuntime(workspaceKey, state.os === 'darwin' ? 'macos' : 'linux', 'ready', out.entry || item.path || '');
-        } else if (item.context === 'web') {
+        if (item.context === 'web') {
           setTargetRuntime(workspaceKey, 'hosted-web', 'ready', out.entry || item.path || '');
           setTargetRuntime(workspaceKey, state.os === 'darwin' ? 'macos' : 'linux', 'running', out.artifact || out.entry || item.path || '');
         } else if (item.context === 'godot') {
@@ -1918,11 +1916,9 @@
         renderSelectedTargetsEditor(selectedCatalogItem());
         var launchedSummary = item.context === 'godot'
           ? (item.title + ' launched in Godot.')
-          : (openedWorkspace
-            ? (item.title + ' opened in the file browser.')
           : (launchedMode === 'python-http'
             ? (item.title + ' launched as hosted web.')
-            : (item.title + ' built and launched from the desktop app bundle.')));
+            : (item.title + ' built and launched from the desktop app bundle.'));
         renderResult({
           status: 'ok',
           summary: launchedSummary,
@@ -2087,33 +2083,36 @@
           if (!item.draft) {
             var rowActions = document.createElement('span');
             rowActions.className = 'catalog-row-actions menu-anchor';
-            var play = document.createElement('button');
-            play.type = 'button';
-            play.className = 'row-play';
-            play.title = 'Run';
-            play.textContent = '▶';
-            if (item.kind === 'builtin') {
-              var itemApp = appById(item.id);
-              if (itemApp && itemApp.distribution === 'optional' && itemApp.exists === false) {
-                play.disabled = true;
-                play.title = 'Download before run';
-              }
-            }
-            play.addEventListener('click', function (event) {
-              event.preventDefault();
-              event.stopPropagation();
-              setSelectedCatalog(item.key);
+            var canRowRun = hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item);
+            if (canRowRun) {
+              var play = document.createElement('button');
+              play.type = 'button';
+              play.className = 'row-play';
+              play.title = 'Run';
+              play.textContent = '▶';
               if (item.kind === 'builtin') {
-                state.selectedBuiltIn = item.id;
-                perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
-              } else {
-                state.selectedWorkspace = item.id;
-                perform('Run workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
+                var itemApp = appById(item.id);
+                if (itemApp && itemApp.distribution === 'optional' && itemApp.exists === false) {
+                  play.disabled = true;
+                  play.title = 'Download before run';
+                }
               }
-              renderCatalogList();
-              renderSelectedBuiltIn();
-            });
-            rowActions.appendChild(play);
+              play.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                setSelectedCatalog(item.key);
+                if (item.kind === 'builtin') {
+                  state.selectedBuiltIn = item.id;
+                  perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
+                } else {
+                  state.selectedWorkspace = item.id;
+                  perform('Run workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
+                }
+                renderCatalogList();
+                renderSelectedBuiltIn();
+              });
+              rowActions.appendChild(play);
+            }
 
             var rowMenuBtn = document.createElement('button');
             rowMenuBtn.type = 'button';
@@ -2473,6 +2472,9 @@
         if (isBuiltInNotDownloaded(selected)) {
           return false;
         }
+        if (selected.kind === 'workspace' && selected.runnable === false) {
+          return false;
+        }
         var hostTarget = hostTargetId();
         if (!hostTarget) {
           return false;
@@ -2487,6 +2489,9 @@
           return false;
         }
         if (isBuiltInNotDownloaded(selected)) {
+          return false;
+        }
+        if (selected.kind === 'workspace' && selected.runnable === false) {
           return false;
         }
         var projectType = projectTypeKeyForContext(selected.context);
@@ -2827,9 +2832,12 @@
           els.actionRun.classList.toggle('hidden', !showRunSplit);
           var runTitle = canRunHost
             ? ('Run ' + runTargetName + ' app')
-            : ('Enable ' + runTargetName + ' target to run native app');
+            : (canServeWebHost
+              ? 'Run hosted web'
+              : ('Enable ' + runTargetName + ' target to run native app'));
           els.actionRun.title = runTitle;
           els.actionRun.setAttribute('aria-label', runTitle);
+          els.actionRun.disabled = !!state.busy || (!canRunHost && !canServeWebHost);
         }
         if (els.actionRunMenu) {
           els.actionRunMenu.classList.toggle('hidden', !canServeWebHost);
@@ -3660,7 +3668,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-workspaces', [state.projectsRoot], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 7);
+        var rows = parseTSV(res.stdout || '', 8);
         var hiddenPaths = hiddenWorkspacePathSet();
         state.workspaces = rows.map(function (row) {
           return {
@@ -3670,7 +3678,8 @@
             context: row[3],
             targets: row[4],
             path: row[5],
-            sortTimestamp: row[6] || '0'
+            sortTimestamp: row[6] || '0',
+            runnable: row[7] === '1'
           };
         }).filter(function (ws) {
           return !hiddenPaths[normalizePathForCompare(ws.path)];
