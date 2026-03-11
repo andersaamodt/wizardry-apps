@@ -177,6 +177,11 @@ printf '%s\n' "$workspaces_after_import" | grep -E '^plain-web\t' >/dev/null
 printf '%s\n' "$workspaces_after_import" | grep -E '^direct-space\t' >/dev/null
 printf '%s\n' "$workspaces_after_import" | grep -E '^generic-repo\t' >/dev/null
 
+run_workspace_generic=$(sh "$backend" run-workspace "$scratch" "$generic_workspace_abs" web)
+printf '%s\n' "$run_workspace_generic" | grep -E '^mode=open(-manual)?$' >/dev/null
+printf '%s\n' "$run_workspace_generic" | grep -F "entry=$generic_workspace_abs" >/dev/null
+printf '%s\n' "$run_workspace_generic" | grep -E '^launched=[01]$' >/dev/null
+
 set_app_targets_out=$(sh "$backend" set-app-targets "$scratch" sandbox-tool "hosted-web,macos,linux,ios,android")
 printf '%s\n' "$set_app_targets_out" | grep -F "slug=sandbox-tool" >/dev/null
 jq -e '.apps[] | select(.slug == "sandbox-tool" and .targets == "hosted-web,macos,linux,ios,android")' "$scratch/config/apps.manifest.json" >/dev/null

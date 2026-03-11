@@ -1898,7 +1898,12 @@
         var res = await backend('run-workspace', [item.path, item.context]);
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || ('workspace:' + item.id);
-        if (item.context === 'web') {
+        var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : 'desktop-executable');
+        var openedWorkspace = launchedMode.indexOf('open') === 0;
+        if (item.context === 'web' && openedWorkspace) {
+          setTargetRuntime(workspaceKey, 'hosted-web', 'ready', out.entry || item.path || '');
+          setTargetRuntime(workspaceKey, state.os === 'darwin' ? 'macos' : 'linux', 'ready', out.entry || item.path || '');
+        } else if (item.context === 'web') {
           setTargetRuntime(workspaceKey, 'hosted-web', 'ready', out.entry || item.path || '');
           setTargetRuntime(workspaceKey, state.os === 'darwin' ? 'macos' : 'linux', 'running', out.artifact || out.entry || item.path || '');
         } else if (item.context === 'godot') {
@@ -1911,12 +1916,13 @@
           setTargetRuntime(workspaceKey, 'macos', 'ready', out.entry || item.path || '');
         }
         renderSelectedTargetsEditor(selectedCatalogItem());
-        var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : 'desktop-executable');
         var launchedSummary = item.context === 'godot'
           ? (item.title + ' launched in Godot.')
+          : (openedWorkspace
+            ? (item.title + ' opened in the file browser.')
           : (launchedMode === 'python-http'
             ? (item.title + ' launched as hosted web.')
-            : (item.title + ' built and launched from the desktop app bundle.'));
+            : (item.title + ' built and launched from the desktop app bundle.')));
         renderResult({
           status: 'ok',
           summary: launchedSummary,

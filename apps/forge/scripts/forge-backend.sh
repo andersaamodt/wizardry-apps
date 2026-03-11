@@ -354,6 +354,29 @@ resolve_godot_engine() {
   return 1
 }
 
+open_path_default() {
+  path=${1-}
+  [ -n "$path" ] || return 1
+
+  if [ "$(os_id)" = "darwin" ] && command -v open >/dev/null 2>&1; then
+    if command -v nohup >/dev/null 2>&1; then
+      nohup open "$path" >/dev/null 2>&1 &
+    else
+      open "$path" >/dev/null 2>&1 &
+    fi
+    return 0
+  fi
+  if [ "$(os_id)" = "linux" ] && command -v xdg-open >/dev/null 2>&1; then
+    if command -v nohup >/dev/null 2>&1; then
+      nohup xdg-open "$path" >/dev/null 2>&1 &
+    else
+      xdg-open "$path" >/dev/null 2>&1 &
+    fi
+    return 0
+  fi
+  return 1
+}
+
 ensure_godot_project() {
   workspace_path=$1
   project_title=${2-}
@@ -2615,10 +2638,29 @@ cmd_run_workspace() {
   if [ ! -f "$app_dir/index.html" ] && [ -f "$workspace_path/index.html" ]; then
     app_dir="$workspace_path"
   fi
-  [ -f "$app_dir/index.html" ] || {
+  if [ ! -f "$app_dir/index.html" ]; then
+    workspace_conf="$workspace_path/wizardry.workspace.conf"
+    profile_kind=""
+    starter_kind=""
+    if [ -f "$workspace_conf" ]; then
+      profile_kind=$(workspace_field "$workspace_conf" profile_kind "")
+      starter_kind=$(workspace_field "$workspace_conf" starter "")
+    fi
+    if [ "$profile_kind" = "generic" ] || [ "$starter_kind" = "import-generic" ]; then
+      launched=0
+      mode=open-manual
+      if open_path_default "$workspace_path"; then
+        launched=1
+        mode=open
+      fi
+      printf 'launched=%s\n' "$launched"
+      printf 'mode=%s\n' "$mode"
+      printf 'entry=%s\n' "$workspace_path"
+      return 0
+    fi
     printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
     exit 1
-  }
+  fi
   app_entry_suffix=''
   if [ "$app_dir" != "$workspace_path" ]; then
     app_entry_suffix='/app'
