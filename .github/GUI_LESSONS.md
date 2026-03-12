@@ -15,3 +15,8 @@
 - Do not maintain duplicate frontend bundles by hand; keep one canonical source and make any secondary path a generated artifact or compatibility alias.
 - App-level keydown handlers should early-return for editable targets with modifier keys so native text shortcuts keep working without per-shortcut hacks.
 - For workspace apps launched from `.../app`, keep icon assets synchronized at both workspace root and nested app paths, and prefer workspace-level icon selection to avoid stale nested overrides.
+- Keep bridge connectivity status persistent and separate from action-complete toasts so transient success messaging cannot hide host disconnects.
+- Theme pickers should support instant `ArrowUp`/`ArrowDown` cycling while focused, not only click selection inside the menu.
+- In dense top bars, path affordances should degrade to icon-only mode before truncating critical primary action controls.
+- Background refresh loops should skip while commands are active and run once on focus/visibility regain for freshness without UI churn.
+- Drag-and-drop import cues should only activate for folder/file URI payloads so normal text drags do not show false drop targets.
