@@ -111,6 +111,21 @@
 - Refresh loops should run on visibility/focus regain for freshness without constant polling load.
 - Keep current selection stable across refreshes whenever the selected item still exists.
 
+## Cross-App Interaction Patterns
+- Route GUI actions through one backend adapter that logs argv and normalizes command errors into concise summaries.
+- Keep a persistent bridge/connectivity status surface separate from action-level toast messages.
+- Keep one busy state for write actions and disable overlapping action triggers while a command is running.
+- Keep logs prepend-timestamped, bounded in size, keyboard-selectable, and copy/clear capable.
+- Keep at most one floating menu open at a time and keep trigger `aria-expanded` values in sync.
+- Close floating menus on outside click and `Escape`, and restore focus to the triggering control when practical.
+- Keep list rows keyboard-selectable (`Enter`/`Space`) and preserve selection across data refreshes when the item still exists.
+- Keep path chips compact: basename label, ellipsis handling, icon-only fallback in narrow widths, click-to-copy, and double-click-to-open/reveal.
+- For folder path utilities, provide an optional adjacent open-in-terminal control with explicit tooltip/aria labeling.
+- For drag-and-drop folder import, only show drop cues for valid payload types and clear cues immediately on leave/drop.
+- Parse dropped paths from both URI payloads and file payloads for host/runtime portability.
+- Prefer section-local expansion/collapse (`details/summary`) for multi-step workflows to preserve one-screen comprehension.
+- Keep motion subtle (roughly 180-220ms) and disable non-essential motion when `prefers-reduced-motion` is enabled.
+
 ## Host Drag-Region Geometry
 - Keep drag behavior in native-host geometry and click behavior in WebView controls.
 - Reserve drag-strip holes around interactive controls instead of placing drag layers over controls.
@@ -139,6 +154,14 @@
 - Global key handlers must early-return for editable targets with modifier keys instead of hardcoding app-level shortcut patches.
 - Avoid defaulting buttons and short text-entry inputs to `width: 100%`; size them to content or a bounded width unless full-width is required by layout.
 - Keep motion subtle and meaningful, never required for comprehension.
+
+## Conflict Resolution Order
+- If an app implementation conflicts with this file, treat this file as canonical for new work and move touched legacy code toward it.
+- Use Forge interaction patterns as the default baseline for new desktop control-plane apps.
+- Treat simple wrapper apps (for example menu-app/chatroom) as compatibility references, not visual or interaction baselines.
+- Legacy fixed-color screens may remain untouched, but any edited/new screens should migrate to theme-token styling.
+- Shell-based fallback command resolution is acceptable only for fixed internal script lookup with no user-controlled executable or shell fragment input.
+- When density conflicts with clarity, prioritize clear labels and explicit state feedback over packing additional controls.
 
 ## AI Agent Delivery Rules
 - Prefer surgical edits that preserve each app’s existing visual language.
