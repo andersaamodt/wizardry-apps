@@ -33,6 +33,9 @@
 ## Button And Icon Style Contract
 - Use unobtrusive icon style for most minor icon-only actions (copy, reveal, overflow, helper actions).
 - Unobtrusive icon style is borderless/backgroundless at rest and gains opaque rounded background on hover/focus.
+- In dense toolbars, prefer icon-first controls for secondary actions and keep text labels for the highest-impact primary actions.
+- Icon-only controls must include a clear tooltip/title and explicit `aria-label`.
+- Keep toolbar icon sizing and stroke weight consistent across actions in the same bar.
 - Use polite button style for most primary workflow buttons (Build, Run, Create, Save, Apply).
 - Polite button style is a simple outlined button with rounded corners and a clear hover highlight.
 - Polite toggle buttons must stay visibly highlighted while toggled on.
@@ -43,6 +46,8 @@
 - Prefer visual hierarchy with spacing, typography, and separating lines over heavy frame-within-frame boxes.
 - Use separators and section headers to create structure before adding extra borders.
 - Keep dense control groups compact, aligned, and scannable; avoid decorative wrappers that hide hierarchy.
+- Avoid stacking multiple decorative borders around the same logical group; one container boundary is usually enough.
+- Use background tint and spacing depth before introducing another card/border level.
 
 ## Left-Right Panel Pattern
 - When one primary data type is being managed, use left-right split layout: list/select on left, details/workflow on right.
@@ -51,6 +56,13 @@
 - In this pattern, place Settings icon at lower-left corner of the left rail.
 - Place theme and optional LLM dropdown controls to the right of Settings in the same bottom-left rail bar.
 - Keep left rail width bounded and persist user resize preference when a divider is provided.
+
+## Sidebar and Drawer Pattern
+- Use sidebars/drawers for contextual utilities (settings, activity, diagnostics) instead of route-switching away from the main workflow.
+- Sidebar open/close must preserve current selection and scroll context in the main pane.
+- Provide at least two close paths for sidebars: explicit toggle button and `Escape` (plus outside click when overlay behavior is used).
+- Trigger sidebars from compact icon controls in rails/toolbars; keep explanatory text inside the opened panel header/body.
+- Avoid full-screen modal takeover for routine settings; reserve modal blocking for confirmations or destructive actions.
 
 ## Right-Side Menu Bar Pattern
 - For left-right apps, place a top bar above right pane containing item title, location/path widget, and primary actions.
@@ -145,6 +157,12 @@
 - Keep app backend at `apps/<slug>/scripts/<slug>-backend.sh` when backend logic exists.
 - Keep app-scoped docs in `apps/<slug>/README.md` for runtime paths and operator notes.
 - Keep naming consistent with hyphenated app slugs.
+
+## Icon Assets and Licensing
+- Prefer local SVG icon assets over raster icons for toolbar/rail controls when possible.
+- Prefer public-domain or permissive-license icon sources (for example CC0/public domain/0BSD) and keep attribution/license notes in app docs when required.
+- Normalize imported SVGs for consistent sizing, stroke behavior, and theme-color compatibility before committing.
+- Avoid mixing multiple incompatible icon styles in the same surface (for example heavy filled glyphs beside thin outline symbols).
 
 ## Accessibility and Input Ergonomics
 - Use semantic controls and keyboard-operable interactions.
