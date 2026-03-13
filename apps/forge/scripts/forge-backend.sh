@@ -976,6 +976,59 @@ resolve_workspace_relative_path() {
   return 1
 }
 
+wizardry_spell_path() {
+  wizardry_dir=${1-}
+  current_path=${2-}
+
+  [ -n "$wizardry_dir" ] || wizardry_dir="$HOME/.wizardry"
+  spell_path=$current_path
+
+  for dir in \
+    /opt/homebrew/bin \
+    /opt/homebrew/sbin \
+    /opt/local/bin \
+    /opt/local/sbin \
+    /opt/pkg/bin \
+    /opt/pkg/sbin \
+    /usr/local/bin \
+    /usr/local/sbin \
+    "$HOME/.local/bin" \
+    "$HOME/bin"; do
+    [ -d "$dir" ] || continue
+    case ":$spell_path:" in
+      *":$dir:"*)
+        ;;
+      *)
+        spell_path="$dir:$spell_path"
+        ;;
+    esac
+  done
+
+  if [ -d "$wizardry_dir/spells" ]; then
+    for dir in \
+      "$wizardry_dir/spells"/* \
+      "$wizardry_dir/spells"/.* \
+      "$wizardry_dir/spells"/*/* \
+      "$wizardry_dir/spells"/.*/*; do
+      [ -d "$dir" ] || continue
+      case "$dir" in
+        */.|*/..|*/.DS_Store)
+          continue
+          ;;
+      esac
+      case ":$spell_path:" in
+        *":$dir:"*)
+          ;;
+        *)
+          spell_path="$dir:$spell_path"
+          ;;
+      esac
+    done
+  fi
+
+  printf '%s\n' "$spell_path"
+}
+
 serve_workspace_managed_hosted_web() {
   root=$1
   workspace_path=$2
@@ -1009,6 +1062,10 @@ serve_workspace_managed_hosted_web() {
 
   if ! (
     cd "$workspace_path"
+    wizardry_dir=${WIZARDRY_DIR:-$HOME/.wizardry}
+    PATH=$(wizardry_spell_path "$wizardry_dir" "${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}")
+    export PATH
+    export WIZARDRY_DIR="$wizardry_dir"
     if [ -x "$serve_script" ]; then
       "$serve_script" "$serve_action" "$site_name"
     else

@@ -227,6 +227,26 @@ printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$renamed_workspac
 
 managed_site_workspace="$workspaces_root/workspace-managed-site"
 managed_site_workspace_abs=$(CDPATH= cd -- "$workspaces_root" && mkdir -p "workspace-managed-site/scripts" && cd -- "workspace-managed-site" && pwd -P)
+wizardry_home="$scratch/wizardry"
+mkdir -p "$wizardry_home/spells/web"
+cat > "$wizardry_home/spells/web/write-managed-site-conf" <<'SH'
+#!/bin/sh
+set -eu
+
+site_name=${1-}
+web_root=${2-}
+[ -n "$site_name" ] || exit 2
+[ -n "$web_root" ] || exit 2
+
+site_dir="$web_root/$site_name"
+mkdir -p "$site_dir"
+cat > "$site_dir/site.conf" <<CONF
+domain=localhost
+port=43123
+https=false
+CONF
+SH
+chmod +x "$wizardry_home/spells/web/write-managed-site-conf"
 cat > "$managed_site_workspace/wizardry.workspace.conf" <<CONF
 project_id=workspace-managed-site
 title=Workspace Managed Site
@@ -248,17 +268,11 @@ site_name=${2-}
 [ -n "$site_name" ] || exit 2
 
 web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
-site_dir="$web_root/$site_name"
-mkdir -p "$site_dir"
-cat > "$site_dir/site.conf" <<CONF
-domain=localhost
-port=43123
-https=false
-CONF
+write-managed-site-conf "$site_name" "$web_root"
 SH
 chmod +x "$managed_site_workspace/scripts/serve-site.sh"
 
-serve_workspace_managed_site=$(WEB_WIZARDRY_ROOT="$scratch/web-root" sh "$backend" serve-hosted-web "$scratch" workspace "$managed_site_workspace")
+serve_workspace_managed_site=$(env -i HOME="$scratch/home" PATH='/usr/bin:/bin:/usr/sbin:/sbin' WIZARDRY_DIR="$wizardry_home" WEB_WIZARDRY_ROOT="$scratch/web-root" sh "$backend" serve-hosted-web "$scratch" workspace "$managed_site_workspace")
 printf '%s\n' "$serve_workspace_managed_site" | grep -F "mode=web-wizardry" >/dev/null
 printf '%s\n' "$serve_workspace_managed_site" | grep -F "site=workspace-managed-site" >/dev/null
 printf '%s\n' "$serve_workspace_managed_site" | grep -F "entry=$scratch/web-root/workspace-managed-site" >/dev/null
