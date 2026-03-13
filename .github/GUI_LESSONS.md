@@ -21,3 +21,4 @@
 - In dense top bars, path affordances should degrade to icon-only mode before truncating critical primary action controls.
 - Background refresh loops should skip while commands are active and run once on focus/visibility regain for freshness without UI churn.
 - Drag-and-drop import cues should only activate for folder/file URI payloads so normal text drags do not show false drop targets.
+- Folder-drop overlays need global cleanup on `dragend`/`drop`/window blur because leaving the window may not fire target `dragleave`, which leaves the drop cue stuck on.

@@ -2654,6 +2654,16 @@
         setWorkspaceDropCue(false);
       }
 
+      function dragEventInsideElementBounds(event, el) {
+        if (!event || !el || typeof el.getBoundingClientRect !== 'function') {
+          return false;
+        }
+        var rect = el.getBoundingClientRect();
+        var x = typeof event.clientX === 'number' ? event.clientX : -1;
+        var y = typeof event.clientY === 'number' ? event.clientY : -1;
+        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+      }
+
       async function importWorkspaceFromDropPath(path) {
         requireRoot();
         var folderPath = String(path || '').trim();
@@ -2737,6 +2747,9 @@
         dropTarget.addEventListener('dragleave', function (event) {
           event.preventDefault();
           event.stopPropagation();
+          if (dragEventInsideElementBounds(event, dropTarget)) {
+            return;
+          }
           if (state.workspaceDropDepth > 0) {
             state.workspaceDropDepth -= 1;
           }
@@ -2761,6 +2774,22 @@
           perform('Import project folder', function () {
             return importWorkspaceFromDropPath(droppedPath);
           }, { swallow: true });
+        });
+
+        ['dragend', 'drop'].forEach(function (eventName) {
+          window.addEventListener(eventName, function () {
+            clearWorkspaceDropCue();
+          });
+        });
+
+        window.addEventListener('blur', function () {
+          clearWorkspaceDropCue();
+        });
+
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) {
+            clearWorkspaceDropCue();
+          }
         });
       }
 
