@@ -1901,8 +1901,14 @@
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || ('workspace:' + item.id);
         var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : 'desktop-executable');
+        var launchedUrl = String(out.url || '').trim();
         if (item.context === 'web') {
-          setTargetRuntime(workspaceKey, 'hosted-web', 'ready', out.entry || item.path || '');
+          if (launchedUrl) {
+            await openPath(launchedUrl, false);
+            setTargetRuntime(workspaceKey, 'hosted-web', 'running', launchedUrl);
+          } else {
+            setTargetRuntime(workspaceKey, 'hosted-web', 'ready', out.entry || item.path || '');
+          }
           setTargetRuntime(workspaceKey, state.os === 'darwin' ? 'macos' : 'linux', 'running', out.artifact || out.entry || item.path || '');
         } else if (item.context === 'godot') {
           setTargetRuntime(workspaceKey, 'linux', 'running', out.entry || item.path || '');
@@ -1923,6 +1929,7 @@
           status: 'ok',
           summary: launchedSummary,
           paths: [
+            launchedUrl ? { label: 'Hosted web URL', path: launchedUrl, canReveal: false } : null,
             out.entry ? { label: (item.context === 'godot' ? 'Godot project' : 'Entry folder'), path: out.entry, canReveal: true } : null,
             out.log ? { label: 'Launch log', path: out.log, canReveal: true } : null
           ].filter(Boolean),
