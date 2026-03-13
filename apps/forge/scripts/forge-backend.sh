@@ -947,6 +947,100 @@ config_field() {
   fi
 }
 
+resolve_workspace_relative_path() {
+  workspace_path=$1
+  rel_path=$2
+
+  [ -n "$workspace_path" ] || return 1
+  [ -n "$rel_path" ] || return 1
+
+  case "$rel_path" in
+    /*)
+      return 1
+      ;;
+  esac
+
+  workspace_abs=$(CDPATH= cd -- "$workspace_path" && pwd -P) || return 1
+  rel_dir=$(dirname "$rel_path")
+  rel_base=$(basename "$rel_path")
+  abs_dir=$(CDPATH= cd -- "$workspace_abs/$rel_dir" 2>/dev/null && pwd -P) || return 1
+  abs_path="$abs_dir/$rel_base"
+
+  case "$abs_path" in
+    "$workspace_abs" | "$workspace_abs"/*)
+      printf '%s\n' "$abs_path"
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+serve_workspace_managed_hosted_web() {
+  root=$1
+  workspace_path=$2
+  workspace_conf=$3
+  workspace_slug=$4
+
+  site_name=$(workspace_field "$workspace_conf" hosted_web_site_name "")
+  [ -n "$site_name" ] || site_name=$(workspace_field "$workspace_conf" project_id "$workspace_slug")
+  validate_site_name "$site_name"
+
+  serve_script_rel=$(workspace_field "$workspace_conf" hosted_web_serve_script "")
+  [ -n "$serve_script_rel" ] || {
+    printf '%s\n' "forge-backend: hosted_web_serve_script is required for hosted_web_mode=web-wizardry-site" >&2
+    return 1
+  }
+
+  serve_action=$(workspace_field "$workspace_conf" hosted_web_serve_action "serve")
+  serve_script=$(resolve_workspace_relative_path "$workspace_path" "$serve_script_rel") || {
+    printf '%s\n' "forge-backend: hosted_web_serve_script must resolve inside the workspace: $serve_script_rel" >&2
+    return 1
+  }
+  [ -f "$serve_script" ] || {
+    printf '%s\n' "forge-backend: hosted web serve script not found: $serve_script" >&2
+    return 1
+  }
+
+  web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+  site_dir="$web_root/$site_name"
+  web_log="$root/_tmp/workbench/log/hosted-web/$site_name-workspace-web-wizardry.log"
+  mkdir -p "$(dirname "$web_log")"
+
+  if ! (
+    cd "$workspace_path"
+    if [ -x "$serve_script" ]; then
+      "$serve_script" "$serve_action" "$site_name"
+    else
+      sh "$serve_script" "$serve_action" "$site_name"
+    fi
+  ) >"$web_log" 2>&1; then
+    printf '%s\n' "forge-backend: workspace hosted web serve failed (see log: $web_log)" >&2
+    return 1
+  fi
+
+  site_conf="$site_dir/site.conf"
+  [ -f "$site_conf" ] || {
+    printf '%s\n' "forge-backend: workspace hosted web site config not found after serve: $site_conf" >&2
+    return 1
+  }
+
+  domain=$(config_field "$site_conf" domain "localhost")
+  port=$(config_field "$site_conf" port "8080")
+  https=$(config_field "$site_conf" https "false")
+  scheme=http
+  if [ "$https" = "true" ]; then
+    scheme=https
+  fi
+
+  printf 'mode=web-wizardry\n'
+  printf 'site=%s\n' "$site_name"
+  printf 'entry=%s\n' "$site_dir"
+  printf 'url=%s\n' "$scheme://$domain:$port"
+  printf 'log=%s\n' "$web_log"
+  return 0
+}
+
 kv_read() {
   key=$1
   awk -F= -v k="$key" '
@@ -2931,6 +3025,22 @@ cmd_serve_hosted_web() {
         printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
         exit 1
       }
+      workspace_path=$(CDPATH= cd -- "$workspace_path" && pwd -P)
+      workspace_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
+      workspace_conf="$workspace_path/wizardry.workspace.conf"
+      workspace_hosted_web_mode=$(workspace_field "$workspace_conf" hosted_web_mode "")
+      case "$workspace_hosted_web_mode" in
+        "")
+          ;;
+        web-wizardry-site)
+          serve_workspace_managed_hosted_web "$root" "$workspace_path" "$workspace_conf" "$workspace_slug" || exit 1
+          return 0
+          ;;
+        *)
+          printf '%s\n' "forge-backend: unknown workspace hosted_web_mode: $workspace_hosted_web_mode" >&2
+          exit 1
+          ;;
+      esac
       app_dir="$workspace_path/app"
       if [ ! -f "$app_dir/index.html" ] && [ -f "$workspace_path/index.html" ]; then
         app_dir="$workspace_path"
@@ -2943,7 +3053,6 @@ cmd_serve_hosted_web() {
         printf '%s\n' "forge-backend: python3 is required to serve workspace hosted web targets" >&2
         exit 1
       }
-      workspace_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
       port=$(python3 - <<'PY'
 import socket
 s = socket.socket()

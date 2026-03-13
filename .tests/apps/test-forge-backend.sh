@@ -225,6 +225,45 @@ printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$renamed_workspac
 [ ! -f "$renamed_workspace/assets/forge-icon.png" ]
 [ ! -f "$renamed_workspace/app/assets/forge-icon.png" ]
 
+managed_site_workspace="$workspaces_root/workspace-managed-site"
+managed_site_workspace_abs=$(CDPATH= cd -- "$workspaces_root" && mkdir -p "workspace-managed-site/scripts" && cd -- "workspace-managed-site" && pwd -P)
+cat > "$managed_site_workspace/wizardry.workspace.conf" <<CONF
+project_id=workspace-managed-site
+title=Workspace Managed Site
+project_type=application
+development_context=web
+targets=hosted-web
+root=$managed_site_workspace_abs
+hosted_web_mode=web-wizardry-site
+hosted_web_site_name=workspace-managed-site
+hosted_web_serve_script=scripts/serve-site.sh
+CONF
+cat > "$managed_site_workspace/scripts/serve-site.sh" <<'SH'
+#!/bin/sh
+set -eu
+
+action=${1-}
+site_name=${2-}
+[ "$action" = "serve" ] || exit 2
+[ -n "$site_name" ] || exit 2
+
+web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+site_dir="$web_root/$site_name"
+mkdir -p "$site_dir"
+cat > "$site_dir/site.conf" <<CONF
+domain=localhost
+port=43123
+https=false
+CONF
+SH
+chmod +x "$managed_site_workspace/scripts/serve-site.sh"
+
+serve_workspace_managed_site=$(WEB_WIZARDRY_ROOT="$scratch/web-root" sh "$backend" serve-hosted-web "$scratch" workspace "$managed_site_workspace")
+printf '%s\n' "$serve_workspace_managed_site" | grep -F "mode=web-wizardry" >/dev/null
+printf '%s\n' "$serve_workspace_managed_site" | grep -F "site=workspace-managed-site" >/dev/null
+printf '%s\n' "$serve_workspace_managed_site" | grep -F "entry=$scratch/web-root/workspace-managed-site" >/dev/null
+printf '%s\n' "$serve_workspace_managed_site" | grep -F "url=http://localhost:43123" >/dev/null
+
 run_workspace_web=$(sh "$backend" run-workspace "$scratch" "$renamed_workspace" web)
 printf '%s\n' "$run_workspace_web" | grep -F "mode=python-http" >/dev/null
 printf '%s\n' "$run_workspace_web" | grep -F "entry=$renamed_workspace/app" >/dev/null
