@@ -227,8 +227,20 @@ printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$renamed_workspac
 
 managed_site_workspace="$workspaces_root/workspace-managed-site"
 managed_site_workspace_abs=$(CDPATH= cd -- "$workspaces_root" && mkdir -p "workspace-managed-site/scripts" && cd -- "workspace-managed-site" && pwd -P)
-wizardry_home="$scratch/wizardry"
-mkdir -p "$wizardry_home/spells/web"
+wizardry_home="$scratch/home/.wizardry"
+mkdir -p "$wizardry_home/spells/web" "$wizardry_home/spells/.imps/sys"
+cat > "$wizardry_home/spells/.imps/sys/env-clear" <<'SH'
+#!/bin/sh
+return 0 2>/dev/null || exit 0
+SH
+chmod +x "$wizardry_home/spells/.imps/sys/env-clear"
+cat > "$wizardry_home/spells/web/web-wizardry" <<'SH'
+#!/bin/sh
+set -eu
+printf '%s\n' "stub web-wizardry"
+exit 0
+SH
+chmod +x "$wizardry_home/spells/web/web-wizardry"
 cat > "$wizardry_home/spells/web/write-managed-site-conf" <<'SH'
 #!/bin/sh
 set -eu
@@ -272,7 +284,16 @@ write-managed-site-conf "$site_name" "$web_root"
 SH
 chmod +x "$managed_site_workspace/scripts/serve-site.sh"
 
-serve_workspace_managed_site=$(env -i HOME="$scratch/home" PATH='/usr/bin:/bin:/usr/sbin:/sbin' WIZARDRY_DIR="$wizardry_home" WEB_WIZARDRY_ROOT="$scratch/web-root" sh "$backend" serve-hosted-web "$scratch" workspace "$managed_site_workspace")
+mkdir -p "$scratch/invalid-wizardry/spells/web"
+cat > "$scratch/invalid-wizardry/spells/web/web-wizardry" <<'SH'
+#!/bin/sh
+set -eu
+printf '%s\n' "invalid runtime"
+exit 1
+SH
+chmod +x "$scratch/invalid-wizardry/spells/web/web-wizardry"
+
+serve_workspace_managed_site=$(env -i HOME="$scratch/home" PATH='/usr/bin:/bin:/usr/sbin:/sbin' WIZARDRY_DIR="$scratch/invalid-wizardry" WEB_WIZARDRY_ROOT="$scratch/web-root" sh "$backend" serve-hosted-web "$scratch" workspace "$managed_site_workspace")
 printf '%s\n' "$serve_workspace_managed_site" | grep -F "mode=web-wizardry" >/dev/null
 printf '%s\n' "$serve_workspace_managed_site" | grep -F "site=workspace-managed-site" >/dev/null
 printf '%s\n' "$serve_workspace_managed_site" | grep -F "entry=$scratch/web-root/workspace-managed-site" >/dev/null

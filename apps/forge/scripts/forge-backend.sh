@@ -976,6 +976,36 @@ resolve_workspace_relative_path() {
   return 1
 }
 
+is_valid_wizardry_runtime_dir() {
+  wizardry_dir=${1-}
+  [ -n "$wizardry_dir" ] || return 1
+  [ -x "$wizardry_dir/spells/.imps/sys/env-clear" ] || return 1
+  [ -x "$wizardry_dir/spells/web/web-wizardry" ] || return 1
+  return 0
+}
+
+resolve_runtime_wizardry_dir() {
+  inherited=${1-}
+
+  if is_valid_wizardry_runtime_dir "$inherited"; then
+    printf '%s\n' "$inherited"
+    return 0
+  fi
+
+  if is_valid_wizardry_runtime_dir "$HOME/.wizardry"; then
+    printf '%s\n' "$HOME/.wizardry"
+    return 0
+  fi
+
+  if [ -n "$inherited" ]; then
+    printf '%s\n' "$inherited"
+    return 0
+  fi
+
+  printf '%s\n' "$HOME/.wizardry"
+  return 0
+}
+
 wizardry_spell_path() {
   wizardry_dir=${1-}
   current_path=${2-}
@@ -1062,7 +1092,7 @@ serve_workspace_managed_hosted_web() {
 
   if ! (
     cd "$workspace_path"
-    wizardry_dir=${WIZARDRY_DIR:-$HOME/.wizardry}
+    wizardry_dir=$(resolve_runtime_wizardry_dir "${WIZARDRY_DIR-}")
     PATH=$(wizardry_spell_path "$wizardry_dir" "${PATH:-/usr/bin:/bin:/usr/sbin:/sbin}")
     export PATH
     export WIZARDRY_DIR="$wizardry_dir"
