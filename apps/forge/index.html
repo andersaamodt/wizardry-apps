@@ -4349,13 +4349,9 @@
           if (!selected) {
             return;
           }
-          if (!hasEnabledHostRunTarget(selected)) {
-            if (hasEnabledHostedWebTarget(selected) && els.actionRunMenu && !els.actionRunMenu.disabled) {
-              toggleFloatingMenu(els.runMenu, els.actionRunMenu);
-              return;
-            }
+          if (!hasEnabledHostRunTarget(selected) && !hasEnabledHostedWebTarget(selected)) {
             var runTargetName = state.os === 'darwin' ? 'macOS' : (state.os === 'linux' ? 'Linux' : 'desktop');
-            toast('Enable ' + runTargetName + ' target to run native app.', 'bad');
+            toast('Enable Hosted Web or the ' + runTargetName + ' target to run this app.', 'bad');
             return;
           }
           perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });

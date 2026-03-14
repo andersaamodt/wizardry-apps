@@ -22,3 +22,4 @@
 - Background refresh loops should skip while commands are active and run once on focus/visibility regain for freshness without UI churn.
 - Drag-and-drop import cues should only activate for folder/file URI payloads so normal text drags do not show false drop targets.
 - Folder-drop overlays need global cleanup on `dragend`/`drop`/window blur because leaving the window may not fire target `dragleave`, which leaves the drop cue stuck on.
+- A primary `Run` button must always execute the default runnable target directly; do not turn it into a menu opener just because Hosted Web is the only enabled run target.
