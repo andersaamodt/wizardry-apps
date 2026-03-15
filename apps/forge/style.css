@@ -523,10 +523,14 @@ body.settings-open #settings-panel {
   width: 100%;
   min-width: 0;
   margin-top: -0.12rem;
-  padding: 0.12rem 0.14rem 0;
+  padding: 0.12rem 2rem 0 0.14rem;
   background: color-mix(in srgb, var(--panel-solid, #fff) 18%, transparent);
   border-radius: 8px 8px 0 0;
   -webkit-app-region: no-drag;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  white-space: nowrap;
 }
 
 .catalog-mini-tabs::after {
@@ -538,6 +542,10 @@ body.settings-open #settings-panel {
   height: 1px;
   background: color-mix(in srgb, var(--line) 86%, transparent);
   pointer-events: none;
+}
+
+.catalog-mini-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .catalog-mini-tab,
@@ -558,6 +566,7 @@ body.settings-open #settings-panel {
   max-width: 8.7rem;
   margin-bottom: -1px;
   box-shadow: none;
+  flex: 0 0 auto;
 }
 
 .catalog-mini-tab:hover,
@@ -635,11 +644,15 @@ body.settings-open #settings-panel {
 }
 
 .catalog-mini-tab-add {
-  margin-left: auto;
+  position: sticky;
+  right: 0;
   min-width: 1.28rem;
   justify-content: center;
   padding-left: 0.34rem;
   padding-right: 0.34rem;
+  z-index: 3;
+  background: color-mix(in srgb, var(--panel-solid, #fff) 96%, transparent);
+  box-shadow: -10px 0 12px color-mix(in srgb, var(--panel-solid, #fff) 72%, transparent);
 }
 
 .sidebar-footer {

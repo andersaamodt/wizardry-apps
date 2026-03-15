@@ -38,3 +38,4 @@
 - Internal catalog item drags need their own drag MIME type; if they advertise generic plain-text payloads, Forge’s external project-import drop cue will incorrectly activate on its own app list.
 - Dropping an item onto a grouping tab should assign the item there without forcing navigation to that tab; reassignment and view-switching are separate actions.
 - If a catalog uses `All` plus explicit user tabs, the system tab can toggle between `All` and `Other` states in the same slot; that narrows or broadens the view without changing assignments or adding extra permanent chrome.
+- Overflowing minitab bars should scroll horizontally under a fixed add button, and mouse-wheel motion over the bar should translate into horizontal scrolling the same way overloaded browser tab strips do.
