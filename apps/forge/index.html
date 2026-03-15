@@ -376,6 +376,7 @@
         activeMiniTab: 'all',
         editingMiniTabId: '',
         editingMiniTabDraft: '',
+        pendingMiniTabFocusId: '',
         dragCatalogItemKey: '',
         dragMiniTabTargetId: ''
       };
@@ -679,6 +680,7 @@
         if (state.editingMiniTabId && state.editingMiniTabId !== 'all' && state.editingMiniTabId !== 'other' && !validTabs[state.editingMiniTabId]) {
           state.editingMiniTabId = '';
           state.editingMiniTabDraft = '';
+          state.pendingMiniTabFocusId = '';
         }
         if (state.dragMiniTabTargetId && state.dragMiniTabTargetId !== 'all' && state.dragMiniTabTargetId !== 'other' && !validTabs[state.dragMiniTabTargetId]) {
           state.dragMiniTabTargetId = '';
@@ -692,12 +694,14 @@
         }
         state.editingMiniTabId = tab.id;
         state.editingMiniTabDraft = tab.label;
+        state.pendingMiniTabFocusId = tab.id;
         renderMiniTabs();
       }
 
       function cancelMiniTabEdit() {
         state.editingMiniTabId = '';
         state.editingMiniTabDraft = '';
+        state.pendingMiniTabFocusId = '';
         renderMiniTabs();
       }
 
@@ -748,6 +752,7 @@
         setActiveMiniTab(tab.id);
         state.editingMiniTabId = tab.id;
         state.editingMiniTabDraft = label;
+        state.pendingMiniTabFocusId = tab.id;
         renderCatalogList();
       }
 
@@ -2372,10 +2377,6 @@
               commitMiniTabEdit(tab.id, input.value);
             });
             button.appendChild(input);
-            setTimeout(function () {
-              input.focus();
-              input.select();
-            }, 0);
           } else {
             var label = document.createElement('span');
             label.className = 'catalog-mini-tab-label';
@@ -2400,6 +2401,20 @@
         add.title = 'Create tab';
         add.textContent = '+';
         els.catalogMiniTabs.appendChild(add);
+
+        if (state.pendingMiniTabFocusId && state.editingMiniTabId === state.pendingMiniTabFocusId) {
+          var focusId = state.pendingMiniTabFocusId;
+          requestAnimationFrame(function () {
+            var selector = '.catalog-mini-tab[data-mini-tab-id="' + focusId.replace(/"/g, '\\"') + '"] .catalog-mini-tab-input';
+            var input = els.catalogMiniTabs ? els.catalogMiniTabs.querySelector(selector) : null;
+            if (!input) {
+              return;
+            }
+            state.pendingMiniTabFocusId = '';
+            input.focus();
+            input.select();
+          });
+        }
       }
 
       function renderCatalogList() {
