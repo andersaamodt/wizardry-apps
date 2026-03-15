@@ -2583,7 +2583,7 @@
           return '';
         }
 
-        var directTypes = ['text/uri-list', 'public.file-url', 'text/plain'];
+        var directTypes = ['text/uri-list', 'public.file-url', 'text/plain', 'public.utf8-plain-text'];
         for (var t = 0; t < directTypes.length; t += 1) {
           var payload = String(dataTransfer.getData(directTypes[t]) || '');
           var directPath = firstPathFromUriBlock(payload);
@@ -2617,13 +2617,10 @@
               continue;
             }
             if (item.kind === 'string') {
-              var type = String(item.type || '');
-              if (type === 'text/uri-list' || type === 'public.file-url' || type === 'text/plain') {
-                var itemValue = await getDataTransferItemString(item);
-                var itemPath = firstPathFromUriBlock(itemValue);
-                if (itemPath) {
-                  return itemPath;
-                }
+              var itemValue = await getDataTransferItemString(item);
+              var itemPath = firstPathFromUriBlock(itemValue);
+              if (itemPath) {
+                return itemPath;
               }
             }
           }
