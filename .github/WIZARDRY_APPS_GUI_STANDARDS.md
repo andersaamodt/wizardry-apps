@@ -101,6 +101,8 @@
 - If an external action is required, pair instruction with immediate verification control.
 - Gate sensitive actions behind explicit confirmation in the same interface.
 - Surface undo/revert actions when behavior is irreversible or high-impact.
+- For low-risk settings in control-plane apps, prefer autosave on edit/change over explicit Save buttons.
+- For live runtime state in control-plane apps, prefer background refresh and visibility/focus refresh over explicit Refresh buttons.
 
 ## Feedback and Error Handling
 - Show command status, outcome, and stderr/stdout context in-app.
