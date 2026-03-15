@@ -360,6 +360,7 @@
         pathCompactTimer: null,
         hostBootReadySent: false,
         workspaceDropDepth: 0,
+        lastHostDropZoneKey: '',
         activeCatalogRowMenuKey: '',
         inlineRenameKey: ''
       };
@@ -1171,6 +1172,7 @@
           els.appGrid.style.setProperty('--left-rail-width', next + 'px');
         }
         scheduleLayoutRecoveryCheck();
+        window.requestAnimationFrame(syncHostWorkspaceDropZone);
       }
 
       function enforceLayoutRecovery() {
@@ -1975,6 +1977,7 @@
           empty.className = 'empty';
           empty.textContent = 'No apps match current filters.';
           els.catalogList.appendChild(empty);
+          syncHostWorkspaceDropZone();
           return;
         }
 
@@ -2236,6 +2239,7 @@
           els.catalogList.appendChild(row);
         });
         scheduleWindowFit();
+        syncHostWorkspaceDropZone();
       }
 
       function selectedBuiltInApp() {
@@ -2687,6 +2691,69 @@
         var x = typeof event.clientX === 'number' ? event.clientX : -1;
         var y = typeof event.clientY === 'number' ? event.clientY : -1;
         return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+      }
+
+      function workspaceDropZoneRect() {
+        if (!els.catalogList || typeof els.catalogList.getBoundingClientRect !== 'function') {
+          return null;
+        }
+        var rect = els.catalogList.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) {
+          return null;
+        }
+        return rect;
+      }
+
+      function syncHostWorkspaceDropZone() {
+        if (state.os !== 'darwin' || !bridgeAvailable()) {
+          return;
+        }
+        var rect = workspaceDropZoneRect();
+        var nextKey = rect
+          ? [Math.round(rect.left), Math.round(rect.top), Math.round(rect.right), Math.round(rect.bottom)].join(':')
+          : '';
+        if (nextKey === state.lastHostDropZoneKey) {
+          return;
+        }
+        state.lastHostDropZoneKey = nextKey;
+        var argv = ['__wizardry_host_forge_drop_zone'];
+        if (rect) {
+          argv.push(
+            String(Math.round(rect.left)),
+            String(Math.round(rect.top)),
+            String(Math.round(rect.right)),
+            String(Math.round(rect.bottom))
+          );
+        }
+        execArgv(argv).catch(function () {
+          return;
+        });
+      }
+
+      function handleForgeHostFileDrag(detail) {
+        var payload = detail && typeof detail === 'object' ? detail : {};
+        var phase = String(payload.phase || '');
+        var paths = Array.isArray(payload.paths) ? payload.paths : [];
+        if (phase === 'enter' || phase === 'update') {
+          if (paths.length) {
+            setWorkspaceDropCue(true);
+          }
+          return;
+        }
+        if (phase === 'leave') {
+          clearWorkspaceDropCue();
+          return;
+        }
+        if (phase === 'drop') {
+          clearWorkspaceDropCue();
+          if (!paths.length) {
+            toast('Drop a project folder to import.', 'bad');
+            return;
+          }
+          perform('Import project folder', function () {
+            return importWorkspaceFromDropPath(paths[0]);
+          }, { swallow: true });
+        }
       }
 
       async function importWorkspaceFromDropPath(path) {
@@ -5021,6 +5088,7 @@
           bindButtons();
           bindKeyboardShortcuts();
           window.forgeHostAction = handleForgeHostAction;
+          window.forgeHostFileDrag = handleForgeHostFileDrag;
           startAutoRefresh();
           setPanel('settings', false);
           setArtifacts([]);
@@ -5039,6 +5107,7 @@
           syncCreateUI();
           scheduleLayoutRecoveryCheck();
           window.addEventListener('resize', scheduleLayoutRecoveryCheck);
+          window.addEventListener('resize', syncHostWorkspaceDropZone);
           window.addEventListener('resize', scheduleSelectedPathCompactSync);
 
           if (state.rootHint) {
@@ -5097,6 +5166,7 @@
           }, 250);
         } finally {
           revealBootUi();
+          window.requestAnimationFrame(syncHostWorkspaceDropZone);
         }
       }
 
