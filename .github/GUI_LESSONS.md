@@ -55,3 +55,4 @@
 - Iconless thumbnail slots should default to the list surface color, not transparent, and should avoid rounded clipped compositing paths; otherwise WebKit can flash white edges during selection updates.
 - Dense catalog rows should disable text/image selection on labels, pills, icons, and row action glyphs; only true text-entry controls inside the row should remain selectable.
 - If a view change rerenders a catalog, keep thumbnail nodes stable by item key instead of recreating them; rebuilding empty thumb slots can reintroduce white flicker even when selection updates are otherwise in-place.
+- For transparent image-backed thumbs in WebKit, give the image layer its own themed backing and WebKit mask inside the rounded thumb; otherwise view-change repaints can briefly outline icon detail against white.

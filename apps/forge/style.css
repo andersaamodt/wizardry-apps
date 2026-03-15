@@ -1004,6 +1004,7 @@ input[type="checkbox"]:disabled {
   backface-visibility: hidden;
   background: var(--catalog-row-surface, var(--bg-panel));
   background-clip: padding-box;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .catalog-thumb img {
@@ -1011,9 +1012,12 @@ input[type="checkbox"]:disabled {
   height: 100%;
   object-fit: cover;
   display: block;
-  background: transparent;
+  border-radius: inherit;
+  background: var(--catalog-row-surface, var(--bg-panel));
+  background-clip: padding-box;
   transform: translateZ(0);
   backface-visibility: hidden;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .catalog-thumb.no-icon {
