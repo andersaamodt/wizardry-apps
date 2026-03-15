@@ -2633,13 +2633,41 @@
       }
 
       function dragPayloadLooksLikeFolderDrop(dataTransfer) {
-        if (!dataTransfer || !dataTransfer.types) {
+        if (!dataTransfer) {
+          return false;
+        }
+        var items = dataTransfer.items;
+        if (items && items.length) {
+          for (var i = 0; i < items.length; i += 1) {
+            var item = items[i];
+            if (!item) {
+              continue;
+            }
+            if (item.kind === 'file') {
+              return true;
+            }
+            if (item.kind === 'string') {
+              var itemType = String(item.type || '');
+              if (
+                itemType === 'text/uri-list' ||
+                itemType === 'public.file-url' ||
+                itemType === 'text/plain' ||
+                itemType === 'public.utf8-plain-text'
+              ) {
+                return true;
+              }
+            }
+          }
+        }
+        if (!dataTransfer.types) {
           return false;
         }
         var types = Array.prototype.slice.call(dataTransfer.types);
         return types.indexOf('Files') >= 0
           || types.indexOf('text/uri-list') >= 0
-          || types.indexOf('public.file-url') >= 0;
+          || types.indexOf('public.file-url') >= 0
+          || types.indexOf('text/plain') >= 0
+          || types.indexOf('public.utf8-plain-text') >= 0;
       }
 
       function setWorkspaceDropCue(active) {

@@ -24,3 +24,4 @@
 - Folder-drop overlays need global cleanup on `dragend`/`drop`/window blur because leaving the window may not fire target `dragleave`, which leaves the drop cue stuck on.
 - A primary `Run` button must always execute the default runnable target directly; do not turn it into a menu opener just because Hosted Web is the only enabled run target.
 - Workspace import should detect a single nested `apps/<slug>/index.html` app as the runnable web entrypoint, not downgrade the repo to a generic non-runnable folder.
+- Finder-to-WebView folder drags may arrive as `text/plain` or plain-text string items instead of `Files`, so drop gates must accept both URI and plain-text path transfers.
