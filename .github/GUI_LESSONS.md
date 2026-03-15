@@ -35,3 +35,4 @@
 - If a launch action only changes selection, sync the selected-row class in place instead of rebuilding the whole catalog; re-creating transparent thumbnails can trigger a one-frame white flash in WebKit during app handoff.
 - In Forge, leave shell and rail surfaces explicitly theme-opaque instead of transparent; WebKit can briefly composite transparent seams against white during rerender or focus churn, which reads as white borders around controls and icons.
 - In Forge, plain selection changes in the catalog should update active-row state in place and no-op on re-click of the selected item; rebuilding the list just to change selection causes avoidable flicker, especially on iconless rows.
+- Internal catalog item drags need their own drag MIME type; if they advertise generic plain-text payloads, Forge’s external project-import drop cue will incorrectly activate on its own app list.

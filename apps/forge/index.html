@@ -312,6 +312,7 @@
       var MINI_TABS_KEY = 'wizardry.forge.mini_tabs.v1';
       var ACTIVE_MINI_TAB_KEY = 'wizardry.forge.active_mini_tab.v1';
       var MINI_TAB_ASSIGNMENTS_KEY = 'wizardry.forge.mini_tab_assignments.v1';
+      var INTERNAL_CATALOG_DRAG_TYPE = 'application/x-wizardry-forge-catalog-item';
       var ASSET_VERSION = 'forge20260218a';
       var BACKEND_PREF_BY_STORAGE_KEY = {
         'wizardry.forge.root': 'root',
@@ -2682,7 +2683,7 @@
             row.classList.add('dragging');
             if (event.dataTransfer) {
               event.dataTransfer.effectAllowed = 'move';
-              event.dataTransfer.setData('text/plain', item.key);
+              event.dataTransfer.setData(INTERNAL_CATALOG_DRAG_TYPE, item.key);
             }
             renderMiniTabs();
           });
@@ -3042,6 +3043,9 @@
         if (!dataTransfer) {
           return '';
         }
+        if (isInternalCatalogDrag(dataTransfer)) {
+          return '';
+        }
 
         var directTypes = ['text/uri-list', 'public.file-url', 'text/plain', 'public.utf8-plain-text'];
         for (var t = 0; t < directTypes.length; t += 1) {
@@ -3089,8 +3093,22 @@
         return '';
       }
 
+      function isInternalCatalogDrag(dataTransfer) {
+        if (state.dragCatalogItemKey) {
+          return true;
+        }
+        if (!dataTransfer || !dataTransfer.types) {
+          return false;
+        }
+        var types = Array.prototype.slice.call(dataTransfer.types);
+        return types.indexOf(INTERNAL_CATALOG_DRAG_TYPE) >= 0;
+      }
+
       function dragPayloadLooksLikeFolderDrop(dataTransfer) {
         if (!dataTransfer) {
+          return false;
+        }
+        if (isInternalCatalogDrag(dataTransfer)) {
           return false;
         }
         var items = dataTransfer.items;
