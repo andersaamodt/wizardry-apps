@@ -3739,7 +3739,11 @@
         if (!els.actionStage) {
           return;
         }
-        var show = !!selected && state.route === 'pipeline' && selected.kind === 'builtin' && hasMobileTargets(selected);
+        var show = !!selected
+          && state.route === 'pipeline'
+          && selected.kind === 'builtin'
+          && !isBuiltInNotDownloaded(selected)
+          && hasMobileTargets(selected);
         els.actionStage.classList.toggle('hidden', !show);
         var stageTitle = mobileStageTooltip(selected);
         els.actionStage.title = stageTitle;
