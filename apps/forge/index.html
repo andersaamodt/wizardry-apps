@@ -346,7 +346,9 @@
         os: '',
         tools: {},
         apps: [],
+        appsLoaded: false,
         workspaces: [],
+        workspacesLoaded: false,
         organizeShow: 'both',
         organizeSort: 'alphabetical',
         organizeBuiltinFirst: true,
@@ -760,36 +762,47 @@
         });
         var assignments = currentMiniTabAssignments();
         var migrated = false;
-        var validItems = {};
-        catalogItems().forEach(function (item) {
-          var itemKeys = assignmentKeysForItem(item);
-          var stableKey = stableAssignmentKeyForItem(item);
-          if (item.kind === 'workspace' && stableKey) {
-            itemKeys.forEach(function (assignmentKey) {
-              if (assignmentKey === stableKey) {
-                return;
-              }
-              var legacyTabId = String(assignments[assignmentKey] || '').trim().toLowerCase();
-              if (!legacyTabId || assignments[stableKey]) {
-                return;
-              }
-              assignments[stableKey] = legacyTabId;
-              delete assignments[assignmentKey];
-              migrated = true;
-            });
-          }
-          itemKeys.forEach(function (assignmentKey) {
-            validItems[assignmentKey] = true;
-          });
-        });
         var changed = false;
-        Object.keys(assignments).forEach(function (itemKey) {
-          var tabId = String(assignments[itemKey] || '').trim().toLowerCase();
-          if (!validItems[itemKey] || !validTabs[tabId]) {
-            delete assignments[itemKey];
-            changed = true;
-          }
-        });
+        var catalogReady = state.appsLoaded && state.workspacesLoaded;
+        if (catalogReady) {
+          var validItems = {};
+          catalogItems().forEach(function (item) {
+            var itemKeys = assignmentKeysForItem(item);
+            var stableKey = stableAssignmentKeyForItem(item);
+            if (item.kind === 'workspace' && stableKey) {
+              itemKeys.forEach(function (assignmentKey) {
+                if (assignmentKey === stableKey) {
+                  return;
+                }
+                var legacyTabId = String(assignments[assignmentKey] || '').trim().toLowerCase();
+                if (!legacyTabId || assignments[stableKey]) {
+                  return;
+                }
+                assignments[stableKey] = legacyTabId;
+                delete assignments[assignmentKey];
+                migrated = true;
+              });
+            }
+            itemKeys.forEach(function (assignmentKey) {
+              validItems[assignmentKey] = true;
+            });
+          });
+          Object.keys(assignments).forEach(function (itemKey) {
+            var tabId = String(assignments[itemKey] || '').trim().toLowerCase();
+            if (!validItems[itemKey] || !validTabs[tabId]) {
+              delete assignments[itemKey];
+              changed = true;
+            }
+          });
+        } else {
+          Object.keys(assignments).forEach(function (itemKey) {
+            var tabId = String(assignments[itemKey] || '').trim().toLowerCase();
+            if (!validTabs[tabId]) {
+              delete assignments[itemKey];
+              changed = true;
+            }
+          });
+        }
         if (changed || migrated) {
           saveMiniTabAssignments(assignments);
         }
@@ -4469,7 +4482,9 @@
 
         if (!info.root) {
           state.apps = [];
+          state.appsLoaded = false;
           state.workspaces = [];
+          state.workspacesLoaded = false;
           if (shouldRender) {
             renderCatalogList();
             renderSelectedBuiltIn();
@@ -4506,6 +4521,7 @@
             sortTimestamp: row[9] || '0'
           };
         });
+        state.appsLoaded = true;
 
         if (!state.selectedBuiltIn && state.apps.length) {
           state.selectedBuiltIn = state.apps[0].id;
@@ -4553,6 +4569,7 @@
         }).filter(function (ws) {
           return !hiddenPaths[normalizePathForCompare(ws.path)];
         });
+        state.workspacesLoaded = true;
         cleanupMiniTabState();
         applyPreferredSystemMiniTabMode();
 

@@ -47,6 +47,7 @@
 - For workspace grouping persistence, store minitab assignments against a stable workspace identity such as normalized path, with fallback from older transient row keys, so tab membership survives restarts and reimports.
 - Internal catalog drags should carry a stable plain-text sentinel alongside custom drag MIME data, because WKWebView does not always preserve the custom type reliably enough for persistence-only drop flows.
 - Desktop UI-pref writes that each rewrite the same plaintext config file must be serialized; fire-and-forget async writes can race and silently drop unrelated keys like minitab assignments.
+- Do not prune persisted grouping assignments before the underlying catalogs finish loading; an empty pre-refresh catalog at startup is not authoritative and will wipe valid saved memberships.
 - When a system tab has `All` and `Other` modes, prefer `Other` as the startup default whenever uncategorized items exist; fall back to `All` only when `Other` would be empty.
 - New minitabs should open directly into inline naming with an empty field, and blur-without-input should delete that new tab instead of leaving a placeholder label behind.
 - Row overflow menus should expose only actions that are actually valid for that item type; disabled dead-end actions read as broken UI.
