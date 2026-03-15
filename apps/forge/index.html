@@ -462,7 +462,10 @@
       function normalizeMiniTabLabel(value, fallback) {
         var label = String(value || '').replace(/\s+/g, ' ').trim();
         if (!label) {
-          return fallback || 'New Tab';
+          if (typeof fallback === 'string') {
+            return fallback;
+          }
+          return 'New Tab';
         }
         if (label.length > 24) {
           return label.slice(0, 24).trim();
@@ -685,6 +688,11 @@
             });
             saveMiniTabs();
             cleanupMiniTabState();
+            state.editingMiniTabId = '';
+            state.editingMiniTabDraft = '';
+            renderCatalogList();
+            renderSelectedBuiltIn();
+            return;
           }
           cancelMiniTabEdit();
           return;
@@ -709,6 +717,7 @@
         state.editingMiniTabId = tab.id;
         state.editingMiniTabDraft = '';
         renderCatalogList();
+        renderSelectedBuiltIn();
       }
 
       function deleteMiniTab(tabId) {
@@ -725,6 +734,7 @@
         saveMiniTabs();
         cleanupMiniTabState();
         renderCatalogList();
+        renderSelectedBuiltIn();
       }
 
       function parseHiddenWorkspaceList() {
@@ -1021,6 +1031,9 @@
         state.busy = flag;
         document.body.classList.toggle('is-busy', flag);
         document.querySelectorAll('.action, .row-play, .row-mini').forEach(function (btn) {
+          btn.disabled = flag;
+        });
+        document.querySelectorAll('.catalog-mini-tab, .catalog-mini-tab-add').forEach(function (btn) {
           btn.disabled = flag;
         });
         syncSettingsSaveButtons();
@@ -1460,6 +1473,8 @@
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
         state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
+        state.miniTabs = parseMiniTabs();
+        state.activeMiniTab = loadStorage(ACTIVE_MINI_TAB_KEY) || 'all';
       }
 
       function syncSettingsSaveButtons() {
@@ -4226,6 +4241,7 @@
         }).filter(function (ws) {
           return !hiddenPaths[normalizePathForCompare(ws.path)];
         });
+        cleanupMiniTabState();
 
         if (shouldRender) {
           renderCatalogList();
@@ -4675,6 +4691,91 @@
           }
         });
 
+        els.catalogMiniTabs.addEventListener('click', function (event) {
+          var addButton = event.target.closest('#catalog-mini-tab-add');
+          if (addButton) {
+            event.preventDefault();
+            createMiniTab();
+            return;
+          }
+          var tabButton = event.target.closest('[data-mini-tab-id]');
+          if (!tabButton) {
+            return;
+          }
+          var tabId = String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase();
+          if (event.target.closest('.catalog-mini-tab-remove')) {
+            event.preventDefault();
+            event.stopPropagation();
+            deleteMiniTab(tabId);
+            return;
+          }
+          if (state.editingMiniTabId && state.editingMiniTabId !== tabId) {
+            commitMiniTabEdit(state.editingMiniTabId, state.editingMiniTabDraft);
+          }
+          if (state.activeMiniTab === tabId) {
+            return;
+          }
+          setActiveMiniTab(tabId);
+          renderCatalogList();
+          renderSelectedBuiltIn();
+        });
+
+        els.catalogMiniTabs.addEventListener('dblclick', function (event) {
+          var tabButton = event.target.closest('[data-mini-tab-id]');
+          if (!tabButton) {
+            return;
+          }
+          beginMiniTabEdit(tabButton.getAttribute('data-mini-tab-id'));
+        });
+
+        els.catalogMiniTabs.addEventListener('dragover', function (event) {
+          if (!state.dragCatalogItemKey) {
+            return;
+          }
+          var tabButton = event.target.closest('[data-mini-tab-id]');
+          if (!tabButton) {
+            return;
+          }
+          event.preventDefault();
+          var nextTargetId = String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase() || 'all';
+          if (state.dragMiniTabTargetId !== nextTargetId) {
+            state.dragMiniTabTargetId = nextTargetId;
+            renderMiniTabs();
+          }
+        });
+
+        els.catalogMiniTabs.addEventListener('dragleave', function (event) {
+          var tabButton = event.target.closest('[data-mini-tab-id]');
+          if (!tabButton) {
+            return;
+          }
+          if (event.relatedTarget && tabButton.contains(event.relatedTarget)) {
+            return;
+          }
+          if (state.dragMiniTabTargetId === String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase()) {
+            state.dragMiniTabTargetId = '';
+            renderMiniTabs();
+          }
+        });
+
+        els.catalogMiniTabs.addEventListener('drop', function (event) {
+          if (!state.dragCatalogItemKey) {
+            return;
+          }
+          var tabButton = event.target.closest('[data-mini-tab-id]');
+          if (!tabButton) {
+            return;
+          }
+          event.preventDefault();
+          var tabId = String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase() || 'all';
+          persistItemMiniTab(state.dragCatalogItemKey, tabId);
+          state.dragCatalogItemKey = '';
+          state.dragMiniTabTargetId = '';
+          setActiveMiniTab(tabId);
+          renderCatalogList();
+          renderSelectedBuiltIn();
+        });
+
         els.organizeBtn.addEventListener('click', function () {
           toggleFloatingMenu(els.organizeMenu, els.organizeBtn);
         });
@@ -4820,11 +4921,15 @@
             event.target.closest('#run-menu') ||
             event.target.closest('#action-run-menu') ||
             event.target.closest('.catalog-row-menu') ||
-            event.target.closest('.row-overflow')
+            event.target.closest('.row-overflow') ||
+            event.target.closest('#catalog-mini-tabs')
           ) {
             return;
           }
           state.activeCatalogRowMenuKey = '';
+          if (state.editingMiniTabId) {
+            commitMiniTabEdit(state.editingMiniTabId, state.editingMiniTabDraft);
+          }
           closeFloatingMenus();
           renderCatalogList();
         });
@@ -5410,6 +5515,7 @@
         els.metricTemplates = document.getElementById('metric-templates');
 
         els.builtinSearch = document.getElementById('builtin-search');
+        els.catalogMiniTabs = document.getElementById('catalog-mini-tabs');
         els.catalogList = document.getElementById('catalog-list');
         els.organizeBtn = document.getElementById('organize-btn');
         els.organizeMenu = document.getElementById('organize-menu');

@@ -465,7 +465,7 @@ body.settings-open #settings-panel {
 .apps-list-card {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0.48rem;
   border: 0;
   border-radius: 0;
@@ -507,6 +507,134 @@ body.settings-open #settings-panel {
 #builtin-search::placeholder {
   color: var(--muted);
   opacity: 0.85;
+}
+
+.catalog-mini-tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.08rem;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  margin-top: -0.12rem;
+  padding: 0.12rem 0.14rem 0;
+  background: color-mix(in srgb, var(--panel-solid, #fff) 18%, transparent);
+  border-radius: 8px 8px 0 0;
+  -webkit-app-region: no-drag;
+}
+
+.catalog-mini-tabs::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--line) 86%, transparent);
+  pointer-events: none;
+}
+
+.catalog-mini-tab,
+.catalog-mini-tab-add {
+  border: 1px solid transparent;
+  border-bottom: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--muted) 84%, var(--text) 16%);
+  border-radius: 8px 8px 0 0;
+  padding: 0.14rem 0.46rem 0.18rem;
+  font-size: 0.67rem;
+  font-weight: 620;
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+  min-height: 1.24rem;
+  max-width: 8.7rem;
+  margin-bottom: -1px;
+  box-shadow: none;
+}
+
+.catalog-mini-tab:hover,
+.catalog-mini-tab:focus-visible,
+.catalog-mini-tab-add:hover,
+.catalog-mini-tab-add:focus-visible {
+  border-color: color-mix(in srgb, var(--line) 78%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: color-mix(in srgb, var(--text) 94%, transparent);
+  box-shadow: none;
+}
+
+.catalog-mini-tab.active {
+  background: color-mix(in srgb, var(--panel-solid, #fff) 96%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--line));
+  border-bottom-color: transparent;
+  color: color-mix(in srgb, var(--text) 94%, transparent);
+  position: relative;
+  z-index: 2;
+}
+
+.catalog-mini-tab.drag-target {
+  border-color: color-mix(in srgb, #4ba46a 52%, var(--line));
+  background: color-mix(in srgb, #4ba46a 14%, transparent);
+  color: color-mix(in srgb, var(--text) 94%, transparent);
+}
+
+.catalog-mini-tab.editing {
+  padding: 0.08rem 0.2rem 0.14rem;
+}
+
+.catalog-mini-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalog-mini-tab-input {
+  min-width: 4.1rem;
+  width: 100%;
+  height: 1.1rem;
+  min-height: 1.1rem;
+  padding: 0 0.3rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  background: color-mix(in srgb, var(--panel-solid, #fff) 98%, transparent);
+  color: color-mix(in srgb, var(--text) 94%, transparent);
+  font-size: 0.67rem;
+  line-height: 1.1;
+}
+
+.catalog-mini-tab-remove {
+  width: 0.72rem;
+  height: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--muted) 78%, var(--text) 22%);
+  flex: 0 0 auto;
+}
+
+.catalog-mini-tab-remove svg {
+  width: 0.54rem;
+  height: 0.54rem;
+  display: block;
+}
+
+.catalog-mini-tab-remove path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+}
+
+.catalog-mini-tab-add {
+  margin-left: auto;
+  min-width: 1.28rem;
+  justify-content: center;
+  padding-left: 0.34rem;
+  padding-right: 0.34rem;
 }
 
 .sidebar-footer {
@@ -774,6 +902,10 @@ input[type="checkbox"]:disabled {
   row-gap: 0;
   padding: 0 0.18rem 0 0.4rem;
   min-height: 1.9rem;
+}
+
+.catalog-row.dragging {
+  opacity: 0.52;
 }
 
 .catalog-content {

@@ -31,3 +31,4 @@
 - Icon import pipelines must not transcode non-JPEG sources to JPEG just to shrink payload size; that strips real alpha from PNG/WebP/SVG icons.
 - On macOS, `sips -z ... --out file.png` does not guarantee PNG output; set `-s format png` explicitly or Forge can write JPEG bytes into `forge-icon.png`.
 - Focus/visibility-triggered auto-refresh right after launching another app/browser can tear down and redraw transparent catalog icons, causing a brief white-edge flash during Run handoff.
+- Compact left-rail minitabs work best as one global `All` view plus exclusive user tabs, with drag-to-reassign, inline rename on double-click, and delete affordance shown only for empty tabs.
