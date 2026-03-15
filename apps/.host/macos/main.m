@@ -944,6 +944,52 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     [appMenuItem setSubmenu:appMenu];
 
+    NSMenuItem *editMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    [mainMenu addItem:editMenuItem];
+    NSMenu *editMenu = [[NSMenu alloc] initWithTitle:@"Edit"];
+
+    NSMenuItem *undoItem = [editMenu addItemWithTitle:@"Undo"
+                                               action:@selector(undo:)
+                                        keyEquivalent:@"z"];
+    [undoItem setTarget:nil];
+
+    NSMenuItem *redoItem = [editMenu addItemWithTitle:@"Redo"
+                                               action:@selector(redo:)
+                                        keyEquivalent:@"Z"];
+    [redoItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagShift)];
+    [redoItem setTarget:nil];
+
+    [editMenu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem *cutItem = [editMenu addItemWithTitle:@"Cut"
+                                              action:@selector(cut:)
+                                       keyEquivalent:@"x"];
+    [cutItem setTarget:nil];
+
+    NSMenuItem *copyItem = [editMenu addItemWithTitle:@"Copy"
+                                               action:@selector(copy:)
+                                        keyEquivalent:@"c"];
+    [copyItem setTarget:nil];
+
+    NSMenuItem *pasteItem = [editMenu addItemWithTitle:@"Paste"
+                                                action:@selector(paste:)
+                                         keyEquivalent:@"v"];
+    [pasteItem setTarget:nil];
+
+    NSMenuItem *deleteItem = [editMenu addItemWithTitle:@"Delete"
+                                                 action:@selector(delete:)
+                                          keyEquivalent:@""];
+    [deleteItem setTarget:nil];
+
+    [editMenu addItem:[NSMenuItem separatorItem]];
+
+    NSMenuItem *selectAllItem = [editMenu addItemWithTitle:@"Select All"
+                                                    action:@selector(selectAll:)
+                                             keyEquivalent:@"a"];
+    [selectAllItem setTarget:nil];
+
+    [editMenuItem setSubmenu:editMenu];
+
     if (self.enableForgeAppMenu) {
         NSMenuItem *projectMenuItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
         [mainMenu addItem:projectMenuItem];
@@ -1411,6 +1457,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
 
     [self.window setContentView:rootView];
+    if (self.webView) {
+        [self.window makeFirstResponder:self.webView];
+    }
 
     [self.window makeKeyAndOrderFront:nil];
     [self.window orderFrontRegardless];
@@ -1424,6 +1473,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [self.window makeMainWindow];
         [self.window makeKeyAndOrderFront:nil];
         [self.window orderFrontRegardless];
+        if (self.webView) {
+            [self.window makeFirstResponder:self.webView];
+        }
         [NSApp unhide:nil];
         [NSApp activateIgnoringOtherApps:YES];
     });
@@ -1434,6 +1486,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     // current app folder), so read access must include the broader filesystem tree.
     NSURL *allowDir = [NSURL fileURLWithPath:@"/" isDirectory:YES];
     [self.webView loadFileURL:url allowingReadAccessToURL:allowDir];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.webView) {
+            [self.window makeFirstResponder:self.webView];
+        }
+    });
 }
 
 - (void)userContentController:(WKUserContentController *)userContentController

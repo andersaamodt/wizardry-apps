@@ -179,6 +179,8 @@
 - Keep focus states visible and modal escape paths obvious.
 - Avoid click-only critical actions; support keyboard submission where practical.
 - Preserve native text-editing shortcuts in text-entry controls; do not intercept `Ctrl/Cmd/Alt` combos for cut/copy/paste/select-all/undo/redo/navigation.
+- On macOS desktop hosts, ship a standard `Edit` menu wired to nil-target Cocoa selectors for `undo:`, `redo:`, `cut:`, `copy:`, `paste:`, `delete:`, and `selectAll:` so Command shortcuts work in both text-entry controls and selected `WKWebView` content.
+- On macOS desktop hosts, make the main `WKWebView` first responder on launch/initial handoff so Edit commands are live without requiring an extra click before `Cmd-A/C/X/V` start working.
 - Global key handlers must early-return for editable targets with modifier keys instead of hardcoding app-level shortcut patches.
 - Avoid defaulting buttons and short text-entry inputs to `width: 100%`; size them to content or a bounded width unless full-width is required by layout.
 - Form controls should usually be content-sized or bounded-width rather than stretched full-width; reserve full-width controls for genuinely long freeform input areas or narrow sidebars where a bounded width would waste space.
