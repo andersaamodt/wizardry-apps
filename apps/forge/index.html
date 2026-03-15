@@ -455,6 +455,278 @@
         }
       }
 
+      function defaultMiniTab() {
+        return { id: 'all', label: 'All', system: true };
+      }
+
+      function normalizeMiniTabLabel(value, fallback) {
+        var label = String(value || '').replace(/\s+/g, ' ').trim();
+        if (!label) {
+          return fallback || 'New Tab';
+        }
+        if (label.length > 24) {
+          return label.slice(0, 24).trim();
+        }
+        return label;
+      }
+
+      function slugifyMiniTabLabel(value) {
+        var slug = String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        return slug || 'tab';
+      }
+
+      function createMiniTabId(label) {
+        var base = slugifyMiniTabLabel(label);
+        var existing = {};
+        state.miniTabs.forEach(function (tab) {
+          existing[String(tab.id || '')] = true;
+        });
+        var next = base;
+        var index = 2;
+        while (existing[next] || next === 'all') {
+          next = base + '-' + index;
+          index += 1;
+        }
+        return next;
+      }
+
+      function parseMiniTabs() {
+        var raw = loadStorage(MINI_TABS_KEY);
+        if (!raw) {
+          return [];
+        }
+        try {
+          var parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) {
+            return [];
+          }
+          var seen = {};
+          return parsed.map(function (entry) {
+            if (!entry || typeof entry !== 'object') {
+              return null;
+            }
+            var id = String(entry.id || '').trim().toLowerCase();
+            if (!id || id === 'all' || seen[id]) {
+              return null;
+            }
+            seen[id] = true;
+            return {
+              id: id,
+              label: normalizeMiniTabLabel(entry.label, 'New Tab')
+            };
+          }).filter(Boolean);
+        } catch (_err) {
+          return [];
+        }
+      }
+
+      function parseMiniTabAssignments() {
+        var raw = loadStorage(MINI_TAB_ASSIGNMENTS_KEY);
+        if (!raw) {
+          return {};
+        }
+        try {
+          var parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== 'object') {
+            return {};
+          }
+          var out = {};
+          Object.keys(parsed).forEach(function (itemKey) {
+            var tabId = String(parsed[itemKey] || '').trim().toLowerCase();
+            if (!itemKey || !tabId || tabId === 'all') {
+              return;
+            }
+            out[itemKey] = tabId;
+          });
+          return out;
+        } catch (_err) {
+          return {};
+        }
+      }
+
+      function saveMiniTabs() {
+        saveStorage(MINI_TABS_KEY, JSON.stringify(state.miniTabs.map(function (tab) {
+          return {
+            id: tab.id,
+            label: tab.label
+          };
+        })));
+      }
+
+      function saveMiniTabAssignments(assignments) {
+        saveStorage(MINI_TAB_ASSIGNMENTS_KEY, JSON.stringify(assignments || {}));
+      }
+
+      function allMiniTabs() {
+        return [defaultMiniTab()].concat(state.miniTabs);
+      }
+
+      function miniTabById(tabId) {
+        var normalized = String(tabId || '').trim().toLowerCase();
+        if (!normalized || normalized === 'all') {
+          return defaultMiniTab();
+        }
+        return state.miniTabs.find(function (tab) {
+          return tab.id === normalized;
+        }) || null;
+      }
+
+      function setActiveMiniTab(tabId) {
+        var next = String(tabId || '').trim().toLowerCase();
+        if (next !== 'all' && !miniTabById(next)) {
+          next = 'all';
+        }
+        if (!next) {
+          next = 'all';
+        }
+        state.activeMiniTab = next;
+        saveStorage(ACTIVE_MINI_TAB_KEY, next);
+      }
+
+      function currentMiniTabAssignments() {
+        return parseMiniTabAssignments();
+      }
+
+      function itemAssignedMiniTab(itemKey) {
+        var assignments = currentMiniTabAssignments();
+        var tabId = String(assignments[itemKey] || '').trim().toLowerCase();
+        if (!tabId) {
+          return '';
+        }
+        return miniTabById(tabId) ? tabId : '';
+      }
+
+      function persistItemMiniTab(itemKey, tabId) {
+        var assignments = currentMiniTabAssignments();
+        var normalizedTab = String(tabId || '').trim().toLowerCase();
+        if (!normalizedTab || normalizedTab === 'all' || !miniTabById(normalizedTab)) {
+          delete assignments[itemKey];
+        } else {
+          assignments[itemKey] = normalizedTab;
+        }
+        saveMiniTabAssignments(assignments);
+      }
+
+      function miniTabItemCount(tabId) {
+        var target = String(tabId || '').trim().toLowerCase();
+        if (!target || target === 'all') {
+          return catalogItems().length;
+        }
+        return catalogItems().filter(function (item) {
+          return itemAssignedMiniTab(item.key) === target;
+        }).length;
+      }
+
+      function cleanupMiniTabState() {
+        var validTabs = {};
+        state.miniTabs.forEach(function (tab) {
+          validTabs[tab.id] = true;
+        });
+        var validItems = {};
+        catalogItems().forEach(function (item) {
+          validItems[item.key] = true;
+        });
+        var assignments = currentMiniTabAssignments();
+        var changed = false;
+        Object.keys(assignments).forEach(function (itemKey) {
+          var tabId = String(assignments[itemKey] || '').trim().toLowerCase();
+          if (!validItems[itemKey] || !validTabs[tabId]) {
+            delete assignments[itemKey];
+            changed = true;
+          }
+        });
+        if (changed) {
+          saveMiniTabAssignments(assignments);
+        }
+        if (state.activeMiniTab !== 'all' && !validTabs[state.activeMiniTab]) {
+          setActiveMiniTab('all');
+        }
+        if (state.editingMiniTabId && state.editingMiniTabId !== 'all' && !validTabs[state.editingMiniTabId]) {
+          state.editingMiniTabId = '';
+          state.editingMiniTabDraft = '';
+        }
+        if (state.dragMiniTabTargetId && state.dragMiniTabTargetId !== 'all' && !validTabs[state.dragMiniTabTargetId]) {
+          state.dragMiniTabTargetId = '';
+        }
+      }
+
+      function beginMiniTabEdit(tabId) {
+        var tab = miniTabById(tabId);
+        if (!tab || tab.system || state.busy) {
+          return;
+        }
+        state.editingMiniTabId = tab.id;
+        state.editingMiniTabDraft = tab.label;
+        renderMiniTabs();
+      }
+
+      function cancelMiniTabEdit() {
+        state.editingMiniTabId = '';
+        state.editingMiniTabDraft = '';
+        renderMiniTabs();
+      }
+
+      function commitMiniTabEdit(tabId, nextLabel) {
+        var normalizedId = String(tabId || '').trim().toLowerCase();
+        if (!normalizedId || normalizedId === 'all') {
+          cancelMiniTabEdit();
+          return;
+        }
+        var tab = miniTabById(normalizedId);
+        var label = normalizeMiniTabLabel(nextLabel, '');
+        if (!tab) {
+          cancelMiniTabEdit();
+          return;
+        }
+        if (!label) {
+          if (miniTabItemCount(normalizedId) === 0) {
+            state.miniTabs = state.miniTabs.filter(function (entry) {
+              return entry.id !== normalizedId;
+            });
+            saveMiniTabs();
+            cleanupMiniTabState();
+          }
+          cancelMiniTabEdit();
+          return;
+        }
+        tab.label = label;
+        saveMiniTabs();
+        cancelMiniTabEdit();
+      }
+
+      function createMiniTab() {
+        if (state.busy) {
+          return;
+        }
+        var label = 'New Tab';
+        var tab = {
+          id: createMiniTabId(label),
+          label: label
+        };
+        state.miniTabs.push(tab);
+        saveMiniTabs();
+        setActiveMiniTab(tab.id);
+        state.editingMiniTabId = tab.id;
+        state.editingMiniTabDraft = '';
+        renderCatalogList();
+      }
+
+      function deleteMiniTab(tabId) {
+        var normalizedId = String(tabId || '').trim().toLowerCase();
+        if (!normalizedId || normalizedId === 'all' || miniTabItemCount(normalizedId) > 0 || state.busy) {
+          return;
+        }
+        state.miniTabs = state.miniTabs.filter(function (tab) {
+          return tab.id !== normalizedId;
+        });
+        if (state.activeMiniTab === normalizedId) {
+          setActiveMiniTab('all');
+        }
+        saveMiniTabs();
+        cleanupMiniTabState();
+        renderCatalogList();
+      }
+
       function parseHiddenWorkspaceList() {
         var raw = loadStorage(HIDDEN_WORKSPACES_KEY);
         if (!raw) {
@@ -1041,6 +1313,9 @@
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
         var showMode = state.organizeShow || 'both';
         var items = catalogItems().filter(function (item) {
+          if (state.activeMiniTab && state.activeMiniTab !== 'all' && itemAssignedMiniTab(item.key) !== state.activeMiniTab) {
+            return false;
+          }
           if (showMode === 'builtin' && item.kind !== 'builtin') {
             return false;
           }
@@ -1994,7 +2269,82 @@
         return items[0];
       }
 
+      function renderMiniTabs() {
+        if (!els.catalogMiniTabs) {
+          return;
+        }
+        cleanupMiniTabState();
+        els.catalogMiniTabs.innerHTML = '';
+        allMiniTabs().forEach(function (tab) {
+          var isEditing = state.editingMiniTabId === tab.id;
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'catalog-mini-tab' + (state.activeMiniTab === tab.id ? ' active' : '') + (state.dragMiniTabTargetId === tab.id ? ' drag-target' : '');
+          button.setAttribute('data-mini-tab-id', tab.id);
+          button.setAttribute('aria-pressed', state.activeMiniTab === tab.id ? 'true' : 'false');
+          button.title = tab.label;
+          if (isEditing) {
+            button.classList.add('editing');
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'catalog-mini-tab-input';
+            input.value = state.editingMiniTabDraft || '';
+            input.placeholder = 'Tab name';
+            input.setAttribute('aria-label', 'Tab name');
+            input.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+            });
+            input.addEventListener('input', function () {
+              state.editingMiniTabDraft = input.value;
+            });
+            input.addEventListener('keydown', function (event) {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                cancelMiniTabEdit();
+                return;
+              }
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                commitMiniTabEdit(tab.id, input.value);
+              }
+            });
+            input.addEventListener('blur', function () {
+              commitMiniTabEdit(tab.id, input.value);
+            });
+            button.appendChild(input);
+            setTimeout(function () {
+              input.focus();
+              input.select();
+            }, 0);
+          } else {
+            var label = document.createElement('span');
+            label.className = 'catalog-mini-tab-label';
+            label.textContent = tab.label;
+            button.appendChild(label);
+            if (!tab.system && miniTabItemCount(tab.id) === 0) {
+              var remove = document.createElement('span');
+              remove.className = 'catalog-mini-tab-remove';
+              remove.setAttribute('aria-hidden', 'true');
+              remove.innerHTML = '<svg viewBox="0 0 12 12" focusable="false"><path d="M3 3l6 6M9 3L3 9"></path></svg>';
+              button.appendChild(remove);
+            }
+          }
+          els.catalogMiniTabs.appendChild(button);
+        });
+
+        var add = document.createElement('button');
+        add.type = 'button';
+        add.id = 'catalog-mini-tab-add';
+        add.className = 'catalog-mini-tab-add';
+        add.setAttribute('aria-label', 'Create tab');
+        add.title = 'Create tab';
+        add.textContent = '+';
+        els.catalogMiniTabs.appendChild(add);
+      }
+
       function renderCatalogList() {
+        renderMiniTabs();
         var items = filteredCatalogItems();
         if (state.activeCatalogRowMenuKey && !items.some(function (item) { return item.key === state.activeCatalogRowMenuKey; })) {
           state.activeCatalogRowMenuKey = '';
@@ -2007,7 +2357,9 @@
         if (!items.length) {
           var empty = document.createElement('p');
           empty.className = 'empty';
-          empty.textContent = 'No apps match current filters.';
+          empty.textContent = state.activeMiniTab === 'all'
+            ? 'No apps match current filters.'
+            : 'No apps in this tab match current filters.';
           els.catalogList.appendChild(empty);
           syncHostWorkspaceDropZone();
           return;
@@ -2018,8 +2370,15 @@
           row.className = 'list-row catalog-row';
           row.setAttribute('role', 'button');
           row.setAttribute('tabindex', '0');
+          row.setAttribute('data-catalog-item-key', item.key);
+          if (!state.inlineRenameKey && !item.draft) {
+            row.setAttribute('draggable', 'true');
+          }
           if (state.selectedCatalog === item.key) {
             row.classList.add('active');
+          }
+          if (state.dragCatalogItemKey === item.key) {
+            row.classList.add('dragging');
           }
 
           var thumb = document.createElement('span');
@@ -2267,6 +2626,26 @@
               event.preventDefault();
               selectItem();
             }
+          });
+          row.addEventListener('dragstart', function (event) {
+            if (state.inlineRenameKey || item.draft) {
+              event.preventDefault();
+              return;
+            }
+            state.dragCatalogItemKey = item.key;
+            state.dragMiniTabTargetId = '';
+            row.classList.add('dragging');
+            if (event.dataTransfer) {
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', item.key);
+            }
+            renderMiniTabs();
+          });
+          row.addEventListener('dragend', function () {
+            state.dragCatalogItemKey = '';
+            state.dragMiniTabTargetId = '';
+            row.classList.remove('dragging');
+            renderMiniTabs();
           });
           els.catalogList.appendChild(row);
         });
