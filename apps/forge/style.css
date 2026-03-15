@@ -698,7 +698,7 @@ body.settings-open #settings-panel {
   width: 0.95rem;
   height: 0.95rem;
   display: block;
-  filter: brightness(0) saturate(100%) opacity(0.8);
+  filter: var(--footer-icon-filter, brightness(0) saturate(100%) opacity(0.8));
 }
 
 .footer-theme-anchor {

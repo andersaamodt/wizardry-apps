@@ -17,4 +17,5 @@
   --nav-link-hover: #3c3c6c;
   --nav-link-active: #f39c12;
   --nav-icon: #f39c12;
+  --footer-icon-filter: brightness(0) saturate(100%) invert(97%) sepia(6%) saturate(189%) hue-rotate(184deg) brightness(109%) contrast(95%);
 }
