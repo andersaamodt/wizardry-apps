@@ -931,6 +931,22 @@ input[type="checkbox"]:disabled {
   opacity: 0.52;
 }
 
+.catalog-row.catalog-row-filtered {
+  position: absolute;
+  left: 0;
+  right: 0;
+  min-height: 0;
+  height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border: 0;
+  margin: 0;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .catalog-row,
 .catalog-row .name-text,
 .catalog-thumb,

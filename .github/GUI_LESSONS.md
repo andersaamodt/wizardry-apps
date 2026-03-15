@@ -58,3 +58,4 @@
 - For transparent image-backed thumbs in WebKit, give the image layer its own themed backing and WebKit mask inside the rounded thumb; otherwise view-change repaints can briefly outline icon detail against white.
 - For catalog view changes, reusing only thumbnail nodes is not enough if the parent row is still rebuilt; keep the whole row DOM stable by item key so transparent icons are not detached/reinserted during filtering or tab switches.
 - For pure view filters like tab switches, preserve row order and toggle visibility in place instead of re-appending rows; moving transparent-icon rows is enough to trigger one-frame white detailing in WebKit.
+- For transparent-icon catalogs, do not hide filtered rows with `display:none`; use an in-place filtered state that removes layout footprint without destroying the row/image layers, or WebKit will white-flash the icons when rows reappear.

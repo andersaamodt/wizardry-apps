@@ -2604,7 +2604,7 @@
         var anchor = els.catalogList.firstChild;
         orderedItems.forEach(function (item) {
           var row = catalogRowElement(item);
-          row.classList.toggle('hidden', !visibleKeys[item.key]);
+          setCatalogRowFiltered(row, !visibleKeys[item.key]);
           if (row !== anchor) {
             els.catalogList.insertBefore(row, anchor);
           } else {
@@ -2667,12 +2667,28 @@
       function syncCatalogRowState(row, item) {
         row.classList.toggle('active', state.selectedCatalog === item.key);
         row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
-        row.classList.remove('hidden');
+        row.classList.remove('catalog-row-filtered');
+        row.removeAttribute('aria-hidden');
         if (!state.inlineRenameKey && !item.draft) {
           row.setAttribute('draggable', 'true');
         } else {
           row.removeAttribute('draggable');
         }
+        row.setAttribute('tabindex', '0');
+      }
+
+      function setCatalogRowFiltered(row, filtered) {
+        row.classList.toggle('catalog-row-filtered', !!filtered);
+        if (filtered) {
+          row.classList.remove('active');
+          row.classList.remove('dragging');
+          row.removeAttribute('draggable');
+          row.setAttribute('tabindex', '-1');
+          row.setAttribute('aria-hidden', 'true');
+          return;
+        }
+        row.removeAttribute('aria-hidden');
+        row.setAttribute('tabindex', '0');
       }
 
       function catalogRowElement(item) {
