@@ -3142,6 +3142,16 @@
         return types.indexOf(INTERNAL_CATALOG_DRAG_TYPE) >= 0;
       }
 
+      function internalCatalogDragItemKey(dataTransfer) {
+        if (dataTransfer && typeof dataTransfer.getData === 'function') {
+          var payload = String(dataTransfer.getData(INTERNAL_CATALOG_DRAG_TYPE) || '').trim();
+          if (payload) {
+            return payload;
+          }
+        }
+        return String(state.dragCatalogItemKey || '').trim();
+      }
+
       function dragPayloadLooksLikeFolderDrop(dataTransfer) {
         if (!dataTransfer) {
           return false;
@@ -4881,7 +4891,8 @@
         });
 
         els.catalogMiniTabs.addEventListener('drop', function (event) {
-          if (!state.dragCatalogItemKey) {
+          var draggedItemKey = internalCatalogDragItemKey(event.dataTransfer);
+          if (!draggedItemKey) {
             return;
           }
           var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
@@ -4890,7 +4901,7 @@
           }
           event.preventDefault();
           var tabId = String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase() || 'all';
-          persistItemMiniTab(state.dragCatalogItemKey, tabId);
+          persistItemMiniTab(draggedItemKey, tabId);
           state.dragCatalogItemKey = '';
           state.dragMiniTabTargetId = '';
           renderCatalogList();
