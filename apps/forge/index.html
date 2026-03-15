@@ -3439,6 +3439,7 @@
       function renderCatalogThumb(thumb, item) {
         var iconSrc = iconSrcForItem(item);
         if (!iconSrc) {
+          thumb.classList.add('no-icon');
           return;
         }
         var thumbImg = document.createElement('img');
