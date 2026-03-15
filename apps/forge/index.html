@@ -371,6 +371,7 @@
         createDraftActive: false,
         leftRailWidth: 240,
         uiPrefs: {},
+        uiPrefPersistChain: Promise.resolve(),
         targetRuntime: {},
         targetSectionByRow: {},
         iconVersionByKey: {},
@@ -430,11 +431,15 @@
         if (!pref) {
           return;
         }
-        try {
-          await backend('set-ui-pref', [pref, String(value || '')], { quiet: true });
-        } catch (_err) {
+        var persistedValue = String(value || '');
+        state.uiPrefPersistChain = state.uiPrefPersistChain.catch(function () {
           return;
-        }
+        }).then(function () {
+          return backend('set-ui-pref', [pref, persistedValue], { quiet: true }).catch(function () {
+            return;
+          });
+        });
+        await state.uiPrefPersistChain;
       }
 
       function mergePrefsIntoState(prefs) {
