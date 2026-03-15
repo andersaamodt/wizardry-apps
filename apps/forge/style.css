@@ -527,8 +527,8 @@ body.settings-open #settings-panel {
 .catalog-mini-tabs::after {
   content: "";
   position: absolute;
-  left: -0.14rem;
-  right: -0.14rem;
+  left: -0.5rem;
+  right: -0.5rem;
   bottom: 0;
   height: 1px;
   background: color-mix(in srgb, var(--line) 86%, transparent);
