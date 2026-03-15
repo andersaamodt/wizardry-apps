@@ -2286,7 +2286,7 @@ write_project_icon_from_data_url() {
     resized_icon_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon-resized.XXXXXX")
     resized_icon="$resized_icon_base.png"
     rm -f "$resized_icon"
-    if sips -z 1024 1024 "$tmp_icon" --out "$resized_icon" >/dev/null 2>&1; then
+    if sips -s format png -z 1024 1024 "$tmp_icon" --out "$resized_icon" >/dev/null 2>&1; then
       normalized_icon=$resized_icon
     else
       rm -f "$resized_icon"
