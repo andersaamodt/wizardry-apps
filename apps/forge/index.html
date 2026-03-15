@@ -638,6 +638,14 @@
         saveMiniTabAssignments(assignments);
       }
 
+      function activeUserMiniTabId() {
+        var tabId = String(state.activeMiniTab || '').trim().toLowerCase();
+        if (!tabId || tabId === 'all' || tabId === 'other') {
+          return '';
+        }
+        return miniTabById(tabId) ? tabId : '';
+      }
+
       function miniTabItemCount(tabId) {
         var target = String(tabId || '').trim().toLowerCase();
         if (!target || target === 'all') {
@@ -3292,6 +3300,16 @@
         } else if (out.project_id) {
           setSelectedCatalog('workspace:' + out.project_id);
           state.selectedWorkspace = out.project_id;
+        }
+
+        var assignTabId = activeUserMiniTabId();
+        if (assignTabId) {
+          var importedKey = selectedWorkspace
+            ? ('workspace:' + selectedWorkspace.id)
+            : (out.project_id ? ('workspace:' + out.project_id) : '');
+          if (importedKey) {
+            persistItemMiniTab(importedKey, assignTabId);
+          }
         }
 
         setWorkflowMode('pipeline');
