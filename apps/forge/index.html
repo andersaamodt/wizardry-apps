@@ -1043,9 +1043,29 @@
         return items;
       }
 
+      function builtInListGroup(appId) {
+        var nonWizardryBuiltIns = {
+          priorities: true,
+          memetrader: true,
+          'virtual-redditor': true
+        };
+        if (nonWizardryBuiltIns[String(appId || '').toLowerCase()]) {
+          return 'builtin';
+        }
+        return 'wizardry';
+      }
+
+      function isWizardrySuiteItem(item) {
+        return !!(item && item.listGroup === 'wizardry');
+      }
+
       function compareCatalogItems(a, b) {
-        if (state.organizeBuiltinFirst && a.kind !== b.kind) {
-          return a.kind === 'builtin' ? -1 : 1;
+        if (state.organizeBuiltinFirst) {
+          var aWizardry = isWizardrySuiteItem(a);
+          var bWizardry = isWizardrySuiteItem(b);
+          if (aWizardry !== bWizardry) {
+            return aWizardry ? -1 : 1;
+          }
         }
 
         var sortMode = state.organizeSort || 'alphabetical';
@@ -1733,18 +1753,6 @@
       }
 
       function catalogItems() {
-        function builtInListGroup(appId) {
-          var nonWizardryBuiltIns = {
-            priorities: true,
-            memetrader: true,
-            'virtual-redditor': true
-          };
-          if (nonWizardryBuiltIns[String(appId || '').toLowerCase()]) {
-            return 'builtin';
-          }
-          return 'wizardry';
-        }
-
         var builtIn = state.apps.map(function (app) {
           var listGroup = builtInListGroup(app.id);
           return {
@@ -2080,7 +2088,7 @@
           contextPill.classList.add(isGameContext ? 'game' : 'web');
           contextPill.textContent = isGameContext ? 'game' : 'web';
           nameWrap.appendChild(contextPill);
-          if (item.kind === 'builtin' && item.listGroup === 'wizardry') {
+          if (item.kind === 'builtin' && isWizardrySuiteItem(item)) {
             var suiteDot = document.createElement('span');
             suiteDot.className = 'suite-dot';
             suiteDot.setAttribute('aria-label', 'Wizardry suite app');
@@ -2340,7 +2348,7 @@
           els.selectedTypeBadge.classList.remove('hidden');
         }
         if (els.selectedSuiteBadge) {
-          els.selectedSuiteBadge.classList.toggle('hidden', !(selected.kind === 'builtin' && selected.listGroup === 'wizardry'));
+          els.selectedSuiteBadge.classList.toggle('hidden', !(selected.kind === 'builtin' && isWizardrySuiteItem(selected)));
         }
         if (isBuiltInNotDownloaded(selected)) {
           if (els.openSelectedPath) {
