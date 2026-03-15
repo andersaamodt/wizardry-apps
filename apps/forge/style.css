@@ -962,6 +962,11 @@ input[type="checkbox"]:disabled {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background: transparent;
+  isolation: isolate;
+  contain: paint;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .catalog-thumb img {
@@ -969,6 +974,9 @@ input[type="checkbox"]:disabled {
   height: 100%;
   object-fit: cover;
   display: block;
+  background: transparent;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .list-row .meta {

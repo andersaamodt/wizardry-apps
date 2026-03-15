@@ -32,3 +32,4 @@
 - On macOS, `sips -z ... --out file.png` does not guarantee PNG output; set `-s format png` explicitly or Forge can write JPEG bytes into `forge-icon.png`.
 - Focus/visibility-triggered auto-refresh right after launching another app/browser can tear down and redraw transparent catalog icons, causing a brief white-edge flash during Run handoff.
 - Compact left-rail minitabs work best as one global `All` view plus exclusive user tabs, with drag-to-reassign, inline rename on double-click, and delete affordance shown only for empty tabs.
+- If a launch action only changes selection, sync the selected-row class in place instead of rebuilding the whole catalog; re-creating transparent thumbnails can trigger a one-frame white flash in WebKit during app handoff.

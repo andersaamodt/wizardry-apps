@@ -2302,6 +2302,16 @@
         return items[0];
       }
 
+      function syncCatalogSelectionState() {
+        if (!els.catalogList) {
+          return;
+        }
+        els.catalogList.querySelectorAll('.catalog-row[data-catalog-item-key]').forEach(function (row) {
+          var itemKey = String(row.getAttribute('data-catalog-item-key') || '');
+          row.classList.toggle('active', itemKey === state.selectedCatalog);
+        });
+      }
+
       function renderMiniTabs() {
         if (!els.catalogMiniTabs) {
           return;
@@ -2542,7 +2552,7 @@
                   state.selectedWorkspace = item.id;
                   perform('Run workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
                 }
-                renderCatalogList();
+                syncCatalogSelectionState();
                 renderSelectedBuiltIn();
               });
               rowActions.appendChild(play);
