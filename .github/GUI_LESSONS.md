@@ -42,3 +42,4 @@
 - Empty thumbnail slots should inherit the row surface and avoid extra compositing layers; treating iconless slots like image-backed thumbnails can flash white during fast rerenders.
 - External imports should respect the current user grouping context: dropping a new project while viewing a user tab should assign it there immediately, but `All`/`Other` views should remain non-assigning.
 - For persisted drag/drop reassignment, resolve the dragged item from `DataTransfer` in the drop handler instead of relying only on transient in-memory drag state; the latter can clear before persistence runs.
+- Advanced grouping UI like minitabs should be user-toggleable and default off; when disabled, hide the entire grouping strip and ignore grouping filters rather than leaving dormant chrome onscreen.

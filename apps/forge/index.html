@@ -102,6 +102,10 @@
                   <input id="organize-builtin-first" type="checkbox" checked>
                   <span>Wizardry apps first</span>
                 </label>
+                <label class="organize-checkbox" for="organize-use-minitabs">
+                  <input id="organize-use-minitabs" type="checkbox">
+                  <span>Use minitabs</span>
+                </label>
               </div>
             </div>
             <button id="open-create-workflow" class="icon-action" type="button" title="Create App" aria-label="Create App"><span class="icon-glyph icon-glyph-create" aria-hidden="true">+</span></button>
@@ -305,6 +309,7 @@
       var ORGANIZE_SHOW_KEY = 'wizardry.forge.organize.show';
       var ORGANIZE_SORT_KEY = 'wizardry.forge.organize.sort';
       var ORGANIZE_BUILTIN_FIRST_KEY = 'wizardry.forge.organize.builtin_first';
+      var USE_MINI_TABS_KEY = 'wizardry.forge.use_mini_tabs.v1';
       var THEME_KEY = 'wizardry.forge.theme';
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
@@ -320,6 +325,7 @@
         'wizardry.forge.organize.show': 'organize_show',
         'wizardry.forge.organize.sort': 'organize_sort',
         'wizardry.forge.organize.builtin_first': 'organize_builtin_first',
+        'wizardry.forge.use_mini_tabs.v1': 'use_mini_tabs',
         'wizardry.forge.theme': 'theme',
         'wizardry.forge.left_rail.width': 'left_rail_width',
         'wizardry.forge.selected.catalog.v1': 'selected_catalog',
@@ -341,6 +347,7 @@
         organizeShow: 'both',
         organizeSort: 'alphabetical',
         organizeBuiltinFirst: true,
+        useMiniTabs: false,
         themes: ['psionic'],
         activeTheme: 'psionic',
         selectedBuiltIn: '',
@@ -1369,11 +1376,13 @@
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
         var showMode = state.organizeShow || 'both';
         var items = catalogItems().filter(function (item) {
-          if (state.activeMiniTab === 'other' && itemAssignedMiniTab(item.key)) {
-            return false;
-          }
-          if (state.activeMiniTab && state.activeMiniTab !== 'all' && state.activeMiniTab !== 'other' && itemAssignedMiniTab(item.key) !== state.activeMiniTab) {
-            return false;
+          if (state.useMiniTabs) {
+            if (state.activeMiniTab === 'other' && itemAssignedMiniTab(item.key)) {
+              return false;
+            }
+            if (state.activeMiniTab && state.activeMiniTab !== 'all' && state.activeMiniTab !== 'other' && itemAssignedMiniTab(item.key) !== state.activeMiniTab) {
+              return false;
+            }
           }
           if (showMode === 'builtin' && item.kind !== 'builtin') {
             return false;
@@ -1516,6 +1525,7 @@
         state.organizeShow = loadStorage(ORGANIZE_SHOW_KEY) || 'both';
         state.organizeSort = normalizeOrganizeSort(loadStorage(ORGANIZE_SORT_KEY) || 'alphabetical');
         state.organizeBuiltinFirst = loadStorage(ORGANIZE_BUILTIN_FIRST_KEY) !== 'false';
+        state.useMiniTabs = loadStorage(USE_MINI_TABS_KEY) === 'true';
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
         state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
@@ -2204,6 +2214,18 @@
         renderCatalogList();
       }
 
+      function setUseMiniTabs(enabled) {
+        state.useMiniTabs = !!enabled;
+        saveStorage(USE_MINI_TABS_KEY, state.useMiniTabs ? 'true' : 'false');
+        if (!state.useMiniTabs) {
+          state.dragMiniTabTargetId = '';
+          state.dragCatalogItemKey = '';
+        }
+        renderOrganizeMenuState();
+        renderCatalogList();
+        renderSelectedBuiltIn();
+      }
+
       function renderOrganizeMenuState() {
         if (!els.organizeMenu) {
           return;
@@ -2218,6 +2240,9 @@
         });
         if (els.organizeBuiltinFirst) {
           els.organizeBuiltinFirst.checked = !!state.organizeBuiltinFirst;
+        }
+        if (els.organizeUseMiniTabs) {
+          els.organizeUseMiniTabs.checked = !!state.useMiniTabs;
         }
       }
 
@@ -2342,6 +2367,11 @@
 
       function renderMiniTabs() {
         if (!els.catalogMiniTabs) {
+          return;
+        }
+        els.catalogMiniTabs.classList.toggle('hidden', !state.useMiniTabs);
+        if (!state.useMiniTabs) {
+          els.catalogMiniTabs.innerHTML = '';
           return;
         }
         cleanupMiniTabState();
@@ -4799,6 +4829,9 @@
         });
 
         els.catalogMiniTabs.addEventListener('click', function (event) {
+          if (!state.useMiniTabs) {
+            return;
+          }
           var addButton = closestEventTarget(event, '#catalog-mini-tab-add');
           if (addButton) {
             event.preventDefault();
@@ -4837,6 +4870,9 @@
         });
 
         els.catalogMiniTabs.addEventListener('dblclick', function (event) {
+          if (!state.useMiniTabs) {
+            return;
+          }
           var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
           if (!tabButton) {
             return;
@@ -4845,6 +4881,9 @@
         });
 
         els.catalogMiniTabs.addEventListener('wheel', function (event) {
+          if (!state.useMiniTabs) {
+            return;
+          }
           if (!els.catalogMiniTabs) {
             return;
           }
@@ -4861,6 +4900,9 @@
         }, { passive: false });
 
         els.catalogMiniTabs.addEventListener('dragover', function (event) {
+          if (!state.useMiniTabs) {
+            return;
+          }
           if (!state.dragCatalogItemKey) {
             return;
           }
@@ -4877,6 +4919,9 @@
         });
 
         els.catalogMiniTabs.addEventListener('dragleave', function (event) {
+          if (!state.useMiniTabs) {
+            return;
+          }
           var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
           if (!tabButton) {
             return;
@@ -4891,6 +4936,9 @@
         });
 
         els.catalogMiniTabs.addEventListener('drop', function (event) {
+          if (!state.useMiniTabs) {
+            return;
+          }
           var draggedItemKey = internalCatalogDragItemKey(event.dataTransfer);
           if (!draggedItemKey) {
             return;
@@ -4928,6 +4976,10 @@
 
         els.organizeBuiltinFirst.addEventListener('change', function () {
           setOrganizeBuiltinFirst(!!els.organizeBuiltinFirst.checked);
+        });
+
+        els.organizeUseMiniTabs.addEventListener('change', function () {
+          setUseMiniTabs(!!els.organizeUseMiniTabs.checked);
         });
 
         els.themePickerBtn.addEventListener('click', function (event) {
@@ -5652,6 +5704,7 @@
         els.organizeBtn = document.getElementById('organize-btn');
         els.organizeMenu = document.getElementById('organize-menu');
         els.organizeBuiltinFirst = document.getElementById('organize-builtin-first');
+        els.organizeUseMiniTabs = document.getElementById('organize-use-minitabs');
         els.themePickerBtn = document.getElementById('theme-picker-btn');
         els.themePickerMenu = document.getElementById('theme-picker-menu');
         els.themePickerList = document.getElementById('theme-picker-list');
@@ -5754,6 +5807,7 @@
           setOrganizeShow(state.organizeShow);
           setOrganizeSort(state.organizeSort);
           setOrganizeBuiltinFirst(state.organizeBuiltinFirst);
+          setUseMiniTabs(state.useMiniTabs);
           setLeftRailWidth(state.leftRailWidth);
           setWorkflowMode(state.route);
           closeFloatingMenus();
