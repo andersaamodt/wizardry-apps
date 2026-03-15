@@ -726,17 +726,18 @@ body.settings-open #settings-panel {
   min-width: 0;
   flex: 0 0 auto;
   display: flex;
+  align-self: stretch;
 }
 
 .footer-theme-btn {
-  height: 1.9rem;
+  height: 100%;
   min-width: 0;
   width: auto;
   border: 0;
   border-right: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
   border-radius: 0;
   background: transparent;
-  color: color-mix(in srgb, var(--text) 72%, var(--muted));
+  color: var(--text);
   padding: 0 0.66rem;
   font-size: 0.79rem;
   display: inline-flex;
@@ -744,7 +745,7 @@ body.settings-open #settings-panel {
   justify-content: flex-start;
   gap: 0.34rem;
   box-shadow: none;
-  transform: translateY(1px);
+  transform: none;
   flex: 0 0 auto;
 }
 
@@ -762,7 +763,7 @@ body.settings-open #settings-panel {
 
 .footer-theme-btn:hover {
   background: color-mix(in srgb, var(--accent-soft, #e6e3f4) 55%, transparent);
-  color: var(--accent-strong);
+  color: var(--text);
 }
 
 .settings-status-row {
