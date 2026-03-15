@@ -78,6 +78,7 @@
 - Desktop UIs must fit fully in-window; no important controls should render off-screen or clip outside viewport.
 - Avoid layouts that force horizontal overflow for baseline app workflows.
 - Desktop apps should keep their intended desktop composition at narrow sizes; do not collapse split-pane/two-column control surfaces into liquid single-column layouts and instead enforce the minimum host window width needed for the designed view.
+- In scrollable desktop panes, do not leave decorative gutter outside the scrollbar; if the pane is intended to reach the window edge, make the scroll track sit flush to that edge and keep content padding inside the scrolling area instead.
 - Validate GUI layout and interaction quality with Safari automations for desktop app surfaces when making GUI changes.
 - Validate startup (no flicker), focus states, hover states, and split-pane behavior in that QA pass.
 
