@@ -3071,6 +3071,7 @@
               var sizes = [1024, 896, 768, 640, 512, 384, 256, 192, 128, 96];
               var output = '';
               var qualitySteps = [0.95, 0.9, 0.85, 0.8, 0.75];
+              var allowJpegFallback = /^image\/jpe?g$/i.test(file.type || '');
 
               function renderDataUrl(size, mime, quality) {
                 canvas.width = size;
@@ -3090,7 +3091,8 @@
 
               for (var i = 0; i < sizes.length; i += 1) {
                 var size = sizes[i];
-                if (size >= 512) {
+                // Keep non-JPEG sources alpha-safe; converting PNG/WebP/SVG to JPEG strips transparency.
+                if (allowJpegFallback && size >= 512) {
                   for (var q = 0; q < qualitySteps.length; q += 1) {
                     output = renderDataUrl(size, 'image/jpeg', qualitySteps[q]);
                     if (output.length <= maxArgChars) {
