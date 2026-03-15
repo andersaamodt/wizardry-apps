@@ -1736,6 +1736,67 @@ derive_workspace_slug() {
   printf '%s\n' "$slug"
 }
 
+detect_workspace_app_subpath() {
+  workspace_path=${1-}
+  if [ -f "$workspace_path/app/index.html" ]; then
+    printf '%s\n' "app"
+    return 0
+  fi
+  if [ -f "$workspace_path/index.html" ]; then
+    printf '%s\n' "."
+    return 0
+  fi
+
+  apps_dir="$workspace_path/apps"
+  if [ -d "$apps_dir" ]; then
+    found_subpath=""
+    found_count=0
+    for candidate in "$apps_dir"/*; do
+      [ -d "$candidate" ] || continue
+      if [ -f "$candidate/index.html" ]; then
+        found_subpath="apps/$(basename "$candidate")"
+        found_count=$((found_count + 1))
+      fi
+    done
+    if [ "$found_count" -eq 1 ] && [ -n "$found_subpath" ]; then
+      printf '%s\n' "$found_subpath"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+resolve_workspace_app_dir() {
+  workspace_path=${1-}
+  conf_path=${2-}
+  app_subpath=""
+  if [ -n "$conf_path" ] && [ -f "$conf_path" ]; then
+    app_subpath=$(workspace_field "$conf_path" app_subpath "")
+  fi
+  if [ -z "$app_subpath" ]; then
+    app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true)
+  fi
+
+  case "$app_subpath" in
+    "")
+      return 1
+      ;;
+    ".")
+      printf '%s\n' "$workspace_path"
+      return 0
+      ;;
+    *)
+      if [ -f "$workspace_path/$app_subpath/index.html" ]; then
+        printf '%s\n' "$workspace_path/$app_subpath"
+        return 0
+      fi
+      ;;
+  esac
+
+  return 1
+}
+
 resolve_workspace_slug() {
   conf_path=${1-}
   workspace_path=${2-}
@@ -1762,6 +1823,23 @@ ensure_importable_workspace_profile() {
   workspace_path=${1-}
   conf_path="$workspace_path/wizardry.workspace.conf"
   if [ -f "$conf_path" ]; then
+    existing_profile_kind=$(workspace_field "$conf_path" profile_kind "")
+    existing_context=$(workspace_field "$conf_path" development_context "")
+    existing_targets=$(workspace_field "$conf_path" targets "")
+    existing_app_subpath=$(workspace_field "$conf_path" app_subpath "")
+    detected_app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true)
+    if [ -n "$detected_app_subpath" ] && [ "$existing_context" != "godot" ]; then
+      if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ -z "$existing_app_subpath" ]; then
+        write_key_value_file "$conf_path" project_type "application"
+        write_key_value_file "$conf_path" development_context "web"
+        write_key_value_file "$conf_path" starter "import-web"
+        write_key_value_file "$conf_path" profile_kind "detected"
+        write_key_value_file "$conf_path" targets "hosted-web,macos,linux"
+        if [ "$detected_app_subpath" != "." ]; then
+          write_key_value_file "$conf_path" app_subpath "$detected_app_subpath"
+        fi
+      fi
+    fi
     printf '%s\t%s\n' "$conf_path" "0"
     return 0
   fi
@@ -1776,12 +1854,13 @@ ensure_importable_workspace_profile() {
   targets=""
   starter="import"
   profile_kind="detected"
+  app_subpath=""
   if [ -f "$workspace_path/project.godot" ] || [ -f "$workspace_path/game/project.godot" ] || [ -f "$workspace_path/tool_main.gd" ]; then
     context="godot"
     project_type="game"
     targets="macos,linux,godot-desktop"
     starter="import-godot"
-  elif [ -f "$workspace_path/app/index.html" ] || [ -f "$workspace_path/index.html" ]; then
+  elif app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true) && [ -n "$app_subpath" ]; then
     context="web"
     project_type="application"
     targets="hosted-web,macos,linux"
@@ -1809,6 +1888,9 @@ profile_kind=$profile_kind
 targets=$targets
 root=$workspace_path
 CONF
+  if [ -n "$app_subpath" ] && [ "$app_subpath" != "." ]; then
+    printf 'app_subpath=%s\n' "$app_subpath" >>"$conf_path"
+  fi
 
   printf '%s\t%s\n' "$conf_path" "1"
 }
@@ -1889,7 +1971,7 @@ cmd_list_workspaces() {
         fi
         ;;
       *)
-        if [ -f "$path/app/index.html" ] || [ -f "$path/index.html" ]; then
+        if resolve_workspace_app_dir "$path" "$conf" >/dev/null 2>&1; then
           runnable=1
         fi
         ;;
@@ -2805,20 +2887,16 @@ cmd_run_workspace() {
       ;;
   esac
 
-  app_dir="$workspace_path/app"
-  if [ ! -f "$app_dir/index.html" ] && [ -f "$workspace_path/index.html" ]; then
-    app_dir="$workspace_path"
-  fi
-  if [ ! -f "$app_dir/index.html" ]; then
+  workspace_conf="$workspace_path/wizardry.workspace.conf"
+  if ! app_dir=$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null); then
     printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
     exit 1
   fi
   app_entry_suffix=''
   if [ "$app_dir" != "$workspace_path" ]; then
-    app_entry_suffix='/app'
+    app_entry_suffix=${app_dir#"$workspace_path"}
   fi
 
-  workspace_conf="$workspace_path/wizardry.workspace.conf"
   targets_csv=''
   if [ -f "$workspace_conf" ]; then
     targets_csv=$(workspace_field "$workspace_conf" targets "")
@@ -3128,14 +3206,10 @@ cmd_serve_hosted_web() {
           exit 1
           ;;
       esac
-      app_dir="$workspace_path/app"
-      if [ ! -f "$app_dir/index.html" ] && [ -f "$workspace_path/index.html" ]; then
-        app_dir="$workspace_path"
-      fi
-      [ -f "$app_dir/index.html" ] || {
+      if ! app_dir=$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null); then
         printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
         exit 1
-      }
+      fi
       command -v python3 >/dev/null 2>&1 || {
         printf '%s\n' "forge-backend: python3 is required to serve workspace hosted web targets" >&2
         exit 1
