@@ -49,6 +49,7 @@
 - Keep dense control groups compact, aligned, and scannable; avoid decorative wrappers that hide hierarchy.
 - Avoid stacking multiple decorative borders around the same logical group; one container boundary is usually enough.
 - Use background tint and spacing depth before introducing another card/border level.
+- Flatten wrapper structure aggressively; remove structural `div`/panel layers that only restack or pad content already separated by cards, sections, or rails.
 
 ## Left-Right Panel Pattern
 - When one primary data type is being managed, use left-right split layout: list/select on left, details/workflow on right.
@@ -74,6 +75,7 @@
 ## Desktop Window Fit And GUI QA
 - Desktop UIs must fit fully in-window; no important controls should render off-screen or clip outside viewport.
 - Avoid layouts that force horizontal overflow for baseline app workflows.
+- Desktop apps should keep their intended desktop composition at narrow sizes; do not collapse split-pane/two-column control surfaces into liquid single-column layouts and instead enforce the minimum host window width needed for the designed view.
 - Validate GUI layout and interaction quality with Safari automations for desktop app surfaces when making GUI changes.
 - Validate startup (no flicker), focus states, hover states, and split-pane behavior in that QA pass.
 
