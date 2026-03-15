@@ -933,9 +933,9 @@
 
         if (state.os === 'darwin') {
           if (reveal) {
-            await execArgv(['open', '-R', path]);
+            await execArgv(['/usr/bin/open', '-R', path]);
           } else {
-            await execArgv(['open', path]);
+            await execArgv(['/usr/bin/open', path]);
           }
           return;
         }
@@ -960,7 +960,7 @@
           return;
         }
         if (state.os === 'darwin') {
-          await execArgv(['open', '-a', 'Terminal', path]);
+          await execArgv(['/usr/bin/open', '-a', 'Terminal', path]);
           return;
         }
         if (state.os === 'linux') {

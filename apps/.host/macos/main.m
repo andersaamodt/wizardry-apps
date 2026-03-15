@@ -49,6 +49,8 @@
 @property (assign) EventHotKeyRef favoriteTrackHotKeyRef;
 @property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
 - (void)emitGlobalFavoriteTrackHotkey;
+- (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment;
+- (NSString *)normalizedCommandPath;
 - (WKWebView *)createAuxWindowWithConfiguration:(WKWebViewConfiguration *)configuration
                                          request:(NSURLRequest *)request
                                      windowTitle:(NSString *)windowTitle
@@ -340,6 +342,48 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             NSLog(@"Global hotkey emit error: %@", error);
         }
     }];
+}
+
+- (NSString *)normalizedCommandPath {
+    NSMutableArray<NSString *> *components = [NSMutableArray array];
+    NSString *currentPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"PATH"] ?: @"";
+    if (currentPath.length) {
+        [components addObjectsFromArray:[currentPath componentsSeparatedByString:@":"]];
+    }
+
+    NSString *homeDir = NSHomeDirectory();
+    NSArray<NSString *> *fallbacks = @[
+        @"/opt/homebrew/bin",
+        @"/opt/homebrew/sbin",
+        @"/usr/local/bin",
+        @"/usr/local/sbin",
+        @"/usr/bin",
+        @"/bin",
+        @"/usr/sbin",
+        @"/sbin",
+        [homeDir stringByAppendingPathComponent:@".local/bin"],
+        [homeDir stringByAppendingPathComponent:@"bin"],
+        [homeDir stringByAppendingPathComponent:@".cargo/bin"]
+    ];
+    [components addObjectsFromArray:fallbacks];
+
+    NSMutableArray<NSString *> *deduped = [NSMutableArray array];
+    NSMutableSet<NSString *> *seen = [NSMutableSet set];
+    for (NSString *entry in components) {
+        NSString *path = [[NSString stringWithFormat:@"%@", entry ?: @""] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (!path.length || [seen containsObject:path]) {
+            continue;
+        }
+        [seen addObject:path];
+        [deduped addObject:path];
+    }
+    return [deduped componentsJoinedByString:@":"];
+}
+
+- (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment {
+    NSMutableDictionary<NSString *, NSString *> *environment = [NSMutableDictionary dictionaryWithDictionary:[[NSProcessInfo processInfo] environment]];
+    environment[@"PATH"] = [self normalizedCommandPath];
+    return environment;
 }
 
 - (void)clearFavoriteTrackHotkeyRegistration {
@@ -1485,6 +1529,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
         NSTask *task = [[NSTask alloc] init];
         task.launchPath = @"/usr/bin/env";
+        task.environment = [self resolvedCommandEnvironment];
 
         // Build arguments: env program arg1 arg2 ...
         NSMutableArray *taskArgs = [NSMutableArray arrayWithObject:program];

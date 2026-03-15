@@ -26,3 +26,4 @@
 - Workspace import should detect a single nested `apps/<slug>/index.html` app as the runnable web entrypoint, not downgrade the repo to a generic non-runnable folder.
 - Finder-to-WebView folder drags may arrive as `text/plain` or plain-text string items instead of `Files`, so drop gates must accept both URI and plain-text path transfers.
 - When widening accepted drag payload types, widen the path extractor too; otherwise the UI will accept the drag but still show the generic “Drop a project folder to import” failure toast.
+- Finder-launched macOS hosts need a normalized command `PATH`; otherwise Forge run flows can fail only in the desktop app even though the same backend commands work from Terminal.
