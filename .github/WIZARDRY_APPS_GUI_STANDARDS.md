@@ -179,6 +179,7 @@
 - Global key handlers must early-return for editable targets with modifier keys instead of hardcoding app-level shortcut patches.
 - Avoid defaulting buttons and short text-entry inputs to `width: 100%`; size them to content or a bounded width unless full-width is required by layout.
 - Form controls should usually be content-sized or bounded-width rather than stretched full-width; reserve full-width controls for genuinely long freeform input areas or narrow sidebars where a bounded width would waste space.
+- Numeric steppers and short number-entry boxes should be explicitly bounded to compact widths; do not let small scalar settings consume the same width as long text fields.
 - Do not make buttons, pills, selects, or ordinary text inputs weirdly tall or fat; default control sizing should stay compact unless a larger target is required by a specific workflow.
 - Keep motion subtle and meaningful, never required for comprehension.
 
