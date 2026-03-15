@@ -15,7 +15,9 @@
 
 ## Startup Splash Contract
 - Desktop apps use one standard splash treatment: centered app logo on the active theme background.
+- Use the splash instead of rendering partial app chrome or placeholder runtime data before initial app state is ready.
 - During splash, any underlying host/WebView regions must be pre-colored to the same theme surface so nothing flashes through.
+- During splash, no browser/WebView/host scrollbar should be visible; boot state must suppress overflow until the first ready frame is shown.
 - Desktop windows must start at their intended initial size before splash handoff; do not visibly resize the host window after opening just to reach the correct startup height.
 - Splash handoff must be an atomic flip from splash to ready UI with no fade, no crossfade, and no staggered reveal.
 - The main interface must stay hidden until initial data/theme/layout state is ready for first interaction.
