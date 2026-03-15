@@ -638,22 +638,64 @@
         return parseMiniTabAssignments();
       }
 
-      function itemAssignedMiniTab(itemKey) {
-        var assignments = currentMiniTabAssignments();
-        var tabId = String(assignments[itemKey] || '').trim().toLowerCase();
-        if (!tabId) {
-          return '';
+      function assignmentKeysForItem(itemOrKey) {
+        if (!itemOrKey) {
+          return [];
         }
-        return miniTabById(tabId) ? tabId : '';
+        if (typeof itemOrKey === 'string') {
+          var key = String(itemOrKey || '').trim();
+          if (!key) {
+            return [];
+          }
+          var match = catalogItems().find(function (item) {
+            return item.key === key;
+          }) || null;
+          if (match) {
+            return assignmentKeysForItem(match);
+          }
+          return [key];
+        }
+        var item = itemOrKey;
+        var keys = [];
+        if (item.kind === 'workspace') {
+          var normalizedPath = normalizePathForCompare(item.path || '');
+          if (normalizedPath) {
+            keys.push('workspace-path:' + normalizedPath);
+          }
+        }
+        if (item.key) {
+          keys.push(item.key);
+        }
+        return keys.filter(Boolean);
       }
 
-      function persistItemMiniTab(itemKey, tabId) {
+      function itemAssignedMiniTab(itemOrKey) {
+        var assignments = currentMiniTabAssignments();
+        var keys = assignmentKeysForItem(itemOrKey);
+        for (var i = 0; i < keys.length; i += 1) {
+          var tabId = String(assignments[keys[i]] || '').trim().toLowerCase();
+          if (!tabId) {
+            continue;
+          }
+          if (miniTabById(tabId)) {
+            return tabId;
+          }
+        }
+        return '';
+      }
+
+      function persistItemMiniTab(itemOrKey, tabId) {
         var assignments = currentMiniTabAssignments();
         var normalizedTab = String(tabId || '').trim().toLowerCase();
-        if (!normalizedTab || normalizedTab === 'all' || !miniTabById(normalizedTab)) {
-          delete assignments[itemKey];
-        } else {
-          assignments[itemKey] = normalizedTab;
+        var keys = assignmentKeysForItem(itemOrKey);
+        if (!keys.length) {
+          return;
+        }
+        for (var i = 0; i < keys.length; i += 1) {
+          delete assignments[keys[i]];
+        }
+        if (normalizedTab && normalizedTab !== 'all' && miniTabById(normalizedTab)) {
+          assignments[keys[0]] = normalizedTab;
         }
         saveMiniTabAssignments(assignments);
       }
@@ -681,6 +723,18 @@
         }).length;
       }
 
+      function preferredSystemMiniTabMode() {
+        return miniTabItemCount('other') > 0 ? 'other' : 'all';
+      }
+
+      function applyPreferredSystemMiniTabMode() {
+        var preferred = preferredSystemMiniTabMode();
+        setSystemMiniTabMode(preferred);
+        if (state.activeMiniTab === 'all' || state.activeMiniTab === 'other' || !state.activeMiniTab) {
+          setActiveMiniTab(preferred);
+        }
+      }
+
       function cleanupMiniTabState() {
         var validTabs = {};
         state.miniTabs.forEach(function (tab) {
@@ -688,7 +742,9 @@
         });
         var validItems = {};
         catalogItems().forEach(function (item) {
-          validItems[item.key] = true;
+          assignmentKeysForItem(item).forEach(function (assignmentKey) {
+            validItems[assignmentKey] = true;
+          });
         });
         var assignments = currentMiniTabAssignments();
         var changed = false;
@@ -3362,11 +3418,20 @@
 
         var assignTabId = activeUserMiniTabId();
         if (assignTabId) {
-          var importedKey = selectedWorkspace
-            ? ('workspace:' + selectedWorkspace.id)
-            : (out.project_id ? ('workspace:' + out.project_id) : '');
-          if (importedKey) {
-            persistItemMiniTab(importedKey, assignTabId);
+          var importedItem = selectedWorkspace ? {
+            key: 'workspace:' + selectedWorkspace.id,
+            kind: 'workspace',
+            path: selectedWorkspace.path || ''
+          } : null;
+          if (!importedItem && out.project_id) {
+            importedItem = {
+              key: 'workspace:' + out.project_id,
+              kind: 'workspace',
+              path: out.registered_path || out.workspace || ''
+            };
+          }
+          if (importedItem) {
+            persistItemMiniTab(importedItem, assignTabId);
           }
         }
 
@@ -4397,6 +4462,7 @@
           return !hiddenPaths[normalizePathForCompare(ws.path)];
         });
         cleanupMiniTabState();
+        applyPreferredSystemMiniTabMode();
 
         if (shouldRender) {
           renderCatalogList();
@@ -4969,7 +5035,10 @@
           }
           event.preventDefault();
           var tabId = String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase() || 'all';
-          persistItemMiniTab(draggedItemKey, tabId);
+          var draggedItem = catalogItems().find(function (item) {
+            return item.key === draggedItemKey;
+          }) || draggedItemKey;
+          persistItemMiniTab(draggedItem, tabId);
           state.dragCatalogItemKey = '';
           state.dragMiniTabTargetId = '';
           renderCatalogList();
