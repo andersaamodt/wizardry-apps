@@ -375,6 +375,7 @@
         uiPrefs: {},
         uiPrefPersistChain: Promise.resolve(),
         catalogThumbCache: {},
+        catalogRowCache: {},
         targetRuntime: {},
         targetSectionByRow: {},
         iconVersionByKey: {},
@@ -2588,9 +2589,22 @@
         if (state.inlineRenameKey && !items.some(function (item) { return item.key === state.inlineRenameKey; })) {
           state.inlineRenameKey = '';
         }
+        pruneCatalogRowCache();
 
-        els.catalogList.innerHTML = '';
         if (!items.length) {
+          Object.keys(state.catalogRowCache).forEach(function (itemKey) {
+            var cachedRow = state.catalogRowCache[itemKey];
+            if (!cachedRow) {
+              return;
+            }
+            cachedRow.classList.add('hidden');
+            if (cachedRow.parentNode !== els.catalogList) {
+              els.catalogList.appendChild(cachedRow);
+            }
+          });
+          els.catalogList.querySelectorAll('.empty').forEach(function (node) {
+            node.remove();
+          });
           var empty = document.createElement('p');
           empty.className = 'empty';
           empty.textContent = state.activeMiniTab === 'all'
@@ -2600,243 +2614,327 @@
           syncHostWorkspaceDropZone();
           return;
         }
+        els.catalogList.querySelectorAll('.empty').forEach(function (node) {
+          node.remove();
+        });
 
+        var visibleKeys = {};
         items.forEach(function (item) {
-          var row = document.createElement('div');
-          row.className = 'list-row catalog-row';
-          row.setAttribute('role', 'button');
-          row.setAttribute('tabindex', '0');
-          row.setAttribute('data-catalog-item-key', item.key);
-          if (!state.inlineRenameKey && !item.draft) {
-            row.setAttribute('draggable', 'true');
-          }
-          if (state.selectedCatalog === item.key) {
-            row.classList.add('active');
-          }
-          if (state.dragCatalogItemKey === item.key) {
-            row.classList.add('dragging');
-          }
-
-          var thumb = catalogThumbElement(item);
-
-          var line = document.createElement('div');
-          line.className = 'catalog-line';
-
-          var nameWrap = document.createElement('span');
-          nameWrap.className = 'name';
-          if (state.inlineRenameKey === item.key && item.kind === 'workspace' && !item.draft) {
-            var renameInput = document.createElement('input');
-            renameInput.type = 'text';
-            renameInput.className = 'catalog-inline-rename';
-            renameInput.value = item.title;
-            renameInput.setAttribute('aria-label', 'Rename project');
-            renameInput.addEventListener('click', function (event) {
-              event.preventDefault();
-              event.stopPropagation();
-            });
-            renameInput.addEventListener('keydown', function (event) {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                renameInput.blur();
-                return;
-              }
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                state.inlineRenameKey = '';
-                renderCatalogList();
-              }
-            });
-            renameInput.addEventListener('blur', function () {
-              var nextTitle = renameInput.value.trim();
-              if (!nextTitle || nextTitle === item.title) {
-                state.inlineRenameKey = '';
-                renderCatalogList();
-                return;
-              }
-              perform('Rename project', async function () {
-                var renameRes = await backend('rename-workspace', [item.path, nextTitle], { quiet: true });
-                var renameOut = kv(renameRes.stdout || '');
-                unhideWorkspacePath(renameOut.workspace || '');
-                unhideWorkspacePath(renameOut.old_workspace || '');
-                await refreshWorkspaces({ quiet: true, render: false });
-                var renamed = state.workspaces.find(function (ws) {
-                  if (renameOut.workspace && normalizePathForCompare(ws.path) === normalizePathForCompare(renameOut.workspace)) {
-                    return true;
-                  }
-                  if (renameOut.project_id && ws.id === renameOut.project_id) {
-                    return true;
-                  }
-                  return normalizePathForCompare(ws.path) === normalizePathForCompare(item.path);
-                });
-                if (renamed) {
-                  setSelectedCatalog('workspace:' + renamed.id);
-                  state.selectedWorkspace = renamed.id;
-                }
-                state.inlineRenameKey = '';
-                renderCatalogList();
-                renderSelectedBuiltIn();
-              }, { swallow: true, noToast: true, keepResult: true });
-            });
-            nameWrap.appendChild(renameInput);
-            setTimeout(function () {
-              renameInput.focus();
-              renameInput.select();
-            }, 0);
-          } else {
-            var title = document.createElement('span');
-            title.className = 'name-text';
-            title.textContent = item.title;
-            nameWrap.appendChild(title);
-          }
-          var contextPill = document.createElement('span');
-          contextPill.className = 'context-dot';
-          var isGameContext = item.context === 'godot';
-          contextPill.classList.add(isGameContext ? 'game' : 'web');
-          contextPill.textContent = isGameContext ? 'game' : 'web';
-          nameWrap.appendChild(contextPill);
-          if (item.kind === 'builtin' && isWizardrySuiteItem(item)) {
-            var suiteDot = document.createElement('span');
-            suiteDot.className = 'suite-dot';
-            suiteDot.setAttribute('aria-label', 'Wizardry suite app');
-            suiteDot.title = 'Wizardry suite';
-            suiteDot.textContent = 'wizardry';
-            nameWrap.appendChild(suiteDot);
-            var rowApp = appById(item.id);
-            if (rowApp && rowApp.distribution === 'optional' && rowApp.exists === false) {
-              var pendingDot = document.createElement('span');
-              pendingDot.className = 'suite-dot';
-              pendingDot.title = 'Not downloaded';
-              pendingDot.textContent = 'download';
-              nameWrap.appendChild(pendingDot);
-            }
-          }
-
-          line.appendChild(nameWrap);
-          var content = document.createElement('div');
-          content.className = 'catalog-content';
-
-          if (!item.draft) {
-            var rowActions = document.createElement('span');
-            rowActions.className = 'catalog-row-actions menu-anchor';
-            var canRowRun = hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item);
-            if (canRowRun) {
-              var play = document.createElement('button');
-              play.type = 'button';
-              play.className = 'row-play';
-              play.title = 'Run';
-              play.textContent = '▶';
-              if (item.kind === 'builtin') {
-                var itemApp = appById(item.id);
-                if (itemApp && itemApp.distribution === 'optional' && itemApp.exists === false) {
-                  play.disabled = true;
-                  play.title = 'Download before run';
-                }
-              }
-              play.addEventListener('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                setSelectedCatalog(item.key);
-                if (item.kind === 'builtin') {
-                  state.selectedBuiltIn = item.id;
-                  perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
-                } else {
-                  state.selectedWorkspace = item.id;
-                  perform('Run workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
-                }
-                syncCatalogSelectionState();
-                renderSelectedBuiltIn();
-              });
-              rowActions.appendChild(play);
-            }
-
-            var rowMenuBtn = document.createElement('button');
-            rowMenuBtn.type = 'button';
-            rowMenuBtn.className = 'row-overflow';
-            rowMenuBtn.title = 'More actions';
-            rowMenuBtn.setAttribute('aria-label', 'More actions');
-            rowMenuBtn.textContent = '⋮';
-            rowMenuBtn.addEventListener('click', function (event) {
-              event.preventDefault();
-              event.stopPropagation();
-              if (state.activeCatalogRowMenuKey === item.key) {
-                state.activeCatalogRowMenuKey = '';
-              } else {
-                state.activeCatalogRowMenuKey = item.key;
-              }
-              renderCatalogList();
-            });
-            rowActions.appendChild(rowMenuBtn);
-
-            var rowMenu = buildCatalogRowMenu(item);
-            if (rowMenu) {
-              rowActions.appendChild(rowMenu);
-            }
-            line.appendChild(rowActions);
-          }
-
-          content.appendChild(line);
-          row.appendChild(thumb);
-          row.appendChild(content);
-          function selectItem() {
-            if (state.inlineRenameKey) {
-              return;
-            }
-            if (state.selectedCatalog === item.key) {
-              return;
-            }
-            if (item.draft) {
-              setWorkflowMode('create');
-              if (els.createTitle) {
-                els.createTitle.focus();
-              }
-              return;
-            }
-            if (state.route !== 'pipeline') {
-              setWorkflowMode('pipeline');
-            }
-            setSelectedCatalog(item.key);
-            if (item.kind === 'builtin') {
-              state.selectedBuiltIn = item.id;
-            } else {
-              state.selectedWorkspace = item.id;
-            }
-            syncCatalogSelectionState();
-            renderSelectedBuiltIn();
-          }
-          row.addEventListener('click', selectItem);
-          row.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              selectItem();
-            }
-          });
-          row.addEventListener('dragstart', function (event) {
-            if (state.inlineRenameKey || item.draft) {
-              event.preventDefault();
-              return;
-            }
-            state.dragCatalogItemKey = item.key;
-            state.dragCatalogAssignmentKey = stableAssignmentKeyForItem(item) || item.key;
-            state.dragMiniTabTargetId = '';
-            row.classList.add('dragging');
-            if (event.dataTransfer) {
-              event.dataTransfer.effectAllowed = 'move';
-              event.dataTransfer.setData(INTERNAL_CATALOG_DRAG_TYPE, item.key);
-              event.dataTransfer.setData('text/plain', INTERNAL_CATALOG_DRAG_PREFIX + state.dragCatalogAssignmentKey);
-            }
-            renderMiniTabs();
-          });
-          row.addEventListener('dragend', function () {
-            row.classList.remove('dragging');
-            setTimeout(function () {
-              clearCatalogDragState();
-              renderMiniTabs();
-            }, 0);
-          });
+          visibleKeys[item.key] = true;
+          var row = catalogRowElement(item);
+          row.classList.remove('hidden');
           els.catalogList.appendChild(row);
+        });
+        Object.keys(state.catalogRowCache).forEach(function (itemKey) {
+          if (visibleKeys[itemKey]) {
+            return;
+          }
+          var cachedRow = state.catalogRowCache[itemKey];
+          if (!cachedRow) {
+            return;
+          }
+          cachedRow.classList.add('hidden');
+          if (cachedRow.parentNode !== els.catalogList) {
+            els.catalogList.appendChild(cachedRow);
+          } else {
+            els.catalogList.appendChild(cachedRow);
+          }
         });
         scheduleWindowFit();
         syncHostWorkspaceDropZone();
+      }
+
+      function pruneCatalogRowCache() {
+        var validKeys = {};
+        catalogItems().forEach(function (item) {
+          if (item && item.key) {
+            validKeys[item.key] = true;
+          }
+        });
+        Object.keys(state.catalogRowCache).forEach(function (itemKey) {
+          if (validKeys[itemKey]) {
+            return;
+          }
+          var row = state.catalogRowCache[itemKey];
+          if (row && row.parentNode) {
+            row.parentNode.removeChild(row);
+          }
+          delete state.catalogRowCache[itemKey];
+        });
+      }
+
+      function catalogRowRenderSignature(item) {
+        var rowApp = item.kind === 'builtin' ? appById(item.id) : null;
+        return [
+          item.key,
+          item.title,
+          item.kind,
+          item.context,
+          item.draft ? 'draft' : 'saved',
+          state.inlineRenameKey === item.key ? 'rename' : 'plain',
+          state.activeCatalogRowMenuKey === item.key ? 'menu' : 'closed',
+          isWizardrySuiteItem(item) ? 'suite' : 'plain',
+          hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item) ? 'run' : 'norun',
+          rowApp ? rowApp.distribution : '',
+          rowApp && rowApp.exists === false ? 'missing' : 'present'
+        ].join('|');
+      }
+
+      function syncCatalogRowState(row, item) {
+        row.classList.toggle('active', state.selectedCatalog === item.key);
+        row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
+        row.classList.remove('hidden');
+        if (!state.inlineRenameKey && !item.draft) {
+          row.setAttribute('draggable', 'true');
+        } else {
+          row.removeAttribute('draggable');
+        }
+      }
+
+      function catalogRowElement(item) {
+        var itemKey = String(item && item.key ? item.key : '').trim();
+        var signature = catalogRowRenderSignature(item);
+        var row = itemKey ? state.catalogRowCache[itemKey] : null;
+        if (!row || row.dataset.renderSignature !== signature) {
+          var nextRow = buildCatalogRow(item);
+          nextRow.dataset.renderSignature = signature;
+          if (row && row.parentNode) {
+            row.parentNode.replaceChild(nextRow, row);
+          }
+          row = nextRow;
+          if (itemKey) {
+            state.catalogRowCache[itemKey] = row;
+          }
+        }
+        syncCatalogRowState(row, item);
+        return row;
+      }
+
+      function buildCatalogRow(item) {
+        var row = document.createElement('div');
+        row.className = 'list-row catalog-row';
+        row.setAttribute('role', 'button');
+        row.setAttribute('tabindex', '0');
+        row.setAttribute('data-catalog-item-key', item.key);
+        syncCatalogRowState(row, item);
+
+        var thumb = catalogThumbElement(item);
+
+        var line = document.createElement('div');
+        line.className = 'catalog-line';
+
+        var nameWrap = document.createElement('span');
+        nameWrap.className = 'name';
+        if (state.inlineRenameKey === item.key && item.kind === 'workspace' && !item.draft) {
+          var renameInput = document.createElement('input');
+          renameInput.type = 'text';
+          renameInput.className = 'catalog-inline-rename';
+          renameInput.value = item.title;
+          renameInput.setAttribute('aria-label', 'Rename project');
+          renameInput.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          });
+          renameInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              renameInput.blur();
+              return;
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              state.inlineRenameKey = '';
+              renderCatalogList();
+            }
+          });
+          renameInput.addEventListener('blur', function () {
+            var nextTitle = renameInput.value.trim();
+            if (!nextTitle || nextTitle === item.title) {
+              state.inlineRenameKey = '';
+              renderCatalogList();
+              return;
+            }
+            perform('Rename project', async function () {
+              var renameRes = await backend('rename-workspace', [item.path, nextTitle], { quiet: true });
+              var renameOut = kv(renameRes.stdout || '');
+              unhideWorkspacePath(renameOut.workspace || '');
+              unhideWorkspacePath(renameOut.old_workspace || '');
+              await refreshWorkspaces({ quiet: true, render: false });
+              var renamed = state.workspaces.find(function (ws) {
+                if (renameOut.workspace && normalizePathForCompare(ws.path) === normalizePathForCompare(renameOut.workspace)) {
+                  return true;
+                }
+                if (renameOut.project_id && ws.id === renameOut.project_id) {
+                  return true;
+                }
+                return normalizePathForCompare(ws.path) === normalizePathForCompare(item.path);
+              });
+              if (renamed) {
+                setSelectedCatalog('workspace:' + renamed.id);
+                state.selectedWorkspace = renamed.id;
+              }
+              state.inlineRenameKey = '';
+              renderCatalogList();
+              renderSelectedBuiltIn();
+            }, { swallow: true, noToast: true, keepResult: true });
+          });
+          nameWrap.appendChild(renameInput);
+          setTimeout(function () {
+            renameInput.focus();
+            renameInput.select();
+          }, 0);
+        } else {
+          var title = document.createElement('span');
+          title.className = 'name-text';
+          title.textContent = item.title;
+          nameWrap.appendChild(title);
+        }
+        var contextPill = document.createElement('span');
+        contextPill.className = 'context-dot';
+        var isGameContext = item.context === 'godot';
+        contextPill.classList.add(isGameContext ? 'game' : 'web');
+        contextPill.textContent = isGameContext ? 'game' : 'web';
+        nameWrap.appendChild(contextPill);
+        if (item.kind === 'builtin' && isWizardrySuiteItem(item)) {
+          var suiteDot = document.createElement('span');
+          suiteDot.className = 'suite-dot';
+          suiteDot.setAttribute('aria-label', 'Wizardry suite app');
+          suiteDot.title = 'Wizardry suite';
+          suiteDot.textContent = 'wizardry';
+          nameWrap.appendChild(suiteDot);
+          var rowApp = appById(item.id);
+          if (rowApp && rowApp.distribution === 'optional' && rowApp.exists === false) {
+            var pendingDot = document.createElement('span');
+            pendingDot.className = 'suite-dot';
+            pendingDot.title = 'Not downloaded';
+            pendingDot.textContent = 'download';
+            nameWrap.appendChild(pendingDot);
+          }
+        }
+
+        line.appendChild(nameWrap);
+        var content = document.createElement('div');
+        content.className = 'catalog-content';
+
+        if (!item.draft) {
+          var rowActions = document.createElement('span');
+          rowActions.className = 'catalog-row-actions menu-anchor';
+          var canRowRun = hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item);
+          if (canRowRun) {
+            var play = document.createElement('button');
+            play.type = 'button';
+            play.className = 'row-play';
+            play.title = 'Run';
+            play.textContent = '▶';
+            if (item.kind === 'builtin') {
+              var itemApp = appById(item.id);
+              if (itemApp && itemApp.distribution === 'optional' && itemApp.exists === false) {
+                play.disabled = true;
+                play.title = 'Download before run';
+              }
+            }
+            play.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              setSelectedCatalog(item.key);
+              if (item.kind === 'builtin') {
+                state.selectedBuiltIn = item.id;
+                perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
+              } else {
+                state.selectedWorkspace = item.id;
+                perform('Run workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
+              }
+              syncCatalogSelectionState();
+              renderSelectedBuiltIn();
+            });
+            rowActions.appendChild(play);
+          }
+
+          var rowMenuBtn = document.createElement('button');
+          rowMenuBtn.type = 'button';
+          rowMenuBtn.className = 'row-overflow';
+          rowMenuBtn.title = 'More actions';
+          rowMenuBtn.setAttribute('aria-label', 'More actions');
+          rowMenuBtn.textContent = '⋮';
+          rowMenuBtn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (state.activeCatalogRowMenuKey === item.key) {
+              state.activeCatalogRowMenuKey = '';
+            } else {
+              state.activeCatalogRowMenuKey = item.key;
+            }
+            renderCatalogList();
+          });
+          rowActions.appendChild(rowMenuBtn);
+
+          var rowMenu = buildCatalogRowMenu(item);
+          if (rowMenu) {
+            rowActions.appendChild(rowMenu);
+          }
+          line.appendChild(rowActions);
+        }
+
+        content.appendChild(line);
+        row.appendChild(thumb);
+        row.appendChild(content);
+        function selectItem() {
+          if (state.inlineRenameKey) {
+            return;
+          }
+          if (state.selectedCatalog === item.key) {
+            return;
+          }
+          if (item.draft) {
+            setWorkflowMode('create');
+            if (els.createTitle) {
+              els.createTitle.focus();
+            }
+            return;
+          }
+          if (state.route !== 'pipeline') {
+            setWorkflowMode('pipeline');
+          }
+          setSelectedCatalog(item.key);
+          if (item.kind === 'builtin') {
+            state.selectedBuiltIn = item.id;
+          } else {
+            state.selectedWorkspace = item.id;
+          }
+          syncCatalogSelectionState();
+          renderSelectedBuiltIn();
+        }
+        row.addEventListener('click', selectItem);
+        row.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectItem();
+          }
+        });
+        row.addEventListener('dragstart', function (event) {
+          if (state.inlineRenameKey || item.draft) {
+            event.preventDefault();
+            return;
+          }
+          state.dragCatalogItemKey = item.key;
+          state.dragCatalogAssignmentKey = stableAssignmentKeyForItem(item) || item.key;
+          state.dragMiniTabTargetId = '';
+          row.classList.add('dragging');
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData(INTERNAL_CATALOG_DRAG_TYPE, item.key);
+            event.dataTransfer.setData('text/plain', INTERNAL_CATALOG_DRAG_PREFIX + state.dragCatalogAssignmentKey);
+          }
+          renderMiniTabs();
+        });
+        row.addEventListener('dragend', function () {
+          row.classList.remove('dragging');
+          setTimeout(function () {
+            clearCatalogDragState();
+            renderMiniTabs();
+          }, 0);
+        });
+        return row;
       }
 
       function buildCatalogRowMenu(item) {
