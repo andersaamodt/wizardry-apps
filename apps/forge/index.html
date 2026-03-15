@@ -2783,14 +2783,14 @@
             if (state.inlineRenameKey) {
               return;
             }
+            if (state.selectedCatalog === item.key) {
+              return;
+            }
             if (item.draft) {
               setWorkflowMode('create');
               if (els.createTitle) {
                 els.createTitle.focus();
               }
-              return;
-            }
-            if (state.selectedCatalog === item.key && state.route === 'pipeline') {
               return;
             }
             if (state.route !== 'pipeline') {

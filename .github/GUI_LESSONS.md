@@ -51,3 +51,4 @@
 - When a system tab has `All` and `Other` modes, prefer `Other` as the startup default whenever uncategorized items exist; fall back to `All` only when `Other` would be empty.
 - New minitabs should open directly into inline naming with an empty field, and blur-without-input should delete that new tab instead of leaving a placeholder label behind.
 - Row overflow menus should expose only actions that are actually valid for that item type; disabled dead-end actions read as broken UI.
+- Clicking the currently selected catalog row should be fully inert; it must not reselect, rerender, or route-switch just because the user clicked the active item again.
