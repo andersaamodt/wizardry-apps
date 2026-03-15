@@ -310,6 +310,7 @@
       var ORGANIZE_SORT_KEY = 'wizardry.forge.organize.sort';
       var ORGANIZE_BUILTIN_FIRST_KEY = 'wizardry.forge.organize.builtin_first';
       var USE_MINI_TABS_KEY = 'wizardry.forge.use_mini_tabs.v1';
+      var SYSTEM_MINI_TAB_MODE_KEY = 'wizardry.forge.system_mini_tab_mode.v1';
       var THEME_KEY = 'wizardry.forge.theme';
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
@@ -326,6 +327,7 @@
         'wizardry.forge.organize.sort': 'organize_sort',
         'wizardry.forge.organize.builtin_first': 'organize_builtin_first',
         'wizardry.forge.use_mini_tabs.v1': 'use_mini_tabs',
+        'wizardry.forge.system_mini_tab_mode.v1': 'system_mini_tab_mode',
         'wizardry.forge.theme': 'theme',
         'wizardry.forge.left_rail.width': 'left_rail_width',
         'wizardry.forge.selected.catalog.v1': 'selected_catalog',
@@ -348,6 +350,7 @@
         organizeSort: 'alphabetical',
         organizeBuiltinFirst: true,
         useMiniTabs: false,
+        systemMiniTabMode: 'all',
         themes: ['psionic'],
         activeTheme: 'psionic',
         selectedBuiltIn: '',
@@ -383,6 +386,7 @@
         activeMiniTab: 'all',
         editingMiniTabId: '',
         editingMiniTabDraft: '',
+        creatingMiniTabId: '',
         pendingMiniTabFocusId: '',
         dragCatalogItemKey: '',
         dragMiniTabTargetId: ''
@@ -591,9 +595,18 @@
         saveStorage(MINI_TAB_ASSIGNMENTS_KEY, JSON.stringify(assignments || {}));
       }
 
+      function currentSystemMiniTab() {
+        return state.systemMiniTabMode === 'other' ? uncategorizedMiniTab() : defaultMiniTab();
+      }
+
+      function setSystemMiniTabMode(mode) {
+        var next = String(mode || '').trim().toLowerCase() === 'other' ? 'other' : 'all';
+        state.systemMiniTabMode = next;
+        saveStorage(SYSTEM_MINI_TAB_MODE_KEY, next);
+      }
+
       function allMiniTabs() {
-        var systemTab = state.activeMiniTab === 'other' ? uncategorizedMiniTab() : defaultMiniTab();
-        return [systemTab].concat(state.miniTabs);
+        return [currentSystemMiniTab()].concat(state.miniTabs);
       }
 
       function miniTabById(tabId) {
@@ -695,6 +708,7 @@
         if (state.editingMiniTabId && state.editingMiniTabId !== 'all' && state.editingMiniTabId !== 'other' && !validTabs[state.editingMiniTabId]) {
           state.editingMiniTabId = '';
           state.editingMiniTabDraft = '';
+          state.creatingMiniTabId = '';
           state.pendingMiniTabFocusId = '';
         }
         if (state.dragMiniTabTargetId && state.dragMiniTabTargetId !== 'all' && state.dragMiniTabTargetId !== 'other' && !validTabs[state.dragMiniTabTargetId]) {
@@ -709,6 +723,7 @@
         }
         state.editingMiniTabId = tab.id;
         state.editingMiniTabDraft = tab.label;
+        state.creatingMiniTabId = '';
         state.pendingMiniTabFocusId = tab.id;
         renderMiniTabs();
       }
@@ -716,6 +731,7 @@
       function cancelMiniTabEdit() {
         state.editingMiniTabId = '';
         state.editingMiniTabDraft = '';
+        state.creatingMiniTabId = '';
         state.pendingMiniTabFocusId = '';
         renderMiniTabs();
       }
@@ -732,8 +748,9 @@
           cancelMiniTabEdit();
           return;
         }
+        var isCreating = state.creatingMiniTabId === normalizedId;
         if (!label) {
-          if (miniTabItemCount(normalizedId) === 0) {
+          if (isCreating || miniTabItemCount(normalizedId) === 0) {
             state.miniTabs = state.miniTabs.filter(function (entry) {
               return entry.id !== normalizedId;
             });
@@ -741,6 +758,7 @@
             cleanupMiniTabState();
             state.editingMiniTabId = '';
             state.editingMiniTabDraft = '';
+            state.creatingMiniTabId = '';
             renderCatalogList();
             renderSelectedBuiltIn();
             return;
@@ -750,6 +768,7 @@
         }
         tab.label = label;
         saveMiniTabs();
+        state.creatingMiniTabId = '';
         cancelMiniTabEdit();
       }
 
@@ -765,7 +784,8 @@
         state.miniTabs.push(tab);
         saveMiniTabs();
         state.editingMiniTabId = tab.id;
-        state.editingMiniTabDraft = label;
+        state.editingMiniTabDraft = '';
+        state.creatingMiniTabId = tab.id;
         state.pendingMiniTabFocusId = tab.id;
         renderCatalogList();
       }
@@ -1526,6 +1546,7 @@
         state.organizeSort = normalizeOrganizeSort(loadStorage(ORGANIZE_SORT_KEY) || 'alphabetical');
         state.organizeBuiltinFirst = loadStorage(ORGANIZE_BUILTIN_FIRST_KEY) !== 'false';
         state.useMiniTabs = loadStorage(USE_MINI_TABS_KEY) === 'true';
+        state.systemMiniTabMode = loadStorage(SYSTEM_MINI_TAB_MODE_KEY) === 'other' ? 'other' : 'all';
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
         state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
@@ -2626,82 +2647,79 @@
               rowActions.appendChild(play);
             }
 
-            var rowMenuBtn = document.createElement('button');
-            rowMenuBtn.type = 'button';
-            rowMenuBtn.className = 'row-overflow';
-            rowMenuBtn.title = 'More actions';
-            rowMenuBtn.setAttribute('aria-label', 'More actions');
-            rowMenuBtn.textContent = '⋮';
-            rowMenuBtn.addEventListener('click', function (event) {
-              event.preventDefault();
-              event.stopPropagation();
-              if (state.activeCatalogRowMenuKey === item.key) {
-                state.activeCatalogRowMenuKey = '';
-              } else {
-                state.activeCatalogRowMenuKey = item.key;
-              }
-              renderCatalogList();
-            });
-            rowActions.appendChild(rowMenuBtn);
-
-            var rowMenu = document.createElement('div');
-            rowMenu.className = 'floating-menu catalog-row-menu' + (state.activeCatalogRowMenuKey === item.key ? '' : ' hidden');
-
-            var renameButton = document.createElement('button');
-            renameButton.type = 'button';
-            renameButton.textContent = 'Rename';
-            renameButton.disabled = item.kind !== 'workspace' || item.draft;
-            renameButton.addEventListener('click', function (event) {
-              event.preventDefault();
-              event.stopPropagation();
-              state.activeCatalogRowMenuKey = '';
-              state.inlineRenameKey = item.key;
-              renderCatalogList();
-            });
-            rowMenu.appendChild(renameButton);
-
-            var removeButton = document.createElement('button');
-            removeButton.type = 'button';
-            removeButton.textContent = 'Remove';
-            removeButton.disabled = item.kind !== 'workspace' || item.draft;
-            removeButton.addEventListener('click', function (event) {
-              event.preventDefault();
-              event.stopPropagation();
-              state.activeCatalogRowMenuKey = '';
-              if (item.kind !== 'workspace' || item.draft) {
-                return;
-              }
-              perform('Remove project from Forge', async function () {
-                var removedPath = item.path || '';
-                hideWorkspacePath(removedPath);
-                await refreshWorkspaces({ quiet: true, render: false });
-                if (state.selectedCatalog === item.key) {
-                  setSelectedCatalog('');
+            if (item.kind === 'workspace') {
+              var rowMenuBtn = document.createElement('button');
+              rowMenuBtn.type = 'button';
+              rowMenuBtn.className = 'row-overflow';
+              rowMenuBtn.title = 'More actions';
+              rowMenuBtn.setAttribute('aria-label', 'More actions');
+              rowMenuBtn.textContent = '⋮';
+              rowMenuBtn.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (state.activeCatalogRowMenuKey === item.key) {
+                  state.activeCatalogRowMenuKey = '';
+                } else {
+                  state.activeCatalogRowMenuKey = item.key;
                 }
                 renderCatalogList();
-                renderSelectedBuiltIn();
-                renderResult({
-                  status: 'ok',
-                  summary: item.title + ' removed from Forge list.',
-                  paths: removedPath ? [{ label: 'Original folder (not deleted)', path: removedPath, canReveal: true }] : [],
-                  actions: removedPath ? [{
-                    label: 'Open Folder',
-                    run: function () { return openPath(removedPath, false); }
-                  }] : [],
-                  help: {
-                    title: 'Folder kept',
-                    body: 'Nothing was deleted. This only removed the item from Forge.'
+              });
+              rowActions.appendChild(rowMenuBtn);
+
+              var rowMenu = document.createElement('div');
+              rowMenu.className = 'floating-menu catalog-row-menu' + (state.activeCatalogRowMenuKey === item.key ? '' : ' hidden');
+
+              var renameButton = document.createElement('button');
+              renameButton.type = 'button';
+              renameButton.textContent = 'Rename';
+              renameButton.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                state.activeCatalogRowMenuKey = '';
+                state.inlineRenameKey = item.key;
+                renderCatalogList();
+              });
+              rowMenu.appendChild(renameButton);
+
+              var removeButton = document.createElement('button');
+              removeButton.type = 'button';
+              removeButton.textContent = 'Remove';
+              removeButton.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                state.activeCatalogRowMenuKey = '';
+                perform('Remove project from Forge', async function () {
+                  var removedPath = item.path || '';
+                  hideWorkspacePath(removedPath);
+                  await refreshWorkspaces({ quiet: true, render: false });
+                  if (state.selectedCatalog === item.key) {
+                    setSelectedCatalog('');
                   }
-                });
-                if (removedPath) {
-                  toast('Removed from Forge. Folder kept: ' + removedPath, 'ok');
-                } else {
-                  toast('Removed from Forge. Nothing was deleted.', 'ok');
-                }
-              }, { swallow: true, noToast: true, keepResult: true });
-            });
-            rowMenu.appendChild(removeButton);
-            rowActions.appendChild(rowMenu);
+                  renderCatalogList();
+                  renderSelectedBuiltIn();
+                  renderResult({
+                    status: 'ok',
+                    summary: item.title + ' removed from Forge list.',
+                    paths: removedPath ? [{ label: 'Original folder (not deleted)', path: removedPath, canReveal: true }] : [],
+                    actions: removedPath ? [{
+                      label: 'Open Folder',
+                      run: function () { return openPath(removedPath, false); }
+                    }] : [],
+                    help: {
+                      title: 'Folder kept',
+                      body: 'Nothing was deleted. This only removed the item from Forge.'
+                    }
+                  });
+                  if (removedPath) {
+                    toast('Removed from Forge. Folder kept: ' + removedPath, 'ok');
+                  } else {
+                    toast('Removed from Forge. Nothing was deleted.', 'ok');
+                  }
+                }, { swallow: true, noToast: true, keepResult: true });
+              });
+              rowMenu.appendChild(removeButton);
+              rowActions.appendChild(rowMenu);
+            }
             line.appendChild(rowActions);
           }
 
@@ -4854,10 +4872,12 @@
           }
           if (state.activeMiniTab === tabId) {
             if (tabId === 'all') {
+              setSystemMiniTabMode('other');
               setActiveMiniTab('other');
               renderCatalogList();
               renderSelectedBuiltIn();
             } else if (tabId === 'other') {
+              setSystemMiniTabMode('all');
               setActiveMiniTab('all');
               renderCatalogList();
               renderSelectedBuiltIn();

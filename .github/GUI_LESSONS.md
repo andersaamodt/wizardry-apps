@@ -43,3 +43,6 @@
 - External imports should respect the current user grouping context: dropping a new project while viewing a user tab should assign it there immediately, but `All`/`Other` views should remain non-assigning.
 - For persisted drag/drop reassignment, resolve the dragged item from `DataTransfer` in the drop handler instead of relying only on transient in-memory drag state; the latter can clear before persistence runs.
 - Advanced grouping UI like minitabs should be user-toggleable and default off; when disabled, hide the entire grouping strip and ignore grouping filters rather than leaving dormant chrome onscreen.
+- In a minitab strip with a system tab, keep the system tab mode (`All` or `Other`) persistent across switching to user tabs, and only flip it when that system tab is clicked while already selected.
+- New minitabs should open directly into inline naming with an empty field, and blur-without-input should delete that new tab instead of leaving a placeholder label behind.
+- Row overflow menus should expose only actions that are actually valid for that item type; disabled dead-end actions read as broken UI.
