@@ -390,6 +390,7 @@
         creatingMiniTabId: '',
         pendingMiniTabFocusId: '',
         dragCatalogItemKey: '',
+        dragCatalogAssignmentKey: '',
         dragMiniTabTargetId: ''
       };
 
@@ -673,6 +674,12 @@
       function stableAssignmentKeyForItem(itemOrKey) {
         var keys = assignmentKeysForItem(itemOrKey);
         return keys.length ? keys[0] : '';
+      }
+
+      function clearCatalogDragState() {
+        state.dragCatalogItemKey = '';
+        state.dragCatalogAssignmentKey = '';
+        state.dragMiniTabTargetId = '';
       }
 
       function itemAssignedMiniTab(itemOrKey) {
@@ -2793,20 +2800,22 @@
               return;
             }
             state.dragCatalogItemKey = item.key;
+            state.dragCatalogAssignmentKey = stableAssignmentKeyForItem(item) || item.key;
             state.dragMiniTabTargetId = '';
             row.classList.add('dragging');
             if (event.dataTransfer) {
               event.dataTransfer.effectAllowed = 'move';
               event.dataTransfer.setData(INTERNAL_CATALOG_DRAG_TYPE, item.key);
-              event.dataTransfer.setData('text/plain', INTERNAL_CATALOG_DRAG_PREFIX + item.key);
+              event.dataTransfer.setData('text/plain', INTERNAL_CATALOG_DRAG_PREFIX + state.dragCatalogAssignmentKey);
             }
             renderMiniTabs();
           });
           row.addEventListener('dragend', function () {
-            state.dragCatalogItemKey = '';
-            state.dragMiniTabTargetId = '';
             row.classList.remove('dragging');
-            renderMiniTabs();
+            setTimeout(function () {
+              clearCatalogDragState();
+              renderMiniTabs();
+            }, 0);
           });
           els.catalogList.appendChild(row);
         });
@@ -3301,7 +3310,7 @@
       }
 
       function isInternalCatalogDrag(dataTransfer) {
-        if (state.dragCatalogItemKey) {
+        if (state.dragCatalogItemKey || state.dragCatalogAssignmentKey) {
           return true;
         }
         if (!dataTransfer) {
@@ -3331,7 +3340,7 @@
             return textPayload.slice(INTERNAL_CATALOG_DRAG_PREFIX.length).trim();
           }
         }
-        return String(state.dragCatalogItemKey || '').trim();
+        return String(state.dragCatalogAssignmentKey || state.dragCatalogItemKey || '').trim();
       }
 
       function dragPayloadLooksLikeFolderDrop(dataTransfer) {
@@ -5103,8 +5112,8 @@
           if (!state.useMiniTabs) {
             return;
           }
-          var draggedItemKey = internalCatalogDragItemKey(event.dataTransfer);
-          if (!draggedItemKey) {
+          var draggedAssignmentKey = internalCatalogDragItemKey(event.dataTransfer);
+          if (!draggedAssignmentKey) {
             return;
           }
           var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
@@ -5113,12 +5122,8 @@
           }
           event.preventDefault();
           var tabId = String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase() || 'all';
-          var draggedItem = catalogItems().find(function (item) {
-            return item.key === draggedItemKey;
-          }) || draggedItemKey;
-          persistItemMiniTab(draggedItem, tabId);
-          state.dragCatalogItemKey = '';
-          state.dragMiniTabTargetId = '';
+          persistItemMiniTab(draggedAssignmentKey, tabId);
+          clearCatalogDragState();
           renderCatalogList();
           renderSelectedBuiltIn();
         });
