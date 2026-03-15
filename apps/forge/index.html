@@ -374,6 +374,7 @@
         leftRailWidth: 240,
         uiPrefs: {},
         uiPrefPersistChain: Promise.resolve(),
+        catalogThumbCache: {},
         targetRuntime: {},
         targetSectionByRow: {},
         iconVersionByKey: {},
@@ -2616,9 +2617,7 @@
             row.classList.add('dragging');
           }
 
-          var thumb = document.createElement('span');
-          thumb.className = 'catalog-thumb';
-          renderCatalogThumb(thumb, item);
+          var thumb = catalogThumbElement(item);
 
           var line = document.createElement('div');
           line.className = 'catalog-line';
@@ -3683,6 +3682,9 @@
 
       function renderCatalogThumb(thumb, item) {
         var iconSrc = iconSrcForItem(item);
+        thumb.className = 'catalog-thumb';
+        thumb.innerHTML = '';
+        thumb.dataset.iconSrc = iconSrc || '';
         if (!iconSrc) {
           thumb.classList.add('no-icon');
           return;
@@ -3695,6 +3697,22 @@
           }
         });
         thumb.appendChild(thumbImg);
+      }
+
+      function catalogThumbElement(item) {
+        var itemKey = String(item && item.key ? item.key : '').trim();
+        var thumb = itemKey ? state.catalogThumbCache[itemKey] : null;
+        if (!thumb) {
+          thumb = document.createElement('span');
+          if (itemKey) {
+            state.catalogThumbCache[itemKey] = thumb;
+          }
+        }
+        var nextIconSrc = iconSrcForItem(item) || '';
+        if (thumb.dataset.iconSrc !== nextIconSrc || thumb.className.indexOf('catalog-thumb') !== 0) {
+          renderCatalogThumb(thumb, item);
+        }
+        return thumb;
       }
 
       function syncStageActionVisibility(selected) {
