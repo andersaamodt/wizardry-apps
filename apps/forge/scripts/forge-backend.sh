@@ -2426,13 +2426,12 @@ cmd_build_desktop() {
         cp -R "$root/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
         cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
 
-        cat > "$bundle/Contents/MacOS/$slug" <<APP
+        install -m 755 /dev/stdin "$bundle/Contents/MacOS/$slug" <<APP
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
 exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$slug"
 APP
-        chmod +x "$bundle/Contents/MacOS/$slug"
 
         icon_source=''
         icon_source_format=''
@@ -2967,13 +2966,12 @@ cmd_run_workspace() {
     printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
     cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
 
-    cat > "$bundle/Contents/MacOS/$workspace_slug" <<APP
+    install -m 755 /dev/stdin "$bundle/Contents/MacOS/$workspace_slug" <<APP
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
 exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$workspace_slug$app_entry_suffix"
 APP
-    chmod +x "$bundle/Contents/MacOS/$workspace_slug"
 
     icon_source=''
     icon_source_format=''
