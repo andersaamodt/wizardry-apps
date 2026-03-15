@@ -46,6 +46,9 @@ grep -F ">Log<" "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="target-active-list"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="target-inactive-list"' "$root/apps/forge/index.html" >/dev/null
 grep -F "row-play" "$root/apps/forge/index.html" >/dev/null
+grep -F "function buildCatalogRowMenu(item)" "$root/apps/forge/index.html" >/dev/null
+grep -F "rowMenuBtn.className = 'row-overflow'" "$root/apps/forge/index.html" >/dev/null
+grep -F "appendAction('Open folder'" "$root/apps/forge/index.html" >/dev/null
 grep -F "placeholder=\"Filter\"" "$root/apps/forge/index.html" >/dev/null
 ! grep -F "Refresh" "$root/apps/forge/index.html" >/dev/null
 ! grep -F 'id="artifact-list"' "$root/apps/forge/index.html" >/dev/null

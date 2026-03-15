@@ -319,6 +319,7 @@
       var ACTIVE_MINI_TAB_KEY = 'wizardry.forge.active_mini_tab.v1';
       var MINI_TAB_ASSIGNMENTS_KEY = 'wizardry.forge.mini_tab_assignments.v1';
       var INTERNAL_CATALOG_DRAG_TYPE = 'application/x-wizardry-forge-catalog-item';
+      var INTERNAL_CATALOG_DRAG_PREFIX = 'wizardry-catalog-item:';
       var ASSET_VERSION = 'forge20260218a';
       var BACKEND_PREF_BY_STORAGE_KEY = {
         'wizardry.forge.root': 'root',
@@ -669,6 +670,11 @@
         return keys.filter(Boolean);
       }
 
+      function stableAssignmentKeyForItem(itemOrKey) {
+        var keys = assignmentKeysForItem(itemOrKey);
+        return keys.length ? keys[0] : '';
+      }
+
       function itemAssignedMiniTab(itemOrKey) {
         var assignments = currentMiniTabAssignments();
         var keys = assignmentKeysForItem(itemOrKey);
@@ -740,13 +746,30 @@
         state.miniTabs.forEach(function (tab) {
           validTabs[tab.id] = true;
         });
+        var assignments = currentMiniTabAssignments();
+        var migrated = false;
         var validItems = {};
         catalogItems().forEach(function (item) {
-          assignmentKeysForItem(item).forEach(function (assignmentKey) {
+          var itemKeys = assignmentKeysForItem(item);
+          var stableKey = stableAssignmentKeyForItem(item);
+          if (item.kind === 'workspace' && stableKey) {
+            itemKeys.forEach(function (assignmentKey) {
+              if (assignmentKey === stableKey) {
+                return;
+              }
+              var legacyTabId = String(assignments[assignmentKey] || '').trim().toLowerCase();
+              if (!legacyTabId || assignments[stableKey]) {
+                return;
+              }
+              assignments[stableKey] = legacyTabId;
+              delete assignments[assignmentKey];
+              migrated = true;
+            });
+          }
+          itemKeys.forEach(function (assignmentKey) {
             validItems[assignmentKey] = true;
           });
         });
-        var assignments = currentMiniTabAssignments();
         var changed = false;
         Object.keys(assignments).forEach(function (itemKey) {
           var tabId = String(assignments[itemKey] || '').trim().toLowerCase();
@@ -755,7 +778,7 @@
             changed = true;
           }
         });
-        if (changed) {
+        if (changed || migrated) {
           saveMiniTabAssignments(assignments);
         }
         if (state.activeMiniTab !== 'all' && state.activeMiniTab !== 'other' && !validTabs[state.activeMiniTab]) {
@@ -2703,77 +2726,26 @@
               rowActions.appendChild(play);
             }
 
-            if (item.kind === 'workspace') {
-              var rowMenuBtn = document.createElement('button');
-              rowMenuBtn.type = 'button';
-              rowMenuBtn.className = 'row-overflow';
-              rowMenuBtn.title = 'More actions';
-              rowMenuBtn.setAttribute('aria-label', 'More actions');
-              rowMenuBtn.textContent = '⋮';
-              rowMenuBtn.addEventListener('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                if (state.activeCatalogRowMenuKey === item.key) {
-                  state.activeCatalogRowMenuKey = '';
-                } else {
-                  state.activeCatalogRowMenuKey = item.key;
-                }
-                renderCatalogList();
-              });
-              rowActions.appendChild(rowMenuBtn);
-
-              var rowMenu = document.createElement('div');
-              rowMenu.className = 'floating-menu catalog-row-menu' + (state.activeCatalogRowMenuKey === item.key ? '' : ' hidden');
-
-              var renameButton = document.createElement('button');
-              renameButton.type = 'button';
-              renameButton.textContent = 'Rename';
-              renameButton.addEventListener('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
+            var rowMenuBtn = document.createElement('button');
+            rowMenuBtn.type = 'button';
+            rowMenuBtn.className = 'row-overflow';
+            rowMenuBtn.title = 'More actions';
+            rowMenuBtn.setAttribute('aria-label', 'More actions');
+            rowMenuBtn.textContent = '⋮';
+            rowMenuBtn.addEventListener('click', function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (state.activeCatalogRowMenuKey === item.key) {
                 state.activeCatalogRowMenuKey = '';
-                state.inlineRenameKey = item.key;
-                renderCatalogList();
-              });
-              rowMenu.appendChild(renameButton);
+              } else {
+                state.activeCatalogRowMenuKey = item.key;
+              }
+              renderCatalogList();
+            });
+            rowActions.appendChild(rowMenuBtn);
 
-              var removeButton = document.createElement('button');
-              removeButton.type = 'button';
-              removeButton.textContent = 'Remove';
-              removeButton.addEventListener('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                state.activeCatalogRowMenuKey = '';
-                perform('Remove project from Forge', async function () {
-                  var removedPath = item.path || '';
-                  hideWorkspacePath(removedPath);
-                  await refreshWorkspaces({ quiet: true, render: false });
-                  if (state.selectedCatalog === item.key) {
-                    setSelectedCatalog('');
-                  }
-                  renderCatalogList();
-                  renderSelectedBuiltIn();
-                  renderResult({
-                    status: 'ok',
-                    summary: item.title + ' removed from Forge list.',
-                    paths: removedPath ? [{ label: 'Original folder (not deleted)', path: removedPath, canReveal: true }] : [],
-                    actions: removedPath ? [{
-                      label: 'Open Folder',
-                      run: function () { return openPath(removedPath, false); }
-                    }] : [],
-                    help: {
-                      title: 'Folder kept',
-                      body: 'Nothing was deleted. This only removed the item from Forge.'
-                    }
-                  });
-                  if (removedPath) {
-                    toast('Removed from Forge. Folder kept: ' + removedPath, 'ok');
-                  } else {
-                    toast('Removed from Forge. Nothing was deleted.', 'ok');
-                  }
-                }, { swallow: true, noToast: true, keepResult: true });
-              });
-              rowMenu.appendChild(removeButton);
+            var rowMenu = buildCatalogRowMenu(item);
+            if (rowMenu) {
               rowActions.appendChild(rowMenu);
             }
             line.appendChild(rowActions);
@@ -2826,6 +2798,7 @@
             if (event.dataTransfer) {
               event.dataTransfer.effectAllowed = 'move';
               event.dataTransfer.setData(INTERNAL_CATALOG_DRAG_TYPE, item.key);
+              event.dataTransfer.setData('text/plain', INTERNAL_CATALOG_DRAG_PREFIX + item.key);
             }
             renderMiniTabs();
           });
@@ -2839,6 +2812,98 @@
         });
         scheduleWindowFit();
         syncHostWorkspaceDropZone();
+      }
+
+      function buildCatalogRowMenu(item) {
+        var rowMenu = document.createElement('div');
+        rowMenu.className = 'floating-menu catalog-row-menu' + (state.activeCatalogRowMenuKey === item.key ? '' : ' hidden');
+
+        var hasItems = false;
+
+        function appendAction(label, handler) {
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = label;
+          button.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            state.activeCatalogRowMenuKey = '';
+            handler();
+          });
+          rowMenu.appendChild(button);
+          hasItems = true;
+        }
+
+        if (item.path) {
+          appendAction('Open folder', function () {
+            perform('Open folder', function () { return openPath(item.path, false); }, { swallow: true, noToast: true });
+          });
+          appendAction('Open terminal', function () {
+            perform('Open terminal', function () { return openTerminalAtPath(item.path); }, { swallow: true, noToast: true });
+          });
+        }
+
+        if (item.kind === 'workspace') {
+          appendAction('Rename', function () {
+            state.inlineRenameKey = item.key;
+            renderCatalogList();
+          });
+          appendAction('Remove', function () {
+            perform('Remove project from Forge', async function () {
+              var removedPath = item.path || '';
+              hideWorkspacePath(removedPath);
+              await refreshWorkspaces({ quiet: true, render: false });
+              if (state.selectedCatalog === item.key) {
+                setSelectedCatalog('');
+              }
+              renderCatalogList();
+              renderSelectedBuiltIn();
+              renderResult({
+                status: 'ok',
+                summary: item.title + ' removed from Forge list.',
+                paths: removedPath ? [{ label: 'Original folder (not deleted)', path: removedPath, canReveal: true }] : [],
+                actions: removedPath ? [{
+                  label: 'Open Folder',
+                  run: function () { return openPath(removedPath, false); }
+                }] : [],
+                help: {
+                  title: 'Folder kept',
+                  body: 'Nothing was deleted. This only removed the item from Forge.'
+                }
+              });
+              if (removedPath) {
+                toast('Removed from Forge. Folder kept: ' + removedPath, 'ok');
+              } else {
+                toast('Removed from Forge. Nothing was deleted.', 'ok');
+              }
+            }, { swallow: true, noToast: true, keepResult: true });
+          });
+        } else {
+          var rowApp = appById(item.id);
+          if (rowApp && rowApp.distribution === 'optional') {
+            if (rowApp.exists === false) {
+              appendAction('Download', function () {
+                perform('Download app', async function () {
+                  await backend('download-app', [item.id]);
+                  await refreshApps({ quiet: true, render: false });
+                  renderCatalogList();
+                  renderSelectedBuiltIn();
+                }, { swallow: true, noToast: true });
+              });
+            } else {
+              appendAction('Remove download', function () {
+                perform('Remove downloaded app', async function () {
+                  await backend('remove-downloaded-app', [item.id]);
+                  await refreshApps({ quiet: true, render: false });
+                  renderCatalogList();
+                  renderSelectedBuiltIn();
+                }, { swallow: true, noToast: true });
+              });
+            }
+          }
+        }
+
+        return hasItems ? rowMenu : null;
       }
 
       function selectedBuiltInApp() {
@@ -3239,7 +3304,16 @@
         if (state.dragCatalogItemKey) {
           return true;
         }
-        if (!dataTransfer || !dataTransfer.types) {
+        if (!dataTransfer) {
+          return false;
+        }
+        if (typeof dataTransfer.getData === 'function') {
+          var textPayload = String(dataTransfer.getData('text/plain') || '').trim();
+          if (textPayload.indexOf(INTERNAL_CATALOG_DRAG_PREFIX) === 0) {
+            return true;
+          }
+        }
+        if (!dataTransfer.types) {
           return false;
         }
         var types = Array.prototype.slice.call(dataTransfer.types);
@@ -3251,6 +3325,10 @@
           var payload = String(dataTransfer.getData(INTERNAL_CATALOG_DRAG_TYPE) || '').trim();
           if (payload) {
             return payload;
+          }
+          var textPayload = String(dataTransfer.getData('text/plain') || '').trim();
+          if (textPayload.indexOf(INTERNAL_CATALOG_DRAG_PREFIX) === 0) {
+            return textPayload.slice(INTERNAL_CATALOG_DRAG_PREFIX.length).trim();
           }
         }
         return String(state.dragCatalogItemKey || '').trim();
