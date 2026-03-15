@@ -2650,6 +2650,9 @@
               }
               return;
             }
+            if (state.selectedCatalog === item.key && state.route === 'pipeline') {
+              return;
+            }
             if (state.route !== 'pipeline') {
               setWorkflowMode('pipeline');
             }
@@ -2659,7 +2662,7 @@
             } else {
               state.selectedWorkspace = item.id;
             }
-            renderCatalogList();
+            syncCatalogSelectionState();
             renderSelectedBuiltIn();
           }
           row.addEventListener('click', selectItem);
