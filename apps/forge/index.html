@@ -361,6 +361,7 @@
         hostBootReadySent: false,
         workspaceDropDepth: 0,
         lastHostDropZoneKey: '',
+        refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
         inlineRenameKey: ''
       };
@@ -549,6 +550,15 @@
           next = next.slice(0, 36000);
         }
         setLogContent(next);
+      }
+
+      function suppressTransientRefresh(ms) {
+        var duration = typeof ms === 'number' && ms > 0 ? ms : 2200;
+        state.refreshSuppressedUntil = Math.max(state.refreshSuppressedUntil || 0, Date.now() + duration);
+      }
+
+      function refreshIsSuppressed() {
+        return Date.now() < (state.refreshSuppressedUntil || 0);
       }
 
       function selectLogText() {
@@ -1899,6 +1909,7 @@
           throw new Error('Select a user-created app to run');
         }
 
+        suppressTransientRefresh();
         var res = await backend('run-workspace', [item.path, item.context]);
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || ('workspace:' + item.id);
@@ -3403,6 +3414,7 @@
         if (!ref) {
           throw new Error('Hosted Web reference path is missing.');
         }
+        suppressTransientRefresh();
         var res = await backend('serve-hosted-web', [mode, ref]);
         var out = kv(res.stdout || '');
         var url = String(out.url || '').trim();
@@ -4037,6 +4049,7 @@
 
         if (kind === 'run') {
           if (enabledTargets[nativeTarget]) {
+            suppressTransientRefresh();
             var run = await backend('run-desktop', [app.id]);
             var runOut = kv(run.stdout || '');
 
@@ -4959,7 +4972,7 @@
         }
 
         state.autoRefreshTimer = setInterval(function () {
-          if (state.busy || !bridgeAvailable()) {
+          if (state.busy || !bridgeAvailable() || refreshIsSuppressed()) {
             return;
           }
           refreshWorkspace({ quiet: true }).catch(function (err) {
@@ -4968,7 +4981,7 @@
         }, 15000);
 
         window.addEventListener('focus', function () {
-          if (state.busy || !bridgeAvailable()) {
+          if (state.busy || !bridgeAvailable() || refreshIsSuppressed()) {
             return;
           }
           refreshWorkspace({ quiet: true }).catch(function (_err) {
@@ -4977,7 +4990,7 @@
         });
 
         document.addEventListener('visibilitychange', function () {
-          if (document.hidden || state.busy || !bridgeAvailable()) {
+          if (document.hidden || state.busy || !bridgeAvailable() || refreshIsSuppressed()) {
             return;
           }
           refreshWorkspace({ quiet: true }).catch(function (_err) {
