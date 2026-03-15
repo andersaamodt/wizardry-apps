@@ -478,6 +478,10 @@
         return { id: 'all', label: 'All', system: true };
       }
 
+      function uncategorizedMiniTab() {
+        return { id: 'other', label: 'Other', system: true };
+      }
+
       function normalizeMiniTabLabel(value, fallback) {
         var label = String(value || '').replace(/\s+/g, ' ').trim();
         if (!label) {
@@ -580,13 +584,16 @@
       }
 
       function allMiniTabs() {
-        return [defaultMiniTab()].concat(state.miniTabs);
+        return [defaultMiniTab(), uncategorizedMiniTab()].concat(state.miniTabs);
       }
 
       function miniTabById(tabId) {
         var normalized = String(tabId || '').trim().toLowerCase();
         if (!normalized || normalized === 'all') {
           return defaultMiniTab();
+        }
+        if (normalized === 'other') {
+          return uncategorizedMiniTab();
         }
         return state.miniTabs.find(function (tab) {
           return tab.id === normalized;
@@ -595,7 +602,7 @@
 
       function setActiveMiniTab(tabId) {
         var next = String(tabId || '').trim().toLowerCase();
-        if (next !== 'all' && !miniTabById(next)) {
+        if (next !== 'all' && next !== 'other' && !miniTabById(next)) {
           next = 'all';
         }
         if (!next) {
@@ -634,6 +641,11 @@
         if (!target || target === 'all') {
           return catalogItems().length;
         }
+        if (target === 'other') {
+          return catalogItems().filter(function (item) {
+            return !itemAssignedMiniTab(item.key);
+          }).length;
+        }
         return catalogItems().filter(function (item) {
           return itemAssignedMiniTab(item.key) === target;
         }).length;
@@ -660,14 +672,14 @@
         if (changed) {
           saveMiniTabAssignments(assignments);
         }
-        if (state.activeMiniTab !== 'all' && !validTabs[state.activeMiniTab]) {
+        if (state.activeMiniTab !== 'all' && state.activeMiniTab !== 'other' && !validTabs[state.activeMiniTab]) {
           setActiveMiniTab('all');
         }
-        if (state.editingMiniTabId && state.editingMiniTabId !== 'all' && !validTabs[state.editingMiniTabId]) {
+        if (state.editingMiniTabId && state.editingMiniTabId !== 'all' && state.editingMiniTabId !== 'other' && !validTabs[state.editingMiniTabId]) {
           state.editingMiniTabId = '';
           state.editingMiniTabDraft = '';
         }
-        if (state.dragMiniTabTargetId && state.dragMiniTabTargetId !== 'all' && !validTabs[state.dragMiniTabTargetId]) {
+        if (state.dragMiniTabTargetId && state.dragMiniTabTargetId !== 'all' && state.dragMiniTabTargetId !== 'other' && !validTabs[state.dragMiniTabTargetId]) {
           state.dragMiniTabTargetId = '';
         }
       }
@@ -1344,7 +1356,10 @@
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
         var showMode = state.organizeShow || 'both';
         var items = catalogItems().filter(function (item) {
-          if (state.activeMiniTab && state.activeMiniTab !== 'all' && itemAssignedMiniTab(item.key) !== state.activeMiniTab) {
+          if (state.activeMiniTab === 'other' && itemAssignedMiniTab(item.key)) {
+            return false;
+          }
+          if (state.activeMiniTab && state.activeMiniTab !== 'all' && state.activeMiniTab !== 'other' && itemAssignedMiniTab(item.key) !== state.activeMiniTab) {
             return false;
           }
           if (showMode === 'builtin' && item.kind !== 'builtin') {
@@ -4761,6 +4776,11 @@
             commitMiniTabEdit(state.editingMiniTabId, state.editingMiniTabDraft);
           }
           if (state.activeMiniTab === tabId) {
+            if (tabId === 'all') {
+              setActiveMiniTab('other');
+              renderCatalogList();
+              renderSelectedBuiltIn();
+            }
             return;
           }
           setActiveMiniTab(tabId);
