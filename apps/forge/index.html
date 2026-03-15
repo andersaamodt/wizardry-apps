@@ -2918,7 +2918,7 @@
                 }, { swallow: true, noToast: true });
               });
             } else {
-              appendAction('Remove download', function () {
+              appendAction('Remove', function () {
                 perform('Remove downloaded app', async function () {
                   await backend('remove-downloaded-app', [item.id]);
                   await refreshApps({ quiet: true, render: false });
