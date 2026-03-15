@@ -53,3 +53,4 @@
 - Row overflow menus should expose only actions that are actually valid for that item type; disabled dead-end actions read as broken UI.
 - Clicking the currently selected catalog row should be fully inert; it must not reselect, rerender, or route-switch just because the user clicked the active item again.
 - Iconless thumbnail slots should default to the list surface color, not transparent, and should avoid rounded clipped compositing paths; otherwise WebKit can flash white edges during selection updates.
+- Dense catalog rows should disable text/image selection on labels, pills, icons, and row action glyphs; only true text-entry controls inside the row should remain selectable.

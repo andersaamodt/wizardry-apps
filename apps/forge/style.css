@@ -931,6 +931,18 @@ input[type="checkbox"]:disabled {
   opacity: 0.52;
 }
 
+.catalog-row,
+.catalog-row .name-text,
+.catalog-thumb,
+.catalog-thumb img,
+.context-dot,
+.suite-dot,
+.row-play,
+.row-overflow {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .catalog-content {
   min-width: 0;
   display: block;
@@ -1063,6 +1075,11 @@ input[type="checkbox"]:disabled {
 .list-row:focus-visible {
   outline: 2px solid rgba(10, 132, 255, 0.26);
   outline-offset: -2px;
+}
+
+.catalog-inline-rename {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .app-kind-icon {
