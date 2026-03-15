@@ -584,7 +584,8 @@
       }
 
       function allMiniTabs() {
-        return [defaultMiniTab(), uncategorizedMiniTab()].concat(state.miniTabs);
+        var systemTab = state.activeMiniTab === 'other' ? uncategorizedMiniTab() : defaultMiniTab();
+        return [systemTab].concat(state.miniTabs);
       }
 
       function miniTabById(tabId) {
@@ -4778,6 +4779,10 @@
           if (state.activeMiniTab === tabId) {
             if (tabId === 'all') {
               setActiveMiniTab('other');
+              renderCatalogList();
+              renderSelectedBuiltIn();
+            } else if (tabId === 'other') {
+              setActiveMiniTab('all');
               renderCatalogList();
               renderSelectedBuiltIn();
             }
