@@ -455,6 +455,24 @@
         }
       }
 
+      function closestEventTarget(event, selector) {
+        if (!event || !selector) {
+          return null;
+        }
+        var target = event.target || null;
+        if (!target) {
+          return null;
+        }
+        if (typeof target.closest === 'function') {
+          return target.closest(selector);
+        }
+        var elementTarget = target.nodeType === 3 ? target.parentElement : target;
+        if (elementTarget && typeof elementTarget.closest === 'function') {
+          return elementTarget.closest(selector);
+        }
+        return null;
+      }
+
       function defaultMiniTab() {
         return { id: 'all', label: 'All', system: true };
       }
@@ -4692,18 +4710,18 @@
         });
 
         els.catalogMiniTabs.addEventListener('click', function (event) {
-          var addButton = event.target.closest('#catalog-mini-tab-add');
+          var addButton = closestEventTarget(event, '#catalog-mini-tab-add');
           if (addButton) {
             event.preventDefault();
             createMiniTab();
             return;
           }
-          var tabButton = event.target.closest('[data-mini-tab-id]');
+          var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
           if (!tabButton) {
             return;
           }
           var tabId = String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase();
-          if (event.target.closest('.catalog-mini-tab-remove')) {
+          if (closestEventTarget(event, '.catalog-mini-tab-remove')) {
             event.preventDefault();
             event.stopPropagation();
             deleteMiniTab(tabId);
@@ -4721,7 +4739,7 @@
         });
 
         els.catalogMiniTabs.addEventListener('dblclick', function (event) {
-          var tabButton = event.target.closest('[data-mini-tab-id]');
+          var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
           if (!tabButton) {
             return;
           }
@@ -4732,7 +4750,7 @@
           if (!state.dragCatalogItemKey) {
             return;
           }
-          var tabButton = event.target.closest('[data-mini-tab-id]');
+          var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
           if (!tabButton) {
             return;
           }
@@ -4745,7 +4763,7 @@
         });
 
         els.catalogMiniTabs.addEventListener('dragleave', function (event) {
-          var tabButton = event.target.closest('[data-mini-tab-id]');
+          var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
           if (!tabButton) {
             return;
           }
@@ -4762,7 +4780,7 @@
           if (!state.dragCatalogItemKey) {
             return;
           }
-          var tabButton = event.target.closest('[data-mini-tab-id]');
+          var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
           if (!tabButton) {
             return;
           }
