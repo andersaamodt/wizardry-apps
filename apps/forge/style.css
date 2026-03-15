@@ -542,6 +542,7 @@ body.settings-open #settings-panel {
   height: 1px;
   background: color-mix(in srgb, var(--line) 86%, transparent);
   pointer-events: none;
+  z-index: 4;
 }
 
 .catalog-mini-tabs::-webkit-scrollbar {
