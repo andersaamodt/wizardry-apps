@@ -33,3 +33,4 @@
 - Focus/visibility-triggered auto-refresh right after launching another app/browser can tear down and redraw transparent catalog icons, causing a brief white-edge flash during Run handoff.
 - Compact left-rail minitabs work best as one global `All` view plus exclusive user tabs, with drag-to-reassign, inline rename on double-click, and delete affordance shown only for empty tabs.
 - If a launch action only changes selection, sync the selected-row class in place instead of rebuilding the whole catalog; re-creating transparent thumbnails can trigger a one-frame white flash in WebKit during app handoff.
+- In Forge, leave shell and rail surfaces explicitly theme-opaque instead of transparent; WebKit can briefly composite transparent seams against white during rerender or focus churn, which reads as white borders around controls and icons.

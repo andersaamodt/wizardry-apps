@@ -157,6 +157,10 @@ body {
   overflow: hidden;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -306,6 +310,7 @@ body.forge-booting .forge-shell {
   height: 100%;
   min-height: 0;
   width: 100%;
+  background: var(--bg);
 }
 
 body.layout-recovery .app-grid {
@@ -418,7 +423,7 @@ body.settings-open #settings-panel {
 .stage.panel {
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background: var(--bg);
 }
 
 .rail-divider {
@@ -469,7 +474,7 @@ body.settings-open #settings-panel {
   gap: 0.48rem;
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background: var(--bg-panel);
   padding: calc(0.5rem + 20px) 0.5rem 0.42rem;
   -webkit-app-region: drag;
 }
@@ -861,6 +866,7 @@ input[type="checkbox"]:disabled {
   width: calc(100% + 1rem);
   -webkit-app-region: no-drag;
   position: relative;
+  background: var(--bg-panel);
 }
 
 #catalog-list.workspace-drop-active::before {
