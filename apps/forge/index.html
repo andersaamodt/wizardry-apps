@@ -2624,7 +2624,6 @@
           syncHostWorkspaceDropZone();
           return;
         }
-        scheduleWindowFit();
         syncHostWorkspaceDropZone();
       }
 
@@ -3163,7 +3162,6 @@
           controls.appendChild(downloadBtn);
           statusCard.appendChild(controls);
           els.selectedAppGrid.appendChild(statusCard);
-          scheduleWindowFit();
           return;
         }
         if (els.openSelectedPath) {
@@ -3190,7 +3188,6 @@
         scheduleSelectedPathCompactSync();
         renderSelectedTargetsEditor(selected);
         renderSelectedIconEditor(selected);
-        scheduleWindowFit();
       }
 
       function hasMobileTargets(selected) {
