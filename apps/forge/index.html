@@ -473,10 +473,16 @@
       }
 
       function setSelectedCatalog(value) {
-        state.selectedCatalog = value || '';
+        var previous = state.selectedCatalog || '';
+        var next = value || '';
+        if (previous === next) {
+          return;
+        }
+        state.selectedCatalog = next;
         if (/^(builtin|workspace):/.test(state.selectedCatalog)) {
           saveStorage(SELECTED_CATALOG_KEY, state.selectedCatalog);
         }
+        syncCatalogSelectionState(previous, next);
       }
 
       function closestEventTarget(event, selector) {
@@ -2481,8 +2487,25 @@
         return items[0];
       }
 
-      function syncCatalogSelectionState() {
+      function syncCatalogSelectionState(previousKey, nextKey) {
         if (!els.catalogList) {
+          return;
+        }
+        var previous = String(previousKey || '').trim();
+        var next = String(nextKey || state.selectedCatalog || '').trim();
+        if (previous || next) {
+          if (previous && previous !== next) {
+            var previousRow = state.catalogRowCache[previous] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + previous.replace(/'/g, "\\'") + "']");
+            if (previousRow) {
+              previousRow.classList.remove('active');
+            }
+          }
+          if (next) {
+            var nextRow = state.catalogRowCache[next] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + next.replace(/'/g, "\\'") + "']");
+            if (nextRow && !nextRow.classList.contains('catalog-row-filtered')) {
+              nextRow.classList.add('active');
+            }
+          }
           return;
         }
         els.catalogList.querySelectorAll('.catalog-row[data-catalog-item-key]').forEach(function (row) {
@@ -2843,7 +2866,6 @@
                 state.selectedWorkspace = item.id;
                 perform('Run workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
               }
-              syncCatalogSelectionState();
               renderSelectedBuiltIn();
             });
             rowActions.appendChild(play);
@@ -2900,7 +2922,6 @@
           } else {
             state.selectedWorkspace = item.id;
           }
-          syncCatalogSelectionState();
           renderSelectedBuiltIn();
         }
         row.addEventListener('click', selectItem);
