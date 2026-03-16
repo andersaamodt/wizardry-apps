@@ -951,7 +951,6 @@ input[type="checkbox"]:disabled {
 .catalog-row,
 .catalog-row .name-text,
 .catalog-thumb,
-.catalog-thumb img,
 .context-dot,
 .suite-dot,
 .row-play,
@@ -1015,33 +1014,14 @@ input[type="checkbox"]:disabled {
   justify-content: center;
   overflow: hidden;
   background: transparent;
-  isolation: isolate;
-  contain: paint;
-  transform: translateZ(0);
-  backface-visibility: hidden;
   background: var(--catalog-row-surface, var(--bg-panel));
   background-clip: padding-box;
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
-}
-
-.catalog-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  border-radius: inherit;
-  background: var(--catalog-row-surface, var(--bg-panel));
-  background-clip: padding-box;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .catalog-thumb.no-icon {
-  isolation: auto;
-  contain: none;
-  transform: none;
-  backface-visibility: visible;
   overflow: visible;
   border-radius: 0;
   background: var(--catalog-row-surface, var(--bg-panel));

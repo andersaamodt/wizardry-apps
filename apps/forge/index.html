@@ -3781,20 +3781,13 @@
       function renderCatalogThumb(thumb, item) {
         var iconSrc = iconSrcForItem(item);
         thumb.className = 'catalog-thumb';
-        thumb.innerHTML = '';
         thumb.dataset.iconSrc = iconSrc || '';
+        thumb.style.backgroundImage = '';
         if (!iconSrc) {
           thumb.classList.add('no-icon');
           return;
         }
-        var thumbImg = document.createElement('img');
-        thumbImg.alt = '';
-        setImageSource(thumbImg, iconSrc, function () {
-          if (thumbImg.parentNode === thumb) {
-            thumb.removeChild(thumbImg);
-          }
-        });
-        thumb.appendChild(thumbImg);
+        thumb.style.backgroundImage = 'url(' + JSON.stringify(iconSrc) + ')';
       }
 
       function catalogThumbElement(item) {
