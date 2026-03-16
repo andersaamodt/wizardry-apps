@@ -310,7 +310,7 @@ completionHandler:(void (^)(BOOL result))completionHandler {
         (void)exception;
     }
     if (@available(macOS 11.0, *)) {
-        childWebView.underPageBackgroundColor = [NSColor clearColor];
+        childWebView.underPageBackgroundColor = self.prioritiesBootBgColor ?: [NSColor clearColor];
     }
     [childWebView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [childWindow setContentView:childWebView];
@@ -1316,7 +1316,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         (void)exception;
     }
     if (@available(macOS 11.0, *)) {
-        self.webView.underPageBackgroundColor = [NSColor clearColor];
+        self.webView.underPageBackgroundColor = self.prioritiesBootBgColor ?: [NSColor clearColor];
     }
     NSString *pageZoomEnv = [[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_PAGE_ZOOM"];
     if (pageZoomEnv) {

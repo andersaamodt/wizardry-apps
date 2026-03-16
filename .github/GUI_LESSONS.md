@@ -60,3 +60,4 @@
 - For pure view filters like tab switches, preserve row order and toggle visibility in place instead of re-appending rows; moving transparent-icon rows is enough to trigger one-frame white detailing in WebKit.
 - For transparent-icon catalogs, do not hide filtered rows with `display:none`; use an in-place filtered state that removes layout footprint without destroying the row/image layers, or WebKit will white-flash the icons when rows reappear.
 - In Forge’s catalog, paint transparent app icons as thumb background images rather than nested `<img>` elements; a separate image layer can still briefly re-composite against white during fast minitab/view switches even when the row DOM is otherwise stable.
+- On macOS hosts, set `WKWebView.underPageBackgroundColor` to the current theme surface instead of `clear`; otherwise transient WebKit repaints can still composite through a light fallback backing and outline transparent UI assets in white.
