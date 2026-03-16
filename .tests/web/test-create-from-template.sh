@@ -77,6 +77,11 @@ test_all_web_templates_create_expected_structure() {
       rm -rf "$test_web_root"
       return 1
     }
+    if [ -f "$template_path/wizardry-server-requirements.conf" ] && [ ! -f "$site_dir/wizardry-server-requirements.conf" ]; then
+      TEST_FAILURE_REASON="template '$template' missing generated wizardry-server-requirements.conf"
+      rm -rf "$test_web_root"
+      return 1
+    fi
 
     config_template=$(config-get "$site_dir/site.conf" template 2>/dev/null || printf '')
     if [ "$config_template" != "$template" ]; then
@@ -115,6 +120,9 @@ EOF
   cat > "$fake_wizardry_root/web/minimal/static/style.css" <<'EOF'
 body { font-family: sans-serif; }
 EOF
+  cat > "$fake_wizardry_root/web/minimal/wizardry-server-requirements.conf" <<'EOF'
+nostril=required
+EOF
 
   WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
     run_spell spells/web/create-from-template mini minimal
@@ -126,6 +134,11 @@ EOF
 
   [ -f "$test_web_root/mini/site/pages/index.md" ] || {
     TEST_FAILURE_REASON="custom web template index.md not copied"
+    rm -rf "$test_web_root" "$fake_wizardry_root"
+    return 1
+  }
+  [ -f "$test_web_root/mini/wizardry-server-requirements.conf" ] || {
+    TEST_FAILURE_REASON="custom web template requirements file not copied"
     rm -rf "$test_web_root" "$fake_wizardry_root"
     return 1
   }

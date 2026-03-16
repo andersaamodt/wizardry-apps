@@ -142,6 +142,48 @@ EOF
     rm -rf "$test_web_root" "$fake_wizardry_root"
     return 1
   fi
+  [ ! -f "$test_web_root/minisite/wizardry-server-requirements.conf" ] || {
+    TEST_FAILURE_REASON="requirements file should not exist when template does not define one"
+    rm -rf "$test_web_root" "$fake_wizardry_root"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$fake_wizardry_root"
+}
+
+test_update_refreshes_requirements_file() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  fake_wizardry_root=$(temp-dir wizardry-template-root)
+  template_root="$fake_wizardry_root/web/minimal"
+
+  mkdir -p "$template_root/pages" "$template_root/static"
+  cat > "$template_root/pages/index.md" <<'EOF'
+# from template
+EOF
+  cat > "$template_root/static/style.css" <<'EOF'
+body { margin: 0; }
+EOF
+  cat > "$template_root/wizardry-server-requirements.conf" <<'EOF'
+nostril=required
+EOF
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template minisite minimal
+  assert_success
+
+  printf '%s\n' 'old=requirement' > "$test_web_root/minisite/wizardry-server-requirements.conf"
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/update-from-template minisite --force
+  assert_success
+
+  if ! grep -q '^nostril=required$' "$test_web_root/minisite/wizardry-server-requirements.conf"; then
+    TEST_FAILURE_REASON="requirements file not refreshed from template"
+    rm -rf "$test_web_root" "$fake_wizardry_root"
+    return 1
+  fi
 
   rm -rf "$test_web_root" "$fake_wizardry_root"
 }
@@ -151,5 +193,6 @@ run_test_case "update-from-template updates files from template" test_updates_fr
 run_test_case "update-from-template preserves uploads" test_preserves_uploads
 run_test_case "update-from-template fails for nonexistent site" test_fails_for_nonexistent_site
 run_test_case "update-from-template resolves templates from web" test_update_uses_web_template_directory
+run_test_case "update-from-template refreshes requirements file" test_update_refreshes_requirements_file
 
 finish_tests

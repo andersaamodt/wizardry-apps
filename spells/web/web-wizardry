@@ -18,6 +18,7 @@ Commands:
   status [SITENAME]  Show website status
   configure SITENAME Configure website settings
   nostr-mirror SITENAME  Mirror Nostr events for a blog site
+  check-nostril    Check Nostr server tooling
   install-nostril Ensure nostril is installed
   uninstall-nostril Remove nostril
 
@@ -128,6 +129,10 @@ case "$cmd" in
       die 2 "web-wizardry: nostr-mirror requires SITENAME argument"
     fi
     blog-nostr-mirror "$site_name"
+    exit 0
+    ;;
+  check-nostril)
+    check-nostril
     exit 0
     ;;
   install-nostril)

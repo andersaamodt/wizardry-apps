@@ -210,21 +210,65 @@ while true; do
   update_template_cmd_wrapped=$(wrap_cmd "Update from template" \
     "update-from-template \"$site_name\"")
 
+  site_requirements_file="$SITE_DIR/wizardry-server-requirements.conf"
+  if [ ! -f "$site_requirements_file" ] && [ "$site_template" = "blog" ] && [ -f "$HOME/git/nostr-blog/wizardry-server-requirements.conf" ]; then
+    site_requirements_file="$HOME/git/nostr-blog/wizardry-server-requirements.conf"
+  fi
+  requirements_registry_dir="$WIZARDRY_DIR/spells/web/.requirements"
+
+  requirement_meta_value() {
+    requirement_id=$1
+    requirement_key=$2
+    requirement_file="$requirements_registry_dir/$requirement_id.conf"
+    [ -f "$requirement_file" ] || return 1
+    awk -F= -v key="$requirement_key" '
+      $1 == key {
+        sub(/^[^=]+=/, "")
+        print
+        exit
+      }
+    ' "$requirement_file"
+  }
+
+  requirement_status() {
+    requirement_id=$1
+    check_spell=$(requirement_meta_value "$requirement_id" check_spell 2>/dev/null || printf '')
+    [ -n "$check_spell" ] || return 1
+    [ -x "$WIZARDRY_DIR/spells/web/$check_spell" ] || return 1
+    output=$(PATH="$PATH" "$WIZARDRY_DIR/spells/web/$check_spell" 2>/dev/null || true)
+    printf '%s\n' "$output" | awk -F= '$1=="status" { print $2; exit }'
+  }
+
+  requirement_menu_items_file=$(temp-file site-requirements-menu)
+  if [ -f "$site_requirements_file" ] && [ -d "$requirements_registry_dir" ]; then
+    while IFS= read -r requirement_line; do
+      case "$requirement_line" in
+        ''|'#'*) continue ;;
+      esac
+      requirement_id=${requirement_line%%=*}
+      requirement_id=$(printf '%s' "$requirement_id" | tr -d '[:space:]')
+      [ -n "$requirement_id" ] || continue
+      label=$(requirement_meta_value "$requirement_id" label 2>/dev/null || printf '%s' "$requirement_id")
+      install_label=$(requirement_meta_value "$requirement_id" install_label 2>/dev/null || printf 'Install %s' "$label")
+      uninstall_label=$(requirement_meta_value "$requirement_id" uninstall_label 2>/dev/null || printf 'Uninstall %s' "$label")
+      install_spell=$(requirement_meta_value "$requirement_id" install_spell 2>/dev/null || printf '')
+      uninstall_spell=$(requirement_meta_value "$requirement_id" uninstall_spell 2>/dev/null || printf '')
+      requirement_state=$(requirement_status "$requirement_id" 2>/dev/null || printf 'bad')
+      if [ "$requirement_state" = "ok" ] && [ -n "$uninstall_spell" ]; then
+        uninstall_cmd_wrapped=$(wrap_cmd "$uninstall_label" "$uninstall_spell")
+        printf '%s\n' "${uninstall_label}%$uninstall_cmd_wrapped" >> "$requirement_menu_items_file"
+      elif [ -n "$install_spell" ]; then
+        install_cmd_wrapped=$(wrap_cmd "$install_label" "$install_spell")
+        printf '%s\n' "${install_label}%$install_cmd_wrapped" >> "$requirement_menu_items_file"
+      fi
+    done < "$site_requirements_file"
+  fi
+
   mirror_nostr_option=""
-  nostril_tooling_option=""
   if [ "$site_template" = "blog" ]; then
     mirror_nostr_cmd_wrapped=$(wrap_cmd "Mirror Nostr events" \
       "blog-nostr-mirror \"$site_name\"")
     mirror_nostr_option="Mirror Nostr events%$mirror_nostr_cmd_wrapped"
-    if has nostril; then
-      uninstall_nostril_cmd_wrapped=$(wrap_cmd "Uninstall nostril" \
-        "uninstall-nostril")
-      nostril_tooling_option="Uninstall nostril%$uninstall_nostril_cmd_wrapped"
-    else
-      install_nostril_cmd_wrapped=$(wrap_cmd "Install nostril" \
-        "install-nostril")
-      nostril_tooling_option="Install nostril%$install_nostril_cmd_wrapped"
-    fi
   fi
   
   # Conditional: Copy .onion address
@@ -334,8 +378,14 @@ while true; do
   set -- \
     ${open_browser_option:+"$open_browser_option"} \
     "Build all & restart server%$build_restart_cmd_wrapped" \
-    ${mirror_nostr_option:+"$mirror_nostr_option"} \
-    ${nostril_tooling_option:+"$nostril_tooling_option"} \
+    ${mirror_nostr_option:+"$mirror_nostr_option"}
+  if [ -f "$requirement_menu_items_file" ]; then
+    while IFS= read -r requirement_item; do
+      [ -n "$requirement_item" ] || continue
+      set -- "$@" "$requirement_item"
+    done < "$requirement_menu_items_file"
+  fi
+  set -- "$@" \
     "Update from template%$update_template_cmd_wrapped" \
     ${copy_site_onion:+"$copy_site_onion"} \
     "Open site directory%$open_dir_cmd_wrapped" \
