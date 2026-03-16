@@ -312,9 +312,45 @@ test_build_cache_falls_back_to_site_data_only() {
   rm -rf "$test_web_root" "$stub_dir"
 }
 
+test_build_runs_site_pre_build_hook() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-build-root)
+  stub_dir=$(make_build_stub_dir)
+  site_name="hooktest"
+  site_dir="$test_web_root/$site_name"
+
+  WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template "$site_name" demo
+  assert_success
+
+  mkdir -p "$site_dir/cgi"
+  cat > "$site_dir/cgi/pre-build" <<'EOF'
+#!/bin/sh
+set -eu
+pages_dir=$WEB_WIZARDRY_ROOT/$WIZARDRY_SITE_NAME/site/pages
+cat > "$pages_dir/generated.md" <<'EOMD'
+# Generated
+EOMD
+EOF
+  chmod +x "$site_dir/cgi/pre-build"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build "$site_name" --full
+  assert_success
+
+  [ -f "$site_dir/build/pages/generated.html" ] || {
+    TEST_FAILURE_REASON="pre-build hook should generate pages before build"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
 run_test_case "build --help works" test_build_help
 run_test_case "build generates output for every template" test_build_generates_html_for_every_template
 run_test_case "build cache falls back to site data cache" test_build_cache_falls_back_to_site_data_only
+run_test_case "build runs site pre-build hook" test_build_runs_site_pre_build_hook
 if [ -d "$ROOT_DIR/web/blog" ]; then
   run_test_case "blog build renders nested posts and feeds" test_build_blog_generates_posts_and_feeds
 fi

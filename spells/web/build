@@ -131,6 +131,24 @@ site_base_url() {
   printf '%s://%s\n' "$scheme" "$domain"
 }
 
+run_site_pre_build_hook() {
+  hook_path=''
+  for candidate in "$SITE_DIR/cgi/pre-build" "$SITE_DIR/pre-build"; do
+    if [ -x "$candidate" ]; then
+      hook_path=$candidate
+      break
+    fi
+  done
+  [ -n "$hook_path" ] || return 0
+
+  info "Running site pre-build hook..."
+  WIZARDRY_SITES_DIR="$SITES_DIR" \
+    WIZARDRY_SITE_NAME="$site_name" \
+    WIZARDRY_DIR="$WIZARDRY_DIR" \
+    WEB_WIZARDRY_ROOT="$WEB_ROOT" \
+    "$hook_path" || die "build: site pre-build hook failed"
+}
+
 generate_blog_feeds_and_sitemap() {
   posts_dir="$SITE_DIR/site/pages/posts"
   build_pages_dir="$SITE_DIR/build/pages"
@@ -468,6 +486,8 @@ build_site() {
       warn "build: blog Nostr derived rebuild failed; continuing with existing local files"
     fi
   fi
+
+  run_site_pre_build_hook
 
   mkdir -p "$SITE_DIR/build/pages"
   mkdir -p "$SITE_DIR/build/static"
