@@ -361,7 +361,7 @@ ensure_godot_project() {
   workspace_path=$1
   project_title=${2-}
 
-  if godot_subpath=$(detect_workspace_godot_subpath "$workspace_path" 2>/dev/null || true) && [ -n "$godot_subpath" ]; then
+  if godot_subpath=$(resolve_workspace_godot_subpath "$workspace_path" "$workspace_path/wizardry.workspace.conf" 2>/dev/null || true) && [ -n "$godot_subpath" ]; then
     case "$godot_subpath" in
       ".")
         printf '%s\n' "$workspace_path"
@@ -1362,21 +1362,23 @@ launch_workspace_bundle_macos() {
   [ -d "$bundle" ] || return 1
   [ -n "$app_dir" ] || return 1
 
+  stop_host_instances_for_app "" "$app_dir"
+
   if command -v open >/dev/null 2>&1; then
     if open -na "$bundle" >/dev/null 2>&1; then
-      if wait_for_workspace_host_start "$app_dir" 25; then
-        return 0
-      fi
+      wait_for_workspace_host_start "$app_dir" 50 || true
+      return 0
     fi
   fi
 
   [ -x "$launcher_exec" ] || return 1
+  stop_host_instances_for_app "" "$app_dir"
   if command -v nohup >/dev/null 2>&1; then
     nohup "$launcher_exec" >/dev/null 2>&1 &
   else
     "$launcher_exec" >/dev/null 2>&1 &
   fi
-  wait_for_workspace_host_start "$app_dir" 25
+  wait_for_workspace_host_start "$app_dir" 50
 }
 
 stop_desktop_instances_for_slug() {
@@ -1870,6 +1872,35 @@ detect_workspace_godot_subpath() {
   return 1
 }
 
+resolve_workspace_godot_subpath() {
+  workspace_path=${1-}
+  conf_path=${2-}
+
+  godot_subpath=""
+  if [ -n "$conf_path" ] && [ -f "$conf_path" ]; then
+    godot_subpath=$(workspace_field "$conf_path" godot_subpath "")
+  fi
+
+  if [ -n "$godot_subpath" ]; then
+    case "$godot_subpath" in
+      ".")
+        if [ -f "$workspace_path/project.godot" ] || [ -f "$workspace_path/tool_main.gd" ]; then
+          printf '%s\n' "."
+          return 0
+        fi
+        ;;
+      *)
+        if [ -f "$workspace_path/$godot_subpath/project.godot" ]; then
+          printf '%s\n' "$godot_subpath"
+          return 0
+        fi
+        ;;
+    esac
+  fi
+
+  detect_workspace_godot_subpath "$workspace_path"
+}
+
 resolve_workspace_app_dir() {
   workspace_path=${1-}
   conf_path=${2-}
@@ -1930,25 +1961,48 @@ ensure_importable_workspace_profile() {
     existing_context=$(workspace_field "$conf_path" development_context "")
     existing_targets=$(workspace_field "$conf_path" targets "")
     existing_app_subpath=$(workspace_field "$conf_path" app_subpath "")
-    detected_godot_subpath=$(detect_workspace_godot_subpath "$workspace_path" 2>/dev/null || true)
-    detected_app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true)
-    if [ -n "$detected_godot_subpath" ]; then
-      if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ "$existing_context" != "godot" ]; then
-        write_key_value_file "$conf_path" project_type "game"
-        write_key_value_file "$conf_path" development_context "godot"
-        write_key_value_file "$conf_path" starter "import-godot"
-        write_key_value_file "$conf_path" profile_kind "detected"
-        write_key_value_file "$conf_path" targets "macos,linux,godot-desktop"
-      fi
-    elif [ -n "$detected_app_subpath" ] && [ "$existing_context" != "godot" ]; then
-      if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ -z "$existing_app_subpath" ]; then
-        write_key_value_file "$conf_path" project_type "application"
-        write_key_value_file "$conf_path" development_context "web"
-        write_key_value_file "$conf_path" starter "import-web"
-        write_key_value_file "$conf_path" profile_kind "detected"
-        write_key_value_file "$conf_path" targets "hosted-web,macos,linux"
-        if [ "$detected_app_subpath" != "." ]; then
-          write_key_value_file "$conf_path" app_subpath "$detected_app_subpath"
+    existing_godot_subpath=$(workspace_field "$conf_path" godot_subpath "")
+    needs_detection=0
+    if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ]; then
+      needs_detection=1
+    elif [ "$existing_context" = "godot" ]; then
+      needs_detection=0
+    elif [ "$existing_context" = "web" ] && [ -n "$existing_app_subpath" ]; then
+      needs_detection=0
+    elif [ "$existing_context" = "web" ] && [ -f "$workspace_path/index.html" ]; then
+      needs_detection=0
+    else
+      needs_detection=1
+    fi
+
+    if [ "$needs_detection" -eq 1 ]; then
+      detected_godot_subpath=$(detect_workspace_godot_subpath "$workspace_path" 2>/dev/null || true)
+      detected_app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true)
+      if [ -n "$detected_godot_subpath" ]; then
+        if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ "$existing_context" != "godot" ]; then
+          write_key_value_file "$conf_path" project_type "game"
+          write_key_value_file "$conf_path" development_context "godot"
+          write_key_value_file "$conf_path" starter "import-godot"
+          write_key_value_file "$conf_path" profile_kind "detected"
+          write_key_value_file "$conf_path" targets "macos,linux,godot-desktop"
+        fi
+        if [ "$detected_godot_subpath" = "." ]; then
+          if [ "$existing_godot_subpath" != "." ]; then
+            write_key_value_file "$conf_path" godot_subpath "."
+          fi
+        elif [ "$existing_godot_subpath" != "$detected_godot_subpath" ]; then
+          write_key_value_file "$conf_path" godot_subpath "$detected_godot_subpath"
+        fi
+      elif [ -n "$detected_app_subpath" ] && [ "$existing_context" != "godot" ]; then
+        if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ -z "$existing_app_subpath" ]; then
+          write_key_value_file "$conf_path" project_type "application"
+          write_key_value_file "$conf_path" development_context "web"
+          write_key_value_file "$conf_path" starter "import-web"
+          write_key_value_file "$conf_path" profile_kind "detected"
+          write_key_value_file "$conf_path" targets "hosted-web,macos,linux"
+          if [ "$detected_app_subpath" != "." ]; then
+            write_key_value_file "$conf_path" app_subpath "$detected_app_subpath"
+          fi
         fi
       fi
     fi
@@ -2005,6 +2059,9 @@ root=$workspace_path
 CONF
   if [ -n "$app_subpath" ] && [ "$app_subpath" != "." ]; then
     printf 'app_subpath=%s\n' "$app_subpath" >>"$conf_path"
+  fi
+  if [ -n "$godot_subpath" ]; then
+    printf 'godot_subpath=%s\n' "$godot_subpath" >>"$conf_path"
   fi
   printf 'run_rebuild_command=%s\n' ":" >>"$conf_path"
 
@@ -2067,7 +2124,24 @@ cmd_list_workspaces() {
     [ -d "$path" ] || continue
     conf="$path/wizardry.workspace.conf"
     [ -f "$conf" ] || continue
-    ensure_importable_workspace_profile "$path" >/dev/null 2>&1 || true
+
+    profile_kind=$(workspace_field "$conf" profile_kind "")
+    profile_targets=$(workspace_field "$conf" targets "")
+    profile_context=$(workspace_field "$conf" development_context "")
+    profile_rebuild=$(workspace_rebuild_command "$conf")
+    profile_app_subpath=$(workspace_field "$conf" app_subpath "")
+    profile_godot_subpath=$(workspace_field "$conf" godot_subpath "")
+    needs_profile_repair=0
+    if [ "$profile_kind" = "generic" ] || [ -z "$profile_targets" ] || [ -z "$profile_rebuild" ]; then
+      needs_profile_repair=1
+    elif [ "$profile_context" = "web" ] && [ -z "$profile_app_subpath" ] && [ ! -f "$path/index.html" ]; then
+      needs_profile_repair=1
+    elif [ "$profile_context" = "godot" ] && [ -z "$profile_godot_subpath" ] && [ ! -f "$path/project.godot" ] && [ ! -f "$path/tool_main.gd" ]; then
+      needs_profile_repair=1
+    fi
+    if [ "$needs_profile_repair" -eq 1 ]; then
+      ensure_importable_workspace_profile "$path" >/dev/null 2>&1 || true
+    fi
 
     project_id=$(workspace_field "$conf" project_id "")
     [ -n "$project_id" ] || project_id=$(workspace_field "$conf" slug "$(basename "$path")")
@@ -2083,7 +2157,7 @@ cmd_list_workspaces() {
     runnable=0
     case "$development_context" in
       godot)
-        if detect_workspace_godot_subpath "$path" >/dev/null 2>&1; then
+        if resolve_workspace_godot_subpath "$path" "$conf" >/dev/null 2>&1; then
           runnable=1
         fi
         ;;

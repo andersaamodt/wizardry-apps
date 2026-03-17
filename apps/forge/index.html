@@ -1141,6 +1141,14 @@
         return !!(window.wizardry && window.wizardry.exec);
       }
 
+      function waitForStartupPaint() {
+        return new Promise(function (resolve) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(resolve);
+          });
+        });
+      }
+
       function notifyHostBootReady(attempt) {
         var tries = typeof attempt === 'number' ? attempt : 0;
         if (state.hostBootReadySent) {
@@ -6939,6 +6947,7 @@
           });
           renderCatalogList();
           renderSelectedBuiltIn();
+          await waitForStartupPaint();
 
           if (state.rootHint) {
             setWorkspaceRoot(state.rootHint);
