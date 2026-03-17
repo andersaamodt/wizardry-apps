@@ -1395,8 +1395,10 @@ launch_workspace_bundle_macos() {
 
   if command -v open >/dev/null 2>&1; then
     if open -na "$bundle" >/dev/null 2>&1; then
-      wait_for_workspace_host_start "$app_dir" 50 || true
-      return 0
+      if wait_for_workspace_host_start "$app_dir" 50; then
+        return 0
+      fi
+      stop_host_instances_for_app "" "$app_dir"
     fi
   fi
 

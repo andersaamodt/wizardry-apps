@@ -123,7 +123,7 @@
                 <div id="theme-picker-list" class="menu-list"></div>
               </div>
             </div>
-            <div class="footer-spacer" aria-hidden="true"></div>
+            <div id="footer-status" class="footer-status hidden" aria-live="polite"></div>
           </div>
         </section>
       </aside>
@@ -431,7 +431,9 @@
         suppressMiniTabClickUntil: 0,
         dragCatalogItemKey: '',
         dragCatalogAssignmentKey: '',
-        dragMiniTabTargetId: ''
+        dragMiniTabTargetId: '',
+        footerStatusKind: '',
+        footerStatusMessage: ''
       };
 
       var els = {};
@@ -1135,6 +1137,25 @@
         els.activityPill.textContent = msg;
       }
 
+      function setFooterStatus(kind, msg) {
+        state.footerStatusKind = String(kind || '');
+        state.footerStatusMessage = String(msg || '');
+        if (!els.footerStatus) {
+          return;
+        }
+        var hasMessage = !!state.footerStatusMessage;
+        els.footerStatus.classList.toggle('hidden', !hasMessage);
+        els.footerStatus.classList.toggle('working', state.footerStatusKind === 'working');
+        els.footerStatus.classList.toggle('ok', state.footerStatusKind === 'ok');
+        els.footerStatus.classList.toggle('bad', state.footerStatusKind === 'bad');
+        els.footerStatus.textContent = hasMessage ? state.footerStatusMessage : '';
+        if (hasMessage) {
+          els.footerStatus.title = state.footerStatusMessage;
+          return;
+        }
+        els.footerStatus.removeAttribute('title');
+      }
+
       function setToastCopyState(copied) {
         if (!els.toastCopy) {
           return;
@@ -1365,6 +1386,7 @@
         opts = opts || {};
         setBusy(true);
         setActivity('working', label + '...');
+        setFooterStatus('working', label + '...');
         if (!opts.keepResult) {
           renderResult({
             status: 'working',
@@ -1380,6 +1402,7 @@
 
         try {
           await fn();
+          setFooterStatus('ok', label + ' complete');
           if (!opts.noToast) {
             toast(label + ' complete', 'ok');
           }
@@ -1395,6 +1418,7 @@
           var help = actionableHelp(message);
           appendLog('error: ' + message);
           setActivity('fault', 'Error');
+          setFooterStatus('bad', message);
           renderResult({
             status: 'error',
             summary: message,
@@ -7085,6 +7109,7 @@
         els.themePickerBtn = document.getElementById('theme-picker-btn');
         els.themePickerMenu = document.getElementById('theme-picker-menu');
         els.themePickerList = document.getElementById('theme-picker-list');
+        els.footerStatus = document.getElementById('footer-status');
         els.actionBuildMenu = document.getElementById('action-build-menu');
         els.buildMenu = document.getElementById('build-menu');
         els.actionRunMenu = document.getElementById('action-run-menu');
@@ -7172,6 +7197,7 @@
           state.settingsOpen = false;
           document.body.classList.remove('layout-recovery');
           cacheElements();
+          setFooterStatus(state.footerStatusKind, state.footerStatusMessage);
           syncToolchainUI();
           syncLogClearVisibility();
           bindButtons();
