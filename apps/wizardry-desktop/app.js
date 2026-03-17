@@ -174,6 +174,24 @@
     }, 2200);
   }
 
+  function waitForBridge(timeoutMs) {
+    var deadline = Date.now() + (timeoutMs || 1600);
+    return new Promise(function (resolve) {
+      function poll() {
+        if (window.wizardry && typeof window.wizardry.exec === 'function') {
+          resolve(true);
+          return;
+        }
+        if (Date.now() >= deadline) {
+          resolve(false);
+          return;
+        }
+        window.setTimeout(poll, 40);
+      }
+      poll();
+    });
+  }
+
   async function loadPrefs() {
     try {
       var text = await backend('get-ui-prefs', [], { quiet: true });
@@ -384,7 +402,7 @@
     }
     state.theme = themeName;
     if (els.themeStylesheet) {
-      els.themeStylesheet.href = 'themes/' + themeName + '.css?v=wizardry-desktop-20260317a';
+      els.themeStylesheet.href = 'themes/' + themeName + '.css?v=wizardry-desktop-20260317c';
     }
     if (els.themePickerBtn) {
       els.themePickerBtn.textContent = themeName.charAt(0).toUpperCase() + themeName.slice(1);
@@ -1172,6 +1190,8 @@
     updateBridgePill();
     bindGlobalEvents();
     try {
+      setBootStatus('Connecting wizardry bridge…');
+      await waitForBridge();
       await loadPrefs();
       await loadSnapshot();
       await render();
