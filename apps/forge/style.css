@@ -791,9 +791,9 @@ label {
   display: block;
   margin: 0.56rem 0 0.24rem;
   color: var(--muted);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 0.76rem;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
 .label-plain {
@@ -1208,8 +1208,8 @@ input[type="checkbox"]:disabled {
   margin: 0.16rem 0.3rem 0.24rem;
   color: var(--muted);
   font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
 
 .floating-menu p.organize-heading {
@@ -1854,8 +1854,8 @@ input[type="checkbox"]:disabled {
   padding: 0.2rem 0.52rem;
   font-size: 0.72rem;
   font-weight: 620;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
 .details-card h3,
@@ -1918,14 +1918,23 @@ input[type="checkbox"]:disabled {
   color: var(--section-text);
   font-size: 0.86rem;
   font-weight: 640;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-transform: none;
+  letter-spacing: 0.01em;
   padding: 0.48rem 0.62rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
+}
+
+.workspace-profile-summary {
+  justify-content: flex-start;
+  gap: 0.42rem;
+}
+
+.workspace-profile-summary::after {
+  margin-left: auto;
 }
 
 .pipeline-section[open] > .pipeline-section-head {
@@ -1983,6 +1992,20 @@ input[type="checkbox"]:disabled {
   font-size: 0.77rem;
 }
 
+.workspace-profile-kind-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.08rem;
+  padding: 0.06rem 0.46rem;
+  border: 1px solid var(--section-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--section-bg) 90%, transparent);
+  color: var(--section-muted);
+  font-size: 0.69rem;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
 .workspace-profile-status {
   flex: 0 0 auto;
   border: 1px solid var(--section-border);
@@ -2034,7 +2057,7 @@ input[type="checkbox"]:disabled {
 
 .workspace-profile-label {
   color: var(--section-text);
-  font-size: 0.77rem;
+  font-size: 0.79rem;
   font-weight: 620;
 }
 
@@ -2042,11 +2065,6 @@ input[type="checkbox"]:disabled {
   color: var(--section-muted);
   font-size: 0.73rem;
   line-height: 1.32;
-}
-
-.workspace-profile-field textarea {
-  min-height: 4.4rem;
-  resize: vertical;
 }
 
 .workspace-profile-meta {
@@ -2065,6 +2083,10 @@ input[type="checkbox"]:disabled {
   background: color-mix(in srgb, var(--section-bg) 92%, transparent);
 }
 
+.workspace-profile-meta-item.wide {
+  grid-column: 1 / -1;
+}
+
 .workspace-profile-meta-label {
   color: var(--section-muted);
   font-size: 0.72rem;
@@ -2075,6 +2097,62 @@ input[type="checkbox"]:disabled {
   font-size: 0.76rem;
   overflow-wrap: anywhere;
   user-select: text;
+}
+
+.workspace-profile-meta-help {
+  color: var(--section-muted);
+  font-size: 0.71rem;
+  line-height: 1.32;
+}
+
+.workspace-profile-control {
+  width: min(100%, 18rem);
+  height: 2rem;
+  box-sizing: border-box;
+  padding: 0.34rem 0.5rem;
+}
+
+.workspace-profile-field.path-field .workspace-profile-control {
+  width: 100%;
+  min-width: 0;
+}
+
+.workspace-profile-field.command-field .workspace-profile-control {
+  width: min(100%, 24rem);
+}
+
+.workspace-profile-control-row,
+.workspace-profile-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.46rem;
+  flex-wrap: wrap;
+}
+
+.workspace-profile-control-row .workspace-profile-control {
+  flex: 1 1 14rem;
+}
+
+.workspace-profile-browse-btn {
+  flex: 0 0 auto;
+  width: auto;
+  height: 2rem;
+  padding: 0.34rem 0.62rem;
+}
+
+.workspace-profile-toggle-row {
+  gap: 0.5rem;
+}
+
+.workspace-profile-toggle-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.workspace-profile-toggle-label {
+  color: var(--section-text);
+  font-size: 0.78rem;
+  font-weight: 520;
 }
 
 .pipeline-sections :is(input, select) {

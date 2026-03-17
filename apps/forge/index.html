@@ -194,11 +194,14 @@
                   </div>
                 </details>
 
-                <details id="workspace-profile-section" class="pipeline-section hidden" open>
-                  <summary class="pipeline-section-head">Workspace settings</summary>
+                <details id="workspace-profile-section" class="pipeline-section hidden">
+                  <summary class="pipeline-section-head workspace-profile-summary">
+                    <span>Workspace settings</span>
+                    <span id="workspace-profile-kind-pill" class="workspace-profile-kind-pill hidden"></span>
+                  </summary>
                   <div class="pipeline-section-body">
                     <div class="workspace-profile-head">
-                      <p class="workspace-profile-copy">Changes save automatically. System-managed values stay read-only here.</p>
+                      <p class="workspace-profile-copy">Changes save automatically.</p>
                       <span id="workspace-profile-status" class="workspace-profile-status hidden" aria-live="polite"></span>
                     </div>
                     <div id="workspace-profile-form" class="workspace-profile-form"></div>
@@ -1184,6 +1187,23 @@
             requestAnimationFrame(resolve);
           });
         });
+      }
+
+      function activeRouteScroller() {
+        return document.querySelector('.route.active');
+      }
+
+      function preserveActiveRouteScroll(work) {
+        var scroller = activeRouteScroller();
+        var scrollTop = scroller ? scroller.scrollTop : 0;
+        var result = work();
+        if (scroller) {
+          scroller.scrollTop = scrollTop;
+          requestAnimationFrame(function () {
+            scroller.scrollTop = scrollTop;
+          });
+        }
+        return result;
       }
 
       function notifyHostBootReady(attempt) {
@@ -4473,7 +4493,9 @@
           }
           var current = selectedCatalogItem();
           if (current && current.kind === 'workspace' && workspaceProfileCacheKey(current.path) === key) {
-            renderWorkspaceProfileEditor(current);
+            preserveActiveRouteScroll(function () {
+              renderWorkspaceProfileEditor(current);
+            });
           }
         }
       }
@@ -4520,8 +4542,10 @@
         if (statusPath && statusMessage) {
           setWorkspaceProfileStatus(statusPath, 'ok', statusMessage);
         }
-        renderCatalogList();
-        renderSelectedBuiltIn();
+        preserveActiveRouteScroll(function () {
+          renderCatalogList();
+          renderSelectedBuiltIn();
+        });
       }
 
       async function saveWorkspaceProfileField(selected, fieldKey, value) {
@@ -4533,34 +4557,14 @@
           return;
         }
         var nextValue = String(value == null ? '' : value);
-        if (fieldKey === 'title') {
-          var nextTitle = nextValue.replace(/\s+/g, ' ').trim();
-          if (!nextTitle || nextTitle === profile.title) {
-            renderWorkspaceProfileEditor(selected);
-            return;
-          }
-          var renameOut = await saveWorkspaceProfileMutation(selected, 'Save workspace title', async function () {
-            var renameRes = await backend('rename-workspace', [selected.path, nextTitle], { quiet: true });
-            return kv((renameRes && renameRes.stdout) || '');
-          });
-          if (!renameOut) {
-            renderWorkspaceProfileEditor(selected);
-            return;
-          }
-          await refreshWorkspaceSelectionAfterProfileSave(
-            selected.path,
-            'workspace:' + (renameOut.project_id || selected.id),
-            renameOut.workspace || selected.path,
-            'Saved'
-          );
-          return;
-        }
         if (fieldKey === 'kind') {
           var targetProjectType = nextValue === 'game:godot' ? 'game' : 'application';
           var targetContext = nextValue === 'game:godot' ? 'godot' : 'web';
           var targetStarter = nextValue === 'game:godot' ? 'import-godot' : 'import-web';
           if (profile.project_type === targetProjectType && profile.development_context === targetContext) {
-            renderWorkspaceProfileEditor(selected);
+            preserveActiveRouteScroll(function () {
+              renderWorkspaceProfileEditor(selected);
+            });
             return;
           }
           var kindOut = await saveWorkspaceProfileMutation(selected, 'Save workspace kind', async function () {
@@ -4573,7 +4577,9 @@
             };
           });
           if (!kindOut) {
-            renderWorkspaceProfileEditor(selected);
+            preserveActiveRouteScroll(function () {
+              renderWorkspaceProfileEditor(selected);
+            });
             return;
           }
           await refreshWorkspaceSelectionAfterProfileSave(selected.path, selected.key, selected.path, 'Saved');
@@ -4590,78 +4596,253 @@
           };
         });
         if (!updateOut) {
-          renderWorkspaceProfileEditor(selected);
+          preserveActiveRouteScroll(function () {
+            renderWorkspaceProfileEditor(selected);
+          });
           return;
         }
-        await refreshWorkspaceSelectionAfterProfileSave(selected.path, selected.key, selected.path, 'Saved');
+        state.workspaceProfileCache[workspaceProfileCacheKey(selected.path)] = normalizeWorkspaceProfile(Object.assign({}, profile, {
+          profile: profile.profile || (selected.path + '/wizardry.workspace.conf'),
+          workspace: selected.path,
+          root: profile.root || selected.path
+        }, (function () {
+          var patch = {};
+          patch[fieldKey] = nextValue;
+          return patch;
+        })()));
+        setWorkspaceProfileStatus(selected.path, 'ok', 'Saved');
+        preserveActiveRouteScroll(function () {
+          renderWorkspaceProfileEditor(selectedCatalogItem() || selected);
+        });
       }
 
-      function createWorkspaceProfileField(selected, profile, config) {
-        var row = document.createElement('label');
+      function createWorkspaceProfileFieldShell(config) {
+        config = config || {};
+        var row = document.createElement('div');
         row.className = 'workspace-profile-field';
         if (config.wide) {
           row.classList.add('wide');
+        }
+        if (config.path) {
+          row.classList.add('path-field');
+        }
+        if (config.compact) {
+          row.classList.add('compact-field');
+        }
+        if (config.command) {
+          row.classList.add('command-field');
+        }
+        if (config.toggle) {
+          row.classList.add('toggle-field');
         }
 
         var label = document.createElement('span');
         label.className = 'workspace-profile-label';
         label.textContent = config.label;
         row.appendChild(label);
-
-        var control;
-        if (config.type === 'select') {
-          control = document.createElement('select');
-          (config.options || []).forEach(function (option) {
-            var opt = document.createElement('option');
-            opt.value = option.value;
-            opt.textContent = option.label;
-            control.appendChild(opt);
-          });
-          control.value = config.value;
-          control.addEventListener('change', function () {
-            saveWorkspaceProfileField(selected, config.field, control.value);
-          });
-        } else {
-          control = document.createElement(config.type === 'textarea' ? 'textarea' : 'input');
-          if (config.type !== 'textarea') {
-            control.type = config.inputType || 'text';
-          }
-          control.value = config.value;
-          control.dataset.lastCommitted = config.value;
-          control.spellcheck = false;
-          if (config.placeholder) {
-            control.placeholder = config.placeholder;
-          }
-          var commit = function () {
-            if (control.value === control.dataset.lastCommitted) {
-              return;
-            }
-            control.dataset.lastCommitted = control.value;
-            saveWorkspaceProfileField(selected, config.field, control.value);
-          };
-          control.addEventListener('blur', commit);
-          control.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter' && config.type !== 'textarea') {
-              event.preventDefault();
-              commit();
-            }
-          });
-        }
-        control.disabled = state.busy;
-        row.appendChild(control);
-
-        if (config.help) {
-          var help = document.createElement('span');
-          help.className = 'workspace-profile-help';
-          help.textContent = config.help;
-          row.appendChild(help);
-        }
         return row;
       }
 
-      function createWorkspaceProfileMeta(labelText, valueText) {
+      function appendWorkspaceProfileHelp(row, helpText) {
+        if (!helpText) {
+          return;
+        }
+        var help = document.createElement('span');
+        help.className = 'workspace-profile-help';
+        help.textContent = helpText;
+        row.appendChild(help);
+      }
+
+      function attachWorkspaceProfileCommit(selected, fieldKey, control, normalize) {
+        normalize = typeof normalize === 'function'
+          ? normalize
+          : function (value) { return String(value || '').trim(); };
+        control.dataset.lastCommitted = normalize(control.value);
+        var commit = function () {
+          var nextValue = normalize(control.value);
+          control.value = nextValue;
+          if (nextValue === String(control.dataset.lastCommitted || '')) {
+            return;
+          }
+          control.dataset.lastCommitted = nextValue;
+          saveWorkspaceProfileField(selected, fieldKey, nextValue);
+        };
+        control.addEventListener('blur', commit);
+        control.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            commit();
+          }
+        });
+        return commit;
+      }
+
+      function createWorkspaceProfileSelectField(selected, config) {
+        var row = createWorkspaceProfileFieldShell(config);
+        var control = document.createElement('select');
+        control.className = 'workspace-profile-control';
+        (config.options || []).forEach(function (option) {
+          var opt = document.createElement('option');
+          opt.value = option.value;
+          opt.textContent = option.label;
+          control.appendChild(opt);
+        });
+        control.value = config.value;
+        control.disabled = state.busy;
+        control.addEventListener('change', function () {
+          saveWorkspaceProfileField(selected, config.field, control.value);
+        });
+        row.appendChild(control);
+        appendWorkspaceProfileHelp(row, config.help);
+        return row;
+      }
+
+      function createWorkspaceProfileTextField(selected, config) {
+        var row = createWorkspaceProfileFieldShell(config);
+        var control = document.createElement('input');
+        control.type = config.inputType || 'text';
+        control.className = 'workspace-profile-control';
+        control.value = String(config.value || '');
+        control.spellcheck = false;
+        control.disabled = state.busy;
+        if (config.placeholder) {
+          control.placeholder = config.placeholder;
+        }
+        attachWorkspaceProfileCommit(selected, config.field, control, config.normalize);
+        row.appendChild(control);
+        appendWorkspaceProfileHelp(row, config.help);
+        return row;
+      }
+
+      async function browseWorkspaceAppSubpath(selected, input) {
+        if (!selected || selected.kind !== 'workspace' || !selected.path || state.busy) {
+          return;
+        }
+        setActivity('working', 'Choose app subpath...');
+        try {
+          var res = await backend('pick-workspace-subpath', [selected.path], { quiet: true });
+          var picked = kv((res && res.stdout) || '');
+          var relative = String(picked.relative || '');
+          if (!relative) {
+            return;
+          }
+          input.value = relative;
+          input.dataset.lastCommitted = String(input.dataset.lastCommitted || '');
+          await saveWorkspaceProfileField(selected, 'app_subpath', relative);
+        } catch (err) {
+          var message = String(err && err.message ? err.message : err);
+          if (!/cancel/i.test(message)) {
+            toast(message, 'bad');
+          }
+        } finally {
+          if (!document.body.classList.contains('bridge-missing')) {
+            setActivity('ready', 'Ready');
+          }
+        }
+      }
+
+      function createWorkspaceProfilePathField(selected, config) {
+        var row = createWorkspaceProfileFieldShell(config);
+        var controlRow = document.createElement('div');
+        controlRow.className = 'workspace-profile-control-row';
+        var control = document.createElement('input');
+        control.type = 'text';
+        control.className = 'workspace-profile-control';
+        control.value = String(config.value || '');
+        control.spellcheck = false;
+        control.disabled = state.busy;
+        if (config.placeholder) {
+          control.placeholder = config.placeholder;
+        }
+        attachWorkspaceProfileCommit(selected, config.field, control, config.normalize);
+        controlRow.appendChild(control);
+        if (typeof config.onBrowse === 'function') {
+          var browseButton = document.createElement('button');
+          browseButton.type = 'button';
+          browseButton.className = 'action workspace-profile-browse-btn';
+          browseButton.textContent = 'Browse...';
+          browseButton.title = 'Choose a subfolder inside this workspace';
+          browseButton.setAttribute('aria-label', 'Choose a subfolder inside this workspace');
+          browseButton.disabled = state.busy;
+          browseButton.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            config.onBrowse(control);
+          });
+          controlRow.appendChild(browseButton);
+        }
+        row.appendChild(controlRow);
+        appendWorkspaceProfileHelp(row, config.help);
+        return row;
+      }
+
+      function rebuildCommandUiValue(rawValue) {
+        var value = String(rawValue || '').trim();
+        if (!value || value === ':' || value.toLowerCase() === 'true') {
+          return '';
+        }
+        return value;
+      }
+
+      function createWorkspaceProfileRebuildField(selected, profile) {
+        var row = createWorkspaceProfileFieldShell({
+          label: 'Rebuild before run',
+          wide: true,
+          command: true,
+          toggle: true
+        });
+        var controlRow = document.createElement('div');
+        controlRow.className = 'workspace-profile-toggle-row';
+        var toggle = document.createElement('input');
+        toggle.id = 'workspace-rebuild-toggle-' + (profile.project_id || 'workspace');
+        toggle.type = 'checkbox';
+        toggle.checked = !!rebuildCommandUiValue(profile.run_rebuild_command);
+        toggle.disabled = state.busy;
+        var toggleLabel = document.createElement('label');
+        toggleLabel.className = 'workspace-profile-toggle-label';
+        toggleLabel.setAttribute('for', toggle.id);
+        toggleLabel.textContent = 'Run a rebuild command before Build and Run';
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'workspace-profile-control';
+        input.value = rebuildCommandUiValue(profile.run_rebuild_command);
+        input.placeholder = 'npm run build';
+        input.spellcheck = false;
+        input.disabled = state.busy || !toggle.checked;
+        attachWorkspaceProfileCommit(selected, 'run_rebuild_command', input, function (value) {
+          return String(value || '').trim();
+        });
+        toggle.addEventListener('change', function () {
+          if (!toggle.checked) {
+            input.value = '';
+            input.dataset.lastCommitted = '';
+            input.disabled = true;
+            saveWorkspaceProfileField(selected, 'run_rebuild_command', '');
+            return;
+          }
+          input.disabled = state.busy;
+          input.focus();
+          input.select();
+          if (input.value.trim()) {
+            input.dataset.lastCommitted = input.value.trim();
+            saveWorkspaceProfileField(selected, 'run_rebuild_command', input.value.trim());
+          }
+        });
+        controlRow.appendChild(toggle);
+        controlRow.appendChild(toggleLabel);
+        controlRow.appendChild(input);
+        row.appendChild(controlRow);
+        appendWorkspaceProfileHelp(row, 'Leave this off unless the workspace actually needs a pre-run build step.');
+        return row;
+      }
+
+      function createWorkspaceProfileMeta(labelText, valueText, options) {
+        options = options || {};
         var item = document.createElement('div');
         item.className = 'workspace-profile-meta-item';
+        if (options.wide) {
+          item.classList.add('wide');
+        }
         var label = document.createElement('span');
         label.className = 'workspace-profile-meta-label';
         label.textContent = labelText;
@@ -4670,7 +4851,24 @@
         value.textContent = valueText || '—';
         item.appendChild(label);
         item.appendChild(value);
+        if (options.help) {
+          var help = document.createElement('span');
+          help.className = 'workspace-profile-meta-help';
+          help.textContent = options.help;
+          item.appendChild(help);
+        }
         return item;
+      }
+
+      function workspaceProfileKindLabel(profile) {
+        var rawKind = String((profile && profile.profile_kind) || '').trim();
+        if (rawKind === 'detected') {
+          return 'Detected';
+        }
+        if (rawKind === 'generic') {
+          return 'Generic';
+        }
+        return 'Manual';
       }
 
       function renderWorkspaceProfileEditor(selected) {
@@ -4681,6 +4879,10 @@
         els.workspaceProfileSection.classList.toggle('hidden', !show);
         if (!show) {
           els.workspaceProfileForm.innerHTML = '';
+          if (els.workspaceProfileKindPill) {
+            els.workspaceProfileKindPill.classList.add('hidden');
+            els.workspaceProfileKindPill.textContent = '';
+          }
           if (els.workspaceProfileStatus) {
             els.workspaceProfileStatus.classList.add('hidden');
           }
@@ -4691,6 +4893,10 @@
         var profile = cachedWorkspaceProfile(selected.path);
         if (!profile) {
           els.workspaceProfileForm.innerHTML = '';
+          if (els.workspaceProfileKindPill) {
+            els.workspaceProfileKindPill.classList.add('hidden');
+            els.workspaceProfileKindPill.textContent = '';
+          }
           var loading = document.createElement('div');
           loading.className = 'workspace-profile-empty';
           loading.textContent = state.workspaceProfileLoadingKey === workspaceProfileCacheKey(selected.path)
@@ -4702,19 +4908,25 @@
         }
 
         els.workspaceProfileForm.innerHTML = '';
+        if (els.workspaceProfileKindPill) {
+          els.workspaceProfileKindPill.textContent = workspaceProfileKindLabel(profile);
+          els.workspaceProfileKindPill.classList.remove('hidden');
+        }
+        var meta = document.createElement('div');
+        meta.className = 'workspace-profile-meta';
+        meta.appendChild(createWorkspaceProfileMeta('Project ID', profile.project_id, {
+          help: 'Read-only here because changing it cleanly also needs a folder and workspace-id migration.'
+        }));
+        meta.appendChild(createWorkspaceProfileMeta('Workspace root', profile.root || selected.path, { wide: true }));
+        meta.appendChild(createWorkspaceProfileMeta('Starter', profile.starter));
+        els.workspaceProfileForm.appendChild(meta);
+
         var fields = document.createElement('div');
         fields.className = 'workspace-profile-fields';
-        fields.appendChild(createWorkspaceProfileField(selected, profile, {
-          field: 'title',
-          label: 'Workspace title',
-          value: profile.title,
-          placeholder: 'App title',
-          help: 'Renaming here also keeps the workspace path and project id aligned.'
-        }));
-        fields.appendChild(createWorkspaceProfileField(selected, profile, {
+        fields.appendChild(createWorkspaceProfileSelectField(selected, {
           field: 'kind',
           label: 'Workspace kind',
-          type: 'select',
+          compact: true,
           value: profile.development_context === 'godot' ? 'game:godot' : 'application:web',
           options: [
             { value: 'application:web', label: 'Web application workspace' },
@@ -4723,17 +4935,21 @@
           help: 'This updates the project type and development context together.'
         }));
         if (profile.development_context !== 'godot') {
-          fields.appendChild(createWorkspaceProfileField(selected, profile, {
+          fields.appendChild(createWorkspaceProfilePathField(selected, {
             field: 'app_subpath',
             label: 'App subpath',
             value: profile.app_subpath,
+            path: true,
             placeholder: 'app',
-            help: 'Relative folder that contains the runnable index.html. Use . for workspace root.'
+            help: 'Choose a folder inside the workspace that contains the runnable index.html. Use . for the workspace root.',
+            onBrowse: function (input) {
+              browseWorkspaceAppSubpath(selected, input);
+            }
           }));
-          fields.appendChild(createWorkspaceProfileField(selected, profile, {
+          fields.appendChild(createWorkspaceProfileSelectField(selected, {
             field: 'hosted_web_mode',
             label: 'Hosted Web mode',
-            type: 'select',
+            compact: true,
             value: profile.hosted_web_mode,
             options: [
               { value: '', label: 'Serve app subpath directly' },
@@ -4742,46 +4958,34 @@
             help: 'Use managed site mode only when this workspace has a dedicated hosted-web site workflow.'
           }));
           if (profile.hosted_web_mode === 'web-wizardry-site') {
-            fields.appendChild(createWorkspaceProfileField(selected, profile, {
+            fields.appendChild(createWorkspaceProfileTextField(selected, {
               field: 'hosted_web_site_name',
               label: 'Hosted Web site name',
+              compact: true,
               value: profile.hosted_web_site_name,
               placeholder: profile.project_id || 'my-site',
               help: 'Site name used by the managed hosted-web pipeline.'
             }));
-            fields.appendChild(createWorkspaceProfileField(selected, profile, {
+            fields.appendChild(createWorkspaceProfilePathField(selected, {
               field: 'hosted_web_serve_script',
               label: 'Hosted Web serve script',
               value: profile.hosted_web_serve_script,
+              path: true,
               placeholder: 'scripts/site.sh',
               help: 'Relative script path inside the workspace.'
             }));
-            fields.appendChild(createWorkspaceProfileField(selected, profile, {
+            fields.appendChild(createWorkspaceProfileTextField(selected, {
               field: 'hosted_web_serve_action',
               label: 'Hosted Web serve action',
+              compact: true,
               value: profile.hosted_web_serve_action,
               placeholder: 'serve',
               help: 'Action name passed to the hosted-web serve script.'
             }));
           }
         }
-        fields.appendChild(createWorkspaceProfileField(selected, profile, {
-          field: 'run_rebuild_command',
-          label: 'Rebuild before Run',
-          value: profile.run_rebuild_command,
-          placeholder: ':',
-          wide: true,
-          help: 'Shell command run from the workspace root before Build/Run. Use : when no rebuild step is needed.'
-        }));
+        fields.appendChild(createWorkspaceProfileRebuildField(selected, profile));
         els.workspaceProfileForm.appendChild(fields);
-
-        var meta = document.createElement('div');
-        meta.className = 'workspace-profile-meta';
-        meta.appendChild(createWorkspaceProfileMeta('Project ID', profile.project_id));
-        meta.appendChild(createWorkspaceProfileMeta('Starter', profile.starter));
-        meta.appendChild(createWorkspaceProfileMeta('Profile kind', profile.profile_kind || 'manual'));
-        meta.appendChild(createWorkspaceProfileMeta('Workspace root', profile.root || selected.path));
-        els.workspaceProfileForm.appendChild(meta);
       }
 
       function renderSelectedTargetsEditor(selected) {
@@ -6905,6 +7109,7 @@
         els.terminalSelectedPath = document.getElementById('terminal-selected-path');
         els.selectedTargetsEditor = document.getElementById('selected-targets-editor');
         els.workspaceProfileSection = document.getElementById('workspace-profile-section');
+        els.workspaceProfileKindPill = document.getElementById('workspace-profile-kind-pill');
         els.workspaceProfileStatus = document.getElementById('workspace-profile-status');
         els.workspaceProfileForm = document.getElementById('workspace-profile-form');
         els.activeTargetsSubhead = document.getElementById('active-targets-subhead');

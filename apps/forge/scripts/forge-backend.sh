@@ -18,6 +18,7 @@ Commands:
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
   import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]
   get-workspace-profile [ROOT_HINT] WORKSPACE_PATH
+  pick-workspace-subpath [ROOT_HINT] WORKSPACE_PATH
   get-ui-prefs [ROOT_HINT]
   set-ui-pref [ROOT_HINT] KEY VALUE
   set-workspace-field [ROOT_HINT] WORKSPACE_PATH KEY VALUE
@@ -926,9 +927,17 @@ workspace_field() {
 
 workspace_rebuild_command() {
   conf=${1-}
-  command=$(workspace_field "$conf" run_rebuild_command "")
+  if workspace_field_exists "$conf" run_rebuild_command; then
+    command=$(workspace_field "$conf" run_rebuild_command "")
+  else
+    command=""
+  fi
   if [ -n "$command" ]; then
     printf '%s\n' "$command"
+    return 0
+  fi
+  if workspace_field_exists "$conf" run_rebuild_command; then
+    printf '%s\n' ""
     return 0
   fi
   printf '%s\n' "$(workspace_field "$conf" rebuild_command "")"
@@ -1002,6 +1011,26 @@ config_field() {
   else
     printf '%s\n' "$fallback"
   fi
+}
+
+workspace_field_exists() {
+  conf=$1
+  key=$2
+  [ -f "$conf" ] || return 1
+  awk -F= -v k="$key" '
+    $1 ~ /^[[:space:]]*#/ { next }
+    $1 ~ /^[[:space:]]*$/ { next }
+    {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+      if ($1 == k) {
+        found = 1
+        exit
+      }
+    }
+    END {
+      exit(found ? 0 : 1)
+    }
+  ' "$conf"
 }
 
 resolve_workspace_relative_path() {
@@ -2309,6 +2338,89 @@ cmd_get_workspace_profile() {
   printf 'hosted_web_serve_script=%s\n' "$(workspace_field "$conf" hosted_web_serve_script "")"
   printf 'hosted_web_serve_action=%s\n' "$(workspace_field "$conf" hosted_web_serve_action "")"
   printf 'run_rebuild_command=%s\n' "$(workspace_rebuild_command "$conf")"
+}
+
+pick_directory_under_workspace() {
+  workspace_abs=$1
+  prompt=${2-Choose folder}
+  os_name=$(os_id)
+
+  if [ "$os_name" = "darwin" ] && command -v osascript >/dev/null 2>&1; then
+    osascript - "$workspace_abs" "$prompt" <<'OSA' 2>/dev/null || true
+on run argv
+  set defaultDir to POSIX file (item 1 of argv)
+  set dialogPrompt to item 2 of argv
+  try
+    set chosenFolder to choose folder with prompt dialogPrompt default location defaultDir
+    return POSIX path of chosenFolder
+  on error number -128
+    return ""
+  end try
+end run
+OSA
+    return 0
+  fi
+
+  if [ "$os_name" = "linux" ]; then
+    if command -v zenity >/dev/null 2>&1; then
+      zenity --file-selection --directory --filename="$workspace_abs/" --title="$prompt" 2>/dev/null || true
+      return 0
+    fi
+    if command -v kdialog >/dev/null 2>&1; then
+      kdialog --getexistingdirectory "$workspace_abs" --title "$prompt" 2>/dev/null || true
+      return 0
+    fi
+  fi
+
+  printf '%s\n' "forge-backend: no folder picker is available on this OS" >&2
+  exit 1
+}
+
+cmd_pick_workspace_subpath() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: pick-workspace-subpath requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+
+  picked_path=$(pick_directory_under_workspace "$workspace_abs" "Choose app subpath")
+  [ -n "$picked_path" ] || exit 0
+
+  picked_abs=$(resolve_existing_dir_path "$picked_path" 2>/dev/null || true)
+  [ -n "$picked_abs" ] || {
+    printf '%s\n' "forge-backend: selected folder no longer exists" >&2
+    exit 1
+  }
+
+  case "$picked_abs" in
+    "$workspace_abs")
+      relative="."
+      ;;
+    "$workspace_abs"/*)
+      relative=${picked_abs#"$workspace_abs"/}
+      ;;
+    *)
+      printf '%s\n' "forge-backend: selected folder must stay inside the workspace root" >&2
+      exit 1
+      ;;
+  esac
+
+  [ -f "$picked_abs/index.html" ] || {
+    printf '%s\n' "forge-backend: selected folder must contain index.html" >&2
+    exit 1
+  }
+
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'absolute=%s\n' "$picked_abs"
+  printf 'relative=%s\n' "$relative"
 }
 
 validate_workspace_profile_field_key() {
@@ -4464,6 +4576,9 @@ case "$cmd" in
     ;;
   get-workspace-profile)
     cmd_get_workspace_profile "${2-}" "${3-}"
+    ;;
+  pick-workspace-subpath)
+    cmd_pick_workspace_subpath "${2-}" "${3-}"
     ;;
   get-ui-prefs)
     cmd_get_ui_prefs "${2-}"
