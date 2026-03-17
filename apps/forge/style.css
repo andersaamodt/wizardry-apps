@@ -1969,6 +1969,114 @@ input[type="checkbox"]:disabled {
   color: var(--section-text);
 }
 
+.workspace-profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.workspace-profile-copy {
+  margin: 0;
+  color: var(--section-muted);
+  font-size: 0.77rem;
+}
+
+.workspace-profile-status {
+  flex: 0 0 auto;
+  border: 1px solid var(--section-border);
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.72rem;
+  color: var(--section-text);
+  background: color-mix(in srgb, var(--section-bg) 92%, transparent);
+}
+
+.workspace-profile-status.ok {
+  border-color: var(--section-ok-border);
+}
+
+.workspace-profile-status.bad {
+  border-color: var(--section-bad-border);
+}
+
+.workspace-profile-status.working {
+  border-color: var(--section-accent-border);
+}
+
+.workspace-profile-form {
+  display: grid;
+  gap: 0.68rem;
+}
+
+.workspace-profile-empty {
+  color: var(--section-muted);
+  font-size: 0.82rem;
+  padding: 0.08rem 0;
+}
+
+.workspace-profile-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.62rem;
+}
+
+.workspace-profile-field {
+  display: grid;
+  gap: 0.28rem;
+  align-content: start;
+}
+
+.workspace-profile-field.wide {
+  grid-column: 1 / -1;
+}
+
+.workspace-profile-label {
+  color: var(--section-text);
+  font-size: 0.77rem;
+  font-weight: 620;
+}
+
+.workspace-profile-help {
+  color: var(--section-muted);
+  font-size: 0.73rem;
+  line-height: 1.32;
+}
+
+.workspace-profile-field textarea {
+  min-height: 4.4rem;
+  resize: vertical;
+}
+
+.workspace-profile-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.52rem;
+  padding-top: 0.08rem;
+}
+
+.workspace-profile-meta-item {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.44rem 0.5rem;
+  border: 1px solid var(--section-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--section-bg) 92%, transparent);
+}
+
+.workspace-profile-meta-label {
+  color: var(--section-muted);
+  font-size: 0.72rem;
+}
+
+.workspace-profile-meta-value {
+  color: var(--section-text);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
 .pipeline-sections :is(input, select) {
   border-color: var(--section-border);
   background: color-mix(in srgb, var(--section-bg) 95%, transparent);
@@ -2834,7 +2942,9 @@ body.bridge-missing .status-pill {
   .button-row,
   .button-row.compact,
   .form-grid.two,
-  .target-grid {
+  .target-grid,
+  .workspace-profile-fields,
+  .workspace-profile-meta {
     grid-template-columns: 1fr;
   }
 

@@ -19,6 +19,7 @@ The GUI is organized around two primary use-cases:
 - Theme picker (left footer): all bundled wizardry themes, persisted locally
 - Projects are external by default under `~/git`, and only folders with `wizardry.workspace.conf` are shown as managed workspaces.
 - Workspace `Run` now executes `run_rebuild_command` from `wizardry.workspace.conf` first when that field is set; use `run_rebuild_command=:` for workspaces that do not need a pre-run rebuild step.
+- Workspace selections in the right pane include a structured `Workspace settings` section for validated edits to supported `wizardry.workspace.conf` fields.
 
 ## Backend
 

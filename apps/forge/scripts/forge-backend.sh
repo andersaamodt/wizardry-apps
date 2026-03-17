@@ -17,8 +17,10 @@ Commands:
   list-godot-tools [ROOT_HINT]
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
   import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]
+  get-workspace-profile [ROOT_HINT] WORKSPACE_PATH
   get-ui-prefs [ROOT_HINT]
   set-ui-pref [ROOT_HINT] KEY VALUE
+  set-workspace-field [ROOT_HINT] WORKSPACE_PATH KEY VALUE
   set-app-targets [ROOT_HINT] APP_SLUG TARGETS
   set-workspace-targets [ROOT_HINT] WORKSPACE_PATH TARGETS
   rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE
@@ -2195,6 +2197,195 @@ write_key_value_file() {
   mv "$tmp_file" "$file"
 }
 
+cmd_get_workspace_profile() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: get-workspace-profile requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+
+  conf="$workspace_abs/wizardry.workspace.conf"
+  [ -f "$conf" ] || {
+    printf '%s\n' "forge-backend: workspace profile missing: $workspace_abs" >&2
+    exit 1
+  }
+
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf 'project_id=%s\n' "$(workspace_field "$conf" project_id "$(workspace_field "$conf" slug "$(basename "$workspace_abs")")")"
+  printf 'title=%s\n' "$(workspace_field "$conf" title "$(workspace_field "$conf" name "$(basename "$workspace_abs")")")"
+  printf 'project_type=%s\n' "$(workspace_field "$conf" project_type "application")"
+  printf 'development_context=%s\n' "$(workspace_field "$conf" development_context "web")"
+  printf 'starter=%s\n' "$(workspace_field "$conf" starter "")"
+  printf 'targets=%s\n' "$(workspace_field "$conf" targets "")"
+  printf 'source=%s\n' "$(workspace_field "$conf" source "")"
+  printf 'root=%s\n' "$(workspace_field "$conf" root "$workspace_abs")"
+  printf 'profile_kind=%s\n' "$(workspace_field "$conf" profile_kind "")"
+  printf 'app_subpath=%s\n' "$(workspace_field "$conf" app_subpath "")"
+  printf 'hosted_web_mode=%s\n' "$(workspace_field "$conf" hosted_web_mode "")"
+  printf 'hosted_web_site_name=%s\n' "$(workspace_field "$conf" hosted_web_site_name "")"
+  printf 'hosted_web_serve_script=%s\n' "$(workspace_field "$conf" hosted_web_serve_script "")"
+  printf 'hosted_web_serve_action=%s\n' "$(workspace_field "$conf" hosted_web_serve_action "")"
+  printf 'run_rebuild_command=%s\n' "$(workspace_rebuild_command "$conf")"
+}
+
+validate_workspace_profile_field_key() {
+  key=${1-}
+  case "$key" in
+    project_type|development_context|starter|app_subpath|hosted_web_mode|hosted_web_site_name|hosted_web_serve_script|hosted_web_serve_action|run_rebuild_command)
+      return 0
+      ;;
+  esac
+  printf '%s\n' "forge-backend: unsupported workspace field '$key'" >&2
+  exit 2
+}
+
+validate_workspace_relative_field() {
+  workspace_abs=$1
+  rel_value=$2
+  field_name=$3
+  must_exist=$4
+
+  [ -n "$rel_value" ] || return 0
+  case "$rel_value" in
+    /*)
+      printf '%s\n' "forge-backend: $field_name must stay relative to the workspace root" >&2
+      exit 2
+      ;;
+    *".."*)
+      printf '%s\n' "forge-backend: $field_name must not escape the workspace root" >&2
+      exit 2
+      ;;
+  esac
+
+  if [ "$must_exist" = "file" ]; then
+    abs_path=$(resolve_workspace_relative_path "$workspace_abs" "$rel_value" 2>/dev/null || true)
+    [ -n "$abs_path" ] && [ -f "$abs_path" ] || {
+      printf '%s\n' "forge-backend: $field_name not found in workspace: $rel_value" >&2
+      exit 1
+    }
+  fi
+}
+
+cmd_set_workspace_field() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  key=${3-}
+  value=${4-}
+
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: set-workspace-field requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -n "$key" ] || {
+    printf '%s\n' "forge-backend: set-workspace-field requires KEY" >&2
+    exit 2
+  }
+
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+  conf="$workspace_abs/wizardry.workspace.conf"
+  [ -f "$conf" ] || {
+    printf '%s\n' "forge-backend: workspace profile missing: $workspace_abs" >&2
+    exit 1
+  }
+
+  validate_workspace_profile_field_key "$key"
+
+  normalized_value=$(printf '%s' "${value-}" | tr '\r\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+  case "$key" in
+    project_type)
+      case "$normalized_value" in
+        application|game) ;;
+        *)
+          printf '%s\n' "forge-backend: project_type must be application or game" >&2
+          exit 2
+          ;;
+      esac
+      ;;
+    development_context)
+      case "$normalized_value" in
+        web|godot) ;;
+        *)
+          printf '%s\n' "forge-backend: development_context must be web or godot" >&2
+          exit 2
+          ;;
+      esac
+      ;;
+    starter)
+      case "$normalized_value" in
+        ""|import-web|import-godot|import-generic|blank|panel|clone)
+          ;;
+        *)
+          printf '%s\n' "forge-backend: unsupported starter '$normalized_value'" >&2
+          exit 2
+          ;;
+      esac
+      ;;
+    app_subpath)
+      if [ "$normalized_value" = "." ]; then
+        [ -f "$workspace_abs/index.html" ] || {
+          printf '%s\n' "forge-backend: workspace root does not contain index.html" >&2
+          exit 1
+        }
+      elif [ -n "$normalized_value" ]; then
+        validate_workspace_relative_field "$workspace_abs" "$normalized_value" "app_subpath" "dir"
+        [ -f "$workspace_abs/$normalized_value/index.html" ] || {
+          printf '%s\n' "forge-backend: app_subpath must point to a folder containing index.html" >&2
+          exit 1
+        }
+      fi
+      ;;
+    hosted_web_mode)
+      case "$normalized_value" in
+        ""|web-wizardry-site) ;;
+        *)
+          printf '%s\n' "forge-backend: hosted_web_mode must be blank or web-wizardry-site" >&2
+          exit 2
+          ;;
+      esac
+      ;;
+    hosted_web_site_name)
+      if [ -n "$normalized_value" ]; then
+        validate_site_name "$normalized_value"
+      fi
+      ;;
+    hosted_web_serve_script)
+      validate_workspace_relative_field "$workspace_abs" "$normalized_value" "hosted_web_serve_script" "file"
+      ;;
+    hosted_web_serve_action)
+      case "$normalized_value" in
+        ""|[A-Za-z0-9][A-Za-z0-9._:-]*) ;;
+        *)
+          printf '%s\n' "forge-backend: invalid hosted_web_serve_action '$normalized_value'" >&2
+          exit 2
+          ;;
+      esac
+      ;;
+    run_rebuild_command)
+      :
+      ;;
+  esac
+
+  write_key_value_file "$conf" "$key" "$normalized_value"
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf 'key=%s\n' "$key"
+  printf 'value=%s\n' "$normalized_value"
+}
+
 cmd_set_app_targets() {
   root=$(require_root "${1-}")
   slug=${2-}
@@ -4192,11 +4383,17 @@ case "$cmd" in
   import-workspace)
     cmd_import_workspace "${2-}" "${3-}" "${4-}"
     ;;
+  get-workspace-profile)
+    cmd_get_workspace_profile "${2-}" "${3-}"
+    ;;
   get-ui-prefs)
     cmd_get_ui_prefs "${2-}"
     ;;
   set-ui-pref)
     cmd_set_ui_pref "${2-}" "${3-}" "${4-}"
+    ;;
+  set-workspace-field)
+    cmd_set_workspace_field "${2-}" "${3-}" "${4-}" "${5-}"
     ;;
   set-app-targets)
     cmd_set_app_targets "${2-}" "${3-}" "${4-}"
