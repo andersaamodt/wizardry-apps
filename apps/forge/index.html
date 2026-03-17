@@ -5020,34 +5020,47 @@
 
         if (kind === 'build') {
           if (selected.context === 'godot') {
+            var godotBuild = await backend('rebuild-workspace', [selected.path, selected.context]);
+            var godotBuildOut = kv(godotBuild.stdout || '');
             setTargetRuntime(projectKey, nativeTarget, 'ready', selected.path || '');
             renderSelectedTargetsEditor(selectedCatalogItem());
             renderResult({
               status: 'ok',
-              summary: selected.title + ' is ready as a game project.',
-              paths: [{ label: 'Project folder', path: selected.path, canReveal: true }],
+              summary: godotBuildOut.status === 'ok'
+                ? selected.title + ' rebuild completed for the game workspace.'
+                : selected.title + ' is ready as a game project.',
+              paths: [
+                { label: 'Project folder', path: selected.path, canReveal: true },
+                godotBuildOut.log ? { label: 'Rebuild log', path: godotBuildOut.log, canReveal: true } : null
+              ].filter(Boolean),
               help: {
                 title: 'Game project build',
-                body: 'Game projects are built/exported in your external editor.\nUse Run to launch the game through Godot.'
+                body: godotBuildOut.status === 'ok'
+                  ? 'Forge ran the workspace rebuild command before launch.\nUse Run to launch the game through Godot.'
+                  : 'Game projects are built/exported in your external editor.\nUse Run to launch the game through Godot.'
               }
             });
             return;
           }
 
-          var run = await backend('run-workspace', [selected.path, selected.context]);
-          var runOut = kv(run.stdout || '');
-          setTargetRuntime(projectKey, nativeTarget, 'ready', runOut.entry || selected.path || '');
+          var rebuild = await backend('rebuild-workspace', [selected.path, selected.context]);
+          var rebuildOut = kv(rebuild.stdout || '');
+          setTargetRuntime(projectKey, nativeTarget, 'ready', rebuildOut.app_entry || selected.path || '');
           renderSelectedTargetsEditor(selectedCatalogItem());
           renderResult({
             status: 'ok',
-            summary: selected.title + ' is ready.',
+            summary: rebuildOut.status === 'ok'
+              ? selected.title + ' rebuild completed.'
+              : selected.title + ' is ready.',
             paths: [
-              runOut.entry ? { label: 'Project entry folder', path: runOut.entry, canReveal: true } : null,
-              runOut.log ? { label: 'Launch log', path: runOut.log, canReveal: true } : null
+              rebuildOut.app_entry ? { label: 'Project entry folder', path: rebuildOut.app_entry, canReveal: true } : null,
+              rebuildOut.log ? { label: 'Rebuild log', path: rebuildOut.log, canReveal: true } : null
             ].filter(Boolean),
             help: {
               title: 'Workspace projects',
-              body: 'Workspace projects use host/editor workflows.\nUse Run to launch/open them from Forge.'
+              body: rebuildOut.status === 'ok'
+                ? 'Forge ran the workspace rebuild command.\nUse Run to launch/open the rebuilt workspace from Forge.'
+                : 'Workspace projects use host/editor workflows.\nUse Run to launch/open them from Forge.'
             }
           });
           return;

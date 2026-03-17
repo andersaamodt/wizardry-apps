@@ -18,6 +18,7 @@ The GUI is organized around two primary use-cases:
 - Activity panel (top-right icon): artifacts and command logs
 - Theme picker (left footer): all bundled wizardry themes, persisted locally
 - Projects are external by default under `~/git`, and only folders with `wizardry.workspace.conf` are shown as managed workspaces.
+- Workspace `Run` now executes `run_rebuild_command` from `wizardry.workspace.conf` first when that field is set; use `run_rebuild_command=:` for workspaces that do not need a pre-run rebuild step.
 
 ## Backend
 

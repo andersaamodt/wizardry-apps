@@ -31,6 +31,7 @@ Commands:
   build-desktop [ROOT_HINT] APP_SLUG
   install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID]
   run-desktop [ROOT_HINT] APP_SLUG
+  rebuild-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
   run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
   serve-hosted-web [ROOT_HINT] MODE REF
   stage-mobile [ROOT_HINT] APP_SLUG
@@ -919,6 +920,57 @@ workspace_field() {
   else
     printf '%s\n' "$fallback"
   fi
+}
+
+workspace_rebuild_command() {
+  conf=${1-}
+  command=$(workspace_field "$conf" run_rebuild_command "")
+  if [ -n "$command" ]; then
+    printf '%s\n' "$command"
+    return 0
+  fi
+  printf '%s\n' "$(workspace_field "$conf" rebuild_command "")"
+}
+
+run_workspace_rebuild() {
+  root=$1
+  workspace_path=$2
+  workspace_conf=$3
+
+  rebuild_command=$(workspace_rebuild_command "$workspace_conf")
+  if [ -z "$rebuild_command" ]; then
+    printf 'status=noop\n'
+    printf 'mode=none\n'
+    return 0
+  fi
+
+  case "$rebuild_command" in
+    :|true)
+      printf 'status=noop\n'
+      printf 'mode=command-noop\n'
+      printf 'command=%s\n' "$rebuild_command"
+      return 0
+      ;;
+  esac
+
+  workspace_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
+  log_dir="$root/_tmp/workbench/log"
+  mkdir -p "$log_dir"
+  log_path="$log_dir/workspace-$workspace_slug-rebuild.log"
+
+  if (
+    cd "$workspace_path"
+    env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" sh -lc "$rebuild_command"
+  ) >"$log_path" 2>&1; then
+    printf 'status=ok\n'
+    printf 'mode=command\n'
+    printf 'command=%s\n' "$rebuild_command"
+    printf 'log=%s\n' "$log_path"
+    return 0
+  fi
+
+  printf '%s\n' "forge-backend: workspace rebuild failed (see log: $log_path)" >&2
+  exit 1
 }
 
 config_field() {
@@ -1898,6 +1950,9 @@ ensure_importable_workspace_profile() {
         fi
       fi
     fi
+    if [ -z "$(workspace_rebuild_command "$conf_path")" ]; then
+      write_key_value_file "$conf_path" run_rebuild_command ":"
+    fi
     printf '%s\t%s\n' "$conf_path" "0"
     return 0
   fi
@@ -1949,6 +2004,7 @@ CONF
   if [ -n "$app_subpath" ] && [ "$app_subpath" != "." ]; then
     printf 'app_subpath=%s\n' "$app_subpath" >>"$conf_path"
   fi
+  printf 'run_rebuild_command=%s\n' ":" >>"$conf_path"
 
   printf '%s\t%s\n' "$conf_path" "1"
 }
@@ -2871,6 +2927,40 @@ cmd_run_desktop() {
   printf 'log=%s\n' "$log_path"
 }
 
+cmd_rebuild_workspace() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  context_hint=${3-}
+
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: rebuild-workspace requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -d "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+
+  workspace_path=$(CDPATH= cd -- "$workspace_path" && pwd -P)
+  workspace_conf="$workspace_path/wizardry.workspace.conf"
+  [ -f "$workspace_conf" ] || {
+    printf '%s\n' "forge-backend: workspace is missing wizardry.workspace.conf: $workspace_path" >&2
+    exit 1
+  }
+
+  context=$context_hint
+  if [ -z "$context" ]; then
+    context=$(workspace_field "$workspace_conf" development_context "")
+  fi
+  [ -n "$context" ] || context=web
+
+  rebuild_out=$(run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf")
+  printf '%s\n' "$rebuild_out"
+  printf 'workspace=%s\n' "$workspace_path"
+  printf 'context=%s\n' "$context"
+  printf 'app_entry=%s\n' "$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path")"
+}
+
 cmd_run_workspace() {
   root=$(require_root "${1-}")
   workspace_path=${2-}
@@ -2890,6 +2980,13 @@ cmd_run_workspace() {
     context=$(workspace_field "$workspace_path/wizardry.workspace.conf" development_context "")
   fi
   [ -n "$context" ] || context=web
+
+  workspace_conf="$workspace_path/wizardry.workspace.conf"
+  [ -f "$workspace_conf" ] || {
+    printf '%s\n' "forge-backend: workspace is missing wizardry.workspace.conf: $workspace_path" >&2
+    exit 1
+  }
+  run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
 
   case "$context" in
     godot)
@@ -2945,7 +3042,6 @@ cmd_run_workspace() {
       ;;
   esac
 
-  workspace_conf="$workspace_path/wizardry.workspace.conf"
   if ! app_dir=$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null); then
     printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
     exit 1
@@ -3250,6 +3346,11 @@ cmd_serve_hosted_web() {
       workspace_path=$(CDPATH= cd -- "$workspace_path" && pwd -P)
       workspace_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
       workspace_conf="$workspace_path/wizardry.workspace.conf"
+      [ -f "$workspace_conf" ] || {
+        printf '%s\n' "forge-backend: workspace is missing wizardry.workspace.conf: $workspace_path" >&2
+        exit 1
+      }
+      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
       workspace_hosted_web_mode=$(workspace_field "$workspace_conf" hosted_web_mode "")
       case "$workspace_hosted_web_mode" in
         "")
@@ -3924,6 +4025,7 @@ project_type=$project_type
 development_context=$development_context
 starter=$starter
 targets=$targets
+run_rebuild_command=:
 source=${source-}
 root=$workspace_dir
 CONF
@@ -4128,6 +4230,9 @@ case "$cmd" in
     ;;
   run-desktop)
     cmd_run_desktop "${2-}" "${3-}"
+    ;;
+  rebuild-workspace)
+    cmd_rebuild_workspace "${2-}" "${3-}" "${4-}"
     ;;
   install-desktop)
     cmd_install_desktop "${2-}" "${3-}" "${4-}"
