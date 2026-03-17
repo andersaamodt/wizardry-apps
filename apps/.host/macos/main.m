@@ -31,7 +31,7 @@
 @property (assign) BOOL nativeFileDragActive;
 @end
 
-@interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler, NSWindowDelegate, WKUIDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler, NSWindowDelegate, WKUIDelegate, WKNavigationDelegate>
 @property (strong) NSWindow *window;
 @property (strong) WKWebView *webView;
 @property (strong) NSMutableArray<NSWindow *> *auxWindows;
@@ -156,6 +156,18 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
 @end
 
 @implementation AppDelegate
+
+- (void)dismissNativeBootSplashIfNeededForWebView:(WKWebView *)webView {
+    if (!self.enableNativeBootSplash) {
+        return;
+    }
+    if (webView != self.webView) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self hideNativeBootSplash];
+    });
+}
 
 - (NSString *)desktopBridgeBootstrapSource {
     return @"(function () {"
@@ -1308,6 +1320,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
     }
     self.webView.UIDelegate = self;
+    self.webView.navigationDelegate = self;
     @try {
         // Avoid white intermediate paint by letting the themed host window color
         // show through until page styles apply.
@@ -1491,6 +1504,23 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             [self.window makeFirstResponder:self.webView];
         }
     });
+}
+
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+    (void)navigation;
+    [self dismissNativeBootSplashIfNeededForWebView:webView];
+}
+
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    (void)navigation;
+    NSLog(@"WebView navigation failed: %@", error);
+    [self dismissNativeBootSplashIfNeededForWebView:webView];
+}
+
+- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    (void)navigation;
+    NSLog(@"WebView provisional navigation failed: %@", error);
+    [self dismissNativeBootSplashIfNeededForWebView:webView];
 }
 
 - (void)userContentController:(WKUserContentController *)userContentController
