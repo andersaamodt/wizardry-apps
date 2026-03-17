@@ -660,6 +660,8 @@ BLOG_FOOTER
   info "Setting file permissions..."
   find "$SITE_DIR/build" -type d -exec chmod 755 {} \; 2>/dev/null || true
   find "$SITE_DIR/build" -type f -exec chmod 644 {} \; 2>/dev/null || true
+  date -u +%Y-%m-%dT%H:%M:%SZ > "$SITE_DIR/build/.wizardry-build-stamp"
+  chmod 644 "$SITE_DIR/build/.wizardry-build-stamp" 2>/dev/null || true
 
   success "Built $built_count pages for $site_name"
   info "Build output: $SITE_DIR/build/"
