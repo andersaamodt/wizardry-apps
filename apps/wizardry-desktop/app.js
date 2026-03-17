@@ -15,13 +15,16 @@
     categories: [],
     customRootSpells: [],
     castEntries: [],
+    spellActivity: [],
     arcana: [],
     synonyms: [],
     players: [],
     mudStatus: {},
     spellCache: {},
     navRows: [],
-    toastTimer: null
+    toastTimer: null,
+    spellActivityTimer: null,
+    spellActivityBusy: false
   };
 
   var els = {};
@@ -58,6 +61,21 @@
   function parseTsv(blob) {
     return String(blob || '').trim().split('\n').filter(Boolean).map(function (line) {
       return line.split('\t');
+    });
+  }
+
+  function parseSpellActivity(blob) {
+    return parseTsv(blob).map(function (row) {
+      return {
+        kind: row[0] || '',
+        app: row[1] || 'external',
+        pid: row[2] || '',
+        ppid: row[3] || '',
+        elapsed: row[4] || '',
+        target: row[5] || '',
+        path: row[6] || '',
+        command: row[7] || ''
+      };
     });
   }
 
@@ -230,6 +248,7 @@
       backend('list-categories', [], { quiet: true }),
       backend('list-custom-root-spells', [], { quiet: true }),
       backend('list-cast', [], { quiet: true }),
+      backend('list-spell-activity', [], { quiet: true }),
       backend('list-arcana', [], { quiet: true }),
       backend('list-synonyms', [], { quiet: true }),
       backend('list-players', [], { quiet: true }),
@@ -254,16 +273,17 @@
     state.castEntries = parseTsv(String(responses[4].stdout || '')).map(function (row) {
       return { alias: row[0], command: row[1] };
     });
-    state.arcana = parseTsv(String(responses[5].stdout || '')).map(function (row) {
+    state.spellActivity = parseSpellActivity(String(responses[5].stdout || ''));
+    state.arcana = parseTsv(String(responses[6].stdout || '')).map(function (row) {
       return { name: row[0], status: row[1], description: row[2] };
     });
-    state.synonyms = parseTsv(String(responses[6].stdout || '')).map(function (row) {
+    state.synonyms = parseTsv(String(responses[7].stdout || '')).map(function (row) {
       return { word: row[0], target: row[1], origin: row[2] };
     });
-    state.players = parseTsv(String(responses[7].stdout || '')).map(function (row) {
+    state.players = parseTsv(String(responses[8].stdout || '')).map(function (row) {
       return { name: row[0], active: row[1] === '1', path: row[2] };
     });
-    state.mudStatus = parseKv(String(responses[8].stdout || ''));
+    state.mudStatus = parseKv(String(responses[9].stdout || ''));
     state.spellCache = {};
     if (els.doctorOutput) {
       els.doctorOutput.textContent = state.doctor.trim() || 'No backend output.';
@@ -283,6 +303,7 @@
   function buildNavRows() {
     var guided = [
       { id: 'home', label: 'Main Menu', meta: 'Main menu map', group: 'Guided Panels' },
+      { id: 'spell-activity', label: 'Casting Watch', meta: String(state.spellActivity.length || 0), group: 'Guided Panels' },
       { id: 'cast', label: 'Cast', meta: String(state.castEntries.length || 0), group: 'Guided Panels' },
       { id: 'spellbook', label: 'Spellbook', meta: String(state.synonyms.length || 0), group: 'Guided Panels' },
       { id: 'arcana', label: 'Arcana', meta: String(state.arcana.length || 0), group: 'Guided Panels' },
@@ -322,6 +343,13 @@
         eyebrow: 'Cast',
         title: 'Memorized Spells',
         subtitle: 'Your cast menu, without needing to reopen the terminal menu loop.'
+      };
+    }
+    if (pageId === 'spell-activity') {
+      return {
+        eyebrow: 'Live Monitor',
+        title: 'Casting Watch',
+        subtitle: 'Watch running Wizardry spells and app backends, with source app attribution inferred from the standard backend and host paths.'
       };
     }
     if (pageId === 'spellbook') {
@@ -496,6 +524,93 @@
     await requestRender();
   }
 
+  async function loadSpellActivity() {
+    var result = await backend('list-spell-activity', [], { quiet: true });
+    state.spellActivity = parseSpellActivity(String(result.stdout || ''));
+  }
+
+  function countSpellActivity(kindPrefix) {
+    return state.spellActivity.filter(function (item) {
+      return String(item.kind || '').indexOf(kindPrefix) === 0;
+    }).length;
+  }
+
+  function countDistinctActivityApps() {
+    var seen = {};
+    state.spellActivity.forEach(function (item) {
+      var name = item.app || 'external';
+      seen[name] = true;
+    });
+    return Object.keys(seen).length;
+  }
+
+  function activityKindLabel(kind) {
+    if (kind === 'builtin-spell') {
+      return 'Built-in spell';
+    }
+    if (kind === 'home-spell') {
+      return 'Home spell';
+    }
+    if (kind === 'app-backend') {
+      return 'App backend';
+    }
+    return 'Activity';
+  }
+
+  function renderSpellActivity() {
+    var spellCount = countSpellActivity('builtin') + countSpellActivity('home');
+    var backendCount = state.spellActivity.filter(function (item) { return item.kind === 'app-backend'; }).length;
+    var appCount = countDistinctActivityApps();
+    var html = '';
+    html += '<section class="hero">';
+    html += '<div class="card-copy"><h3>Live Spell Monitor</h3><p class="subtle-copy">This watches the current process table. Built-in spells show up when the running command resolves into `' + escHtml(state.doctorKv.wizardry_dir || '~/.wizardry') + '/spells` or `~/spells`; app-backend rows show the standard app-internal analogue path.</p></div>';
+    html += '<div class="stat-grid">';
+    html += '<div class="stat-card"><strong>' + escHtml(String(spellCount)) + '</strong><span>Active spells</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(String(backendCount)) + '</strong><span>App backends</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(String(appCount)) + '</strong><span>Apps represented</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(String(state.spellActivity.length)) + '</strong><span>Total rows</span></div>';
+    html += '</div>';
+    html += '<div class="button-row"><button id="refresh-spell-activity-btn" class="action-btn" type="button">Refresh now</button><span class="pill">Auto refresh: 2.2s while visible</span></div>';
+    html += '</section>';
+
+    html += '<section class="card list-card"><div class="list-head"><h3>Active Casting And App Commands</h3><p class="subtle-copy">Rows are live process snapshots. If a wizardry app only uses its own backend analogue, you will see the backend row but not a spell row.</p></div><div class="list-body">';
+    if (!state.spellActivity.length) {
+      html += '<div class="list-row"><p class="empty-state">No active Wizardry spells or app backends were detected in the current process table.</p></div>';
+    } else {
+      state.spellActivity.forEach(function (item) {
+        var subtitle = (item.app || 'external') + ' • ' + (item.elapsed || 'now');
+        if (item.path) {
+          subtitle += ' • ' + item.path;
+        }
+        if (item.command) {
+          subtitle += ' • ' + item.command;
+        }
+        html += '<div class="list-row"><div class="row-copy"><span class="row-title">' + escHtml(item.target || item.command || item.kind) + '</span><span class="row-subtitle">' + escHtml(subtitle) + '</span></div><div class="row-actions"><span class="pill">' + escHtml(activityKindLabel(item.kind)) + '</span><span class="pill">pid ' + escHtml(item.pid || '?') + '</span></div></div>';
+      });
+    }
+    html += '</div></section>';
+    return html;
+  }
+
+  function syncSpellActivityMonitor() {
+    if (state.spellActivityTimer) {
+      window.clearInterval(state.spellActivityTimer);
+      state.spellActivityTimer = null;
+    }
+    if (state.activePage !== 'spell-activity') {
+      return;
+    }
+    state.spellActivityTimer = window.setInterval(function () {
+      if (document.hidden || state.spellActivityBusy) {
+        return;
+      }
+      state.spellActivityBusy = true;
+      requestRender().finally(function () {
+        state.spellActivityBusy = false;
+      });
+    }, 2200);
+  }
+
   function renderHome() {
     var hero = '';
     hero += '<section class="hero">';
@@ -507,6 +622,7 @@
     hero += '<div class="stat-card"><strong>' + escHtml(state.doctorKv.arcana_count || '0') + '</strong><span>Arcana entries</span></div>';
     hero += '</div>';
     hero += '<div class="card-grid">';
+    hero += quickCard('Casting Watch', 'See live spell processes and app-backend analogues as they run.', 'spell-activity');
     hero += quickCard('Cast', 'Launch your memorized commands without reopening the terminal menu.', 'cast');
     hero += quickCard('Spellbook', 'Scribe, categorize, and alias commands through GUI forms.', 'spellbook');
     hero += quickCard('Arcana', 'Browse the same installable add-ons the install menu exposes.', 'arcana');
@@ -772,6 +888,24 @@
     });
   }
 
+  function bindSpellActivityPageEvents() {
+    var refreshBtn = document.getElementById('refresh-spell-activity-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async function () {
+        try {
+          state.spellActivityBusy = true;
+          await loadSpellActivity();
+          await render();
+          toast('Casting watch refreshed');
+        } catch (error) {
+          toast(error.message || 'Refresh failed');
+        } finally {
+          state.spellActivityBusy = false;
+        }
+      });
+    }
+  }
+
   function bindSpellbookPageEvents() {
     var createBtn = document.getElementById('create-category-btn');
     if (createBtn) {
@@ -1025,6 +1159,10 @@
     var html = '';
     if (state.activePage === 'home') {
       html = renderHome();
+    } else if (state.activePage === 'spell-activity') {
+      setBootStatus('Scanning live spell activity…');
+      await loadSpellActivity();
+      html = renderSpellActivity();
     } else if (state.activePage === 'cast') {
       html = renderCast();
     } else if (state.activePage === 'spellbook') {
@@ -1042,7 +1180,9 @@
     }
     els.pageContent.innerHTML = html;
     bindCommonPageEvents();
-    if (state.activePage === 'spellbook') {
+    if (state.activePage === 'spell-activity') {
+      bindSpellActivityPageEvents();
+    } else if (state.activePage === 'spellbook') {
       bindSpellbookPageEvents();
     } else if (state.activePage === 'computer') {
       bindComputerPageEvents();
@@ -1051,6 +1191,7 @@
     } else if (state.activePage === 'arcana') {
       bindArcanaPageEvents();
     }
+    syncSpellActivityMonitor();
     setBootStatus('Ready.');
   }
 
@@ -1133,6 +1274,14 @@
           state.drawerOpen = false;
           syncDrawer();
         }
+      }
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && state.activePage === 'spell-activity' && !state.spellActivityBusy) {
+        state.spellActivityBusy = true;
+        requestRender().finally(function () {
+          state.spellActivityBusy = false;
+        });
       }
     });
   }

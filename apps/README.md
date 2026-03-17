@@ -206,7 +206,7 @@ See `apps/menu-app/` for a simple example demonstrating:
 ### chatroom
 
 See `apps/chatroom/` for a real-world example demonstrating:
-- Thin wrapper around existing web demo (reuses `.templates/demo/pages/chat.md`)
+- App-owned copy of the chat demo page and stylesheet, synced into the local demo site build so the app keeps the same CGI/SSE behavior without treating the demo page as its source
 - Integration with CGI scripts for backend communication
 - Server-Sent Events (SSE) for real-time updates
 - **Standalone operation - no terminal required!**

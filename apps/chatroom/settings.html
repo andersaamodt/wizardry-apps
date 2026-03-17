@@ -234,7 +234,7 @@
     
     const MODE_KEY = 'mode';
     const CHAT_URL_KEY = 'chat_url';
-    const chatPath = '/pages/chat.html';
+    const chatPath = '/pages/chatroom-app.html';
     
     let serverRunning = false;
     let serverPort = '';
@@ -406,7 +406,7 @@
         const rawPort = String(out.port || '').trim();
         const rawUrl = String(out.chat_url || '').trim();
         serverPort = /^[0-9]+$/.test(rawPort) ? rawPort : '';
-        if (/^https?:\/\/[^ ]+\/pages\/chat\.html$/.test(rawUrl)) {
+        if (/^https?:\/\/[^ ]+\/pages\/(?:chat|chatroom-app)\.html$/.test(rawUrl)) {
           await saveChatUrl(rawUrl);
         }
       } catch (_err) {

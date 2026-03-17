@@ -15,6 +15,7 @@ Commands:
   list-spells KIND ID
   list-arcana
   list-cast
+  list-spell-activity
   list-synonyms
   list-players
   mud-status
@@ -89,6 +90,36 @@ export PATH
 
 spellbook_dir() {
   printf '%s\n' "${SPELLBOOK_DIR:-$HOME/.spellbook}"
+}
+
+spell_activity_catalog() {
+  target=${1-}
+  [ -n "$target" ] || return 1
+  : >"$target"
+
+  if [ -d "$WIZARDRY_DIR/spells" ]; then
+    for dir in "$WIZARDRY_DIR"/spells/*; do
+      [ -d "$dir" ] || continue
+      case "$(basename "$dir")" in
+        .*)
+          continue
+          ;;
+      esac
+      for spell in "$dir"/*; do
+        [ -f "$spell" ] || continue
+        [ -x "$spell" ] || continue
+        printf 'builtin-spell\t%s\t%s\n' "$(basename "$spell")" "$spell" >>"$target"
+      done
+    done
+  fi
+
+  if [ -d "$HOME/spells" ]; then
+    for spell in "$HOME"/spells/* "$HOME"/spells/*/*; do
+      [ -f "$spell" ] || continue
+      [ -x "$spell" ] || continue
+      printf 'home-spell\t%s\t%s\n' "$(basename "$spell")" "$spell" >>"$target"
+    done
+  fi
 }
 
 ui_prefs_file() {
@@ -777,6 +808,185 @@ list_cast() {
 
 cmd_list_cast() {
   list_cast
+}
+
+cmd_list_spell_activity() {
+  catalog=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-activity.XXXXXX")
+  trap 'rm -f "$catalog"' EXIT HUP INT TERM
+  spell_activity_catalog "$catalog"
+  tab=$(printf '\t')
+  ps -eo pid=,ppid=,etime=,command= 2>/dev/null \
+    | awk -v catalog="$catalog" -v self_pid="$$" -v builtin_root="$WIZARDRY_DIR/spells" -v home_root="$HOME/spells" '
+function first_token(text, parts, count) {
+  count = split(text, parts, /[[:space:]]+/)
+  return parts[1]
+}
+function second_token(text, parts, count) {
+  count = split(text, parts, /[[:space:]]+/)
+  return count >= 2 ? parts[2] : ""
+}
+function trim_token(text) {
+  gsub(/^[[:space:]]+/, "", text)
+  gsub(/[[:space:]]+$/, "", text)
+  gsub(/^["'"'"'"'"'"'"'"'"']+/, "", text)
+  gsub(/["'"'"'"'"'"'"'"'"']+$/, "", text)
+  return text
+}
+function basename_path(path, parts, count) {
+  count = split(path, parts, "/")
+  return count ? parts[count] : path
+}
+function slug_from_apps_path(text, idx, rest, end_idx) {
+  idx = index(text, "/apps/")
+  if (!idx) {
+    return ""
+  }
+  rest = substr(text, idx + 6)
+  end_idx = index(rest, "/scripts/")
+  if (!end_idx) {
+    return ""
+  }
+  return substr(rest, 1, end_idx - 1)
+}
+function slug_from_marker(text, marker, idx, rest, slug, i, ch) {
+  idx = index(text, marker)
+  if (!idx) {
+    return ""
+  }
+  rest = substr(text, idx + length(marker))
+  slug = ""
+  for (i = 1; i <= length(rest); i += 1) {
+    ch = substr(rest, i, 1)
+    if (ch == "/" || ch == " " || ch == "\t") {
+      break
+    }
+    slug = slug ch
+  }
+  return slug
+}
+function slug_from_host_path(text, slug) {
+  slug = slug_from_marker(text, "/Resources/")
+  if (slug != "") {
+    return slug
+  }
+  return slug_from_marker(text, "/usr/share/")
+}
+function infer_app(pid, cur, depth, cmd, slug) {
+  cur = pid
+  depth = 0
+  while (cur != "" && cur != "0" && depth < 16) {
+    cmd = proc_cmd[cur]
+    slug = slug_from_apps_path(cmd)
+    if (slug != "") {
+      return slug
+    }
+    slug = slug_from_host_path(cmd)
+    if (slug != "") {
+      return slug
+    }
+    cur = proc_ppid[cur]
+    depth += 1
+  }
+  return "external"
+}
+function spell_kind_for_command(cmd, token1, token2) {
+  if (slug_from_apps_path(cmd) != "") {
+    return "app-backend"
+  }
+  token1 = trim_token(first_token(cmd))
+  token2 = trim_token(second_token(cmd))
+  if (token1 in catalog_kind) {
+    return catalog_kind[token1]
+  }
+  if (token2 in catalog_kind) {
+    return catalog_kind[token2]
+  }
+  if (index(token1, builtin_root "/") == 1 || index(token2, builtin_root "/") == 1) {
+    return "builtin-spell"
+  }
+  if (index(token1, home_root "/") == 1 || index(token2, home_root "/") == 1) {
+    return "home-spell"
+  }
+  return ""
+}
+function spell_path_for_command(cmd, kind, token1, token2) {
+  token1 = trim_token(first_token(cmd))
+  token2 = trim_token(second_token(cmd))
+  if (kind == "app-backend") {
+    return token2
+  }
+  if (token1 in catalog_path) {
+    return catalog_path[token1]
+  }
+  if (token2 in catalog_path) {
+    return catalog_path[token2]
+  }
+  if (index(token1, builtin_root "/") == 1 || index(token1, home_root "/") == 1) {
+    return token1
+  }
+  if (index(token2, builtin_root "/") == 1 || index(token2, home_root "/") == 1) {
+    return token2
+  }
+  return ""
+}
+function target_for_command(cmd, kind, path, token1, token2) {
+  token1 = trim_token(first_token(cmd))
+  token2 = trim_token(second_token(cmd))
+  if (kind == "app-backend") {
+    return basename_path(path != "" ? path : token2)
+  }
+  if (token1 in catalog_kind) {
+    return token1
+  }
+  if (token2 in catalog_kind) {
+    return token2
+  }
+  if (path != "") {
+    return basename_path(path)
+  }
+  return token1
+}
+BEGIN {
+  while ((getline line < catalog) > 0) {
+    split(line, cols, "\t")
+    if (cols[2] == "") {
+      continue
+    }
+    if (!(cols[2] in catalog_kind)) {
+      catalog_kind[cols[2]] = cols[1]
+      catalog_path[cols[2]] = cols[3]
+    }
+  }
+  close(catalog)
+}
+{
+  pid = $1
+  ppid = $2
+  elapsed = $3
+  cmd = $0
+  sub(/^[[:space:]]*[0-9]+[[:space:]]+[0-9]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "", cmd)
+  proc_ppid[pid] = ppid
+  proc_etime[pid] = elapsed
+  proc_cmd[pid] = cmd
+}
+END {
+  for (pid in proc_cmd) {
+    if (pid == self_pid) {
+      continue
+    }
+    kind = spell_kind_for_command(proc_cmd[pid])
+    if (kind == "") {
+      continue
+    }
+    path = spell_path_for_command(proc_cmd[pid], kind)
+    target = target_for_command(proc_cmd[pid], kind, path)
+    app = infer_app(pid)
+    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", kind, app, pid, proc_ppid[pid], proc_etime[pid], target, path, proc_cmd[pid]
+  }
+}
+' | sort -t "$tab" -k2,2 -k1,1 -k6,6
+  rm -f "$catalog"
+  trap - EXIT HUP INT TERM
 }
 
 cmd_list_synonyms() {
@@ -1506,6 +1716,7 @@ case "$cmd" in
   list-spells) cmd_list_spells "$@" ;;
   list-arcana) cmd_list_arcana "$@" ;;
   list-cast) cmd_list_cast "$@" ;;
+  list-spell-activity) cmd_list_spell_activity "$@" ;;
   list-synonyms) cmd_list_synonyms "$@" ;;
   list-players) cmd_list_players "$@" ;;
   mud-status) cmd_mud_status "$@" ;;

@@ -32,6 +32,7 @@ grep -F 'id="settings-modal"' "$app_dir/index.html" >/dev/null
 grep -F 'wizardry-bridge.js' "$app_dir/index.html" >/dev/null
 
 grep -F "function renderSpellbook()" "$app_dir/app.js" >/dev/null
+grep -F "function renderSpellActivity()" "$app_dir/app.js" >/dev/null
 grep -F "function renderComputer()" "$app_dir/app.js" >/dev/null
 grep -F "function renderMud()" "$app_dir/app.js" >/dev/null
 grep -F "function renderCategory(pageId)" "$app_dir/app.js" >/dev/null
@@ -52,8 +53,40 @@ printf '%s\n' "$doctor_out" | grep -F "spell_count=" >/dev/null
 categories_out=$("$backend" list-categories)
 printf '%s\n' "$categories_out" | grep -F "$(printf 'builtin\t')" >/dev/null
 
+activity_out=$("$backend" list-spell-activity)
+[ -n "${activity_out-}" ] || true
+
 mud_out=$("$backend" mud-status)
 printf '%s\n' "$mud_out" | grep -F "portal_location=" >/dev/null
 printf '%s\n' "$mud_out" | grep -F "parse_enabled=" >/dev/null
+
+tmp_home=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-desktop-activity-home.XXXXXX")
+cleanup() {
+  if [ -n "${spell_pid-}" ]; then
+    kill "$spell_pid" >/dev/null 2>&1 || true
+    wait "$spell_pid" >/dev/null 2>&1 || true
+  fi
+  rm -rf "$tmp_home"
+}
+trap cleanup EXIT INT TERM
+
+mkdir -p "$tmp_home/spells"
+cat > "$tmp_home/spells/slow-activity-spell" <<'EOF'
+#!/bin/sh
+sleep 3
+EOF
+chmod +x "$tmp_home/spells/slow-activity-spell"
+
+"$tmp_home/spells/slow-activity-spell" &
+spell_pid=$!
+sleep 0.3
+
+activity_probe=$(HOME="$tmp_home" WIZARDRY_DIR="$HOME/.wizardry" "$backend" list-spell-activity)
+printf '%s\n' "$activity_probe" | grep -F "home-spell" >/dev/null
+printf '%s\n' "$activity_probe" | grep -F "slow-activity-spell" >/dev/null
+
+kill "$spell_pid" >/dev/null 2>&1 || true
+wait "$spell_pid" >/dev/null 2>&1 || true
+spell_pid=
 
 printf '%s\n' "wizardry desktop contract tests passed"

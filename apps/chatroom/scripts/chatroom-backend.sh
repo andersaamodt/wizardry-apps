@@ -19,6 +19,9 @@ esac
 
 set -eu
 
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
+
 config_file() {
   base="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/chatroom"
   mkdir -p "$base"
@@ -65,7 +68,7 @@ read_demo_port() {
 
 default_chat_url() {
   port=$(read_demo_port) || return 1
-  printf 'http://localhost:%s/pages/chat.html\n' "$port"
+  printf 'http://localhost:%s/pages/chatroom-app.html\n' "$port"
 }
 
 find_chat_template() {
@@ -79,6 +82,46 @@ find_chat_template() {
   fi
   if [ -f "$HOME/git/wizardry-apps/web/demo/pages/chat.md" ]; then
     printf '%s\n' "$HOME/git/wizardry-apps/web/demo/pages/chat.md"
+    return 0
+  fi
+  return 1
+}
+
+find_chatroom_app_page() {
+  if [ -f "$APP_DIR/chat.md" ]; then
+    printf '%s\n' "$APP_DIR/chat.md"
+    return 0
+  fi
+  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -f "$WIZARDRY_APPS_ROOT/apps/chatroom/chat.md" ]; then
+    printf '%s\n' "$WIZARDRY_APPS_ROOT/apps/chatroom/chat.md"
+    return 0
+  fi
+  if [ -n "${WIZARDRY_DIR-}" ] && [ -f "$WIZARDRY_DIR/apps/chatroom/chat.md" ]; then
+    printf '%s\n' "$WIZARDRY_DIR/apps/chatroom/chat.md"
+    return 0
+  fi
+  if [ -f "$HOME/git/wizardry-apps/apps/chatroom/chat.md" ]; then
+    printf '%s\n' "$HOME/git/wizardry-apps/apps/chatroom/chat.md"
+    return 0
+  fi
+  return 1
+}
+
+find_chatroom_app_style() {
+  if [ -f "$APP_DIR/chatroom.css" ]; then
+    printf '%s\n' "$APP_DIR/chatroom.css"
+    return 0
+  fi
+  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -f "$WIZARDRY_APPS_ROOT/apps/chatroom/chatroom.css" ]; then
+    printf '%s\n' "$WIZARDRY_APPS_ROOT/apps/chatroom/chatroom.css"
+    return 0
+  fi
+  if [ -n "${WIZARDRY_DIR-}" ] && [ -f "$WIZARDRY_DIR/apps/chatroom/chatroom.css" ]; then
+    printf '%s\n' "$WIZARDRY_DIR/apps/chatroom/chatroom.css"
+    return 0
+  fi
+  if [ -f "$HOME/git/wizardry-apps/apps/chatroom/chatroom.css" ]; then
+    printf '%s\n' "$HOME/git/wizardry-apps/apps/chatroom/chatroom.css"
     return 0
   fi
   return 1
@@ -101,6 +144,31 @@ ensure_demo_chat_page() {
   }
   mkdir -p "$(dirname "$target")"
   cp "$src" "$target"
+}
+
+sync_chatroom_app_assets() {
+  page_src=$(find_chatroom_app_page) || {
+    printf '%s\n' "chatroom-backend: app chat page missing (expected apps/chatroom/chat.md)" >&2
+    exit 1
+  }
+  style_src=$(find_chatroom_app_style) || {
+    printf '%s\n' "chatroom-backend: app chat stylesheet missing (expected apps/chatroom/chatroom.css)" >&2
+    exit 1
+  }
+
+  page_target="$HOME/sites/demo/site/pages/chatroom-app.md"
+  style_target="$HOME/sites/demo/site/static/chatroom.css"
+
+  mkdir -p "$(dirname "$page_target")" "$(dirname "$style_target")"
+  cp "$page_src" "$page_target"
+  cp "$style_src" "$style_target"
+}
+
+prepare_chatroom_app() {
+  ensure_demo_site
+  ensure_demo_chat_page
+  sync_chatroom_app_assets
+  ensure_demo_built
 }
 
 ensure_demo_built() {
@@ -210,7 +278,8 @@ case "$action" in
     port=''
     url=''
     if port=$(read_demo_port 2>/dev/null); then
-      url="http://localhost:$port/pages/chat.html"
+      prepare_chatroom_app
+      url="http://localhost:$port/pages/chatroom-app.html"
     fi
     printf 'port=%s\n' "$port"
     printf 'chat_url=%s\n' "$url"
@@ -223,7 +292,10 @@ case "$action" in
     status='stopped'
 
     if port=$(read_demo_port 2>/dev/null); then
-      default_url="http://localhost:$port/pages/chat.html"
+      default_url="http://localhost:$port/pages/chatroom-app.html"
+      if [ -z "$requested" ]; then
+        prepare_chatroom_app
+      fi
     fi
 
     if [ -n "$requested" ] && is_http_url "$requested"; then
@@ -241,9 +313,7 @@ case "$action" in
     printf 'chat_url=%s\n' "$url"
     ;;
   start-server)
-    ensure_demo_site
-    ensure_demo_chat_page
-    ensure_demo_built
+    prepare_chatroom_app
     serve_demo_site || {
       printf '%s\n' "chatroom-backend: failed to start demo site" >&2
       exit 1
@@ -251,7 +321,7 @@ case "$action" in
     port=''
     url=''
     if port=$(read_demo_port 2>/dev/null); then
-      url="http://localhost:$port/pages/chat.html"
+      url="http://localhost:$port/pages/chatroom-app.html"
     fi
     printf 'status=running\n'
     printf 'port=%s\n' "$port"

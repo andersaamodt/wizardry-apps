@@ -178,7 +178,7 @@
         const text = await backendExec('get-ui-prefs');
         const prefs = parseKeyValue(text);
         const value = String(prefs[CHAT_URL_KEY] || '').trim();
-        chatUrlCache = /^https?:\/\/[^ ]+\/pages\/chat\.html$/.test(value) ? value : '';
+        chatUrlCache = /^https?:\/\/[^ ]+\/pages\/(?:chat|chatroom-app)\.html$/.test(value) ? value : '';
       } catch (_err) {
         chatUrlCache = '';
       }
@@ -193,7 +193,7 @@
         const text = await backendExec('get-chat-endpoint');
         const out = parseKeyValue(text);
         const value = String(out.chat_url || '').trim();
-        return /^https?:\/\/[^ ]+\/pages\/chat\.html$/.test(value) ? value : '';
+        return /^https?:\/\/[^ ]+\/pages\/(?:chat|chatroom-app)\.html$/.test(value) ? value : '';
       } catch (_err) {
         return '';
       }
