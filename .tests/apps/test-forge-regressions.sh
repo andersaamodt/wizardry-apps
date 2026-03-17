@@ -110,6 +110,35 @@ starter=import-web
 CONF
 }
 
+kill_test_workbench_hosts() {
+  workbench_root=$1
+  command -v ps >/dev/null 2>&1 || return 0
+  pids=$(
+    ps -axo pid=,command= 2>/dev/null \
+      | awk -v root="$workbench_root" '
+          index($0, root) > 0 && index($0, "wizardry-host") > 0 { print $1 }
+        ' \
+      | tr '\n' ' ' \
+      | sed 's/[[:space:]]*$//'
+  )
+  [ -n "$pids" ] || return 0
+  # shellcheck disable=SC2086
+  kill $pids >/dev/null 2>&1 || true
+  sleep 0.2
+  still=$(
+    ps -axo pid=,command= 2>/dev/null \
+      | awk -v root="$workbench_root" '
+          index($0, root) > 0 && index($0, "wizardry-host") > 0 { print $1 }
+        ' \
+      | tr '\n' ' ' \
+      | sed 's/[[:space:]]*$//'
+  )
+  if [ -n "$still" ]; then
+    # shellcheck disable=SC2086
+    kill -9 $still >/dev/null 2>&1 || true
+  fi
+}
+
 cat > "$fake_bin/uname" <<'SH'
 #!/bin/sh
 printf '%s\n' "${FORGE_TEST_UNAME:-Linux}"
@@ -202,6 +231,7 @@ test_env() {
 # so cached real host binaries or prior desktop bundles under _tmp must not leak in.
 rm -f "$root/_tmp/workbench/bin/wizardry-host-linux"
 rm -rf "$root/_tmp/workbench/dist/linux" "$root/_tmp/workbench/dist/linux-workspaces"
+kill_test_workbench_hosts "$root/_tmp/workbench/dist/"
 
 explicit_blank_ws="$scratch/explicit-blank"
 make_workspace "$explicit_blank_ws" "explicit-blank" "Explicit Blank" "linux"
