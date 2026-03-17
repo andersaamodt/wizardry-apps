@@ -39,7 +39,9 @@ jobs:
           for t in \
             .tests/apps/test-forge-backend.sh \
             .tests/apps/test-forge-install-launch.sh \
+            .tests/apps/test-forge-regressions.sh \
             .tests/apps/test-forge-run-modes.sh \
+            .tests/apps/test-forge-ui-regressions.sh \
             .tests/apps/test-forge-ui-assets.sh \
             .tests/apps/test-macos-host-menu-contract.sh \
             .tests/apps/test-no-hardcoded-localhost-port.sh; do

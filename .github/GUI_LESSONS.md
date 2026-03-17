@@ -74,3 +74,4 @@
 - If Forge reveals before the live catalog scan finishes, it still needs a last-known catalog cache from backend prefs so built-ins and workspaces are visible immediately on startup instead of popping in seconds later.
 - Confirmation toasts should stay on screen long enough to read and expose an unobtrusive copy button, because short-lived desktop feedback often contains paths or error text users need to reuse.
 - Persistent footer status works well for substantive Forge operations like Build, Run, Install, Remove, and cleanup; do not overwrite it with trivial navigation actions such as opening folders.
+- High-regression Forge flows such as Run, import/drop, scaffold, and workspace rebuild detection need executable behavior tests with fake host/tool stubs, not just static `grep` contract checks.
