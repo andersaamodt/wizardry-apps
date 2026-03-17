@@ -422,7 +422,7 @@ tell application "Safari"
   if (count of windows) = 0 then
     make new document
   end if
-  set bounds of front window to {80, 40, 1500, 980}
+  set bounds of front window to {80, 40, 1120, 860}
   set URL of front document to pageUrl
   set ready to false
   repeat with i from 1 to 60
@@ -464,6 +464,6 @@ APPLESCRIPT
 printf '%s\n' "$RESULT"
 printf '%s\n' "$RESULT" | grep -F '"ok":true' >/dev/null 2>&1 || fail "Safari UI smoke checks failed"
 
-screencapture -x -R80,40,1420,940 "$SCREENSHOT_PATH"
+screencapture -x -R80,40,1040,820 "$SCREENSHOT_PATH"
 printf 'SCREENSHOT: %s\n' "$SCREENSHOT_PATH"
 printf 'PASS: wizardry-desktop Safari smoke checks\n'

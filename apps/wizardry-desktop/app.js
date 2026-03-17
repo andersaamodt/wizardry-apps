@@ -24,7 +24,9 @@
     navRows: [],
     toastTimer: null,
     spellActivityTimer: null,
-    spellActivityBusy: false
+    spellActivityBusy: false,
+    startupWindowSized: false,
+    windowFitInFlight: false
   };
 
   var els = {};
@@ -190,6 +192,29 @@
     state.toastTimer = window.setTimeout(function () {
       els.toast.classList.remove('show');
     }, 2200);
+  }
+
+  async function requestWindowFit() {
+    if (state.startupWindowSized || state.windowFitInFlight) {
+      return;
+    }
+    if (!(window.wizardry && typeof window.wizardry.exec === 'function')) {
+      return;
+    }
+    state.windowFitInFlight = true;
+    try {
+      var doc = document.documentElement;
+      var innerWidth = window.innerWidth || 920;
+      var innerHeight = window.innerHeight || 760;
+      var requiredWidth = Math.max(980, Math.round(Math.max(doc.scrollWidth || 0, innerWidth) + 36));
+      var requiredHeight = Math.max(760, Math.round(Math.max(doc.scrollHeight || 0, innerHeight) + 84));
+      await execArgv(['__wizardry_host_resize', String(requiredWidth), String(requiredHeight)], { quiet: true });
+      state.startupWindowSized = true;
+    } catch (_error) {
+      return;
+    } finally {
+      state.windowFitInFlight = false;
+    }
   }
 
   function waitForBridge(timeoutMs) {
@@ -430,7 +455,7 @@
     }
     state.theme = themeName;
     if (els.themeStylesheet) {
-      els.themeStylesheet.href = 'themes/' + themeName + '.css?v=wizardry-desktop-20260317c';
+      els.themeStylesheet.href = 'themes/' + themeName + '.css?v=wizardry-desktop-20260317e';
     }
     if (els.themePickerBtn) {
       els.themePickerBtn.textContent = themeName.charAt(0).toUpperCase() + themeName.slice(1);
@@ -1344,6 +1369,7 @@
       await loadPrefs();
       await loadSnapshot();
       await render();
+      await requestWindowFit();
       revealBootUi();
       await signalBootReady();
     } catch (error) {
