@@ -394,6 +394,9 @@
         editingMiniTabDraft: '',
         creatingMiniTabId: '',
         pendingMiniTabFocusId: '',
+        dragMiniTabId: '',
+        dragMiniTabDirty: false,
+        suppressMiniTabClickUntil: 0,
         dragCatalogItemKey: '',
         dragCatalogAssignmentKey: '',
         dragMiniTabTargetId: ''
@@ -2514,6 +2517,145 @@
         });
       }
 
+      function captureMiniTabRects() {
+        if (!els.catalogMiniTabs) {
+          return null;
+        }
+        var rects = {};
+        els.catalogMiniTabs.querySelectorAll('.catalog-mini-tab[data-mini-tab-id]').forEach(function (button) {
+          var tabId = String(button.getAttribute('data-mini-tab-id') || '').trim().toLowerCase();
+          if (!tabId) {
+            return;
+          }
+          rects[tabId] = button.getBoundingClientRect();
+        });
+        return rects;
+      }
+
+      function animateMiniTabReflow(previousRects) {
+        if (!els.catalogMiniTabs || !previousRects) {
+          return;
+        }
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          return;
+        }
+        els.catalogMiniTabs.querySelectorAll('.catalog-mini-tab[data-mini-tab-id]').forEach(function (button) {
+          var tabId = String(button.getAttribute('data-mini-tab-id') || '').trim().toLowerCase();
+          if (!tabId || !previousRects[tabId]) {
+            return;
+          }
+          var first = previousRects[tabId];
+          var last = button.getBoundingClientRect();
+          var dx = first.left - last.left;
+          var dy = first.top - last.top;
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+            return;
+          }
+          button.animate([
+            { transform: 'translate(' + dx + 'px, ' + dy + 'px)' },
+            { transform: 'translate(0, 0)' }
+          ], {
+            duration: 180,
+            easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)'
+          });
+        });
+      }
+
+      function renderMiniTabsWithFlip(previousRects) {
+        renderMiniTabs();
+        if (!previousRects) {
+          return;
+        }
+        requestAnimationFrame(function () {
+          animateMiniTabReflow(previousRects);
+        });
+      }
+
+      function miniTabReorderTargetAtPoint(clientX, clientY, dragTabId) {
+        if (!els.catalogMiniTabs) {
+          return null;
+        }
+        var buttons = Array.prototype.slice.call(
+          els.catalogMiniTabs.querySelectorAll('.catalog-mini-tab[data-mini-tab-id]')
+        ).filter(function (button) {
+          var tabId = String(button.getAttribute('data-mini-tab-id') || '').trim().toLowerCase();
+          return !!tabId && tabId !== dragTabId && tabId !== 'all' && tabId !== 'other' && !button.classList.contains('editing');
+        });
+        if (!buttons.length) {
+          return null;
+        }
+        for (var i = 0; i < buttons.length; i += 1) {
+          var button = buttons[i];
+          var rect = button.getBoundingClientRect();
+          if (clientY < rect.top - 8 || clientY > rect.bottom + 8) {
+            continue;
+          }
+          if (clientX >= rect.left && clientX <= rect.right) {
+            return {
+              id: String(button.getAttribute('data-mini-tab-id') || '').trim().toLowerCase(),
+              placeAfter: clientX > (rect.left + rect.width / 2)
+            };
+          }
+        }
+        var firstRect = buttons[0].getBoundingClientRect();
+        var lastRect = buttons[buttons.length - 1].getBoundingClientRect();
+        if (clientY >= firstRect.top - 8 && clientY <= firstRect.bottom + 8) {
+          if (clientX < firstRect.left) {
+            return {
+              id: String(buttons[0].getAttribute('data-mini-tab-id') || '').trim().toLowerCase(),
+              placeAfter: false
+            };
+          }
+          if (clientX > lastRect.right) {
+            return {
+              id: String(buttons[buttons.length - 1].getAttribute('data-mini-tab-id') || '').trim().toLowerCase(),
+              placeAfter: true
+            };
+          }
+        }
+        return null;
+      }
+
+      function reorderMiniTab(dragTabId, targetTabId, placeAfter) {
+        var dragId = String(dragTabId || '').trim().toLowerCase();
+        var targetId = String(targetTabId || '').trim().toLowerCase();
+        if (!dragId || !targetId || dragId === targetId) {
+          return false;
+        }
+        var nextTabs = state.miniTabs.slice();
+        var fromIndex = nextTabs.findIndex(function (tab) {
+          return tab.id === dragId;
+        });
+        var targetIndex = nextTabs.findIndex(function (tab) {
+          return tab.id === targetId;
+        });
+        if (fromIndex < 0 || targetIndex < 0) {
+          return false;
+        }
+        var moved = nextTabs.splice(fromIndex, 1)[0];
+        var insertIndex = nextTabs.findIndex(function (tab) {
+          return tab.id === targetId;
+        });
+        if (insertIndex < 0) {
+          insertIndex = nextTabs.length;
+        }
+        if (placeAfter) {
+          insertIndex += 1;
+        }
+        nextTabs.splice(insertIndex, 0, moved);
+        var changed = nextTabs.some(function (tab, index) {
+          return !state.miniTabs[index] || state.miniTabs[index].id !== tab.id;
+        }) || nextTabs.length !== state.miniTabs.length;
+        if (!changed) {
+          return false;
+        }
+        var previousRects = captureMiniTabRects();
+        state.miniTabs = nextTabs;
+        state.dragMiniTabDirty = true;
+        renderMiniTabsWithFlip(previousRects);
+        return true;
+      }
+
       function renderMiniTabs() {
         if (!els.catalogMiniTabs) {
           return;
@@ -2530,6 +2672,9 @@
           var button = document.createElement('button');
           button.type = 'button';
           button.className = 'catalog-mini-tab' + (state.activeMiniTab === tab.id ? ' active' : '') + (state.dragMiniTabTargetId === tab.id ? ' drag-target' : '');
+          if (state.dragMiniTabId === tab.id) {
+            button.classList.add('dragging');
+          }
           button.setAttribute('data-mini-tab-id', tab.id);
           button.setAttribute('aria-pressed', state.activeMiniTab === tab.id ? 'true' : 'false');
           button.title = tab.label;
@@ -5155,6 +5300,11 @@
           if (!state.useMiniTabs) {
             return;
           }
+          if (state.suppressMiniTabClickUntil && Date.now() < state.suppressMiniTabClickUntil) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
           var addButton = closestEventTarget(event, '#catalog-mini-tab-add');
           if (addButton) {
             event.preventDefault();
@@ -5193,6 +5343,76 @@
           setActiveMiniTab(tabId);
           renderCatalogList();
           renderSelectedBuiltIn();
+        });
+
+        els.catalogMiniTabs.addEventListener('pointerdown', function (event) {
+          if (!state.useMiniTabs || state.busy || event.button !== 0) {
+            return;
+          }
+          if (closestEventTarget(event, '#catalog-mini-tab-add') || closestEventTarget(event, '.catalog-mini-tab-remove') || closestEventTarget(event, '.catalog-mini-tab-input')) {
+            return;
+          }
+          var tabButton = closestEventTarget(event, '[data-mini-tab-id]');
+          if (!tabButton) {
+            return;
+          }
+          var dragTabId = String(tabButton.getAttribute('data-mini-tab-id') || '').trim().toLowerCase();
+          if (!dragTabId || dragTabId === 'all' || dragTabId === 'other' || state.editingMiniTabId === dragTabId) {
+            return;
+          }
+
+          var originX = event.clientX;
+          var originY = event.clientY;
+          var dragStarted = false;
+
+          function finishMiniTabDrag(endEvent) {
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', onUp, true);
+            window.removeEventListener('pointercancel', onCancel, true);
+            if (!dragStarted) {
+              return;
+            }
+            if (endEvent) {
+              endEvent.preventDefault();
+              endEvent.stopPropagation();
+            }
+            if (state.dragMiniTabDirty) {
+              saveMiniTabs();
+            }
+            state.dragMiniTabDirty = false;
+            state.dragMiniTabId = '';
+            state.suppressMiniTabClickUntil = Date.now() + 220;
+            renderMiniTabs();
+          }
+
+          function onMove(moveEvent) {
+            if (!dragStarted) {
+              if (Math.abs(moveEvent.clientX - originX) < 4 && Math.abs(moveEvent.clientY - originY) < 4) {
+                return;
+              }
+              dragStarted = true;
+              state.dragMiniTabId = dragTabId;
+              renderMiniTabs();
+            }
+            moveEvent.preventDefault();
+            var placement = miniTabReorderTargetAtPoint(moveEvent.clientX, moveEvent.clientY, dragTabId);
+            if (!placement) {
+              return;
+            }
+            reorderMiniTab(dragTabId, placement.id, placement.placeAfter);
+          }
+
+          function onUp(upEvent) {
+            finishMiniTabDrag(upEvent);
+          }
+
+          function onCancel(cancelEvent) {
+            finishMiniTabDrag(cancelEvent);
+          }
+
+          window.addEventListener('pointermove', onMove, true);
+          window.addEventListener('pointerup', onUp, true);
+          window.addEventListener('pointercancel', onCancel, true);
         });
 
         els.catalogMiniTabs.addEventListener('dblclick', function (event) {

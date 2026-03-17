@@ -595,6 +595,10 @@ body.settings-open #settings-panel {
   color: color-mix(in srgb, var(--text) 94%, transparent);
 }
 
+.catalog-mini-tab.dragging {
+  opacity: 0.58;
+}
+
 .catalog-mini-tab.editing {
   padding: 0.08rem 0.2rem 0.14rem;
 }
