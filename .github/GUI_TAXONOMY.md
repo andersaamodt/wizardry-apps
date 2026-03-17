@@ -13,11 +13,10 @@
 - `/Users/andersaamodt/git/wizardry-apps/apps/chatroom/` and `/Users/andersaamodt/git/wizardry-apps/apps/menu-app/` are useful compatibility references, not visual or interaction baselines.
 
 ## Navigation And Layout Controls
-- Top nav tabs. Apps: Chatroom. Best: Chatroom by default because it is the only checked-in user of this pattern; if touched, move it toward real button semantics and Forge-level keyboard/state handling.
 - Selectable list rows. Apps: Forge, Wizardry Desktop. Best: Forge catalog rows for dense primary navigation because they preserve selection across refreshes and ignore re-click on the active row.
 - Listbox-style rail navigation. Apps: Wizardry Desktop. Best: Wizardry Desktop nav rows for menu-family navigation that should read like a persistent command palette rather than a mutable catalog.
 - Mini-tabs. Apps: Forge. Best: Forge app-group tabs because they support create, rename, delete-empty, drag-to-assign, and persistent system `All`/`Other` views.
-- Slide panel toggle. Apps: Forge. Best: Forge settings panel for contextual utilities; open it from a compact icon button and close it with the trigger, `Escape`, or outside click.
+- Slide panel toggle. Apps: Forge, Chatroom. Best: Forge settings panel for contextual utilities; Chatroom now uses the same family for its integrated settings rail, but Forge remains the best reference because it also handles `Escape` and outside-click close paths.
 - Activity drawer toggle. Apps: Wizardry Desktop. Best: Wizardry Desktop activity drawer because it gives the log a stable right-side home without taking over the main document flow.
 - Split-pane divider. Apps: Forge. Best: Forge rail divider for resizable left-right layouts; persist width and keep the host layout stable instead of collapsing to a single column.
 - Disclosure sections. Apps: Forge. Best: Forge `details/summary` pipeline sections for multi-step workflows; keep sections local to the page and open by default when they hold core tasks.
@@ -26,7 +25,7 @@
 
 ## Text Entry And Selection Controls
 - Search field. Apps: Forge. Best: Forge filter input for short live-filter fields; keep it compact, immediate, and near the list it filters.
-- Bounded text input with explicit action. Apps: Forge, Wizardry Desktop. Best: Forge root path rows for path settings that should not autosave every keystroke.
+- Bounded text input with explicit action. Apps: Forge, Wizardry Desktop, Chatroom. Best: Forge root path rows for path settings that should not autosave every keystroke; Chatroom now uses this family for its saved remote chat URL field.
 - Inline rename input. Apps: Forge. Best: Forge project rename and mini-tab rename for short inline edits; focus immediately, commit on blur or `Enter`, and cancel on `Escape`.
 - Primary short-text input. Apps: Forge, Wizardry Desktop, Chatroom. Best: Forge `Create App` title field because it pairs one short field with immediate derived feedback like the path preview.
 - Multi-field inline form. Apps: Wizardry Desktop. Best: Wizardry Desktop spellbook, services, and MUD rows for short operational forms that mix several compact fields and one immediate action.
@@ -47,11 +46,11 @@
 - Split button. Apps: Forge. Best: Forge `Run` plus adjacent run-options toggle for a primary default action with secondary variants.
 - Row-level quick action. Apps: Forge, Wizardry Desktop. Best: Forge row play buttons for the highest-value per-item action in dense catalogs.
 - Row-level micro-actions. Apps: Forge, Wizardry Desktop. Best: Forge target-row open, run, install, and mobile buttons for compact secondary actions attached to one enabled capability.
-- Path chip button. Apps: Forge. Best: Forge selected-path control; use basename labeling, click-to-copy, double-click-to-open, ellipsis handling, and an adjacent terminal button when useful.
+- Path chip button. Apps: Forge, Chatroom. Best: Forge selected-path control; Chatroom now reuses the same copy-centric compact-chip pattern for the active chat URL.
 - Section utility buttons. Apps: Forge, Wizardry Desktop, Chatroom. Best: Forge log copy and clear buttons for small actions in a section header.
 - Button grid actions. Apps: Wizardry Desktop, Menu App. Best: Wizardry Desktop for pages that expose many direct backend verbs in one grouped card.
 - Simple CTA button. Apps: Chatroom. Best: Chatroom server error CTA as a simple fallback when a screen only needs one obvious next step.
-- Legacy utility button cluster. Apps: Menu App, Chatroom. Best: none; keep these only for simple surfaces, not dense control planes.
+- Legacy utility button cluster. Apps: Menu App. Best: none; keep these only for simple surfaces, not dense control planes.
 
 ## Menus And Popovers
 - Floating menu. Apps: Forge, Wizardry Desktop. Best: Forge organize, theme, run, and row-overflow menus for compact contextual command sets.
@@ -69,7 +68,7 @@
 - Thumbnail slot. Apps: Forge. Best: Forge catalog thumbs for optional app and project artwork; keep the thumb node stable and theme-backed to avoid white-flash artifacts.
 
 ## Status, Feedback, And Read-Only Surfaces
-- Persistent status pill. Apps: Forge, Wizardry Desktop. Best: Forge bridge and activity pills for always-visible runtime state.
+- Persistent status pill. Apps: Forge, Wizardry Desktop, Chatroom. Best: Forge bridge and activity pills for always-visible runtime state; Chatroom now uses this family for bridge and runtime target state.
 - Badge and metadata pill. Apps: Forge, Wizardry Desktop. Best: Forge type badge, suite badge, scope pill, and context dot for compact classification metadata.
 - Simple pill metadata. Apps: Wizardry Desktop. Best: Wizardry Desktop spell count, status, and memorized pills for terse row metadata in menu-derived pages.
 - Toast. Apps: Forge, Wizardry Desktop. Best: Forge for short-lived confirmations and lightweight failures; keep the message factual and reserve durable panels or logs for actionable detail.
@@ -80,7 +79,7 @@
 - Empty or error panel. Apps: Chatroom, Wizardry Desktop, Forge. Best: Chatroom server-not-running panel for a simple blocked-state surface with one recovery action.
 
 ## Embedded And Host-Coupled Surfaces
-- Embedded iframe view. Apps: Chatroom. Best: Chatroom by default because it is the only checked-in user; treat it as a compatibility pattern for wrapping an existing site, not the default control-plane pattern.
+- Embedded iframe view. Apps: Chatroom. Best: Chatroom integrated viewport by default because it is the only checked-in user; keep the embedded page as the source of truth and put app-local controls around it instead of re-skinning it inside the frame.
 - Host resize control. Apps: Forge. Best: Forge rail divider for a host-visible interactive separator.
 - Boot splash. Apps: Wizardry Desktop. Best: Wizardry Desktop for a checked-in splash surface that keeps the shell hidden until the first ready frame.
 - Splash and startup handoff. Apps: Forge, Wizardry Desktop. Best: standards file first, then Wizardry Desktop as the closest checked-in concrete example.
@@ -99,7 +98,7 @@
 - Theme selection: Forge theme picker.
 - Status plus output feedback: Forge bridge/activity pills + toast + log.
 - Compact settings modal: wizardry-desktop settings modal.
-- Simple wrapped web surface: chatroom tabs + iframe.
+- Simple wrapped web surface: chatroom integrated viewport + settings rail.
 - Minimal starter app surface: menu-app button grid + output pane.
 
 ## Micro-Patterns To Reuse

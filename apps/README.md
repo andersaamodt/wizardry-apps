@@ -172,14 +172,14 @@ Currently, the built packages open the app's `index.html` in the default web bro
 
 **First time setup (chatroom app):**
 1. Open the app
-2. Go to Settings tab
+2. Open the integrated settings rail
 3. Choose "Host Server" mode
 4. Click "Start Server" button
 5. Share the connection URL with friends!
 
 **Client mode:**
 - Choose "Client Only" mode to connect to someone else's chatroom
-- No server needed - just enter their URL in the chat tab
+- No server needed - save their URL in the integrated settings rail
 
 ### For Developers
 
@@ -212,19 +212,21 @@ See `apps/chatroom/` for a real-world example demonstrating:
 - **Standalone operation - no terminal required!**
   - Double-click the app to launch
   - Choose Client-Only or Host Server mode
-  - Start/stop server directly from Settings GUI
+  - Start/stop server directly from the integrated settings rail
   - Mode preference saved between sessions
-- **Settings page with:**
+- **Integrated desktop shell with:**
   - Mode selection (Client vs Host)
+  - Embedded chat viewport for the app-owned chat page
   - Server start/stop controls
   - Server status monitoring
   - Connection URL display (IP:port)
   - IP and Tor address display
   - Copy-to-clipboard functionality
+  - Compatibility redirect from the old standalone settings page into the main app surface
 - Full compatibility with MUD `say` command format
 - Tor hidden service support for anonymous access
 
-The chatroom app shows how desktop apps can be minimal frames around existing web functionality, avoiding code duplication. **It's designed to be completely standalone** - users can double-click the .app bundle on macOS or AppImage on Linux, choose their mode, and start hosting or connecting without ever touching a terminal.
+The chatroom app shows how desktop apps can be minimal frames around existing web functionality while still keeping operational controls in one place. **It's designed to be completely standalone** - users can double-click the .app bundle on macOS or AppImage on Linux, choose their mode, and start hosting or connecting without ever touching a terminal.
 
 ### unix-settings
 

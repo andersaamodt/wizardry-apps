@@ -20,7 +20,13 @@ app_style="$app_dir/chatroom.css"
 grep -F '<link rel="stylesheet" href="/static/chatroom.css" />' "$app_chat" >/dev/null
 grep -F 'pages/chatroom-app.html' "$backend" >/dev/null
 grep -F 'sync_chatroom_app_assets' "$backend" >/dev/null
-grep -F "const chatPath = '/pages/chatroom-app.html';" "$app_dir/settings.html" >/dev/null
-grep -F 'pages\/(?:chat|chatroom-app)\.html' "$app_dir/index.html" >/dev/null
+grep -F "const CHAT_PATH = '/pages/chatroom-app.html';" "$app_dir/index.html" >/dev/null
+grep -F "const CLIENT_CHAT_URL_KEY = 'client_chat_url';" "$app_dir/index.html" >/dev/null
+grep -F 'Chatroom Controls' "$app_dir/index.html" >/dev/null
+grep -F "window.location.replace('index.html#settings');" "$app_dir/settings.html" >/dev/null
+if rg -F 'chat-tab' "$app_dir/index.html" >/dev/null 2>&1; then
+  printf '%s\n' "legacy tab shell still present in $app_dir/index.html" >&2
+  exit 1
+fi
 
 printf '%s\n' "chatroom contract tests passed"

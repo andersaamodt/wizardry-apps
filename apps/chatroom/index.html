@@ -5,89 +5,709 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wizardry Chatroom</title>
   <style>
+    :root {
+      color-scheme: dark;
+      --app-bg: #0c1324;
+      --panel-bg: rgba(16, 24, 42, 0.88);
+      --panel-strong: rgba(20, 30, 52, 0.96);
+      --panel-soft: rgba(255, 255, 255, 0.06);
+      --line: rgba(173, 190, 255, 0.18);
+      --line-strong: rgba(173, 190, 255, 0.3);
+      --text: #edf3ff;
+      --muted: #a8b6d6;
+      --accent: #77a7ff;
+      --accent-strong: #5d8ff1;
+      --success: #4dd4a0;
+      --warning: #f4c76b;
+      --danger: #ff8d9a;
+      --shadow: rgba(0, 0, 0, 0.36);
+      --focus: rgba(119, 167, 255, 0.55);
+      --radius-lg: 22px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --control-height: 40px;
+      --settings-width: 360px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
     body {
       margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-width: 1120px;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(115, 146, 255, 0.22), transparent 34%),
+        radial-gradient(circle at top right, rgba(85, 180, 221, 0.12), transparent 22%),
+        linear-gradient(180deg, #10192d 0%, var(--app-bg) 48%, #08111f 100%);
+      overflow: hidden;
     }
-    
-    .app-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 1rem 2rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      color: white;
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+      color: inherit;
     }
-    
-    .app-header h1 {
-      margin: 0 0 0.5rem 0;
-      font-size: 1.5rem;
+
+    button {
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      cursor: pointer;
+      height: var(--control-height);
+      padding: 0 0.95rem;
+      transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
     }
-    
-    .app-nav {
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.11);
+      border-color: rgba(173, 190, 255, 0.42);
+    }
+
+    button:disabled {
+      cursor: default;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    button.primary {
+      background: linear-gradient(180deg, rgba(119, 167, 255, 0.34), rgba(87, 134, 229, 0.42));
+      border-color: rgba(119, 167, 255, 0.52);
+    }
+
+    button.quiet {
+      background: transparent;
+    }
+
+    button.fit {
+      width: fit-content;
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    input[type="text"],
+    input[type="url"] {
+      width: 100%;
+      min-height: 44px;
+      padding: 0 0.95rem;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(6, 12, 24, 0.55);
+      color: var(--text);
+    }
+
+    code,
+    .code-block {
+      font-family: "SFMono-Regular", "SF Mono", Monaco, Consolas, monospace;
+    }
+
+    .app-shell {
       display: flex;
+      flex-direction: column;
       gap: 1rem;
+      min-height: 100vh;
+      padding: 1rem;
     }
-    
-    .app-nav a {
-      color: white;
-      text-decoration: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      transition: background 0.2s;
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.1rem 1.2rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(18, 29, 52, 0.96), rgba(10, 19, 35, 0.9));
+      box-shadow: 0 18px 38px var(--shadow);
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 1.55rem;
+      letter-spacing: 0.01em;
+    }
+
+    .title-block p {
+      margin: 0.4rem 0 0;
+      max-width: 62ch;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .topbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-height: 36px;
+      padding: 0 0.8rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .status-pill::before {
+      content: "";
+      width: 0.6rem;
+      height: 0.6rem;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.9;
+    }
+
+    .status-pill.is-success {
+      color: var(--success);
+    }
+
+    .status-pill.is-warning {
+      color: var(--warning);
+    }
+
+    .status-pill.is-danger {
+      color: var(--danger);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) var(--settings-width);
+      gap: 1rem;
+      min-height: 0;
+      flex: 1;
+    }
+
+    body[data-settings-open="false"] .workspace {
+      grid-template-columns: minmax(0, 1fr) 0;
+    }
+
+    .panel,
+    .settings-panel {
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--panel-bg);
+      box-shadow: 0 18px 38px var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.1rem 0.85rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .panel-heading h2 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .panel-heading p {
+      margin: 0.3rem 0 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .panel-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.55rem;
+    }
+
+    .endpoint-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.9rem 1.1rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .path-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      max-width: 100%;
+      min-height: 38px;
+      padding: 0 0.8rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+    }
+
+    .path-chip span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .path-chip code {
+      font-size: 0.88rem;
+    }
+
+    .chat-stage {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      background: var(--panel-strong);
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #101628;
+    }
+
+    .chat-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background:
+        linear-gradient(180deg, rgba(12, 20, 38, 0.78), rgba(9, 14, 27, 0.92)),
+        radial-gradient(circle at top, rgba(119, 167, 255, 0.16), transparent 36%);
+    }
+
+    .chat-overlay[hidden] {
+      display: none;
+    }
+
+    .overlay-card {
+      width: min(100%, 560px);
+      padding: 1.6rem;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: rgba(10, 17, 31, 0.9);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .overlay-card h3 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .overlay-card p {
+      margin: 0.75rem 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .overlay-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-top: 1.2rem;
+    }
+
+    .settings-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease;
+    }
+
+    body[data-settings-open="false"] .settings-panel {
+      opacity: 0;
+      transform: translateX(16px);
+      pointer-events: none;
+      border-color: transparent;
+    }
+
+    .settings-scroll {
+      min-height: 0;
+      overflow: auto;
+      padding: 1rem;
+    }
+
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0 0.1rem 0.9rem;
+    }
+
+    .settings-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .settings-header p {
+      margin: 0.25rem 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .settings-section {
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .settings-section + .settings-section {
+      margin-top: 0.9rem;
+    }
+
+    .section-head h3 {
+      margin: 0;
+      font-size: 0.98rem;
+    }
+
+    .section-head p,
+    .hint,
+    .field-help {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.92rem;
+    }
+
+    .mode-grid {
+      display: grid;
+      gap: 0.65rem;
+      margin-top: 0.95rem;
+    }
+
+    .mode-option {
+      display: block;
       cursor: pointer;
     }
-    
-    .app-nav a:hover {
-      background: rgba(255,255,255,0.1);
+
+    .mode-option input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
     }
-    
-    .app-nav a.active {
-      background: rgba(255,255,255,0.2);
-      font-weight: bold;
+
+    .mode-card {
+      display: grid;
+      gap: 0.3rem;
+      padding: 0.9rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      transition: border-color 180ms ease, background 180ms ease;
     }
-    
-    iframe {
-      border: none;
-      width: 100%;
-      height: calc(100vh - 90px);
+
+    .mode-option input:checked + .mode-card {
+      border-color: rgba(119, 167, 255, 0.58);
+      background: rgba(119, 167, 255, 0.14);
+    }
+
+    .mode-card strong {
+      font-size: 0.95rem;
+    }
+
+    .mode-card span {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .field {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.95rem;
+    }
+
+    .field-label {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 0.9rem;
+    }
+
+    .info-grid {
+      display: grid;
+      gap: 0.75rem;
+      margin-top: 0.95rem;
+    }
+
+    .info-card {
+      padding: 0.85rem 0.9rem;
+      border-radius: 16px;
+      background: rgba(5, 12, 24, 0.45);
+      border: 1px solid rgba(173, 190, 255, 0.12);
+    }
+
+    .info-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .info-card-header strong {
       display: block;
+      margin-bottom: 0.15rem;
+      font-size: 0.92rem;
+    }
+
+    .value-block {
+      display: block;
+      margin-top: 0.55rem;
+      padding: 0.8rem;
+      border-radius: 14px;
+      border: 1px solid rgba(173, 190, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      word-break: break-word;
+      font-size: 0.88rem;
+    }
+
+    .value-block.is-loading {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .value-block.is-danger {
+      color: var(--danger);
+    }
+
+    .about-list {
+      margin: 0.85rem 0 0;
+      padding-left: 1rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .is-hidden {
+      display: none;
     }
   </style>
 </head>
-<body>
-  <div class="app-header">
-    <h1>🧙 Wizardry Chatroom</h1>
-    <nav class="app-nav">
-      <a onclick="showChat()" id="chat-tab" class="active">Chat</a>
-      <a onclick="showSettings()" id="settings-tab">Settings</a>
-    </nav>
-  </div>
-  
-  <iframe id="chat-frame" src="about:blank" title="Chatroom"></iframe>
-  
-  <div id="error-message" style="display: none; padding: 3rem 2rem; text-align: center; color: #666;">
-    <h2 style="color: #dc3545; margin-bottom: 1rem;">⚠️ Server Not Running</h2>
-    <p style="margin-bottom: 1.5rem; line-height: 1.6;">
-      The chatroom requires the wizardry web server to be running.<br>
-      Please start the server from the Settings tab.
-    </p>
-    <button onclick="showSettings()" style="padding: 0.75rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem;">
-      Go to Settings →
-    </button>
-  </div>
-  
-  <div id="settings-frame" style="display: none;">
-    <!-- Settings will be loaded via iframe from settings.html -->
+<body data-settings-open="true">
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="title-block">
+        <h1>Wizardry Chatroom</h1>
+        <p>Desktop shell for the app-owned Chatroom page. The chat UI itself stays identical to the copied demo surface, and host/client controls now live beside it instead of in a separate stub screen.</p>
+      </div>
+      <div class="topbar-actions">
+        <div class="status-pill is-warning" id="bridge-pill">Checking bridge</div>
+        <div class="status-pill is-warning" id="runtime-pill">Checking target</div>
+        <button class="quiet fit" id="refresh-button" type="button">Refresh</button>
+        <button class="fit" id="settings-toggle" type="button" aria-controls="settings-panel" aria-expanded="true">Hide settings</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel" aria-label="Chat viewport">
+        <div class="panel-bar">
+          <div class="panel-heading">
+            <h2>Chatroom Surface</h2>
+            <p>Live CGI and SSE page served from the local demo site when hosting, or a remote chatroom URL when connecting as a client.</p>
+          </div>
+          <div class="panel-actions">
+            <button class="quiet fit" id="copy-url-button" type="button">Copy URL</button>
+            <button class="quiet fit" id="open-url-button" type="button">Open in browser</button>
+          </div>
+        </div>
+
+        <div class="endpoint-row">
+          <button class="path-chip quiet" id="endpoint-chip" type="button" title="Copy current chat URL" aria-label="Copy current chat URL">
+            <span><code id="endpoint-chip-text">No chat URL configured</code></span>
+          </button>
+        </div>
+
+        <div class="chat-stage">
+          <iframe id="chat-frame" src="about:blank" title="Chatroom"></iframe>
+          <div class="chat-overlay" id="chat-overlay">
+            <div class="overlay-card">
+              <h3 id="overlay-title">Preparing chatroom</h3>
+              <p id="overlay-body">The app is resolving the configured chat target and checking whether the local demo server is available.</p>
+              <div class="overlay-actions">
+                <button class="primary fit" id="overlay-primary" type="button">Refresh</button>
+                <button class="quiet fit" id="overlay-secondary" type="button">Show settings</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="settings-panel" id="settings-panel" aria-label="Chatroom settings">
+        <div class="settings-scroll">
+          <div class="settings-header">
+            <div>
+              <h2>Chatroom Controls</h2>
+              <p>Configure how this app reaches the chat page and whether it should host the local demo server.</p>
+            </div>
+            <button class="quiet fit" id="close-settings" type="button">Hide</button>
+          </div>
+
+          <section class="settings-section">
+            <div class="section-head">
+              <h3>Mode</h3>
+              <p>Host your own local chatroom, or point the app at someone else’s server.</p>
+            </div>
+            <div class="mode-grid" role="radiogroup" aria-label="Chatroom mode">
+              <label class="mode-option">
+                <input id="mode-client" type="radio" name="mode" value="client">
+                <span class="mode-card">
+                  <strong>Client only</strong>
+                  <span>Connect to another chatroom by URL. The embedded page stays the same; only the target changes.</span>
+                </span>
+              </label>
+              <label class="mode-option">
+                <input id="mode-host" type="radio" name="mode" value="host">
+                <span class="mode-card">
+                  <strong>Host local server</strong>
+                  <span>Start the local demo site, use the app-owned `chatroom-app` page, and share the published address.</span>
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-section" id="client-section">
+            <div class="section-head">
+              <h3>Remote Chat URL</h3>
+              <p>Use this in client mode to point the app at another machine’s `chatroom-app` or `chat` page.</p>
+            </div>
+            <label class="field" for="chat-url-input">
+              <span class="field-label">Chatroom URL</span>
+              <input id="chat-url-input" type="url" spellcheck="false" placeholder="http://localhost:43110/pages/chatroom-app.html">
+            </label>
+            <div class="action-row">
+              <button class="primary fit" id="save-client-url" type="button">Save URL</button>
+              <button class="quiet fit" id="use-local-url" type="button">Use local demo URL</button>
+            </div>
+            <p class="hint" id="client-url-hint">When saved, the Chatroom viewport reloads to that address.</p>
+          </section>
+
+          <section class="settings-section" id="server-section">
+            <div class="section-head">
+              <h3>Server Control</h3>
+              <p>Start or stop the local demo site that serves the app-owned chat page.</p>
+            </div>
+            <div class="info-grid">
+              <div class="info-card">
+                <strong>Server status</strong>
+                <div class="value-block is-loading" id="server-status">Checking local server…</div>
+                <div class="action-row">
+                  <button class="primary fit" id="start-server" type="button">Start server</button>
+                  <button class="quiet fit" id="stop-server" type="button">Stop server</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="connection-section">
+            <div class="section-head">
+              <h3>Connection Info</h3>
+              <p>These values are populated from the locally served app-owned chat page when host mode is active.</p>
+            </div>
+            <div class="info-grid">
+              <div class="info-card">
+                <div class="info-card-header">
+                  <div>
+                    <strong>Local connection URL</strong>
+                    <span class="field-help">Share this exact page URL with people on your network.</span>
+                  </div>
+                  <button class="quiet fit" id="copy-connection-url" type="button">Copy</button>
+                </div>
+                <code class="value-block is-loading" id="connection-url">Waiting for local server…</code>
+              </div>
+
+              <div class="info-card">
+                <div class="info-card-header">
+                  <div>
+                    <strong>Local IP address</strong>
+                    <span class="field-help">Used to turn the local host URL into a shareable LAN address.</span>
+                  </div>
+                  <button class="quiet fit" id="copy-ip-address" type="button">Copy</button>
+                </div>
+                <code class="value-block is-loading" id="ip-address">Waiting for system info…</code>
+              </div>
+
+              <div class="info-card">
+                <div class="info-card-header">
+                  <div>
+                    <strong>Tor hidden service</strong>
+                    <span class="field-help">Shown when the local environment reports an `.onion` address.</span>
+                  </div>
+                  <button class="quiet fit" id="copy-tor-address" type="button">Copy</button>
+                </div>
+                <code class="value-block is-loading" id="tor-address">Waiting for system info…</code>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <div class="section-head">
+              <h3>About</h3>
+              <p>This shell adds desktop controls around the preserved chat UI rather than restyling the chat page itself.</p>
+            </div>
+            <ul class="about-list">
+              <li>Uses the same CGI backend and SSE streams as the browser demo.</li>
+              <li>Keeps the app-owned chat page and stylesheet as the source of truth.</li>
+              <li>Stores mode and target URL in backend UI prefs instead of browser-only storage.</li>
+              <li>Leaves the original `/pages/chat.html` demo page untouched until you approve removing it.</li>
+            </ul>
+          </section>
+        </div>
+      </aside>
+    </main>
   </div>
 
   <script src="../.host/shared/wizardry-bridge.js"></script>
-
   <script>
+    const MODE_KEY = 'mode';
     const CHAT_URL_KEY = 'chat_url';
-    let iframeCheckInterval;
-    let chatUrlCache = '';
+    const CLIENT_CHAT_URL_KEY = 'client_chat_url';
+    const CHAT_PATH = '/pages/chatroom-app.html';
 
-    let backendScriptCache = '';
+    const state = {
+      backendScriptCache: '',
+      currentMode: 'client',
+      activeChatUrl: '',
+      clientChatUrl: '',
+      serverPort: '',
+      serverRunning: false,
+      refreshTimer: null
+    };
 
     function detectBackendScriptCandidates() {
       const out = [];
@@ -123,9 +743,13 @@
     function parseKeyValue(text) {
       const out = {};
       String(text || '').split('\n').forEach((line) => {
-        if (!line) return;
+        if (!line) {
+          return;
+        }
         const idx = line.indexOf('=');
-        if (idx <= 0) return;
+        if (idx <= 0) {
+          return;
+        }
         out[line.slice(0, idx)] = line.slice(idx + 1);
       });
       return out;
@@ -136,10 +760,12 @@
     }
 
     async function backendExec(action, args = []) {
-      if (!hasBridge()) return '';
+      if (!hasBridge()) {
+        return '';
+      }
       const candidates = [];
-      if (backendScriptCache) {
-        candidates.push(backendScriptCache);
+      if (state.backendScriptCache) {
+        candidates.push(state.backendScriptCache);
       }
       detectBackendScriptCandidates().forEach((candidate) => {
         if (candidates.indexOf(candidate) < 0) {
@@ -148,12 +774,12 @@
       });
       for (const scriptPath of candidates) {
         try {
-          const byPathResult = await window.wizardry.exec(['sh', scriptPath, action].concat(args));
-          if (typeof byPathResult.exit_code !== 'undefined' && byPathResult.exit_code !== 0) {
-            throw new Error((byPathResult.stderr || byPathResult.stdout || 'backend error').trim());
+          const result = await window.wizardry.exec(['sh', scriptPath, action].concat(args));
+          if (typeof result.exit_code !== 'undefined' && result.exit_code !== 0) {
+            throw new Error((result.stderr || result.stdout || 'backend error').trim());
           }
-          backendScriptCache = scriptPath;
-          return String((byPathResult && byPathResult.stdout) || '');
+          state.backendScriptCache = scriptPath;
+          return String((result && result.stdout) || '');
         } catch (error) {
           if (!isMissingBackendScriptError(error)) {
             throw error;
@@ -173,123 +799,484 @@
       return String((fallbackResult && fallbackResult.stdout) || '');
     }
 
-    async function refreshChatUrlPref() {
+    async function loadPrefs() {
       try {
         const text = await backendExec('get-ui-prefs');
-        const prefs = parseKeyValue(text);
-        const value = String(prefs[CHAT_URL_KEY] || '').trim();
-        chatUrlCache = /^https?:\/\/[^ ]+\/pages\/(?:chat|chatroom-app)\.html$/.test(value) ? value : '';
+        return parseKeyValue(text);
       } catch (_err) {
-        chatUrlCache = '';
+        return {};
       }
     }
 
-    function configuredChatUrl() {
-      return chatUrlCache;
+    async function setPref(key, value) {
+      try {
+        await backendExec('set-ui-pref', [key, String(value || '')]);
+      } catch (_err) {
+        // Ignore persistence errors in browser-only preview mode.
+      }
     }
-    
-    async function detectDefaultChatUrl() {
+
+    function normalizeMode(value) {
+      return value === 'host' ? 'host' : 'client';
+    }
+
+    function normalizeChatUrl(value) {
+      const raw = String(value || '').trim();
+      if (!raw) {
+        return '';
+      }
+      if (/^https?:\/\/\S+$/i.test(raw)) {
+        return raw;
+      }
+      return '';
+    }
+
+    function localChatUrl() {
+      if (!state.serverPort) {
+        return '';
+      }
+      return 'http://localhost:' + state.serverPort + CHAT_PATH;
+    }
+
+    function setStatusPill(element, tone, text) {
+      element.textContent = text;
+      element.classList.remove('is-success', 'is-warning', 'is-danger');
+      if (tone) {
+        element.classList.add(tone);
+      }
+    }
+
+    function setValueBlock(element, text, mode) {
+      element.textContent = text;
+      element.classList.remove('is-loading', 'is-danger');
+      if (mode === 'loading') {
+        element.classList.add('is-loading');
+      }
+      if (mode === 'danger') {
+        element.classList.add('is-danger');
+      }
+    }
+
+    function setButtonTemporaryLabel(button, label) {
+      const original = button.dataset.originalLabel || button.textContent;
+      button.dataset.originalLabel = original;
+      button.textContent = label;
+      window.setTimeout(() => {
+        button.textContent = button.dataset.originalLabel || original;
+      }, 1400);
+    }
+
+    async function copyText(text, button) {
+      if (!text) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        if (button) {
+          setButtonTemporaryLabel(button, 'Copied');
+        }
+      } catch (_err) {
+        if (button) {
+          setButtonTemporaryLabel(button, 'Copy failed');
+        }
+      }
+    }
+
+    function showSettingsPanel() {
+      document.body.dataset.settingsOpen = 'true';
+      const toggle = document.getElementById('settings-toggle');
+      toggle.textContent = 'Hide settings';
+      toggle.setAttribute('aria-expanded', 'true');
+    }
+
+    function hideSettingsPanel() {
+      document.body.dataset.settingsOpen = 'false';
+      const toggle = document.getElementById('settings-toggle');
+      toggle.textContent = 'Show settings';
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleSettingsPanel() {
+      if (document.body.dataset.settingsOpen === 'false') {
+        showSettingsPanel();
+        return;
+      }
+      hideSettingsPanel();
+    }
+
+    function updateEndpointChip(url) {
+      const text = url || 'No chat URL configured';
+      document.getElementById('endpoint-chip-text').textContent = text;
+      const chip = document.getElementById('endpoint-chip');
+      chip.disabled = !url;
+      chip.title = url ? 'Copy current chat URL' : 'No chat URL configured';
+    }
+
+    function showOverlay(title, body, primaryLabel, primaryAction) {
+      const overlay = document.getElementById('chat-overlay');
+      overlay.hidden = false;
+      document.getElementById('overlay-title').textContent = title;
+      document.getElementById('overlay-body').textContent = body;
+      const primary = document.getElementById('overlay-primary');
+      primary.textContent = primaryLabel;
+      primary.onclick = primaryAction;
+    }
+
+    function hideOverlay() {
+      document.getElementById('chat-overlay').hidden = true;
+    }
+
+    function updateModeUI() {
+      const hostMode = state.currentMode === 'host';
+      document.getElementById('mode-client').checked = !hostMode;
+      document.getElementById('mode-host').checked = hostMode;
+      document.getElementById('client-section').classList.toggle('is-hidden', hostMode);
+      document.getElementById('server-section').classList.toggle('is-hidden', !hostMode);
+      document.getElementById('connection-section').classList.toggle('is-hidden', !hostMode);
+    }
+
+    async function loadEndpointInfo() {
+      state.serverPort = '';
+      if (!hasBridge()) {
+        return '';
+      }
       try {
         const text = await backendExec('get-chat-endpoint');
         const out = parseKeyValue(text);
-        const value = String(out.chat_url || '').trim();
-        return /^https?:\/\/[^ ]+\/pages\/(?:chat|chatroom-app)\.html$/.test(value) ? value : '';
+        const rawPort = String(out.port || '').trim();
+        const rawUrl = normalizeChatUrl(out.chat_url || '');
+        state.serverPort = /^[0-9]+$/.test(rawPort) ? rawPort : '';
+        return rawUrl;
       } catch (_err) {
         return '';
       }
     }
 
-    async function probeChat(url) {
+    async function syncSystemInfo() {
+      if (state.currentMode !== 'host' || !state.serverRunning) {
+        setValueBlock(document.getElementById('connection-url'), 'Waiting for local server…', 'loading');
+        setValueBlock(document.getElementById('ip-address'), 'Waiting for system info…', 'loading');
+        setValueBlock(document.getElementById('tor-address'), 'Waiting for system info…', 'loading');
+        return;
+      }
+
+      const localUrl = localChatUrl();
+      const localUrlElement = document.getElementById('connection-url');
+      const ipElement = document.getElementById('ip-address');
+      const torElement = document.getElementById('tor-address');
+      setValueBlock(localUrlElement, localUrl, '');
+      setValueBlock(ipElement, 'Loading local IP…', 'loading');
+      setValueBlock(torElement, 'Checking for hidden service…', 'loading');
+
       try {
-        const text = await backendExec('check-chat', [url || '']);
-        return parseKeyValue(text);
+        const base = new URL(localUrl).origin;
+        const response = await fetch(base + '/cgi/system-info', { cache: 'no-store' });
+        const html = await response.text();
+        const ipMatch = html.match(/(\d+\.\d+\.\d+\.\d+)/);
+        const onionMatch = html.match(/([a-z2-7]{16,56}\.onion)/i);
+        const ip = ipMatch && ipMatch[1] !== '127.0.0.1' ? ipMatch[1] : 'localhost';
+        setValueBlock(ipElement, ip, '');
+        if (ip && state.serverPort) {
+          setValueBlock(localUrlElement, 'http://' + ip + ':' + state.serverPort + CHAT_PATH, '');
+        }
+        if (onionMatch) {
+          setValueBlock(torElement, onionMatch[1], '');
+        } else {
+          setValueBlock(torElement, 'Tor hidden service not configured', '');
+        }
       } catch (_err) {
-        return { status: 'stopped', chat_url: '' };
+        setValueBlock(ipElement, 'Unable to determine IP address', 'danger');
+        setValueBlock(torElement, 'Tor hidden service not configured', '');
       }
     }
 
-    async function checkIframeLoaded() {
-      const iframe = document.getElementById('chat-frame');
-      const errorMsg = document.getElementById('error-message');
+    function updateServerControls() {
+      const statusElement = document.getElementById('server-status');
+      if (state.serverRunning) {
+        setValueBlock(statusElement, 'Running on localhost:' + state.serverPort, '');
+      } else if (state.currentMode === 'host') {
+        setValueBlock(statusElement, 'Not running', 'danger');
+      } else {
+        setValueBlock(statusElement, 'Host mode is off', '');
+      }
+      document.getElementById('start-server').disabled = !hasBridge() || state.serverRunning;
+      document.getElementById('stop-server').disabled = !hasBridge() || !state.serverRunning;
+    }
 
-      await refreshChatUrlPref();
-      let url = configuredChatUrl();
-      if (!url && hasBridge()) {
-        url = await detectDefaultChatUrl();
+    function updateRuntimePill() {
+      const runtimePill = document.getElementById('runtime-pill');
+      if (state.currentMode === 'host') {
+        if (state.serverRunning) {
+          setStatusPill(runtimePill, 'is-success', 'Local server running');
+        } else {
+          setStatusPill(runtimePill, 'is-danger', 'Local server stopped');
+        }
+        return;
+      }
+      if (state.activeChatUrl) {
+        setStatusPill(runtimePill, 'is-success', 'Remote target configured');
+      } else {
+        setStatusPill(runtimePill, 'is-warning', 'No remote target saved');
+      }
+    }
+
+    function updateBridgePill() {
+      const bridgePill = document.getElementById('bridge-pill');
+      if (hasBridge()) {
+        setStatusPill(bridgePill, 'is-success', 'Bridge ready');
+      } else {
+        setStatusPill(bridgePill, 'is-warning', 'Browser preview');
+      }
+    }
+
+    async function persistActiveUrl(url) {
+      state.activeChatUrl = url;
+      await setPref(CHAT_URL_KEY, url);
+    }
+
+    async function refreshChatView(options = {}) {
+      const forceReload = !!options.forceReload;
+      updateBridgePill();
+
+      const defaultUrl = await loadEndpointInfo();
+      const iframe = document.getElementById('chat-frame');
+
+      if (state.currentMode === 'host') {
+        const url = defaultUrl || localChatUrl();
+        await persistActiveUrl(url);
+        if (!url) {
+          state.serverRunning = false;
+          updateEndpointChip('');
+          updateRuntimePill();
+          updateServerControls();
+          await syncSystemInfo();
+          showOverlay(
+            'Local chatroom unavailable',
+            'The demo site does not have a resolved port yet. Start the local server or inspect the demo site configuration.',
+            'Show settings',
+            showSettingsPanel
+          );
+          return;
+        }
+
+        try {
+          const text = await backendExec('check-chat', [url]);
+          const out = parseKeyValue(text);
+          state.serverRunning = String(out.status || '').trim() === 'running';
+        } catch (_err) {
+          state.serverRunning = false;
+        }
+
+        updateEndpointChip(url);
+        updateRuntimePill();
+        updateServerControls();
+        await syncSystemInfo();
+
+        if (!state.serverRunning) {
+          showOverlay(
+            'Server not running',
+            'Start the local demo server to load the app-owned chat page. The original demo `/pages/chat.html` remains untouched.',
+            'Start server',
+            startServer
+          );
+          return;
+        }
+
+        if (forceReload || iframe.src !== url) {
+          iframe.src = url;
+        }
+        hideOverlay();
+        return;
       }
 
+      const url = normalizeChatUrl(state.clientChatUrl || document.getElementById('chat-url-input').value);
+      await persistActiveUrl(url);
+      updateEndpointChip(url);
+      updateRuntimePill();
+      state.serverRunning = false;
+      updateServerControls();
+      await syncSystemInfo();
+
       if (!url) {
-        iframe.style.display = 'none';
-        errorMsg.style.display = 'block';
+        showOverlay(
+          'No remote chat URL configured',
+          'Save a remote chatroom URL in client mode, or switch to host mode to run the local app-owned chat page.',
+          'Show settings',
+          showSettingsPanel
+        );
         return;
       }
 
       if (hasBridge()) {
-        const status = await probeChat(url);
-        const liveUrl = String(status.chat_url || url || '').trim();
-        if (String(status.status || '').trim() === 'running' && liveUrl) {
-          if (iframe.src !== liveUrl) {
-            iframe.src = liveUrl;
+        try {
+          const text = await backendExec('check-chat', [url]);
+          const out = parseKeyValue(text);
+          if (String(out.status || '').trim() !== 'running') {
+            showOverlay(
+              'Remote chatroom is not responding',
+              'The saved URL did not answer a quick health probe. Check the address or ask the host to start their chatroom server.',
+              'Refresh',
+              () => refreshChatView({ forceReload: true })
+            );
+            return;
           }
-          iframe.style.display = 'block';
-          errorMsg.style.display = 'none';
+        } catch (_err) {
+          showOverlay(
+            'Remote chatroom probe failed',
+            'The desktop bridge could not confirm the remote chatroom. The URL may still work in a browser, but the host did not answer the probe.',
+            'Refresh',
+            () => refreshChatView({ forceReload: true })
+          );
           return;
         }
-        iframe.style.display = 'none';
-        errorMsg.style.display = 'block';
-        return;
       }
 
-      try {
-        await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-        if (iframe.src !== url) {
-          iframe.src = url;
+      if (forceReload || iframe.src !== url) {
+        iframe.src = url;
+      }
+      hideOverlay();
+    }
+
+    async function setMode(mode) {
+      state.currentMode = normalizeMode(mode);
+      await setPref(MODE_KEY, state.currentMode);
+      if (state.currentMode === 'client') {
+        const inputValue = normalizeChatUrl(state.clientChatUrl || state.activeChatUrl);
+        if (inputValue) {
+          document.getElementById('chat-url-input').value = inputValue;
         }
-        iframe.style.display = 'block';
-        errorMsg.style.display = 'none';
-      } catch (_err) {
-        iframe.style.display = 'none';
-        errorMsg.style.display = 'block';
+      }
+      updateModeUI();
+      await refreshChatView({ forceReload: true });
+    }
+
+    async function saveClientUrl() {
+      const input = document.getElementById('chat-url-input');
+      const normalized = normalizeChatUrl(input.value);
+      const hint = document.getElementById('client-url-hint');
+      if (!normalized) {
+        hint.textContent = 'Enter a full http:// or https:// chatroom URL.';
+        return;
+      }
+      state.clientChatUrl = normalized;
+      input.value = normalized;
+      hint.textContent = 'Saved. The viewport will now load the remote chatroom.';
+      await setPref(CLIENT_CHAT_URL_KEY, normalized);
+      await persistActiveUrl(normalized);
+      await refreshChatView({ forceReload: true });
+    }
+
+    async function useLocalUrlForClient() {
+      const url = await loadEndpointInfo();
+      const resolved = url || localChatUrl();
+      const hint = document.getElementById('client-url-hint');
+      if (!resolved) {
+        hint.textContent = 'No local demo URL is available yet.';
+        return;
+      }
+      state.clientChatUrl = resolved;
+      document.getElementById('chat-url-input').value = resolved;
+      hint.textContent = 'Local demo URL loaded into client mode.';
+      await setPref(CLIENT_CHAT_URL_KEY, resolved);
+      await persistActiveUrl(resolved);
+      await refreshChatView({ forceReload: true });
+    }
+
+    async function startServer() {
+      const statusElement = document.getElementById('server-status');
+      setValueBlock(statusElement, 'Starting local server…', 'loading');
+      document.getElementById('start-server').disabled = true;
+      try {
+        await backendExec('start-server');
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+        await refreshChatView({ forceReload: true });
+      } catch (error) {
+        setValueBlock(statusElement, 'Failed to start: ' + String(error && error.message ? error.message : error), 'danger');
+      } finally {
+        updateServerControls();
       }
     }
-    
-    function showChat() {
-      document.getElementById('chat-frame').style.display = 'block';
-      document.getElementById('error-message').style.display = 'none';
-      document.getElementById('settings-frame').style.display = 'none';
-      document.getElementById('chat-tab').classList.add('active');
-      document.getElementById('settings-tab').classList.remove('active');
-      
-      checkIframeLoaded();
-    }
-    
-    function showSettings() {
-      document.getElementById('chat-frame').style.display = 'none';
-      document.getElementById('error-message').style.display = 'none';
-      document.getElementById('settings-frame').style.display = 'block';
-      document.getElementById('chat-tab').classList.remove('active');
-      document.getElementById('settings-tab').classList.add('active');
-      
-      // Load settings.html in an iframe
-      let settingsFrame = document.getElementById('settings-iframe');
-      if (!settingsFrame) {
-        settingsFrame = document.createElement('iframe');
-        settingsFrame.id = 'settings-iframe';
-        settingsFrame.src = 'settings.html';
-        settingsFrame.style.border = 'none';
-        settingsFrame.style.width = '100%';
-        settingsFrame.style.height = 'calc(100vh - 90px)';
-        document.getElementById('settings-frame').innerHTML = '';
-        document.getElementById('settings-frame').appendChild(settingsFrame);
+
+    async function stopServer() {
+      const statusElement = document.getElementById('server-status');
+      setValueBlock(statusElement, 'Stopping local server…', 'loading');
+      document.getElementById('stop-server').disabled = true;
+      try {
+        await backendExec('stop-server');
+        await new Promise((resolve) => window.setTimeout(resolve, 700));
+        state.serverRunning = false;
+        await refreshChatView({ forceReload: true });
+      } catch (error) {
+        setValueBlock(statusElement, 'Failed to stop: ' + String(error && error.message ? error.message : error), 'danger');
+      } finally {
+        updateServerControls();
       }
     }
-    
-    // Check on page load
-    window.addEventListener('DOMContentLoaded', async () => {
-      await checkIframeLoaded();
-      // Recheck every 5 seconds in case server starts
-      iframeCheckInterval = setInterval(() => { checkIframeLoaded(); }, 5000);
+
+    function openCurrentUrl() {
+      if (!state.activeChatUrl) {
+        return;
+      }
+      window.open(state.activeChatUrl, '_blank', 'noopener,noreferrer');
+    }
+
+    async function initialize() {
+      updateBridgePill();
+      const prefs = await loadPrefs();
+      state.currentMode = normalizeMode(String(prefs[MODE_KEY] || 'client').trim());
+      state.clientChatUrl = normalizeChatUrl(prefs[CLIENT_CHAT_URL_KEY] || '');
+      state.activeChatUrl = normalizeChatUrl(prefs[CHAT_URL_KEY] || '');
+
+      if (!state.clientChatUrl && state.currentMode === 'client') {
+        state.clientChatUrl = state.activeChatUrl;
+      }
+
+      document.getElementById('chat-url-input').value = state.clientChatUrl;
+      updateModeUI();
+      if (window.location.hash === '#settings') {
+        showSettingsPanel();
+      }
+      await refreshChatView({ forceReload: true });
+
+      state.refreshTimer = window.setInterval(() => {
+        refreshChatView();
+      }, 5000);
+    }
+
+    document.getElementById('settings-toggle').addEventListener('click', toggleSettingsPanel);
+    document.getElementById('close-settings').addEventListener('click', hideSettingsPanel);
+    document.getElementById('refresh-button').addEventListener('click', () => refreshChatView({ forceReload: true }));
+    document.getElementById('copy-url-button').addEventListener('click', (event) => copyText(state.activeChatUrl, event.currentTarget));
+    document.getElementById('open-url-button').addEventListener('click', openCurrentUrl);
+    document.getElementById('endpoint-chip').addEventListener('click', () => copyText(state.activeChatUrl, document.getElementById('copy-url-button')));
+    document.getElementById('overlay-secondary').addEventListener('click', showSettingsPanel);
+    document.getElementById('mode-client').addEventListener('change', () => setMode('client'));
+    document.getElementById('mode-host').addEventListener('change', () => setMode('host'));
+    document.getElementById('save-client-url').addEventListener('click', saveClientUrl);
+    document.getElementById('use-local-url').addEventListener('click', useLocalUrlForClient);
+    document.getElementById('start-server').addEventListener('click', startServer);
+    document.getElementById('stop-server').addEventListener('click', stopServer);
+    document.getElementById('copy-connection-url').addEventListener('click', (event) => copyText(document.getElementById('connection-url').textContent, event.currentTarget));
+    document.getElementById('copy-ip-address').addEventListener('click', (event) => copyText(document.getElementById('ip-address').textContent, event.currentTarget));
+    document.getElementById('copy-tor-address').addEventListener('click', (event) => copyText(document.getElementById('tor-address').textContent, event.currentTarget));
+    document.getElementById('chat-url-input').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveClientUrl();
+      }
     });
+    document.getElementById('chat-frame').addEventListener('load', hideOverlay);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        refreshChatView();
+      }
+    });
+    window.addEventListener('beforeunload', () => {
+      if (state.refreshTimer) {
+        window.clearInterval(state.refreshTimer);
+      }
+    });
+    window.addEventListener('DOMContentLoaded', initialize);
   </script>
 </body>
 </html>
