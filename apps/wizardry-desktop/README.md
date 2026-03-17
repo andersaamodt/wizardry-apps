@@ -5,6 +5,7 @@ Wizardry Desktop is a built-in desktop app for browsing Wizardry through visual 
 It focuses on:
 - translating the `main-menu` structure into persistent pages
 - exposing spellbook, arcana, system, and MUD workflows through GUI controls
+- showing a live Casting Watch panel for built-in spell processes and app-backend analogue processes
 - keeping a live right-side activity drawer that shows backend terminal output for every GUI action
 
 ## Backend
@@ -36,3 +37,4 @@ Current keys:
 - Theme assets are bundled from `web/.themes` via the shared Forge theme set copied into `apps/wizardry-desktop/themes/`.
 - Generic spell runs execute from the saved `work_dir`.
 - MUD room-sensitive actions execute from the saved `mud_room_path`.
+- Casting Watch reads the live process table. Built-in spells resolve from `~/.wizardry/spells` and `~/spells`; app-internal analogue work shows up as app backend rows inferred from the standard `apps/<slug>/scripts/*-backend.sh` path.

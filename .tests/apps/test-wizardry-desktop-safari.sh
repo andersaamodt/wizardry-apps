@@ -63,6 +63,10 @@ cat > "$BRIDGE_PATH" <<'BRIDGE'
     ['ll', 'ls -lah'],
     ['gs', 'git status --short']
   ];
+  var spellActivity = [
+    ['builtin-spell', 'wizardry-desktop', '401', '301', '00:05', 'update-all', '/Users/andersaamodt/.wizardry/spells/system/update-all', 'update-all -v'],
+    ['app-backend', 'chatroom', '402', '302', '00:09', 'chatroom-backend.sh', '/Users/andersaamodt/git/wizardry-apps/apps/chatroom/scripts/chatroom-backend.sh', 'sh /Users/andersaamodt/git/wizardry-apps/apps/chatroom/scripts/chatroom-backend.sh start-server']
+  ];
   var arcana = [
     ['ripgrep', 'installed', 'Fast text search'],
     ['tmux', 'available', 'Terminal multiplexer']
@@ -160,6 +164,9 @@ cat > "$BRIDGE_PATH" <<'BRIDGE'
     }
     if (command === 'list-cast') {
       return ok(tsv(castEntries));
+    }
+    if (command === 'list-spell-activity') {
+      return ok(tsv(spellActivity));
     }
     if (command === 'list-arcana') {
       return ok(tsv(arcana));
@@ -331,56 +338,67 @@ cat > "$JS_TMP" <<'JSCODE'
       expect(themeAfter !== themeBefore, 'theme-arrow-cycle');
     }
 
-    var spellbookRow = click('.nav-row[data-page="spellbook"]');
-    expect(!!spellbookRow, 'spellbook-row-present');
+    var watchRow = click('.nav-row[data-page="spell-activity"]');
+    expect(!!watchRow, 'watch-row-present');
 
     step(90, function () {
-      var activeSpellbookRow = document.querySelector('.nav-row.active[data-page="spellbook"]');
-      if (activeSpellbookRow) {
-        expect(activeSpellbookRow.classList.contains('active'), 'nav-row-active');
-        expect(activeSpellbookRow.getAttribute('aria-selected') === 'true', 'nav-row-selected');
-        expect(getComputedStyle(activeSpellbookRow).cursor === 'default', 'nav-row-default-cursor');
-        expect(Math.abs(activeSpellbookRow.getBoundingClientRect().left - document.querySelector('.nav-groups').getBoundingClientRect().left) <= 1, 'nav-row-full-width');
-      } else {
-        issues.push('nav-row-active');
-      }
-      expect(document.getElementById('page-title').textContent.indexOf('Scribe') >= 0, 'spellbook-page-title');
+      expect(document.getElementById('page-title').textContent.indexOf('Casting Watch') >= 0, 'watch-page-title');
+      expect(!!document.getElementById('refresh-spell-activity-btn'), 'watch-refresh-button');
+      expect(document.querySelectorAll('.list-row').length >= 2, 'watch-rows-rendered');
+      expect(String(document.getElementById('page-content').textContent || '').indexOf('chatroom-backend.sh') >= 0, 'watch-backend-row');
+      expect(String(document.getElementById('page-content').textContent || '').indexOf('update-all') >= 0, 'watch-spell-row');
 
-      click('#settings-btn');
-      step(50, function () {
-        var settings = document.getElementById('settings-modal');
-        expect(!!settings && !settings.classList.contains('hidden'), 'settings-open');
-        expect(String((document.getElementById('doctor-output') || {}).textContent || '').indexOf('wizardry_dir=') >= 0, 'doctor-output-loaded');
-        click('#settings-close-btn');
+      var spellbookRow = click('.nav-row[data-page="spellbook"]');
+      expect(!!spellbookRow, 'spellbook-row-present');
 
-        step(60, function () {
-          expect(document.getElementById('settings-modal').classList.contains('hidden'), 'settings-close');
-          click('.nav-row[data-page="computer"]');
+      step(90, function () {
+        var activeSpellbookRow = document.querySelector('.nav-row.active[data-page="spellbook"]');
+        if (activeSpellbookRow) {
+          expect(activeSpellbookRow.classList.contains('active'), 'nav-row-active');
+          expect(activeSpellbookRow.getAttribute('aria-selected') === 'true', 'nav-row-selected');
+          expect(getComputedStyle(activeSpellbookRow).cursor === 'default', 'nav-row-default-cursor');
+          expect(Math.abs(activeSpellbookRow.getBoundingClientRect().left - document.querySelector('.nav-groups').getBoundingClientRect().left) <= 1, 'nav-row-full-width');
+        } else {
+          issues.push('nav-row-active');
+        }
+        expect(document.getElementById('page-title').textContent.indexOf('Scribe') >= 0, 'spellbook-page-title');
 
-          step(80, function () {
-            click('[data-system="update-all"]');
+        click('#settings-btn');
+        step(50, function () {
+          var settings = document.getElementById('settings-modal');
+          expect(!!settings && !settings.classList.contains('hidden'), 'settings-open');
+          expect(String((document.getElementById('doctor-output') || {}).textContent || '').indexOf('wizardry_dir=') >= 0, 'doctor-output-loaded');
+          click('#settings-close-btn');
 
-            step(110, function () {
-              click('#activity-toggle');
+          step(60, function () {
+            expect(document.getElementById('settings-modal').classList.contains('hidden'), 'settings-close');
+            click('.nav-row[data-page="computer"]');
 
-              step(260, function () {
-                expect(document.body.classList.contains('drawer-open'), 'drawer-open');
-                var logText = String((document.getElementById('activity-log') || {}).textContent || '');
-                expect(logText.indexOf('system action') >= 0, 'activity-title-logged');
-                expect(logText.indexOf("'system' 'update-all'") >= 0, 'activity-command-logged');
-                click('#clear-log-btn');
+            step(80, function () {
+              click('[data-system="update-all"]');
 
-                step(40, function () {
-                  expect(String(document.getElementById('activity-log').textContent || '').trim() === 'Waiting for activity.', 'activity-clear');
-                  click('#activity-toggle');
+              step(110, function () {
+                click('#activity-toggle');
 
-                  step(260, function () {
-                    expect(!document.body.classList.contains('drawer-open'), 'drawer-close');
-                    click('.nav-row[data-page="builtin:translocation"]');
+                step(260, function () {
+                  expect(document.body.classList.contains('drawer-open'), 'drawer-open');
+                  var logText = String((document.getElementById('activity-log') || {}).textContent || '');
+                  expect(logText.indexOf('system action') >= 0, 'activity-title-logged');
+                  expect(logText.indexOf("'system' 'update-all'") >= 0, 'activity-command-logged');
+                  click('#clear-log-btn');
 
-                    step(110, function () {
-                      expect(document.querySelectorAll('[data-run-spell]').length >= 2, 'category-spells-rendered');
-                      finish();
+                  step(40, function () {
+                    expect(String(document.getElementById('activity-log').textContent || '').trim() === 'Waiting for activity.', 'activity-clear');
+                    click('#activity-toggle');
+
+                    step(260, function () {
+                      expect(!document.body.classList.contains('drawer-open'), 'drawer-close');
+                      click('.nav-row[data-page="builtin:translocation"]');
+
+                      step(110, function () {
+                        expect(document.querySelectorAll('[data-run-spell]').length >= 2, 'category-spells-rendered');
+                        finish();
+                      });
                     });
                   });
                 });
