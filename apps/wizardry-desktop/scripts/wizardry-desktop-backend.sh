@@ -198,6 +198,10 @@ sanitize_field() {
     | sed 's/[[:space:]][[:space:]]*/ /g; s/^ //; s/ $//'
 }
 
+strip_ansi() {
+  printf '%s' "${1-}" | sed 's/\x1b\[[0-9;]*m//g'
+}
+
 shell_quote() {
   printf "'%s'" "$(printf '%s' "${1-}" | sed "s/'/'\\\\''/g")"
 }
@@ -323,6 +327,23 @@ arcana_description() {
     voice-recognition) printf '%s\n' "Install dictation and voice-recognition tooling." ;;
     nostr) printf '%s\n' "Install Nostr and relay-oriented support spells." ;;
     *) printf '%s\n' "Install optional supporting software for Wizardry." ;;
+  esac
+}
+
+arcana_label() {
+  case "${1-}" in
+    core) printf '%s\n' "core wizardry" ;;
+    mud) printf '%s\n' "wizardry MUD" ;;
+    web-wizardry) printf '%s\n' "web wizardry" ;;
+    wizardry-apps) printf '%s\n' "wizardry apps" ;;
+    ai-dev) printf '%s\n' "AI dev" ;;
+    yt-dlp) printf '%s\n' "yt-dlp" ;;
+    voice-recognition) printf '%s\n' "voice recognition" ;;
+    nostr) printf '%s\n' "Nostr" ;;
+    docker) printf '%s\n' "Docker" ;;
+    *)
+      printf '%s\n' "${1-}"
+      ;;
   esac
 }
 
@@ -606,6 +627,48 @@ arcana_run_command() {
   printf '%s\n' ""
 }
 
+arcana_menu_command() {
+  install_dir=$WIZARDRY_DIR/spells/.arcana
+  name=${1-}
+  if command -v "${name}-menu" >/dev/null 2>&1; then
+    printf '%s\n' "${name}-menu"
+    return 0
+  fi
+  for candidate in "$install_dir/$name-menu" "$install_dir/$name/$name-menu"; do
+    if [ -x "$candidate" ] && [ ! -d "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  printf '%s\n' ""
+}
+
+arcana_action_kind() {
+  name=${1-}
+  if [ "$name" = "import-arcanum" ]; then
+    printf '%s\n' "import"
+    return 0
+  fi
+  if [ -n "$(arcana_menu_command "$name")" ]; then
+    printf '%s\n' "menu"
+    return 0
+  fi
+  if [ -n "$(arcana_run_command "$name")" ]; then
+    printf '%s\n' "install"
+    return 0
+  fi
+  printf '%s\n' "pending"
+}
+
+arcana_action_label() {
+  case "${1-}" in
+    menu) printf '%s\n' "Open menu" ;;
+    install) printf '%s\n' "Install" ;;
+    import) printf '%s\n' "Import" ;;
+    *) printf '%s\n' "Unavailable" ;;
+  esac
+}
+
 safe_split_command() {
   line=${1-}
   old_ifs=${IFS}
@@ -785,13 +848,28 @@ list_arcana() {
     status_cmd=$(arcana_status_command "$name")
     status="coming soon"
     if [ -n "$status_cmd" ]; then
-      status=$($status_cmd 2>/dev/null || printf 'available')
+      status=$(strip_ansi "$($status_cmd 2>/dev/null || printf 'available')")
     fi
-    printf '%s\t%s\t%s\n' \
+    action_kind=$(arcana_action_kind "$name")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "entry" \
       "$name" \
+      "$(sanitize_field "$(arcana_label "$name")")" \
       "$(sanitize_field "$status")" \
-      "$(sanitize_field "$(arcana_description "$name")")"
+      "$(sanitize_field "$(arcana_description "$name")")" \
+      "$action_kind" \
+      "$(sanitize_field "$(arcana_action_label "$action_kind")")"
   done
+  if [ -x "$WIZARDRY_DIR/spells/.arcana/import-arcanum" ] || command -v import-arcanum >/dev/null 2>&1; then
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "import" \
+      "import-arcanum" \
+      "Import arcanum" \
+      "" \
+      "Load an external arcanum into the install menu, matching the terminal menu utility item." \
+      "import" \
+      "Import"
+  fi
 }
 
 cmd_list_arcana() {
@@ -1692,6 +1770,12 @@ cmd_arcana() {
     exit 2
   }
   validate_name_token "$name"
+  if [ "$name" = "mud" ] && [ -n "$(arcana_menu_command "$name")" ]; then
+    command_path=$(arcana_menu_command "$name")
+    trace_line sh -c ". \$1" sh "$command_path"
+    sh -c '. "$1"' sh "$command_path"
+    exit 0
+  fi
   command_path=$(arcana_run_command "$name")
   [ -n "$command_path" ] || {
     printf '%s\n' "wizardry-desktop-backend: no runnable arcana action found for $name" >&2

@@ -427,15 +427,15 @@ cat > "$JS_TMP" <<'JSCODE'
                             step(110, function () {
                               expect(document.querySelectorAll('[data-run-spell]').length >= 2, 'category-spells-rendered');
                               finish();
-                            });
-                          });
-                        });
-                      });
-                    });
-                  });
                 });
               });
             });
+            });
+          });
+        });
+      });
+                });
+              });
           });
         });
       });

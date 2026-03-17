@@ -301,7 +301,15 @@
     });
     state.spellActivity = parseSpellActivity(String(responses[5].stdout || ''));
     state.arcana = parseTsv(String(responses[6].stdout || '')).map(function (row) {
-      return { name: row[0], status: row[1], description: row[2] };
+      return {
+        kind: row[0],
+        name: row[1],
+        label: row[2],
+        status: row[3],
+        description: row[4],
+        actionKind: row[5],
+        actionLabel: row[6]
+      };
     });
     state.synonyms = parseTsv(String(responses[7].stdout || '')).map(function (row) {
       return { word: row[0], target: row[1], origin: row[2] };
@@ -757,11 +765,49 @@
   }
 
   function renderArcana() {
-    var html = '<section class="card list-card"><div class="list-head"><h3>Install Menu</h3><p class="subtle-copy">Discovered directly from `spells/.arcana`, with status text surfaced beside each entry.</p></div><div class="list-body">';
-    state.arcana.forEach(function (item) {
-      html += '<div class="list-row"><div class="row-copy"><span class="row-title">' + escHtml(item.name) + '</span><span class="row-subtitle">' + escHtml(item.description) + '</span></div><div class="row-actions"><span class="pill">' + escHtml(item.status) + '</span><button class="action-btn" type="button" data-run-arcana="' + escHtml(item.name) + '">Run</button></div></div>';
-    });
-    html += '</div></section>';
+    var installable = state.arcana.filter(function (item) { return item.kind === 'entry'; });
+    var utility = state.arcana.filter(function (item) { return item.kind !== 'entry'; });
+    var menuCount = installable.filter(function (item) { return item.actionKind === 'menu'; }).length;
+    var installCount = installable.filter(function (item) { return item.actionKind === 'install'; }).length;
+    var html = '';
+    html += '<section class="hero">';
+    html += '<div class="card-copy"><h3>Install Menu Structure</h3><p class="subtle-copy">This page follows the POSIX `install-menu`: the same preferred order, the same renamed labels, the same status text, and the same special import utility row.</p></div>';
+    html += '<div class="stat-grid">';
+    html += '<div class="stat-card"><strong>' + escHtml(String(installable.length)) + '</strong><span>Arcana entries</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(String(menuCount)) + '</strong><span>Submenus</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(String(installCount)) + '</strong><span>Direct installers</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(String(utility.length)) + '</strong><span>Utility items</span></div>';
+    html += '</div>';
+    html += '</section>';
+
+    html += '<section class="card list-card"><div class="list-head"><h3>Install Menu</h3><p class="subtle-copy">Entries are ordered and labeled the same way as the shell install menu, with submenu actions preserved where Wizardry defines them.</p></div><div class="list-body">';
+    if (!installable.length) {
+      html += '<div class="list-row"><p class="empty-state">No installable arcana were discovered.</p></div>';
+    } else {
+      installable.forEach(function (item) {
+        html += '<div class="list-row"><div class="row-copy"><span class="row-title">' + escHtml(item.label || item.name) + '</span><span class="row-subtitle">' + escHtml(item.description) + '</span></div><div class="row-actions">';
+        if (item.status) {
+          html += '<span class="pill">' + escHtml(item.status) + '</span>';
+        }
+        html += '<span class="pill">' + escHtml(item.actionKind === 'menu' ? 'submenu' : item.actionKind) + '</span>';
+        if (item.actionKind !== 'pending') {
+          html += '<button class="action-btn" type="button" data-run-arcana="' + escHtml(item.name) + '">' + escHtml(item.actionLabel || 'Run') + '</button>';
+        }
+        html += '</div></div>';
+      });
+    }
+    html += '</div>';
+    if (utility.length) {
+      html += '<div class="list-foot">';
+      utility.forEach(function (item) {
+        html += '<div class="list-row"><div class="row-copy"><span class="row-title">' + escHtml(item.label || item.name) + '</span><span class="row-subtitle">' + escHtml(item.description) + '</span></div><div class="row-actions">';
+        html += '<span class="pill">' + escHtml(item.actionKind) + '</span>';
+        html += '<button class="action-btn" type="button" data-run-arcana="' + escHtml(item.name) + '">' + escHtml(item.actionLabel || 'Run') + '</button>';
+        html += '</div></div>';
+      });
+      html += '</div>';
+    }
+    html += '</section>';
     return html;
   }
 

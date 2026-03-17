@@ -56,6 +56,14 @@ printf '%s\n' "$categories_out" | grep -F "$(printf 'builtin\t')" >/dev/null
 activity_out=$("$backend" list-spell-activity)
 [ -n "${activity_out-}" ] || true
 
+arcana_out=$("$backend" list-arcana)
+printf '%s\n' "$arcana_out" | grep -F "entry" >/dev/null
+printf '%s\n' "$arcana_out" | grep -F "core wizardry" >/dev/null
+printf '%s\n' "$arcana_out" | grep -F "Open menu" >/dev/null
+if [ -x "$HOME/.wizardry/spells/.arcana/import-arcanum" ] || command -v import-arcanum >/dev/null 2>&1; then
+  printf '%s\n' "$arcana_out" | grep -F "Import arcanum" >/dev/null
+fi
+
 mud_out=$("$backend" mud-status)
 printf '%s\n' "$mud_out" | grep -F "portal_location=" >/dev/null
 printf '%s\n' "$mud_out" | grep -F "parse_enabled=" >/dev/null
