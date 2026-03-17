@@ -418,6 +418,23 @@ select:focus,
   gap: 0.78rem;
 }
 
+.page-content-spell-activity {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  overflow: hidden;
+}
+
+.page-content-spell-activity > .list-card {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.page-content-spell-activity > .list-card > .list-body {
+  min-height: 0;
+  overflow: auto;
+}
+
 .hero,
 .card {
   border: 1px solid var(--shell-edge);

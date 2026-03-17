@@ -1182,6 +1182,9 @@
     els.pageEyebrow.textContent = meta.eyebrow;
     els.pageTitle.textContent = meta.title;
     els.pageSubtitle.textContent = meta.subtitle;
+    els.pageContent.className = state.activePage === 'spell-activity'
+      ? 'page-content page-content-spell-activity'
+      : 'page-content';
     var html = '';
     if (state.activePage === 'home') {
       html = renderHome();
