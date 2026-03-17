@@ -1189,28 +1189,31 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     if (!resolvedBundleIcon) {
         resolvedBundleIcon = [NSApp applicationIconImage];
     }
-    if (resolvedBundleIcon) {
-        // Prefer the packaged bundle icon so Dock/Finder and splash stay in sync.
-        self.appIconImage = resolvedBundleIcon;
-        [NSApp setApplicationIconImage:self.appIconImage];
-    } else {
-        NSString *resolvedIconPath = nil;
-        if (isNestedWorkspaceApp && [fileManager fileExistsAtPath:parentIconPath]) {
-            // For workspace apps launched from .../app, prefer the workspace-level icon.
-            resolvedIconPath = parentIconPath;
-        } else if ([fileManager fileExistsAtPath:customIconPath]) {
-            resolvedIconPath = customIconPath;
-        } else if ([fileManager fileExistsAtPath:parentIconPath]) {
-            resolvedIconPath = parentIconPath;
-        }
-        if (resolvedIconPath && [fileManager fileExistsAtPath:resolvedIconPath]) {
-            NSImage *iconImage = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
-            if (iconImage) {
-                self.appIconImage = iconImage;
-                [NSApp setApplicationIconImage:self.appIconImage];
-            }
-        }
+    NSString *resolvedIconPath = nil;
+    if (isNestedWorkspaceApp && [fileManager fileExistsAtPath:parentIconPath]) {
+        // For workspace apps launched from .../app, prefer the workspace-level icon.
+        resolvedIconPath = parentIconPath;
+    } else if ([fileManager fileExistsAtPath:customIconPath]) {
+        resolvedIconPath = customIconPath;
+    } else if ([fileManager fileExistsAtPath:parentIconPath]) {
+        resolvedIconPath = parentIconPath;
     }
+
+    NSImage *resolvedFileIcon = nil;
+    if (resolvedIconPath && [fileManager fileExistsAtPath:resolvedIconPath]) {
+        resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
+    }
+
+    if (resolvedBundleIcon) {
+        // Keep the packaged app icon for Dock/Finder identity when available.
+        [NSApp setApplicationIconImage:resolvedBundleIcon];
+    } else if (resolvedFileIcon) {
+        [NSApp setApplicationIconImage:resolvedFileIcon];
+    }
+
+    // Prefer a direct packaged/workspace icon file for the splash logo because
+    // it is more reliable than bundle-icon lookup during early startup.
+    self.appIconImage = resolvedFileIcon ?: resolvedBundleIcon;
     [NSApp unhide:nil];
     [NSApp activateIgnoringOtherApps:YES];
     

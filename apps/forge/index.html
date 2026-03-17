@@ -1090,22 +1090,39 @@
         return !!(window.wizardry && window.wizardry.exec);
       }
 
-      function revealBootUi() {
-        document.body.classList.remove('forge-booting');
+      function notifyHostBootReady(attempt) {
+        var tries = typeof attempt === 'number' ? attempt : 0;
         if (state.hostBootReadySent) {
           return;
         }
-        state.hostBootReadySent = true;
         if (!bridgeAvailable()) {
+          if (tries >= 160) {
+            return;
+          }
+          setTimeout(function () {
+            notifyHostBootReady(tries + 1);
+          }, 50);
           return;
         }
+        state.hostBootReadySent = true;
         requestAnimationFrame(function () {
           requestAnimationFrame(function () {
             execArgv(['__wizardry_host_boot_ready']).catch(function () {
-              return;
+              state.hostBootReadySent = false;
+              if (tries >= 160) {
+                return;
+              }
+              setTimeout(function () {
+                notifyHostBootReady(tries + 1);
+              }, 50);
             });
           });
         });
+      }
+
+      function revealBootUi() {
+        document.body.classList.remove('forge-booting');
+        notifyHostBootReady(0);
       }
 
       function summarizeExecFailure(stderr, stdout, exitCode) {
