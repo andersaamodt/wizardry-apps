@@ -674,7 +674,23 @@
   }
 
   function renderCast() {
-    var html = '<section class="card list-card"><div class="list-head"><h3>Cast Menu</h3><p class="subtle-copy">Wizardry stores each memorized command as an alias plus the command text it will execute.</p></div><div class="list-body">';
+    var distinctCommands = {};
+    state.castEntries.forEach(function (entry) {
+      distinctCommands[String(entry.command || '')] = true;
+    });
+    var html = '';
+    html += '<section class="hero">';
+    html += '<div class="card-copy"><h3>Cast Menu Overview</h3><p class="subtle-copy">Memorized spells are stable aliases for commands you want to launch quickly. This panel stays focused on the saved cast list rather than live process activity.</p></div>';
+    html += '<div class="stat-grid">';
+    html += '<div class="stat-card"><strong>' + escHtml(String(state.castEntries.length)) + '</strong><span>Memorized aliases</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(String(Object.keys(distinctCommands).filter(Boolean).length)) + '</strong><span>Distinct commands</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(state.castEntries.length ? state.castEntries[0].alias : 'none') + '</strong><span>First alias</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(state.castEntries.length ? 'ready' : 'empty') + '</strong><span>Cast state</span></div>';
+    html += '</div>';
+    html += '<div class="button-row"><button class="action-btn" type="button" data-nav="spellbook">Open Spellbook</button><button class="action-btn" type="button" data-nav="home">Back to main menu</button></div>';
+    html += '</section>';
+
+    html += '<section class="card list-card"><div class="list-head"><h3>Memorized Spells</h3><p class="subtle-copy">Wizardry stores each memorized command as an alias plus the command text it will execute.</p></div><div class="list-body">';
     if (!state.castEntries.length) {
       html += '<div class="list-row"><p class="empty-state">No memorized spells yet. Use a category page or the spellbook panel to memorize one.</p></div>';
     } else {
