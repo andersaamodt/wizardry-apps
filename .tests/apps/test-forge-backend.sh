@@ -13,6 +13,8 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
 grep -F 'staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")' "$backend" >/dev/null
 grep -F 'mv "$staged_bundle" "$final_bundle"' "$backend" >/dev/null
 grep -F 'if wait_for_workspace_host_start "$app_dir" 50; then' "$backend" >/dev/null
+grep -F 'bundle_app_dir="\$APPDIR/Resources/$workspace_slug$app_entry_suffix"' "$backend" >/dev/null
+grep -F 'exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "$bundle_app_dir"' "$backend" >/dev/null
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "skip: jq not installed" >&2

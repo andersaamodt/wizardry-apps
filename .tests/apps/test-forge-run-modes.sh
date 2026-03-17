@@ -78,8 +78,9 @@ grep -F "\"\$bundle/Contents/Resources/.host/\"" "$backend" >/dev/null
 grep -F "\"\$appdir/usr/share/.host/\"" "$backend" >/dev/null
 grep -F 'WIZARDRY_APPS_ROOT="$root"' "$backend" >/dev/null
 grep -F 'WIZARDRY_DIR="$root"' "$backend" >/dev/null
-grep -F "copy_tree_for_bundle \"\$workspace_path\" \"\$bundle/Contents/Resources/\$workspace_slug/\"" "$backend" >/dev/null
-grep -F "\"\\\$APPDIR/MacOS/wizardry-host\" \"\\\$APPDIR/Resources/\$workspace_slug\$app_entry_suffix\"" "$backend" >/dev/null
+grep -F "copy_tree_for_bundle \"\$workspace_path\" \"\$staged_bundle/Contents/Resources/\$workspace_slug/\"" "$backend" >/dev/null
+grep -F 'bundle_app_dir="\$APPDIR/Resources/$workspace_slug$app_entry_suffix"' "$backend" >/dev/null
+grep -F 'exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "$bundle_app_dir"' "$backend" >/dev/null
 grep -F "sync_macos_install_for_slug" "$backend" >/dev/null
 grep -F "sync_existing_macos_installs_from_bundle" "$backend" >/dev/null
 grep -F "installed_synced=%s" "$backend" >/dev/null

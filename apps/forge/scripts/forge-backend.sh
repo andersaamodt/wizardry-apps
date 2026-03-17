@@ -305,22 +305,20 @@ desktop_build_input_hash() {
   [ -n "$target" ] || return 1
 
   host_src=''
-  bundle_target=''
+  bundle_id=''
   case "$target" in
     darwin)
       host_src="$root/apps/.host/macos/main.m"
-      bundle_target='macos'
+      bundle_id=$(bundle_id_from_manifest "$root" macos "$slug")
       ;;
     linux)
       host_src="$root/apps/.host/linux/main.c"
-      bundle_target='linux'
+      bundle_id="linux.$slug"
       ;;
     *)
       return 1
       ;;
   esac
-
-  bundle_id=$(bundle_id_from_manifest "$root" "$bundle_target" "$slug")
 
   {
     printf 'v=2\n'
@@ -1374,13 +1372,48 @@ wait_for_workspace_host_start() {
   [ -n "$app_dir" ] || return 1
   [ -n "$attempts" ] || attempts=20
   i=0
+  stable=0
   while [ "$i" -lt "$attempts" ]; do
     if workspace_host_running_for_app_dir "$app_dir"; then
-      return 0
+      stable=$((stable + 1))
+      if [ "$stable" -ge 2 ]; then
+        return 0
+      fi
+    else
+      stable=0
     fi
     i=$((i + 1))
     sleep 0.2
   done
+  return 1
+}
+
+launch_desktop_host_linux() {
+  app_run=${1-}
+  app_dir=${2-}
+  log_path=${3-}
+
+  [ -n "$app_run" ] || return 1
+  [ -x "$app_run" ] || return 1
+  [ -n "$app_dir" ] || return 1
+  [ -n "$log_path" ] || return 1
+
+  stop_host_instances_for_app "" "$app_dir"
+
+  if command -v nohup >/dev/null 2>&1; then
+    nohup "$app_run" >"$log_path" 2>&1 &
+  else
+    "$app_run" >"$log_path" 2>&1 &
+  fi
+  pid=$!
+
+  if wait_for_workspace_host_start "$app_dir" 50; then
+    printf '%s\n' "$pid"
+    return 0
+  fi
+
+  stop_host_instances_for_app "" "$app_dir"
+  wait "$pid" >/dev/null 2>&1 || true
   return 1
 }
 
@@ -3276,32 +3309,30 @@ cmd_run_desktop() {
   log_dir="$root/_tmp/workbench/log"
   mkdir -p "$log_dir"
   log_path="$log_dir/$slug-run.log"
+  app_dir="$appdir/usr/share/$slug"
 
-  if command -v nohup >/dev/null 2>&1; then
-    case "$bundle_artifact" in
-      *.AppImage)
+  case "$bundle_artifact" in
+    *.AppImage)
+      if command -v nohup >/dev/null 2>&1; then
         nohup "$bundle_artifact" >"$log_path" 2>&1 &
-        ;;
-      *)
-        nohup "$appdir/AppRun" >"$log_path" 2>&1 &
-        ;;
-    esac
-  else
-    case "$bundle_artifact" in
-      *.AppImage)
+      else
         "$bundle_artifact" >"$log_path" 2>&1 &
-        ;;
-      *)
-        "$appdir/AppRun" >"$log_path" 2>&1 &
-        ;;
-    esac
-  fi
-  pid=$!
+      fi
+      pid=$!
+      ;;
+    *)
+      pid=$(launch_desktop_host_linux "$appdir/AppRun" "$app_dir" "$log_path") || {
+        printf '%s\n' "forge-backend: failed to launch desktop app: $app_dir" >&2
+        exit 1
+      }
+      ;;
+  esac
 
   printf 'launched=1\n'
   printf 'mode=desktop-executable\n'
-  printf 'entry=%s\n' "$appdir"
+  printf 'entry=%s\n' "$app_dir"
   printf 'artifact=%s\n' "$bundle_artifact"
+  printf 'built_artifact=%s\n' "$bundle_artifact"
   printf 'pid=%s\n' "$pid"
   printf 'log=%s\n' "$log_path"
 }
@@ -3501,11 +3532,12 @@ cmd_run_workspace() {
     printf '%s\n' "$root" > "$staged_bundle/Contents/Resources/wizardry-apps-root.txt"
     cp "$host_bin" "$staged_bundle/Contents/MacOS/wizardry-host"
 
+    bundle_app_dir="\$APPDIR/Resources/$workspace_slug$app_entry_suffix"
     install -m 755 /dev/stdin "$staged_bundle/Contents/MacOS/$workspace_slug" <<APP
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
-exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "$app_dir"
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "$bundle_app_dir"
 APP
 
     icon_source=''
@@ -3576,14 +3608,15 @@ PLIST
     rm -rf "$final_bundle"
     mv "$staged_bundle" "$final_bundle"
     rmdir "$staged_root" 2>/dev/null || :
-    if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/$workspace_slug" "$app_dir"; then
+    bundle_app_dir="$final_bundle/Contents/Resources/$workspace_slug$app_entry_suffix"
+    if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/$workspace_slug" "$bundle_app_dir"; then
       printf '%s\n' "forge-backend: failed to launch workspace bundle: $final_bundle" >&2
       exit 1
     fi
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$final_bundle"
-    printf 'entry=%s\n' "$app_dir"
+    printf 'entry=%s\n' "$bundle_app_dir"
     printf 'log=%s\n' "$log_path"
     return 0
   fi
@@ -3621,16 +3654,15 @@ exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$HERE/usr/bin/wizardr
 APP
     chmod +x "$appdir/AppRun"
 
-    if command -v nohup >/dev/null 2>&1; then
-      nohup "$appdir/AppRun" >"$log_path" 2>&1 &
-    else
-      "$appdir/AppRun" >"$log_path" 2>&1 &
-    fi
-    pid=$!
+    app_entry="$appdir/usr/share/$bundle_slug$app_entry_suffix"
+    pid=$(launch_desktop_host_linux "$appdir/AppRun" "$app_entry" "$log_path") || {
+      printf '%s\n' "forge-backend: failed to launch workspace desktop host: $app_entry" >&2
+      exit 1
+    }
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$appdir"
-    printf 'entry=%s\n' "$appdir/usr/share/$bundle_slug$app_entry_suffix"
+    printf 'entry=%s\n' "$app_entry"
     printf 'pid=%s\n' "$pid"
     printf 'log=%s\n' "$log_path"
     return 0
