@@ -25,6 +25,7 @@
     toastTimer: null,
     spellActivityTimer: null,
     spellActivityBusy: false,
+    synonymComposerOpen: false,
     startupWindowSized: false,
     windowFitInFlight: false
   };
@@ -445,6 +446,9 @@
     Array.prototype.forEach.call(els.navGroups.querySelectorAll('[data-page]'), function (button) {
       button.addEventListener('click', function () {
         state.activePage = button.getAttribute('data-page') || 'home';
+        if (state.activePage !== 'spellbook') {
+          state.synonymComposerOpen = false;
+        }
         savePref('active_page', state.activePage);
         requestRender();
       });
@@ -712,7 +716,6 @@
     var html = '';
     html += '<section class="section-grid">';
     html += '<article class="card"><div class="card-copy"><h4>New Category</h4><p class="subtle-copy">Create a custom spellbook folder like the spellbook menu does.</p></div><div class="inline-form"><input id="create-category-name" type="text" spellcheck="false" placeholder="rituals"><button id="create-category-btn" class="action-btn" type="button">Create</button></div></article>';
-    html += '<article class="card"><div class="card-copy"><h4>Add Synonym</h4><p class="subtle-copy">Map a short word to an existing spell or command target.</p></div><div class="field-row"><input id="synonym-word" type="text" spellcheck="false" placeholder="ll"><input id="synonym-target" type="text" spellcheck="false" placeholder="ls -l"><button id="add-synonym-btn" class="action-btn" type="button">Add</button></div></article>';
     html += '<article class="card settings-card-wide"><div class="card-copy"><h4>Scribe Spell</h4><p class="subtle-copy">Write a custom executable in your spellbook without dropping to the terminal.</p></div><div class="field-row"><input id="scribe-name" type="text" spellcheck="false" placeholder="ship-it"><select id="scribe-category"><option value="">Spellbook root</option>' + options + '</select><input id="scribe-command" type="text" spellcheck="false" placeholder="git status --short"><button id="scribe-btn" class="action-btn" type="button">Scribe</button></div></article>';
     html += '</section>';
 
@@ -721,12 +724,17 @@
       html += '<div class="list-row"><p class="empty-state">No synonyms discovered.</p></div>';
     } else {
       state.synonyms.forEach(function (item) {
-        html += '<div class="list-row"><div class="row-copy"><span class="row-title">' + escHtml(item.word) + '</span><span class="row-subtitle">' + escHtml(item.target) + ' • ' + escHtml(item.origin) + '</span></div><div class="row-actions">';
+        html += '<div class="list-row synonym-row"><div class="row-copy synonym-copy"><span class="row-title">' + escHtml(item.word) + '</span><span class="synonym-command">' + escHtml(item.target) + '</span><span class="synonym-meta">' + escHtml(item.origin) + '</span></div><div class="row-actions synonym-actions">';
         if (item.origin === 'custom') {
           html += '<button class="action-btn" type="button" data-delete-synonym="' + escHtml(item.word) + '">Delete</button>';
         }
         html += '</div></div>';
       });
+    }
+    html += '</div><div class="list-foot">';
+    html += '<div class="button-row synonym-footer-row"><button id="open-synonym-composer-btn" class="icon-btn list-plus-btn" type="button" aria-label="Add synonym" title="Add synonym">+</button><p class="subtle-copy">Add a new synonym under the existing list.</p></div>';
+    if (state.synonymComposerOpen) {
+      html += '<div class="inline-reveal-card"><div class="card-copy"><h4>New Synonym</h4><p class="subtle-copy">Map a short word to an existing spell or command target.</p></div><div class="field-row"><input id="synonym-word" type="text" spellcheck="false" placeholder="ll"><input id="synonym-target" type="text" spellcheck="false" placeholder="ls -l"><button id="add-synonym-btn" class="action-btn" type="button">Add</button><button id="cancel-synonym-btn" class="action-btn" type="button">Cancel</button></div></div>';
     }
     html += '</div></section>';
 
@@ -875,6 +883,9 @@
     Array.prototype.forEach.call(els.pageContent.querySelectorAll('[data-nav]'), function (button) {
       button.addEventListener('click', function () {
         state.activePage = button.getAttribute('data-nav') || 'home';
+        if (state.activePage !== 'spellbook') {
+          state.synonymComposerOpen = false;
+        }
         savePref('active_page', state.activePage);
         requestRender();
       });
@@ -962,19 +973,53 @@
         }
       });
     }
+    var openSynonymComposerBtn = document.getElementById('open-synonym-composer-btn');
+    if (openSynonymComposerBtn) {
+      openSynonymComposerBtn.addEventListener('click', function () {
+        state.synonymComposerOpen = !state.synonymComposerOpen;
+        requestRender().then(function () {
+          if (state.synonymComposerOpen) {
+            var word = document.getElementById('synonym-word');
+            if (word) {
+              word.focus();
+            }
+          }
+        });
+      });
+    }
+    var cancelSynonymBtn = document.getElementById('cancel-synonym-btn');
+    if (cancelSynonymBtn) {
+      cancelSynonymBtn.addEventListener('click', function () {
+        state.synonymComposerOpen = false;
+        requestRender();
+      });
+    }
     var addSynonymBtn = document.getElementById('add-synonym-btn');
     if (addSynonymBtn) {
-      addSynonymBtn.addEventListener('click', async function () {
+      var submitSynonym = async function () {
         var word = document.getElementById('synonym-word');
         var target = document.getElementById('synonym-target');
         try {
           await runAndRefresh('synonym', ['add', String(word.value || '').trim(), String(target.value || '').trim()], 'add synonym');
-          word.value = '';
-          target.value = '';
+          state.synonymComposerOpen = false;
+          await requestRender();
           toast('Synonym added');
         } catch (error) {
           toast(error.message || 'Synonym failed');
         }
+      };
+      addSynonymBtn.addEventListener('click', submitSynonym);
+      ['synonym-word', 'synonym-target'].forEach(function (id) {
+        var input = document.getElementById(id);
+        if (!input) {
+          return;
+        }
+        input.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            submitSynonym();
+          }
+        });
       });
     }
     var scribeBtn = document.getElementById('scribe-btn');
@@ -1313,6 +1358,11 @@
         }
         if (state.themeMenuOpen) {
           closeThemeMenu();
+          return;
+        }
+        if (state.activePage === 'spellbook' && state.synonymComposerOpen) {
+          state.synonymComposerOpen = false;
+          requestRender();
           return;
         }
         if (state.drawerOpen) {

@@ -27,6 +27,7 @@
 - Search field. Apps: Forge. Best: Forge filter input for short live-filter fields; keep it compact, immediate, and near the list it filters.
 - Bounded text input with explicit action. Apps: Forge, Wizardry Desktop, Chatroom. Best: Forge root path rows for path settings that should not autosave every keystroke; Chatroom now uses this family for its saved remote chat URL field.
 - Inline rename input. Apps: Forge. Best: Forge project rename and mini-tab rename for short inline edits; focus immediately, commit on blur or `Enter`, and cancel on `Escape`.
+- Inline reveal composer. Apps: Wizardry Desktop. Best: Wizardry Desktop synonym composer for low-frequency additive forms that should stay near the managed list; reveal it from a compact `+` control in the card footer and dismiss it with `Escape`, cancel, or successful submit.
 - Primary short-text input. Apps: Forge, Wizardry Desktop, Chatroom. Best: Forge `Create App` title field because it pairs one short field with immediate derived feedback like the path preview.
 - Multi-field inline form. Apps: Wizardry Desktop. Best: Wizardry Desktop spellbook, services, and MUD rows for short operational forms that mix several compact fields and one immediate action.
 - File input. Apps: Forge. Best: Forge icon picker; hide the raw file input behind a labeled dropzone and keep keyboard access through the label.
