@@ -1305,12 +1305,13 @@ launch_workspace_bundle_macos() {
   bundle=${1-}
   launcher_exec=${2-}
   app_dir=${3-}
+  launch_attempts=75
   [ -d "$bundle" ] || return 1
   [ -n "$app_dir" ] || return 1
 
   if command -v open >/dev/null 2>&1; then
     if open -na "$bundle" >/dev/null 2>&1; then
-      if wait_for_workspace_host_start "$app_dir" 25; then
+      if wait_for_workspace_host_start "$app_dir" "$launch_attempts"; then
         return 0
       fi
     fi
@@ -1322,7 +1323,7 @@ launch_workspace_bundle_macos() {
   else
     "$launcher_exec" >/dev/null 2>&1 &
   fi
-  wait_for_workspace_host_start "$app_dir" 25
+  wait_for_workspace_host_start "$app_dir" "$launch_attempts"
 }
 
 stop_desktop_instances_for_slug() {
