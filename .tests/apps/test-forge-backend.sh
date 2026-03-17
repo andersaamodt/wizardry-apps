@@ -10,6 +10,9 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
   exit 1
 }
 
+grep -F 'staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")' "$backend" >/dev/null
+grep -F 'mv "$staged_bundle" "$final_bundle"' "$backend" >/dev/null
+
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "skip: jq not installed" >&2
   exit 0

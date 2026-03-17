@@ -3301,18 +3301,19 @@ cmd_run_workspace() {
     workspace_slug=$(sanitize_bundle_component "$workspace_slug")
 
     bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
-    bundle="$bundle_root/$workspace_title.app"
-    rm -rf "$bundle"
-    mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$workspace_slug" "$bundle/Contents/Resources/.host"
+    final_bundle="$bundle_root/$workspace_title.app"
+    staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")
+    staged_bundle="$staged_root/$workspace_title.app"
+    mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources/$workspace_slug" "$staged_bundle/Contents/Resources/.host"
 
-    copy_tree_for_bundle "$workspace_path" "$bundle/Contents/Resources/$workspace_slug/"
-    mkdir -p "$bundle/Contents/Resources/$workspace_slug/.host"
-    cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$workspace_slug/.host/"
-    cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
-    printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
-    cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
+    copy_tree_for_bundle "$workspace_path" "$staged_bundle/Contents/Resources/$workspace_slug/"
+    mkdir -p "$staged_bundle/Contents/Resources/$workspace_slug/.host"
+    cp -R "$root/apps/.host/shared" "$staged_bundle/Contents/Resources/$workspace_slug/.host/"
+    cp -R "$root/apps/.host/shared" "$staged_bundle/Contents/Resources/.host/"
+    printf '%s\n' "$root" > "$staged_bundle/Contents/Resources/wizardry-apps-root.txt"
+    cp "$host_bin" "$staged_bundle/Contents/MacOS/wizardry-host"
 
-    install -m 755 /dev/stdin "$bundle/Contents/MacOS/$workspace_slug" <<APP
+    install -m 755 /dev/stdin "$staged_bundle/Contents/MacOS/$workspace_slug" <<APP
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
@@ -3349,26 +3350,26 @@ APP
         sips -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
       done
       icon_name="forge-${icon_hash}.icns"
-      if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
+      if iconutil -c icns "$iconset" -o "$staged_bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
         icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
       else
         icon_name="forge-icon-${icon_hash}.png"
-        cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+        cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
         icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
       fi
       rm -rf "$iconset"
     elif [ "$icon_source_format" = 'png' ]; then
       icon_name="forge-icon-${icon_hash}.png"
-      cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+      cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
       icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
     elif [ "$icon_source_format" = 'icns' ]; then
       icon_name="forge-${icon_hash}.icns"
-      cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+      cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
       icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
     fi
 
     bundle_id="com.wizardry.workspace.$workspace_slug"
-    cat > "$bundle/Contents/Info.plist" <<PLIST
+    cat > "$staged_bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -3383,14 +3384,18 @@ $icon_key
 PLIST
 
     stop_desktop_instances_for_slug "$root" "$workspace_slug" "$workspace_title" "$os"
-    if ! launch_workspace_bundle_macos "$bundle" "$bundle/Contents/MacOS/$workspace_slug" "$bundle/Contents/Resources/$workspace_slug$app_entry_suffix"; then
-      printf '%s\n' "forge-backend: failed to launch workspace bundle: $bundle" >&2
+    mkdir -p "$bundle_root"
+    rm -rf "$final_bundle"
+    mv "$staged_bundle" "$final_bundle"
+    rmdir "$staged_root" 2>/dev/null || :
+    if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/$workspace_slug" "$final_bundle/Contents/Resources/$workspace_slug$app_entry_suffix"; then
+      printf '%s\n' "forge-backend: failed to launch workspace bundle: $final_bundle" >&2
       exit 1
     fi
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
-    printf 'artifact=%s\n' "$bundle"
-    printf 'entry=%s\n' "$bundle/Contents/Resources/$workspace_slug$app_entry_suffix"
+    printf 'artifact=%s\n' "$final_bundle"
+    printf 'entry=%s\n' "$final_bundle/Contents/Resources/$workspace_slug$app_entry_suffix"
     printf 'log=%s\n' "$log_path"
     return 0
   fi
