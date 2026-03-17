@@ -26,6 +26,7 @@
     spellActivityTimer: null,
     spellActivityBusy: false,
     synonymComposerOpen: false,
+    castCategoryPage: '',
     startupWindowSized: false,
     windowFitInFlight: false
   };
@@ -346,13 +347,7 @@
     var desktopFeatures = [
       { id: 'spell-activity', label: 'Casting Watch', meta: String(state.spellActivity.length || 0), group: 'Desktop Features' }
     ];
-    var builtin = state.categories.filter(function (item) { return item.kind === 'builtin'; }).map(function (item) {
-      return { id: 'builtin:' + item.id, label: item.label, meta: item.count, group: 'Spell Categories' };
-    });
-    var custom = state.categories.filter(function (item) { return item.kind === 'custom'; }).map(function (item) {
-      return { id: 'custom:' + item.id, label: item.label, meta: item.count, group: 'Custom Categories' };
-    });
-    state.navRows = guided.concat(desktopFeatures, builtin, custom);
+    state.navRows = guided.concat(desktopFeatures);
   }
 
   function ensureActivePage() {
@@ -361,7 +356,12 @@
       known[row.id] = true;
     });
     if (!known[state.activePage]) {
-      state.activePage = 'home';
+      if (/^(builtin|custom):/.test(state.activePage)) {
+        state.castCategoryPage = state.activePage;
+        state.activePage = 'cast';
+      } else {
+        state.activePage = 'home';
+      }
     }
     savePref('active_page', state.activePage);
   }
@@ -433,7 +433,7 @@
   }
 
   function renderNav() {
-    var groupOrder = ['Guided Panels', 'Desktop Features', 'Spell Categories', 'Custom Categories'];
+    var groupOrder = ['Guided Panels', 'Desktop Features'];
     var html = '';
     groupOrder.forEach(function (groupName) {
       var rows = state.navRows.filter(function (row) { return row.group === groupName; });
@@ -456,6 +456,9 @@
         state.activePage = button.getAttribute('data-page') || 'home';
         if (state.activePage !== 'spellbook') {
           state.synonymComposerOpen = false;
+        }
+        if (state.activePage !== 'cast') {
+          state.castCategoryPage = '';
         }
         savePref('active_page', state.activePage);
         requestRender();
@@ -653,7 +656,7 @@
   function renderHome() {
     var hero = '';
     hero += '<section class="hero">';
-    hero += '<div class="card-copy"><h3>Main Menu Structure</h3><p class="subtle-copy">The left rail mirrors Wizardry’s main menu first, then expands into discovered spell categories. Desktop-only utilities live in their own rail section.</p></div>';
+    hero += '<div class="card-copy"><h3>Main Menu Structure</h3><p class="subtle-copy">The left rail mirrors Wizardry’s main menu panels. Spell categories now live inside the Cast page, while desktop-only utilities stay in their own rail section.</p></div>';
     hero += '<div class="stat-grid">';
     hero += '<div class="stat-card"><strong>' + escHtml(state.doctorKv.category_count || '0') + '</strong><span>Categories</span></div>';
     hero += '<div class="stat-card"><strong>' + escHtml(state.doctorKv.spell_count || '0') + '</strong><span>Executable spells</span></div>';
@@ -690,14 +693,15 @@
     state.castEntries.forEach(function (entry) {
       distinctCommands[String(entry.command || '')] = true;
     });
+    var categories = state.categories.slice();
     var html = '';
     html += '<section class="hero">';
-    html += '<div class="card-copy"><h3>Cast Menu Overview</h3><p class="subtle-copy">Memorized spells are stable aliases for commands you want to launch quickly. This panel stays focused on the saved cast list rather than live process activity.</p></div>';
+    html += '<div class="card-copy"><h3>Cast Menu Overview</h3><p class="subtle-copy">Memorized spells are stable aliases for commands you want to launch quickly. Category browsing from the shell cast flow lives here too, not in the left rail.</p></div>';
     html += '<div class="stat-grid">';
     html += '<div class="stat-card"><strong>' + escHtml(String(state.castEntries.length)) + '</strong><span>Memorized aliases</span></div>';
     html += '<div class="stat-card"><strong>' + escHtml(String(Object.keys(distinctCommands).filter(Boolean).length)) + '</strong><span>Distinct commands</span></div>';
-    html += '<div class="stat-card"><strong>' + escHtml(state.castEntries.length ? state.castEntries[0].alias : 'none') + '</strong><span>First alias</span></div>';
-    html += '<div class="stat-card"><strong>' + escHtml(state.castEntries.length ? 'ready' : 'empty') + '</strong><span>Cast state</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(String(categories.length)) + '</strong><span>Spell categories</span></div>';
+    html += '<div class="stat-card"><strong>' + escHtml(state.castCategoryPage ? state.castCategoryPage.split(':')[1] : (state.castEntries.length ? 'ready' : 'empty')) + '</strong><span>Focused category</span></div>';
     html += '</div>';
     html += '<div class="button-row"><button class="action-btn" type="button" data-nav="spellbook">Open Spellbook</button><button class="action-btn" type="button" data-nav="home">Back to main menu</button></div>';
     html += '</section>';
@@ -714,6 +718,37 @@
       });
     }
     html += '</div></section>';
+
+    html += '<section class="card list-card"><div class="list-head"><h3>Spell Categories</h3><p class="subtle-copy">This mirrors the category portion of the cast flow. Open a category below to browse and run its spells without leaving Cast.</p></div><div class="list-body">';
+    if (!categories.length) {
+      html += '<div class="list-row"><p class="empty-state">No spell categories were discovered.</p></div>';
+    } else {
+      categories.forEach(function (item) {
+        var pageId = item.kind + ':' + item.id;
+        var isOpen = state.castCategoryPage === pageId;
+        html += '<div class="list-row"><div class="row-copy"><span class="row-title">' + escHtml(item.label) + '</span><span class="row-subtitle">' + escHtml(item.description) + '</span></div><div class="row-actions"><span class="pill">' + escHtml(item.kind) + '</span><span class="pill">' + escHtml(item.count) + ' spells</span><button class="action-btn" type="button" data-open-cast-category="' + escHtml(pageId) + '">' + escHtml(isOpen ? 'Close' : 'Open') + '</button></div></div>';
+        if (isOpen) {
+          html += renderCastCategoryDetail(pageId);
+        }
+      });
+    }
+    html += '</div></section>';
+    return html;
+  }
+
+  function renderCastCategoryDetail(pageId) {
+    var spells = state.spellCache[pageId] || [];
+    var html = '<div class="inline-reveal-card category-inline">';
+    html += '<div class="card-copy"><h4>Category Spells</h4><p class="subtle-copy">Run, inspect, or memorize spells from the selected category.</p></div>';
+    if (!spells.length) {
+      html += '<div class="list-row list-row-embedded"><p class="empty-state">No executable spells were found for this category.</p></div>';
+    } else {
+      var split = pageId.split(':');
+      spells.forEach(function (item) {
+        html += '<div class="list-row list-row-embedded"><div class="row-copy"><span class="row-title">' + escHtml(item.name) + '</span><span class="row-subtitle">' + escHtml(item.summary || 'No summary available.') + ' • ' + escHtml(split[0]) + '</span></div><div class="row-actions">' + (item.memorized ? '<span class="pill good">memorized</span>' : '') + '<button class="action-btn" type="button" data-help-spell="' + escHtml(item.name) + '">Help</button><button class="action-btn" type="button" data-run-spell="' + escHtml(item.name) + '">Run</button><button class="action-btn" type="button" data-memorize-spell="' + escHtml(item.name) + '">' + (item.memorized ? 'Forget' : 'Memorize') + '</button></div></div>';
+      });
+    }
+    html += '</div>';
     return html;
   }
 
@@ -932,7 +967,17 @@
         if (state.activePage !== 'spellbook') {
           state.synonymComposerOpen = false;
         }
+        if (state.activePage !== 'cast') {
+          state.castCategoryPage = '';
+        }
         savePref('active_page', state.activePage);
+        requestRender();
+      });
+    });
+    Array.prototype.forEach.call(els.pageContent.querySelectorAll('[data-open-cast-category]'), function (button) {
+      button.addEventListener('click', function () {
+        var pageId = button.getAttribute('data-open-cast-category') || '';
+        state.castCategoryPage = state.castCategoryPage === pageId ? '' : pageId;
         requestRender();
       });
     });
@@ -1300,6 +1345,10 @@
       await loadSpellActivity();
       html = renderSpellActivity();
     } else if (state.activePage === 'cast') {
+      if (/^(builtin|custom):/.test(state.castCategoryPage)) {
+        setBootStatus('Loading category…');
+        await loadCategoryPage(state.castCategoryPage);
+      }
       html = renderCast();
     } else if (state.activePage === 'spellbook') {
       html = renderSpellbook();

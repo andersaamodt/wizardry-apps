@@ -639,6 +639,16 @@ select:focus,
   background: color-mix(in srgb, var(--panel-soft) 92%, white);
 }
 
+.category-inline .list-row-embedded {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.category-inline .card-copy + .list-row-embedded,
+.category-inline .list-row-embedded:first-child {
+  border-top: 0;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

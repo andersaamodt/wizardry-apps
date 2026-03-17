@@ -365,77 +365,79 @@ cat > "$JS_TMP" <<'JSCODE'
         expect(!!document.querySelector('[data-run-cast="ll"]'), 'cast-run-button');
         expect(!document.getElementById('refresh-spell-activity-btn'), 'cast-watch-button-absent');
         expect(String(document.getElementById('page-content').textContent || '').indexOf('ls -lah') >= 0, 'cast-command-rendered');
+        expect(!document.querySelector('.nav-row[data-page="builtin:translocation"]'), 'cast-category-not-in-rail');
+        expect(String(document.getElementById('page-content').textContent || '').indexOf('Translocation') >= 0, 'cast-category-listed');
+        click('[data-open-cast-category="builtin:translocation"]');
 
-        var spellbookRow = click('.nav-row[data-page="spellbook"]');
-        expect(!!spellbookRow, 'spellbook-row-present');
+        step(110, function () {
+          expect(String(document.getElementById('page-content').textContent || '').indexOf('teleport-home') >= 0, 'cast-category-spells-rendered');
+          expect(document.querySelectorAll('[data-run-spell]').length >= 2, 'cast-category-run-buttons');
+          var spellbookRow = click('.nav-row[data-page="spellbook"]');
+          expect(!!spellbookRow, 'spellbook-row-present');
 
-        step(90, function () {
-          expect(document.getElementById('page-title').textContent.indexOf('Scribe') >= 0, 'spellbook-page-title');
-          expect(!!document.getElementById('open-synonym-composer-btn'), 'synonym-open-button');
-          click('#open-synonym-composer-btn');
+          step(90, function () {
+            expect(document.getElementById('page-title').textContent.indexOf('Scribe') >= 0, 'spellbook-page-title');
+            expect(!!document.getElementById('open-synonym-composer-btn'), 'synonym-open-button');
+            click('#open-synonym-composer-btn');
 
-          step(70, function () {
-            var synonymWord = document.getElementById('synonym-word');
-            var synonymTarget = document.getElementById('synonym-target');
-            expect(!!synonymWord && !!synonymTarget, 'synonym-composer-open');
-            if (synonymWord) {
-              synonymWord.value = 'gst';
-            }
-            if (synonymTarget) {
-              synonymTarget.value = 'git status';
-            }
-            click('#add-synonym-btn');
+            step(70, function () {
+              var synonymWord = document.getElementById('synonym-word');
+              var synonymTarget = document.getElementById('synonym-target');
+              expect(!!synonymWord && !!synonymTarget, 'synonym-composer-open');
+              if (synonymWord) {
+                synonymWord.value = 'gst';
+              }
+              if (synonymTarget) {
+                synonymTarget.value = 'git status';
+              }
+              click('#add-synonym-btn');
 
-            step(100, function () {
-              var spellbookText = String(document.getElementById('page-content').textContent || '');
-              expect(spellbookText.indexOf('gst') >= 0, 'synonym-added-word');
-              expect(spellbookText.indexOf('git status') >= 0, 'synonym-added-target');
-              expect(!document.getElementById('synonym-word'), 'synonym-composer-closed');
+              step(100, function () {
+                var spellbookText = String(document.getElementById('page-content').textContent || '');
+                expect(spellbookText.indexOf('gst') >= 0, 'synonym-added-word');
+                expect(spellbookText.indexOf('git status') >= 0, 'synonym-added-target');
+                expect(!document.getElementById('synonym-word'), 'synonym-composer-closed');
 
-              click('#settings-btn');
-              step(50, function () {
-                var settings = document.getElementById('settings-modal');
-                expect(!!settings && !settings.classList.contains('hidden'), 'settings-open');
-                expect(String((document.getElementById('doctor-output') || {}).textContent || '').indexOf('wizardry_dir=') >= 0, 'doctor-output-loaded');
-                click('#settings-close-btn');
+                click('#settings-btn');
+                step(50, function () {
+                  var settings = document.getElementById('settings-modal');
+                  expect(!!settings && !settings.classList.contains('hidden'), 'settings-open');
+                  expect(String((document.getElementById('doctor-output') || {}).textContent || '').indexOf('wizardry_dir=') >= 0, 'doctor-output-loaded');
+                  click('#settings-close-btn');
 
-                step(60, function () {
-                  expect(document.getElementById('settings-modal').classList.contains('hidden'), 'settings-close');
-                  click('.nav-row[data-page="computer"]');
+                  step(60, function () {
+                    expect(document.getElementById('settings-modal').classList.contains('hidden'), 'settings-close');
+                    click('.nav-row[data-page="computer"]');
 
-                  step(80, function () {
-                    click('[data-system="update-all"]');
+                    step(80, function () {
+                      click('[data-system="update-all"]');
 
-                    step(110, function () {
-                      click('#activity-toggle');
+                      step(110, function () {
+                        click('#activity-toggle');
 
-                      step(260, function () {
-                        expect(document.body.classList.contains('drawer-open'), 'drawer-open');
-                        var logText = String((document.getElementById('activity-log') || {}).textContent || '');
-                        expect(logText.indexOf('system action') >= 0, 'activity-title-logged');
-                        expect(logText.indexOf("'system' 'update-all'") >= 0, 'activity-command-logged');
-                        click('#clear-log-btn');
+                        step(260, function () {
+                          expect(document.body.classList.contains('drawer-open'), 'drawer-open');
+                          var logText = String((document.getElementById('activity-log') || {}).textContent || '');
+                          expect(logText.indexOf('system action') >= 0, 'activity-title-logged');
+                          expect(logText.indexOf("'system' 'update-all'") >= 0, 'activity-command-logged');
+                          click('#clear-log-btn');
 
-                        step(40, function () {
-                          expect(String(document.getElementById('activity-log').textContent || '').trim() === 'Waiting for activity.', 'activity-clear');
-                          click('#activity-toggle');
+                          step(40, function () {
+                            expect(String(document.getElementById('activity-log').textContent || '').trim() === 'Waiting for activity.', 'activity-clear');
+                            click('#activity-toggle');
 
-                          step(260, function () {
-                            expect(!document.body.classList.contains('drawer-open'), 'drawer-close');
-                            click('.nav-row[data-page="builtin:translocation"]');
-
-                            step(110, function () {
-                              expect(document.querySelectorAll('[data-run-spell]').length >= 2, 'category-spells-rendered');
+                            step(260, function () {
+                              expect(!document.body.classList.contains('drawer-open'), 'drawer-close');
                               finish();
+                            });
+                          });
+                        });
+                      });
+                    });
+                  });
                 });
               });
             });
-            });
-          });
-        });
-      });
-                });
-              });
           });
         });
       });
