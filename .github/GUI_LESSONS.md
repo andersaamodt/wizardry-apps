@@ -67,3 +67,4 @@
 - For draggable compact tab strips in Forge, prefer custom pointer-driven reordering plus FLIP animation over native HTML drag/drop; native tab drags do not survive strip rerenders well enough for reliable live animated reordering.
 - Do not mark a desktop splash handoff as sent until the host bridge is actually available; if the web UI fires its ready signal too early and never retries, the native splash will sit until the host-side failsafe timeout.
 - For Forge startup, keep Dock/Finder identity on the packaged bundle icon but prefer a direct packaged/workspace icon file as the splash logo source; file-backed icon loading is more reliable during the earliest startup frames than bundle-icon lookup alone.
+- Forge startup should paint from cached local UI state first and move `doctor` plus catalog scans off the splash-critical path; startup time should be bounded by first useful paint, not by repository or projects-root enumeration latency.

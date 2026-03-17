@@ -475,6 +475,37 @@
         }
       }
 
+      async function runInitialBridgeBootstrap() {
+        try {
+          await hydratePrefsFromBackend();
+          refreshStateFromStorage();
+          applyTheme(state.activeTheme, { allowUnlisted: true });
+          await loadThemes();
+          applyTheme(state.activeTheme);
+          renderThemePicker();
+          setOrganizeShow(state.organizeShow);
+          setOrganizeSort(state.organizeSort);
+          setOrganizeBuiltinFirst(state.organizeBuiltinFirst);
+          setUseMiniTabs(state.useMiniTabs);
+          setLeftRailWidth(state.leftRailWidth);
+          if (state.rootHint) {
+            setWorkspaceRoot(state.rootHint);
+          }
+          if (state.projectsRoot) {
+            els.settingsProjectsRoot.value = state.projectsRoot;
+          }
+          syncSettingsSaveButtons();
+          await refreshWorkspace({ quiet: true });
+          text(els.qualityScope, 'Global checks for repository: ' + (state.rootHint || '(not set)'));
+          text(els.qualityHelp, 'These checks run against the repository and pipeline tooling, not one selected app.');
+          setActivity('ready', 'Ready');
+          scheduleWindowFit();
+        } catch (err) {
+          appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
+          setActivity('idle', 'Waiting');
+        }
+      }
+
       function setSelectedCatalog(value) {
         var previous = state.selectedCatalog || '';
         var next = value || '';
@@ -6379,6 +6410,13 @@
           window.addEventListener('resize', syncHostWorkspaceDropZone);
           window.addEventListener('resize', scheduleSelectedPathCompactSync);
 
+          renderResult({
+            status: 'neutral',
+            summary: 'Run an action to see structured results and next steps.',
+            paths: [],
+            help: null
+          });
+
           if (state.rootHint) {
             setWorkspaceRoot(state.rootHint);
           }
@@ -6387,24 +6425,12 @@
           }
           syncSettingsSaveButtons();
 
-          renderResult({
-            status: 'neutral',
-            summary: 'Run an action to see structured results and next steps.',
-            paths: [],
-            help: null
-          });
-
           if (bridgeAvailable()) {
             setBridgeStatus(true, 'Bridge: connected');
-            setActivity('ready', 'Ready');
-            try {
-              await refreshWorkspace({ quiet: true });
-            } catch (err) {
-              appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
-            }
-            text(els.qualityScope, 'Global checks for repository: ' + (state.rootHint || '(not set)'));
-            text(els.qualityHelp, 'These checks run against the repository and pipeline tooling, not one selected app.');
-            scheduleWindowFit();
+            setActivity('idle', 'Loading');
+            window.setTimeout(function () {
+              runInitialBridgeBootstrap();
+            }, 0);
             return;
           }
 
@@ -6427,11 +6453,8 @@
             clearInterval(timer);
             document.body.classList.remove('bridge-missing');
             setBridgeStatus(true, 'Bridge: connected');
-            setActivity('ready', 'Ready');
-            refreshWorkspace({ quiet: true }).catch(function (err) {
-              appendLog('initial refresh error: ' + String(err && err.message ? err.message : err));
-            });
-            scheduleWindowFit();
+            setActivity('idle', 'Loading');
+            runInitialBridgeBootstrap();
           }, 250);
         } finally {
           revealBootUi();
