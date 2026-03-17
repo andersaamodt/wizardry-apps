@@ -326,6 +326,8 @@
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
       var HIDDEN_WORKSPACES_KEY = 'wizardry.forge.hidden.workspaces.v1';
+      var CACHED_APPS_KEY = 'wizardry.forge.cached_apps.v1';
+      var CACHED_WORKSPACES_KEY = 'wizardry.forge.cached_workspaces.v1';
       var MINI_TABS_KEY = 'wizardry.forge.mini_tabs.v1';
       var ACTIVE_MINI_TAB_KEY = 'wizardry.forge.active_mini_tab.v1';
       var MINI_TAB_ASSIGNMENTS_KEY = 'wizardry.forge.mini_tab_assignments.v1';
@@ -344,6 +346,8 @@
         'wizardry.forge.left_rail.width': 'left_rail_width',
         'wizardry.forge.selected.catalog.v1': 'selected_catalog',
         'wizardry.forge.hidden.workspaces.v1': 'hidden_workspaces',
+        'wizardry.forge.cached_apps.v1': 'cached_apps',
+        'wizardry.forge.cached_workspaces.v1': 'cached_workspaces',
         'wizardry.forge.mini_tabs.v1': 'mini_tabs',
         'wizardry.forge.active_mini_tab.v1': 'active_mini_tab',
         'wizardry.forge.mini_tab_assignments.v1': 'mini_tab_assignments'
@@ -1730,6 +1734,108 @@
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
         state.miniTabs = parseMiniTabs();
         state.activeMiniTab = loadStorage(ACTIVE_MINI_TAB_KEY) || 'all';
+      }
+
+      function parseCatalogCache(raw, fallback) {
+        if (!raw) {
+          return null;
+        }
+        try {
+          var parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : (fallback || null);
+        } catch (_err) {
+          return fallback || null;
+        }
+      }
+
+      function normalizeCachedApps(items) {
+        return (items || []).map(function (row) {
+          return {
+            id: String(row && row.id || ''),
+            title: String(row && row.title || ''),
+            production: !!(row && row.production),
+            exists: row && row.exists !== false,
+            context: String(row && row.context || 'web'),
+            targets: typeof (row && row.targets) === 'string' ? row.targets : 'macos,linux',
+            distribution: String(row && row.distribution || 'optional'),
+            resolvedStatus: String(row && row.resolvedStatus || ''),
+            resolvedPath: String(row && row.resolvedPath || ''),
+            sortTimestamp: String(row && row.sortTimestamp || '0')
+          };
+        }).filter(function (row) {
+          return !!row.id;
+        });
+      }
+
+      function normalizeCachedWorkspaces(items) {
+        var hiddenPaths = hiddenWorkspacePathSet();
+        return (items || []).map(function (row) {
+          return {
+            id: String(row && row.id || ''),
+            title: String(row && row.title || ''),
+            projectType: String(row && row.projectType || 'application'),
+            context: String(row && row.context || 'web'),
+            targets: String(row && row.targets || ''),
+            path: String(row && row.path || ''),
+            sortTimestamp: String(row && row.sortTimestamp || '0'),
+            runnable: row && row.runnable !== false
+          };
+        }).filter(function (row) {
+          return !!row.id && !!row.path && !hiddenPaths[normalizePathForCompare(row.path)];
+        });
+      }
+
+      function syncStarterOptionsFromCatalog() {
+        if (els.starterApplicationSelect) {
+          els.starterApplicationSelect.innerHTML = '';
+          [
+            { value: 'minimal', label: 'Blank application project' },
+            { value: 'panel', label: 'Template: Control panel project' }
+          ].forEach(function (item) {
+            var opt = document.createElement('option');
+            opt.value = item.value;
+            opt.textContent = item.label;
+            els.starterApplicationSelect.appendChild(opt);
+          });
+          state.apps.forEach(function (app) {
+            var opt = document.createElement('option');
+            opt.value = 'clone:' + app.id;
+            opt.textContent = 'Clone ' + app.title;
+            els.starterApplicationSelect.appendChild(opt);
+          });
+        }
+        if (els.starterGameSelect) {
+          els.starterGameSelect.innerHTML = '';
+          var blank = document.createElement('option');
+          blank.value = 'blank';
+          blank.textContent = 'Blank game project';
+          els.starterGameSelect.appendChild(blank);
+          state.workspaces
+            .filter(function (ws) { return ws.projectType === 'game'; })
+            .forEach(function (ws) {
+              var opt = document.createElement('option');
+              opt.value = 'clone:' + ws.id;
+              opt.textContent = 'Clone ' + ws.title;
+              els.starterGameSelect.appendChild(opt);
+            });
+        }
+      }
+
+      function loadCatalogCachesFromStorage() {
+        var cachedAppsRaw = loadStorage(CACHED_APPS_KEY);
+        var cachedWorkspacesRaw = loadStorage(CACHED_WORKSPACES_KEY);
+        var cachedApps = normalizeCachedApps(parseCatalogCache(cachedAppsRaw, []));
+        var cachedWorkspaces = normalizeCachedWorkspaces(parseCatalogCache(cachedWorkspacesRaw, []));
+        state.apps = cachedApps;
+        state.appsLoaded = !!cachedAppsRaw;
+        state.workspaces = cachedWorkspaces;
+        state.workspacesLoaded = !!cachedWorkspacesRaw;
+        if (!state.selectedBuiltIn && state.apps.length) {
+          state.selectedBuiltIn = state.apps[0].id;
+        }
+        cleanupMiniTabState();
+        applyPreferredSystemMiniTabMode();
+        syncStarterOptionsFromCatalog();
       }
 
       function syncSettingsSaveButtons() {
@@ -5268,6 +5374,7 @@
           };
         });
         state.appsLoaded = true;
+        saveStorage(CACHED_APPS_KEY, JSON.stringify(state.apps));
 
         if (!state.selectedBuiltIn && state.apps.length) {
           state.selectedBuiltIn = state.apps[0].id;
@@ -5277,22 +5384,7 @@
           renderCatalogList();
           renderSelectedBuiltIn();
         }
-        els.starterApplicationSelect.innerHTML = '';
-        [
-          { value: 'minimal', label: 'Blank application project' },
-          { value: 'panel', label: 'Template: Control panel project' }
-        ].forEach(function (item) {
-          var opt = document.createElement('option');
-          opt.value = item.value;
-          opt.textContent = item.label;
-          els.starterApplicationSelect.appendChild(opt);
-        });
-        state.apps.forEach(function (app) {
-          var opt = document.createElement('option');
-          opt.value = 'clone:' + app.id;
-          opt.textContent = 'Clone ' + app.title;
-          els.starterApplicationSelect.appendChild(opt);
-        });
+        syncStarterOptionsFromCatalog();
       }
 
       async function refreshWorkspaces(options) {
@@ -5316,25 +5408,14 @@
           return !hiddenPaths[normalizePathForCompare(ws.path)];
         });
         state.workspacesLoaded = true;
+        saveStorage(CACHED_WORKSPACES_KEY, JSON.stringify(state.workspaces));
         cleanupMiniTabState();
         applyPreferredSystemMiniTabMode();
 
         if (shouldRender) {
           renderCatalogList();
         }
-        els.starterGameSelect.innerHTML = '';
-        var blank = document.createElement('option');
-        blank.value = 'blank';
-        blank.textContent = 'Blank game project';
-        els.starterGameSelect.appendChild(blank);
-        state.workspaces
-          .filter(function (ws) { return ws.projectType === 'game'; })
-          .forEach(function (ws) {
-            var opt = document.createElement('option');
-            opt.value = 'clone:' + ws.id;
-            opt.textContent = 'Clone ' + ws.title;
-            els.starterGameSelect.appendChild(opt);
-          });
+        syncStarterOptionsFromCatalog();
       }
 
       function requireRoot() {
@@ -6832,6 +6913,7 @@
           setArtifacts([]);
           await hydratePrefsFromBackend();
           refreshStateFromStorage();
+          loadCatalogCachesFromStorage();
           applyTheme(state.activeTheme, { allowUnlisted: true });
           await loadThemes();
           applyTheme(state.activeTheme);
@@ -6855,6 +6937,8 @@
             paths: [],
             help: null
           });
+          renderCatalogList();
+          renderSelectedBuiltIn();
 
           if (state.rootHint) {
             setWorkspaceRoot(state.rootHint);

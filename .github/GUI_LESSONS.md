@@ -70,3 +70,4 @@
 - Forge startup should paint from cached local UI state first and move `doctor` plus catalog scans off the splash-critical path; startup time should be bounded by first useful paint, not by repository or projects-root enumeration latency.
 - Workspace `Run` semantics should stay explicit: if a workspace needs a pre-launch rebuild, declare it in `wizardry.workspace.conf` via `run_rebuild_command` and let both `Build` and `Run` honor that same hook rather than guessing a toolchain from repo shape.
 - For workspace entries in Forge, surface `wizardry.workspace.conf` as a structured autosave form between Targets and Log; expose validated logical controls, keep high-risk/system-managed metadata read-only, and avoid raw key/value editing in the UI.
+- If Forge reveals before the live catalog scan finishes, it still needs a last-known catalog cache from backend prefs so built-ins and workspaces are visible immediately on startup instead of popping in seconds later.
