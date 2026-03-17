@@ -1511,6 +1511,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [self dismissNativeBootSplashIfNeededForWebView:webView];
 }
 
+- (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation {
+    (void)navigation;
+    [self dismissNativeBootSplashIfNeededForWebView:webView];
+}
+
 - (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
     (void)navigation;
     NSLog(@"WebView navigation failed: %@", error);
