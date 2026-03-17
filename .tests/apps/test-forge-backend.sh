@@ -12,6 +12,9 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
 
 grep -F 'launch_attempts=75' "$backend" >/dev/null
 grep -F 'wait_for_workspace_host_start "$app_dir" "$launch_attempts"' "$backend" >/dev/null
+grep -F 'stage_bundle=$(workspace_stage_bundle_path "$bundle_root" "$workspace_title")' "$backend" >/dev/null
+grep -F 'stage_bundle=$(app_stage_bundle_path "$dist_dir" "$app_name")' "$backend" >/dev/null
+grep -F 'mv "$stage_bundle" "$bundle"' "$backend" >/dev/null
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "skip: jq not installed" >&2

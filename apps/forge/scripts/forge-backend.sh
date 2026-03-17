@@ -1326,6 +1326,18 @@ launch_workspace_bundle_macos() {
   wait_for_workspace_host_start "$app_dir" "$launch_attempts"
 }
 
+workspace_stage_bundle_path() {
+  bundle_root=${1-}
+  workspace_title=${2-}
+  printf '%s\n' "$bundle_root/.staging/$workspace_title.app"
+}
+
+app_stage_bundle_path() {
+  dist_dir=${1-}
+  app_name=${2-}
+  printf '%s\n' "$dist_dir/.staging/$app_name.app"
+}
+
 stop_desktop_instances_for_slug() {
   root=${1-}
   slug=${2-}
@@ -2473,20 +2485,22 @@ cmd_build_desktop() {
       fi
 
       if [ "$cache_hit" = false ]; then
-        rm -rf "$bundle"
-        mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$slug" "$bundle/Contents/Resources/.host" "$bundle/Contents/Resources/wizardry-apps/core"
+        stage_bundle=$(app_stage_bundle_path "$dist_dir" "$app_name")
+        stage_hash_path="$stage_bundle/Contents/Resources/wizardry-build-input.sha256"
+        rm -rf "$stage_bundle"
+        mkdir -p "$stage_bundle/Contents/MacOS" "$stage_bundle/Contents/Resources/$slug" "$stage_bundle/Contents/Resources/.host" "$stage_bundle/Contents/Resources/wizardry-apps/core"
 
-        copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$slug/"
-        mkdir -p "$bundle/Contents/Resources/$slug/.host"
-        cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
-        cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
-        printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
-        printf '%s\n' "$expected_hash" > "$hash_path"
-        cp -R "$root/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
-        cp -R "$root/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
-        cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
+        copy_tree_for_bundle "$app_dir" "$stage_bundle/Contents/Resources/$slug/"
+        mkdir -p "$stage_bundle/Contents/Resources/$slug/.host"
+        cp -R "$root/apps/.host/shared" "$stage_bundle/Contents/Resources/$slug/.host/"
+        cp -R "$root/apps/.host/shared" "$stage_bundle/Contents/Resources/.host/"
+        printf '%s\n' "$root" > "$stage_bundle/Contents/Resources/wizardry-apps-root.txt"
+        printf '%s\n' "$expected_hash" > "$stage_hash_path"
+        cp -R "$root/core/include" "$stage_bundle/Contents/Resources/wizardry-apps/core/"
+        cp -R "$root/core/src" "$stage_bundle/Contents/Resources/wizardry-apps/core/"
+        cp "$host_bin" "$stage_bundle/Contents/MacOS/wizardry-host"
 
-        install -m 755 /dev/stdin "$bundle/Contents/MacOS/$slug" <<APP
+        install -m 755 /dev/stdin "$stage_bundle/Contents/MacOS/$slug" <<APP
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
@@ -2521,21 +2535,21 @@ APP
             sips -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
           done
           icon_name="forge-${icon_hash}.icns"
-          if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
+          if iconutil -c icns "$iconset" -o "$stage_bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
             icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
           else
             icon_name="forge-icon-${icon_hash}.png"
-            cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+            cp "$icon_source" "$stage_bundle/Contents/Resources/$icon_name"
             icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
           fi
           rm -rf "$iconset"
         elif [ "$icon_source_format" = 'png' ]; then
           icon_name="forge-icon-${icon_hash}.png"
-          cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+          cp "$icon_source" "$stage_bundle/Contents/Resources/$icon_name"
           icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
         elif [ "$icon_source_format" = 'icns' ]; then
           icon_name="forge-${icon_hash}.icns"
-          cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+          cp "$icon_source" "$stage_bundle/Contents/Resources/$icon_name"
           icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
         fi
         if [ -n "${icon_name-}" ] && [ "${icon_name##*.}" = "icns" ]; then
@@ -2545,7 +2559,7 @@ APP
         bundle_version=$(printf '%s' "$expected_hash" | cksum | awk '{ print $1 }')
         [ -n "$bundle_version" ] || bundle_version=1
 
-        cat > "$bundle/Contents/Info.plist" <<PLIST
+        cat > "$stage_bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -2558,6 +2572,11 @@ APP
 $icon_key
 </dict></plist>
 PLIST
+
+        stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
+        rm -rf "$bundle"
+        mkdir -p "$dist_dir"
+        mv "$stage_bundle" "$bundle"
       fi
 
       if command -v ditto >/dev/null 2>&1; then
@@ -3016,17 +3035,18 @@ cmd_run_workspace() {
 
     bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
     bundle="$bundle_root/$workspace_title.app"
-    rm -rf "$bundle"
-    mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$workspace_slug" "$bundle/Contents/Resources/.host"
+    stage_bundle=$(workspace_stage_bundle_path "$bundle_root" "$workspace_title")
+    rm -rf "$stage_bundle"
+    mkdir -p "$stage_bundle/Contents/MacOS" "$stage_bundle/Contents/Resources/$workspace_slug" "$stage_bundle/Contents/Resources/.host"
 
-    copy_tree_for_bundle "$workspace_path" "$bundle/Contents/Resources/$workspace_slug/"
-    mkdir -p "$bundle/Contents/Resources/$workspace_slug/.host"
-    cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$workspace_slug/.host/"
-    cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
-    printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
-    cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
+    copy_tree_for_bundle "$workspace_path" "$stage_bundle/Contents/Resources/$workspace_slug/"
+    mkdir -p "$stage_bundle/Contents/Resources/$workspace_slug/.host"
+    cp -R "$root/apps/.host/shared" "$stage_bundle/Contents/Resources/$workspace_slug/.host/"
+    cp -R "$root/apps/.host/shared" "$stage_bundle/Contents/Resources/.host/"
+    printf '%s\n' "$root" > "$stage_bundle/Contents/Resources/wizardry-apps-root.txt"
+    cp "$host_bin" "$stage_bundle/Contents/MacOS/wizardry-host"
 
-    install -m 755 /dev/stdin "$bundle/Contents/MacOS/$workspace_slug" <<APP
+    install -m 755 /dev/stdin "$stage_bundle/Contents/MacOS/$workspace_slug" <<APP
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
@@ -3063,26 +3083,26 @@ APP
         sips -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
       done
       icon_name="forge-${icon_hash}.icns"
-      if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
+      if iconutil -c icns "$iconset" -o "$stage_bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
         icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
       else
         icon_name="forge-icon-${icon_hash}.png"
-        cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+        cp "$icon_source" "$stage_bundle/Contents/Resources/$icon_name"
         icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
       fi
       rm -rf "$iconset"
     elif [ "$icon_source_format" = 'png' ]; then
       icon_name="forge-icon-${icon_hash}.png"
-      cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+      cp "$icon_source" "$stage_bundle/Contents/Resources/$icon_name"
       icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
     elif [ "$icon_source_format" = 'icns' ]; then
       icon_name="forge-${icon_hash}.icns"
-      cp "$icon_source" "$bundle/Contents/Resources/$icon_name"
+      cp "$icon_source" "$stage_bundle/Contents/Resources/$icon_name"
       icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
     fi
 
     bundle_id="com.wizardry.workspace.$workspace_slug"
-    cat > "$bundle/Contents/Info.plist" <<PLIST
+    cat > "$stage_bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -3097,6 +3117,9 @@ $icon_key
 PLIST
 
     stop_desktop_instances_for_slug "$root" "$workspace_slug" "$workspace_title" "$os"
+    rm -rf "$bundle"
+    mkdir -p "$bundle_root"
+    mv "$stage_bundle" "$bundle"
     if ! launch_workspace_bundle_macos "$bundle" "$bundle/Contents/MacOS/$workspace_slug" "$bundle/Contents/Resources/$workspace_slug$app_entry_suffix"; then
       printf '%s\n' "forge-backend: failed to launch workspace bundle: $bundle" >&2
       exit 1
