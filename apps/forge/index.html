@@ -899,7 +899,7 @@
         state.editingMiniTabDraft = '';
         state.creatingMiniTabId = tab.id;
         state.pendingMiniTabFocusId = tab.id;
-        renderCatalogList();
+        renderMiniTabs();
       }
 
       function deleteMiniTab(tabId) {
@@ -5158,6 +5158,7 @@
           var addButton = closestEventTarget(event, '#catalog-mini-tab-add');
           if (addButton) {
             event.preventDefault();
+            event.stopPropagation();
             createMiniTab();
             return;
           }
