@@ -164,6 +164,7 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
     if (webView != self.webView) {
         return;
     }
+    NSLog(@"Dismissing native boot splash for main web view");
     dispatch_async(dispatch_get_main_queue(), ^{
         [self hideNativeBootSplash];
     });
@@ -1498,6 +1499,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     // Forge renders app/workspace icons from absolute file paths (often outside the
     // current app folder), so read access must include the broader filesystem tree.
     NSURL *allowDir = [NSURL fileURLWithPath:@"/" isDirectory:YES];
+    NSLog(@"Loading app URL %@ with read access %@", url, allowDir);
     [self.webView loadFileURL:url allowingReadAccessToURL:allowDir];
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.webView) {
@@ -1508,11 +1510,13 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
     (void)navigation;
+    NSLog(@"WebView didFinishNavigation %@", webView);
     [self dismissNativeBootSplashIfNeededForWebView:webView];
 }
 
 - (void)webView:(WKWebView *)webView didCommitNavigation:(WKNavigation *)navigation {
     (void)navigation;
+    NSLog(@"WebView didCommitNavigation %@", webView);
     [self dismissNativeBootSplashIfNeededForWebView:webView];
 }
 
