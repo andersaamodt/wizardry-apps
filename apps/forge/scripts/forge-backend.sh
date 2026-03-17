@@ -3505,7 +3505,7 @@ cmd_run_workspace() {
 #!/bin/sh
 set -eu
 APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
-exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$workspace_slug$app_entry_suffix"
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "$app_dir"
 APP
 
     icon_source=''
@@ -3576,14 +3576,14 @@ PLIST
     rm -rf "$final_bundle"
     mv "$staged_bundle" "$final_bundle"
     rmdir "$staged_root" 2>/dev/null || :
-    if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/$workspace_slug" "$final_bundle/Contents/Resources/$workspace_slug$app_entry_suffix"; then
+    if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/$workspace_slug" "$app_dir"; then
       printf '%s\n' "forge-backend: failed to launch workspace bundle: $final_bundle" >&2
       exit 1
     fi
     printf 'launched=1\n'
     printf 'mode=desktop-executable\n'
     printf 'artifact=%s\n' "$final_bundle"
-    printf 'entry=%s\n' "$final_bundle/Contents/Resources/$workspace_slug$app_entry_suffix"
+    printf 'entry=%s\n' "$app_dir"
     printf 'log=%s\n' "$log_path"
     return 0
   fi
