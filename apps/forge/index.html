@@ -309,7 +309,15 @@
     </div>
   </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite">
+    <span id="toast-message" class="toast-message"></span>
+    <button id="toast-copy" type="button" class="toast-copy-btn" title="Copy toast" aria-label="Copy toast">
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="5" y="3" width="8" height="10" rx="1.5"></rect>
+        <rect x="3" y="5" width="8" height="10" rx="1.5"></rect>
+      </svg>
+    </button>
+  </div>
 
   <script src="../.host/shared/wizardry-bridge.js"></script>
 
@@ -377,6 +385,7 @@
         route: 'pipeline',
         busy: false,
         toastTimer: null,
+        toastCopyResetTimer: null,
         latestResult: null,
         settingsOpen: false,
         autoRefreshTimer: null,
@@ -1123,18 +1132,46 @@
         els.activityPill.textContent = msg;
       }
 
+      function setToastCopyState(copied) {
+        if (!els.toastCopy) {
+          return;
+        }
+        els.toastCopy.classList.toggle('copied', !!copied);
+        if (copied) {
+          els.toastCopy.title = 'Copied';
+          els.toastCopy.setAttribute('aria-label', 'Copied');
+          if (state.toastCopyResetTimer) {
+            clearTimeout(state.toastCopyResetTimer);
+          }
+          state.toastCopyResetTimer = setTimeout(function () {
+            setToastCopyState(false);
+          }, 1400);
+          return;
+        }
+        els.toastCopy.title = 'Copy toast';
+        els.toastCopy.setAttribute('aria-label', 'Copy toast');
+      }
+
       function toast(msg, kind) {
-        if (!els.toast) {
+        if (!els.toast || !els.toastMessage) {
+          return;
+        }
+        var text = String(msg || '');
+        if (!text) {
+          els.toast.className = 'toast';
+          els.toastMessage.textContent = '';
+          setToastCopyState(false);
           return;
         }
         els.toast.className = 'toast show ' + (kind || 'ok');
-        els.toast.textContent = msg;
+        els.toastMessage.textContent = text;
+        setToastCopyState(false);
         if (state.toastTimer) {
           clearTimeout(state.toastTimer);
         }
         state.toastTimer = setTimeout(function () {
           els.toast.className = 'toast';
-        }, 2600);
+        }, 6800);
       }
 
       function bridgeAvailable() {
@@ -6522,6 +6559,24 @@
           });
         }
 
+        if (els.toastCopy) {
+          els.toastCopy.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var toastText = els.toastMessage ? String(els.toastMessage.textContent || '') : '';
+            if (!toastText) {
+              return;
+            }
+            copyTextToClipboard(toastText).then(function (ok) {
+              if (ok) {
+                setToastCopyState(true);
+                return;
+              }
+              toast('Could not copy toast', 'bad');
+            });
+          });
+        }
+
         if (els.log) {
           els.log.addEventListener('keydown', function (event) {
             var meta = event.metaKey || event.ctrlKey;
@@ -6901,6 +6956,8 @@
         els.doctor = document.getElementById('doctor');
 
         els.toast = document.getElementById('toast');
+        els.toastMessage = document.getElementById('toast-message');
+        els.toastCopy = document.getElementById('toast-copy');
       }
 
       async function boot() {

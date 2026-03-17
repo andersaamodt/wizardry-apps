@@ -2889,9 +2889,13 @@ input[type="checkbox"]:disabled {
   transform: translate(-50%, 12px);
   opacity: 0;
   pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  max-width: min(32rem, calc(100vw - 1.6rem));
   border: 1px solid transparent;
   border-radius: 12px;
-  padding: 0.5rem 0.86rem;
+  padding: 0.44rem 0.5rem 0.44rem 0.78rem;
   background: rgba(24, 33, 45, 0.95);
   color: #f4f8ff;
   font-size: 0.82rem;
@@ -2900,9 +2904,15 @@ input[type="checkbox"]:disabled {
   z-index: 20;
 }
 
+.toast-message {
+  min-width: 0;
+  line-height: 1.35;
+}
+
 .toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
+  pointer-events: auto;
 }
 
 .toast.ok {
@@ -2911,6 +2921,41 @@ input[type="checkbox"]:disabled {
 
 .toast.bad {
   border-color: rgba(191, 63, 63, 0.5);
+}
+
+.toast-copy-btn {
+  flex: 0 0 auto;
+  width: 1.18rem;
+  height: 1.18rem;
+  margin-right: -0.06rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.72;
+  cursor: pointer;
+  transition: background 180ms ease, opacity 180ms ease, color 180ms ease;
+}
+
+.toast-copy-btn:hover,
+.toast-copy-btn:focus-visible,
+.toast-copy-btn.copied {
+  background: rgba(255, 255, 255, 0.12);
+  opacity: 1;
+  outline: none;
+}
+
+.toast-copy-btn svg {
+  width: 0.74rem;
+  height: 0.74rem;
+  display: block;
+  margin: 0 auto;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  fill: none;
 }
 
 body.is-busy {
