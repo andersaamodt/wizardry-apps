@@ -328,12 +328,14 @@
   function buildNavRows() {
     var guided = [
       { id: 'home', label: 'Main Menu', meta: 'Main menu map', group: 'Guided Panels' },
-      { id: 'spell-activity', label: 'Casting Watch', meta: String(state.spellActivity.length || 0), group: 'Guided Panels' },
       { id: 'cast', label: 'Cast', meta: String(state.castEntries.length || 0), group: 'Guided Panels' },
       { id: 'spellbook', label: 'Spellbook', meta: String(state.synonyms.length || 0), group: 'Guided Panels' },
       { id: 'arcana', label: 'Arcana', meta: String(state.arcana.length || 0), group: 'Guided Panels' },
       { id: 'computer', label: 'Computer', meta: 'System flows', group: 'Guided Panels' },
       { id: 'mud', label: 'MUD', meta: state.players.length ? String(state.players.length) : '', group: 'Guided Panels' }
+    ];
+    var desktopFeatures = [
+      { id: 'spell-activity', label: 'Casting Watch', meta: String(state.spellActivity.length || 0), group: 'Desktop Features' }
     ];
     var builtin = state.categories.filter(function (item) { return item.kind === 'builtin'; }).map(function (item) {
       return { id: 'builtin:' + item.id, label: item.label, meta: item.count, group: 'Spell Categories' };
@@ -341,7 +343,7 @@
     var custom = state.categories.filter(function (item) { return item.kind === 'custom'; }).map(function (item) {
       return { id: 'custom:' + item.id, label: item.label, meta: item.count, group: 'Custom Categories' };
     });
-    state.navRows = guided.concat(builtin).concat(custom);
+    state.navRows = guided.concat(desktopFeatures, builtin, custom);
   }
 
   function ensureActivePage() {
@@ -372,9 +374,9 @@
     }
     if (pageId === 'spell-activity') {
       return {
-        eyebrow: 'Live Monitor',
+        eyebrow: 'Desktop Feature',
         title: 'Casting Watch',
-        subtitle: 'Watch running Wizardry spells and app backends, with source app attribution inferred from the standard backend and host paths.'
+        subtitle: 'A Wizardry Desktop utility for watching running spells and app backends, with source app attribution inferred from the standard backend and host paths.'
       };
     }
     if (pageId === 'spellbook') {
@@ -422,7 +424,7 @@
   }
 
   function renderNav() {
-    var groupOrder = ['Guided Panels', 'Spell Categories', 'Custom Categories'];
+    var groupOrder = ['Guided Panels', 'Desktop Features', 'Spell Categories', 'Custom Categories'];
     var html = '';
     groupOrder.forEach(function (groupName) {
       var rows = state.navRows.filter(function (row) { return row.group === groupName; });
@@ -639,7 +641,7 @@
   function renderHome() {
     var hero = '';
     hero += '<section class="hero">';
-    hero += '<div class="card-copy"><h3>Main Menu Structure</h3><p class="subtle-copy">The left rail mirrors Wizardry’s main menu first, then expands into every discovered spell category.</p></div>';
+    hero += '<div class="card-copy"><h3>Main Menu Structure</h3><p class="subtle-copy">The left rail mirrors Wizardry’s main menu first, then expands into discovered spell categories. Desktop-only utilities live in their own rail section.</p></div>';
     hero += '<div class="stat-grid">';
     hero += '<div class="stat-card"><strong>' + escHtml(state.doctorKv.category_count || '0') + '</strong><span>Categories</span></div>';
     hero += '<div class="stat-card"><strong>' + escHtml(state.doctorKv.spell_count || '0') + '</strong><span>Executable spells</span></div>';
@@ -647,7 +649,6 @@
     hero += '<div class="stat-card"><strong>' + escHtml(state.doctorKv.arcana_count || '0') + '</strong><span>Arcana entries</span></div>';
     hero += '</div>';
     hero += '<div class="card-grid">';
-    hero += quickCard('Casting Watch', 'See live spell processes and app-backend analogues as they run.', 'spell-activity');
     hero += quickCard('Cast', 'Launch your memorized commands without reopening the terminal menu.', 'cast');
     hero += quickCard('Spellbook', 'Scribe, categorize, and alias commands through GUI forms.', 'spellbook');
     hero += quickCard('Arcana', 'Browse the same installable add-ons the install menu exposes.', 'arcana');
