@@ -367,6 +367,34 @@ render_cgi_fragment() {
   return 0
 }
 
+build_path_newer_than() {
+  candidate_path=${1-}
+  target_path=${2-}
+  [ -n "$candidate_path" ] || return 1
+  [ -n "$target_path" ] || return 1
+  [ -e "$candidate_path" ] || return 1
+  [ -e "$target_path" ] || return 0
+  if [ -d "$candidate_path" ]; then
+    find "$candidate_path" -type f -newer "$target_path" -print -quit 2>/dev/null | grep -q .
+    return $?
+  fi
+  [ "$candidate_path" -nt "$target_path" ]
+}
+
+blog_dynamic_section_needs_refresh() {
+  target_html=${1-}
+  shift || true
+  [ -n "$target_html" ] || return 0
+  [ -f "$target_html" ] || return 0
+  [ "${full_rebuild:-0}" -eq 1 ] && return 0
+  for source_path in "$@"; do
+    if build_path_newer_than "$source_path" "$target_html"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 replace_html_container_by_id() {
   html_file=$1
   container_id=$2
@@ -434,7 +462,15 @@ prerender_blog_dynamic_sections() {
     return 0
   fi
 
-  if [ -f "$SITE_DIR/build/pages/index.html" ] && [ -x "$cgi_dir/blog-index" ]; then
+  if [ -f "$SITE_DIR/build/pages/index.html" ] &&
+     [ -x "$cgi_dir/blog-index" ] &&
+     blog_dynamic_section_needs_refresh \
+       "$SITE_DIR/build/pages/index.html" \
+       "$cgi_dir/blog-index" \
+       "$cgi_dir/blog-lib.sh" \
+       "$cgi_dir/blog-list-common.sh" \
+       "$cgi_dir/blog-nostr-pages-common.sh" \
+       "$SITE_DIR/site/pages/posts"; then
     post_list_tmp=$(temp-file blog-index-fragment)
     if render_cgi_fragment "$cgi_dir/blog-index" "page=1" "$post_list_tmp"; then
       replace_html_container_by_id "$SITE_DIR/build/pages/index.html" "post-list" "$post_list_tmp" || true
@@ -442,7 +478,15 @@ prerender_blog_dynamic_sections() {
     rm -f "$post_list_tmp"
   fi
 
-  if [ -f "$SITE_DIR/build/pages/tags.html" ] && [ -x "$cgi_dir/blog-tags" ]; then
+  if [ -f "$SITE_DIR/build/pages/tags.html" ] &&
+     [ -x "$cgi_dir/blog-tags" ] &&
+     blog_dynamic_section_needs_refresh \
+       "$SITE_DIR/build/pages/tags.html" \
+       "$cgi_dir/blog-tags" \
+       "$cgi_dir/blog-lib.sh" \
+       "$cgi_dir/blog-list-common.sh" \
+       "$cgi_dir/blog-nostr-pages-common.sh" \
+       "$SITE_DIR/site/pages/posts"; then
     tag_cloud_tmp=$(temp-file blog-tags-fragment)
     if render_cgi_fragment "$cgi_dir/blog-tags" "" "$tag_cloud_tmp"; then
       replace_html_container_by_id "$SITE_DIR/build/pages/tags.html" "tag-cloud" "$tag_cloud_tmp" || true
@@ -450,7 +494,15 @@ prerender_blog_dynamic_sections() {
     rm -f "$tag_cloud_tmp"
   fi
 
-  if [ -f "$SITE_DIR/build/pages/archive.html" ] && [ -x "$cgi_dir/blog-archive" ]; then
+  if [ -f "$SITE_DIR/build/pages/archive.html" ] &&
+     [ -x "$cgi_dir/blog-archive" ] &&
+     blog_dynamic_section_needs_refresh \
+       "$SITE_DIR/build/pages/archive.html" \
+       "$cgi_dir/blog-archive" \
+       "$cgi_dir/blog-lib.sh" \
+       "$cgi_dir/blog-list-common.sh" \
+       "$cgi_dir/blog-nostr-pages-common.sh" \
+       "$SITE_DIR/site/pages/posts"; then
     archive_list_tmp=$(temp-file blog-archive-fragment)
     if render_cgi_fragment "$cgi_dir/blog-archive" "" "$archive_list_tmp"; then
       replace_html_container_by_id "$SITE_DIR/build/pages/archive.html" "archive-list" "$archive_list_tmp" || true
@@ -657,9 +709,6 @@ BLOG_FOOTER
   generate_blog_feeds_and_sitemap
   prerender_blog_dynamic_sections
 
-  info "Setting file permissions..."
-  find "$SITE_DIR/build" -type d -exec chmod 755 {} \; 2>/dev/null || true
-  find "$SITE_DIR/build" -type f -exec chmod 644 {} \; 2>/dev/null || true
   date -u +%Y-%m-%dT%H:%M:%SZ > "$SITE_DIR/build/.wizardry-build-stamp"
   chmod 644 "$SITE_DIR/build/.wizardry-build-stamp" 2>/dev/null || true
 
