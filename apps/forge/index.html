@@ -1378,15 +1378,25 @@
         syncSettingsSaveButtons();
       }
 
+      function shouldShowFooterStatusForAction(label, opts) {
+        if (opts && opts.footerStatus === false) {
+          return false;
+        }
+        return !/^(open|copy)\b/i.test(String(label || ''));
+      }
+
       async function perform(label, fn, opts) {
         if (state.busy) {
           return;
         }
 
         opts = opts || {};
+        var showFooterStatus = shouldShowFooterStatusForAction(label, opts);
         setBusy(true);
         setActivity('working', label + '...');
-        setFooterStatus('working', label + '...');
+        if (showFooterStatus) {
+          setFooterStatus('working', label + '...');
+        }
         if (!opts.keepResult) {
           renderResult({
             status: 'working',
@@ -1402,7 +1412,9 @@
 
         try {
           await fn();
-          setFooterStatus('ok', label + ' complete');
+          if (showFooterStatus) {
+            setFooterStatus('ok', label + ' complete');
+          }
           if (!opts.noToast) {
             toast(label + ' complete', 'ok');
           }
@@ -1418,7 +1430,9 @@
           var help = actionableHelp(message);
           appendLog('error: ' + message);
           setActivity('fault', 'Error');
-          setFooterStatus('bad', message);
+          if (showFooterStatus) {
+            setFooterStatus('bad', message);
+          }
           renderResult({
             status: 'error',
             summary: message,

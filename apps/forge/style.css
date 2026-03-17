@@ -753,10 +753,34 @@ body.settings-open #settings-panel {
   flex: 0 0 auto;
 }
 
-.footer-spacer {
+.footer-status {
   flex: 1 1 auto;
   min-width: 0;
-  height: 1.9rem;
+  min-height: 1.9rem;
+  padding: 0 0.68rem;
+  border-left: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  color: color-mix(in srgb, var(--text) 74%, var(--muted));
+  font-size: 0.74rem;
+  font-weight: 560;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footer-status.working {
+  color: color-mix(in srgb, var(--accent-strong, var(--accent)) 78%, var(--text) 22%);
+}
+
+.footer-status.ok {
+  color: color-mix(in srgb, var(--ok) 72%, var(--text) 28%);
+}
+
+.footer-status.bad {
+  color: color-mix(in srgb, var(--bad) 76%, var(--text) 24%);
 }
 
 .footer-theme-btn::after {
