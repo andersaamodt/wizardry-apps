@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wizardry Desktop</title>
+  <link rel="stylesheet" href="style.css?v=wizardry-desktop-20260317a">
+  <link id="wizardry-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop-20260317a">
+</head>
+<body class="wizardry-desktop-booting">
+  <div id="boot-splash" class="boot-splash" aria-live="polite" aria-busy="true">
+    <div class="boot-card">
+      <img class="boot-icon" src="assets/forge-icon.png" alt="Wizardry Desktop">
+      <p class="boot-title">Wizardry Desktop</p>
+      <p class="boot-subtitle">Rendering the main menu into panels</p>
+      <div id="boot-status" class="boot-status">Loading wizardry state…</div>
+    </div>
+  </div>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <header class="sidebar-head">
+        <p class="app-kicker">Wizardry</p>
+        <h1>Desktop</h1>
+        <p class="sidebar-copy">Main-menu panels, spellbook categories, and live terminal activity in one window.</p>
+      </header>
+
+      <div id="nav-groups" class="nav-groups" role="listbox" aria-label="Wizardry panels"></div>
+
+      <div class="sidebar-footer">
+        <button id="settings-btn" class="footer-row footer-gear" type="button" aria-label="Settings" title="Settings">
+          <img src="assets/settings-gear.svg" alt="">
+        </button>
+        <div class="menu-anchor footer-theme-anchor">
+          <button id="theme-picker-btn" class="footer-row footer-theme-btn" type="button" aria-haspopup="menu" aria-expanded="false" title="Select theme">
+            Psionic
+          </button>
+          <div id="theme-picker-menu" class="floating-menu hidden" role="menu" aria-label="Theme selector">
+            <div id="theme-picker-list" class="menu-list"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-shell">
+      <header class="toolbar">
+        <div class="toolbar-copy">
+          <p id="page-eyebrow" class="page-eyebrow">Main Menu</p>
+          <h2 id="page-title">Wizardry Desktop</h2>
+          <p id="page-subtitle" class="page-subtitle">A visual shell over Wizardry’s menu-first command structure.</p>
+        </div>
+        <div class="toolbar-actions">
+          <span id="bridge-pill" class="status-pill">Bridge: checking</span>
+          <button id="activity-toggle" class="icon-btn" type="button" aria-label="Toggle terminal activity" aria-expanded="false" title="Terminal activity">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path d="M3 4.5h14M3 10h14M3 15.5h14"></path>
+              <path d="M5.25 3.5l3.5 3.5-3.5 3.5"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <section id="page-content" class="page-content" aria-live="polite"></section>
+    </main>
+
+    <aside id="activity-drawer" class="activity-drawer" aria-label="Terminal activity">
+      <header class="drawer-head">
+        <div>
+          <p class="drawer-kicker">Activity</p>
+          <h3>Terminal Stream</h3>
+        </div>
+        <div class="drawer-actions">
+          <button id="copy-log-btn" class="mini-btn" type="button">Copy</button>
+          <button id="clear-log-btn" class="mini-btn" type="button">Clear</button>
+        </div>
+      </header>
+      <pre id="activity-log" class="activity-log">Waiting for activity.</pre>
+    </aside>
+  </div>
+
+  <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="modal-card">
+      <header class="modal-head">
+        <div>
+          <p class="drawer-kicker">Settings</p>
+          <h3 id="settings-title">Wizardry Desktop</h3>
+        </div>
+        <button id="settings-close-btn" class="icon-btn" type="button" aria-label="Close settings" title="Close settings">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M5 5l10 10M15 5L5 15"></path>
+          </svg>
+        </button>
+      </header>
+
+      <section class="settings-grid">
+        <article class="card settings-card">
+          <h4>Working Directory</h4>
+          <p class="subtle-copy">Generic spell runs and category-page actions execute from this folder.</p>
+          <div class="inline-form">
+            <input id="settings-work-dir" type="text" spellcheck="false" placeholder="/Users/you">
+            <button id="save-work-dir-btn" class="action-btn" type="button">Save</button>
+          </div>
+        </article>
+
+        <article class="card settings-card">
+          <h4>MUD Room</h4>
+          <p class="subtle-copy">Adventure actions such as `look` and `say` use this path as the current room.</p>
+          <div class="inline-form">
+            <input id="settings-mud-room" type="text" spellcheck="false" placeholder="/path/to/room">
+            <button id="save-mud-room-btn" class="action-btn" type="button">Save</button>
+          </div>
+        </article>
+
+        <article class="card settings-card settings-card-wide">
+          <div class="settings-card-head">
+            <div>
+              <h4>Doctor</h4>
+              <p class="subtle-copy">Resolved roots, counts, and the desktop bridge status.</p>
+            </div>
+            <button id="refresh-btn" class="action-btn" type="button">Refresh</button>
+          </div>
+          <pre id="doctor-output" class="doctor-output">Waiting for backend.</pre>
+        </article>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function loadBridge() {
+      var candidates = [
+        './.host/shared/wizardry-bridge.js',
+        '../.host/shared/wizardry-bridge.js',
+        '../../.host/shared/wizardry-bridge.js'
+      ];
+      var index = 0;
+      function installFallback() {
+        if (window.wizardry && window.wizardry.exec) {
+          return;
+        }
+        window.__wizardry_callbacks = window.__wizardry_callbacks || {};
+        function nextId() {
+          return Math.random().toString(36).slice(2);
+        }
+        function post(message) {
+          if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.wizardry) {
+            window.webkit.messageHandlers.wizardry.postMessage(message);
+            return true;
+          }
+          if (window.WizardryBridge && typeof window.WizardryBridge.postMessage === 'function') {
+            window.WizardryBridge.postMessage(JSON.stringify(message));
+            return true;
+          }
+          return false;
+        }
+        window.wizardry = {
+          exec: function (argv) {
+            return new Promise(function (resolve, reject) {
+              var id = nextId();
+              window.__wizardry_callbacks[id] = function (payload) {
+                if (payload && payload.error) {
+                  reject(new Error(payload.error.message || 'bridge error'));
+                  return;
+                }
+                resolve(payload || { stdout: '', stderr: 'bridge unavailable', exit_code: 1 });
+              };
+              if (!post({ id: id, command: argv })) {
+                setTimeout(function () {
+                  window.__wizardry_callbacks[id]({ stdout: '', stderr: 'wizardry bridge unavailable', exit_code: 1 });
+                }, 0);
+              }
+            });
+          }
+        };
+      }
+      function tryNext() {
+        if (index >= candidates.length) {
+          installFallback();
+          return;
+        }
+        var script = document.createElement('script');
+        script.src = candidates[index++];
+        script.onload = function () {
+          if (!(window.wizardry && window.wizardry.exec)) {
+            tryNext();
+          }
+        };
+        script.onerror = tryNext;
+        document.head.appendChild(script);
+      }
+      tryNext();
+    })();
+  </script>
+  <script src="app.js?v=wizardry-desktop-20260317a"></script>
+</body>
+</html>

@@ -4,6 +4,7 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/README.md` for repo stance and boundaries.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_ETHOS.md` for policy and tone.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md` for mandatory GUI patterns and behavior contracts.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_TAXONOMY.md` before creating or materially editing any GUI so you reuse and maintain the current control inventory.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_LESSONS.md` for known host/WebView pitfalls and regression lessons.
 - Read app-local docs (for example `apps/forge/README.md`) before changing an app.
 

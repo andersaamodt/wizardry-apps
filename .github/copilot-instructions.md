@@ -4,6 +4,7 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/AI_DOCS.md` first.
 - Then read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_ETHOS.md`.
 - Then read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md`.
+- Then read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_TAXONOMY.md` before creating or materially editing a GUI.
 
 ## Hard Rules
 - Follow Wizardry ethos and keep behavior file-first, explicit, and discoverable.
@@ -14,8 +15,10 @@
 - Do not let user input construct executable names or arbitrary shell syntax.
 - Preserve CLI parity for new GUI capabilities.
 - Keep AI-facing docs in `.github/`, not the repo root.
+- Reuse documented GUI control families from `.github/GUI_TAXONOMY.md` before inventing new ones.
 
 ## Change Discipline
 - Prefer small, surgical edits over broad rewrites.
 - Reuse existing app patterns before inventing new abstractions.
 - Update AI docs in the same PR when policy or patterns change.
+- Update `.github/GUI_TAXONOMY.md` in the same change when GUI control patterns are added or materially revised.

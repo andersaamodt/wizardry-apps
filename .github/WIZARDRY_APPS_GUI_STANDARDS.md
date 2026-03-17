@@ -3,6 +3,7 @@
 ## Scope
 - This file defines GUI implementation standards for Wizardry desktop and hosted app surfaces.
 - Use this with `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_ETHOS.md`.
+- For control inventory and best in-repo examples, also read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_TAXONOMY.md`.
 
 ## Core GUI Posture
 - GUIs are operational consoles, not decorative wrappers detached from backend truth.
@@ -199,5 +200,7 @@
 ## AI Agent Delivery Rules
 - Prefer surgical edits that preserve each app’s existing visual language.
 - Extend shared patterns already present in Forge/Priorities/Virtual Redditor first.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_TAXONOMY.md` before creating or materially editing a GUI, and reuse the closest matching control family already documented there.
 - When introducing a new pattern, document it in this file within the same change.
+- When introducing or materially revising a GUI control family, update `/Users/andersaamodt/git/wizardry-apps/.github/GUI_TAXONOMY.md` in the same change.
 - Avoid speculative frameworks or architectural rewrites without explicit user request.
