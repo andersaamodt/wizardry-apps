@@ -198,6 +198,11 @@ test_env() {
     "$@"
 }
 
+# Keep the harness deterministic: these tests rely on fake host/tool stubs,
+# so cached real host binaries or prior desktop bundles under _tmp must not leak in.
+rm -f "$root/_tmp/workbench/bin/wizardry-host-linux"
+rm -rf "$root/_tmp/workbench/dist/linux" "$root/_tmp/workbench/dist/linux-workspaces"
+
 explicit_blank_ws="$scratch/explicit-blank"
 make_workspace "$explicit_blank_ws" "explicit-blank" "Explicit Blank" "linux"
 cat >> "$explicit_blank_ws/wizardry.workspace.conf" <<CONF
