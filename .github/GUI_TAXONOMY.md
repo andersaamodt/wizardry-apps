@@ -13,77 +13,77 @@
 - `/Users/andersaamodt/git/wizardry-apps/apps/chatroom/` and `/Users/andersaamodt/git/wizardry-apps/apps/menu-app/` are useful compatibility references, not visual or interaction baselines.
 
 ## Navigation And Layout Controls
-- Top nav tabs: chatroom uses simple tab-like anchors to swap Chat and Settings views; if touched, move toward real button semantics and Forge-level keyboard/state handling.
-- Selectable list rows: Forge catalog rows are the best reference for dense primary navigation; they are keyboard-selectable, preserve selection across refreshes, and ignore re-click on the active row.
-- Listbox-style rail navigation: wizardry-desktop is the current reference for menu-family navigation that should read like a persistent command palette rather than a mutable catalog.
-- Mini-tabs: Forge app-group tabs are the best reference for lightweight secondary grouping; they support create, rename, delete-empty, drag-to-assign, and persistent system `All`/`Other` views.
-- Slide panel toggle: Forge settings panel is the best reference for contextual utilities; open it from a compact icon button and close it with the trigger, `Escape`, or outside click.
-- Activity drawer toggle: wizardry-desktop is the best current reference for a right-side log drawer opened from a single unobtrusive toolbar button.
-- Split-pane divider: Forge rail divider is the current reference for resizable left-right layouts; persist width and keep the host layout stable instead of collapsing to a single column.
-- Disclosure sections: Forge `details/summary` pipeline sections are the best reference for multi-step workflows; keep sections local to the page and open by default when they hold core tasks.
-- Nested disclosure: Forge inactive-targets disclosure is the current reference for hiding lower-priority detail inside an already visible workflow.
-- Modal dialog: wizardry-desktop settings modal is the current reference for a compact contained dialog with explicit close control; do not use this as a substitute for routine side-panel settings when a drawer would suffice.
+- Top nav tabs. Apps: Chatroom. Best: Chatroom by default because it is the only checked-in user of this pattern; if touched, move it toward real button semantics and Forge-level keyboard/state handling.
+- Selectable list rows. Apps: Forge, Wizardry Desktop. Best: Forge catalog rows for dense primary navigation because they preserve selection across refreshes and ignore re-click on the active row.
+- Listbox-style rail navigation. Apps: Wizardry Desktop. Best: Wizardry Desktop nav rows for menu-family navigation that should read like a persistent command palette rather than a mutable catalog.
+- Mini-tabs. Apps: Forge. Best: Forge app-group tabs because they support create, rename, delete-empty, drag-to-assign, and persistent system `All`/`Other` views.
+- Slide panel toggle. Apps: Forge. Best: Forge settings panel for contextual utilities; open it from a compact icon button and close it with the trigger, `Escape`, or outside click.
+- Activity drawer toggle. Apps: Wizardry Desktop. Best: Wizardry Desktop activity drawer because it gives the log a stable right-side home without taking over the main document flow.
+- Split-pane divider. Apps: Forge. Best: Forge rail divider for resizable left-right layouts; persist width and keep the host layout stable instead of collapsing to a single column.
+- Disclosure sections. Apps: Forge. Best: Forge `details/summary` pipeline sections for multi-step workflows; keep sections local to the page and open by default when they hold core tasks.
+- Nested disclosure. Apps: Forge. Best: Forge inactive-targets disclosure for hiding lower-priority detail inside an already visible workflow.
+- Modal dialog. Apps: Wizardry Desktop. Best: Wizardry Desktop settings modal for a compact contained dialog with explicit close control; do not use this as a substitute for routine side-panel settings when a drawer would suffice.
 
 ## Text Entry And Selection Controls
-- Search field: Forge filter input is the current reference for short live-filter fields; keep it compact, immediate, and near the list it filters.
-- Bounded text input with explicit action: Forge root path rows are the current reference for path settings that should not autosave every keystroke.
-- Inline rename input: Forge project rename and mini-tab rename are the current reference for short inline edits; focus immediately, commit on blur/Enter, and cancel on `Escape`.
-- Primary short-text input: Forge `Create App` title field is the current reference for one-field creation flows; pair it with live derived feedback like the path preview.
-- Multi-field inline form: wizardry-desktop spellbook, services, and MUD rows are the current reference for short operational forms that mix several compact fields and one immediate action.
-- File input: Forge icon picker is the current reference; hide the raw file input behind a labeled dropzone and keep keyboard access through the label.
-- Radio group, simple stack: chatroom mode selection is the current reference for a simple two-choice settings row.
-- Radio group, card picker: Forge project type cards are the best reference when the choice is important enough to deserve icon, title, and description.
-- Checkbox toggle, simple setting: Forge organize menu checkboxes are the current reference for compact binary preferences inside menus.
-- Checkbox toggle, operational row: Forge publish-target rows are the best reference when a checkbox enables a capability and adjacent status/actions depend on it.
-- Checkbox toggle, confirmation gate: wizardry-desktop power-confirm row is the current reference for a boolean that must gate a destructive action.
-- Checkbox toggle, inline option: wizardry-desktop portal `Use Tor` checkbox is the current reference for a compact inline boolean inside a larger form row.
-- Select dropdown: Forge starter selects are the current reference for bounded enumerated choices; keep them content-sized instead of stretching full width.
-- Select dropdown, entity picker: wizardry-desktop player and spellbook category selects are the current reference for choosing an existing runtime entity before acting.
+- Search field. Apps: Forge. Best: Forge filter input for short live-filter fields; keep it compact, immediate, and near the list it filters.
+- Bounded text input with explicit action. Apps: Forge, Wizardry Desktop. Best: Forge root path rows for path settings that should not autosave every keystroke.
+- Inline rename input. Apps: Forge. Best: Forge project rename and mini-tab rename for short inline edits; focus immediately, commit on blur or `Enter`, and cancel on `Escape`.
+- Primary short-text input. Apps: Forge, Wizardry Desktop, Chatroom. Best: Forge `Create App` title field because it pairs one short field with immediate derived feedback like the path preview.
+- Multi-field inline form. Apps: Wizardry Desktop. Best: Wizardry Desktop spellbook, services, and MUD rows for short operational forms that mix several compact fields and one immediate action.
+- File input. Apps: Forge. Best: Forge icon picker; hide the raw file input behind a labeled dropzone and keep keyboard access through the label.
+- Radio group, simple stack. Apps: Chatroom. Best: Chatroom mode selection for a simple two-choice settings row.
+- Radio group, card picker. Apps: Forge. Best: Forge project type cards when the choice is important enough to deserve icon, title, and description.
+- Checkbox toggle, simple setting. Apps: Forge. Best: Forge organize menu checkboxes for compact binary preferences inside menus.
+- Checkbox toggle, operational row. Apps: Forge. Best: Forge publish-target rows when a checkbox enables a capability and adjacent status/actions depend on it.
+- Checkbox toggle, confirmation gate. Apps: Wizardry Desktop. Best: Wizardry Desktop power-confirm row for a boolean that must gate a destructive action.
+- Checkbox toggle, inline option. Apps: Wizardry Desktop. Best: Wizardry Desktop portal `Use Tor` checkbox for a compact inline boolean inside a larger form row.
+- Select dropdown. Apps: Forge, Wizardry Desktop. Best: Forge starter selects for bounded enumerated choices; keep them content-sized instead of stretching full width.
+- Select dropdown, entity picker. Apps: Wizardry Desktop. Best: Wizardry Desktop player and spellbook category selects for choosing an existing runtime entity before acting.
 
 ## Action Buttons
-- Primary workflow button: Forge `Build` and `Create Project` buttons are the best current references for polite primary actions.
-- Secondary outlined action button: Forge `Save`, `Refresh Tool Status`, install, test, and stage buttons are the current reference for routine non-destructive actions.
-- Icon-only unobtrusive button: Forge filter, settings, copy-log, terminal, and overflow buttons are the best current references for minor actions.
-- Split button: Forge `Run` plus adjacent run-options toggle is the best current reference for a primary default action with secondary variants.
-- Row-level quick action: Forge row play buttons are the current reference for the highest-value per-item action in dense catalogs.
-- Row-level micro-actions: Forge target-row open/run/install/mobile buttons are the current reference for compact secondary actions attached to one enabled capability.
-- Path chip button: Forge selected-path control is the best current reference for path utilities; use basename labeling, click-to-copy, double-click-to-open, ellipsis handling, and an adjacent terminal button when useful.
-- Section utility buttons: Forge log copy/clear buttons are the current reference for small actions in a section header.
-- Button grid actions: wizardry-desktop is the current reference for pages that expose many direct backend verbs in one grouped card.
-- Simple CTA button: chatroom’s server error CTA is an acceptable simple fallback when a screen only needs one obvious next step.
-- Legacy utility button cluster: menu-app and chatroom use straightforward button grids and copy/start/stop buttons; keep them only for simple surfaces, not dense control planes.
+- Primary workflow button. Apps: Forge, Wizardry Desktop. Best: Forge `Build` and `Create Project` buttons for polite primary actions with clear hierarchy.
+- Secondary outlined action button. Apps: Forge, Wizardry Desktop, Chatroom, Menu App. Best: Forge `Save`, `Refresh Tool Status`, install, test, and stage buttons for routine non-destructive actions.
+- Icon-only unobtrusive button. Apps: Forge, Wizardry Desktop. Best: Forge filter, settings, copy-log, terminal, and overflow buttons for minor actions.
+- Split button. Apps: Forge. Best: Forge `Run` plus adjacent run-options toggle for a primary default action with secondary variants.
+- Row-level quick action. Apps: Forge, Wizardry Desktop. Best: Forge row play buttons for the highest-value per-item action in dense catalogs.
+- Row-level micro-actions. Apps: Forge, Wizardry Desktop. Best: Forge target-row open, run, install, and mobile buttons for compact secondary actions attached to one enabled capability.
+- Path chip button. Apps: Forge. Best: Forge selected-path control; use basename labeling, click-to-copy, double-click-to-open, ellipsis handling, and an adjacent terminal button when useful.
+- Section utility buttons. Apps: Forge, Wizardry Desktop, Chatroom. Best: Forge log copy and clear buttons for small actions in a section header.
+- Button grid actions. Apps: Wizardry Desktop, Menu App. Best: Wizardry Desktop for pages that expose many direct backend verbs in one grouped card.
+- Simple CTA button. Apps: Chatroom. Best: Chatroom server error CTA as a simple fallback when a screen only needs one obvious next step.
+- Legacy utility button cluster. Apps: Menu App, Chatroom. Best: none; keep these only for simple surfaces, not dense control planes.
 
 ## Menus And Popovers
-- Floating menu: Forge organize, theme, run, and row-overflow menus are the current reference for compact contextual command sets.
-- Theme picker menu: Forge is the best reference; it keeps the active item visible, applies changes immediately, supports `ArrowUp`/`ArrowDown`, and closes cleanly back to the trigger.
-- Overflow row menu: Forge catalog row menus are the best reference for low-frequency per-item actions like Open, Rename, Remove, Download, and Open Terminal.
+- Floating menu. Apps: Forge, Wizardry Desktop. Best: Forge organize, theme, run, and row-overflow menus for compact contextual command sets.
+- Theme picker menu. Apps: Forge, Wizardry Desktop. Best: Forge because it keeps the active item visible, applies changes immediately, supports `ArrowUp` and `ArrowDown`, and closes cleanly back to the trigger.
+- Overflow row menu. Apps: Forge. Best: Forge catalog row menus for low-frequency per-item actions like Open, Rename, Remove, Download, and Open Terminal.
 
 ## List, Row, And Collection Controls
-- Dense management list: Forge catalog rows are the best current reference for wizardry admin/control-plane lists; use row surfaces, small badges, and compact row actions instead of card grids.
-- Target capability list: Forge publish-target rows are the best current reference for a capability list that combines enablement, status, and row-local actions.
-- Empty list state: Forge empty-catalog copy is the current reference for filter-aware empty states.
+- Dense management list. Apps: Forge, Wizardry Desktop. Best: Forge catalog rows for wizardry admin and control-plane lists; use row surfaces, small badges, and compact row actions instead of card grids.
+- Target capability list. Apps: Forge. Best: Forge publish-target rows for a capability list that combines enablement, status, and row-local actions.
+- Empty list state. Apps: Forge, Wizardry Desktop. Best: Forge empty-catalog copy for filter-aware empty states.
 
 ## Drag, Drop, Media, And Asset Controls
-- App icon dropzone: Forge is the best current reference; combine a visible drop target, preview, clear button, hidden file input, and drag-over cue.
-- Workspace import drop zone: Forge catalog list is the current reference for folder import; only show the drop cue for valid payloads and clear the cue on leave, drop, drag end, blur, and visibility loss.
-- Thumbnail slot: Forge catalog thumbs are the current reference for optional app/project artwork; keep the thumb node stable and theme-backed to avoid white-flash artifacts.
+- App icon dropzone. Apps: Forge. Best: Forge; combine a visible drop target, preview, clear button, hidden file input, and drag-over cue.
+- Workspace import drop zone. Apps: Forge. Best: Forge catalog list for folder import; only show the drop cue for valid payloads and clear the cue on leave, drop, drag end, blur, and visibility loss.
+- Thumbnail slot. Apps: Forge. Best: Forge catalog thumbs for optional app and project artwork; keep the thumb node stable and theme-backed to avoid white-flash artifacts.
 
 ## Status, Feedback, And Read-Only Surfaces
-- Persistent status pill: Forge bridge and activity pills are the best current reference for always-visible runtime state.
-- Badge and metadata pill: Forge type badge, suite badge, scope pill, and context dot are the current reference for compact classification metadata.
-- Simple pill metadata: wizardry-desktop spell count, status, and memorized pills are the current reference for terse row metadata in menu-derived pages.
-- Toast: Forge is the current reference for short-lived confirmations and lightweight failures; keep the message factual and reserve durable panels/logs for actionable detail.
-- Command log: Forge is the best current reference for durable action output; keep it bounded, selectable, copyable, and separate from transient toasts.
-- Activity drawer log: wizardry-desktop is the current reference when logs should stay visible beside the main workflow instead of inside the main document flow.
-- Simple output pane: menu-app’s `<pre>` output is the minimal reference for a tiny single-surface tool.
-- Read-only value block: chatroom settings code/value blocks are the current reference for copy-centric URLs, addresses, and status text.
-- Empty/error panel: chatroom’s server-not-running panel is the current reference for a simple blocked-state surface with one recovery action.
+- Persistent status pill. Apps: Forge, Wizardry Desktop. Best: Forge bridge and activity pills for always-visible runtime state.
+- Badge and metadata pill. Apps: Forge, Wizardry Desktop. Best: Forge type badge, suite badge, scope pill, and context dot for compact classification metadata.
+- Simple pill metadata. Apps: Wizardry Desktop. Best: Wizardry Desktop spell count, status, and memorized pills for terse row metadata in menu-derived pages.
+- Toast. Apps: Forge, Wizardry Desktop. Best: Forge for short-lived confirmations and lightweight failures; keep the message factual and reserve durable panels or logs for actionable detail.
+- Command log. Apps: Forge, Wizardry Desktop, Menu App. Best: Forge for durable action output; keep it bounded, selectable, copyable, and separate from transient toasts.
+- Activity drawer log. Apps: Wizardry Desktop. Best: Wizardry Desktop when logs should stay visible beside the main workflow instead of inside the main document flow.
+- Simple output pane. Apps: Menu App, Chatroom, Wizardry Desktop, Forge. Best: Menu App’s `<pre>` output as the minimal single-surface form of this pattern.
+- Read-only value block. Apps: Chatroom, Wizardry Desktop, Forge. Best: Chatroom settings code and value blocks for copy-centric URLs, addresses, and status text.
+- Empty or error panel. Apps: Chatroom, Wizardry Desktop, Forge. Best: Chatroom server-not-running panel for a simple blocked-state surface with one recovery action.
 
 ## Embedded And Host-Coupled Surfaces
-- Embedded iframe view: chatroom uses iframes for the chat surface and settings surface; treat this as a compatibility pattern for wrapping an existing site, not the default control-plane pattern.
-- Host resize control: Forge’s rail divider is the current reference for a host-visible interactive separator.
-- Boot splash: wizardry-desktop is the current reference for a checked-in splash surface that keeps the shell hidden until the first ready frame.
-- Splash and startup handoff: follow `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md`; no checked-in app currently provides a clearer reference than the standards themselves.
+- Embedded iframe view. Apps: Chatroom. Best: Chatroom by default because it is the only checked-in user; treat it as a compatibility pattern for wrapping an existing site, not the default control-plane pattern.
+- Host resize control. Apps: Forge. Best: Forge rail divider for a host-visible interactive separator.
+- Boot splash. Apps: Wizardry Desktop. Best: Wizardry Desktop for a checked-in splash surface that keeps the shell hidden until the first ready frame.
+- Splash and startup handoff. Apps: Forge, Wizardry Desktop. Best: standards file first, then Wizardry Desktop as the closest checked-in concrete example.
 
 ## Best Current References By Family
 - Dense control-plane list rows: Forge catalog rows.

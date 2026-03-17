@@ -243,6 +243,14 @@ See `apps/forge/` for the flagship wizardry-apps desktop control plane that:
 - Exposes all actions through `apps/forge/scripts/forge-backend.sh` for CLI parity
 - Supports checkout-local run (`./run-forge`) and user-local install (`./install-forge`)
 
+### wizardry-desktop
+
+See `apps/wizardry-desktop/` for a built-in desktop atlas of Wizardry itself that:
+- translates the `main-menu` structure into persistent panels
+- exposes spellbook, arcana, system, and MUD workflows through direct GUI controls
+- keeps a right-side activity drawer for backend terminal output
+- persists theme, page, working-directory, and MUD-room state through a plaintext backend prefs file
+
 ### virtual-redditor
 
 See `apps/virtual-redditor/` for an autonomous moderation desktop app that:
