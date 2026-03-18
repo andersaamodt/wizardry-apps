@@ -3332,10 +3332,10 @@
               setSelectedCatalog(item.key);
               if (item.kind === 'builtin') {
                 state.selectedBuiltIn = item.id;
-                perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
+                perform('Running app', function () { return runPipelineAction('run'); }, { swallow: true });
               } else {
                 state.selectedWorkspace = item.id;
-                perform('Run workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
+                perform('Running workspace', function () { return runWorkspaceItem(item); }, { swallow: true });
               }
               renderSelectedBuiltIn();
             });
@@ -6605,7 +6605,7 @@
             toast('Enable Hosted Web or the ' + runTargetName + ' target to run this app.', 'bad');
             return;
           }
-          perform('Run app', function () { return runPipelineAction('run'); }, { swallow: true });
+          perform('Running app', function () { return runPipelineAction('run'); }, { swallow: true });
         });
 
         els.actionStage.addEventListener('click', function () {
