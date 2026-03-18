@@ -89,6 +89,54 @@ extract_markdown_body() {
   ' "$file"
 }
 
+strip_dynamic_title_block() {
+  file=$1
+  [ -f "$file" ] || return 0
+  if ! grep -Eq 'id="(blog-page-root|nip23-page-root|public-ranking-root|oeuvre-root|contact-page-root)"' "$file"; then
+    return 0
+  fi
+
+  tmp=$(mktemp "${TMPDIR:-/tmp}/wizardry-dynamic-page.XXXXXX")
+  awk '
+    BEGIN {
+      in_header = 0
+      removed = 0
+      header = ""
+    }
+    function flush_header() {
+      if (header != "") {
+        printf "%s", header
+        header = ""
+      }
+    }
+    {
+      if (removed == 0 && in_header == 0 && $0 ~ /^<header([[:space:]][^>]*)?>[[:space:]]*$/) {
+        in_header = 1
+        header = $0 "\n"
+        next
+      }
+      if (in_header == 1) {
+        header = header $0 "\n"
+        if ($0 ~ /^<\/header>[[:space:]]*$/) {
+          if (header ~ /class="title"/) {
+            removed = 1
+            header = ""
+          } else {
+            flush_header()
+          }
+          in_header = 0
+        }
+        next
+      }
+      print
+    }
+    END {
+      flush_header()
+    }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+}
+
 normalize_tags() {
   printf '%s' "${1-}" | tr '\n' ',' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | awk 'NF { if (!seen[$0]++) { if (out != "") out = out ", "; out = out $0 } } END { printf "%s", out }'
 }
@@ -684,6 +732,8 @@ BLOG_FOOTER
         ' "$html_file" > "$temp_html"
         mv "$temp_html" "$html_file"
       fi
+
+      strip_dynamic_title_block "$html_file"
 
       rm -f "$htmx_header"
       if [ -n "$footer_tmp" ] && [ -f "$footer_tmp" ]; then
