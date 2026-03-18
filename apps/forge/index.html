@@ -4959,7 +4959,6 @@
         meta.appendChild(createWorkspaceProfileMeta('Project ID', profile.project_id, {
           tooltip: 'Read-only here because changing it cleanly also needs a folder and workspace-id migration.'
         }));
-        meta.appendChild(createWorkspaceProfileMeta('Workspace root', profile.root || selected.path, { wide: true }));
         meta.appendChild(createWorkspaceProfileMeta('Starter', profile.starter));
         els.workspaceProfileForm.appendChild(meta);
 
