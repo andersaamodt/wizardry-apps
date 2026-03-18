@@ -25,6 +25,10 @@ struct _AppState {
     char *app_name;
     char *index_uri;
     GList *windows;
+    WindowContext *main_context;
+    gboolean keep_running_in_background;
+    gboolean show_status_icon;
+    GtkStatusIcon *status_icon;
 };
 
 struct _WindowContext {
@@ -40,11 +44,14 @@ static WebKitWebView *web_view_create_cb(WebKitWebView *web_view,
                                          WebKitNavigationAction *navigation_action,
                                          gpointer user_data);
 static void window_destroy_cb(GtkWidget *window, gpointer user_data);
+static gboolean window_delete_event_cb(GtkWidget *window, GdkEvent *event, gpointer user_data);
 static WindowContext *create_window_context(AppState *state,
                                             const char *title,
                                             int width,
                                             int height,
                                             GtkWindow *transient_for);
+static void update_status_icon(AppState *state);
+static void apply_background_mode(AppState *state, gboolean enabled, gboolean show_icon);
 
 static const char *DESKTOP_BRIDGE_BOOTSTRAP =
     "(function () {"
@@ -293,6 +300,104 @@ static void handle_open_window_command(WindowContext *context,
     send_result_to_web_view(context->web_view, message_id, "ok", "", 0, NULL);
 }
 
+static void show_main_window(AppState *state) {
+    if (!state || !state->main_context || !state->main_context->window) {
+        return;
+    }
+    gtk_widget_show_all(state->main_context->window);
+    gtk_window_present(GTK_WINDOW(state->main_context->window));
+    update_status_icon(state);
+}
+
+static void toggle_main_window(AppState *state) {
+    if (!state || !state->main_context || !state->main_context->window) {
+        return;
+    }
+    if (gtk_widget_get_visible(state->main_context->window)) {
+        gtk_widget_hide(state->main_context->window);
+    } else {
+        show_main_window(state);
+    }
+    update_status_icon(state);
+}
+
+static void tray_activate_cb(GtkStatusIcon *status_icon, gpointer user_data) {
+    (void)status_icon;
+    toggle_main_window((AppState *)user_data);
+}
+
+static void tray_show_cb(GtkMenuItem *item, gpointer user_data) {
+    (void)item;
+    show_main_window((AppState *)user_data);
+}
+
+static void tray_hide_cb(GtkMenuItem *item, gpointer user_data) {
+    (void)item;
+    AppState *state = (AppState *)user_data;
+    if (!state || !state->main_context || !state->main_context->window) {
+        return;
+    }
+    gtk_widget_hide(state->main_context->window);
+    update_status_icon(state);
+}
+
+static void tray_quit_cb(GtkMenuItem *item, gpointer user_data) {
+    (void)item;
+    (void)user_data;
+    gtk_main_quit();
+}
+
+static void tray_popup_menu_cb(GtkStatusIcon *status_icon,
+                               guint button,
+                               guint activate_time,
+                               gpointer user_data) {
+    (void)status_icon;
+    AppState *state = (AppState *)user_data;
+    gboolean visible = state && state->main_context && state->main_context->window &&
+                       gtk_widget_get_visible(state->main_context->window);
+    GtkWidget *menu = gtk_menu_new();
+    GtkWidget *toggle_item = gtk_menu_item_new_with_label(visible ? "Hide Window" : "Show Window");
+    g_signal_connect(toggle_item, "activate", G_CALLBACK(visible ? tray_hide_cb : tray_show_cb), state);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), toggle_item);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
+    GtkWidget *quit_item = gtk_menu_item_new_with_label("Quit");
+    g_signal_connect(quit_item, "activate", G_CALLBACK(tray_quit_cb), state);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), quit_item);
+    gtk_widget_show_all(menu);
+    gtk_menu_popup(GTK_MENU(menu), NULL, NULL, gtk_status_icon_position_menu, status_icon, button, activate_time);
+}
+
+static void update_status_icon(AppState *state) {
+    if (!state) {
+        return;
+    }
+    gboolean wants_icon = state->keep_running_in_background && state->show_status_icon;
+    if (!wants_icon) {
+        if (state->status_icon) {
+            gtk_status_icon_set_visible(state->status_icon, FALSE);
+            g_object_unref(state->status_icon);
+            state->status_icon = NULL;
+        }
+        return;
+    }
+    if (!state->status_icon) {
+        state->status_icon = gtk_status_icon_new_from_icon_name("network-server");
+        g_signal_connect(state->status_icon, "activate", G_CALLBACK(tray_activate_cb), state);
+        g_signal_connect(state->status_icon, "popup-menu", G_CALLBACK(tray_popup_menu_cb), state);
+    }
+    gtk_status_icon_set_visible(state->status_icon, TRUE);
+    gtk_status_icon_set_tooltip_text(state->status_icon, state->app_name ? state->app_name : "Wizardry");
+}
+
+static void apply_background_mode(AppState *state, gboolean enabled, gboolean show_icon) {
+    if (!state) {
+        return;
+    }
+    state->keep_running_in_background = enabled;
+    state->show_status_icon = enabled && show_icon;
+    update_status_icon(state);
+}
+
 static void message_received_cb(WebKitUserContentManager *manager,
                                 WebKitJavascriptResult *js_result,
                                 gpointer user_data) {
@@ -342,6 +447,23 @@ static void message_received_cb(WebKitUserContentManager *manager,
 
     if (strcmp(argv[0], "__wizardry_host_open_window") == 0) {
         handle_open_window_command(context, msg_id, argv, cmd_len);
+    } else if (strcmp(argv[0], "__wizardry_host_set_background_mode") == 0) {
+        gboolean enabled = FALSE;
+        gboolean show_icon = FALSE;
+        if (cmd_len >= 2 && argv[1]) {
+            enabled = g_ascii_strcasecmp(argv[1], "1") == 0 ||
+                      g_ascii_strcasecmp(argv[1], "true") == 0 ||
+                      g_ascii_strcasecmp(argv[1], "yes") == 0 ||
+                      g_ascii_strcasecmp(argv[1], "on") == 0;
+        }
+        if (cmd_len >= 3 && argv[2]) {
+            show_icon = g_ascii_strcasecmp(argv[2], "1") == 0 ||
+                        g_ascii_strcasecmp(argv[2], "true") == 0 ||
+                        g_ascii_strcasecmp(argv[2], "yes") == 0 ||
+                        g_ascii_strcasecmp(argv[2], "on") == 0;
+        }
+        apply_background_mode(context->state, enabled, show_icon);
+        send_result_to_web_view(context->web_view, msg_id, "", "", 0, NULL);
     } else {
         char *stdout_str = NULL;
         char *stderr_str = NULL;
@@ -390,11 +512,28 @@ static void window_destroy_cb(GtkWidget *window, gpointer user_data) {
         return;
     }
 
+    if (context->state->main_context == context) {
+        context->state->main_context = NULL;
+    }
     context->state->windows = g_list_remove(context->state->windows, window);
     if (context->state->windows == NULL) {
         gtk_main_quit();
     }
     g_free(context);
+}
+
+static gboolean window_delete_event_cb(GtkWidget *window, GdkEvent *event, gpointer user_data) {
+    (void)event;
+    WindowContext *context = (WindowContext *)user_data;
+    if (!context || !context->state) {
+        return FALSE;
+    }
+    if (context == context->state->main_context && context->state->keep_running_in_background) {
+        gtk_widget_hide(window);
+        update_status_icon(context->state);
+        return TRUE;
+    }
+    return FALSE;
 }
 
 static WindowContext *create_window_context(AppState *state,
@@ -422,6 +561,7 @@ static WindowContext *create_window_context(AppState *state,
         gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
     }
 
+    g_signal_connect(window, "delete-event", G_CALLBACK(window_delete_event_cb), context);
     g_signal_connect(window, "destroy", G_CALLBACK(window_destroy_cb), context);
 
     WebKitUserContentManager *content_manager = webkit_user_content_manager_new();
@@ -458,6 +598,9 @@ static WindowContext *create_window_context(AppState *state,
     g_signal_connect(context->web_view, "create", G_CALLBACK(web_view_create_cb), context);
     gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(context->web_view));
     state->windows = g_list_prepend(state->windows, window);
+    if (!transient_for) {
+        state->main_context = context;
+    }
     return context;
 }
 

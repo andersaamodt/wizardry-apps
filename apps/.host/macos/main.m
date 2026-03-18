@@ -60,6 +60,9 @@
 @property (assign) BOOL forgeDropZoneActive;
 @property (assign) EventHotKeyRef favoriteTrackHotKeyRef;
 @property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
+@property (assign) BOOL keepRunningInBackground;
+@property (assign) BOOL showStatusItem;
+@property (strong) NSStatusItem *statusItem;
 - (void)emitGlobalFavoriteTrackHotkey;
 - (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment;
 - (NSString *)normalizedCommandPath;
@@ -69,8 +72,13 @@
 - (WKWebView *)createAuxWindowWithConfiguration:(WKWebViewConfiguration *)configuration
                                          request:(NSURLRequest *)request
                                      windowTitle:(NSString *)windowTitle
-                                           width:(CGFloat)width
-                                          height:(CGFloat)height;
+                                          width:(CGFloat)width
+                                         height:(CGFloat)height;
+- (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem;
+- (void)updateStatusItemVisibility;
+- (void)showMainWindow;
+- (void)toggleMainWindowFromStatusItem:(id)sender;
+- (void)quitFromStatusItem:(id)sender;
 @end
 
 static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, EventRef event, void *userData) {
@@ -895,6 +903,79 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [overlay removeFromSuperview];
 }
 
+- (void)showMainWindow {
+    if (!self.window) {
+        return;
+    }
+    [self.window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    [self updateStatusItemVisibility];
+}
+
+- (void)toggleMainWindowFromStatusItem:(id)sender {
+    (void)sender;
+    if (!self.window) {
+        return;
+    }
+    if ([self.window isVisible]) {
+        [self.window orderOut:nil];
+        [self updateStatusItemVisibility];
+        return;
+    }
+    [self showMainWindow];
+}
+
+- (void)quitFromStatusItem:(id)sender {
+    (void)sender;
+    [NSApp terminate:nil];
+}
+
+- (void)updateStatusItemVisibility {
+    BOOL wantsStatusItem = self.keepRunningInBackground && self.showStatusItem;
+    if (!wantsStatusItem) {
+        if (self.statusItem) {
+            [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];
+            self.statusItem = nil;
+        }
+        return;
+    }
+    if (!self.statusItem) {
+        self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
+    }
+    NSStatusBarButton *button = self.statusItem.button;
+    if (button) {
+        if (self.appIconImage) {
+            NSImage *icon = [self.appIconImage copy];
+            [icon setTemplate:NO];
+            button.image = icon;
+            button.title = @"";
+        } else {
+            button.image = nil;
+            button.title = @"S";
+        }
+        button.toolTip = self.window ? self.window.title : @"Wizardry";
+    }
+    NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Relay"];
+    NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:([self.window isVisible] ? @"Hide Window" : @"Show Window")
+                                                        action:@selector(toggleMainWindowFromStatusItem:)
+                                                 keyEquivalent:@""];
+    [toggleItem setTarget:self];
+    [menu addItem:toggleItem];
+    [menu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit"
+                                                      action:@selector(quitFromStatusItem:)
+                                               keyEquivalent:@""];
+    [quitItem setTarget:self];
+    [menu addItem:quitItem];
+    self.statusItem.menu = menu;
+}
+
+- (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem {
+    self.keepRunningInBackground = enabled;
+    self.showStatusItem = enabled && showStatusItem;
+    [self updateStatusItemVisibility];
+}
+
 - (void)setupMainMenuWithAppName:(NSString *)appName {
     NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
 
@@ -1713,6 +1794,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             return;
         }
 
+        if ([program isEqualToString:@"__wizardry_host_set_background_mode"]) {
+            BOOL enabled = NO;
+            BOOL wantsStatusItem = NO;
+            if (args.count >= 1) {
+                NSString *raw = [NSString stringWithFormat:@"%@", args[0]];
+                enabled = [@[@"1", @"true", @"yes", @"on"] containsObject:[raw lowercaseString]];
+            }
+            if (args.count >= 2) {
+                NSString *raw = [NSString stringWithFormat:@"%@", args[1]];
+                wantsStatusItem = [@[@"1", @"true", @"yes", @"on"] containsObject:[raw lowercaseString]];
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self applyBackgroundModeEnabled:enabled showStatusItem:wantsStatusItem];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
         if ([program isEqualToString:@"__wizardry_host_priorities_drag_hole"]) {
             CGFloat holeLeft = self.prioritiesTitleHoleLeftWidth;
             CGFloat holeRight = self.prioritiesTitleHoleRightWidth;
@@ -1877,6 +1976,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
+    (void)sender;
+    return !self.keepRunningInBackground;
+}
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
+    (void)sender;
+    if (!flag) {
+        [self showMainWindow];
+    }
+    return YES;
+}
+
+- (BOOL)windowShouldClose:(NSWindow *)sender {
+    if (self.keepRunningInBackground && sender == self.window) {
+        [sender orderOut:nil];
+        [self updateStatusItemVisibility];
+        return NO;
+    }
     return YES;
 }
 
@@ -1889,6 +2006,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     if (self.auxWindows && closingWindow != self.window) {
         [self.auxWindows removeObject:closingWindow];
     }
+    [self updateStatusItemVisibility];
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
