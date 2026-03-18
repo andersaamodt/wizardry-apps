@@ -187,6 +187,9 @@
                       <label id="selected-icon-drop" class="icon-dropzone" for="selected-icon-input" aria-label="Drop app icon or choose a file" tabindex="0">
                         <div class="icon-preview-wrap">
                           <button id="selected-icon-clear" type="button" class="icon-clear-btn hidden" title="Clear icon" aria-label="Clear icon">×</button>
+                          <div id="selected-icon-processing" class="icon-processing hidden" aria-hidden="true">
+                            <span class="icon-processing-spinner"></span>
+                          </div>
                           <img id="selected-icon-preview" class="icon-preview hidden" alt="App icon preview">
                           <span id="selected-icon-placeholder" class="icon-placeholder">No icon</span>
                         </div>
@@ -419,6 +422,8 @@
         iconSquircleOnDrop: true,
         uiPrefs: {},
         uiPrefPersistChain: Promise.resolve(),
+        iconPreviewOverrideByKey: {},
+        iconProcessingByKey: {},
         catalogThumbCache: {},
         catalogRowCache: {},
         targetRuntime: {},
@@ -4255,6 +4260,43 @@
         state.iconVersionByKey[item.key] = Date.now();
       }
 
+      function setItemIconPreviewOverride(item, src) {
+        if (!item || !item.key) {
+          return;
+        }
+        if (src) {
+          state.iconPreviewOverrideByKey[item.key] = String(src);
+          return;
+        }
+        delete state.iconPreviewOverrideByKey[item.key];
+      }
+
+      function setItemIconProcessing(item, flag) {
+        if (!item || !item.key) {
+          return;
+        }
+        if (flag) {
+          state.iconProcessingByKey[item.key] = true;
+          return;
+        }
+        delete state.iconProcessingByKey[item.key];
+      }
+
+      function itemIconPreviewSrc(item) {
+        if (!item || !item.key) {
+          return '';
+        }
+        return String(state.iconPreviewOverrideByKey[item.key] || '');
+      }
+
+      function itemIconIsProcessing(item) {
+        return !!(item && item.key && state.iconProcessingByKey[item.key]);
+      }
+
+      function selectedIconIsProcessing() {
+        return itemIconIsProcessing(selectedCatalogItem());
+      }
+
       function setImageSource(img, src, onMissing) {
         if (!src) {
           if (typeof onMissing === 'function') {
@@ -4355,11 +4397,19 @@
         if (!els.selectedIconPreview || !els.selectedIconPlaceholder || !els.selectedIconClear) {
           return;
         }
-        var iconSrc = iconSrcForItem(selected);
+        var iconSrc = itemIconPreviewSrc(selected) || iconSrcForItem(selected);
+        var processing = itemIconIsProcessing(selected);
+        if (els.selectedIconProcessing) {
+          els.selectedIconProcessing.classList.toggle('hidden', !processing);
+        }
+        if (els.selectedIconDrop) {
+          els.selectedIconDrop.classList.toggle('processing', processing);
+          els.selectedIconDrop.setAttribute('aria-busy', processing ? 'true' : 'false');
+        }
         if (iconSrc) {
           els.selectedIconPreview.classList.remove('hidden');
           els.selectedIconPlaceholder.classList.add('hidden');
-          els.selectedIconClear.classList.remove('hidden');
+          els.selectedIconClear.classList.toggle('hidden', processing);
           setImageSource(els.selectedIconPreview, iconSrc, function () {
             els.selectedIconPreview.removeAttribute('src');
             els.selectedIconPreview.classList.add('hidden');
@@ -4384,19 +4434,32 @@
           throw new Error('Create the project first, then set its icon.');
         }
         var iconPayload = dataUrl || '';
-        if (selected.kind === 'builtin') {
-          await backend('set-app-icon', [selected.id, iconPayload, shapeMode], { quiet: true });
-        } else if (selected.kind === 'workspace') {
-          if (!selected.path) {
-            throw new Error('Workspace path is missing; cannot update icon.');
-          }
-          await backend('set-workspace-icon', [selected.path, iconPayload, shapeMode], { quiet: true });
-        } else {
-          throw new Error('Unknown app type; cannot update icon.');
-        }
-        setItemIconVersion(selected);
-        renderCatalogList();
+        setItemIconPreviewOverride(selected, iconPayload);
+        setItemIconProcessing(selected, true);
         renderSelectedIconEditor(selected);
+        try {
+          if (selected.kind === 'builtin') {
+            await backend('set-app-icon', [selected.id, iconPayload, shapeMode], { quiet: true });
+          } else if (selected.kind === 'workspace') {
+            if (!selected.path) {
+              throw new Error('Workspace path is missing; cannot update icon.');
+            }
+            await backend('set-workspace-icon', [selected.path, iconPayload, shapeMode], { quiet: true });
+          } else {
+            throw new Error('Unknown app type; cannot update icon.');
+          }
+          setItemIconVersion(selected);
+          setItemIconPreviewOverride(selected, '');
+          renderCatalogList();
+          renderSelectedIconEditor(selected);
+        } catch (err) {
+          setItemIconPreviewOverride(selected, '');
+          renderSelectedIconEditor(selected);
+          throw err;
+        } finally {
+          setItemIconProcessing(selected, false);
+          renderSelectedIconEditor(selected);
+        }
       }
 
       function readImageFileToDataUrl(file) {
@@ -6687,6 +6750,10 @@
 
         if (els.selectedIconInput) {
           els.selectedIconInput.addEventListener('change', function () {
+            if (selectedIconIsProcessing()) {
+              els.selectedIconInput.value = '';
+              return;
+            }
             var file = els.selectedIconInput.files && els.selectedIconInput.files[0];
             if (!file) {
               return;
@@ -6705,6 +6772,9 @@
           els.selectedIconClear.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
+            if (selectedIconIsProcessing()) {
+              return;
+            }
             applySelectedIconData('').catch(function (err) {
               toast(String(err && err.message ? err.message : err), 'bad');
             });
@@ -6714,6 +6784,9 @@
         if (els.selectedIconDrop) {
           els.selectedIconDrop.addEventListener('click', function (event) {
             if (event.target && event.target.closest('#selected-icon-clear')) {
+              return;
+            }
+            if (selectedIconIsProcessing()) {
               return;
             }
             event.preventDefault();
@@ -6737,6 +6810,9 @@
           });
           els.selectedIconDrop.addEventListener('drop', function (event) {
             els.selectedIconDrop.classList.remove('drag-over');
+            if (selectedIconIsProcessing()) {
+              return;
+            }
             var files = event.dataTransfer && event.dataTransfer.files;
             var file = files && files[0] ? files[0] : null;
             if (!file) {
@@ -7247,6 +7323,7 @@
         els.inactiveTargetsSection = document.getElementById('inactive-targets-section');
         els.selectedIconDrop = document.getElementById('selected-icon-drop');
         els.selectedIconPreview = document.getElementById('selected-icon-preview');
+        els.selectedIconProcessing = document.getElementById('selected-icon-processing');
         els.selectedIconPlaceholder = document.getElementById('selected-icon-placeholder');
         els.selectedIconChoose = document.getElementById('selected-icon-choose');
         els.selectedIconInput = document.getElementById('selected-icon-input');
