@@ -218,16 +218,16 @@ cp "$SITE_DIR/site.conf" "$temp_conf"
 
 # Remove old template files (but preserve uploads and build)
 info "Removing old template files..."
-if [ -d "$SITE_DIR/site/pages" ]; then
+if [ -e "$SITE_DIR/site/pages" ] || [ -L "$SITE_DIR/site/pages" ]; then
   rm -rf "$SITE_DIR/site/pages"
 fi
-if [ -d "$SITE_DIR/site/static" ]; then
+if [ -e "$SITE_DIR/site/static" ] || [ -L "$SITE_DIR/site/static" ]; then
   rm -rf "$SITE_DIR/site/static"
 fi
-if [ -d "$SITE_DIR/site/includes" ]; then
+if [ -e "$SITE_DIR/site/includes" ] || [ -L "$SITE_DIR/site/includes" ]; then
   rm -rf "$SITE_DIR/site/includes"
 fi
-if [ -d "$SITE_DIR/cgi" ]; then
+if [ -e "$SITE_DIR/cgi" ] || [ -L "$SITE_DIR/cgi" ]; then
   rm -rf "$SITE_DIR/cgi"
 fi
 # Remove README if it exists (comes from template)
