@@ -31,6 +31,7 @@ while true; do
     "Run App Forge%forge-backend run-desktop \"$repo_root\" forge" \
     "App Forge doctor%forge-backend doctor \"$repo_root\"" \
     "Desktop status%\"$script_dir/wizardry-apps-status\" --section desktop" \
+    "Icon creation tools%\"$repo_root/spells/.arcana/icon-creation/icon-creation-menu\"" \
     "---" \
     "Install App Forge launcher%\"$script_dir/install-app-forge\" \"$repo_root\"" \
     "Uninstall App Forge launcher%\"$script_dir/uninstall-app-forge\"" \

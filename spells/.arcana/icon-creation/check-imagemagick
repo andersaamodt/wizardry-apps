@@ -1,0 +1,28 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: check-imagemagick
+
+Checks whether ImageMagick is available for Forge icon generation.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}
+
+if command -v magick >/dev/null 2>&1; then
+  version=$(magick -version 2>/dev/null | sed -n '1s/^Version: //p')
+  [ -n "$version" ] || version="ImageMagick is available on PATH."
+  printf 'status=ok\n'
+  printf 'summary=%s\n' "$version"
+  exit 0
+fi
+
+printf 'status=bad\n'
+printf 'summary=%s\n' 'ImageMagick is not installed.'
+exit 0

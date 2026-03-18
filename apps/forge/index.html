@@ -67,6 +67,21 @@
           </article>
 
           <article class="card">
+            <h3>Icon Creation</h3>
+            <p class="sub">Generate platform icon assets automatically when an app icon is dropped into Forge.</p>
+            <label class="settings-toggle" for="icon-squircle-on-drop">
+              <input id="icon-squircle-on-drop" type="checkbox" checked>
+              <span>Make squircle when dropping icon</span>
+            </label>
+            <div class="button-row compact">
+              <button id="install-imagemagick" type="button" class="action">Install ImageMagick</button>
+              <button id="uninstall-imagemagick" type="button" class="action">Uninstall ImageMagick</button>
+              <button id="refresh-icon-tooling" type="button" class="action">Refresh Icon Tools</button>
+            </div>
+            <pre id="icon-tool-summary" class="mono">Waiting for workspace check.</pre>
+          </article>
+
+          <article class="card">
             <h3>Debug Info</h3>
             <pre id="doctor" class="mono">Waiting for workspace check.</pre>
           </article>
@@ -335,6 +350,7 @@
       var SYSTEM_MINI_TAB_MODE_KEY = 'wizardry.forge.system_mini_tab_mode.v1';
       var THEME_KEY = 'wizardry.forge.theme';
       var LEFT_RAIL_WIDTH_KEY = 'wizardry.forge.left_rail.width';
+      var ICON_SQUIRCLE_ON_DROP_KEY = 'wizardry.forge.icon.squircle_on_drop';
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
       var HIDDEN_WORKSPACES_KEY = 'wizardry.forge.hidden.workspaces.v1';
       var CACHED_APPS_KEY = 'wizardry.forge.cached_apps.v1';
@@ -355,6 +371,7 @@
         'wizardry.forge.system_mini_tab_mode.v1': 'system_mini_tab_mode',
         'wizardry.forge.theme': 'theme',
         'wizardry.forge.left_rail.width': 'left_rail_width',
+        'wizardry.forge.icon.squircle_on_drop': 'icon_squircle_on_drop',
         'wizardry.forge.selected.catalog.v1': 'selected_catalog',
         'wizardry.forge.hidden.workspaces.v1': 'hidden_workspaces',
         'wizardry.forge.cached_apps.v1': 'cached_apps',
@@ -399,6 +416,7 @@
         windowFitInFlight: false,
         createDraftActive: false,
         leftRailWidth: 240,
+        iconSquircleOnDrop: true,
         uiPrefs: {},
         uiPrefPersistChain: Promise.resolve(),
         catalogThumbCache: {},
@@ -522,6 +540,7 @@
           setOrganizeBuiltinFirst(state.organizeBuiltinFirst);
           setUseMiniTabs(state.useMiniTabs);
           setLeftRailWidth(state.leftRailWidth);
+          setIconSquircleOnDrop(state.iconSquircleOnDrop);
           if (state.rootHint) {
             setWorkspaceRoot(state.rootHint);
           }
@@ -1541,6 +1560,30 @@
         }
       }
 
+      function syncIconToolingUI() {
+        if (!els.iconToolSummary) {
+          return;
+        }
+        var hasMagick = toolAvailable('magick');
+        var lines = [
+          'ImageMagick: ' + (hasMagick ? 'yes' : 'no'),
+          'macOS .icns export: ' + (state.os === 'darwin' ? 'native via iconutil' : 'n/a on this host'),
+          'Drop behavior: ' + (state.iconSquircleOnDrop ? 'squircle enabled' : 'plain icon')
+        ];
+        text(els.iconToolSummary, lines.join('\n'));
+
+        if (els.iconSquircleOnDrop) {
+          els.iconSquircleOnDrop.checked = !!state.iconSquircleOnDrop;
+        }
+        if (els.installImagemagick) {
+          els.installImagemagick.disabled = hasMagick;
+          els.installImagemagick.textContent = hasMagick ? 'ImageMagick installed' : 'Install ImageMagick';
+        }
+        if (els.uninstallImagemagick) {
+          els.uninstallImagemagick.disabled = !hasMagick;
+        }
+      }
+
       function extractLogPath(message) {
         var match = String(message || '').match(/see log:\s*([^)]+)/i);
         if (!match || !match[1]) {
@@ -1820,6 +1863,15 @@
         syncSettingsSaveButtons();
       }
 
+      function setIconSquircleOnDrop(enabled) {
+        state.iconSquircleOnDrop = !!enabled;
+        saveStorage(ICON_SQUIRCLE_ON_DROP_KEY, state.iconSquircleOnDrop ? 'true' : 'false');
+        if (els.iconSquircleOnDrop) {
+          els.iconSquircleOnDrop.checked = state.iconSquircleOnDrop;
+        }
+        syncIconToolingUI();
+      }
+
       function normalizedSettingValue(value) {
         return String(value || '').trim();
       }
@@ -1834,6 +1886,7 @@
         state.systemMiniTabMode = loadStorage(SYSTEM_MINI_TAB_MODE_KEY) === 'other' ? 'other' : 'all';
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
         state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
+        state.iconSquircleOnDrop = loadStorage(ICON_SQUIRCLE_ON_DROP_KEY) !== 'false';
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
         state.miniTabs = parseMiniTabs();
         state.activeMiniTab = loadStorage(ACTIVE_MINI_TAB_KEY) || 'all';
@@ -4323,6 +4376,7 @@
 
       async function applySelectedIconData(dataUrl) {
         var selected = selectedCatalogItem();
+        var shapeMode = state.iconSquircleOnDrop ? 'squircle' : 'plain';
         if (!selected || !selected.key) {
           return;
         }
@@ -4331,12 +4385,12 @@
         }
         var iconPayload = dataUrl || '';
         if (selected.kind === 'builtin') {
-          await backend('set-app-icon', [selected.id, iconPayload], { quiet: true });
+          await backend('set-app-icon', [selected.id, iconPayload, shapeMode], { quiet: true });
         } else if (selected.kind === 'workspace') {
           if (!selected.path) {
             throw new Error('Workspace path is missing; cannot update icon.');
           }
-          await backend('set-workspace-icon', [selected.path, iconPayload], { quiet: true });
+          await backend('set-workspace-icon', [selected.path, iconPayload, shapeMode], { quiet: true });
         } else {
           throw new Error('Unknown app type; cannot update icon.');
         }
@@ -5590,6 +5644,7 @@
         state.homeDir = info.home || '';
         state.tools = info;
         syncToolchainUI();
+        syncIconToolingUI();
         if (info.root) {
           setWorkspaceRoot(info.root);
         } else if (state.rootHint) {
@@ -6779,6 +6834,38 @@
           });
         }
 
+        if (els.iconSquircleOnDrop) {
+          els.iconSquircleOnDrop.addEventListener('change', function () {
+            setIconSquircleOnDrop(!!els.iconSquircleOnDrop.checked);
+          });
+        }
+
+        if (els.installImagemagick) {
+          els.installImagemagick.addEventListener('click', function () {
+            perform('Install ImageMagick', async function () {
+              await backend('install-icon-tool', ['imagemagick']);
+              await refreshWorkspace({ quiet: true });
+            }, { swallow: true });
+          });
+        }
+
+        if (els.uninstallImagemagick) {
+          els.uninstallImagemagick.addEventListener('click', function () {
+            perform('Uninstall ImageMagick', async function () {
+              await backend('uninstall-icon-tool', ['imagemagick']);
+              await refreshWorkspace({ quiet: true });
+            }, { swallow: true });
+          });
+        }
+
+        if (els.refreshIconTooling) {
+          els.refreshIconTooling.addEventListener('click', function () {
+            perform('Refresh icon tool status', function () {
+              return refreshWorkspace({ quiet: true });
+            }, { swallow: true, noToast: true, keepResult: true });
+          });
+        }
+
         if (els.clearLog) {
           els.clearLog.addEventListener('click', function (event) {
             event.preventDefault();
@@ -7200,6 +7287,11 @@
         els.installXcodeClt = document.getElementById('install-xcode-clt');
         els.refreshToolchain = document.getElementById('refresh-toolchain');
         els.toolchainSummary = document.getElementById('toolchain-summary');
+        els.iconSquircleOnDrop = document.getElementById('icon-squircle-on-drop');
+        els.installImagemagick = document.getElementById('install-imagemagick');
+        els.uninstallImagemagick = document.getElementById('uninstall-imagemagick');
+        els.refreshIconTooling = document.getElementById('refresh-icon-tooling');
+        els.iconToolSummary = document.getElementById('icon-tool-summary');
         els.doctor = document.getElementById('doctor');
 
         els.toast = document.getElementById('toast');
@@ -7216,6 +7308,7 @@
           cacheElements();
           setFooterStatus(state.footerStatusKind, state.footerStatusMessage);
           syncToolchainUI();
+          syncIconToolingUI();
           syncLogClearVisibility();
           bindButtons();
           bindKeyboardShortcuts();
@@ -7236,6 +7329,7 @@
           setOrganizeBuiltinFirst(state.organizeBuiltinFirst);
           setUseMiniTabs(state.useMiniTabs);
           setLeftRailWidth(state.leftRailWidth);
+          setIconSquircleOnDrop(state.iconSquircleOnDrop);
           setWorkflowMode(state.route);
           closeFloatingMenus();
           syncCreateUI();

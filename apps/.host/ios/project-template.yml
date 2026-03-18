@@ -22,6 +22,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: "__APP_NAME__"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
 
 schemes:

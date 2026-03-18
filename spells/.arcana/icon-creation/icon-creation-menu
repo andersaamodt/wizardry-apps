@@ -1,0 +1,40 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: icon-creation-menu
+
+Displays install and uninstall actions for Forge icon tooling.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+
+if ! command -v menu >/dev/null 2>&1; then
+  printf '%s\n' "icon-creation-menu: menu command not available" >&2
+  exit 1
+fi
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+
+trap 'exit 130' INT
+trap 'exit 0' TERM
+
+while :; do
+  status=$("$script_dir/icon-creation-status" 2>/dev/null || printf 'unknown')
+  if [ "$status" = "installed" ]; then
+    toggle="[X] ImageMagick%$script_dir/uninstall-imagemagick"
+  else
+    toggle="[ ] ImageMagick%$script_dir/install-imagemagick"
+  fi
+
+  menu "Icon creation tools:" \
+    "$toggle" \
+    "Check tooling%$script_dir/check-imagemagick" \
+    "Exit%kill -TERM \$PPID" || menu_status=$?
+  menu_status=${menu_status:-0}
+  [ "$menu_status" -eq 130 ] && exit 0
+done

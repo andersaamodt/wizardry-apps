@@ -15,6 +15,7 @@ The GUI is organized around two primary use-cases:
 - Unified left app list: built-in and user-created apps together, with organize filters and per-row run action
 - Drag-and-drop import: drop a project folder onto Forge to register it into the left list
 - Settings panel (bottom-left gear): roots, diagnostics, bridge status, and global quality checks
+- Settings panel icon tooling: ImageMagick install/uninstall helpers plus a persisted "Make squircle when dropping icon" toggle
 - Activity panel (top-right icon): artifacts and command logs
 - Theme picker (left footer): all bundled wizardry themes, persisted locally
 - Projects are external by default under `~/git`, and only folders with `wizardry.workspace.conf` are shown as managed workspaces.
@@ -28,6 +29,14 @@ The GUI calls:
 - `apps/forge/scripts/forge-backend.sh`
 
 This backend is the CLI parity surface for all Forge actions.
+
+Dropped icons are now normalized into platform asset sets under `assets/icons/` when
+ImageMagick is available, including:
+- `assets/icons/macos/forge.icns`
+- `assets/icons/linux/<size>x<size>/forge-icon.png`
+- `assets/icons/android/mipmap-*/ic_launcher.png`
+- `assets/icons/ios/AppIcon.appiconset/*`
+- `assets/icons/web/icon-*.png`
 
 ## Launch And Install
 

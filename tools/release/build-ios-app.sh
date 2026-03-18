@@ -64,6 +64,16 @@ mkdir -p "$project_dir" "$out_dir"
 cp -R "$IOS_ROOT/Host" "$project_dir/Host"
 mkdir -p "$project_dir/Resources"
 sh "$ROOT_DIR/tools/release/stage-web-assets.sh" "$slug" "$project_dir/Resources"
+mkdir -p "$project_dir/Host/Assets.xcassets"
+cat > "$project_dir/Host/Assets.xcassets/Contents.json" <<'JSON'
+{
+  "info" : {
+    "author" : "wizardry",
+    "version" : 1
+  }
+}
+JSON
+sh "$ROOT_DIR/tools/icons/stage-ios-appiconset.sh" "$ROOT_DIR/apps/$slug" "$project_dir/Host/Assets.xcassets"
 
 project_yml="$project_dir/project.yml"
 cp "$IOS_ROOT/project-template.yml" "$project_yml"
