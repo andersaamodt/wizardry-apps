@@ -247,10 +247,11 @@ if [ -d "$template_dir/static" ]; then
   cp -r "$template_dir/static" "$SITE_DIR/site/"
 fi
 
-# Sync shared theme catalog into every site.
+# Point each site at the shared theme catalog.
 if [ -d "$shared_theme_dir" ]; then
-  mkdir -p "$SITE_DIR/site/static/themes"
-  cp -f "$shared_theme_dir"/*.css "$SITE_DIR/site/static/themes/" 2>/dev/null || true
+  mkdir -p "$SITE_DIR/site/static"
+  rm -rf "$SITE_DIR/site/static/themes"
+  ln -s "$shared_theme_dir" "$SITE_DIR/site/static/themes"
 fi
 
 if [ -d "$template_dir/includes" ]; then

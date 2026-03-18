@@ -1811,11 +1811,6 @@ cmd_list_themes() {
   theme_root="$root/web/.themes"
   app_theme_dir="$root/apps/forge/themes"
 
-  if [ -d "$theme_root" ]; then
-    mkdir -p "$app_theme_dir"
-    cp -f "$theme_root"/*.css "$app_theme_dir/" 2>/dev/null || true
-  fi
-
   themes=$(theme_names_from_dir "$theme_root" || true)
   if [ -z "$themes" ]; then
     themes=$(theme_names_from_dir "$app_theme_dir" || true)
@@ -4611,8 +4606,9 @@ cmd_scaffold_site() {
   fi
 
   if [ -d "$root/web/.themes" ]; then
-    mkdir -p "$site_dir/site/static/themes"
-    cp -f "$root/web/.themes"/*.css "$site_dir/site/static/themes/" 2>/dev/null || true
+    mkdir -p "$site_dir/site/static"
+    rm -rf "$site_dir/site/static/themes"
+    ln -s "$root/web/.themes" "$site_dir/site/static/themes"
   fi
 
   mkdir -p "$site_dir/site/uploads" "$site_dir/build"

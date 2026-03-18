@@ -636,13 +636,18 @@ build_site() {
   cp "$js_lib_dir/idiomorph-ext.min.js" "$SITE_DIR/build/static/js/" || die "build: failed to copy idiomorph-ext.min.js"
 
   if [ -d "$shared_theme_dir" ]; then
-    mkdir -p "$SITE_DIR/site/static/themes"
-    cp -f "$shared_theme_dir"/*.css "$SITE_DIR/site/static/themes/" 2>/dev/null || true
+    mkdir -p "$SITE_DIR/site/static"
+    rm -rf "$SITE_DIR/site/static/themes"
+    ln -s "$shared_theme_dir" "$SITE_DIR/site/static/themes"
   fi
 
   if [ -d "$SITE_DIR/site/static" ]; then
     info "Copying static files to build/static/..."
     cp -r "$SITE_DIR/site/static"/* "$SITE_DIR/build/static/" 2>/dev/null || true
+  fi
+  if [ -d "$shared_theme_dir" ]; then
+    rm -rf "$SITE_DIR/build/static/themes"
+    ln -s "$shared_theme_dir" "$SITE_DIR/build/static/themes"
   fi
 
   prune_stale_build_pages "$SITE_DIR/build/pages" "$SITE_DIR/site/pages"
