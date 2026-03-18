@@ -64,21 +64,75 @@ mkdir -p "$assets_dir" "$macos_dir" "$linux_dir" "$android_dir" "$ios_dir" "$web
 plain_master="$tmp_dir/plain-master.png"
 apple_base="$tmp_dir/apple-base.png"
 primary_master="$tmp_dir/primary-master.png"
+trimmed_source="$tmp_dir/trimmed-source.png"
+subject_master="$tmp_dir/subject-master.png"
+shadow_master="$tmp_dir/shadow-master.png"
+shadow_alpha="$tmp_dir/shadow-alpha.png"
+subject_card="$tmp_dir/subject-card.png"
+
+alpha_min=$(magick "$input_image" -alpha extract -format '%[fx:minima]' info: 2>/dev/null || printf '1')
+subject_size=700
+subject_rounding=0
+
+case "$alpha_min" in
+  1|1.0|1.000000)
+    subject_size=620
+    subject_rounding=92
+    ;;
+esac
 
 magick "$input_image" \
   -auto-orient \
   -background none \
   -alpha on \
-  -resize 768x768 \
+  -trim +repage \
+  "$trimmed_source"
+
+if [ ! -s "$trimmed_source" ]; then
+  cp "$input_image" "$trimmed_source"
+fi
+
+magick "$trimmed_source" \
+  -background none \
+  -alpha on \
+  -resize "${subject_size}x${subject_size}" \
   -gravity center \
-  -extent 1024x1024 \
+  "$subject_master"
+
+if [ "$subject_rounding" -gt 0 ]; then
+  magick "$subject_master" \
+    \( -size "${subject_size}x${subject_size}" xc:none -fill white -draw "roundrectangle 0,0 $((subject_size - 1)),$((subject_size - 1)) ${subject_rounding},${subject_rounding}" \) \
+    -alpha off -compose CopyOpacity -composite \
+    "$subject_card"
+  cp "$subject_card" "$subject_master"
+fi
+
+magick "$subject_master" \
+  -alpha extract \
+  -blur 0x10 \
+  -level 0,45% \
+  "$shadow_alpha"
+
+magick -size 1024x1024 xc:none \
+  \( "$shadow_alpha" -background none -gravity center -extent 1024x1024 \) \
+  -compose CopyOpacity -composite \
+  "$shadow_master"
+
+magick "$shadow_master" \
+  -fill "rgba(0,0,0,0.22)" -colorize 100 \
+  "$shadow_master"
+
+magick "$shadow_master" \
+  \( "$subject_master" -background none -gravity center -extent 1024x1024 \) \
+  -gravity center -compose Over -composite \
   -sharpen 0x0.6 \
   -contrast-stretch 2%x2% \
+  -gravity center \
   "$plain_master"
 
 if [ "$use_squircle" -eq 1 ]; then
   magick "$plain_master" \
-    \( -size 1024x1024 xc:none -fill white -draw "roundrectangle 32,32 992,992 236,236" \) \
+    \( -size 1024x1024 xc:none -fill white -draw "roundrectangle 44,44 980,980 232,232" \) \
     -alpha off -compose CopyOpacity -composite \
     "$apple_base"
   cp "$apple_base" "$primary_master"
