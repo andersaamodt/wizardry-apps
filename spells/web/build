@@ -137,6 +137,25 @@ strip_dynamic_title_block() {
   mv "$tmp" "$file"
 }
 
+prune_stale_build_pages() {
+  build_pages_dir=$1
+  site_pages_dir=$2
+
+  [ -d "$build_pages_dir" ] || return 0
+
+  find "$build_pages_dir" -type f -name '*.html' ! -name '._*' | while IFS= read -r html_file; do
+    rel_html=${html_file#"$build_pages_dir/"}
+    rel_md=${rel_html%.html}.md
+    md_file="$site_pages_dir/$rel_md"
+    if [ ! -f "$md_file" ]; then
+      info "  Removing stale build page: $rel_html"
+      rm -f "$html_file"
+    fi
+  done
+
+  find "$build_pages_dir" -depth -type d -empty -delete 2>/dev/null || true
+}
+
 normalize_tags() {
   printf '%s' "${1-}" | tr '\n' ',' | tr ',' '\n' | sed 's/^ *//;s/ *$//' | awk 'NF { if (!seen[$0]++) { if (out != "") out = out ", "; out = out $0 } } END { printf "%s", out }'
 }
@@ -625,6 +644,8 @@ build_site() {
     info "Copying static files to build/static/..."
     cp -r "$SITE_DIR/site/static"/* "$SITE_DIR/build/static/" 2>/dev/null || true
   fi
+
+  prune_stale_build_pages "$SITE_DIR/build/pages" "$SITE_DIR/site/pages"
 
   info "Converting Markdown to HTML..."
   built_count=0
