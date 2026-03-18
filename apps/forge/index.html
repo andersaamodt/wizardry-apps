@@ -4881,6 +4881,10 @@
         if (options.wide) {
           item.classList.add('wide');
         }
+        if (options.tooltip) {
+          item.classList.add('has-tooltip');
+          item.title = options.tooltip;
+        }
         var label = document.createElement('span');
         label.className = 'workspace-profile-meta-label';
         label.textContent = labelText;
@@ -4953,7 +4957,7 @@
         var meta = document.createElement('div');
         meta.className = 'workspace-profile-meta';
         meta.appendChild(createWorkspaceProfileMeta('Project ID', profile.project_id, {
-          help: 'Read-only here because changing it cleanly also needs a folder and workspace-id migration.'
+          tooltip: 'Read-only here because changing it cleanly also needs a folder and workspace-id migration.'
         }));
         meta.appendChild(createWorkspaceProfileMeta('Workspace root', profile.root || selected.path, { wide: true }));
         meta.appendChild(createWorkspaceProfileMeta('Starter', profile.starter));
