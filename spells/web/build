@@ -219,7 +219,7 @@ generate_blog_feeds_and_sitemap() {
   posts_tmp=$(temp-file blog-feed-posts)
   ranked_tmp=$(temp-file blog-feed-ranked)
 
-  find "$posts_dir" -type f -name '*.md' | while IFS= read -r file; do
+  find "$posts_dir" -type f -name '*.md' ! -name '._*' | while IFS= read -r file; do
     visibility=$(extract_front_matter_value "$file" visibility 2>/dev/null || printf '')
     if [ -z "$visibility" ]; then
       visibility=public
@@ -629,13 +629,13 @@ build_site() {
   info "Converting Markdown to HTML..."
   built_count=0
   if [ -d "$SITE_DIR/site/pages" ]; then
-    md_file_count=$(find "$SITE_DIR/site/pages" -name '*.md' -type f 2>/dev/null | wc -l)
+    md_file_count=$(find "$SITE_DIR/site/pages" -type f -name '*.md' ! -name '._*' 2>/dev/null | wc -l)
     if [ "$md_file_count" -eq 0 ]; then
       warn "No Markdown files found in $SITE_DIR/site/pages/"
       warn "Create .md files there to build HTML pages."
     fi
 
-    find "$SITE_DIR/site/pages" -name '*.md' -type f | sort | while IFS= read -r md_file; do
+    find "$SITE_DIR/site/pages" -type f -name '*.md' ! -name '._*' | sort | while IFS= read -r md_file; do
       rel_path=${md_file#"$SITE_DIR/site/pages/"}
       rel_html=${rel_path%.md}.html
       html_file="$SITE_DIR/build/pages/$rel_html"
