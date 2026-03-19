@@ -3848,6 +3848,34 @@
         }
       }
 
+      function firstPathFromDropData(dataTransfer) {
+        if (!dataTransfer || typeof dataTransfer.getData !== 'function') {
+          return '';
+        }
+        var candidates = [
+          dataTransfer.getData('text/uri-list'),
+          dataTransfer.getData('public.file-url'),
+          dataTransfer.getData('text/plain'),
+          dataTransfer.getData('public.utf8-plain-text')
+        ];
+        for (var i = 0; i < candidates.length; i += 1) {
+          var raw = String(candidates[i] || '').trim();
+          if (!raw) {
+            continue;
+          }
+          var line = raw.split('\n').map(function (entry) {
+            return String(entry || '').trim();
+          }).filter(function (entry) {
+            return entry && entry.charAt(0) !== '#';
+          })[0] || '';
+          var parsed = parseFileUriPath(line);
+          if (parsed) {
+            return parsed;
+          }
+        }
+        return '';
+      }
+
       function firstPathFromUriBlock(rawValue) {
         var raw = String(rawValue || '').replace(/\0/g, '').trim();
         if (!raw) {
@@ -4488,12 +4516,12 @@
         renderSelectedIconEditor(selected);
         try {
           if (selected.kind === 'builtin') {
-            await backend('set-app-icon', [selected.id, iconPayload, shapeMode], { quiet: true });
+            await backendWithTimeout('set-app-icon', [selected.id, iconPayload, shapeMode], 30000);
           } else if (selected.kind === 'workspace') {
             if (!selected.path) {
               throw new Error('Workspace path is missing; cannot update icon.');
             }
-            await backend('set-workspace-icon', [selected.path, iconPayload, shapeMode], { quiet: true });
+            await backendWithTimeout('set-workspace-icon', [selected.path, iconPayload, shapeMode], 30000);
           } else {
             throw new Error('Unknown app type; cannot update icon.');
           }
@@ -4509,6 +4537,18 @@
           setItemIconProcessing(selected, false);
           renderSelectedIconEditor(selected);
         }
+      }
+
+      function backendWithTimeout(cmd, args, timeoutMs) {
+        var limit = typeof timeoutMs === 'number' && timeoutMs > 0 ? timeoutMs : 30000;
+        return Promise.race([
+          backend(cmd, args, { quiet: true }),
+          new Promise(function (_resolve, reject) {
+            setTimeout(function () {
+              reject(new Error('Icon processing timed out. Try a smaller image or use Choose file.'));
+            }, limit);
+          })
+        ]);
       }
 
       async function applySelectedIconPath(filePath) {
@@ -4568,7 +4608,7 @@
           };
           reader.onload = function () {
             var originalDataUrl = String(reader.result || '');
-            var maxArgChars = 2000000;
+            var maxArgChars = 350000;
             if (originalDataUrl && originalDataUrl.length <= maxArgChars) {
               resolve(originalDataUrl);
               return;
@@ -4582,9 +4622,9 @@
                 return;
               }
               // Preserve original files when possible; only resample when the data URL is oversized.
-              var sizes = [2048, 1536, 1024, 896, 768, 640];
+              var sizes = [1536, 1024, 896, 768, 640, 512, 384];
               var output = '';
-              var qualitySteps = [0.95, 0.9, 0.85, 0.8, 0.75];
+              var qualitySteps = [0.92, 0.86, 0.8, 0.72, 0.64];
               var allowJpegFallback = /^image\/jpe?g$/i.test(file.type || '');
 
               function renderDataUrl(size, mime, quality) {
@@ -4605,6 +4645,13 @@
 
               for (var i = 0; i < sizes.length; i += 1) {
                 var size = sizes[i];
+                for (var w = 0; w < qualitySteps.length; w += 1) {
+                  output = renderDataUrl(size, 'image/webp', qualitySteps[w]);
+                  if (output.length <= maxArgChars && /^data:image\/webp;base64,/i.test(output)) {
+                    resolve(output);
+                    return;
+                  }
+                }
                 // Keep non-JPEG sources alpha-safe; converting PNG/WebP/SVG to JPEG strips transparency.
                 if (allowJpegFallback && size >= 512) {
                   for (var q = 0; q < qualitySteps.length; q += 1) {
@@ -6906,6 +6953,13 @@
           els.selectedIconDrop.addEventListener('drop', function (event) {
             els.selectedIconDrop.classList.remove('drag-over');
             if (selectedIconIsProcessing()) {
+              return;
+            }
+            var droppedPath = firstPathFromDropData(event.dataTransfer);
+            if (droppedPath) {
+              applySelectedIconPath(droppedPath).catch(function (err) {
+                toast(String(err && err.message ? err.message : err), 'bad');
+              });
               return;
             }
             var files = event.dataTransfer && event.dataTransfer.files;
