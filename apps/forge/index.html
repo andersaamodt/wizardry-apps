@@ -436,6 +436,7 @@
         lastHostIconDropZoneKey: '',
         lastHostIconDropTargetKey: '',
         hostIconDropPendingKey: '',
+        nativeHostIconDropExpectedUntil: 0,
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
         workspaceProfileCache: {},
@@ -4189,6 +4190,16 @@
         syncHostIconDropTarget();
       }
 
+      function setNativeHostIconDropExpected(flag) {
+        state.nativeHostIconDropExpectedUntil = flag ? (Date.now() + 2000) : 0;
+      }
+
+      function nativeHostShouldOwnIconDrop() {
+        return state.os === 'darwin'
+          && bridgeAvailable()
+          && state.nativeHostIconDropExpectedUntil > Date.now();
+      }
+
       function handleForgeHostFileDrag(detail) {
         var payload = detail && typeof detail === 'object' ? detail : {};
         var phase = String(payload.phase || '');
@@ -4199,12 +4210,14 @@
           if (target === 'workspace' && paths.length) {
             setWorkspaceDropCue(true);
           } else if (target === 'icon' && paths.length) {
+            setNativeHostIconDropExpected(true);
             setSelectedIconDropCue(true);
           }
           return;
         }
         if (phase === 'leave') {
           clearWorkspaceDropCue();
+          setNativeHostIconDropExpected(false);
           setSelectedIconDropCue(false);
           return;
         }
@@ -4213,14 +4226,17 @@
           setSelectedIconDropCue(false);
           if (target === 'icon' && paths.length) {
             if (nativeHandled) {
+              setNativeHostIconDropExpected(true);
               beginNativeHostIconDrop(paths[0]);
               return;
             }
+            setNativeHostIconDropExpected(false);
             applySelectedIconPath(paths[0]).catch(function (err) {
               toast(String(err && err.message ? err.message : err), 'bad');
             });
             return;
           }
+          setNativeHostIconDropExpected(false);
           if (!paths.length) {
             toast('Drop a project folder to import.', 'bad');
             return;
@@ -4681,6 +4697,7 @@
           toast('Create the project first, then set its icon.', 'bad');
           return;
         }
+        setNativeHostIconDropExpected(true);
         state.hostIconDropPendingKey = selected.key;
         setItemIconPreviewOverride(selected, pathToIconSrc(normalizedPath));
         setItemIconProcessing(selected, true);
@@ -4697,9 +4714,11 @@
         var stdout = String(detail.stdout || '');
         var errorText = String(detail.error || '');
         if (!item || !item.key) {
+          setNativeHostIconDropExpected(false);
           state.hostIconDropPendingKey = '';
           return;
         }
+        setNativeHostIconDropExpected(false);
         state.hostIconDropPendingKey = '';
         if (!Number.isFinite(exitCode)) {
           exitCode = detail.ok ? 0 : 1;
@@ -7083,6 +7102,9 @@
           els.selectedIconDrop.addEventListener('drop', function (event) {
             els.selectedIconDrop.classList.remove('drag-over');
             if (selectedIconIsProcessing()) {
+              return;
+            }
+            if (nativeHostShouldOwnIconDrop()) {
               return;
             }
             var droppedPath = firstPathFromDropData(event.dataTransfer);
