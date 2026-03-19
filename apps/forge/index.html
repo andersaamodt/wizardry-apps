@@ -438,6 +438,7 @@
         hostIconDropPendingKey: '',
         hostIconDropVisualPendingKey: '',
         nativeHostIconDropExpectedUntil: 0,
+        nativeHostIconDropHandledUntil: 0,
         nativeHostIconDropArmed: false,
         nativeHostIconDropFallbackTimer: 0,
         refreshSuppressedUntil: 0,
@@ -4198,6 +4199,14 @@
         state.nativeHostIconDropExpectedUntil = flag ? (Date.now() + 5000) : 0;
       }
 
+      function markNativeHostIconDropHandled() {
+        state.nativeHostIconDropHandledUntil = Date.now() + 1500;
+      }
+
+      function nativeHostRecentlyHandledIconDrop() {
+        return state.nativeHostIconDropHandledUntil > Date.now();
+      }
+
       function clearNativeHostIconDropFallback() {
         if (state.nativeHostIconDropFallbackTimer) {
           clearTimeout(state.nativeHostIconDropFallbackTimer);
@@ -4241,7 +4250,7 @@
         clearNativeHostIconDropFallback();
         state.nativeHostIconDropFallbackTimer = setTimeout(function () {
           state.nativeHostIconDropFallbackTimer = 0;
-          if (state.hostIconDropPendingKey) {
+          if (state.hostIconDropPendingKey || nativeHostRecentlyHandledIconDrop()) {
             return;
           }
           triggerSelectedIconDropFallback(normalizedPath, fallbackFile);
@@ -4278,6 +4287,7 @@
           setSelectedIconDropCue(false);
           if (target === 'icon' && (paths.length || hasImagePayload)) {
             if (nativeHandled) {
+              markNativeHostIconDropHandled();
               beginNativeHostIconDrop(paths[0] || '');
               return;
             }
@@ -4774,6 +4784,7 @@
         }
         setNativeHostIconDropExpected(true);
         state.hostIconDropPendingKey = selected.key;
+        markNativeHostIconDropHandled();
         setHostIconDropVisualPending(selected, false);
         if (normalizedPath) {
           setItemIconPreviewOverride(selected, pathToIconSrc(normalizedPath));
@@ -4808,6 +4819,7 @@
         }
         setNativeHostIconDropExpected(false);
         state.hostIconDropPendingKey = '';
+        markNativeHostIconDropHandled();
         setHostIconDropVisualPending(item, false);
         if (!Number.isFinite(exitCode)) {
           exitCode = detail.ok ? 0 : 1;
@@ -7202,6 +7214,9 @@
             var file = files && files[0] ? files[0] : null;
             if (state.os === 'darwin' && bridgeAvailable()) {
               setNativeHostIconDropExpected(true);
+              if (nativeHostRecentlyHandledIconDrop()) {
+                return;
+              }
               if (nativeHostShouldOwnIconDrop()) {
                 setItemIconPreviewOverride(selected, '');
                 setHostIconDropVisualPending(selected, true);
