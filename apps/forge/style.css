@@ -657,14 +657,22 @@ body.settings-open #settings-panel {
   top: 0;
   right: 0;
   margin-left: auto;
-  min-width: 1.28rem;
+  width: 1.24rem;
+  min-width: 1.24rem;
+  max-width: 1.24rem;
+  min-height: 1.24rem;
+  height: 1.24rem;
   justify-content: center;
-  padding-left: 0.34rem;
-  padding-right: 0.34rem;
+  padding: 0;
   z-index: 3;
   background: color-mix(in srgb, var(--panel-solid, #fff) 96%, transparent);
   box-shadow: -10px 0 12px color-mix(in srgb, var(--bg-panel) 78%, transparent);
-  margin-bottom: 0;
+  margin-top: 0.02rem;
+  margin-bottom: 1px;
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border-radius: 5px;
+  font-size: 0.8rem;
+  line-height: 1;
 }
 
 .sidebar-footer {
