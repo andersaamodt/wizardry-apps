@@ -63,6 +63,9 @@ mkdir -p "$assets_dir" "$macos_dir" "$linux_dir" "$android_dir" "$ios_dir" "$web
 
 plain_master="$tmp_dir/plain-master.png"
 apple_base="$tmp_dir/apple-base.png"
+apple_source="$tmp_dir/apple-source.png"
+apple_mask="$tmp_dir/apple-mask.png"
+apple_alpha="$tmp_dir/apple-alpha.png"
 primary_master="$tmp_dir/primary-master.png"
 trimmed_source="$tmp_dir/trimmed-source.png"
 full_bleed_source="$tmp_dir/full-bleed-source.png"
@@ -72,6 +75,7 @@ shadow_master="$tmp_dir/shadow-master.png"
 shadow_alpha="$tmp_dir/shadow-alpha.png"
 subject_size=820
 full_bleed_subject_size=944
+apple_full_bleed_subject_size=896
 full_bleed_mode=0
 
 magick "$input_image" \
@@ -93,6 +97,13 @@ input_opaque=${3-false}
 set -- $(magick identify -format '%w %h' "$trimmed_source")
 trimmed_w=${1-0}
 trimmed_h=${2-0}
+
+if [ "$trimmed_w" -le 1 ] || [ "$trimmed_h" -le 1 ]; then
+  cp "$input_image" "$trimmed_source"
+  set -- $(magick identify -format '%w %h' "$trimmed_source")
+  trimmed_w=${1-0}
+  trimmed_h=${2-0}
+fi
 
 input_max=$input_w
 input_min=$input_w
@@ -189,9 +200,27 @@ else
     "$plain_master"
 fi
 
-if [ "$use_squircle" -eq 1 ]; then
+if [ "$use_squircle" -eq 1 ] && [ "$full_bleed_mode" -eq 1 ]; then
   magick "$plain_master" \
-    \( -size 1024x1024 xc:none -fill white -draw "roundrectangle 44,44 980,980 232,232" \) \
+    -background none \
+    -alpha on \
+    -resize "${apple_full_bleed_subject_size}x${apple_full_bleed_subject_size}" \
+    -gravity center \
+    -extent 1024x1024 \
+    "$apple_source"
+else
+  cp "$plain_master" "$apple_source"
+fi
+
+if [ "$use_squircle" -eq 1 ]; then
+  magick -size 1024x1024 xc:none \
+    -fill white -draw "roundrectangle 44,44 980,980 232,232" \
+    "$apple_mask"
+  magick "$apple_source" -alpha set -alpha extract "$apple_alpha"
+  magick "$apple_alpha" "$apple_mask" \
+    -compose Multiply -composite \
+    "$apple_alpha"
+  magick "$apple_source" "$apple_alpha" \
     -alpha off -compose CopyOpacity -composite \
     "$apple_base"
   cp "$apple_base" "$primary_master"
