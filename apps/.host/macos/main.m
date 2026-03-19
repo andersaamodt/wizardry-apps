@@ -93,6 +93,7 @@
                                          height:(CGFloat)height;
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem;
 - (void)updateStatusItemVisibility;
+- (NSImage *)renderedStatusItemImage;
 - (void)showMainWindow;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
 - (void)quitFromStatusItem:(id)sender;
@@ -1138,6 +1139,34 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [NSApp terminate:nil];
 }
 
+- (NSImage *)renderedStatusItemImage {
+    NSImage *source = self.appIconImage ?: [NSApp applicationIconImage];
+    if (!source || source.size.width <= 0.0 || source.size.height <= 0.0) {
+        if (@available(macOS 11.0, *)) {
+            NSImage *fallback = [NSImage imageWithSystemSymbolName:@"play.square.fill" accessibilityDescription:nil];
+            if (fallback) {
+                [fallback setTemplate:YES];
+                return fallback;
+            }
+        }
+        return nil;
+    }
+
+    CGFloat side = MAX(14.0, [NSStatusBar systemStatusBar].thickness - 4.0);
+    NSImage *rendered = [[NSImage alloc] initWithSize:NSMakeSize(side, side)];
+    [rendered lockFocus];
+    [[NSGraphicsContext currentContext] setImageInterpolation:NSImageInterpolationHigh];
+    [source drawInRect:NSMakeRect(0, 0, side, side)
+              fromRect:NSZeroRect
+             operation:NSCompositingOperationSourceOver
+              fraction:1.0
+        respectFlipped:YES
+                 hints:nil];
+    [rendered unlockFocus];
+    [rendered setTemplate:YES];
+    return rendered;
+}
+
 - (void)updateStatusItemVisibility {
     BOOL wantsStatusItem = self.keepRunningInBackground && self.showStatusItem;
     if (!wantsStatusItem) {
@@ -1152,14 +1181,15 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     NSStatusBarButton *button = self.statusItem.button;
     if (button) {
-        if (self.appIconImage) {
-            NSImage *icon = [self.appIconImage copy];
-            [icon setTemplate:NO];
+        NSImage *icon = [self renderedStatusItemImage];
+        if (icon) {
             button.image = icon;
             button.title = @"";
+            button.imagePosition = NSImageOnly;
         } else {
             button.image = nil;
             button.title = @"S";
+            button.imagePosition = NSNoImage;
         }
         button.toolTip = self.window ? self.window.title : @"Wizardry";
     }
