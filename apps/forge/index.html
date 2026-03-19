@@ -3866,6 +3866,9 @@
           }).filter(function (entry) {
             return entry && entry.charAt(0) !== '#';
           })[0] || '';
+          if (!/^file:\/\//i.test(line) && line.charAt(0) !== '/') {
+            continue;
+          }
           var parsed = parseFileUriPath(line);
           if (parsed) {
             return parsed;
@@ -6931,6 +6934,13 @@
             if (selectedIconIsProcessing()) {
               return;
             }
+            var droppedPath = firstPathFromDropData(event.dataTransfer);
+            if (droppedPath) {
+              applySelectedIconPath(droppedPath).catch(function (err) {
+                toast(String(err && err.message ? err.message : err), 'bad');
+              });
+              return;
+            }
             var files = event.dataTransfer && event.dataTransfer.files;
             var file = files && files[0] ? files[0] : null;
             if (file) {
@@ -6941,13 +6951,6 @@
               });
               return;
             }
-            var droppedPath = firstPathFromDropData(event.dataTransfer);
-            if (!droppedPath) {
-              return;
-            }
-            applySelectedIconPath(droppedPath).catch(function (err) {
-              toast(String(err && err.message ? err.message : err), 'bad');
-            });
           });
           els.selectedIconDrop.addEventListener('keydown', function (event) {
             if (event.key === 'Enter' || event.key === ' ') {
