@@ -39,6 +39,8 @@ grep -F "window.forgeHostIconDropResult = finishNativeHostIconDrop;" "$ui" >/dev
 grep -F "beginNativeHostIconDrop(paths[0] || '');" "$ui" >/dev/null
 grep -F "argv = ['__wizardry_host_forge_icon_drop_target'];" "$ui" >/dev/null
 grep -F "nativeHostIconDropArmed: false," "$ui" >/dev/null
+grep -F "nativeHostIconDropFallbackTimer: 0," "$ui" >/dev/null
+grep -F "scheduleNativeHostIconDropFallback(droppedPath, file);" "$ui" >/dev/null
 grep -F "setNativeHostIconDropExpected(true);" "$ui" >/dev/null
 grep -F "toast('Drop a project folder to import.', 'bad');" "$ui" >/dev/null
 
