@@ -2265,8 +2265,8 @@ input[type="checkbox"]:disabled {
   fill: none;
 }
 
-.command-log-frame {
-  position: relative;
+.log-section-body {
+  padding: 0;
 }
 
 .command-log {
@@ -2274,15 +2274,16 @@ input[type="checkbox"]:disabled {
   max-height: 18rem;
   overflow: auto;
   margin: 0;
-  border: 1px solid var(--section-border);
-  border-radius: 10px;
+  border: 0;
+  border-radius: 0 0 11px 11px;
   background: var(--section-code-bg);
   color: var(--section-text);
+  padding: 0.68rem 0.78rem 0.74rem;
 }
 
 .command-log:focus-visible {
   outline: 2px solid var(--section-focus-ring);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
 .command-log.is-empty {
