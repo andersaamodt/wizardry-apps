@@ -10,7 +10,7 @@ Usage: stage-web-assets.sh APP_SLUG DEST_DIR
 Copies:
   apps/APP_SLUG/* -> DEST_DIR/app/
   apps/.host/shared/* -> DEST_DIR/app/.host/shared/
-  web/.themes/* -> DEST_DIR/app/themes/
+  app/themes -> symlink to web/.themes
   core/include + core/src -> DEST_DIR/core/
 USAGE
   exit 0
@@ -59,9 +59,8 @@ for entry in "$app_dir"/* "$app_dir"/.[!.]* "$app_dir"/..?*; do
   cp -R "$entry" "$dest/app/"
 done
 
-mkdir -p "$dest/app/themes"
+ln -s "$theme_dir" "$dest/app/themes"
 cp -R "$shared_dir"/. "$dest/app/.host/shared/"
-cp -R "$theme_dir"/. "$dest/app/themes/"
 cp -R "$ROOT_DIR/core/include" "$dest/core/include"
 cp -R "$ROOT_DIR/core/src" "$dest/core/src"
 

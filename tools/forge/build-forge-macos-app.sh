@@ -10,7 +10,6 @@ Usage: build-forge-macos-app [--root ROOT_DIR] [--out APP_BUNDLE] [--bundle-id B
 Builds a self-contained App Forge .app bundle with:
 - native WebKit host binary
 - Forge app assets
-- shared theme assets
 - shared bridge assets
 - core source/include payload
 - icon resource (.icns)
@@ -104,7 +103,6 @@ forge_bundle_input_hash() {
     printf 'bundle_id=%s\n' "$bundle_id"
     printf 'host_src=%s\n' "$(hash_path_sha256 "$root/apps/.host/macos/main.m")"
     printf 'forge_app=%s\n' "$(hash_path_sha256 "$root/apps/forge")"
-    printf 'forge_themes=%s\n' "$(hash_path_sha256 "$root/web/.themes")"
     printf 'shared=%s\n' "$(hash_path_sha256 "$root/apps/.host/shared")"
     printf 'core_include=%s\n' "$(hash_path_sha256 "$root/core/include")"
     printf 'core_src=%s\n' "$(hash_path_sha256 "$root/core/src")"
@@ -222,7 +220,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-mkdir -p "$macos_dir" "$resources_dir/forge" "$resources_dir/forge/themes" "$resources_dir/.host" "$resources_dir/wizardry-apps/core"
+mkdir -p "$macos_dir" "$resources_dir/forge" "$resources_dir/.host" "$resources_dir/wizardry-apps/core"
 
 cp "$host_bin" "$macos_dir/wizardry-host"
 for entry in "$root/apps/forge"/* "$root/apps/forge"/.[!.]* "$root/apps/forge"/..?*; do
@@ -234,8 +232,7 @@ for entry in "$root/apps/forge"/* "$root/apps/forge"/.[!.]* "$root/apps/forge"/.
   cp -R "$entry" "$resources_dir/forge/"
 done
 
-mkdir -p "$resources_dir/forge/themes"
-cp -R "$root/web/.themes"/. "$resources_dir/forge/themes/"
+ln -s "$root/web/.themes" "$resources_dir/forge/themes"
 mkdir -p "$resources_dir/forge/.host"
 cp -R "$root/apps/.host/shared" "$resources_dir/forge/.host/"
 cp -R "$root/apps/.host/shared" "$resources_dir/.host/"

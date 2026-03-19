@@ -3054,6 +3054,10 @@ cmd_build_desktop() {
         mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$slug" "$bundle/Contents/Resources/.host" "$bundle/Contents/Resources/wizardry-apps/core"
 
         copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$slug/"
+        if [ -d "$root/web/.themes" ]; then
+          rm -rf "$bundle/Contents/Resources/$slug/themes"
+          ln -s "$root/web/.themes" "$bundle/Contents/Resources/$slug/themes"
+        fi
         mkdir -p "$bundle/Contents/Resources/$slug/.host"
         cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
         cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
