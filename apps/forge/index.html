@@ -437,6 +437,7 @@
         lastHostIconDropTargetKey: '',
         hostIconDropPendingKey: '',
         nativeHostIconDropExpectedUntil: 0,
+        nativeHostIconDropArmed: false,
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
         workspaceProfileCache: {},
@@ -4191,13 +4192,14 @@
       }
 
       function setNativeHostIconDropExpected(flag) {
-        state.nativeHostIconDropExpectedUntil = flag ? (Date.now() + 2000) : 0;
+        state.nativeHostIconDropArmed = !!flag;
+        state.nativeHostIconDropExpectedUntil = flag ? (Date.now() + 5000) : 0;
       }
 
       function nativeHostShouldOwnIconDrop() {
         return state.os === 'darwin'
           && bridgeAvailable()
-          && state.nativeHostIconDropExpectedUntil > Date.now();
+          && (state.nativeHostIconDropArmed || state.nativeHostIconDropExpectedUntil > Date.now());
       }
 
       function handleForgeHostFileDrag(detail) {
@@ -7087,6 +7089,9 @@
             els.selectedIconDrop.addEventListener(name, function (event) {
               event.preventDefault();
               event.stopPropagation();
+              if (state.os === 'darwin' && bridgeAvailable()) {
+                setNativeHostIconDropExpected(true);
+              }
               els.selectedIconDrop.classList.add('drag-over');
             });
           });
@@ -7103,6 +7108,9 @@
             els.selectedIconDrop.classList.remove('drag-over');
             if (selectedIconIsProcessing()) {
               return;
+            }
+            if (state.os === 'darwin' && bridgeAvailable()) {
+              setNativeHostIconDropExpected(true);
             }
             if (nativeHostShouldOwnIconDrop()) {
               return;
