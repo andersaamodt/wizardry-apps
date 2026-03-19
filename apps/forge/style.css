@@ -544,7 +544,7 @@ body.settings-open #settings-panel {
   height: 1px;
   background: var(--line);
   pointer-events: none;
-  z-index: 4;
+  z-index: 0;
 }
 
 .catalog-mini-tabs::-webkit-scrollbar {
@@ -570,6 +570,8 @@ body.settings-open #settings-panel {
   margin-bottom: -1px;
   box-shadow: none;
   flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .catalog-mini-tab:hover,
@@ -587,20 +589,8 @@ body.settings-open #settings-panel {
   border-color: color-mix(in srgb, var(--accent) 44%, var(--line));
   border-bottom-color: transparent;
   color: color-mix(in srgb, var(--text) 94%, transparent);
-  position: relative;
   z-index: 2;
   box-shadow: none;
-}
-
-.catalog-mini-tab.active::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  background: var(--bg-panel);
-  pointer-events: none;
 }
 
 .catalog-mini-tab.drag-target {

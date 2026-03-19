@@ -3792,7 +3792,7 @@ cmd_run_workspace() {
     printf '%s\n' "$root" > "$staged_bundle/Contents/Resources/wizardry-apps-root.txt"
     cp "$host_bin" "$staged_bundle/Contents/MacOS/wizardry-host"
 
-    bundle_app_dir="\$APPDIR/Resources/$workspace_slug$app_entry_suffix"
+    bundle_app_dir="$app_dir"
     install -m 755 /dev/stdin "$staged_bundle/Contents/MacOS/$workspace_slug" <<APP
 #!/bin/sh
 set -eu
@@ -3879,7 +3879,7 @@ PLIST
     rm -rf "$final_bundle"
     mv "$staged_bundle" "$final_bundle"
     rmdir "$staged_root" 2>/dev/null || :
-    bundle_app_dir="$final_bundle/Contents/Resources/$workspace_slug$app_entry_suffix"
+    bundle_app_dir="$app_dir"
     if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/$workspace_slug" "$bundle_app_dir"; then
       printf '%s\n' "forge-backend: failed to launch workspace bundle: $final_bundle" >&2
       exit 1
