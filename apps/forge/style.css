@@ -2278,6 +2278,9 @@ input[type="checkbox"]:disabled {
 
 .log-section-body {
   padding: 0;
+  background: var(--section-code-bg);
+  border-radius: 0 0 11px 11px;
+  overflow: hidden;
 }
 
 .command-log {
@@ -2286,8 +2289,8 @@ input[type="checkbox"]:disabled {
   overflow: auto;
   margin: 0;
   border: 0;
-  border-radius: 0 0 11px 11px;
-  background: var(--section-code-bg);
+  border-radius: 0;
+  background: transparent;
   color: var(--section-text);
   padding: 0.68rem 0.78rem 0.74rem;
 }
