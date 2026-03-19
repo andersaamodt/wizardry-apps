@@ -29,6 +29,7 @@
 @interface WizardryForgeWebView : WKWebView <NSDraggingDestination>
 @property (weak) AppDelegate *appDelegate;
 @property (assign) BOOL nativeFileDragActive;
+@property (copy) NSString *nativeFileDragTarget;
 @end
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler, NSWindowDelegate, WKUIDelegate>
@@ -53,11 +54,16 @@
 @property (assign) CGFloat prioritiesTitleHoleLeftWidth;
 @property (assign) CGFloat prioritiesTitleHoleRightWidth;
 @property (assign) CGFloat prioritiesRightControlsReservedWidth;
-@property (assign) CGFloat forgeDropZoneLeft;
-@property (assign) CGFloat forgeDropZoneTop;
-@property (assign) CGFloat forgeDropZoneRight;
-@property (assign) CGFloat forgeDropZoneBottom;
-@property (assign) BOOL forgeDropZoneActive;
+@property (assign) CGFloat forgeWorkspaceDropZoneLeft;
+@property (assign) CGFloat forgeWorkspaceDropZoneTop;
+@property (assign) CGFloat forgeWorkspaceDropZoneRight;
+@property (assign) CGFloat forgeWorkspaceDropZoneBottom;
+@property (assign) BOOL forgeWorkspaceDropZoneActive;
+@property (assign) CGFloat forgeIconDropZoneLeft;
+@property (assign) CGFloat forgeIconDropZoneTop;
+@property (assign) CGFloat forgeIconDropZoneRight;
+@property (assign) CGFloat forgeIconDropZoneBottom;
+@property (assign) BOOL forgeIconDropZoneActive;
 @property (assign) EventHotKeyRef favoriteTrackHotKeyRef;
 @property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
 @property (assign) BOOL keepRunningInBackground;
@@ -66,9 +72,9 @@
 - (void)emitGlobalFavoriteTrackHotkey;
 - (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment;
 - (NSString *)normalizedCommandPath;
-- (NSArray<NSString *> *)directoryPathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo;
-- (BOOL)shouldHandleForgeFileDragAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
-- (void)dispatchForgeFileDragPhase:(NSString *)phase domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
+- (NSArray<NSString *> *)filePathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo;
+- (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
+- (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
 - (WKWebView *)createAuxWindowWithConfiguration:(WKWebViewConfiguration *)configuration
                                          request:(NSURLRequest *)request
                                      windowTitle:(NSString *)windowTitle
@@ -103,32 +109,37 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
 @implementation WizardryForgeWebView
 
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
-    NSArray<NSString *> *paths = [self.appDelegate directoryPathsFromDraggingInfo:sender];
+    NSArray<NSString *> *paths = [self.appDelegate filePathsFromDraggingInfo:sender];
     NSPoint localPoint = [self convertPoint:[sender draggingLocation] fromView:nil];
     CGFloat domX = localPoint.x;
     CGFloat domY = self.bounds.size.height - localPoint.y;
-    if ([self.appDelegate shouldHandleForgeFileDragAtDomX:domX domY:domY paths:paths]) {
+    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths];
+    if (target.length) {
         self.nativeFileDragActive = YES;
-        [self.appDelegate dispatchForgeFileDragPhase:@"enter" domX:domX domY:domY paths:paths];
+        self.nativeFileDragTarget = target;
+        [self.appDelegate dispatchForgeFileDragPhase:@"enter" target:target domX:domX domY:domY paths:paths];
         return NSDragOperationCopy;
     }
     return [super draggingEntered:sender];
 }
 
 - (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
-    NSArray<NSString *> *paths = [self.appDelegate directoryPathsFromDraggingInfo:sender];
+    NSArray<NSString *> *paths = [self.appDelegate filePathsFromDraggingInfo:sender];
     NSPoint localPoint = [self convertPoint:[sender draggingLocation] fromView:nil];
     CGFloat domX = localPoint.x;
     CGFloat domY = self.bounds.size.height - localPoint.y;
-    if ([self.appDelegate shouldHandleForgeFileDragAtDomX:domX domY:domY paths:paths]) {
+    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths];
+    if (target.length) {
         NSString *phase = self.nativeFileDragActive ? @"update" : @"enter";
         self.nativeFileDragActive = YES;
-        [self.appDelegate dispatchForgeFileDragPhase:phase domX:domX domY:domY paths:paths];
+        self.nativeFileDragTarget = target;
+        [self.appDelegate dispatchForgeFileDragPhase:phase target:target domX:domX domY:domY paths:paths];
         return NSDragOperationCopy;
     }
     if (self.nativeFileDragActive) {
         self.nativeFileDragActive = NO;
-        [self.appDelegate dispatchForgeFileDragPhase:@"leave" domX:domX domY:domY paths:@[]];
+        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[]];
+        self.nativeFileDragTarget = nil;
     }
     return [super draggingUpdated:sender];
 }
@@ -139,24 +150,28 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
         CGFloat domX = localPoint.x;
         CGFloat domY = self.bounds.size.height - localPoint.y;
         self.nativeFileDragActive = NO;
-        [self.appDelegate dispatchForgeFileDragPhase:@"leave" domX:domX domY:domY paths:@[]];
+        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[]];
+        self.nativeFileDragTarget = nil;
     }
     [super draggingExited:sender];
 }
 
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
-    NSArray<NSString *> *paths = [self.appDelegate directoryPathsFromDraggingInfo:sender];
+    NSArray<NSString *> *paths = [self.appDelegate filePathsFromDraggingInfo:sender];
     NSPoint localPoint = [self convertPoint:[sender draggingLocation] fromView:nil];
     CGFloat domX = localPoint.x;
     CGFloat domY = self.bounds.size.height - localPoint.y;
-    if ([self.appDelegate shouldHandleForgeFileDragAtDomX:domX domY:domY paths:paths]) {
+    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths];
+    if (target.length) {
         self.nativeFileDragActive = NO;
-        [self.appDelegate dispatchForgeFileDragPhase:@"drop" domX:domX domY:domY paths:paths];
+        [self.appDelegate dispatchForgeFileDragPhase:@"drop" target:target domX:domX domY:domY paths:paths];
+        self.nativeFileDragTarget = nil;
         return YES;
     }
     if (self.nativeFileDragActive) {
         self.nativeFileDragActive = NO;
-        [self.appDelegate dispatchForgeFileDragPhase:@"leave" domX:domX domY:domY paths:@[]];
+        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[]];
+        self.nativeFileDragTarget = nil;
     }
     return [super performDragOperation:sender];
 }
@@ -472,7 +487,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return environment;
 }
 
-- (NSArray<NSString *> *)directoryPathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo {
+- (NSArray<NSString *> *)filePathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo {
     if (!draggingInfo) {
         return @[];
     }
@@ -492,11 +507,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         if (![url isFileURL]) {
             continue;
         }
-        NSNumber *isDirectory = nil;
-        [url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:nil];
-        if (![isDirectory boolValue]) {
-            continue;
-        }
         NSString *path = [[url path] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (!path.length || [seen containsObject:path]) {
             continue;
@@ -507,26 +517,48 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return paths;
 }
 
-- (BOOL)shouldHandleForgeFileDragAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths {
-    if (!self.enableForgeAppMenu || !self.forgeDropZoneActive || !paths.count) {
-        return NO;
+- (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths {
+    if (!self.enableForgeAppMenu || !paths.count) {
+        return @"";
     }
-    if (domX < self.forgeDropZoneLeft || domX > self.forgeDropZoneRight) {
-        return NO;
+
+    if (self.forgeIconDropZoneActive &&
+        domX >= self.forgeIconDropZoneLeft &&
+        domX <= self.forgeIconDropZoneRight &&
+        domY >= self.forgeIconDropZoneTop &&
+        domY <= self.forgeIconDropZoneBottom) {
+        for (NSString *path in paths) {
+            BOOL isDirectory = NO;
+            if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && !isDirectory) {
+                return @"icon";
+            }
+        }
     }
-    if (domY < self.forgeDropZoneTop || domY > self.forgeDropZoneBottom) {
-        return NO;
+
+    if (self.forgeWorkspaceDropZoneActive &&
+        domX >= self.forgeWorkspaceDropZoneLeft &&
+        domX <= self.forgeWorkspaceDropZoneRight &&
+        domY >= self.forgeWorkspaceDropZoneTop &&
+        domY <= self.forgeWorkspaceDropZoneBottom) {
+        for (NSString *path in paths) {
+            BOOL isDirectory = NO;
+            if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && isDirectory) {
+                return @"workspace";
+            }
+        }
     }
-    return YES;
+
+    return @"";
 }
 
-- (void)dispatchForgeFileDragPhase:(NSString *)phase domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths {
+- (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths {
     if (!self.enableForgeAppMenu || !self.webView || !phase.length) {
         return;
     }
 
     NSDictionary *payload = @{
         @"phase": phase,
+        @"target": target ?: @"",
         @"clientX": @(domX),
         @"clientY": @(domY),
         @"paths": paths ?: @[]
@@ -1835,7 +1867,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             return;
         }
 
-        if ([program isEqualToString:@"__wizardry_host_forge_drop_zone"]) {
+        if ([program isEqualToString:@"__wizardry_host_forge_workspace_drop_zone"]) {
             CGFloat left = 0.0;
             CGFloat top = 0.0;
             CGFloat right = 0.0;
@@ -1849,11 +1881,35 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                 active = YES;
             }
             dispatch_async(dispatch_get_main_queue(), ^{
-                self.forgeDropZoneLeft = left;
-                self.forgeDropZoneTop = top;
-                self.forgeDropZoneRight = right;
-                self.forgeDropZoneBottom = bottom;
-                self.forgeDropZoneActive = active;
+                self.forgeWorkspaceDropZoneLeft = left;
+                self.forgeWorkspaceDropZoneTop = top;
+                self.forgeWorkspaceDropZoneRight = right;
+                self.forgeWorkspaceDropZoneBottom = bottom;
+                self.forgeWorkspaceDropZoneActive = active;
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_forge_icon_drop_zone"]) {
+            CGFloat left = 0.0;
+            CGFloat top = 0.0;
+            CGFloat right = 0.0;
+            CGFloat bottom = 0.0;
+            BOOL active = NO;
+            if (args.count >= 4) {
+                left = MAX(0.0, [args[0] doubleValue]);
+                top = MAX(0.0, [args[1] doubleValue]);
+                right = MAX(left, [args[2] doubleValue]);
+                bottom = MAX(top, [args[3] doubleValue]);
+                active = YES;
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.forgeIconDropZoneLeft = left;
+                self.forgeIconDropZoneTop = top;
+                self.forgeIconDropZoneRight = right;
+                self.forgeIconDropZoneBottom = bottom;
+                self.forgeIconDropZoneActive = active;
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;

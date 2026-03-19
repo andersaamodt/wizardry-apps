@@ -27,6 +27,8 @@ Commands:
   rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE
   set-app-icon [ROOT_HINT] APP_SLUG DATA_URL [squircle|plain]
   set-workspace-icon [ROOT_HINT] WORKSPACE_PATH DATA_URL [squircle|plain]
+  set-app-icon-file [ROOT_HINT] APP_SLUG IMAGE_PATH [squircle|plain]
+  set-workspace-icon-file [ROOT_HINT] WORKSPACE_PATH IMAGE_PATH [squircle|plain]
   icon-tool-status [ROOT_HINT]
   install-icon-tool [ROOT_HINT] TOOL
   uninstall-icon-tool [ROOT_HINT] TOOL
@@ -2897,6 +2899,67 @@ write_project_icon_from_data_url() {
   printf 'status=updated\n'
 }
 
+write_project_icon_from_file() {
+  project_dir=$1
+  image_path=$2
+  shape_mode=${3-squircle}
+
+  [ -d "$project_dir" ] || {
+    printf '%s\n' "forge-backend: project path not found: $project_dir" >&2
+    exit 1
+  }
+
+  [ -n "$image_path" ] || {
+    printf '%s\n' "forge-backend: image path is required" >&2
+    exit 2
+  }
+
+  [ -f "$image_path" ] || {
+    printf '%s\n' "forge-backend: image path not found: $image_path" >&2
+    exit 1
+  }
+
+  icon_path="$project_dir/assets/forge-icon.png"
+  legacy_icns_path="$project_dir/assets/forge.icns"
+  generated_icons_dir="$project_dir/assets/icons"
+  mkdir -p "$(dirname "$icon_path")"
+  rm -rf "$generated_icons_dir"
+
+  if command -v magick >/dev/null 2>&1; then
+    root=$(require_root "")
+    generator="$root/tools/icons/generate-platform-icons.sh"
+    generator_mode=--squircle
+    if [ "$shape_mode" = "plain" ]; then
+      generator_mode=--plain
+    fi
+    if [ -f "$generator" ]; then
+      sh "$generator" "$image_path" "$project_dir" "$generator_mode"
+      rm -f "$legacy_icns_path"
+      return 0
+    fi
+  fi
+
+  tmp_copy=''
+  if command -v sips >/dev/null 2>&1; then
+    tmp_copy_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon-file.XXXXXX")
+    tmp_copy="$tmp_copy_base.png"
+    rm -f "$tmp_copy"
+    if sips -s format png -z 1024 1024 "$image_path" --out "$tmp_copy" >/dev/null 2>&1; then
+      mv "$tmp_copy" "$icon_path"
+      rm -f "$legacy_icns_path"
+      printf 'icon=%s\n' "$icon_path"
+      printf 'status=updated\n'
+      return 0
+    fi
+    rm -f "$tmp_copy"
+  fi
+
+  cp "$image_path" "$icon_path"
+  rm -f "$legacy_icns_path"
+  printf 'icon=%s\n' "$icon_path"
+  printf 'status=updated\n'
+}
+
 cmd_set_app_icon() {
   root=$(require_root "${1-}")
   slug=${2-}
@@ -2961,7 +3024,63 @@ cmd_set_workspace_icon() {
   if [ -f "$workspace_app_dir/index.html" ]; then
     # Keep workspace root and nested app icon assets synchronized so runtime,
     # splash, and bundle icon resolution cannot diverge.
-    write_project_icon_from_data_url "$workspace_app_dir" "$data_url" "$shape_mode" >/dev/null
+  write_project_icon_from_data_url "$workspace_app_dir" "$data_url" "$shape_mode" >/dev/null
+  fi
+  printf 'workspace=%s\n' "$workspace_path"
+}
+
+cmd_set_app_icon_file() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  image_path=${3-}
+  shape_mode=${4-squircle}
+
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: set-app-icon-file requires APP_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
+    exit 1
+  }
+  app_dir=$(resolve_app_dir_or_error "$root" "$slug")
+  distribution=$(app_distribution "$root" "$slug")
+  override_icon=''
+  if [ "$distribution" = "optional" ]; then
+    override_icon=$(app_icon_override_path "$slug")
+  fi
+
+  write_project_icon_from_file "$app_dir" "$image_path" "$shape_mode"
+  if [ "$distribution" = "optional" ] && [ -n "$override_icon" ] && [ -f "$app_dir/assets/forge-icon.png" ]; then
+    mkdir -p "$(dirname "$override_icon")"
+    cp "$app_dir/assets/forge-icon.png" "$override_icon"
+  fi
+  synced_install=$(sync_macos_install_for_slug "$root" "$slug" 2>/dev/null || true)
+  [ -n "$synced_install" ] && printf 'installed_synced=%s\n' "$synced_install"
+  printf 'slug=%s\n' "$slug"
+}
+
+cmd_set_workspace_icon_file() {
+  require_root "${1-}" >/dev/null
+  workspace_path=${2-}
+  image_path=${3-}
+  shape_mode=${4-squircle}
+
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: set-workspace-icon-file requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -d "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    exit 1
+  }
+
+  write_project_icon_from_file "$workspace_path" "$image_path" "$shape_mode"
+  workspace_app_dir="$workspace_path/app"
+  if [ -f "$workspace_app_dir/index.html" ]; then
+    write_project_icon_from_file "$workspace_app_dir" "$image_path" "$shape_mode" >/dev/null
   fi
   printf 'workspace=%s\n' "$workspace_path"
 }
@@ -4768,6 +4887,12 @@ case "$cmd" in
     ;;
   set-workspace-icon)
     cmd_set_workspace_icon "${2-}" "${3-}" "${4-}" "${5-}"
+    ;;
+  set-app-icon-file)
+    cmd_set_app_icon_file "${2-}" "${3-}" "${4-}" "${5-}"
+    ;;
+  set-workspace-icon-file)
+    cmd_set_workspace_icon_file "${2-}" "${3-}" "${4-}" "${5-}"
     ;;
   icon-tool-status)
     cmd_icon_tool_status "${2-}"
