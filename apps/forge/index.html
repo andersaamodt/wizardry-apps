@@ -2420,6 +2420,24 @@
         ensureActiveThemeInList();
       }
 
+      function buildThemeStylesheetHref(themeName) {
+        var href = 'themes/' + themeName + '.css?v=' + ASSET_VERSION;
+        return href + '&ts=' + String(Date.now());
+      }
+
+      function setThemeStylesheet(themeName) {
+        if (!els.themeStylesheet) {
+          return;
+        }
+        var nextLink = els.themeStylesheet.cloneNode(false);
+        nextLink.href = buildThemeStylesheetHref(themeName);
+        nextLink.setAttribute('data-theme-name', themeName);
+        if (els.themeStylesheet.parentNode) {
+          els.themeStylesheet.parentNode.replaceChild(nextLink, els.themeStylesheet);
+        }
+        els.themeStylesheet = nextLink;
+      }
+
       function applyTheme(themeName, options) {
         options = options || {};
         var normalized = String(themeName || '').toLowerCase().trim();
@@ -2433,9 +2451,7 @@
         }
         state.activeTheme = normalized;
         saveStorage(THEME_KEY, normalized);
-        if (els.themeStylesheet) {
-          els.themeStylesheet.href = 'themes/' + normalized + '.css?v=' + ASSET_VERSION;
-        }
+        setThemeStylesheet(normalized);
         if (els.themePickerBtn) {
           els.themePickerBtn.textContent = themeLabel(normalized);
         }
