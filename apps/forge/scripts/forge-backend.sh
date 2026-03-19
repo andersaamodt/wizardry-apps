@@ -915,6 +915,24 @@ ensure_macos_host() {
   printf '%s\n' "$host_bin"
 }
 
+macos_bundle_signature_is_usable() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  command -v codesign >/dev/null 2>&1 || return 0
+  codesign --verify --deep --strict "$bundle_path" >/dev/null 2>&1
+}
+
+ensure_macos_bundle_signature() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  command -v codesign >/dev/null 2>&1 || return 0
+  if macos_bundle_signature_is_usable "$bundle_path"; then
+    return 0
+  fi
+  codesign --force --deep --sign - "$bundle_path" >/dev/null 2>&1 || return 1
+  macos_bundle_signature_is_usable "$bundle_path"
+}
+
 ensure_linux_host() {
   root=$1
   require_tool cc
@@ -1309,6 +1327,7 @@ copy_macos_bundle() {
   fi
   touch "$dest_bundle" >/dev/null 2>&1 || :
   touch "$dest_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
+  ensure_macos_bundle_signature "$dest_bundle" || return 1
   return 0
 }
 
@@ -3163,7 +3182,7 @@ cmd_build_desktop() {
          [ -f "$hash_path" ]; then
         cached_hash=$(head -n 1 "$hash_path" 2>/dev/null | tr -d '\r')
         cached_root=$(head -n 1 "$bundle/Contents/Resources/wizardry-apps-root.txt" 2>/dev/null | tr -d '\r')
-        if [ "$cached_hash" = "$expected_hash" ] && [ "$cached_root" = "$root" ]; then
+        if [ "$cached_hash" = "$expected_hash" ] && [ "$cached_root" = "$root" ] && ensure_macos_bundle_signature "$bundle"; then
           cache_hit=true
         fi
       fi
@@ -3173,10 +3192,7 @@ cmd_build_desktop() {
         mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$slug" "$bundle/Contents/Resources/.host" "$bundle/Contents/Resources/wizardry-apps/core"
 
         copy_tree_for_bundle "$app_dir" "$bundle/Contents/Resources/$slug/"
-        if [ -d "$root/web/.themes" ]; then
-          rm -rf "$bundle/Contents/Resources/$slug/themes"
-          ln -s "$root/web/.themes" "$bundle/Contents/Resources/$slug/themes"
-        fi
+        rm -rf "$bundle/Contents/Resources/$slug/themes"
         mkdir -p "$bundle/Contents/Resources/$slug/.host"
         cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/$slug/.host/"
         cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
@@ -3261,6 +3277,11 @@ APP
 $icon_key
 </dict></plist>
 PLIST
+
+        ensure_macos_bundle_signature "$bundle" || {
+          printf '%s\n' "forge-backend: failed to sign macOS app bundle: $bundle" >&2
+          exit 1
+        }
       fi
 
       if command -v ditto >/dev/null 2>&1; then
@@ -3764,6 +3785,7 @@ cmd_run_workspace() {
     mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources/$workspace_slug" "$staged_bundle/Contents/Resources/.host"
 
     copy_tree_for_bundle "$workspace_path" "$staged_bundle/Contents/Resources/$workspace_slug/"
+    rm -rf "$staged_bundle/Contents/Resources/$workspace_slug/themes"
     mkdir -p "$staged_bundle/Contents/Resources/$workspace_slug/.host"
     cp -R "$root/apps/.host/shared" "$staged_bundle/Contents/Resources/$workspace_slug/.host/"
     cp -R "$root/apps/.host/shared" "$staged_bundle/Contents/Resources/.host/"
@@ -3846,6 +3868,11 @@ APP
 $icon_key
 </dict></plist>
 PLIST
+
+    ensure_macos_bundle_signature "$staged_bundle" || {
+      printf '%s\n' "forge-backend: failed to sign macOS workspace bundle: $staged_bundle" >&2
+      exit 1
+    }
 
     stop_desktop_instances_for_slug "$root" "$workspace_slug" "$workspace_title" "$os"
     mkdir -p "$bundle_root"

@@ -97,6 +97,24 @@ hash_path_sha256() {
   rm -f "$listing"
 }
 
+macos_bundle_signature_is_usable() {
+  bundle_path=$1
+  [ -d "$bundle_path" ] || return 1
+  command -v codesign >/dev/null 2>&1 || return 0
+  codesign --verify --deep --strict "$bundle_path" >/dev/null 2>&1
+}
+
+ensure_macos_bundle_signature() {
+  bundle_path=$1
+  [ -d "$bundle_path" ] || return 1
+  command -v codesign >/dev/null 2>&1 || return 0
+  if macos_bundle_signature_is_usable "$bundle_path"; then
+    return 0
+  fi
+  codesign --force --deep --sign - "$bundle_path" >/dev/null 2>&1 || return 1
+  macos_bundle_signature_is_usable "$bundle_path"
+}
+
 forge_bundle_input_hash() {
   {
     printf 'v=2\n'
@@ -201,7 +219,7 @@ if [ -d "$out_bundle" ] &&
    [ -f "$plist_file" ]; then
   cached_hash=$(head -n 1 "$hash_file" 2>/dev/null | tr -d '\r')
   cached_root=$(head -n 1 "$root_file" 2>/dev/null | tr -d '\r')
-  if [ "$cached_hash" = "$expected_hash" ] && [ "$cached_root" = "$root" ] && grep -F "<string>$bundle_id</string>" "$plist_file" >/dev/null 2>&1; then
+  if [ "$cached_hash" = "$expected_hash" ] && [ "$cached_root" = "$root" ] && grep -F "<string>$bundle_id</string>" "$plist_file" >/dev/null 2>&1 && ensure_macos_bundle_signature "$out_bundle"; then
     printf '%s\n' "app_bundle=$out_bundle"
     printf '%s\n' "host_binary=$host_bin"
     printf '%s\n' "cache=hit"
@@ -231,8 +249,6 @@ for entry in "$root/apps/forge"/* "$root/apps/forge"/.[!.]* "$root/apps/forge"/.
   [ "$base" = "themes" ] && continue
   cp -R "$entry" "$resources_dir/forge/"
 done
-
-ln -s "$root/web/.themes" "$resources_dir/forge/themes"
 mkdir -p "$resources_dir/forge/.host"
 cp -R "$root/apps/.host/shared" "$resources_dir/forge/.host/"
 cp -R "$root/apps/.host/shared" "$resources_dir/.host/"
@@ -309,6 +325,10 @@ PLIST
 mkdir -p "$(dirname "$out_bundle")"
 rm -rf "$out_bundle"
 cp -R "$stage_bundle" "$out_bundle"
+ensure_macos_bundle_signature "$out_bundle" || {
+  printf '%s\n' "build-forge-macos-app: failed to sign macOS app bundle: $out_bundle" >&2
+  exit 1
+}
 
 printf '%s\n' "app_bundle=$out_bundle"
 printf '%s\n' "host_binary=$host_bin"

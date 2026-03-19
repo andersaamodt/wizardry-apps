@@ -2426,6 +2426,9 @@
 
       function buildThemeStylesheetHref(themeName) {
         var href = 'themes/' + themeName + '.css?v=' + ASSET_VERSION;
+        if (state.rootHint) {
+          href = pathToIconSrc(state.rootHint + '/web/.themes/' + themeName + '.css') + '?v=' + ASSET_VERSION;
+        }
         return href + '&ts=' + String(Date.now());
       }
 

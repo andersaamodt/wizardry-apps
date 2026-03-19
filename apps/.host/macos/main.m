@@ -78,6 +78,8 @@
 - (void)emitGlobalFavoriteTrackHotkey;
 - (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment;
 - (NSString *)normalizedCommandPath;
+- (NSString *)resolvedWizardryAppsRoot;
+- (NSString *)resolvedSharedThemeFileForTheme:(NSString *)themeName;
 - (NSArray<NSString *> *)filePathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo;
 - (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
 - (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
@@ -848,6 +850,44 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return @"";
 }
 
+- (NSString *)resolvedWizardryAppsRoot {
+    NSString *envRoot = [[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_APPS_ROOT"];
+    if (envRoot.length && [[NSFileManager defaultManager] fileExistsAtPath:envRoot]) {
+        return envRoot;
+    }
+
+    NSString *rootFile = [[[self.appPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"wizardry-apps-root.txt"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSError *error = nil;
+    NSString *rootFromFile = [[NSString stringWithContentsOfFile:rootFile encoding:NSUTF8StringEncoding error:&error] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (rootFromFile.length && [[NSFileManager defaultManager] fileExistsAtPath:rootFromFile]) {
+        return rootFromFile;
+    }
+
+    return @"";
+}
+
+- (NSString *)resolvedSharedThemeFileForTheme:(NSString *)themeName {
+    NSString *cleanTheme = [[themeName ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lowercaseString];
+    if (!cleanTheme.length) {
+        cleanTheme = @"psionic";
+    }
+
+    NSString *appThemePath = [[self.appPath stringByAppendingPathComponent:@"themes"] stringByAppendingPathComponent:[cleanTheme stringByAppendingString:@".css"]];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:appThemePath]) {
+        return appThemePath;
+    }
+
+    NSString *repoRoot = [self resolvedWizardryAppsRoot];
+    if (repoRoot.length) {
+        NSString *sharedThemePath = [[[repoRoot stringByAppendingPathComponent:@"web/.themes"] stringByAppendingPathComponent:cleanTheme] stringByAppendingString:@".css"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:sharedThemePath]) {
+            return sharedThemePath;
+        }
+    }
+
+    return @"";
+}
+
 - (NSColor *)parseCSSColorToken:(NSString *)token {
     NSString *raw = [[token ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lowercaseString];
     if (!raw.length) {
@@ -938,7 +978,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         theme = @"psionic";
     }
 
-    NSString *themeFile = [[self.appPath stringByAppendingPathComponent:@"themes"] stringByAppendingPathComponent:[theme stringByAppendingString:@".css"]];
+    NSString *themeFile = [self resolvedSharedThemeFileForTheme:theme];
     NSDictionary<NSString *, NSString *> *vars = [self readThemeVariablesFromFile:themeFile];
     NSColor *bg = [self parseCSSColorToken:vars[@"bg"]];
     NSColor *text = [self parseCSSColorToken:vars[@"text"]];
@@ -963,7 +1003,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         theme = @"psionic";
     }
 
-    NSString *themeFile = [[self.appPath stringByAppendingPathComponent:@"themes"] stringByAppendingPathComponent:[theme stringByAppendingString:@".css"]];
+    NSString *themeFile = [self resolvedSharedThemeFileForTheme:theme];
     NSDictionary<NSString *, NSString *> *vars = [self readThemeVariablesFromFile:themeFile];
     NSColor *bg = [self parseCSSColorToken:vars[@"bg"]];
     NSColor *text = [self parseCSSColorToken:vars[@"text"]];
