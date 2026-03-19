@@ -1241,7 +1241,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)updateStatusItemVisibility {
-    BOOL wantsStatusItem = self.keepRunningInBackground && self.showStatusItem;
+    BOOL wantsStatusItem = self.showStatusItem;
     if (!wantsStatusItem) {
         if (self.statusItem) {
             [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];
@@ -1283,7 +1283,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem {
     self.keepRunningInBackground = enabled;
-    self.showStatusItem = enabled && showStatusItem;
+    self.showStatusItem = showStatusItem;
     [self updateStatusItemVisibility];
 }
 
