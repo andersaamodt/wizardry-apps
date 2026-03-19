@@ -65,11 +65,13 @@ plain_master="$tmp_dir/plain-master.png"
 apple_base="$tmp_dir/apple-base.png"
 primary_master="$tmp_dir/primary-master.png"
 trimmed_source="$tmp_dir/trimmed-source.png"
+full_bleed_source="$tmp_dir/full-bleed-source.png"
 subject_master="$tmp_dir/subject-master.png"
 subject_canvas="$tmp_dir/subject-canvas.png"
 shadow_master="$tmp_dir/shadow-master.png"
 shadow_alpha="$tmp_dir/shadow-alpha.png"
 subject_size=820
+full_bleed_mode=0
 
 magick "$input_image" \
   -auto-orient \
@@ -82,41 +84,109 @@ if [ ! -s "$trimmed_source" ]; then
   cp "$input_image" "$trimmed_source"
 fi
 
-magick "$trimmed_source" \
-  -background none \
-  -alpha on \
-  -resize "${subject_size}x${subject_size}" \
-  -gravity center \
-  "$subject_master"
+set -- $(magick identify -format '%w %h %[opaque]' "$input_image")
+input_w=${1-0}
+input_h=${2-0}
+input_opaque=${3-false}
 
-magick "$subject_master" \
-  -background none \
-  -gravity center \
-  -extent 1024x1024 \
-  "$subject_canvas"
+set -- $(magick identify -format '%w %h' "$trimmed_source")
+trimmed_w=${1-0}
+trimmed_h=${2-0}
 
-magick "$subject_master" \
-  -alpha extract \
-  -blur 0x10 \
-  -level 0,45% \
-  "$shadow_alpha"
+input_max=$input_w
+input_min=$input_w
+if [ "$input_h" -gt "$input_max" ]; then
+  input_max=$input_h
+fi
+if [ "$input_h" -lt "$input_min" ]; then
+  input_min=$input_h
+fi
 
-magick -size 1024x1024 xc:none \
-  \( "$shadow_alpha" -background none -gravity center -extent 1024x1024 \) \
-  -compose CopyOpacity -composite \
-  "$shadow_master"
+trimmed_max=$trimmed_w
+trimmed_min=$trimmed_w
+if [ "$trimmed_h" -gt "$trimmed_max" ]; then
+  trimmed_max=$trimmed_h
+fi
+if [ "$trimmed_h" -lt "$trimmed_min" ]; then
+  trimmed_min=$trimmed_h
+fi
 
-magick "$shadow_master" \
-  -fill "rgba(0,0,0,0.22)" -colorize 100 \
-  "$shadow_master"
+input_square_pct=0
+trimmed_square_pct=0
+trim_w_pct=0
+trim_h_pct=0
+if [ "$input_max" -gt 0 ]; then
+  input_square_pct=$((input_min * 100 / input_max))
+fi
+if [ "$trimmed_max" -gt 0 ]; then
+  trimmed_square_pct=$((trimmed_min * 100 / trimmed_max))
+fi
+if [ "$input_w" -gt 0 ]; then
+  trim_w_pct=$((trimmed_w * 100 / input_w))
+fi
+if [ "$input_h" -gt 0 ]; then
+  trim_h_pct=$((trimmed_h * 100 / input_h))
+fi
 
-magick "$subject_canvas" \
-  "$shadow_master" \
-  -compose DstOver -composite \
-  -sharpen 0x0.6 \
-  -contrast-stretch 2%x2% \
-  -gravity center \
-  "$plain_master"
+case "$input_opaque" in
+  true|True)
+    if [ "$input_square_pct" -ge 96 ] \
+      && [ "$trimmed_square_pct" -ge 96 ] \
+      && [ "$trim_w_pct" -ge 96 ] \
+      && [ "$trim_h_pct" -ge 96 ]; then
+      full_bleed_mode=1
+    fi
+    ;;
+esac
+
+if [ "$full_bleed_mode" -eq 1 ]; then
+  magick "$trimmed_source" \
+    -background none \
+    -alpha on \
+    -resize 1024x1024^ \
+    -gravity center \
+    -extent 1024x1024 \
+    -sharpen 0x0.4 \
+    -contrast-stretch 1%x1% \
+    "$full_bleed_source"
+  cp "$full_bleed_source" "$plain_master"
+else
+  magick "$trimmed_source" \
+    -background none \
+    -alpha on \
+    -resize "${subject_size}x${subject_size}" \
+    -gravity center \
+    "$subject_master"
+
+  magick "$subject_master" \
+    -background none \
+    -gravity center \
+    -extent 1024x1024 \
+    "$subject_canvas"
+
+  magick "$subject_master" \
+    -alpha extract \
+    -blur 0x10 \
+    -level 0,45% \
+    "$shadow_alpha"
+
+  magick -size 1024x1024 xc:none \
+    \( "$shadow_alpha" -background none -gravity center -extent 1024x1024 \) \
+    -compose CopyOpacity -composite \
+    "$shadow_master"
+
+  magick "$shadow_master" \
+    -fill "rgba(0,0,0,0.22)" -colorize 100 \
+    "$shadow_master"
+
+  magick "$subject_canvas" \
+    "$shadow_master" \
+    -compose DstOver -composite \
+    -sharpen 0x0.6 \
+    -contrast-stretch 2%x2% \
+    -gravity center \
+    "$plain_master"
+fi
 
 if [ "$use_squircle" -eq 1 ]; then
   magick "$plain_master" \
@@ -217,6 +287,7 @@ cp "$web_dir/icon-180.png" "$web_dir/apple-touch-icon.png"
 cat > "$meta_dir/icon-settings.conf" <<CONF
 generator=wizardry-forge-icon-pipeline
 squircle=$use_squircle
+full_bleed=$full_bleed_mode
 master=$assets_dir/forge-icon.png
 plain_master=$meta_dir/plain-master.png
 apple_master=$meta_dir/apple-master.png
