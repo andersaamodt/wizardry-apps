@@ -2780,6 +2780,28 @@
         }
       }
 
+      function itemStatusName(item) {
+        if (!item) {
+          return 'app';
+        }
+        return String(item.title || item.name || (item.kind === 'workspace' ? 'project' : 'app'));
+      }
+
+      function buildActionLabel(item) {
+        return 'Building ' + itemStatusName(item);
+      }
+
+      function runActionLabel(item) {
+        if (item && item.kind === 'builtin' && hasEnabledHostRunTarget(item)) {
+          return buildActionLabel(item);
+        }
+        return 'Running ' + itemStatusName(item);
+      }
+
+      function ranActionLabel(item) {
+        return 'Ran ' + itemStatusName(item) + '...';
+      }
+
       async function runWorkspaceItem(item) {
         if (!item || item.kind !== 'workspace') {
           throw new Error('Select a user-created app to run');
@@ -3374,10 +3396,10 @@
               setSelectedCatalog(item.key);
               if (item.kind === 'builtin') {
                 state.selectedBuiltIn = item.id;
-                perform('Running app', function () { return runPipelineAction('run'); }, { swallow: true });
+                perform(runActionLabel(item), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(item) });
               } else {
                 state.selectedWorkspace = item.id;
-                perform('Running project', function () { return runWorkspaceItem(item); }, { swallow: true, successLabel: 'Ran ' + String(item.title || item.name || 'project') });
+                perform(runActionLabel(item), function () { return runWorkspaceItem(item); }, { swallow: true, successLabel: ranActionLabel(item) });
               }
               renderSelectedBuiltIn();
             });
@@ -6435,6 +6457,9 @@
 
         if (kind === 'run') {
           if (enabledTargets[nativeTarget]) {
+            var runningLabel = 'Running ' + itemStatusName(app) + '...';
+            setActivity('working', runningLabel);
+            setFooterStatus('working', runningLabel);
             suppressTransientRefresh();
             var run = await backend('run-desktop', [app.id]);
             var runOut = kv(run.stdout || '');
@@ -7044,7 +7069,7 @@
           if (!hasBuildAction(selected)) {
             return;
           }
-          perform('Build enabled targets', function () { return runPipelineAction('build'); }, { swallow: true });
+          perform(buildActionLabel(selected), function () { return runPipelineAction('build'); }, { swallow: true });
         });
 
         els.actionRun.addEventListener('click', function () {
@@ -7060,7 +7085,7 @@
             toast('Enable Hosted Web or the ' + runTargetName + ' target to run this app.', 'bad');
             return;
           }
-          perform('Running app', function () { return runPipelineAction('run'); }, { swallow: true });
+          perform(runActionLabel(selected), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(selected) });
         });
 
         els.actionStage.addEventListener('click', function () {
@@ -7558,7 +7583,7 @@
               return;
             }
             event.preventDefault();
-            perform('Build enabled targets', function () { return runPipelineAction('build'); }, { swallow: true });
+            perform(buildActionLabel(selected), function () { return runPipelineAction('build'); }, { swallow: true });
             return;
           }
 

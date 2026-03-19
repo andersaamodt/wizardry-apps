@@ -21,6 +21,10 @@ grep -F "function shouldShowFooterStatusForAction(label, opts)" "$ui" >/dev/null
 grep -F "setFooterStatus('working', label + '...');" "$ui" >/dev/null
 grep -F "var successLabel = String(opts.successLabel || (label + ' complete'));" "$ui" >/dev/null
 grep -F "setFooterStatus('ok', successLabel);" "$ui" >/dev/null
+grep -F "function buildActionLabel(item)" "$ui" >/dev/null
+grep -F "function runActionLabel(item)" "$ui" >/dev/null
+grep -F "function ranActionLabel(item)" "$ui" >/dev/null
+grep -F "setFooterStatus('working', runningLabel);" "$ui" >/dev/null
 grep -F "setFooterStatus('bad', message);" "$ui" >/dev/null
 grep -F "return !/^(open|copy)\\b/i.test(String(label || ''));" "$ui" >/dev/null
 
