@@ -220,6 +220,7 @@ printf '%s\n' "${FORGE_TEST_PICK_DIR:-}"
 SH
 chmod +x "$fake_bin/zenity"
 
+
 test_env() {
   env \
     PATH="$fake_bin:$PATH" \
@@ -278,7 +279,7 @@ if test_env FORGE_TEST_PICK_DIR="$scratch/outside" sh "$backend" pick-workspace-
   printf '%s\n' "pick-workspace-subpath unexpectedly accepted an external folder" >&2
   exit 1
 fi
-grep -F "selected folder must stay inside the workspace root" /tmp/forge-pick-outside.err >/dev/null
+grep -F "selected folder must stay inside the project root" /tmp/forge-pick-outside.err >/dev/null
 
 if test_env FORGE_TEST_PICK_DIR="$pick_ws/docs" sh "$backend" pick-workspace-subpath "$root" "$pick_ws" >/tmp/forge-pick-docs.out 2>/tmp/forge-pick-docs.err; then
   printf '%s\n' "pick-workspace-subpath unexpectedly accepted a folder without index.html" >&2
@@ -342,7 +343,7 @@ if test_env \
   printf '%s\n' "run-workspace unexpectedly succeeded even though the host exited immediately" >&2
   exit 1
 fi
-grep -F "failed to launch workspace desktop host" /tmp/forge-run-workspace-fail.err >/dev/null
+grep -F "failed to launch project desktop host" /tmp/forge-run-workspace-fail.err >/dev/null
 
 builtin_host_log="$scratch/builtin-host.log"
 builtin_run_out=$(test_env \

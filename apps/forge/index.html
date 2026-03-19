@@ -63,7 +63,7 @@
               <button id="install-xcode-clt" type="button" class="action">Install Xcode CLT</button>
               <button id="refresh-toolchain" type="button" class="action">Refresh Tool Status</button>
             </div>
-            <pre id="toolchain-summary" class="mono">Waiting for workspace check.</pre>
+            <pre id="toolchain-summary" class="mono">Waiting for project check.</pre>
           </article>
 
           <article class="card">
@@ -78,12 +78,12 @@
               <button id="uninstall-imagemagick" type="button" class="action">Uninstall ImageMagick</button>
               <button id="refresh-icon-tooling" type="button" class="action">Refresh Icon Tools</button>
             </div>
-            <pre id="icon-tool-summary" class="mono">Waiting for workspace check.</pre>
+            <pre id="icon-tool-summary" class="mono">Waiting for project check.</pre>
           </article>
 
           <article class="card">
             <h3>Debug Info</h3>
-            <pre id="doctor" class="mono">Waiting for workspace check.</pre>
+            <pre id="doctor" class="mono">Waiting for project check.</pre>
           </article>
         </div>
       </aside>
@@ -214,7 +214,7 @@
 
                 <details id="workspace-profile-section" class="pipeline-section hidden">
                   <summary class="pipeline-section-head workspace-profile-summary">
-                    <span>Workspace settings</span>
+                    <span>Project settings</span>
                     <span id="workspace-profile-kind-pill" class="workspace-profile-kind-pill hidden"></span>
                   </summary>
                   <div class="pipeline-section-body">
@@ -1858,7 +1858,7 @@
       function setWorkspaceRoot(root) {
         state.rootHint = root || '';
         saveStorage(ROOT_KEY, state.rootHint);
-        text(els.workspaceRootDisplay, state.rootHint || 'Workspace root not resolved. Use the settings gear.');
+        text(els.workspaceRootDisplay, state.rootHint || 'Project root not resolved. Use the settings gear.');
         els.repoRoot.value = state.rootHint;
         syncHostIconDropTarget();
         syncSettingsSaveButtons();
@@ -2819,7 +2819,7 @@
             out.log ? { label: 'Launch log', path: out.log, canReveal: true } : null
           ].filter(Boolean),
           help: {
-            title: item.context === 'godot' ? 'Game launch' : 'Workspace launch',
+            title: item.context === 'godot' ? 'Game launch' : 'Project launch',
             body: item.context === 'godot'
               ? ('Mode: ' + launchedMode + '\nPID: ' + (out.pid || '(managed by OS)'))
               : ('Mode: ' + launchedMode + '\nPID: ' + (out.pid || '(managed by OS)'))
@@ -3373,7 +3373,7 @@
                 perform('Running app', function () { return runPipelineAction('run'); }, { swallow: true });
               } else {
                 state.selectedWorkspace = item.id;
-                perform('Running workspace', function () { return runWorkspaceItem(item); }, { swallow: true, successLabel: 'Ran ' + String(item.title || item.name || 'workspace') });
+                perform('Running project', function () { return runWorkspaceItem(item); }, { swallow: true, successLabel: 'Ran ' + String(item.title || item.name || 'project') });
               }
               renderSelectedBuiltIn();
             });
@@ -4610,7 +4610,7 @@
             await backendWithTimeout('set-app-icon', [selected.id, iconPayload, shapeMode], 30000);
           } else if (selected.kind === 'workspace') {
             if (!selected.path) {
-              throw new Error('Workspace path is missing; cannot update icon.');
+              throw new Error('Project path is missing; cannot update icon.');
             }
             await backendWithTimeout('set-workspace-icon', [selected.path, iconPayload, shapeMode], 30000);
           } else {
@@ -4663,7 +4663,7 @@
             await backendWithTimeout('set-app-icon-file', [selected.id, normalizedPath, shapeMode], 30000);
           } else if (selected.kind === 'workspace') {
             if (!selected.path) {
-              throw new Error('Workspace path is missing; cannot update icon.');
+              throw new Error('Project path is missing; cannot update icon.');
             }
             await backendWithTimeout('set-workspace-icon-file', [selected.path, normalizedPath, shapeMode], 30000);
           } else {
@@ -5013,7 +5013,7 @@
             });
             return;
           }
-          var kindOut = await saveWorkspaceProfileMutation(selected, 'Save workspace kind', async function () {
+          var kindOut = await saveWorkspaceProfileMutation(selected, 'Save project kind', async function () {
             await backend('set-workspace-field', [selected.path, 'project_type', targetProjectType], { quiet: true });
             await backend('set-workspace-field', [selected.path, 'development_context', targetContext], { quiet: true });
             await backend('set-workspace-field', [selected.path, 'starter', targetStarter], { quiet: true });
@@ -5034,7 +5034,7 @@
         if (nextValue === String(profile[fieldKey] || '')) {
           return;
         }
-        var updateOut = await saveWorkspaceProfileMutation(selected, 'Save workspace settings', async function () {
+        var updateOut = await saveWorkspaceProfileMutation(selected, 'Save project settings', async function () {
           await backend('set-workspace-field', [selected.path, fieldKey, nextValue], { quiet: true });
           return {
             workspace: selected.path,
@@ -5207,8 +5207,8 @@
           browseButton.type = 'button';
           browseButton.className = 'action workspace-profile-browse-btn';
           browseButton.textContent = 'Browse...';
-          browseButton.title = 'Choose a subfolder inside this workspace';
-          browseButton.setAttribute('aria-label', 'Choose a subfolder inside this workspace');
+          browseButton.title = 'Choose a subfolder inside this project';
+          browseButton.setAttribute('aria-label', 'Choose a subfolder inside this project');
           browseButton.disabled = state.busy;
           browseButton.addEventListener('click', function (event) {
             event.preventDefault();
@@ -5278,7 +5278,7 @@
         controlRow.appendChild(toggleLabel);
         controlRow.appendChild(input);
         row.appendChild(controlRow);
-        appendWorkspaceProfileHelp(row, 'Leave this off unless the workspace actually needs a pre-run build step.');
+        appendWorkspaceProfileHelp(row, 'Leave this off unless the project actually needs a pre-run build step.');
         return row;
       }
 
@@ -5350,8 +5350,8 @@
           var loading = document.createElement('div');
           loading.className = 'workspace-profile-empty';
           loading.textContent = state.workspaceProfileLoadingKey === workspaceProfileCacheKey(selected.path)
-            ? 'Loading workspace settings...'
-            : 'Workspace settings will appear here.';
+            ? 'Loading project settings...'
+            : 'Project settings will appear here.';
           els.workspaceProfileForm.appendChild(loading);
           ensureWorkspaceProfileLoaded(selected);
           return;
@@ -5365,7 +5365,7 @@
         var meta = document.createElement('div');
         meta.className = 'workspace-profile-meta';
         meta.appendChild(createWorkspaceProfileMeta('Project ID', profile.project_id, {
-          tooltip: 'Read-only here because changing it cleanly also needs a folder and workspace-id migration.'
+          tooltip: 'Read-only here because changing it cleanly also needs a folder and project-id migration.'
         }));
         meta.appendChild(createWorkspaceProfileMeta('Starter', profile.starter));
         els.workspaceProfileForm.appendChild(meta);
@@ -5374,12 +5374,12 @@
         fields.className = 'workspace-profile-fields';
         fields.appendChild(createWorkspaceProfileSelectField(selected, {
           field: 'kind',
-          label: 'Workspace kind',
+          label: 'Project kind',
           compact: true,
           value: profile.development_context === 'godot' ? 'game:godot' : 'application:web',
           options: [
-            { value: 'application:web', label: 'Web application workspace' },
-            { value: 'game:godot', label: 'Godot game workspace' }
+            { value: 'application:web', label: 'Web application project' },
+            { value: 'game:godot', label: 'Godot game project' }
           ],
           help: 'This updates the project type and development context together.'
         }));
@@ -5390,7 +5390,7 @@
             value: profile.app_subpath,
             path: true,
             placeholder: 'app',
-            help: 'Choose a folder inside the workspace that contains the runnable index.html. Use . for the workspace root.',
+            help: 'Choose a folder inside the project that contains the runnable index.html. Use . for the project root.',
             onBrowse: function (input) {
               browseWorkspaceAppSubpath(selected, input);
             }
@@ -5404,7 +5404,7 @@
               { value: '', label: 'Serve app subpath directly' },
               { value: 'web-wizardry-site', label: 'Managed web-wizardry site' }
             ],
-            help: 'Use managed site mode only when this workspace has a dedicated hosted-web site workflow.'
+            help: 'Use managed site mode only when this project has a dedicated hosted-web site workflow.'
           }));
           if (profile.hosted_web_mode === 'web-wizardry-site') {
             fields.appendChild(createWorkspaceProfileTextField(selected, {
@@ -5421,7 +5421,7 @@
               value: profile.hosted_web_serve_script,
               path: true,
               placeholder: 'scripts/site.sh',
-              help: 'Relative script path inside the workspace.'
+              help: 'Relative script path inside the project.'
             }));
             fields.appendChild(createWorkspaceProfileTextField(selected, {
               field: 'hosted_web_serve_action',
@@ -6004,7 +6004,7 @@
         } else if (state.rootHint) {
           text(els.workspaceRootDisplay, state.rootHint + ' (unverified)');
         } else {
-          text(els.workspaceRootDisplay, 'Workspace root not resolved. Use the settings gear.');
+          text(els.workspaceRootDisplay, 'Project root not resolved. Use the settings gear.');
         }
 
         normalizeProjectsRoot();
@@ -6230,7 +6230,7 @@
             renderResult({
               status: 'ok',
               summary: godotBuildOut.status === 'ok'
-                ? selected.title + ' rebuild completed for the game workspace.'
+                ? selected.title + ' rebuild completed for the game project.'
                 : selected.title + ' is ready as a game project.',
               paths: [
                 { label: 'Project folder', path: selected.path, canReveal: true },
@@ -6239,7 +6239,7 @@
               help: {
                 title: 'Game project build',
                 body: godotBuildOut.status === 'ok'
-                  ? 'Forge ran the workspace rebuild command before launch.\nUse Run to launch the game through Godot.'
+                  ? 'Forge ran the project rebuild command before launch.\nUse Run to launch the game through Godot.'
                   : 'Game projects are built/exported in your external editor.\nUse Run to launch the game through Godot.'
               }
             });
@@ -6260,10 +6260,10 @@
               rebuildOut.log ? { label: 'Rebuild log', path: rebuildOut.log, canReveal: true } : null
             ].filter(Boolean),
             help: {
-              title: 'Workspace projects',
+              title: 'Projects',
               body: rebuildOut.status === 'ok'
-                ? 'Forge ran the workspace rebuild command.\nUse Run to launch/open the rebuilt workspace from Forge.'
-                : 'Workspace projects use host/editor workflows.\nUse Run to launch/open them from Forge.'
+                ? 'Forge ran the project rebuild command.\nUse Run to launch/open the rebuilt project from Forge.'
+                : 'Projects use host/editor workflows.\nUse Run to launch/open them from Forge.'
             }
           });
           return;
@@ -7150,7 +7150,7 @@
             return;
           }
           setWorkspaceRoot(nextRoot);
-          perform('Update workspace root', function () {
+          perform('Update project root', function () {
             return refreshWorkspace({ quiet: true });
           }, { noToast: true, swallow: true, keepResult: true });
         });

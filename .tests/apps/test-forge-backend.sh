@@ -13,7 +13,7 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
 grep -F 'staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")' "$backend" >/dev/null
 grep -F 'mv "$staged_bundle" "$final_bundle"' "$backend" >/dev/null
 grep -F 'if wait_for_workspace_host_start "$app_dir" 50; then' "$backend" >/dev/null
-grep -F 'bundle_app_dir="\$APPDIR/Resources/$workspace_slug$app_entry_suffix"' "$backend" >/dev/null
+grep -F 'bundle_app_dir="$app_dir"' "$backend" >/dev/null
 grep -F 'exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "$bundle_app_dir"' "$backend" >/dev/null
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -187,7 +187,7 @@ if sh "$backend" run-workspace "$scratch" "$generic_workspace_abs" web >/tmp/for
   printf '%s\n' "forge backend test: generic workspace unexpectedly runnable" >&2
   exit 1
 fi
-grep -F "workspace app index not found" /tmp/forge-run-generic.err >/dev/null
+grep -F "project app index not found" /tmp/forge-run-generic.err >/dev/null
 
 set_app_targets_out=$(sh "$backend" set-app-targets "$scratch" sandbox-tool "hosted-web,macos,linux,ios,android")
 printf '%s\n' "$set_app_targets_out" | grep -F "slug=sandbox-tool" >/dev/null

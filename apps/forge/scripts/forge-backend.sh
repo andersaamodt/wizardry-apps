@@ -409,7 +409,7 @@ ensure_godot_project() {
   [ -f "$workspace_path/tool_main.gd" ] || return 1
 
   [ -w "$workspace_path" ] || {
-    printf '%s\n' "forge-backend: workspace is not writable for Godot bootstrap: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project is not writable for Godot bootstrap: $workspace_path" >&2
     return 1
   }
 
@@ -1030,7 +1030,7 @@ run_workspace_rebuild() {
     return 0
   fi
 
-  printf '%s\n' "forge-backend: workspace rebuild failed (see log: $log_path)" >&2
+  printf '%s\n' "forge-backend: project rebuild failed (see log: $log_path)" >&2
   exit 1
 }
 
@@ -1213,7 +1213,7 @@ serve_workspace_managed_hosted_web() {
 
   serve_action=$(workspace_field "$workspace_conf" hosted_web_serve_action "serve")
   serve_script=$(resolve_workspace_relative_path "$workspace_path" "$serve_script_rel") || {
-    printf '%s\n' "forge-backend: hosted_web_serve_script must resolve inside the workspace: $serve_script_rel" >&2
+    printf '%s\n' "forge-backend: hosted_web_serve_script must resolve inside the project: $serve_script_rel" >&2
     return 1
   }
   [ -f "$serve_script" ] || {
@@ -1238,13 +1238,13 @@ serve_workspace_managed_hosted_web() {
       sh "$serve_script" "$serve_action" "$site_name"
     fi
   ) >"$web_log" 2>&1; then
-    printf '%s\n' "forge-backend: workspace hosted web serve failed (see log: $web_log)" >&2
+    printf '%s\n' "forge-backend: project hosted web serve failed (see log: $web_log)" >&2
     return 1
   fi
 
   site_conf="$site_dir/site.conf"
   [ -f "$site_conf" ] || {
-    printf '%s\n' "forge-backend: workspace hosted web site config not found after serve: $site_conf" >&2
+    printf '%s\n' "forge-backend: project hosted web site config not found after serve: $site_conf" >&2
     return 1
   }
 
@@ -2147,7 +2147,7 @@ ensure_importable_workspace_profile() {
   fi
 
   if [ ! -w "$workspace_path" ]; then
-    printf '%s\n' "forge-backend: workspace profile missing and workspace is not writable: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project profile missing and project is not writable: $workspace_path" >&2
     exit 1
   fi
 
@@ -2180,7 +2180,7 @@ ensure_importable_workspace_profile() {
   project_id=$(derive_workspace_slug "$(basename "$workspace_path")")
   project_title=$(basename "$workspace_path")
   cat > "$conf_path" <<CONF
-# Wizardry Apps workspace profile
+# Wizardry Apps project profile
 project_id=$project_id
 title=$project_title
 project_type=$project_type
@@ -2316,7 +2316,7 @@ cmd_import_workspace() {
 
   workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
   [ -n "$workspace_abs" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
@@ -2358,12 +2358,12 @@ cmd_import_workspace() {
   fi
 
   [ -n "$registered_path" ] || {
-    printf '%s\n' "forge-backend: failed to register workspace: $workspace_abs" >&2
+    printf '%s\n' "forge-backend: failed to register project: $workspace_abs" >&2
     exit 1
   }
 
   [ -f "$registered_path/wizardry.workspace.conf" ] || {
-    printf '%s\n' "forge-backend: registered workspace is missing wizardry.workspace.conf: $registered_path" >&2
+    printf '%s\n' "forge-backend: registered project is missing wizardry.workspace.conf: $registered_path" >&2
     exit 1
   }
 
@@ -2414,13 +2414,13 @@ cmd_get_workspace_profile() {
 
   workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
   [ -n "$workspace_abs" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
   conf="$workspace_abs/wizardry.workspace.conf"
   [ -f "$conf" ] || {
-    printf '%s\n' "forge-backend: workspace profile missing: $workspace_abs" >&2
+    printf '%s\n' "forge-backend: project profile missing: $workspace_abs" >&2
     exit 1
   }
 
@@ -2490,7 +2490,7 @@ cmd_pick_workspace_subpath() {
 
   workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
   [ -n "$workspace_abs" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
@@ -2511,7 +2511,7 @@ cmd_pick_workspace_subpath() {
       relative=${picked_abs#"$workspace_abs"/}
       ;;
     *)
-      printf '%s\n' "forge-backend: selected folder must stay inside the workspace root" >&2
+      printf '%s\n' "forge-backend: selected folder must stay inside the project root" >&2
       exit 1
       ;;
   esac
@@ -2534,7 +2534,7 @@ validate_workspace_profile_field_key() {
       return 0
       ;;
   esac
-  printf '%s\n' "forge-backend: unsupported workspace field '$key'" >&2
+  printf '%s\n' "forge-backend: unsupported project field '$key'" >&2
   exit 2
 }
 
@@ -2547,11 +2547,11 @@ validate_workspace_relative_field() {
   [ -n "$rel_value" ] || return 0
   case "$rel_value" in
     /*)
-      printf '%s\n' "forge-backend: $field_name must stay relative to the workspace root" >&2
+      printf '%s\n' "forge-backend: $field_name must stay relative to the project root" >&2
       exit 2
       ;;
     *".."*)
-      printf '%s\n' "forge-backend: $field_name must not escape the workspace root" >&2
+      printf '%s\n' "forge-backend: $field_name must not escape the project root" >&2
       exit 2
       ;;
   esac
@@ -2559,7 +2559,7 @@ validate_workspace_relative_field() {
   if [ "$must_exist" = "file" ]; then
     abs_path=$(resolve_workspace_relative_path "$workspace_abs" "$rel_value" 2>/dev/null || true)
     [ -n "$abs_path" ] && [ -f "$abs_path" ] || {
-      printf '%s\n' "forge-backend: $field_name not found in workspace: $rel_value" >&2
+      printf '%s\n' "forge-backend: $field_name not found in project: $rel_value" >&2
       exit 1
     }
   fi
@@ -2582,12 +2582,12 @@ cmd_set_workspace_field() {
 
   workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
   [ -n "$workspace_abs" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
   conf="$workspace_abs/wizardry.workspace.conf"
   [ -f "$conf" ] || {
-    printf '%s\n' "forge-backend: workspace profile missing: $workspace_abs" >&2
+    printf '%s\n' "forge-backend: project profile missing: $workspace_abs" >&2
     exit 1
   }
 
@@ -2626,7 +2626,7 @@ cmd_set_workspace_field() {
     app_subpath)
       if [ "$normalized_value" = "." ]; then
         [ -f "$workspace_abs/index.html" ] || {
-          printf '%s\n' "forge-backend: workspace root does not contain index.html" >&2
+          printf '%s\n' "forge-backend: project root does not contain index.html" >&2
           exit 1
         }
       elif [ -n "$normalized_value" ]; then
@@ -2718,13 +2718,13 @@ cmd_set_workspace_targets() {
     exit 2
   }
   [ -d "$workspace_path" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
   conf="$workspace_path/wizardry.workspace.conf"
   [ -f "$conf" ] || {
-    printf '%s\n' "forge-backend: workspace profile missing: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project profile missing: $workspace_path" >&2
     exit 1
   }
 
@@ -2744,7 +2744,7 @@ cmd_rename_workspace() {
     exit 2
   }
   [ -d "$workspace_path" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
   [ -n "$title" ] || {
@@ -2754,13 +2754,13 @@ cmd_rename_workspace() {
 
   workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
   [ -n "$workspace_abs" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
   conf="$workspace_abs/wizardry.workspace.conf"
   [ -f "$conf" ] || {
-    printf '%s\n' "forge-backend: workspace profile missing: $workspace_abs" >&2
+    printf '%s\n' "forge-backend: project profile missing: $workspace_abs" >&2
     exit 1
   }
 
@@ -2778,7 +2778,7 @@ cmd_rename_workspace() {
 
   if [ "$workspace_abs" != "$target_path" ]; then
     [ ! -e "$target_path" ] || {
-      printf '%s\n' "forge-backend: workspace path already exists: $target_path" >&2
+      printf '%s\n' "forge-backend: project path already exists: $target_path" >&2
       exit 1
     }
     mv "$workspace_abs" "$target_path"
@@ -3034,7 +3034,7 @@ cmd_set_workspace_icon() {
     exit 2
   }
   [ -d "$workspace_path" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
@@ -3092,7 +3092,7 @@ cmd_set_workspace_icon_file() {
     exit 2
   }
   [ -d "$workspace_path" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
@@ -3606,14 +3606,14 @@ cmd_rebuild_workspace() {
     exit 2
   }
   [ -d "$workspace_path" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
   workspace_path=$(CDPATH= cd -- "$workspace_path" && pwd -P)
   workspace_conf="$workspace_path/wizardry.workspace.conf"
   [ -f "$workspace_conf" ] || {
-    printf '%s\n' "forge-backend: workspace is missing wizardry.workspace.conf: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2
     exit 1
   }
 
@@ -3640,7 +3640,7 @@ cmd_run_workspace() {
     exit 2
   }
   [ -d "$workspace_path" ] || {
-    printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
 
@@ -3652,7 +3652,7 @@ cmd_run_workspace() {
 
   workspace_conf="$workspace_path/wizardry.workspace.conf"
   [ -f "$workspace_conf" ] || {
-    printf '%s\n' "forge-backend: workspace is missing wizardry.workspace.conf: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2
     exit 1
   }
   run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
@@ -3664,7 +3664,7 @@ cmd_run_workspace() {
         project_title=$(workspace_field "$workspace_path/wizardry.workspace.conf" title "")
       fi
       if ! project_path=$(ensure_godot_project "$workspace_path" "$project_title"); then
-        printf '%s\n' "forge-backend: Godot project not found in workspace (missing project.godot): $workspace_path" >&2
+        printf '%s\n' "forge-backend: Godot project is missing project.godot: $workspace_path" >&2
         exit 1
       fi
 
@@ -3706,13 +3706,13 @@ cmd_run_workspace() {
     web)
       ;;
     *)
-      printf '%s\n' "forge-backend: workspace context must be web or godot" >&2
+      printf '%s\n' "forge-backend: project context must be web or godot" >&2
       exit 2
       ;;
   esac
 
   if ! app_dir=$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null); then
-    printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
+    printf '%s\n' "forge-backend: project app index not found: $workspace_path" >&2
     exit 1
   fi
   app_entry_suffix=''
@@ -3745,7 +3745,7 @@ cmd_run_workspace() {
     return 0
   fi
   if [ "$has_host_target" = false ]; then
-    printf '%s\n' "forge-backend: workspace has no runnable target for this host (enable $host_target or hosted-web)" >&2
+    printf '%s\n' "forge-backend: project has no runnable target for this host (enable $host_target or hosted-web)" >&2
     exit 1
   fi
 
@@ -3870,7 +3870,7 @@ $icon_key
 PLIST
 
     ensure_macos_bundle_signature "$staged_bundle" || {
-      printf '%s\n' "forge-backend: failed to sign macOS workspace bundle: $staged_bundle" >&2
+      printf '%s\n' "forge-backend: failed to sign macOS project bundle: $staged_bundle" >&2
       exit 1
     }
 
@@ -3881,7 +3881,7 @@ PLIST
     rmdir "$staged_root" 2>/dev/null || :
     bundle_app_dir="$app_dir"
     if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/$workspace_slug" "$bundle_app_dir"; then
-      printf '%s\n' "forge-backend: failed to launch workspace bundle: $final_bundle" >&2
+      printf '%s\n' "forge-backend: failed to launch project bundle: $final_bundle" >&2
       exit 1
     fi
     printf 'launched=1\n'
@@ -3931,7 +3931,7 @@ APP
 
     app_entry="$appdir/usr/share/$bundle_slug$app_entry_suffix"
     pid=$(launch_desktop_host_linux "$appdir/AppRun" "$app_entry" "$log_path") || {
-      printf '%s\n' "forge-backend: failed to launch workspace desktop host: $app_entry" >&2
+      printf '%s\n' "forge-backend: failed to launch project desktop host: $app_entry" >&2
       exit 1
     }
     printf 'launched=1\n'
@@ -3954,7 +3954,7 @@ cmd_serve_hosted_web() {
     exit 2
   }
   [ -n "$ref" ] || {
-    printf '%s\n' "forge-backend: serve-hosted-web requires REF (APP_SLUG or WORKSPACE_PATH)" >&2
+    printf '%s\n' "forge-backend: serve-hosted-web requires REF (APP_SLUG or PROJECT_PATH)" >&2
     exit 2
   }
 
@@ -4031,14 +4031,14 @@ cmd_serve_hosted_web() {
     workspace)
       workspace_path=$ref
       [ -d "$workspace_path" ] || {
-        printf '%s\n' "forge-backend: workspace not found: $workspace_path" >&2
+        printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
         exit 1
       }
       workspace_path=$(CDPATH= cd -- "$workspace_path" && pwd -P)
       workspace_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
       workspace_conf="$workspace_path/wizardry.workspace.conf"
       [ -f "$workspace_conf" ] || {
-        printf '%s\n' "forge-backend: workspace is missing wizardry.workspace.conf: $workspace_path" >&2
+        printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2
         exit 1
       }
       run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
@@ -4051,16 +4051,16 @@ cmd_serve_hosted_web() {
           return 0
           ;;
         *)
-          printf '%s\n' "forge-backend: unknown workspace hosted_web_mode: $workspace_hosted_web_mode" >&2
+          printf '%s\n' "forge-backend: unknown project hosted_web_mode: $workspace_hosted_web_mode" >&2
           exit 1
           ;;
       esac
       if ! app_dir=$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null); then
-        printf '%s\n' "forge-backend: workspace app index not found: $workspace_path" >&2
+        printf '%s\n' "forge-backend: project app index not found: $workspace_path" >&2
         exit 1
       fi
       command -v python3 >/dev/null 2>&1 || {
-        printf '%s\n' "forge-backend: python3 is required to serve workspace hosted web targets" >&2
+        printf '%s\n' "forge-backend: python3 is required to serve project hosted web targets" >&2
         exit 1
       }
       port=$(python3 - <<'PY'
@@ -4573,7 +4573,7 @@ cmd_scaffold_workspace() {
 
   workspace_dir="$project_root/$slug"
   [ ! -e "$workspace_dir" ] || {
-    printf '%s\n' "forge-backend: workspace path already exists: $workspace_dir" >&2
+    printf '%s\n' "forge-backend: project path already exists: $workspace_dir" >&2
     exit 1
   }
 
@@ -4621,7 +4621,7 @@ cmd_scaffold_workspace() {
       cat > "$workspace_dir/README.md" <<README
 # $app_name
 
-Application workspace scaffolded by App Forge.
+Application project scaffolded by App Forge.
 
 - Development context: web
 - App files: app/
@@ -4655,13 +4655,13 @@ TSCN
           cat > "$workspace_dir/README.md" <<README
 # $app_name
 
-Godot workspace scaffold generated by App Forge.
+Godot project scaffold generated by App Forge.
 README
           cat > "$workspace_dir/tool_main.gd" <<'GDSCRIPT'
 extends Node
 
 func _ready():
-    print("Wizardry Godot tool workspace ready.")
+    print("Wizardry Godot tool project ready.")
 GDSCRIPT
           ;;
         clone)
@@ -4690,7 +4690,7 @@ GDSCRIPT
             cat > "$workspace_dir/README.md" <<README
 # $app_name
 
-Godot workspace cloned by App Forge.
+Godot project cloned by App Forge.
 README
           fi
           ;;
@@ -4710,7 +4710,7 @@ README
 
   profile="$workspace_dir/wizardry.workspace.conf"
   cat > "$profile" <<CONF
-# Wizardry Apps workspace profile
+# Wizardry Apps project profile
 project_id=$slug
 title=$app_name
 project_type=$project_type
