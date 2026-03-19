@@ -4300,16 +4300,16 @@
         clearNativeHostIconDropFallback();
         setNativeHostIconDropExpected(false);
         setHostIconDropVisualPending(selected, false);
-        if (fallbackFile && /^image\//.test(String(fallbackFile.type || ''))) {
-          readImageFileToDataUrl(fallbackFile).then(function (dataUrl) {
-            return applySelectedIconData(dataUrl);
-          }).catch(function (err) {
+        if (normalizedPath) {
+          applySelectedIconPath(normalizedPath).catch(function (err) {
             toast(String(err && err.message ? err.message : err), 'bad');
           });
           return;
         }
-        if (normalizedPath) {
-          applySelectedIconPath(normalizedPath).catch(function (err) {
+        if (fallbackFile && /^image\//.test(String(fallbackFile.type || ''))) {
+          readImageFileToDataUrl(fallbackFile).then(function (dataUrl) {
+            return applySelectedIconData(dataUrl);
+          }).catch(function (err) {
             toast(String(err && err.message ? err.message : err), 'bad');
           });
           return;
@@ -5012,6 +5012,17 @@
           };
           reader.readAsDataURL(file);
         });
+      }
+
+      function localPathFromImageFile(file) {
+        if (!file || typeof file !== 'object') {
+          return '';
+        }
+        var candidate = String(file.path || '').trim();
+        if (candidate) {
+          return candidate;
+        }
+        return '';
       }
 
       function openSelectedIconPicker() {
@@ -7267,9 +7278,13 @@
             if (!file) {
               return;
             }
-            readImageFileToDataUrl(file).then(function (dataUrl) {
-              return applySelectedIconData(dataUrl);
-            }).catch(function (err) {
+            var filePath = localPathFromImageFile(file);
+            var applyPromise = filePath
+              ? applySelectedIconPath(filePath)
+              : readImageFileToDataUrl(file).then(function (dataUrl) {
+                  return applySelectedIconData(dataUrl);
+                });
+            applyPromise.catch(function (err) {
               toast(String(err && err.message ? err.message : err), 'bad');
             }).finally(function () {
               els.selectedIconInput.value = '';
@@ -7329,6 +7344,7 @@
             var droppedPath = firstPathFromDropData(event.dataTransfer);
             var files = event.dataTransfer && event.dataTransfer.files;
             var file = files && files[0] ? files[0] : null;
+            var droppedFilePath = droppedPath || localPathFromImageFile(file);
             if (state.os === 'darwin' && bridgeAvailable()) {
               setNativeHostIconDropExpected(true);
               if (nativeHostRecentlyHandledIconDrop()) {
@@ -7338,23 +7354,23 @@
                 setItemIconPreviewOverride(selected, '');
                 setHostIconDropVisualPending(selected, true);
                 renderSelectedIconEditor(selected);
-                scheduleNativeHostIconDropFallback(droppedPath, file);
+                scheduleNativeHostIconDropFallback(droppedFilePath, file);
                 return;
               }
             }
             if (nativeHostShouldOwnIconDrop()) {
               return;
             }
-            if (file) {
-              readImageFileToDataUrl(file).then(function (dataUrl) {
-                return applySelectedIconData(dataUrl);
-              }).catch(function (err) {
+            if (droppedFilePath) {
+              applySelectedIconPath(droppedFilePath).catch(function (err) {
                 toast(String(err && err.message ? err.message : err), 'bad');
               });
               return;
             }
-            if (droppedPath) {
-              applySelectedIconPath(droppedPath).catch(function (err) {
+            if (file) {
+              readImageFileToDataUrl(file).then(function (dataUrl) {
+                return applySelectedIconData(dataUrl);
+              }).catch(function (err) {
                 toast(String(err && err.message ? err.message : err), 'bad');
               });
               return;
