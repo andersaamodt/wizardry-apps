@@ -1218,28 +1218,23 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (NSImage *)renderedStatusItemImage {
-    NSImage *source = self.appIconImage ?: [NSApp applicationIconImage];
-    if (!source || source.size.width <= 0.0 || source.size.height <= 0.0) {
-        if (@available(macOS 11.0, *)) {
-            NSImage *fallback = [NSImage imageWithSystemSymbolName:@"play.square.fill" accessibilityDescription:nil];
-            if (fallback) {
-                [fallback setTemplate:YES];
-                return fallback;
-            }
-        }
-        return nil;
-    }
-
     CGFloat side = MAX(14.0, [NSStatusBar systemStatusBar].thickness - 4.0);
     NSImage *rendered = [[NSImage alloc] initWithSize:NSMakeSize(side, side)];
     [rendered lockFocus];
-    [[NSGraphicsContext currentContext] setImageInterpolation:NSImageInterpolationHigh];
-    [source drawInRect:NSMakeRect(0, 0, side, side)
-              fromRect:NSZeroRect
-             operation:NSCompositingOperationSourceOver
-              fraction:1.0
-        respectFlipped:YES
-                 hints:nil];
+    [[NSColor blackColor] set];
+    CGFloat fontSize = MAX(11.0, side - 2.0);
+    NSFont *font = [NSFont systemFontOfSize:fontSize weight:NSFontWeightSemibold];
+    NSDictionary *attrs = @{
+        NSFontAttributeName: font,
+        NSForegroundColorAttributeName: [NSColor blackColor]
+    };
+    NSString *glyph = @"S";
+    NSSize glyphSize = [glyph sizeWithAttributes:attrs];
+    NSRect drawRect = NSMakeRect(floor((side - glyphSize.width) / 2.0),
+                                 floor((side - glyphSize.height) / 2.0) - 0.5,
+                                 glyphSize.width,
+                                 glyphSize.height);
+    [glyph drawInRect:drawRect withAttributes:attrs];
     [rendered unlockFocus];
     [rendered setTemplate:YES];
     return rendered;
