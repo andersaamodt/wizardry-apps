@@ -433,6 +433,7 @@
         hostBootReadySent: false,
         workspaceDropDepth: 0,
         lastHostWorkspaceDropZoneKey: '',
+        lastHostIconDropZoneKey: '',
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
         workspaceProfileCache: {},
@@ -4081,6 +4082,17 @@
         return rect;
       }
 
+      function selectedIconDropZoneRect() {
+        if (!els.selectedIconDrop || typeof els.selectedIconDrop.getBoundingClientRect !== 'function') {
+          return null;
+        }
+        var rect = els.selectedIconDrop.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) {
+          return null;
+        }
+        return rect;
+      }
+
       function syncHostDropZoneRect(argv, rect, stateKey) {
         if (state.os !== 'darwin' || !bridgeAvailable()) {
           return;
@@ -4107,6 +4119,7 @@
 
       function syncHostDropZones() {
         syncHostDropZoneRect(['__wizardry_host_forge_workspace_drop_zone'], workspaceDropZoneRect(), 'lastHostWorkspaceDropZoneKey');
+        syncHostDropZoneRect(['__wizardry_host_forge_icon_drop_zone'], selectedIconDropZoneRect(), 'lastHostIconDropZoneKey');
       }
 
       function handleForgeHostFileDrag(detail) {
@@ -4117,15 +4130,25 @@
         if (phase === 'enter' || phase === 'update') {
           if (target === 'workspace' && paths.length) {
             setWorkspaceDropCue(true);
+          } else if (target === 'icon' && paths.length) {
+            setSelectedIconDropCue(true);
           }
           return;
         }
         if (phase === 'leave') {
           clearWorkspaceDropCue();
+          setSelectedIconDropCue(false);
           return;
         }
         if (phase === 'drop') {
           clearWorkspaceDropCue();
+          setSelectedIconDropCue(false);
+          if (target === 'icon' && paths.length) {
+            applySelectedIconPath(paths[0]).catch(function (err) {
+              toast(String(err && err.message ? err.message : err), 'bad');
+            });
+            return;
+          }
           if (!paths.length) {
             toast('Drop a project folder to import.', 'bad');
             return;
@@ -4548,12 +4571,12 @@
         renderSelectedIconEditor(selected);
         try {
           if (selected.kind === 'builtin') {
-            await backend('set-app-icon-file', [selected.id, normalizedPath, shapeMode], { quiet: true });
+            await backendWithTimeout('set-app-icon-file', [selected.id, normalizedPath, shapeMode], 30000);
           } else if (selected.kind === 'workspace') {
             if (!selected.path) {
               throw new Error('Workspace path is missing; cannot update icon.');
             }
-            await backend('set-workspace-icon-file', [selected.path, normalizedPath, shapeMode], { quiet: true });
+            await backendWithTimeout('set-workspace-icon-file', [selected.path, normalizedPath, shapeMode], 30000);
           } else {
             throw new Error('Unknown app type; cannot update icon.');
           }

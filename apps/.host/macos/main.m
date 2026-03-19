@@ -59,6 +59,11 @@
 @property (assign) CGFloat forgeWorkspaceDropZoneRight;
 @property (assign) CGFloat forgeWorkspaceDropZoneBottom;
 @property (assign) BOOL forgeWorkspaceDropZoneActive;
+@property (assign) CGFloat forgeIconDropZoneLeft;
+@property (assign) CGFloat forgeIconDropZoneTop;
+@property (assign) CGFloat forgeIconDropZoneRight;
+@property (assign) CGFloat forgeIconDropZoneBottom;
+@property (assign) BOOL forgeIconDropZoneActive;
 @property (assign) EventHotKeyRef favoriteTrackHotKeyRef;
 @property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
 @property (assign) BOOL keepRunningInBackground;
@@ -515,6 +520,23 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths {
     if (!self.enableForgeAppMenu || !paths.count) {
         return @"";
+    }
+
+    if (self.forgeIconDropZoneActive &&
+        domX >= self.forgeIconDropZoneLeft &&
+        domX <= self.forgeIconDropZoneRight &&
+        domY >= self.forgeIconDropZoneTop &&
+        domY <= self.forgeIconDropZoneBottom) {
+        for (NSString *path in paths) {
+            BOOL isDirectory = NO;
+            if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] || isDirectory) {
+                continue;
+            }
+            NSString *ext = [[[path pathExtension] lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if ([@[@"png", @"jpg", @"jpeg", @"webp", @"gif", @"bmp", @"tif", @"tiff", @"svg", @"heic", @"heif", @"avif", @"icns"] containsObject:ext]) {
+                return @"icon";
+            }
+        }
     }
 
     if (self.forgeWorkspaceDropZoneActive &&
@@ -1868,6 +1890,30 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                 self.forgeWorkspaceDropZoneRight = right;
                 self.forgeWorkspaceDropZoneBottom = bottom;
                 self.forgeWorkspaceDropZoneActive = active;
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_forge_icon_drop_zone"]) {
+            CGFloat left = 0.0;
+            CGFloat top = 0.0;
+            CGFloat right = 0.0;
+            CGFloat bottom = 0.0;
+            BOOL active = NO;
+            if (args.count >= 4) {
+                left = MAX(0.0, [args[0] doubleValue]);
+                top = MAX(0.0, [args[1] doubleValue]);
+                right = MAX(left, [args[2] doubleValue]);
+                bottom = MAX(top, [args[3] doubleValue]);
+                active = YES;
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.forgeIconDropZoneLeft = left;
+                self.forgeIconDropZoneTop = top;
+                self.forgeIconDropZoneRight = right;
+                self.forgeIconDropZoneBottom = bottom;
+                self.forgeIconDropZoneActive = active;
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
