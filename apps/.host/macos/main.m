@@ -64,6 +64,12 @@
 @property (assign) CGFloat forgeIconDropZoneRight;
 @property (assign) CGFloat forgeIconDropZoneBottom;
 @property (assign) BOOL forgeIconDropZoneActive;
+@property (strong) NSString *forgeIconDropRootHint;
+@property (strong) NSString *forgeIconDropItemKey;
+@property (strong) NSString *forgeIconDropTargetKind;
+@property (strong) NSString *forgeIconDropTargetValue;
+@property (strong) NSString *forgeIconDropShapeMode;
+@property (assign) BOOL forgeIconDropBusy;
 @property (assign) EventHotKeyRef favoriteTrackHotKeyRef;
 @property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
 @property (assign) BOOL keepRunningInBackground;
@@ -75,6 +81,9 @@
 - (NSArray<NSString *> *)filePathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo;
 - (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
 - (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
+- (void)dispatchForgeHostCallbackNamed:(NSString *)functionName payload:(NSDictionary *)payload toWebView:(WKWebView *)targetWebView;
+- (NSArray<NSString *> *)forgeIconDropCommandArgumentsForPath:(NSString *)imagePath;
+- (void)runForgeIconDropForPath:(NSString *)imagePath fromWebView:(WKWebView *)sourceWebView;
 - (WKWebView *)createAuxWindowWithConfiguration:(WKWebViewConfiguration *)configuration
                                          request:(NSURLRequest *)request
                                      windowTitle:(NSString *)windowTitle
@@ -166,6 +175,17 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
         self.nativeFileDragActive = NO;
         [self.appDelegate dispatchForgeFileDragPhase:@"drop" target:target domX:domX domY:domY paths:paths];
         self.nativeFileDragTarget = nil;
+        if ([target isEqualToString:@"icon"]) {
+            NSString *imagePath = @"";
+            for (NSString *path in paths) {
+                BOOL isDirectory = NO;
+                if ([[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] && !isDirectory) {
+                    imagePath = path;
+                    break;
+                }
+            }
+            [self.appDelegate runForgeIconDropForPath:imagePath fromWebView:self];
+        }
         return YES;
     }
     if (self.nativeFileDragActive) {
@@ -523,6 +543,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
 
     if (self.forgeIconDropZoneActive &&
+        !self.forgeIconDropBusy &&
         domX >= self.forgeIconDropZoneLeft &&
         domX <= self.forgeIconDropZoneRight &&
         domY >= self.forgeIconDropZoneTop &&
@@ -563,14 +584,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSDictionary *payload = @{
         @"phase": phase,
         @"target": target ?: @"",
+        @"nativeHandled": @([phase isEqualToString:@"drop"] && [target isEqualToString:@"icon"]),
         @"clientX": @(domX),
         @"clientY": @(domY),
         @"paths": paths ?: @[]
     };
+    [self dispatchForgeHostCallbackNamed:@"forgeHostFileDrag" payload:payload toWebView:self.webView];
+}
+
+- (void)dispatchForgeHostCallbackNamed:(NSString *)functionName payload:(NSDictionary *)payload toWebView:(WKWebView *)targetWebView {
+    WKWebView *resolvedTarget = targetWebView ?: self.webView;
+    if (!self.enableForgeAppMenu || !resolvedTarget || !functionName.length || !payload) {
+        return;
+    }
+
     NSError *jsonError = nil;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:&jsonError];
     if (!jsonData || jsonError) {
-        NSLog(@"Forge file drag payload serialization error: %@", jsonError);
+        NSLog(@"Forge host callback payload serialization error: %@", jsonError);
         return;
     }
     NSString *payloadJSON = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
@@ -578,14 +609,115 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return;
     }
 
-    NSString *js = [NSString stringWithFormat:@"if (window && typeof window.forgeHostFileDrag === 'function') { window.forgeHostFileDrag(%@); }", payloadJSON];
+    NSString *js = [NSString stringWithFormat:@"if (window && typeof window.%@ === 'function') { window.%@(%@); }", functionName, functionName, payloadJSON];
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self.webView evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
+        [resolvedTarget evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
             (void)result;
             if (error) {
-                NSLog(@"Forge file drag dispatch error: %@", error);
+                NSLog(@"Forge host callback dispatch error: %@", error);
             }
         }];
+    });
+}
+
+- (NSArray<NSString *> *)forgeIconDropCommandArgumentsForPath:(NSString *)imagePath {
+    NSString *trimmedPath = [[NSString stringWithString:(imagePath ?: @"")] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString *backendScript = [[self.appPath stringByAppendingPathComponent:@"scripts"] stringByAppendingPathComponent:@"forge-backend.sh"];
+    NSString *shapeMode = [[NSString stringWithString:(self.forgeIconDropShapeMode ?: @"squircle")] lowercaseString];
+    NSString *targetKind = [[NSString stringWithString:(self.forgeIconDropTargetKind ?: @"")] lowercaseString];
+    NSString *targetValue = [NSString stringWithString:(self.forgeIconDropTargetValue ?: @"")];
+    NSString *rootHint = [NSString stringWithString:(self.forgeIconDropRootHint ?: @"")];
+
+    if (!trimmedPath.length || !backendScript.length || ![[NSFileManager defaultManager] fileExistsAtPath:backendScript]) {
+        return nil;
+    }
+    if (![shapeMode isEqualToString:@"plain"]) {
+        shapeMode = @"squircle";
+    }
+    if ([targetKind isEqualToString:@"builtin"] && targetValue.length) {
+        return @[backendScript, @"set-app-icon-file", rootHint, targetValue, trimmedPath, shapeMode];
+    }
+    if ([targetKind isEqualToString:@"workspace"] && targetValue.length) {
+        return @[backendScript, @"set-workspace-icon-file", rootHint, targetValue, trimmedPath, shapeMode];
+    }
+    return nil;
+}
+
+- (void)runForgeIconDropForPath:(NSString *)imagePath fromWebView:(WKWebView *)sourceWebView {
+    WKWebView *resolvedTarget = sourceWebView ?: self.webView;
+    NSString *itemKey = [NSString stringWithString:(self.forgeIconDropItemKey ?: @"")];
+    NSString *trimmedPath = [[NSString stringWithString:(imagePath ?: @"")] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSArray<NSString *> *commandArgs = [self forgeIconDropCommandArgumentsForPath:trimmedPath];
+    if (!trimmedPath.length || !commandArgs.count) {
+        NSDictionary *payload = @{
+            @"ok": @NO,
+            @"itemKey": itemKey ?: @"",
+            @"imagePath": trimmedPath ?: @"",
+            @"stdout": @"",
+            @"stderr": @"",
+            @"exitCode": @1,
+            @"error": @"Forge icon drop target is not ready."
+        };
+        [self dispatchForgeHostCallbackNamed:@"forgeHostIconDropResult" payload:payload toWebView:resolvedTarget];
+        return;
+    }
+
+    self.forgeIconDropBusy = YES;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSTask *task = [[NSTask alloc] init];
+        task.launchPath = @"/bin/sh";
+        task.arguments = commandArgs;
+        task.environment = [self resolvedCommandEnvironment];
+
+        NSPipe *outPipe = [NSPipe pipe];
+        NSPipe *errPipe = [NSPipe pipe];
+        task.standardOutput = outPipe;
+        task.standardError = errPipe;
+
+        @try {
+            [task launch];
+        } @catch (NSException *exception) {
+            NSDictionary *payload = @{
+                @"ok": @NO,
+                @"itemKey": itemKey ?: @"",
+                @"imagePath": trimmedPath ?: @"",
+                @"stdout": @"",
+                @"stderr": @"",
+                @"exitCode": @1,
+                @"error": [NSString stringWithFormat:@"Failed to launch icon drop command: %@", exception.reason ?: @"unknown error"]
+            };
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.forgeIconDropBusy = NO;
+                [self dispatchForgeHostCallbackNamed:@"forgeHostIconDropResult" payload:payload toWebView:resolvedTarget];
+            });
+            return;
+        }
+
+        [task waitUntilExit];
+
+        NSData *outData = [[outPipe fileHandleForReading] readDataToEndOfFile];
+        NSData *errData = [[errPipe fileHandleForReading] readDataToEndOfFile];
+        NSString *stdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
+        NSString *stderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
+        int exitCode = [task terminationStatus];
+
+        NSMutableDictionary *payload = [@{
+            @"ok": @(exitCode == 0),
+            @"itemKey": itemKey ?: @"",
+            @"imagePath": trimmedPath ?: @"",
+            @"stdout": stdout,
+            @"stderr": stderr,
+            @"exitCode": @(exitCode)
+        } mutableCopy];
+        if (exitCode != 0) {
+            NSString *errorMessage = stderr.length ? stderr : (stdout.length ? stdout : @"Icon drop failed.");
+            payload[@"error"] = errorMessage;
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.forgeIconDropBusy = NO;
+            [self dispatchForgeHostCallbackNamed:@"forgeHostIconDropResult" payload:payload toWebView:resolvedTarget];
+        });
     });
 }
 
@@ -1914,6 +2046,30 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                 self.forgeIconDropZoneRight = right;
                 self.forgeIconDropZoneBottom = bottom;
                 self.forgeIconDropZoneActive = active;
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_forge_icon_drop_target"]) {
+            NSString *rootHint = @"";
+            NSString *itemKey = @"";
+            NSString *targetKind = @"";
+            NSString *targetValue = @"";
+            NSString *shapeMode = @"squircle";
+            if (args.count >= 5) {
+                rootHint = [NSString stringWithFormat:@"%@", args[0]];
+                itemKey = [NSString stringWithFormat:@"%@", args[1]];
+                targetKind = [NSString stringWithFormat:@"%@", args[2]];
+                targetValue = [NSString stringWithFormat:@"%@", args[3]];
+                shapeMode = [NSString stringWithFormat:@"%@", args[4]];
+            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.forgeIconDropRootHint = rootHint;
+                self.forgeIconDropItemKey = itemKey;
+                self.forgeIconDropTargetKind = targetKind;
+                self.forgeIconDropTargetValue = targetValue;
+                self.forgeIconDropShapeMode = shapeMode;
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;

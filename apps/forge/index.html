@@ -434,6 +434,8 @@
         workspaceDropDepth: 0,
         lastHostWorkspaceDropZoneKey: '',
         lastHostIconDropZoneKey: '',
+        lastHostIconDropTargetKey: '',
+        hostIconDropPendingKey: '',
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
         workspaceProfileCache: {},
@@ -1857,6 +1859,7 @@
         saveStorage(ROOT_KEY, state.rootHint);
         text(els.workspaceRootDisplay, state.rootHint || 'Workspace root not resolved. Use the settings gear.');
         els.repoRoot.value = state.rootHint;
+        syncHostIconDropTarget();
         syncSettingsSaveButtons();
       }
 
@@ -1874,6 +1877,7 @@
         if (els.iconSquircleOnDrop) {
           els.iconSquircleOnDrop.checked = state.iconSquircleOnDrop;
         }
+        syncHostIconDropTarget();
         syncIconToolingUI();
       }
 
@@ -2835,6 +2839,15 @@
         }
         setSelectedCatalog(items[0].key);
         return items[0];
+      }
+
+      function catalogItemByKey(key) {
+        var itemKey = String(key || '').trim();
+        return filteredCatalogItems().find(function (item) {
+          return item.key === itemKey;
+        }) || catalogItems().find(function (item) {
+          return item.key === itemKey;
+        }) || null;
       }
 
       function syncCatalogSelectionState(previousKey, nextKey) {
@@ -4117,15 +4130,67 @@
         });
       }
 
+      function hostIconDropTargetPayload() {
+        var selected = selectedCatalogItem();
+        if (!selected || !selected.key || selected.draft) {
+          return null;
+        }
+        if (selected.kind === 'builtin' && selected.id) {
+          return {
+            rootHint: state.rootHint || '',
+            itemKey: selected.key,
+            kind: 'builtin',
+            targetValue: selected.id,
+            shapeMode: state.iconSquircleOnDrop ? 'squircle' : 'plain'
+          };
+        }
+        if (selected.kind === 'workspace' && selected.path) {
+          return {
+            rootHint: state.rootHint || '',
+            itemKey: selected.key,
+            kind: 'workspace',
+            targetValue: selected.path,
+            shapeMode: state.iconSquircleOnDrop ? 'squircle' : 'plain'
+          };
+        }
+        return null;
+      }
+
+      function syncHostIconDropTarget() {
+        var payload;
+        var nextKey;
+        var argv;
+        if (state.os !== 'darwin' || !bridgeAvailable()) {
+          return;
+        }
+        payload = hostIconDropTargetPayload();
+        nextKey = payload
+          ? [payload.rootHint, payload.itemKey, payload.kind, payload.targetValue, payload.shapeMode].join('\n')
+          : '';
+        if (nextKey === state.lastHostIconDropTargetKey) {
+          return;
+        }
+        state.lastHostIconDropTargetKey = nextKey;
+        argv = ['__wizardry_host_forge_icon_drop_target'];
+        if (payload) {
+          argv.push(payload.rootHint, payload.itemKey, payload.kind, payload.targetValue, payload.shapeMode);
+        }
+        execArgv(argv).catch(function () {
+          return;
+        });
+      }
+
       function syncHostDropZones() {
         syncHostDropZoneRect(['__wizardry_host_forge_workspace_drop_zone'], workspaceDropZoneRect(), 'lastHostWorkspaceDropZoneKey');
         syncHostDropZoneRect(['__wizardry_host_forge_icon_drop_zone'], selectedIconDropZoneRect(), 'lastHostIconDropZoneKey');
+        syncHostIconDropTarget();
       }
 
       function handleForgeHostFileDrag(detail) {
         var payload = detail && typeof detail === 'object' ? detail : {};
         var phase = String(payload.phase || '');
         var target = String(payload.target || '');
+        var nativeHandled = !!payload.nativeHandled;
         var paths = Array.isArray(payload.paths) ? payload.paths : [];
         if (phase === 'enter' || phase === 'update') {
           if (target === 'workspace' && paths.length) {
@@ -4144,6 +4209,10 @@
           clearWorkspaceDropCue();
           setSelectedIconDropCue(false);
           if (target === 'icon' && paths.length) {
+            if (nativeHandled) {
+              beginNativeHostIconDrop(paths[0]);
+              return;
+            }
             applySelectedIconPath(paths[0]).catch(function (err) {
               toast(String(err && err.message ? err.message : err), 'bad');
             });
@@ -4478,6 +4547,7 @@
         }
         var iconSrc = itemIconPreviewSrc(selected) || iconSrcForItem(selected);
         var processing = itemIconIsProcessing(selected);
+        syncHostIconDropTarget();
         if (els.selectedIconProcessing) {
           els.selectedIconProcessing.classList.toggle('hidden', !processing);
         }
@@ -4592,6 +4662,61 @@
           setItemIconProcessing(selected, false);
           renderSelectedIconEditor(selected);
         }
+      }
+
+      function beginNativeHostIconDrop(filePath) {
+        var selected = selectedCatalogItem();
+        var normalizedPath = String(filePath || '').trim();
+        if (!selected || !selected.key) {
+          return;
+        }
+        if (!normalizedPath) {
+          toast('Dropped icon path is missing.', 'bad');
+          return;
+        }
+        if (selected.draft) {
+          toast('Create the project first, then set its icon.', 'bad');
+          return;
+        }
+        state.hostIconDropPendingKey = selected.key;
+        setItemIconPreviewOverride(selected, pathToIconSrc(normalizedPath));
+        setItemIconProcessing(selected, true);
+        renderSelectedIconEditor(selected);
+      }
+
+      function finishNativeHostIconDrop(payload) {
+        var detail = payload && typeof payload === 'object' ? payload : {};
+        var itemKey = String(detail.itemKey || state.hostIconDropPendingKey || '').trim();
+        var item = itemKey ? (catalogItemByKey(itemKey) || { key: itemKey }) : null;
+        var selected = selectedCatalogItem();
+        var exitCode = Number(detail.exitCode);
+        var stderr = String(detail.stderr || '');
+        var stdout = String(detail.stdout || '');
+        var errorText = String(detail.error || '');
+        if (!item || !item.key) {
+          state.hostIconDropPendingKey = '';
+          return;
+        }
+        state.hostIconDropPendingKey = '';
+        if (!Number.isFinite(exitCode)) {
+          exitCode = detail.ok ? 0 : 1;
+        }
+        if (detail.ok || exitCode === 0) {
+          setItemIconVersion(item);
+          setItemIconPreviewOverride(item, '');
+          setItemIconProcessing(item, false);
+          renderCatalogList();
+          if (selected && selected.key === item.key) {
+            renderSelectedIconEditor(selected);
+          }
+          return;
+        }
+        setItemIconPreviewOverride(item, '');
+        setItemIconProcessing(item, false);
+        if (selected && selected.key === item.key) {
+          renderSelectedIconEditor(selected);
+        }
+        toast(errorText || summarizeExecFailure(stderr, stdout, exitCode), 'bad');
       }
 
       function readImageFileToDataUrl(file) {
@@ -7542,6 +7667,7 @@
           bindKeyboardShortcuts();
           window.forgeHostAction = handleForgeHostAction;
           window.forgeHostFileDrag = handleForgeHostFileDrag;
+          window.forgeHostIconDropResult = finishNativeHostIconDrop;
           startAutoRefresh();
           setPanel('settings', false);
           setArtifacts([]);

@@ -19,7 +19,8 @@ grep -F 'id="footer-status"' "$ui" >/dev/null
 grep -F "function setFooterStatus(kind, msg)" "$ui" >/dev/null
 grep -F "function shouldShowFooterStatusForAction(label, opts)" "$ui" >/dev/null
 grep -F "setFooterStatus('working', label + '...');" "$ui" >/dev/null
-grep -F "setFooterStatus('ok', label + ' complete');" "$ui" >/dev/null
+grep -F "var successLabel = String(opts.successLabel || (label + ' complete'));" "$ui" >/dev/null
+grep -F "setFooterStatus('ok', successLabel);" "$ui" >/dev/null
 grep -F "setFooterStatus('bad', message);" "$ui" >/dev/null
 grep -F "return !/^(open|copy)\\b/i.test(String(label || ''));" "$ui" >/dev/null
 
@@ -34,10 +35,14 @@ grep -F "var directTypes = ['text/uri-list', 'public.file-url', 'text/plain', 'p
 grep -F "types.indexOf('public.utf8-plain-text') >= 0" "$ui" >/dev/null
 grep -F "itemType === 'public.utf8-plain-text'" "$ui" >/dev/null
 grep -F "window.forgeHostFileDrag = handleForgeHostFileDrag;" "$ui" >/dev/null
-grep -F "var argv = ['__wizardry_host_forge_drop_zone'];" "$ui" >/dev/null
+grep -F "window.forgeHostIconDropResult = finishNativeHostIconDrop;" "$ui" >/dev/null
+grep -F "beginNativeHostIconDrop(paths[0]);" "$ui" >/dev/null
+grep -F "argv = ['__wizardry_host_forge_icon_drop_target'];" "$ui" >/dev/null
 grep -F "toast('Drop a project folder to import.', 'bad');" "$ui" >/dev/null
 
-grep -F "window.forgeHostFileDrag" "$host_macos" >/dev/null
-grep -F "__wizardry_host_forge_drop_zone" "$host_macos" >/dev/null
+grep -F 'dispatchForgeHostCallbackNamed:@"forgeHostFileDrag"' "$host_macos" >/dev/null
+grep -F "forgeHostIconDropResult" "$host_macos" >/dev/null
+grep -F "__wizardry_host_forge_icon_drop_target" "$host_macos" >/dev/null
+grep -F "runForgeIconDropForPath" "$host_macos" >/dev/null
 
 printf '%s\n' "forge ui regression tests passed"
