@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>App Forge</title>
-  <link rel="stylesheet" href="style.css?v=forge20260318b">
+  <link rel="stylesheet" href="style.css?v=forge20260318c">
   <link id="forge-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=forge20260218a">
 </head>
 <body class="forge-booting">
@@ -181,7 +181,15 @@
             <section id="selected-targets-editor" class="targets-editor">
               <div class="pipeline-sections">
                 <details class="pipeline-section" open>
-                  <summary class="pipeline-section-head">App icon</summary>
+                  <summary class="pipeline-section-head with-action">
+                    <span>App icon</span>
+                    <div class="menu-anchor section-summary-menu-anchor">
+                      <button id="selected-icon-menu-btn" type="button" class="action section-clear-btn section-menu-btn" aria-haspopup="menu" aria-expanded="false" title="App icon actions" aria-label="App icon actions">⋯</button>
+                      <div id="selected-icon-menu" class="floating-menu hidden" role="menu" aria-label="App icon actions">
+                        <button id="selected-icon-regenerate" type="button">Regenerate icon assets</button>
+                      </div>
+                    </div>
+                  </summary>
                   <div class="pipeline-section-body">
                     <div class="icon-editor">
                       <label id="selected-icon-drop" class="icon-dropzone" for="selected-icon-input" aria-label="Drop app icon or choose a file" tabindex="0">
@@ -2753,6 +2761,9 @@
         if (els.runMenu) {
           els.runMenu.classList.add('hidden');
         }
+        if (els.selectedIconMenu) {
+          els.selectedIconMenu.classList.add('hidden');
+        }
         if (els.organizeBtn) {
           els.organizeBtn.setAttribute('aria-expanded', 'false');
         }
@@ -2764,6 +2775,9 @@
         }
         if (els.actionRunMenu) {
           els.actionRunMenu.setAttribute('aria-expanded', 'false');
+        }
+        if (els.selectedIconMenuBtn) {
+          els.selectedIconMenuBtn.setAttribute('aria-expanded', 'false');
         }
         clearThemeTypeahead();
       }
@@ -2800,6 +2814,43 @@
 
       function ranActionLabel(item) {
         return 'Ran ' + itemStatusName(item) + '...';
+      }
+
+      function iconShapeModeValue() {
+        return state.iconSquircleOnDrop ? 'squircle' : 'plain';
+      }
+
+      async function regenerateSelectedIconAssets() {
+        var selected = selectedCatalogItem();
+        var shapeMode = iconShapeModeValue();
+        if (!selected || !selected.key) {
+          throw new Error('Select an app first');
+        }
+        if (selected.draft) {
+          throw new Error('Create the project first, then regenerate its icon assets.');
+        }
+
+        setItemIconPreviewOverride(selected, '');
+        setItemIconProcessing(selected, true);
+        renderSelectedIconEditor(selected);
+        try {
+          if (selected.kind === 'builtin') {
+            await backendWithTimeout('regenerate-app-icon-assets', [selected.id, shapeMode], 30000);
+          } else if (selected.kind === 'workspace') {
+            if (!selected.path) {
+              throw new Error('Project path is missing; cannot regenerate icon assets.');
+            }
+            await backendWithTimeout('regenerate-workspace-icon-assets', [selected.path, shapeMode], 30000);
+          } else {
+            throw new Error('Unknown app type; cannot regenerate icon assets.');
+          }
+          setItemIconVersion(selected);
+          renderCatalogList();
+          renderSelectedIconEditor(selected);
+        } finally {
+          setItemIconProcessing(selected, false);
+          renderSelectedIconEditor(selected);
+        }
       }
 
       async function runWorkspaceItem(item) {
@@ -4668,6 +4719,7 @@
         var processing = itemIconIsProcessing(selected);
         var previewSrc = itemIconPreviewSrc(selected);
         var iconSrc = processing ? previewSrc : (previewSrc || iconSrcForItem(selected));
+        var iconMenuDisabled = !selected || !selected.key || !!selected.draft || processing;
         syncHostIconDropTarget();
         if (els.selectedIconProcessing) {
           els.selectedIconProcessing.classList.toggle('hidden', !processing);
@@ -4675,6 +4727,12 @@
         if (els.selectedIconDrop) {
           els.selectedIconDrop.classList.toggle('processing', processing);
           els.selectedIconDrop.setAttribute('aria-busy', processing ? 'true' : 'false');
+        }
+        if (els.selectedIconMenuBtn) {
+          els.selectedIconMenuBtn.disabled = iconMenuDisabled;
+        }
+        if (els.selectedIconRegenerate) {
+          els.selectedIconRegenerate.disabled = iconMenuDisabled;
         }
         if (iconSrc) {
           els.selectedIconPreview.classList.remove('hidden');
@@ -6660,6 +6718,9 @@
             if (!details || details.dataset.animating === '1') {
               return;
             }
+            if (event.target && (event.target.closest('button') || event.target.closest('.floating-menu'))) {
+              return;
+            }
             event.preventDefault();
             animatePipelineSectionToggle(details);
           });
@@ -6981,6 +7042,17 @@
           });
         }
 
+        if (els.selectedIconMenuBtn) {
+          els.selectedIconMenuBtn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (selectedIconIsProcessing() || els.selectedIconMenuBtn.disabled) {
+              return;
+            }
+            toggleFloatingMenu(els.selectedIconMenu, els.selectedIconMenuBtn);
+          });
+        }
+
         if (els.runMenu) {
           els.runMenu.addEventListener('click', function (event) {
             var actionButton = event.target.closest('button[id]');
@@ -6990,6 +7062,26 @@
             closeFloatingMenus();
             if (actionButton.id === 'action-run-webhost') {
               perform('Serve web host', function () { return runPipelineAction('serve-web-host'); }, { swallow: true });
+            }
+          });
+        }
+
+        if (els.selectedIconMenu) {
+          els.selectedIconMenu.addEventListener('click', function (event) {
+            var actionButton = event.target.closest('button[id]');
+            var selected;
+            if (!actionButton) {
+              return;
+            }
+            closeFloatingMenus();
+            if (actionButton.id === 'selected-icon-regenerate') {
+              selected = selectedCatalogItem();
+              perform('Regenerating ' + itemStatusName(selected) + ' icon assets', function () {
+                return regenerateSelectedIconAssets();
+              }, {
+                swallow: true,
+                successLabel: 'Regenerated ' + itemStatusName(selected) + ' icon assets'
+              });
             }
           });
         }
@@ -7772,6 +7864,9 @@
         els.selectedIconChoose = document.getElementById('selected-icon-choose');
         els.selectedIconInput = document.getElementById('selected-icon-input');
         els.selectedIconClear = document.getElementById('selected-icon-clear');
+        els.selectedIconMenuBtn = document.getElementById('selected-icon-menu-btn');
+        els.selectedIconMenu = document.getElementById('selected-icon-menu');
+        els.selectedIconRegenerate = document.getElementById('selected-icon-regenerate');
 
         els.actionBuild = document.getElementById('action-build');
         els.actionRun = document.getElementById('action-run');

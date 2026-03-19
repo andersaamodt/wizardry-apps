@@ -24,7 +24,12 @@ grep -F "setFooterStatus('ok', successLabel);" "$ui" >/dev/null
 grep -F "function buildActionLabel(item)" "$ui" >/dev/null
 grep -F "function runActionLabel(item)" "$ui" >/dev/null
 grep -F "function ranActionLabel(item)" "$ui" >/dev/null
+grep -F "function regenerateSelectedIconAssets()" "$ui" >/dev/null
 grep -F "setFooterStatus('working', runningLabel);" "$ui" >/dev/null
+grep -F 'id="selected-icon-menu-btn"' "$ui" >/dev/null
+grep -F 'id="selected-icon-regenerate"' "$ui" >/dev/null
+grep -F "regenerate-app-icon-assets" "$ui" >/dev/null
+grep -F "regenerate-workspace-icon-assets" "$ui" >/dev/null
 grep -F "setFooterStatus('bad', message);" "$ui" >/dev/null
 grep -F "return !/^(open|copy)\\b/i.test(String(label || ''));" "$ui" >/dev/null
 

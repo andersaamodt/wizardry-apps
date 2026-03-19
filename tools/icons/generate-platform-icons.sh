@@ -61,6 +61,14 @@ meta_dir="$icons_dir/meta"
 
 mkdir -p "$assets_dir" "$macos_dir" "$linux_dir" "$android_dir" "$ios_dir" "$web_dir" "$meta_dir"
 
+input_name=$(basename "$input_image")
+case "$input_name" in
+  *.*) original_ext=${input_name##*.} ;;
+  *) original_ext=png ;;
+esac
+original_ext=$(printf '%s' "$original_ext" | tr '[:upper:]' '[:lower:]')
+stored_original="$meta_dir/original-source.$original_ext"
+
 plain_master="$tmp_dir/plain-master.png"
 apple_base="$tmp_dir/apple-base.png"
 apple_source="$tmp_dir/apple-source.png"
@@ -232,6 +240,13 @@ fi
 cp "$primary_master" "$assets_dir/forge-icon.png"
 cp "$plain_master" "$meta_dir/plain-master.png"
 cp "$apple_base" "$meta_dir/apple-master.png"
+for existing_original in "$meta_dir"/original-source.*; do
+  [ -f "$existing_original" ] || continue
+  [ "$existing_original" = "$stored_original" ] || rm -f "$existing_original"
+done
+if [ "$input_image" != "$stored_original" ]; then
+  cp "$input_image" "$stored_original"
+fi
 
 rm -rf "$macos_dir/iconset.iconset"
 iconset_dir="$macos_dir/iconset.iconset"
@@ -321,6 +336,7 @@ full_bleed=$full_bleed_mode
 master=$assets_dir/forge-icon.png
 plain_master=$meta_dir/plain-master.png
 apple_master=$meta_dir/apple-master.png
+original_source=$stored_original
 CONF
 
 printf 'icon=%s\n' "$assets_dir/forge-icon.png"

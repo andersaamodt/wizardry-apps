@@ -2270,6 +2270,19 @@ input[type="checkbox"]:disabled {
   padding: 0;
 }
 
+.section-menu-btn {
+  width: 1.24rem;
+  padding: 0;
+  font-size: 0.92rem;
+}
+
+#selected-icon-menu-btn:hover,
+#selected-icon-menu-btn:focus-visible {
+  border-color: transparent !important;
+  background: color-mix(in srgb, var(--section-accent-soft) 74%, var(--section-bg));
+  box-shadow: none;
+}
+
 .section-copy-btn svg {
   width: 0.78rem;
   height: 0.78rem;

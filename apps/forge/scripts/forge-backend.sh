@@ -29,6 +29,8 @@ Commands:
   set-workspace-icon [ROOT_HINT] WORKSPACE_PATH DATA_URL [squircle|plain]
   set-app-icon-file [ROOT_HINT] APP_SLUG IMAGE_PATH [squircle|plain]
   set-workspace-icon-file [ROOT_HINT] WORKSPACE_PATH IMAGE_PATH [squircle|plain]
+  regenerate-app-icon-assets [ROOT_HINT] APP_SLUG [squircle|plain]
+  regenerate-workspace-icon-assets [ROOT_HINT] WORKSPACE_PATH [squircle|plain]
   icon-tool-status [ROOT_HINT]
   install-icon-tool [ROOT_HINT] TOOL
   uninstall-icon-tool [ROOT_HINT] TOOL
@@ -2918,6 +2920,95 @@ write_project_icon_from_data_url() {
   printf 'status=updated\n'
 }
 
+project_icon_meta_dir() {
+  project_dir=$1
+  printf '%s\n' "$project_dir/assets/icons/meta"
+}
+
+project_icon_shape_mode() {
+  project_dir=$1
+  requested_mode=${2-}
+  config_path="$project_dir/assets/icons/meta/icon-settings.conf"
+
+  case "$requested_mode" in
+    plain|squircle)
+      printf '%s\n' "$requested_mode"
+      return 0
+      ;;
+  esac
+
+  if [ -f "$config_path" ]; then
+    config_squircle=$(awk -F= '/^squircle=/{print $2; exit}' "$config_path" 2>/dev/null | tr -d '\r')
+    if [ "$config_squircle" = "0" ]; then
+      printf '%s\n' plain
+      return 0
+    fi
+    if [ "$config_squircle" = "1" ]; then
+      printf '%s\n' squircle
+      return 0
+    fi
+  fi
+
+  printf '%s\n' squircle
+}
+
+project_original_icon_source() {
+  project_dir=$1
+  meta_dir=$(project_icon_meta_dir "$project_dir")
+  config_path="$meta_dir/icon-settings.conf"
+  configured_path=''
+
+  if [ -f "$config_path" ]; then
+    configured_path=$(awk -F= '/^original_source=/{print substr($0, index($0, "=") + 1); exit}' "$config_path" 2>/dev/null | tr -d '\r')
+    if [ -n "$configured_path" ] && [ -f "$configured_path" ]; then
+      printf '%s\n' "$configured_path"
+      return 0
+    fi
+  fi
+
+  for candidate in "$meta_dir"/original-source.*; do
+    [ -f "$candidate" ] || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+
+  return 1
+}
+
+regenerate_project_icon_assets() {
+  root_hint=$1
+  project_dir=$2
+  requested_mode=${3-}
+
+  [ -d "$project_dir" ] || {
+    printf '%s\n' "forge-backend: project path not found: $project_dir" >&2
+    exit 1
+  }
+
+  original_source=$(project_original_icon_source "$project_dir" || true)
+  [ -n "$original_source" ] || {
+    printf '%s\n' "forge-backend: no saved original icon source was found for $project_dir" >&2
+    exit 1
+  }
+
+  root=$(require_root "$root_hint")
+  generator="$root/tools/icons/generate-platform-icons.sh"
+  [ -f "$generator" ] || {
+    printf '%s\n' "forge-backend: icon generator not found: $generator" >&2
+    exit 1
+  }
+
+  shape_mode=$(project_icon_shape_mode "$project_dir" "$requested_mode")
+  generator_mode=--squircle
+  if [ "$shape_mode" = "plain" ]; then
+    generator_mode=--plain
+  fi
+
+  legacy_icns_path="$project_dir/assets/forge.icns"
+  sh "$generator" "$original_source" "$project_dir" "$generator_mode"
+  rm -f "$legacy_icns_path"
+}
+
 write_project_icon_from_file() {
   project_dir=$1
   image_path=$2
@@ -3101,6 +3192,66 @@ cmd_set_workspace_icon_file() {
   if [ -f "$workspace_app_dir/index.html" ]; then
     write_project_icon_from_file "$workspace_app_dir" "$image_path" "$shape_mode" >/dev/null
   fi
+  printf 'workspace=%s\n' "$workspace_path"
+}
+
+cmd_regenerate_app_icon_assets() {
+  root=$(require_root "${1-}")
+  slug=${2-}
+  requested_mode=${3-}
+
+  [ -n "$slug" ] || {
+    printf '%s\n' "forge-backend: regenerate-app-icon-assets requires APP_SLUG" >&2
+    exit 2
+  }
+  validate_slug "$slug"
+  require_jq
+  manifest_app_exists "$root" "$slug" || {
+    printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
+    exit 1
+  }
+
+  app_dir=$(resolve_app_dir_or_error "$root" "$slug")
+  distribution=$(app_distribution "$root" "$slug")
+  override_icon=''
+  if [ "$distribution" = "optional" ]; then
+    override_icon=$(app_icon_override_path "$slug")
+  fi
+
+  regenerate_project_icon_assets "$root" "$app_dir" "$requested_mode"
+  if [ "$distribution" = "optional" ] && [ -n "$override_icon" ] && [ -f "$app_dir/assets/forge-icon.png" ]; then
+    mkdir -p "$(dirname "$override_icon")"
+    cp "$app_dir/assets/forge-icon.png" "$override_icon"
+  fi
+  synced_install=$(sync_macos_install_for_slug "$root" "$slug" 2>/dev/null || true)
+  [ -n "$synced_install" ] && printf 'installed_synced=%s\n' "$synced_install"
+  printf 'icon=%s\n' "$app_dir/assets/forge-icon.png"
+  printf 'status=regenerated\n'
+  printf 'slug=%s\n' "$slug"
+}
+
+cmd_regenerate_workspace_icon_assets() {
+  require_root "${1-}" >/dev/null
+  workspace_path=${2-}
+  requested_mode=${3-}
+
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: regenerate-workspace-icon-assets requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -d "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+
+  root=$(require_root "${1-}")
+  regenerate_project_icon_assets "$root" "$workspace_path" "$requested_mode"
+  workspace_app_dir="$workspace_path/app"
+  if [ -f "$workspace_app_dir/index.html" ]; then
+    regenerate_project_icon_assets "$root" "$workspace_app_dir" "$requested_mode"
+  fi
+  printf 'icon=%s\n' "$workspace_path/assets/forge-icon.png"
+  printf 'status=regenerated\n'
   printf 'workspace=%s\n' "$workspace_path"
 }
 
@@ -4920,6 +5071,12 @@ case "$cmd" in
     ;;
   set-workspace-icon-file)
     cmd_set_workspace_icon_file "${2-}" "${3-}" "${4-}" "${5-}"
+    ;;
+  regenerate-app-icon-assets)
+    cmd_regenerate_app_icon_assets "${2-}" "${3-}" "${4-}"
+    ;;
+  regenerate-workspace-icon-assets)
+    cmd_regenerate_workspace_icon_assets "${2-}" "${3-}" "${4-}"
     ;;
   icon-tool-status)
     cmd_icon_tool_status "${2-}"
