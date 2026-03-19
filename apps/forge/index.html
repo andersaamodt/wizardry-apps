@@ -4205,11 +4205,12 @@
         var phase = String(payload.phase || '');
         var target = String(payload.target || '');
         var nativeHandled = !!payload.nativeHandled;
+        var hasImagePayload = !!payload.hasImagePayload;
         var paths = Array.isArray(payload.paths) ? payload.paths : [];
         if (phase === 'enter' || phase === 'update') {
           if (target === 'workspace' && paths.length) {
             setWorkspaceDropCue(true);
-          } else if (target === 'icon' && paths.length) {
+          } else if (target === 'icon' && (paths.length || hasImagePayload)) {
             setNativeHostIconDropExpected(true);
             setSelectedIconDropCue(true);
           }
@@ -4224,10 +4225,9 @@
         if (phase === 'drop') {
           clearWorkspaceDropCue();
           setSelectedIconDropCue(false);
-          if (target === 'icon' && paths.length) {
+          if (target === 'icon' && (paths.length || hasImagePayload)) {
             if (nativeHandled) {
-              setNativeHostIconDropExpected(true);
-              beginNativeHostIconDrop(paths[0]);
+              beginNativeHostIconDrop(paths[0] || '');
               return;
             }
             setNativeHostIconDropExpected(false);
@@ -4689,17 +4689,17 @@
         if (!selected || !selected.key) {
           return;
         }
-        if (!normalizedPath) {
-          toast('Dropped icon path is missing.', 'bad');
-          return;
-        }
         if (selected.draft) {
           toast('Create the project first, then set its icon.', 'bad');
           return;
         }
         setNativeHostIconDropExpected(true);
         state.hostIconDropPendingKey = selected.key;
-        setItemIconPreviewOverride(selected, pathToIconSrc(normalizedPath));
+        if (normalizedPath) {
+          setItemIconPreviewOverride(selected, pathToIconSrc(normalizedPath));
+        } else {
+          setItemIconPreviewOverride(selected, '');
+        }
         setItemIconProcessing(selected, true);
         renderSelectedIconEditor(selected);
       }

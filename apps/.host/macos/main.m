@@ -81,8 +81,10 @@
 - (NSString *)resolvedWizardryAppsRoot;
 - (NSString *)resolvedSharedThemeFileForTheme:(NSString *)themeName;
 - (NSArray<NSString *> *)filePathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo;
-- (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
-- (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths;
+- (BOOL)draggingInfoContainsImagePayload:(id<NSDraggingInfo>)draggingInfo;
+- (NSString *)stagedImagePathFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo;
+- (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths hasImagePayload:(BOOL)hasImagePayload;
+- (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths hasImagePayload:(BOOL)hasImagePayload;
 - (void)dispatchForgeHostCallbackNamed:(NSString *)functionName payload:(NSDictionary *)payload toWebView:(WKWebView *)targetWebView;
 - (NSArray<NSString *> *)forgeIconDropCommandArgumentsForPath:(NSString *)imagePath;
 - (void)runForgeIconDropForPath:(NSString *)imagePath fromWebView:(WKWebView *)sourceWebView;
@@ -122,14 +124,15 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
 
 - (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
     NSArray<NSString *> *paths = [self.appDelegate filePathsFromDraggingInfo:sender];
+    BOOL hasImagePayload = [self.appDelegate draggingInfoContainsImagePayload:sender];
     NSPoint localPoint = [self convertPoint:[sender draggingLocation] fromView:nil];
     CGFloat domX = localPoint.x;
     CGFloat domY = self.bounds.size.height - localPoint.y;
-    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths];
+    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths hasImagePayload:hasImagePayload];
     if (target.length) {
         self.nativeFileDragActive = YES;
         self.nativeFileDragTarget = target;
-        [self.appDelegate dispatchForgeFileDragPhase:@"enter" target:target domX:domX domY:domY paths:paths];
+        [self.appDelegate dispatchForgeFileDragPhase:@"enter" target:target domX:domX domY:domY paths:paths hasImagePayload:hasImagePayload];
         return NSDragOperationCopy;
     }
     return [super draggingEntered:sender];
@@ -137,20 +140,21 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
 
 - (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)sender {
     NSArray<NSString *> *paths = [self.appDelegate filePathsFromDraggingInfo:sender];
+    BOOL hasImagePayload = [self.appDelegate draggingInfoContainsImagePayload:sender];
     NSPoint localPoint = [self convertPoint:[sender draggingLocation] fromView:nil];
     CGFloat domX = localPoint.x;
     CGFloat domY = self.bounds.size.height - localPoint.y;
-    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths];
+    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths hasImagePayload:hasImagePayload];
     if (target.length) {
         NSString *phase = self.nativeFileDragActive ? @"update" : @"enter";
         self.nativeFileDragActive = YES;
         self.nativeFileDragTarget = target;
-        [self.appDelegate dispatchForgeFileDragPhase:phase target:target domX:domX domY:domY paths:paths];
+        [self.appDelegate dispatchForgeFileDragPhase:phase target:target domX:domX domY:domY paths:paths hasImagePayload:hasImagePayload];
         return NSDragOperationCopy;
     }
     if (self.nativeFileDragActive) {
         self.nativeFileDragActive = NO;
-        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[]];
+        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[] hasImagePayload:NO];
         self.nativeFileDragTarget = nil;
     }
     return [super draggingUpdated:sender];
@@ -162,7 +166,7 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
         CGFloat domX = localPoint.x;
         CGFloat domY = self.bounds.size.height - localPoint.y;
         self.nativeFileDragActive = NO;
-        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[]];
+        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[] hasImagePayload:NO];
         self.nativeFileDragTarget = nil;
     }
     [super draggingExited:sender];
@@ -170,13 +174,20 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
 
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
     NSArray<NSString *> *paths = [self.appDelegate filePathsFromDraggingInfo:sender];
+    BOOL hasImagePayload = [self.appDelegate draggingInfoContainsImagePayload:sender];
     NSPoint localPoint = [self convertPoint:[sender draggingLocation] fromView:nil];
     CGFloat domX = localPoint.x;
     CGFloat domY = self.bounds.size.height - localPoint.y;
-    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths];
+    NSString *target = [self.appDelegate forgeDropTargetAtDomX:domX domY:domY paths:paths hasImagePayload:hasImagePayload];
     if (target.length) {
+        if ([target isEqualToString:@"icon"] && !paths.count && hasImagePayload) {
+            NSString *stagedImagePath = [self.appDelegate stagedImagePathFromDraggingInfo:sender];
+            if (stagedImagePath.length) {
+                paths = @[stagedImagePath];
+            }
+        }
         self.nativeFileDragActive = NO;
-        [self.appDelegate dispatchForgeFileDragPhase:@"drop" target:target domX:domX domY:domY paths:paths];
+        [self.appDelegate dispatchForgeFileDragPhase:@"drop" target:target domX:domX domY:domY paths:paths hasImagePayload:hasImagePayload];
         self.nativeFileDragTarget = nil;
         if ([target isEqualToString:@"icon"]) {
             NSString *imagePath = @"";
@@ -193,7 +204,7 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
     }
     if (self.nativeFileDragActive) {
         self.nativeFileDragActive = NO;
-        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[]];
+        [self.appDelegate dispatchForgeFileDragPhase:@"leave" target:(self.nativeFileDragTarget ?: @"") domX:domX domY:domY paths:@[] hasImagePayload:NO];
         self.nativeFileDragTarget = nil;
     }
     return [super performDragOperation:sender];
@@ -540,8 +551,68 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return paths;
 }
 
-- (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths {
-    if (!self.enableForgeAppMenu || !paths.count) {
+- (BOOL)draggingInfoContainsImagePayload:(id<NSDraggingInfo>)draggingInfo {
+    if (!draggingInfo) {
+        return NO;
+    }
+    NSPasteboard *pasteboard = [draggingInfo draggingPasteboard];
+    if (!pasteboard) {
+        return NO;
+    }
+    return [NSImage canInitWithPasteboard:pasteboard];
+}
+
+- (NSString *)stagedImagePathFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo {
+    if (!draggingInfo) {
+        return @"";
+    }
+    NSPasteboard *pasteboard = [draggingInfo draggingPasteboard];
+    if (!pasteboard || ![NSImage canInitWithPasteboard:pasteboard]) {
+        return @"";
+    }
+    NSImage *image = [[NSImage alloc] initWithPasteboard:pasteboard];
+    if (!image) {
+        return @"";
+    }
+
+    NSBitmapImageRep *bitmapRep = nil;
+    for (NSImageRep *candidate in [image representations]) {
+        if ([candidate isKindOfClass:[NSBitmapImageRep class]]) {
+            bitmapRep = (NSBitmapImageRep *)candidate;
+            break;
+        }
+    }
+    if (!bitmapRep) {
+        NSData *tiffData = [image TIFFRepresentation];
+        if (tiffData.length) {
+            bitmapRep = [NSBitmapImageRep imageRepWithData:tiffData];
+        }
+    }
+    if (!bitmapRep) {
+        return @"";
+    }
+
+    NSData *pngData = [bitmapRep representationUsingType:NSPNGFileType properties:@{}];
+    if (!pngData.length) {
+        return @"";
+    }
+
+    NSString *tempDir = NSTemporaryDirectory();
+    if (!tempDir.length) {
+        tempDir = @"/tmp";
+    }
+    NSString *fileName = [NSString stringWithFormat:@"wizardry-forge-drop-%@.png", [[NSUUID UUID] UUIDString]];
+    NSString *path = [tempDir stringByAppendingPathComponent:fileName];
+    NSError *writeError = nil;
+    if (![pngData writeToFile:path options:NSDataWritingAtomic error:&writeError]) {
+        NSLog(@"Forge staged image write failed: %@", writeError);
+        return @"";
+    }
+    return path;
+}
+
+- (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths hasImagePayload:(BOOL)hasImagePayload {
+    if (!self.enableForgeAppMenu) {
         return @"";
     }
 
@@ -551,6 +622,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         domX <= self.forgeIconDropZoneRight &&
         domY >= self.forgeIconDropZoneTop &&
         domY <= self.forgeIconDropZoneBottom) {
+        if (!paths.count && hasImagePayload) {
+            return @"icon";
+        }
         for (NSString *path in paths) {
             BOOL isDirectory = NO;
             if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDirectory] || isDirectory) {
@@ -579,7 +653,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return @"";
 }
 
-- (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths {
+- (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths hasImagePayload:(BOOL)hasImagePayload {
     if (!self.enableForgeAppMenu || !self.webView || !phase.length) {
         return;
     }
@@ -588,6 +662,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         @"phase": phase,
         @"target": target ?: @"",
         @"nativeHandled": @([phase isEqualToString:@"drop"] && [target isEqualToString:@"icon"]),
+        @"hasImagePayload": @(hasImagePayload),
         @"clientX": @(domX),
         @"clientY": @(domY),
         @"paths": paths ?: @[]
@@ -1624,7 +1699,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     if (isForgeApp) {
         WizardryForgeWebView *forgeWebView = [[WizardryForgeWebView alloc] initWithFrame:webFrame configuration:config];
         forgeWebView.appDelegate = self;
-        [forgeWebView registerForDraggedTypes:@[NSPasteboardTypeFileURL]];
+        NSMutableArray<NSPasteboardType> *dragTypes = [NSMutableArray arrayWithArray:[NSImage imagePasteboardTypes]];
+        if (![dragTypes containsObject:NSPasteboardTypeFileURL]) {
+            [dragTypes addObject:NSPasteboardTypeFileURL];
+        }
+        [forgeWebView registerForDraggedTypes:dragTypes];
         self.webView = forgeWebView;
     } else {
         self.webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];

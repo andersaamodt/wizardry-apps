@@ -29,6 +29,7 @@
 - Finder-launched macOS hosts need a normalized command `PATH`; otherwise Forge run flows can fail only in the desktop app even though the same backend commands work from Terminal.
 - Finder folder drops into macOS `WKWebView` cannot be treated as reliable DOM drag data; Forge needs a native host drop bridge with explicit sidebar hit-testing for project-folder import.
 - Finder image drops into Forge’s icon zone should execute the backend directly in the native host after hit-testing; routing the actual icon write back through the WebView bridge can fail even when shell commands work.
+- Finder image drags on macOS do not reliably arrive as file URLs; Forge’s native host must register image pasteboard types too and stage pasteboard image data into a temp PNG for icon-drop handling.
 - Icon import pipelines must not transcode non-JPEG sources to JPEG just to shrink payload size; that strips real alpha from PNG/WebP/SVG icons.
 - On macOS, `sips -z ... --out file.png` does not guarantee PNG output; set `-s format png` explicitly or Forge can write JPEG bytes into `forge-icon.png`.
 - Focus/visibility-triggered auto-refresh right after launching another app/browser can tear down and redraw transparent catalog icons, causing a brief white-edge flash during Run handoff.

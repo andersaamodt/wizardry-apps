@@ -36,7 +36,7 @@ grep -F "types.indexOf('public.utf8-plain-text') >= 0" "$ui" >/dev/null
 grep -F "itemType === 'public.utf8-plain-text'" "$ui" >/dev/null
 grep -F "window.forgeHostFileDrag = handleForgeHostFileDrag;" "$ui" >/dev/null
 grep -F "window.forgeHostIconDropResult = finishNativeHostIconDrop;" "$ui" >/dev/null
-grep -F "beginNativeHostIconDrop(paths[0]);" "$ui" >/dev/null
+grep -F "beginNativeHostIconDrop(paths[0] || '');" "$ui" >/dev/null
 grep -F "argv = ['__wizardry_host_forge_icon_drop_target'];" "$ui" >/dev/null
 grep -F "toast('Drop a project folder to import.', 'bad');" "$ui" >/dev/null
 
