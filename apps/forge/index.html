@@ -3373,7 +3373,7 @@
                 perform('Running app', function () { return runPipelineAction('run'); }, { swallow: true });
               } else {
                 state.selectedWorkspace = item.id;
-                perform('Running workspace', function () { return runWorkspaceItem(item); }, { swallow: true, successLabel: 'Ran workspace' });
+                perform('Running workspace', function () { return runWorkspaceItem(item); }, { swallow: true, successLabel: 'Ran ' + String(item.title || item.name || 'workspace') });
               }
               renderSelectedBuiltIn();
             });
