@@ -435,7 +435,6 @@
         hostBootReadySent: false,
         workspaceDropDepth: 0,
         lastHostWorkspaceDropZoneKey: '',
-        lastHostIconDropZoneKey: '',
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
         workspaceProfileCache: {},
@@ -4080,17 +4079,6 @@
         return rect;
       }
 
-      function selectedIconDropZoneRect() {
-        if (!els.selectedIconDrop || typeof els.selectedIconDrop.getBoundingClientRect !== 'function') {
-          return null;
-        }
-        var rect = els.selectedIconDrop.getBoundingClientRect();
-        if (!rect || rect.width <= 0 || rect.height <= 0) {
-          return null;
-        }
-        return rect;
-      }
-
       function syncHostDropZoneRect(argv, rect, stateKey) {
         if (state.os !== 'darwin' || !bridgeAvailable()) {
           return;
@@ -4117,7 +4105,6 @@
 
       function syncHostDropZones() {
         syncHostDropZoneRect(['__wizardry_host_forge_workspace_drop_zone'], workspaceDropZoneRect(), 'lastHostWorkspaceDropZoneKey');
-        syncHostDropZoneRect(['__wizardry_host_forge_icon_drop_zone'], selectedIconDropZoneRect(), 'lastHostIconDropZoneKey');
       }
 
       function handleForgeHostFileDrag(detail) {
@@ -4128,27 +4115,17 @@
         if (phase === 'enter' || phase === 'update') {
           if (target === 'workspace' && paths.length) {
             setWorkspaceDropCue(true);
-          } else if (target === 'icon' && paths.length) {
-            setSelectedIconDropCue(true);
           }
           return;
         }
         if (phase === 'leave') {
           clearWorkspaceDropCue();
-          setSelectedIconDropCue(false);
           return;
         }
         if (phase === 'drop') {
           clearWorkspaceDropCue();
-          setSelectedIconDropCue(false);
           if (!paths.length) {
             toast('Drop a project folder to import.', 'bad');
-            return;
-          }
-          if (target === 'icon') {
-            applySelectedIconPath(paths[0]).catch(function (err) {
-              toast(String(err && err.message ? err.message : err), 'bad');
-            });
             return;
           }
           perform('Import project folder', function () {
@@ -6955,21 +6932,21 @@
             if (selectedIconIsProcessing()) {
               return;
             }
-            var droppedPath = firstPathFromDropData(event.dataTransfer);
-            if (droppedPath) {
-              applySelectedIconPath(droppedPath).catch(function (err) {
+            var files = event.dataTransfer && event.dataTransfer.files;
+            var file = files && files[0] ? files[0] : null;
+            if (file) {
+              readImageFileToDataUrl(file).then(function (dataUrl) {
+                return applySelectedIconData(dataUrl);
+              }).catch(function (err) {
                 toast(String(err && err.message ? err.message : err), 'bad');
               });
               return;
             }
-            var files = event.dataTransfer && event.dataTransfer.files;
-            var file = files && files[0] ? files[0] : null;
-            if (!file) {
+            var droppedPath = firstPathFromDropData(event.dataTransfer);
+            if (!droppedPath) {
               return;
             }
-            readImageFileToDataUrl(file).then(function (dataUrl) {
-              return applySelectedIconData(dataUrl);
-            }).catch(function (err) {
+            applySelectedIconPath(droppedPath).catch(function (err) {
               toast(String(err && err.message ? err.message : err), 'bad');
             });
           });
