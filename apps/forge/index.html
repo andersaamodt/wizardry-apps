@@ -4952,9 +4952,9 @@
                 return;
               }
               // Preserve original files when possible; only resample when the data URL is oversized.
-              var sizes = [1536, 1024, 896, 768, 640, 512, 384];
+              var sizes = [1536, 1024, 896, 768, 640, 512, 384, 320, 256, 224, 192, 160, 128];
               var output = '';
-              var qualitySteps = [0.92, 0.86, 0.8, 0.72, 0.64];
+              var qualitySteps = [0.92, 0.86, 0.8, 0.72, 0.64, 0.55, 0.46, 0.38];
               var allowJpegFallback = /^image\/jpe?g$/i.test(file.type || '');
 
               function renderDataUrl(size, mime, quality) {
