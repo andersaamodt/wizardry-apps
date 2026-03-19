@@ -2381,6 +2381,12 @@ input[type="checkbox"]:disabled {
 
 .icon-dropzone.processing {
   cursor: progress;
+  grid-template-columns: auto;
+  gap: 0;
+}
+
+.icon-dropzone.processing .icon-drop-copy {
+  display: none;
 }
 
 .icon-preview-wrap {
