@@ -429,7 +429,7 @@ body.settings-open #settings-panel {
 .rail-divider {
   width: var(--rail-divider-width);
   cursor: col-resize;
-  background: #a6b8cc;
+  background: var(--line);
   position: relative;
 }
 
@@ -444,7 +444,7 @@ body.settings-open #settings-panel {
 }
 
 .rail-divider:hover {
-  background: #95b1cf;
+  background: var(--line);
 }
 
 .stage {
@@ -542,7 +542,7 @@ body.settings-open #settings-panel {
   right: 0;
   bottom: 0;
   height: 1px;
-  background: color-mix(in srgb, var(--line) 86%, transparent);
+  background: var(--line);
   pointer-events: none;
   z-index: 4;
 }
@@ -718,7 +718,7 @@ body.settings-open #settings-panel {
   justify-content: center;
   padding: 0;
   border: 0;
-  border-right: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border-right: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   color: color-mix(in srgb, var(--text) 70%, var(--muted));
@@ -753,7 +753,7 @@ body.settings-open #settings-panel {
   min-width: 0;
   width: auto;
   border: 0;
-  border-right: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border-right: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   color: var(--text);
@@ -773,7 +773,7 @@ body.settings-open #settings-panel {
   min-width: 0;
   min-height: 1.9rem;
   padding: 0 0.68rem;
-  border-left: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
+  border-left: 1px solid var(--line);
   color: color-mix(in srgb, var(--text) 74%, var(--muted));
   font-size: 0.74rem;
   font-weight: 560;
