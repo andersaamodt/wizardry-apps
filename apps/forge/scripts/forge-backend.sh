@@ -1310,6 +1310,22 @@ copy_macos_bundle() {
   return 0
 }
 
+macos_app_is_running() {
+  app_name=${1-}
+  [ -n "$app_name" ] || return 1
+  command -v osascript >/dev/null 2>&1 || return 1
+
+  running=$(
+    osascript \
+      -e "if application \"$app_name\" is running then" \
+      -e 'return "yes"' \
+      -e 'else' \
+      -e 'return "no"' \
+      -e 'end if' 2>/dev/null || printf 'no'
+  )
+  [ "$running" = "yes" ]
+}
+
 sync_existing_macos_installs_from_bundle() {
   bundle_path=${1-}
   app_name=${2-}
@@ -1344,6 +1360,11 @@ sync_macos_install_for_slug() {
     fi
   done
   [ "$has_install" -eq 1 ] || return 1
+
+  # Do not try to hot-swap an installed macOS app bundle while it is running.
+  # That can hang or fail when the user edits the icon of the currently running app,
+  # especially Forge updating itself from inside Forge.
+  macos_app_is_running "$app_name" && return 1
 
   build_out=$(cmd_build_desktop "$root" "$slug" 2>/dev/null || true)
   bundle_path=$(printf '%s\n' "$build_out" | kv_read artifact)
