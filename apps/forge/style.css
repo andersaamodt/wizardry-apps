@@ -520,12 +520,14 @@ body.settings-open #settings-panel {
   align-items: center;
   gap: 0.08rem;
   justify-content: flex-start;
-  width: 100%;
+  width: calc(100% + 1rem);
   min-width: 0;
   margin-top: -0.12rem;
-  padding: 0.12rem 0.14rem 0 0.14rem;
-  background: color-mix(in srgb, var(--panel-solid, #fff) 18%, transparent);
-  border-radius: 8px 8px 0 0;
+  margin-left: -0.5rem;
+  margin-right: -0.5rem;
+  padding: 0.12rem 0.5rem 0;
+  background: transparent;
+  border-radius: 0;
   -webkit-app-region: no-drag;
   overflow-x: auto;
   overflow-y: hidden;
@@ -536,8 +538,8 @@ body.settings-open #settings-panel {
 .catalog-mini-tabs::after {
   content: "";
   position: absolute;
-  left: -0.5rem;
-  right: -0.5rem;
+  left: 0;
+  right: 0;
   bottom: 0;
   height: 1px;
   background: color-mix(in srgb, var(--line) 86%, transparent);
@@ -587,6 +589,7 @@ body.settings-open #settings-panel {
   color: color-mix(in srgb, var(--text) 94%, transparent);
   position: relative;
   z-index: 2;
+  box-shadow: inset 0 -1px 0 var(--bg-panel);
 }
 
 .catalog-mini-tab.drag-target {
@@ -649,16 +652,17 @@ body.settings-open #settings-panel {
 }
 
 .catalog-mini-tab-add {
-  position: absolute;
-  top: 0.12rem;
-  right: -0.5rem;
+  position: sticky;
+  top: 0;
+  right: 0;
+  margin-left: auto;
   min-width: 1.28rem;
   justify-content: center;
   padding-left: 0.34rem;
   padding-right: 0.34rem;
   z-index: 3;
   background: color-mix(in srgb, var(--panel-solid, #fff) 96%, transparent);
-  box-shadow: -10px 0 12px color-mix(in srgb, var(--panel-solid, #fff) 72%, transparent);
+  box-shadow: -10px 0 12px color-mix(in srgb, var(--bg-panel) 78%, transparent);
   margin-bottom: 0;
 }
 
