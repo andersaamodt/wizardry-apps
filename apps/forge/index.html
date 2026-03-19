@@ -436,6 +436,7 @@
         lastHostIconDropZoneKey: '',
         lastHostIconDropTargetKey: '',
         hostIconDropPendingKey: '',
+        hostIconDropVisualPendingKey: '',
         nativeHostIconDropExpectedUntil: 0,
         nativeHostIconDropArmed: false,
         nativeHostIconDropFallbackTimer: 0,
@@ -4213,8 +4214,10 @@
       function triggerSelectedIconDropFallback(filePath, file) {
         var normalizedPath = String(filePath || '').trim();
         var fallbackFile = file || null;
+        var selected = selectedCatalogItem();
         clearNativeHostIconDropFallback();
         setNativeHostIconDropExpected(false);
+        setHostIconDropVisualPending(selected, false);
         if (fallbackFile && /^image\//.test(String(fallbackFile.type || ''))) {
           readImageFileToDataUrl(fallbackFile).then(function (dataUrl) {
             return applySelectedIconData(dataUrl);
@@ -4238,11 +4241,11 @@
         clearNativeHostIconDropFallback();
         state.nativeHostIconDropFallbackTimer = setTimeout(function () {
           state.nativeHostIconDropFallbackTimer = 0;
-          if (state.hostIconDropPendingKey || selectedIconIsProcessing()) {
+          if (state.hostIconDropPendingKey) {
             return;
           }
           triggerSelectedIconDropFallback(normalizedPath, fallbackFile);
-        }, 350);
+        }, 900);
       }
 
       function handleForgeHostFileDrag(detail) {
@@ -4266,6 +4269,7 @@
           clearWorkspaceDropCue();
           setNativeHostIconDropExpected(false);
           setSelectedIconDropCue(false);
+          setHostIconDropVisualPending(selectedCatalogItem(), false);
           return;
         }
         if (phase === 'drop') {
@@ -4493,6 +4497,23 @@
         delete state.iconProcessingByKey[item.key];
       }
 
+      function setHostIconDropVisualPending(item, flag) {
+        var itemKey = String(item && item.key ? item.key : '').trim();
+        if (!itemKey) {
+          if (!flag) {
+            state.hostIconDropVisualPendingKey = '';
+          }
+          return;
+        }
+        if (flag) {
+          state.hostIconDropVisualPendingKey = itemKey;
+          return;
+        }
+        if (state.hostIconDropVisualPendingKey === itemKey) {
+          state.hostIconDropVisualPendingKey = '';
+        }
+      }
+
       function itemIconPreviewSrc(item) {
         if (!item || !item.key) {
           return '';
@@ -4501,7 +4522,11 @@
       }
 
       function itemIconIsProcessing(item) {
-        return !!(item && item.key && state.iconProcessingByKey[item.key]);
+        var itemKey = String(item && item.key ? item.key : '').trim();
+        if (!itemKey) {
+          return false;
+        }
+        return !!state.iconProcessingByKey[itemKey] || state.hostIconDropVisualPendingKey === itemKey;
       }
 
       function selectedIconIsProcessing() {
@@ -4608,8 +4633,9 @@
         if (!els.selectedIconPreview || !els.selectedIconPlaceholder || !els.selectedIconClear) {
           return;
         }
-        var iconSrc = itemIconPreviewSrc(selected) || iconSrcForItem(selected);
         var processing = itemIconIsProcessing(selected);
+        var previewSrc = itemIconPreviewSrc(selected);
+        var iconSrc = processing ? previewSrc : (previewSrc || iconSrcForItem(selected));
         syncHostIconDropTarget();
         if (els.selectedIconProcessing) {
           els.selectedIconProcessing.classList.toggle('hidden', !processing);
@@ -4632,7 +4658,7 @@
         }
         els.selectedIconPreview.removeAttribute('src');
         els.selectedIconPreview.classList.add('hidden');
-        els.selectedIconPlaceholder.classList.remove('hidden');
+        els.selectedIconPlaceholder.classList.toggle('hidden', processing);
         els.selectedIconClear.classList.add('hidden');
       }
 
@@ -4733,19 +4759,22 @@
         clearNativeHostIconDropFallback();
         if (!selected || !selected.key) {
           setNativeHostIconDropExpected(false);
+          setHostIconDropVisualPending(null, false);
           return;
         }
         if (selected.draft) {
           setNativeHostIconDropExpected(false);
+          setHostIconDropVisualPending(selected, false);
           toast('Create the project first, then set its icon.', 'bad');
           return;
         }
-        if (selectedIconIsProcessing() || state.hostIconDropPendingKey) {
+        if (state.iconProcessingByKey[selected.key] || state.hostIconDropPendingKey) {
           setNativeHostIconDropExpected(false);
           return;
         }
         setNativeHostIconDropExpected(true);
         state.hostIconDropPendingKey = selected.key;
+        setHostIconDropVisualPending(selected, false);
         if (normalizedPath) {
           setItemIconPreviewOverride(selected, pathToIconSrc(normalizedPath));
         } else {
@@ -4768,15 +4797,18 @@
         clearNativeHostIconDropFallback();
         if (!pendingKey) {
           setNativeHostIconDropExpected(false);
+          setHostIconDropVisualPending(null, false);
           return;
         }
         if (!item || !item.key) {
           setNativeHostIconDropExpected(false);
           state.hostIconDropPendingKey = '';
+          setHostIconDropVisualPending(null, false);
           return;
         }
         setNativeHostIconDropExpected(false);
         state.hostIconDropPendingKey = '';
+        setHostIconDropVisualPending(item, false);
         if (!Number.isFinite(exitCode)) {
           exitCode = detail.ok ? 0 : 1;
         }
@@ -7164,12 +7196,16 @@
             if (selectedIconIsProcessing()) {
               return;
             }
+            var selected = selectedCatalogItem();
             var droppedPath = firstPathFromDropData(event.dataTransfer);
             var files = event.dataTransfer && event.dataTransfer.files;
             var file = files && files[0] ? files[0] : null;
             if (state.os === 'darwin' && bridgeAvailable()) {
               setNativeHostIconDropExpected(true);
               if (nativeHostShouldOwnIconDrop()) {
+                setItemIconPreviewOverride(selected, '');
+                setHostIconDropVisualPending(selected, true);
+                renderSelectedIconEditor(selected);
                 scheduleNativeHostIconDropFallback(droppedPath, file);
                 return;
               }

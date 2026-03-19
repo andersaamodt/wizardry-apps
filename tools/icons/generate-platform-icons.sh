@@ -71,6 +71,7 @@ subject_canvas="$tmp_dir/subject-canvas.png"
 shadow_master="$tmp_dir/shadow-master.png"
 shadow_alpha="$tmp_dir/shadow-alpha.png"
 subject_size=820
+full_bleed_subject_size=944
 full_bleed_mode=0
 
 magick "$input_image" \
@@ -143,7 +144,7 @@ if [ "$full_bleed_mode" -eq 1 ]; then
   magick "$trimmed_source" \
     -background none \
     -alpha on \
-    -resize 1024x1024^ \
+    -resize "${full_bleed_subject_size}x${full_bleed_subject_size}" \
     -gravity center \
     -extent 1024x1024 \
     -sharpen 0x0.4 \
