@@ -47,6 +47,7 @@
 @property (assign) BOOL enableForgeAppMenu;
 @property (assign) BOOL prefersWideDragStrip;
 @property (assign) BOOL enableHeaderDragHoles;
+@property (assign) BOOL prefersLeftOnlyHeaderDragArea;
 @property (assign) CGFloat bootSplashLogoSize;
 @property (strong) NSView *prioritiesTopDragStrip;
 @property (strong) NSView *prioritiesLeftHeaderDragStrip;
@@ -446,10 +447,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
 
     if (self.prioritiesTopDragStrip) {
+        CGFloat topStripWidth = self.prefersLeftOnlyHeaderDragArea ? leftStripWidth : frame.size.width;
         [self.prioritiesTopDragStrip setFrame:NSMakeRect(0.0,
                                                          frame.size.height - topStripHeight,
-                                                         frame.size.width,
+                                                         topStripWidth,
                                                          topStripHeight)];
+        [self.prioritiesTopDragStrip setHidden:(topStripWidth <= 0.0)];
     }
     if (self.prioritiesLeftHeaderDragStrip) {
         [self.prioritiesLeftHeaderDragStrip setFrame:NSMakeRect(0.0,
@@ -1547,11 +1550,13 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSString *appSlug = [appComponent lowercaseString];
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
-    BOOL prefersHeaderDragHoles = ([appSlug isEqualToString:@"headquarters"] || [appSlug isEqualToString:@"priorities"] || [appSlug isEqualToString:@"serenity"]);
+    BOOL prefersHeaderDragHoles = ([appSlug isEqualToString:@"headquarters"] || [appSlug isEqualToString:@"priorities"] || [appSlug isEqualToString:@"serenity"] || [appSlug isEqualToString:@"boycott"]);
+    BOOL prefersLeftOnlyHeaderDragArea = [appSlug isEqualToString:@"boycott"];
     BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.enableHeaderDragHoles = prefersHeaderDragHoles;
+    self.prefersLeftOnlyHeaderDragArea = prefersLeftOnlyHeaderDragArea;
     self.enableForgeAppMenu = isForgeApp;
     self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp;
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
@@ -1785,6 +1790,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             self.prioritiesTitleHoleLeftWidth = 240.0;
             self.prioritiesTitleHoleRightWidth = 240.0;
             self.prioritiesRightControlsReservedWidth = 200.0;
+        } else if ([appSlug isEqualToString:@"boycott"]) {
+            CGFloat centerX = floor(frame.size.width / 2.0);
+            self.prioritiesTitleHoleLeftWidth = MAX(0.0, centerX - 40.0);
+            self.prioritiesTitleHoleRightWidth = MAX(0.0, frame.size.width - centerX);
+            self.prioritiesRightControlsReservedWidth = 0.0;
         } else if ([appSlug isEqualToString:@"serenity"]) {
             self.prioritiesTitleHoleLeftWidth = 420.0;
             self.prioritiesTitleHoleRightWidth = 24.0;
