@@ -708,10 +708,12 @@ body.settings-open #settings-panel {
   background: color-mix(in srgb, var(--panel-solid, #fff) 95%, transparent);
   width: 100%;
   min-width: 0;
+  overflow: hidden;
 }
 
 .footer-icon-btn {
   width: 2.12rem;
+  min-width: 2.12rem;
   height: 2.12rem;
   display: inline-flex;
   align-items: center;
@@ -726,6 +728,7 @@ body.settings-open #settings-panel {
   line-height: 1;
   box-shadow: none;
   transform: translateY(-1px);
+  flex: 0 0 2.12rem;
 }
 
 .footer-icon-btn:hover,
@@ -742,16 +745,17 @@ body.settings-open #settings-panel {
 }
 
 .footer-theme-anchor {
-  min-width: 0;
   flex: 0 0 auto;
   display: flex;
   align-self: stretch;
+  min-width: 5.2rem;
 }
 
 .footer-theme-btn {
   height: 100%;
-  min-width: 0;
-  width: auto;
+  min-width: 5.2rem;
+  width: 5.2rem;
+  max-width: 5.2rem;
   border: 0;
   border-right: 1px solid var(--line);
   border-radius: 0;
@@ -761,11 +765,14 @@ body.settings-open #settings-panel {
   font-size: 0.79rem;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 0.34rem;
   box-shadow: none;
   transform: none;
-  flex: 0 0 auto;
+  flex: 0 0 5.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .footer-status {
