@@ -74,6 +74,8 @@ apple_base="$tmp_dir/apple-base.png"
 apple_source="$tmp_dir/apple-source.png"
 apple_mask="$tmp_dir/apple-mask.png"
 apple_alpha="$tmp_dir/apple-alpha.png"
+apple_mask_source="$tmp_dir/apple-mask-source.png"
+apple_mask_alpha="$tmp_dir/apple-mask-alpha.png"
 primary_master="$tmp_dir/primary-master.png"
 trimmed_source="$tmp_dir/trimmed-source.png"
 full_bleed_source="$tmp_dir/full-bleed-source.png"
@@ -84,6 +86,10 @@ shadow_alpha="$tmp_dir/shadow-alpha.png"
 subject_size=820
 full_bleed_subject_size=944
 apple_full_bleed_subject_size=896
+apple_superellipse_exponent=5
+apple_mask_canvas_size=4096
+apple_mask_canvas_center=2048
+apple_mask_canvas_radius=1872
 full_bleed_mode=0
 
 magick "$input_image" \
@@ -208,29 +214,35 @@ else
     "$plain_master"
 fi
 
-if [ "$use_squircle" -eq 1 ] && [ "$full_bleed_mode" -eq 1 ]; then
-  magick "$plain_master" \
-    -background none \
-    -alpha on \
-    -resize "${apple_full_bleed_subject_size}x${apple_full_bleed_subject_size}" \
-    -gravity center \
-    -extent 1024x1024 \
-    "$apple_source"
-else
-  cp "$plain_master" "$apple_source"
-fi
+cp "$plain_master" "$apple_source"
 
 if [ "$use_squircle" -eq 1 ]; then
-  magick -size 1024x1024 xc:none \
-    -fill white -draw "roundrectangle 44,44 980,980 232,232" \
+  magick -size "${apple_mask_canvas_size}x${apple_mask_canvas_size}" xc:white \
+    -alpha set -channel alpha \
+    -fx "pow(abs(((i+0.5)-${apple_mask_canvas_center})/${apple_mask_canvas_radius}),${apple_superellipse_exponent}) + pow(abs(((j+0.5)-${apple_mask_canvas_center})/${apple_mask_canvas_radius}),${apple_superellipse_exponent}) <= 1 ? 1 : 0" \
+    +channel \
+    "$apple_mask_source"
+  magick "$apple_mask_source" \
+    -filter Lanczos \
+    -resize 1024x1024 \
     "$apple_mask"
   magick "$apple_source" -alpha set -alpha extract "$apple_alpha"
-  magick "$apple_alpha" "$apple_mask" \
+  magick "$apple_mask" -alpha extract "$apple_mask_alpha"
+  magick "$apple_alpha" "$apple_mask_alpha" \
     -compose Multiply -composite \
     "$apple_alpha"
   magick "$apple_source" "$apple_alpha" \
     -alpha off -compose CopyOpacity -composite \
     "$apple_base"
+  if [ "$full_bleed_mode" -eq 1 ]; then
+    magick "$apple_base" \
+      -background none \
+      -alpha on \
+      -resize "${apple_full_bleed_subject_size}x${apple_full_bleed_subject_size}" \
+      -gravity center \
+      -extent 1024x1024 \
+      "$apple_base"
+  fi
   cp "$apple_base" "$primary_master"
 else
   cp "$plain_master" "$apple_base"
