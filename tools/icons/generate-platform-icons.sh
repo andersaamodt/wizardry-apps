@@ -68,18 +68,7 @@ trimmed_source="$tmp_dir/trimmed-source.png"
 subject_master="$tmp_dir/subject-master.png"
 shadow_master="$tmp_dir/shadow-master.png"
 shadow_alpha="$tmp_dir/shadow-alpha.png"
-subject_card="$tmp_dir/subject-card.png"
-
-alpha_min=$(magick "$input_image" -alpha extract -format '%[fx:minima]' info: 2>/dev/null || printf '1')
-subject_size=700
-subject_rounding=0
-
-case "$alpha_min" in
-  1|1.0|1.000000)
-    subject_size=620
-    subject_rounding=92
-    ;;
-esac
+subject_size=820
 
 magick "$input_image" \
   -auto-orient \
@@ -98,14 +87,6 @@ magick "$trimmed_source" \
   -resize "${subject_size}x${subject_size}" \
   -gravity center \
   "$subject_master"
-
-if [ "$subject_rounding" -gt 0 ]; then
-  magick "$subject_master" \
-    \( -size "${subject_size}x${subject_size}" xc:none -fill white -draw "roundrectangle 0,0 $((subject_size - 1)),$((subject_size - 1)) ${subject_rounding},${subject_rounding}" \) \
-    -alpha off -compose CopyOpacity -composite \
-    "$subject_card"
-  cp "$subject_card" "$subject_master"
-fi
 
 magick "$subject_master" \
   -alpha extract \

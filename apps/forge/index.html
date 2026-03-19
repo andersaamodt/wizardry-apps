@@ -4477,17 +4477,22 @@
             reject(new Error('Could not read icon file'));
           };
           reader.onload = function () {
+            var originalDataUrl = String(reader.result || '');
+            var maxArgChars = 2000000;
+            if (originalDataUrl && originalDataUrl.length <= maxArgChars) {
+              resolve(originalDataUrl);
+              return;
+            }
             var img = new Image();
             img.onload = function () {
               var canvas = document.createElement('canvas');
               var ctx = canvas.getContext('2d');
               if (!ctx) {
-                resolve(String(reader.result || ''));
+                resolve(originalDataUrl);
                 return;
               }
-              // Keep icon fidelity high while staying below practical argv limits.
-              var maxArgChars = 240000;
-              var sizes = [1024, 896, 768, 640, 512, 384, 256, 192, 128, 96];
+              // Preserve original files when possible; only resample when the data URL is oversized.
+              var sizes = [2048, 1536, 1024, 896, 768, 640];
               var output = '';
               var qualitySteps = [0.95, 0.9, 0.85, 0.8, 0.75];
               var allowJpegFallback = /^image\/jpe?g$/i.test(file.type || '');
@@ -4534,9 +4539,9 @@
               reject(new Error('Icon is too large/complex to process. Try a simpler image or SVG.'));
             };
             img.onerror = function () {
-              resolve(String(reader.result || ''));
+              resolve(originalDataUrl);
             };
-            img.src = String(reader.result || '');
+            img.src = originalDataUrl;
           };
           reader.readAsDataURL(file);
         });
