@@ -4212,18 +4212,19 @@
 
       function triggerSelectedIconDropFallback(filePath, file) {
         var normalizedPath = String(filePath || '').trim();
+        var fallbackFile = file || null;
         clearNativeHostIconDropFallback();
         setNativeHostIconDropExpected(false);
-        if (normalizedPath) {
-          applySelectedIconPath(normalizedPath).catch(function (err) {
+        if (fallbackFile && /^image\//.test(String(fallbackFile.type || ''))) {
+          readImageFileToDataUrl(fallbackFile).then(function (dataUrl) {
+            return applySelectedIconData(dataUrl);
+          }).catch(function (err) {
             toast(String(err && err.message ? err.message : err), 'bad');
           });
           return;
         }
-        if (file) {
-          readImageFileToDataUrl(file).then(function (dataUrl) {
-            return applySelectedIconData(dataUrl);
-          }).catch(function (err) {
+        if (normalizedPath) {
+          applySelectedIconPath(normalizedPath).catch(function (err) {
             toast(String(err && err.message ? err.message : err), 'bad');
           });
           return;
@@ -7176,16 +7177,16 @@
             if (nativeHostShouldOwnIconDrop()) {
               return;
             }
-            if (droppedPath) {
-              applySelectedIconPath(droppedPath).catch(function (err) {
-                toast(String(err && err.message ? err.message : err), 'bad');
-              });
-              return;
-            }
             if (file) {
               readImageFileToDataUrl(file).then(function (dataUrl) {
                 return applySelectedIconData(dataUrl);
               }).catch(function (err) {
+                toast(String(err && err.message ? err.message : err), 'bad');
+              });
+              return;
+            }
+            if (droppedPath) {
+              applySelectedIconPath(droppedPath).catch(function (err) {
                 toast(String(err && err.message ? err.message : err), 'bad');
               });
               return;

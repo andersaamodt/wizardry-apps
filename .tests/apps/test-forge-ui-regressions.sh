@@ -48,5 +48,9 @@ grep -F 'dispatchForgeHostCallbackNamed:@"forgeHostFileDrag"' "$host_macos" >/de
 grep -F "forgeHostIconDropResult" "$host_macos" >/dev/null
 grep -F "__wizardry_host_forge_icon_drop_target" "$host_macos" >/dev/null
 grep -F "runForgeIconDropForPath" "$host_macos" >/dev/null
+grep -F 'NSPasteboardTypeFileURL' "$host_macos" >/dev/null
+grep -F '"public.file-url"' "$host_macos" >/dev/null
+grep -F '"text/uri-list"' "$host_macos" >/dev/null
+grep -F 'NSFilenamesPboardType' "$host_macos" >/dev/null
 
 printf '%s\n' "forge ui regression tests passed"

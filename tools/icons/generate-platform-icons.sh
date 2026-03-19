@@ -66,6 +66,7 @@ apple_base="$tmp_dir/apple-base.png"
 primary_master="$tmp_dir/primary-master.png"
 trimmed_source="$tmp_dir/trimmed-source.png"
 subject_master="$tmp_dir/subject-master.png"
+subject_canvas="$tmp_dir/subject-canvas.png"
 shadow_master="$tmp_dir/shadow-master.png"
 shadow_alpha="$tmp_dir/shadow-alpha.png"
 subject_size=820
@@ -89,6 +90,12 @@ magick "$trimmed_source" \
   "$subject_master"
 
 magick "$subject_master" \
+  -background none \
+  -gravity center \
+  -extent 1024x1024 \
+  "$subject_canvas"
+
+magick "$subject_master" \
   -alpha extract \
   -blur 0x10 \
   -level 0,45% \
@@ -103,9 +110,9 @@ magick "$shadow_master" \
   -fill "rgba(0,0,0,0.22)" -colorize 100 \
   "$shadow_master"
 
-magick "$shadow_master" \
-  \( "$subject_master" -background none -gravity center -extent 1024x1024 \) \
-  -gravity center -compose Over -composite \
+magick "$subject_canvas" \
+  "$shadow_master" \
+  -compose DstOver -composite \
   -sharpen 0x0.6 \
   -contrast-stretch 2%x2% \
   -gravity center \

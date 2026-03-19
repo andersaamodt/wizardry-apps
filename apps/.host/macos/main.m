@@ -81,6 +81,12 @@
 - (NSString *)normalizedCommandPath;
 - (NSString *)resolvedWizardryAppsRoot;
 - (NSString *)resolvedSharedThemeFileForTheme:(NSString *)themeName;
+- (void)addResolvedDraggedPathCandidate:(NSString *)candidate
+                                toPaths:(NSMutableArray<NSString *> *)paths
+                                   seen:(NSMutableSet<NSString *> *)seen;
+- (void)addResolvedDraggedPathsFromRawString:(NSString *)rawValue
+                                     toPaths:(NSMutableArray<NSString *> *)paths
+                                        seen:(NSMutableSet<NSString *> *)seen;
 - (NSArray<NSString *> *)filePathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo;
 - (BOOL)draggingInfoContainsImagePayload:(id<NSDraggingInfo>)draggingInfo;
 - (NSString *)stagedImagePathFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo;
@@ -524,6 +530,57 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return environment;
 }
 
+- (void)addResolvedDraggedPathCandidate:(NSString *)candidate
+                                toPaths:(NSMutableArray<NSString *> *)paths
+                                   seen:(NSMutableSet<NSString *> *)seen
+{
+    NSString *trimmed = [[NSString stringWithString:(candidate ?: @"")] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!trimmed.length) {
+        return;
+    }
+
+    NSString *resolvedPath = @"";
+    if ([trimmed hasPrefix:@"file://"]) {
+        NSURL *fileURL = [NSURL URLWithString:trimmed];
+        if (fileURL && [fileURL isFileURL]) {
+            resolvedPath = [fileURL path] ?: @"";
+        }
+    } else if ([trimmed hasPrefix:@"/"] || [trimmed hasPrefix:@"~"]) {
+        resolvedPath = [trimmed stringByExpandingTildeInPath];
+    }
+
+    resolvedPath = [[resolvedPath stringByStandardizingPath] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!resolvedPath.length || [seen containsObject:resolvedPath]) {
+        return;
+    }
+
+    if (![[NSFileManager defaultManager] fileExistsAtPath:resolvedPath]) {
+        return;
+    }
+
+    [seen addObject:resolvedPath];
+    [paths addObject:resolvedPath];
+}
+
+- (void)addResolvedDraggedPathsFromRawString:(NSString *)rawValue
+                                     toPaths:(NSMutableArray<NSString *> *)paths
+                                        seen:(NSMutableSet<NSString *> *)seen
+{
+    NSString *raw = [NSString stringWithString:(rawValue ?: @"")];
+    if (!raw.length) {
+        return;
+    }
+
+    NSArray<NSString *> *lines = [raw componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    for (NSString *line in lines) {
+        NSString *candidate = [[line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] stringByReplacingOccurrencesOfString:@"\0" withString:@""];
+        if (!candidate.length || [candidate hasPrefix:@"#"]) {
+            continue;
+        }
+        [self addResolvedDraggedPathCandidate:candidate toPaths:paths seen:seen];
+    }
+}
+
 - (NSArray<NSString *> *)filePathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo {
     if (!draggingInfo) {
         return @[];
@@ -532,25 +589,66 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     if (!pasteboard) {
         return @[];
     }
-    NSDictionary *options = @{ NSPasteboardURLReadingFileURLsOnlyKey: @YES };
-    NSArray<NSURL *> *urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:options];
-    if (!urls.count) {
-        return @[];
-    }
-
     NSMutableArray<NSString *> *paths = [NSMutableArray array];
     NSMutableSet<NSString *> *seen = [NSMutableSet set];
+
+    NSDictionary *options = @{ NSPasteboardURLReadingFileURLsOnlyKey: @YES };
+    NSArray<NSURL *> *urls = [pasteboard readObjectsForClasses:@[[NSURL class]] options:options];
     for (NSURL *url in urls) {
         if (![url isFileURL]) {
             continue;
         }
-        NSString *path = [[url path] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if (!path.length || [seen containsObject:path]) {
-            continue;
-        }
-        [seen addObject:path];
-        [paths addObject:path];
+        [self addResolvedDraggedPathCandidate:[url path] toPaths:paths seen:seen];
     }
+
+    NSArray<NSString *> *pasteboardTypes = @[
+        NSPasteboardTypeFileURL,
+        @"public.file-url",
+        @"text/uri-list",
+        NSPasteboardTypeString,
+        @"public.utf8-plain-text"
+    ];
+    for (NSString *type in pasteboardTypes) {
+        NSString *raw = [pasteboard stringForType:type];
+        if (raw.length) {
+            [self addResolvedDraggedPathsFromRawString:raw toPaths:paths seen:seen];
+        }
+    }
+
+    id fileNamesProperty = [pasteboard propertyListForType:NSFilenamesPboardType];
+    if ([fileNamesProperty isKindOfClass:[NSArray class]]) {
+        for (id entry in (NSArray *)fileNamesProperty) {
+            if ([entry isKindOfClass:[NSString class]]) {
+                [self addResolvedDraggedPathCandidate:(NSString *)entry toPaths:paths seen:seen];
+            }
+        }
+    }
+
+    for (NSPasteboardItem *item in [pasteboard pasteboardItems]) {
+        for (NSString *type in pasteboardTypes) {
+            NSString *raw = [item stringForType:type];
+            if (raw.length) {
+                [self addResolvedDraggedPathsFromRawString:raw toPaths:paths seen:seen];
+                continue;
+            }
+            NSData *data = [item dataForType:type];
+            if (data.length) {
+                NSString *decoded = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+                if (decoded.length) {
+                    [self addResolvedDraggedPathsFromRawString:decoded toPaths:paths seen:seen];
+                }
+            }
+        }
+        id legacyFileNames = [item propertyListForType:NSFilenamesPboardType];
+        if ([legacyFileNames isKindOfClass:[NSArray class]]) {
+            for (id entry in (NSArray *)legacyFileNames) {
+                if ([entry isKindOfClass:[NSString class]]) {
+                    [self addResolvedDraggedPathCandidate:(NSString *)entry toPaths:paths seen:seen];
+                }
+            }
+        }
+    }
+
     return paths;
 }
 
