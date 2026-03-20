@@ -1668,24 +1668,17 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSBundle *mainBundle = [NSBundle mainBundle];
     NSString *mainBundlePath = [mainBundle bundlePath];
     BOOL bundleLooksPackagedApp = [[[mainBundlePath pathExtension] lowercaseString] isEqualToString:@"app"];
-    if (bundleLooksPackagedApp && mainBundlePath.length > 0) {
-        NSImage *iconServicesBundleIcon = [[NSWorkspace sharedWorkspace] iconForFile:mainBundlePath];
-        if (iconServicesBundleIcon) {
-            resolvedBundleIcon = [iconServicesBundleIcon copy];
+    BOOL launchedFromPackagedBundle = bundleLooksPackagedApp && [fileManager fileExistsAtPath:[mainBundlePath stringByAppendingPathComponent:@"Contents/Info.plist"]];
+    NSString *bundleIconFile = [[[mainBundle infoDictionary] objectForKey:@"CFBundleIconFile"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (bundleIconFile.length > 0) {
+        NSString *iconBase = [bundleIconFile stringByDeletingPathExtension];
+        NSString *iconExt = [bundleIconFile pathExtension];
+        if (iconExt.length == 0) {
+            iconExt = @"icns";
         }
-    }
-    if (!resolvedBundleIcon) {
-        NSString *bundleIconFile = [[[mainBundle infoDictionary] objectForKey:@"CFBundleIconFile"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if (bundleIconFile.length > 0) {
-            NSString *iconBase = [bundleIconFile stringByDeletingPathExtension];
-            NSString *iconExt = [bundleIconFile pathExtension];
-            if (iconExt.length == 0) {
-                iconExt = @"icns";
-            }
-            NSString *bundleIconPath = [mainBundle pathForResource:iconBase ofType:iconExt];
-            if (bundleIconPath.length > 0 && [fileManager fileExistsAtPath:bundleIconPath]) {
-                resolvedBundleIcon = [[NSImage alloc] initWithContentsOfFile:bundleIconPath];
-            }
+        NSString *bundleIconPath = [mainBundle pathForResource:iconBase ofType:iconExt];
+        if (bundleIconPath.length > 0 && [fileManager fileExistsAtPath:bundleIconPath]) {
+            resolvedBundleIcon = [[NSImage alloc] initWithContentsOfFile:bundleIconPath];
         }
     }
     if (!resolvedBundleIcon) {
@@ -1706,11 +1699,13 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
     }
 
-    if (resolvedBundleIcon) {
-        // Keep the packaged app icon for Dock/Finder identity when available.
-        [NSApp setApplicationIconImage:resolvedBundleIcon];
-    } else if (resolvedFileIcon) {
-        [NSApp setApplicationIconImage:resolvedFileIcon];
+    if (!launchedFromPackagedBundle) {
+        // Non-bundled host launches need an explicit icon assignment.
+        if (resolvedFileIcon) {
+            [NSApp setApplicationIconImage:resolvedFileIcon];
+        } else if (resolvedBundleIcon) {
+            [NSApp setApplicationIconImage:resolvedBundleIcon];
+        }
     }
 
     // Prefer a direct packaged/workspace icon file for the splash logo because
