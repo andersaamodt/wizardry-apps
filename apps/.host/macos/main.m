@@ -1666,16 +1666,26 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSImage *resolvedBundleIcon = nil;
     NSBundle *mainBundle = [NSBundle mainBundle];
-    NSString *bundleIconFile = [[[mainBundle infoDictionary] objectForKey:@"CFBundleIconFile"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (bundleIconFile.length > 0) {
-        NSString *iconBase = [bundleIconFile stringByDeletingPathExtension];
-        NSString *iconExt = [bundleIconFile pathExtension];
-        if (iconExt.length == 0) {
-            iconExt = @"icns";
+    NSString *mainBundlePath = [mainBundle bundlePath];
+    BOOL bundleLooksPackagedApp = [[[mainBundlePath pathExtension] lowercaseString] isEqualToString:@"app"];
+    if (bundleLooksPackagedApp && mainBundlePath.length > 0) {
+        NSImage *iconServicesBundleIcon = [[NSWorkspace sharedWorkspace] iconForFile:mainBundlePath];
+        if (iconServicesBundleIcon) {
+            resolvedBundleIcon = [iconServicesBundleIcon copy];
         }
-        NSString *bundleIconPath = [mainBundle pathForResource:iconBase ofType:iconExt];
-        if (bundleIconPath.length > 0 && [fileManager fileExistsAtPath:bundleIconPath]) {
-            resolvedBundleIcon = [[NSImage alloc] initWithContentsOfFile:bundleIconPath];
+    }
+    if (!resolvedBundleIcon) {
+        NSString *bundleIconFile = [[[mainBundle infoDictionary] objectForKey:@"CFBundleIconFile"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (bundleIconFile.length > 0) {
+            NSString *iconBase = [bundleIconFile stringByDeletingPathExtension];
+            NSString *iconExt = [bundleIconFile pathExtension];
+            if (iconExt.length == 0) {
+                iconExt = @"icns";
+            }
+            NSString *bundleIconPath = [mainBundle pathForResource:iconBase ofType:iconExt];
+            if (bundleIconPath.length > 0 && [fileManager fileExistsAtPath:bundleIconPath]) {
+                resolvedBundleIcon = [[NSImage alloc] initWithContentsOfFile:bundleIconPath];
+            }
         }
     }
     if (!resolvedBundleIcon) {

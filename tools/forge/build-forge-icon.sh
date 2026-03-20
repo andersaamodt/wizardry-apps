@@ -67,8 +67,8 @@ if [ -f "$png_icon" ] && command -v sips >/dev/null 2>&1 && command -v iconutil 
   mv "$iconset_tmp" "$iconset"
   trap 'rm -rf "$iconset"' EXIT INT TERM
   for size in 16 32 128 256 512; do
-    sips -z "$size" "$size" "$png_icon" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-    sips -z $((size * 2)) $((size * 2)) "$png_icon" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+    sips -s format png -z "$size" "$size" "$png_icon" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+    sips -s format png -z $((size * 2)) $((size * 2)) "$png_icon" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
   done
   mkdir -p "$(dirname "$out_file")"
   iconutil -c icns "$iconset" -o "$out_file"

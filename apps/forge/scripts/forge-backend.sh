@@ -3387,8 +3387,8 @@ APP
           iconset="${iconset_tmp}.iconset"
           mv "$iconset_tmp" "$iconset"
           for size in 16 32 128 256 512; do
-            sips -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-            sips -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+            sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+            sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
           done
           icon_name="forge-${icon_hash}.icns"
           if iconutil -c icns "$iconset" -o "$bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
@@ -3983,8 +3983,8 @@ APP
       iconset="${iconset_tmp}.iconset"
       mv "$iconset_tmp" "$iconset"
       for size in 16 32 128 256 512; do
-        sips -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-        sips -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+        sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+        sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
       done
       icon_name="forge-${icon_hash}.icns"
       if iconutil -c icns "$iconset" -o "$staged_bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
