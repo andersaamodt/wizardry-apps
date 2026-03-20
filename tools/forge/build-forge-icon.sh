@@ -9,10 +9,11 @@ Usage: build-forge-icon.sh [--root ROOT_DIR] [--out ICON_FILE]
 
 Ensures a valid .icns icon exists by selecting the first available source.
 Priority:
-  1) ROOT_DIR/apps/forge/assets/forge-icon.png (converted to .icns)
-  2) macOS CoreTypes ToolbarCustomizeIcon.icns
-  3) macOS CoreTypes ApplicationsFolderIcon.icns
-  4) macOS CoreTypes GenericApplicationIcon.icns
+  1) ROOT_DIR/apps/forge/assets/icons/macos/forge.icns
+  2) ROOT_DIR/apps/forge/assets/forge-icon.png (converted to .icns)
+  3) macOS CoreTypes ToolbarCustomizeIcon.icns
+  4) macOS CoreTypes ApplicationsFolderIcon.icns
+  5) macOS CoreTypes GenericApplicationIcon.icns
 USAGE
   exit 0
   ;;
@@ -58,6 +59,15 @@ done
 
 if [ -z "$out_file" ]; then
   out_file="$root/_tmp/forge-build-cache/forge.icns"
+fi
+
+generated_icns="$root/apps/forge/assets/icons/macos/forge.icns"
+if [ -f "$generated_icns" ]; then
+  mkdir -p "$(dirname "$out_file")"
+  cp "$generated_icns" "$out_file"
+  printf '%s\n' "built_icon=$out_file"
+  printf '%s\n' "source_icon=$generated_icns"
+  exit 0
 fi
 
 png_icon="$root/apps/forge/assets/forge-icon.png"
