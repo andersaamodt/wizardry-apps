@@ -1655,21 +1655,43 @@
       }
 
       async function openPath(path, reveal) {
-        if (!path) {
+        var normalizedPath = String(path || '').trim();
+        if (!normalizedPath) {
           return;
         }
 
         if (state.os === 'darwin') {
-          if (reveal) {
-            await execArgv(['/usr/bin/open', '-R', path]);
-          } else {
-            await execArgv(['/usr/bin/open', path]);
+          try {
+            if (reveal) {
+              await execArgv(['/usr/bin/open', '-R', normalizedPath]);
+            } else {
+              await execArgv(['/usr/bin/open', normalizedPath]);
+            }
+          } catch (err) {
+            var message = String(err && err.message ? err.message : err).toLowerCase();
+            var isMissingPath = message.indexOf('object can not be found here') >= 0
+              || message.indexOf('object cannot be found here') >= 0
+              || message.indexOf('no such file') >= 0
+              || message.indexOf('does not exist') >= 0;
+            if (!isMissingPath) {
+              throw err;
+            }
+            var fallbackPath = normalizedPath.replace(/\/+$/, '');
+            var slashIndex = fallbackPath.lastIndexOf('/');
+            if (slashIndex <= 0) {
+              throw err;
+            }
+            fallbackPath = fallbackPath.slice(0, slashIndex);
+            if (!fallbackPath) {
+              throw err;
+            }
+            await execArgv(['/usr/bin/open', fallbackPath]);
           }
           return;
         }
 
         if (state.os === 'linux') {
-          var targetPath = path;
+          var targetPath = normalizedPath;
           if (reveal) {
             targetPath = path.replace(/\/+$/, '');
             if (targetPath && targetPath.lastIndexOf('/') > 0) {
