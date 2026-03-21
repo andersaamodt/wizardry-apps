@@ -76,6 +76,7 @@
 @property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
 @property (assign) BOOL keepRunningInBackground;
 @property (assign) BOOL showStatusItem;
+@property (assign) BOOL explicitQuitRequested;
 @property (strong) NSStatusItem *statusItem;
 @property (assign) NSInteger statusItemRepairAttempts;
 @property (strong) NSDictionary<NSString *, NSString *> *stonrStatusSnapshot;
@@ -1568,6 +1569,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (void)quitFromStatusItem:(id)sender {
     (void)sender;
+    self.explicitQuitRequested = YES;
     [NSApp terminate:nil];
 }
 
@@ -2920,6 +2922,21 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return !(self.keepRunningInBackground || self.showStatusItem);
 }
 
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
+    (void)sender;
+    if (self.explicitQuitRequested) {
+        return NSTerminateNow;
+    }
+    if (self.keepRunningInBackground || self.showStatusItem) {
+        if (self.window && [self.window isVisible]) {
+            [self.window orderOut:nil];
+        }
+        [self updateStatusItemVisibility];
+        return NSTerminateCancel;
+    }
+    return NSTerminateNow;
+}
+
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
     (void)sender;
     if (!flag) {
@@ -2951,6 +2968,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
     (void)notification;
+    self.explicitQuitRequested = NO;
     [self clearFavoriteTrackHotkeyRegistration];
     if (self.favoriteTrackHotKeyHandlerRef) {
         RemoveEventHandler(self.favoriteTrackHotKeyHandlerRef);
