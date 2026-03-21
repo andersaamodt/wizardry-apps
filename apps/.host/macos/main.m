@@ -1573,30 +1573,34 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (NSImage *)renderedStatusItemImage {
     CGFloat side = MAX(14.0, [NSStatusBar systemStatusBar].thickness - 4.0);
-    if (@available(macOS 11.0, *)) {
-        NSImage *symbol = [NSImage imageWithSystemSymbolName:@"dot.radiowaves.left.and.right"
-                                       accessibilityDescription:@"Show Stonr"];
-        if (symbol) {
-            [symbol setTemplate:YES];
-            return symbol;
-        }
-    }
     NSImage *rendered = [[NSImage alloc] initWithSize:NSMakeSize(side, side)];
     [rendered lockFocus];
-    [[NSColor blackColor] set];
-    CGFloat fontSize = MAX(11.0, side - 2.0);
-    NSFont *font = [NSFont systemFontOfSize:fontSize weight:NSFontWeightSemibold];
-    NSDictionary *attrs = @{
-        NSFontAttributeName: font,
-        NSForegroundColorAttributeName: [NSColor blackColor]
-    };
-    NSString *glyph = @"S";
-    NSSize glyphSize = [glyph sizeWithAttributes:attrs];
-    NSRect drawRect = NSMakeRect(floor((side - glyphSize.width) / 2.0),
-                                 floor((side - glyphSize.height) / 2.0) - 0.5,
-                                 glyphSize.width,
-                                 glyphSize.height);
-    [glyph drawInRect:drawRect withAttributes:attrs];
+    if ([self isStonrApp]) {
+        [[NSColor blackColor] setFill];
+        CGFloat stoneWidth = floor(side * 0.82);
+        CGFloat stoneHeight = floor(side * 0.68);
+        NSRect stoneRect = NSMakeRect(floor((side - stoneWidth) / 2.0),
+                                      floor((side - stoneHeight) / 2.0),
+                                      stoneWidth,
+                                      stoneHeight);
+        NSBezierPath *stone = [NSBezierPath bezierPathWithOvalInRect:stoneRect];
+        [stone fill];
+    } else {
+        [[NSColor blackColor] set];
+        CGFloat fontSize = MAX(11.0, side - 2.0);
+        NSFont *font = [NSFont systemFontOfSize:fontSize weight:NSFontWeightSemibold];
+        NSDictionary *attrs = @{
+            NSFontAttributeName: font,
+            NSForegroundColorAttributeName: [NSColor blackColor]
+        };
+        NSString *glyph = @"S";
+        NSSize glyphSize = [glyph sizeWithAttributes:attrs];
+        NSRect drawRect = NSMakeRect(floor((side - glyphSize.width) / 2.0),
+                                     floor((side - glyphSize.height) / 2.0) - 0.5,
+                                     glyphSize.width,
+                                     glyphSize.height);
+        [glyph drawInRect:drawRect withAttributes:attrs];
+    }
     [rendered unlockFocus];
     [rendered setTemplate:YES];
     return rendered;
@@ -1637,14 +1641,20 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     NSStatusBarButton *button = self.statusItem.button;
     if (button) {
-        button.image = nil;
-        button.title = @"St";
-        button.imagePosition = NSNoImage;
+        if ([self isStonrApp]) {
+            button.title = @"";
+            button.image = [self renderedStatusItemImage];
+            button.imagePosition = NSImageOnly;
+        } else {
+            button.image = nil;
+            button.title = @"St";
+            button.imagePosition = NSNoImage;
+        }
         button.toolTip = self.window ? self.window.title : @"Wizardry";
     } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        self.statusItem.title = @"St";
+        self.statusItem.title = [self isStonrApp] ? @"" : @"St";
 #pragma clang diagnostic pop
     }
     NSDictionary<NSString *, NSString *> *relayStatus = @{};
