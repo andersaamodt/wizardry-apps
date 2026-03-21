@@ -1788,7 +1788,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem {
-    self.keepRunningInBackground = enabled;
+    self.keepRunningInBackground = enabled || showStatusItem;
     self.showStatusItem = showStatusItem;
     [self updateStatusItemVisibility];
 }
@@ -2917,7 +2917,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     (void)sender;
-    return !self.keepRunningInBackground;
+    return !(self.keepRunningInBackground || self.showStatusItem);
 }
 
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
@@ -2929,7 +2929,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (BOOL)windowShouldClose:(NSWindow *)sender {
-    if (self.keepRunningInBackground && sender == self.window) {
+    if ((self.keepRunningInBackground || self.showStatusItem) && sender == self.window) {
         [sender orderOut:nil];
         [self updateStatusItemVisibility];
         return NO;
