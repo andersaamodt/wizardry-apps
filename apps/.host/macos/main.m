@@ -1580,7 +1580,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         CGFloat stoneWidth = floor(side * 0.70);
         CGFloat stoneHeight = floor(side * 0.44);
         NSRect stoneRect = NSMakeRect(floor((side - stoneWidth) / 2.0),
-                                      floor((side - stoneHeight) / 2.0) + 1.0,
+                                      floor((side - stoneHeight) / 2.0) + 0.5,
                                       stoneWidth,
                                       stoneHeight);
         NSBezierPath *stone = [NSBezierPath bezierPathWithOvalInRect:stoneRect];
