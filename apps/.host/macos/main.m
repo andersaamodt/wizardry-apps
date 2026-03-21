@@ -76,6 +76,7 @@
 @property (assign) BOOL keepRunningInBackground;
 @property (assign) BOOL showStatusItem;
 @property (strong) NSStatusItem *statusItem;
+@property (assign) NSInteger statusItemRepairAttempts;
 - (void)emitGlobalFavoriteTrackHotkey;
 - (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment;
 - (NSString *)normalizedCommandPath;
@@ -103,6 +104,7 @@
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem;
 - (void)updateStatusItemVisibility;
 - (NSImage *)renderedStatusItemImage;
+- (BOOL)isStatusItemRendered;
 - (void)showMainWindow;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
 - (void)quitFromStatusItem:(id)sender;
@@ -1373,9 +1375,27 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return rendered;
 }
 
+- (BOOL)isStatusItemRendered {
+    if (!self.statusItem) {
+        return NO;
+    }
+    NSStatusBarButton *button = self.statusItem.button;
+    if (button && button.window) {
+        return YES;
+    }
+    if ([self.statusItem respondsToSelector:@selector(isVisible)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        return [self.statusItem isVisible];
+#pragma clang diagnostic pop
+    }
+    return button != nil;
+}
+
 - (void)updateStatusItemVisibility {
     BOOL wantsStatusItem = self.showStatusItem;
     if (!wantsStatusItem) {
+        self.statusItemRepairAttempts = 0;
         if (self.statusItem) {
             [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];
             self.statusItem = nil;
@@ -1413,6 +1433,27 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [quitItem setTarget:self];
     [menu addItem:quitItem];
     self.statusItem.menu = menu;
+
+    if ([self isStatusItemRendered]) {
+        self.statusItemRepairAttempts = 0;
+        return;
+    }
+
+    if (self.statusItemRepairAttempts >= 3) {
+        return;
+    }
+    self.statusItemRepairAttempts += 1;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.18 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (!self.showStatusItem) {
+            self.statusItemRepairAttempts = 0;
+            return;
+        }
+        if (self.statusItem) {
+            [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];
+            self.statusItem = nil;
+        }
+        [self updateStatusItemVisibility];
+    });
 }
 
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem {
@@ -2302,10 +2343,15 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
         if ([program isEqualToString:@"__wizardry_host_status_item_state"]) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                NSString *stdout = [NSString stringWithFormat:@"background=%d\nshow_status_item=%d\nhas_status_item=%d\n",
+                NSStatusBarButton *button = self.statusItem.button;
+                BOOL buttonAttached = (button && button.window) ? YES : NO;
+                NSString *stdout = [NSString stringWithFormat:@"background=%d\nshow_status_item=%d\nhas_status_item=%d\nstatus_item_rendered=%d\nbutton_attached=%d\nrepair_attempts=%ld\n",
                                     self.keepRunningInBackground ? 1 : 0,
                                     self.showStatusItem ? 1 : 0,
-                                    self.statusItem ? 1 : 0];
+                                    self.statusItem ? 1 : 0,
+                                    [self isStatusItemRendered] ? 1 : 0,
+                                    buttonAttached ? 1 : 0,
+                                    (long)self.statusItemRepairAttempts];
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:stdout stderr:@"" exitCode:0 error:nil];
             });
             return;
