@@ -10,10 +10,12 @@ linux_host="$root/apps/.host/linux/main.c"
 [ -f "$linux_host" ]
 
 grep -F '__wizardry_host_set_background_mode' "$mac_host" >/dev/null
+grep -F '__wizardry_host_status_item_state' "$mac_host" >/dev/null
 grep -F 'applyBackgroundModeEnabled:' "$mac_host" >/dev/null
 grep -F 'showStatusItem:' "$mac_host" >/dev/null
 grep -F 'NSStatusItem *statusItem' "$mac_host" >/dev/null
 grep -F 'renderedStatusItemImage' "$mac_host" >/dev/null
+grep -F 'NSVariableStatusItemLength' "$mac_host" >/dev/null
 grep -F 'setTemplate:YES' "$mac_host" >/dev/null
 grep -F 'windowShouldClose:' "$mac_host" >/dev/null
 grep -F 'applicationShouldHandleReopen:' "$mac_host" >/dev/null

@@ -108,6 +108,33 @@
 - (void)quitFromStatusItem:(id)sender;
 @end
 
+static BOOL wizardryPrefBoolFromEnvFile(NSString *filePath, NSString *key, BOOL *found) {
+    if (found) {
+        *found = NO;
+    }
+    if (!filePath.length || !key.length) {
+        return NO;
+    }
+    NSString *content = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:nil];
+    if (!content.length) {
+        return NO;
+    }
+    NSString *prefix = [key stringByAppendingString:@"="];
+    NSArray<NSString *> *lines = [content componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    for (NSString *line in lines) {
+        if (![line hasPrefix:prefix]) {
+            continue;
+        }
+        NSString *rawValue = [[line substringFromIndex:[prefix length]] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *normalized = [rawValue lowercaseString];
+        if (found) {
+            *found = YES;
+        }
+        return [@[@"1", @"true", @"yes", @"on"] containsObject:normalized];
+    }
+    return NO;
+}
+
 static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, EventRef event, void *userData) {
     (void)nextHandler;
     if (!userData) return noErr;
@@ -1317,6 +1344,14 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (NSImage *)renderedStatusItemImage {
     CGFloat side = MAX(14.0, [NSStatusBar systemStatusBar].thickness - 4.0);
+    if (@available(macOS 11.0, *)) {
+        NSImage *symbol = [NSImage imageWithSystemSymbolName:@"dot.radiowaves.left.and.right"
+                                       accessibilityDescription:@"Show Stonr"];
+        if (symbol) {
+            [symbol setTemplate:YES];
+            return symbol;
+        }
+    }
     NSImage *rendered = [[NSImage alloc] initWithSize:NSMakeSize(side, side)];
     [rendered lockFocus];
     [[NSColor blackColor] set];
@@ -1348,21 +1383,22 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return;
     }
     if (!self.statusItem) {
-        self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
+        self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+        if ([self.statusItem respondsToSelector:@selector(setVisible:)]) {
+            [self.statusItem setVisible:YES];
+        }
     }
     NSStatusBarButton *button = self.statusItem.button;
     if (button) {
-        NSImage *icon = [self renderedStatusItemImage];
-        if (icon) {
-            button.image = icon;
-            button.title = @"";
-            button.imagePosition = NSImageOnly;
-        } else {
-            button.image = nil;
-            button.title = @"S";
-            button.imagePosition = NSNoImage;
-        }
+        button.image = nil;
+        button.title = @"St";
+        button.imagePosition = NSNoImage;
         button.toolTip = self.window ? self.window.title : @"Wizardry";
+    } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        self.statusItem.title = @"St";
+#pragma clang diagnostic pop
     }
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Relay"];
     NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:([self.window isVisible] ? @"Hide Window" : @"Show Window")
@@ -1382,7 +1418,15 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem {
     self.keepRunningInBackground = enabled;
     self.showStatusItem = showStatusItem;
+    if (showStatusItem) {
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    } else {
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    }
     [self updateStatusItemVisibility];
+    if (!showStatusItem) {
+        [NSApp activateIgnoringOtherApps:YES];
+    }
 }
 
 - (void)setupMainMenuWithAppName:(NSString *)appName {
@@ -1641,6 +1685,21 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSString *appName = [appComponent stringByReplacingOccurrencesOfString:@"-" withString:@" "];
     appName = [appName capitalizedString];
     NSString *appSlug = [appComponent lowercaseString];
+    if ([appSlug isEqualToString:@"stonr"]) {
+        NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
+        NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
+        NSString *prefsPath = [[configRoot stringByAppendingPathComponent:@"stonr-control"] stringByAppendingPathComponent:@"ui-prefs.env"];
+        BOOL foundBackground = NO;
+        BOOL foundStatusItem = NO;
+        BOOL keepRunning = wizardryPrefBoolFromEnvFile(prefsPath, @"background_mode", &foundBackground);
+        BOOL showStatusItem = wizardryPrefBoolFromEnvFile(prefsPath, @"menu_bar_icon", &foundStatusItem);
+        if (foundBackground) {
+            self.keepRunningInBackground = keepRunning;
+        }
+        if (foundStatusItem) {
+            self.showStatusItem = showStatusItem;
+        }
+    }
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
     BOOL prefersHeaderDragHoles = ([appSlug isEqualToString:@"headquarters"] || [appSlug isEqualToString:@"priorities"] || [appSlug isEqualToString:@"serenity"] || [appSlug isEqualToString:@"boycott"]);
@@ -1969,6 +2028,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     if (self.webView) {
         [self.window makeFirstResponder:self.webView];
     }
+    if (self.showStatusItem) {
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    }
+    [self updateStatusItemVisibility];
 
     [self.window makeKeyAndOrderFront:nil];
     [self.window orderFrontRegardless];
@@ -2233,6 +2296,17 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self applyBackgroundModeEnabled:enabled showStatusItem:wantsStatusItem];
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_status_item_state"]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *stdout = [NSString stringWithFormat:@"background=%d\nshow_status_item=%d\nhas_status_item=%d\n",
+                                    self.keepRunningInBackground ? 1 : 0,
+                                    self.showStatusItem ? 1 : 0,
+                                    self.statusItem ? 1 : 0];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:stdout stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
