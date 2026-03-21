@@ -1069,6 +1069,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return rootFromFile;
     }
 
+    NSString *bundleRootFile = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"wizardry-apps-root.txt"];
+    NSString *rootFromBundle = [[NSString stringWithContentsOfFile:bundleRootFile encoding:NSUTF8StringEncoding error:nil] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (rootFromBundle.length && [[NSFileManager defaultManager] fileExistsAtPath:rootFromBundle]) {
+        return rootFromBundle;
+    }
+
     return @"";
 }
 
@@ -1687,13 +1693,33 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     // Get app directory from command line argument
     NSArray *args = [[NSProcessInfo processInfo] arguments];
-    if (args.count < 2) {
-        NSLog(@"Usage: %@ <app-directory>", args[0]);
+    NSString *resolvedAppPath = @"";
+    if (args.count >= 2) {
+        resolvedAppPath = [NSString stringWithFormat:@"%@", args[1]];
+    } else {
+        NSString *envAppPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_APP_ENTRY"];
+        if (envAppPath.length) {
+            resolvedAppPath = envAppPath;
+        } else {
+            NSString *plistAppPath = [[[NSBundle mainBundle] objectForInfoDictionaryKey:@"WizardryAppEntry"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (plistAppPath.length) {
+                if ([plistAppPath hasPrefix:@"/"]) {
+                    resolvedAppPath = plistAppPath;
+                } else {
+                    NSString *contentsPath = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"Contents"];
+                    resolvedAppPath = [contentsPath stringByAppendingPathComponent:plistAppPath];
+                }
+            }
+        }
+    }
+    resolvedAppPath = [[resolvedAppPath stringByExpandingTildeInPath] stringByStandardizingPath];
+    if (!resolvedAppPath.length) {
+        NSLog(@"Usage: %@ <app-directory> (or set WIZARDRY_APP_ENTRY / WizardryAppEntry)", args[0]);
         [NSApp terminate:nil];
         return;
     }
-    
-    self.appPath = args[1];
+
+    self.appPath = resolvedAppPath;
     NSString *indexPath = [self.appPath stringByAppendingPathComponent:@"index.html"];
     NSString *customIconPath = [self.appPath stringByAppendingPathComponent:@"assets/forge-icon.png"];
     NSString *parentIconPath = [[[self.appPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"assets"] stringByAppendingPathComponent:@"forge-icon.png"];

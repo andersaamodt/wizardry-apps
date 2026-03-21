@@ -3328,7 +3328,6 @@ cmd_build_desktop() {
 
       if [ -d "$bundle" ] &&
          [ -x "$bundle/Contents/MacOS/wizardry-host" ] &&
-         [ -x "$bundle/Contents/MacOS/$slug" ] &&
          [ -f "$bundle/Contents/Resources/wizardry-apps-root.txt" ] &&
          [ -f "$hash_path" ]; then
         cached_hash=$(head -n 1 "$hash_path" 2>/dev/null | tr -d '\r')
@@ -3352,13 +3351,6 @@ cmd_build_desktop() {
         cp -R "$root/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
         cp -R "$root/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
         cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
-
-        install -m 755 /dev/stdin "$bundle/Contents/MacOS/$slug" <<APP
-#!/bin/sh
-set -eu
-APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
-exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "\$APPDIR/Resources/$slug"
-APP
 
         icon_source=''
         icon_source_format=''
@@ -3424,7 +3416,8 @@ APP
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
 <key>CFBundleVersion</key><string>$bundle_version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleExecutable</key><string>$slug</string>
+<key>CFBundleExecutable</key><string>wizardry-host</string>
+<key>WizardryAppEntry</key><string>Resources/$slug</string>
 $icon_key
 </dict></plist>
 PLIST
@@ -3944,12 +3937,6 @@ cmd_run_workspace() {
     cp "$host_bin" "$staged_bundle/Contents/MacOS/wizardry-host"
 
     bundle_app_dir="$app_dir"
-    install -m 755 /dev/stdin "$staged_bundle/Contents/MacOS/$workspace_slug" <<APP
-#!/bin/sh
-set -eu
-APPDIR=\$(CDPATH= cd -- "\$(dirname "\$0")/.." && pwd -P)
-exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "$bundle_app_dir"
-APP
 
     icon_source=''
     icon_source_format=''
@@ -4015,7 +4002,8 @@ APP
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
 <key>CFBundleVersion</key><string>1.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleExecutable</key><string>$workspace_slug</string>
+<key>CFBundleExecutable</key><string>wizardry-host</string>
+<key>WizardryAppEntry</key><string>$bundle_app_dir</string>
 $icon_key
 </dict></plist>
 PLIST
@@ -4031,7 +4019,7 @@ PLIST
     mv "$staged_bundle" "$final_bundle"
     rmdir "$staged_root" 2>/dev/null || :
     bundle_app_dir="$app_dir"
-    if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/$workspace_slug" "$bundle_app_dir"; then
+    if ! launch_workspace_bundle_macos "$final_bundle" "$final_bundle/Contents/MacOS/wizardry-host" "$bundle_app_dir"; then
       printf '%s\n' "forge-backend: failed to launch project bundle: $final_bundle" >&2
       exit 1
     fi
