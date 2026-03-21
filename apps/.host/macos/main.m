@@ -1459,15 +1459,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem {
     self.keepRunningInBackground = enabled;
     self.showStatusItem = showStatusItem;
-    if (showStatusItem) {
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-    } else {
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    }
     [self updateStatusItemVisibility];
-    if (!showStatusItem) {
-        [NSApp activateIgnoringOtherApps:YES];
-    }
 }
 
 - (void)setupMainMenuWithAppName:(NSString *)appName {
@@ -2068,9 +2060,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [self.window setContentView:rootView];
     if (self.webView) {
         [self.window makeFirstResponder:self.webView];
-    }
-    if (self.showStatusItem) {
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     }
     [self updateStatusItemVisibility];
 
