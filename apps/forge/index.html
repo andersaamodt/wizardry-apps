@@ -7704,6 +7704,9 @@
           }
 
           var key = event.key.toLowerCase();
+          if (event.repeat && (key === 'r' || key === 'b' || key === ',' || key === '1' || key === '2')) {
+            return;
+          }
           if (key === 'b') {
             if (state.route === 'create') {
               return;

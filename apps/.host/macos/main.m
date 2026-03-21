@@ -2084,6 +2084,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         if (foundStatusItem) {
             self.showStatusItem = showStatusItem;
         }
+        // Backward-compatibility: older prefs files may only have menu_bar_icon.
+        // If status-item is enabled, keep background mode enabled too so closing
+        // the window does not terminate the app and remove the tray icon.
+        if (!foundBackground && foundStatusItem && showStatusItem) {
+            self.keepRunningInBackground = YES;
+        }
     }
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
