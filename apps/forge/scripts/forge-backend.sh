@@ -1503,7 +1503,7 @@ launch_workspace_bundle_macos() {
   stop_host_instances_for_app "" "$app_dir"
 
   if command -v open >/dev/null 2>&1; then
-    if open -na "$bundle" >/dev/null 2>&1; then
+    if open "$bundle" >/dev/null 2>&1; then
       if wait_for_workspace_host_start "$app_dir" 50; then
         return 0
       fi
@@ -1541,6 +1541,38 @@ stop_desktop_instances_for_slug() {
     pkill -f "wizardry-host.*/Resources/$slug" >/dev/null 2>&1 || true
     if [ -n "$root" ]; then
       pkill -f "wizardry-host.*$root/_tmp/workbench/dist/.*/$slug" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  if command -v ps >/dev/null 2>&1; then
+    i=0
+    still_running=1
+    while [ "$i" -lt 20 ]; do
+      still_running=$(
+        ps -axo command= 2>/dev/null \
+          | awk -v slug="$slug" -v root="$root" '
+              index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0)) { found=1; exit }
+              END { if (found) print "1"; else print "0" }
+            '
+      )
+      [ "$still_running" = "0" ] && break
+      sleep 0.1
+      i=$((i + 1))
+    done
+
+    if [ "$still_running" = "1" ]; then
+      stubborn_pids=$(
+        ps -axo pid=,command= 2>/dev/null \
+          | awk -v slug="$slug" -v root="$root" '
+              index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0)) { print $1 }
+            ' \
+          | tr '\n' ' ' \
+          | sed 's/[[:space:]]*$//'
+      )
+      if [ -n "$stubborn_pids" ]; then
+        # shellcheck disable=SC2086
+        kill -9 $stubborn_pids >/dev/null 2>&1 || true
+      fi
     fi
   fi
 }
@@ -3684,7 +3716,7 @@ cmd_run_desktop() {
         printf '%s\n' "forge-backend: open command not available on this system" >&2
         exit 1
       }
-      open -na "$launch_bundle"
+      open "$launch_bundle"
       printf 'launched=1\n'
       printf 'mode=desktop-executable\n'
       printf 'artifact=%s\n' "$launch_bundle"

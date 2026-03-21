@@ -85,5 +85,7 @@ grep -F "sync_macos_install_for_slug" "$backend" >/dev/null
 grep -F "sync_existing_macos_installs_from_bundle" "$backend" >/dev/null
 grep -F "installed_synced=%s" "$backend" >/dev/null
 grep -F "built_artifact=%s" "$backend" >/dev/null
+! grep -F 'open -na "$launch_bundle"' "$backend" >/dev/null
+! grep -F 'open -na "$bundle"' "$backend" >/dev/null
 
 printf '%s\n' "forge standardized run/install pipeline tests passed"
