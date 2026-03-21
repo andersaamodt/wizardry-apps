@@ -38,6 +38,7 @@
 @property (strong) NSMutableArray<NSWindow *> *auxWindows;
 @property (strong) NSView *hostRootView;
 @property (strong) NSString *appPath;
+@property (strong) NSString *appSlug;
 @property (strong) NSImage *appIconImage;
 @property (strong) NSView *nativeBootSplashView;
 @property (strong) NSColor *prioritiesBootBgColor;
@@ -77,6 +78,9 @@
 @property (assign) BOOL showStatusItem;
 @property (strong) NSStatusItem *statusItem;
 @property (assign) NSInteger statusItemRepairAttempts;
+@property (strong) NSDictionary<NSString *, NSString *> *stonrStatusSnapshot;
+@property (assign) BOOL stonrStatusCommandInFlight;
+@property (strong) NSString *stonrStatusCommandLabel;
 - (void)emitGlobalFavoriteTrackHotkey;
 - (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment;
 - (NSString *)normalizedCommandPath;
@@ -108,6 +112,21 @@
 - (void)showMainWindow;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
 - (void)quitFromStatusItem:(id)sender;
+- (BOOL)isStonrApp;
+- (NSString *)stonrBackendScriptPath;
+- (NSDictionary<NSString *, NSString *> *)dictionaryFromKeyValueBlob:(NSString *)blob;
+- (int)runCommandWithLaunchPath:(NSString *)launchPath
+                       arguments:(NSArray<NSString *> *)arguments
+                          stdout:(NSString **)stdout
+                          stderr:(NSString **)stderr;
+- (NSDictionary<NSString *, NSString *> *)stonrRelayStatusSnapshot;
+- (void)runStonrBackendCommandAsync:(NSString *)command actionLabel:(NSString *)actionLabel;
+- (void)dispatchStonrMenuAction:(NSString *)actionName;
+- (void)nativeStonrToggleRelayFromStatusItem:(id)sender;
+- (void)nativeStonrRestartRelayFromStatusItem:(id)sender;
+- (void)nativeStonrOpenStoreRootFromStatusItem:(id)sender;
+- (void)nativeStonrOpenLogFromStatusItem:(id)sender;
+- (void)nativeStonrRefreshFromStatusItem:(id)sender;
 @end
 
 static BOOL wizardryPrefBoolFromEnvFile(NSString *filePath, NSString *key, BOOL *found) {
@@ -1323,6 +1342,208 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [overlay removeFromSuperview];
 }
 
+- (BOOL)isStonrApp {
+    return [[self.appSlug lowercaseString] isEqualToString:@"stonr"];
+}
+
+- (NSString *)stonrBackendScriptPath {
+    if (!self.appPath.length) {
+        return @"";
+    }
+    NSString *scriptPath = [[self.appPath stringByAppendingPathComponent:@"scripts"] stringByAppendingPathComponent:@"stonr-control-backend.sh"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:scriptPath]) {
+        return scriptPath;
+    }
+    return @"";
+}
+
+- (NSDictionary<NSString *, NSString *> *)dictionaryFromKeyValueBlob:(NSString *)blob {
+    NSMutableDictionary<NSString *, NSString *> *result = [NSMutableDictionary dictionary];
+    NSString *text = [NSString stringWithFormat:@"%@", blob ?: @""];
+    NSArray<NSString *> *lines = [text componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    for (NSString *line in lines) {
+        NSRange delimiter = [line rangeOfString:@"="];
+        if (delimiter.location == NSNotFound || delimiter.location == 0) {
+            continue;
+        }
+        NSString *key = [[line substringToIndex:delimiter.location] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *value = [line substringFromIndex:(delimiter.location + 1)];
+        if (!key.length) {
+            continue;
+        }
+        result[key] = value ?: @"";
+    }
+    return result;
+}
+
+- (int)runCommandWithLaunchPath:(NSString *)launchPath
+                       arguments:(NSArray<NSString *> *)arguments
+                          stdout:(NSString **)stdout
+                          stderr:(NSString **)stderr
+{
+    if (stdout) {
+        *stdout = @"";
+    }
+    if (stderr) {
+        *stderr = @"";
+    }
+    if (!launchPath.length) {
+        if (stderr) {
+            *stderr = @"missing launch path";
+        }
+        return 1;
+    }
+
+    NSTask *task = [[NSTask alloc] init];
+    task.launchPath = launchPath;
+    task.arguments = arguments ?: @[];
+    task.environment = [self resolvedCommandEnvironment];
+
+    NSPipe *outPipe = [NSPipe pipe];
+    NSPipe *errPipe = [NSPipe pipe];
+    task.standardOutput = outPipe;
+    task.standardError = errPipe;
+
+    @try {
+        [task launch];
+    } @catch (NSException *exception) {
+        if (stderr) {
+            *stderr = [NSString stringWithFormat:@"failed to launch command: %@", exception.reason ?: @"unknown error"];
+        }
+        return 1;
+    }
+
+    [task waitUntilExit];
+
+    NSData *outData = [[outPipe fileHandleForReading] readDataToEndOfFile];
+    NSData *errData = [[errPipe fileHandleForReading] readDataToEndOfFile];
+    NSString *capturedStdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
+    NSString *capturedStderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
+    if (stdout) {
+        *stdout = capturedStdout;
+    }
+    if (stderr) {
+        *stderr = capturedStderr;
+    }
+    return [task terminationStatus];
+}
+
+- (NSDictionary<NSString *, NSString *> *)stonrRelayStatusSnapshot {
+    NSString *scriptPath = [self stonrBackendScriptPath];
+    if (!scriptPath.length) {
+        return @{};
+    }
+    NSString *stdout = @"";
+    NSString *stderr = @"";
+    int exitCode = [self runCommandWithLaunchPath:@"/bin/sh"
+                                        arguments:@[scriptPath, @"relay-status"]
+                                           stdout:&stdout
+                                           stderr:&stderr];
+    if (exitCode != 0) {
+        if (stderr.length) {
+            NSLog(@"Stonr status command failed: %@", stderr);
+        }
+        return @{};
+    }
+    NSDictionary<NSString *, NSString *> *parsed = [self dictionaryFromKeyValueBlob:stdout];
+    return parsed ?: @{};
+}
+
+- (void)dispatchStonrMenuAction:(NSString *)actionName {
+    if (![self isStonrApp] || !self.webView || !actionName.length) {
+        return;
+    }
+    NSString *escapedAction = [[actionName stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
+        stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
+    NSString *js = [NSString stringWithFormat:@"if (window && typeof window.stonrHostAction === 'function') { window.stonrHostAction('%@'); }", escapedAction];
+    [self.webView evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
+        (void)result;
+        if (error) {
+            NSLog(@"Stonr host action dispatch error: %@", error);
+        }
+    }];
+}
+
+- (void)runStonrBackendCommandAsync:(NSString *)command actionLabel:(NSString *)actionLabel {
+    if (![self isStonrApp] || !command.length) {
+        return;
+    }
+    NSString *scriptPath = [self stonrBackendScriptPath];
+    if (!scriptPath.length) {
+        return;
+    }
+    self.stonrStatusCommandInFlight = YES;
+    self.stonrStatusCommandLabel = actionLabel.length ? actionLabel : @"Running command...";
+    [self updateStatusItemVisibility];
+
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *stdout = @"";
+        NSString *stderr = @"";
+        int exitCode = [self runCommandWithLaunchPath:@"/bin/sh"
+                                            arguments:@[scriptPath, command]
+                                               stdout:&stdout
+                                               stderr:&stderr];
+        NSDictionary<NSString *, NSString *> *nextStatus = [self stonrRelayStatusSnapshot];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.stonrStatusCommandInFlight = NO;
+            self.stonrStatusCommandLabel = @"";
+            if (nextStatus.count) {
+                self.stonrStatusSnapshot = nextStatus;
+            }
+            [self updateStatusItemVisibility];
+            [self dispatchStonrMenuAction:@"refresh"];
+            if (exitCode != 0) {
+                NSLog(@"Stonr tray command '%@' failed (exit %d): %@%@", command, exitCode, stderr ?: @"", stdout.length ? [NSString stringWithFormat:@"\n%@", stdout] : @"");
+            }
+        });
+    });
+}
+
+- (void)nativeStonrToggleRelayFromStatusItem:(id)sender {
+    (void)sender;
+    NSString *statusValue = self.stonrStatusSnapshot[@"status"];
+    NSString *status = [statusValue.length ? statusValue : @"" lowercaseString];
+    BOOL running = [status isEqualToString:@"running"];
+    [self runStonrBackendCommandAsync:(running ? @"relay-stop" : @"relay-start")
+                          actionLabel:(running ? @"Stopping relay..." : @"Starting relay...")];
+}
+
+- (void)nativeStonrRestartRelayFromStatusItem:(id)sender {
+    (void)sender;
+    [self runStonrBackendCommandAsync:@"relay-restart" actionLabel:@"Restarting relay..."];
+}
+
+- (void)nativeStonrOpenStoreRootFromStatusItem:(id)sender {
+    (void)sender;
+    [self runStonrBackendCommandAsync:@"open-store-root" actionLabel:@"Opening relay folder..."];
+}
+
+- (void)nativeStonrOpenLogFromStatusItem:(id)sender {
+    (void)sender;
+    NSDictionary<NSString *, NSString *> *snapshot = self.stonrStatusSnapshot;
+    if (!snapshot.count) {
+        snapshot = [self stonrRelayStatusSnapshot];
+    }
+    NSString *logPath = [[snapshot[@"log_path"] ?: @"" stringByExpandingTildeInPath] stringByStandardizingPath];
+    if (!logPath.length) {
+        [self showMainWindow];
+        return;
+    }
+    if (![[NSFileManager defaultManager] fileExistsAtPath:logPath]) {
+        [self showMainWindow];
+        return;
+    }
+    NSURL *logURL = [NSURL fileURLWithPath:logPath isDirectory:NO];
+    [[NSWorkspace sharedWorkspace] openURL:logURL];
+}
+
+- (void)nativeStonrRefreshFromStatusItem:(id)sender {
+    (void)sender;
+    self.stonrStatusSnapshot = [self stonrRelayStatusSnapshot];
+    [self updateStatusItemVisibility];
+    [self dispatchStonrMenuAction:@"refresh"];
+}
+
 - (void)showMainWindow {
     if (!self.window) {
         return;
@@ -1426,7 +1647,101 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         self.statusItem.title = @"St";
 #pragma clang diagnostic pop
     }
+    NSDictionary<NSString *, NSString *> *relayStatus = @{};
+    if ([self isStonrApp]) {
+        relayStatus = [self stonrRelayStatusSnapshot];
+        if (relayStatus.count) {
+            self.stonrStatusSnapshot = relayStatus;
+        } else if (self.stonrStatusSnapshot.count) {
+            relayStatus = self.stonrStatusSnapshot;
+        }
+    }
+
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Relay"];
+    if ([self isStonrApp]) {
+        NSString *relayState = relayStatus[@"status"] ?: @"unknown";
+        NSString *pidValue = relayStatus[@"pid"] ?: @"";
+        if (!pidValue.length) {
+            pidValue = @"not running";
+        }
+        NSString *storeRoot = relayStatus[@"store_root"] ?: @"";
+        NSString *envPath = relayStatus[@"env_path"] ?: @"";
+        NSString *storeLabel = storeRoot.length ? [storeRoot stringByAbbreviatingWithTildeInPath] : @"(unknown)";
+        NSString *envLabel = envPath.length ? [envPath stringByAbbreviatingWithTildeInPath] : @"(unknown)";
+
+        NSMenuItem *relayStateItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Relay: %@", relayState]
+                                                                 action:nil
+                                                          keyEquivalent:@""];
+        relayStateItem.enabled = NO;
+        [menu addItem:relayStateItem];
+
+        NSMenuItem *pidItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"PID: %@", pidValue]
+                                                          action:nil
+                                                   keyEquivalent:@""];
+        pidItem.enabled = NO;
+        [menu addItem:pidItem];
+
+        NSMenuItem *storeItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Store: %@", storeLabel]
+                                                            action:nil
+                                                     keyEquivalent:@""];
+        storeItem.enabled = NO;
+        [menu addItem:storeItem];
+
+        NSMenuItem *envItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Env: %@", envLabel]
+                                                          action:nil
+                                                   keyEquivalent:@""];
+        envItem.enabled = NO;
+        [menu addItem:envItem];
+
+        if (self.stonrStatusCommandInFlight && self.stonrStatusCommandLabel.length) {
+            NSMenuItem *actionItem = [[NSMenuItem alloc] initWithTitle:self.stonrStatusCommandLabel
+                                                                 action:nil
+                                                          keyEquivalent:@""];
+            actionItem.enabled = NO;
+            [menu addItem:actionItem];
+        }
+
+        [menu addItem:[NSMenuItem separatorItem]];
+
+        BOOL relayRunning = [[relayState lowercaseString] isEqualToString:@"running"];
+        NSMenuItem *toggleRelayItem = [[NSMenuItem alloc] initWithTitle:(relayRunning ? @"Stop Relay" : @"Start Relay")
+                                                                  action:@selector(nativeStonrToggleRelayFromStatusItem:)
+                                                           keyEquivalent:@""];
+        [toggleRelayItem setTarget:self];
+        toggleRelayItem.enabled = !self.stonrStatusCommandInFlight;
+        [menu addItem:toggleRelayItem];
+
+        NSMenuItem *restartRelayItem = [[NSMenuItem alloc] initWithTitle:@"Restart Relay"
+                                                                   action:@selector(nativeStonrRestartRelayFromStatusItem:)
+                                                            keyEquivalent:@""];
+        [restartRelayItem setTarget:self];
+        restartRelayItem.enabled = !self.stonrStatusCommandInFlight;
+        [menu addItem:restartRelayItem];
+
+        NSMenuItem *openStoreRootItem = [[NSMenuItem alloc] initWithTitle:@"Open Relay Folder"
+                                                                    action:@selector(nativeStonrOpenStoreRootFromStatusItem:)
+                                                             keyEquivalent:@""];
+        [openStoreRootItem setTarget:self];
+        openStoreRootItem.enabled = !self.stonrStatusCommandInFlight;
+        [menu addItem:openStoreRootItem];
+
+        NSMenuItem *openLogItem = [[NSMenuItem alloc] initWithTitle:@"Open Relay Log"
+                                                              action:@selector(nativeStonrOpenLogFromStatusItem:)
+                                                       keyEquivalent:@""];
+        [openLogItem setTarget:self];
+        openLogItem.enabled = !self.stonrStatusCommandInFlight;
+        [menu addItem:openLogItem];
+
+        NSMenuItem *refreshItem = [[NSMenuItem alloc] initWithTitle:@"Refresh Status"
+                                                              action:@selector(nativeStonrRefreshFromStatusItem:)
+                                                       keyEquivalent:@""];
+        [refreshItem setTarget:self];
+        refreshItem.enabled = !self.stonrStatusCommandInFlight;
+        [menu addItem:refreshItem];
+
+        [menu addItem:[NSMenuItem separatorItem]];
+    }
+
     NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:([self.window isVisible] ? @"Hide Window" : @"Show Window")
                                                         action:@selector(toggleMainWindowFromStatusItem:)
                                                  keyEquivalent:@""];
@@ -1744,6 +2059,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSString *appName = [appComponent stringByReplacingOccurrencesOfString:@"-" withString:@" "];
     appName = [appName capitalizedString];
     NSString *appSlug = [appComponent lowercaseString];
+    self.appSlug = appSlug;
     if ([appSlug isEqualToString:@"stonr"]) {
         NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
         NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];

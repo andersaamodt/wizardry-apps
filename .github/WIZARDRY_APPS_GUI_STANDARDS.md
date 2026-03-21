@@ -74,6 +74,12 @@
 - Keep path text compact with ellipsis behavior and an icon-only fallback when horizontal space is tight.
 - Keep primary action buttons in the same bar so item context and actions are colocated.
 
+## macOS Menu Bar Icon Pattern
+- For macOS apps that expose a menu bar icon, bundle with a native binary `CFBundleExecutable` (for example `wizardry-host`), not a shell-script launcher.
+- Pass app entrypoint to host via `WizardryAppEntry` in `Info.plist` (or argv/env fallback) so packaged app launches still resolve the correct web app path.
+- Keep tray menus operational: include at least show/hide window and quit, plus app-specific runtime actions when background mode is enabled.
+- Verify tray health with a real packaged/workspace launch and host state checks (`__wizardry_host_status_item_state`) instead of assuming simulator/web parity.
+
 ## Desktop Window Fit And GUI QA
 - Desktop UIs must fit fully in-window; no important controls should render off-screen or clip outside viewport.
 - Avoid layouts that force horizontal overflow for baseline app workflows.

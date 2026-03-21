@@ -78,3 +78,4 @@
 - Confirmation toasts should stay on screen long enough to read and expose an unobtrusive copy button, because short-lived desktop feedback often contains paths or error text users need to reuse.
 - Persistent footer status works well for substantive Forge operations like Build, Run, Install, Remove, and cleanup; do not overwrite it with trivial navigation actions such as opening folders.
 - High-regression Forge flows such as Run, import/drop, scaffold, and workspace rebuild detection need executable behavior tests with fake host/tool stubs, not just static `grep` contract checks.
+- macOS status/tray items can fail to render when the app bundle launches through a shell `CFBundleExecutable`; launch packaged apps with a native host binary and pass app entry via `WizardryAppEntry` instead.
