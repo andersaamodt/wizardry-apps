@@ -30,6 +30,7 @@
 - [ ] Logs/output surfaces are bounded, selectable, and copyable where logs exist (`Feedback and Error Handling` + `Cross-App Interaction Patterns`).
 - [ ] Keyboard paths work for primary controls: `Tab`, `Shift-Tab`, `Enter`, `Space`, `Escape`, and arrow-key pickers where relevant (`Accessibility and Input Ergonomics` + `Cross-App Interaction Patterns`).
 - [ ] Focus-visible states are obvious for interactive controls (`Button And Icon Style Contract` + `Accessibility and Input Ergonomics`).
+- [ ] Listbox-style selected rows use inset rounded highlights instead of edge-to-edge full-width highlight fill (`Cross-App Interaction Patterns`).
 - [ ] Runtime endpoint/port handling avoids fixed localhost ports and resolves canonical config (`Port and Runtime Safety`).
 - [ ] Bridge execution remains hardcoded argv with no user-composed shell fragments (`Command and Bridge Rules`).
 - [ ] Safari GUI QA is run for GUI changes and verifies layout, focus/hover, and panel behavior (`Desktop Window Fit And GUI QA`).

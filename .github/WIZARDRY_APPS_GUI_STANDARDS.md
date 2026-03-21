@@ -147,6 +147,7 @@
 - Keep at most one floating menu open at a time and keep trigger `aria-expanded` values in sync.
 - Close floating menus on outside click and `Escape`, and restore focus to the triggering control when practical.
 - Keep list rows keyboard-selectable (`Enter`/`Space`) and preserve selection across data refreshes when the item still exists.
+- For listbox-style row selections, use an inset highlight surface with rounded corners; selected-state fill should not run edge-to-edge across the entire list container width.
 - Keep path chips compact: basename label, ellipsis handling, icon-only fallback in narrow widths, click-to-copy, and double-click-to-open/reveal.
 - For folder path utilities, provide an optional adjacent open-in-terminal control with explicit tooltip/aria labeling.
 - For drag-and-drop folder import, only show drop cues for valid payload types and clear cues immediately on leave/drop.
