@@ -1504,10 +1504,13 @@ launch_workspace_bundle_macos() {
 
   if command -v open >/dev/null 2>&1; then
     if open "$bundle" >/dev/null 2>&1; then
-      if wait_for_workspace_host_start "$app_dir" 50; then
+      # A successful open request should not be followed by a second explicit
+      # launch attempt; doing both can create duplicate app instances/tray icons
+      # on slower startups.
+      if wait_for_workspace_host_start "$app_dir" 100; then
         return 0
       fi
-      stop_host_instances_for_app "" "$app_dir"
+      return 1
     fi
   fi
 
