@@ -111,6 +111,7 @@
 - (NSImage *)renderedStatusItemImageForRelayState:(NSString *)relayState busy:(BOOL)busy;
 - (BOOL)isStatusItemRendered;
 - (BOOL)handleDuplicateLaunchByActivatingExistingInstance;
+- (void)syncStonrActivationPolicy;
 - (void)showMainWindow;
 - (void)openMainWindowFromStatusItem:(id)sender;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
@@ -1537,9 +1538,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     if (!self.window) {
         return;
     }
+    [self syncStonrActivationPolicy];
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
     [self updateStatusItemVisibility];
+}
+
+- (void)syncStonrActivationPolicy {
+    if (![self isStonrApp]) {
+        return;
+    }
+    BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
+    BOOL hasVisibleMainWindow = (self.window && [self.window isVisible]);
+    NSApplicationActivationPolicy targetPolicy = (keepBackground && !hasVisibleMainWindow)
+                                                     ? NSApplicationActivationPolicyAccessory
+                                                     : NSApplicationActivationPolicyRegular;
+    if ([NSApp activationPolicy] != targetPolicy) {
+        [NSApp setActivationPolicy:targetPolicy];
+    }
 }
 
 - (BOOL)handleDuplicateLaunchByActivatingExistingInstance {
@@ -1573,6 +1589,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     if ([self.window isVisible]) {
         [self.window orderOut:nil];
+        [self syncStonrActivationPolicy];
         [self updateStatusItemVisibility];
         return;
     }
@@ -1787,6 +1804,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem {
     self.keepRunningInBackground = enabled || showStatusItem;
     self.showStatusItem = showStatusItem;
+    [self syncStonrActivationPolicy];
     [self updateStatusItemVisibility];
 }
 
@@ -2917,6 +2935,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     (void)sender;
+    [self syncStonrActivationPolicy];
     return !(self.keepRunningInBackground || self.showStatusItem);
 }
 
@@ -2929,6 +2948,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         if (self.window && [self.window isVisible]) {
             [self.window orderOut:nil];
         }
+        [self syncStonrActivationPolicy];
         [self updateStatusItemVisibility];
         return NSTerminateCancel;
     }
@@ -2946,6 +2966,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (BOOL)windowShouldClose:(NSWindow *)sender {
     if ((self.keepRunningInBackground || self.showStatusItem) && sender == self.window) {
         [sender orderOut:nil];
+        [self syncStonrActivationPolicy];
         [self updateStatusItemVisibility];
         return NO;
     }
