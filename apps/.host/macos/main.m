@@ -110,6 +110,7 @@
 - (void)updateStatusItemVisibility;
 - (NSImage *)renderedStatusItemImage;
 - (BOOL)isStatusItemRendered;
+- (BOOL)handleDuplicateLaunchByActivatingExistingInstance;
 - (void)showMainWindow;
 - (void)openMainWindowFromStatusItem:(id)sender;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
@@ -1541,6 +1542,25 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [self updateStatusItemVisibility];
 }
 
+- (BOOL)handleDuplicateLaunchByActivatingExistingInstance {
+    NSString *bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+    if (!bundleIdentifier.length) {
+        return NO;
+    }
+    pid_t currentPid = [[NSProcessInfo processInfo] processIdentifier];
+    NSArray<NSRunningApplication *> *runningApps = [NSRunningApplication runningApplicationsWithBundleIdentifier:bundleIdentifier];
+    for (NSRunningApplication *runningApp in runningApps) {
+        if (!runningApp || runningApp.processIdentifier == currentPid || runningApp.terminated) {
+            continue;
+        }
+        [runningApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
+        self.explicitQuitRequested = YES;
+        [NSApp terminate:nil];
+        return YES;
+    }
+    return NO;
+}
+
 - (void)openMainWindowFromStatusItem:(id)sender {
     (void)sender;
     [self showMainWindow];
@@ -2033,6 +2053,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     appName = [appName capitalizedString];
     NSString *appSlug = [appComponent lowercaseString];
     self.appSlug = appSlug;
+    if ([self handleDuplicateLaunchByActivatingExistingInstance]) {
+        return;
+    }
     if ([appSlug isEqualToString:@"stonr"]) {
         NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
         NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];

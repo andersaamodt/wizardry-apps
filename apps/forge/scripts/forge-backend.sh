@@ -1542,6 +1542,9 @@ stop_desktop_instances_for_slug() {
   if command -v pkill >/dev/null 2>&1; then
     pkill -f "wizardry-host.*[/.]apps/$slug" >/dev/null 2>&1 || true
     pkill -f "wizardry-host.*/Resources/$slug" >/dev/null 2>&1 || true
+    if [ -n "$app_name" ]; then
+      pkill -f "/$app_name.app/Contents/MacOS/wizardry-host" >/dev/null 2>&1 || true
+    fi
     if [ -n "$root" ]; then
       pkill -f "wizardry-host.*$root/_tmp/workbench/dist/.*/$slug" >/dev/null 2>&1 || true
     fi
@@ -1553,8 +1556,8 @@ stop_desktop_instances_for_slug() {
     while [ "$i" -lt 20 ]; do
       still_running=$(
         ps -axo command= 2>/dev/null \
-          | awk -v slug="$slug" -v root="$root" '
-              index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0)) { found=1; exit }
+          | awk -v slug="$slug" -v root="$root" -v app_name="$app_name" '
+              index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0)) { found=1; exit }
               END { if (found) print "1"; else print "0" }
             '
       )
@@ -1566,8 +1569,8 @@ stop_desktop_instances_for_slug() {
     if [ "$still_running" = "1" ]; then
       stubborn_pids=$(
         ps -axo pid=,command= 2>/dev/null \
-          | awk -v slug="$slug" -v root="$root" '
-              index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0)) { print $1 }
+          | awk -v slug="$slug" -v root="$root" -v app_name="$app_name" '
+              index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0)) { print $1 }
             ' \
           | tr '\n' ' ' \
           | sed 's/[[:space:]]*$//'
