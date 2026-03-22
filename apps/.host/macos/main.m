@@ -1658,38 +1658,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Relay"];
     if ([self isStonrApp]) {
         NSString *relayState = relayStatus[@"status"] ?: @"unknown";
-        NSString *pidValue = relayStatus[@"pid"] ?: @"";
-        if (!pidValue.length) {
-            pidValue = @"not running";
-        }
-        NSString *storeRoot = relayStatus[@"store_root"] ?: @"";
-        NSString *envPath = relayStatus[@"env_path"] ?: @"";
-        NSString *storeLabel = storeRoot.length ? [storeRoot stringByAbbreviatingWithTildeInPath] : @"(unknown)";
-        NSString *envLabel = envPath.length ? [envPath stringByAbbreviatingWithTildeInPath] : @"(unknown)";
 
         NSMenuItem *relayStateItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Relay: %@", relayState]
                                                                  action:nil
                                                           keyEquivalent:@""];
         relayStateItem.enabled = NO;
         [menu addItem:relayStateItem];
-
-        NSMenuItem *pidItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"PID: %@", pidValue]
-                                                          action:nil
-                                                   keyEquivalent:@""];
-        pidItem.enabled = NO;
-        [menu addItem:pidItem];
-
-        NSMenuItem *storeItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Store: %@", storeLabel]
-                                                            action:nil
-                                                     keyEquivalent:@""];
-        storeItem.enabled = NO;
-        [menu addItem:storeItem];
-
-        NSMenuItem *envItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Env: %@", envLabel]
-                                                          action:nil
-                                                   keyEquivalent:@""];
-        envItem.enabled = NO;
-        [menu addItem:envItem];
 
         if (self.stonrStatusCommandInFlight && self.stonrStatusCommandLabel.length) {
             NSMenuItem *actionItem = [[NSMenuItem alloc] initWithTitle:self.stonrStatusCommandLabel
