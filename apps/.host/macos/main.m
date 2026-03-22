@@ -1723,21 +1723,21 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [menu addItem:[NSMenuItem separatorItem]];
 
         BOOL relayRunning = [[relayState lowercaseString] isEqualToString:@"running"];
-        NSMenuItem *toggleRelayItem = [[NSMenuItem alloc] initWithTitle:(relayRunning ? @"Stop Relay" : @"Start Relay")
+        NSMenuItem *toggleRelayItem = [[NSMenuItem alloc] initWithTitle:(relayRunning ? @"Stop relay" : @"Start Relay")
                                                                   action:@selector(nativeStonrToggleRelayFromStatusItem:)
                                                            keyEquivalent:@""];
         [toggleRelayItem setTarget:self];
         toggleRelayItem.enabled = !self.stonrStatusCommandInFlight;
         [menu addItem:toggleRelayItem];
 
-        NSMenuItem *openStoreRootItem = [[NSMenuItem alloc] initWithTitle:@"Open Relay Folder"
+        NSMenuItem *openStoreRootItem = [[NSMenuItem alloc] initWithTitle:@"Open folder"
                                                                     action:@selector(nativeStonrOpenStoreRootFromStatusItem:)
                                                              keyEquivalent:@""];
         [openStoreRootItem setTarget:self];
         openStoreRootItem.enabled = !self.stonrStatusCommandInFlight;
         [menu addItem:openStoreRootItem];
 
-        NSMenuItem *openLogItem = [[NSMenuItem alloc] initWithTitle:@"Open Relay Log"
+        NSMenuItem *openLogItem = [[NSMenuItem alloc] initWithTitle:@"Open log"
                                                               action:@selector(nativeStonrOpenLogFromStatusItem:)
                                                        keyEquivalent:@""];
         [openLogItem setTarget:self];
