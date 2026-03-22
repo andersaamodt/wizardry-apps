@@ -124,7 +124,6 @@
 - (void)runStonrBackendCommandAsync:(NSString *)command actionLabel:(NSString *)actionLabel;
 - (void)dispatchStonrMenuAction:(NSString *)actionName;
 - (void)nativeStonrToggleRelayFromStatusItem:(id)sender;
-- (void)nativeStonrRestartRelayFromStatusItem:(id)sender;
 - (void)nativeStonrOpenStoreRootFromStatusItem:(id)sender;
 - (void)nativeStonrOpenLogFromStatusItem:(id)sender;
 - (void)nativeStonrRefreshFromStatusItem:(id)sender;
@@ -1509,11 +1508,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                           actionLabel:(running ? @"Stopping relay..." : @"Starting relay...")];
 }
 
-- (void)nativeStonrRestartRelayFromStatusItem:(id)sender {
-    (void)sender;
-    [self runStonrBackendCommandAsync:@"relay-restart" actionLabel:@"Restarting relay..."];
-}
-
 - (void)nativeStonrOpenStoreRootFromStatusItem:(id)sender {
     (void)sender;
     [self runStonrBackendCommandAsync:@"open-store-root" actionLabel:@"Opening relay folder..."];
@@ -1722,13 +1716,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [toggleRelayItem setTarget:self];
         toggleRelayItem.enabled = !self.stonrStatusCommandInFlight;
         [menu addItem:toggleRelayItem];
-
-        NSMenuItem *restartRelayItem = [[NSMenuItem alloc] initWithTitle:@"Restart Relay"
-                                                                   action:@selector(nativeStonrRestartRelayFromStatusItem:)
-                                                            keyEquivalent:@""];
-        [restartRelayItem setTarget:self];
-        restartRelayItem.enabled = !self.stonrStatusCommandInFlight;
-        [menu addItem:restartRelayItem];
 
         NSMenuItem *openStoreRootItem = [[NSMenuItem alloc] initWithTitle:@"Open Relay Folder"
                                                                     action:@selector(nativeStonrOpenStoreRootFromStatusItem:)
