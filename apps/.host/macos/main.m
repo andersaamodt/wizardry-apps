@@ -108,7 +108,7 @@
                                          height:(CGFloat)height;
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem;
 - (void)updateStatusItemVisibility;
-- (NSImage *)renderedStatusItemImage;
+- (NSImage *)renderedStatusItemImageForRelayState:(NSString *)relayState busy:(BOOL)busy;
 - (BOOL)isStatusItemRendered;
 - (BOOL)handleDuplicateLaunchByActivatingExistingInstance;
 - (void)showMainWindow;
@@ -1585,7 +1585,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [NSApp terminate:nil];
 }
 
-- (NSImage *)renderedStatusItemImage {
+- (NSImage *)renderedStatusItemImageForRelayState:(NSString *)relayState busy:(BOOL)busy {
     CGFloat side = MAX(14.0, [NSStatusBar systemStatusBar].thickness - 4.0);
     NSImage *rendered = [[NSImage alloc] initWithSize:NSMakeSize(side, side)];
     [rendered lockFocus];
@@ -1598,7 +1598,27 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                       stoneWidth,
                                       stoneHeight);
         NSBezierPath *stone = [NSBezierPath bezierPathWithOvalInRect:stoneRect];
-        [stone fill];
+        NSString *normalized = [[relayState ?: @"unknown" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (busy) {
+            [stone fill];
+            [[NSColor whiteColor] setFill];
+            CGFloat dotSide = MAX(2.0, floor(side * 0.16));
+            NSRect dotRect = NSMakeRect(floor((side - dotSide) / 2.0), floor((side - dotSide) / 2.0), dotSide, dotSide);
+            [[NSBezierPath bezierPathWithOvalInRect:dotRect] fill];
+        } else if ([normalized isEqualToString:@"running"]) {
+            [stone fill];
+        } else if ([normalized isEqualToString:@"stopped"] || [normalized isEqualToString:@"not running"]) {
+            [stone setLineWidth:MAX(1.4, floor(side * 0.12))];
+            [stone stroke];
+        } else {
+            [stone fill];
+            [[NSColor whiteColor] set];
+            NSBezierPath *slash = [NSBezierPath bezierPath];
+            [slash setLineWidth:MAX(1.4, floor(side * 0.10))];
+            [slash moveToPoint:NSMakePoint(NSMinX(stoneRect) + 2.0, NSMinY(stoneRect) + 1.0)];
+            [slash lineToPoint:NSMakePoint(NSMaxX(stoneRect) - 2.0, NSMaxY(stoneRect) - 1.0)];
+            [slash stroke];
+        }
     } else {
         [[NSColor blackColor] set];
         CGFloat fontSize = MAX(11.0, side - 2.0);
@@ -1653,11 +1673,21 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             [self.statusItem setVisible:YES];
         }
     }
+    NSDictionary<NSString *, NSString *> *relayStatus = @{};
+    if ([self isStonrApp]) {
+        relayStatus = [self stonrRelayStatusSnapshot];
+        if (relayStatus.count) {
+            self.stonrStatusSnapshot = relayStatus;
+        } else if (self.stonrStatusSnapshot.count) {
+            relayStatus = self.stonrStatusSnapshot;
+        }
+    }
     NSStatusBarButton *button = self.statusItem.button;
     if (button) {
         if ([self isStonrApp]) {
+            NSString *relayState = relayStatus[@"status"] ?: @"unknown";
             button.title = @"";
-            button.image = [self renderedStatusItemImage];
+            button.image = [self renderedStatusItemImageForRelayState:relayState busy:self.stonrStatusCommandInFlight];
             button.imagePosition = NSImageOnly;
         } else {
             button.image = nil;
@@ -1671,26 +1701,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         self.statusItem.title = [self isStonrApp] ? @"" : @"St";
 #pragma clang diagnostic pop
     }
-    NSDictionary<NSString *, NSString *> *relayStatus = @{};
-    if ([self isStonrApp]) {
-        relayStatus = [self stonrRelayStatusSnapshot];
-        if (relayStatus.count) {
-            self.stonrStatusSnapshot = relayStatus;
-        } else if (self.stonrStatusSnapshot.count) {
-            relayStatus = self.stonrStatusSnapshot;
-        }
-    }
 
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Relay"];
     if ([self isStonrApp]) {
         NSString *relayState = relayStatus[@"status"] ?: @"unknown";
-
-        NSMenuItem *relayStateItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Relay: %@", relayState]
-                                                                 action:nil
-                                                          keyEquivalent:@""];
-        relayStateItem.enabled = NO;
-        [menu addItem:relayStateItem];
-        [menu addItem:[NSMenuItem separatorItem]];
 
         NSMenuItem *openStonrItem = [[NSMenuItem alloc] initWithTitle:@"Open Stonr"
                                                                 action:@selector(openMainWindowFromStatusItem:)
