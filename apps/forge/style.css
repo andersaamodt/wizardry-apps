@@ -1988,12 +1988,19 @@ input[type="checkbox"]:disabled {
 }
 
 .workspace-profile-summary {
-  justify-content: flex-start;
-  gap: 0.42rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 0.42rem;
+  align-items: center;
 }
 
 .workspace-profile-summary::after {
-  margin-left: auto;
+  margin-left: 0;
+  justify-self: end;
+}
+
+.workspace-profile-summary .workspace-profile-kind-pill {
+  justify-self: end;
 }
 
 .pipeline-section[open] > .pipeline-section-head {
