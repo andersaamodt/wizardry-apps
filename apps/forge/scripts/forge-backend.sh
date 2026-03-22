@@ -1398,16 +1398,22 @@ sync_macos_install_for_slug() {
 stop_host_instances_for_app() {
   host_bin=${1-}
   app_dir=${2-}
+  bundle_path=${3-}
 
-  [ -n "$app_dir" ] || return 0
+  [ -n "$app_dir$bundle_path" ] || return 0
   command -v ps >/dev/null 2>&1 || return 0
 
   # Prevent stale hidden windows/processes from making desktop runs appear as no-op.
   # Match by app_dir path + wizardry host command so we also catch launcher/bundle variants.
   pids=$(
     ps -axo pid=,command= 2>/dev/null \
-      | awk -v app="$app_dir" '
-          index($0, app) > 0 && index($0, "wizardry-host") > 0 { print $1 }
+      | awk -v app="$app_dir" -v bundle="$bundle_path" '
+          {
+            matched = 0
+            if (app != "" && index($0, app) > 0) matched = 1
+            if (bundle != "" && index($0, bundle "/Contents/MacOS/wizardry-host") > 0) matched = 1
+            if (index($0, "wizardry-host") > 0 && matched) print $1
+          }
         ' \
       | tr '\n' ' ' \
       | sed 's/[[:space:]]*$//'
@@ -1419,8 +1425,13 @@ stop_host_instances_for_app() {
   sleep 0.2
   still=$(
     ps -axo pid=,command= 2>/dev/null \
-      | awk -v app="$app_dir" '
-          index($0, app) > 0 && index($0, "wizardry-host") > 0 { print $1 }
+      | awk -v app="$app_dir" -v bundle="$bundle_path" '
+          {
+            matched = 0
+            if (app != "" && index($0, app) > 0) matched = 1
+            if (bundle != "" && index($0, bundle "/Contents/MacOS/wizardry-host") > 0) matched = 1
+            if (index($0, "wizardry-host") > 0 && matched) print $1
+          }
         ' \
       | tr '\n' ' ' \
       | sed 's/[[:space:]]*$//'
@@ -1433,11 +1444,20 @@ stop_host_instances_for_app() {
 
 workspace_host_running_for_app_dir() {
   app_dir=${1-}
-  [ -n "$app_dir" ] || return 1
+  bundle_path=${2-}
+  [ -n "$app_dir$bundle_path" ] || return 1
   command -v ps >/dev/null 2>&1 || return 1
   ps -axo command= 2>/dev/null \
-    | awk -v app="$app_dir" '
-        index($0, app) > 0 && index($0, "wizardry-host") > 0 { found=1; exit }
+    | awk -v app="$app_dir" -v bundle="$bundle_path" '
+        {
+          matched = 0
+          if (app != "" && index($0, app) > 0) matched = 1
+          if (bundle != "" && index($0, bundle "/Contents/MacOS/wizardry-host") > 0) matched = 1
+          if (index($0, "wizardry-host") > 0 && matched) {
+            found = 1
+            exit
+          }
+        }
         END { if (found) exit 0; exit 1 }
       '
 }
@@ -1445,12 +1465,13 @@ workspace_host_running_for_app_dir() {
 wait_for_workspace_host_start() {
   app_dir=${1-}
   attempts=${2-}
-  [ -n "$app_dir" ] || return 1
+  bundle_path=${3-}
+  [ -n "$app_dir$bundle_path" ] || return 1
   [ -n "$attempts" ] || attempts=20
   i=0
   stable=0
   while [ "$i" -lt "$attempts" ]; do
-    if workspace_host_running_for_app_dir "$app_dir"; then
+    if workspace_host_running_for_app_dir "$app_dir" "$bundle_path"; then
       stable=$((stable + 1))
       if [ "$stable" -ge 2 ]; then
         return 0
@@ -1500,14 +1521,14 @@ launch_workspace_bundle_macos() {
   [ -d "$bundle" ] || return 1
   [ -n "$app_dir" ] || return 1
 
-  stop_host_instances_for_app "" "$app_dir"
+  stop_host_instances_for_app "" "$app_dir" "$bundle"
 
   if command -v open >/dev/null 2>&1; then
     if open "$bundle" >/dev/null 2>&1; then
       # A successful open request should not be followed by a second explicit
       # launch attempt; doing both can create duplicate app instances/tray icons
       # on slower startups.
-      if wait_for_workspace_host_start "$app_dir" 100; then
+      if wait_for_workspace_host_start "$app_dir" 100 "$bundle"; then
         return 0
       fi
       return 1
@@ -1515,13 +1536,13 @@ launch_workspace_bundle_macos() {
   fi
 
   [ -x "$launcher_exec" ] || return 1
-  stop_host_instances_for_app "" "$app_dir"
+  stop_host_instances_for_app "" "$app_dir" "$bundle"
   if command -v nohup >/dev/null 2>&1; then
     nohup "$launcher_exec" >/dev/null 2>&1 &
   else
     "$launcher_exec" >/dev/null 2>&1 &
   fi
-  wait_for_workspace_host_start "$app_dir" 50
+  wait_for_workspace_host_start "$app_dir" 50 "$bundle"
 }
 
 stop_desktop_instances_for_slug() {
