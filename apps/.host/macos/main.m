@@ -2085,8 +2085,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     self.appPath = resolvedAppPath;
     NSString *indexPath = [self.appPath stringByAppendingPathComponent:@"index.html"];
-    NSString *customIconPath = [self.appPath stringByAppendingPathComponent:@"assets/forge-icon.png"];
-    NSString *parentIconPath = [[[self.appPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"assets"] stringByAppendingPathComponent:@"forge-icon.png"];
     
     // Check if index.html exists
     if (![[NSFileManager defaultManager] fileExistsAtPath:indexPath]) {
@@ -2183,13 +2181,26 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedBundleIcon = [NSApp applicationIconImage];
     }
     NSString *resolvedIconPath = nil;
-    if (isNestedWorkspaceApp && [fileManager fileExistsAtPath:parentIconPath]) {
-        // For workspace apps launched from .../app, prefer the workspace-level icon.
-        resolvedIconPath = parentIconPath;
-    } else if ([fileManager fileExistsAtPath:customIconPath]) {
-        resolvedIconPath = customIconPath;
-    } else if ([fileManager fileExistsAtPath:parentIconPath]) {
-        resolvedIconPath = parentIconPath;
+    NSMutableArray<NSString *> *iconCandidates = [NSMutableArray arrayWithArray:@[
+        [self.appPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
+        [self.appPath stringByAppendingPathComponent:@"assets/icons/meta/plain-master.png"],
+        [self.appPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
+        [self.appPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
+    ]];
+    if (isNestedWorkspaceApp) {
+        NSString *parentPath = [self.appPath stringByDeletingLastPathComponent];
+        [iconCandidates addObjectsFromArray:@[
+            [parentPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
+            [parentPath stringByAppendingPathComponent:@"assets/icons/meta/plain-master.png"],
+            [parentPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
+            [parentPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
+        ]];
+    }
+    for (NSString *candidate in iconCandidates) {
+        if ([fileManager fileExistsAtPath:candidate]) {
+            resolvedIconPath = candidate;
+            break;
+        }
     }
 
     NSImage *resolvedFileIcon = nil;
