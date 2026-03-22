@@ -111,6 +111,7 @@
 - (NSImage *)renderedStatusItemImageForRelayState:(NSString *)relayState busy:(BOOL)busy;
 - (BOOL)isStatusItemRendered;
 - (BOOL)handleDuplicateLaunchByActivatingExistingInstance;
+- (void)handleDistributedShowWindowRequest:(NSNotification *)notification;
 - (void)syncStonrActivationPolicy;
 - (void)showMainWindow;
 - (void)openMainWindowFromStatusItem:(id)sender;
@@ -130,6 +131,9 @@
 - (void)nativeStonrOpenStoreRootFromStatusItem:(id)sender;
 - (void)nativeStonrOpenLogFromStatusItem:(id)sender;
 @end
+
+static NSString *const WizardryHostShowWindowNotification = @"com.wizardry.host.show-window";
+static NSString *const WizardryHostShowWindowSlugKey = @"slug";
 
 static BOOL wizardryPrefBoolFromEnvFile(NSString *filePath, NSString *key, BOOL *found) {
     if (found) {
@@ -1569,12 +1573,32 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         if (!runningApp || runningApp.processIdentifier == currentPid || runningApp.terminated) {
             continue;
         }
+        NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+        if (self.appSlug.length) {
+            userInfo[WizardryHostShowWindowSlugKey] = self.appSlug;
+        }
+        [[NSDistributedNotificationCenter defaultCenter] postNotificationName:WizardryHostShowWindowNotification
+                                                                        object:nil
+                                                                      userInfo:userInfo.count ? userInfo : nil
+                                                            deliverImmediately:YES];
         [runningApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
         self.explicitQuitRequested = YES;
         [NSApp terminate:nil];
         return YES;
     }
     return NO;
+}
+
+- (void)handleDistributedShowWindowRequest:(NSNotification *)notification {
+    if (![self isStonrApp]) {
+        return;
+    }
+    NSDictionary *info = [notification userInfo];
+    NSString *slug = [info isKindOfClass:[NSDictionary class]] ? info[WizardryHostShowWindowSlugKey] : nil;
+    if (slug.length > 0 && ![[slug lowercaseString] isEqualToString:[self.appSlug lowercaseString]]) {
+        return;
+    }
+    [self showMainWindow];
 }
 
 - (void)openMainWindowFromStatusItem:(id)sender {
@@ -2085,6 +2109,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     appName = [appName capitalizedString];
     NSString *appSlug = [appComponent lowercaseString];
     self.appSlug = appSlug;
+    if ([appSlug isEqualToString:@"stonr"]) {
+        [[NSDistributedNotificationCenter defaultCenter] addObserver:self
+                                                            selector:@selector(handleDistributedShowWindowRequest:)
+                                                                name:WizardryHostShowWindowNotification
+                                                              object:nil];
+    }
     if ([self handleDuplicateLaunchByActivatingExistingInstance]) {
         return;
     }
@@ -2987,6 +3017,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
     (void)notification;
+    [[NSDistributedNotificationCenter defaultCenter] removeObserver:self
+                                                               name:WizardryHostShowWindowNotification
+                                                             object:nil];
     self.explicitQuitRequested = NO;
     [self clearFavoriteTrackHotkeyRegistration];
     if (self.favoriteTrackHotKeyHandlerRef) {
