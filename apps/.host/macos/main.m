@@ -126,7 +126,6 @@
 - (void)nativeStonrToggleRelayFromStatusItem:(id)sender;
 - (void)nativeStonrOpenStoreRootFromStatusItem:(id)sender;
 - (void)nativeStonrOpenLogFromStatusItem:(id)sender;
-- (void)nativeStonrRefreshFromStatusItem:(id)sender;
 @end
 
 static BOOL wizardryPrefBoolFromEnvFile(NSString *filePath, NSString *key, BOOL *found) {
@@ -1532,13 +1531,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [[NSWorkspace sharedWorkspace] openURL:logURL];
 }
 
-- (void)nativeStonrRefreshFromStatusItem:(id)sender {
-    (void)sender;
-    self.stonrStatusSnapshot = [self stonrRelayStatusSnapshot];
-    [self updateStatusItemVisibility];
-    [self dispatchStonrMenuAction:@"refresh"];
-}
-
 - (void)showMainWindow {
     if (!self.window) {
         return;
@@ -1730,13 +1722,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [openLogItem setTarget:self];
         openLogItem.enabled = !self.stonrStatusCommandInFlight;
         [menu addItem:openLogItem];
-
-        NSMenuItem *refreshItem = [[NSMenuItem alloc] initWithTitle:@"Refresh Status"
-                                                              action:@selector(nativeStonrRefreshFromStatusItem:)
-                                                       keyEquivalent:@""];
-        [refreshItem setTarget:self];
-        refreshItem.enabled = !self.stonrStatusCommandInFlight;
-        [menu addItem:refreshItem];
 
         [menu addItem:[NSMenuItem separatorItem]];
     }
