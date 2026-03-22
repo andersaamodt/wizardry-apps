@@ -111,6 +111,7 @@
 - (NSImage *)renderedStatusItemImage;
 - (BOOL)isStatusItemRendered;
 - (void)showMainWindow;
+- (void)openMainWindowFromStatusItem:(id)sender;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
 - (void)quitFromStatusItem:(id)sender;
 - (BOOL)isStonrApp;
@@ -1540,6 +1541,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [self updateStatusItemVisibility];
 }
 
+- (void)openMainWindowFromStatusItem:(id)sender {
+    (void)sender;
+    [self showMainWindow];
+}
+
 - (void)toggleMainWindowFromStatusItem:(id)sender {
     (void)sender;
     if (!self.window) {
@@ -1664,6 +1670,13 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                                           keyEquivalent:@""];
         relayStateItem.enabled = NO;
         [menu addItem:relayStateItem];
+        [menu addItem:[NSMenuItem separatorItem]];
+
+        NSMenuItem *openStonrItem = [[NSMenuItem alloc] initWithTitle:@"Open Stonr"
+                                                                action:@selector(openMainWindowFromStatusItem:)
+                                                         keyEquivalent:@""];
+        [openStonrItem setTarget:self];
+        [menu addItem:openStonrItem];
 
         if (self.stonrStatusCommandInFlight && self.stonrStatusCommandLabel.length) {
             NSMenuItem *actionItem = [[NSMenuItem alloc] initWithTitle:self.stonrStatusCommandLabel
@@ -1700,12 +1713,14 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [menu addItem:[NSMenuItem separatorItem]];
     }
 
-    NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:([self.window isVisible] ? @"Hide Window" : @"Show Window")
-                                                        action:@selector(toggleMainWindowFromStatusItem:)
-                                                 keyEquivalent:@""];
-    [toggleItem setTarget:self];
-    [menu addItem:toggleItem];
-    [menu addItem:[NSMenuItem separatorItem]];
+    if (![self isStonrApp]) {
+        NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:([self.window isVisible] ? @"Hide Window" : @"Show Window")
+                                                            action:@selector(toggleMainWindowFromStatusItem:)
+                                                     keyEquivalent:@""];
+        [toggleItem setTarget:self];
+        [menu addItem:toggleItem];
+        [menu addItem:[NSMenuItem separatorItem]];
+    }
     NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit"
                                                       action:@selector(quitFromStatusItem:)
                                                keyEquivalent:@""];
