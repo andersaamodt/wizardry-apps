@@ -44,6 +44,14 @@
           <p id="page-subtitle">Operational console for wizardry flows.</p>
         </div>
         <div class="wd-head-actions">
+          <button id="command-composer-toggle" type="button" class="wd-icon-btn wd-composer-btn" title="Compose command..." aria-label="Compose command..." aria-expanded="false" aria-controls="command-composer-modal">
+            <span class="wd-icon-composer" aria-hidden="true">
+              <svg viewBox="0 0 18 18" focusable="false" aria-hidden="true">
+                <path d="M1 1h4v4H1zm7 1h4v4H7zm13 1h-4v4h4zM1 7h4v4H1zm7 7h4v4h-4zM1 13h4v4H1zM7 7h4v4H7zm13 7h-4v4h4zM7 13h4v4H7zm13 13h-4v4h4z"></path>
+              </svg>
+            </span>
+            <span class="wd-hidden">Compose</span>
+          </button>
           <button id="activity-toggle" type="button" class="wd-icon-btn" aria-label="Toggle Casting Watch">✦</button>
           <button id="action-refresh" type="button" class="wd-polite-btn wd-secondary" title="Refresh page data">Refresh</button>
         </div>
@@ -95,6 +103,42 @@
     </aside>
   </main>
 
+  <div id="command-composer-modal" class="wd-composer-modal wd-hidden" role="dialog" aria-modal="true" aria-labelledby="composer-title">
+    <div id="composer-backdrop" class="wd-composer-backdrop" aria-hidden="true"></div>
+    <section class="wd-composer-panel" role="document">
+      <header class="wd-composer-head">
+        <div>
+          <h3 id="composer-title">Compose command</h3>
+          <p id="composer-subtitle" class="wd-subline">Build validated wizardry commands from action blocks.</p>
+        </div>
+        <button id="composer-close" type="button" class="wd-icon-btn wd-compact" title="Close composer" aria-label="Close command composer">×</button>
+      </header>
+      <div id="composer-blocks" class="wd-composer-blocks">
+        <div id="composer-block-groups"></div>
+      </div>
+      <div class="wd-composer-field">
+        <label for="composer-input" class="wd-composer-label">Command builder</label>
+        <div class="wd-composer-token-surface">
+          <div id="composer-token-row" class="wd-composer-token-row" aria-label="Command tokens" role="list"></div>
+          <input id="composer-input" class="wd-composer-input" type="text" placeholder="Type tokens or choose a building block..." autocomplete="off" spellcheck="false">
+        </div>
+        <p id="composer-command-preview" class="wd-composer-preview wd-subline">No command preview</p>
+        <p id="composer-feedback" class="wd-composer-feedback wd-subline"></p>
+      </div>
+      <div class="wd-composer-help" aria-live="polite">
+        <span>Press <kbd>Enter</kbd> to add token or run, <kbd>Shift</kbd>+<kbd>Enter</kbd> to run current command, <kbd>Esc</kbd> to close.</span>
+        <span>Spaces and commas create pills. Click pills to edit or remove.</span>
+      </div>
+      <pre id="composer-output" class="wd-mono-box wd-composer-output" aria-live="polite">No command run yet.</pre>
+      <footer class="wd-composer-actions">
+        <button id="composer-clear" type="button" class="wd-polite-btn wd-secondary">Reset</button>
+        <button id="composer-copy" type="button" class="wd-polite-btn wd-secondary">Copy</button>
+        <button id="composer-run" type="button" class="wd-polite-btn">Run</button>
+        <button id="composer-close-btn" type="button" class="wd-polite-btn wd-secondary">Close</button>
+      </footer>
+    </section>
+  </div>
+
   <script src="../.host/shared/wizardry-bridge.js"></script>
   <script>
     (function () {
@@ -102,6 +146,20 @@
 
       var ASSET_VERSION = 'wizardry-desktop20260324d';
       var THEME_FALLBACK = ['archmage', 'adept', 'chrono', 'chronomancer', 'conjurer', 'druid', 'empath'];
+      var COMPOSER_ACTIONS = ['run-spell', 'spell-help', 'run-action', 'run-system'];
+      var COMPOSER_SYSTEM_ACTIONS = ['system:whoami', 'system:pwd', 'system:date', 'system:status', 'system:environment'];
+      var COMPOSER_PRESET_LIMIT = 8;
+      var COMPOSER_TOKEN_RE = /^[a-z0-9._:-]+$/i;
+      var COMPOSER_REF_RE = /^[a-z0-9._-]+:[a-z0-9._-]+$/i;
+      var COMPOSER_RUN_ACTIONS = {
+        'arcana:install': { label: 'Arcana install', requiresArg: true, minArgs: 1, maxArgs: 1 },
+        'arcana:menu': { label: 'Arcana menu', requiresArg: false, minArgs: 0, maxArgs: 1 },
+        'arcana:themes': { label: 'Arcana themes', requiresArg: false, minArgs: 0, maxArgs: 0 },
+        'arcana:reload': { label: 'Reload arcana index', requiresArg: false, minArgs: 0, maxArgs: 0 },
+        'arcana:install-menu': { label: 'Arcana install menu', requiresArg: false, minArgs: 0, maxArgs: 0 },
+        'arcana:module-menu': { label: 'Arcana module menu', requiresArg: true, minArgs: 1, maxArgs: 1 },
+        'app-help': { label: 'Show app help', requiresArg: true, minArgs: 1, maxArgs: 1 }
+      };
       var NAV_PAGES = [
         { id: 'home', title: 'Home', blurb: 'Overview and diagnostics.' },
         { id: 'cast', title: 'Cast', blurb: 'Cast spells and monitor memorized commands.' },
@@ -145,7 +203,16 @@
         activityWatchIntervalMs: 2000,
         activityWatchTimer: null,
         activityRowsLimit: 220,
-        actionInFlight: false
+        actionInFlight: false,
+        composer: {
+          open: false,
+          rawInput: '',
+          tokens: [],
+          selectedToken: -1,
+          message: '',
+          output: 'No command run yet.',
+          running: false
+        }
       };
 
       var els = {};
@@ -180,7 +247,21 @@
           bridgeStatus: document.getElementById('bridge-status'),
           prefsStatus: document.getElementById('prefs-status'),
           railWidthInput: document.getElementById('rail-width'),
-          arcanaList: document.getElementById('arcana-list')
+          arcanaList: document.getElementById('arcana-list'),
+          composerModal: document.getElementById('command-composer-modal'),
+          composerBackdrop: document.getElementById('composer-backdrop'),
+          composerToggle: document.getElementById('command-composer-toggle'),
+          composerClose: document.getElementById('composer-close'),
+          composerCloseBtn: document.getElementById('composer-close-btn'),
+          composerRun: document.getElementById('composer-run'),
+          composerClear: document.getElementById('composer-clear'),
+          composerCopy: document.getElementById('composer-copy'),
+          composerCommandPreview: document.getElementById('composer-command-preview'),
+          composerInput: document.getElementById('composer-input'),
+          composerFeedback: document.getElementById('composer-feedback'),
+          composerTokenRow: document.getElementById('composer-token-row'),
+          composerBlocks: document.getElementById('composer-block-groups'),
+          composerOutput: document.getElementById('composer-output')
         };
       }
 
@@ -305,6 +386,812 @@
           return;
         }
         el.textContent = String(value || '');
+      }
+
+      function normalizeComposerToken(value) {
+        return String(value || '').trim();
+      }
+
+      function splitComposerText(value) {
+        return normalizeComposerToken(value).split(/\s+/).filter(Boolean);
+      }
+
+      function escapeHtmlAttribute(value) {
+        return String(value == null ? '' : value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+
+      function composerDraftTokens() {
+        var tokens = Array.prototype.slice.call(state.composer.tokens || []);
+        var pending = splitComposerText(state.composer.rawInput);
+        if (!pending.length) {
+          return tokens;
+        }
+        return tokens.concat(pending);
+      }
+
+      function composerResetSelectedToken() {
+        if (state.composer.selectedToken >= state.composer.tokens.length) {
+          state.composer.selectedToken = -1;
+        }
+      }
+
+      function setComposerSelectedToken(index) {
+        state.composer.selectedToken = Number(index);
+        if (!Number.isInteger(state.composer.selectedToken) || state.composer.selectedToken < 0 || state.composer.selectedToken >= state.composer.tokens.length) {
+          state.composer.selectedToken = -1;
+        }
+      }
+
+      function addComposerTokens(values) {
+        for (var i = 0; i < values.length; i += 1) {
+          var token = normalizeComposerToken(values[i]);
+          if (!token) {
+            continue;
+          }
+          state.composer.tokens.push(token);
+        }
+        setComposerSelectedToken(-1);
+        state.composer.rawInput = '';
+        if (els.composerInput) {
+          els.composerInput.value = '';
+        }
+        renderComposer();
+      }
+
+      function removeComposerTokenAt(index) {
+        var idx = Number(index);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= state.composer.tokens.length) {
+          return;
+        }
+        state.composer.tokens.splice(idx, 1);
+        if (state.composer.selectedToken >= idx) {
+          setComposerSelectedToken(state.composer.selectedToken - 1);
+        }
+        renderComposer();
+      }
+
+      function editComposerTokenAt(index) {
+        var idx = Number(index);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= state.composer.tokens.length) {
+          return;
+        }
+        var token = state.composer.tokens[idx];
+        removeComposerTokenAt(idx);
+        state.composer.rawInput = String(token || '');
+        if (els.composerInput) {
+          els.composerInput.value = state.composer.rawInput;
+          if (typeof els.composerInput.focus === 'function') {
+            els.composerInput.focus();
+          }
+          if (typeof els.composerInput.setSelectionRange === 'function') {
+            els.composerInput.setSelectionRange(state.composer.rawInput.length, state.composer.rawInput.length);
+          }
+        }
+        renderComposer();
+      }
+
+      function commitComposerInput(force) {
+        if (!els.composerInput) {
+          return false;
+        }
+        var value = els.composerInput.value || '';
+        var tokens = splitComposerText(value);
+        if (!tokens.length) {
+          state.composer.rawInput = '';
+          renderComposer();
+          return false;
+        }
+        var shouldCommit = !!force || /(?:\s|,)$/.test(value) || tokens.length > 1;
+        if (!shouldCommit) {
+          state.composer.rawInput = value;
+          renderComposer();
+          return false;
+        }
+        addComposerTokens(tokens);
+        return true;
+      }
+
+      function composerOpenWithTokens(tokens) {
+        state.composer.tokens = Array.isArray(tokens) ? tokens.slice(0) : [];
+        state.composer.rawInput = '';
+        state.composer.selectedToken = -1;
+        state.composer.message = '';
+        state.composer.output = 'No command run yet.';
+        if (els.composerInput) {
+          els.composerInput.value = '';
+        }
+        setComposerOpen(true);
+        renderComposer();
+      }
+
+      function runActionConfig(actionName) {
+        return COMPOSER_RUN_ACTIONS[actionName] || null;
+      }
+
+      function addTokenKindsFromList(result, start, end, kind) {
+        for (var i = start; i < end; i += 1) {
+          result.tokenKinds[i] = kind;
+        }
+      }
+
+      function addComposerPlaceholder(result, index, label, kind) {
+        if (!result.placeholders) {
+          result.placeholders = [];
+        }
+        result.placeholders.push({
+          index: index,
+          label: label,
+          kind: kind || 'arg-opt'
+        });
+      }
+
+      function composerPlanFromTokens(tokens) {
+        var result = {
+          status: 'idle',
+          ready: false,
+          valid: false,
+          message: 'Add a command action token to begin.',
+          placeholders: [],
+          tokens: tokens,
+          tokenKinds: [],
+          backend: null,
+          preview: ''
+        };
+
+        if (!tokens.length) {
+          result.tokenKinds = [];
+          return result;
+        }
+
+        var safeTokenList = tokens.every(function (token) {
+          return COMPOSER_TOKEN_RE.test(token);
+        });
+        if (!safeTokenList) {
+          result.status = 'error';
+          result.message = 'Only alphanumeric, dot, hyphen, underscore, or colon characters are allowed.';
+          result.tokenKinds = tokens.map(function (_, idx) {
+            return idx === 0 ? 'action' : 'token-error';
+          });
+          return result;
+        }
+
+        var action = tokens[0];
+        if (COMPOSER_ACTIONS.indexOf(action) < 0) {
+          result.status = 'error';
+          result.message = 'Unknown command action "' + action + '".';
+          result.tokenKinds = ['token-error'];
+          return result;
+        }
+
+        result.tokenKinds[0] = 'action';
+        result.preview = action;
+        if (action === 'run-spell' || action === 'spell-help') {
+          if (!tokens[1]) {
+            result.status = 'incomplete';
+            result.message = 'Add a spell reference like builtin:web next.';
+            result.tokenKinds[1] = 'missing';
+            addComposerPlaceholder(result, 1, 'source', 'arg-source');
+            return result;
+          }
+          if (!COMPOSER_REF_RE.test(tokens[1])) {
+            result.status = 'error';
+            result.message = 'Spell reference must use "<source>:<category>".';
+            result.tokenKinds[1] = 'error';
+            return result;
+          }
+          result.tokenKinds[1] = 'arg-source';
+          result.preview = action + ' ' + tokens[1];
+
+          if (!tokens[2]) {
+            result.status = 'incomplete';
+            result.message = 'Add a spell name.';
+            result.tokenKinds[2] = 'missing';
+            addComposerPlaceholder(result, 2, 'name', 'arg-spell');
+            return result;
+          }
+          if (!COMPOSER_TOKEN_RE.test(tokens[2])) {
+            result.status = 'error';
+            result.message = 'Spell names may only use simple token characters.';
+            result.tokenKinds[2] = 'error';
+            return result;
+          }
+          result.tokenKinds[2] = 'arg-spell';
+          result.preview = action + ' ' + tokens[1] + ' ' + tokens[2];
+          if (tokens[3]) {
+            result.status = 'error';
+            result.message = 'run-spell only accepts two arguments.';
+            result.tokenKinds[3] = 'error';
+            return result;
+          }
+          result.status = 'ready';
+          result.ready = true;
+          result.valid = true;
+          result.message = 'Command is ready.';
+          result.backend = {
+            type: action,
+            ref: tokens[1],
+            name: tokens[2]
+          };
+          return result;
+        }
+
+        if (action === 'run-system') {
+          if (!tokens[1]) {
+            result.status = 'incomplete';
+            result.message = 'Add a system action.';
+            result.tokenKinds[1] = 'missing';
+            addComposerPlaceholder(result, 1, 'system-action', 'arg-system');
+            return result;
+          }
+          if (COMPOSER_SYSTEM_ACTIONS.indexOf(tokens[1]) < 0) {
+            result.status = 'error';
+            result.message = 'Unsupported system action "' + tokens[1] + '".';
+            result.tokenKinds[1] = 'error';
+            return result;
+          }
+          result.tokenKinds[1] = 'arg-system';
+          result.preview = action + ' ' + tokens[1];
+          if (tokens[2]) {
+            result.status = 'error';
+            result.message = 'run-system accepts exactly one argument.';
+            result.tokenKinds[2] = 'error';
+            return result;
+          }
+          result.status = 'ready';
+          result.ready = true;
+          result.valid = true;
+          result.message = 'Command is ready.';
+          result.backend = {
+            type: action,
+            command: tokens[1]
+          };
+          return result;
+        }
+
+        if (action === 'run-action') {
+          if (!tokens[1]) {
+            result.status = 'incomplete';
+            result.message = 'Add a wizardry action token.';
+            result.tokenKinds[1] = 'missing';
+            addComposerPlaceholder(result, 1, 'action', 'arg-action');
+            return result;
+          }
+          var actionName = tokens[1];
+          var config = runActionConfig(actionName);
+          if (!config) {
+            result.status = 'error';
+            result.message = 'Unsupported wizardry action "' + actionName + '".';
+            result.tokenKinds[1] = 'error';
+            return result;
+          }
+          if (!COMPOSER_TOKEN_RE.test(actionName)) {
+            result.status = 'error';
+            result.message = 'Action names must only use valid token characters.';
+            result.tokenKinds[1] = 'error';
+            return result;
+          }
+          var minArgs = typeof config.minArgs === 'number' ? config.minArgs : (config.requiresArg ? 1 : 0);
+          var maxArgs = typeof config.maxArgs === 'number' ? config.maxArgs : (config.requiresArg ? 1 : 0);
+          var providedArgs = tokens.length - 2;
+          result.tokenKinds[1] = 'arg-action';
+          result.preview = action + ' ' + actionName;
+          if (minArgs > 0 && providedArgs < minArgs) {
+            if (minArgs === 1) {
+              result.status = 'incomplete';
+              result.message = 'Add the required action parameter.';
+              result.tokenKinds[2] = 'missing';
+              addComposerPlaceholder(result, 2, 'argument', 'arg-arg');
+            }
+            return result;
+          }
+          var argHasError = false;
+          for (var argIndex = 2; argIndex < tokens.length; argIndex += 1) {
+            if (!COMPOSER_TOKEN_RE.test(tokens[argIndex])) {
+              result.status = 'error';
+              result.message = 'Action arguments must use allowed token characters.';
+              result.tokenKinds[argIndex] = 'error';
+              argHasError = true;
+            } else {
+              result.tokenKinds[argIndex] = providedArgs === 1 ? 'arg-arg' : (argIndex === 2 ? 'arg-arg' : 'arg-arg');
+            }
+          }
+          if (argHasError) {
+            return result;
+          }
+          if (providedArgs >= 1) {
+            result.preview = action + ' ' + actionName + ' ' + tokens.slice(2).join(' ');
+          }
+          if (maxArgs === 0 && providedArgs > maxArgs) {
+            result.status = 'error';
+            result.message = actionName + ' accepts no parameters.';
+            addTokenKindsFromList(result, 3, result.tokens.length, 'error');
+            return result;
+          }
+          if (maxArgs > 0 && providedArgs > maxArgs) {
+            result.status = 'error';
+            result.message = actionName + ' accepts at most ' + maxArgs + ' parameter(s).';
+            addTokenKindsFromList(result, 2 + maxArgs, result.tokens.length, 'error');
+            return result;
+          }
+
+          if (result.status !== 'error') {
+            result.status = 'ready';
+            result.ready = true;
+            result.valid = true;
+            result.message = 'Command is ready.';
+            result.backend = {
+              type: action,
+              actionName: actionName,
+              param: tokens[2] || ''
+            };
+          }
+          return result;
+        }
+
+        return result;
+      }
+
+      function composerBlockDefinitions() {
+        var blocks = [
+          {
+            label: 'System',
+            entries: [
+              { label: 'whoami', tokens: ['run-system', 'system:whoami'], help: 'Inspect current shell user.' },
+              { label: 'pwd', tokens: ['run-system', 'system:pwd'], help: 'Print current working directory.' },
+              { label: 'date', tokens: ['run-system', 'system:date'], help: 'Print current date and time.' },
+              { label: 'status', tokens: ['run-system', 'system:status'], help: 'Run lightweight status probe.' },
+              { label: 'environment', tokens: ['run-system', 'system:environment'], help: 'Show shell and directory context.' }
+            ]
+          },
+          {
+            label: 'Casting',
+            entries: [
+              { label: 'run-spell', tokens: ['run-spell'], help: 'Build a spell reference and spell name.' },
+              { label: 'spell-help', tokens: ['spell-help'], help: 'Fetch help text for a known spell.' }
+            ]
+          },
+          {
+            label: 'Arcana Actions',
+            entries: [
+              { label: 'app help (cast)', tokens: ['run-action', 'app-help', 'cast'], help: 'Show app help output for `cast`.' },
+              { label: 'arcana install', tokens: ['run-action', 'arcana:install'], help: 'Install a chosen arcana module by adding a final parameter.' },
+              { label: 'arcana module menu', tokens: ['run-action', 'arcana:module-menu'], help: 'Open a module menu after adding a module name.' },
+              { label: 'arcana menu', tokens: ['run-action', 'arcana:menu'], help: 'Run arcana menu.' },
+              { label: 'arcana themes', tokens: ['run-action', 'arcana:themes'], help: 'List available themes.' },
+              { label: 'reload arcana', tokens: ['run-action', 'arcana:reload'], help: 'Refresh the arcana metadata cache.' }
+            ]
+          }
+        ];
+
+        if (state.cast.categories && state.cast.categories.length) {
+          var limit = Math.min(4, state.cast.categories.length);
+          for (var i = 0; i < limit; i += 1) {
+            var category = state.cast.categories[i];
+            var spellRows = (state.spellCache && state.spellCache[category.id]) || [];
+            if (spellRows && spellRows[0]) {
+              blocks[1].entries.push({
+                label: 'run-spell ' + safeShortText(category.id) + ' / ' + safeShortText(spellRows[0]),
+                tokens: ['run-spell', category.id, spellRows[0]],
+                help: 'Quick launch ' + category.id + ' : ' + spellRows[0]
+              });
+            }
+          }
+        }
+
+        if (state.arcanaInstall && state.arcanaInstall.length) {
+          var moduleLimit = Math.min(5, state.arcanaInstall.length);
+          for (var j = 0; j < moduleLimit; j += 1) {
+            var module = state.arcanaInstall[j];
+            if (!module || !module.name) {
+              continue;
+            }
+            blocks[2].entries.push({
+              label: 'Install ' + safeShortText(module.name),
+              tokens: ['run-action', 'arcana:install', module.name],
+              help: 'Install module ' + module.name
+            });
+            blocks[2].entries.push({
+              label: 'Module menu ' + safeShortText(module.name),
+              tokens: ['run-action', 'arcana:menu', module.name],
+              help: 'Open module menu for ' + module.name
+            });
+          }
+        }
+
+        return blocks;
+      }
+
+      function composerArgSuggestionGroups(plan, blocks) {
+        if (!plan || !plan.tokens || !plan.tokens.length) {
+          return blocks;
+        }
+
+        var action = plan.tokens[0];
+        var hasRef = plan.tokens[1];
+        var hasArg = plan.tokens[2];
+
+        if (action === 'run-spell' && !hasRef) {
+          var categoryRefs = [];
+          for (var i = 0; i < state.cast.categories.length && categoryRefs.length < COMPOSER_PRESET_LIMIT; i += 1) {
+            var category = state.cast.categories[i];
+            categoryRefs.push({
+              label: category.id,
+              tokens: [category.id],
+              help: 'Use spell source and category, e.g. ' + category.id
+            });
+          }
+          if (categoryRefs.length) {
+            blocks.unshift({
+              label: 'Spell References',
+              entries: categoryRefs
+            });
+          }
+          return blocks;
+        }
+
+        if (action === 'run-spell' && hasRef && !hasArg) {
+          var spellRows = state.spellCache[hasRef] || [];
+          if (spellRows.length) {
+            var spellSuggestions = [];
+            for (var s = 0; s < spellRows.length && spellSuggestions.length < COMPOSER_PRESET_LIMIT; s += 1) {
+              spellSuggestions.push({
+                label: spellRows[s],
+                tokens: [spellRows[s]],
+                help: 'Cast ' + hasRef + ' spell ' + spellRows[s]
+              });
+            }
+            if (spellSuggestions.length) {
+              blocks.unshift({
+                label: 'Spell Names',
+                entries: spellSuggestions
+              });
+            }
+          }
+          return blocks;
+        }
+
+        if (action === 'run-system' && !hasRef) {
+          var systemSuggestions = [];
+          for (var j = 0; j < COMPOSER_SYSTEM_ACTIONS.length; j += 1) {
+            systemSuggestions.push({
+              label: COMPOSER_SYSTEM_ACTIONS[j],
+              tokens: [COMPOSER_SYSTEM_ACTIONS[j]],
+              help: 'Run host helper: ' + COMPOSER_SYSTEM_ACTIONS[j]
+            });
+          }
+          blocks.unshift({
+            label: 'System Actions',
+            entries: systemSuggestions
+          });
+          return blocks;
+        }
+
+        if (action === 'run-action' && !hasRef) {
+          var actionSuggestions = [];
+          var actionNames = Object.keys(COMPOSER_RUN_ACTIONS);
+          for (var k = 0; k < actionNames.length && actionSuggestions.length < COMPOSER_PRESET_LIMIT; k += 1) {
+            var name = actionNames[k];
+            actionSuggestions.push({
+              label: name,
+              tokens: [name],
+              help: COMPOSER_RUN_ACTIONS[name].label || ('Run action ' + name)
+            });
+          }
+          blocks.unshift({
+            label: 'Wizardry Actions',
+            entries: actionSuggestions
+          });
+          return blocks;
+        }
+
+        if (action === 'run-action' && hasRef && !hasArg && runActionConfig(hasRef) &&
+          (runActionConfig(hasRef).requiresArg || hasRef === 'arcana:menu')) {
+          var argSuggestions = [];
+          if (hasRef === 'arcana:install' || hasRef === 'arcana:module-menu') {
+            for (var m = 0; m < state.arcanaInstall.length && argSuggestions.length < COMPOSER_PRESET_LIMIT; m += 1) {
+              var module = state.arcanaInstall[m];
+              if (module && module.name) {
+                argSuggestions.push({
+                  label: module.name,
+                  tokens: [module.name],
+                  help: hasRef === 'arcana:install' ? 'Install module ' + module.name : 'Open menu for ' + module.name
+                });
+              }
+            }
+          } else if (hasRef === 'arcana:menu') {
+            for (var menuIndex = 0; menuIndex < state.arcanaInstall.length && argSuggestions.length < COMPOSER_PRESET_LIMIT; menuIndex += 1) {
+              var menuModule = state.arcanaInstall[menuIndex];
+              if (menuModule && menuModule.name) {
+                argSuggestions.push({
+                  label: menuModule.name,
+                  tokens: [menuModule.name],
+                  help: 'Open module menu for ' + menuModule.name
+                });
+              }
+            }
+          } else if (hasRef === 'app-help') {
+            argSuggestions = [
+              { label: 'cast', tokens: ['cast'], help: 'Show cast help.' },
+              { label: 'mud', tokens: ['mud'], help: 'Show MUD help, where available.' },
+              { label: 'arcana', tokens: ['arcana'], help: 'Show arcana help.' },
+              { label: 'main-menu', tokens: ['main-menu'], help: 'Show system help entrypoint menu help.' }
+            ];
+          }
+          if (argSuggestions.length) {
+            blocks.unshift({
+              label: 'Action Arguments',
+              entries: argSuggestions
+            });
+          }
+          return blocks;
+        }
+
+        return blocks;
+      }
+
+      function renderComposerTokenRow(plan) {
+        if (!els.composerTokenRow) {
+          return;
+        }
+        var tokens = plan && plan.tokens ? plan.tokens : [];
+        var placeholders = plan && plan.placeholders ? plan.placeholders : [];
+        if (!tokens.length && !placeholders.length) {
+          els.composerTokenRow.innerHTML = '<span class="wd-composer-empty">No tokens yet.</span>';
+          return;
+        }
+        var html = '';
+        for (var i = 0; i < tokens.length; i += 1) {
+          var token = tokens[i];
+          var kind = plan.tokenKinds && plan.tokenKinds[i] ? plan.tokenKinds[i] : 'token';
+          var selected = state.composer.selectedToken === i ? ' wd-composer-token-selected' : '';
+          var tokenTabIndex = 0;
+          html += '<span class="wd-composer-token wd-composer-token-' + kind + selected + '" role="listitem">';
+          html += '<button type="button" class="wd-composer-token-text" data-composer-token="' + i + '" tabindex="' + tokenTabIndex + '" aria-label="Edit token ' + escapeHtmlAttribute(token) + '" data-token-value="' + escapeAttrValue(token) + '">' + escapeText(token) + '</button>';
+          html += '<button type="button" class="wd-composer-token-remove" data-composer-token-remove="' + i + '" aria-label="Remove token ' + escapeHtmlAttribute(token) + '">×</button>';
+          html += '</span>';
+        }
+        for (var p = 0; p < placeholders.length; p += 1) {
+          var placeholder = placeholders[p];
+          if (!placeholder) {
+            continue;
+          }
+          var placeholderKind = placeholder.kind || 'arg-opt';
+          var placeholderLabel = placeholder.label || 'argument';
+          html += '<span class="wd-composer-token wd-composer-token-' + placeholderKind + ' wd-composer-token-placeholder" role="note">';
+          html += '<span class="wd-composer-token-text" aria-hidden="true">[' + escapeText(placeholderLabel) + ']</span>';
+          html += '</span>';
+        }
+        if (!html) {
+          html = '<span class="wd-composer-empty">No tokens yet.</span>';
+        }
+        els.composerTokenRow.innerHTML = html;
+      }
+
+      function renderComposerBlocks(plan) {
+        if (!els.composerBlocks) {
+          return;
+        }
+        var groups = composerArgSuggestionGroups(plan || {}, composerBlockDefinitions());
+        var html = '';
+        for (var i = 0; i < groups.length; i += 1) {
+          var group = groups[i];
+          html += '<section class="wd-composer-group">';
+          html += '<h4>' + escapeText(group.label || 'Blocks') + '</h4>';
+          html += '<div class="wd-composer-group-entries">';
+          for (var j = 0; j < group.entries.length; j += 1) {
+            var block = group.entries[j];
+            html += '<button type="button" class="wd-polite-btn wd-composer-block" title="' + escapeHtmlAttribute(block.help || '') + '" data-composer-block="' + escapeAttrValue((block.tokens || []).join(' ')) + '">' + escapeText(block.label || ('block ' + (j + 1))) + '</button>';
+          }
+          html += '</div></section>';
+        }
+        els.composerBlocks.innerHTML = html;
+      }
+
+      function updateComposerOutput(value) {
+        state.composer.output = String(value == null ? '' : value).trim() || 'No command output.';
+        if (els.composerOutput) {
+          setText(els.composerOutput, state.composer.output);
+        }
+      }
+
+      function renderComposerFeedback(plan) {
+        if (!els.composerFeedback) {
+          return;
+        }
+        var status = plan && plan.status ? plan.status : 'idle';
+        var message = plan && plan.message ? plan.message : '';
+        if (state.composer.running) {
+          status = 'running';
+          message = 'Executing command...';
+        }
+        els.composerFeedback.textContent = message;
+        els.composerFeedback.className = 'wd-composer-feedback wd-subline wd-composer-feedback-' + status;
+      }
+
+      function renderComposerPreview(plan) {
+        if (!els.composerCommandPreview) {
+          return;
+        }
+        var tokens = [];
+        if (plan && Array.isArray(plan.tokens)) {
+          tokens = plan.tokens.slice(0);
+        }
+        if (!tokens.length) {
+          setText(els.composerCommandPreview, 'No command preview');
+          return;
+        }
+        setText(els.composerCommandPreview, tokens.join(' '));
+      }
+
+      function copyComposerCommand() {
+        var tokens = composerDraftTokens();
+        var command = String(tokens.join(' ')).trim();
+        if (!command) {
+          return;
+        }
+        if (typeof navigator === 'undefined' || !navigator.clipboard || !navigator.clipboard.writeText) {
+          return;
+        }
+        navigator.clipboard.writeText(command).catch(function () {});
+      }
+
+      function renderComposer() {
+        if (!state.composer.open) {
+          return;
+        }
+        composerResetSelectedToken();
+        var plan = composerPlanFromTokens(composerDraftTokens());
+        renderComposerTokenRow(plan);
+        renderComposerBlocks(plan);
+        renderComposerFeedback(plan);
+        renderComposerPreview(plan);
+        updateComposerOutput(state.composer.output || 'No command run yet.');
+        if (els.composerRun) {
+          var runCommand = String(plan && plan.tokens ? plan.tokens.join(' ') : '').trim();
+          els.composerRun.title = runCommand ? 'Run ' + runCommand : 'Build a complete command first';
+          els.composerRun.disabled = state.composer.running || state.actionInFlight || !plan.ready;
+        }
+        if (els.composerCloseBtn) {
+          els.composerCloseBtn.disabled = false;
+        }
+      }
+
+      function setComposerOpen(open) {
+        state.composer.open = !!open;
+        if (!els.composerModal || !els.composerToggle) {
+          return;
+        }
+        els.composerModal.classList.toggle('wd-hidden', !state.composer.open);
+        els.composerToggle.setAttribute('aria-expanded', String(state.composer.open));
+        if (state.composer.open) {
+          if (els.composerInput) {
+            els.composerInput.value = state.composer.rawInput || '';
+            if (typeof els.composerInput.focus === 'function') {
+              els.composerInput.focus();
+            }
+          }
+          renderComposer();
+          if (state.composer.tokens.length && state.composer.selectedToken >= 0) {
+            setComposerSelectedToken(state.composer.selectedToken);
+          }
+          return;
+        }
+        if (typeof els.composerToggle.focus === 'function') {
+          els.composerToggle.focus();
+        }
+      }
+
+      function clearComposer() {
+        state.composer.tokens = [];
+        state.composer.rawInput = '';
+        state.composer.selectedToken = -1;
+        state.composer.message = '';
+        state.composer.output = 'No command run yet.';
+        state.composer.running = false;
+        if (els.composerInput) {
+          els.composerInput.value = '';
+        }
+        renderComposer();
+      }
+
+      function setSynonymDialogOpen(open) {
+        var dialog = document.getElementById('spellbook-add-dialog');
+        var toggle = document.getElementById('spellbook-add-toggle');
+        if (!dialog || !toggle) {
+          return;
+        }
+        if (open) {
+          dialog.classList.remove('wd-hidden');
+          toggle.setAttribute('aria-expanded', 'true');
+          var aliasInput = document.getElementById('spell-alias');
+          if (aliasInput && typeof aliasInput.focus === 'function') {
+            aliasInput.focus();
+          }
+          return;
+        }
+        dialog.classList.add('wd-hidden');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+
+      function clearSynonymInputs() {
+        var aliasInput = document.getElementById('spell-alias');
+        var commandInput = document.getElementById('spell-command');
+        if (aliasInput) {
+          aliasInput.value = '';
+        }
+        if (commandInput) {
+          commandInput.value = '';
+        }
+      }
+
+      function getSynonymValues() {
+        var aliasInput = document.getElementById('spell-alias');
+        var commandInput = document.getElementById('spell-command');
+        return {
+          alias: String(aliasInput ? aliasInput.value : '').trim(),
+          command: String(commandInput ? commandInput.value : '').trim()
+        };
+      }
+
+      function saveSynonymFromDialog() {
+        var values = getSynonymValues();
+        if (!values.alias || !values.command) {
+          return;
+        }
+        addSynonym(values.alias, values.command);
+        clearSynonymInputs();
+        setSynonymDialogOpen(false);
+      }
+
+      function executeComposerCommand(plan) {
+        if (!plan || !plan.ready || !plan.backend) {
+          if (plan && plan.message && els.composerFeedback) {
+            renderComposerFeedback(plan);
+          }
+          return;
+        }
+        if (state.composer.running || state.actionInFlight) {
+          return;
+        }
+        state.composer.running = true;
+        renderComposerFeedback(plan);
+        var run;
+        if (plan.backend.type === 'run-spell') {
+          run = runSpell(plan.backend.ref, plan.backend.name, { outputId: 'composer-output' });
+        } else if (plan.backend.type === 'spell-help') {
+          run = runSpellHelp(plan.backend.ref, plan.backend.name, { outputId: 'composer-output' });
+        } else if (plan.backend.type === 'run-system') {
+          run = callBackend('run-system', [plan.backend.command]).then(function (text) {
+            updateComposerOutput(text || 'ok');
+            pushActivity('app', 'system:' + plan.backend.command + ' completed', { kind: 'system:' + plan.backend.command, section: 'app', app: 'host', source: plan.backend.command, status: 'ok' });
+          }).catch(function (error) {
+            updateComposerOutput(error && error.message ? error.message : String(error || 'failed'));
+            pushActivity('app', 'system:' + plan.backend.command + ' failed', { section: 'app', app: 'host', source: plan.backend.command, status: 'error' });
+          });
+        } else if (plan.backend.type === 'run-action') {
+          var actionArgs = [plan.backend.actionName];
+          if (plan.backend.param) {
+            actionArgs.push(plan.backend.param);
+          }
+          run = callBackend('run-action', actionArgs).then(function (text) {
+            updateComposerOutput(text || 'ok');
+            pushActivity('app', 'run-action ' + plan.backend.actionName + ' completed', { section: 'app', app: 'wizardry-core', source: 'run-action:' + plan.backend.actionName, status: 'ok' });
+          }).catch(function (error) {
+            updateComposerOutput(error && error.message ? error.message : String(error || 'failed'));
+            pushActivity('app', 'run-action ' + plan.backend.actionName + ' failed', { section: 'app', app: 'wizardry-core', source: 'run-action:' + plan.backend.actionName, status: 'error' });
+          });
+        }
+
+        Promise.resolve(run).finally(function () {
+          state.composer.running = false;
+          renderComposer();
+          loadWatchHistory();
+        });
       }
 
       function pushActivity(kind, message, payload) {
@@ -432,6 +1319,10 @@
           var commandRows = visibleApp.slice(0, 180);
           var castingHtml = '';
           var commandHtml = '';
+          var castingCount = Number(visibleCasting.length || 0);
+          var commandCount = Number(visibleApp.length || 0);
+          var castingTitle = 'Active Casting' + (castingCount ? ' (' + castingCount + ')' : '');
+          var commandTitle = 'App Commands' + (commandCount ? ' (' + commandCount + ')' : '');
 
           if (!castingRows.length) {
             castingHtml = '<p class="wd-empty">No cast actions yet.</p>';
@@ -444,8 +1335,8 @@
             commandHtml = castRowsHtml(commandRows);
           }
 
-          els.activityFeed.innerHTML = '<div class="wd-activity-sections"><div class="wd-activity-section"><h4>Active Casting</h4><div class="wd-activity-list wd-scroll-list">' + castingHtml + '</div></div>' +
-            '<div class="wd-activity-section"><h4>App Commands</h4><div class="wd-activity-list wd-scroll-list">' + commandHtml + '</div></div></div>';
+          els.activityFeed.innerHTML = '<div class="wd-activity-sections"><section class="wd-activity-section"><h4>' + escapeText(castingTitle) + '</h4><div class="wd-activity-list wd-scroll-list wd-activity-list-scrolled">' + castingHtml + '</div></section>' +
+            '<section class="wd-activity-section"><h4>' + escapeText(commandTitle) + '</h4><div class="wd-activity-list wd-scroll-list wd-activity-list-scrolled">' + commandHtml + '</div></section></div>';
         }
         if (els.activityCount) {
           var total = Number(visibleCasting.length || 0) + Number(visibleApp.length || 0);
@@ -814,11 +1705,11 @@
           '<p>Run a spell using <strong>Run</strong> to generate casting activity.</p>' +
           '</div></section>';
         if (!state.cast.memorized.length) {
-          html += '<section class="wd-panel wd-spellbook-memo"><h3>Casting Monitor</h3>';
+          html += '<section class="wd-panel wd-spellbook-memo"><h3>Memorized Spells</h3>';
           html += '<p class="wd-subline">Spellbook entries from <code>cast --list</code>.</p>';
           html += '<p class="wd-empty">No memorized spells yet.</p></section>';
         } else {
-          html += '<section class="wd-panel wd-spellbook-memo"><h3>Casting Monitor</h3><p class="wd-subline">Memorized spell entries from <code>cast --list</code>.</p>';
+          html += '<section class="wd-panel wd-spellbook-memo"><h3>Memorized Spells</h3><p class="wd-subline">Memorized spell entries from <code>cast --list</code>.</p>';
           html += '<div class="wd-list wd-list-compact wd-scroll-area">';
           for (var m = 0; m < state.cast.memorized.length; m += 1) {
             var memo = state.cast.memorized[m];
@@ -835,6 +1726,7 @@
       function renderSpellbookPage() {
         var html = '<section class="wd-panel"><div class="wd-panel-head"><h3>Synonyms</h3></div>' +
           '<p class="wd-subline">Map shortcut aliases to spell command lines.</p>';
+        html += '<div class="wd-synonym-list-wrap">';
         html += '<div class="wd-list wd-synonym-list">';
         for (var i = 0; i < state.spellbook.length; i += 1) {
           var item = state.spellbook[i];
@@ -843,6 +1735,7 @@
         if (!state.spellbook.length) {
           html += '<p class="wd-empty">No aliases yet.</p>';
         }
+        html += '</div>';
         html += '</div>';
         html += '<button id="spellbook-add-toggle" type="button" class="wd-icon-btn wd-icon-plus" aria-label="Add synonym" aria-expanded="false">＋</button>';
         html += '<div id="spellbook-add-dialog" class="wd-inline-form wd-synonym-dialog wd-hidden" role="dialog" aria-label="Add synonym">';
@@ -1186,6 +2079,9 @@
           if (state.activePage === 'arcana') {
             renderPage();
           }
+          if (state.composer.open) {
+            renderComposer();
+          }
         }).catch(function () {
           state.arcanaInstall = [];
         });
@@ -1208,6 +2104,9 @@
             if (selected) {
               selected.count = 0;
             }
+          }
+          if (state.composer.open) {
+            renderComposer();
           }
         }).catch(function () {
           state.spellCache[catId] = [];
@@ -1254,25 +2153,69 @@
         runQuickAction(kind, module, options);
       }
 
-      function runSpell(kind, spellName) {
+      function runSpell(kind, spellName, options) {
+        options = options || {};
         if (state.actionInFlight) {
-          return;
+          return Promise.resolve();
         }
         state.actionInFlight = true;
         var appLabel = kind ? String(kind).replace(':', ' ') : 'builtin-spell';
         pushActivity('cast', 'Running ' + kind + ':' + spellName, { spell: spellName, kind: kind, app: appLabel, source: kind, section: 'casting' });
-        callBackend('run-spell', [kind, spellName]).then(function (text) {
+        return callBackend('run-spell', [kind, spellName]).then(function (text) {
+          if (options.outputId) {
+            if (options.outputId === 'composer-output') {
+              updateComposerOutput(text);
+            } else {
+              setOutputBlock(options.outputId, text);
+            }
+          }
           pushActivity('cast', kind + ':' + spellName + ' complete', { kind: kind, spell: spellName, output: String(text || '').trim(), section: 'casting', app: appLabel, source: kind, status: 'ok' });
+          return text;
         }).catch(function (error) {
+          if (options.outputId) {
+            if (options.outputId === 'composer-output') {
+              updateComposerOutput(error && error.message ? error.message : String(error || 'failed'));
+            } else {
+              setOutputBlock(options.outputId, error && error.message ? error.message : String(error || 'failed'));
+            }
+          }
           pushActivity('cast', 'Failed ' + kind + ':' + spellName + ' - ' + (error && error.message ? error.message : String(error || '')), { kind: kind, spell: spellName, section: 'casting', app: appLabel, source: kind, status: 'error' });
+          throw error;
         }).finally(function () {
           loadWatchHistory();
           state.actionInFlight = false;
         });
       }
 
-      function runSpellHelp(kind, spellName) {
-        runQuickAction('spell-help:' + kind, spellName);
+      function runSpellHelp(kind, spellName, options) {
+        options = options || {};
+        if (state.actionInFlight) {
+          return Promise.resolve();
+        }
+        state.actionInFlight = true;
+        pushActivity('cast', 'Checking help for ' + kind + ':' + spellName, { spell: spellName, kind: kind, source: kind, section: 'app' });
+        return callBackend('spell-help', [kind, spellName]).then(function (text) {
+          if (options.outputId) {
+            if (options.outputId === 'composer-output') {
+              updateComposerOutput(text);
+            } else {
+              setOutputBlock(options.outputId, text);
+            }
+          }
+          return text;
+        }).catch(function (error) {
+          if (options.outputId) {
+            if (options.outputId === 'composer-output') {
+              updateComposerOutput(error && error.message ? error.message : String(error || 'failed'));
+            } else {
+              setOutputBlock(options.outputId, error && error.message ? error.message : String(error || 'failed'));
+            }
+          }
+          pushActivity('app', 'spell-help ' + kind + ':' + spellName + ' failed', { kind: kind, spell: spellName, source: kind, status: 'error', section: 'app' });
+          throw error;
+        }).finally(function () {
+          state.actionInFlight = false;
+        });
       }
 
       function copyActivityLog() {
@@ -1364,6 +2307,9 @@
 
       function bindEvents() {
         document.addEventListener('click', function (event) {
+          if (state.composer.open && !event.target.closest('.wd-composer-panel') && !event.target.closest('#command-composer-toggle') && !event.target.closest('.wd-composer-panel *')) {
+            setComposerOpen(false);
+          }
           if (els.themeMenu && !els.themeMenu.classList.contains('wd-hidden')) {
             if (!event.target.closest('#theme-picker-btn') && !event.target.closest('#theme-menu')) {
               closeThemeMenu(true);
@@ -1379,6 +2325,10 @@
 
         document.addEventListener('keydown', function (event) {
           if (event.key === 'Escape') {
+            if (state.composer.open) {
+              setComposerOpen(false);
+              return;
+            }
             closeThemeMenu(false);
             setActivityOpen(false);
             openSettings(false);
@@ -1442,6 +2392,181 @@
           });
         }
 
+        if (els.composerToggle) {
+          els.composerToggle.addEventListener('click', function () {
+            setComposerOpen(!state.composer.open);
+          });
+        }
+        if (els.composerBackdrop) {
+          els.composerBackdrop.addEventListener('click', function () {
+            setComposerOpen(false);
+          });
+        }
+        if (els.composerClose) {
+          els.composerClose.addEventListener('click', function () {
+            setComposerOpen(false);
+          });
+        }
+        if (els.composerCloseBtn) {
+          els.composerCloseBtn.addEventListener('click', function () {
+            setComposerOpen(false);
+          });
+        }
+        if (els.composerCopy) {
+          els.composerCopy.addEventListener('click', function () {
+            copyComposerCommand();
+          });
+        }
+        if (els.composerClear) {
+          els.composerClear.addEventListener('click', function () {
+            clearComposer();
+          });
+        }
+        if (els.composerRun) {
+          els.composerRun.addEventListener('click', function () {
+            commitComposerInput(true);
+            var plan = composerPlanFromTokens(state.composer.tokens);
+            executeComposerCommand(plan);
+          });
+        }
+        if (els.composerInput) {
+          els.composerInput.addEventListener('click', function () {
+            state.composer.selectedToken = -1;
+            renderComposer();
+          });
+          els.composerInput.addEventListener('input', function () {
+            state.composer.rawInput = String(els.composerInput.value || '');
+            commitComposerInput(false);
+            renderComposer();
+          });
+          els.composerInput.addEventListener('keydown', function (event) {
+            if (event.ctrlKey || event.metaKey || event.altKey) {
+              return;
+            }
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              if (event.shiftKey) {
+                commitComposerInput(true);
+                var runPlan = composerPlanFromTokens(state.composer.tokens);
+                if (runPlan.ready && !state.composer.running && !state.actionInFlight) {
+                  executeComposerCommand(runPlan);
+                }
+                renderComposer();
+                return;
+              }
+              var committed = commitComposerInput(true);
+              var plan = composerPlanFromTokens(committed ? state.composer.tokens : composerDraftTokens());
+              if (plan.ready && !state.composer.running && !state.actionInFlight) {
+                executeComposerCommand(plan);
+                return;
+              }
+              renderComposer();
+              return;
+            }
+            if (event.key === ' ' || event.key === ',') {
+              event.preventDefault();
+              commitComposerInput(true);
+              return;
+            }
+            if (event.key === 'Backspace') {
+              if (String(els.composerInput.value || '') === '') {
+                if (state.composer.selectedToken >= 0) {
+                  removeComposerTokenAt(state.composer.selectedToken);
+                  return;
+                }
+                if (state.composer.tokens.length) {
+                  setComposerSelectedToken(state.composer.tokens.length - 1);
+                  renderComposer();
+                  return;
+                }
+              }
+              return;
+            }
+            if (event.key === 'ArrowLeft' && String(els.composerInput.value || '') === '') {
+              if (state.composer.tokens.length) {
+                event.preventDefault();
+                var prev = state.composer.selectedToken;
+                if (prev < 0) {
+                  setComposerSelectedToken(state.composer.tokens.length - 1);
+                } else if (prev === 0) {
+                  setComposerSelectedToken(state.composer.tokens.length - 1);
+                } else {
+                  setComposerSelectedToken(prev - 1);
+                }
+                renderComposer();
+              }
+              return;
+            }
+            if (event.key === 'ArrowRight' && String(els.composerInput.value || '') === '') {
+              if (state.composer.tokens.length) {
+                event.preventDefault();
+                var next = state.composer.selectedToken;
+                if (next < 0 || next >= state.composer.tokens.length - 1) {
+                  setComposerSelectedToken(0);
+                } else {
+                  setComposerSelectedToken(next + 1);
+                }
+                renderComposer();
+              }
+              return;
+            }
+            if (event.key === 'Home') {
+              if (state.composer.tokens.length) {
+                event.preventDefault();
+                setComposerSelectedToken(0);
+                renderComposer();
+              }
+              return;
+            }
+            if (event.key === 'End') {
+              if (state.composer.tokens.length) {
+                event.preventDefault();
+                setComposerSelectedToken(state.composer.tokens.length - 1);
+                renderComposer();
+              }
+              return;
+            }
+            if (event.key === 'Delete') {
+              if (state.composer.selectedToken >= 0) {
+                event.preventDefault();
+                removeComposerTokenAt(state.composer.selectedToken);
+              }
+              return;
+            }
+            if (event.key === 'Escape') {
+              setComposerOpen(false);
+              return;
+            }
+          });
+        }
+        if (els.composerTokenRow) {
+          els.composerTokenRow.addEventListener('click', function (event) {
+            var remove = event.target.closest('[data-composer-token-remove]');
+            if (remove) {
+              removeComposerTokenAt(remove.getAttribute('data-composer-token-remove'));
+              return;
+            }
+            var token = event.target.closest('[data-composer-token]');
+            if (token) {
+              editComposerTokenAt(token.getAttribute('data-composer-token'));
+              return;
+            }
+          });
+        }
+        if (els.composerBlocks) {
+          els.composerBlocks.addEventListener('click', function (event) {
+            var block = event.target.closest('[data-composer-block]');
+            if (!block) {
+              return;
+            }
+            if (state.composer.open) {
+              commitComposerInput(true);
+            }
+            var blockTokens = splitComposerText(block.getAttribute('data-composer-block'));
+            addComposerTokens(blockTokens);
+          });
+        }
+
         if (els.activityToggle) {
           els.activityToggle.addEventListener('click', function () {
             setActivityOpen(!state.activityOpen);
@@ -1489,6 +2614,10 @@
               var value = runSpellBtn.getAttribute('data-run-spell');
               if (value && value.indexOf('|') >= 0) {
                 var pieces = value.split('|');
+                if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                  composerOpenWithTokens(['run-spell', pieces[0], pieces[1]]);
+                  return;
+                }
                 runSpell(pieces[0], pieces[1]);
               }
               return;
@@ -1499,6 +2628,10 @@
               var helpValue = helpBtn.getAttribute('data-help');
               if (helpValue && helpValue.indexOf('|') >= 0) {
                 var pair = helpValue.split('|');
+                if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                  composerOpenWithTokens(['spell-help', pair[0], pair[1]]);
+                  return;
+                }
                 runSpellHelp(pair[0], pair[1]);
               }
               return;
@@ -1508,6 +2641,10 @@
             if (installArcana) {
               var moduleName = installArcana.getAttribute('data-install-arcana');
               if (moduleName) {
+                if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                  composerOpenWithTokens(['run-action', 'arcana:install', moduleName]);
+                  return;
+                }
                 runArcanaAction('arcana:install', moduleName, {
                   outputId: 'arcana-output',
                   refreshArcana: true
@@ -1520,6 +2657,10 @@
             if (arcanaMenu) {
               var menuModule = arcanaMenu.getAttribute('data-arcana-menu');
               if (menuModule) {
+                if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                  composerOpenWithTokens(['run-action', 'arcana:menu', menuModule]);
+                  return;
+                }
                 runArcanaAction('arcana:menu', menuModule, {
                   outputId: 'arcana-output',
                   refreshArcana: true
@@ -1532,6 +2673,10 @@
             if (adminAction) {
               var action = adminAction.getAttribute('data-admin-action');
               if (action) {
+                if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                  composerOpenWithTokens(['run-action', action]);
+                  return;
+                }
                 runQuickAction(action, action, {
                   outputId: 'arcana-output',
                   refreshArcana: isArcanaAction(action)
@@ -1546,6 +2691,11 @@
             var hostAction = event.target.closest('[data-host-action]');
             if (hostAction) {
               var command = hostAction.getAttribute('data-host-action');
+              var systemCommand = command && command.indexOf('system:') === 0 ? command : 'system:' + command;
+              if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                composerOpenWithTokens(['run-system', systemCommand]);
+                return;
+              }
               var output = callBackend('run-system', [command]).then(function (text) {
                 setOutputBlock('system-output', text || 'no output');
               }).catch(function (error) {
@@ -1557,6 +2707,10 @@
             var mudAction = event.target.closest('[data-mud-action]');
             if (mudAction) {
               var mudCmd = mudAction.getAttribute('data-mud-action');
+              if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                composerOpenWithTokens(['run-system', 'system:' + mudCmd]);
+                return;
+              }
               callBackend('run-system', [mudCmd]).then(function (text) {
                 setOutputBlock('mud-output', text || 'no output');
               }).catch(function (error) {
@@ -1568,56 +2722,56 @@
             var addToggle = event.target.closest('#spellbook-add-toggle');
             if (addToggle) {
               var form = document.getElementById('spellbook-add-dialog');
-              if (form) {
-                form.classList.toggle('wd-hidden');
-                addToggle.setAttribute('aria-expanded', form.classList.contains('wd-hidden') ? 'false' : 'true');
-                if (!form.classList.contains('wd-hidden')) {
-                  var aliasInput = document.getElementById('spell-alias');
-                  if (aliasInput && typeof aliasInput.focus === 'function') {
-                    aliasInput.focus();
-                  }
-                }
-              }
+              setSynonymDialogOpen(!form || form.classList.contains('wd-hidden'));
+              return;
             }
             var saveBtn = event.target.closest('#spell-save');
             if (saveBtn) {
-              var addDialog = document.getElementById('spellbook-add-dialog');
-              var addToggleButton = document.getElementById('spellbook-add-toggle');
-              var aliasInput = document.getElementById('spell-alias');
-              var commandInput = document.getElementById('spell-command');
-              addSynonym(
-                String(aliasInput ? aliasInput.value : '').trim(),
-                String(commandInput ? commandInput.value : '').trim()
-              );
-              if (addDialog) {
-                addDialog.classList.add('wd-hidden');
-              }
-              if (addToggleButton) {
-                addToggleButton.setAttribute('aria-expanded', 'false');
-              }
-              if (aliasInput) {
-                aliasInput.value = '';
-              }
-              if (commandInput) {
-                commandInput.value = '';
-              }
+              saveSynonymFromDialog();
+              return;
             }
             var cancelBtn = event.target.closest('#spell-cancel');
             if (cancelBtn) {
-              var cancelDialog = document.getElementById('spellbook-add-dialog');
-              var cancelToggle = document.getElementById('spellbook-add-toggle');
-              if (cancelDialog) {
-                cancelDialog.classList.add('wd-hidden');
-              }
-              if (cancelToggle) {
-                cancelToggle.setAttribute('aria-expanded', 'false');
-              }
+              setSynonymDialogOpen(false);
               return;
             }
 
             var removeSynonym = event.target.closest('[data-remove-synonym]');
-            if (removeSynonym) {
+          if (removeSynonym) {
               removeSynonymFromElement(removeSynonym.getAttribute('data-remove-synonym'));
+            }
+          });
+        }
+
+        if (els.contentArea) {
+          els.contentArea.addEventListener('keydown', function (event) {
+            var dialog = document.getElementById('spellbook-add-dialog');
+            if (!dialog || dialog.classList.contains('wd-hidden')) {
+              return;
+            }
+            if (!event.target) {
+              return;
+            }
+            var isAliasInput = event.target.id === 'spell-alias';
+            var isCommandInput = event.target.id === 'spell-command';
+            if (!isAliasInput && !isCommandInput) {
+              return;
+            }
+
+            if (event.key === 'Escape') {
+              setSynonymDialogOpen(false);
+              return;
+            }
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              if (isAliasInput) {
+                var commandInput = document.getElementById('spell-command');
+                if (commandInput && typeof commandInput.focus === 'function') {
+                  commandInput.focus();
+                }
+                return;
+              }
+              saveSynonymFromDialog();
             }
           });
         }
@@ -1707,6 +2861,7 @@
         setDividerListeners();
         bindEvents();
         bindCategoryDetails();
+        setComposerOpen(false);
         renderNav();
         renderPage();
         renderThemeMenu();
