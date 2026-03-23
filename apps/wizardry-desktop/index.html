@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Wizardry Desktop</title>
+  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260324d">
+  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260324d">
+  <link rel="icon" href="assets/wizardry-desktop-icon.svg" type="image/svg+xml">
+</head>
+<body class="wd-booting">
+  <div id="splash" class="wd-splash" aria-live="polite">
+    <div class="wd-splash-logo" aria-hidden="true">
+      <svg viewBox="0 0 64 64" aria-hidden="true" role="img">
+        <path d="M32 4 39.5 23.2 60 24.6 44.4 38.1 48.4 58.3 32 48.6 15.6 58.3 19.6 38.1 4 24.6 24.5 23.2Z"></path>
+      </svg>
+    </div>
+    <p>Wizardry Desktop</p>
+  </div>
+
+  <main id="wd-app" class="wd-app-shell hidden" aria-hidden="true">
+    <aside id="left-rail" class="wd-left-rail" aria-label="Wizardry workflow list">
+      <header class="wd-rail-head">
+        <h1>Wizardry Desktop</h1>
+      </header>
+      <nav id="left-nav" class="wd-nav" role="listbox" aria-label="Wizardry pages"></nav>
+      <footer class="wd-rail-footer">
+        <button id="settings-toggle" type="button" class="wd-icon-btn" title="Settings" aria-label="Open settings">⚙</button>
+        <div class="wd-theme-wrap">
+          <button id="theme-picker-btn" type="button" class="wd-icon-btn wd-theme-btn" title="Theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-menu">Theme</button>
+          <div id="theme-menu" class="wd-floating wd-hidden" role="menu" aria-label="Theme selector">
+            <div id="theme-list"></div>
+          </div>
+        </div>
+      </footer>
+    </aside>
+
+    <div id="rail-divider" class="wd-rail-divider" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize left rail"></div>
+
+    <section id="main-column" class="wd-main-column">
+      <header class="wd-content-head">
+        <div class="wd-title-wrap">
+          <h2 id="page-title">Home</h2>
+          <p id="page-subtitle">Operational console for wizardry flows.</p>
+        </div>
+        <div class="wd-head-actions">
+          <button id="activity-toggle" type="button" class="wd-icon-btn" aria-label="Toggle Casting Watch">✦</button>
+          <button id="action-refresh" type="button" class="wd-polite-btn wd-secondary" title="Refresh page data">Refresh</button>
+        </div>
+      </header>
+      <section id="content-scroll" class="wd-content-scroll">
+        <div id="content-area"></div>
+      </section>
+    </section>
+
+    <aside id="settings-panel" class="wd-settings wd-hidden" aria-label="Settings panel">
+      <header class="wd-settings-head">
+        <h2>Settings</h2>
+        <button id="settings-close" type="button" class="wd-icon-btn wd-compact" aria-label="Close settings">×</button>
+      </header>
+      <section class="wd-settings-card">
+        <h3>Bridge</h3>
+        <p id="bridge-status" class="wd-subline">Bridge: checking</p>
+      </section>
+      <section class="wd-settings-card">
+        <h3>Rail Width</h3>
+        <label for="rail-width" class="wd-row-label">Resize rail (persistent)</label>
+        <input id="rail-width" type="range" min="220" max="420" step="10">
+      </section>
+      <section class="wd-settings-card">
+        <h3>Theme</h3>
+        <p class="wd-subline">Theme controls are in the rail footer.</p>
+      </section>
+      <section class="wd-settings-card">
+        <h3>Persistence</h3>
+        <div class="wd-status-pairs">
+          <span>UI prefs</span>
+          <span id="prefs-status">loaded</span>
+        </div>
+      </section>
+    </aside>
+
+    <aside id="activity-drawer" class="wd-activity-drawer wd-closed" aria-label="Casting watch">
+      <div class="wd-activity-head">
+        <div>
+          <h3>Casting Watch</h3>
+          <p id="activity-count" class="wd-subline">No events yet</p>
+        </div>
+        <div class="wd-activity-head-actions">
+          <button id="activity-copy" type="button" class="wd-icon-btn wd-compact" title="Copy log">⎘</button>
+          <button id="activity-close" type="button" class="wd-icon-btn wd-compact" title="Close casting watch">×</button>
+        </div>
+      </div>
+      <div id="activity-feed" class="wd-activity-feed" role="log" aria-live="polite"></div>
+    </aside>
+  </main>
+
+  <script src="../.host/shared/wizardry-bridge.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      var ASSET_VERSION = 'wizardry-desktop20260324d';
+      var THEME_FALLBACK = ['archmage', 'adept', 'chrono', 'chronomancer', 'conjurer', 'druid', 'empath'];
+      var NAV_PAGES = [
+        { id: 'home', title: 'Home', blurb: 'Overview and diagnostics.' },
+        { id: 'cast', title: 'Cast', blurb: 'Cast spells and monitor memorized commands.' },
+        { id: 'spellbook', title: 'Spellbook', blurb: 'Manage in-app spell aliases.' },
+        { id: 'arcana', title: 'Arcana', blurb: 'Tools for wizardry app setup.' },
+        { id: 'system', title: 'Computer', blurb: 'System checks and helper actions.' },
+        { id: 'mud', title: 'Mud', blurb: 'MUD-focused runtime commands.' }
+      ];
+
+      var state = {
+        activePage: 'home',
+        busy: false,
+        bridgeReady: false,
+        hostBootReadySent: false,
+        rootHint: '',
+        themes: [],
+        activeTheme: 'adept',
+        themeMenuOpen: false,
+        themeTypeahead: '',
+        themeTypeaheadTimer: null,
+        prefsLoaded: false,
+        railWidth: 300,
+        dividerDragging: false,
+        selectedNavIndex: 0,
+        castPageLoading: false,
+        cast: {
+          categories: [],
+          memorized: [],
+          expandedCategory: ''
+        },
+        spellCache: {},
+        arcanaInstall: [],
+        activityLoading: false,
+        activity: {
+          casting: [],
+          app: []
+        },
+        spellbook: [],
+        activityOpen: false,
+        activityDrawerWidth: 340,
+        activityWatchIntervalMs: 2000,
+        activityWatchTimer: null,
+        activityRowsLimit: 220,
+        actionInFlight: false
+      };
+
+      var els = {};
+      var backendScriptCache = '';
+
+      function initElements() {
+        els = {
+          body: document.body,
+          app: document.getElementById('wd-app'),
+          splash: document.getElementById('splash'),
+          leftRail: document.getElementById('left-rail'),
+          mainColumn: document.getElementById('main-column'),
+          leftNav: document.getElementById('left-nav'),
+          railDivider: document.getElementById('rail-divider'),
+          pageTitle: document.getElementById('page-title'),
+          pageSubtitle: document.getElementById('page-subtitle'),
+          contentArea: document.getElementById('content-area'),
+          actionRefresh: document.getElementById('action-refresh'),
+          activityToggle: document.getElementById('activity-toggle'),
+          activityDrawer: document.getElementById('activity-drawer'),
+          activityCount: document.getElementById('activity-count'),
+          activityFeed: document.getElementById('activity-feed'),
+          activityCopy: document.getElementById('activity-copy'),
+          activityClose: document.getElementById('activity-close'),
+          themeStylesheet: document.getElementById('wd-theme-stylesheet'),
+          themePickerBtn: document.getElementById('theme-picker-btn'),
+          themeMenu: document.getElementById('theme-menu'),
+          themeList: document.getElementById('theme-list'),
+          settingsPanel: document.getElementById('settings-panel'),
+          settingsToggle: document.getElementById('settings-toggle'),
+          settingsClose: document.getElementById('settings-close'),
+          bridgeStatus: document.getElementById('bridge-status'),
+          prefsStatus: document.getElementById('prefs-status'),
+          railWidthInput: document.getElementById('rail-width'),
+          arcanaList: document.getElementById('arcana-list')
+        };
+      }
+
+      function bridgeAvailable() {
+        return !!(window.wizardry && window.wizardry.exec);
+      }
+
+      function detectBackendScriptCandidates() {
+        var out = [];
+        try {
+          var pagePath = decodeURIComponent(String(window.location.pathname || ''));
+          var appMarker = '/wizardry-desktop/index.html';
+          var appIdx = pagePath.lastIndexOf(appMarker);
+          if (appIdx >= 0) {
+            out.push(pagePath.slice(0, appIdx) + '/wizardry-desktop/scripts/wizardry-desktop-backend.sh');
+          }
+          var repoMarker = '/apps/wizardry-desktop/';
+          var repoIdx = pagePath.lastIndexOf(repoMarker);
+          if (repoIdx >= 0) {
+            state.rootHint = pagePath.slice(0, repoIdx);
+            out.push(state.rootHint + '/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh');
+          }
+          out.push('apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh');
+          out.push('chatroom/scripts/chatroom-backend.sh');
+        } catch (_err) {
+          // ignore
+        }
+        return out.filter(function (value, idx, arr) {
+          return value && arr.indexOf(value) === idx;
+        });
+      }
+
+      function isMissingBackendScriptError(error) {
+        var msg = String(error && error.message ? error.message : error).toLowerCase();
+        return msg.indexOf('wizardry-desktop-backend.sh') >= 0 && (msg.indexOf('no such file') >= 0 || msg.indexOf('cannot open') >= 0);
+      }
+
+      function ensureRootHint() {
+        if (state.rootHint) {
+          return state.rootHint;
+        }
+        var candidates = detectBackendScriptCandidates();
+        for (var i = 0; i < candidates.length; i += 1) {
+          var candidate = candidates[i];
+          var marker = '/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh';
+          var idx = candidate.lastIndexOf(marker);
+          if (idx > 0) {
+            state.rootHint = candidate.slice(0, idx);
+            return state.rootHint;
+          }
+        }
+        return '';
+      }
+
+      function execArgv(argv) {
+        return window.wizardry.exec(argv);
+      }
+
+      function parseKeyValueBlob(text) {
+        var out = {};
+        String(text || '').split('\n').forEach(function (line) {
+          if (!line) {
+            return;
+          }
+          var idx = line.indexOf('=');
+          if (idx <= 0) {
+            return;
+          }
+          out[line.slice(0, idx)] = line.slice(idx + 1);
+        });
+        return out;
+      }
+
+      async function callBackend(action, args) {
+        args = args || [];
+        var candidates = [];
+        if (backendScriptCache) {
+          candidates.push(backendScriptCache);
+        }
+        detectBackendScriptCandidates().forEach(function (candidate) {
+          if (candidates.indexOf(candidate) < 0) {
+            candidates.push(candidate);
+          }
+        });
+
+        var lastErr;
+        for (var i = 0; i < candidates.length; i += 1) {
+          var scriptPath = candidates[i];
+          try {
+            var argv = ['sh', scriptPath, action].concat(args);
+            var result = await execArgv(argv);
+            if (typeof result !== 'undefined' && result !== null) {
+              if (typeof result.exit_code !== 'undefined' && Number(result.exit_code) !== 0) {
+                throw new Error(String((result.stderr || result.stdout || 'command failed').trim()));
+              }
+            }
+            backendScriptCache = scriptPath;
+            return String((result && result.stdout) || '');
+          } catch (error) {
+            lastErr = error;
+            if (!isMissingBackendScriptError(error)) {
+              throw error;
+            }
+          }
+        }
+        if (!candidates.length) {
+          throw new Error('backend command unavailable');
+        }
+        if (bridgeAvailable()) {
+          var fallback = ['sh', '-c', 'root="${WIZARDRY_APPS_ROOT:-}"; if [ -z "$root" ]; then if [ -n "${WIZARDRY_DIR:-}" ]; then root="${WIZARDRY_DIR}"; else root="${HOME}/git/wizardry-apps"; fi; fi; exec sh "$root/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh" "$@"', 'wizardry-desktop-backend', action].concat(args);
+          var fallbackResult = await execArgv(fallback);
+          if (typeof fallbackResult !== 'undefined' && fallbackResult !== null && Number(fallbackResult.exit_code || 0) !== 0) {
+            throw new Error(String((fallbackResult.stderr || fallbackResult.stdout || 'command failed').trim()));
+          }
+          return String((fallbackResult && fallbackResult.stdout) || '');
+        }
+        throw lastErr || new Error('backend unavailable');
+      }
+
+      function setText(el, value) {
+        if (!el) {
+          return;
+        }
+        el.textContent = String(value || '');
+      }
+
+      function pushActivity(kind, message, payload) {
+        var section = payload && payload.section ? payload.section : (kind === 'cast' ? 'casting' : 'app');
+        if (section !== 'casting' && section !== 'app') {
+          section = kind === 'cast' ? 'casting' : 'app';
+        }
+        var bucket = state.activity[section];
+        if (!bucket) {
+          bucket = [];
+          state.activity[section] = bucket;
+        }
+        bucket.unshift({
+          ts: Math.floor(Date.now() / 1000),
+          kind: kind,
+          text: String(message || ''),
+          payload: payload || {}
+        });
+        if (bucket.length > state.activityRowsLimit) {
+          bucket.length = state.activityRowsLimit;
+        }
+        renderActivity();
+      }
+
+      function normalizeWatchPayload(part) {
+        if (!part) {
+          return {};
+        }
+        return {
+          section: part.kind === 'cast' ? 'casting' : 'app',
+          source: part.source || part.app || '',
+          app: part.app || '',
+          status: part.status || ''
+        };
+      }
+
+      function parseWatchLog(text) {
+        var lines = String(text || '').split('\n');
+        var casting = [];
+        var app = [];
+        for (var i = 0; i < lines.length; i += 1) {
+          var line = String(lines[i] || '').trim();
+          if (!line) {
+            continue;
+          }
+          var parts = line.split('\t');
+          if (parts.length < 5) {
+            continue;
+          }
+          var ts = Number(parts[0]);
+          var kind = String(parts[1] || '').trim();
+          var source = String(parts[2] || '').trim();
+          var appName = String(parts[3] || '').trim();
+          var status = String(parts[4] || '').trim();
+          var message;
+          if (kind === 'cast') {
+            message = source;
+          } else if (kind === 'app') {
+            message = source;
+          } else {
+            message = source;
+          }
+          var row = {
+            ts: isNaN(ts) ? Math.floor(Date.now() / 1000) : ts,
+            kind: kind,
+            text: String(message || ''),
+            payload: normalizeWatchPayload({
+              kind: kind,
+              source: source,
+              app: appName,
+              status: status
+            })
+          };
+          if (kind === 'cast') {
+            casting.push(row);
+          } else {
+            app.push(row);
+          }
+        }
+        return {
+          casting: casting,
+          app: app
+        };
+      }
+
+      function loadWatchHistory() {
+        if (state.activityLoading) {
+          return Promise.resolve();
+        }
+        state.activityLoading = true;
+        return callBackend('list-watch', [String(state.activityRowsLimit)])
+          .then(function (text) {
+            var parsed = parseWatchLog(text);
+            state.activity.casting = parsed.casting;
+            state.activity.app = parsed.app;
+          })
+          .catch(function () {
+            // Keep live activity stack if log unavailable.
+          })
+          .finally(function () {
+            state.activityLoading = false;
+            renderActivity();
+          });
+      }
+
+      function timestampForRow(ts) {
+        var date = new Date(ts * 1000);
+        var h = String(date.getHours()).padStart(2, '0');
+        var m = String(date.getMinutes()).padStart(2, '0');
+        var s = String(date.getSeconds()).padStart(2, '0');
+        return h + ':' + m + ':' + s;
+      }
+
+      function renderActivity() {
+        if (!els.activityFeed) {
+          return;
+        }
+        var casting = state.activity.casting || [];
+        var app = state.activity.app || [];
+        var visibleCasting = casting;
+        var visibleApp = app;
+
+        if (els.activityFeed) {
+          var castingRows = visibleCasting.slice(0, 180);
+          var commandRows = visibleApp.slice(0, 180);
+          var castingHtml = '';
+          var commandHtml = '';
+
+          if (!castingRows.length) {
+            castingHtml = '<p class="wd-empty">No cast actions yet.</p>';
+          } else {
+            castingHtml = castRowsHtml(castingRows);
+          }
+          if (!commandRows.length) {
+            commandHtml = '<p class="wd-empty">No app commands yet.</p>';
+          } else {
+            commandHtml = castRowsHtml(commandRows);
+          }
+
+          els.activityFeed.innerHTML = '<div class="wd-activity-sections"><div class="wd-activity-section"><h4>Active Casting</h4><div class="wd-activity-list wd-scroll-list">' + castingHtml + '</div></div>' +
+            '<div class="wd-activity-section"><h4>App Commands</h4><div class="wd-activity-list wd-scroll-list">' + commandHtml + '</div></div></div>';
+        }
+        if (els.activityCount) {
+          var total = Number(visibleCasting.length || 0) + Number(visibleApp.length || 0);
+          setText(els.activityCount, total ? total + ' events tracked' : 'No events yet');
+        }
+      }
+
+      function castRowsHtml(rows) {
+        return rows.map(function (row) {
+          var app = row.payload && row.payload.app ? (' ' + escapeText(row.payload.app)) : '';
+          var source = row.payload && row.payload.source ? (' ' + escapeText(row.payload.source)) : '';
+          var kind = escapeText(row.kind);
+          return '<article class="wd-log-row"><span class="wd-log-time">' + timestampForRow(row.ts) + '</span><span class="wd-log-kind">' + kind + '</span><span class="wd-log-message">' + escapeText(row.text || '') + '<span class="wd-log-meta">' + app + source + '</span></span></article>';
+        }).join('');
+      }
+
+      function escapeText(value) {
+        return String(value == null ? '' : value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;');
+      }
+
+      function escapeAttrValue(value) {
+        return String(value == null ? '' : value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;');
+      }
+
+      function themeLabel(value) {
+        if (!value) {
+          return '';
+        }
+        return String(value).replace(/[-_]/g, ' ').replace(/\b\w/g, function (m) {
+          return m.toUpperCase();
+        });
+      }
+
+      function buildThemeStylesheetHref(themeName) {
+        var theme = String(themeName || '').trim();
+        if (!theme) {
+          theme = 'adept';
+        }
+        var primary = ensureRootHint() + '/web/.themes/' + theme + '.css';
+        if (state.rootHint && theme === 'psionic') {
+          primary = ensureRootHint() + '/web/.themes/' + theme + '.css';
+        }
+        if (!state.rootHint) {
+          primary = 'web/.themes/' + theme + '.css';
+        }
+        return primary + '?v=' + ASSET_VERSION + '&ts=' + Date.now();
+      }
+
+      function setThemeStylesheet(themeName) {
+        if (!els.themeStylesheet) {
+          return;
+        }
+        var next = els.themeStylesheet.cloneNode(false);
+        next.href = buildThemeStylesheetHref(themeName);
+        next.setAttribute('data-theme-name', themeName);
+        if (els.themeStylesheet.parentNode) {
+          els.themeStylesheet.parentNode.replaceChild(next, els.themeStylesheet);
+        }
+        els.themeStylesheet = next;
+      }
+
+      function savePreference(key, value) {
+        callBackend('set-ui-pref', [key, value]).catch(function () {});
+      }
+
+      function ensureThemes() {
+        if (!Array.isArray(state.themes) || !state.themes.length) {
+          state.themes = ['archmage', 'adept', 'chrono', 'chronomancer', 'conjurer'];
+        }
+        if (state.themes.indexOf(state.activeTheme) < 0) {
+          state.activeTheme = state.themes[0] || 'adept';
+        }
+      }
+
+      function loadThemes() {
+        return callBackend('list-themes').then(function (text) {
+          var list = String(text || '').split('\n').map(function (line) {
+            return String(line || '').trim();
+          }).filter(Boolean).filter(function (name) {
+            return /^[a-z0-9_-]+$/.test(name);
+          });
+          if (list.length) {
+            state.themes = list;
+          } else {
+            ensureThemes();
+          }
+        }).catch(function () {
+          ensureThemes();
+        });
+      }
+
+      function openThemeMenu() {
+        if (!els.themeMenu || !els.themePickerBtn) {
+          return;
+        }
+        closeFloatingMenus({ keepTheme: true });
+        els.themeMenu.classList.remove('wd-hidden');
+        els.themePickerBtn.setAttribute('aria-expanded', 'true');
+        renderThemeMenu();
+        state.themeMenuOpen = true;
+      }
+
+      function closeThemeMenu(restoreFocus) {
+        if (!els.themeMenu || !els.themePickerBtn) {
+          return;
+        }
+        els.themeMenu.classList.add('wd-hidden');
+        els.themePickerBtn.setAttribute('aria-expanded', 'false');
+        state.themeTypeahead = '';
+        state.themeMenuOpen = false;
+        if (restoreFocus && typeof els.themePickerBtn.focus === 'function') {
+          els.themePickerBtn.focus();
+        }
+      }
+
+      function closeFloatingMenus(options) {
+        options = options || {};
+        if (!options.keepTheme) {
+          closeThemeMenu(false);
+        }
+        if (state.activityOpen) {
+          state.activityOpen = false;
+          renderActivityDrawer();
+        }
+      }
+
+      function renderThemeMenu() {
+        if (!els.themeList) {
+          return;
+        }
+        ensureThemes();
+        var html = '';
+        for (var i = 0; i < state.themes.length; i += 1) {
+          var theme = state.themes[i];
+          var active = theme === state.activeTheme ? ' wd-theme-item-active' : '';
+          html += '<button type="button" class="wd-theme-item' + active + '" data-theme-name="' + escapeAttrValue(theme) + '">' + themeLabel(theme) + '</button>';
+        }
+        els.themeList.innerHTML = html;
+        if (els.themePickerBtn) {
+          els.themePickerBtn.textContent = themeLabel(state.activeTheme);
+        }
+      }
+
+      function applyTheme(themeName, options) {
+        options = options || {};
+        ensureThemes();
+        if (state.themes.indexOf(themeName) < 0) {
+          if (options.allowUnlisted && themeName) {
+            // keep explicitly set custom themes in menu state.
+          } else {
+            themeName = state.themes[0] || 'adept';
+          }
+        }
+        state.activeTheme = themeName;
+        setThemeStylesheet(themeName);
+        savePreference('theme', themeName);
+        if (els.themePickerBtn) {
+          els.themePickerBtn.textContent = themeLabel(themeName);
+        }
+        renderThemeMenu();
+      }
+
+      function cycleTheme(step) {
+        ensureThemes();
+        var current = state.themes.indexOf(state.activeTheme);
+        if (current < 0) {
+          current = 0;
+        }
+        var idx = (current + step + state.themes.length) % state.themes.length;
+        applyTheme(state.themes[idx]);
+      }
+
+      function handleThemeTypeahead(key) {
+        if (!/^[a-z0-9 _-]$/.test(String(key || '').toLowerCase())) {
+          return false;
+        }
+        state.themeTypeahead = (state.themeTypeahead || '') + String(key).toLowerCase();
+        if (state.themeTypeaheadTimer) {
+          clearTimeout(state.themeTypeaheadTimer);
+        }
+        state.themeTypeaheadTimer = setTimeout(function () {
+          state.themeTypeahead = '';
+        }, 700);
+
+        var query = state.themeTypeahead;
+        for (var i = 0; i < state.themes.length; i += 1) {
+          if (state.themes[i].indexOf(query) === 0 || themeLabel(state.themes[i]).toLowerCase().indexOf(query) === 0) {
+            applyTheme(state.themes[i]);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function loadPreferences() {
+        return callBackend('get-ui-prefs').then(function (text) {
+          var prefs = parseKeyValueBlob(text);
+          state.prefsLoaded = true;
+          state.activeTheme = prefs.theme || prefs.desktop_theme || 'adept';
+          state.railWidth = Number(prefs.leftRailWidth || state.railWidth);
+          var rawSynonyms = prefs.spellbook_synonyms || '';
+          if (rawSynonyms) {
+            state.spellbook = rawSynonyms.split('\n')
+              .map(function (row) {
+                var parts = String(row || '').split('=>');
+                if (!parts[0] || !parts[1]) {
+                  return null;
+                }
+                return { alias: String(parts[0]).trim(), command: String(parts[1]).trim() };
+              })
+              .filter(Boolean);
+          }
+          return ensureThemes();
+        }).catch(function () {
+          state.prefsLoaded = false;
+          return ensureThemes();
+        }).then(function () {
+          state.railWidth = Math.min(420, Math.max(220, Number(state.railWidth) || 300));
+          applyTheme(state.activeTheme, { allowUnlisted: true });
+        });
+      }
+
+      function saveRailWidth(width) {
+        state.railWidth = Math.min(420, Math.max(220, Number(width) || 300));
+        applyRailWidth();
+        savePreference('leftRailWidth', String(state.railWidth));
+      }
+
+      function applyRailWidth() {
+        if (!els.leftRail || !els.mainColumn) {
+          return;
+        }
+        var px = state.railWidth + 'px';
+        els.leftRail.style.width = px;
+        document.documentElement.style.setProperty('--wd-rail-width', px);
+        applyLayoutColumns();
+        if (els.railDivider) {
+          els.railDivider.style.width = '8px';
+        }
+      }
+
+      function applyLayoutColumns() {
+        var activityWidth = state.activityOpen ? state.activityDrawerWidth : 0;
+        document.documentElement.style.setProperty('--wd-activity-width', activityWidth + 'px');
+      }
+
+      function renderNav() {
+        if (!els.leftNav) {
+          return;
+        }
+        var activeIdx = 0;
+        var html = '';
+        for (var i = 0; i < NAV_PAGES.length; i += 1) {
+          var page = NAV_PAGES[i];
+          if (page.id === state.activePage) {
+            activeIdx = i;
+          }
+          var rowClass = 'wd-nav-row' + (page.id === state.activePage ? ' wd-nav-row-active' : '');
+          html += '<button type="button" role="option" class="' + rowClass + '" data-page="' + page.id + '" aria-selected="' + (page.id === state.activePage ? 'true' : 'false') + '" tabindex="' + (page.id === state.activePage ? '0' : '-1') + '">' +
+            '<span class="wd-nav-title">' + escapeText(page.title) + '</span>' +
+            '<span>' + escapeText(page.blurb) + '</span>' +
+            '</button>';
+        }
+        els.leftNav.innerHTML = html;
+        state.selectedNavIndex = activeIdx;
+        if (els.leftNav.firstElementChild && els.leftNav.firstElementChild.focus) {
+          // keep focus where needed during rerender.
+        }
+      }
+
+      function rowElementForPage(pageId) {
+        return els.leftNav && els.leftNav.querySelector('[data-page="' + pageId + '"]');
+      }
+
+      function setActivePage(pageId) {
+        if (state.activePage === pageId) {
+          return;
+        }
+        state.activePage = pageId;
+        renderNav();
+        var idx = NAV_PAGES.findIndex(function (page) {
+          return page.id === pageId;
+        });
+        if (idx >= 0) {
+          state.selectedNavIndex = idx;
+        }
+        if (pageId === 'arcana' && state.arcanaInstall.length === 0) {
+          loadArcanaInstall();
+        }
+        if (pageId === 'cast' && !state.cast.categories.length) {
+          loadCastData();
+        }
+        renderPage();
+      }
+
+      function renderHomePage() {
+        return '<section class="wd-panel"><h3>Overview</h3><p class="wd-subline">Wizardry Desktop is the control plane for shell actions and spell workflows.</p><div class="wd-card-grid">' +
+          card('Bridge', state.bridgeReady ? 'Ready' : 'Waiting', 'Bridge status appears when the native host is connected.') +
+          card('Theme', themeLabel(state.activeTheme), 'Theme is persisted using backend prefs and applied instantly.') +
+          card('Categories', state.cast.categories.length + ' loaded', 'Cast page keeps spell categories in a persistent structure.') +
+          card('Watch', ((Number(state.activity.casting.length) || 0) + (Number(state.activity.app.length) || 0)) + ' events', 'Casting Watch tracks all command results.') +
+          '</div></section>';
+      }
+
+      function card(title, metric, body) {
+        return '<article class="wd-mini-card"><h4>' + escapeText(title) + '</h4><p class="wd-metric">' + escapeText(metric) + '</p><p>' + escapeText(body) + '</p></article>';
+      }
+
+      function safeShortText(value) {
+        return escapeText(String(value || '').slice(0, 72));
+      }
+
+      function castCategoryDisplay(cat) {
+        var title = safeShortText(cat.title);
+        var kind = String(cat.kind || '').trim();
+        if (!kind) {
+          return title;
+        }
+        return title + ' (' + escapeText(kind) + ')';
+      }
+
+      function listItemHtml(row) {
+        var controls = '<button type="button" class="wd-polite-btn wd-tiny" data-help="' + escapeAttrValue(row.kind + '|' + row.value) + '">Help</button>' +
+          '<button type="button" class="wd-polite-btn wd-tiny" data-run-spell="' + escapeAttrValue(row.kind + '|' + row.value) + '">Run</button>';
+        return '<div class="wd-list-row"><span class="wd-list-main">' + escapeText(row.label) + '</span><span class="wd-list-meta">' + escapeText(row.kind) + '</span><span class="wd-row-actions">' + controls + '</span></div>';
+      }
+
+      function renderCastPage() {
+        var html = '<section class="wd-panel"><h3>Spell Categories</h3>' +
+          '<p class="wd-subline">Select a category to inspect available spells.</p>';
+        if (state.castPageLoading) {
+          html += '<p class="wd-empty">Loading spell categories…</p>';
+        } else if (!state.cast.categories.length) {
+          html += '<p class="wd-empty">No categories found. Configure spell roots under ~/.wizardry or repo spells folders.</p>';
+        } else {
+          html += '<div class="wd-categories">';
+          for (var i = 0; i < state.cast.categories.length; i += 1) {
+            var cat = state.cast.categories[i];
+            var expanded = state.cast.expandedCategory === cat.id ? ' wd-expanded' : '';
+            var summary = String(cat.count) + ' spell' + (cat.count === 1 ? '' : 's');
+            html += '<details class="wd-category' + expanded + '"' + (expanded ? ' open' : '') + ' data-category="' + cat.id + '">';
+            html += '<summary class="wd-category-head"><span>' + castCategoryDisplay(cat) + '</span><span>' + escapeText(summary) + '</span><span class="wd-pill">' + escapeText(cat.kind) + '</span></summary>';
+            if (state.spellCache[cat.id]) {
+              html += '<div class="wd-category-body">';
+              for (var s = 0; s < state.spellCache[cat.id].length; s += 1) {
+                var spell = state.spellCache[cat.id][s];
+                html += listItemHtml({ kind: cat.id, value: spell, label: spell });
+              }
+              html += '</div>';
+            } else {
+              html += '<p class="wd-empty">No spells loaded.</p>';
+            }
+            html += '</details>';
+          }
+          html += '</div>';
+        }
+        html += '<div class="wd-messages wd-empty">' +
+          '<p>Run a spell using <strong>Run</strong> to generate casting activity.</p>' +
+          '</div></section>';
+        if (!state.cast.memorized.length) {
+          html += '<section class="wd-panel wd-spellbook-memo"><h3>Casting Monitor</h3>';
+          html += '<p class="wd-subline">Spellbook entries from <code>cast --list</code>.</p>';
+          html += '<p class="wd-empty">No memorized spells yet.</p></section>';
+        } else {
+          html += '<section class="wd-panel wd-spellbook-memo"><h3>Casting Monitor</h3><p class="wd-subline">Memorized spell entries from <code>cast --list</code>.</p>';
+          html += '<div class="wd-list wd-list-compact wd-scroll-area">';
+          for (var m = 0; m < state.cast.memorized.length; m += 1) {
+            var memo = state.cast.memorized[m];
+            html += '<div class="wd-list-row">';
+            html += '<span class="wd-list-main wd-col-2">' + safeShortText(memo.name) + '</span>';
+            html += '<span class="wd-list-meta wd-col-4">' + safeShortText(memo.command) + '</span>';
+            html += '</div>';
+          }
+          html += '</div></section>';
+        }
+        return html;
+      }
+
+      function renderSpellbookPage() {
+        var html = '<section class="wd-panel"><div class="wd-panel-head"><h3>Synonyms</h3></div>' +
+          '<p class="wd-subline">Map shortcut aliases to spell command lines.</p>';
+        html += '<div class="wd-list wd-synonym-list">';
+        for (var i = 0; i < state.spellbook.length; i += 1) {
+          var item = state.spellbook[i];
+          html += '<div class="wd-list-row wd-synonym-row"><span class="wd-list-main wd-col-2">' + escapeText(item.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(item.command) + '</span><span class="wd-row-actions"><button type="button" class="wd-polite-btn wd-tiny wd-danger" data-remove-synonym="' + i + '">Remove</button></span></div>';
+        }
+        if (!state.spellbook.length) {
+          html += '<p class="wd-empty">No aliases yet.</p>';
+        }
+        html += '</div>';
+        html += '<button id="spellbook-add-toggle" type="button" class="wd-icon-btn wd-icon-plus" aria-label="Add synonym" aria-expanded="false">＋</button>';
+        html += '<div id="spellbook-add-dialog" class="wd-inline-form wd-synonym-dialog wd-hidden" role="dialog" aria-label="Add synonym">';
+        html += '<h4>Add Synonym</h4>';
+        html += '<input id="spell-alias" type="text" placeholder="Alias" class="wd-inline-input">';
+        html += '<input id="spell-command" type="text" placeholder="Spell command" class="wd-inline-input">';
+        html += '<div class="wd-form-actions">';
+        html += '<button type="button" id="spell-save" class="wd-polite-btn">Save</button>';
+        html += '<button type="button" id="spell-cancel" class="wd-polite-btn wd-secondary">Cancel</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</section>';
+        return html;
+      }
+
+      function renderArcanaPage() {
+        var rows = state.arcanaInstall || [];
+        var html = '<section class="wd-panel"><h3>Arcana Install Menu</h3>' +
+          '<p class="wd-subline">Matches wizardry POSIX install menu ordering and status labels.</p>' +
+          '<div id="arcana-list" class="wd-list wd-compact-list">';
+        for (var i = 0; i < rows.length; i += 1) {
+          var row = rows[i];
+          html += '<div class="wd-list-row"><span class="wd-list-main wd-col-2">' + safeShortText(row.label) + '</span>';
+          html += '<span class="wd-list-meta">' + safeShortText(row.status) + '</span>';
+          html += '<span class="wd-row-actions">';
+          html += '<button type="button" class="wd-polite-btn wd-tiny" data-install-arcana="' + escapeAttrValue(row.name) + '">Install</button>';
+          html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-arcana-menu="' + escapeAttrValue(row.name) + '">Menu</button>';
+          html += '</span></div>';
+        }
+        if (!rows.length) {
+          html += '<p class="wd-empty">No arcana entries.</p>';
+        }
+        html += '</div>';
+        html += '<div class="wd-inline-form">';
+        html += '<button type="button" class="wd-polite-btn" data-admin-action="arcana:themes">List Themes</button>';
+        html += '<button type="button" class="wd-polite-btn wd-secondary" data-admin-action="arcana:reload">Reload Spell Index</button>';
+        html += '<p id="arcana-output" class="wd-mono-box wd-inline-output">Launch an action to view output.</p>';
+        html += '</div>';
+        html += '</section>';
+        return html;
+      }
+
+      function renderSystemPage() {
+        return '<section class="wd-panel"><h3>System Panel</h3>' +
+          '<p class="wd-subline">Host-safe command surface for frequent app-level operations.</p>' +
+          '<div class="wd-tool-strip">' +
+          '<button type="button" class="wd-polite-btn" data-host-action="system:whoami">Whoami</button>' +
+          '<button type="button" class="wd-polite-btn" data-host-action="system:pwd">Pwd</button>' +
+          '<button type="button" class="wd-polite-btn" data-host-action="system:date">Date</button>' +
+          '</div>' +
+          '<pre id="system-output" class="wd-mono-box">Pick an action to run.</pre>' +
+          '</section>';
+      }
+
+      function renderMudPage() {
+        return '<section class="wd-panel"><h3>Mud Tools</h3>' +
+          '<p class="wd-subline">MUD-focused checks and status probes.</p>' +
+          '<div class="wd-tool-strip">' +
+          '<button type="button" class="wd-polite-btn" data-mud-action="status">Status</button>' +
+          '<button type="button" class="wd-polite-btn" data-mud-action="environment">Environment</button>' +
+          '</div>' +
+          '<pre id="mud-output" class="wd-mono-box">No action yet.</pre>' +
+          '</section>';
+      }
+
+      function renderPage() {
+        var title = 'Home';
+        var subtitle = '';
+        var content = '';
+
+        if (state.activePage === 'home') {
+          title = 'Home';
+          subtitle = 'Wizardry operations in one place.';
+          content = renderHomePage();
+        } else if (state.activePage === 'cast') {
+          title = 'Cast';
+          subtitle = 'Open a category to run spells.';
+          content = renderCastPage();
+        } else if (state.activePage === 'spellbook') {
+          title = 'Spellbook';
+          subtitle = 'Manage command aliases.';
+          content = renderSpellbookPage();
+        } else if (state.activePage === 'arcana') {
+          title = 'Arcana';
+          subtitle = 'Wizardry admin command groups.';
+          content = renderArcanaPage();
+        } else if (state.activePage === 'system') {
+          title = 'Computer';
+          subtitle = 'Helpful host-level checks.';
+          content = renderSystemPage();
+        } else if (state.activePage === 'mud') {
+          title = 'Mud';
+          subtitle = 'MUD-oriented status checks.';
+          content = renderMudPage();
+        }
+
+        if (els.pageTitle) {
+          els.pageTitle.textContent = title;
+        }
+        if (els.pageSubtitle) {
+          els.pageSubtitle.textContent = subtitle;
+        }
+        if (els.contentArea) {
+          els.contentArea.innerHTML = content;
+        }
+        setRowSelection();
+      }
+
+      function setRowSelection() {
+        var rows = Array.prototype.slice.call(els.leftNav.querySelectorAll('.wd-nav-row'));
+        for (var i = 0; i < rows.length; i += 1) {
+          rows[i].classList.toggle('wd-nav-row-active', i === state.selectedNavIndex || rows[i].getAttribute('data-page') === state.activePage);
+        }
+      }
+
+      function setBridgeState(value) {
+        state.bridgeReady = !!value;
+        if (els.bridgeStatus) {
+          els.bridgeStatus.textContent = 'Bridge: ' + (state.bridgeReady ? 'ready' : 'unavailable');
+        }
+        if (els.prefsStatus) {
+          setText(els.prefsStatus, state.prefsLoaded ? 'loaded' : 'fallback');
+        }
+      }
+
+      function ensureBridge() {
+        if (!bridgeAvailable()) {
+          setBridgeState(false);
+          return false;
+        }
+        setBridgeState(true);
+        return true;
+      }
+
+      function applyBridgeReadyGate() {
+        state.bridgeReady = false;
+        var tries = 0;
+        var limit = 160;
+        function check() {
+          if (state.bridgeReady) {
+            return;
+          }
+          state.bridgeReady = bridgeAvailable();
+          if (!state.bridgeReady) {
+            if (tries >= limit) {
+              setBridgeState(false);
+              return;
+            }
+            tries += 1;
+            setTimeout(check, 50);
+            return;
+          }
+          setBridgeState(true);
+        }
+        check();
+      }
+
+      function notifyHostBootReady(attempt) {
+        var tries = typeof attempt === 'number' ? attempt : 0;
+        if (state.hostBootReadySent) {
+          return;
+        }
+        if (!bridgeAvailable()) {
+          if (tries >= 160) {
+            return;
+          }
+          setTimeout(function () {
+            notifyHostBootReady(tries + 1);
+          }, 50);
+          return;
+        }
+        state.hostBootReadySent = true;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            execArgv(['__wizardry_host_boot_ready']).then(function () {
+              revealUI();
+            }).catch(function () {
+              state.hostBootReadySent = false;
+              if (tries >= 160) {
+                revealUI();
+                return;
+              }
+              setTimeout(function () {
+                notifyHostBootReady(tries + 1);
+              }, 50);
+            });
+          });
+        });
+      }
+
+      function revealUI() {
+        if (els.splash) {
+          els.splash.classList.add('wd-splash-fade');
+        }
+        if (els.app) {
+          els.app.classList.remove('hidden');
+          els.app.setAttribute('aria-hidden', 'false');
+        }
+        if (els.body) {
+          els.body.classList.remove('wd-booting');
+        }
+      }
+
+      function setActivityOpen(open) {
+        state.activityOpen = !!open;
+        applyLayoutColumns();
+        renderActivityDrawer();
+        if (state.activityOpen) {
+          loadWatchHistory();
+          if (!state.activityWatchTimer) {
+            state.activityWatchTimer = setInterval(function () {
+              if (!state.activityOpen) {
+                stopActivityWatch();
+                return;
+              }
+              loadWatchHistory();
+            }, state.activityWatchIntervalMs);
+          }
+        } else {
+          stopActivityWatch();
+        }
+      }
+
+      function stopActivityWatch() {
+        if (state.activityWatchTimer) {
+          clearInterval(state.activityWatchTimer);
+          state.activityWatchTimer = null;
+        }
+      }
+
+      function renderActivityDrawer() {
+        if (!els.activityDrawer) {
+          return;
+        }
+        els.activityDrawer.classList.toggle('wd-closed', !state.activityOpen);
+        if (state.activityOpen) {
+          renderActivity();
+          if (els.activityFeed) {
+            els.activityFeed.scrollTop = 0;
+          }
+        }
+      }
+
+      function setSelectedNavFromIndex(delta) {
+        var next = state.selectedNavIndex + delta;
+        if (next < 0 || next >= NAV_PAGES.length) {
+          return;
+        }
+        state.selectedNavIndex = next;
+        var row = rowElementForPage(NAV_PAGES[next].id);
+        if (row) {
+          row.focus();
+          row.scrollIntoView({ block: 'nearest' });
+          if (els.leftNav) {
+            var allRows = Array.prototype.slice.call(els.leftNav.querySelectorAll('.wd-nav-row'));
+            allRows.forEach(function (item, idx) {
+              item.setAttribute('tabindex', idx === next ? '0' : '-1');
+            });
+          }
+        }
+      }
+
+      function loadCastData() {
+        state.castPageLoading = true;
+        renderPage();
+        return Promise.all([
+          callBackend('list-spell-categories')
+            .then(function (text) {
+              var rows = String(text || '').split('\n').map(function (line) {
+                return String(line || '').trim();
+              }).filter(Boolean);
+              var parsed = [];
+              for (var i = 0; i < rows.length; i += 1) {
+                var line = rows[i];
+                var parts = line.split('|');
+                var id = parts[0] || '';
+                var kind = parts[1] || 'spell';
+                var label = parts[2] || id;
+                var count = Number(parts[3] || 0);
+                if (!label && id.indexOf(':') !== -1) {
+                  label = id.split(':')[1];
+                }
+                if (isNaN(count) || count < 0) {
+                  count = 0;
+                }
+                if (id) {
+                  parsed.push({ id: id, kind: kind, title: label, count: count });
+                }
+              }
+              parsed.sort(function (left, right) {
+                return (left.title || '').localeCompare(right.title || '');
+              });
+              state.cast.categories = parsed;
+            })
+            .catch(function () {
+              state.cast.categories = [
+                { id: 'builtin:arcana', kind: 'builtin', title: 'Arcana', count: 0 },
+                { id: 'builtin:web', kind: 'builtin', title: 'Web', count: 0 },
+                { id: 'custom:local', kind: 'custom', title: 'Local', count: 0 }
+              ];
+            })
+            .finally(function () {
+              state.castPageLoading = false;
+              renderPage();
+            }),
+          callBackend('list-memorized-spells')
+            .then(function (text) {
+              var raw = String(text || '').split('\n');
+              var parsed = [];
+              for (var i = 0; i < raw.length; i += 1) {
+                var parts = String(raw[i] || '').split('\t');
+                if (!parts[0]) {
+                  continue;
+                }
+                parsed.push({ name: String(parts[0]).trim(), command: String(parts[1] || '').trim() });
+              }
+              state.cast.memorized = parsed;
+            })
+            .catch(function () {
+              state.cast.memorized = [];
+            }),
+          loadSpellRowsForCategory(state.cast.expandedCategory).catch(function () {})
+        ]);
+      }
+
+      function loadArcanaInstall() {
+        return callBackend('list-arcana-install').then(function (text) {
+          var lines = String(text || '').split('\n');
+          var parsed = [];
+          for (var i = 0; i < lines.length; i += 1) {
+            var parts = String(lines[i] || '').split('|');
+            var name = String(parts[0] || '').trim();
+            var status = String(parts[1] || '').trim();
+            var label = String(parts[2] || '').trim();
+            if (!name) {
+              continue;
+            }
+            parsed.push({ name: name, status: status || 'coming soon', label: label || name });
+          }
+          state.arcanaInstall = parsed;
+          if (state.activePage === 'arcana') {
+            renderPage();
+          }
+        }).catch(function () {
+          state.arcanaInstall = [];
+        });
+      }
+
+      function loadSpellRowsForCategory(catId) {
+        if (!catId) {
+          return Promise.resolve();
+        }
+        var parts = catId.split(':');
+        var kind = parts[0] || 'builtin';
+        var id = parts[1] || catId;
+        return callBackend('list-spells', [kind, id]).then(function (text) {
+          var rows = String(text || '').split('\n').map(function (line) {
+            return String(line || '').trim();
+          }).filter(Boolean);
+          state.spellCache[catId] = rows;
+          if (!rows.length && state.cast.categories.length) {
+            var selected = state.cast.categories.filter(function (item) { return item.id === catId; })[0];
+            if (selected) {
+              selected.count = 0;
+            }
+          }
+        }).catch(function () {
+          state.spellCache[catId] = [];
+        });
+      }
+
+      function isArcanaAction(kind) {
+        return String(kind || '').indexOf('arcana:') === 0;
+      }
+
+      function runQuickAction(kind, target, options) {
+        options = options || {};
+        if (state.actionInFlight) {
+          return;
+        }
+        state.actionInFlight = true;
+        pushActivity('app', 'Queued ' + kind + (target ? ': ' + target : ''), { kind: kind, target: target, section: 'app', app: 'wizardry-core' });
+        callBackend('run-action', [kind, target]).then(function (text) {
+          var output = String(text || '').trim();
+          if (options.outputId) {
+            setOutputBlock(options.outputId, output || ('Action ' + kind + ' complete.'));
+          }
+          pushActivity('app', kind + ' completed', { kind: kind, output: output, section: 'app', app: 'wizardry-core', status: 'ok' });
+        }).catch(function (error) {
+          if (options.outputId) {
+            setOutputBlock(options.outputId, String(error && error.message ? error.message : error || 'Action failed.'));
+          }
+          pushActivity('app', kind + ' failed: ' + (error && error.message ? error.message : String(error || '')), { kind: kind, section: 'app', app: 'wizardry-core', status: 'error' });
+        }).finally(function () {
+          loadWatchHistory();
+          if (options.refreshArcana || (typeof options.refreshArcana === 'undefined' && isArcanaAction(kind))) {
+            loadArcanaInstall();
+          }
+          state.actionInFlight = false;
+        });
+      }
+
+      function runArcanaAction(kind, name, options) {
+        var module = String(name || '').trim();
+        if (!module) {
+          pushActivity('app', 'Blocked: missing arcana module for ' + kind, { kind: kind, section: 'app', app: 'wizardry-core', status: 'error' });
+          return;
+        }
+        runQuickAction(kind, module, options);
+      }
+
+      function runSpell(kind, spellName) {
+        if (state.actionInFlight) {
+          return;
+        }
+        state.actionInFlight = true;
+        var appLabel = kind ? String(kind).replace(':', ' ') : 'builtin-spell';
+        pushActivity('cast', 'Running ' + kind + ':' + spellName, { spell: spellName, kind: kind, app: appLabel, source: kind, section: 'casting' });
+        callBackend('run-spell', [kind, spellName]).then(function (text) {
+          pushActivity('cast', kind + ':' + spellName + ' complete', { kind: kind, spell: spellName, output: String(text || '').trim(), section: 'casting', app: appLabel, source: kind, status: 'ok' });
+        }).catch(function (error) {
+          pushActivity('cast', 'Failed ' + kind + ':' + spellName + ' - ' + (error && error.message ? error.message : String(error || '')), { kind: kind, spell: spellName, section: 'casting', app: appLabel, source: kind, status: 'error' });
+        }).finally(function () {
+          loadWatchHistory();
+          state.actionInFlight = false;
+        });
+      }
+
+      function runSpellHelp(kind, spellName) {
+        runQuickAction('spell-help:' + kind, spellName);
+      }
+
+      function copyActivityLog() {
+        if (!navigator.clipboard) {
+          return;
+        }
+        var text = state.activity.casting.concat(state.activity.app).map(function (row) {
+          return timestampForRow(row.ts) + ' ' + row.kind + ' ' + row.text +
+            (row.payload && row.payload.app ? (' app=' + row.payload.app) : '') +
+            (row.payload && row.payload.source ? (' source=' + row.payload.source) : '');
+        }).join('\n');
+        navigator.clipboard.writeText(text).catch(function () {});
+      }
+
+      function addSynonym(alias, command) {
+        if (!alias || !command) {
+          return;
+        }
+        state.spellbook.push({ alias: alias, command: command });
+        pushActivity('alias', 'Added synonym ' + alias + ' -> ' + command, { alias: alias });
+        persistSynonyms();
+        renderPage();
+      }
+
+      function removeSynonym(index) {
+        var item = state.spellbook[index];
+        if (!item) {
+          return;
+        }
+        state.spellbook.splice(index, 1);
+        pushActivity('alias', 'Removed synonym ' + item.alias, {});
+        persistSynonyms();
+        renderPage();
+      }
+
+      function persistSynonyms() {
+        var normalized = state.spellbook.map(function (item) {
+          return item.alias + '=>' + item.command;
+        }).join('\n');
+        savePreference('spellbook_synonyms', normalized);
+      }
+
+      function openSettings(open) {
+        els.settingsPanel.classList.toggle('wd-hidden', !open);
+        if (open && els.railWidthInput) {
+          els.railWidthInput.value = String(state.railWidth);
+        }
+      }
+
+      function setDividerListeners() {
+        var startX = 0;
+        var startW = state.railWidth;
+
+        function onMove(event) {
+          if (!state.dividerDragging) {
+            return;
+          }
+          var clientX = event.clientX;
+          var delta = clientX - startX;
+          saveRailWidth(startW + delta);
+        }
+
+        function onEnd() {
+          state.dividerDragging = false;
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onEnd);
+        }
+
+        if (!els.railDivider) {
+          return;
+        }
+        els.railDivider.addEventListener('pointerdown', function (event) {
+          event.preventDefault();
+          state.dividerDragging = true;
+          startX = event.clientX;
+          startW = state.railWidth;
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onEnd);
+        });
+      }
+
+      function setOutputBlock(id, value) {
+        var el = document.getElementById(id);
+        if (!el) {
+          return;
+        }
+        el.textContent = String(value == null ? '' : value).trim() || 'No output.';
+      }
+
+      function bindEvents() {
+        document.addEventListener('click', function (event) {
+          if (els.themeMenu && !els.themeMenu.classList.contains('wd-hidden')) {
+            if (!event.target.closest('#theme-picker-btn') && !event.target.closest('#theme-menu')) {
+              closeThemeMenu(true);
+            }
+          }
+          if (state.activityOpen && !event.target.closest('#activity-drawer') && !event.target.closest('#activity-toggle')) {
+            setActivityOpen(false);
+          }
+          if (!state.dividerDragging && !els.settingsPanel.classList.contains('wd-hidden') && !event.target.closest('#settings-panel') && !event.target.closest('#settings-toggle')) {
+            openSettings(false);
+          }
+        });
+
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            closeThemeMenu(false);
+            setActivityOpen(false);
+            openSettings(false);
+            return;
+          }
+          if (document.activeElement && document.activeElement.tagName === 'INPUT' && event.ctrlKey) {
+            return;
+          }
+          if (state.themeMenuOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            cycleTheme(event.key === 'ArrowDown' ? 1 : -1);
+            return;
+          }
+          if (document.activeElement && document.activeElement.closest('#left-nav')) {
+            if (event.key === 'ArrowDown') {
+              setSelectedNavFromIndex(1);
+              return;
+            }
+            if (event.key === 'ArrowUp') {
+              setSelectedNavFromIndex(-1);
+              return;
+            }
+            if (event.key === 'Enter' || event.key === ' ') {
+              var selected = rowElementForPage(NAV_PAGES[state.selectedNavIndex].id);
+              if (selected) {
+                setActivePage(selected.getAttribute('data-page'));
+              }
+              return;
+            }
+          }
+        });
+
+        if (els.leftNav) {
+          els.leftNav.addEventListener('click', function (event) {
+            var pageButton = event.target.closest('[data-page]');
+            if (pageButton) {
+              setActivePage(pageButton.getAttribute('data-page'));
+            }
+          });
+        }
+
+        if (els.themePickerBtn) {
+          els.themePickerBtn.addEventListener('click', function () {
+            if (state.themeMenuOpen) {
+              closeThemeMenu(true);
+            } else {
+              openThemeMenu();
+            }
+          });
+        }
+
+        if (els.themeMenu) {
+          els.themeMenu.addEventListener('click', function (event) {
+            if (!event.target.closest('.wd-theme-item')) {
+              return;
+            }
+            var name = event.target.getAttribute('data-theme-name');
+            if (name) {
+              applyTheme(name);
+              closeThemeMenu(true);
+            }
+          });
+        }
+
+        if (els.activityToggle) {
+          els.activityToggle.addEventListener('click', function () {
+            setActivityOpen(!state.activityOpen);
+          });
+        }
+        if (els.activityCopy) {
+          els.activityCopy.addEventListener('click', copyActivityLog);
+        }
+        if (els.activityClose) {
+          els.activityClose.addEventListener('click', function () {
+            setActivityOpen(false);
+          });
+        }
+        if (els.actionRefresh) {
+          els.actionRefresh.addEventListener('click', function () {
+            if (state.activePage === 'arcana') {
+              loadArcanaInstall();
+            } else {
+              loadCastData();
+            }
+          });
+        }
+        if (els.settingsToggle) {
+          els.settingsToggle.addEventListener('click', function () {
+            openSettings(true);
+          });
+        }
+        if (els.settingsClose) {
+          els.settingsClose.addEventListener('click', function () {
+            openSettings(false);
+          });
+        }
+        if (els.railWidthInput) {
+          els.railWidthInput.addEventListener('input', function (event) {
+            saveRailWidth(event.target.value);
+          });
+          els.railWidthInput.min = '220';
+          els.railWidthInput.max = '420';
+          els.railWidthInput.value = String(state.railWidth);
+        }
+        if (els.contentArea) {
+          els.contentArea.addEventListener('click', function (event) {
+            var runSpellBtn = event.target.closest('[data-run-spell]');
+            if (runSpellBtn) {
+              var value = runSpellBtn.getAttribute('data-run-spell');
+              if (value && value.indexOf('|') >= 0) {
+                var pieces = value.split('|');
+                runSpell(pieces[0], pieces[1]);
+              }
+              return;
+            }
+
+            var helpBtn = event.target.closest('[data-help]');
+            if (helpBtn) {
+              var helpValue = helpBtn.getAttribute('data-help');
+              if (helpValue && helpValue.indexOf('|') >= 0) {
+                var pair = helpValue.split('|');
+                runSpellHelp(pair[0], pair[1]);
+              }
+              return;
+            }
+
+            var installArcana = event.target.closest('[data-install-arcana]');
+            if (installArcana) {
+              var moduleName = installArcana.getAttribute('data-install-arcana');
+              if (moduleName) {
+                runArcanaAction('arcana:install', moduleName, {
+                  outputId: 'arcana-output',
+                  refreshArcana: true
+                });
+              }
+              return;
+            }
+
+            var arcanaMenu = event.target.closest('[data-arcana-menu]');
+            if (arcanaMenu) {
+              var menuModule = arcanaMenu.getAttribute('data-arcana-menu');
+              if (menuModule) {
+                runArcanaAction('arcana:menu', menuModule, {
+                  outputId: 'arcana-output',
+                  refreshArcana: true
+                });
+              }
+              return;
+            }
+
+            var adminAction = event.target.closest('[data-admin-action]');
+            if (adminAction) {
+              var action = adminAction.getAttribute('data-admin-action');
+              if (action) {
+                runQuickAction(action, action, {
+                  outputId: 'arcana-output',
+                  refreshArcana: isArcanaAction(action)
+                });
+                if (action === 'arcana:themes') {
+                  setOutputBlock('arcana-output', 'Themes: ' + state.themes.join(', '));
+                }
+              }
+              return;
+            }
+
+            var hostAction = event.target.closest('[data-host-action]');
+            if (hostAction) {
+              var command = hostAction.getAttribute('data-host-action');
+              var output = callBackend('run-system', [command]).then(function (text) {
+                setOutputBlock('system-output', text || 'no output');
+              }).catch(function (error) {
+                setOutputBlock('system-output', String(error && error.message ? error.message : error || 'failure'));
+              });
+              return;
+            }
+
+            var mudAction = event.target.closest('[data-mud-action]');
+            if (mudAction) {
+              var mudCmd = mudAction.getAttribute('data-mud-action');
+              callBackend('run-system', [mudCmd]).then(function (text) {
+                setOutputBlock('mud-output', text || 'no output');
+              }).catch(function (error) {
+                setOutputBlock('mud-output', String(error && error.message ? error.message : error || 'failure'));
+              });
+              return;
+            }
+
+            var addToggle = event.target.closest('#spellbook-add-toggle');
+            if (addToggle) {
+              var form = document.getElementById('spellbook-add-dialog');
+              if (form) {
+                form.classList.toggle('wd-hidden');
+                addToggle.setAttribute('aria-expanded', form.classList.contains('wd-hidden') ? 'false' : 'true');
+                if (!form.classList.contains('wd-hidden')) {
+                  var aliasInput = document.getElementById('spell-alias');
+                  if (aliasInput && typeof aliasInput.focus === 'function') {
+                    aliasInput.focus();
+                  }
+                }
+              }
+            }
+            var saveBtn = event.target.closest('#spell-save');
+            if (saveBtn) {
+              var addDialog = document.getElementById('spellbook-add-dialog');
+              var addToggleButton = document.getElementById('spellbook-add-toggle');
+              var aliasInput = document.getElementById('spell-alias');
+              var commandInput = document.getElementById('spell-command');
+              addSynonym(
+                String(aliasInput ? aliasInput.value : '').trim(),
+                String(commandInput ? commandInput.value : '').trim()
+              );
+              if (addDialog) {
+                addDialog.classList.add('wd-hidden');
+              }
+              if (addToggleButton) {
+                addToggleButton.setAttribute('aria-expanded', 'false');
+              }
+              if (aliasInput) {
+                aliasInput.value = '';
+              }
+              if (commandInput) {
+                commandInput.value = '';
+              }
+            }
+            var cancelBtn = event.target.closest('#spell-cancel');
+            if (cancelBtn) {
+              var cancelDialog = document.getElementById('spellbook-add-dialog');
+              var cancelToggle = document.getElementById('spellbook-add-toggle');
+              if (cancelDialog) {
+                cancelDialog.classList.add('wd-hidden');
+              }
+              if (cancelToggle) {
+                cancelToggle.setAttribute('aria-expanded', 'false');
+              }
+              return;
+            }
+
+            var removeSynonym = event.target.closest('[data-remove-synonym]');
+            if (removeSynonym) {
+              removeSynonymFromElement(removeSynonym.getAttribute('data-remove-synonym'));
+            }
+          });
+        }
+
+        if (els.railDivider) {
+          els.railDivider.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowLeft') {
+              saveRailWidth(state.railWidth - 10);
+            }
+            if (event.key === 'ArrowRight') {
+              saveRailWidth(state.railWidth + 10);
+            }
+          });
+        }
+
+        document.addEventListener('pointerup', function () {
+          state.dividerDragging = false;
+        });
+        setDividerListeners();
+
+        document.addEventListener('keydown', function (event) {
+          if (!state.themeMenuOpen) {
+            return;
+          }
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
+            event.preventDefault();
+          }
+          if (event.key === 'Escape') {
+            closeThemeMenu(true);
+          }
+          if (event.key === 'ArrowDown') {
+            cycleTheme(1);
+          } else if (event.key === 'ArrowUp') {
+            cycleTheme(-1);
+          } else if (event.key.length === 1) {
+            handleThemeTypeahead(event.key);
+          }
+        });
+      }
+
+      function removeSynonymFromElement(index) {
+        var idx = Number(index);
+        if (!Number.isInteger(idx)) {
+          return;
+        }
+        removeSynonym(idx);
+      }
+
+      function bindCategoryDetails() {
+        if (!els.contentArea) {
+          return;
+        }
+        els.contentArea.addEventListener('toggle', function (event) {
+          var details = event.target.closest('[data-category]');
+          if (!details || details.tagName !== 'DETAILS') {
+            return;
+          }
+          var categoryId = details.getAttribute('data-category');
+          if (!categoryId) {
+            return;
+          }
+          if (details.open) {
+            state.cast.expandedCategory = categoryId;
+            loadSpellRowsForCategory(categoryId).then(function () {
+              if (state.activePage === 'cast') {
+                renderPage();
+              }
+            });
+          } else if (state.cast.expandedCategory === categoryId) {
+            state.cast.expandedCategory = '';
+          }
+        });
+      }
+
+      function initThemeControlFallback() {
+        if (els.themePickerBtn) {
+          els.themePickerBtn.textContent = themeLabel(state.activeTheme || 'adept');
+        }
+        if (els.railWidthInput) {
+          els.railWidthInput.value = String(state.railWidth);
+        }
+        applyRailWidth();
+      }
+
+      function bootstrap() {
+        initElements();
+        setDividerListeners();
+        bindEvents();
+        bindCategoryDetails();
+        renderNav();
+        renderPage();
+        renderThemeMenu();
+        renderActivity();
+        initThemeControlFallback();
+        ensureBridge();
+        setBridgeState(bridgeAvailable());
+
+        Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadCastData(), loadArcanaInstall(), loadWatchHistory()])
+          .catch(function () {
+            state.bridgeReady = bridgeAvailable();
+          })
+          .finally(function () {
+            setBridgeState(state.bridgeReady);
+            applyLayoutColumns();
+            renderPage();
+            pushActivity('boot', 'Wizardry Desktop is ready. Theme: ' + state.activeTheme, {});
+            notifyHostBootReady(0);
+            revealUI();
+          });
+      }
+
+      bootstrap();
+    }());
+  </script>
+</body>
+</html>
