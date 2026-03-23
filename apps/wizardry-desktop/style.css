@@ -831,6 +831,13 @@ body::before {
 .wd-composer-block:hover,
 .wd-composer-block:focus-visible {
   background: color-mix(in srgb, var(--wd-accent) 18%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--wd-accent) 45%, transparent);
+  outline-offset: 0;
+}
+
+.wd-composer-block-active {
+  background: color-mix(in srgb, var(--wd-accent) 24%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wd-accent) 45%, transparent);
 }
 
 .wd-composer-field {

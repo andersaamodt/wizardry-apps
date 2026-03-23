@@ -133,6 +133,7 @@
       <div class="wd-composer-help" aria-live="polite">
         <span>Press <kbd>Enter</kbd> to add token or run, <kbd>Shift</kbd>+<kbd>Enter</kbd> to run current command, <kbd>Esc</kbd> to close.</span>
         <span>Use <kbd>Tab</kbd> to cycle fields, <kbd>Left</kbd>/<kbd>Right</kbd> to move token selection, <kbd>Del</kbd> to remove a selected token.</span>
+        <span>Arrow <kbd>Up</kbd>/<kbd>Down</kbd> in empty input or focused blocks to choose blocks.</span>
         <span>Spaces and commas create pills. Click pills to edit or remove.</span>
       </div>
       <pre id="composer-output" class="wd-mono-box wd-composer-output" aria-live="polite">No command run yet.</pre>
@@ -215,6 +216,7 @@
           rawInput: '',
           tokens: [],
           selectedToken: -1,
+          activeBlock: 0,
           message: '',
           output: 'No command run yet.',
           running: false
@@ -542,7 +544,8 @@
           renderComposer();
           return false;
         }
-        var shouldCommit = !!force || /(?:\s|,)$/.test(value) || tokens.length > 1;
+        var options = force && force === true ? {} : (force || {});
+        var shouldCommit = !!options.force || options.forceSingle || /(?:\s|,)$/.test(value) || tokens.length > 1;
         if (!shouldCommit) {
           state.composer.rawInput = value;
           renderComposer();
@@ -552,6 +555,55 @@
         return true;
       }
 
+      function runComposerFromDraft() {
+        commitComposerInput({ forceSingle: true });
+        var plan = composerPlanFromTokens(state.composer.tokens);
+        if (plan.ready && !state.composer.running && !state.actionInFlight) {
+          executeComposerCommand(plan);
+          return true;
+        }
+        renderComposer();
+        return false;
+      }
+
+      function composerBlockButtons() {
+        if (!els.composerBlocks) {
+          return [];
+        }
+        return Array.prototype.slice.call(els.composerBlocks.querySelectorAll('.wd-composer-block'));
+      }
+
+      function composerSetActiveBlock(index) {
+        var buttons = composerBlockButtons();
+        if (!buttons.length) {
+          return;
+        }
+        if (!Number.isInteger(index) || index < 0 || index >= buttons.length) {
+          index = 0;
+        }
+        for (var i = 0; i < buttons.length; i += 1) {
+          if (i === index) {
+            buttons[i].tabIndex = 0;
+            buttons[i].classList.add('wd-composer-block-active');
+          } else {
+            buttons[i].tabIndex = -1;
+            buttons[i].classList.remove('wd-composer-block-active');
+          }
+        }
+      }
+
+      function composerInsertBlock(block) {
+        var tokenText = '';
+        if (block) {
+          tokenText = block.getAttribute && block.getAttribute('data-composer-block') || '';
+        }
+        commitComposerInput({ forceSingle: true });
+        addComposerTokens(splitComposerText(tokenText));
+        if (els.composerInput) {
+          focusComposerInput();
+        }
+      }
+
       function composerOpenWithTokens(tokens) {
         if (!Array.isArray(tokens) || !tokens.length) {
           tokens = composerDefaultTokensForPage(state.activePage);
@@ -559,6 +611,7 @@
         state.composer.tokens = Array.isArray(tokens) ? tokens.slice(0) : [];
         state.composer.rawInput = '';
         state.composer.selectedToken = -1;
+        state.composer.activeBlock = 0;
         state.composer.message = '';
         state.composer.output = 'No command run yet.';
         if (els.composerInput) {
@@ -1036,7 +1089,12 @@
           return;
         }
         var groups = composerArgSuggestionGroups(plan || {}, composerBlockDefinitions());
+        var activeSet = Number(state.composer.activeBlock);
+        if (!Number.isInteger(activeSet) || activeSet < 0) {
+          activeSet = 0;
+        }
         var html = '';
+        var flatIndex = 0;
         for (var i = 0; i < groups.length; i += 1) {
           var group = groups[i];
           html += '<section class="wd-composer-group">';
@@ -1044,11 +1102,25 @@
           html += '<div class="wd-composer-group-entries">';
           for (var j = 0; j < group.entries.length; j += 1) {
             var block = group.entries[j];
-            html += '<button type="button" class="wd-polite-btn wd-composer-block" title="' + escapeHtmlAttribute(block.help || '') + '" data-composer-block="' + escapeAttrValue((block.tokens || []).join(' ')) + '">' + escapeText(block.label || ('block ' + (j + 1))) + '</button>';
+            var label = block.label || ('block ' + (j + 1));
+            var tabIndex = flatIndex === activeSet ? '0' : '-1';
+            var activeClass = flatIndex === activeSet ? ' wd-composer-block-active' : '';
+            html += '<button type="button" class="wd-polite-btn wd-composer-block' + activeClass + '" title="' + escapeHtmlAttribute(block.help || '') + '" data-composer-block="' + escapeAttrValue((block.tokens || []).join(' ')) + '" tabindex="' + tabIndex + '">' + escapeText(label) + '</button>';
+            flatIndex += 1;
           }
           html += '</div></section>';
         }
         els.composerBlocks.innerHTML = html;
+
+        if (!groups.length) {
+          return;
+        }
+        var blockButtons = composerBlockButtons();
+        if (flatIndex <= activeSet) {
+          state.composer.activeBlock = 0;
+          activeSet = 0;
+        }
+        composerSetActiveBlock(activeSet);
       }
 
       function updateComposerOutput(value) {
@@ -1153,6 +1225,7 @@
         state.composer.tokens = [];
         state.composer.rawInput = '';
         state.composer.selectedToken = -1;
+        state.composer.activeBlock = 0;
         state.composer.message = '';
         state.composer.output = 'No command run yet.';
         state.composer.running = false;
@@ -2491,9 +2564,7 @@
         }
         if (els.composerRun) {
           els.composerRun.addEventListener('click', function () {
-            commitComposerInput(true);
-            var plan = composerPlanFromTokens(state.composer.tokens);
-            executeComposerCommand(plan);
+            runComposerFromDraft();
           });
         }
         if (els.composerInput) {
@@ -2503,7 +2574,6 @@
           });
           els.composerInput.addEventListener('input', function () {
             state.composer.rawInput = String(els.composerInput.value || '');
-            commitComposerInput(false);
             renderComposer();
           });
           els.composerInput.addEventListener('keydown', function (event) {
@@ -2513,12 +2583,7 @@
             if (event.key === 'Enter') {
               event.preventDefault();
               if (event.shiftKey) {
-                commitComposerInput(true);
-                var runPlan = composerPlanFromTokens(state.composer.tokens);
-                if (runPlan.ready && !state.composer.running && !state.actionInFlight) {
-                  executeComposerCommand(runPlan);
-                }
-                renderComposer();
+                runComposerFromDraft();
                 return;
               }
               var committed = commitComposerInput(true);
@@ -2539,6 +2604,8 @@
               var firstBlock = els.composerBlocks && els.composerBlocks.querySelector('[data-composer-block]');
               if (firstBlock && typeof firstBlock.focus === 'function') {
                 event.preventDefault();
+                state.composer.activeBlock = 0;
+                composerSetActiveBlock(0);
                 firstBlock.focus();
               }
               return;
@@ -2693,11 +2760,78 @@
             if (!block) {
               return;
             }
-            if (state.composer.open) {
-              commitComposerInput(true);
+            var buttons = composerBlockButtons();
+            var index = buttons.indexOf(block);
+            state.composer.activeBlock = index;
+            composerSetActiveBlock(index);
+            composerInsertBlock(block);
+          });
+          els.composerBlocks.addEventListener('keydown', function (event) {
+            if (!event.target || event.key === 'Tab' || event.ctrlKey || event.altKey || event.metaKey) {
+              return;
             }
-            var blockTokens = splitComposerText(block.getAttribute('data-composer-block'));
-            addComposerTokens(blockTokens);
+            var buttons = composerBlockButtons();
+            if (!buttons.length) {
+              return;
+            }
+            var index = buttons.indexOf(document.activeElement);
+            if (index < 0) {
+              index = 0;
+              buttons[0].focus();
+              state.composer.activeBlock = 0;
+              composerSetActiveBlock(0);
+              return;
+            }
+            if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+              event.preventDefault();
+              index += 1;
+              if (index >= buttons.length) {
+                index = 0;
+              }
+              buttons[index].focus();
+              state.composer.activeBlock = index;
+              composerSetActiveBlock(index);
+              return;
+            }
+            if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+              event.preventDefault();
+              index -= 1;
+              if (index < 0) {
+                index = buttons.length - 1;
+              }
+              buttons[index].focus();
+              state.composer.activeBlock = index;
+              composerSetActiveBlock(index);
+              return;
+            }
+            if (event.key === 'Home') {
+              event.preventDefault();
+              buttons[0].focus();
+              state.composer.activeBlock = 0;
+              composerSetActiveBlock(0);
+              return;
+            }
+            if (event.key === 'End') {
+              event.preventDefault();
+              index = buttons.length - 1;
+              buttons[index].focus();
+              state.composer.activeBlock = index;
+              composerSetActiveBlock(index);
+              return;
+            }
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              if (index >= 0 && index < buttons.length) {
+                composerInsertBlock(buttons[index]);
+              }
+              return;
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              if (typeof focusComposerInput === 'function') {
+                focusComposerInput();
+              }
+            }
           });
         }
         if (els.composerPanel) {
