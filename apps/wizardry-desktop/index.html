@@ -47,7 +47,12 @@
           <button id="command-composer-toggle" type="button" class="wd-icon-btn wd-composer-btn" title="Compose command..." aria-label="Compose command..." aria-expanded="false" aria-controls="command-composer-modal">
             <span class="wd-icon-composer" aria-hidden="true">
               <svg viewBox="0 0 18 18" focusable="false" aria-hidden="true">
-                <path d="M1 1h4v4H1zm7 1h4v4H7zm13 1h-4v4h4zM1 7h4v4H1zm7 7h4v4h-4zM1 13h4v4H1zM7 7h4v4H7zm13 7h-4v4h4zM7 13h4v4H7zm13 13h-4v4h4z"></path>
+                <g fill="currentColor">
+                  <rect x="1" y="1" width="6" height="6" rx="1" ry="1"></rect>
+                  <rect x="11" y="1" width="6" height="6" rx="1" ry="1"></rect>
+                  <rect x="6" y="6" width="6" height="6" rx="1" ry="1"></rect>
+                  <rect x="11" y="11" width="6" height="6" rx="1" ry="1"></rect>
+                </g>
               </svg>
             </span>
             <span class="wd-hidden">Compose</span>
@@ -127,6 +132,7 @@
       </div>
       <div class="wd-composer-help" aria-live="polite">
         <span>Press <kbd>Enter</kbd> to add token or run, <kbd>Shift</kbd>+<kbd>Enter</kbd> to run current command, <kbd>Esc</kbd> to close.</span>
+        <span>Use <kbd>Tab</kbd> to cycle fields, <kbd>Left</kbd>/<kbd>Right</kbd> to move token selection, <kbd>Del</kbd> to remove a selected token.</span>
         <span>Spaces and commas create pills. Click pills to edit or remove.</span>
       </div>
       <pre id="composer-output" class="wd-mono-box wd-composer-output" aria-live="polite">No command run yet.</pre>
@@ -253,6 +259,7 @@
           composerToggle: document.getElementById('command-composer-toggle'),
           composerClose: document.getElementById('composer-close'),
           composerCloseBtn: document.getElementById('composer-close-btn'),
+          composerPanel: document.querySelector('.wd-composer-panel'),
           composerRun: document.getElementById('composer-run'),
           composerClear: document.getElementById('composer-clear'),
           composerCopy: document.getElementById('composer-copy'),
@@ -388,6 +395,55 @@
         el.textContent = String(value || '');
       }
 
+      function focusComposerInput() {
+        if (!els.composerInput) {
+          return;
+        }
+        if (typeof els.composerInput.focus === 'function') {
+          els.composerInput.focus();
+        }
+      }
+
+      function moveComposerTokenSelection(delta) {
+        var count = state.composer.tokens.length;
+        if (!count) {
+          return;
+        }
+        if (state.composer.selectedToken < 0) {
+          state.composer.selectedToken = delta < 0 ? count - 1 : 0;
+        } else {
+          state.composer.selectedToken = (state.composer.selectedToken + delta + count) % count;
+        }
+        renderComposer();
+      }
+
+      function composerDefaultTokensForPage(pageId) {
+        if (pageId === 'cast') {
+          return ['run-spell'];
+        }
+        if (pageId === 'arcana') {
+          return ['run-action'];
+        }
+        if (pageId === 'system' || pageId === 'mud') {
+          return ['run-system'];
+        }
+        return ['run-action'];
+      }
+
+      function composerFocusableElements() {
+        if (!els.composerModal) {
+          return [];
+        }
+        var panel = els.composerModal.querySelector('.wd-composer-panel');
+        if (!panel) {
+          return [];
+        }
+        var nodes = Array.prototype.slice.call(panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'));
+        return nodes.filter(function (node) {
+          return node.offsetParent !== null && node.getAttribute('aria-hidden') !== 'true' && !node.disabled;
+        });
+      }
+
       function normalizeComposerToken(value) {
         return String(value || '').trim();
       }
@@ -497,6 +553,9 @@
       }
 
       function composerOpenWithTokens(tokens) {
+        if (!Array.isArray(tokens) || !tokens.length) {
+          tokens = composerDefaultTokensForPage(state.activePage);
+        }
         state.composer.tokens = Array.isArray(tokens) ? tokens.slice(0) : [];
         state.composer.rawInput = '';
         state.composer.selectedToken = -1;
@@ -949,10 +1008,10 @@
           var token = tokens[i];
           var kind = plan.tokenKinds && plan.tokenKinds[i] ? plan.tokenKinds[i] : 'token';
           var selected = state.composer.selectedToken === i ? ' wd-composer-token-selected' : '';
-          var tokenTabIndex = 0;
+          var tokenTabIndex = selected ? '0' : '-1';
           html += '<span class="wd-composer-token wd-composer-token-' + kind + selected + '" role="listitem">';
-          html += '<button type="button" class="wd-composer-token-text" data-composer-token="' + i + '" tabindex="' + tokenTabIndex + '" aria-label="Edit token ' + escapeHtmlAttribute(token) + '" data-token-value="' + escapeAttrValue(token) + '">' + escapeText(token) + '</button>';
-          html += '<button type="button" class="wd-composer-token-remove" data-composer-token-remove="' + i + '" aria-label="Remove token ' + escapeHtmlAttribute(token) + '">×</button>';
+          html += '<button type="button" class="wd-composer-token-text" data-composer-token="' + i + '" tabindex="' + tokenTabIndex + '" aria-label="Edit token ' + escapeHtmlAttribute(token) + '" data-token-value="' + escapeAttrValue(token) + '" aria-selected="' + String(selected ? 'true' : 'false') + '">' + escapeText(token) + '</button>';
+          html += '<button type="button" class="wd-composer-token-remove" data-composer-token-remove="' + i + '" aria-label="Remove token ' + escapeHtmlAttribute(token) + '" tabindex="-1">×</button>';
           html += '</span>';
         }
         for (var p = 0; p < placeholders.length; p += 1) {
@@ -1059,6 +1118,12 @@
         if (els.composerCloseBtn) {
           els.composerCloseBtn.disabled = false;
         }
+        if (state.composer.selectedToken >= 0) {
+          var activeToken = els.composerTokenRow && els.composerTokenRow.querySelector('[data-composer-token="' + state.composer.selectedToken + '"]');
+          if (activeToken && typeof activeToken.focus === 'function') {
+            activeToken.focus();
+          }
+        }
       }
 
       function setComposerOpen(open) {
@@ -1071,9 +1136,7 @@
         if (state.composer.open) {
           if (els.composerInput) {
             els.composerInput.value = state.composer.rawInput || '';
-            if (typeof els.composerInput.focus === 'function') {
-              els.composerInput.focus();
-            }
+            focusComposerInput();
           }
           renderComposer();
           if (state.composer.tokens.length && state.composer.selectedToken >= 0) {
@@ -2394,7 +2457,11 @@
 
         if (els.composerToggle) {
           els.composerToggle.addEventListener('click', function () {
-            setComposerOpen(!state.composer.open);
+            if (state.composer.open) {
+              setComposerOpen(false);
+            } else {
+              composerOpenWithTokens(composerDefaultTokensForPage(state.activePage));
+            }
           });
         }
         if (els.composerBackdrop) {
@@ -2466,6 +2533,22 @@
             if (event.key === ' ' || event.key === ',') {
               event.preventDefault();
               commitComposerInput(true);
+              return;
+            }
+            if (event.key === 'ArrowDown' && String(els.composerInput.value || '') === '') {
+              var firstBlock = els.composerBlocks && els.composerBlocks.querySelector('[data-composer-block]');
+              if (firstBlock && typeof firstBlock.focus === 'function') {
+                event.preventDefault();
+                firstBlock.focus();
+              }
+              return;
+            }
+            if (event.key === 'ArrowUp' && String(els.composerInput.value || '') === '') {
+              event.preventDefault();
+              if (state.composer.tokens.length) {
+                setComposerSelectedToken(state.composer.tokens.length - 1);
+                renderComposer();
+              }
               return;
             }
             if (event.key === 'Backspace') {
@@ -2552,6 +2635,57 @@
               return;
             }
           });
+          els.composerTokenRow.addEventListener('keydown', function (event) {
+            var tokenEl = event.target.closest('[data-composer-token]');
+            if (!tokenEl) {
+              return;
+            }
+            var idx = Number(tokenEl.getAttribute('data-composer-token'));
+            if (event.key === 'ArrowLeft') {
+              event.preventDefault();
+              moveComposerTokenSelection(-1);
+              return;
+            }
+            if (event.key === 'ArrowRight') {
+              event.preventDefault();
+              moveComposerTokenSelection(1);
+              return;
+            }
+            if (event.key === 'Home') {
+              event.preventDefault();
+              setComposerSelectedToken(0);
+              renderComposer();
+              return;
+            }
+            if (event.key === 'End') {
+              event.preventDefault();
+              setComposerSelectedToken(state.composer.tokens.length - 1);
+              renderComposer();
+              return;
+            }
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              editComposerTokenAt(idx);
+              return;
+            }
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+              event.preventDefault();
+              removeComposerTokenAt(idx);
+              return;
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              if (state.composer.tokens.length) {
+                setComposerSelectedToken(-1);
+                renderComposer();
+                if (typeof focusComposerInput === 'function') {
+                  focusComposerInput();
+                }
+              } else {
+                setComposerOpen(false);
+              }
+            }
+          });
         }
         if (els.composerBlocks) {
           els.composerBlocks.addEventListener('click', function (event) {
@@ -2564,6 +2698,29 @@
             }
             var blockTokens = splitComposerText(block.getAttribute('data-composer-block'));
             addComposerTokens(blockTokens);
+          });
+        }
+        if (els.composerPanel) {
+          els.composerPanel.addEventListener('keydown', function (event) {
+            if (event.key !== 'Tab') {
+              return;
+            }
+            var focusables = composerFocusableElements();
+            if (!focusables.length) {
+              return;
+            }
+            var index = focusables.indexOf(document.activeElement);
+            if (event.shiftKey) {
+              if (index <= 0) {
+                event.preventDefault();
+                focusables[focusables.length - 1].focus();
+              }
+              return;
+            }
+            if (index === focusables.length - 1) {
+              event.preventDefault();
+              focusables[0].focus();
+            }
           });
         }
 

@@ -223,6 +223,11 @@ body::before {
   stroke-linejoin: round;
 }
 
+.wd-icon-composer rect {
+  fill: currentColor;
+  stroke: none;
+}
+
 .wd-icon-btn.wd-compact {
   width: 24px;
   height: 20px;
@@ -891,6 +896,12 @@ body::before {
 .wd-composer-token-text:focus-visible {
   outline: none;
   background: color-mix(in srgb, var(--wd-accent) 18%, transparent);
+}
+
+.wd-composer-token-text:focus-visible,
+.wd-composer-token.wd-composer-token-selected .wd-composer-token-text {
+  outline: 2px solid color-mix(in srgb, var(--wd-accent) 35%, transparent);
+  outline-offset: -1px;
 }
 
 .wd-composer-token-remove {
