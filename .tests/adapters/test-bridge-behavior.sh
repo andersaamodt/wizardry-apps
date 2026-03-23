@@ -10,29 +10,43 @@ bridge="$ROOT_DIR/apps/.host/shared/wizardry-bridge.js"
   exit 1
 }
 
-# rpc promise lifecycle
-rg -n "return new Promise" "$bridge" >/dev/null
-rg -n "window\.__wizardry_callbacks\[id\]" "$bridge" >/dev/null
+assert_contains() {
+  file=$1
+  needle=$2
+  if ! grep -F "$needle" "$file" >/dev/null 2>&1; then
+    printf '%s\n' "missing expected bridge behavior text in $file: $needle" >&2
+    exit 1
+  fi
+}
 
-# success resolution and error rejection branches
-rg -n "reject\(new Error\(" "$bridge" >/dev/null
-rg -n "resolve\(payload && payload\.result \? payload\.result : payload\)" "$bridge" >/dev/null
+assert_matches() {
+  file=$1
+  pattern=$2
+  if ! grep -E "$pattern" "$file" >/dev/null 2>&1; then
+    printf '%s\n' "missing expected bridge behavior pattern in $file: $pattern" >&2
+    exit 1
+  fi
+}
 
-# desktop compatibility path
-rg -n "method === 'bridge\.exec'" "$bridge" >/dev/null
-rg -n "post\(\{ id: id, command: params\.argv \}\)" "$bridge" >/dev/null
-rg -n "stderr: 'native bridge unavailable'" "$bridge" >/dev/null
+# Promise lifecycle + callback dispatch.
+assert_matches "$bridge" 'return new Promise\(function \(resolve\)'
+assert_contains "$bridge" 'window.__wizardry_callbacks[id] = function (payload) {'
+assert_contains "$bridge" 'resolve(payload || {'
 
-# generic bridge unavailable branch
-rg -n "native bridge unavailable or method unsupported" "$bridge" >/dev/null
+# Fallback behavior when native bridge is unavailable.
+assert_contains "$bridge" "stderr: 'native bridge unavailable'"
+assert_contains "$bridge" 'exit_code: 1'
+assert_contains "$bridge" 'setTimeout(function () {'
 
-# subscriptions and dispatch behavior
-rg -n "subscribe: function" "$bridge" >/dev/null
-rg -n "window\.__wizardry_subscriptions\[token\] =" "$bridge" >/dev/null
-rg -n "unsubscribe: function" "$bridge" >/dev/null
-rg -n "delete window\.__wizardry_subscriptions\[token\]" "$bridge" >/dev/null
-rg -n "window\.__wizardry_emit = function" "$bridge" >/dev/null
-rg -n "Object\.keys\(window\.__wizardry_subscriptions\)" "$bridge" >/dev/null
-rg -n "sub\.fn\(payload\)" "$bridge" >/dev/null
+# RPC wrapper behavior should only allow bridge.exec and normalize argv payload.
+assert_contains "$bridge" "if (method !== 'bridge.exec')"
+assert_contains "$bridge" "unsupported rpc method"
+assert_contains "$bridge" 'Array.isArray(payload.argv)'
+assert_contains "$bridge" 'argv = payload.argv;'
+
+# Transport behavior must post command + callback id through native bridge.
+assert_contains "$bridge" 'post({ id: id, command: argv })'
+assert_contains "$bridge" 'window.webkit.messageHandlers.wizardry.postMessage(message);'
+assert_contains "$bridge" 'window.WizardryBridge.postMessage(JSON.stringify(message));'
 
 printf '%s\n' "bridge behavior checks passed"
