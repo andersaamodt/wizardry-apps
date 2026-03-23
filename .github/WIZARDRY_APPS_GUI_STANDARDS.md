@@ -198,7 +198,7 @@
 ## Conflict Resolution Order
 - If an app implementation conflicts with this file, treat this file as canonical for new work and move touched legacy code toward it.
 - Use Forge interaction patterns as the default baseline for new desktop control-plane apps.
-- Treat simple wrapper apps (for example menu-app/chatroom) as compatibility references, not visual or interaction baselines.
+- Treat simple wrapper apps (for example chatroom) as compatibility references, not visual or interaction baselines.
 - Legacy fixed-color screens may remain untouched, but any edited/new screens should migrate to theme-token styling.
 - Shell-based fallback command resolution is acceptable only for fixed internal script lookup with no user-controlled executable or shell fragment input.
 - When density conflicts with clarity, prioritize clear labels and explicit state feedback over packing additional controls.

@@ -195,14 +195,6 @@ launch-app chatroom
 
 ## Examples
 
-### menu-app
-
-See `apps/menu-app/` for a simple example demonstrating:
-- WebView UI with buttons
-- Hardcoded commands in JavaScript
-- Output display
-- Styling
-
 ### chatroom
 
 See `apps/chatroom/` for a real-world example demonstrating:

@@ -19,6 +19,7 @@ out/
 # Test artifacts
 _tmp/
 coverage/
+.assay-runs/
 
 # Workspace logs
 .log

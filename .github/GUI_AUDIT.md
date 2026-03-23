@@ -8,7 +8,7 @@
 ## Audit Inputs
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md` first.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_LESSONS.md` for known regressions.
-- Audit all shipped app surfaces in `apps/`: `forge`, `wizardry-desktop`, `chatroom`, and `menu-app`.
+- Audit all shipped app surfaces in `apps/`: `forge`, `wizardry-desktop`, and `chatroom`.
 
 ## Audit Output Contract
 - Produce per-app pass/fail notes with file evidence (`apps/<slug>/...`) for every check group below.
@@ -39,7 +39,6 @@
 - `forge`: left-right rail behavior, resizable divider persistence, path chip interactions, theme picker key handling.
 - `wizardry-desktop`: right activity drawer behavior, compact settings modal behavior, theme application and persistence.
 - `chatroom`: embedded viewport loading, integrated settings controls, server/client mode behavior, endpoint persistence.
-- `menu-app`: baseline control sizing and button behavior; treat as compatibility reference, not style baseline.
 
 ## Lightweight Report Template
 - `App:` `<slug>`
