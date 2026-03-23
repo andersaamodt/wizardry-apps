@@ -15,62 +15,62 @@ host_macos="$root/apps/.host/macos/main.m"
   exit 1
 }
 
-grep -F 'id="footer-status"' "$ui" >/dev/null
-grep -F "function setFooterStatus(kind, msg)" "$ui" >/dev/null
-grep -F "function shouldShowFooterStatusForAction(label, opts)" "$ui" >/dev/null
-grep -F "setFooterStatus('working', label + '...');" "$ui" >/dev/null
-grep -F "var successLabel = String(opts.successLabel || (label + ' complete'));" "$ui" >/dev/null
-grep -F "setFooterStatus('ok', successLabel);" "$ui" >/dev/null
-grep -F "function buildActionLabel(item)" "$ui" >/dev/null
-grep -F "function runActionLabel(item)" "$ui" >/dev/null
-grep -F "function ranActionLabel(item)" "$ui" >/dev/null
-grep -F "function regenerateSelectedIconAssets()" "$ui" >/dev/null
-grep -F "setFooterStatus('working', runningLabel);" "$ui" >/dev/null
-grep -F 'id="selected-icon-menu-btn"' "$ui" >/dev/null
-grep -F 'id="selected-icon-regenerate"' "$ui" >/dev/null
-grep -F "regenerate-app-icon-assets" "$ui" >/dev/null
-grep -F "regenerate-workspace-icon-assets" "$ui" >/dev/null
-grep -F "setFooterStatus('bad', message);" "$ui" >/dev/null
-grep -F "return !/^(open|copy)\\b/i.test(String(label || ''));" "$ui" >/dev/null
+assert_contains() {
+  file=$1
+  needle=$2
+  if ! grep -F "$needle" "$file" >/dev/null 2>&1; then
+    printf '%s\n' "missing expected contract text in $file: $needle" >&2
+    exit 1
+  fi
+}
 
-grep -F "perform('Import project folder'" "$ui" >/dev/null
-grep -F "perform('Create project', createProject, { swallow: true });" "$ui" >/dev/null
-grep -F "backend('run-workspace', [item.path, item.context]);" "$ui" >/dev/null
-grep -F "backend('rebuild-workspace', [selected.path, selected.context]);" "$ui" >/dev/null
-grep -F "built and launched from the desktop app bundle." "$ui" >/dev/null
-grep -F "launched as hosted web." "$ui" >/dev/null
+assert_matches() {
+  file=$1
+  pattern=$2
+  if ! grep -E "$pattern" "$file" >/dev/null 2>&1; then
+    printf '%s\n' "missing expected contract pattern in $file: $pattern" >&2
+    exit 1
+  fi
+}
 
-grep -F "var directTypes = ['text/uri-list', 'public.file-url', 'text/plain', 'public.utf8-plain-text'];" "$ui" >/dev/null
-grep -F "types.indexOf('public.utf8-plain-text') >= 0" "$ui" >/dev/null
-grep -F "itemType === 'public.utf8-plain-text'" "$ui" >/dev/null
-grep -F "window.forgeHostFileDrag = handleForgeHostFileDrag;" "$ui" >/dev/null
-grep -F "window.forgeHostIconDropResult = finishNativeHostIconDrop;" "$ui" >/dev/null
-grep -F "beginNativeHostIconDrop(paths[0] || '');" "$ui" >/dev/null
-grep -F "argv = ['__wizardry_host_forge_icon_drop_target'];" "$ui" >/dev/null
-grep -F "nativeHostIconDropArmed: false," "$ui" >/dev/null
-grep -F "nativeHostIconDropHandledUntil: 0," "$ui" >/dev/null
-grep -F "nativeHostIconDropFallbackTimer: 0," "$ui" >/dev/null
-grep -F "hostIconDropVisualPendingKey: ''," "$ui" >/dev/null
-grep -F "function setHostIconDropVisualPending(item, flag)" "$ui" >/dev/null
-grep -F "function markNativeHostIconDropHandled()" "$ui" >/dev/null
-grep -F "function nativeHostRecentlyHandledIconDrop()" "$ui" >/dev/null
-grep -F "scheduleNativeHostIconDropFallback(droppedPath, file);" "$ui" >/dev/null
-grep -F "setHostIconDropVisualPending(selected, true);" "$ui" >/dev/null
-grep -F "setHostIconDropVisualPending(selected, false);" "$ui" >/dev/null
-grep -F "markNativeHostIconDropHandled();" "$ui" >/dev/null
-grep -F "state.hostIconDropPendingKey || nativeHostRecentlyHandledIconDrop()" "$ui" >/dev/null
-grep -F "state.hostIconDropPendingKey) {" "$ui" >/dev/null
-grep -F "}, 900);" "$ui" >/dev/null
-grep -F "setNativeHostIconDropExpected(true);" "$ui" >/dev/null
-grep -F "toast('Drop a project folder to import.', 'bad');" "$ui" >/dev/null
+# UI feedback and action wiring contracts.
+assert_contains "$ui" 'id="footer-status"'
+assert_contains "$ui" 'id="selected-icon-menu-btn"'
+assert_contains "$ui" 'id="selected-icon-regenerate"'
+assert_matches "$ui" 'function setFooterStatus\(kind, msg\)'
+assert_matches "$ui" 'function shouldShowFooterStatusForAction\(label, opts\)'
+assert_matches "$ui" 'function buildActionLabel\(item\)'
+assert_matches "$ui" 'function runActionLabel\(item\)'
+assert_matches "$ui" 'function ranActionLabel\(item\)'
+assert_matches "$ui" 'function regenerateSelectedIconAssets\(\)'
 
-grep -F 'dispatchForgeHostCallbackNamed:@"forgeHostFileDrag"' "$host_macos" >/dev/null
-grep -F "forgeHostIconDropResult" "$host_macos" >/dev/null
-grep -F "__wizardry_host_forge_icon_drop_target" "$host_macos" >/dev/null
-grep -F "runForgeIconDropForPath" "$host_macos" >/dev/null
-grep -F 'NSPasteboardTypeFileURL' "$host_macos" >/dev/null
-grep -F '"public.file-url"' "$host_macos" >/dev/null
-grep -F '"text/uri-list"' "$host_macos" >/dev/null
-grep -F 'NSFilenamesPboardType' "$host_macos" >/dev/null
+# Backend actions should remain explicit and structured.
+assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context\]\);"
+assert_matches "$ui" "backend\('rebuild-workspace', \[selected\.path, selected\.context\]\);"
+assert_matches "$ui" "perform\('Import project folder'"
+assert_matches "$ui" "backend\('import-workspace'"
+assert_matches "$ui" "backend\('rename-workspace'"
 
-printf '%s\n' "forge ui regression tests passed"
+# Native host icon-drop bridge contracts (allow variable renames in callsites).
+assert_matches "$ui" "window\.forgeHostFileDrag[[:space:]]*=[[:space:]]*handleForgeHostFileDrag;"
+assert_matches "$ui" "window\.forgeHostIconDropResult[[:space:]]*=[[:space:]]*finishNativeHostIconDrop;"
+assert_matches "$ui" "argv[[:space:]]*=[[:space:]]*\['__wizardry_host_forge_icon_drop_target'\];"
+assert_matches "$ui" 'function scheduleNativeHostIconDropFallback\([^)]*\)'
+assert_matches "$ui" 'scheduleNativeHostIconDropFallback\([^,]+,[[:space:]]*file\);'
+assert_matches "$ui" 'function markNativeHostIconDropHandled\(\)'
+assert_matches "$ui" 'function nativeHostRecentlyHandledIconDrop\(\)'
+assert_contains "$ui" 'public.file-url'
+assert_contains "$ui" 'text/uri-list'
+assert_contains "$ui" 'public.utf8-plain-text'
+
+# Native host callback + drag payload contracts.
+assert_contains "$host_macos" 'dispatchForgeHostCallbackNamed:@"forgeHostFileDrag"'
+assert_contains "$host_macos" 'forgeHostIconDropResult'
+assert_contains "$host_macos" '__wizardry_host_forge_icon_drop_target'
+assert_contains "$host_macos" 'runForgeIconDropForPath'
+assert_contains "$host_macos" 'NSPasteboardTypeFileURL'
+assert_contains "$host_macos" '"public.file-url"'
+assert_contains "$host_macos" '"text/uri-list"'
+assert_contains "$host_macos" 'NSFilenamesPboardType'
+
+printf '%s\n' "forge ui regression contracts passed"

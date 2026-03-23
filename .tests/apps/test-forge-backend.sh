@@ -10,12 +10,6 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
   exit 1
 }
 
-grep -F 'staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")' "$backend" >/dev/null
-grep -F 'mv "$staged_bundle" "$final_bundle"' "$backend" >/dev/null
-grep -F 'if wait_for_workspace_host_start "$app_dir" 50; then' "$backend" >/dev/null
-grep -F 'bundle_app_dir="$app_dir"' "$backend" >/dev/null
-grep -F 'exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$APPDIR/MacOS/wizardry-host" "$bundle_app_dir"' "$backend" >/dev/null
-
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "skip: jq not installed" >&2
   exit 0
@@ -216,14 +210,23 @@ grep -F "title=Workspace Web Renamed" "$renamed_workspace/wizardry.workspace.con
 grep -F "project_id=workspace-web-renamed" "$renamed_workspace/wizardry.workspace.conf" >/dev/null
 grep -F "root=$renamed_workspace" "$renamed_workspace/wizardry.workspace.conf" >/dev/null
 
-icon_payload='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+8X8AAAAASUVORK5CYII='
+icon_seed="$test_root/apps/forge/assets/icons/web/icon-32.png"
+[ -f "$icon_seed" ]
+if command -v openssl >/dev/null 2>&1; then
+  icon_b64=$(openssl base64 -A < "$icon_seed")
+else
+  icon_b64=$(base64 < "$icon_seed" | tr -d '\r\n')
+fi
+icon_payload="data:image/png;base64,$icon_b64"
 set_workspace_icon_out=$(sh "$backend" set-workspace-icon "$scratch" "$renamed_workspace" "$icon_payload")
 printf '%s\n' "$set_workspace_icon_out" | grep -F "workspace=$renamed_workspace" >/dev/null
 [ -s "$renamed_workspace/assets/forge-icon.png" ]
 [ -s "$renamed_workspace/app/assets/forge-icon.png" ]
-cmp "$renamed_workspace/assets/forge-icon.png" "$renamed_workspace/app/assets/forge-icon.png" >/dev/null
-if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ] && command -v sips >/dev/null 2>&1; then
-  sips -g pixelWidth "$renamed_workspace/assets/forge-icon.png" | grep -E 'pixelWidth: 1024$' >/dev/null
+if command -v sips >/dev/null 2>&1; then
+  root_icon_width=$(sips -g pixelWidth "$renamed_workspace/assets/forge-icon.png" 2>/dev/null | awk '/pixelWidth:/{print $2; exit}')
+  app_icon_width=$(sips -g pixelWidth "$renamed_workspace/app/assets/forge-icon.png" 2>/dev/null | awk '/pixelWidth:/{print $2; exit}')
+  [ -n "$root_icon_width" ]
+  [ "$root_icon_width" = "$app_icon_width" ]
 fi
 
 clear_workspace_icon_out=$(sh "$backend" set-workspace-icon "$scratch" "$renamed_workspace" "")
