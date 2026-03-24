@@ -266,7 +266,7 @@ body::before {
 }
 
 .wd-hidden {
-  display: none;
+  display: none !important;
 }
 
 .wd-theme-item {
