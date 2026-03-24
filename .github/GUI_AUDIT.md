@@ -21,9 +21,12 @@
 - [ ] Theme controls and theme application match `Theme System Contract`.
 - [ ] Desktop theme persistence uses backend prefs and plaintext files, not browser-owned durability (`Theme System Contract` + `Storage Rules`).
 - [ ] Minor icon actions and primary actions match `Button And Icon Style Contract`.
+- [ ] Dense top/menu bars use icon controls for secondary actions; text buttons are reserved for primary workflow actions (`Button And Icon Style Contract` + `Discoverability and Navigation`).
 - [ ] Buttons/selects/short inputs are fit-to-content or bounded-width by default (`Accessibility and Input Ergonomics`).
+- [ ] Primary navigation strips render as tabs (not generic pills/chips) and include keyboard tab semantics (`Tab Strip Contract`).
 - [ ] Settings surfaces follow `Sidebar and Drawer Pattern` or modal guidance (`Modal dialog` behavior in standards sections).
 - [ ] Settings/dialog close paths include explicit close control plus `Escape`, and backdrop click-close when overlay behavior is used (`Sidebar and Drawer Pattern`).
+- [ ] Left-right desktop apps preserve split-pane composition at narrow desktop widths (no liquid collapse) (`Left-Right Panel Pattern` + `Desktop Window Fit And GUI QA`).
 - [ ] Most low-risk settings autosave; explicit Save is reserved for higher-risk/batched edits (`Workflow Design Rules`).
 - [ ] Refresh behavior avoids manual-refresh-only drift when background/visibility refresh is appropriate (`Workflow Design Rules` + `Live Refresh Safety`).
 - [ ] Persistent status surfaces are separate from transient confirmations (`Feedback and Error Handling` + `Cross-App Interaction Patterns`).
@@ -31,6 +34,7 @@
 - [ ] Keyboard paths work for primary controls: `Tab`, `Shift-Tab`, `Enter`, `Space`, `Escape`, and arrow-key pickers where relevant (`Accessibility and Input Ergonomics` + `Cross-App Interaction Patterns`).
 - [ ] Focus-visible states are obvious for interactive controls (`Button And Icon Style Contract` + `Accessibility and Input Ergonomics`).
 - [ ] Listbox-style selected rows use inset rounded highlights instead of edge-to-edge full-width highlight fill (`Cross-App Interaction Patterns`).
+- [ ] If LLM controls exist, settings menus prioritize app-recommended models and expose install/uninstall via Wizardry `ai-dev` script-backed flows (`LLM Controls Contract`).
 - [ ] Runtime endpoint/port handling avoids fixed localhost ports and resolves canonical config (`Port and Runtime Safety`).
 - [ ] Bridge execution remains hardcoded argv with no user-composed shell fragments (`Command and Bridge Rules`).
 - [ ] Safari GUI QA is run for GUI changes and verifies layout, focus/hover, and panel behavior (`Desktop Window Fit And GUI QA`).

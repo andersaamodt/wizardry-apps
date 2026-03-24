@@ -52,6 +52,7 @@
 - Avoid stacking multiple decorative borders around the same logical group; one container boundary is usually enough.
 - Use background tint and spacing depth before introducing another card/border level.
 - Flatten wrapper structure aggressively; remove structural `div`/panel layers that only restack or pad content already separated by cards, sections, or rails.
+- Keep most screens flat and readable; reserve intentionally denser nested card grouping for high-signal dashboards where grouped monitoring blocks improve operator scan speed.
 
 ## Left-Right Panel Pattern
 - When one primary data type is being managed, use left-right split layout: list/select on left, details/workflow on right.
@@ -60,6 +61,13 @@
 - In this pattern, place Settings icon at lower-left corner of the left rail.
 - Place theme and optional LLM dropdown controls to the right of Settings in the same bottom-left rail bar.
 - Keep left rail width bounded and persist user resize preference when a divider is provided.
+- Do not collapse the left rail into a top block at narrow desktop widths; preserve split-pane composition and enforce minimum desktop host width instead of switching to liquid single-column flow.
+
+## Tab Strip Contract
+- Primary section navigation should render as recognizable tabs with a shared strip baseline and a clearly attached active tab.
+- Avoid styling primary tabs as generic pills/chips that read as filters instead of section navigation.
+- Keep tab labels short and stable, with active/inactive states obvious at a glance.
+- Use semantic tab roles (`tablist`, `tab`, `tabpanel`) and arrow-key navigation for keyboard users.
 
 ## Sidebar and Drawer Pattern
 - Use sidebars/drawers for contextual utilities (settings, activity, diagnostics) instead of route-switching away from the main workflow.
@@ -126,6 +134,7 @@
 - Keep settings easy to find and clearly separate global vs project state.
 - Use consistent labels for repeated concepts across apps.
 - Prefer one-screen comprehension over hidden routes and modal mazes.
+- In dense top/menu bars, render secondary controls as icon buttons with tooltip/aria labels instead of text-word buttons.
 
 ## Admin List Pages
 - Prefer row-based management tables over card grids for dense admin lists (users, drafts, posts, queue).
@@ -154,6 +163,12 @@
 - Parse dropped paths from both URI payloads and file payloads for host/runtime portability.
 - Prefer section-local expansion/collapse (`details/summary`) for multi-step workflows to preserve one-screen comprehension.
 - Keep motion subtle (roughly 180-220ms) and disable non-essential motion when `prefers-reduced-motion` is enabled.
+
+## LLM Controls Contract
+- When an app has local LLM controls, place them in Settings and keep the control surface compact (dropdown/menu plus focused runtime actions).
+- LLM model dropdowns should default to app-recommended models and include non-recommended models only when already installed locally.
+- Model install/uninstall actions should use Wizardry `ai-dev` installer scripts (`list-available-llms`, `list-installed-llms`, `install-llm`, `uninstall-llm`) unless a documented platform constraint requires fallback.
+- Keep model-selection intent clear: selecting an uninstalled model should offer install action rather than silently failing.
 
 ## Host Drag-Region Geometry
 - Keep drag behavior in native-host geometry and click behavior in WebView controls.
