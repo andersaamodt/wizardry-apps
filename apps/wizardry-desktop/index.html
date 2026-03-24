@@ -108,7 +108,7 @@
     </aside>
   </main>
 
-  <div id="command-composer-modal" class="wd-composer-modal wd-hidden" role="dialog" aria-modal="true" aria-labelledby="composer-title">
+  <div id="command-composer-modal" class="wd-composer-modal wd-hidden" role="dialog" aria-modal="true" aria-labelledby="composer-title" hidden>
     <div id="composer-backdrop" class="wd-composer-backdrop" aria-hidden="true"></div>
     <section class="wd-composer-panel" role="document">
       <header class="wd-composer-head">
@@ -213,6 +213,7 @@
         actionInFlight: false,
         composer: {
           open: false,
+          startupLock: true,
           rawInput: '',
           tokens: [],
           selectedToken: -1,
@@ -617,7 +618,7 @@
         if (els.composerInput) {
           els.composerInput.value = '';
         }
-        setComposerOpen(true);
+        setComposerOpen(true, { userInitiated: true });
         renderComposer();
       }
 
@@ -1200,11 +1201,15 @@
 
       function setComposerOpen(open, options) {
         options = options || {};
+        if (open && state.composer.startupLock && !options.userInitiated) {
+          return;
+        }
         state.composer.open = !!open;
         if (!els.composerModal || !els.composerToggle) {
           return;
         }
         els.composerModal.classList.toggle('wd-hidden', !state.composer.open);
+        els.composerModal.hidden = !state.composer.open;
         els.composerToggle.setAttribute('aria-expanded', String(state.composer.open));
         if (state.composer.open) {
           if (els.composerInput) {
@@ -2531,6 +2536,7 @@
 
         if (els.composerToggle) {
           els.composerToggle.addEventListener('click', function () {
+            state.composer.startupLock = false;
             if (state.composer.open) {
               setComposerOpen(false);
             } else {
@@ -3164,6 +3170,24 @@
         initThemeControlFallback();
         ensureBridge();
         setBridgeState(bridgeAvailable());
+        window.addEventListener('pointerdown', function () {
+          state.composer.startupLock = false;
+        }, { once: true, capture: true });
+        window.addEventListener('keydown', function () {
+          state.composer.startupLock = false;
+        }, { once: true, capture: true });
+        var startupCloseTicks = 0;
+        var startupCloseTimer = setInterval(function () {
+          if (!state.composer.startupLock || startupCloseTicks >= 10) {
+            clearInterval(startupCloseTimer);
+            return;
+          }
+          setComposerOpen(false, { skipFocus: true });
+          startupCloseTicks += 1;
+        }, 120);
+        setTimeout(function () {
+          state.composer.startupLock = false;
+        }, 1400);
 
         Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadCastData(), loadArcanaInstall(), loadWatchHistory()])
           .catch(function () {
