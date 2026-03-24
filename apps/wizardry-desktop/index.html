@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Wizardry Desktop</title>
-  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260324d">
-  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260324d">
+  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260324f">
+  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260324f">
   <link rel="icon" href="assets/wizardry-desktop-icon.svg" type="image/svg+xml">
 </head>
 <body class="wd-booting">
@@ -151,7 +151,7 @@
     (function () {
       'use strict';
 
-      var ASSET_VERSION = 'wizardry-desktop20260324d';
+      var ASSET_VERSION = 'wizardry-desktop20260324f';
       var THEME_FALLBACK = ['archmage', 'adept', 'chrono', 'chronomancer', 'conjurer', 'druid', 'empath'];
       var COMPOSER_ACTIONS = ['run-spell', 'spell-help', 'run-action', 'run-system'];
       var COMPOSER_SYSTEM_ACTIONS = ['system:whoami', 'system:pwd', 'system:date', 'system:status', 'system:environment'];
@@ -1198,7 +1198,8 @@
         }
       }
 
-      function setComposerOpen(open) {
+      function setComposerOpen(open, options) {
+        options = options || {};
         state.composer.open = !!open;
         if (!els.composerModal || !els.composerToggle) {
           return;
@@ -1216,7 +1217,7 @@
           }
           return;
         }
-        if (typeof els.composerToggle.focus === 'function') {
+        if (!options.skipFocus && typeof els.composerToggle.focus === 'function') {
           els.composerToggle.focus();
         }
       }
@@ -3152,7 +3153,10 @@
         setDividerListeners();
         bindEvents();
         bindCategoryDetails();
-        setComposerOpen(false);
+        setComposerOpen(false, { skipFocus: true });
+        window.addEventListener('pageshow', function () {
+          setComposerOpen(false, { skipFocus: true });
+        });
         renderNav();
         renderPage();
         renderThemeMenu();
@@ -3168,6 +3172,7 @@
           .finally(function () {
             setBridgeState(state.bridgeReady);
             applyLayoutColumns();
+            setComposerOpen(false, { skipFocus: true });
             renderPage();
             pushActivity('boot', 'Wizardry Desktop is ready. Theme: ' + state.activeTheme, {});
             notifyHostBootReady(0);

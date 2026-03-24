@@ -1,4 +1,5 @@
 :root {
+  --wd-host-top-inset: 34px;
   --wd-bg: var(--bg, #f6f7fb);
   --wd-surface: var(--light-bg, #e2e8f0);
   --wd-panel: color-mix(in srgb, var(--bg, #ffffff) 92%, black 8%);
@@ -746,7 +747,7 @@ body::before {
 
 .wd-composer-modal {
   position: fixed;
-  inset: 0;
+  inset: var(--wd-host-top-inset) 0 0 0;
   display: grid;
   place-items: center;
   padding: 0.7rem;
@@ -763,7 +764,7 @@ body::before {
   position: relative;
   width: min(960px, calc(100vw - 1.1rem));
   max-width: 960px;
-  max-height: min(96vh, calc(100vh - 1rem));
+  max-height: min(96vh, calc(100vh - var(--wd-host-top-inset) - 1rem));
   min-height: 58vh;
   display: grid;
   grid-template-rows: auto minmax(120px, 30vh) 1fr auto;
