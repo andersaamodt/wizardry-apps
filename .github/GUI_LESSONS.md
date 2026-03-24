@@ -79,3 +79,5 @@
 - Persistent footer status works well for substantive Forge operations like Build, Run, Install, Remove, and cleanup; do not overwrite it with trivial navigation actions such as opening folders.
 - High-regression Forge flows such as Run, import/drop, scaffold, and workspace rebuild detection need executable behavior tests with fake host/tool stubs, not just static `grep` contract checks.
 - macOS status/tray items can fail to render when the app bundle launches through a shell `CFBundleExecutable`; launch packaged apps with a native host binary and pass app entry via `WizardryAppEntry` instead.
+- In Safari/WebKit split-pane UIs, missing `minmax(0, 1fr)` on the main track or missing `min-height: 0` on intermediate panels can make scrollable content overflow downward and read as bottom-aligned.
+- Visual listbox highlights are not enough for robust keyboard behavior; keep `role=listbox` plus `role=option`/`aria-selected` and a synced `aria-activedescendant`.

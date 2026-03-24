@@ -92,6 +92,7 @@
 - Desktop UIs must fit fully in-window; no important controls should render off-screen or clip outside viewport.
 - Avoid layouts that force horizontal overflow for baseline app workflows.
 - Desktop apps should keep their intended desktop composition at narrow sizes; do not collapse split-pane/two-column control surfaces into liquid single-column layouts and instead enforce the minimum host window width needed for the designed view.
+- In split-pane grid/flex desktop layouts, constrain the main content track with `minmax(0, 1fr)` and set `min-height: 0` on intermediate panel containers so Safari/WebKit does not overflow panels downward and make content appear bottom-anchored.
 - In scrollable desktop panes, do not leave decorative gutter outside the scrollbar; if the pane is intended to reach the window edge, make the scroll track sit flush to that edge and keep content padding inside the scrolling area instead.
 - Validate GUI layout and interaction quality with Safari automations for desktop app surfaces when making GUI changes.
 - Validate startup (no flicker), focus states, hover states, and split-pane behavior in that QA pass.
@@ -156,6 +157,7 @@
 - Keep at most one floating menu open at a time and keep trigger `aria-expanded` values in sync.
 - Close floating menus on outside click and `Escape`, and restore focus to the triggering control when practical.
 - Keep list rows keyboard-selectable (`Enter`/`Space`) and preserve selection across data refreshes when the item still exists.
+- For listbox-style selectors, keep semantic state explicit: container `role="listbox"`, row `role="option"` + `aria-selected`, and synchronized `aria-activedescendant` for keyboard-driven active selection.
 - For listbox-style row selections, use an inset highlight surface with rounded corners; selected-state fill should not run edge-to-edge across the entire list container width.
 - Keep path chips compact: basename label, ellipsis handling, icon-only fallback in narrow widths, click-to-copy, and double-click-to-open/reveal.
 - For folder path utilities, provide an optional adjacent open-in-terminal control with explicit tooltip/aria labeling.

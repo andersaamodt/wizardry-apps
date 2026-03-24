@@ -27,12 +27,14 @@
 - [ ] Settings surfaces follow `Sidebar and Drawer Pattern` or modal guidance (`Modal dialog` behavior in standards sections).
 - [ ] Settings/dialog close paths include explicit close control plus `Escape`, and backdrop click-close when overlay behavior is used (`Sidebar and Drawer Pattern`).
 - [ ] Left-right desktop apps preserve split-pane composition at narrow desktop widths (no liquid collapse) (`Left-Right Panel Pattern` + `Desktop Window Fit And GUI QA`).
+- [ ] Split-pane desktop layouts constrain scroll tracks correctly in Safari/WebKit (`minmax(0, 1fr)` main content row plus `min-height: 0` on intermediate grid/flex panels) so content does not appear bottom-anchored (`Desktop Window Fit And GUI QA`).
 - [ ] Most low-risk settings autosave; explicit Save is reserved for higher-risk/batched edits (`Workflow Design Rules`).
 - [ ] Refresh behavior avoids manual-refresh-only drift when background/visibility refresh is appropriate (`Workflow Design Rules` + `Live Refresh Safety`).
 - [ ] Persistent status surfaces are separate from transient confirmations (`Feedback and Error Handling` + `Cross-App Interaction Patterns`).
 - [ ] Logs/output surfaces are bounded, selectable, and copyable where logs exist (`Feedback and Error Handling` + `Cross-App Interaction Patterns`).
 - [ ] Keyboard paths work for primary controls: `Tab`, `Shift-Tab`, `Enter`, `Space`, `Escape`, and arrow-key pickers where relevant (`Accessibility and Input Ergonomics` + `Cross-App Interaction Patterns`).
 - [ ] Focus-visible states are obvious for interactive controls (`Button And Icon Style Contract` + `Accessibility and Input Ergonomics`).
+- [ ] Listbox selectors keep semantic selection state (`role=listbox`, `role=option`, `aria-selected`, `aria-activedescendant`) in addition to visual highlighting (`Cross-App Interaction Patterns`).
 - [ ] Listbox-style selected rows use inset rounded highlights instead of edge-to-edge full-width highlight fill (`Cross-App Interaction Patterns`).
 - [ ] If LLM controls exist, settings menus prioritize app-recommended models and expose install/uninstall via Wizardry `ai-dev` script-backed flows (`LLM Controls Contract`).
 - [ ] Runtime endpoint/port handling avoids fixed localhost ports and resolves canonical config (`Port and Runtime Safety`).
