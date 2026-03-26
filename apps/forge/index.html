@@ -3381,8 +3381,25 @@
             state.catalogRowCache[itemKey] = row;
           }
         }
+        syncCatalogRowThumb(row, item);
         syncCatalogRowState(row, item);
         return row;
+      }
+
+      function syncCatalogRowThumb(row, item) {
+        if (!row) {
+          return;
+        }
+        var thumb = catalogThumbElement(item);
+        var existingThumb = row.querySelector('.catalog-thumb');
+        if (existingThumb === thumb) {
+          return;
+        }
+        if (existingThumb && existingThumb.parentNode === row) {
+          row.replaceChild(thumb, existingThumb);
+          return;
+        }
+        row.insertBefore(thumb, row.firstChild || null);
       }
 
       function buildCatalogRow(item) {
