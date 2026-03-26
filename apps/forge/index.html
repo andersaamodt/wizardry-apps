@@ -1167,12 +1167,29 @@
         els.bridgeStatus.classList.toggle('bad', !ok);
       }
 
+      function renderStatusMessage(el, msg, withSpinner) {
+        if (!el) {
+          return;
+        }
+        el.textContent = '';
+        var label = document.createElement('span');
+        label.className = 'status-message-label';
+        label.textContent = String(msg || '');
+        el.appendChild(label);
+        if (withSpinner) {
+          var spinner = document.createElement('span');
+          spinner.className = 'status-inline-spinner';
+          spinner.setAttribute('aria-hidden', 'true');
+          el.appendChild(spinner);
+        }
+      }
+
       function setActivity(kind, msg) {
         if (!els.activityPill) {
           return;
         }
         els.activityPill.className = 'activity-pill ' + kind;
-        els.activityPill.textContent = msg;
+        renderStatusMessage(els.activityPill, msg, kind === 'working');
       }
 
       function setFooterStatus(kind, msg) {
@@ -1186,7 +1203,7 @@
         els.footerStatus.classList.toggle('working', state.footerStatusKind === 'working');
         els.footerStatus.classList.toggle('ok', state.footerStatusKind === 'ok');
         els.footerStatus.classList.toggle('bad', state.footerStatusKind === 'bad');
-        els.footerStatus.textContent = hasMessage ? state.footerStatusMessage : '';
+        renderStatusMessage(els.footerStatus, hasMessage ? state.footerStatusMessage : '', state.footerStatusKind === 'working' && hasMessage);
         if (hasMessage) {
           els.footerStatus.title = state.footerStatusMessage;
           return;

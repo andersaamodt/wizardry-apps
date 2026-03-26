@@ -292,6 +292,12 @@ body.forge-booting .forge-shell {
   color: var(--accent-strong);
 }
 
+.activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+}
+
 .activity-pill.fault {
   border-color: rgba(191, 63, 63, 0.35);
   background: rgba(191, 63, 63, 0.08);
@@ -786,9 +792,26 @@ body.settings-open #settings-panel {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 0.42rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.status-message-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-inline-spinner {
+  width: 0.76rem;
+  height: 0.76rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--line) 64%, transparent);
+  border-top-color: currentColor;
+  animation: forge-icon-spin 0.8s linear infinite;
 }
 
 .footer-status.working {
