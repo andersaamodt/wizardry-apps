@@ -211,6 +211,10 @@
                 <details class="pipeline-section" open>
                   <summary class="pipeline-section-head">Publish targets</summary>
                   <div class="pipeline-section-body">
+                    <label id="install-before-run-row" class="target-install-before-run hidden" for="install-before-run-toggle">
+                      <input id="install-before-run-toggle" type="checkbox">
+                      <span>Install before run</span>
+                    </label>
                     <h5 id="active-targets-subhead" class="targets-subhead">Active Targets</h5>
                     <div id="target-active-list" class="target-list"></div>
                     <details id="inactive-targets-section" class="targets-subsection">
@@ -367,6 +371,7 @@
       var MINI_TABS_KEY = 'wizardry.forge.mini_tabs.v1';
       var ACTIVE_MINI_TAB_KEY = 'wizardry.forge.active_mini_tab.v1';
       var MINI_TAB_ASSIGNMENTS_KEY = 'wizardry.forge.mini_tab_assignments.v1';
+      var INSTALL_BEFORE_RUN_KEY = 'wizardry.forge.install_before_run.v1';
       var INTERNAL_CATALOG_DRAG_TYPE = 'application/x-wizardry-forge-catalog-item';
       var INTERNAL_CATALOG_DRAG_PREFIX = 'wizardry-catalog-item:';
       var ASSET_VERSION = 'forge20260218a';
@@ -387,7 +392,8 @@
         'wizardry.forge.cached_workspaces.v1': 'cached_workspaces',
         'wizardry.forge.mini_tabs.v1': 'mini_tabs',
         'wizardry.forge.active_mini_tab.v1': 'active_mini_tab',
-        'wizardry.forge.mini_tab_assignments.v1': 'mini_tab_assignments'
+        'wizardry.forge.mini_tab_assignments.v1': 'mini_tab_assignments',
+        'wizardry.forge.install_before_run.v1': 'install_before_run'
       };
 
       var state = {
@@ -405,6 +411,8 @@
         organizeSort: 'alphabetical',
         organizeBuiltinFirst: true,
         useMiniTabs: false,
+        installBeforeRun: false,
+        installBeforeRunHasUserPref: false,
         systemMiniTabMode: 'all',
         themes: ['psionic'],
         activeTheme: 'psionic',
@@ -1430,6 +1438,10 @@
         document.querySelectorAll('.catalog-mini-tab, .catalog-mini-tab-add').forEach(function (btn) {
           btn.disabled = flag;
         });
+        if (els.installBeforeRunToggle) {
+          var hidden = !!(els.installBeforeRunRow && els.installBeforeRunRow.classList.contains('hidden'));
+          els.installBeforeRunToggle.disabled = !!flag || hidden;
+        }
         syncSettingsSaveButtons();
       }
 
@@ -1933,6 +1945,16 @@
         syncIconToolingUI();
       }
 
+      function setInstallBeforeRunEnabled(enabled) {
+        state.installBeforeRunHasUserPref = true;
+        state.installBeforeRun = !!enabled;
+        saveStorage(INSTALL_BEFORE_RUN_KEY, state.installBeforeRun ? 'true' : 'false');
+        if (els.installBeforeRunToggle) {
+          els.installBeforeRunToggle.checked = state.installBeforeRun;
+        }
+        syncStageActionVisibility(selectedCatalogItem());
+      }
+
       function normalizedSettingValue(value) {
         return String(value || '').trim();
       }
@@ -1948,6 +1970,9 @@
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
         state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
         state.iconSquircleOnDrop = loadStorage(ICON_SQUIRCLE_ON_DROP_KEY) !== 'false';
+        var installBeforeRunRaw = loadStorage(INSTALL_BEFORE_RUN_KEY);
+        state.installBeforeRunHasUserPref = installBeforeRunRaw === 'true' || installBeforeRunRaw === 'false';
+        state.installBeforeRun = installBeforeRunRaw === 'true';
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
         state.miniTabs = parseMiniTabs();
         state.activeMiniTab = loadStorage(ACTIVE_MINI_TAB_KEY) || 'all';
@@ -2845,6 +2870,9 @@
       }
 
       function runActionLabel(item) {
+        if (item && shouldInstallBeforeRun(item)) {
+          return 'Installing and running ' + itemStatusName(item);
+        }
         if (item && item.kind === 'builtin' && hasEnabledHostRunTarget(item)) {
           return buildActionLabel(item);
         }
@@ -3943,6 +3971,27 @@
         return activeTargets.indexOf('hosted-web') >= 0;
       }
 
+      function defaultInstallBeforeRunForSelected(selected) {
+        return !!(selected && selected.kind === 'builtin');
+      }
+
+      function effectiveInstallBeforeRunForSelected(selected) {
+        if (state.installBeforeRunHasUserPref) {
+          return !!state.installBeforeRun;
+        }
+        return defaultInstallBeforeRunForSelected(selected);
+      }
+
+      function shouldInstallBeforeRun(selected) {
+        if (!selected || !effectiveInstallBeforeRunForSelected(selected)) {
+          return false;
+        }
+        if (selected.kind !== 'builtin') {
+          return false;
+        }
+        return hasEnabledHostRunTarget(selected);
+      }
+
       function pathToIconSrc(path) {
         var value = String(path || '').trim();
         if (!value) {
@@ -4710,7 +4759,9 @@
         if (els.actionRun) {
           els.actionRun.classList.toggle('hidden', !showRunSplit);
           var runTitle = canRunHost
-            ? ('Run ' + runTargetName + ' app')
+            ? (shouldInstallBeforeRun(selected)
+              ? ('Install then run ' + runTargetName + ' app')
+              : ('Run ' + runTargetName + ' app'))
             : (canServeWebHost
               ? 'Run hosted web'
               : ('Enable ' + runTargetName + ' target to run native app'));
@@ -5855,6 +5906,19 @@
         els.targetInactiveList.innerHTML = '';
         els.targetActiveList.appendChild(activeFragment);
         els.targetInactiveList.appendChild(inactiveFragment);
+        var showInstallBeforeRun = !!(
+          selected.kind === 'builtin' &&
+          hostTarget &&
+          activeSet[hostTarget] &&
+          isTargetSupportedForSelected(selected, hostTarget)
+        );
+        if (els.installBeforeRunRow) {
+          els.installBeforeRunRow.classList.toggle('hidden', !showInstallBeforeRun);
+        }
+        if (els.installBeforeRunToggle) {
+          els.installBeforeRunToggle.checked = !!effectiveInstallBeforeRunForSelected(selected);
+          els.installBeforeRunToggle.disabled = !!state.busy || !showInstallBeforeRun;
+        }
         if (els.activeTargetsSubhead) {
           els.activeTargetsSubhead.classList.toggle('hidden', activeTargets.length === 0);
         }
@@ -6569,23 +6633,31 @@
             setActivity('working', runningLabel);
             setFooterStatus('working', runningLabel);
             suppressTransientRefresh();
-            var run = await backend('run-desktop', [app.id]);
+            var runInstallFirst = shouldInstallBeforeRun(selected);
+            var run = await backend('run-desktop', runInstallFirst ? [app.id, 'install-first'] : [app.id]);
             var runOut = kv(run.stdout || '');
 
             renderResult({
               status: 'ok',
-              summary: app.title + ' built and launched from the compiled desktop app bundle.',
+              summary: runInstallFirst
+                ? (app.title + ' installed and launched from the installed desktop app.')
+                : (app.title + ' built and launched from the compiled desktop app bundle.'),
               paths: [
+                runOut.installed ? { label: 'Installed app', path: runOut.installed, canReveal: true } : null,
+                runOut.launcher ? { label: 'Launcher', path: runOut.launcher, canReveal: true } : null,
                 runOut.artifact ? { label: 'Launched app bundle', path: runOut.artifact, canReveal: true } : null,
+                runOut.built_artifact ? { label: 'Built artifact', path: runOut.built_artifact, canReveal: true } : null,
                 runOut.entry ? { label: 'App source folder', path: runOut.entry, canReveal: true } : null,
                 runOut.log ? { label: 'Launch log', path: runOut.log, canReveal: true } : null
               ].filter(Boolean),
               help: {
                 title: 'Launch details',
-                body: 'PID: ' + (runOut.pid || '(managed by OS)') + '\nRun builds and launches the native desktop executable for this platform.'
+                body: runInstallFirst
+                  ? ('PID: ' + (runOut.pid || '(managed by OS)') + '\nRun built, installed, and launched the installed desktop app for this platform.')
+                  : ('PID: ' + (runOut.pid || '(managed by OS)') + '\nRun builds and launches the native desktop executable for this platform.')
               }
             });
-            setTargetRuntime(projectKey, nativeTarget, 'running', runOut.artifact || runOut.entry || '');
+            setTargetRuntime(projectKey, nativeTarget, 'running', runOut.installed || runOut.launcher || runOut.artifact || runOut.entry || '');
             setTargetRuntime(projectKey, 'hosted-web', 'ready', runOut.entry || '');
             renderSelectedTargetsEditor(selectedCatalogItem());
             return;
@@ -7303,6 +7375,11 @@
         [els.targetHostedWeb, els.targetMacos, els.targetLinux, els.targetIos, els.targetAndroid].forEach(function (checkbox) {
           checkbox.addEventListener('change', syncCreateDraftList);
         });
+        if (els.installBeforeRunToggle) {
+          els.installBeforeRunToggle.addEventListener('change', function () {
+            setInstallBeforeRunEnabled(!!els.installBeforeRunToggle.checked);
+          });
+        }
         els.createSubmit.addEventListener('click', function () {
           perform('Create project', createProject, { swallow: true });
         });
@@ -7915,6 +7992,8 @@
         els.targetActiveList = document.getElementById('target-active-list');
         els.targetInactiveList = document.getElementById('target-inactive-list');
         els.inactiveTargetsSection = document.getElementById('inactive-targets-section');
+        els.installBeforeRunRow = document.getElementById('install-before-run-row');
+        els.installBeforeRunToggle = document.getElementById('install-before-run-toggle');
         els.selectedIconDrop = document.getElementById('selected-icon-drop');
         els.selectedIconPreview = document.getElementById('selected-icon-preview');
         els.selectedIconProcessing = document.getElementById('selected-icon-processing');

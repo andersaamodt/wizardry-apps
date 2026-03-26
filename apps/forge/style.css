@@ -2565,6 +2565,23 @@ input[type="checkbox"]:disabled {
   font-weight: 620;
 }
 
+.target-install-before-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  margin: 0.2rem 0 0.28rem;
+  color: var(--section-text);
+  font-size: 0.79rem;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.target-install-before-run input {
+  width: auto;
+  margin: 0;
+}
+
 .targets-subsection {
   margin-top: 0.28rem;
 }

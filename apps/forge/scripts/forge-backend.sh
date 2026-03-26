@@ -40,7 +40,7 @@ Commands:
   remove-downloaded-template [ROOT_HINT] TEMPLATE_SLUG
   build-desktop [ROOT_HINT] APP_SLUG
   install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID]
-  run-desktop [ROOT_HINT] APP_SLUG
+  run-desktop [ROOT_HINT] APP_SLUG [normal|install-first|bundle]
   rebuild-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
   run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]
   serve-hosted-web [ROOT_HINT] MODE REF
@@ -3706,17 +3706,101 @@ DESKTOP
 cmd_run_desktop() {
   root=$(require_root "${1-}")
   slug=${2-}
+  run_mode=${3-}
+  [ -n "$run_mode" ] || run_mode='normal'
   [ -n "$slug" ] || {
     printf '%s\n' "forge-backend: run-desktop requires APP_SLUG" >&2
     exit 2
   }
   validate_slug "$slug"
+  case "$run_mode" in
+    normal|install-first)
+      ;;
+    bundle)
+      run_mode='normal'
+      ;;
+    *)
+      printf '%s\n' "forge-backend: run-desktop mode must be normal, install-first, or bundle" >&2
+      exit 2
+      ;;
+  esac
 
   require_jq
   manifest_app_exists "$root" "$slug" || {
     printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
     exit 1
   }
+  os=$(os_id)
+  if [ "$run_mode" = "install-first" ]; then
+    install_out=$(cmd_install_desktop "$root" "$slug")
+    bundle_artifact=$(printf '%s\n' "$install_out" | kv_read artifact)
+    installed_path=$(printf '%s\n' "$install_out" | kv_read installed)
+    launcher_path=$(printf '%s\n' "$install_out" | kv_read launcher)
+    [ -n "$bundle_artifact" ] || {
+      printf '%s\n' "forge-backend: install-desktop did not return an artifact" >&2
+      exit 1
+    }
+
+    case "$os" in
+      darwin)
+        app_name=$(app_name_from_manifest "$root" "$slug")
+        stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
+        [ -n "$installed_path" ] || installed_path="$bundle_artifact"
+        [ -d "$installed_path" ] || {
+          printf '%s\n' "forge-backend: installed macOS bundle missing: $installed_path" >&2
+          exit 1
+        }
+        command -v open >/dev/null 2>&1 || {
+          printf '%s\n' "forge-backend: open command not available on this system" >&2
+          exit 1
+        }
+        open "$installed_path"
+        printf 'launched=1\n'
+        printf 'mode=desktop-installed\n'
+        printf 'artifact=%s\n' "$installed_path"
+        printf 'built_artifact=%s\n' "$bundle_artifact"
+        printf 'installed=%s\n' "$installed_path"
+        [ -n "$launcher_path" ] && printf 'launcher=%s\n' "$launcher_path"
+        exit 0
+        ;;
+      linux)
+        stop_desktop_instances_for_slug "$root" "$slug" "" "$os"
+        launch_exec=''
+        if [ -n "$launcher_path" ] && [ -x "$launcher_path" ]; then
+          launch_exec="$launcher_path"
+        elif [ -n "$installed_path" ] && [ -x "$installed_path/AppRun" ]; then
+          launch_exec="$installed_path/AppRun"
+        fi
+        [ -n "$launch_exec" ] || {
+          printf '%s\n' "forge-backend: installed Linux launcher missing for $slug" >&2
+          exit 1
+        }
+        log_dir="$root/_tmp/workbench/log"
+        mkdir -p "$log_dir"
+        log_path="$log_dir/$slug-run.log"
+        if command -v nohup >/dev/null 2>&1; then
+          nohup "$launch_exec" >"$log_path" 2>&1 &
+        else
+          "$launch_exec" >"$log_path" 2>&1 &
+        fi
+        pid=$!
+        printf 'launched=1\n'
+        printf 'mode=desktop-installed\n'
+        printf 'artifact=%s\n' "$launch_exec"
+        printf 'built_artifact=%s\n' "$bundle_artifact"
+        printf 'installed=%s\n' "$installed_path"
+        [ -n "$launcher_path" ] && printf 'launcher=%s\n' "$launcher_path"
+        printf 'pid=%s\n' "$pid"
+        printf 'log=%s\n' "$log_path"
+        exit 0
+        ;;
+      *)
+        printf '%s\n' "forge-backend: unsupported desktop OS: $os" >&2
+        exit 1
+        ;;
+    esac
+  fi
+
   build_out=$(cmd_build_desktop "$root" "$slug")
   bundle_artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
   appdir=$(printf '%s\n' "$build_out" | kv_read appdir)
@@ -3725,7 +3809,6 @@ cmd_run_desktop() {
     exit 1
   }
 
-  os=$(os_id)
   case "$os" in
     darwin)
       app_name=$(app_name_from_manifest "$root" "$slug")
@@ -5150,7 +5233,7 @@ case "$cmd" in
     cmd_build_desktop "${2-}" "${3-}"
     ;;
   run-desktop)
-    cmd_run_desktop "${2-}" "${3-}"
+    cmd_run_desktop "${2-}" "${3-}" "${4-}"
     ;;
   rebuild-workspace)
     cmd_rebuild_workspace "${2-}" "${3-}" "${4-}"
