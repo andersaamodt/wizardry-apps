@@ -290,7 +290,6 @@ body::before {
 }
 
 .wd-rail-divider {
-  display: none;
   width: 0;
   min-width: 0;
   cursor: default;
