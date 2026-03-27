@@ -1639,34 +1639,29 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                       stoneWidth,
                                       stoneHeight);
         NSBezierPath *stone = [NSBezierPath bezierPathWithOvalInRect:stoneRect];
+        CGFloat outlineStrokeWidth = MAX(1.4, floor(side * 0.12));
+        // Match running fill outer bounds to stopped outline outer bounds.
+        NSRect runningRect = NSInsetRect(stoneRect, -outlineStrokeWidth * 0.5, -outlineStrokeWidth * 0.5);
+        NSBezierPath *runningStone = [NSBezierPath bezierPathWithOvalInRect:runningRect];
         NSString *normalized = [[relayState ?: @"unknown" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (busy) {
-            [stone fill];
+            [runningStone fill];
             [[NSColor whiteColor] setFill];
             CGFloat dotSide = MAX(2.0, floor(side * 0.16));
             NSRect dotRect = NSMakeRect(floor((side - dotSide) / 2.0), floor((side - dotSide) / 2.0), dotSide, dotSide);
             [[NSBezierPath bezierPathWithOvalInRect:dotRect] fill];
         } else if ([normalized isEqualToString:@"running"]) {
-            [stone fill];
+            [runningStone fill];
         } else if ([normalized isEqualToString:@"stopped"] || [normalized isEqualToString:@"not running"]) {
-            // Keep stopped-state outline visually aligned to running-state fill.
-            // A centered stroke on the same rect renders larger because half of
-            // the stroke extends outside the filled oval bounds.
-            CGFloat strokeWidth = MAX(1.2, floor(side * 0.09));
-            NSRect insetRect = NSInsetRect(stoneRect, strokeWidth * 0.6, strokeWidth * 0.6);
-            if (insetRect.size.width <= 0.0 || insetRect.size.height <= 0.0) {
-                insetRect = stoneRect;
-            }
-            NSBezierPath *outline = [NSBezierPath bezierPathWithOvalInRect:insetRect];
-            [outline setLineWidth:strokeWidth];
-            [outline stroke];
+            [stone setLineWidth:outlineStrokeWidth];
+            [stone stroke];
         } else {
-            [stone fill];
+            [runningStone fill];
             [[NSColor whiteColor] set];
             NSBezierPath *slash = [NSBezierPath bezierPath];
             [slash setLineWidth:MAX(1.4, floor(side * 0.10))];
-            [slash moveToPoint:NSMakePoint(NSMinX(stoneRect) + 2.0, NSMinY(stoneRect) + 1.0)];
-            [slash lineToPoint:NSMakePoint(NSMaxX(stoneRect) - 2.0, NSMaxY(stoneRect) - 1.0)];
+            [slash moveToPoint:NSMakePoint(NSMinX(runningRect) + 2.0, NSMinY(runningRect) + 1.0)];
+            [slash lineToPoint:NSMakePoint(NSMaxX(runningRect) - 2.0, NSMaxY(runningRect) - 1.0)];
             [slash stroke];
         }
     } else {
