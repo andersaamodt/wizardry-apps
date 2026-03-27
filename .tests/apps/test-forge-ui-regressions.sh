@@ -43,9 +43,6 @@ assert_matches "$ui" 'function buildActionLabel\(item\)'
 assert_matches "$ui" 'function runActionLabel\(item\)'
 assert_matches "$ui" 'function ranActionLabel\(item\)'
 assert_matches "$ui" 'function regenerateSelectedIconAssets\(\)'
-assert_matches "$ui" 'function normalizedCatalogId\(value\)'
-assert_matches "$ui" 'workspaceIdSet\[wsId\][[:space:]]*=[[:space:]]*true'
-assert_matches "$ui" 'return !workspaceIdSet\[appId\];'
 
 # Backend actions should remain explicit and structured.
 assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context\]\);"

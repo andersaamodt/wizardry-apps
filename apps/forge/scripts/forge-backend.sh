@@ -2388,34 +2388,49 @@ cmd_import_workspace() {
   profile_path=$(printf '%s\n' "$profile_meta" | cut -f1)
   profile_created=$(printf '%s\n' "$profile_meta" | cut -f2)
   workspace_id=$(resolve_workspace_slug "$profile_path" "$workspace_abs")
-  registration_mode="linked"
   registered_path=""
+  existing_registered_path=""
 
-  workspace_parent=$(dirname "$workspace_abs")
-  if [ "$workspace_parent" = "$project_root_abs" ]; then
-    registration_mode="direct"
-    registered_path="$workspace_abs"
-  else
-    candidate_base="$project_root_abs/$workspace_id"
-    candidate_path="$candidate_base"
-    suffix=2
-    while :; do
-      if [ -e "$candidate_path" ] || [ -L "$candidate_path" ]; then
-        if [ -d "$candidate_path" ]; then
-          existing_target=$(resolve_existing_dir_path "$candidate_path" 2>/dev/null || true)
-          if [ -n "$existing_target" ] && [ "$existing_target" = "$workspace_abs" ]; then
-            registered_path="$candidate_path"
-            break
-          fi
-        fi
-        candidate_path="$candidate_base-$suffix"
-        suffix=$((suffix + 1))
-        continue
-      fi
-      ln -s "$workspace_abs" "$candidate_path"
-      registered_path="$candidate_path"
+  for existing_path in "$project_root_abs"/*; do
+    [ -d "$existing_path" ] || continue
+    [ -f "$existing_path/wizardry.workspace.conf" ] || continue
+    existing_target=$(resolve_existing_dir_path "$existing_path" 2>/dev/null || true)
+    if [ -n "$existing_target" ] && [ "$existing_target" = "$workspace_abs" ]; then
+      existing_registered_path="$existing_path"
       break
-    done
+    fi
+  done
+
+  if [ -n "$existing_registered_path" ]; then
+    registered_path="$existing_registered_path"
+  fi
+
+  if [ -z "$registered_path" ]; then
+    workspace_parent=$(dirname "$workspace_abs")
+    if [ "$workspace_parent" = "$project_root_abs" ]; then
+      registered_path="$workspace_abs"
+    else
+      candidate_base="$project_root_abs/$workspace_id"
+      candidate_path="$candidate_base"
+      suffix=2
+      while :; do
+        if [ -e "$candidate_path" ] || [ -L "$candidate_path" ]; then
+          if [ -d "$candidate_path" ]; then
+            existing_target=$(resolve_existing_dir_path "$candidate_path" 2>/dev/null || true)
+            if [ -n "$existing_target" ] && [ "$existing_target" = "$workspace_abs" ]; then
+              registered_path="$candidate_path"
+              break
+            fi
+          fi
+          candidate_path="$candidate_base-$suffix"
+          suffix=$((suffix + 1))
+          continue
+        fi
+        ln -s "$workspace_abs" "$candidate_path"
+        registered_path="$candidate_path"
+        break
+      done
+    fi
   fi
 
   [ -n "$registered_path" ] || {
@@ -2427,6 +2442,11 @@ cmd_import_workspace() {
     printf '%s\n' "forge-backend: registered project is missing wizardry.workspace.conf: $registered_path" >&2
     exit 1
   }
+
+  registration_mode="linked"
+  if [ "$registered_path" = "$workspace_abs" ]; then
+    registration_mode="direct"
+  fi
 
   printf 'workspace=%s\n' "$workspace_abs"
   printf 'registered_path=%s\n' "$registered_path"

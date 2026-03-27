@@ -138,9 +138,16 @@ printf '%s\n' "$import_workspace_out" | grep -F "registered_path=$workspaces_roo
 printf '%s\n' "$import_workspace_out" | grep -F "mode=linked" >/dev/null
 printf '%s\n' "$import_workspace_out" | grep -F "profile_created=1" >/dev/null
 [ -L "$workspaces_root_abs/plain-web" ]
+[ ! -e "$workspaces_root_abs/plain-web-2" ]
 [ -f "$external_workspace_abs/wizardry.workspace.conf" ]
 grep -F "project_type=application" "$external_workspace_abs/wizardry.workspace.conf" >/dev/null
 grep -F "development_context=web" "$external_workspace_abs/wizardry.workspace.conf" >/dev/null
+
+import_workspace_dup_out=$(sh "$backend" import-workspace "$scratch" "$external_workspace_abs" "$workspaces_root")
+printf '%s\n' "$import_workspace_dup_out" | grep -F "workspace=$external_workspace_abs" >/dev/null
+printf '%s\n' "$import_workspace_dup_out" | grep -F "registered_path=$workspaces_root_abs/plain-web" >/dev/null
+printf '%s\n' "$import_workspace_dup_out" | grep -F "mode=linked" >/dev/null
+[ ! -e "$workspaces_root_abs/plain-web-2" ]
 
 direct_workspace="$workspaces_root/direct-space"
 mkdir -p "$direct_workspace/app"
