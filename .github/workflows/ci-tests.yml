@@ -43,6 +43,8 @@ jobs:
             .tests/apps/test-forge-run-modes.sh \
             .tests/apps/test-forge-ui-regressions.sh \
             .tests/apps/test-forge-ui-assets.sh \
+            .tests/apps/test-wizardry-desktop-ui-contract.sh \
+            .tests/apps/test-wizardry-desktop-backend-contract.sh \
             .tests/apps/test-macos-host-menu-contract.sh \
             .tests/apps/test-no-hardcoded-localhost-port.sh; do
             sh "$t"

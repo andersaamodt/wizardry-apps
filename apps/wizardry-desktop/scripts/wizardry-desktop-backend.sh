@@ -8,6 +8,7 @@ case "${1-}" in
 Usage: wizardry-desktop-backend.sh ACTION [ARGS...]
 
 Actions:
+  root-hint [ROOT_HINT]
   list-themes [ROOT_HINT]
   get-ui-prefs
   set-ui-pref KEY VALUE
@@ -224,8 +225,10 @@ require_root() {
     return 0
   fi
   if [ -n "${WIZARDRY_DIR-}" ] && [ -d "$WIZARDRY_DIR" ]; then
-    printf '%s\n' "$WIZARDRY_DIR"
-    return 0
+    if [ -d "$WIZARDRY_DIR/spells" ] || [ -d "$WIZARDRY_DIR/web/.themes" ] || [ -d "$WIZARDRY_DIR/apps/wizardry-desktop" ]; then
+      printf '%s\n' "$WIZARDRY_DIR"
+      return 0
+    fi
   fi
   if [ -d "$WIZARDRY_APPS_ROOT_FALLBACK" ]; then
     printf '%s\n' "$WIZARDRY_APPS_ROOT_FALLBACK"
@@ -237,6 +240,11 @@ require_root() {
   fi
 
   printf '%s\n' "$WIZARDRY_APPS_ROOT_FALLBACK"
+}
+
+cmd_root_hint() {
+  root=$(require_root "${1-}")
+  printf '%s\n' "$root"
 }
 
 theme_files() {
@@ -253,7 +261,10 @@ cmd_list_themes() {
   root=$(require_root "${1-}")
   root="${root:-$WIZARDRY_APPS_ROOT_FALLBACK}"
   themes=$(theme_files "$root/web/.themes")
-  if [ -z "$themes" ] && [ -f "$root/apps/forge/themes" ]; then
+  if [ -z "$themes" ] && [ -d "$WIZARDRY_APPS_ROOT_FALLBACK/web/.themes" ]; then
+    themes=$(theme_files "$WIZARDRY_APPS_ROOT_FALLBACK/web/.themes")
+  fi
+  if [ -z "$themes" ] && [ -d "$root/apps/forge/themes" ]; then
     themes=$(theme_files "$root/apps/forge/themes")
   fi
   printf '%s\n' "$themes"
@@ -346,11 +357,18 @@ cmd_list_spell_categories() {
   tmp_file=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-cats.XXXXXX")
   {
     collect_category_rows "$root/spells" "builtin"
+    if [ "$WIZARDRY_APPS_ROOT_FALLBACK" != "$root" ]; then
+      collect_category_rows "$WIZARDRY_APPS_ROOT_FALLBACK/spells" "builtin"
+    fi
     if [ -d "$WIZARDRY_DIR_FALLBACK/spells" ]; then
       collect_category_rows "$WIZARDRY_DIR_FALLBACK/spells" "builtin"
     fi
-    collect_category_rows "$HOME/.wizardry/spells" "custom"
-    collect_category_rows "$HOME/spells" "custom"
+    if [ "$HOME/.wizardry/spells" != "$WIZARDRY_DIR_FALLBACK/spells" ] && [ "$HOME/.wizardry/spells" != "$root/spells" ] && [ "$HOME/.wizardry/spells" != "$WIZARDRY_APPS_ROOT_FALLBACK/spells" ]; then
+      collect_category_rows "$HOME/.wizardry/spells" "custom"
+    fi
+    if [ "$HOME/spells" != "$WIZARDRY_DIR_FALLBACK/spells" ] && [ "$HOME/spells" != "$root/spells" ] && [ "$HOME/spells" != "$WIZARDRY_APPS_ROOT_FALLBACK/spells" ]; then
+      collect_category_rows "$HOME/spells" "custom"
+    fi
   } >"$tmp_file"
 
   while IFS='|' read -r raw_id raw_kind raw_category count || [ -n "$raw_id" ]; do
@@ -420,14 +438,9 @@ cmd_list_spells() {
     exit 2
   }
 
-  if [ "$source" = "custom" ]; then
-    src_root="$HOME/.wizardry/spells"
-    [ -d "$src_root/$category" ] || src_root="$HOME/spells"
-  else
-    src_root="$root/spells"
-  fi
-
-  list_spell_files_in_dir "$src_root/$category"
+  spell_dir_for "$root" "$source" "$category" | while IFS= read -r file_dir || [ -n "$file_dir" ]; do
+    list_spell_files_in_dir "$file_dir"
+  done | sort -u
 }
 
 spell_dir_for() {
@@ -443,6 +456,7 @@ spell_dir_for() {
     return
   fi
   [ -d "$root/spells/$category" ] && printf '%s\n' "$root/spells/$category"
+  [ "$WIZARDRY_APPS_ROOT_FALLBACK" != "$root" ] && [ -d "$WIZARDRY_APPS_ROOT_FALLBACK/spells/$category" ] && printf '%s\n' "$WIZARDRY_APPS_ROOT_FALLBACK/spells/$category"
   [ -d "$WIZARDRY_DIR_FALLBACK/spells/$category" ] && printf '%s\n' "$WIZARDRY_DIR_FALLBACK/spells/$category"
 }
 
@@ -651,34 +665,54 @@ arcana_entry_names() {
 
 cmd_list_arcana_install() {
   install_root=${1-}
-  [ -d "$install_root" ] || install_root="$WIZARDRY_DIR_FALLBACK/spells/.arcana"
-  [ -d "$install_root" ] || return 0
+  root=$(require_root "")
+  roots=''
+  seen_roots=''
+  for candidate in "$install_root" "$root/spells/.arcana" "$WIZARDRY_DIR_FALLBACK/spells/.arcana" "$WIZARDRY_APPS_ROOT_FALLBACK/spells/.arcana"; do
+    [ -n "$candidate" ] || continue
+    [ -d "$candidate" ] || continue
+    case " $seen_roots " in
+      *" $candidate "*) continue ;;
+    esac
+    seen_roots="$seen_roots $candidate "
+    roots="$roots $candidate"
+  done
+  [ -n "$roots" ] || return 0
 
   list_entries=""
   seen_entries=""
 
-  while IFS= read -r name || [ -n "$name" ]; do
-    [ -n "$name" ] || continue
-    case " $seen_entries " in
-      *" $name "*)
-        continue
-        ;;
-    esac
-    seen_entries="$seen_entries $name "
-    list_entries="$list_entries $name"
-  done <<EOF
-$(arcana_entry_names "$install_root")
+  for root_dir in $roots; do
+    while IFS= read -r name || [ -n "$name" ]; do
+      [ -n "$name" ] || continue
+      case " $seen_entries " in
+        *" $name "*)
+          continue
+          ;;
+      esac
+      seen_entries="$seen_entries $name "
+      list_entries="$list_entries $name"
+    done <<EOF
+$(arcana_entry_names "$root_dir")
 EOF
+  done
 
   resolve_arcana_status() {
     module_name=$1
     status='coming soon'
     if hascmd "${module_name}-status" 2>/dev/null; then
       status=$("${module_name}-status" 2>/dev/null | head -n 1)
-    elif [ -x "$install_root/$module_name-status" ] && [ -f "$install_root/$module_name-status" ]; then
-      status=$("$install_root/$module_name-status" 2>/dev/null | head -n 1)
-    elif [ -x "$install_root/$module_name/$module_name-status" ] && [ -f "$install_root/$module_name/$module_name-status" ]; then
-      status=$("$install_root/$module_name/$module_name-status" 2>/dev/null | head -n 1)
+    else
+      for root_dir in $roots; do
+        if [ -x "$root_dir/$module_name-status" ] && [ -f "$root_dir/$module_name-status" ]; then
+          status=$("$root_dir/$module_name-status" 2>/dev/null | head -n 1)
+          break
+        fi
+        if [ -x "$root_dir/$module_name/$module_name-status" ] && [ -f "$root_dir/$module_name/$module_name-status" ]; then
+          status=$("$root_dir/$module_name/$module_name-status" 2>/dev/null | head -n 1)
+          break
+        fi
+      done
     fi
     normalize_status "$status"
   }
@@ -689,12 +723,34 @@ EOF
         continue
         ;;
     esac
-    if [ -d "$install_root/$name" ] || [ -x "$install_root/$name-menu" ] || [ -x "$install_root/$name" ] || hascmd "$name-menu" || hascmd "$name-status" || hascmd "$name" || [ -x "$install_root/$name/$name-status" ] || [ -x "$install_root/$name-status" ] || [ -x "$install_root/$name/$name" ] || [ -x "$install_root/$name/install-$name" ]; then
+    emit=false
+    if hascmd "$name-menu" || hascmd "$name-status" || hascmd "$name"; then
+      emit=true
+    else
+      for root_dir in $roots; do
+        if [ -d "$root_dir/$name" ] || [ -x "$root_dir/$name-menu" ] || [ -x "$root_dir/$name" ] || [ -x "$root_dir/$name/$name-status" ] || [ -x "$root_dir/$name-status" ] || [ -x "$root_dir/$name/$name" ] || [ -x "$root_dir/$name/install-$name" ]; then
+          emit=true
+          break
+        fi
+      done
+    fi
+    if [ "$emit" = "true" ]; then
       printf '%s|%s|%s\n' "$name" "$(resolve_arcana_status "$name")" "$(arcana_label_for_name "$name")"
     fi
   done
 
-  if [ -x "$install_root/import-arcanum" ] || hascmd import-arcanum; then
+  import_ready=false
+  if hascmd import-arcanum; then
+    import_ready=true
+  else
+    for root_dir in $roots; do
+      if [ -x "$root_dir/import-arcanum" ]; then
+        import_ready=true
+        break
+      fi
+    done
+  fi
+  if [ "$import_ready" = "true" ]; then
     printf 'import-arcanum|%s|import arcanum\n' "ready"
   fi
 }
@@ -731,8 +787,13 @@ cmd_run_arcana_install() {
     printf '%s\n' "wizardry-desktop-backend: invalid arcana module: $name" >&2
     exit 2
   }
-  install_root="$WIZARDRY_DIR_FALLBACK/spells/.arcana"
-  launcher=$(resolve_arcana_launch_script "$install_root" "$name")
+  root=$(require_root "")
+  launcher=''
+  for candidate in "$root/spells/.arcana" "$WIZARDRY_DIR_FALLBACK/spells/.arcana" "$WIZARDRY_APPS_ROOT_FALLBACK/spells/.arcana"; do
+    [ -d "$candidate" ] || continue
+    launcher=$(resolve_arcana_launch_script "$candidate" "$name")
+    [ -n "$launcher" ] && break
+  done
   app_label=$(normalize_watch_actor "$name")
   app_label=${app_label-}
   [ -n "$app_label" ] || app_label='wizardry-arcana'
@@ -757,10 +818,17 @@ cmd_run_arcana_menu() {
     printf '%s\n' "wizardry-desktop-backend: invalid arcana module: $name" >&2
     exit 2
   }
-  if [ -z "$install_root" ]; then
-    install_root="$WIZARDRY_DIR_FALLBACK/spells/.arcana"
+  script=''
+  if [ -n "$install_root" ] && [ -d "$install_root" ]; then
+    script=$(resolve_arcana_module_script "$install_root" "$name" "menu")
+  else
+    root=$(require_root "")
+    for candidate in "$root/spells/.arcana" "$WIZARDRY_DIR_FALLBACK/spells/.arcana" "$WIZARDRY_APPS_ROOT_FALLBACK/spells/.arcana"; do
+      [ -d "$candidate" ] || continue
+      script=$(resolve_arcana_module_script "$candidate" "$name" "menu")
+      [ -n "$script" ] && break
+    done
   fi
-  script=$(resolve_arcana_module_script "$install_root" "$name" "menu")
   app_label=$(normalize_watch_actor "$name")
   app_label=${app_label-}
   [ -n "$app_label" ] || app_label='wizardry-arcana'
@@ -807,7 +875,7 @@ cmd_run_action() {
       exit 2
       ;;
     arcana:install-menu)
-      cmd_list_arcana_install "${WIZARDRY_DIR_FALLBACK}/spells/.arcana"
+      cmd_list_arcana_install "$root/spells/.arcana"
       record_watch "app" "arcana:install-menu" "wizardry-core" "ok"
       ;;
     arcana:install)
@@ -900,7 +968,10 @@ if [ -z "$action" ]; then
 fi
 shift || true
 
-  case "$action" in
+case "$action" in
+  root-hint)
+    cmd_root_hint "$@"
+    ;;
   list-themes)
     cmd_list_themes "$@"
     ;;

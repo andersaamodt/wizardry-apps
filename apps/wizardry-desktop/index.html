@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Wizardry Desktop</title>
-  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260324h">
-  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260324h">
+  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260324i">
+  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260324i">
   <link rel="icon" href="assets/wizardry-desktop-icon.svg" type="image/svg+xml">
 </head>
 <body class="wd-booting">
@@ -151,7 +151,7 @@
     (function () {
       'use strict';
 
-      var ASSET_VERSION = 'wizardry-desktop20260324h';
+      var ASSET_VERSION = 'wizardry-desktop20260324i';
       var THEME_FALLBACK = ['archmage', 'adept', 'chrono', 'chronomancer', 'conjurer', 'druid', 'empath'];
       var COMPOSER_ACTIONS = ['run-spell', 'spell-help', 'run-action', 'run-system'];
       var COMPOSER_SYSTEM_ACTIONS = ['system:whoami', 'system:pwd', 'system:date', 'system:status', 'system:environment'];
@@ -288,12 +288,23 @@
           if (appIdx >= 0) {
             out.push(pagePath.slice(0, appIdx) + '/wizardry-desktop/scripts/wizardry-desktop-backend.sh');
           }
+          var workspaceMarker = '/wizardry-desktop/app/index.html';
+          var workspaceIdx = pagePath.lastIndexOf(workspaceMarker);
+          if (workspaceIdx >= 0) {
+            var rootBase = pagePath.slice(0, workspaceIdx);
+            out.push(rootBase + '/wizardry-desktop/app/scripts/wizardry-desktop-backend.sh');
+            out.push(rootBase + '/wizardry-apps/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh');
+            if (!state.rootHint) {
+              state.rootHint = rootBase + '/wizardry-apps';
+            }
+          }
           var repoMarker = '/apps/wizardry-desktop/';
           var repoIdx = pagePath.lastIndexOf(repoMarker);
           if (repoIdx >= 0) {
             state.rootHint = pagePath.slice(0, repoIdx);
             out.push(state.rootHint + '/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh');
           }
+          out.push('scripts/wizardry-desktop-backend.sh');
           out.push('apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh');
           out.push('chatroom/scripts/chatroom-backend.sh');
         } catch (_err) {
@@ -324,6 +335,24 @@
           }
         }
         return '';
+      }
+
+      function syncRootHintFromBackendPath(scriptPath) {
+        var value = String(scriptPath || '');
+        if (!value || state.rootHint) {
+          return;
+        }
+        var marker = '/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh';
+        var idx = value.lastIndexOf(marker);
+        if (idx > 0) {
+          state.rootHint = value.slice(0, idx);
+          return;
+        }
+        var workspaceMarker = '/wizardry-desktop/app/scripts/wizardry-desktop-backend.sh';
+        idx = value.lastIndexOf(workspaceMarker);
+        if (idx > 0) {
+          state.rootHint = value.slice(0, idx) + '/wizardry-apps';
+        }
       }
 
       function execArgv(argv) {
@@ -369,6 +398,7 @@
               }
             }
             backendScriptCache = scriptPath;
+            syncRootHintFromBackendPath(scriptPath);
             return String((result && result.stdout) || '');
           } catch (error) {
             lastErr = error;
@@ -381,7 +411,7 @@
           throw new Error('backend command unavailable');
         }
         if (bridgeAvailable()) {
-          var fallback = ['sh', '-c', 'root="${WIZARDRY_APPS_ROOT:-}"; if [ -z "$root" ]; then if [ -n "${WIZARDRY_DIR:-}" ]; then root="${WIZARDRY_DIR}"; else root="${HOME}/git/wizardry-apps"; fi; fi; exec sh "$root/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh" "$@"', 'wizardry-desktop-backend', action].concat(args);
+          var fallback = ['sh', '-c', 'root="${WIZARDRY_APPS_ROOT:-}"; if [ -z "$root" ]; then root="${HOME}/git/wizardry-apps"; fi; exec sh "$root/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh" "$@"', 'wizardry-desktop-backend', action].concat(args);
           var fallbackResult = await execArgv(fallback);
           if (typeof fallbackResult !== 'undefined' && fallbackResult !== null && Number(fallbackResult.exit_code || 0) !== 0) {
             throw new Error(String((fallbackResult.stderr || fallbackResult.stdout || 'command failed').trim()));
@@ -605,7 +635,8 @@
         }
       }
 
-      function composerOpenWithTokens(tokens) {
+      function composerOpenWithTokens(tokens, options) {
+        options = options || {};
         if (!Array.isArray(tokens) || !tokens.length) {
           tokens = composerDefaultTokensForPage(state.activePage);
         }
@@ -618,7 +649,7 @@
         if (els.composerInput) {
           els.composerInput.value = '';
         }
-        setComposerOpen(true, { userInitiated: true });
+        setComposerOpen(true, { userInitiated: !!options.userInitiated });
         renderComposer();
       }
 
@@ -1550,6 +1581,19 @@
 
       function savePreference(key, value) {
         callBackend('set-ui-pref', [key, value]).catch(function () {});
+      }
+
+      function loadRootHint() {
+        return callBackend('root-hint').then(function (text) {
+          var root = String(text || '').split('\n')[0];
+          root = String(root || '').trim();
+          if (root) {
+            state.rootHint = root;
+            if (state.activeTheme) {
+              setThemeStylesheet(state.activeTheme);
+            }
+          }
+        }).catch(function () {});
       }
 
       function ensureThemes() {
@@ -2540,7 +2584,7 @@
             if (state.composer.open) {
               setComposerOpen(false);
             } else {
-              composerOpenWithTokens(composerDefaultTokensForPage(state.activePage));
+              composerOpenWithTokens(composerDefaultTokensForPage(state.activePage), { userInitiated: true });
             }
           });
         }
@@ -2913,7 +2957,7 @@
               if (value && value.indexOf('|') >= 0) {
                 var pieces = value.split('|');
                 if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                  composerOpenWithTokens(['run-spell', pieces[0], pieces[1]]);
+                  composerOpenWithTokens(['run-spell', pieces[0], pieces[1]], { userInitiated: true });
                   return;
                 }
                 runSpell(pieces[0], pieces[1]);
@@ -2927,7 +2971,7 @@
               if (helpValue && helpValue.indexOf('|') >= 0) {
                 var pair = helpValue.split('|');
                 if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                  composerOpenWithTokens(['spell-help', pair[0], pair[1]]);
+                  composerOpenWithTokens(['spell-help', pair[0], pair[1]], { userInitiated: true });
                   return;
                 }
                 runSpellHelp(pair[0], pair[1]);
@@ -2940,7 +2984,7 @@
               var moduleName = installArcana.getAttribute('data-install-arcana');
               if (moduleName) {
                 if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                  composerOpenWithTokens(['run-action', 'arcana:install', moduleName]);
+                  composerOpenWithTokens(['run-action', 'arcana:install', moduleName], { userInitiated: true });
                   return;
                 }
                 runArcanaAction('arcana:install', moduleName, {
@@ -2956,7 +3000,7 @@
               var menuModule = arcanaMenu.getAttribute('data-arcana-menu');
               if (menuModule) {
                 if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                  composerOpenWithTokens(['run-action', 'arcana:menu', menuModule]);
+                  composerOpenWithTokens(['run-action', 'arcana:menu', menuModule], { userInitiated: true });
                   return;
                 }
                 runArcanaAction('arcana:menu', menuModule, {
@@ -2972,7 +3016,7 @@
               var action = adminAction.getAttribute('data-admin-action');
               if (action) {
                 if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                  composerOpenWithTokens(['run-action', action]);
+                  composerOpenWithTokens(['run-action', action], { userInitiated: true });
                   return;
                 }
                 runQuickAction(action, action, {
@@ -2991,7 +3035,7 @@
               var command = hostAction.getAttribute('data-host-action');
               var systemCommand = command && command.indexOf('system:') === 0 ? command : 'system:' + command;
               if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                composerOpenWithTokens(['run-system', systemCommand]);
+                composerOpenWithTokens(['run-system', systemCommand], { userInitiated: true });
                 return;
               }
               var output = callBackend('run-system', [command]).then(function (text) {
@@ -3006,7 +3050,7 @@
             if (mudAction) {
               var mudCmd = mudAction.getAttribute('data-mud-action');
               if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                composerOpenWithTokens(['run-system', 'system:' + mudCmd]);
+                composerOpenWithTokens(['run-system', 'system:' + mudCmd], { userInitiated: true });
                 return;
               }
               callBackend('run-system', [mudCmd]).then(function (text) {
@@ -3035,7 +3079,7 @@
             }
 
             var removeSynonym = event.target.closest('[data-remove-synonym]');
-          if (removeSynonym) {
+            if (removeSynonym) {
               removeSynonymFromElement(removeSynonym.getAttribute('data-remove-synonym'));
             }
           });
@@ -3163,6 +3207,11 @@
         window.addEventListener('pageshow', function () {
           setComposerOpen(false, { skipFocus: true });
         });
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden && state.composer.open) {
+            setComposerOpen(false, { skipFocus: true });
+          }
+        });
         renderNav();
         renderPage();
         renderThemeMenu();
@@ -3189,19 +3238,21 @@
           state.composer.startupLock = false;
         }, 1400);
 
-        Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadCastData(), loadArcanaInstall(), loadWatchHistory()])
-          .catch(function () {
-            state.bridgeReady = bridgeAvailable();
-          })
-          .finally(function () {
-            setBridgeState(state.bridgeReady);
-            applyLayoutColumns();
-            setComposerOpen(false, { skipFocus: true });
-            renderPage();
-            pushActivity('boot', 'Wizardry Desktop is ready. Theme: ' + state.activeTheme, {});
-            notifyHostBootReady(0);
-            revealUI();
-          });
+        loadRootHint().finally(function () {
+          Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadCastData(), loadArcanaInstall(), loadWatchHistory()])
+            .catch(function () {
+              state.bridgeReady = bridgeAvailable();
+            })
+            .finally(function () {
+              setBridgeState(state.bridgeReady);
+              applyLayoutColumns();
+              setComposerOpen(false, { skipFocus: true });
+              renderPage();
+              pushActivity('boot', 'Wizardry Desktop is ready. Theme: ' + state.activeTheme, {});
+              notifyHostBootReady(0);
+              revealUI();
+            });
+        });
       }
 
       bootstrap();

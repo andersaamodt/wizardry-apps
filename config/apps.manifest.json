@@ -56,6 +56,18 @@
       "targets": "macos,linux"
     },
     {
+      "slug": "wizardry-desktop",
+      "name": "Wizardry Desktop",
+      "production": true,
+      "distribution": "core",
+      "bundleIds": {
+        "macos": "com.wizardry.apps.wizardrydesktop.macos",
+        "ios": "com.wizardry.apps.wizardrydesktop.ios",
+        "android": "com.wizardry.apps.wizardrydesktop.android"
+      },
+      "targets": "macos,linux"
+    },
+    {
       "slug": "chatroom",
       "name": "Chatroom",
       "production": false,
