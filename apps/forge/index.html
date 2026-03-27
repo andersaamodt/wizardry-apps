@@ -2677,8 +2677,22 @@
         return true;
       }
 
+      function normalizedCatalogId(value) {
+        return String(value == null ? '' : value).trim().toLowerCase();
+      }
+
       function catalogItems() {
-        var builtIn = state.apps.map(function (app) {
+        var workspaceIdSet = {};
+        state.workspaces.forEach(function (ws) {
+          var wsId = normalizedCatalogId(ws && ws.id);
+          if (wsId) {
+            workspaceIdSet[wsId] = true;
+          }
+        });
+        var builtIn = state.apps.filter(function (app) {
+          var appId = normalizedCatalogId(app && app.id);
+          return !workspaceIdSet[appId];
+        }).map(function (app) {
           var listGroup = builtInListGroup(app.id);
           return {
             key: 'builtin:' + app.id,
