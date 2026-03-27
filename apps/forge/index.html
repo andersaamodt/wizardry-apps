@@ -2880,7 +2880,7 @@
       }
 
       function ranActionLabel(item) {
-        return 'Ran ' + itemStatusName(item) + '...';
+        return 'Ran ' + itemStatusName(item);
       }
 
       function iconShapeModeValue() {
@@ -6646,13 +6646,18 @@
 
         if (kind === 'run') {
           if (enabledTargets[nativeTarget]) {
-            var runningLabel = 'Running ' + itemStatusName(app) + '...';
-            setActivity('working', runningLabel);
-            setFooterStatus('working', runningLabel);
+            var buildingLabel = shouldInstallBeforeRun(selected)
+              ? ('Building and installing ' + itemStatusName(app) + '...')
+              : ('Building ' + itemStatusName(app) + '...');
+            setActivity('working', buildingLabel);
+            setFooterStatus('working', buildingLabel);
             suppressTransientRefresh();
             var runInstallFirst = shouldInstallBeforeRun(selected);
             var run = await backend('run-desktop', runInstallFirst ? [app.id, 'install-first'] : [app.id]);
             var runOut = kv(run.stdout || '');
+            var runningLabel = 'Running ' + itemStatusName(app) + '...';
+            setActivity('working', runningLabel);
+            setFooterStatus('working', runningLabel);
 
             renderResult({
               status: 'ok',

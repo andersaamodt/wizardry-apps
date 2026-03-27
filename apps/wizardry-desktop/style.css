@@ -338,18 +338,20 @@ body::before {
 
 .wd-content-scroll {
   min-height: 0;
-  padding: 0.34rem 0.34rem 0.24rem;
+  padding: 0.24rem 0.28rem 0.2rem;
   overflow: auto;
   overflow-x: hidden;
 }
 
 .wd-polite-btn {
   border: 1px solid var(--wd-line);
-  border-radius: 8px;
+  border-radius: 7px;
   background: transparent;
   color: var(--wd-text);
-  padding: 0.23rem 0.45rem;
+  padding: 0.15rem 0.42rem;
   font-size: 0.64rem;
+  line-height: 1.2;
+  min-height: 22px;
   cursor: pointer;
 }
 
@@ -377,10 +379,16 @@ body::before {
 }
 
 .wd-panel {
-  background: var(--wd-panel);
-  border: 1px solid var(--wd-line);
-  border-radius: var(--wd-radius);
-  padding: 0.38rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.wd-panel + .wd-panel {
+  margin-top: 0.5rem;
+  padding-top: 0.44rem;
+  border-top: 1px solid var(--wd-line);
 }
 
 .wd-panel-head {
@@ -390,7 +398,7 @@ body::before {
 }
 
 .wd-subline {
-  margin: 0 0 0.7rem;
+  margin: 0 0 0.45rem;
   color: var(--wd-muted);
   font-size: 0.64rem;
 }
@@ -480,9 +488,9 @@ body::before {
 
 .wd-list-row {
   border: 1px solid var(--wd-line);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--wd-surface);
-  padding: 0.22rem 0.28rem;
+  padding: 0.16rem 0.22rem;
   display: grid;
   grid-template-columns: 1fr 110px auto;
   gap: 0.3rem;
@@ -565,8 +573,9 @@ body::before {
 
 .wd-inline-input {
   border: 1px solid var(--wd-line);
-  border-radius: 8px;
-  padding: 0.2rem 0.32rem;
+  border-radius: 7px;
+  padding: 0.14rem 0.28rem;
+  min-height: 22px;
   min-width: 0;
   width: 100%;
   font-size: 0.6rem;
@@ -589,13 +598,13 @@ body::before {
 .wd-mono-box {
   margin: 0.35rem 0 0;
   border: 1px solid var(--wd-line);
-  border-radius: 8px;
-  padding: 0.34rem;
+  border-radius: 6px;
+  padding: 0.24rem;
   background: var(--wd-surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.58rem;
   line-height: 1.35;
-  min-height: 76px;
+  min-height: 58px;
   white-space: pre-wrap;
   overflow: auto;
 }
@@ -737,10 +746,11 @@ body::before {
 }
 
 .wd-activity-list-scrolled {
-  border: 1px solid var(--wd-line);
-  background: color-mix(in srgb, var(--wd-surface) 80%, transparent);
-  border-radius: 7px;
-  padding: 0.14rem 0.18rem 0.18rem;
+  border: 0;
+  border-top: 1px solid var(--wd-line);
+  background: transparent;
+  border-radius: 0;
+  padding: 0.14rem 0.02rem 0.02rem;
   max-height: none;
   height: 100%;
 }
@@ -750,7 +760,7 @@ body::before {
   inset: var(--wd-host-top-inset) 0 0 0;
   display: grid;
   place-items: center;
-  padding: 0.7rem;
+  padding: 0.44rem;
   z-index: 40;
 }
 
@@ -762,25 +772,25 @@ body::before {
 
 .wd-composer-panel {
   position: relative;
-  width: min(960px, calc(100vw - 1.1rem));
-  max-width: 960px;
-  max-height: min(96vh, calc(100vh - var(--wd-host-top-inset) - 1rem));
-  min-height: 58vh;
+  width: min(920px, calc(100vw - 0.72rem));
+  max-width: 920px;
+  max-height: min(90vh, calc(100vh - var(--wd-host-top-inset) - 0.72rem));
+  min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(120px, 30vh) 1fr auto;
-  gap: 0.35rem;
+  grid-template-rows: auto minmax(72px, 18vh) auto auto minmax(72px, 16vh) auto;
+  gap: 0.22rem;
   border: 1px solid var(--wd-line);
   background: var(--wd-panel);
-  border-radius: var(--wd-radius);
+  border-radius: 8px;
   box-shadow: 0 18px 48px color-mix(in srgb, var(--wd-text) 20%, transparent);
-  padding: 0.45rem;
+  padding: 0.34rem;
 }
 
 .wd-composer-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.6rem;
+  gap: 0.36rem;
 }
 
 .wd-composer-head h3 {
@@ -790,12 +800,13 @@ body::before {
 
 .wd-composer-blocks {
   min-height: 0;
-  border: 1px solid var(--wd-line);
-  border-radius: 8px;
-  padding: 0.36rem;
-  background: color-mix(in srgb, var(--wd-surface) 82%, transparent);
+  border: 0;
+  border-top: 1px solid var(--wd-line);
+  border-radius: 0;
+  padding: 0.24rem 0 0;
+  background: transparent;
   overflow: auto;
-  max-height: 26vh;
+  max-height: 18vh;
 }
 
 .wd-composer-blocks,
@@ -807,8 +818,14 @@ body::before {
 
 .wd-composer-group {
   border-top: 1px solid var(--wd-line);
-  padding-top: 0.3rem;
-  margin-top: 0.25rem;
+  padding-top: 0.22rem;
+  margin-top: 0.18rem;
+}
+
+.wd-composer-group:first-child {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
 }
 
 .wd-composer-group h4 {
@@ -859,10 +876,10 @@ body::before {
 }
 
 .wd-composer-token-surface {
-  min-height: 44px;
-  padding: 0.24rem;
+  min-height: 34px;
+  padding: 0.14rem;
   border: 1px solid var(--wd-line);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--wd-surface);
   display: flex;
   flex-wrap: wrap;
@@ -979,14 +996,14 @@ body::before {
 .wd-composer-input {
   border: 0;
   outline: none;
-  min-width: 180px;
+  min-width: 120px;
   width: 100%;
-  max-width: 340px;
+  max-width: 260px;
   background: transparent;
   color: var(--wd-text);
   padding: 0;
   font-size: 0.58rem;
-  height: 20px;
+  height: 18px;
 }
 
 .wd-composer-input:focus-visible {
@@ -1014,7 +1031,7 @@ body::before {
 }
 
 .wd-composer-output {
-  min-height: 102px;
+  min-height: 72px;
   margin: 0;
   flex: 1;
   overflow: auto;
@@ -1023,7 +1040,7 @@ body::before {
 .wd-composer-help {
   display: flex;
   justify-content: space-between;
-  gap: 0.35rem;
+  gap: 0.24rem;
   color: var(--wd-muted);
   font-size: 0.56rem;
   flex-wrap: wrap;
@@ -1039,7 +1056,7 @@ body::before {
 
 .wd-composer-actions {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.24rem;
   justify-content: flex-end;
 }
 
