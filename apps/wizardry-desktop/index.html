@@ -72,10 +72,6 @@
         <button id="settings-close" type="button" class="wd-icon-btn wd-compact" aria-label="Close settings">×</button>
       </header>
       <section class="wd-settings-card">
-        <h3>Bridge</h3>
-        <p id="bridge-status" class="wd-subline">Bridge: checking</p>
-      </section>
-      <section class="wd-settings-card">
         <h3>Rail Width</h3>
         <label for="rail-width" class="wd-row-label">Resize rail (persistent)</label>
         <input id="rail-width" type="range" min="220" max="420" step="10">
@@ -263,7 +259,6 @@
           settingsPanel: document.getElementById('settings-panel'),
           settingsToggle: document.getElementById('settings-toggle'),
           settingsClose: document.getElementById('settings-close'),
-          bridgeStatus: document.getElementById('bridge-status'),
           prefsStatus: document.getElementById('prefs-status'),
           railWidthInput: document.getElementById('rail-width'),
           arcanaList: document.getElementById('arcana-list'),
@@ -2085,6 +2080,7 @@
         return callBackend('get-ui-prefs').then(function (text) {
           var prefs = parseKeyValueBlob(text);
           state.prefsLoaded = true;
+          syncPrefsStatus();
           state.activeTheme = prefs.theme || prefs.desktop_theme || 'adept';
           state.railWidth = Number(prefs.leftRailWidth || state.railWidth);
           var rawSynonyms = prefs.spellbook_synonyms || '';
@@ -2102,6 +2098,7 @@
           return ensureThemes();
         }).catch(function () {
           state.prefsLoaded = false;
+          syncPrefsStatus();
           return ensureThemes();
         }).then(function () {
           state.railWidth = Math.min(420, Math.max(220, Number(state.railWidth) || 300));
@@ -2187,7 +2184,7 @@
 
       function renderHomePage() {
         return '<section class="wd-panel"><h3>Overview</h3><p class="wd-subline">Wizardry Desktop is the control plane for shell actions and spell workflows.</p><div class="wd-card-grid">' +
-          card('Bridge', state.bridgeReady ? 'Ready' : 'Waiting', 'Bridge status appears when the native host is connected.') +
+          card('Console', state.actionInFlight ? 'Busy' : 'Ready', 'Actions execute directly from UI controls and command composer.') +
           card('Theme', themeLabel(state.activeTheme), 'Theme is persisted using backend prefs and applied instantly.') +
           card('Menus', state.menuCatalog.length + ' indexed', 'Menus page tracks the full wizardry menu command surface.') +
           card('Categories', state.cast.categories.length + ' loaded', 'Cast page keeps spell categories in a persistent structure.') +
@@ -2495,14 +2492,14 @@
         }
       }
 
-      function setBridgeState(value) {
-        state.bridgeReady = !!value;
-        if (els.bridgeStatus) {
-          els.bridgeStatus.textContent = 'Bridge: ' + (state.bridgeReady ? 'ready' : 'unavailable');
-        }
+      function syncPrefsStatus() {
         if (els.prefsStatus) {
           setText(els.prefsStatus, state.prefsLoaded ? 'loaded' : 'fallback');
         }
+      }
+
+      function setBridgeState(value) {
+        state.bridgeReady = !!value;
       }
 
       function ensureBridge() {

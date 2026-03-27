@@ -76,6 +76,8 @@ assert_contains "$ui" "/web/.themes/"
 assert_contains "$ui" "function loadRootHint()"
 assert_contains "$ui" "callBackend('root-hint')"
 assert_contains "$ui" "workspaceMarker = '/wizardry-desktop/app/index.html'"
+assert_not_contains "$ui" 'id="bridge-status"'
+assert_not_contains "$ui" "card('Bridge'"
 
 # Activity drawer scrollability and layout contracts.
 assert_contains "$ui" 'wd-activity-sections'
