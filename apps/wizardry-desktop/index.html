@@ -58,7 +58,6 @@
             <span class="wd-hidden">Compose</span>
           </button>
           <button id="activity-toggle" type="button" class="wd-icon-btn" aria-label="Toggle Casting Watch">✦</button>
-          <button id="action-refresh" type="button" class="wd-polite-btn wd-secondary" title="Refresh page data">Refresh</button>
         </div>
       </header>
       <section id="content-scroll" class="wd-content-scroll">
@@ -245,7 +244,6 @@
           pageTitle: document.getElementById('page-title'),
           pageSubtitle: document.getElementById('page-subtitle'),
           contentArea: document.getElementById('content-area'),
-          actionRefresh: document.getElementById('action-refresh'),
           activityToggle: document.getElementById('activity-toggle'),
           activityDrawer: document.getElementById('activity-drawer'),
           activityCount: document.getElementById('activity-count'),
@@ -3586,17 +3584,6 @@
         if (els.activityClose) {
           els.activityClose.addEventListener('click', function () {
             setActivityOpen(false);
-          });
-        }
-        if (els.actionRefresh) {
-          els.actionRefresh.addEventListener('click', function () {
-            if (state.activePage === 'arcana') {
-              loadArcanaInstall();
-            } else if (state.activePage === 'menus') {
-              loadMenuCatalog();
-            } else {
-              loadCastData();
-            }
           });
         }
         if (els.settingsToggle) {

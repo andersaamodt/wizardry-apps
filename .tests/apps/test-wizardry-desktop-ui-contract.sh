@@ -44,6 +44,7 @@ assert_not_contains() {
 
 # Startup + composer stability contracts.
 assert_contains "$ui" 'id="command-composer-toggle"'
+assert_not_contains "$ui" 'id="action-refresh"'
 assert_contains "$ui" 'id="command-composer-modal" class="wd-composer-modal wd-hidden"'
 assert_contains "$ui" 'startupLock: true'
 assert_contains "$ui" 'open: false'
