@@ -582,6 +582,12 @@ body::before {
   line-height: 1.25;
 }
 
+.wd-menu-arg {
+  width: 9.5rem;
+  min-width: 8rem;
+  max-width: 11rem;
+}
+
 .wd-form-actions {
   display: flex;
   gap: 0.35rem;

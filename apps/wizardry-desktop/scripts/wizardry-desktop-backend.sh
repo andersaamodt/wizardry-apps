@@ -16,6 +16,9 @@ Actions:
   list-spells SPELL_REF [ROOT_HINT]
   run-spell SPELL_REF SPELL_NAME [ROOT_HINT]
   spell-help SPELL_REF SPELL_NAME [ROOT_HINT]
+  list-menu-spells [ROOT_HINT]
+  menu-help MENU_NAME [ROOT_HINT]
+  run-menu MENU_NAME [MENU_ARG] [ROOT_HINT]
   list-memorized-spells
   list-arcana-install [INSTALL_ROOT]
   run-arcana-install MODULE
@@ -599,6 +602,264 @@ cmd_list_memorized_spells() {
   fi
 }
 
+menu_script_dirs() {
+  root=${1-}
+  for dir in \
+    "$root/spells/menu" \
+    "$WIZARDRY_DIR_FALLBACK/spells/menu" \
+    "$WIZARDRY_APPS_ROOT_FALLBACK/spells/menu" \
+    "$HOME/.wizardry/spells/menu" \
+    "$HOME/spells/menu"
+  do
+    [ -d "$dir" ] || continue
+    printf '%s\n' "$dir"
+  done | awk '!seen[$0]++'
+}
+
+resolve_menu_script() {
+  root=${1-}
+  name=${2-}
+  safe_name "$name" || return 1
+  menu_script_dirs "$root" | while IFS= read -r dir || [ -n "$dir" ]; do
+    [ -n "$dir" ] || continue
+    file="$dir/$name"
+    if [ -f "$file" ] && [ ! -d "$file" ]; then
+      printf '%s\n' "$file"
+      return 0
+    fi
+  done
+  return 1
+}
+
+menu_is_sourced_only() {
+  file=${1-}
+  [ -f "$file" ] || return 1
+  if grep -qi 'must be sourced' "$file" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
+menu_requires_argument() {
+  file=${1-}
+  [ -f "$file" ] || return 1
+  if awk 'BEGIN {found=0} /^Usage:/ {if ($0 ~ /<[A-Za-z0-9_:-]+>/) found=1} END {exit(found ? 0 : 1)}' "$file"; then
+    return 0
+  fi
+  return 1
+}
+
+menu_invocation_text() {
+  name=${1-}
+  sourced_only=${2-0}
+  requires_arg=${3-0}
+  cmd="$name"
+  if [ "$sourced_only" = "1" ]; then
+    cmd=". $name"
+  fi
+  if [ "$requires_arg" = "1" ]; then
+    cmd="$cmd <arg>"
+  fi
+  printf '%s\n' "$cmd"
+}
+
+menu_rank() {
+  case "${1-}" in
+    main-menu) printf '001' ;;
+    cast) printf '002' ;;
+    mud) printf '003' ;;
+    spellbook) printf '004' ;;
+    install-menu) printf '005' ;;
+    system-menu) printf '006' ;;
+    *) printf '100' ;;
+  esac
+}
+
+menu_top_level_flag() {
+  case "${1-}" in
+    main-menu|cast|mud|spellbook|install-menu|system-menu)
+      printf '1\n'
+      ;;
+    *)
+      printf '0\n'
+      ;;
+  esac
+}
+
+cmd_list_menu_spells() {
+  root=$(require_root "${1-}")
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-menus.XXXXXX")
+  seen_names=''
+
+  menu_script_dirs "$root" | while IFS= read -r dir || [ -n "$dir" ]; do
+    [ -d "$dir" ] || continue
+    for file in "$dir"/*; do
+      [ -f "$file" ] || continue
+      [ -d "$file" ] && continue
+      name=$(basename "$file")
+      case "$name" in
+        ''|.*|menu)
+          continue
+          ;;
+      esac
+      safe_name "$name" || continue
+      case " $seen_names " in
+        *" $name "*)
+          continue
+          ;;
+      esac
+      seen_names="$seen_names $name "
+      sourced_only=0
+      requires_arg=0
+      if menu_is_sourced_only "$file"; then
+        sourced_only=1
+      fi
+      if menu_requires_argument "$file"; then
+        requires_arg=1
+      fi
+      invocation=$(menu_invocation_text "$name" "$sourced_only" "$requires_arg")
+      top_level=$(menu_top_level_flag "$name")
+      rank=$(menu_rank "$name")
+      printf '%s|%s|%s|%s|%s|%s\n' "$rank" "$name" "$sourced_only" "$requires_arg" "$top_level" "$invocation"
+    done
+  done >"$tmp_file"
+
+  sort -t'|' -k1,1 -k2,2 "$tmp_file" | while IFS='|' read -r rank name sourced_only requires_arg top_level invocation || [ -n "$name" ]; do
+    [ -n "$name" ] || continue
+    printf '%s|%s|%s|%s|%s\n' "$name" "$sourced_only" "$requires_arg" "$top_level" "$invocation"
+  done
+  rm -f "$tmp_file"
+}
+
+cmd_menu_help() {
+  name=${1-}
+  root=$(require_root "${2-}")
+  [ -n "$name" ] || {
+    printf '%s\n' "wizardry-desktop-backend: menu-help requires MENU_NAME" >&2
+    exit 2
+  }
+  safe_name "$name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid menu name: $name" >&2
+    exit 2
+  }
+  script=$(resolve_menu_script "$root" "$name" || true)
+  [ -n "$script" ] || {
+    printf '%s\n' "wizardry-desktop-backend: menu not found: $name" >&2
+    exit 2
+  }
+  output=$(sh "$script" --help 2>&1 || true)
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output"
+    return
+  fi
+  head -n 60 "$script"
+}
+
+cmd_run_menu() {
+  name=${1-}
+  menu_arg=${2-}
+  root=$(require_root "${3-}")
+
+  [ -n "$name" ] || {
+    printf '%s\n' "wizardry-desktop-backend: run-menu requires MENU_NAME" >&2
+    exit 2
+  }
+  safe_name "$name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid menu name: $name" >&2
+    exit 2
+  }
+
+  script=$(resolve_menu_script "$root" "$name" || true)
+  [ -n "$script" ] || {
+    printf '%s\n' "wizardry-desktop-backend: menu not found: $name" >&2
+    exit 2
+  }
+
+  sourced_only=0
+  requires_arg=0
+  if menu_is_sourced_only "$script"; then
+    sourced_only=1
+  fi
+  if menu_requires_argument "$script"; then
+    requires_arg=1
+  fi
+
+  if [ "$requires_arg" -eq 1 ] && [ -z "$menu_arg" ]; then
+    printf '%s\n' "wizardry-desktop-backend: menu '$name' requires an argument" >&2
+    exit 2
+  fi
+
+  invocation=$(menu_invocation_text "$name" "$sourced_only" "$requires_arg")
+
+  case "$name" in
+    cast)
+      status=0
+      output=$(sh "$script" --list 2>&1) || status=$?
+      status=${status:-0}
+      printf '%s\n' "$output"
+      if [ "$status" -eq 0 ]; then
+        record_watch "app" "menu:$name" "wizardry-core" "ok"
+        return
+      fi
+      record_watch "app" "menu:$name" "wizardry-core" "failed:$status"
+      exit 2
+      ;;
+    spellbook)
+      status=0
+      output=$(sh "$script" --list 2>&1) || status=$?
+      status=${status:-0}
+      printf '%s\n' "$output"
+      if [ "$status" -eq 0 ]; then
+        record_watch "app" "menu:$name" "wizardry-core" "ok"
+        return
+      fi
+      record_watch "app" "menu:$name" "wizardry-core" "failed:$status"
+      exit 2
+      ;;
+    thesaurus)
+      status=0
+      output=$(sh "$script" --list 2>&1) || status=$?
+      status=${status:-0}
+      printf '%s\n' "$output"
+      if [ "$status" -eq 0 ]; then
+        record_watch "app" "menu:$name" "wizardry-core" "ok"
+        return
+      fi
+      record_watch "app" "menu:$name" "wizardry-core" "failed:$status"
+      exit 2
+      ;;
+  esac
+
+  if [ "$sourced_only" -eq 1 ]; then
+    printf '%s\n' "menu=$name"
+    printf '%s\n' "mode=sourced-only"
+    printf '%s\n' "command=$invocation"
+    printf '%s\n' "Run this command in a shell to launch the interactive menu."
+    record_watch "app" "menu:$name" "wizardry-core" "sourced-only"
+    return
+  fi
+
+  status=0
+  if [ -n "$menu_arg" ]; then
+    output=$(sh "$script" "$menu_arg" 2>&1) || status=$?
+  else
+    output=$(sh "$script" --help 2>&1) || status=$?
+  fi
+  status=${status:-0}
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output"
+  else
+    printf '%s\n' "menu=$name"
+    printf '%s\n' "command=$invocation"
+  fi
+  if [ "$status" -eq 0 ]; then
+    record_watch "app" "menu:$name" "wizardry-core" "ok"
+    return
+  fi
+  record_watch "app" "menu:$name" "wizardry-core" "failed:$status"
+  exit 2
+}
+
 resolve_arcana_module_script() {
   install_root=${1-}
   name=${2-}
@@ -908,6 +1169,25 @@ cmd_run_action() {
       record_watch "app" "app-help:$arg" "wizardry-core" "failed:$code"
       exit 2
       ;;
+    menu:list)
+      cmd_list_menu_spells "$root"
+      record_watch "app" "menu:list" "wizardry-core" "ok"
+      ;;
+    menu:help)
+      cmd_menu_help "$arg" "$root"
+      record_watch "app" "menu:help:$arg" "wizardry-core" "ok"
+      ;;
+    menu:run)
+      menu_name=$arg
+      menu_arg=''
+      case "$arg" in
+        *:*)
+          menu_name=${arg%%:*}
+          menu_arg=${arg#*:}
+          ;;
+      esac
+      cmd_run_menu "$menu_name" "$menu_arg" "$root"
+      ;;
     *)
       printf '%s\n' "wizardry-desktop-backend: unsupported action: $action" >&2
       exit 2
@@ -992,6 +1272,15 @@ case "$action" in
     ;;
   spell-help)
     cmd_spell_help "$@"
+    ;;
+  list-menu-spells)
+    cmd_list_menu_spells "$@"
+    ;;
+  menu-help)
+    cmd_menu_help "$@"
+    ;;
+  run-menu)
+    cmd_run_menu "$@"
     ;;
   list-memorized-spells)
     cmd_list_memorized_spells "$@"

@@ -165,10 +165,14 @@
         'arcana:reload': { label: 'Reload arcana index', requiresArg: false, minArgs: 0, maxArgs: 0 },
         'arcana:install-menu': { label: 'Arcana install menu', requiresArg: false, minArgs: 0, maxArgs: 0 },
         'arcana:module-menu': { label: 'Arcana module menu', requiresArg: true, minArgs: 1, maxArgs: 1 },
+        'menu:list': { label: 'List all wizardry menus', requiresArg: false, minArgs: 0, maxArgs: 0 },
+        'menu:help': { label: 'Show menu help', requiresArg: true, minArgs: 1, maxArgs: 1 },
+        'menu:run': { label: 'Run menu command', requiresArg: true, minArgs: 1, maxArgs: 1 },
         'app-help': { label: 'Show app help', requiresArg: true, minArgs: 1, maxArgs: 1 }
       };
       var NAV_PAGES = [
         { id: 'home', title: 'Home', blurb: 'Overview and diagnostics.' },
+        { id: 'menus', title: 'Menus', blurb: 'Full wizardry menu command index.' },
         { id: 'cast', title: 'Cast', blurb: 'Cast spells and monitor memorized commands.' },
         { id: 'spellbook', title: 'Spellbook', blurb: 'Manage in-app spell aliases.' },
         { id: 'arcana', title: 'Arcana', blurb: 'Tools for wizardry app setup.' },
@@ -192,11 +196,13 @@
         dividerDragging: false,
         selectedNavIndex: 0,
         castPageLoading: false,
+        menuPageLoading: false,
         cast: {
           categories: [],
           memorized: [],
           expandedCategory: ''
         },
+        menuCatalog: [],
         spellCache: {},
         arcanaInstall: [],
         activityLoading: false,
@@ -453,6 +459,9 @@
       function composerDefaultTokensForPage(pageId) {
         if (pageId === 'cast') {
           return ['run-spell'];
+        }
+        if (pageId === 'menus') {
+          return ['run-action', 'menu:list'];
         }
         if (pageId === 'arcana') {
           return ['run-action'];
@@ -909,6 +918,14 @@
               { label: 'arcana themes', tokens: ['run-action', 'arcana:themes'], help: 'List available themes.' },
               { label: 'reload arcana', tokens: ['run-action', 'arcana:reload'], help: 'Refresh the arcana metadata cache.' }
             ]
+          },
+          {
+            label: 'Menu Actions',
+            entries: [
+              { label: 'list menus', tokens: ['run-action', 'menu:list'], help: 'List all menu scripts known to wizardry.' },
+              { label: 'menu help', tokens: ['run-action', 'menu:help'], help: 'Show help for a selected menu name.' },
+              { label: 'menu run', tokens: ['run-action', 'menu:run'], help: 'Run safe menu operation or show sourced guidance.' }
+            ]
           }
         ];
 
@@ -943,6 +960,26 @@
               label: 'Module menu ' + safeShortText(module.name),
               tokens: ['run-action', 'arcana:menu', module.name],
               help: 'Open module menu for ' + module.name
+            });
+          }
+        }
+
+        if (state.menuCatalog && state.menuCatalog.length) {
+          var menuLimit = Math.min(6, state.menuCatalog.length);
+          for (var menuIdx = 0; menuIdx < menuLimit; menuIdx += 1) {
+            var menu = state.menuCatalog[menuIdx];
+            if (!menu || !menu.name) {
+              continue;
+            }
+            blocks[3].entries.push({
+              label: 'menu help ' + safeShortText(menu.name),
+              tokens: ['run-action', 'menu:help', menu.name],
+              help: 'Show help for menu ' + menu.name
+            });
+            blocks[3].entries.push({
+              label: 'menu run ' + safeShortText(menu.name),
+              tokens: ['run-action', 'menu:run', menu.name],
+              help: 'Run safe menu action for ' + menu.name
             });
           }
         }
@@ -1065,6 +1102,18 @@
               { label: 'arcana', tokens: ['arcana'], help: 'Show arcana help.' },
               { label: 'main-menu', tokens: ['main-menu'], help: 'Show system help entrypoint menu help.' }
             ];
+          } else if (hasRef === 'menu:help' || hasRef === 'menu:run') {
+            for (var menuNameIdx = 0; menuNameIdx < state.menuCatalog.length && argSuggestions.length < COMPOSER_PRESET_LIMIT; menuNameIdx += 1) {
+              var menuRow = state.menuCatalog[menuNameIdx];
+              if (!menuRow || !menuRow.name) {
+                continue;
+              }
+              argSuggestions.push({
+                label: menuRow.name,
+                tokens: [menuRow.name],
+                help: hasRef === 'menu:help' ? ('Show help for ' + menuRow.name) : ('Run menu action for ' + menuRow.name)
+              });
+            }
           }
           if (argSuggestions.length) {
             blocks.unshift({
@@ -1820,6 +1869,9 @@
         if (pageId === 'arcana' && state.arcanaInstall.length === 0) {
           loadArcanaInstall();
         }
+        if (pageId === 'menus' && state.menuCatalog.length === 0) {
+          loadMenuCatalog();
+        }
         if (pageId === 'cast' && !state.cast.categories.length) {
           loadCastData();
         }
@@ -1830,6 +1882,7 @@
         return '<section class="wd-panel"><h3>Overview</h3><p class="wd-subline">Wizardry Desktop is the control plane for shell actions and spell workflows.</p><div class="wd-card-grid">' +
           card('Bridge', state.bridgeReady ? 'Ready' : 'Waiting', 'Bridge status appears when the native host is connected.') +
           card('Theme', themeLabel(state.activeTheme), 'Theme is persisted using backend prefs and applied instantly.') +
+          card('Menus', state.menuCatalog.length + ' indexed', 'Menus page tracks the full wizardry menu command surface.') +
           card('Categories', state.cast.categories.length + ' loaded', 'Cast page keeps spell categories in a persistent structure.') +
           card('Watch', ((Number(state.activity.casting.length) || 0) + (Number(state.activity.app.length) || 0)) + ' events', 'Casting Watch tracks all command results.') +
           '</div></section>';
@@ -1856,6 +1909,67 @@
         var controls = '<button type="button" class="wd-polite-btn wd-tiny" data-help="' + escapeAttrValue(row.kind + '|' + row.value) + '">Help</button>' +
           '<button type="button" class="wd-polite-btn wd-tiny" data-run-spell="' + escapeAttrValue(row.kind + '|' + row.value) + '">Run</button>';
         return '<div class="wd-list-row"><span class="wd-list-main">' + escapeText(row.label) + '</span><span class="wd-list-meta">' + escapeText(row.kind) + '</span><span class="wd-row-actions">' + controls + '</span></div>';
+      }
+
+      function menuDisplayName(name) {
+        var raw = String(name || '').trim();
+        if (!raw) {
+          return '';
+        }
+        var title = raw.replace(/-/g, ' ');
+        return title.replace(/\b[a-z]/g, function (ch) {
+          return ch.toUpperCase();
+        });
+      }
+
+      function renderMenusPage() {
+        var rows = state.menuCatalog || [];
+        var html = '<section class="wd-panel"><h3>Wizardry Menus</h3>' +
+          '<p class="wd-subline">Complete index from <code>spells/menu</code>, including sourced-only and argument-required menus.</p>';
+        html += '<div class="wd-card-grid">';
+        html += card('Indexed Menus', String(rows.length), 'Backed by list-menu-spells in the backend contract.');
+        html += card('Main Menu Entries', String(rows.filter(function (row) { return row.topLevel; }).length), 'Top-level entries aligned to main-menu flow.');
+        html += card('Sourced-only', String(rows.filter(function (row) { return row.sourcedOnly; }).length), 'Menus that must run with dot-sourcing in a shell.');
+        html += '</div>';
+        html += '</section>';
+
+        html += '<section class="wd-panel"><h3>Menu Command Surface</h3>';
+        if (state.menuPageLoading) {
+          html += '<p class="wd-empty">Loading menu inventory…</p>';
+        } else if (!rows.length) {
+          html += '<p class="wd-empty">No menu scripts found.</p>';
+        } else {
+          html += '<div class="wd-list wd-compact-list wd-scroll-area">';
+          for (var i = 0; i < rows.length; i += 1) {
+            var row = rows[i];
+            var flags = [];
+            if (row.topLevel) {
+              flags.push('main');
+            }
+            if (row.sourcedOnly) {
+              flags.push('sourced');
+            }
+            if (row.requiresArg) {
+              flags.push('arg');
+            }
+            var flagText = flags.join(', ') || 'menu';
+            html += '<div class="wd-list-row">';
+            html += '<span class="wd-list-main wd-col-2">' + escapeText(menuDisplayName(row.name) || row.name) + '</span>';
+            html += '<span class="wd-list-meta wd-col-4"><code>' + escapeText(row.invocation || row.name) + '</code> · ' + escapeText(flagText) + '</span>';
+            html += '<span class="wd-row-actions">';
+            if (row.requiresArg) {
+              html += '<input type="text" class="wd-inline-input wd-menu-arg" data-menu-arg-for="' + escapeAttrValue(row.name) + '" placeholder="Argument">';
+            }
+            html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-menu-help="' + escapeAttrValue(row.name) + '">Help</button>';
+            html += '<button type="button" class="wd-polite-btn wd-tiny" data-menu-run="' + escapeAttrValue(row.name) + '">' + (row.sourcedOnly ? 'Guide' : 'Run') + '</button>';
+            html += '</span>';
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+        html += '<pre id="menu-output" class="wd-mono-box wd-inline-output">Select Help or Run to inspect menu behavior.</pre>';
+        html += '</section>';
+        return html;
       }
 
       function renderCastPage() {
@@ -1996,6 +2110,10 @@
           title = 'Home';
           subtitle = 'Wizardry operations in one place.';
           content = renderHomePage();
+        } else if (state.activePage === 'menus') {
+          title = 'Menus';
+          subtitle = 'Comprehensive wizardry menu index.';
+          content = renderMenusPage();
         } else if (state.activePage === 'cast') {
           title = 'Cast';
           subtitle = 'Open a category to run spells.';
@@ -2247,6 +2365,47 @@
         ]);
       }
 
+      function loadMenuCatalog() {
+        state.menuPageLoading = true;
+        renderPage();
+        return callBackend('list-menu-spells').then(function (text) {
+          var lines = String(text || '').split('\n');
+          var parsed = [];
+          for (var i = 0; i < lines.length; i += 1) {
+            var parts = String(lines[i] || '').split('|');
+            var name = String(parts[0] || '').trim();
+            var sourcedOnly = String(parts[1] || '').trim() === '1';
+            var requiresArg = String(parts[2] || '').trim() === '1';
+            var topLevel = String(parts[3] || '').trim() === '1';
+            var invocation = String(parts[4] || '').trim();
+            if (!name) {
+              continue;
+            }
+            parsed.push({
+              name: name,
+              sourcedOnly: sourcedOnly,
+              requiresArg: requiresArg,
+              topLevel: topLevel,
+              invocation: invocation || name
+            });
+          }
+          state.menuCatalog = parsed;
+          if (state.activePage === 'menus') {
+            renderPage();
+          }
+          if (state.composer.open) {
+            renderComposer();
+          }
+        }).catch(function () {
+          state.menuCatalog = [];
+        }).finally(function () {
+          state.menuPageLoading = false;
+          if (state.activePage === 'menus') {
+            renderPage();
+          }
+        });
+      }
+
       function loadArcanaInstall() {
         return callBackend('list-arcana-install').then(function (text) {
           var lines = String(text || '').split('\n');
@@ -2337,6 +2496,81 @@
           return;
         }
         runQuickAction(kind, module, options);
+      }
+
+      function menuArgumentFor(name) {
+        var key = String(name || '').trim();
+        if (!key || !els.contentArea) {
+          return '';
+        }
+        var inputs = els.contentArea.querySelectorAll('[data-menu-arg-for]');
+        for (var i = 0; i < inputs.length; i += 1) {
+          if (String(inputs[i].getAttribute('data-menu-arg-for') || '') === key) {
+            return String(inputs[i].value || '').trim();
+          }
+        }
+        return '';
+      }
+
+      function runMenuHelp(menuName, options) {
+        options = options || {};
+        var name = String(menuName || '').trim();
+        if (!name) {
+          return;
+        }
+        if (state.actionInFlight) {
+          return;
+        }
+        state.actionInFlight = true;
+        callBackend('menu-help', [name]).then(function (text) {
+          var output = String(text || '').trim();
+          if (options.outputId) {
+            setOutputBlock(options.outputId, output || ('No help output for ' + name + '.'));
+          }
+          pushActivity('app', 'menu-help ' + name + ' completed', { section: 'app', app: 'wizardry-core', source: 'menu-help:' + name, status: 'ok' });
+        }).catch(function (error) {
+          var message = String(error && error.message ? error.message : error || 'menu-help failed');
+          if (options.outputId) {
+            setOutputBlock(options.outputId, message);
+          }
+          pushActivity('app', 'menu-help ' + name + ' failed', { section: 'app', app: 'wizardry-core', source: 'menu-help:' + name, status: 'error' });
+        }).finally(function () {
+          state.actionInFlight = false;
+          loadWatchHistory();
+        });
+      }
+
+      function runMenuCommand(menuName, menuArg, options) {
+        options = options || {};
+        var name = String(menuName || '').trim();
+        var arg = String(menuArg || '').trim();
+        if (!name) {
+          return;
+        }
+        if (state.actionInFlight) {
+          return;
+        }
+        state.actionInFlight = true;
+        var args = [name];
+        if (arg) {
+          args.push(arg);
+        }
+        callBackend('run-menu', args).then(function (text) {
+          var output = String(text || '').trim();
+          if (options.outputId) {
+            setOutputBlock(options.outputId, output || ('menu ' + name + ' completed.'));
+          }
+          pushActivity('app', 'run-menu ' + name + ' completed', { section: 'app', app: 'wizardry-core', source: 'run-menu:' + name, status: 'ok' });
+        }).catch(function (error) {
+          var message = String(error && error.message ? error.message : error || 'run-menu failed');
+          if (options.outputId) {
+            setOutputBlock(options.outputId, message);
+          }
+          pushActivity('app', 'run-menu ' + name + ' failed', { section: 'app', app: 'wizardry-core', source: 'run-menu:' + name, status: 'error' });
+        }).finally(function () {
+          state.actionInFlight = false;
+          loadWatchHistory();
+        });
       }
 
       function runSpell(kind, spellName, options) {
@@ -2926,6 +3160,8 @@
           els.actionRefresh.addEventListener('click', function () {
             if (state.activePage === 'arcana') {
               loadArcanaInstall();
+            } else if (state.activePage === 'menus') {
+              loadMenuCatalog();
             } else {
               loadCastData();
             }
@@ -3058,6 +3294,35 @@
               }).catch(function (error) {
                 setOutputBlock('mud-output', String(error && error.message ? error.message : error || 'failure'));
               });
+              return;
+            }
+
+            var menuHelp = event.target.closest('[data-menu-help]');
+            if (menuHelp) {
+              var helpName = String(menuHelp.getAttribute('data-menu-help') || '').trim();
+              if (!helpName) {
+                return;
+              }
+              if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                composerOpenWithTokens(['run-action', 'menu:help', helpName], { userInitiated: true });
+                return;
+              }
+              runMenuHelp(helpName, { outputId: 'menu-output' });
+              return;
+            }
+
+            var menuRun = event.target.closest('[data-menu-run]');
+            if (menuRun) {
+              var runName = String(menuRun.getAttribute('data-menu-run') || '').trim();
+              if (!runName) {
+                return;
+              }
+              var runArg = menuArgumentFor(runName);
+              if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                composerOpenWithTokens(['run-action', 'menu:run', runName], { userInitiated: true });
+                return;
+              }
+              runMenuCommand(runName, runArg, { outputId: 'menu-output' });
               return;
             }
 
@@ -3239,7 +3504,7 @@
         }, 1400);
 
         loadRootHint().finally(function () {
-          Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadCastData(), loadArcanaInstall(), loadWatchHistory()])
+          Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadMenuCatalog(), loadCastData(), loadArcanaInstall(), loadWatchHistory()])
             .catch(function () {
               state.bridgeReady = bridgeAvailable();
             })

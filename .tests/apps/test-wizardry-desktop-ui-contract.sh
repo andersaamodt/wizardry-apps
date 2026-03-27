@@ -56,8 +56,13 @@ assert_contains "$ui" "document.addEventListener('visibilitychange'"
 assert_contains "$ui" "role=\"listbox\""
 assert_contains "$ui" "role=\"option\""
 assert_contains "$ui" "aria-selected=\""
+assert_contains "$ui" "{ id: 'menus', title: 'Menus'"
 assert_contains "$ui" "{ id: 'cast', title: 'Cast'"
 assert_not_contains "$ui" "id: 'casting-watch'"
+assert_contains "$ui" "function renderMenusPage()"
+assert_contains "$ui" "data-menu-help"
+assert_contains "$ui" "data-menu-run"
+assert_contains "$ui" "id=\"menu-output\""
 
 # Centralized theme and backend root contracts.
 assert_matches "$ui" "buildThemeStylesheetHref\\(themeName\\)"

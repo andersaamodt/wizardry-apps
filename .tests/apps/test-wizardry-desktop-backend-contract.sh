@@ -40,6 +40,28 @@ printf '%s\n' "$spells" | grep -F "status" >/dev/null 2>&1 || {
   exit 1
 }
 
+menus=$(sh "$backend" list-menu-spells "$root")
+printf '%s\n' "$menus" | grep -F "main-menu|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-menu-spells missing main-menu" >&2
+  exit 1
+}
+printf '%s\n' "$menus" | grep -F "cast|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-menu-spells missing cast" >&2
+  exit 1
+}
+
+menu_help=$(sh "$backend" menu-help cast "$root" 2>&1)
+printf '%s\n' "$menu_help" | grep -E '^Usage: cast' >/dev/null 2>&1 || {
+  printf '%s\n' "menu-help cast missing Usage output" >&2
+  exit 1
+}
+
+menu_run_main=$(sh "$backend" run-menu main-menu "" "$root")
+printf '%s\n' "$menu_run_main" | grep -F "mode=sourced-only" >/dev/null 2>&1 || {
+  printf '%s\n' "run-menu main-menu should report sourced-only mode" >&2
+  exit 1
+}
+
 arcana=$(sh "$backend" list-arcana-install "$root/spells/.arcana")
 printf '%s\n' "$arcana" | grep -F "web-wizardry|" >/dev/null 2>&1 || {
   printf '%s\n' "list-arcana-install missing web-wizardry" >&2
