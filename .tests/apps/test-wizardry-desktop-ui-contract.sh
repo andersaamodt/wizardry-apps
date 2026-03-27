@@ -51,6 +51,9 @@ assert_matches "$ui" 'function composerOpenWithTokens\(tokens, options\)'
 assert_contains "$ui" 'setComposerOpen(true, { userInitiated: !!options.userInitiated });'
 assert_contains "$ui" "setComposerOpen(false, { skipFocus: true });"
 assert_contains "$ui" "document.addEventListener('visibilitychange'"
+assert_contains "$ui" "els.splash.hidden = true;"
+assert_contains "$css" ".wd-splash-fade {"
+assert_contains "$css" "pointer-events: none;"
 
 # Navigation and listbox semantics.
 assert_contains "$ui" "role=\"listbox\""

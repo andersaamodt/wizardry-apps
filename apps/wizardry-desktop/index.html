@@ -2570,6 +2570,12 @@
       function revealUI() {
         if (els.splash) {
           els.splash.classList.add('wd-splash-fade');
+          els.splash.setAttribute('aria-hidden', 'true');
+          setTimeout(function () {
+            if (els.splash) {
+              els.splash.hidden = true;
+            }
+          }, 60);
         }
         if (els.app) {
           els.app.classList.remove('hidden');
