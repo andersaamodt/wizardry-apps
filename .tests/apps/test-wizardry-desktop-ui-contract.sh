@@ -62,7 +62,10 @@ assert_not_contains "$ui" "id: 'casting-watch'"
 assert_contains "$ui" "function renderMenusPage()"
 assert_contains "$ui" "data-menu-help"
 assert_contains "$ui" "data-menu-run"
+assert_contains "$ui" "data-menu-terminal"
 assert_contains "$ui" "id=\"menu-output\""
+assert_contains "$ui" "id=\"composer-arg-assistant\""
+assert_matches "$ui" "function renderComposerArgAssistant\\(plan\\)"
 
 # Centralized theme and backend root contracts.
 assert_matches "$ui" "buildThemeStylesheetHref\\(themeName\\)"

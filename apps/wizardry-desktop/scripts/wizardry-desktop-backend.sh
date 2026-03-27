@@ -19,10 +19,11 @@ Actions:
   list-menu-spells [ROOT_HINT]
   menu-help MENU_NAME [ROOT_HINT]
   run-menu MENU_NAME [MENU_ARG] [ROOT_HINT]
+  open-menu-terminal MENU_NAME [MENU_ARG] [ROOT_HINT]
   list-memorized-spells
   list-arcana-install [INSTALL_ROOT]
   run-arcana-install MODULE
-  run-action ACTION [ARG] [ROOT_HINT]
+  run-action ACTION [ARG1] [ARG2] [ROOT_HINT]
   run-system ACTION
   list-watch [N]
 USAGE
@@ -640,25 +641,150 @@ menu_is_sourced_only() {
   return 1
 }
 
-menu_requires_argument() {
+menu_argument_mode_from_usage() {
   file=${1-}
-  [ -f "$file" ] || return 1
-  if awk 'BEGIN {found=0} /^Usage:/ {if ($0 ~ /<[A-Za-z0-9_:-]+>/) found=1} END {exit(found ? 0 : 1)}' "$file"; then
+  [ -f "$file" ] || {
+    printf '%s\n' "none"
+    return 0
+  }
+  if awk '
+    /^Usage:/ {
+      line=$0
+      if (line ~ /\[[^]]*<[A-Za-z0-9_ .:\/-]+>[^]]*\]/ || line ~ /\[[A-Za-z0-9_ .:\/|-]+\]/) {
+        opt=1
+      }
+      if (line ~ /<[A-Za-z0-9_ .:\/-]+>/ && line !~ /\[[^]]*<[A-Za-z0-9_ .:\/-]+>[^]]*\]/) {
+        req=1
+      }
+    }
+    END {
+      if (req == 1) print "required";
+      else if (opt == 1) print "optional";
+      else print "none";
+    }' "$file" | head -n 1 | grep -E '^(required|optional)$' >/dev/null 2>&1; then
+    awk '
+      /^Usage:/ {
+        line=$0
+        if (line ~ /\[[^]]*<[A-Za-z0-9_ .:\/-]+>[^]]*\]/ || line ~ /\[[A-Za-z0-9_ .:\/|-]+\]/) {
+          opt=1
+        }
+        if (line ~ /<[A-Za-z0-9_ .:\/-]+>/ && line !~ /\[[^]]*<[A-Za-z0-9_ .:\/-]+>[^]]*\]/) {
+          req=1
+        }
+      }
+      END {
+        if (req == 1) print "required";
+        else if (opt == 1) print "optional";
+        else print "none";
+      }' "$file" | head -n 1
     return 0
   fi
-  return 1
+  printf '%s\n' "none"
+}
+
+menu_argument_spec() {
+  name=${1-}
+  file=${2-}
+
+  case "$name" in
+    spell-menu)
+      printf '%s|%s|%s|%s|%s\n' \
+        "required" \
+        "Spell name" \
+        "Spell name to inspect in spell-menu (for example: status)." \
+        "status" \
+        ""
+      return 0
+      ;;
+    synonym-menu)
+      printf '%s|%s|%s|%s|%s\n' \
+        "required" \
+        "Synonym alias" \
+        "Existing synonym alias to inspect or modify." \
+        "lsall" \
+        ""
+      return 0
+      ;;
+    priority-menu)
+      printf '%s|%s|%s|%s|%s\n' \
+        "required" \
+        "Path" \
+        "File or folder path that already has a priority marker." \
+        "~/git/wizardry-apps" \
+        ""
+      return 0
+      ;;
+    spellbook)
+      printf '%s|%s|%s|%s|%s\n' \
+        "optional" \
+        "Path or --list" \
+        "Optional path to open in spellbook, or --list to print entries." \
+        "--list" \
+        "--list"
+      return 0
+      ;;
+    thesaurus)
+      printf '%s|%s|%s|%s|%s\n' \
+        "optional" \
+        "--list" \
+        "Optional --list flag to print synonyms without opening interactive mode." \
+        "--list" \
+        "--list"
+      return 0
+      ;;
+    priorities)
+      printf '%s|%s|%s|%s|%s\n' \
+        "optional" \
+        "-v" \
+        "Optional verbose flag." \
+        "-v" \
+        "-v"
+      return 0
+      ;;
+    *)
+      ;;
+  esac
+
+  mode=$(menu_argument_mode_from_usage "$file")
+  if [ "$mode" = "required" ]; then
+    printf '%s|%s|%s|%s|%s\n' \
+      "required" \
+      "Argument" \
+      "Required menu argument." \
+      "" \
+      ""
+    return 0
+  fi
+  if [ "$mode" = "optional" ]; then
+    printf '%s|%s|%s|%s|%s\n' \
+      "optional" \
+      "Argument" \
+      "Optional menu argument." \
+      "" \
+      ""
+    return 0
+  fi
+
+  printf '%s|%s|%s|%s|%s\n' \
+    "none" \
+    "" \
+    "" \
+    "" \
+    ""
 }
 
 menu_invocation_text() {
   name=${1-}
   sourced_only=${2-0}
-  requires_arg=${3-0}
+  arg_mode=${3-none}
   cmd="$name"
   if [ "$sourced_only" = "1" ]; then
     cmd=". $name"
   fi
-  if [ "$requires_arg" = "1" ]; then
+  if [ "$arg_mode" = "required" ]; then
     cmd="$cmd <arg>"
+  elif [ "$arg_mode" = "optional" ]; then
+    cmd="$cmd [arg]"
   fi
   printf '%s\n' "$cmd"
 }
@@ -710,23 +836,44 @@ cmd_list_menu_spells() {
       esac
       seen_names="$seen_names $name "
       sourced_only=0
-      requires_arg=0
       if menu_is_sourced_only "$file"; then
         sourced_only=1
       fi
-      if menu_requires_argument "$file"; then
-        requires_arg=1
-      fi
-      invocation=$(menu_invocation_text "$name" "$sourced_only" "$requires_arg")
+      arg_spec=$(menu_argument_spec "$name" "$file")
+      arg_mode=$(printf '%s\n' "$arg_spec" | cut -d'|' -f1)
+      arg_label=$(printf '%s\n' "$arg_spec" | cut -d'|' -f2)
+      arg_help=$(printf '%s\n' "$arg_spec" | cut -d'|' -f3)
+      arg_example=$(printf '%s\n' "$arg_spec" | cut -d'|' -f4)
+      arg_values=$(printf '%s\n' "$arg_spec" | cut -d'|' -f5)
+      invocation=$(menu_invocation_text "$name" "$sourced_only" "$arg_mode")
       top_level=$(menu_top_level_flag "$name")
       rank=$(menu_rank "$name")
-      printf '%s|%s|%s|%s|%s|%s\n' "$rank" "$name" "$sourced_only" "$requires_arg" "$top_level" "$invocation"
+      printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \
+        "$rank" \
+        "$name" \
+        "$sourced_only" \
+        "$arg_mode" \
+        "$top_level" \
+        "$invocation" \
+        "$arg_label" \
+        "$arg_help" \
+        "$arg_example" \
+        "$arg_values"
     done
   done >"$tmp_file"
 
-  sort -t'|' -k1,1 -k2,2 "$tmp_file" | while IFS='|' read -r rank name sourced_only requires_arg top_level invocation || [ -n "$name" ]; do
+  sort -t'|' -k1,1 -k2,2 "$tmp_file" | while IFS='|' read -r rank name sourced_only arg_mode top_level invocation arg_label arg_help arg_example arg_values || [ -n "$name" ]; do
     [ -n "$name" ] || continue
-    printf '%s|%s|%s|%s|%s\n' "$name" "$sourced_only" "$requires_arg" "$top_level" "$invocation"
+    printf '%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \
+      "$name" \
+      "$sourced_only" \
+      "$arg_mode" \
+      "$top_level" \
+      "$invocation" \
+      "$arg_label" \
+      "$arg_help" \
+      "$arg_example" \
+      "$arg_values"
   done
   rm -f "$tmp_file"
 }
@@ -776,20 +923,23 @@ cmd_run_menu() {
   }
 
   sourced_only=0
-  requires_arg=0
+  arg_mode="none"
   if menu_is_sourced_only "$script"; then
     sourced_only=1
   fi
-  if menu_requires_argument "$script"; then
-    requires_arg=1
-  fi
+  arg_spec=$(menu_argument_spec "$name" "$script")
+  arg_mode=$(printf '%s\n' "$arg_spec" | cut -d'|' -f1)
 
-  if [ "$requires_arg" -eq 1 ] && [ -z "$menu_arg" ]; then
+  if [ "$arg_mode" = "required" ] && [ -z "$menu_arg" ]; then
     printf '%s\n' "wizardry-desktop-backend: menu '$name' requires an argument" >&2
     exit 2
   fi
+  if [ "$arg_mode" = "none" ] && [ -n "$menu_arg" ]; then
+    printf '%s\n' "wizardry-desktop-backend: menu '$name' does not take an argument" >&2
+    exit 2
+  fi
 
-  invocation=$(menu_invocation_text "$name" "$sourced_only" "$requires_arg")
+  invocation=$(menu_invocation_text "$name" "$sourced_only" "$arg_mode")
 
   case "$name" in
     cast)
@@ -858,6 +1008,100 @@ cmd_run_menu() {
   fi
   record_watch "app" "menu:$name" "wizardry-core" "failed:$status"
   exit 2
+}
+
+shell_quote() {
+  value=${1-}
+  quoted=$(printf '%s' "$value" | sed "s/'/'\\\\''/g")
+  printf "'%s'" "$quoted"
+}
+
+cmd_open_menu_terminal() {
+  name=${1-}
+  menu_arg=${2-}
+  root=$(require_root "${3-}")
+
+  [ -n "$name" ] || {
+    printf '%s\n' "wizardry-desktop-backend: open-menu-terminal requires MENU_NAME" >&2
+    exit 2
+  }
+  safe_name "$name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid menu name: $name" >&2
+    exit 2
+  }
+
+  case "$menu_arg" in
+    *'
+'*|*''*)
+      printf '%s\n' "wizardry-desktop-backend: menu argument must be one line" >&2
+      exit 2
+      ;;
+    *)
+      ;;
+  esac
+
+  script=$(resolve_menu_script "$root" "$name" || true)
+  [ -n "$script" ] || {
+    printf '%s\n' "wizardry-desktop-backend: menu not found: $name" >&2
+    exit 2
+  }
+
+  sourced_only=0
+  if menu_is_sourced_only "$script"; then
+    sourced_only=1
+  fi
+
+  arg_spec=$(menu_argument_spec "$name" "$script")
+  arg_mode=$(printf '%s\n' "$arg_spec" | cut -d'|' -f1)
+  if [ "$arg_mode" = "required" ] && [ -z "$menu_arg" ]; then
+    printf '%s\n' "wizardry-desktop-backend: menu '$name' requires an argument" >&2
+    exit 2
+  fi
+  if [ "$arg_mode" = "none" ] && [ -n "$menu_arg" ]; then
+    printf '%s\n' "wizardry-desktop-backend: menu '$name' does not take an argument" >&2
+    exit 2
+  fi
+
+  command_text=""
+  if [ "$sourced_only" -eq 1 ]; then
+    command_text=". $(shell_quote "$script")"
+  else
+    command_text="$(shell_quote "$script")"
+  fi
+  if [ -n "$menu_arg" ]; then
+    command_text="$command_text $(shell_quote "$menu_arg")"
+  fi
+
+  if [ "$(os_id)" != "darwin" ] || ! command -v osascript >/dev/null 2>&1; then
+    printf 'mode=%s\n' "manual"
+    printf 'command=%s\n' "$command_text"
+    printf '%s\n' "Automatic terminal launch is unavailable on this platform."
+    record_watch "app" "menu:terminal:$name" "wizardry-core" "manual"
+    return
+  fi
+
+  terminal_line="cd $(shell_quote "$HOME"); $command_text"
+  if osascript - "$terminal_line" <<'OSA' >/dev/null 2>&1
+on run argv
+  set cmd to item 1 of argv
+  tell application "Terminal"
+    activate
+    do script cmd
+  end tell
+end run
+OSA
+  then
+    printf 'mode=%s\n' "terminal"
+    printf 'command=%s\n' "$command_text"
+    printf '%s\n' "Opened Terminal and sent command."
+    record_watch "app" "menu:terminal:$name" "wizardry-core" "ok"
+    return
+  fi
+
+  printf 'mode=%s\n' "manual"
+  printf 'command=%s\n' "$command_text"
+  printf '%s\n' "Terminal automation failed; run command manually."
+  record_watch "app" "menu:terminal:$name" "wizardry-core" "failed:osascript"
 }
 
 resolve_arcana_module_script() {
@@ -1109,16 +1353,17 @@ cmd_run_arcana_menu() {
 
 cmd_run_action() {
   action=${1-}
-  arg=${2-}
-  root=$(require_root "${3-}")
+  arg1=${2-}
+  arg2=${3-}
+  root=$(require_root "${4-}")
 
   case "$action" in
     arcana:module-menu)
-      cmd_run_arcana_menu "$arg" "$root/spells/.arcana"
+      cmd_run_arcana_menu "$arg1" "$root/spells/.arcana"
       ;;
     arcana:menu)
-      if [ -n "$arg" ]; then
-        cmd_run_arcana_menu "$arg" "$root/spells/.arcana"
+      if [ -n "$arg1" ]; then
+        cmd_run_arcana_menu "$arg1" "$root/spells/.arcana"
         return
       fi
       menu_script="$WIZARDRY_DIR_FALLBACK/spells/menu/main-menu"
@@ -1140,11 +1385,11 @@ cmd_run_action() {
       record_watch "app" "arcana:install-menu" "wizardry-core" "ok"
       ;;
     arcana:install)
-      if cmd_run_arcana_install "$arg"; then
-        record_watch "app" "arcana:install:$arg" "wizardry-core" "ok"
+      if cmd_run_arcana_install "$arg1"; then
+        record_watch "app" "arcana:install:$arg1" "wizardry-core" "ok"
       else
         code=$?
-        record_watch "app" "arcana:install:$arg" "wizardry-core" "failed:$code"
+        record_watch "app" "arcana:install:$arg1" "wizardry-core" "failed:$code"
         exit 2
       fi
       ;;
@@ -1157,16 +1402,16 @@ cmd_run_action() {
       printf '%s\n' "wizardry-desktop-backend: arcana cache reload requested"
       ;;
     app-help)
-      [ -n "$arg" ] || {
+      [ -n "$arg1" ] || {
         printf '%s\n' "wizardry-desktop-backend: app-help requires a target command" >&2
         exit 2
       }
-      if "$arg" --help; then
-        record_watch "app" "app-help:$arg" "wizardry-core" "ok"
+      if "$arg1" --help; then
+        record_watch "app" "app-help:$arg1" "wizardry-core" "ok"
         return
       fi
       code=$?
-      record_watch "app" "app-help:$arg" "wizardry-core" "failed:$code"
+      record_watch "app" "app-help:$arg1" "wizardry-core" "failed:$code"
       exit 2
       ;;
     menu:list)
@@ -1174,19 +1419,24 @@ cmd_run_action() {
       record_watch "app" "menu:list" "wizardry-core" "ok"
       ;;
     menu:help)
-      cmd_menu_help "$arg" "$root"
-      record_watch "app" "menu:help:$arg" "wizardry-core" "ok"
+      cmd_menu_help "$arg1" "$root"
+      record_watch "app" "menu:help:$arg1" "wizardry-core" "ok"
       ;;
     menu:run)
-      menu_name=$arg
-      menu_arg=''
-      case "$arg" in
-        *:*)
-          menu_name=${arg%%:*}
-          menu_arg=${arg#*:}
-          ;;
-      esac
+      menu_name=$arg1
+      menu_arg=$arg2
+      if [ -n "$menu_name" ] && [ -z "$menu_arg" ]; then
+        case "$menu_name" in
+          *:*)
+            menu_arg=${menu_name#*:}
+            menu_name=${menu_name%%:*}
+            ;;
+        esac
+      fi
       cmd_run_menu "$menu_name" "$menu_arg" "$root"
+      ;;
+    menu:terminal)
+      cmd_open_menu_terminal "$arg1" "$arg2" "$root"
       ;;
     *)
       printf '%s\n' "wizardry-desktop-backend: unsupported action: $action" >&2
@@ -1281,6 +1531,9 @@ case "$action" in
     ;;
   run-menu)
     cmd_run_menu "$@"
+    ;;
+  open-menu-terminal)
+    cmd_open_menu_terminal "$@"
     ;;
   list-memorized-spells)
     cmd_list_memorized_spells "$@"

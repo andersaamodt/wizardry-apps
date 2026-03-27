@@ -588,6 +588,11 @@ body::before {
   max-width: 11rem;
 }
 
+.wd-menu-arg-help {
+  margin: 0 0 0.22rem 0.1rem;
+  font-size: 0.56rem;
+}
+
 .wd-form-actions {
   display: flex;
   gap: 0.35rem;
@@ -1018,6 +1023,28 @@ body::before {
 
 .wd-composer-feedback {
   margin: 0;
+}
+
+.wd-composer-arg-assistant {
+  display: grid;
+  gap: 0.2rem;
+  min-height: 18px;
+}
+
+.wd-composer-arg-assistant p {
+  margin: 0;
+}
+
+.wd-composer-arg-head {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+}
+
+.wd-composer-assist-buttons {
+  display: flex;
+  gap: 0.24rem;
+  flex-wrap: wrap;
 }
 
 .wd-composer-feedback-error {

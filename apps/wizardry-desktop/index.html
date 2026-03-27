@@ -129,6 +129,7 @@
         </div>
         <p id="composer-command-preview" class="wd-composer-preview wd-subline">No command preview</p>
         <p id="composer-feedback" class="wd-composer-feedback wd-subline"></p>
+        <div id="composer-arg-assistant" class="wd-composer-arg-assistant" aria-live="polite"></div>
       </div>
       <div class="wd-composer-help" aria-live="polite">
         <span>Press <kbd>Enter</kbd> to add token or run, <kbd>Shift</kbd>+<kbd>Enter</kbd> to run current command, <kbd>Esc</kbd> to close.</span>
@@ -157,6 +158,7 @@
       var COMPOSER_SYSTEM_ACTIONS = ['system:whoami', 'system:pwd', 'system:date', 'system:status', 'system:environment'];
       var COMPOSER_PRESET_LIMIT = 8;
       var COMPOSER_TOKEN_RE = /^[a-z0-9._:-]+$/i;
+      var COMPOSER_ARG_TOKEN_RE = /^[a-z0-9._:\/~+\-@%]+$/i;
       var COMPOSER_REF_RE = /^[a-z0-9._-]+:[a-z0-9._-]+$/i;
       var COMPOSER_RUN_ACTIONS = {
         'arcana:install': { label: 'Arcana install', requiresArg: true, minArgs: 1, maxArgs: 1 },
@@ -167,7 +169,8 @@
         'arcana:module-menu': { label: 'Arcana module menu', requiresArg: true, minArgs: 1, maxArgs: 1 },
         'menu:list': { label: 'List all wizardry menus', requiresArg: false, minArgs: 0, maxArgs: 0 },
         'menu:help': { label: 'Show menu help', requiresArg: true, minArgs: 1, maxArgs: 1 },
-        'menu:run': { label: 'Run menu command', requiresArg: true, minArgs: 1, maxArgs: 1 },
+        'menu:run': { label: 'Run menu command', requiresArg: true, minArgs: 1, maxArgs: 2 },
+        'menu:terminal': { label: 'Open menu in terminal', requiresArg: true, minArgs: 1, maxArgs: 2 },
         'app-help': { label: 'Show app help', requiresArg: true, minArgs: 1, maxArgs: 1 }
       };
       var NAV_PAGES = [
@@ -275,6 +278,7 @@
           composerCommandPreview: document.getElementById('composer-command-preview'),
           composerInput: document.getElementById('composer-input'),
           composerFeedback: document.getElementById('composer-feedback'),
+          composerArgAssistant: document.getElementById('composer-arg-assistant'),
           composerTokenRow: document.getElementById('composer-token-row'),
           composerBlocks: document.getElementById('composer-block-groups'),
           composerOutput: document.getElementById('composer-output')
@@ -838,15 +842,23 @@
               result.status = 'incomplete';
               result.message = 'Add the required action parameter.';
               result.tokenKinds[2] = 'missing';
-              addComposerPlaceholder(result, 2, 'argument', 'arg-arg');
+              var firstArgLabel = 'argument';
+              if (actionName === 'arcana:install' || actionName === 'arcana:module-menu' || actionName === 'arcana:menu') {
+                firstArgLabel = 'module';
+              } else if (actionName === 'menu:help' || actionName === 'menu:run' || actionName === 'menu:terminal') {
+                firstArgLabel = 'menu-name';
+              } else if (actionName === 'app-help') {
+                firstArgLabel = 'command';
+              }
+              addComposerPlaceholder(result, 2, firstArgLabel, 'arg-arg');
             }
             return result;
           }
           var argHasError = false;
           for (var argIndex = 2; argIndex < tokens.length; argIndex += 1) {
-            if (!COMPOSER_TOKEN_RE.test(tokens[argIndex])) {
+            if (!COMPOSER_ARG_TOKEN_RE.test(tokens[argIndex])) {
               result.status = 'error';
-              result.message = 'Action arguments must use allowed token characters.';
+              result.message = 'Action arguments may use letters, numbers, dot, underscore, colon, slash, tilde, plus, percent, and dash.';
               result.tokenKinds[argIndex] = 'error';
               argHasError = true;
             } else {
@@ -872,6 +884,31 @@
             return result;
           }
 
+          if ((actionName === 'menu:help' || actionName === 'menu:run' || actionName === 'menu:terminal') && tokens[2]) {
+            var menuSpec = menuRowByName(tokens[2]);
+            if (!menuSpec) {
+              result.status = 'error';
+              result.message = 'Unknown menu "' + tokens[2] + '".';
+              result.tokenKinds[2] = 'error';
+              return result;
+            }
+            if (actionName !== 'menu:help') {
+              if (menuSpec.argMode === 'required' && providedArgs < 2) {
+                result.status = 'incomplete';
+                result.message = 'Menu "' + menuSpec.name + '" requires an argument.';
+                result.tokenKinds[3] = 'missing';
+                addComposerPlaceholder(result, 3, menuSpec.argLabel || 'argument', 'arg-arg');
+                return result;
+              }
+              if (menuSpec.argMode === 'none' && providedArgs > 1) {
+                result.status = 'error';
+                result.message = 'Menu "' + menuSpec.name + '" does not take an argument.';
+                result.tokenKinds[3] = 'error';
+                return result;
+              }
+            }
+          }
+
           if (result.status !== 'error') {
             result.status = 'ready';
             result.ready = true;
@@ -880,7 +917,7 @@
             result.backend = {
               type: action,
               actionName: actionName,
-              param: tokens[2] || ''
+              params: tokens.slice(2)
             };
           }
           return result;
@@ -924,7 +961,8 @@
             entries: [
               { label: 'list menus', tokens: ['run-action', 'menu:list'], help: 'List all menu scripts known to wizardry.' },
               { label: 'menu help', tokens: ['run-action', 'menu:help'], help: 'Show help for a selected menu name.' },
-              { label: 'menu run', tokens: ['run-action', 'menu:run'], help: 'Run safe menu operation or show sourced guidance.' }
+              { label: 'menu run', tokens: ['run-action', 'menu:run'], help: 'Run safe menu operation or show sourced guidance.' },
+              { label: 'menu terminal', tokens: ['run-action', 'menu:terminal'], help: 'Open menu command in Terminal.' }
             ]
           }
         ];
@@ -981,6 +1019,13 @@
               tokens: ['run-action', 'menu:run', menu.name],
               help: 'Run safe menu action for ' + menu.name
             });
+            if (menu.sourcedOnly) {
+              blocks[3].entries.push({
+                label: 'terminal ' + safeShortText(menu.name),
+                tokens: ['run-action', 'menu:terminal', menu.name],
+                help: 'Open Terminal command for sourced menu ' + menu.name
+              });
+            }
           }
         }
 
@@ -1102,7 +1147,7 @@
               { label: 'arcana', tokens: ['arcana'], help: 'Show arcana help.' },
               { label: 'main-menu', tokens: ['main-menu'], help: 'Show system help entrypoint menu help.' }
             ];
-          } else if (hasRef === 'menu:help' || hasRef === 'menu:run') {
+          } else if (hasRef === 'menu:help' || hasRef === 'menu:run' || hasRef === 'menu:terminal') {
             for (var menuNameIdx = 0; menuNameIdx < state.menuCatalog.length && argSuggestions.length < COMPOSER_PRESET_LIMIT; menuNameIdx += 1) {
               var menuRow = state.menuCatalog[menuNameIdx];
               if (!menuRow || !menuRow.name) {
@@ -1111,7 +1156,11 @@
               argSuggestions.push({
                 label: menuRow.name,
                 tokens: [menuRow.name],
-                help: hasRef === 'menu:help' ? ('Show help for ' + menuRow.name) : ('Run menu action for ' + menuRow.name)
+                help: hasRef === 'menu:help'
+                  ? ('Show help for ' + menuRow.name)
+                  : (hasRef === 'menu:terminal'
+                    ? ('Open Terminal for ' + menuRow.name)
+                    : ('Run menu action for ' + menuRow.name))
               });
             }
           }
@@ -1119,6 +1168,37 @@
             blocks.unshift({
               label: 'Action Arguments',
               entries: argSuggestions
+            });
+          }
+          return blocks;
+        }
+
+        if (action === 'run-action' && (hasRef === 'menu:run' || hasRef === 'menu:terminal') && hasArg && !plan.tokens[3]) {
+          var selectedMenu = menuRowByName(hasArg);
+          if (!selectedMenu) {
+            return blocks;
+          }
+          var secondaryArgs = [];
+          if (selectedMenu.argValues && selectedMenu.argValues.length) {
+            for (var mv = 0; mv < selectedMenu.argValues.length && secondaryArgs.length < COMPOSER_PRESET_LIMIT; mv += 1) {
+              secondaryArgs.push({
+                label: selectedMenu.argValues[mv],
+                tokens: [selectedMenu.argValues[mv]],
+                help: 'Suggested argument for ' + selectedMenu.name
+              });
+            }
+          }
+          if (selectedMenu.argExample && secondaryArgs.length < COMPOSER_PRESET_LIMIT) {
+            secondaryArgs.push({
+              label: selectedMenu.argExample,
+              tokens: [selectedMenu.argExample],
+              help: 'Example argument for ' + selectedMenu.name
+            });
+          }
+          if (secondaryArgs.length) {
+            blocks.unshift({
+              label: 'Menu Arguments',
+              entries: secondaryArgs
             });
           }
           return blocks;
@@ -1225,6 +1305,75 @@
         els.composerFeedback.className = 'wd-composer-feedback wd-subline wd-composer-feedback-' + status;
       }
 
+      function renderComposerArgAssistant(plan) {
+        if (!els.composerArgAssistant) {
+          return;
+        }
+        if (!plan || !plan.tokens || !plan.tokens.length || plan.tokens[0] !== 'run-action') {
+          els.composerArgAssistant.innerHTML = '';
+          return;
+        }
+        var actionName = String(plan.tokens[1] || '').trim();
+        if (!actionName) {
+          els.composerArgAssistant.innerHTML = '<p class="wd-subline">Select a run-action to start composing arguments.</p>';
+          return;
+        }
+        var params = plan.tokens.slice(2);
+        if (actionName !== 'menu:help' && actionName !== 'menu:run' && actionName !== 'menu:terminal') {
+          els.composerArgAssistant.innerHTML = '';
+          return;
+        }
+
+        var html = '<div class="wd-composer-arg-head"><span class="wd-pill">' + escapeText(actionName) + '</span></div>';
+        if (!params[0]) {
+          html += '<p class="wd-subline">Choose a menu name as the first argument.</p>';
+          if (state.menuCatalog.length) {
+            html += '<div class="wd-composer-assist-buttons">';
+            for (var i = 0; i < state.menuCatalog.length && i < COMPOSER_PRESET_LIMIT; i += 1) {
+              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-composer-assist-token="' + escapeAttrValue(state.menuCatalog[i].name) + '">' + escapeText(state.menuCatalog[i].name) + '</button>';
+            }
+            html += '</div>';
+          }
+          els.composerArgAssistant.innerHTML = html;
+          return;
+        }
+
+        var menuSpec = menuRowByName(params[0]);
+        if (!menuSpec) {
+          html += '<p class="wd-subline">Unknown menu name: <code>' + escapeText(params[0]) + '</code>.</p>';
+          els.composerArgAssistant.innerHTML = html;
+          return;
+        }
+
+        html += '<p class="wd-subline">Menu: <code>' + escapeText(menuSpec.name) + '</code> · ' + escapeText(menuArgModeLabel(menuSpec.argMode)) + (menuSpec.sourcedOnly ? ' · sourced only' : '') + '</p>';
+        if (menuSpec.argHelp) {
+          html += '<p class="wd-subline">' + escapeText(menuSpec.argHelp) + '</p>';
+        }
+
+        if ((actionName === 'menu:run' || actionName === 'menu:terminal') && (menuSpec.argMode === 'required' || menuSpec.argMode === 'optional') && !params[1]) {
+          html += '<p class="wd-subline">' + escapeText(menuSpec.argMode === 'required' ? 'A second argument is required for this menu.' : 'A second argument is optional for this menu.') + '</p>';
+          var suggested = [];
+          if (menuSpec.argValues && menuSpec.argValues.length) {
+            suggested = suggested.concat(menuSpec.argValues);
+          }
+          if (menuSpec.argExample) {
+            suggested.push(menuSpec.argExample);
+          }
+          if (suggested.length) {
+            html += '<div class="wd-composer-assist-buttons">';
+            for (var s = 0; s < suggested.length && s < COMPOSER_PRESET_LIMIT; s += 1) {
+              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-composer-assist-token="' + escapeAttrValue(suggested[s]) + '">' + escapeText(suggested[s]) + '</button>';
+            }
+            html += '</div>';
+          }
+        }
+
+        if (actionName === 'menu:terminal' && !menuSpec.sourcedOnly) {
+          html += '<p class="wd-subline">Tip: this menu can run directly in-app; terminal is optional.</p>';
+        }
+        els.composerArgAssistant.innerHTML = html;
+      }
+
       function renderComposerPreview(plan) {
         if (!els.composerCommandPreview) {
           return;
@@ -1261,6 +1410,7 @@
         renderComposerTokenRow(plan);
         renderComposerBlocks(plan);
         renderComposerFeedback(plan);
+        renderComposerArgAssistant(plan);
         renderComposerPreview(plan);
         updateComposerOutput(state.composer.output || 'No command run yet.');
         if (els.composerRun) {
@@ -1397,8 +1547,8 @@
           });
         } else if (plan.backend.type === 'run-action') {
           var actionArgs = [plan.backend.actionName];
-          if (plan.backend.param) {
-            actionArgs.push(plan.backend.param);
+          if (Array.isArray(plan.backend.params) && plan.backend.params.length) {
+            actionArgs = actionArgs.concat(plan.backend.params);
           }
           run = callBackend('run-action', actionArgs).then(function (text) {
             updateComposerOutput(text || 'ok');
@@ -1922,6 +2072,30 @@
         });
       }
 
+      function menuRowByName(name) {
+        var key = String(name || '').trim();
+        if (!key) {
+          return null;
+        }
+        for (var i = 0; i < state.menuCatalog.length; i += 1) {
+          var row = state.menuCatalog[i];
+          if (row && row.name === key) {
+            return row;
+          }
+        }
+        return null;
+      }
+
+      function menuArgModeLabel(mode) {
+        if (mode === 'required') {
+          return 'arg required';
+        }
+        if (mode === 'optional') {
+          return 'arg optional';
+        }
+        return 'no arg';
+      }
+
       function renderMenusPage() {
         var rows = state.menuCatalog || [];
         var html = '<section class="wd-panel"><h3>Wizardry Menus</h3>' +
@@ -1949,21 +2123,30 @@
             if (row.sourcedOnly) {
               flags.push('sourced');
             }
-            if (row.requiresArg) {
-              flags.push('arg');
+            if (row.argMode === 'required') {
+              flags.push('arg required');
+            } else if (row.argMode === 'optional') {
+              flags.push('arg optional');
             }
             var flagText = flags.join(', ') || 'menu';
             html += '<div class="wd-list-row">';
             html += '<span class="wd-list-main wd-col-2">' + escapeText(menuDisplayName(row.name) || row.name) + '</span>';
             html += '<span class="wd-list-meta wd-col-4"><code>' + escapeText(row.invocation || row.name) + '</code> · ' + escapeText(flagText) + '</span>';
             html += '<span class="wd-row-actions">';
-            if (row.requiresArg) {
-              html += '<input type="text" class="wd-inline-input wd-menu-arg" data-menu-arg-for="' + escapeAttrValue(row.name) + '" placeholder="Argument">';
+            if (row.argMode === 'required' || row.argMode === 'optional') {
+              var placeholder = row.argExample ? row.argExample : (row.argMode === 'required' ? 'Required argument' : 'Optional argument');
+              html += '<input type="text" class="wd-inline-input wd-menu-arg" data-menu-arg-for="' + escapeAttrValue(row.name) + '" placeholder="' + escapeAttrValue(placeholder) + '" title="' + escapeHtmlAttribute(row.argHelp || row.argLabel || 'Menu argument') + '">';
             }
             html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-menu-help="' + escapeAttrValue(row.name) + '">Help</button>';
             html += '<button type="button" class="wd-polite-btn wd-tiny" data-menu-run="' + escapeAttrValue(row.name) + '">' + (row.sourcedOnly ? 'Guide' : 'Run') + '</button>';
+            if (row.sourcedOnly) {
+              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-menu-terminal="' + escapeAttrValue(row.name) + '">Open Terminal</button>';
+            }
             html += '</span>';
             html += '</div>';
+            if (row.argHelp) {
+              html += '<p class="wd-subline wd-menu-arg-help">' + escapeText(row.argHelp) + '</p>';
+            }
           }
           html += '</div>';
         }
@@ -2375,18 +2558,26 @@
             var parts = String(lines[i] || '').split('|');
             var name = String(parts[0] || '').trim();
             var sourcedOnly = String(parts[1] || '').trim() === '1';
-            var requiresArg = String(parts[2] || '').trim() === '1';
+            var argMode = String(parts[2] || '').trim() || 'none';
             var topLevel = String(parts[3] || '').trim() === '1';
             var invocation = String(parts[4] || '').trim();
+            var argLabel = String(parts[5] || '').trim();
+            var argHelp = String(parts[6] || '').trim();
+            var argExample = String(parts[7] || '').trim();
+            var argValues = String(parts[8] || '').trim();
             if (!name) {
               continue;
             }
             parsed.push({
               name: name,
               sourcedOnly: sourcedOnly,
-              requiresArg: requiresArg,
+              argMode: argMode === 'required' || argMode === 'optional' ? argMode : 'none',
               topLevel: topLevel,
-              invocation: invocation || name
+              invocation: invocation || name,
+              argLabel: argLabel,
+              argHelp: argHelp,
+              argExample: argExample,
+              argValues: argValues ? argValues.split(',').map(function (item) { return String(item || '').trim(); }).filter(Boolean) : []
             });
           }
           state.menuCatalog = parsed;
@@ -2512,6 +2703,21 @@
         return '';
       }
 
+      function menuArgumentState(name, arg) {
+        var row = menuRowByName(name);
+        var value = String(arg || '').trim();
+        if (!row) {
+          return { ok: false, message: 'Unknown menu: ' + name };
+        }
+        if (row.argMode === 'required' && !value) {
+          return { ok: false, message: 'Menu "' + row.name + '" requires an argument.' };
+        }
+        if (row.argMode === 'none' && value) {
+          return { ok: false, message: 'Menu "' + row.name + '" does not take an argument.' };
+        }
+        return { ok: true, message: '' };
+      }
+
       function runMenuHelp(menuName, options) {
         options = options || {};
         var name = String(menuName || '').trim();
@@ -2547,6 +2753,14 @@
         if (!name) {
           return;
         }
+        var stateCheck = menuArgumentState(name, arg);
+        if (!stateCheck.ok) {
+          if (options.outputId) {
+            setOutputBlock(options.outputId, stateCheck.message);
+          }
+          pushActivity('app', 'run-menu ' + name + ' blocked', { section: 'app', app: 'wizardry-core', source: 'run-menu:' + name, status: 'error' });
+          return;
+        }
         if (state.actionInFlight) {
           return;
         }
@@ -2567,6 +2781,47 @@
             setOutputBlock(options.outputId, message);
           }
           pushActivity('app', 'run-menu ' + name + ' failed', { section: 'app', app: 'wizardry-core', source: 'run-menu:' + name, status: 'error' });
+        }).finally(function () {
+          state.actionInFlight = false;
+          loadWatchHistory();
+        });
+      }
+
+      function runMenuInTerminal(menuName, menuArg, options) {
+        options = options || {};
+        var name = String(menuName || '').trim();
+        var arg = String(menuArg || '').trim();
+        if (!name) {
+          return;
+        }
+        var stateCheck = menuArgumentState(name, arg);
+        if (!stateCheck.ok) {
+          if (options.outputId) {
+            setOutputBlock(options.outputId, stateCheck.message);
+          }
+          pushActivity('app', 'menu-terminal ' + name + ' blocked', { section: 'app', app: 'wizardry-core', source: 'menu-terminal:' + name, status: 'error' });
+          return;
+        }
+        if (state.actionInFlight) {
+          return;
+        }
+        state.actionInFlight = true;
+        var args = [name];
+        if (arg) {
+          args.push(arg);
+        }
+        callBackend('open-menu-terminal', args).then(function (text) {
+          var output = String(text || '').trim();
+          if (options.outputId) {
+            setOutputBlock(options.outputId, output || ('Opened terminal for menu ' + name + '.'));
+          }
+          pushActivity('app', 'menu-terminal ' + name + ' completed', { section: 'app', app: 'wizardry-core', source: 'menu-terminal:' + name, status: 'ok' });
+        }).catch(function (error) {
+          var message = String(error && error.message ? error.message : error || 'menu-terminal failed');
+          if (options.outputId) {
+            setOutputBlock(options.outputId, message);
+          }
+          pushActivity('app', 'menu-terminal ' + name + ' failed', { section: 'app', app: 'wizardry-core', source: 'menu-terminal:' + name, status: 'error' });
         }).finally(function () {
           state.actionInFlight = false;
           loadWatchHistory();
@@ -3119,6 +3374,19 @@
             }
           });
         }
+        if (els.composerArgAssistant) {
+          els.composerArgAssistant.addEventListener('click', function (event) {
+            var assist = event.target.closest('[data-composer-assist-token]');
+            if (!assist) {
+              return;
+            }
+            commitComposerInput({ forceSingle: true });
+            addComposerTokens(splitComposerText(String(assist.getAttribute('data-composer-assist-token') || '')));
+            if (els.composerInput) {
+              focusComposerInput();
+            }
+          });
+        }
         if (els.composerPanel) {
           els.composerPanel.addEventListener('keydown', function (event) {
             if (event.key !== 'Tab') {
@@ -3319,10 +3587,33 @@
               }
               var runArg = menuArgumentFor(runName);
               if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                composerOpenWithTokens(['run-action', 'menu:run', runName], { userInitiated: true });
+                if (runArg) {
+                  composerOpenWithTokens(['run-action', 'menu:run', runName, runArg], { userInitiated: true });
+                } else {
+                  composerOpenWithTokens(['run-action', 'menu:run', runName], { userInitiated: true });
+                }
                 return;
               }
               runMenuCommand(runName, runArg, { outputId: 'menu-output' });
+              return;
+            }
+
+            var menuTerminal = event.target.closest('[data-menu-terminal]');
+            if (menuTerminal) {
+              var terminalName = String(menuTerminal.getAttribute('data-menu-terminal') || '').trim();
+              if (!terminalName) {
+                return;
+              }
+              var terminalArg = menuArgumentFor(terminalName);
+              if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                if (terminalArg) {
+                  composerOpenWithTokens(['run-action', 'menu:terminal', terminalName, terminalArg], { userInitiated: true });
+                } else {
+                  composerOpenWithTokens(['run-action', 'menu:terminal', terminalName], { userInitiated: true });
+                }
+                return;
+              }
+              runMenuInTerminal(terminalName, terminalArg, { outputId: 'menu-output' });
               return;
             }
 

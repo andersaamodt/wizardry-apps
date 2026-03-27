@@ -49,6 +49,14 @@ printf '%s\n' "$menus" | grep -F "cast|" >/dev/null 2>&1 || {
   printf '%s\n' "list-menu-spells missing cast" >&2
   exit 1
 }
+printf '%s\n' "$menus" | grep -F "spell-menu|0|required|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-menu-spells missing required arg metadata for spell-menu" >&2
+  exit 1
+}
+printf '%s\n' "$menus" | grep -F "spellbook|0|optional|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-menu-spells missing optional arg metadata for spellbook" >&2
+  exit 1
+}
 
 menu_help=$(sh "$backend" menu-help cast "$root" 2>&1)
 printf '%s\n' "$menu_help" | grep -E '^Usage: cast' >/dev/null 2>&1 || {
@@ -59,6 +67,21 @@ printf '%s\n' "$menu_help" | grep -E '^Usage: cast' >/dev/null 2>&1 || {
 menu_run_main=$(sh "$backend" run-menu main-menu "" "$root")
 printf '%s\n' "$menu_run_main" | grep -F "mode=sourced-only" >/dev/null 2>&1 || {
   printf '%s\n' "run-menu main-menu should report sourced-only mode" >&2
+  exit 1
+}
+
+if sh "$backend" run-menu spell-menu "" "$root" >/tmp/wizardry-desktop-run-menu.out 2>/tmp/wizardry-desktop-run-menu.err; then
+  printf '%s\n' "run-menu spell-menu should fail without required argument" >&2
+  exit 1
+fi
+grep -F "requires an argument" /tmp/wizardry-desktop-run-menu.err >/dev/null 2>&1 || {
+  printf '%s\n' "run-menu spell-menu missing required argument error" >&2
+  exit 1
+}
+
+menu_help_via_action=$(sh "$backend" run-action menu:help cast "" "$root" 2>&1)
+printf '%s\n' "$menu_help_via_action" | grep -E '^Usage: cast' >/dev/null 2>&1 || {
+  printf '%s\n' "run-action menu:help cast missing Usage output" >&2
   exit 1
 }
 

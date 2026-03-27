@@ -13,6 +13,8 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
 
 - UI calls `apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh`.
 - Commands stay argv-based (`window.wizardry.exec([...])`), not shell fragments.
+- Menu inventory includes argument metadata (`none` / `optional` / `required`) used by both Menus page and Command Composer.
+- Sourced-only menu rows expose `Open Terminal`, backed by `open-menu-terminal`.
 - Desktop prefs persist through backend key-value storage under:
   - `${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/wizardry-desktop/config`
 - Watch activity log persists under:
@@ -30,6 +32,7 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
 - Left rail listbox selection works by mouse and keyboard.
 - Cast page shows spell categories and memorized spells with readable scroll regions.
 - Menus page indexes all menu scripts from `spells/menu` with help/run-safe actions.
+- Command Composer argument assistant should suggest menu names and menu-specific second arguments when required.
 - Activity drawer shows both `Active Casting` and `App Commands` with independent scroll.
 - Shift/Cmd/Ctrl click on runnable buttons opens Composer pre-filled (instead of executing immediately).
 - Theme picker applies instantly and survives restart.
