@@ -135,7 +135,7 @@
         <span>Press <kbd>Enter</kbd> to add token or run, <kbd>Shift</kbd>+<kbd>Enter</kbd> to run current command, <kbd>Esc</kbd> to close.</span>
         <span>Use <kbd>Tab</kbd> to cycle fields, <kbd>Left</kbd>/<kbd>Right</kbd> to move token selection, <kbd>Del</kbd> to remove a selected token.</span>
         <span>Arrow <kbd>Up</kbd>/<kbd>Down</kbd> in empty input or focused blocks to choose blocks.</span>
-        <span>Spaces and commas create pills. Click pills to edit or remove.</span>
+        <span>Spaces and commas create pills. Wrap values in quotes to keep spaces inside one pill.</span>
       </div>
       <pre id="composer-output" class="wd-mono-box wd-composer-output" aria-live="polite">No command run yet.</pre>
       <footer class="wd-composer-actions">
@@ -158,7 +158,7 @@
       var COMPOSER_SYSTEM_ACTIONS = ['system:whoami', 'system:pwd', 'system:date', 'system:status', 'system:environment'];
       var COMPOSER_PRESET_LIMIT = 8;
       var COMPOSER_TOKEN_RE = /^[a-z0-9._:-]+$/i;
-      var COMPOSER_ARG_TOKEN_RE = /^[a-z0-9._:\/~+\-@%]+$/i;
+      var COMPOSER_ARG_TOKEN_RE = /^[a-z0-9._:\/~+\-@% ]+$/i;
       var COMPOSER_REF_RE = /^[a-z0-9._-]+:[a-z0-9._-]+$/i;
       var COMPOSER_RUN_ACTIONS = {
         'arcana:install': { label: 'Arcana install', requiresArg: true, minArgs: 1, maxArgs: 1 },
@@ -223,6 +223,7 @@
         composer: {
           open: false,
           startupLock: true,
+          seededDefaults: false,
           rawInput: '',
           tokens: [],
           selectedToken: -1,
@@ -494,8 +495,56 @@
         return String(value || '').trim();
       }
 
+      function parseComposerText(value) {
+        var input = String(value == null ? '' : value);
+        var tokens = [];
+        var token = '';
+        var quote = '';
+        var escaped = false;
+        var i = 0;
+        for (i = 0; i < input.length; i += 1) {
+          var ch = input.charAt(i);
+          if (escaped) {
+            token += ch;
+            escaped = false;
+            continue;
+          }
+          if (quote) {
+            if (ch === '\\') {
+              escaped = true;
+              continue;
+            }
+            if (ch === quote) {
+              quote = '';
+              continue;
+            }
+            token += ch;
+            continue;
+          }
+          if (ch === '"' || ch === "'") {
+            quote = ch;
+            continue;
+          }
+          if (ch === ',' || /\s/.test(ch)) {
+            if (token) {
+              tokens.push(token);
+              token = '';
+            }
+            continue;
+          }
+          token += ch;
+        }
+        if (token) {
+          tokens.push(token);
+        }
+        return {
+          tokens: tokens.map(normalizeComposerToken).filter(Boolean),
+          unclosedQuote: !!quote
+        };
+      }
+
       function splitComposerText(value) {
-        return normalizeComposerToken(value).split(/\s+/).filter(Boolean);
+        return parseComposerText(value).tokens;
       }
 
       function escapeHtmlAttribute(value) {
@@ -507,13 +556,20 @@
           .replaceAll("'", '&#39;');
       }
 
-      function composerDraftTokens() {
+      function composerDraftState() {
         var tokens = Array.prototype.slice.call(state.composer.tokens || []);
-        var pending = splitComposerText(state.composer.rawInput);
-        if (!pending.length) {
-          return tokens;
+        var parsed = parseComposerText(state.composer.rawInput);
+        if (!parsed.tokens.length) {
+          return { tokens: tokens, unclosedQuote: parsed.unclosedQuote };
         }
-        return tokens.concat(pending);
+        return {
+          tokens: tokens.concat(parsed.tokens),
+          unclosedQuote: parsed.unclosedQuote
+        };
+      }
+
+      function composerDraftTokens() {
+        return composerDraftState().tokens;
       }
 
       function composerResetSelectedToken() {
@@ -537,6 +593,7 @@
           }
           state.composer.tokens.push(token);
         }
+        state.composer.seededDefaults = false;
         setComposerSelectedToken(-1);
         state.composer.rawInput = '';
         if (els.composerInput) {
@@ -588,6 +645,13 @@
           renderComposer();
           return false;
         }
+        if (state.composer.seededDefaults && tokens[0] && COMPOSER_ACTIONS.indexOf(tokens[0]) >= 0) {
+          state.composer.tokens = [];
+          state.composer.seededDefaults = false;
+        }
+        if (state.composer.tokens.length === 1 && tokens[0] && state.composer.tokens[0] === tokens[0]) {
+          state.composer.tokens = [];
+        }
         var options = force && force === true ? {} : (force || {});
         var shouldCommit = !!options.force || options.forceSingle || /(?:\s|,)$/.test(value) || tokens.length > 1;
         if (!shouldCommit) {
@@ -601,7 +665,13 @@
 
       function runComposerFromDraft() {
         commitComposerInput({ forceSingle: true });
-        var plan = composerPlanFromTokens(state.composer.tokens);
+        var draftState = composerDraftState();
+        var plan = composerPlanFromTokens(draftState.tokens);
+        if (draftState.unclosedQuote) {
+          plan.status = 'incomplete';
+          plan.ready = false;
+          plan.message = 'Close the quoted token before running.';
+        }
         if (plan.ready && !state.composer.running && !state.actionInFlight) {
           executeComposerCommand(plan);
           return true;
@@ -654,6 +724,7 @@
           tokens = composerDefaultTokensForPage(state.activePage);
         }
         state.composer.tokens = Array.isArray(tokens) ? tokens.slice(0) : [];
+        state.composer.seededDefaults = !!options.seededDefaults;
         state.composer.rawInput = '';
         state.composer.selectedToken = -1;
         state.composer.activeBlock = 0;
@@ -705,14 +776,25 @@
           return result;
         }
 
-        var safeTokenList = tokens.every(function (token) {
-          return COMPOSER_TOKEN_RE.test(token);
-        });
-        if (!safeTokenList) {
+        for (var tokenIndex = 0; tokenIndex < tokens.length; tokenIndex += 1) {
+          var tokenValue = tokens[tokenIndex];
+          var isRunActionArg = tokenIndex >= 2 && tokens[0] === 'run-action';
+          var tokenIsValid = COMPOSER_TOKEN_RE.test(tokenValue) || (isRunActionArg && COMPOSER_ARG_TOKEN_RE.test(tokenValue));
+          if (tokenIsValid) {
+            continue;
+          }
           result.status = 'error';
-          result.message = 'Only alphanumeric, dot, hyphen, underscore, or colon characters are allowed.';
+          result.message = isRunActionArg
+            ? 'Action arguments may use letters, numbers, spaces, dot, underscore, colon, slash, tilde, plus, percent, and dash.'
+            : 'Only alphanumeric, dot, hyphen, underscore, or colon characters are allowed.';
           result.tokenKinds = tokens.map(function (_, idx) {
-            return idx === 0 ? 'action' : 'token-error';
+            if (idx === 0) {
+              return 'action';
+            }
+            if (idx === tokenIndex) {
+              return 'error';
+            }
+            return 'token-error';
           });
           return result;
         }
@@ -858,7 +940,7 @@
           for (var argIndex = 2; argIndex < tokens.length; argIndex += 1) {
             if (!COMPOSER_ARG_TOKEN_RE.test(tokens[argIndex])) {
               result.status = 'error';
-              result.message = 'Action arguments may use letters, numbers, dot, underscore, colon, slash, tilde, plus, percent, and dash.';
+              result.message = 'Action arguments may use letters, numbers, spaces, dot, underscore, colon, slash, tilde, plus, percent, and dash.';
               result.tokenKinds[argIndex] = 'error';
               argHasError = true;
             } else {
@@ -1305,32 +1387,94 @@
         els.composerFeedback.className = 'wd-composer-feedback wd-subline wd-composer-feedback-' + status;
       }
 
+      function composerNextPlaceholder(plan) {
+        if (!plan || !plan.placeholders || !plan.placeholders.length) {
+          return null;
+        }
+        var tokensCount = plan.tokens && plan.tokens.length ? plan.tokens.length : 0;
+        for (var i = 0; i < plan.placeholders.length; i += 1) {
+          var placeholder = plan.placeholders[i];
+          if (!placeholder) {
+            continue;
+          }
+          var idx = Number(placeholder.index);
+          if (Number.isInteger(idx) && idx >= tokensCount) {
+            return placeholder;
+          }
+          if (Number.isInteger(idx) && plan.tokenKinds && plan.tokenKinds[idx] === 'missing') {
+            return placeholder;
+          }
+        }
+        return null;
+      }
+
+      function encodeComposerAssistArgs(tokens) {
+        try {
+          return encodeURIComponent(JSON.stringify(Array.isArray(tokens) ? tokens : []));
+        } catch (_err) {
+          return '';
+        }
+      }
+
+      function decodeComposerAssistArgs(value) {
+        try {
+          var parsed = JSON.parse(decodeURIComponent(String(value || '')));
+          if (!Array.isArray(parsed)) {
+            return [];
+          }
+          return parsed.map(normalizeComposerToken).filter(Boolean);
+        } catch (_err) {
+          return [];
+        }
+      }
+
+      function collectComposerAssistEntries(plan) {
+        var groups = composerArgSuggestionGroups(plan || {}, composerBlockDefinitions());
+        var entries = [];
+        var seen = {};
+        var i = 0;
+        for (i = 0; i < groups.length && entries.length < COMPOSER_PRESET_LIMIT; i += 1) {
+          var group = groups[i];
+          if (!group || !group.entries || !group.entries.length) {
+            continue;
+          }
+          for (var j = 0; j < group.entries.length && entries.length < COMPOSER_PRESET_LIMIT; j += 1) {
+            var item = group.entries[j];
+            var tokens = Array.isArray(item && item.tokens) ? item.tokens.map(normalizeComposerToken).filter(Boolean) : [];
+            if (!tokens.length) {
+              continue;
+            }
+            var key = tokens.join('\u001f');
+            if (seen[key]) {
+              continue;
+            }
+            seen[key] = true;
+            entries.push({
+              label: item && item.label ? item.label : tokens.join(' '),
+              help: item && item.help ? item.help : '',
+              tokens: tokens
+            });
+          }
+        }
+        return entries;
+      }
+
       function renderComposerArgAssistant(plan) {
         if (!els.composerArgAssistant) {
           return;
         }
-        if (!plan || !plan.tokens || !plan.tokens.length || plan.tokens[0] !== 'run-action') {
-          els.composerArgAssistant.innerHTML = '';
-          return;
-        }
-        var actionName = String(plan.tokens[1] || '').trim();
-        if (!actionName) {
-          els.composerArgAssistant.innerHTML = '<p class="wd-subline">Select a run-action to start composing arguments.</p>';
-          return;
-        }
-        var params = plan.tokens.slice(2);
-        if (actionName !== 'menu:help' && actionName !== 'menu:run' && actionName !== 'menu:terminal') {
-          els.composerArgAssistant.innerHTML = '';
-          return;
-        }
+        var workingPlan = plan || { tokens: [] };
+        var tokens = Array.isArray(workingPlan.tokens) ? workingPlan.tokens.slice(0) : [];
+        var html = '';
 
-        var html = '<div class="wd-composer-arg-head"><span class="wd-pill">' + escapeText(actionName) + '</span></div>';
-        if (!params[0]) {
-          html += '<p class="wd-subline">Choose a menu name as the first argument.</p>';
-          if (state.menuCatalog.length) {
+        if (!tokens.length) {
+          html = '<p class="wd-subline">Choose a command block, then fill required arguments.</p>';
+          var starterEntries = collectComposerAssistEntries(workingPlan);
+          if (starterEntries.length) {
             html += '<div class="wd-composer-assist-buttons">';
-            for (var i = 0; i < state.menuCatalog.length && i < COMPOSER_PRESET_LIMIT; i += 1) {
-              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-composer-assist-token="' + escapeAttrValue(state.menuCatalog[i].name) + '">' + escapeText(state.menuCatalog[i].name) + '</button>';
+            for (var starterIdx = 0; starterIdx < starterEntries.length; starterIdx += 1) {
+              var starter = starterEntries[starterIdx];
+              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" title="' + escapeHtmlAttribute(starter.help || '') + '" data-composer-assist-token="' + escapeAttrValue(starter.tokens.join(' ')) + '" data-composer-assist-args="' + escapeAttrValue(encodeComposerAssistArgs(starter.tokens)) + '">' + escapeText(starter.label) + '</button>';
             }
             html += '</div>';
           }
@@ -1338,39 +1482,45 @@
           return;
         }
 
-        var menuSpec = menuRowByName(params[0]);
-        if (!menuSpec) {
-          html += '<p class="wd-subline">Unknown menu name: <code>' + escapeText(params[0]) + '</code>.</p>';
-          els.composerArgAssistant.innerHTML = html;
-          return;
+        html += '<div class="wd-composer-arg-head"><span class="wd-pill">' + escapeText(tokens[0]) + '</span>';
+        if (tokens[1]) {
+          html += '<span class="wd-pill wd-secondary">' + escapeText(tokens[1]) + '</span>';
+        }
+        html += '</div>';
+
+        if (workingPlan.message) {
+          html += '<p class="wd-subline">' + escapeText(workingPlan.message) + '</p>';
         }
 
-        html += '<p class="wd-subline">Menu: <code>' + escapeText(menuSpec.name) + '</code> · ' + escapeText(menuArgModeLabel(menuSpec.argMode)) + (menuSpec.sourcedOnly ? ' · sourced only' : '') + '</p>';
-        if (menuSpec.argHelp) {
-          html += '<p class="wd-subline">' + escapeText(menuSpec.argHelp) + '</p>';
+        var nextPlaceholder = composerNextPlaceholder(workingPlan);
+        if (nextPlaceholder && nextPlaceholder.label) {
+          html += '<p class="wd-subline">Next: <code>' + escapeText(nextPlaceholder.label) + '</code>.</p>';
+        } else if (workingPlan.ready) {
+          html += '<p class="wd-subline">Command is complete. Run now, or keep composing.</p>';
         }
 
-        if ((actionName === 'menu:run' || actionName === 'menu:terminal') && (menuSpec.argMode === 'required' || menuSpec.argMode === 'optional') && !params[1]) {
-          html += '<p class="wd-subline">' + escapeText(menuSpec.argMode === 'required' ? 'A second argument is required for this menu.' : 'A second argument is optional for this menu.') + '</p>';
-          var suggested = [];
-          if (menuSpec.argValues && menuSpec.argValues.length) {
-            suggested = suggested.concat(menuSpec.argValues);
-          }
-          if (menuSpec.argExample) {
-            suggested.push(menuSpec.argExample);
-          }
-          if (suggested.length) {
-            html += '<div class="wd-composer-assist-buttons">';
-            for (var s = 0; s < suggested.length && s < COMPOSER_PRESET_LIMIT; s += 1) {
-              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-composer-assist-token="' + escapeAttrValue(suggested[s]) + '">' + escapeText(suggested[s]) + '</button>';
+        if (tokens[0] === 'run-action' && (tokens[1] === 'menu:help' || tokens[1] === 'menu:run' || tokens[1] === 'menu:terminal') && tokens[2]) {
+          var menuSpec = menuRowByName(tokens[2]);
+          if (menuSpec) {
+            html += '<p class="wd-subline">Menu: <code>' + escapeText(menuSpec.name) + '</code> · ' + escapeText(menuArgModeLabel(menuSpec.argMode)) + (menuSpec.sourcedOnly ? ' · sourced only' : '') + '</p>';
+            if (menuSpec.argHelp) {
+              html += '<p class="wd-subline">' + escapeText(menuSpec.argHelp) + '</p>';
             }
-            html += '</div>';
+          } else {
+            html += '<p class="wd-subline">Unknown menu name: <code>' + escapeText(tokens[2]) + '</code>.</p>';
           }
         }
 
-        if (actionName === 'menu:terminal' && !menuSpec.sourcedOnly) {
-          html += '<p class="wd-subline">Tip: this menu can run directly in-app; terminal is optional.</p>';
+        var entries = collectComposerAssistEntries(workingPlan);
+        if (entries.length) {
+          html += '<div class="wd-composer-assist-buttons">';
+          for (var idx = 0; idx < entries.length; idx += 1) {
+            var entry = entries[idx];
+            html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" title="' + escapeHtmlAttribute(entry.help || '') + '" data-composer-assist-token="' + escapeAttrValue(entry.tokens.join(' ')) + '" data-composer-assist-args="' + escapeAttrValue(encodeComposerAssistArgs(entry.tokens)) + '">' + escapeText(entry.label) + '</button>';
+          }
+          html += '</div>';
         }
+
         els.composerArgAssistant.innerHTML = html;
       }
 
@@ -1406,7 +1556,13 @@
           return;
         }
         composerResetSelectedToken();
-        var plan = composerPlanFromTokens(composerDraftTokens());
+        var draftState = composerDraftState();
+        var plan = composerPlanFromTokens(draftState.tokens);
+        if (draftState.unclosedQuote) {
+          plan.status = 'incomplete';
+          plan.ready = false;
+          plan.message = 'Close the quoted token to continue.';
+        }
         renderComposerTokenRow(plan);
         renderComposerBlocks(plan);
         renderComposerFeedback(plan);
@@ -1459,6 +1615,7 @@
 
       function clearComposer() {
         state.composer.tokens = [];
+        state.composer.seededDefaults = false;
         state.composer.rawInput = '';
         state.composer.selectedToken = -1;
         state.composer.activeBlock = 0;
@@ -3073,7 +3230,7 @@
             if (state.composer.open) {
               setComposerOpen(false);
             } else {
-              composerOpenWithTokens(composerDefaultTokensForPage(state.activePage), { userInitiated: true });
+              composerOpenWithTokens(composerDefaultTokensForPage(state.activePage), { userInitiated: true, seededDefaults: true });
             }
           });
         }
@@ -3381,7 +3538,11 @@
               return;
             }
             commitComposerInput({ forceSingle: true });
-            addComposerTokens(splitComposerText(String(assist.getAttribute('data-composer-assist-token') || '')));
+            var assistTokens = decodeComposerAssistArgs(assist.getAttribute('data-composer-assist-args'));
+            if (!assistTokens.length) {
+              assistTokens = splitComposerText(String(assist.getAttribute('data-composer-assist-token') || ''));
+            }
+            addComposerTokens(assistTokens);
             if (els.composerInput) {
               focusComposerInput();
             }

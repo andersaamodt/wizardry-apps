@@ -486,6 +486,11 @@ body::before {
   color: var(--wd-muted);
 }
 
+.wd-pill.wd-secondary {
+  color: var(--wd-text);
+  background: color-mix(in srgb, var(--wd-accent) 10%, transparent);
+}
+
 .wd-list-row {
   border: 1px solid var(--wd-line);
   border-radius: 6px;

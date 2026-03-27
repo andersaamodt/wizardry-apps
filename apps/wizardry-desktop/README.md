@@ -28,11 +28,13 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
 
 ## QA Checklist
 
+- Production completion checklist lives in `apps/wizardry-desktop/PRODUCTION_CHECKLIST.md`.
 - Startup renders splash then main UI with Composer closed.
 - Left rail listbox selection works by mouse and keyboard.
 - Cast page shows spell categories and memorized spells with readable scroll regions.
 - Menus page indexes all menu scripts from `spells/menu` with help/run-safe actions.
-- Command Composer argument assistant should suggest menu names and menu-specific second arguments when required.
+- Command Composer argument assistant should suggest next tokens for any command shape, with menu-specific guidance and second-argument suggestions when required.
+- Composer input supports quoted tokens for arguments that contain spaces.
 - Activity drawer shows both `Active Casting` and `App Commands` with independent scroll.
 - Shift/Cmd/Ctrl click on runnable buttons opens Composer pre-filled (instead of executing immediately).
 - Theme picker applies instantly and survives restart.

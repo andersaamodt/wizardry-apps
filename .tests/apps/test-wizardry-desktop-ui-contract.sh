@@ -66,6 +66,9 @@ assert_contains "$ui" "data-menu-terminal"
 assert_contains "$ui" "id=\"menu-output\""
 assert_contains "$ui" "id=\"composer-arg-assistant\""
 assert_matches "$ui" "function renderComposerArgAssistant\\(plan\\)"
+assert_matches "$ui" "function parseComposerText\\(value\\)"
+assert_matches "$ui" "function decodeComposerAssistArgs\\(value\\)"
+assert_contains "$ui" "data-composer-assist-args"
 
 # Centralized theme and backend root contracts.
 assert_matches "$ui" "buildThemeStylesheetHref\\(themeName\\)"
