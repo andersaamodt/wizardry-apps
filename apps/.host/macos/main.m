@@ -1649,8 +1649,17 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         } else if ([normalized isEqualToString:@"running"]) {
             [stone fill];
         } else if ([normalized isEqualToString:@"stopped"] || [normalized isEqualToString:@"not running"]) {
-            [stone setLineWidth:MAX(1.4, floor(side * 0.12))];
-            [stone stroke];
+            // Keep stopped-state outline visually aligned to running-state fill.
+            // A centered stroke on the same rect renders larger because half of
+            // the stroke extends outside the filled oval bounds.
+            CGFloat strokeWidth = MAX(1.2, floor(side * 0.09));
+            NSRect insetRect = NSInsetRect(stoneRect, strokeWidth * 0.6, strokeWidth * 0.6);
+            if (insetRect.size.width <= 0.0 || insetRect.size.height <= 0.0) {
+                insetRect = stoneRect;
+            }
+            NSBezierPath *outline = [NSBezierPath bezierPathWithOvalInRect:insetRect];
+            [outline setLineWidth:strokeWidth];
+            [outline stroke];
         } else {
             [stone fill];
             [[NSColor whiteColor] set];
