@@ -872,7 +872,8 @@
       function applyPreferredSystemMiniTabMode() {
         var preferred = preferredSystemMiniTabMode();
         setSystemMiniTabMode(preferred);
-        if (state.activeMiniTab === 'all' || state.activeMiniTab === 'other' || !state.activeMiniTab) {
+        // Never auto-switch users from "All" to "Other" during background refresh.
+        if (!state.activeMiniTab || (state.activeMiniTab === 'other' && preferred === 'all')) {
           setActiveMiniTab(preferred);
         }
       }
