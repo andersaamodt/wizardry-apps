@@ -34,6 +34,7 @@ grep -F "method !== 'bridge.exec'" "$root/apps/.host/shared/wizardry-bridge.js" 
 grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "territory-master.png" "$root/apps/.host/macos/main.m" >/dev/null
+grep -F "plain-master.png" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "DESKTOP_BRIDGE_BOOTSTRAP" "$root/apps/.host/linux/main.c" >/dev/null
 grep -F "window.wizardry.rpc = rpcBridge;" "$root/apps/.host/linux/main.c" >/dev/null
 grep -F 'id="toggle-settings-panel"' "$root/apps/forge/index.html" >/dev/null
@@ -66,6 +67,8 @@ grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-for
 [ -f "$root/apps/wizardry-desktop/assets/icons/meta/territory-master.png" ]
 grep -F "territory_master=" "$root/apps/forge/assets/icons/meta/icon-settings.conf" >/dev/null
 grep -F "territory_master=" "$root/apps/wizardry-desktop/assets/icons/meta/icon-settings.conf" >/dev/null
+grep -F "assets/icons/meta/plain-master.png" "$root/apps/forge/index.html" >/dev/null
+grep -F 'plain_master="$project_dir/assets/icons/meta/plain-master.png"' "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "territory-master.png" "$root/apps/wizardry-desktop/index.html" >/dev/null
 grep -F "territory-master.png" "$root/tools/forge/build-forge-icon.sh" >/dev/null
 

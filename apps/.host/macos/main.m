@@ -2255,6 +2255,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     for (NSString *rootPath in iconRoots) {
         NSString *metaDir = [rootPath stringByAppendingPathComponent:@"assets/icons/meta"];
         [iconCandidates addObject:[metaDir stringByAppendingPathComponent:@"territory-master.png"]];
+        [iconCandidates addObject:[metaDir stringByAppendingPathComponent:@"plain-master.png"]];
         NSArray<NSString *> *metaEntries = [fileManager contentsOfDirectoryAtPath:metaDir error:nil];
         for (NSString *entry in metaEntries) {
             if ([entry hasPrefix:@"original-source."]) {
@@ -2265,7 +2266,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [iconCandidates addObjectsFromArray:@[
             [rootPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
             [rootPath stringByAppendingPathComponent:@"assets/icons/meta/apple-master.png"],
-            [rootPath stringByAppendingPathComponent:@"assets/icons/meta/plain-master.png"],
             [rootPath stringByAppendingPathComponent:@"assets/icons/macos/forge.icns"],
             [rootPath stringByAppendingPathComponent:@"assets/forge.icns"],
             [rootPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
@@ -2284,7 +2284,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
     }
 
-    if (launchedFromPackagedBundle) {
+    if (launchedFromPackagedBundle && resolvedBundleIcon) {
         // Leave packaged app icons under system control so Dock styling stays
         // aligned with the bundle icon metadata across open/closed states.
     } else if (resolvedFileIcon) {
