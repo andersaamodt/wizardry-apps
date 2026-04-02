@@ -83,6 +83,7 @@ assert_contains "$ui" "title=\"Press Enter to add token, Shift+Enter to run curr
 assert_matches "$ui" "function loadSpellbookAliases\\(\\)"
 assert_contains "$ui" "callBackend('list-synonyms')"
 assert_contains "$ui" "Wizardry aliases"
+assert_not_contains "$ui" "Desktop aliases"
 assert_contains "$ui" "callBackend('list-spells', [catId])"
 assert_not_contains "$ui" "callBackend('list-spells', [kind, id])"
 assert_matches "$ui" "function loadArcanaModuleItems\\(moduleName\\)"
@@ -109,6 +110,7 @@ assert_contains "$ui" "wd-theme-check"
 # Activity drawer scrollability and layout contracts.
 assert_contains "$ui" 'wd-activity-sections'
 assert_contains "$ui" 'wd-activity-list wd-scroll-list wd-activity-list-scrolled'
+assert_contains "$ui" "Command Output"
 assert_contains "$css" '.wd-scroll-list'
 assert_contains "$css" '.wd-activity-list'
 assert_contains "$css" '.wd-rail-divider::before'

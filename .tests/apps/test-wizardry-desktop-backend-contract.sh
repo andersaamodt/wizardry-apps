@@ -4,6 +4,8 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 backend="$root/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh"
+tmp_spellbook=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-desktop-spellbook.XXXXXX")
+trap 'rm -rf "$tmp_spellbook"' EXIT
 
 [ -f "$backend" ] || {
   printf '%s\n' "wizardry-desktop backend missing: $backend" >&2
@@ -42,6 +44,26 @@ printf '%s\n' "$spells" | grep -F "status" >/dev/null 2>&1 || {
 
 if ! sh "$backend" list-synonyms "$root" >/dev/null 2>&1; then
   printf '%s\n' "list-synonyms action failed" >&2
+  exit 1
+fi
+
+printf '%s\n' "arcana=install-menu" >"$tmp_spellbook/.default-synonyms"
+SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" add-synonym leap jump-to-marker >/dev/null 2>&1 || {
+  printf '%s\n' "add-synonym action failed" >&2
+  exit 1
+}
+tmp_synonyms=$(SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" list-synonyms)
+printf '%s\n' "$tmp_synonyms" | grep -F "leap|jump-to-marker|custom" >/dev/null 2>&1 || {
+  printf '%s\n' "add-synonym did not create expected custom row" >&2
+  exit 1
+}
+SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" remove-synonym leap >/dev/null 2>&1 || {
+  printf '%s\n' "remove-synonym action failed" >&2
+  exit 1
+}
+tmp_synonyms_after=$(SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" list-synonyms)
+if printf '%s\n' "$tmp_synonyms_after" | grep -F "leap|" >/dev/null 2>&1; then
+  printf '%s\n' "remove-synonym did not remove custom row" >&2
   exit 1
 fi
 

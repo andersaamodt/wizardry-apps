@@ -15,6 +15,8 @@ Actions:
   list-spell-categories [ROOT_HINT]
   list-spells SPELL_REF [ROOT_HINT]
   list-synonyms
+  add-synonym ALIAS TARGET
+  remove-synonym ALIAS
   run-spell SPELL_REF SPELL_NAME [ROOT_HINT]
   spell-help SPELL_REF SPELL_NAME [ROOT_HINT]
   list-menu-spells [ROOT_HINT]
@@ -151,7 +153,7 @@ normalize_status() {
   status=$(printf '%s' "$status" | tr '\r' ' ')
   status=$(printf '%s' "$status" | awk '{$1=$1; print}' )
   if [ -z "$status" ]; then
-    status='coming soon'
+    status='not installed'
   fi
   printf '%s\n' "$status"
 }
@@ -658,6 +660,120 @@ cmd_list_synonyms() {
   rm -f "$custom_tmp" "$default_tmp"
 }
 
+spellbook_home_dir() {
+  printf '%s\n' "${SPELLBOOK_DIR:-"${HOME:-.}/.spellbook"}"
+}
+
+spellbook_custom_synonyms_file() {
+  spell_home=$(spellbook_home_dir)
+  printf '%s\n' "$spell_home/.synonyms"
+}
+
+cmd_add_synonym() {
+  alias_name=${1-}
+  target=${2-}
+
+  [ -n "$alias_name" ] && [ -n "$target" ] || {
+    printf '%s\n' "wizardry-desktop-backend: add-synonym requires ALIAS TARGET" >&2
+    exit 2
+  }
+  safe_name "$alias_name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid synonym alias: $alias_name" >&2
+    exit 2
+  }
+  case "$target" in
+    *'
+'*|*''*)
+      printf '%s\n' "wizardry-desktop-backend: synonym target must be one line" >&2
+      exit 2
+      ;;
+    *)
+      ;;
+  esac
+
+  custom_file=$(spellbook_custom_synonyms_file)
+  spell_home=${custom_file%/*}
+  mkdir -p "$spell_home"
+  [ -f "$custom_file" ] || : >"$custom_file"
+
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-synonyms-write.XXXXXX")
+  awk -v key="$alias_name" -v value="$target" '
+    BEGIN {
+      replaced = 0
+    }
+    {
+      line = $0
+      gsub(/\r/, "", line)
+      if (line ~ /^[[:space:]]*#/ || line ~ /^[[:space:]]*$/) {
+        print line
+        next
+      }
+      split(line, parts, "=")
+      existing = parts[1]
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", existing)
+      if (existing == key) {
+        if (replaced == 0) {
+          print key "=" value
+          replaced = 1
+        }
+        next
+      }
+      print line
+    }
+    END {
+      if (replaced == 0) {
+        print key "=" value
+      }
+    }
+  ' "$custom_file" >"$tmp_file"
+
+  mv "$tmp_file" "$custom_file"
+  printf '%s|%s\n' "$alias_name" "$target"
+  record_watch "app" "spellbook:add-synonym:$alias_name" "wizardry-core" "ok"
+}
+
+cmd_remove_synonym() {
+  alias_name=${1-}
+  [ -n "$alias_name" ] || {
+    printf '%s\n' "wizardry-desktop-backend: remove-synonym requires ALIAS" >&2
+    exit 2
+  }
+  safe_name "$alias_name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid synonym alias: $alias_name" >&2
+    exit 2
+  }
+
+  custom_file=$(spellbook_custom_synonyms_file)
+  [ -f "$custom_file" ] || {
+    printf '%s\n' "$alias_name"
+    record_watch "app" "spellbook:remove-synonym:$alias_name" "wizardry-core" "ok"
+    return
+  }
+
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-synonyms-write.XXXXXX")
+  awk -v key="$alias_name" '
+    {
+      line = $0
+      gsub(/\r/, "", line)
+      if (line ~ /^[[:space:]]*#/ || line ~ /^[[:space:]]*$/) {
+        print line
+        next
+      }
+      split(line, parts, "=")
+      existing = parts[1]
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", existing)
+      if (existing == key) {
+        next
+      }
+      print line
+    }
+  ' "$custom_file" >"$tmp_file"
+
+  mv "$tmp_file" "$custom_file"
+  printf '%s\n' "$alias_name"
+  record_watch "app" "spellbook:remove-synonym:$alias_name" "wizardry-core" "ok"
+}
+
 menu_script_dirs() {
   root=${1-}
   for dir in \
@@ -1028,15 +1144,15 @@ cmd_list_system_menu_actions() {
   fi
 
   if menu_action_available "$root" "shutdown-menu"; then
-    print_system_menu_action "system:restart-menu" "Restart..." "menu" "Open the shutdown/restart power menu in Terminal." "1" "1" ""
+    print_system_menu_action "system:restart-menu" "Restart..." "menu" "Open the shutdown/restart power menu in Terminal." "0" "1" ""
   else
-    print_system_menu_action "system:restart-menu" "Restart..." "menu" "Open the shutdown/restart power menu in Terminal." "1" "0" "shutdown-menu is unavailable."
+    print_system_menu_action "system:restart-menu" "Restart..." "menu" "Open the shutdown/restart power menu in Terminal." "0" "0" "shutdown-menu is unavailable."
   fi
 
   if hascmd update-all || [ -x "$WIZARDRY_DIR_FALLBACK/spells/system/update-all" ]; then
-    print_system_menu_action "system:update-all" "Update all software" "spell" "Run update-all with verbose output." "1" "1" ""
+    print_system_menu_action "system:update-all" "Update all software" "spell" "Run update-all with verbose output." "0" "1" ""
   else
-    print_system_menu_action "system:update-all" "Update all software" "spell" "Run update-all with verbose output." "1" "0" "update-all is unavailable."
+    print_system_menu_action "system:update-all" "Update all software" "spell" "Run update-all with verbose output." "0" "0" "update-all is unavailable."
   fi
 
   if hascmd update-wizardry || [ -x "$WIZARDRY_DIR_FALLBACK/spells/.wizardry/update-wizardry" ]; then
@@ -1053,9 +1169,9 @@ cmd_list_system_menu_actions() {
 
   if is_nixos_host; then
     if hascmd nixos-rebuild; then
-      print_system_menu_action "system:nixos-rebuild" "Rebuild NixOS" "command" "Run sudo nixos-rebuild switch in Terminal." "1" "1" ""
+      print_system_menu_action "system:nixos-rebuild" "Rebuild NixOS" "command" "Run sudo nixos-rebuild switch in Terminal." "0" "1" ""
     else
-      print_system_menu_action "system:nixos-rebuild" "Rebuild NixOS" "command" "Run sudo nixos-rebuild switch in Terminal." "1" "0" "nixos-rebuild is unavailable."
+      print_system_menu_action "system:nixos-rebuild" "Rebuild NixOS" "command" "Run sudo nixos-rebuild switch in Terminal." "0" "0" "nixos-rebuild is unavailable."
     fi
   fi
 
@@ -1078,9 +1194,9 @@ cmd_list_system_menu_actions() {
   fi
 
   if [ -f "$uninstall_script" ]; then
-    print_system_menu_action "system:uninstall-wizardry" "Uninstall wizardry" "script" "Run wizardry uninstall script." "1" "1" ""
+    print_system_menu_action "system:uninstall-wizardry" "Uninstall wizardry" "script" "Run wizardry uninstall script." "0" "1" ""
   else
-    print_system_menu_action "system:uninstall-wizardry" "Uninstall wizardry" "script" "Run wizardry uninstall script." "1" "0" ".uninstall script is unavailable."
+    print_system_menu_action "system:uninstall-wizardry" "Uninstall wizardry" "script" "Run wizardry uninstall script." "0" "0" ".uninstall script is unavailable."
   fi
 }
 
@@ -2032,6 +2148,12 @@ case "$action" in
     ;;
   list-synonyms)
     cmd_list_synonyms "$@"
+    ;;
+  add-synonym)
+    cmd_add_synonym "$@"
+    ;;
+  remove-synonym)
+    cmd_remove_synonym "$@"
     ;;
   run-spell)
     cmd_run_spell "$@"

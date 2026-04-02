@@ -20,9 +20,7 @@
 
   <main id="wd-app" class="wd-app-shell hidden" aria-hidden="true">
     <aside id="left-rail" class="wd-left-rail" aria-label="Wizardry workflow list">
-      <header class="wd-rail-head">
-        <h1>Wizardry Desktop</h1>
-      </header>
+      <header class="wd-rail-head" aria-hidden="true"></header>
       <nav id="left-nav" class="wd-nav" role="listbox" aria-label="Wizardry pages"></nav>
       <footer class="wd-rail-footer">
         <button id="settings-toggle" type="button" class="wd-icon-btn" title="Settings" aria-label="Open settings">⚙</button>
@@ -57,7 +55,11 @@
             </span>
             <span class="wd-hidden">Compose</span>
           </button>
-          <button id="activity-toggle" type="button" class="wd-icon-btn" aria-label="Toggle Casting Watch">✦</button>
+          <button id="activity-toggle" type="button" class="wd-icon-btn wd-watch-btn" title="Toggle Casting Watch" aria-label="Toggle Casting Watch" aria-pressed="false">
+            <svg viewBox="0 0 18 18" focusable="false" aria-hidden="true">
+              <path d="M7.5 3.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6Zm0 1.3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm4.4 6.1 3.1 3.1-.9.9-3.1-3.1.9-.9Z" fill="currentColor"></path>
+            </svg>
+          </button>
         </div>
       </header>
       <section id="content-scroll" class="wd-content-scroll">
@@ -221,9 +223,9 @@
         activityLoading: false,
         activity: {
           casting: [],
-          app: []
+          app: [],
+          output: []
         },
-        spellbook: [],
         activityOpen: false,
         activityDrawerWidth: 340,
         activityWatchIntervalMs: 2000,
@@ -1378,10 +1380,14 @@
         composerSetActiveBlock(activeSet);
       }
 
-      function updateComposerOutput(value) {
+      function updateComposerOutput(value, options) {
+        options = options || {};
         state.composer.output = String(value == null ? '' : value).trim() || 'No command output.';
         if (els.composerOutput) {
           setText(els.composerOutput, state.composer.output);
+        }
+        if (!options.silent) {
+          pushCommandOutput('composer', state.composer.output);
         }
       }
 
@@ -1559,7 +1565,7 @@
         renderComposerFeedback(plan);
         renderComposerArgAssistant(plan);
         renderComposerPreview(plan);
-        updateComposerOutput(state.composer.output || 'No command run yet.');
+        updateComposerOutput(state.composer.output || 'No command run yet.', { silent: true });
         if (els.composerRun) {
           els.composerRun.title = 'Press Enter to add token, Shift+Enter to run current command.';
           els.composerRun.disabled = state.composer.running || state.actionInFlight || !plan.ready;
@@ -1662,9 +1668,12 @@
         if (!values.alias || !values.command) {
           return;
         }
-        addSynonym(values.alias, values.command);
-        clearSynonymInputs();
-        setSynonymDialogOpen(false);
+        addSynonym(values.alias, values.command).then(function () {
+          clearSynonymInputs();
+          setSynonymDialogOpen(false);
+        }).catch(function () {
+          // keep dialog open so user can fix values
+        });
       }
 
       function routeMenuActionToGui(actionName, params) {
@@ -1735,7 +1744,7 @@
 
       function pushActivity(kind, message, payload) {
         var section = payload && payload.section ? payload.section : (kind === 'cast' ? 'casting' : 'app');
-        if (section !== 'casting' && section !== 'app') {
+        if (section !== 'casting' && section !== 'app' && section !== 'output') {
           section = kind === 'cast' ? 'casting' : 'app';
         }
         var bucket = state.activity[section];
@@ -1753,6 +1762,18 @@
           bucket.length = state.activityRowsLimit;
         }
         renderActivity();
+      }
+
+      function pushCommandOutput(source, text) {
+        var message = String(text == null ? '' : text).trim();
+        if (!message) {
+          return;
+        }
+        pushActivity('output', source + ': ' + message, {
+          section: 'output',
+          source: source,
+          app: 'wizardry-desktop'
+        });
       }
 
       function normalizeWatchPayload(part) {
@@ -1850,18 +1871,24 @@
         }
         var casting = state.activity.casting || [];
         var app = state.activity.app || [];
+        var output = state.activity.output || [];
         var visibleCasting = casting;
         var visibleApp = app;
+        var visibleOutput = output;
 
         if (els.activityFeed) {
           var castingRows = visibleCasting.slice(0, 180);
           var commandRows = visibleApp.slice(0, 180);
+          var outputRows = visibleOutput.slice(0, 180);
           var castingHtml = '';
           var commandHtml = '';
+          var outputHtml = '';
           var castingCount = Number(visibleCasting.length || 0);
           var commandCount = Number(visibleApp.length || 0);
+          var outputCount = Number(visibleOutput.length || 0);
           var castingTitle = 'Active Casting' + (castingCount ? ' (' + castingCount + ')' : '');
           var commandTitle = 'App Commands' + (commandCount ? ' (' + commandCount + ')' : '');
+          var outputTitle = 'Command Output' + (outputCount ? ' (' + outputCount + ')' : '');
 
           if (!castingRows.length) {
             castingHtml = '<p class="wd-empty">No cast actions yet.</p>';
@@ -1873,12 +1900,18 @@
           } else {
             commandHtml = castRowsHtml(commandRows);
           }
+          if (!outputRows.length) {
+            outputHtml = '<p class="wd-empty">No command output yet.</p>';
+          } else {
+            outputHtml = castRowsHtml(outputRows);
+          }
 
           els.activityFeed.innerHTML = '<div class="wd-activity-sections"><section class="wd-activity-section"><h4>' + escapeText(castingTitle) + '</h4><div class="wd-activity-list wd-scroll-list wd-activity-list-scrolled">' + castingHtml + '</div></section>' +
-            '<section class="wd-activity-section"><h4>' + escapeText(commandTitle) + '</h4><div class="wd-activity-list wd-scroll-list wd-activity-list-scrolled">' + commandHtml + '</div></section></div>';
+            '<section class="wd-activity-section"><h4>' + escapeText(commandTitle) + '</h4><div class="wd-activity-list wd-scroll-list wd-activity-list-scrolled">' + commandHtml + '</div></section>' +
+            '<section class="wd-activity-section"><h4>' + escapeText(outputTitle) + '</h4><div class="wd-activity-list wd-scroll-list wd-activity-list-scrolled">' + outputHtml + '</div></section></div>';
         }
         if (els.activityCount) {
-          var total = Number(visibleCasting.length || 0) + Number(visibleApp.length || 0);
+          var total = Number(visibleCasting.length || 0) + Number(visibleApp.length || 0) + Number(visibleOutput.length || 0);
           setText(els.activityCount, total ? total + ' events tracked' : 'No events yet');
         }
       }
@@ -2099,18 +2132,6 @@
           syncPrefsStatus();
           state.activeTheme = prefs.theme || prefs.desktop_theme || 'adept';
           state.railWidth = Number(prefs.leftRailWidth || state.railWidth);
-          var rawSynonyms = prefs.spellbook_synonyms || '';
-          if (rawSynonyms) {
-            state.spellbook = rawSynonyms.split('\n')
-              .map(function (row) {
-                var parts = String(row || '').split('=>');
-                if (!parts[0] || !parts[1]) {
-                  return null;
-                }
-                return { alias: String(parts[0]).trim(), command: String(parts[1]).trim() };
-              })
-              .filter(Boolean);
-          }
           return ensureThemes();
         }).catch(function () {
           state.prefsLoaded = false;
@@ -2247,12 +2268,7 @@
       }
 
       function castCategoryDisplay(cat) {
-        var title = safeShortText(cat.title);
-        var kind = String(cat.kind || '').trim();
-        if (!kind) {
-          return title;
-        }
-        return title + ' (' + escapeText(kind) + ')';
+        return safeShortText(cat.title);
       }
 
       function listItemHtml(row) {
@@ -2299,7 +2315,7 @@
             var expanded = state.cast.expandedCategory === cat.id ? ' wd-expanded' : '';
             var summary = String(cat.count) + ' spell' + (cat.count === 1 ? '' : 's');
             html += '<details class="wd-category' + expanded + '"' + (expanded ? ' open' : '') + ' data-category="' + cat.id + '">';
-            html += '<summary class="wd-category-head"><span class="wd-category-name">' + castCategoryDisplay(cat) + '</span><span class="wd-category-count">' + escapeText(summary) + '</span><span class="wd-pill wd-category-kind">' + escapeText(cat.kind) + '</span></summary>';
+            html += '<summary class="wd-category-head"><span class="wd-category-name">' + castCategoryDisplay(cat) + '</span><span class="wd-pill wd-category-kind">' + escapeText(cat.kind) + '</span><span class="wd-category-count">' + escapeText(summary) + '</span></summary>';
             if (state.spellCache[cat.id]) {
               html += '<div class="wd-category-body">';
               for (var s = 0; s < state.spellCache[cat.id].length; s += 1) {
@@ -2308,7 +2324,7 @@
               }
               html += '</div>';
             } else {
-              html += '<p class="wd-empty">No spells loaded.</p>';
+              html += '<p class="wd-empty">Expand this category to load spells.</p>';
             }
             html += '</details>';
           }
@@ -2340,30 +2356,20 @@
         var html = '<section class="wd-panel"><div class="wd-panel-head"><h3>Synonyms</h3></div>' +
           '<p class="wd-subline">Map shortcut aliases to spell command lines.</p>';
         html += '<h4>Wizardry aliases</h4>';
-        html += '<p class="wd-subline">Custom and default aliases from <code>~/.spellbook/.synonyms</code> and <code>.default-synonyms</code>.</p>';
+        html += '<p class="wd-subline">Aliases from <code>~/.spellbook/.synonyms</code> (custom) and <code>.default-synonyms</code>.</p>';
         html += '<div class="wd-synonym-list-wrap">';
         html += '<div class="wd-list wd-synonym-list">';
         for (var i = 0; i < state.spellbookBuiltin.length; i += 1) {
           var builtinItem = state.spellbookBuiltin[i];
           var scopeLabel = builtinItem.scope === 'custom' ? 'custom' : 'default';
-          html += '<div class="wd-list-row wd-synonym-row"><span class="wd-list-main wd-col-2">' + escapeText(builtinItem.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(builtinItem.command) + '</span><span class="wd-row-actions"><span class="wd-pill wd-secondary">' + escapeText(scopeLabel) + '</span></span></div>';
+          html += '<div class="wd-list-row wd-synonym-row"><span class="wd-list-main wd-col-2">' + escapeText(builtinItem.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(builtinItem.command) + '</span><span class="wd-row-actions"><span class="wd-pill wd-secondary">' + escapeText(scopeLabel) + '</span>';
+          if (builtinItem.scope === 'custom') {
+            html += '<button type="button" class="wd-polite-btn wd-tiny wd-danger" data-remove-synonym="' + escapeAttrValue(builtinItem.alias) + '">Remove</button>';
+          }
+          html += '</span></div>';
         }
         if (!state.spellbookBuiltin.length) {
           html += '<p class="wd-empty">No wizardry aliases found.</p>';
-        }
-        html += '</div>';
-        html += '</div>';
-
-        html += '<h4>Desktop aliases</h4>';
-        html += '<p class="wd-subline">Aliases stored only in Wizardry Desktop preferences.</p>';
-        html += '<div class="wd-synonym-list-wrap">';
-        html += '<div class="wd-list wd-synonym-list">';
-        for (var j = 0; j < state.spellbook.length; j += 1) {
-          var item = state.spellbook[j];
-          html += '<div class="wd-list-row wd-synonym-row"><span class="wd-list-main wd-col-2">' + escapeText(item.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(item.command) + '</span><span class="wd-row-actions"><button type="button" class="wd-polite-btn wd-tiny wd-danger" data-remove-synonym="' + j + '">Remove</button></span></div>';
-        }
-        if (!state.spellbook.length) {
-          html += '<p class="wd-empty">No desktop aliases yet.</p>';
         }
         html += '</div>';
         html += '</div>';
@@ -2466,7 +2472,7 @@
         html += '<div class="wd-inline-form">';
         html += '<button type="button" class="wd-polite-btn" data-admin-action="arcana:themes">List Themes</button>';
         html += '<button type="button" class="wd-polite-btn wd-secondary" data-admin-action="arcana:reload">Reload Spell Index</button>';
-        html += '<p id="arcana-output" class="wd-mono-box wd-inline-output">Launch an action to view output.</p>';
+        html += '<p class="wd-subline">Command output appears in Casting Watch.</p>';
         html += '</div>';
         html += '</section>';
         return html;
@@ -2493,26 +2499,26 @@
         } else if (!state.systemMenuActions.length) {
           html += '<p class="wd-empty">No Computer actions found.</p>';
         } else {
-          html += '<div class="wd-list wd-system-actions">';
+          html += '<div class="wd-system-actions">';
           for (var i = 0; i < state.systemMenuActions.length; i += 1) {
             var row = state.systemMenuActions[i];
-            var actionLabel = row.mode === 'menu' ? 'Open' : 'Run';
             var disabled = row.available ? '' : ' disabled';
-            var buttonTitle = row.available ? '' : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
-            html += '<div class="wd-list-row wd-system-row">';
-            html += '<span class="wd-list-main wd-col-2">' + escapeText(row.label) + '</span>';
-            html += '<span class="wd-list-meta wd-system-desc">' + escapeText(row.description) + '</span>';
-            html += '<span class="wd-row-actions">';
+            var buttonTitle = row.available
+              ? (' title="' + escapeAttrValue((row.mode === 'menu' ? 'Open ' : 'Run ') + row.label) + '"')
+              : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
+            html += '<div class="wd-system-row">';
+            html += '<button type="button" class="wd-system-name-btn" data-system-menu-action="' + escapeAttrValue(row.id) + '" data-system-label="' + escapeAttrValue(row.label) + '"' + disabled + buttonTitle + '>' + escapeText(row.label) + '</button>';
+            html += '<span class="wd-system-desc">' + escapeText(row.description) + '</span>';
+            html += '<span class="wd-system-actions-right">';
             html += '<span class="wd-pill">' + escapeText(systemActionModeLabel(row.mode)) + '</span>';
-            if (row.danger) {
-              html += '<span class="wd-pill wd-system-danger">danger</span>';
+            if (row.mode === 'menu') {
+              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-system-menu-action="' + escapeAttrValue(row.id) + '" data-system-label="' + escapeAttrValue(row.label) + '"' + disabled + buttonTitle + '>Open</button>';
             }
-            html += '<button type="button" class="wd-polite-btn wd-tiny" data-system-menu-action="' + escapeAttrValue(row.id) + '" data-system-label="' + escapeAttrValue(row.label) + '" data-system-danger="' + (row.danger ? '1' : '0') + '"' + disabled + buttonTitle + '>' + escapeText(actionLabel) + '</button>';
             html += '</span></div>';
           }
           html += '</div>';
         }
-        html += '<pre id="system-output" class="wd-mono-box">' + escapeText(state.systemOutput || 'Choose a Computer action to run.') + '</pre>';
+        html += '<p class="wd-subline">Command output appears in Casting Watch.</p>';
         html += '</section>';
         return html;
       }
@@ -2523,8 +2529,7 @@
           '<div class="wd-tool-strip">' +
           '<button type="button" class="wd-polite-btn" data-mud-action="status">Status</button>' +
           '<button type="button" class="wd-polite-btn" data-mud-action="environment">Environment</button>' +
-          '</div>' +
-          '<pre id="mud-output" class="wd-mono-box">No action yet.</pre>' +
+          '</div><p class="wd-subline">Command output appears in Casting Watch.</p>' +
           '</section>';
       }
 
@@ -2700,6 +2705,10 @@
           return;
         }
         els.activityDrawer.classList.toggle('wd-closed', !state.activityOpen);
+        if (els.activityToggle) {
+          els.activityToggle.classList.toggle('wd-active', state.activityOpen);
+          els.activityToggle.setAttribute('aria-pressed', state.activityOpen ? 'true' : 'false');
+        }
         if (state.activityOpen) {
           renderActivity();
           if (els.activityFeed) {
@@ -2954,7 +2963,7 @@
             if (!name) {
               continue;
             }
-            parsed.push({ name: name, status: status || 'coming soon', label: label || name });
+            parsed.push({ name: name, status: status || 'not installed', label: label || name });
           }
           state.arcanaInstall = parsed;
           if (state.arcanaExpandedModule) {
@@ -3088,12 +3097,6 @@
           return;
         }
         var label = String(options.label || id);
-        var isDanger = !!options.danger;
-        if (isDanger && !window.confirm('Run "' + label + '"? This may change system state.')) {
-          state.systemOutput = 'Cancelled: ' + label;
-          setOutputBlock('system-output', state.systemOutput);
-          return;
-        }
 
         state.actionInFlight = true;
         state.systemOutput = 'Running ' + label + ' ...';
@@ -3188,7 +3191,7 @@
         if (!navigator.clipboard) {
           return;
         }
-        var text = state.activity.casting.concat(state.activity.app).map(function (row) {
+        var text = state.activity.casting.concat(state.activity.app, state.activity.output).map(function (row) {
           return timestampForRow(row.ts) + ' ' + row.kind + ' ' + row.text +
             (row.payload && row.payload.app ? (' app=' + row.payload.app) : '') +
             (row.payload && row.payload.source ? (' source=' + row.payload.source) : '');
@@ -3198,30 +3201,40 @@
 
       function addSynonym(alias, command) {
         if (!alias || !command) {
-          return;
+          return Promise.resolve();
         }
-        state.spellbook.push({ alias: alias, command: command });
-        pushActivity('alias', 'Added synonym ' + alias + ' -> ' + command, { alias: alias });
-        persistSynonyms();
-        renderPage();
+        return callBackend('add-synonym', [alias, command]).then(function () {
+          pushActivity('app', 'Added synonym ' + alias + ' -> ' + command, { section: 'app', app: 'wizardry-core', source: 'add-synonym', status: 'ok' });
+          return loadSpellbookAliases().then(function () {
+            if (state.activePage === 'spellbook') {
+              renderPage();
+            }
+          });
+        }).catch(function (error) {
+          var message = String(error && error.message ? error.message : error || 'Failed to add synonym.');
+          pushActivity('app', 'add-synonym failed: ' + message, { section: 'app', app: 'wizardry-core', source: 'add-synonym', status: 'error' });
+          setOutputBlock('system-output', message);
+          throw error;
+        });
       }
 
-      function removeSynonym(index) {
-        var item = state.spellbook[index];
-        if (!item) {
-          return;
+      function removeSynonym(aliasName) {
+        var alias = String(aliasName || '').trim();
+        if (!alias) {
+          return Promise.resolve();
         }
-        state.spellbook.splice(index, 1);
-        pushActivity('alias', 'Removed synonym ' + item.alias, {});
-        persistSynonyms();
-        renderPage();
-      }
-
-      function persistSynonyms() {
-        var normalized = state.spellbook.map(function (item) {
-          return item.alias + '=>' + item.command;
-        }).join('\n');
-        savePreference('spellbook_synonyms', normalized);
+        return callBackend('remove-synonym', [alias]).then(function () {
+          pushActivity('app', 'Removed synonym ' + alias, { section: 'app', app: 'wizardry-core', source: 'remove-synonym', status: 'ok' });
+          return loadSpellbookAliases().then(function () {
+            if (state.activePage === 'spellbook') {
+              renderPage();
+            }
+          });
+        }).catch(function (error) {
+          var message = String(error && error.message ? error.message : error || 'Failed to remove synonym.');
+          pushActivity('app', 'remove-synonym failed: ' + message, { section: 'app', app: 'wizardry-core', source: 'remove-synonym', status: 'error' });
+          throw error;
+        });
       }
 
       function openSettings(open) {
@@ -3265,10 +3278,11 @@
 
       function setOutputBlock(id, value) {
         var el = document.getElementById(id);
-        if (!el) {
-          return;
+        var outputText = String(value == null ? '' : value).trim() || 'No output.';
+        if (el) {
+          el.textContent = outputText;
         }
-        el.textContent = String(value == null ? '' : value).trim() || 'No output.';
+        pushCommandOutput(id, outputText);
       }
 
       function bindEvents() {
@@ -3824,15 +3838,13 @@
             if (systemMenuAction) {
               var systemActionId = systemMenuAction.getAttribute('data-system-menu-action');
               var systemActionLabel = systemMenuAction.getAttribute('data-system-label') || systemActionId;
-              var systemActionDanger = systemMenuAction.getAttribute('data-system-danger') === '1';
               if (systemActionId) {
                 if (event.shiftKey || event.metaKey || event.ctrlKey) {
                   composerOpenWithTokens(['run-system', systemActionId], { userInitiated: true });
                   return;
                 }
                 runSystemMenuAction(systemActionId, {
-                  label: systemActionLabel,
-                  danger: systemActionDanger
+                  label: systemActionLabel
                 });
               }
               return;
@@ -3963,11 +3975,11 @@
       }
 
       function removeSynonymFromElement(index) {
-        var idx = Number(index);
-        if (!Number.isInteger(idx)) {
+        var aliasName = String(index || '').trim();
+        if (!aliasName) {
           return;
         }
-        removeSynonym(idx);
+        removeSynonym(aliasName);
       }
 
       function bindCategoryDetails() {
@@ -4008,7 +4020,7 @@
           } else if (state.cast.expandedCategory === categoryId) {
             state.cast.expandedCategory = '';
           }
-        });
+        }, true);
       }
 
       function initThemeControlFallback() {

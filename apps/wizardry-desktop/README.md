@@ -8,6 +8,7 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
 - Right pane renders page content and action output.
 - Activity drawer (`Casting Watch`) is a right-side utility panel, not a primary nav page.
 - Command Composer is a modal utility opened from the toolbar icon (`Compose command...`).
+- Casting Watch is the right-side output drawer for casting/app activity and command output.
 
 ## Backend Contract
 
@@ -21,6 +22,7 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
   - `${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/wizardry-desktop/config`
 - Watch activity log persists under:
   - `${XDG_DATA_HOME:-$HOME/.local/share}/wizardry/wizardry-desktop/watch.log`
+- Spellbook alias edits are written to wizardry files (`~/.spellbook/.synonyms`) via backend actions.
 
 ## Theme Contract
 
