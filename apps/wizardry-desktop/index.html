@@ -206,18 +206,24 @@
         cast: {
           categories: [],
           memorized: [],
-          expandedCategory: ''
+          selectedCategory: ''
         },
         menuCatalog: [],
         spellCache: {},
         arcanaInstall: [],
-        arcanaExpandedModule: '',
+        arcanaSelectedModule: '',
         arcanaModuleItems: {},
         arcanaModuleItemsLoading: {},
         mainMenuOrder: DEFAULT_MAIN_MENU_ORDER.slice(0),
         systemMenuLoading: false,
         systemMenuActions: [],
         systemOutput: 'Choose a Computer action to run.',
+        systemSelectedAction: '',
+        mudSelectedAction: '',
+        castDrillTransition: '',
+        arcanaDrillTransition: '',
+        systemDrillTransition: '',
+        mudDrillTransition: '',
         spellbookAliasesLoaded: false,
         spellbookBuiltin: [],
         activityLoading: false,
@@ -2271,10 +2277,143 @@
         return safeShortText(cat.title);
       }
 
-      function listItemHtml(row) {
-        var controls = '<button type="button" class="wd-polite-btn wd-tiny" data-help="' + escapeAttrValue(row.kind + '|' + row.value) + '">Help</button>' +
-          '<button type="button" class="wd-polite-btn wd-tiny" data-run-spell="' + escapeAttrValue(row.kind + '|' + row.value) + '">Run</button>';
-        return '<div class="wd-list-row"><span class="wd-list-main">' + escapeText(row.label) + '</span><span class="wd-list-meta">' + escapeText(row.kind) + '</span><span class="wd-row-actions">' + controls + '</span></div>';
+      function drillTrackClass(detailOpen, transition) {
+        var classes = 'wd-drill-track ' + (detailOpen ? 'wd-drill-depth-1' : 'wd-drill-depth-0');
+        if (transition === 'forward') {
+          classes += ' wd-drill-animate-forward';
+        } else if (transition === 'back') {
+          classes += ' wd-drill-animate-back';
+        }
+        return classes;
+      }
+
+      function drillBackButton(sectionName) {
+        return '<button type="button" class="wd-drill-back" data-drill-back="' + escapeAttrValue(sectionName) + '" title="Back" aria-label="Back">←</button>';
+      }
+
+      function findCastCategoryById(categoryId) {
+        var id = String(categoryId || '').trim();
+        if (!id) {
+          return null;
+        }
+        for (var i = 0; i < state.cast.categories.length; i += 1) {
+          var row = state.cast.categories[i];
+          if (row && row.id === id) {
+            return row;
+          }
+        }
+        return null;
+      }
+
+      function findArcanaModuleByName(name) {
+        var key = String(name || '').trim();
+        if (!key) {
+          return null;
+        }
+        for (var i = 0; i < state.arcanaInstall.length; i += 1) {
+          var row = state.arcanaInstall[i];
+          if (row && row.name === key) {
+            return row;
+          }
+        }
+        return null;
+      }
+
+      function findSystemActionById(actionId) {
+        var id = String(actionId || '').trim();
+        if (!id) {
+          return null;
+        }
+        for (var i = 0; i < state.systemMenuActions.length; i += 1) {
+          var row = state.systemMenuActions[i];
+          if (row && row.id === id) {
+            return row;
+          }
+        }
+        return null;
+      }
+
+      function mudActionRows() {
+        return [
+          { id: 'status', label: 'Status', description: 'Show MUD runtime status.' },
+          { id: 'environment', label: 'Environment', description: 'Show active MUD shell environment.' }
+        ];
+      }
+
+      function mudActionById(actionId) {
+        var id = String(actionId || '').trim();
+        if (!id) {
+          return null;
+        }
+        var rows = mudActionRows();
+        for (var i = 0; i < rows.length; i += 1) {
+          if (rows[i].id === id) {
+            return rows[i];
+          }
+        }
+        return null;
+      }
+
+      function setCastSelectedCategory(categoryId, transition) {
+        var id = String(categoryId || '').trim();
+        if (id && !findCastCategoryById(id)) {
+          return;
+        }
+        if (state.cast.selectedCategory === id && !transition) {
+          return;
+        }
+        state.cast.selectedCategory = id;
+        state.castDrillTransition = transition || '';
+        if (id && !Object.prototype.hasOwnProperty.call(state.spellCache, id)) {
+          loadSpellRowsForCategory(id).then(function () {
+            if (state.activePage === 'cast' && state.cast.selectedCategory === id) {
+              renderPage();
+            }
+          }).catch(function () {});
+        }
+        renderPage();
+      }
+
+      function setArcanaSelectedModule(moduleName, transition) {
+        var name = String(moduleName || '').trim();
+        if (name && !findArcanaModuleByName(name)) {
+          return;
+        }
+        if (state.arcanaSelectedModule === name && !transition) {
+          return;
+        }
+        state.arcanaSelectedModule = name;
+        state.arcanaDrillTransition = transition || '';
+        if (name && !Object.prototype.hasOwnProperty.call(state.arcanaModuleItems, name) && !state.arcanaModuleItemsLoading[name]) {
+          loadArcanaModuleItems(name).catch(function () {});
+        }
+        renderPage();
+      }
+
+      function setSystemSelectedAction(actionId, transition) {
+        var id = String(actionId || '').trim();
+        if (id && !findSystemActionById(id)) {
+          return;
+        }
+        if (state.systemSelectedAction === id && !transition) {
+          return;
+        }
+        state.systemSelectedAction = id;
+        state.systemDrillTransition = transition || '';
+        renderPage();
+      }
+
+      function setMudSelectedAction(actionId, transition) {
+        var id = String(actionId || '').trim();
+        if (id && !mudActionById(id)) {
+          return;
+        }
+        if (state.mudSelectedAction === id && !transition) {
+          return;
+        }
+        state.mudSelectedAction = id;
+        state.mudDrillTransition = transition || '';
+        renderPage();
       }
 
       function menuRowByName(name) {
@@ -2302,37 +2441,67 @@
       }
 
       function renderCastPage() {
-        var html = '<section class="wd-panel"><h3>Spell Categories</h3>' +
-          '<p class="wd-subline">Select a category to inspect available spells.</p>';
-        if (state.castPageLoading) {
-          html += '<p class="wd-empty">Loading spell categories…</p>';
+        var selectedCategory = findCastCategoryById(state.cast.selectedCategory);
+        if (!selectedCategory) {
+          state.cast.selectedCategory = '';
+        }
+        var transition = state.castDrillTransition;
+        state.castDrillTransition = '';
+
+        var rootHtml = '';
+        if (state.castPageLoading && !state.cast.categories.length) {
+          rootHtml += '<p class="wd-empty">Loading spell categories…</p>';
         } else if (!state.cast.categories.length) {
-          html += '<p class="wd-empty">No categories found. Configure spell roots under ~/.wizardry or repo spells folders.</p>';
+          rootHtml += '<p class="wd-empty">No categories found. Configure spell roots under ~/.wizardry or repo spells folders.</p>';
         } else {
-          html += '<div class="wd-categories">';
+          rootHtml += '<div class="wd-drill-list wd-cast-list">';
           for (var i = 0; i < state.cast.categories.length; i += 1) {
             var cat = state.cast.categories[i];
-            var expanded = state.cast.expandedCategory === cat.id ? ' wd-expanded' : '';
             var summary = String(cat.count) + ' spell' + (cat.count === 1 ? '' : 's');
-            html += '<details class="wd-category' + expanded + '"' + (expanded ? ' open' : '') + ' data-category="' + cat.id + '">';
-            html += '<summary class="wd-category-head"><span class="wd-category-name">' + castCategoryDisplay(cat) + '</span><span class="wd-pill wd-category-kind">' + escapeText(cat.kind) + '</span><span class="wd-category-count">' + escapeText(summary) + '</span></summary>';
-            if (state.spellCache[cat.id]) {
-              html += '<div class="wd-category-body">';
-              for (var s = 0; s < state.spellCache[cat.id].length; s += 1) {
-                var spell = state.spellCache[cat.id][s];
-                html += listItemHtml({ kind: cat.id, value: spell, label: spell });
-              }
-              html += '</div>';
-            } else {
-              html += '<p class="wd-empty">Expand this category to load spells.</p>';
-            }
-            html += '</details>';
+            var active = selectedCategory && selectedCategory.id === cat.id ? ' wd-drill-item-active' : '';
+            rootHtml += '<button type="button" class="wd-drill-item wd-cast-item' + active + '" data-cast-category-open="' + escapeAttrValue(cat.id) + '">';
+            rootHtml += '<span class="wd-drill-item-main wd-cast-item-main"><span class="wd-cast-title">' + castCategoryDisplay(cat) + '</span><span class="wd-pill wd-category-kind">' + escapeText(cat.kind) + '</span></span>';
+            rootHtml += '<span class="wd-cast-item-count">' + escapeText(summary) + '</span>';
+            rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
+            rootHtml += '</button>';
           }
-          html += '</div>';
+          rootHtml += '</div>';
         }
-        html += '<div class="wd-messages wd-empty">' +
-          '<p>Run a spell using <strong>Run</strong> to generate casting activity.</p>' +
-          '</div></section>';
+
+        var detailHtml = '';
+        if (!selectedCategory) {
+          detailHtml += '<p class="wd-empty">Select a spell category to inspect and cast spells.</p>';
+        } else {
+          detailHtml += '<div class="wd-drill-head">';
+          detailHtml += drillBackButton('cast');
+          detailHtml += '<h4>' + castCategoryDisplay(selectedCategory) + '</h4>';
+          detailHtml += '<span class="wd-pill wd-category-kind">' + escapeText(selectedCategory.kind) + '</span>';
+          detailHtml += '</div>';
+
+          var spells = state.spellCache[selectedCategory.id];
+          if (!Array.isArray(spells)) {
+            detailHtml += '<p class="wd-empty">Loading spells…</p>';
+          } else if (!spells.length) {
+            detailHtml += '<p class="wd-empty">No spells found in this category.</p>';
+          } else {
+            detailHtml += '<div class="wd-list wd-scroll-area wd-cast-spell-list">';
+            for (var s = 0; s < spells.length; s += 1) {
+              var spell = spells[s];
+              detailHtml += '<div class="wd-list-row wd-cast-spell-row">';
+              detailHtml += '<button type="button" class="wd-system-name-btn wd-cast-spell-btn" data-run-spell="' + escapeAttrValue(selectedCategory.id + '|' + spell) + '" title="' + escapeAttrValue('Run ' + spell) + '">' + escapeText(spell) + '</button>';
+              detailHtml += '<span class="wd-row-actions"><button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-help="' + escapeAttrValue(selectedCategory.id + '|' + spell) + '">Help</button></span>';
+              detailHtml += '</div>';
+            }
+            detailHtml += '</div>';
+          }
+        }
+
+        var html = '<section class="wd-panel"><h3>Spell Categories</h3>' +
+          '<p class="wd-subline">Use the menu list to drill into a category, then click a spell name to cast it.</p>' +
+          '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selectedCategory, transition) + '">' +
+          '<section class="wd-drill-panel">' + rootHtml + '</section>' +
+          '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
+          '</div></div>';
         if (!state.cast.memorized.length) {
           html += '<section class="wd-panel wd-spellbook-memo"><h3>Memorized Spells</h3>';
           html += '<p class="wd-subline">Spellbook entries from <code>cast --list</code>.</p>';
@@ -2428,47 +2597,72 @@
 
       function renderArcanaPage() {
         var rows = state.arcanaInstall || [];
-        var html = '<section class="wd-panel"><h3>Arcana Install Menu</h3>' +
-          '<p class="wd-subline">Accurate install state from arcana status scripts. Expand a module to inspect its menu/actions.</p>' +
-          '<div id="arcana-list" class="wd-arcana-modules">';
-        for (var i = 0; i < rows.length; i += 1) {
-          var row = rows[i];
-          var expanded = state.arcanaExpandedModule === row.name;
-          var statusTone = arcanaStatusTone(row.status);
-          var moduleItems = state.arcanaModuleItems[row.name] || [];
-          var loadingItems = !!state.arcanaModuleItemsLoading[row.name];
-          html += '<details class="wd-arcana-module"' + (expanded ? ' open' : '') + ' data-arcana-module="' + escapeAttrValue(row.name) + '">';
-          html += '<summary class="wd-arcana-head"><span class="wd-list-main wd-col-2">' + safeShortText(row.label) + '</span>';
-          html += '<span class="wd-pill wd-arcana-status wd-arcana-status-' + escapeAttrValue(statusTone) + '">' + safeShortText(row.status) + '</span></summary>';
-          html += '<div class="wd-arcana-body">';
-          html += '<div class="wd-row-actions wd-arcana-actions">';
-          html += '<button type="button" class="wd-polite-btn wd-tiny" data-install-arcana="' + escapeAttrValue(row.name) + '">Install</button>';
-          html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-arcana-menu="' + escapeAttrValue(row.name) + '">Menu</button>';
-          html += '</div>';
+        var selectedModule = findArcanaModuleByName(state.arcanaSelectedModule);
+        if (!selectedModule) {
+          state.arcanaSelectedModule = '';
+        }
+        var transition = state.arcanaDrillTransition;
+        state.arcanaDrillTransition = '';
+
+        var rootHtml = '';
+        if (!rows.length) {
+          rootHtml += '<p class="wd-empty">No arcana entries.</p>';
+        } else {
+          rootHtml += '<div id="arcana-list" class="wd-drill-list wd-arcana-modules">';
+          for (var i = 0; i < rows.length; i += 1) {
+            var row = rows[i];
+            var active = selectedModule && selectedModule.name === row.name ? ' wd-drill-item-active' : '';
+            var statusTone = arcanaStatusTone(row.status);
+            rootHtml += '<button type="button" class="wd-drill-item wd-arcana-module-item' + active + '" data-arcana-module-open="' + escapeAttrValue(row.name) + '" data-arcana-module="' + escapeAttrValue(row.name) + '">';
+            rootHtml += '<span class="wd-drill-item-main">' + safeShortText(row.label) + '</span>';
+            rootHtml += '<span class="wd-pill wd-arcana-status wd-arcana-status-' + escapeAttrValue(statusTone) + '">' + safeShortText(row.status) + '</span>';
+            rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
+            rootHtml += '</button>';
+          }
+          rootHtml += '</div>';
+        }
+
+        var detailHtml = '';
+        if (!selectedModule) {
+          detailHtml += '<p class="wd-empty">Select an Arcana module to inspect its menu/actions.</p>';
+        } else {
+          var moduleItems = state.arcanaModuleItems[selectedModule.name] || [];
+          var loadingItems = !!state.arcanaModuleItemsLoading[selectedModule.name];
+          detailHtml += '<div class="wd-drill-head">';
+          detailHtml += drillBackButton('arcana');
+          detailHtml += '<h4>' + safeShortText(selectedModule.label) + '</h4>';
+          detailHtml += '<span class="wd-pill wd-arcana-status wd-arcana-status-' + escapeAttrValue(arcanaStatusTone(selectedModule.status)) + '">' + safeShortText(selectedModule.status) + '</span>';
+          detailHtml += '</div>';
+          detailHtml += '<div class="wd-row-actions wd-arcana-actions">';
+          detailHtml += '<button type="button" class="wd-polite-btn wd-tiny" data-install-arcana="' + escapeAttrValue(selectedModule.name) + '">Install</button>';
+          detailHtml += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-arcana-menu="' + escapeAttrValue(selectedModule.name) + '">Menu</button>';
+          detailHtml += '</div>';
           if (loadingItems) {
-            html += '<p class="wd-empty">Loading module actions…</p>';
+            detailHtml += '<p class="wd-empty">Loading module actions…</p>';
           } else if (!moduleItems.length) {
-            html += '<p class="wd-empty">No module actions found.</p>';
+            detailHtml += '<p class="wd-empty">No module actions found.</p>';
           } else {
-            html += '<div class="wd-list wd-compact-list wd-scroll-area">';
+            detailHtml += '<div class="wd-list wd-compact-list wd-scroll-area">';
             for (var itemIdx = 0; itemIdx < moduleItems.length; itemIdx += 1) {
               var item = moduleItems[itemIdx];
               var label = item.kind === 'status-detail' ? String(item.value || '') : safeShortText(item.label || item.value || item.name || '');
-              html += '<div class="wd-list-row">';
-              html += '<span class="wd-list-main wd-col-2">' + escapeText(label) + '</span>';
-              html += '<span class="wd-list-meta"><code>' + safeShortText(item.name || item.value || '') + '</code></span>';
-              html += '<span class="wd-row-actions"><span class="wd-pill">' + escapeText(arcanaItemKindLabel(item.kind)) + '</span></span>';
-              html += '</div>';
+              detailHtml += '<div class="wd-list-row">';
+              detailHtml += '<span class="wd-list-main wd-col-2">' + escapeText(label) + '</span>';
+              detailHtml += '<span class="wd-list-meta"><code>' + safeShortText(item.name || item.value || '') + '</code></span>';
+              detailHtml += '<span class="wd-row-actions"><span class="wd-pill">' + escapeText(arcanaItemKindLabel(item.kind)) + '</span></span>';
+              detailHtml += '</div>';
             }
-            html += '</div>';
+            detailHtml += '</div>';
           }
-          html += '</div>';
-          html += '</details>';
+          detailHtml += '<pre id="arcana-output" class="wd-mono-box" aria-live="polite">No output.</pre>';
         }
-        if (!rows.length) {
-          html += '<p class="wd-empty">No arcana entries.</p>';
-        }
-        html += '</div>';
+
+        var html = '<section class="wd-panel"><h3>Arcana Install Menu</h3>' +
+          '<p class="wd-subline">Accurate install state from arcana status scripts.</p>' +
+          '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selectedModule, transition) + '">' +
+          '<section class="wd-drill-panel">' + rootHtml + '</section>' +
+          '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
+          '</div></div>';
         html += '<div class="wd-inline-form">';
         html += '<button type="button" class="wd-polite-btn" data-admin-action="arcana:themes">List Themes</button>';
         html += '<button type="button" class="wd-polite-btn wd-secondary" data-admin-action="arcana:reload">Reload Spell Index</button>';
@@ -2492,44 +2686,112 @@
       }
 
       function renderSystemPage() {
-        var html = '<section class="wd-panel"><h3>Computer Menu</h3>' +
-          '<p class="wd-subline">Mirrors the wizardry <code>system-menu</code> structure.</p>';
+        var selectedAction = findSystemActionById(state.systemSelectedAction);
+        if (!selectedAction) {
+          state.systemSelectedAction = '';
+        }
+        var transition = state.systemDrillTransition;
+        state.systemDrillTransition = '';
+
+        var rootHtml = '';
         if (state.systemMenuLoading) {
-          html += '<p class="wd-empty">Loading Computer actions…</p>';
+          rootHtml += '<p class="wd-empty">Loading Computer actions…</p>';
         } else if (!state.systemMenuActions.length) {
-          html += '<p class="wd-empty">No Computer actions found.</p>';
+          rootHtml += '<p class="wd-empty">No Computer actions found.</p>';
         } else {
-          html += '<div class="wd-system-actions">';
+          rootHtml += '<div class="wd-drill-list wd-system-actions">';
           for (var i = 0; i < state.systemMenuActions.length; i += 1) {
             var row = state.systemMenuActions[i];
             var disabled = row.available ? '' : ' disabled';
+            var active = selectedAction && selectedAction.id === row.id ? ' wd-drill-item-active' : '';
             var buttonTitle = row.available
-              ? (' title="' + escapeAttrValue((row.mode === 'menu' ? 'Open ' : 'Run ') + row.label) + '"')
+              ? (' title="' + escapeAttrValue(row.label) + '"')
               : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
-            html += '<div class="wd-system-row">';
-            html += '<button type="button" class="wd-system-name-btn" data-system-menu-action="' + escapeAttrValue(row.id) + '" data-system-label="' + escapeAttrValue(row.label) + '"' + disabled + buttonTitle + '>' + escapeText(row.label) + '</button>';
-            html += '<span class="wd-system-desc">' + escapeText(row.description) + '</span>';
-            html += '<span class="wd-system-actions-right">';
-            html += '<span class="wd-pill">' + escapeText(systemActionModeLabel(row.mode)) + '</span>';
-            if (row.mode === 'menu') {
-              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-system-menu-action="' + escapeAttrValue(row.id) + '" data-system-label="' + escapeAttrValue(row.label) + '"' + disabled + buttonTitle + '>Open</button>';
-            }
-            html += '</span></div>';
+            rootHtml += '<button type="button" class="wd-drill-item wd-system-row' + active + '" data-system-select="' + escapeAttrValue(row.id) + '"' + disabled + buttonTitle + '>';
+            rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span><span class="wd-system-desc">' + escapeText(row.description) + '</span></span>';
+            rootHtml += '<span class="wd-pill">' + escapeText(systemActionModeLabel(row.mode)) + '</span>';
+            rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
+            rootHtml += '</button>';
           }
-          html += '</div>';
+          rootHtml += '</div>';
         }
-        html += '<p class="wd-subline">Command output appears in Casting Watch.</p>';
+
+        var detailHtml = '';
+        if (!selectedAction) {
+          detailHtml += '<p class="wd-empty">Select a Computer action to inspect and run it.</p>';
+        } else {
+          var runLabel = selectedAction.mode === 'menu' ? 'Open' : 'Run';
+          var disabledAction = selectedAction.available ? '' : ' disabled';
+          var actionTitle = selectedAction.available
+            ? (' title="' + escapeAttrValue(runLabel + ' ' + selectedAction.label) + '"')
+            : (' title="' + escapeAttrValue(selectedAction.reason || 'Unavailable') + '"');
+          detailHtml += '<div class="wd-drill-head">';
+          detailHtml += drillBackButton('system');
+          detailHtml += '<h4>' + escapeText(selectedAction.label) + '</h4>';
+          detailHtml += '<span class="wd-pill">' + escapeText(systemActionModeLabel(selectedAction.mode)) + '</span>';
+          detailHtml += '</div>';
+          detailHtml += '<p class="wd-subline">' + escapeText(selectedAction.description || '') + '</p>';
+          if (!selectedAction.available && selectedAction.reason) {
+            detailHtml += '<p class="wd-empty">' + escapeText(selectedAction.reason) + '</p>';
+          }
+          detailHtml += '<div class="wd-tool-strip">';
+          detailHtml += '<button type="button" class="wd-polite-btn" data-system-menu-action="' + escapeAttrValue(selectedAction.id) + '" data-system-label="' + escapeAttrValue(selectedAction.label) + '"' + disabledAction + actionTitle + '>' + runLabel + ' ' + escapeText(selectedAction.label) + '</button>';
+          detailHtml += '</div>';
+          detailHtml += '<pre id="system-output" class="wd-mono-box" aria-live="polite">' + escapeText(state.systemOutput || 'Choose a Computer action to run.') + '</pre>';
+        }
+
+        var html = '<section class="wd-panel"><h3>Computer Menu</h3>' +
+          '<p class="wd-subline">Mirrors the wizardry <code>system-menu</code> structure.</p>' +
+          '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selectedAction, transition) + '">' +
+          '<section class="wd-drill-panel">' + rootHtml + '</section>' +
+          '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
+          '</div></div>' +
+          '<p class="wd-subline">Command output appears in Casting Watch.</p>';
         html += '</section>';
         return html;
       }
 
       function renderMudPage() {
+        var rows = mudActionRows();
+        var selected = mudActionById(state.mudSelectedAction);
+        if (!selected) {
+          state.mudSelectedAction = '';
+        }
+        var transition = state.mudDrillTransition;
+        state.mudDrillTransition = '';
+        var rootHtml = '<div class="wd-drill-list wd-system-actions">';
+        for (var i = 0; i < rows.length; i += 1) {
+          var row = rows[i];
+          var active = selected && selected.id === row.id ? ' wd-drill-item-active' : '';
+          rootHtml += '<button type="button" class="wd-drill-item wd-system-row' + active + '" data-mud-select="' + escapeAttrValue(row.id) + '" title="' + escapeAttrValue(row.label) + '">';
+          rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span><span class="wd-system-desc">' + escapeText(row.description) + '</span></span>';
+          rootHtml += '<span class="wd-pill">command</span>';
+          rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
+          rootHtml += '</button>';
+        }
+        rootHtml += '</div>';
+
+        var detailHtml = '';
+        if (!selected) {
+          detailHtml += '<p class="wd-empty">Select a Mud command to inspect and run it.</p>';
+        } else {
+          detailHtml += '<div class="wd-drill-head">';
+          detailHtml += drillBackButton('mud');
+          detailHtml += '<h4>' + escapeText(selected.label) + '</h4>';
+          detailHtml += '<span class="wd-pill">command</span>';
+          detailHtml += '</div>';
+          detailHtml += '<p class="wd-subline">' + escapeText(selected.description) + '</p>';
+          detailHtml += '<div class="wd-tool-strip"><button type="button" class="wd-polite-btn" data-mud-action="' + escapeAttrValue(selected.id) + '">Run ' + escapeText(selected.label) + '</button></div>';
+          detailHtml += '<pre id="mud-output" class="wd-mono-box" aria-live="polite">No output.</pre>';
+        }
+
         return '<section class="wd-panel"><h3>Mud Tools</h3>' +
           '<p class="wd-subline">MUD-focused checks and status probes.</p>' +
-          '<div class="wd-tool-strip">' +
-          '<button type="button" class="wd-polite-btn" data-mud-action="status">Status</button>' +
-          '<button type="button" class="wd-polite-btn" data-mud-action="environment">Environment</button>' +
-          '</div><p class="wd-subline">Command output appears in Casting Watch.</p>' +
+          '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selected, transition) + '">' +
+          '<section class="wd-drill-panel">' + rootHtml + '</section>' +
+          '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
+          '</div></div>' +
+          '<p class="wd-subline">Command output appears in Casting Watch.</p>' +
           '</section>';
       }
 
@@ -2805,9 +3067,16 @@
             });
           }
           state.systemMenuActions = parsed;
+          if (state.systemSelectedAction) {
+            var stillExists = parsed.some(function (row) { return row.id === state.systemSelectedAction; });
+            if (!stillExists) {
+              state.systemSelectedAction = '';
+            }
+          }
           return parsed;
         }).catch(function () {
           state.systemMenuActions = [];
+          state.systemSelectedAction = '';
           return [];
         }).finally(function () {
           state.systemMenuLoading = false;
@@ -2849,6 +3118,12 @@
               return (left.title || '').localeCompare(right.title || '');
             });
             state.cast.categories = parsed;
+            if (state.cast.selectedCategory) {
+              var stillExists = parsed.some(function (row) { return row.id === state.cast.selectedCategory; });
+              if (!stillExists) {
+                state.cast.selectedCategory = '';
+              }
+            }
             return parsed;
           })
           .catch(function () {
@@ -2857,6 +3132,9 @@
               { id: 'builtin:web', kind: 'builtin', title: 'Web', count: 0 },
               { id: 'custom:local', kind: 'custom', title: 'Local', count: 0 }
             ];
+            if (state.cast.selectedCategory && !findCastCategoryById(state.cast.selectedCategory)) {
+              state.cast.selectedCategory = '';
+            }
             return state.cast.categories;
           })
           .then(function (categories) {
@@ -2976,10 +3254,10 @@
             parsed.push({ name: name, status: status || 'not installed', label: label || name });
           }
           state.arcanaInstall = parsed;
-          if (state.arcanaExpandedModule) {
-            var stillExists = parsed.some(function (row) { return row.name === state.arcanaExpandedModule; });
+          if (state.arcanaSelectedModule) {
+            var stillExists = parsed.some(function (row) { return row.name === state.arcanaSelectedModule; });
             if (!stillExists) {
-              state.arcanaExpandedModule = '';
+              state.arcanaSelectedModule = '';
             }
           }
           if (state.activePage === 'arcana') {
@@ -2990,6 +3268,7 @@
           }
         }).catch(function () {
           state.arcanaInstall = [];
+          state.arcanaSelectedModule = '';
         });
       }
 
@@ -3765,6 +4044,57 @@
         }
         if (els.contentArea) {
           els.contentArea.addEventListener('click', function (event) {
+            var drillBack = event.target.closest('[data-drill-back]');
+            if (drillBack) {
+              var section = String(drillBack.getAttribute('data-drill-back') || '').trim();
+              if (section === 'cast') {
+                setCastSelectedCategory('', 'back');
+              } else if (section === 'arcana') {
+                setArcanaSelectedModule('', 'back');
+              } else if (section === 'system') {
+                setSystemSelectedAction('', 'back');
+              } else if (section === 'mud') {
+                setMudSelectedAction('', 'back');
+              }
+              return;
+            }
+
+            var castCategoryOpen = event.target.closest('[data-cast-category-open]');
+            if (castCategoryOpen) {
+              var categoryId = castCategoryOpen.getAttribute('data-cast-category-open');
+              if (categoryId) {
+                setCastSelectedCategory(categoryId, 'forward');
+              }
+              return;
+            }
+
+            var arcanaModuleOpen = event.target.closest('[data-arcana-module-open]');
+            if (arcanaModuleOpen) {
+              var moduleOpen = arcanaModuleOpen.getAttribute('data-arcana-module-open');
+              if (moduleOpen) {
+                setArcanaSelectedModule(moduleOpen, 'forward');
+              }
+              return;
+            }
+
+            var systemSelect = event.target.closest('[data-system-select]');
+            if (systemSelect) {
+              var selectedSystemAction = systemSelect.getAttribute('data-system-select');
+              if (selectedSystemAction) {
+                setSystemSelectedAction(selectedSystemAction, 'forward');
+              }
+              return;
+            }
+
+            var mudSelect = event.target.closest('[data-mud-select]');
+            if (mudSelect) {
+              var selectedMudAction = mudSelect.getAttribute('data-mud-select');
+              if (selectedMudAction) {
+                setMudSelectedAction(selectedMudAction, 'forward');
+              }
+              return;
+            }
+
             var runSpellBtn = event.target.closest('[data-run-spell]');
             if (runSpellBtn) {
               var value = runSpellBtn.getAttribute('data-run-spell');
@@ -3992,47 +4322,6 @@
         removeSynonym(aliasName);
       }
 
-      function bindCategoryDetails() {
-        if (!els.contentArea) {
-          return;
-        }
-        els.contentArea.addEventListener('toggle', function (event) {
-          var arcanaDetails = event.target.closest('[data-arcana-module]');
-          if (arcanaDetails && arcanaDetails.tagName === 'DETAILS') {
-            var moduleName = arcanaDetails.getAttribute('data-arcana-module');
-            if (!moduleName) {
-              return;
-            }
-            if (arcanaDetails.open) {
-              state.arcanaExpandedModule = moduleName;
-              loadArcanaModuleItems(moduleName).catch(function () {});
-            } else if (state.arcanaExpandedModule === moduleName) {
-              state.arcanaExpandedModule = '';
-            }
-            return;
-          }
-
-          var details = event.target.closest('[data-category]');
-          if (!details || details.tagName !== 'DETAILS') {
-            return;
-          }
-          var categoryId = details.getAttribute('data-category');
-          if (!categoryId) {
-            return;
-          }
-          if (details.open) {
-            state.cast.expandedCategory = categoryId;
-            loadSpellRowsForCategory(categoryId).then(function () {
-              if (state.activePage === 'cast') {
-                renderPage();
-              }
-            });
-          } else if (state.cast.expandedCategory === categoryId) {
-            state.cast.expandedCategory = '';
-          }
-        }, true);
-      }
-
       function initThemeControlFallback() {
         if (els.themePickerBtn) {
           els.themePickerBtn.textContent = themeLabel(state.activeTheme || 'adept');
@@ -4047,7 +4336,6 @@
         initElements();
         setDividerListeners();
         bindEvents();
-        bindCategoryDetails();
         setComposerOpen(false, { skipFocus: true });
         window.addEventListener('pageshow', function () {
           setComposerOpen(false, { skipFocus: true });
