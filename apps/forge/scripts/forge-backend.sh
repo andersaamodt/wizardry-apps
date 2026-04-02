@@ -510,7 +510,13 @@ apply_optional_app_icon_override_if_present() {
 
 project_preferred_bundle_icon_path() {
   project_dir=$1
+  territory_master="$project_dir/assets/icons/meta/territory-master.png"
   original_source=$(project_original_icon_source "$project_dir" 2>/dev/null || true)
+
+  if [ -f "$territory_master" ]; then
+    printf '%s\n' "$territory_master"
+    return 0
+  fi
 
   if [ -n "$original_source" ] && [ -f "$original_source" ]; then
     printf '%s\n' "$original_source"

@@ -9,12 +9,13 @@ Usage: build-forge-icon.sh [--root ROOT_DIR] [--out ICON_FILE]
 
 Ensures a valid .icns icon exists by selecting the first available source.
 Priority:
-  1) ROOT_DIR/apps/forge/assets/icons/meta/original-source.* (converted to .icns)
-  2) ROOT_DIR/apps/forge/assets/icons/macos/forge.icns
-  3) ROOT_DIR/apps/forge/assets/forge-icon.png (converted to .icns)
-  4) macOS CoreTypes ToolbarCustomizeIcon.icns
-  5) macOS CoreTypes ApplicationsFolderIcon.icns
-  6) macOS CoreTypes GenericApplicationIcon.icns
+  1) ROOT_DIR/apps/forge/assets/icons/meta/territory-master.png (converted to .icns)
+  2) ROOT_DIR/apps/forge/assets/icons/meta/original-source.* (converted to .icns)
+  3) ROOT_DIR/apps/forge/assets/icons/macos/forge.icns
+  4) ROOT_DIR/apps/forge/assets/forge-icon.png (converted to .icns)
+  5) macOS CoreTypes ToolbarCustomizeIcon.icns
+  6) macOS CoreTypes ApplicationsFolderIcon.icns
+  7) macOS CoreTypes GenericApplicationIcon.icns
 USAGE
   exit 0
   ;;
@@ -64,6 +65,29 @@ fi
 
 icon_meta_dir="$root/apps/forge/assets/icons/meta"
 config_path="$icon_meta_dir/icon-settings.conf"
+territory_source="$icon_meta_dir/territory-master.png"
+if [ -f "$config_path" ]; then
+  configured_territory=$(awk -F= '/^territory_master=/{print substr($0, index($0, "=") + 1); exit}' "$config_path" 2>/dev/null | tr -d '\r')
+  if [ -n "$configured_territory" ] && [ -f "$configured_territory" ]; then
+    territory_source=$configured_territory
+  fi
+fi
+if [ -f "$territory_source" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
+  iconset="${iconset_tmp}.iconset"
+  mv "$iconset_tmp" "$iconset"
+  trap 'rm -rf "$iconset"' EXIT INT TERM
+  for size in 16 32 128 256 512; do
+    sips -s format png -z "$size" "$size" "$territory_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+    sips -s format png -z $((size * 2)) $((size * 2)) "$territory_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  mkdir -p "$(dirname "$out_file")"
+  iconutil -c icns "$iconset" -o "$out_file"
+  printf '%s\n' "built_icon=$out_file"
+  printf '%s\n' "source_icon=$territory_source"
+  exit 0
+fi
+
 icon_source=''
 if [ -f "$config_path" ]; then
   configured_icon=$(awk -F= '/^original_source=/{print substr($0, index($0, "=") + 1); exit}' "$config_path" 2>/dev/null | tr -d '\r')
@@ -134,7 +158,7 @@ for candidate in \
 done
 
 [ -n "$source_icon" ] || {
-  printf '%s\n' "build-forge-icon: no icon source found (missing forge-icon.png and system fallback icons)" >&2
+  printf '%s\n' "build-forge-icon: no icon source found (missing territory/original/forge icon assets and system fallback icons)" >&2
   exit 1
 }
 

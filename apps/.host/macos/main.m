@@ -2254,6 +2254,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     for (NSString *rootPath in iconRoots) {
         NSString *metaDir = [rootPath stringByAppendingPathComponent:@"assets/icons/meta"];
+        [iconCandidates addObject:[metaDir stringByAppendingPathComponent:@"territory-master.png"]];
         NSArray<NSString *> *metaEntries = [fileManager contentsOfDirectoryAtPath:metaDir error:nil];
         for (NSString *entry in metaEntries) {
             if ([entry hasPrefix:@"original-source."]) {

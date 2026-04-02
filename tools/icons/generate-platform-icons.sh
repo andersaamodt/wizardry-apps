@@ -70,6 +70,7 @@ original_ext=$(printf '%s' "$original_ext" | tr '[:upper:]' '[:lower:]')
 stored_original="$meta_dir/original-source.$original_ext"
 
 plain_master="$tmp_dir/plain-master.png"
+territory_master="$tmp_dir/territory-master.png"
 apple_base="$tmp_dir/apple-base.png"
 apple_source="$tmp_dir/apple-source.png"
 apple_mask="$tmp_dir/apple-mask.png"
@@ -169,6 +170,13 @@ if [ "$full_bleed_mode" -eq 1 ]; then
   magick "$trimmed_source" \
     -background none \
     -alpha on \
+    -resize "${apple_full_bleed_subject_size}x${apple_full_bleed_subject_size}" \
+    -gravity center \
+    -extent 1024x1024 \
+    "$territory_master"
+  magick "$trimmed_source" \
+    -background none \
+    -alpha on \
     -resize "${full_bleed_subject_size}x${full_bleed_subject_size}" \
     -gravity center \
     -extent 1024x1024 \
@@ -189,6 +197,7 @@ else
     -gravity center \
     -extent 1024x1024 \
     "$subject_canvas"
+  cp "$subject_canvas" "$territory_master"
 
   magick "$subject_master" \
     -alpha extract \
@@ -214,7 +223,7 @@ else
     "$plain_master"
 fi
 
-cp "$plain_master" "$apple_source"
+cp "$territory_master" "$apple_source"
 
 if [ "$use_squircle" -eq 1 ]; then
   magick -size "${apple_mask_canvas_size}x${apple_mask_canvas_size}" xc:white \
@@ -234,22 +243,14 @@ if [ "$use_squircle" -eq 1 ]; then
   magick "$apple_source" "$apple_alpha" \
     -alpha off -compose CopyOpacity -composite \
     "$apple_base"
-  if [ "$full_bleed_mode" -eq 1 ]; then
-    magick "$apple_base" \
-      -background none \
-      -alpha on \
-      -resize "${apple_full_bleed_subject_size}x${apple_full_bleed_subject_size}" \
-      -gravity center \
-      -extent 1024x1024 \
-      "$apple_base"
-  fi
   cp "$apple_base" "$primary_master"
 else
-  cp "$plain_master" "$apple_base"
-  cp "$plain_master" "$primary_master"
+  cp "$territory_master" "$apple_base"
+  cp "$territory_master" "$primary_master"
 fi
 
 cp "$primary_master" "$assets_dir/forge-icon.png"
+cp "$territory_master" "$meta_dir/territory-master.png"
 cp "$plain_master" "$meta_dir/plain-master.png"
 cp "$apple_base" "$meta_dir/apple-master.png"
 for existing_original in "$meta_dir"/original-source.*; do
@@ -347,6 +348,7 @@ generator=wizardry-forge-icon-pipeline
 squircle=$use_squircle
 full_bleed=$full_bleed_mode
 master=$assets_dir/forge-icon.png
+territory_master=$meta_dir/territory-master.png
 plain_master=$meta_dir/plain-master.png
 apple_master=$meta_dir/apple-master.png
 original_source=$stored_original
