@@ -3888,7 +3888,13 @@ cmd_run_desktop() {
   case "$os" in
     darwin)
       app_name=$(app_name_from_manifest "$root" "$slug")
-      stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
+      self_relaunch=0
+      if [ "$slug" = "forge" ]; then
+        self_relaunch=1
+      fi
+      if [ "$self_relaunch" -eq 0 ]; then
+        stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
+      fi
       [ -d "$bundle_artifact" ] || {
         printf '%s\n' "forge-backend: built bundle artifact missing: $bundle_artifact" >&2
         exit 1
@@ -3902,7 +3908,11 @@ cmd_run_desktop() {
         printf '%s\n' "forge-backend: open command not available on this system" >&2
         exit 1
       }
-      open "$launch_bundle"
+      if [ "$self_relaunch" -eq 1 ]; then
+        open -n "$launch_bundle"
+      else
+        open "$launch_bundle"
+      fi
       printf 'launched=1\n'
       printf 'mode=desktop-executable\n'
       printf 'artifact=%s\n' "$launch_bundle"
