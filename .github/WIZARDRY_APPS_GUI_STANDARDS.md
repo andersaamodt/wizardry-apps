@@ -119,6 +119,7 @@
 - Surface undo/revert actions when behavior is irreversible or high-impact.
 - For low-risk settings in control-plane apps, prefer autosave on edit/change over explicit Save buttons.
 - For live runtime state in control-plane apps, prefer background refresh and visibility/focus refresh over explicit Refresh buttons.
+- Do not add manual `Refresh` buttons for routine list/state views; automatic freshness is the default and explicit refresh is reserved for exceptional high-cost flows only.
 - In settings-heavy control-plane apps, prefer stronger field names plus concise tooltips over persistent explanatory copy on every row; keep always-visible field descriptions for only the uncommon or high-risk cases that truly need them.
 - When a tab contains multiple independent toggles, group them under a `Feature Switches` section before detailed policy or path settings.
 
@@ -151,7 +152,7 @@
 
 ## Cross-App Interaction Patterns
 - Route GUI actions through one backend adapter that logs argv and normalizes command errors into concise summaries.
-- Keep a persistent bridge/connectivity status surface separate from action-level toast messages.
+- Do not add bridge-status pills/chips in primary GUI chrome; bridge health should surface only when degraded/failing via actionable errors and optional diagnostics in Settings/logs.
 - Keep one busy state for write actions and disable overlapping action triggers while a command is running.
 - Keep logs prepend-timestamped, bounded in size, keyboard-selectable, and copy/clear capable.
 - Keep at most one floating menu open at a time and keep trigger `aria-expanded` values in sync.

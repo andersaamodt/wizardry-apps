@@ -1349,7 +1349,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (BOOL)isStonrApp {
-    return [[self.appSlug lowercaseString] isEqualToString:@"stonr"];
+    NSString *slug = [[[self.appSlug ?: @"" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+    if ([slug isEqualToString:@"stonr"] || [slug hasPrefix:@"stonr-"] || [slug hasPrefix:@"stonr_"]) {
+        return YES;
+    }
+    return [self stonrBackendScriptPath].length > 0;
 }
 
 - (NSString *)stonrBackendScriptPath {
@@ -2111,6 +2115,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     appName = [appName capitalizedString];
     NSString *appSlug = [appComponent lowercaseString];
     self.appSlug = appSlug;
+    if ([self isStonrApp]) {
+        self.appSlug = @"stonr";
+        appSlug = self.appSlug;
+    }
     if ([appSlug isEqualToString:@"stonr"]) {
         [[NSDistributedNotificationCenter defaultCenter] addObserver:self
                                                             selector:@selector(handleDistributedShowWindowRequest:)
@@ -2212,13 +2220,13 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
     }
 
-    if (!launchedFromPackagedBundle) {
-        // Non-bundled host launches need an explicit icon assignment.
-        if (resolvedFileIcon) {
-            [NSApp setApplicationIconImage:resolvedFileIcon];
-        } else if (resolvedBundleIcon) {
-            [NSApp setApplicationIconImage:resolvedBundleIcon];
-        }
+    if (resolvedFileIcon) {
+        // Prefer the direct app file icon for runtime consistency across bundle
+        // and non-bundle launches (Dock/status item should match Forge source).
+        [NSApp setApplicationIconImage:resolvedFileIcon];
+    } else if (!launchedFromPackagedBundle && resolvedBundleIcon) {
+        // Non-bundled host launches need an explicit icon assignment fallback.
+        [NSApp setApplicationIconImage:resolvedBundleIcon];
     }
 
     // Prefer a direct packaged/workspace icon file for the splash logo because

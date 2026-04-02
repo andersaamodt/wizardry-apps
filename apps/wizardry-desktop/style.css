@@ -293,11 +293,20 @@ body::before {
 .wd-rail-divider {
   width: 0;
   min-width: 0;
-  cursor: default;
   position: relative;
   background: transparent;
   border: 0;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.wd-rail-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
 }
 
 .wd-rail-divider:focus-visible {

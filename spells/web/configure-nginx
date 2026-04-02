@@ -222,6 +222,12 @@ http {
         location = / {
             try_files /pages/index.html =404;
         }
+
+        # Serve pretty post URLs directly via CGI so post pages render
+        # in a single server response (no client-side route repair).
+        location ~ ^/posts/([A-Za-z0-9-]+)/?$ {
+            rewrite ^/posts/([A-Za-z0-9-]+)/?$ /cgi/blog-open-post?path=posts/$1 last;
+        }
         
         # Serve pages
         location /pages/ {

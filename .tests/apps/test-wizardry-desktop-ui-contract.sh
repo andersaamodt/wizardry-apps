@@ -88,5 +88,8 @@ assert_contains "$ui" 'wd-activity-sections'
 assert_contains "$ui" 'wd-activity-list wd-scroll-list wd-activity-list-scrolled'
 assert_contains "$css" '.wd-scroll-list'
 assert_contains "$css" '.wd-activity-list'
+assert_contains "$css" '.wd-rail-divider::before'
+assert_contains "$css" 'cursor: col-resize;'
+assert_not_contains "$css" '.wd-rail-divider:hover'
 
 printf '%s\n' "wizardry-desktop ui contract tests passed"
