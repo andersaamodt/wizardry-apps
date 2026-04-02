@@ -14,6 +14,7 @@ Actions:
   set-ui-pref KEY VALUE
   list-spell-categories [ROOT_HINT]
   list-spells SPELL_REF [ROOT_HINT]
+  list-synonyms
   run-spell SPELL_REF SPELL_NAME [ROOT_HINT]
   spell-help SPELL_REF SPELL_NAME [ROOT_HINT]
   list-menu-spells [ROOT_HINT]
@@ -601,6 +602,57 @@ cmd_list_memorized_spells() {
       [ -n "$cmd" ] && printf '%s\t%s\n' "$file_base" "$cmd"
     done
   fi
+}
+
+parse_synonym_kv_file() {
+  file=${1-}
+  scope=${2-}
+  [ -f "$file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=$(printf '%s' "$line" | sed 's/\r//g')
+    case "$line" in
+      ''|'#'*) continue ;;
+      *=*)
+        word=$(printf '%s' "${line%%=*}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+        target=$(printf '%s' "${line#*=}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+        [ -n "$word" ] || continue
+        [ -n "$target" ] || continue
+        printf '%s|%s|%s\n' "$word" "$target" "$scope"
+        ;;
+      *)
+        continue
+        ;;
+    esac
+  done <"$file"
+}
+
+cmd_list_synonyms() {
+  spell_home=${SPELLBOOK_DIR:-"${HOME:-.}/.spellbook"}
+  custom_file="$spell_home/.synonyms"
+  default_file="$spell_home/.default-synonyms"
+
+  custom_tmp=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-synonyms-custom.XXXXXX")
+  default_tmp=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-synonyms-default.XXXXXX")
+
+  parse_synonym_kv_file "$custom_file" "custom" >"$custom_tmp"
+  parse_synonym_kv_file "$default_file" "default" >"$default_tmp"
+
+  awk -F'|' '
+    NR==FNR {
+      if ($1 != "") {
+        custom[$1] = 1
+        print
+      }
+      next
+    }
+    {
+      if ($1 != "" && !custom[$1]) {
+        print
+      }
+    }
+  ' "$custom_tmp" "$default_tmp" | sort -t '|' -k1,1
+
+  rm -f "$custom_tmp" "$default_tmp"
 }
 
 menu_script_dirs() {
@@ -1516,6 +1568,9 @@ case "$action" in
     ;;
   list-spells)
     cmd_list_spells "$@"
+    ;;
+  list-synonyms)
+    cmd_list_synonyms "$@"
     ;;
   run-spell)
     cmd_run_spell "$@"

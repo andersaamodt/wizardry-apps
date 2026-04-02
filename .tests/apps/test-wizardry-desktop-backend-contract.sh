@@ -40,6 +40,11 @@ printf '%s\n' "$spells" | grep -F "status" >/dev/null 2>&1 || {
   exit 1
 }
 
+if ! sh "$backend" list-synonyms "$root" >/dev/null 2>&1; then
+  printf '%s\n' "list-synonyms action failed" >&2
+  exit 1
+fi
+
 menus=$(sh "$backend" list-menu-spells "$root")
 printf '%s\n' "$menus" | grep -F "main-menu|" >/dev/null 2>&1 || {
   printf '%s\n' "list-menu-spells missing main-menu" >&2

@@ -200,6 +200,8 @@
         menuCatalog: [],
         spellCache: {},
         arcanaInstall: [],
+        spellbookAliasesLoaded: false,
+        spellbookBuiltin: [],
         activityLoading: false,
         activity: {
           casting: [],
@@ -2185,6 +2187,9 @@
         if (pageId === 'arcana' && state.arcanaInstall.length === 0) {
           loadArcanaInstall();
         }
+        if (pageId === 'spellbook' && !state.spellbookAliasesLoaded) {
+          loadSpellbookAliases();
+        }
         if (pageId === 'cast' && !state.cast.categories.length) {
           loadCastData();
         }
@@ -2292,17 +2297,35 @@
       function renderSpellbookPage() {
         var html = '<section class="wd-panel"><div class="wd-panel-head"><h3>Synonyms</h3></div>' +
           '<p class="wd-subline">Map shortcut aliases to spell command lines.</p>';
+        html += '<h4>Wizardry aliases</h4>';
+        html += '<p class="wd-subline">Custom and default aliases from <code>~/.spellbook/.synonyms</code> and <code>.default-synonyms</code>.</p>';
         html += '<div class="wd-synonym-list-wrap">';
         html += '<div class="wd-list wd-synonym-list">';
-        for (var i = 0; i < state.spellbook.length; i += 1) {
-          var item = state.spellbook[i];
-          html += '<div class="wd-list-row wd-synonym-row"><span class="wd-list-main wd-col-2">' + escapeText(item.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(item.command) + '</span><span class="wd-row-actions"><button type="button" class="wd-polite-btn wd-tiny wd-danger" data-remove-synonym="' + i + '">Remove</button></span></div>';
+        for (var i = 0; i < state.spellbookBuiltin.length; i += 1) {
+          var builtinItem = state.spellbookBuiltin[i];
+          var scopeLabel = builtinItem.scope === 'custom' ? 'custom' : 'default';
+          html += '<div class="wd-list-row wd-synonym-row"><span class="wd-list-main wd-col-2">' + escapeText(builtinItem.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(builtinItem.command) + '</span><span class="wd-row-actions"><span class="wd-pill wd-secondary">' + escapeText(scopeLabel) + '</span></span></div>';
+        }
+        if (!state.spellbookBuiltin.length) {
+          html += '<p class="wd-empty">No wizardry aliases found.</p>';
+        }
+        html += '</div>';
+        html += '</div>';
+
+        html += '<h4>Desktop aliases</h4>';
+        html += '<p class="wd-subline">Aliases stored only in Wizardry Desktop preferences.</p>';
+        html += '<div class="wd-synonym-list-wrap">';
+        html += '<div class="wd-list wd-synonym-list">';
+        for (var j = 0; j < state.spellbook.length; j += 1) {
+          var item = state.spellbook[j];
+          html += '<div class="wd-list-row wd-synonym-row"><span class="wd-list-main wd-col-2">' + escapeText(item.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(item.command) + '</span><span class="wd-row-actions"><button type="button" class="wd-polite-btn wd-tiny wd-danger" data-remove-synonym="' + j + '">Remove</button></span></div>';
         }
         if (!state.spellbook.length) {
-          html += '<p class="wd-empty">No aliases yet.</p>';
+          html += '<p class="wd-empty">No desktop aliases yet.</p>';
         }
         html += '</div>';
         html += '</div>';
+
         html += '<button id="spellbook-add-toggle" type="button" class="wd-icon-btn wd-icon-plus" aria-label="Add synonym" aria-expanded="false">＋</button>';
         html += '<div id="spellbook-add-dialog" class="wd-inline-form wd-synonym-dialog wd-hidden" role="dialog" aria-label="Add synonym">';
         html += '<h4>Add Synonym</h4>';
@@ -2665,6 +2688,38 @@
           }
         }).catch(function () {
           state.menuCatalog = [];
+        });
+      }
+
+      function loadSpellbookAliases() {
+        return callBackend('list-synonyms').then(function (text) {
+          var lines = String(text || '').split('\n');
+          var parsed = [];
+          for (var i = 0; i < lines.length; i += 1) {
+            var line = String(lines[i] || '').trim();
+            if (!line) {
+              continue;
+            }
+            var parts = line.split('|');
+            var alias = String(parts[0] || '').trim();
+            var command = String(parts[1] || '').trim();
+            var scope = String(parts[2] || '').trim().toLowerCase();
+            if (!alias || !command) {
+              continue;
+            }
+            if (scope !== 'custom' && scope !== 'default') {
+              scope = 'default';
+            }
+            parsed.push({ alias: alias, command: command, scope: scope });
+          }
+          state.spellbookBuiltin = parsed;
+        }).catch(function () {
+          state.spellbookBuiltin = [];
+        }).finally(function () {
+          state.spellbookAliasesLoaded = true;
+          if (state.activePage === 'spellbook') {
+            renderPage();
+          }
         });
       }
 
@@ -3665,7 +3720,7 @@
         }, 1400);
 
         loadRootHint().finally(function () {
-          Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadMenuCatalog(), loadCastData(), loadArcanaInstall(), loadWatchHistory()])
+          Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadMenuCatalog(), loadCastData(), loadSpellbookAliases(), loadArcanaInstall(), loadWatchHistory()])
             .catch(function () {
               state.bridgeReady = bridgeAvailable();
             })
