@@ -3826,7 +3826,12 @@ cmd_run_desktop() {
           printf '%s\n' "forge-backend: open command not available on this system" >&2
           exit 1
         }
-        open "$installed_path"
+        if [ "$self_relaunch" -eq 1 ]; then
+          # Running Forge from inside Forge should request a fresh instance.
+          open -n "$installed_path"
+        else
+          open "$installed_path"
+        fi
         printf 'launched=1\n'
         printf 'mode=desktop-installed\n'
         printf 'artifact=%s\n' "$installed_path"
@@ -3904,7 +3909,12 @@ cmd_run_desktop() {
         printf '%s\n' "forge-backend: open command not available on this system" >&2
         exit 1
       }
-      open "$launch_bundle"
+      if [ "$self_relaunch" -eq 1 ]; then
+        # Running Forge from inside Forge should request a fresh instance.
+        open -n "$launch_bundle"
+      else
+        open "$launch_bundle"
+      fi
       printf 'launched=1\n'
       printf 'mode=desktop-executable\n'
       printf 'artifact=%s\n' "$launch_bundle"

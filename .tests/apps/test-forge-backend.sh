@@ -10,6 +10,10 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
   exit 1
 }
 
+# Forge self-run should request a new app instance when launched from inside Forge.
+grep -F 'open -n "$installed_path"' "$backend" >/dev/null
+grep -F 'open -n "$launch_bundle"' "$backend" >/dev/null
+
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "skip: jq not installed" >&2
   exit 0
