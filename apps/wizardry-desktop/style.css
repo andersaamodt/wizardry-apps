@@ -170,6 +170,11 @@ body::before {
   gap: 0.2rem;
   padding: 0.26rem 0.24rem;
   border-top: 1px solid var(--wd-line);
+  flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--wd-panel);
 }
 
 .wd-icon-btn {
