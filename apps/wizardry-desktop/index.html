@@ -1664,6 +1664,21 @@
         setSynonymDialogOpen(false);
       }
 
+      function routeMenuActionToGui(actionName, params) {
+        var action = String(actionName || '').trim();
+        if (action !== 'menu:run') {
+          return false;
+        }
+        var menuName = Array.isArray(params) && params.length ? String(params[0] || '').trim().toLowerCase() : '';
+        if (menuName !== 'cast') {
+          return false;
+        }
+        setActivePage('cast');
+        updateComposerOutput('Opened Cast tab (menu:run cast routed to GUI).');
+        pushActivity('app', 'menu:run cast routed to Cast tab', { section: 'app', app: 'wizardry-desktop', source: 'run-action:menu:run', status: 'ok' });
+        return true;
+      }
+
       function executeComposerCommand(plan) {
         if (!plan || !plan.ready || !plan.backend) {
           if (plan && plan.message && els.composerFeedback) {
@@ -1690,17 +1705,21 @@
             pushActivity('app', 'system:' + plan.backend.command + ' failed', { section: 'app', app: 'host', source: plan.backend.command, status: 'error' });
           });
         } else if (plan.backend.type === 'run-action') {
-          var actionArgs = [plan.backend.actionName];
-          if (Array.isArray(plan.backend.params) && plan.backend.params.length) {
-            actionArgs = actionArgs.concat(plan.backend.params);
+          if (routeMenuActionToGui(plan.backend.actionName, plan.backend.params)) {
+            run = Promise.resolve();
+          } else {
+            var actionArgs = [plan.backend.actionName];
+            if (Array.isArray(plan.backend.params) && plan.backend.params.length) {
+              actionArgs = actionArgs.concat(plan.backend.params);
+            }
+            run = callBackend('run-action', actionArgs).then(function (text) {
+              updateComposerOutput(text || 'ok');
+              pushActivity('app', 'run-action ' + plan.backend.actionName + ' completed', { section: 'app', app: 'wizardry-core', source: 'run-action:' + plan.backend.actionName, status: 'ok' });
+            }).catch(function (error) {
+              updateComposerOutput(error && error.message ? error.message : String(error || 'failed'));
+              pushActivity('app', 'run-action ' + plan.backend.actionName + ' failed', { section: 'app', app: 'wizardry-core', source: 'run-action:' + plan.backend.actionName, status: 'error' });
+            });
           }
-          run = callBackend('run-action', actionArgs).then(function (text) {
-            updateComposerOutput(text || 'ok');
-            pushActivity('app', 'run-action ' + plan.backend.actionName + ' completed', { section: 'app', app: 'wizardry-core', source: 'run-action:' + plan.backend.actionName, status: 'ok' });
-          }).catch(function (error) {
-            updateComposerOutput(error && error.message ? error.message : String(error || 'failed'));
-            pushActivity('app', 'run-action ' + plan.backend.actionName + ' failed', { section: 'app', app: 'wizardry-core', source: 'run-action:' + plan.backend.actionName, status: 'error' });
-          });
         }
 
         Promise.resolve(run).finally(function () {
