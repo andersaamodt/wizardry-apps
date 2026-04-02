@@ -309,7 +309,7 @@ cmd_set_ui_pref() {
     printf '%s\n' "wizardry-desktop-backend: set-ui-pref requires KEY VALUE" >&2
     exit 2
   }
-  normalize_pref_key "$key" || {
+  key=$(normalize_pref_key "$key") || {
     printf '%s\n' "wizardry-desktop-backend: invalid key: $key" >&2
     exit 2
   }

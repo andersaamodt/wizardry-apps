@@ -2011,7 +2011,6 @@
           var rowClass = 'wd-nav-row' + (page.id === state.activePage ? ' wd-nav-row-active' : '');
           html += '<button type="button" role="option" class="' + rowClass + '" data-page="' + page.id + '" aria-selected="' + (page.id === state.activePage ? 'true' : 'false') + '" tabindex="' + (page.id === state.activePage ? '0' : '-1') + '">' +
             '<span class="wd-nav-title">' + escapeText(page.title) + '</span>' +
-            '<span>' + escapeText(page.blurb) + '</span>' +
             '</button>';
         }
         els.leftNav.innerHTML = html;
@@ -2339,6 +2338,7 @@
         html += '</section>';
 
         html += '<section class="wd-panel wd-cast-drill">' +
+          '<h4>Spell Categories</h4>' +
           '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selectedCategory, transition) + '">' +
           '<section class="wd-drill-panel">' + rootHtml + '</section>' +
           '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
@@ -3643,10 +3643,11 @@
 
         if (els.themeMenu) {
           els.themeMenu.addEventListener('click', function (event) {
-            if (!event.target.closest('.wd-theme-item')) {
+            var item = event.target.closest('.wd-theme-item');
+            if (!item) {
               return;
             }
-            var name = event.target.getAttribute('data-theme-name');
+            var name = item.getAttribute('data-theme-name');
             if (name) {
               applyTheme(name);
               closeThemeMenu(true);
