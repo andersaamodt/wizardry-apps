@@ -1592,10 +1592,11 @@ stop_desktop_instances_for_slug() {
   slug=${2-}
   app_name=${3-}
   os_name=${4-}
+  skip_gui_quit=${5-}
 
   [ -n "$slug" ] || return 0
 
-  if [ "$os_name" = "darwin" ] && [ -n "$app_name" ] && command -v osascript >/dev/null 2>&1; then
+  if [ "$os_name" = "darwin" ] && [ -n "$app_name" ] && [ "$skip_gui_quit" != "1" ] && command -v osascript >/dev/null 2>&1; then
     osascript \
       -e "if application \"$app_name\" is running then" \
       -e "tell application \"$app_name\" to quit" \
@@ -3512,12 +3513,13 @@ cmd_build_desktop() {
         if [ -f "$icon_override" ]; then
           icon_source="$icon_override"
           icon_source_format='png'
+        elif [ -f "$app_dir/assets/forge-icon.png" ]; then
+          # Prefer the canonical PNG source so per-app icon updates stay in sync.
+          icon_source="$app_dir/assets/forge-icon.png"
+          icon_source_format='png'
         elif [ -f "$app_dir/assets/icons/macos/forge.icns" ]; then
           icon_source="$app_dir/assets/icons/macos/forge.icns"
           icon_source_format='icns'
-        elif [ -f "$app_dir/assets/forge-icon.png" ]; then
-          icon_source="$app_dir/assets/forge-icon.png"
-          icon_source_format='png'
         elif [ -f "$app_dir/assets/forge.icns" ]; then
           icon_source="$app_dir/assets/forge.icns"
           icon_source_format='icns'
@@ -3858,11 +3860,11 @@ cmd_run_desktop() {
         if [ "$self_relaunch" -eq 1 ]; then
           # Restart Forge by scheduling a fresh open request after we stop the
           # current host process (no duplicate instance handoff).
-          schedule_bundle_open_macos "$installed_path" 2.5 || {
+          schedule_bundle_open_macos "$installed_path" 3.0 || {
             printf '%s\n' "forge-backend: failed to schedule Forge restart" >&2
             exit 1
           }
-          stop_desktop_instances_for_slug "$root" "$slug" "" "$os"
+          stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os" "1"
         else
           open "$installed_path"
         fi
@@ -3946,11 +3948,11 @@ cmd_run_desktop() {
       if [ "$self_relaunch" -eq 1 ]; then
         # Restart Forge by scheduling a fresh open request after we stop the
         # current host process (no duplicate instance handoff).
-        schedule_bundle_open_macos "$launch_bundle" 2.5 || {
+        schedule_bundle_open_macos "$launch_bundle" 3.0 || {
           printf '%s\n' "forge-backend: failed to schedule Forge restart" >&2
           exit 1
         }
-        stop_desktop_instances_for_slug "$root" "$slug" "" "$os"
+        stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os" "1"
       else
         open "$launch_bundle"
       fi
