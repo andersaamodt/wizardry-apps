@@ -411,8 +411,8 @@
         organizeSort: 'alphabetical',
         organizeBuiltinFirst: true,
         useMiniTabs: false,
-        installBeforeRun: false,
-        installBeforeRunHasUserPref: false,
+        installBeforeRunByItemKey: {},
+        installBeforeRunLegacyValue: null,
         systemMiniTabMode: 'all',
         themes: ['psionic'],
         activeTheme: 'psionic',
@@ -1946,14 +1946,104 @@
         syncIconToolingUI();
       }
 
-      function setInstallBeforeRunEnabled(enabled) {
-        state.installBeforeRunHasUserPref = true;
-        state.installBeforeRun = !!enabled;
-        saveStorage(INSTALL_BEFORE_RUN_KEY, state.installBeforeRun ? 'true' : 'false');
-        if (els.installBeforeRunToggle) {
-          els.installBeforeRunToggle.checked = state.installBeforeRun;
+      function parseInstallBeforeRunPrefs(raw) {
+        var out = {
+          byItemKey: {},
+          legacyValue: null
+        };
+        var value = String(raw || '').trim();
+        if (!value) {
+          return out;
         }
-        syncStageActionVisibility(selectedCatalogItem());
+        if (value === 'true' || value === 'false') {
+          out.legacyValue = value === 'true';
+          return out;
+        }
+        try {
+          var parsed = JSON.parse(value);
+          if (!parsed || typeof parsed !== 'object') {
+            return out;
+          }
+          Object.keys(parsed).forEach(function (itemKey) {
+            var normalizedItemKey = String(itemKey || '').trim();
+            if (!normalizedItemKey) {
+              return;
+            }
+            var prefValue = parsed[itemKey];
+            if (prefValue === true || prefValue === false) {
+              out.byItemKey[normalizedItemKey] = prefValue;
+              return;
+            }
+            var prefRaw = String(prefValue || '').trim().toLowerCase();
+            if (prefRaw === 'true' || prefRaw === 'false') {
+              out.byItemKey[normalizedItemKey] = prefRaw === 'true';
+            }
+          });
+        } catch (_err) {
+          return out;
+        }
+        return out;
+      }
+
+      function saveInstallBeforeRunPrefs() {
+        saveStorage(INSTALL_BEFORE_RUN_KEY, JSON.stringify(state.installBeforeRunByItemKey || {}));
+      }
+
+      function installBeforeRunPreferenceForSelected(selected) {
+        if (!selected) {
+          return null;
+        }
+        var keys = assignmentKeysForItem(selected);
+        for (var i = 0; i < keys.length; i += 1) {
+          if (Object.prototype.hasOwnProperty.call(state.installBeforeRunByItemKey, keys[i])) {
+            return !!state.installBeforeRunByItemKey[keys[i]];
+          }
+        }
+        return null;
+      }
+
+      function migrateLegacyInstallBeforeRunPreference() {
+        if (state.installBeforeRunLegacyValue !== true && state.installBeforeRunLegacyValue !== false) {
+          return;
+        }
+        var changed = false;
+        state.apps.forEach(function (app) {
+          var appId = String(app && app.id || '').trim();
+          if (!appId) {
+            return;
+          }
+          var itemKey = 'builtin:' + appId;
+          if (Object.prototype.hasOwnProperty.call(state.installBeforeRunByItemKey, itemKey)) {
+            return;
+          }
+          state.installBeforeRunByItemKey[itemKey] = state.installBeforeRunLegacyValue;
+          changed = true;
+        });
+        state.installBeforeRunLegacyValue = null;
+        if (changed) {
+          saveInstallBeforeRunPrefs();
+        }
+      }
+
+      function setInstallBeforeRunEnabled(enabled) {
+        var selected = selectedCatalogItem();
+        if (!selected) {
+          return;
+        }
+        var keys = assignmentKeysForItem(selected);
+        if (!keys.length) {
+          return;
+        }
+        keys.forEach(function (itemKey) {
+          delete state.installBeforeRunByItemKey[itemKey];
+        });
+        state.installBeforeRunByItemKey[keys[0]] = !!enabled;
+        state.installBeforeRunLegacyValue = null;
+        saveInstallBeforeRunPrefs();
+        if (els.installBeforeRunToggle) {
+          els.installBeforeRunToggle.checked = !!enabled;
+        }
+        syncStageActionVisibility(selected);
       }
 
       function normalizedSettingValue(value) {
@@ -1971,9 +2061,9 @@
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
         state.leftRailWidth = parseInt(loadStorage(LEFT_RAIL_WIDTH_KEY), 10) || 240;
         state.iconSquircleOnDrop = loadStorage(ICON_SQUIRCLE_ON_DROP_KEY) !== 'false';
-        var installBeforeRunRaw = loadStorage(INSTALL_BEFORE_RUN_KEY);
-        state.installBeforeRunHasUserPref = installBeforeRunRaw === 'true' || installBeforeRunRaw === 'false';
-        state.installBeforeRun = installBeforeRunRaw === 'true';
+        var installBeforeRunPrefs = parseInstallBeforeRunPrefs(loadStorage(INSTALL_BEFORE_RUN_KEY));
+        state.installBeforeRunByItemKey = installBeforeRunPrefs.byItemKey;
+        state.installBeforeRunLegacyValue = installBeforeRunPrefs.legacyValue;
         state.selectedCatalog = loadStorage(SELECTED_CATALOG_KEY);
         state.miniTabs = parseMiniTabs();
         state.activeMiniTab = loadStorage(ACTIVE_MINI_TAB_KEY) || 'all';
@@ -3994,8 +4084,9 @@
       }
 
       function effectiveInstallBeforeRunForSelected(selected) {
-        if (state.installBeforeRunHasUserPref) {
-          return !!state.installBeforeRun;
+        var selectedPref = installBeforeRunPreferenceForSelected(selected);
+        if (selectedPref !== null) {
+          return selectedPref;
         }
         return defaultInstallBeforeRunForSelected(selected);
       }
@@ -6386,6 +6477,7 @@
           };
         });
         state.appsLoaded = true;
+        migrateLegacyInstallBeforeRunPreference();
         saveStorage(CACHED_APPS_KEY, JSON.stringify(state.apps));
 
         if (!state.selectedBuiltIn && state.apps.length) {

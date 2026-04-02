@@ -24,6 +24,15 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  file=$1
+  needle=$2
+  if grep -F "$needle" "$file" >/dev/null 2>&1; then
+    printf '%s\n' "unexpected contract text present in $file: $needle" >&2
+    exit 1
+  fi
+}
+
 assert_matches() {
   file=$1
   pattern=$2
@@ -43,6 +52,11 @@ assert_matches "$ui" 'function buildActionLabel\(item\)'
 assert_matches "$ui" 'function runActionLabel\(item\)'
 assert_matches "$ui" 'function ranActionLabel\(item\)'
 assert_matches "$ui" 'function regenerateSelectedIconAssets\(\)'
+assert_matches "$ui" 'function parseInstallBeforeRunPrefs\(raw\)'
+assert_matches "$ui" 'function installBeforeRunPreferenceForSelected\(selected\)'
+assert_matches "$ui" 'assignmentKeysForItem\(selected\)'
+assert_matches "$ui" 'state\.installBeforeRunByItemKey\[keys\[0\]\][[:space:]]*=[[:space:]]*!!enabled;'
+assert_not_contains "$ui" 'installBeforeRunHasUserPref'
 
 # Backend actions should remain explicit and structured.
 assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context\]\);"
