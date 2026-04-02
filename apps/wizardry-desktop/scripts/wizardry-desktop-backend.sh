@@ -27,6 +27,7 @@ Actions:
   run-menu MENU_NAME [MENU_ARG] [ROOT_HINT]
   open-menu-terminal MENU_NAME [MENU_ARG] [ROOT_HINT]
   list-memorized-spells
+  memorize-spell SPELL_NAME [COMMAND]
   list-arcana-install [INSTALL_ROOT]
   list-arcana-module-items MODULE [INSTALL_ROOT]
   run-arcana-install MODULE
@@ -314,6 +315,7 @@ cmd_set_ui_pref() {
   }
   value=$(sanitize_value "$value")
   cfg=$(config_path)
+  mkdir -p "$PREFS_ROOT"
   [ -f "$cfg" ] || : >"$cfg"
   write_pref_file "$cfg" "$key" "$value"
   printf 'key=%s\n' "$key"
@@ -623,6 +625,106 @@ cmd_list_memorized_spells() {
       [ -n "$cmd" ] && printf '%s\t%s\n' "$file_base" "$cmd"
     done
   fi
+}
+
+memorized_spellbook_dir() {
+  if hascmd cast; then
+    spellbook_dir=$(cast --dir 2>/dev/null || printf '')
+    if [ -n "$spellbook_dir" ]; then
+      printf '%s\n' "$spellbook_dir"
+      return 0
+    fi
+  fi
+  if [ -x "$HOME/.wizardry/spells/menu/cast" ]; then
+    spellbook_dir=$(sh "$HOME/.wizardry/spells/menu/cast" --dir 2>/dev/null || printf '')
+    if [ -n "$spellbook_dir" ]; then
+      printf '%s\n' "$spellbook_dir"
+      return 0
+    fi
+  fi
+  printf '%s\n' "${SPELLBOOK_DIR:-"${HOME:-.}/.spellbook"}"
+}
+
+memorized_commands_file() {
+  spellbook_dir=$(memorized_spellbook_dir)
+  printf '%s\n' "$spellbook_dir/.memorized"
+}
+
+cmd_memorize_spell() {
+  spell_name=${1-}
+  command_value=${2-}
+
+  [ -n "$spell_name" ] || {
+    printf '%s\n' "wizardry-desktop-backend: memorize-spell requires SPELL_NAME" >&2
+    exit 2
+  }
+  safe_name "$spell_name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid spell name: $spell_name" >&2
+    exit 2
+  }
+  if [ -z "$command_value" ]; then
+    command_value=$spell_name
+  fi
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$command_value" in
+    *"$nl_char"*|*"$cr_char"*)
+      printf '%s\n' "wizardry-desktop-backend: spell command must be one line" >&2
+      exit 2
+      ;;
+    *)
+      :
+      ;;
+  esac
+
+  if [ "$command_value" = "$spell_name" ]; then
+    if hascmd memorize; then
+      memorize "$spell_name"
+      printf '%s\t%s\n' "$spell_name" "$command_value"
+      record_watch "app" "cast:memorize:$spell_name" "wizardry-core" "ok"
+      return 0
+    fi
+    if [ -x "$HOME/.wizardry/spells/cantrips/memorize" ]; then
+      sh "$HOME/.wizardry/spells/cantrips/memorize" "$spell_name"
+      printf '%s\t%s\n' "$spell_name" "$command_value"
+      record_watch "app" "cast:memorize:$spell_name" "wizardry-core" "ok"
+      return 0
+    fi
+  fi
+
+  memorized_file=$(memorized_commands_file)
+  memorized_dir=${memorized_file%/*}
+  if [ "$memorized_dir" != "$memorized_file" ]; then
+    mkdir -p "$memorized_dir"
+  fi
+  [ -f "$memorized_file" ] || : >"$memorized_file"
+
+  tab_char=$(printf '\t')
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-memorized.XXXXXX")
+  while IFS= read -r line || [ -n "$line" ]; do
+    current_name=$line
+    case "$line" in
+      *"$tab_char"*)
+        current_name=${line%%"$tab_char"*}
+        ;;
+      *)
+        ;;
+    esac
+    if [ -z "$current_name" ] || [ "$current_name" = "$spell_name" ]; then
+      continue
+    fi
+    printf '%s\n' "$line" >>"$tmp_file"
+  done <"$memorized_file"
+
+  {
+    printf '%s\t%s\n' "$spell_name" "$command_value"
+    cat "$tmp_file"
+  } >"$memorized_file"
+  rm -f "$tmp_file"
+
+  printf '%s\t%s\n' "$spell_name" "$command_value"
+  record_watch "app" "cast:memorize:$spell_name" "wizardry-core" "ok"
 }
 
 parse_synonym_kv_file() {
@@ -2054,7 +2156,7 @@ resolve_arcana_module_script() {
   candidates="$candidates $install_root/$name/$name/$script_suffix"
 
   for file in $candidates; do
-    [ -x "$file" ] && [ ! -d "$file" ] && printf '%s\n' "$file" && return
+    [ -f "$file" ] && [ ! -d "$file" ] && printf '%s\n' "$file" && return
   done
 
   if [ -n "$script_suffix" ] && hascmd "${name}-${script_suffix}" 2>/dev/null; then
@@ -2125,11 +2227,11 @@ arcana_status_script_for_module() {
   module_name=${1-}
   roots=${2-}
   for root_dir in $roots; do
-    if [ -x "$root_dir/$module_name-status" ] && [ -f "$root_dir/$module_name-status" ]; then
+    if [ -x "$root_dir/$module_name-status" ] && [ ! -d "$root_dir/$module_name-status" ]; then
       printf '%s\n' "$root_dir/$module_name-status"
       return
     fi
-    if [ -x "$root_dir/$module_name/$module_name-status" ] && [ -f "$root_dir/$module_name/$module_name-status" ]; then
+    if [ -x "$root_dir/$module_name/$module_name-status" ] && [ ! -d "$root_dir/$module_name/$module_name-status" ]; then
       printf '%s\n' "$root_dir/$module_name/$module_name-status"
       return
     fi
@@ -2137,14 +2239,40 @@ arcana_status_script_for_module() {
   printf '\n'
 }
 
+run_status_capture() {
+  if [ "$#" -eq 0 ]; then
+    return 0
+  fi
+  (
+    set +e
+    "$@" 2>&1
+    exit 0
+  )
+}
+
+best_status_summary_line() {
+  output=${1-}
+  summary=$(printf '%s\n' "$output" | sed '/^[[:space:]]*$/d' | grep -iE 'installed|not installed|partial|running|ready|enabled|missing|bootstrapped|unavailable' | head -n 1)
+  if [ -n "$summary" ]; then
+    printf '%s\n' "$summary"
+    return
+  fi
+  printf '%s\n' "$output" | sed '/^[[:space:]]*$/d' | head -n 1
+}
+
 arcana_status_output_for_module() {
   module_name=${1-}
   status_script=${2-}
-  if [ -n "$status_script" ]; then
+  status_cmd=""
+  if hascmd "${module_name}-status" 2>/dev/null; then
+    status_cmd="${module_name}-status"
+  fi
+
+  if [ -n "$status_cmd" ]; then
     if [ "$module_name" = "wizardry-apps" ]; then
       merged=''
       for section in web desktop mobile; do
-        section_output=$(sh "$status_script" --section "$section" 2>/dev/null || printf '')
+        section_output=$(run_status_capture "$status_cmd" --section "$section")
         [ -n "$section_output" ] || continue
         if [ -n "$merged" ]; then
           merged="$merged
@@ -2158,11 +2286,36 @@ $section_output"
         return
       fi
     fi
-    sh "$status_script" 2>/dev/null || true
+    run_status_capture "$status_cmd"
     return
   fi
-  if hascmd "${module_name}-status" 2>/dev/null; then
-    "${module_name}-status" 2>/dev/null || true
+
+  if [ -n "$status_script" ]; then
+    if [ "$module_name" = "wizardry-apps" ]; then
+      merged=''
+      for section in web desktop mobile; do
+        section_output=$(run_status_capture "$status_script" --section "$section")
+        if [ -z "$section_output" ]; then
+          section_output=$(run_status_capture sh "$status_script" --section "$section")
+        fi
+        [ -n "$section_output" ] || continue
+        if [ -n "$merged" ]; then
+          merged="$merged
+$section_output"
+        else
+          merged=$section_output
+        fi
+      done
+      if [ -n "$merged" ]; then
+        printf '%s\n' "$merged"
+        return
+      fi
+    fi
+    output=$(run_status_capture "$status_script")
+    if [ -z "$output" ]; then
+      output=$(run_status_capture sh "$status_script")
+    fi
+    printf '%s\n' "$output"
     return
   fi
 }
@@ -2175,7 +2328,7 @@ resolve_arcana_status() {
   output=$(arcana_status_output_for_module "$module_name" "$status_script")
 
   if [ -z "$output" ]; then
-    normalize_status 'coming soon'
+    normalize_status 'not installed'
     return
   fi
 
@@ -2201,7 +2354,7 @@ resolve_arcana_status() {
     return
   fi
 
-  summary=$(printf '%s\n' "$output" | sed '/^[[:space:]]*$/d' | head -n 1)
+  summary=$(best_status_summary_line "$output")
   normalize_status "$summary"
 }
 
@@ -2312,7 +2465,7 @@ EOF
       emit=true
     else
       for root_dir in $roots; do
-        if [ -d "$root_dir/$name" ] || [ -x "$root_dir/$name-menu" ] || [ -x "$root_dir/$name" ] || [ -x "$root_dir/$name/$name-status" ] || [ -x "$root_dir/$name-status" ] || [ -x "$root_dir/$name/$name" ] || [ -x "$root_dir/$name/install-$name" ]; then
+        if [ -d "$root_dir/$name" ] || [ -f "$root_dir/$name-menu" ] || [ -f "$root_dir/$name" ] || [ -f "$root_dir/$name/$name-status" ] || [ -f "$root_dir/$name-status" ] || [ -f "$root_dir/$name/$name" ] || [ -f "$root_dir/$name/install-$name" ]; then
           emit=true
           break
         fi
@@ -2328,7 +2481,7 @@ EOF
     import_ready=true
   else
     for root_dir in $roots; do
-      if [ -x "$root_dir/import-arcanum" ]; then
+      if [ -f "$root_dir/import-arcanum" ]; then
         import_ready=true
         break
       fi
@@ -2342,23 +2495,23 @@ EOF
 resolve_arcana_launch_script() {
   install_root=${1-}
   name=${2-}
-  if [ -x "$install_root/$name-menu" ] && [ ! -d "$install_root/$name-menu" ]; then
+  if [ -f "$install_root/$name-menu" ] && [ ! -d "$install_root/$name-menu" ]; then
     printf '%s\n' "$install_root/$name-menu"
     return
   fi
-  if [ -x "$install_root/$name/$name-menu" ] && [ ! -d "$install_root/$name/$name-menu" ]; then
+  if [ -f "$install_root/$name/$name-menu" ] && [ ! -d "$install_root/$name/$name-menu" ]; then
     printf '%s\n' "$install_root/$name/$name-menu"
     return
   fi
-  if [ -x "$install_root/$name" ] && [ ! -d "$install_root/$name" ]; then
+  if [ -f "$install_root/$name" ] && [ ! -d "$install_root/$name" ]; then
     printf '%s\n' "$install_root/$name"
     return
   fi
-  if [ -x "$install_root/$name/$name" ] && [ ! -d "$install_root/$name/$name" ]; then
+  if [ -f "$install_root/$name/$name" ] && [ ! -d "$install_root/$name/$name" ]; then
     printf '%s\n' "$install_root/$name/$name"
     return
   fi
-  if [ -x "$install_root/$name/install-$name" ] && [ ! -d "$install_root/$name/install-$name" ]; then
+  if [ -f "$install_root/$name/install-$name" ] && [ ! -d "$install_root/$name/install-$name" ]; then
     printf '%s\n' "$install_root/$name/install-$name"
     return
   fi
@@ -2673,6 +2826,9 @@ case "$action" in
     ;;
   list-memorized-spells)
     cmd_list_memorized_spells "$@"
+    ;;
+  memorize-spell)
+    cmd_memorize_spell "$@"
     ;;
   list-arcana-install)
     cmd_list_arcana_install "$@"

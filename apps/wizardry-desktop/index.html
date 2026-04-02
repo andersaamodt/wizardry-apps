@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Wizardry Desktop</title>
-  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260324i">
-  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260324i">
-  <link rel="icon" href="assets/wizardry-desktop-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260402a">
+  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260402a">
+  <link rel="icon" href="assets/forge-icon.png" type="image/png">
 </head>
   <body class="wd-booting">
     <div id="splash" class="wd-splash" aria-live="polite">
-      <img class="wd-splash-icon" src="assets/wizardry-desktop-icon.svg" alt="" aria-hidden="true">
+      <img class="wd-splash-icon" src="assets/forge-icon.png" alt="" aria-hidden="true">
     </div>
 
   <main id="wd-app" class="wd-app-shell hidden" aria-hidden="true">
@@ -37,8 +37,11 @@
     <section id="main-column" class="wd-main-column">
       <header class="wd-content-head">
         <div class="wd-title-wrap">
-          <h2 id="page-title">Cast</h2>
-          <p id="page-subtitle">Open a category to run spells.</p>
+          <div class="wd-title-row">
+            <button id="page-drill-back" type="button" class="wd-drill-back wd-title-back wd-hidden" data-drill-back="" title="Back" aria-label="Back">←</button>
+            <h2 id="page-title">Cast</h2>
+          </div>
+          <p id="page-subtitle" class="wd-hidden"></p>
         </div>
         <div class="wd-head-actions">
           <button id="command-composer-toggle" type="button" class="wd-icon-btn wd-composer-btn" title="Compose command..." aria-label="Compose command..." aria-expanded="false" aria-controls="command-composer-modal">
@@ -56,7 +59,7 @@
           </button>
           <button id="activity-toggle" type="button" class="wd-icon-btn wd-watch-btn" title="Toggle Casting Watch" aria-label="Toggle Casting Watch" aria-pressed="false">
             <svg viewBox="0 0 18 18" focusable="false" aria-hidden="true">
-              <path d="M7.5 3.2a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6Zm0 1.3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm4.4 6.1 3.1 3.1-.9.9-3.1-3.1.9-.9Z" fill="currentColor"></path>
+              <path d="M4 1.8h10a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.8a1 1 0 0 1 1-1Zm.4 1.8v10.8h9.2V3.6H4.4Zm1.4 2.2h6.4v1.1H5.8V5.8Zm0 2.5h6.4v1.1H5.8V8.3Zm0 2.5h4.1v1.1H5.8v-1.1Z" fill="currentColor"></path>
             </svg>
           </button>
         </div>
@@ -113,21 +116,18 @@
         </div>
         <button id="composer-close" type="button" class="wd-icon-btn wd-compact" title="Close composer" aria-label="Close command composer">×</button>
       </header>
-      <div id="composer-blocks" class="wd-composer-blocks">
-        <div id="composer-block-groups"></div>
-      </div>
       <div class="wd-composer-field">
         <label for="composer-input" class="wd-composer-label">Command builder</label>
         <div class="wd-composer-input-row">
           <div class="wd-composer-token-surface">
             <div id="composer-token-row" class="wd-composer-token-row" aria-label="Command tokens" role="list"></div>
-            <input id="composer-input" class="wd-composer-input" type="text" placeholder="Type tokens or choose a building block..." autocomplete="off" spellcheck="false" title="Wrap values in quotes to keep spaces in one token.">
+            <input id="composer-input" class="wd-composer-input" type="text" placeholder="Type command tokens..." autocomplete="off" spellcheck="false" aria-autocomplete="list" title="Wrap values in quotes to keep spaces in one token.">
           </div>
           <button id="composer-copy" type="button" class="wd-icon-btn wd-compact wd-composer-copy-inline" title="Copy command" aria-label="Copy command">⎘</button>
           <button id="composer-run" type="button" class="wd-polite-btn wd-composer-run-inline" title="Press Enter to add token, Shift+Enter to run current command.">Run</button>
         </div>
+        <div id="composer-autocomplete" class="wd-composer-autocomplete wd-hidden" role="listbox" aria-label="Command autocomplete"></div>
         <p id="composer-feedback" class="wd-composer-feedback wd-subline"></p>
-        <div id="composer-arg-assistant" class="wd-composer-arg-assistant" aria-live="polite"></div>
       </div>
       <pre id="composer-output" class="wd-mono-box wd-composer-output" aria-live="polite">No command run yet.</pre>
       <footer class="wd-composer-actions">
@@ -142,7 +142,7 @@
     (function () {
       'use strict';
 
-      var ASSET_VERSION = 'wizardry-desktop20260324i';
+      var ASSET_VERSION = 'wizardry-desktop20260402a';
       var THEME_FALLBACK = ['archmage', 'adept', 'chrono', 'chronomancer', 'conjurer', 'druid', 'empath'];
       var COMPOSER_ACTIONS = ['run-spell', 'spell-help', 'run-action', 'run-system'];
       var COMPOSER_SYSTEM_ACTIONS = [
@@ -249,7 +249,8 @@
           rawInput: '',
           tokens: [],
           selectedToken: -1,
-          activeBlock: 0,
+          autocompleteIndex: -1,
+          autocompleteEntries: [],
           message: '',
           output: 'No command run yet.',
           running: false
@@ -268,8 +269,10 @@
           mainColumn: document.getElementById('main-column'),
           leftNav: document.getElementById('left-nav'),
           railDivider: document.getElementById('rail-divider'),
+          pageDrillBack: document.getElementById('page-drill-back'),
           pageTitle: document.getElementById('page-title'),
           pageSubtitle: document.getElementById('page-subtitle'),
+          contentScroll: document.getElementById('content-scroll'),
           contentArea: document.getElementById('content-area'),
           activityToggle: document.getElementById('activity-toggle'),
           activityDrawer: document.getElementById('activity-drawer'),
@@ -298,10 +301,9 @@
           composerCopy: document.getElementById('composer-copy'),
           composerCommandPreview: document.getElementById('composer-command-preview'),
           composerInput: document.getElementById('composer-input'),
+          composerAutocomplete: document.getElementById('composer-autocomplete'),
           composerFeedback: document.getElementById('composer-feedback'),
-          composerArgAssistant: document.getElementById('composer-arg-assistant'),
           composerTokenRow: document.getElementById('composer-token-row'),
-          composerBlocks: document.getElementById('composer-block-groups'),
           composerOutput: document.getElementById('composer-output')
         };
       }
@@ -698,44 +700,6 @@
         return false;
       }
 
-      function composerBlockButtons() {
-        if (!els.composerBlocks) {
-          return [];
-        }
-        return Array.prototype.slice.call(els.composerBlocks.querySelectorAll('.wd-composer-block'));
-      }
-
-      function composerSetActiveBlock(index) {
-        var buttons = composerBlockButtons();
-        if (!buttons.length) {
-          return;
-        }
-        if (!Number.isInteger(index) || index < 0 || index >= buttons.length) {
-          index = 0;
-        }
-        for (var i = 0; i < buttons.length; i += 1) {
-          if (i === index) {
-            buttons[i].tabIndex = 0;
-            buttons[i].classList.add('wd-composer-block-active');
-          } else {
-            buttons[i].tabIndex = -1;
-            buttons[i].classList.remove('wd-composer-block-active');
-          }
-        }
-      }
-
-      function composerInsertBlock(block) {
-        var tokenText = '';
-        if (block) {
-          tokenText = block.getAttribute && block.getAttribute('data-composer-block') || '';
-        }
-        commitComposerInput({ forceSingle: true });
-        addComposerTokens(splitComposerText(tokenText));
-        if (els.composerInput) {
-          focusComposerInput();
-        }
-      }
-
       function composerOpenWithTokens(tokens, options) {
         options = options || {};
         if ((!Array.isArray(tokens) || !tokens.length) && !options.allowEmpty) {
@@ -745,7 +709,8 @@
         state.composer.seededDefaults = !!options.seededDefaults;
         state.composer.rawInput = '';
         state.composer.selectedToken = -1;
-        state.composer.activeBlock = 0;
+        state.composer.autocompleteIndex = -1;
+        state.composer.autocompleteEntries = [];
         state.composer.message = '';
         state.composer.output = 'No command run yet.';
         if (els.composerInput) {
@@ -1026,291 +991,156 @@
         return result;
       }
 
-      function composerBlockDefinitions() {
-        var blocks = [
-          {
-            label: 'System',
-            entries: [
-              { label: 'restart menu', tokens: ['run-system', 'system:restart-menu'], help: 'Open shutdown-menu in Terminal.' },
-              { label: 'update all', tokens: ['run-system', 'system:update-all'], help: 'Run update-all -v.' },
-              { label: 'update wizardry', tokens: ['run-system', 'system:update-wizardry'], help: 'Update wizardry core.' },
-              { label: 'services menu', tokens: ['run-system', 'system:services-menu'], help: 'Open services-menu in Terminal.' },
-              { label: 'nixos rebuild', tokens: ['run-system', 'system:nixos-rebuild'], help: 'Run sudo nixos-rebuild switch.' },
-              { label: 'verify POSIX', tokens: ['run-system', 'system:verify-posix'], help: 'Run verify-posix checks.' },
-              { label: 'test magic', tokens: ['run-system', 'system:test-magic'], help: 'Run full wizardry test suite.' },
-              { label: 'profile tests', tokens: ['run-system', 'system:profile-tests'], help: 'Profile wizardry tests.' },
-              { label: 'uninstall wizardry', tokens: ['run-system', 'system:uninstall-wizardry'], help: 'Run uninstall script.' },
-              { label: 'whoami', tokens: ['run-system', 'system:whoami'], help: 'Inspect current shell user.' },
-              { label: 'pwd', tokens: ['run-system', 'system:pwd'], help: 'Print current working directory.' }
-            ]
-          },
-          {
-            label: 'Casting',
-            entries: [
-              { label: 'run-spell', tokens: ['run-spell'], help: 'Build a spell reference and spell name.' },
-              { label: 'spell-help', tokens: ['spell-help'], help: 'Fetch help text for a known spell.' }
-            ]
-          },
-          {
-            label: 'Arcana Actions',
-            entries: [
-              { label: 'app help (cast)', tokens: ['run-action', 'app-help', 'cast'], help: 'Show app help output for `cast`.' },
-              { label: 'arcana install', tokens: ['run-action', 'arcana:install'], help: 'Install a chosen arcana module by adding a final parameter.' },
-              { label: 'arcana module menu', tokens: ['run-action', 'arcana:module-menu'], help: 'Open a module menu after adding a module name.' },
-              { label: 'arcana menu', tokens: ['run-action', 'arcana:menu'], help: 'Run arcana menu.' },
-              { label: 'arcana themes', tokens: ['run-action', 'arcana:themes'], help: 'List available themes.' },
-              { label: 'reload arcana', tokens: ['run-action', 'arcana:reload'], help: 'Refresh the arcana metadata cache.' }
-            ]
-          },
-          {
-            label: 'Menu Actions',
-            entries: [
-              { label: 'list menus', tokens: ['run-action', 'menu:list'], help: 'List all menu scripts known to wizardry.' },
-              { label: 'menu help', tokens: ['run-action', 'menu:help'], help: 'Show help for a selected menu name.' },
-              { label: 'menu run', tokens: ['run-action', 'menu:run'], help: 'Run safe menu operation or show sourced guidance.' },
-              { label: 'menu terminal', tokens: ['run-action', 'menu:terminal'], help: 'Open menu command in Terminal.' }
-            ]
-          }
-        ];
-
-        if (state.cast.categories && state.cast.categories.length) {
-          var limit = Math.min(4, state.cast.categories.length);
-          for (var i = 0; i < limit; i += 1) {
-            var category = state.cast.categories[i];
-            var spellRows = (state.spellCache && state.spellCache[category.id]) || [];
-            if (spellRows && spellRows[0]) {
-              blocks[1].entries.push({
-                label: 'run-spell ' + safeShortText(category.id) + ' / ' + safeShortText(spellRows[0]),
-                tokens: ['run-spell', category.id, spellRows[0]],
-                help: 'Quick launch ' + category.id + ' : ' + spellRows[0]
-              });
-            }
-          }
+      function composerPushSuggestion(entries, seen, value, meta, hint) {
+        var token = normalizeComposerToken(value);
+        if (!token || seen[token]) {
+          return;
         }
-
-        if (state.arcanaInstall && state.arcanaInstall.length) {
-          var moduleLimit = Math.min(5, state.arcanaInstall.length);
-          for (var j = 0; j < moduleLimit; j += 1) {
-            var module = state.arcanaInstall[j];
-            if (!module || !module.name) {
-              continue;
-            }
-            blocks[2].entries.push({
-              label: 'Install ' + safeShortText(module.name),
-              tokens: ['run-action', 'arcana:install', module.name],
-              help: 'Install module ' + module.name
-            });
-            blocks[2].entries.push({
-              label: 'Module menu ' + safeShortText(module.name),
-              tokens: ['run-action', 'arcana:menu', module.name],
-              help: 'Open module menu for ' + module.name
-            });
-          }
-        }
-
-        if (state.menuCatalog && state.menuCatalog.length) {
-          var menuLimit = Math.min(6, state.menuCatalog.length);
-          for (var menuIdx = 0; menuIdx < menuLimit; menuIdx += 1) {
-            var menu = state.menuCatalog[menuIdx];
-            if (!menu || !menu.name) {
-              continue;
-            }
-            blocks[3].entries.push({
-              label: 'menu help ' + safeShortText(menu.name),
-              tokens: ['run-action', 'menu:help', menu.name],
-              help: 'Show help for menu ' + menu.name
-            });
-            blocks[3].entries.push({
-              label: 'menu run ' + safeShortText(menu.name),
-              tokens: ['run-action', 'menu:run', menu.name],
-              help: 'Run safe menu action for ' + menu.name
-            });
-            if (menu.sourcedOnly) {
-              blocks[3].entries.push({
-                label: 'terminal ' + safeShortText(menu.name),
-                tokens: ['run-action', 'menu:terminal', menu.name],
-                help: 'Open Terminal command for sourced menu ' + menu.name
-              });
-            }
-          }
-        }
-
-        return blocks;
+        seen[token] = true;
+        entries.push({
+          value: token,
+          meta: meta || '',
+          hint: hint || ''
+        });
       }
 
-      function composerArgSuggestionGroups(plan, blocks) {
-        if (!plan || !plan.tokens || !plan.tokens.length) {
-          return blocks;
+      function composerAutocompleteContext(plan) {
+        var raw = String(state.composer.rawInput || '');
+        var parsed = parseComposerText(raw);
+        if (!parsed.tokens.length || (/(?:\s|,)$/.test(raw) && !parsed.unclosedQuote)) {
+          return null;
+        }
+        var fragment = normalizeComposerToken(parsed.tokens[parsed.tokens.length - 1]);
+        if (!fragment) {
+          return null;
+        }
+        var prefixTokens = Array.prototype.slice.call(state.composer.tokens || []).concat(parsed.tokens.slice(0, -1));
+        return {
+          plan: plan || null,
+          fragment: fragment,
+          fragmentLower: fragment.toLowerCase(),
+          prefixTokens: prefixTokens,
+          tokenIndex: prefixTokens.length,
+          action: prefixTokens[0] || ''
+        };
+      }
+
+      function composerAutocompleteSuggestions(context) {
+        if (!context) {
+          return [];
+        }
+        var entries = [];
+        var seen = {};
+        var add = function (value, meta, hint) {
+          var token = normalizeComposerToken(value);
+          if (!token || token.toLowerCase().indexOf(context.fragmentLower) !== 0) {
+            return;
+          }
+          composerPushSuggestion(entries, seen, token, meta, hint);
+        };
+
+        var tokenIndex = context.tokenIndex;
+        var prefix = context.prefixTokens;
+        var action = context.action;
+
+        if (tokenIndex === 0) {
+          for (var i = 0; i < COMPOSER_ACTIONS.length; i += 1) {
+            add(COMPOSER_ACTIONS[i], 'action', 'Command action');
+          }
+          return entries;
         }
 
-        var action = plan.tokens[0];
-        var hasRef = plan.tokens[1];
-        var hasArg = plan.tokens[2];
-
-        if (action === 'run-spell' && !hasRef) {
-          var categoryRefs = [];
-          for (var i = 0; i < state.cast.categories.length && categoryRefs.length < COMPOSER_PRESET_LIMIT; i += 1) {
-            var category = state.cast.categories[i];
-            categoryRefs.push({
-              label: category.id,
-              tokens: [category.id],
-              help: 'Use spell source and category, e.g. ' + category.id
-            });
-          }
-          if (categoryRefs.length) {
-            blocks.unshift({
-              label: 'Spell References',
-              entries: categoryRefs
-            });
-          }
-          return blocks;
-        }
-
-        if (action === 'run-spell' && hasRef && !hasArg) {
-          var spellRows = state.spellCache[hasRef] || [];
-          if (spellRows.length) {
-            var spellSuggestions = [];
-            for (var s = 0; s < spellRows.length && spellSuggestions.length < COMPOSER_PRESET_LIMIT; s += 1) {
-              spellSuggestions.push({
-                label: spellRows[s],
-                tokens: [spellRows[s]],
-                help: 'Cast ' + hasRef + ' spell ' + spellRows[s]
-              });
+        if (action === 'run-system') {
+          if (tokenIndex === 1) {
+            for (var j = 0; j < COMPOSER_SYSTEM_ACTIONS.length; j += 1) {
+              add(COMPOSER_SYSTEM_ACTIONS[j], 'system', COMPOSER_SYSTEM_ACTIONS[j]);
             }
-            if (spellSuggestions.length) {
-              blocks.unshift({
-                label: 'Spell Names',
-                entries: spellSuggestions
-              });
-            }
           }
-          return blocks;
+          return entries;
         }
 
-        if (action === 'run-system' && !hasRef) {
-          var systemSuggestions = [];
-          for (var j = 0; j < COMPOSER_SYSTEM_ACTIONS.length; j += 1) {
-            systemSuggestions.push({
-              label: COMPOSER_SYSTEM_ACTIONS[j],
-              tokens: [COMPOSER_SYSTEM_ACTIONS[j]],
-              help: 'Run host helper: ' + COMPOSER_SYSTEM_ACTIONS[j]
-            });
-          }
-          blocks.unshift({
-            label: 'System Actions',
-            entries: systemSuggestions
-          });
-          return blocks;
-        }
-
-        if (action === 'run-action' && !hasRef) {
-          var actionSuggestions = [];
-          var actionNames = Object.keys(COMPOSER_RUN_ACTIONS);
-          for (var k = 0; k < actionNames.length && actionSuggestions.length < COMPOSER_PRESET_LIMIT; k += 1) {
-            var name = actionNames[k];
-            actionSuggestions.push({
-              label: name,
-              tokens: [name],
-              help: COMPOSER_RUN_ACTIONS[name].label || ('Run action ' + name)
-            });
-          }
-          blocks.unshift({
-            label: 'Wizardry Actions',
-            entries: actionSuggestions
-          });
-          return blocks;
-        }
-
-        if (action === 'run-action' && hasRef && !hasArg && runActionConfig(hasRef) &&
-          (runActionConfig(hasRef).requiresArg || hasRef === 'arcana:menu')) {
-          var argSuggestions = [];
-          if (hasRef === 'arcana:install' || hasRef === 'arcana:module-menu') {
-            for (var m = 0; m < state.arcanaInstall.length && argSuggestions.length < COMPOSER_PRESET_LIMIT; m += 1) {
-              var module = state.arcanaInstall[m];
-              if (module && module.name) {
-                argSuggestions.push({
-                  label: module.name,
-                  tokens: [module.name],
-                  help: hasRef === 'arcana:install' ? 'Install module ' + module.name : 'Open menu for ' + module.name
-                });
-              }
-            }
-          } else if (hasRef === 'arcana:menu') {
-            for (var menuIndex = 0; menuIndex < state.arcanaInstall.length && argSuggestions.length < COMPOSER_PRESET_LIMIT; menuIndex += 1) {
-              var menuModule = state.arcanaInstall[menuIndex];
-              if (menuModule && menuModule.name) {
-                argSuggestions.push({
-                  label: menuModule.name,
-                  tokens: [menuModule.name],
-                  help: 'Open module menu for ' + menuModule.name
-                });
-              }
-            }
-          } else if (hasRef === 'app-help') {
-            argSuggestions = [
-              { label: 'cast', tokens: ['cast'], help: 'Show cast help.' },
-              { label: 'mud', tokens: ['mud'], help: 'Show MUD help, where available.' },
-              { label: 'arcana', tokens: ['arcana'], help: 'Show arcana help.' },
-              { label: 'main-menu', tokens: ['main-menu'], help: 'Show system help entrypoint menu help.' }
-            ];
-          } else if (hasRef === 'menu:help' || hasRef === 'menu:run' || hasRef === 'menu:terminal') {
-            for (var menuNameIdx = 0; menuNameIdx < state.menuCatalog.length && argSuggestions.length < COMPOSER_PRESET_LIMIT; menuNameIdx += 1) {
-              var menuRow = state.menuCatalog[menuNameIdx];
-              if (!menuRow || !menuRow.name) {
+        if (action === 'run-spell' || action === 'spell-help') {
+          if (tokenIndex === 1) {
+            for (var catIdx = 0; catIdx < state.cast.categories.length; catIdx += 1) {
+              var cat = state.cast.categories[catIdx];
+              if (!cat || !cat.id) {
                 continue;
               }
-              argSuggestions.push({
-                label: menuRow.name,
-                tokens: [menuRow.name],
-                help: hasRef === 'menu:help'
-                  ? ('Show help for ' + menuRow.name)
-                  : (hasRef === 'menu:terminal'
-                    ? ('Open Terminal for ' + menuRow.name)
-                    : ('Run menu action for ' + menuRow.name))
-              });
+              add(cat.id, 'reference', (cat.title || cat.id) + ' category');
+            }
+          } else if (tokenIndex === 2) {
+            var ref = prefix[1];
+            var spellRows = state.spellCache[ref] || [];
+            for (var spellIdx = 0; spellIdx < spellRows.length; spellIdx += 1) {
+              add(spellRows[spellIdx], 'spell', 'Spell from ' + ref);
             }
           }
-          if (argSuggestions.length) {
-            blocks.unshift({
-              label: 'Action Arguments',
-              entries: argSuggestions
-            });
-          }
-          return blocks;
+          return entries;
         }
 
-        if (action === 'run-action' && (hasRef === 'menu:run' || hasRef === 'menu:terminal') && hasArg && !plan.tokens[3]) {
-          var selectedMenu = menuRowByName(hasArg);
+        if (action !== 'run-action') {
+          return entries;
+        }
+
+        if (tokenIndex === 1) {
+          var actionNames = Object.keys(COMPOSER_RUN_ACTIONS);
+          for (var actionIdx = 0; actionIdx < actionNames.length; actionIdx += 1) {
+            var actionName = actionNames[actionIdx];
+            var actionConfig = runActionConfig(actionName);
+            add(actionName, 'menu', actionConfig && actionConfig.label ? actionConfig.label : actionName);
+          }
+          return entries;
+        }
+
+        var runAction = prefix[1];
+        if (!runAction) {
+          return entries;
+        }
+
+        if (tokenIndex === 2) {
+          if (runAction === 'arcana:install' || runAction === 'arcana:module-menu' || runAction === 'arcana:menu') {
+            for (var modIdx = 0; modIdx < state.arcanaInstall.length; modIdx += 1) {
+              var module = state.arcanaInstall[modIdx];
+              if (module && module.name) {
+                add(module.name, 'module', module.status || 'module');
+              }
+            }
+            return entries;
+          }
+          if (runAction === 'app-help') {
+            var appHelpTargets = ['cast', 'mud', 'spellbook', 'arcana', 'system', 'main-menu'];
+            for (var appIdx = 0; appIdx < appHelpTargets.length; appIdx += 1) {
+              add(appHelpTargets[appIdx], 'app', 'Help target');
+            }
+            return entries;
+          }
+          if (runAction === 'menu:help' || runAction === 'menu:run' || runAction === 'menu:terminal') {
+            for (var menuIdx = 0; menuIdx < state.menuCatalog.length; menuIdx += 1) {
+              var menu = state.menuCatalog[menuIdx];
+              if (menu && menu.name) {
+                add(menu.name, 'menu', menuArgModeLabel(menu.argMode));
+              }
+            }
+            return entries;
+          }
+        }
+
+        if (tokenIndex === 3 && (runAction === 'menu:run' || runAction === 'menu:terminal')) {
+          var selectedMenu = menuRowByName(prefix[2]);
           if (!selectedMenu) {
-            return blocks;
+            return entries;
           }
-          var secondaryArgs = [];
           if (selectedMenu.argValues && selectedMenu.argValues.length) {
-            for (var mv = 0; mv < selectedMenu.argValues.length && secondaryArgs.length < COMPOSER_PRESET_LIMIT; mv += 1) {
-              secondaryArgs.push({
-                label: selectedMenu.argValues[mv],
-                tokens: [selectedMenu.argValues[mv]],
-                help: 'Suggested argument for ' + selectedMenu.name
-              });
+            for (var argIdx = 0; argIdx < selectedMenu.argValues.length; argIdx += 1) {
+              add(selectedMenu.argValues[argIdx], 'argument', 'Known menu argument');
             }
           }
-          if (selectedMenu.argExample && secondaryArgs.length < COMPOSER_PRESET_LIMIT) {
-            secondaryArgs.push({
-              label: selectedMenu.argExample,
-              tokens: [selectedMenu.argExample],
-              help: 'Example argument for ' + selectedMenu.name
-            });
+          if (selectedMenu.argExample) {
+            add(selectedMenu.argExample, 'example', 'Example argument');
           }
-          if (secondaryArgs.length) {
-            blocks.unshift({
-              label: 'Menu Arguments',
-              entries: secondaryArgs
-            });
-          }
-          return blocks;
         }
 
-        return blocks;
+        return entries;
       }
 
       function renderComposerTokenRow(plan) {
@@ -1351,43 +1181,102 @@
         els.composerTokenRow.innerHTML = html;
       }
 
-      function renderComposerBlocks(plan) {
-        if (!els.composerBlocks) {
+      function renderComposerAutocomplete(plan) {
+        if (!els.composerAutocomplete) {
           return;
         }
-        var groups = composerArgSuggestionGroups(plan || {}, composerBlockDefinitions());
-        var activeSet = Number(state.composer.activeBlock);
-        if (!Number.isInteger(activeSet) || activeSet < 0) {
-          activeSet = 0;
-        }
-        var html = '';
-        var flatIndex = 0;
-        for (var i = 0; i < groups.length; i += 1) {
-          var group = groups[i];
-          html += '<section class="wd-composer-group">';
-          html += '<h4>' + escapeText(group.label || 'Blocks') + '</h4>';
-          html += '<div class="wd-composer-group-entries">';
-          for (var j = 0; j < group.entries.length; j += 1) {
-            var block = group.entries[j];
-            var label = block.label || ('block ' + (j + 1));
-            var tabIndex = flatIndex === activeSet ? '0' : '-1';
-            var activeClass = flatIndex === activeSet ? ' wd-composer-block-active' : '';
-            html += '<button type="button" class="wd-polite-btn wd-composer-block' + activeClass + '" title="' + escapeHtmlAttribute(block.help || '') + '" data-composer-block="' + escapeAttrValue((block.tokens || []).join(' ')) + '" tabindex="' + tabIndex + '">' + escapeText(label) + '</button>';
-            flatIndex += 1;
+        var context = composerAutocompleteContext(plan);
+        var suggestions = composerAutocompleteSuggestions(context);
+        if (!context || !suggestions.length) {
+          state.composer.autocompleteIndex = -1;
+          state.composer.autocompleteEntries = [];
+          els.composerAutocomplete.classList.add('wd-hidden');
+          els.composerAutocomplete.innerHTML = '';
+          if (els.composerInput) {
+            els.composerInput.setAttribute('aria-expanded', 'false');
+            els.composerInput.removeAttribute('aria-activedescendant');
           }
-          html += '</div></section>';
-        }
-        els.composerBlocks.innerHTML = html;
-
-        if (!groups.length) {
           return;
         }
-        var blockButtons = composerBlockButtons();
-        if (flatIndex <= activeSet) {
-          state.composer.activeBlock = 0;
-          activeSet = 0;
+        var active = Number(state.composer.autocompleteIndex);
+        if (!Number.isInteger(active) || active < 0 || active >= suggestions.length) {
+          active = 0;
         }
-        composerSetActiveBlock(activeSet);
+        state.composer.autocompleteIndex = active;
+        state.composer.autocompleteEntries = suggestions;
+
+        var html = '';
+        for (var i = 0; i < suggestions.length; i += 1) {
+          var suggestion = suggestions[i];
+          var id = 'composer-suggest-' + i;
+          var selected = i === active;
+          html += '<button type="button" class="wd-composer-suggest-item' + (selected ? ' wd-composer-suggest-item-active' : '') + '" role="option" id="' + id + '" aria-selected="' + (selected ? 'true' : 'false') + '" data-composer-suggest-index="' + i + '" data-composer-suggest-value="' + escapeAttrValue(suggestion.value) + '" title="' + escapeHtmlAttribute(suggestion.hint || suggestion.value) + '">';
+          html += '<span class="wd-composer-suggest-label">' + escapeText(suggestion.value) + '</span>';
+          if (suggestion.meta) {
+            html += '<span class="wd-composer-suggest-meta">' + escapeText(suggestion.meta) + '</span>';
+          }
+          html += '</button>';
+        }
+        els.composerAutocomplete.innerHTML = html;
+        els.composerAutocomplete.classList.remove('wd-hidden');
+        if (els.composerInput) {
+          els.composerInput.setAttribute('aria-expanded', 'true');
+          els.composerInput.setAttribute('aria-activedescendant', 'composer-suggest-' + active);
+        }
+      }
+
+      function composerAutocompleteItems() {
+        if (!els.composerAutocomplete || els.composerAutocomplete.classList.contains('wd-hidden')) {
+          return [];
+        }
+        return Array.prototype.slice.call(els.composerAutocomplete.querySelectorAll('[data-composer-suggest-index]'));
+      }
+
+      function composerMoveAutocomplete(delta) {
+        var items = composerAutocompleteItems();
+        if (!items.length) {
+          return false;
+        }
+        var next = Number(state.composer.autocompleteIndex);
+        if (!Number.isInteger(next) || next < 0 || next >= items.length) {
+          next = delta < 0 ? items.length - 1 : 0;
+        } else {
+          next = (next + delta + items.length) % items.length;
+        }
+        state.composer.autocompleteIndex = next;
+        renderComposer();
+        return true;
+      }
+
+      function composerApplyAutocompleteSelection(index) {
+        var entries = Array.isArray(state.composer.autocompleteEntries) ? state.composer.autocompleteEntries : [];
+        if (!entries.length) {
+          return false;
+        }
+        var selected = Number(index);
+        if (!Number.isInteger(selected) || selected < 0 || selected >= entries.length) {
+          selected = Number(state.composer.autocompleteIndex);
+        }
+        if (!Number.isInteger(selected) || selected < 0 || selected >= entries.length) {
+          selected = 0;
+        }
+        var entry = entries[selected];
+        if (!entry || !entry.value) {
+          return false;
+        }
+        var nextValue = String(entry.value);
+        if (/[\s,]/.test(nextValue)) {
+          nextValue = '"' + nextValue.replaceAll('\\', '\\\\').replaceAll('"', '\\"') + '"';
+        }
+        state.composer.rawInput = nextValue;
+        if (els.composerInput) {
+          els.composerInput.value = nextValue;
+        }
+        commitComposerInput(true);
+        if (els.composerInput) {
+          focusComposerInput();
+        }
+        return true;
       }
 
       function updateComposerOutput(value, options) {
@@ -1413,122 +1302,6 @@
         }
         els.composerFeedback.textContent = message;
         els.composerFeedback.className = 'wd-composer-feedback wd-subline wd-composer-feedback-' + status;
-      }
-
-      function composerNextPlaceholder(plan) {
-        if (!plan || !plan.placeholders || !plan.placeholders.length) {
-          return null;
-        }
-        var tokensCount = plan.tokens && plan.tokens.length ? plan.tokens.length : 0;
-        for (var i = 0; i < plan.placeholders.length; i += 1) {
-          var placeholder = plan.placeholders[i];
-          if (!placeholder) {
-            continue;
-          }
-          var idx = Number(placeholder.index);
-          if (Number.isInteger(idx) && idx >= tokensCount) {
-            return placeholder;
-          }
-          if (Number.isInteger(idx) && plan.tokenKinds && plan.tokenKinds[idx] === 'missing') {
-            return placeholder;
-          }
-        }
-        return null;
-      }
-
-      function encodeComposerAssistArgs(tokens) {
-        try {
-          return encodeURIComponent(JSON.stringify(Array.isArray(tokens) ? tokens : []));
-        } catch (_err) {
-          return '';
-        }
-      }
-
-      function decodeComposerAssistArgs(value) {
-        try {
-          var parsed = JSON.parse(decodeURIComponent(String(value || '')));
-          if (!Array.isArray(parsed)) {
-            return [];
-          }
-          return parsed.map(normalizeComposerToken).filter(Boolean);
-        } catch (_err) {
-          return [];
-        }
-      }
-
-      function collectComposerAssistEntries(plan) {
-        var groups = composerArgSuggestionGroups(plan || {}, composerBlockDefinitions());
-        var entries = [];
-        var seen = {};
-        var i = 0;
-        for (i = 0; i < groups.length && entries.length < COMPOSER_PRESET_LIMIT; i += 1) {
-          var group = groups[i];
-          if (!group || !group.entries || !group.entries.length) {
-            continue;
-          }
-          for (var j = 0; j < group.entries.length && entries.length < COMPOSER_PRESET_LIMIT; j += 1) {
-            var item = group.entries[j];
-            var tokens = Array.isArray(item && item.tokens) ? item.tokens.map(normalizeComposerToken).filter(Boolean) : [];
-            if (!tokens.length) {
-              continue;
-            }
-            var key = tokens.join('\u001f');
-            if (seen[key]) {
-              continue;
-            }
-            seen[key] = true;
-            entries.push({
-              label: item && item.label ? item.label : tokens.join(' '),
-              help: item && item.help ? item.help : '',
-              tokens: tokens
-            });
-          }
-        }
-        return entries;
-      }
-
-      function renderComposerArgAssistant(plan) {
-        if (!els.composerArgAssistant) {
-          return;
-        }
-        var workingPlan = plan || { tokens: [] };
-        var tokens = Array.isArray(workingPlan.tokens) ? workingPlan.tokens.slice(0) : [];
-        var html = '';
-
-        if (!tokens.length) {
-          html = '';
-          els.composerArgAssistant.innerHTML = html;
-          return;
-        }
-
-        var nextPlaceholder = composerNextPlaceholder(workingPlan);
-        if (nextPlaceholder && nextPlaceholder.label) {
-          html += '<p class="wd-subline">Next: <code>' + escapeText(nextPlaceholder.label) + '</code>.</p>';
-        }
-
-        if (tokens[0] === 'run-action' && (tokens[1] === 'menu:help' || tokens[1] === 'menu:run' || tokens[1] === 'menu:terminal') && tokens[2]) {
-          var menuSpec = menuRowByName(tokens[2]);
-          if (menuSpec) {
-            html += '<p class="wd-subline">Menu: <code>' + escapeText(menuSpec.name) + '</code> · ' + escapeText(menuArgModeLabel(menuSpec.argMode)) + (menuSpec.sourcedOnly ? ' · sourced only' : '') + '</p>';
-            if (menuSpec.argHelp) {
-              html += '<p class="wd-subline">' + escapeText(menuSpec.argHelp) + '</p>';
-            }
-          } else {
-            html += '<p class="wd-subline">Unknown menu name: <code>' + escapeText(tokens[2]) + '</code>.</p>';
-          }
-        }
-
-        if (nextPlaceholder) {
-          var entries = collectComposerAssistEntries(workingPlan);
-          html += '<div class="wd-composer-assist-buttons">';
-          for (var idx = 0; idx < entries.length; idx += 1) {
-            var entry = entries[idx];
-            html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" title="' + escapeHtmlAttribute(entry.help || '') + '" data-composer-assist-token="' + escapeAttrValue(entry.tokens.join(' ')) + '" data-composer-assist-args="' + escapeAttrValue(encodeComposerAssistArgs(entry.tokens)) + '">' + escapeText(entry.label) + '</button>';
-          }
-          html += '</div>';
-        }
-
-        els.composerArgAssistant.innerHTML = html;
       }
 
       function renderComposerPreview(plan) {
@@ -1571,9 +1344,8 @@
           plan.message = 'Close the quoted token to continue.';
         }
         renderComposerTokenRow(plan);
-        renderComposerBlocks(plan);
+        renderComposerAutocomplete(plan);
         renderComposerFeedback(plan);
-        renderComposerArgAssistant(plan);
         renderComposerPreview(plan);
         updateComposerOutput(state.composer.output || 'No command run yet.', { silent: true });
         if (els.composerRun) {
@@ -1624,7 +1396,8 @@
         state.composer.seededDefaults = false;
         state.composer.rawInput = '';
         state.composer.selectedToken = -1;
-        state.composer.activeBlock = 0;
+        state.composer.autocompleteIndex = -1;
+        state.composer.autocompleteEntries = [];
         state.composer.message = '';
         state.composer.output = 'No command run yet.';
         state.composer.running = false;
@@ -2309,7 +2082,7 @@
       }
 
       function drillBackButton(sectionName) {
-        return '<button type="button" class="wd-drill-back" data-drill-back="' + escapeAttrValue(sectionName) + '" title="Back" aria-label="Back">←</button>';
+        return '<button type="button" class="wd-drill-back wd-inline-back" data-drill-back="' + escapeAttrValue(sectionName) + '" title="Back" aria-label="Back">←</button>';
       }
 
       function findCastCategoryById(categoryId) {
@@ -2430,6 +2203,41 @@
         renderPage();
       }
 
+      function runDrillBack(section) {
+        var key = String(section || '').trim();
+        if (!key) {
+          if (state.activePage === 'cast' && state.cast.selectedCategory) {
+            key = 'cast';
+          } else if (state.activePage === 'arcana' && state.arcanaSelectedModule) {
+            key = 'arcana';
+          } else if (state.activePage === 'system' && state.systemSelectedAction) {
+            key = 'system';
+          } else if (state.activePage === 'mud' && state.mudSelectedAction) {
+            key = 'mud';
+          }
+        }
+        if (!key) {
+          return false;
+        }
+        if (key === 'cast') {
+          setCastSelectedCategory('', 'back');
+          return true;
+        }
+        if (key === 'arcana') {
+          setArcanaSelectedModule('', 'back');
+          return true;
+        }
+        if (key === 'system') {
+          setSystemSelectedAction('', 'back');
+          return true;
+        }
+        if (key === 'mud') {
+          setMudSelectedAction('', 'back');
+          return true;
+        }
+        return false;
+      }
+
       function menuRowByName(name) {
         var key = String(name || '').trim();
         if (!key) {
@@ -2473,11 +2281,14 @@
             var cat = state.cast.categories[i];
             var summary = String(cat.count) + ' spell' + (cat.count === 1 ? '' : 's');
             var active = selectedCategory && selectedCategory.id === cat.id ? ' wd-drill-item-active' : '';
+            rootHtml += '<div class="wd-cast-category-row">';
             rootHtml += '<button type="button" class="wd-drill-item wd-cast-item' + active + '" data-cast-category-open="' + escapeAttrValue(cat.id) + '">';
-            rootHtml += '<span class="wd-drill-item-main wd-cast-item-main"><span class="wd-cast-title">' + castCategoryDisplay(cat) + '</span><span class="wd-pill wd-category-kind">' + escapeText(cat.kind) + '</span></span>';
-            rootHtml += '<span class="wd-cast-item-count">' + escapeText(summary) + '</span>';
+            rootHtml += '<span class="wd-drill-item-main wd-cast-item-main"><span class="wd-cast-title">' + castCategoryDisplay(cat) + '</span></span>';
             rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
             rootHtml += '</button>';
+            rootHtml += '<span class="wd-pill wd-category-kind">' + escapeText(cat.kind) + '</span>';
+            rootHtml += '<span class="wd-pill wd-cast-count-pill">' + escapeText(summary) + '</span>';
+            rootHtml += '</div>';
           }
           rootHtml += '</div>';
         }
@@ -2486,7 +2297,7 @@
         if (!selectedCategory) {
           detailHtml += '<p class="wd-empty">Select a spell category to inspect and cast spells.</p>';
         } else {
-          detailHtml += '<div class="wd-drill-head">';
+          detailHtml += '<div class="wd-drill-head wd-drill-head-with-back">';
           detailHtml += drillBackButton('cast');
           detailHtml += '<h4>' + castCategoryDisplay(selectedCategory) + '</h4>';
           detailHtml += '<span class="wd-pill wd-category-kind">' + escapeText(selectedCategory.kind) + '</span>';
@@ -2498,30 +2309,23 @@
           } else if (!spells.length) {
             detailHtml += '<p class="wd-empty">No spells found in this category.</p>';
           } else {
-            detailHtml += '<div class="wd-list wd-scroll-area wd-cast-spell-list">';
+            detailHtml += '<div class="wd-cast-spell-list wd-scroll-area">';
             for (var s = 0; s < spells.length; s += 1) {
               var spell = spells[s];
-              detailHtml += '<div class="wd-list-row wd-cast-spell-row">';
-              detailHtml += '<button type="button" class="wd-system-name-btn wd-cast-spell-btn" data-run-spell="' + escapeAttrValue(selectedCategory.id + '|' + spell) + '" title="' + escapeAttrValue('Run ' + spell) + '">' + escapeText(spell) + '</button>';
-              detailHtml += '<span class="wd-row-actions"><button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-help="' + escapeAttrValue(selectedCategory.id + '|' + spell) + '">Help</button></span>';
+              detailHtml += '<div class="wd-cast-spell-row">';
+              detailHtml += '<button type="button" class="wd-polite-btn wd-cast-spell-btn" data-run-spell="' + escapeAttrValue(selectedCategory.id + '|' + spell) + '" title="' + escapeAttrValue('Cast ' + spell) + '">' + escapeText(spell) + '</button>';
+              detailHtml += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary wd-cast-help-btn" data-help="' + escapeAttrValue(selectedCategory.id + '|' + spell) + '" title="' + escapeAttrValue('Show help for ' + spell) + '">Help</button>';
+              detailHtml += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary wd-cast-memo-btn" data-memorize-spell="' + escapeAttrValue(selectedCategory.id + '|' + spell) + '" title="' + escapeAttrValue('Memorize ' + spell) + '">Memorize</button>';
               detailHtml += '</div>';
             }
             detailHtml += '</div>';
           }
         }
 
-        var html = '<section class="wd-panel"><h3>Spell Categories</h3>' +
-          '<p class="wd-subline">Use the menu list to drill into a category, then click a spell name to cast it.</p>' +
-          '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selectedCategory, transition) + '">' +
-          '<section class="wd-drill-panel">' + rootHtml + '</section>' +
-          '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
-          '</div></div>';
+        var html = '<section class="wd-panel wd-spellbook-memo"><h3>Memorized Spells</h3>';
         if (!state.cast.memorized.length) {
-          html += '<section class="wd-panel wd-spellbook-memo"><h3>Memorized Spells</h3>';
-          html += '<p class="wd-subline">Spellbook entries from <code>cast --list</code>.</p>';
-          html += '<p class="wd-empty">No memorized spells yet.</p></section>';
+          html += '<p class="wd-empty">No memorized spells yet.</p>';
         } else {
-          html += '<section class="wd-panel wd-spellbook-memo"><h3>Memorized Spells</h3><p class="wd-subline">Memorized spell entries from <code>cast --list</code>.</p>';
           html += '<div class="wd-list wd-list-compact wd-scroll-area">';
           for (var m = 0; m < state.cast.memorized.length; m += 1) {
             var memo = state.cast.memorized[m];
@@ -2530,8 +2334,16 @@
             html += '<span class="wd-list-meta wd-col-4">' + safeShortText(memo.command) + '</span>';
             html += '</div>';
           }
-          html += '</div></section>';
+          html += '</div>';
         }
+        html += '</section>';
+
+        html += '<section class="wd-panel wd-cast-drill">' +
+          '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selectedCategory, transition) + '">' +
+          '<section class="wd-drill-panel">' + rootHtml + '</section>' +
+          '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
+          '</div></div>';
+        html += '</section>';
         return html;
       }
 
@@ -2627,11 +2439,13 @@
             var row = rows[i];
             var active = selectedModule && selectedModule.name === row.name ? ' wd-drill-item-active' : '';
             var statusTone = arcanaStatusTone(row.status);
+            rootHtml += '<div class="wd-menu-action-row">';
             rootHtml += '<button type="button" class="wd-drill-item wd-arcana-module-item' + active + '" data-arcana-module-open="' + escapeAttrValue(row.name) + '" data-arcana-module="' + escapeAttrValue(row.name) + '">';
             rootHtml += '<span class="wd-drill-item-main">' + safeShortText(row.label) + '</span>';
-            rootHtml += '<span class="wd-pill wd-arcana-status wd-arcana-status-' + escapeAttrValue(statusTone) + '">' + safeShortText(row.status) + '</span>';
             rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
             rootHtml += '</button>';
+            rootHtml += '<span class="wd-pill wd-arcana-status wd-arcana-status-' + escapeAttrValue(statusTone) + '">' + safeShortText(row.status) + '</span>';
+            rootHtml += '</div>';
           }
           rootHtml += '</div>';
         }
@@ -2643,7 +2457,6 @@
           var moduleItems = state.arcanaModuleItems[selectedModule.name] || [];
           var loadingItems = !!state.arcanaModuleItemsLoading[selectedModule.name];
           detailHtml += '<div class="wd-drill-head">';
-          detailHtml += drillBackButton('arcana');
           detailHtml += '<h4>' + safeShortText(selectedModule.label) + '</h4>';
           detailHtml += '<span class="wd-pill wd-arcana-status wd-arcana-status-' + escapeAttrValue(arcanaStatusTone(selectedModule.status)) + '">' + safeShortText(selectedModule.status) + '</span>';
           detailHtml += '</div>';
@@ -2671,8 +2484,7 @@
           detailHtml += '<pre id="arcana-output" class="wd-mono-box" aria-live="polite">No output.</pre>';
         }
 
-        var html = '<section class="wd-panel"><h3>Arcana Install Menu</h3>' +
-          '<p class="wd-subline">Accurate install state from arcana status scripts.</p>' +
+        var html = '<section class="wd-panel">' +
           '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selectedModule, transition) + '">' +
           '<section class="wd-drill-panel">' + rootHtml + '</section>' +
           '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
@@ -2680,33 +2492,9 @@
         html += '<div class="wd-inline-form">';
         html += '<button type="button" class="wd-polite-btn" data-admin-action="arcana:themes">List Themes</button>';
         html += '<button type="button" class="wd-polite-btn wd-secondary" data-admin-action="arcana:reload">Reload Spell Index</button>';
-        html += '<p class="wd-subline">Command output appears in Casting Watch.</p>';
         html += '</div>';
         html += '</section>';
         return html;
-      }
-
-      function systemActionModeLabel(mode) {
-        if (mode === 'menu') {
-          return 'menu';
-        }
-        if (mode === 'script') {
-          return 'script';
-        }
-        if (mode === 'command') {
-          return 'command';
-        }
-        return 'spell';
-      }
-
-      function mudActionModeLabel(mode) {
-        if (mode === 'menu') {
-          return 'menu';
-        }
-        if (mode === 'spell') {
-          return 'spell';
-        }
-        return 'command';
       }
 
       function renderSystemPage() {
@@ -2729,13 +2517,14 @@
             var disabled = row.available ? '' : ' disabled';
             var active = selectedAction && selectedAction.id === row.id ? ' wd-drill-item-active' : '';
             var buttonTitle = row.available
-              ? (' title="' + escapeAttrValue(row.label) + '"')
+              ? (' title="' + escapeAttrValue(row.description || row.label) + '"')
               : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
+            rootHtml += '<div class="wd-menu-action-row">';
             rootHtml += '<button type="button" class="wd-drill-item wd-system-row' + active + '" data-system-select="' + escapeAttrValue(row.id) + '"' + disabled + buttonTitle + '>';
-            rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span><span class="wd-system-desc">' + escapeText(row.description) + '</span></span>';
-            rootHtml += '<span class="wd-pill">' + escapeText(systemActionModeLabel(row.mode)) + '</span>';
+            rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span></span>';
             rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
             rootHtml += '</button>';
+            rootHtml += '</div>';
           }
           rootHtml += '</div>';
         }
@@ -2750,9 +2539,7 @@
             ? (' title="' + escapeAttrValue(runLabel + ' ' + selectedAction.label) + '"')
             : (' title="' + escapeAttrValue(selectedAction.reason || 'Unavailable') + '"');
           detailHtml += '<div class="wd-drill-head">';
-          detailHtml += drillBackButton('system');
           detailHtml += '<h4>' + escapeText(selectedAction.label) + '</h4>';
-          detailHtml += '<span class="wd-pill">' + escapeText(systemActionModeLabel(selectedAction.mode)) + '</span>';
           detailHtml += '</div>';
           detailHtml += '<p class="wd-subline">' + escapeText(selectedAction.description || '') + '</p>';
           if (!selectedAction.available && selectedAction.reason) {
@@ -2764,13 +2551,11 @@
           detailHtml += '<pre id="system-output" class="wd-mono-box" aria-live="polite">' + escapeText(state.systemOutput || 'Choose a Computer action to run.') + '</pre>';
         }
 
-        var html = '<section class="wd-panel"><h3>Computer Menu</h3>' +
-          '<p class="wd-subline">Mirrors the wizardry <code>system-menu</code> structure.</p>' +
+        var html = '<section class="wd-panel">' +
           '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selectedAction, transition) + '">' +
           '<section class="wd-drill-panel">' + rootHtml + '</section>' +
           '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
-          '</div></div>' +
-          '<p class="wd-subline">Command output appears in Casting Watch.</p>';
+          '</div></div>';
         html += '</section>';
         return html;
       }
@@ -2796,13 +2581,14 @@
             var active = selected && selected.id === row.id ? ' wd-drill-item-active' : '';
             var disabled = row.available ? '' : ' disabled';
             var buttonTitle = row.available
-              ? (' title="' + escapeAttrValue(row.label) + '"')
+              ? (' title="' + escapeAttrValue(row.description || row.label) + '"')
               : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
+            rootHtml += '<div class="wd-menu-action-row">';
             rootHtml += '<button type="button" class="wd-drill-item wd-system-row' + active + '" data-mud-select="' + escapeAttrValue(row.id) + '"' + disabled + buttonTitle + '>';
-            rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span><span class="wd-system-desc">' + escapeText(row.description) + '</span></span>';
-            rootHtml += '<span class="wd-pill">' + escapeText(mudActionModeLabel(row.mode)) + '</span>';
+            rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span></span>';
             rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
             rootHtml += '</button>';
+            rootHtml += '</div>';
           }
           rootHtml += '</div>';
         }
@@ -2818,9 +2604,7 @@
             : (' title="' + escapeAttrValue(selected.reason || 'Unavailable') + '"');
           var argValue = String(state.mudDraftArgs[selected.id] || '');
           detailHtml += '<div class="wd-drill-head">';
-          detailHtml += drillBackButton('mud');
           detailHtml += '<h4>' + escapeText(selected.label) + '</h4>';
-          detailHtml += '<span class="wd-pill">' + escapeText(mudActionModeLabel(selected.mode)) + '</span>';
           detailHtml += '</div>';
           detailHtml += '<p class="wd-subline">' + escapeText(selected.description) + '</p>';
           if (!selected.available && selected.reason) {
@@ -2843,7 +2627,6 @@
           '<section class="wd-drill-panel">' + rootHtml + '</section>' +
           '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
           '</div></div>' +
-          '<p class="wd-subline">Command output appears in Casting Watch.</p>' +
           '</section>';
       }
 
@@ -2851,26 +2634,34 @@
         var title = 'Cast';
         var subtitle = '';
         var content = '';
+        var drillBackSection = '';
 
         if (state.activePage === 'cast') {
           title = 'Cast';
-          subtitle = 'Open a category to run spells.';
+          if (state.cast.selectedCategory) {
+            drillBackSection = 'cast';
+          }
           content = renderCastPage();
         } else if (state.activePage === 'spellbook') {
           title = 'Spellbook';
-          subtitle = 'Manage command aliases.';
           content = renderSpellbookPage();
         } else if (state.activePage === 'arcana') {
           title = 'Arcana';
-          subtitle = 'Wizardry admin command groups.';
+          if (state.arcanaSelectedModule) {
+            drillBackSection = 'arcana';
+          }
           content = renderArcanaPage();
         } else if (state.activePage === 'system') {
           title = 'Computer';
-          subtitle = 'System maintenance menu and wizardry tooling.';
+          if (state.systemSelectedAction) {
+            drillBackSection = 'system';
+          }
           content = renderSystemPage();
         } else if (state.activePage === 'mud') {
           title = 'MUD';
-          subtitle = 'Play and manage MUD actions.';
+          if (state.mudSelectedAction) {
+            drillBackSection = 'mud';
+          }
           if (!state.mudActions.length && !state.mudActionsLoading) {
             loadMudActions();
           }
@@ -2882,8 +2673,22 @@
         }
         if (els.pageSubtitle) {
           els.pageSubtitle.textContent = subtitle;
+          els.pageSubtitle.classList.toggle('wd-hidden', !subtitle);
+        }
+        if (els.pageDrillBack) {
+          if (drillBackSection) {
+            els.pageDrillBack.classList.remove('wd-hidden');
+            els.pageDrillBack.setAttribute('data-drill-back', drillBackSection);
+          } else {
+            els.pageDrillBack.classList.add('wd-hidden');
+            els.pageDrillBack.setAttribute('data-drill-back', '');
+          }
+        }
+        if (els.contentScroll) {
+          els.contentScroll.classList.toggle('wd-content-scroll-spellbook', state.activePage === 'spellbook');
         }
         if (els.contentArea) {
+          els.contentArea.classList.toggle('wd-page-spellbook', state.activePage === 'spellbook');
           els.contentArea.innerHTML = content;
         }
         setRowSelection();
@@ -3559,15 +3364,43 @@
         });
       }
 
+      function memorizeSpell(spellName) {
+        var spell = String(spellName || '').trim();
+        if (!spell || state.actionInFlight) {
+          return Promise.resolve();
+        }
+        state.actionInFlight = true;
+        setActivityOpen(true);
+        pushActivity('cast', 'Memorizing ' + spell, { spell: spell, section: 'casting', app: 'wizardry-core', source: 'memorize-spell' });
+        return callBackend('memorize-spell', [spell]).then(function (text) {
+          var output = String(text || '').trim() || ('Memorized ' + spell + '.');
+          pushCommandOutput('memorize', output);
+          pushActivity('cast', 'Memorized ' + spell, { spell: spell, section: 'casting', app: 'wizardry-core', source: 'memorize-spell', status: 'ok' });
+          return loadCastData().then(function () {
+            return output;
+          });
+        }).catch(function (error) {
+          var message = error && error.message ? error.message : String(error || 'failed');
+          pushCommandOutput('memorize', message);
+          pushActivity('cast', 'Memorize failed for ' + spell + ' - ' + message, { spell: spell, section: 'casting', app: 'wizardry-core', source: 'memorize-spell', status: 'error' });
+          throw error;
+        }).finally(function () {
+          state.actionInFlight = false;
+          loadWatchHistory();
+        });
+      }
+
       function runSpell(kind, spellName, options) {
         options = options || {};
         if (state.actionInFlight) {
           return Promise.resolve();
         }
         state.actionInFlight = true;
+        setActivityOpen(true);
         var appLabel = kind ? String(kind).replace(':', ' ') : 'builtin-spell';
         pushActivity('cast', 'Running ' + kind + ':' + spellName, { spell: spellName, kind: kind, app: appLabel, source: kind, section: 'casting' });
         return callBackend('run-spell', [kind, spellName]).then(function (text) {
+          pushCommandOutput(kind + ':' + spellName, text);
           if (options.outputId) {
             if (options.outputId === 'composer-output') {
               updateComposerOutput(text);
@@ -3578,6 +3411,7 @@
           pushActivity('cast', kind + ':' + spellName + ' complete', { kind: kind, spell: spellName, output: String(text || '').trim(), section: 'casting', app: appLabel, source: kind, status: 'ok' });
           return text;
         }).catch(function (error) {
+          pushCommandOutput(kind + ':' + spellName, error && error.message ? error.message : String(error || 'failed'));
           if (options.outputId) {
             if (options.outputId === 'composer-output') {
               updateComposerOutput(error && error.message ? error.message : String(error || 'failed'));
@@ -3599,8 +3433,10 @@
           return Promise.resolve();
         }
         state.actionInFlight = true;
+        setActivityOpen(true);
         pushActivity('cast', 'Checking help for ' + kind + ':' + spellName, { spell: spellName, kind: kind, source: kind, section: 'app' });
         return callBackend('spell-help', [kind, spellName]).then(function (text) {
+          pushCommandOutput('help ' + kind + ':' + spellName, text);
           if (options.outputId) {
             if (options.outputId === 'composer-output') {
               updateComposerOutput(text);
@@ -3610,6 +3446,7 @@
           }
           return text;
         }).catch(function (error) {
+          pushCommandOutput('help ' + kind + ':' + spellName, error && error.message ? error.message : String(error || 'failed'));
           if (options.outputId) {
             if (options.outputId === 'composer-output') {
               updateComposerOutput(error && error.message ? error.message : String(error || 'failed'));
@@ -3620,6 +3457,7 @@
           pushActivity('app', 'spell-help ' + kind + ':' + spellName + ' failed', { kind: kind, spell: spellName, source: kind, status: 'error', section: 'app' });
           throw error;
         }).finally(function () {
+          loadWatchHistory();
           state.actionInFlight = false;
         });
       }
@@ -3869,10 +3707,19 @@
             if (event.ctrlKey || event.metaKey || event.altKey) {
               return;
             }
+            if (event.key === 'Tab') {
+              if (composerApplyAutocompleteSelection()) {
+                event.preventDefault();
+              }
+              return;
+            }
             if (event.key === 'Enter') {
               event.preventDefault();
               if (event.shiftKey) {
                 runComposerFromDraft();
+                return;
+              }
+              if (composerApplyAutocompleteSelection()) {
                 return;
               }
               commitComposerInput(true);
@@ -3884,21 +3731,23 @@
               commitComposerInput(true);
               return;
             }
-            if (event.key === 'ArrowDown' && String(els.composerInput.value || '') === '') {
-              var firstBlock = els.composerBlocks && els.composerBlocks.querySelector('[data-composer-block]');
-              if (firstBlock && typeof firstBlock.focus === 'function') {
+            if (event.key === 'ArrowDown') {
+              if (composerMoveAutocomplete(1)) {
                 event.preventDefault();
-                state.composer.activeBlock = 0;
-                composerSetActiveBlock(0);
-                firstBlock.focus();
               }
               return;
             }
-            if (event.key === 'ArrowUp' && String(els.composerInput.value || '') === '') {
-              event.preventDefault();
-              if (state.composer.tokens.length) {
-                setComposerSelectedToken(state.composer.tokens.length - 1);
-                renderComposer();
+            if (event.key === 'ArrowUp') {
+              if (composerMoveAutocomplete(-1)) {
+                event.preventDefault();
+                return;
+              }
+              if (String(els.composerInput.value || '') === '') {
+                event.preventDefault();
+                if (state.composer.tokens.length) {
+                  setComposerSelectedToken(state.composer.tokens.length - 1);
+                  renderComposer();
+                }
               }
               return;
             }
@@ -4038,101 +3887,14 @@
             }
           });
         }
-        if (els.composerBlocks) {
-          els.composerBlocks.addEventListener('click', function (event) {
-            var block = event.target.closest('[data-composer-block]');
-            if (!block) {
+        if (els.composerAutocomplete) {
+          els.composerAutocomplete.addEventListener('click', function (event) {
+            var option = event.target.closest('[data-composer-suggest-index]');
+            if (!option) {
               return;
             }
-            var buttons = composerBlockButtons();
-            var index = buttons.indexOf(block);
-            state.composer.activeBlock = index;
-            composerSetActiveBlock(index);
-            composerInsertBlock(block);
-          });
-          els.composerBlocks.addEventListener('keydown', function (event) {
-            if (!event.target || event.key === 'Tab' || event.ctrlKey || event.altKey || event.metaKey) {
-              return;
-            }
-            var buttons = composerBlockButtons();
-            if (!buttons.length) {
-              return;
-            }
-            var index = buttons.indexOf(document.activeElement);
-            if (index < 0) {
-              index = 0;
-              buttons[0].focus();
-              state.composer.activeBlock = 0;
-              composerSetActiveBlock(0);
-              return;
-            }
-            if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-              event.preventDefault();
-              index += 1;
-              if (index >= buttons.length) {
-                index = 0;
-              }
-              buttons[index].focus();
-              state.composer.activeBlock = index;
-              composerSetActiveBlock(index);
-              return;
-            }
-            if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-              event.preventDefault();
-              index -= 1;
-              if (index < 0) {
-                index = buttons.length - 1;
-              }
-              buttons[index].focus();
-              state.composer.activeBlock = index;
-              composerSetActiveBlock(index);
-              return;
-            }
-            if (event.key === 'Home') {
-              event.preventDefault();
-              buttons[0].focus();
-              state.composer.activeBlock = 0;
-              composerSetActiveBlock(0);
-              return;
-            }
-            if (event.key === 'End') {
-              event.preventDefault();
-              index = buttons.length - 1;
-              buttons[index].focus();
-              state.composer.activeBlock = index;
-              composerSetActiveBlock(index);
-              return;
-            }
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              if (index >= 0 && index < buttons.length) {
-                composerInsertBlock(buttons[index]);
-              }
-              return;
-            }
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              if (typeof focusComposerInput === 'function') {
-                focusComposerInput();
-              }
-            }
-          });
-        }
-        if (els.composerArgAssistant) {
-          els.composerArgAssistant.addEventListener('click', function (event) {
-            var assist = event.target.closest('[data-composer-assist-token]');
-            if (!assist) {
-              return;
-            }
-            commitComposerInput({ forceSingle: true });
-            var assistTokens = decodeComposerAssistArgs(assist.getAttribute('data-composer-assist-args'));
-            if (!assistTokens.length) {
-              assistTokens = splitComposerText(String(assist.getAttribute('data-composer-assist-token') || ''));
-            }
-            addComposerTokens(assistTokens);
-            if (els.composerInput) {
-              focusComposerInput();
-            }
+            var index = Number(option.getAttribute('data-composer-suggest-index'));
+            composerApplyAutocompleteSelection(index);
           });
         }
         if (els.composerPanel) {
@@ -4190,20 +3952,16 @@
           els.railWidthInput.max = '420';
           els.railWidthInput.value = String(state.railWidth);
         }
+        if (els.pageDrillBack) {
+          els.pageDrillBack.addEventListener('click', function () {
+            runDrillBack(els.pageDrillBack.getAttribute('data-drill-back'));
+          });
+        }
         if (els.contentArea) {
           els.contentArea.addEventListener('click', function (event) {
             var drillBack = event.target.closest('[data-drill-back]');
             if (drillBack) {
-              var section = String(drillBack.getAttribute('data-drill-back') || '').trim();
-              if (section === 'cast') {
-                setCastSelectedCategory('', 'back');
-              } else if (section === 'arcana') {
-                setArcanaSelectedModule('', 'back');
-              } else if (section === 'system') {
-                setSystemSelectedAction('', 'back');
-              } else if (section === 'mud') {
-                setMudSelectedAction('', 'back');
-              }
+              runDrillBack(drillBack.getAttribute('data-drill-back'));
               return;
             }
 
@@ -4267,6 +4025,16 @@
                   return;
                 }
                 runSpellHelp(pair[0], pair[1]);
+              }
+              return;
+            }
+
+            var memorizeBtn = event.target.closest('[data-memorize-spell]');
+            if (memorizeBtn) {
+              var memorizeValue = memorizeBtn.getAttribute('data-memorize-spell');
+              if (memorizeValue && memorizeValue.indexOf('|') >= 0) {
+                var memorizePair = memorizeValue.split('|');
+                memorizeSpell(memorizePair[1]);
               }
               return;
             }

@@ -47,6 +47,22 @@ if ! sh "$backend" list-synonyms "$root" >/dev/null 2>&1; then
   exit 1
 fi
 
+tmp_home=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-desktop-home.XXXXXX")
+trap 'rm -rf "$tmp_spellbook" "$tmp_home"' EXIT
+memorized_custom=$(HOME="$tmp_home" SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" memorize-spell quick-look "look ." 2>/dev/null)
+printf '%s\n' "$memorized_custom" | grep -F "quick-look	look ." >/dev/null 2>&1 || {
+  printf '%s\n' "memorize-spell did not return expected tab-separated row" >&2
+  exit 1
+}
+[ -f "$tmp_spellbook/.memorized" ] || {
+  printf '%s\n' "memorize-spell did not create .memorized file" >&2
+  exit 1
+}
+grep -F "quick-look	look ." "$tmp_spellbook/.memorized" >/dev/null 2>&1 || {
+  printf '%s\n' "memorize-spell did not persist expected command entry" >&2
+  exit 1
+}
+
 printf '%s\n' "arcana=install-menu" >"$tmp_spellbook/.default-synonyms"
 SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" add-synonym leap jump-to-marker >/dev/null 2>&1 || {
   printf '%s\n' "add-synonym action failed" >&2

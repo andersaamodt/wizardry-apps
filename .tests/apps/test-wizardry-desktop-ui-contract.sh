@@ -46,6 +46,7 @@ assert_not_contains() {
 assert_contains "$ui" 'id="command-composer-toggle"'
 assert_not_contains "$ui" 'id="action-refresh"'
 assert_contains "$ui" 'id="command-composer-modal" class="wd-composer-modal wd-hidden"'
+assert_contains "$ui" 'id="page-drill-back"'
 assert_contains "$ui" 'startupLock: true'
 assert_contains "$ui" 'open: false'
 assert_matches "$ui" 'function composerOpenWithTokens\(tokens, options\)'
@@ -73,13 +74,20 @@ assert_not_contains "$ui" "id: 'casting-watch'"
 assert_contains "$ui" "DEFAULT_MAIN_MENU_ORDER"
 assert_matches "$ui" "function loadMainMenuEntries\\(\\)"
 assert_contains "$ui" "callBackend('list-main-menu-entries')"
-assert_contains "$ui" "id=\"composer-arg-assistant\""
-assert_matches "$ui" "function renderComposerArgAssistant\\(plan\\)"
+assert_contains "$ui" "id=\"composer-autocomplete\""
+assert_matches "$ui" "function renderComposerAutocomplete\\(plan\\)"
 assert_matches "$ui" "function parseComposerText\\(value\\)"
-assert_matches "$ui" "function decodeComposerAssistArgs\\(value\\)"
-assert_contains "$ui" "data-composer-assist-args"
+assert_matches "$ui" "function composerAutocompleteSuggestions\\(context\\)"
+assert_contains "$ui" "data-composer-suggest-value"
+assert_not_contains "$ui" "data-composer-assist-args"
 assert_contains "$ui" "title=\"Wrap values in quotes to keep spaces in one token.\""
 assert_contains "$ui" "title=\"Press Enter to add token, Shift+Enter to run current command.\""
+assert_matches "$ui" "function memorizeSpell\\(spellName\\)"
+assert_contains "$ui" "callBackend('memorize-spell', [spell])"
+assert_contains "$ui" "data-memorize-spell="
+assert_not_contains "$ui" "<h3>Spell Categories</h3>"
+assert_not_contains "$ui" "Use the menu list to drill into a category"
+assert_not_contains "$ui" "cast --list"
 assert_matches "$ui" "function loadSpellbookAliases\\(\\)"
 assert_contains "$ui" "callBackend('list-synonyms')"
 assert_not_contains "$ui" "<h3>Synonyms</h3>"
@@ -94,7 +102,6 @@ assert_contains "$ui" "data-arcana-module="
 assert_matches "$ui" "function loadSystemMenuActions\\(\\)"
 assert_contains "$ui" "callBackend('list-system-menu-actions')"
 assert_contains "$ui" "data-system-menu-action="
-assert_contains "$ui" "Mirrors the wizardry <code>system-menu</code> structure."
 assert_matches "$ui" "function loadMudActions\\(\\)"
 assert_contains "$ui" "callBackend('list-mud-actions')"
 assert_contains "$ui" "callBackend('run-mud-action', [id, argValue])"
