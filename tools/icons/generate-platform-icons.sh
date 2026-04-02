@@ -264,8 +264,9 @@ rm -rf "$macos_dir/iconset.iconset"
 iconset_dir="$macos_dir/iconset.iconset"
 mkdir -p "$iconset_dir"
 for size in 16 32 64 128 256 512; do
-  magick "$apple_base" -resize "${size}x${size}" "$iconset_dir/icon_${size}x${size}.png"
-  magick "$apple_base" -resize "$((size * 2))x$((size * 2))" "$iconset_dir/icon_${size}x${size}@2x.png"
+  # macOS assets should stay unmasked; system rendering applies final shape/effects.
+  magick "$plain_master" -resize "${size}x${size}" "$iconset_dir/icon_${size}x${size}.png"
+  magick "$plain_master" -resize "$((size * 2))x$((size * 2))" "$iconset_dir/icon_${size}x${size}@2x.png"
 done
 if command -v iconutil >/dev/null 2>&1; then
   iconutil -c icns "$iconset_dir" -o "$macos_dir/forge.icns" >/dev/null 2>&1 || true
