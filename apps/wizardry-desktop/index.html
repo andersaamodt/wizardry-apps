@@ -2698,10 +2698,7 @@
         if (!catId) {
           return Promise.resolve();
         }
-        var parts = catId.split(':');
-        var kind = parts[0] || 'builtin';
-        var id = parts[1] || catId;
-        return callBackend('list-spells', [kind, id]).then(function (text) {
+        return callBackend('list-spells', [catId]).then(function (text) {
           var rows = String(text || '').split('\n').map(function (line) {
             return String(line || '').trim();
           }).filter(Boolean);

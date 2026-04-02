@@ -72,6 +72,8 @@ assert_matches "$ui" "function renderComposerArgAssistant\\(plan\\)"
 assert_matches "$ui" "function parseComposerText\\(value\\)"
 assert_matches "$ui" "function decodeComposerAssistArgs\\(value\\)"
 assert_contains "$ui" "data-composer-assist-args"
+assert_contains "$ui" "callBackend('list-spells', [catId])"
+assert_not_contains "$ui" "callBackend('list-spells', [kind, id])"
 
 # Centralized theme and backend root contracts.
 assert_matches "$ui" "buildThemeStylesheetHref\\(themeName\\)"
