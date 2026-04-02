@@ -109,7 +109,6 @@
       <header class="wd-composer-head">
         <div>
           <h3 id="composer-title">Compose command</h3>
-          <p id="composer-subtitle" class="wd-subline">Build validated wizardry commands from action blocks.</p>
         </div>
         <button id="composer-close" type="button" class="wd-icon-btn wd-compact" title="Close composer" aria-label="Close command composer">×</button>
       </header>
@@ -118,25 +117,20 @@
       </div>
       <div class="wd-composer-field">
         <label for="composer-input" class="wd-composer-label">Command builder</label>
-        <div class="wd-composer-token-surface">
-          <div id="composer-token-row" class="wd-composer-token-row" aria-label="Command tokens" role="list"></div>
-          <input id="composer-input" class="wd-composer-input" type="text" placeholder="Type tokens or choose a building block..." autocomplete="off" spellcheck="false">
+        <div class="wd-composer-input-row">
+          <div class="wd-composer-token-surface">
+            <div id="composer-token-row" class="wd-composer-token-row" aria-label="Command tokens" role="list"></div>
+            <input id="composer-input" class="wd-composer-input" type="text" placeholder="Type tokens or choose a building block..." autocomplete="off" spellcheck="false" title="Wrap values in quotes to keep spaces in one token.">
+          </div>
+          <button id="composer-copy" type="button" class="wd-icon-btn wd-compact wd-composer-copy-inline" title="Copy command" aria-label="Copy command">⎘</button>
+          <button id="composer-run" type="button" class="wd-polite-btn wd-composer-run-inline" title="Press Enter to add token, Shift+Enter to run current command.">Run</button>
         </div>
-        <p id="composer-command-preview" class="wd-composer-preview wd-subline">No command preview</p>
         <p id="composer-feedback" class="wd-composer-feedback wd-subline"></p>
         <div id="composer-arg-assistant" class="wd-composer-arg-assistant" aria-live="polite"></div>
-      </div>
-      <div class="wd-composer-help" aria-live="polite">
-        <span>Press <kbd>Enter</kbd> to add token or run, <kbd>Shift</kbd>+<kbd>Enter</kbd> to run current command, <kbd>Esc</kbd> to close.</span>
-        <span>Use <kbd>Tab</kbd> to cycle fields, <kbd>Left</kbd>/<kbd>Right</kbd> to move token selection, <kbd>Del</kbd> to remove a selected token.</span>
-        <span>Arrow <kbd>Up</kbd>/<kbd>Down</kbd> in empty input or focused blocks to choose blocks.</span>
-        <span>Spaces and commas create pills. Wrap values in quotes to keep spaces inside one pill.</span>
       </div>
       <pre id="composer-output" class="wd-mono-box wd-composer-output" aria-live="polite">No command run yet.</pre>
       <footer class="wd-composer-actions">
         <button id="composer-clear" type="button" class="wd-polite-btn wd-secondary">Reset</button>
-        <button id="composer-copy" type="button" class="wd-polite-btn wd-secondary">Copy</button>
-        <button id="composer-run" type="button" class="wd-polite-btn">Run</button>
         <button id="composer-close-btn" type="button" class="wd-polite-btn wd-secondary">Close</button>
       </footer>
     </section>
@@ -665,6 +659,7 @@
           executeComposerCommand(plan);
           return true;
         }
+        updateComposerOutput(plan && plan.message ? plan.message : 'Command is incomplete.');
         renderComposer();
         return false;
       }
@@ -709,7 +704,7 @@
 
       function composerOpenWithTokens(tokens, options) {
         options = options || {};
-        if (!Array.isArray(tokens) || !tokens.length) {
+        if ((!Array.isArray(tokens) || !tokens.length) && !options.allowEmpty) {
           tokens = composerDefaultTokensForPage(state.activePage);
         }
         state.composer.tokens = Array.isArray(tokens) ? tokens.slice(0) : [];
@@ -1457,35 +1452,14 @@
         var html = '';
 
         if (!tokens.length) {
-          html = '<p class="wd-subline">Choose a command block, then fill required arguments.</p>';
-          var starterEntries = collectComposerAssistEntries(workingPlan);
-          if (starterEntries.length) {
-            html += '<div class="wd-composer-assist-buttons">';
-            for (var starterIdx = 0; starterIdx < starterEntries.length; starterIdx += 1) {
-              var starter = starterEntries[starterIdx];
-              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" title="' + escapeHtmlAttribute(starter.help || '') + '" data-composer-assist-token="' + escapeAttrValue(starter.tokens.join(' ')) + '" data-composer-assist-args="' + escapeAttrValue(encodeComposerAssistArgs(starter.tokens)) + '">' + escapeText(starter.label) + '</button>';
-            }
-            html += '</div>';
-          }
+          html = '';
           els.composerArgAssistant.innerHTML = html;
           return;
-        }
-
-        html += '<div class="wd-composer-arg-head"><span class="wd-pill">' + escapeText(tokens[0]) + '</span>';
-        if (tokens[1]) {
-          html += '<span class="wd-pill wd-secondary">' + escapeText(tokens[1]) + '</span>';
-        }
-        html += '</div>';
-
-        if (workingPlan.message) {
-          html += '<p class="wd-subline">' + escapeText(workingPlan.message) + '</p>';
         }
 
         var nextPlaceholder = composerNextPlaceholder(workingPlan);
         if (nextPlaceholder && nextPlaceholder.label) {
           html += '<p class="wd-subline">Next: <code>' + escapeText(nextPlaceholder.label) + '</code>.</p>';
-        } else if (workingPlan.ready) {
-          html += '<p class="wd-subline">Command is complete. Run now, or keep composing.</p>';
         }
 
         if (tokens[0] === 'run-action' && (tokens[1] === 'menu:help' || tokens[1] === 'menu:run' || tokens[1] === 'menu:terminal') && tokens[2]) {
@@ -1500,8 +1474,8 @@
           }
         }
 
-        var entries = collectComposerAssistEntries(workingPlan);
-        if (entries.length) {
+        if (nextPlaceholder) {
+          var entries = collectComposerAssistEntries(workingPlan);
           html += '<div class="wd-composer-assist-buttons">';
           for (var idx = 0; idx < entries.length; idx += 1) {
             var entry = entries[idx];
@@ -1559,8 +1533,7 @@
         renderComposerPreview(plan);
         updateComposerOutput(state.composer.output || 'No command run yet.');
         if (els.composerRun) {
-          var runCommand = String(plan && plan.tokens ? plan.tokens.join(' ') : '').trim();
-          els.composerRun.title = runCommand ? 'Run ' + runCommand : 'Build a complete command first';
+          els.composerRun.title = 'Press Enter to add token, Shift+Enter to run current command.';
           els.composerRun.disabled = state.composer.running || state.actionInFlight || !plan.ready;
         }
         if (els.composerCloseBtn) {
@@ -1692,6 +1665,7 @@
           return;
         }
         state.composer.running = true;
+        updateComposerOutput('Running ' + String(plan.tokens && plan.tokens.length ? plan.tokens.join(' ') : 'command') + ' ...');
         renderComposerFeedback(plan);
         var run;
         if (plan.backend.type === 'run-spell') {
@@ -2966,7 +2940,9 @@
 
       function bindEvents() {
         document.addEventListener('click', function (event) {
-          if (state.composer.open && !event.target.closest('.wd-composer-panel') && !event.target.closest('#command-composer-toggle') && !event.target.closest('.wd-composer-panel *')) {
+          var path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+          var insideComposer = path.indexOf(els.composerPanel) >= 0 || path.indexOf(els.composerToggle) >= 0;
+          if (state.composer.open && !insideComposer && !event.target.closest('.wd-composer-panel') && !event.target.closest('#command-composer-toggle')) {
             setComposerOpen(false);
           }
           if (els.themeMenu && !els.themeMenu.classList.contains('wd-hidden')) {
@@ -3057,7 +3033,7 @@
             if (state.composer.open) {
               setComposerOpen(false);
             } else {
-              composerOpenWithTokens(composerDefaultTokensForPage(state.activePage), { userInitiated: true, seededDefaults: true });
+              composerOpenWithTokens([], { userInitiated: true, allowEmpty: true, seededDefaults: false });
             }
           });
         }
@@ -3110,12 +3086,7 @@
                 runComposerFromDraft();
                 return;
               }
-              var committed = commitComposerInput(true);
-              var plan = composerPlanFromTokens(committed ? state.composer.tokens : composerDraftTokens());
-              if (plan.ready && !state.composer.running && !state.actionInFlight) {
-                executeComposerCommand(plan);
-                return;
-              }
+              commitComposerInput(true);
               renderComposer();
               return;
             }

@@ -50,8 +50,11 @@ assert_contains "$ui" 'startupLock: true'
 assert_contains "$ui" 'open: false'
 assert_matches "$ui" 'function composerOpenWithTokens\(tokens, options\)'
 assert_contains "$ui" 'setComposerOpen(true, { userInitiated: !!options.userInitiated });'
+assert_contains "$ui" "composerOpenWithTokens([], { userInitiated: true, allowEmpty: true, seededDefaults: false });"
 assert_contains "$ui" "setComposerOpen(false, { skipFocus: true });"
 assert_contains "$ui" "document.addEventListener('visibilitychange'"
+assert_not_contains "$ui" "Build validated wizardry commands from action blocks."
+assert_not_contains "$ui" "Press <kbd>Enter</kbd> to add token or run"
 assert_contains "$ui" "els.splash.hidden = true;"
 assert_contains "$css" ".wd-splash-fade {"
 assert_contains "$css" "pointer-events: none;"
@@ -72,6 +75,8 @@ assert_matches "$ui" "function renderComposerArgAssistant\\(plan\\)"
 assert_matches "$ui" "function parseComposerText\\(value\\)"
 assert_matches "$ui" "function decodeComposerAssistArgs\\(value\\)"
 assert_contains "$ui" "data-composer-assist-args"
+assert_contains "$ui" "title=\"Wrap values in quotes to keep spaces in one token.\""
+assert_contains "$ui" "title=\"Press Enter to add token, Shift+Enter to run current command.\""
 assert_matches "$ui" "function loadSpellbookAliases\\(\\)"
 assert_contains "$ui" "callBackend('list-synonyms')"
 assert_contains "$ui" "Wizardry aliases"

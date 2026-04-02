@@ -838,7 +838,7 @@ body::before {
 .wd-composer-backdrop {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--wd-text) 18%, transparent);
+  background: color-mix(in srgb, var(--wd-text) 10%, transparent);
 }
 
 .wd-composer-panel {
@@ -848,10 +848,10 @@ body::before {
   max-height: min(90vh, calc(100vh - var(--wd-host-top-inset) - 0.72rem));
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(72px, 18vh) auto auto minmax(72px, 16vh) auto;
+  grid-template-rows: auto minmax(72px, 18vh) auto minmax(72px, 16vh) auto;
   gap: 0.22rem;
   border: 1px solid var(--wd-line);
-  background: var(--wd-panel);
+  background: color-mix(in srgb, var(--wd-surface) 88%, #ffffff 12%);
   border-radius: 8px;
   box-shadow: 0 18px 48px color-mix(in srgb, var(--wd-text) 20%, transparent);
   padding: 0.34rem;
@@ -875,7 +875,7 @@ body::before {
   border-top: 1px solid var(--wd-line);
   border-radius: 0;
   padding: 0.24rem 0 0;
-  background: transparent;
+  background: color-mix(in srgb, var(--wd-surface) 72%, #ffffff 28%);
   overflow: auto;
   max-height: 18vh;
 }
@@ -934,6 +934,12 @@ body::before {
   gap: 0.25rem;
 }
 
+.wd-composer-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.24rem;
+}
+
 .wd-composer-label {
   color: var(--wd-muted);
   font-size: 0.62rem;
@@ -951,12 +957,13 @@ body::before {
   padding: 0.14rem;
   border: 1px solid var(--wd-line);
   border-radius: 6px;
-  background: var(--wd-surface);
+  background: color-mix(in srgb, var(--wd-surface) 80%, #ffffff 20%);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.2rem;
   overflow: auto;
+  flex: 1;
 }
 
 .wd-composer-token {
@@ -1069,7 +1076,7 @@ body::before {
   outline: none;
   min-width: 120px;
   width: 100%;
-  max-width: 260px;
+  max-width: none;
   background: transparent;
   color: var(--wd-text);
   padding: 0;
@@ -1083,6 +1090,16 @@ body::before {
 
 .wd-composer-feedback {
   margin: 0;
+}
+
+.wd-composer-copy-inline {
+  width: 22px;
+  min-width: 22px;
+}
+
+.wd-composer-run-inline {
+  min-width: 44px;
+  white-space: nowrap;
 }
 
 .wd-composer-arg-assistant {
@@ -1128,23 +1145,6 @@ body::before {
   margin: 0;
   flex: 1;
   overflow: auto;
-}
-
-.wd-composer-help {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.24rem;
-  color: var(--wd-muted);
-  font-size: 0.56rem;
-  flex-wrap: wrap;
-}
-
-.wd-composer-help kbd {
-  border: 1px solid var(--wd-line);
-  border-radius: 6px;
-  padding: 0 0.28rem;
-  background: color-mix(in srgb, var(--wd-surface) 80%, transparent);
-  font-size: 0.58rem;
 }
 
 .wd-composer-actions {
