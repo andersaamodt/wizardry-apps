@@ -503,10 +503,37 @@ apply_optional_app_icon_override_if_present() {
   dest_dir=$2
   override_icon=$(app_icon_override_path "$slug")
   if [ -f "$override_icon" ]; then
-    mkdir -p "$dest_dir/assets"
-    cp "$override_icon" "$dest_dir/assets/forge-icon.png"
-    rm -f "$dest_dir/assets/forge.icns"
+    shape_mode=$(project_icon_shape_mode "$dest_dir")
+    write_project_icon_from_file "$dest_dir" "$override_icon" "$shape_mode"
   fi
+}
+
+project_preferred_bundle_icon_path() {
+  project_dir=$1
+
+  for candidate in \
+    "$project_dir/assets/forge-icon.png" \
+    "$project_dir/assets/icons/meta/apple-master.png" \
+    "$project_dir/assets/icons/macos/forge.icns" \
+    "$project_dir/assets/icons/meta/plain-master.png" \
+    "$project_dir/assets/forge.icns"
+  do
+    if [ -f "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+icon_source_format_for_path() {
+  path=$1
+
+  case "$path" in
+    *.icns) printf '%s\n' icns ;;
+    *) printf '%s\n' png ;;
+  esac
 }
 
 manifest_app_exists() {
@@ -3481,19 +3508,13 @@ cmd_build_desktop() {
         icon_source=''
         icon_source_format=''
         icon_override=$(app_icon_override_path "$slug")
-        if [ -f "$icon_override" ]; then
+        app_icon_source=$(project_preferred_bundle_icon_path "$app_dir" || true)
+        if [ -n "$app_icon_source" ]; then
+          icon_source="$app_icon_source"
+          icon_source_format=$(icon_source_format_for_path "$icon_source")
+        elif [ -f "$icon_override" ]; then
           icon_source="$icon_override"
           icon_source_format='png'
-        elif [ -f "$app_dir/assets/forge-icon.png" ]; then
-          # Prefer the canonical PNG source so per-app icon updates stay in sync.
-          icon_source="$app_dir/assets/forge-icon.png"
-          icon_source_format='png'
-        elif [ -f "$app_dir/assets/icons/macos/forge.icns" ]; then
-          icon_source="$app_dir/assets/icons/macos/forge.icns"
-          icon_source_format='icns'
-        elif [ -f "$app_dir/assets/forge.icns" ]; then
-          icon_source="$app_dir/assets/forge.icns"
-          icon_source_format='icns'
         fi
 
         icon_key=''
@@ -4185,24 +4206,14 @@ cmd_run_workspace() {
 
     icon_source=''
     icon_source_format=''
-    if [ -f "$workspace_path/assets/icons/macos/forge.icns" ]; then
-      icon_source="$workspace_path/assets/icons/macos/forge.icns"
-      icon_source_format='icns'
-    elif [ -f "$workspace_path/assets/forge-icon.png" ]; then
-      icon_source="$workspace_path/assets/forge-icon.png"
-      icon_source_format='png'
-    elif [ -f "$app_dir/assets/icons/macos/forge.icns" ]; then
-      icon_source="$app_dir/assets/icons/macos/forge.icns"
-      icon_source_format='icns'
-    elif [ -f "$app_dir/assets/forge-icon.png" ]; then
-      icon_source="$app_dir/assets/forge-icon.png"
-      icon_source_format='png'
-    elif [ -f "$workspace_path/assets/forge.icns" ]; then
-      icon_source="$workspace_path/assets/forge.icns"
-      icon_source_format='icns'
-    elif [ -f "$app_dir/assets/forge.icns" ]; then
-      icon_source="$app_dir/assets/forge.icns"
-      icon_source_format='icns'
+    workspace_icon_source=$(project_preferred_bundle_icon_path "$workspace_path" || true)
+    app_icon_source=$(project_preferred_bundle_icon_path "$app_dir" || true)
+    if [ -n "$workspace_icon_source" ]; then
+      icon_source="$workspace_icon_source"
+      icon_source_format=$(icon_source_format_for_path "$icon_source")
+    elif [ -n "$app_icon_source" ]; then
+      icon_source="$app_icon_source"
+      icon_source_format=$(icon_source_format_for_path "$icon_source")
     fi
 
     icon_key=''

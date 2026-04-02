@@ -2195,7 +2195,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSString *resolvedIconPath = nil;
     NSMutableArray<NSString *> *iconCandidates = [NSMutableArray arrayWithArray:@[
         [self.appPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
+        [self.appPath stringByAppendingPathComponent:@"assets/icons/meta/apple-master.png"],
         [self.appPath stringByAppendingPathComponent:@"assets/icons/meta/plain-master.png"],
+        [self.appPath stringByAppendingPathComponent:@"assets/icons/macos/forge.icns"],
+        [self.appPath stringByAppendingPathComponent:@"assets/forge.icns"],
         [self.appPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
         [self.appPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
     ]];
@@ -2203,7 +2206,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         NSString *parentPath = [self.appPath stringByDeletingLastPathComponent];
         [iconCandidates addObjectsFromArray:@[
             [parentPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
+            [parentPath stringByAppendingPathComponent:@"assets/icons/meta/apple-master.png"],
             [parentPath stringByAppendingPathComponent:@"assets/icons/meta/plain-master.png"],
+            [parentPath stringByAppendingPathComponent:@"assets/icons/macos/forge.icns"],
+            [parentPath stringByAppendingPathComponent:@"assets/forge.icns"],
             [parentPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
             [parentPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
         ]];
@@ -2220,9 +2226,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
     }
 
-    if (launchedFromPackagedBundle && resolvedBundleIcon) {
-        // Keep packaged launches aligned with the bundle icon metadata.
-        [NSApp setApplicationIconImage:resolvedBundleIcon];
+    if (launchedFromPackagedBundle) {
+        // Leave packaged app icons under system control so Dock styling stays
+        // aligned with the bundle icon metadata across open/closed states.
     } else if (resolvedFileIcon) {
         // Non-packaged launches do not have a stable bundle icon resource, so
         // prefer the app-local file icon when available.
