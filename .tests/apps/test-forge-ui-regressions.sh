@@ -89,5 +89,8 @@ assert_contains "$host_macos" 'NSPasteboardTypeFileURL'
 assert_contains "$host_macos" '"public.file-url"'
 assert_contains "$host_macos" '"text/uri-list"'
 assert_contains "$host_macos" 'NSFilenamesPboardType'
+assert_contains "$host_macos" 'if (launchedFromPackagedBundle && resolvedBundleIcon)'
+assert_contains "$host_macos" 'else if (resolvedFileIcon)'
+assert_contains "$host_macos" '[NSApp setApplicationIconImage:resolvedBundleIcon];'
 
 printf '%s\n' "forge ui regression contracts passed"
