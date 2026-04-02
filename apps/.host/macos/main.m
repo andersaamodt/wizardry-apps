@@ -2220,10 +2220,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
     }
 
-    if (launchedFromPackagedBundle && resolvedBundleIcon) {
-        // Keep packaged-runtime Dock icon aligned with Finder/non-running icon
-        // identity from Info.plist (CFBundleIconFile).
-        [NSApp setApplicationIconImage:resolvedBundleIcon];
+    if (launchedFromPackagedBundle) {
+        // Leave the packaged app icon under system control. AppKit documents
+        // applicationIconImage as a temporary Dock-tile override, which can
+        // diverge from the non-running bundle icon styling.
     } else if (resolvedFileIcon) {
         // Non-packaged launches do not have a stable bundle icon resource, so
         // prefer the app-local file icon when available.
