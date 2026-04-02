@@ -55,6 +55,9 @@ assert_contains "$ui" "document.addEventListener('visibilitychange'"
 assert_contains "$ui" "els.splash.hidden = true;"
 assert_contains "$css" ".wd-splash-fade {"
 assert_contains "$css" "pointer-events: none;"
+assert_contains "$css" "var(--text-muted, var(--light-text, #334155))"
+assert_contains "$css" "background: var(--wd-panel);"
+assert_not_contains "$css" "background: #ffffff;"
 
 # Navigation and listbox semantics.
 assert_contains "$ui" "role=\"listbox\""

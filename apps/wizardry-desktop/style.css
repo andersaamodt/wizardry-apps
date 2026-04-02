@@ -1,11 +1,11 @@
 :root {
   --wd-host-top-inset: 34px;
   --wd-bg: var(--bg, #f6f7fb);
-  --wd-surface: var(--light-bg, #e2e8f0);
-  --wd-panel: color-mix(in srgb, var(--bg, #ffffff) 92%, black 8%);
+  --wd-panel: var(--bg-panel, color-mix(in srgb, var(--bg, #ffffff) 92%, black 8%));
+  --wd-surface: var(--bg-panel-2, var(--light-bg, #e2e8f0));
   --wd-line: color-mix(in srgb, var(--border, #cbd5e1) 70%, transparent 30%);
   --wd-text: var(--text, #0f172a);
-  --wd-muted: var(--light-text, #334155);
+  --wd-muted: var(--text-muted, var(--light-text, #334155));
   --wd-accent: var(--accent, #0ea5e9);
   --wd-good: #22c55e;
   --wd-bad: #ef4444;
@@ -110,7 +110,7 @@ body::before {
 .wd-left-rail {
   min-width: 210px;
   max-width: 340px;
-  background: #ffffff;
+  background: var(--wd-panel);
   border-right: 1px solid var(--wd-line);
   display: flex;
   flex-direction: column;
