@@ -3826,11 +3826,7 @@ cmd_run_desktop() {
           printf '%s\n' "forge-backend: open command not available on this system" >&2
           exit 1
         }
-        if [ "$self_relaunch" -eq 1 ]; then
-          open -n "$installed_path"
-        else
-          open "$installed_path"
-        fi
+        open "$installed_path"
         printf 'launched=1\n'
         printf 'mode=desktop-installed\n'
         printf 'artifact=%s\n' "$installed_path"
@@ -3908,11 +3904,7 @@ cmd_run_desktop() {
         printf '%s\n' "forge-backend: open command not available on this system" >&2
         exit 1
       }
-      if [ "$self_relaunch" -eq 1 ]; then
-        open -n "$launch_bundle"
-      else
-        open "$launch_bundle"
-      fi
+      open "$launch_bundle"
       printf 'launched=1\n'
       printf 'mode=desktop-executable\n'
       printf 'artifact=%s\n' "$launch_bundle"

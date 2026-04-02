@@ -19,7 +19,8 @@ out=$(sh "$backend" --help)
 printf '%s' "$out" | grep -F "Usage:" >/dev/null
 printf '%s\n' "$out" | grep -F "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]" >/dev/null
 printf '%s\n' "$out" | grep -F "rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE" >/dev/null
-grep -F 'open -n "$launch_bundle"' "$backend" >/dev/null
+grep -F 'self_relaunch=1' "$backend" >/dev/null
+grep -F 'open "$launch_bundle"' "$backend" >/dev/null
 
 out=$(sh "$backend" doctor "$test_root")
 printf '%s\n' "$out" | grep -F "root=$test_root" >/dev/null
