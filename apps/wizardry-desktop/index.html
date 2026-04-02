@@ -2522,23 +2522,23 @@
       }
 
       function renderSpellbookPage() {
-        var html = '<section class="wd-panel"><div class="wd-panel-head"><h3>Synonyms</h3></div>' +
-          '<p class="wd-subline">Map shortcut aliases to spell command lines.</p>';
-        html += '<h4>Wizardry aliases</h4>';
-        html += '<p class="wd-subline">Aliases from <code>~/.spellbook/.synonyms</code> (custom) and <code>.default-synonyms</code>.</p>';
+        var html = '<section class="wd-panel wd-spellbook-panel">';
         html += '<div class="wd-synonym-list-wrap">';
-        html += '<div class="wd-list wd-synonym-list">';
+        html += '<div class="wd-synonym-header" role="presentation">';
+        html += '<span>Alias</span><span>Command</span><span>Scope</span><span class="wd-synonym-header-actions">Actions</span>';
+        html += '</div>';
+        html += '<div class="wd-list wd-synonym-list" role="listbox" aria-label="Spellbook aliases">';
         for (var i = 0; i < state.spellbookBuiltin.length; i += 1) {
           var builtinItem = state.spellbookBuiltin[i];
           var scopeLabel = builtinItem.scope === 'custom' ? 'custom' : 'default';
-          html += '<div class="wd-list-row wd-synonym-row"><span class="wd-list-main wd-col-2">' + escapeText(builtinItem.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(builtinItem.command) + '</span><span class="wd-row-actions"><span class="wd-pill wd-secondary">' + escapeText(scopeLabel) + '</span>';
+          html += '<div class="wd-list-row wd-synonym-row" role="option" aria-selected="false"><span class="wd-list-main wd-col-2">' + escapeText(builtinItem.alias) + '</span><span class="wd-list-meta wd-col-4">' + escapeText(builtinItem.command) + '</span><span class="wd-row-actions wd-synonym-scope"><span class="wd-pill wd-secondary">' + escapeText(scopeLabel) + '</span></span><span class="wd-row-actions wd-synonym-actions">';
           if (builtinItem.scope === 'custom') {
             html += '<button type="button" class="wd-polite-btn wd-tiny wd-danger" data-remove-synonym="' + escapeAttrValue(builtinItem.alias) + '">Remove</button>';
           }
           html += '</span></div>';
         }
         if (!state.spellbookBuiltin.length) {
-          html += '<p class="wd-empty">No wizardry aliases found.</p>';
+          html += '<p class="wd-empty">No aliases found.</p>';
         }
         html += '</div>';
         html += '</div>';

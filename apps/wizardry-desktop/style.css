@@ -834,10 +834,29 @@ body::before {
 
 .wd-synonym-list-wrap {
   margin-bottom: 0.2rem;
+  background: var(--wd-surface);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .wd-synonym-row {
-  min-height: 34px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--wd-line);
+  padding: 0.14rem 0.26rem;
+  grid-template-columns: minmax(110px, 1fr) minmax(170px, 1.8fr) 66px auto;
+  gap: 0.32rem;
+}
+
+.wd-synonym-row:last-of-type {
+  border-bottom: 0;
+}
+
+.wd-synonym-row .wd-list-main {
+  font-weight: 560;
+  font-size: 0.67rem;
 }
 
 .wd-scroll-area {
@@ -858,13 +877,37 @@ body::before {
 .wd-synonym-list {
   max-height: min(46vh, 260px);
   overflow: auto;
-  padding-right: 0.2rem;
-  margin-bottom: 0.35rem;
+  padding: 0;
+  margin: 0;
   scrollbar-width: thin;
 }
 
 .wd-synonym-list-wrap .wd-list {
   margin: 0;
+}
+
+.wd-synonym-header {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(170px, 1.8fr) 66px auto;
+  gap: 0.32rem;
+  padding: 0.16rem 0.26rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.01em;
+  color: var(--wd-muted);
+  border-bottom: 1px solid var(--wd-line);
+  background: color-mix(in srgb, var(--wd-surface) 84%, var(--wd-panel));
+}
+
+.wd-synonym-header-actions {
+  text-align: right;
+}
+
+.wd-synonym-scope {
+  justify-content: flex-start;
+}
+
+.wd-synonym-actions {
+  justify-content: flex-end;
 }
 
 .wd-synonym-dialog {
