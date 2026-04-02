@@ -2820,64 +2820,74 @@
       function loadCastData() {
         state.castPageLoading = true;
         renderPage();
-        return Promise.all([
-          callBackend('list-spell-categories')
-            .then(function (text) {
-              var rows = String(text || '').split('\n').map(function (line) {
-                return String(line || '').trim();
-              }).filter(Boolean);
-              var parsed = [];
-              for (var i = 0; i < rows.length; i += 1) {
-                var line = rows[i];
-                var parts = line.split('|');
-                var id = parts[0] || '';
-                var kind = parts[1] || 'spell';
-                var label = parts[2] || id;
-                var count = Number(parts[3] || 0);
-                if (!label && id.indexOf(':') !== -1) {
-                  label = id.split(':')[1];
-                }
-                if (isNaN(count) || count < 0) {
-                  count = 0;
-                }
-                if (id) {
-                  parsed.push({ id: id, kind: kind, title: label, count: count });
-                }
+        state.spellCache = {};
+
+        var categoriesPromise = callBackend('list-spell-categories')
+          .then(function (text) {
+            var rows = String(text || '').split('\n').map(function (line) {
+              return String(line || '').trim();
+            }).filter(Boolean);
+            var parsed = [];
+            for (var i = 0; i < rows.length; i += 1) {
+              var line = rows[i];
+              var parts = line.split('|');
+              var id = parts[0] || '';
+              var kind = parts[1] || 'spell';
+              var label = parts[2] || id;
+              var count = Number(parts[3] || 0);
+              if (!label && id.indexOf(':') !== -1) {
+                label = id.split(':')[1];
               }
-              parsed.sort(function (left, right) {
-                return (left.title || '').localeCompare(right.title || '');
-              });
-              state.cast.categories = parsed;
-            })
-            .catch(function () {
-              state.cast.categories = [
-                { id: 'builtin:arcana', kind: 'builtin', title: 'Arcana', count: 0 },
-                { id: 'builtin:web', kind: 'builtin', title: 'Web', count: 0 },
-                { id: 'custom:local', kind: 'custom', title: 'Local', count: 0 }
-              ];
-            })
-            .finally(function () {
-              state.castPageLoading = false;
-              renderPage();
-            }),
-          callBackend('list-memorized-spells')
-            .then(function (text) {
-              var raw = String(text || '').split('\n');
-              var parsed = [];
-              for (var i = 0; i < raw.length; i += 1) {
-                var parts = String(raw[i] || '').split('\t');
-                if (!parts[0]) {
-                  continue;
-                }
-                parsed.push({ name: String(parts[0]).trim(), command: String(parts[1] || '').trim() });
+              if (isNaN(count) || count < 0) {
+                count = 0;
               }
-              state.cast.memorized = parsed;
-            })
-            .catch(function () {
-              state.cast.memorized = [];
-            }),
-          loadSpellRowsForCategory(state.cast.expandedCategory).catch(function () {})
-        ]);
+              if (id) {
+                parsed.push({ id: id, kind: kind, title: label, count: count });
+              }
+            }
+            parsed.sort(function (left, right) {
+              return (left.title || '').localeCompare(right.title || '');
+            });
+            state.cast.categories = parsed;
+            return parsed;
+          })
+          .catch(function () {
+            state.cast.categories = [
+              { id: 'builtin:arcana', kind: 'builtin', title: 'Arcana', count: 0 },
+              { id: 'builtin:web', kind: 'builtin', title: 'Web', count: 0 },
+              { id: 'custom:local', kind: 'custom', title: 'Local', count: 0 }
+            ];
+            return state.cast.categories;
+          })
+          .then(function (categories) {
+            var loads = [];
+            for (var i = 0; i < categories.length; i += 1) {
+              loads.push(loadSpellRowsForCategory(categories[i].id).catch(function () {}));
+            }
+            return Promise.all(loads);
+          });
+
+        var memorizedPromise = callBackend('list-memorized-spells')
+          .then(function (text) {
+            var raw = String(text || '').split('\n');
+            var parsed = [];
+            for (var i = 0; i < raw.length; i += 1) {
+              var parts = String(raw[i] || '').split('\t');
+              if (!parts[0]) {
+                continue;
+              }
+              parsed.push({ name: String(parts[0]).trim(), command: String(parts[1] || '').trim() });
+            }
+            state.cast.memorized = parsed;
+          })
+          .catch(function () {
+            state.cast.memorized = [];
+          });
+
+        return Promise.all([categoriesPromise, memorizedPromise]).finally(function () {
+          state.castPageLoading = false;
+          renderPage();
+        });
       }
 
       function loadMenuCatalog() {
