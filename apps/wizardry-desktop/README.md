@@ -4,7 +4,7 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
 
 ## Surface Model
 
-- Left rail is a full-height listbox for primary pages (`Home`, `Menus`, `Cast`, `Spellbook`, `Arcana`, `Computer`, `Mud`).
+- Left rail is a full-height listbox for primary pages mirrored from wizardry `main-menu` (`Cast`, optional `Mud`, `Spellbook`, `Arcana`, `Computer`).
 - Right pane renders page content and action output.
 - Activity drawer (`Casting Watch`) is a right-side utility panel, not a primary nav page.
 - Command Composer is a modal utility opened from the toolbar icon (`Compose command...`).
@@ -14,6 +14,8 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
 - UI calls `apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh`.
 - Commands stay argv-based (`window.wizardry.exec([...])`), not shell fragments.
 - Menu inventory includes argument metadata (`none` / `optional` / `required`) used by both Menus page and Command Composer.
+- Main menu inventory comes from backend `list-main-menu-entries`, so left-rail order follows wizardry main-menu semantics.
+- Computer menu inventory comes from backend `list-system-menu-actions`, matching wizardry `system-menu` actions.
 - Sourced-only menu rows expose `Open Terminal`, backed by `open-menu-terminal`.
 - Desktop prefs persist through backend key-value storage under:
   - `${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/wizardry-desktop/config`
@@ -32,7 +34,7 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
 - Startup renders splash then main UI with Composer closed.
 - Left rail listbox selection works by mouse and keyboard.
 - Cast page shows spell categories and memorized spells with readable scroll regions.
-- Menus page indexes all menu scripts from `spells/menu` with help/run-safe actions.
+- Computer page mirrors `system-menu` actions, including Terminal handoff for interactive menu actions.
 - Command Composer argument assistant should suggest next tokens for any command shape, with menu-specific guidance and second-argument suggestions when required.
 - Composer input supports quoted tokens for arguments that contain spaces.
 - Activity drawer shows both `Active Casting` and `App Commands` with independent scroll.

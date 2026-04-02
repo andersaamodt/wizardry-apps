@@ -642,6 +642,25 @@ body::before {
   font-size: 0.62rem;
 }
 
+.wd-system-actions {
+  gap: 0.18rem;
+}
+
+.wd-system-row {
+  grid-template-columns: minmax(130px, 1fr) minmax(220px, 2fr) auto;
+}
+
+.wd-system-desc {
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.wd-pill.wd-system-danger {
+  color: var(--wd-bad);
+  border-color: color-mix(in srgb, var(--wd-bad) 40%, var(--wd-line));
+  background: color-mix(in srgb, var(--wd-bad) 10%, transparent);
+}
+
 .wd-synonym-list-wrap {
   margin-bottom: 0.2rem;
 }

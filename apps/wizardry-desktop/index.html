@@ -144,11 +144,34 @@
       var ASSET_VERSION = 'wizardry-desktop20260324i';
       var THEME_FALLBACK = ['archmage', 'adept', 'chrono', 'chronomancer', 'conjurer', 'druid', 'empath'];
       var COMPOSER_ACTIONS = ['run-spell', 'spell-help', 'run-action', 'run-system'];
-      var COMPOSER_SYSTEM_ACTIONS = ['system:whoami', 'system:pwd', 'system:date', 'system:status', 'system:environment'];
+      var COMPOSER_SYSTEM_ACTIONS = [
+        'system:restart-menu',
+        'system:update-all',
+        'system:update-wizardry',
+        'system:services-menu',
+        'system:nixos-rebuild',
+        'system:verify-posix',
+        'system:test-magic',
+        'system:profile-tests',
+        'system:uninstall-wizardry',
+        'system:whoami',
+        'system:pwd',
+        'system:date',
+        'system:status',
+        'system:environment'
+      ];
       var COMPOSER_PRESET_LIMIT = 8;
       var COMPOSER_TOKEN_RE = /^[a-z0-9._:-]+$/i;
       var COMPOSER_ARG_TOKEN_RE = /^[a-z0-9._:\/~+\-@% ]+$/i;
       var COMPOSER_REF_RE = /^[a-z0-9._-]+:[a-z0-9._-]+$/i;
+      var NAV_PAGE_MAP = {
+        cast: { id: 'cast', title: 'Cast', blurb: 'Cast spells and monitor memorized commands.' },
+        mud: { id: 'mud', title: 'Mud', blurb: 'MUD-focused runtime commands.' },
+        spellbook: { id: 'spellbook', title: 'Spellbook', blurb: 'Manage in-app spell aliases.' },
+        arcana: { id: 'arcana', title: 'Arcana', blurb: 'Tools for wizardry app setup.' },
+        system: { id: 'system', title: 'Computer', blurb: 'System maintenance and wizardry operations.' }
+      };
+      var DEFAULT_MAIN_MENU_ORDER = ['cast', 'mud', 'spellbook', 'arcana', 'system'];
       var COMPOSER_RUN_ACTIONS = {
         'arcana:install': { label: 'Arcana install', requiresArg: true, minArgs: 1, maxArgs: 1 },
         'arcana:menu': { label: 'Arcana menu', requiresArg: false, minArgs: 0, maxArgs: 1 },
@@ -162,14 +185,6 @@
         'menu:terminal': { label: 'Open menu in terminal', requiresArg: true, minArgs: 1, maxArgs: 2 },
         'app-help': { label: 'Show app help', requiresArg: true, minArgs: 1, maxArgs: 1 }
       };
-      var NAV_PAGES = [
-        { id: 'cast', title: 'Cast', blurb: 'Cast spells and monitor memorized commands.' },
-        { id: 'spellbook', title: 'Spellbook', blurb: 'Manage in-app spell aliases.' },
-        { id: 'arcana', title: 'Arcana', blurb: 'Tools for wizardry app setup.' },
-        { id: 'system', title: 'Computer', blurb: 'System checks and helper actions.' },
-        { id: 'mud', title: 'Mud', blurb: 'MUD-focused runtime commands.' }
-      ];
-
       var state = {
         activePage: 'cast',
         busy: false,
@@ -197,6 +212,10 @@
         arcanaExpandedModule: '',
         arcanaModuleItems: {},
         arcanaModuleItemsLoading: {},
+        mainMenuOrder: DEFAULT_MAIN_MENU_ORDER.slice(0),
+        systemMenuLoading: false,
+        systemMenuActions: [],
+        systemOutput: 'Choose a Computer action to run.',
         spellbookAliasesLoaded: false,
         spellbookBuiltin: [],
         activityLoading: false,
@@ -1000,11 +1019,17 @@
           {
             label: 'System',
             entries: [
+              { label: 'restart menu', tokens: ['run-system', 'system:restart-menu'], help: 'Open shutdown-menu in Terminal.' },
+              { label: 'update all', tokens: ['run-system', 'system:update-all'], help: 'Run update-all -v.' },
+              { label: 'update wizardry', tokens: ['run-system', 'system:update-wizardry'], help: 'Update wizardry core.' },
+              { label: 'services menu', tokens: ['run-system', 'system:services-menu'], help: 'Open services-menu in Terminal.' },
+              { label: 'nixos rebuild', tokens: ['run-system', 'system:nixos-rebuild'], help: 'Run sudo nixos-rebuild switch.' },
+              { label: 'verify POSIX', tokens: ['run-system', 'system:verify-posix'], help: 'Run verify-posix checks.' },
+              { label: 'test magic', tokens: ['run-system', 'system:test-magic'], help: 'Run full wizardry test suite.' },
+              { label: 'profile tests', tokens: ['run-system', 'system:profile-tests'], help: 'Profile wizardry tests.' },
+              { label: 'uninstall wizardry', tokens: ['run-system', 'system:uninstall-wizardry'], help: 'Run uninstall script.' },
               { label: 'whoami', tokens: ['run-system', 'system:whoami'], help: 'Inspect current shell user.' },
-              { label: 'pwd', tokens: ['run-system', 'system:pwd'], help: 'Print current working directory.' },
-              { label: 'date', tokens: ['run-system', 'system:date'], help: 'Print current date and time.' },
-              { label: 'status', tokens: ['run-system', 'system:status'], help: 'Run lightweight status probe.' },
-              { label: 'environment', tokens: ['run-system', 'system:environment'], help: 'Show shell and directory context.' }
+              { label: 'pwd', tokens: ['run-system', 'system:pwd'], help: 'Print current working directory.' }
             ]
           },
           {
@@ -2121,14 +2146,47 @@
         document.documentElement.style.setProperty('--wd-activity-width', activityWidth + 'px');
       }
 
+      function getNavPages() {
+        var pages = [];
+        var seen = {};
+        var order = Array.isArray(state.mainMenuOrder) && state.mainMenuOrder.length
+          ? state.mainMenuOrder
+          : DEFAULT_MAIN_MENU_ORDER;
+        for (var i = 0; i < order.length; i += 1) {
+          var key = String(order[i] || '').trim();
+          if (!key || seen[key] || !NAV_PAGE_MAP[key]) {
+            continue;
+          }
+          pages.push(NAV_PAGE_MAP[key]);
+          seen[key] = true;
+        }
+        if (!pages.length) {
+          return DEFAULT_MAIN_MENU_ORDER.map(function (key) {
+            return NAV_PAGE_MAP[key];
+          }).filter(Boolean);
+        }
+        return pages;
+      }
+
+      function navHasPage(pageId) {
+        var pages = getNavPages();
+        for (var i = 0; i < pages.length; i += 1) {
+          if (pages[i].id === pageId) {
+            return true;
+          }
+        }
+        return false;
+      }
+
       function renderNav() {
         if (!els.leftNav) {
           return;
         }
+        var navPages = getNavPages();
         var activeIdx = 0;
         var html = '';
-        for (var i = 0; i < NAV_PAGES.length; i += 1) {
-          var page = NAV_PAGES[i];
+        for (var i = 0; i < navPages.length; i += 1) {
+          var page = navPages[i];
           if (page.id === state.activePage) {
             activeIdx = i;
           }
@@ -2150,12 +2208,16 @@
       }
 
       function setActivePage(pageId) {
+        if (!navHasPage(pageId)) {
+          var fallbackPages = getNavPages();
+          pageId = fallbackPages.length ? fallbackPages[0].id : 'cast';
+        }
         if (state.activePage === pageId) {
           return;
         }
         state.activePage = pageId;
         renderNav();
-        var idx = NAV_PAGES.findIndex(function (page) {
+        var idx = getNavPages().findIndex(function (page) {
           return page.id === pageId;
         });
         if (idx >= 0) {
@@ -2169,6 +2231,9 @@
         }
         if (pageId === 'cast' && !state.cast.categories.length) {
           loadCastData();
+        }
+        if (pageId === 'system' && !state.systemMenuActions.length) {
+          loadSystemMenuActions();
         }
         renderPage();
       }
@@ -2407,16 +2472,49 @@
         return html;
       }
 
+      function systemActionModeLabel(mode) {
+        if (mode === 'menu') {
+          return 'menu';
+        }
+        if (mode === 'script') {
+          return 'script';
+        }
+        if (mode === 'command') {
+          return 'command';
+        }
+        return 'spell';
+      }
+
       function renderSystemPage() {
-        return '<section class="wd-panel"><h3>System Panel</h3>' +
-          '<p class="wd-subline">Host-safe command surface for frequent app-level operations.</p>' +
-          '<div class="wd-tool-strip">' +
-          '<button type="button" class="wd-polite-btn" data-host-action="system:whoami">Whoami</button>' +
-          '<button type="button" class="wd-polite-btn" data-host-action="system:pwd">Pwd</button>' +
-          '<button type="button" class="wd-polite-btn" data-host-action="system:date">Date</button>' +
-          '</div>' +
-          '<pre id="system-output" class="wd-mono-box">Pick an action to run.</pre>' +
-          '</section>';
+        var html = '<section class="wd-panel"><h3>Computer Menu</h3>' +
+          '<p class="wd-subline">Mirrors the wizardry <code>system-menu</code> structure.</p>';
+        if (state.systemMenuLoading) {
+          html += '<p class="wd-empty">Loading Computer actions…</p>';
+        } else if (!state.systemMenuActions.length) {
+          html += '<p class="wd-empty">No Computer actions found.</p>';
+        } else {
+          html += '<div class="wd-list wd-system-actions">';
+          for (var i = 0; i < state.systemMenuActions.length; i += 1) {
+            var row = state.systemMenuActions[i];
+            var actionLabel = row.mode === 'menu' ? 'Open' : 'Run';
+            var disabled = row.available ? '' : ' disabled';
+            var buttonTitle = row.available ? '' : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
+            html += '<div class="wd-list-row wd-system-row">';
+            html += '<span class="wd-list-main wd-col-2">' + escapeText(row.label) + '</span>';
+            html += '<span class="wd-list-meta wd-system-desc">' + escapeText(row.description) + '</span>';
+            html += '<span class="wd-row-actions">';
+            html += '<span class="wd-pill">' + escapeText(systemActionModeLabel(row.mode)) + '</span>';
+            if (row.danger) {
+              html += '<span class="wd-pill wd-system-danger">danger</span>';
+            }
+            html += '<button type="button" class="wd-polite-btn wd-tiny" data-system-menu-action="' + escapeAttrValue(row.id) + '" data-system-label="' + escapeAttrValue(row.label) + '" data-system-danger="' + (row.danger ? '1' : '0') + '"' + disabled + buttonTitle + '>' + escapeText(actionLabel) + '</button>';
+            html += '</span></div>';
+          }
+          html += '</div>';
+        }
+        html += '<pre id="system-output" class="wd-mono-box">' + escapeText(state.systemOutput || 'Choose a Computer action to run.') + '</pre>';
+        html += '</section>';
+        return html;
       }
 
       function renderMudPage() {
@@ -2449,7 +2547,7 @@
           content = renderArcanaPage();
         } else if (state.activePage === 'system') {
           title = 'Computer';
-          subtitle = 'Helpful host-level checks.';
+          subtitle = 'System maintenance menu and wizardry tooling.';
           content = renderSystemPage();
         } else if (state.activePage === 'mud') {
           title = 'Mud';
@@ -2611,12 +2709,13 @@
       }
 
       function setSelectedNavFromIndex(delta) {
+        var navPages = getNavPages();
         var next = state.selectedNavIndex + delta;
-        if (next < 0 || next >= NAV_PAGES.length) {
+        if (next < 0 || next >= navPages.length) {
           return;
         }
         state.selectedNavIndex = next;
-        var row = rowElementForPage(NAV_PAGES[next].id);
+        var row = rowElementForPage(navPages[next].id);
         if (row) {
           row.focus();
           row.scrollIntoView({ block: 'nearest' });
@@ -2627,6 +2726,86 @@
             });
           }
         }
+      }
+
+      function loadMainMenuEntries() {
+        return callBackend('list-main-menu-entries').then(function (text) {
+          var lines = String(text || '').split('\n');
+          var order = [];
+          for (var i = 0; i < lines.length; i += 1) {
+            var parts = String(lines[i] || '').split('|');
+            var pageId = String(parts[0] || '').trim();
+            if (!pageId || !NAV_PAGE_MAP[pageId]) {
+              continue;
+            }
+            if (order.indexOf(pageId) >= 0) {
+              continue;
+            }
+            order.push(pageId);
+          }
+          if (!order.length) {
+            order = DEFAULT_MAIN_MENU_ORDER.slice(0);
+          }
+          state.mainMenuOrder = order;
+          if (!navHasPage(state.activePage)) {
+            state.activePage = order[0] || 'cast';
+          }
+          renderNav();
+          renderPage();
+        }).catch(function () {
+          state.mainMenuOrder = DEFAULT_MAIN_MENU_ORDER.slice(0);
+          renderNav();
+        });
+      }
+
+      function loadSystemMenuActions() {
+        if (state.systemMenuLoading) {
+          return Promise.resolve(state.systemMenuActions);
+        }
+        state.systemMenuLoading = true;
+        if (state.activePage === 'system') {
+          renderPage();
+        }
+        return callBackend('list-system-menu-actions').then(function (text) {
+          var lines = String(text || '').split('\n');
+          var parsed = [];
+          for (var i = 0; i < lines.length; i += 1) {
+            var line = String(lines[i] || '').trim();
+            if (!line) {
+              continue;
+            }
+            var parts = line.split('|');
+            var id = String(parts[0] || '').trim();
+            var label = String(parts[1] || '').trim();
+            var mode = String(parts[2] || '').trim() || 'spell';
+            var description = String(parts[3] || '').trim();
+            var danger = String(parts[4] || '').trim() === '1';
+            var available = String(parts[5] || '').trim() !== '0';
+            var reason = String(parts[6] || '').trim();
+            if (!id || !label) {
+              continue;
+            }
+            parsed.push({
+              id: id,
+              label: label,
+              mode: mode,
+              description: description,
+              danger: danger,
+              available: available,
+              reason: reason
+            });
+          }
+          state.systemMenuActions = parsed;
+          return parsed;
+        }).catch(function () {
+          state.systemMenuActions = [];
+          return [];
+        }).finally(function () {
+          state.systemMenuLoading = false;
+          if (state.activePage === 'system') {
+            renderPage();
+          }
+        });
       }
 
       function loadCastData() {
@@ -2902,6 +3081,44 @@
         runQuickAction(kind, module, options);
       }
 
+      function runSystemMenuAction(actionId, options) {
+        options = options || {};
+        var id = String(actionId || '').trim();
+        if (!id || state.actionInFlight) {
+          return;
+        }
+        var label = String(options.label || id);
+        var isDanger = !!options.danger;
+        if (isDanger && !window.confirm('Run "' + label + '"? This may change system state.')) {
+          state.systemOutput = 'Cancelled: ' + label;
+          setOutputBlock('system-output', state.systemOutput);
+          return;
+        }
+
+        state.actionInFlight = true;
+        state.systemOutput = 'Running ' + label + ' ...';
+        setOutputBlock('system-output', state.systemOutput);
+        pushActivity('app', 'Queued ' + id, { kind: id, section: 'app', app: 'wizardry-core', status: 'queued' });
+
+        callBackend('run-system', [id]).then(function (text) {
+          state.systemOutput = String(text || '').trim() || (label + ' complete.');
+          setOutputBlock('system-output', state.systemOutput);
+          pushActivity('app', id + ' completed', { kind: id, section: 'app', app: 'wizardry-core', status: 'ok' });
+          if (id === 'system:update-wizardry') {
+            loadCastData();
+            loadMenuCatalog();
+            loadSystemMenuActions();
+          }
+        }).catch(function (error) {
+          state.systemOutput = String(error && error.message ? error.message : error || 'Action failed.');
+          setOutputBlock('system-output', state.systemOutput);
+          pushActivity('app', id + ' failed', { kind: id, section: 'app', app: 'wizardry-core', status: 'error' });
+        }).finally(function () {
+          state.actionInFlight = false;
+          loadWatchHistory();
+        });
+      }
+
       function runSpell(kind, spellName, options) {
         options = options || {};
         if (state.actionInFlight) {
@@ -3102,7 +3319,12 @@
               return;
             }
             if (event.key === 'Enter' || event.key === ' ') {
-              var selected = rowElementForPage(NAV_PAGES[state.selectedNavIndex].id);
+              var navPages = getNavPages();
+              var selectedPage = navPages[state.selectedNavIndex];
+              if (!selectedPage) {
+                return;
+              }
+              var selected = rowElementForPage(selectedPage.id);
               if (selected) {
                 setActivePage(selected.getAttribute('data-page'));
               }
@@ -3598,6 +3820,24 @@
               return;
             }
 
+            var systemMenuAction = event.target.closest('[data-system-menu-action]');
+            if (systemMenuAction) {
+              var systemActionId = systemMenuAction.getAttribute('data-system-menu-action');
+              var systemActionLabel = systemMenuAction.getAttribute('data-system-label') || systemActionId;
+              var systemActionDanger = systemMenuAction.getAttribute('data-system-danger') === '1';
+              if (systemActionId) {
+                if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                  composerOpenWithTokens(['run-system', systemActionId], { userInitiated: true });
+                  return;
+                }
+                runSystemMenuAction(systemActionId, {
+                  label: systemActionLabel,
+                  danger: systemActionDanger
+                });
+              }
+              return;
+            }
+
             var hostAction = event.target.closest('[data-host-action]');
             if (hostAction) {
               var command = hostAction.getAttribute('data-host-action');
@@ -3822,7 +4062,7 @@
         }, 1400);
 
         loadRootHint().finally(function () {
-          Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadMenuCatalog(), loadCastData(), loadSpellbookAliases(), loadArcanaInstall(), loadWatchHistory()])
+          Promise.all([ensureBridge(), loadThemes(), loadPreferences(), loadMainMenuEntries(), loadMenuCatalog(), loadCastData(), loadSpellbookAliases(), loadArcanaInstall(), loadSystemMenuActions(), loadWatchHistory()])
             .catch(function () {
               state.bridgeReady = bridgeAvailable();
             })

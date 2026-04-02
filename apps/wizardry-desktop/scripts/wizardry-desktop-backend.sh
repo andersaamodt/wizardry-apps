@@ -18,6 +18,8 @@ Actions:
   run-spell SPELL_REF SPELL_NAME [ROOT_HINT]
   spell-help SPELL_REF SPELL_NAME [ROOT_HINT]
   list-menu-spells [ROOT_HINT]
+  list-main-menu-entries [ROOT_HINT]
+  list-system-menu-actions [ROOT_HINT]
   menu-help MENU_NAME [ROOT_HINT]
   run-menu MENU_NAME [MENU_ARG] [ROOT_HINT]
   open-menu-terminal MENU_NAME [MENU_ARG] [ROOT_HINT]
@@ -931,6 +933,157 @@ cmd_list_menu_spells() {
   rm -f "$tmp_file"
 }
 
+main_menu_mud_enabled() {
+  spell_home=${SPELLBOOK_DIR:-"${HOME:-.}/.spellbook"}
+  mud_config_file="$spell_home/.mud"
+  mud_enabled=1
+
+  if [ -f "$mud_config_file" ]; then
+    value=''
+    if hascmd config-get; then
+      value=$(config-get "$mud_config_file" "mud-enabled" 2>/dev/null || printf '')
+    fi
+    if [ -z "$value" ]; then
+      value=$(awk -F'=' '
+        {
+          key=$1
+          gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+          if (key == "mud-enabled") {
+            val=$2
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+            print val
+            exit
+          }
+        }
+      ' "$mud_config_file" 2>/dev/null | head -n 1)
+    fi
+    if [ -n "$value" ]; then
+      if [ "$value" = "1" ]; then
+        mud_enabled=1
+      else
+        mud_enabled=0
+      fi
+    fi
+  fi
+
+  printf '%s\n' "$mud_enabled"
+}
+
+cmd_list_main_menu_entries() {
+  mud_enabled=$(main_menu_mud_enabled)
+  printf '%s\n' "cast|Cast|cast"
+  if [ "$mud_enabled" = "1" ]; then
+    printf '%s\n' "mud|MUD|mud"
+  fi
+  printf '%s\n' "spellbook|Spellbook|spellbook"
+  printf '%s\n' "arcana|Arcana|install-menu"
+  printf '%s\n' "system|Computer|system-menu"
+}
+
+is_nixos_host() {
+  if hascmd detect-distro; then
+    distro=$(detect-distro 2>/dev/null || printf '')
+    if [ "$distro" = "nixos" ]; then
+      return 0
+    fi
+  fi
+  if [ -r /etc/os-release ] && grep -qi '^ID=nixos' /etc/os-release 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
+print_system_menu_action() {
+  id=${1-}
+  label=${2-}
+  mode=${3-}
+  description=${4-}
+  danger=${5-0}
+  available=${6-1}
+  reason=${7-}
+  printf '%s|%s|%s|%s|%s|%s|%s\n' \
+    "$id" \
+    "$label" \
+    "$mode" \
+    "$description" \
+    "$danger" \
+    "$available" \
+    "$reason"
+}
+
+menu_action_available() {
+  root=${1-}
+  menu_name=${2-}
+  if [ -n "$(resolve_menu_script "$root" "$menu_name" || true)" ]; then
+    return 0
+  fi
+  return 1
+}
+
+cmd_list_system_menu_actions() {
+  root=$(require_root "${1-}")
+  uninstall_script="$root/.uninstall"
+  if [ ! -f "$uninstall_script" ]; then
+    uninstall_script="$WIZARDRY_DIR_FALLBACK/.uninstall"
+  fi
+
+  if menu_action_available "$root" "shutdown-menu"; then
+    print_system_menu_action "system:restart-menu" "Restart..." "menu" "Open the shutdown/restart power menu in Terminal." "1" "1" ""
+  else
+    print_system_menu_action "system:restart-menu" "Restart..." "menu" "Open the shutdown/restart power menu in Terminal." "1" "0" "shutdown-menu is unavailable."
+  fi
+
+  if hascmd update-all || [ -x "$WIZARDRY_DIR_FALLBACK/spells/system/update-all" ]; then
+    print_system_menu_action "system:update-all" "Update all software" "spell" "Run update-all with verbose output." "1" "1" ""
+  else
+    print_system_menu_action "system:update-all" "Update all software" "spell" "Run update-all with verbose output." "1" "0" "update-all is unavailable."
+  fi
+
+  if hascmd update-wizardry || [ -x "$WIZARDRY_DIR_FALLBACK/spells/.wizardry/update-wizardry" ]; then
+    print_system_menu_action "system:update-wizardry" "Update wizardry" "spell" "Update wizardry core scripts and metadata." "0" "1" ""
+  else
+    print_system_menu_action "system:update-wizardry" "Update wizardry" "spell" "Update wizardry core scripts and metadata." "0" "0" "update-wizardry is unavailable."
+  fi
+
+  if menu_action_available "$root" "services-menu"; then
+    print_system_menu_action "system:services-menu" "Manage services" "menu" "Open services-menu in Terminal." "0" "1" ""
+  else
+    print_system_menu_action "system:services-menu" "Manage services" "menu" "Open services-menu in Terminal." "0" "0" "services-menu is unavailable."
+  fi
+
+  if is_nixos_host; then
+    if hascmd nixos-rebuild; then
+      print_system_menu_action "system:nixos-rebuild" "Rebuild NixOS" "command" "Run sudo nixos-rebuild switch in Terminal." "1" "1" ""
+    else
+      print_system_menu_action "system:nixos-rebuild" "Rebuild NixOS" "command" "Run sudo nixos-rebuild switch in Terminal." "1" "0" "nixos-rebuild is unavailable."
+    fi
+  fi
+
+  if hascmd verify-posix || [ -x "$WIZARDRY_DIR_FALLBACK/spells/.wizardry/verify-posix" ]; then
+    print_system_menu_action "system:verify-posix" "Verify POSIX spells" "spell" "Run POSIX compatibility verification checks." "0" "1" ""
+  else
+    print_system_menu_action "system:verify-posix" "Verify POSIX spells" "spell" "Run POSIX compatibility verification checks." "0" "0" "verify-posix is unavailable."
+  fi
+
+  if hascmd test-magic || [ -x "$WIZARDRY_DIR_FALLBACK/spells/.wizardry/test-magic" ]; then
+    print_system_menu_action "system:test-magic" "Test all wizardry spells" "spell" "Run full wizardry spell test suite." "0" "1" ""
+  else
+    print_system_menu_action "system:test-magic" "Test all wizardry spells" "spell" "Run full wizardry spell test suite." "0" "0" "test-magic is unavailable."
+  fi
+
+  if hascmd profile-tests || [ -x "$WIZARDRY_DIR_FALLBACK/spells/.wizardry/profile-tests" ]; then
+    print_system_menu_action "system:profile-tests" "Profile test performance" "spell" "Profile wizardry test runtime and hotspots." "0" "1" ""
+  else
+    print_system_menu_action "system:profile-tests" "Profile test performance" "spell" "Profile wizardry test runtime and hotspots." "0" "0" "profile-tests is unavailable."
+  fi
+
+  if [ -f "$uninstall_script" ]; then
+    print_system_menu_action "system:uninstall-wizardry" "Uninstall wizardry" "script" "Run wizardry uninstall script." "1" "1" ""
+  else
+    print_system_menu_action "system:uninstall-wizardry" "Uninstall wizardry" "script" "Run wizardry uninstall script." "1" "0" ".uninstall script is unavailable."
+  fi
+}
+
 cmd_menu_help() {
   name=${1-}
   root=$(require_root "${2-}")
@@ -1155,6 +1308,133 @@ OSA
   printf 'command=%s\n' "$command_text"
   printf '%s\n' "Terminal automation failed; run command manually."
   record_watch "app" "menu:terminal:$name" "wizardry-core" "failed:osascript"
+}
+
+run_terminal_command() {
+  command_text=${1-}
+  source=${2-}
+  app=${3-}
+  [ -n "$source" ] || source="system:terminal"
+  [ -n "$app" ] || app="wizardry-core"
+
+  [ -n "$command_text" ] || {
+    printf '%s\n' "wizardry-desktop-backend: terminal command is required" >&2
+    exit 2
+  }
+
+  if [ "$(os_id)" != "darwin" ] || ! command -v osascript >/dev/null 2>&1; then
+    printf 'mode=%s\n' "manual"
+    printf 'command=%s\n' "$command_text"
+    printf '%s\n' "Automatic terminal launch is unavailable on this platform."
+    record_watch "app" "$source" "$app" "manual"
+    return 0
+  fi
+
+  terminal_line="cd $(shell_quote "$HOME"); $command_text"
+  if osascript - "$terminal_line" <<'OSA' >/dev/null 2>&1
+on run argv
+  set cmd to item 1 of argv
+  tell application "Terminal"
+    activate
+    do script cmd
+  end tell
+end run
+OSA
+  then
+    printf 'mode=%s\n' "terminal"
+    printf 'command=%s\n' "$command_text"
+    printf '%s\n' "Opened Terminal and sent command."
+    record_watch "app" "$source" "$app" "ok"
+    return 0
+  fi
+
+  printf 'mode=%s\n' "manual"
+  printf 'command=%s\n' "$command_text"
+  printf '%s\n' "Terminal automation failed; run command manually."
+  record_watch "app" "$source" "$app" "failed:osascript"
+}
+
+resolve_system_command() {
+  name=${1-}
+  [ -n "$name" ] || return 1
+  if hascmd "$name"; then
+    # shellcheck disable=SC2230
+    command -v "$name" 2>/dev/null | awk '{print $1}'
+    return 0
+  fi
+
+  root=$(require_root "")
+  for file in \
+    "$root/spells/.wizardry/$name" \
+    "$root/spells/system/$name" \
+    "$WIZARDRY_DIR_FALLBACK/spells/.wizardry/$name" \
+    "$WIZARDRY_DIR_FALLBACK/spells/system/$name" \
+    "$HOME/.wizardry/spells/.wizardry/$name" \
+    "$HOME/.wizardry/spells/system/$name"
+  do
+    [ -f "$file" ] || continue
+    if [ -x "$file" ]; then
+      printf '%s\n' "$file"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+run_system_command() {
+  action_name=${1-}
+  executable=${2-}
+  shift 2 || true
+
+  [ -n "$action_name" ] || action_name="system:command"
+  [ -n "$executable" ] || {
+    printf '%s\n' "wizardry-desktop-backend: missing executable for $action_name" >&2
+    exit 2
+  }
+
+  status=0
+  output=$("$executable" "$@" 2>&1) || status=$?
+  status=${status:-0}
+  if [ -n "$output" ]; then
+    printf '%s\n' "$output"
+  fi
+  if [ "$status" -eq 0 ]; then
+    record_watch "app" "$action_name" "wizardry-core" "ok"
+    return 0
+  fi
+  if [ -z "$output" ]; then
+    printf '%s\n' "wizardry-desktop-backend: $action_name failed with status $status" >&2
+  fi
+  record_watch "app" "$action_name" "wizardry-core" "failed:$status"
+  exit 2
+}
+
+run_named_system_command() {
+  action_name=${1-}
+  command_name=${2-}
+  shift 2 || true
+  executable=$(resolve_system_command "$command_name" || true)
+  if [ -z "$executable" ]; then
+    printf '%s\n' "wizardry-desktop-backend: command unavailable for $action_name: $command_name" >&2
+    record_watch "app" "$action_name" "wizardry-core" "failed:missing"
+    exit 2
+  fi
+  run_system_command "$action_name" "$executable" "$@"
+}
+
+run_system_uninstall() {
+  root=$(require_root "")
+  uninstall_script="$root/.uninstall"
+  if [ ! -f "$uninstall_script" ]; then
+    uninstall_script="$WIZARDRY_DIR_FALLBACK/.uninstall"
+  fi
+  if [ ! -f "$uninstall_script" ]; then
+    printf '%s\n' "wizardry-desktop-backend: uninstall script not found" >&2
+    record_watch "app" "system:uninstall-wizardry" "wizardry-core" "failed:missing"
+    exit 2
+  fi
+  run_system_command "system:uninstall-wizardry" "sh" "$uninstall_script"
 }
 
 resolve_arcana_module_script() {
@@ -1642,6 +1922,45 @@ cmd_run_action() {
 cmd_run_system() {
   command=${1-}
   case "$command" in
+    system:restart-menu|restart-menu)
+      root=$(require_root "")
+      cmd_open_menu_terminal "shutdown-menu" "" "$root"
+      ;;
+    system:services-menu|services-menu)
+      root=$(require_root "")
+      cmd_open_menu_terminal "services-menu" "" "$root"
+      ;;
+    system:verify-posix|verify-posix)
+      run_named_system_command "system:verify-posix" "verify-posix"
+      ;;
+    system:update-wizardry|update-wizardry)
+      run_named_system_command "system:update-wizardry" "update-wizardry"
+      ;;
+    system:test-magic|test-magic)
+      run_named_system_command "system:test-magic" "test-magic"
+      ;;
+    system:profile-tests|profile-tests)
+      run_named_system_command "system:profile-tests" "profile-tests"
+      ;;
+    system:update-all|update-all)
+      run_named_system_command "system:update-all" "update-all" "-v"
+      ;;
+    system:uninstall-wizardry|uninstall-wizardry)
+      run_system_uninstall
+      ;;
+    system:nixos-rebuild|nixos-rebuild)
+      if ! is_nixos_host; then
+        printf '%s\n' "wizardry-desktop-backend: nixos-rebuild is only available on NixOS" >&2
+        record_watch "app" "system:nixos-rebuild" "host" "failed:unsupported"
+        exit 2
+      fi
+      if ! hascmd nixos-rebuild; then
+        printf '%s\n' "wizardry-desktop-backend: nixos-rebuild command unavailable" >&2
+        record_watch "app" "system:nixos-rebuild" "host" "failed:missing"
+        exit 2
+      fi
+      run_terminal_command "sudo nixos-rebuild switch" "system:nixos-rebuild" "host"
+      ;;
     system:whoami)
       if whoami; then
         record_watch "app" "system:whoami" "host" "ok"
@@ -1722,6 +2041,12 @@ case "$action" in
     ;;
   list-menu-spells)
     cmd_list_menu_spells "$@"
+    ;;
+  list-main-menu-entries)
+    cmd_list_main_menu_entries "$@"
+    ;;
+  list-system-menu-actions)
+    cmd_list_system_menu_actions "$@"
     ;;
   menu-help)
     cmd_menu_help "$@"

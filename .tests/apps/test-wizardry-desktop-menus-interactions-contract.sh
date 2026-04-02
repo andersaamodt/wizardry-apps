@@ -35,6 +35,8 @@ assert_matches() {
 
 # Backend menu metadata + terminal launch contract.
 assert_contains "$backend" "list-menu-spells [ROOT_HINT]"
+assert_contains "$backend" "list-main-menu-entries [ROOT_HINT]"
+assert_contains "$backend" "list-system-menu-actions [ROOT_HINT]"
 assert_contains "$backend" "open-menu-terminal MENU_NAME [MENU_ARG] [ROOT_HINT]"
 assert_matches "$backend" 'menu_argument_spec\(\)'
 assert_matches "$backend" 'cmd_open_menu_terminal\(\)'
@@ -48,10 +50,13 @@ assert_matches "$ui" "function renderComposerArgAssistant\\(plan\\)"
 assert_matches "$ui" "function parseComposerText\\(value\\)"
 assert_matches "$ui" "function collectComposerAssistEntries\\(plan\\)"
 assert_matches "$ui" "function routeMenuActionToGui\\(actionName, params\\)"
+assert_matches "$ui" "function runSystemMenuAction\\(actionId, options\\)"
 assert_contains "$ui" "data-composer-assist-token"
 assert_contains "$ui" "data-composer-assist-args"
 assert_contains "$ui" "'menu:terminal': { label: 'Open menu in terminal'"
 assert_matches "$ui" "tokens: \\['run-action', 'menu:terminal'"
+assert_matches "$ui" "tokens: \\['run-system', 'system:restart-menu'"
+assert_contains "$ui" "data-system-menu-action="
 assert_contains "$ui" "menu:run cast routed to Cast tab"
 assert_matches "$ui" "callBackend\\('run-action', actionArgs\\)"
 

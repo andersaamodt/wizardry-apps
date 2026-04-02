@@ -63,6 +63,58 @@ printf '%s\n' "$menus" | grep -F "spellbook|0|optional|" >/dev/null 2>&1 || {
   exit 1
 }
 
+main_menu_entries=$(sh "$backend" list-main-menu-entries "$root")
+printf '%s\n' "$main_menu_entries" | grep -F "cast|Cast|cast" >/dev/null 2>&1 || {
+  printf '%s\n' "list-main-menu-entries missing Cast" >&2
+  exit 1
+}
+printf '%s\n' "$main_menu_entries" | grep -F "spellbook|Spellbook|spellbook" >/dev/null 2>&1 || {
+  printf '%s\n' "list-main-menu-entries missing Spellbook" >&2
+  exit 1
+}
+printf '%s\n' "$main_menu_entries" | grep -F "arcana|Arcana|install-menu" >/dev/null 2>&1 || {
+  printf '%s\n' "list-main-menu-entries missing Arcana/install-menu" >&2
+  exit 1
+}
+printf '%s\n' "$main_menu_entries" | grep -F "system|Computer|system-menu" >/dev/null 2>&1 || {
+  printf '%s\n' "list-main-menu-entries missing Computer/system-menu" >&2
+  exit 1
+}
+
+system_actions=$(sh "$backend" list-system-menu-actions "$root")
+printf '%s\n' "$system_actions" | grep -F "system:restart-menu|Restart...|menu|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-system-menu-actions missing restart-menu row" >&2
+  exit 1
+}
+printf '%s\n' "$system_actions" | grep -F "system:services-menu|Manage services|menu|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-system-menu-actions missing services-menu row" >&2
+  exit 1
+}
+printf '%s\n' "$system_actions" | grep -F "system:verify-posix|Verify POSIX spells|spell|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-system-menu-actions missing verify-posix row" >&2
+  exit 1
+}
+printf '%s\n' "$system_actions" | grep -F "system:update-wizardry|Update wizardry|spell|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-system-menu-actions missing update-wizardry row" >&2
+  exit 1
+}
+printf '%s\n' "$system_actions" | grep -F "system:test-magic|Test all wizardry spells|spell|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-system-menu-actions missing test-magic row" >&2
+  exit 1
+}
+printf '%s\n' "$system_actions" | grep -F "system:profile-tests|Profile test performance|spell|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-system-menu-actions missing profile-tests row" >&2
+  exit 1
+}
+printf '%s\n' "$system_actions" | grep -F "system:update-all|Update all software|spell|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-system-menu-actions missing update-all row" >&2
+  exit 1
+}
+printf '%s\n' "$system_actions" | grep -F "system:uninstall-wizardry|Uninstall wizardry|script|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-system-menu-actions missing uninstall row" >&2
+  exit 1
+}
+
 menu_help=$(sh "$backend" menu-help cast "$root" 2>&1)
 printf '%s\n' "$menu_help" | grep -E '^Usage: cast' >/dev/null 2>&1 || {
   printf '%s\n' "menu-help cast missing Usage output" >&2
