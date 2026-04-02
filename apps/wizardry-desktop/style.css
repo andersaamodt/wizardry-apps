@@ -79,6 +79,8 @@ body::before {
   width: clamp(72px, 16vw, 112px);
   height: clamp(72px, 16vw, 112px);
   display: block;
+  border-radius: 22.3%;
+  overflow: hidden;
 }
 
 .wd-splash-fade {
@@ -682,14 +684,15 @@ body::before {
 
 .wd-cast-category-row {
   display: grid;
-  grid-template-columns: max-content 4.3rem 5.2rem;
+  grid-template-columns: 11.2rem 4.3rem 5.4rem;
   align-items: center;
-  column-gap: 0.34rem;
+  column-gap: 0.62rem;
   max-width: 100%;
 }
 
 .wd-cast-list .wd-drill-item {
   grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
 }
 
 .wd-cast-item-main {
