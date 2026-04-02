@@ -100,7 +100,7 @@ body::before {
 }
 
 .wd-left-rail {
-  min-width: 210px;
+  min-width: 180px;
   max-width: 340px;
   min-height: 0;
   background: var(--wd-panel);
@@ -125,7 +125,7 @@ body::before {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0.14rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0.08rem;
@@ -138,8 +138,8 @@ body::before {
   text-align: left;
   width: 100%;
   background: transparent;
-  border-radius: var(--wd-radius);
-  padding: 0.24rem 0.34rem;
+  border-radius: 0;
+  padding: 0.26rem 0.42rem;
   color: var(--wd-text);
   cursor: default;
   font: inherit;
@@ -147,9 +147,9 @@ body::before {
 }
 
 .wd-nav-title {
-  font-weight: 640;
+  font-weight: 400;
   letter-spacing: 0.01em;
-  font-size: 0.84rem;
+  font-size: 0.92rem;
   color: color-mix(in srgb, var(--wd-text) 90%, var(--wd-bg) 10%);
   line-height: 1.24;
 }
@@ -1593,7 +1593,7 @@ body::before {
 
 @media (max-width: 1200px) {
   .wd-left-rail {
-    min-width: 200px;
+    min-width: 170px;
   }
   .wd-settings {
     width: 220px;

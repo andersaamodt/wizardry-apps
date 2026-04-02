@@ -77,7 +77,7 @@
       <section class="wd-settings-card">
         <h3>Rail Width</h3>
         <label for="rail-width" class="wd-row-label">Resize rail (persistent)</label>
-        <input id="rail-width" type="range" min="220" max="420" step="10">
+        <input id="rail-width" type="range" min="180" max="420" step="10">
       </section>
       <section class="wd-settings-card">
         <h3>Theme</h3>
@@ -1935,13 +1935,13 @@
           syncPrefsStatus();
           return ensureThemes();
         }).then(function () {
-          state.railWidth = Math.min(420, Math.max(220, Number(state.railWidth) || 300));
+          state.railWidth = Math.min(420, Math.max(180, Number(state.railWidth) || 300));
           applyTheme(preferredTheme, { allowUnlisted: true, persist: false });
         });
       }
 
       function saveRailWidth(width) {
-        state.railWidth = Math.min(420, Math.max(220, Number(width) || 300));
+        state.railWidth = Math.min(420, Math.max(180, Number(width) || 300));
         applyRailWidth();
         savePreference('leftRailWidth', String(state.railWidth));
       }
