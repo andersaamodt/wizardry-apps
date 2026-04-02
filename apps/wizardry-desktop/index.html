@@ -40,8 +40,8 @@
     <section id="main-column" class="wd-main-column">
       <header class="wd-content-head">
         <div class="wd-title-wrap">
-          <h2 id="page-title">Menu</h2>
-          <p id="page-subtitle">Comprehensive wizardry menu index.</p>
+          <h2 id="page-title">Cast</h2>
+          <p id="page-subtitle">Open a category to run spells.</p>
         </div>
         <div class="wd-head-actions">
           <button id="command-composer-toggle" type="button" class="wd-icon-btn wd-composer-btn" title="Compose command..." aria-label="Compose command..." aria-expanded="false" aria-controls="command-composer-modal">
@@ -169,7 +169,6 @@
         'app-help': { label: 'Show app help', requiresArg: true, minArgs: 1, maxArgs: 1 }
       };
       var NAV_PAGES = [
-        { id: 'menus', title: 'Menu', blurb: 'Full wizardry menu command index.' },
         { id: 'cast', title: 'Cast', blurb: 'Cast spells and monitor memorized commands.' },
         { id: 'spellbook', title: 'Spellbook', blurb: 'Manage in-app spell aliases.' },
         { id: 'arcana', title: 'Arcana', blurb: 'Tools for wizardry app setup.' },
@@ -178,7 +177,7 @@
       ];
 
       var state = {
-        activePage: 'menus',
+        activePage: 'cast',
         busy: false,
         bridgeReady: false,
         hostBootReadySent: false,
@@ -193,7 +192,6 @@
         dividerDragging: false,
         selectedNavIndex: 0,
         castPageLoading: false,
-        menuPageLoading: false,
         cast: {
           categories: [],
           memorized: [],
@@ -456,9 +454,6 @@
       function composerDefaultTokensForPage(pageId) {
         if (pageId === 'cast') {
           return ['run-spell'];
-        }
-        if (pageId === 'menus') {
-          return ['run-action', 'menu:list'];
         }
         if (pageId === 'arcana') {
           return ['run-action'];
@@ -2171,9 +2166,6 @@
         if (pageId === 'arcana' && state.arcanaInstall.length === 0) {
           loadArcanaInstall();
         }
-        if (pageId === 'menus' && state.menuCatalog.length === 0) {
-          loadMenuCatalog();
-        }
         if (pageId === 'cast' && !state.cast.categories.length) {
           loadCastData();
         }
@@ -2203,17 +2195,6 @@
         return '<div class="wd-list-row"><span class="wd-list-main">' + escapeText(row.label) + '</span><span class="wd-list-meta">' + escapeText(row.kind) + '</span><span class="wd-row-actions">' + controls + '</span></div>';
       }
 
-      function menuDisplayName(name) {
-        var raw = String(name || '').trim();
-        if (!raw) {
-          return '';
-        }
-        var title = raw.replace(/-/g, ' ');
-        return title.replace(/\b[a-z]/g, function (ch) {
-          return ch.toUpperCase();
-        });
-      }
-
       function menuRowByName(name) {
         var key = String(name || '').trim();
         if (!key) {
@@ -2236,65 +2217,6 @@
           return 'arg optional';
         }
         return 'no arg';
-      }
-
-      function renderMenusPage() {
-        var rows = state.menuCatalog || [];
-        var html = '<section class="wd-panel"><h3>Wizardry Menus</h3>' +
-          '<p class="wd-subline">Complete index from <code>spells/menu</code>, including sourced-only and argument-required menus.</p>';
-        html += '<div class="wd-card-grid">';
-        html += card('Indexed Menus', String(rows.length), 'Backed by list-menu-spells in the backend contract.');
-        html += card('Main Menu Entries', String(rows.filter(function (row) { return row.topLevel; }).length), 'Top-level entries aligned to main-menu flow.');
-        html += card('Sourced-only', String(rows.filter(function (row) { return row.sourcedOnly; }).length), 'Menus that must run with dot-sourcing in a shell.');
-        html += '</div>';
-        html += '</section>';
-
-        html += '<section class="wd-panel"><h3>Menu Command Surface</h3>';
-        if (state.menuPageLoading) {
-          html += '<p class="wd-empty">Loading menu inventory…</p>';
-        } else if (!rows.length) {
-          html += '<p class="wd-empty">No menu scripts found.</p>';
-        } else {
-          html += '<div class="wd-list wd-compact-list wd-scroll-area">';
-          for (var i = 0; i < rows.length; i += 1) {
-            var row = rows[i];
-            var flags = [];
-            if (row.topLevel) {
-              flags.push('main');
-            }
-            if (row.sourcedOnly) {
-              flags.push('sourced');
-            }
-            if (row.argMode === 'required') {
-              flags.push('arg required');
-            } else if (row.argMode === 'optional') {
-              flags.push('arg optional');
-            }
-            var flagText = flags.join(', ') || 'menu';
-            html += '<div class="wd-list-row">';
-            html += '<span class="wd-list-main wd-col-2">' + escapeText(menuDisplayName(row.name) || row.name) + '</span>';
-            html += '<span class="wd-list-meta wd-col-4"><code>' + escapeText(row.invocation || row.name) + '</code> · ' + escapeText(flagText) + '</span>';
-            html += '<span class="wd-row-actions">';
-            if (row.argMode === 'required' || row.argMode === 'optional') {
-              var placeholder = row.argExample ? row.argExample : (row.argMode === 'required' ? 'Required argument' : 'Optional argument');
-              html += '<input type="text" class="wd-inline-input wd-menu-arg" data-menu-arg-for="' + escapeAttrValue(row.name) + '" placeholder="' + escapeAttrValue(placeholder) + '" title="' + escapeHtmlAttribute(row.argHelp || row.argLabel || 'Menu argument') + '">';
-            }
-            html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-menu-help="' + escapeAttrValue(row.name) + '">Help</button>';
-            html += '<button type="button" class="wd-polite-btn wd-tiny" data-menu-run="' + escapeAttrValue(row.name) + '">' + (row.sourcedOnly ? 'Guide' : 'Run') + '</button>';
-            if (row.sourcedOnly) {
-              html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-menu-terminal="' + escapeAttrValue(row.name) + '">Open Terminal</button>';
-            }
-            html += '</span>';
-            html += '</div>';
-            if (row.argHelp) {
-              html += '<p class="wd-subline wd-menu-arg-help">' + escapeText(row.argHelp) + '</p>';
-            }
-          }
-          html += '</div>';
-        }
-        html += '<pre id="menu-output" class="wd-mono-box wd-inline-output">Select Help or Run to inspect menu behavior.</pre>';
-        html += '</section>';
-        return html;
       }
 
       function renderCastPage() {
@@ -2427,15 +2349,11 @@
       }
 
       function renderPage() {
-        var title = 'Menu';
+        var title = 'Cast';
         var subtitle = '';
         var content = '';
 
-        if (state.activePage === 'menus') {
-          title = 'Menu';
-          subtitle = 'Comprehensive wizardry menu index.';
-          content = renderMenusPage();
-        } else if (state.activePage === 'cast') {
+        if (state.activePage === 'cast') {
           title = 'Cast';
           subtitle = 'Open a category to run spells.';
           content = renderCastPage();
@@ -2693,8 +2611,6 @@
       }
 
       function loadMenuCatalog() {
-        state.menuPageLoading = true;
-        renderPage();
         return callBackend('list-menu-spells').then(function (text) {
           var lines = String(text || '').split('\n');
           var parsed = [];
@@ -2725,19 +2641,11 @@
             });
           }
           state.menuCatalog = parsed;
-          if (state.activePage === 'menus') {
-            renderPage();
-          }
           if (state.composer.open) {
             renderComposer();
           }
         }).catch(function () {
           state.menuCatalog = [];
-        }).finally(function () {
-          state.menuPageLoading = false;
-          if (state.activePage === 'menus') {
-            renderPage();
-          }
         });
       }
 
@@ -2831,145 +2739,6 @@
           return;
         }
         runQuickAction(kind, module, options);
-      }
-
-      function menuArgumentFor(name) {
-        var key = String(name || '').trim();
-        if (!key || !els.contentArea) {
-          return '';
-        }
-        var inputs = els.contentArea.querySelectorAll('[data-menu-arg-for]');
-        for (var i = 0; i < inputs.length; i += 1) {
-          if (String(inputs[i].getAttribute('data-menu-arg-for') || '') === key) {
-            return String(inputs[i].value || '').trim();
-          }
-        }
-        return '';
-      }
-
-      function menuArgumentState(name, arg) {
-        var row = menuRowByName(name);
-        var value = String(arg || '').trim();
-        if (!row) {
-          return { ok: false, message: 'Unknown menu: ' + name };
-        }
-        if (row.argMode === 'required' && !value) {
-          return { ok: false, message: 'Menu "' + row.name + '" requires an argument.' };
-        }
-        if (row.argMode === 'none' && value) {
-          return { ok: false, message: 'Menu "' + row.name + '" does not take an argument.' };
-        }
-        return { ok: true, message: '' };
-      }
-
-      function runMenuHelp(menuName, options) {
-        options = options || {};
-        var name = String(menuName || '').trim();
-        if (!name) {
-          return;
-        }
-        if (state.actionInFlight) {
-          return;
-        }
-        state.actionInFlight = true;
-        callBackend('menu-help', [name]).then(function (text) {
-          var output = String(text || '').trim();
-          if (options.outputId) {
-            setOutputBlock(options.outputId, output || ('No help output for ' + name + '.'));
-          }
-          pushActivity('app', 'menu-help ' + name + ' completed', { section: 'app', app: 'wizardry-core', source: 'menu-help:' + name, status: 'ok' });
-        }).catch(function (error) {
-          var message = String(error && error.message ? error.message : error || 'menu-help failed');
-          if (options.outputId) {
-            setOutputBlock(options.outputId, message);
-          }
-          pushActivity('app', 'menu-help ' + name + ' failed', { section: 'app', app: 'wizardry-core', source: 'menu-help:' + name, status: 'error' });
-        }).finally(function () {
-          state.actionInFlight = false;
-          loadWatchHistory();
-        });
-      }
-
-      function runMenuCommand(menuName, menuArg, options) {
-        options = options || {};
-        var name = String(menuName || '').trim();
-        var arg = String(menuArg || '').trim();
-        if (!name) {
-          return;
-        }
-        var stateCheck = menuArgumentState(name, arg);
-        if (!stateCheck.ok) {
-          if (options.outputId) {
-            setOutputBlock(options.outputId, stateCheck.message);
-          }
-          pushActivity('app', 'run-menu ' + name + ' blocked', { section: 'app', app: 'wizardry-core', source: 'run-menu:' + name, status: 'error' });
-          return;
-        }
-        if (state.actionInFlight) {
-          return;
-        }
-        state.actionInFlight = true;
-        var args = [name];
-        if (arg) {
-          args.push(arg);
-        }
-        callBackend('run-menu', args).then(function (text) {
-          var output = String(text || '').trim();
-          if (options.outputId) {
-            setOutputBlock(options.outputId, output || ('menu ' + name + ' completed.'));
-          }
-          pushActivity('app', 'run-menu ' + name + ' completed', { section: 'app', app: 'wizardry-core', source: 'run-menu:' + name, status: 'ok' });
-        }).catch(function (error) {
-          var message = String(error && error.message ? error.message : error || 'run-menu failed');
-          if (options.outputId) {
-            setOutputBlock(options.outputId, message);
-          }
-          pushActivity('app', 'run-menu ' + name + ' failed', { section: 'app', app: 'wizardry-core', source: 'run-menu:' + name, status: 'error' });
-        }).finally(function () {
-          state.actionInFlight = false;
-          loadWatchHistory();
-        });
-      }
-
-      function runMenuInTerminal(menuName, menuArg, options) {
-        options = options || {};
-        var name = String(menuName || '').trim();
-        var arg = String(menuArg || '').trim();
-        if (!name) {
-          return;
-        }
-        var stateCheck = menuArgumentState(name, arg);
-        if (!stateCheck.ok) {
-          if (options.outputId) {
-            setOutputBlock(options.outputId, stateCheck.message);
-          }
-          pushActivity('app', 'menu-terminal ' + name + ' blocked', { section: 'app', app: 'wizardry-core', source: 'menu-terminal:' + name, status: 'error' });
-          return;
-        }
-        if (state.actionInFlight) {
-          return;
-        }
-        state.actionInFlight = true;
-        var args = [name];
-        if (arg) {
-          args.push(arg);
-        }
-        callBackend('open-menu-terminal', args).then(function (text) {
-          var output = String(text || '').trim();
-          if (options.outputId) {
-            setOutputBlock(options.outputId, output || ('Opened terminal for menu ' + name + '.'));
-          }
-          pushActivity('app', 'menu-terminal ' + name + ' completed', { section: 'app', app: 'wizardry-core', source: 'menu-terminal:' + name, status: 'ok' });
-        }).catch(function (error) {
-          var message = String(error && error.message ? error.message : error || 'menu-terminal failed');
-          if (options.outputId) {
-            setOutputBlock(options.outputId, message);
-          }
-          pushActivity('app', 'menu-terminal ' + name + ' failed', { section: 'app', app: 'wizardry-core', source: 'menu-terminal:' + name, status: 'error' });
-        }).finally(function () {
-          state.actionInFlight = false;
-          loadWatchHistory();
-        });
       }
 
       function runSpell(kind, spellName, options) {
@@ -3699,58 +3468,6 @@
               }).catch(function (error) {
                 setOutputBlock('mud-output', String(error && error.message ? error.message : error || 'failure'));
               });
-              return;
-            }
-
-            var menuHelp = event.target.closest('[data-menu-help]');
-            if (menuHelp) {
-              var helpName = String(menuHelp.getAttribute('data-menu-help') || '').trim();
-              if (!helpName) {
-                return;
-              }
-              if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                composerOpenWithTokens(['run-action', 'menu:help', helpName], { userInitiated: true });
-                return;
-              }
-              runMenuHelp(helpName, { outputId: 'menu-output' });
-              return;
-            }
-
-            var menuRun = event.target.closest('[data-menu-run]');
-            if (menuRun) {
-              var runName = String(menuRun.getAttribute('data-menu-run') || '').trim();
-              if (!runName) {
-                return;
-              }
-              var runArg = menuArgumentFor(runName);
-              if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                if (runArg) {
-                  composerOpenWithTokens(['run-action', 'menu:run', runName, runArg], { userInitiated: true });
-                } else {
-                  composerOpenWithTokens(['run-action', 'menu:run', runName], { userInitiated: true });
-                }
-                return;
-              }
-              runMenuCommand(runName, runArg, { outputId: 'menu-output' });
-              return;
-            }
-
-            var menuTerminal = event.target.closest('[data-menu-terminal]');
-            if (menuTerminal) {
-              var terminalName = String(menuTerminal.getAttribute('data-menu-terminal') || '').trim();
-              if (!terminalName) {
-                return;
-              }
-              var terminalArg = menuArgumentFor(terminalName);
-              if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                if (terminalArg) {
-                  composerOpenWithTokens(['run-action', 'menu:terminal', terminalName, terminalArg], { userInitiated: true });
-                } else {
-                  composerOpenWithTokens(['run-action', 'menu:terminal', terminalName], { userInitiated: true });
-                }
-                return;
-              }
-              runMenuInTerminal(terminalName, terminalArg, { outputId: 'menu-output' });
               return;
             }
 

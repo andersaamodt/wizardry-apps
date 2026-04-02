@@ -42,18 +42,15 @@ assert_matches "$backend" 'run-action ACTION \[ARG1\] \[ARG2\] \[ROOT_HINT\]'
 assert_contains "$backend" "menu:terminal)"
 assert_contains "$backend" "open-menu-terminal)"
 
-# UI interactions for menus panel and argument composer.
+# UI interactions for menu actions in command composer.
 assert_matches "$ui" "function menuRowByName\\(name\\)"
-assert_matches "$ui" "function menuArgumentState\\(name, arg\\)"
-assert_matches "$ui" "function runMenuInTerminal\\(menuName, menuArg, options\\)"
 assert_matches "$ui" "function renderComposerArgAssistant\\(plan\\)"
 assert_matches "$ui" "function parseComposerText\\(value\\)"
 assert_matches "$ui" "function collectComposerAssistEntries\\(plan\\)"
-assert_contains "$ui" "data-menu-terminal"
 assert_contains "$ui" "data-composer-assist-token"
 assert_contains "$ui" "data-composer-assist-args"
 assert_contains "$ui" "'menu:terminal': { label: 'Open menu in terminal'"
 assert_matches "$ui" "tokens: \\['run-action', 'menu:terminal'"
-assert_matches "$ui" "callBackend\\('open-menu-terminal', args\\)"
+assert_matches "$ui" "callBackend\\('run-action', actionArgs\\)"
 
 printf '%s\n' "wizardry-desktop menus interaction contracts passed"
