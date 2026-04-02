@@ -2220,12 +2220,15 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
     }
 
-    if (resolvedFileIcon) {
-        // Prefer the direct app file icon for runtime consistency across bundle
-        // and non-bundle launches (Dock/status item should match Forge source).
+    if (launchedFromPackagedBundle && resolvedBundleIcon) {
+        // Keep packaged-runtime Dock icon aligned with Finder/non-running icon
+        // identity from Info.plist (CFBundleIconFile).
+        [NSApp setApplicationIconImage:resolvedBundleIcon];
+    } else if (resolvedFileIcon) {
+        // Non-packaged launches do not have a stable bundle icon resource, so
+        // prefer the app-local file icon when available.
         [NSApp setApplicationIconImage:resolvedFileIcon];
-    } else if (!launchedFromPackagedBundle && resolvedBundleIcon) {
-        // Non-bundled host launches need an explicit icon assignment fallback.
+    } else if (resolvedBundleIcon) {
         [NSApp setApplicationIconImage:resolvedBundleIcon];
     }
 
