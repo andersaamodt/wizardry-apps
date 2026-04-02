@@ -10,9 +10,11 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
   exit 1
 }
 
-# Forge self-run should request a new app instance when launched from inside Forge.
-grep -F 'open -n "$installed_path"' "$backend" >/dev/null
-grep -F 'open -n "$launch_bundle"' "$backend" >/dev/null
+# Forge self-run should restart the current running Forge instance (quit + reopen).
+grep -F 'schedule_self_relaunch_macos "$installed_path" "$app_name"' "$backend" >/dev/null
+grep -F 'schedule_self_relaunch_macos "$launch_bundle" "$app_name"' "$backend" >/dev/null
+grep -F 'tell application appName to quit' "$backend" >/dev/null
+grep -F 'tell application "Finder" to open bundlePath' "$backend" >/dev/null
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "skip: jq not installed" >&2

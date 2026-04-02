@@ -1646,6 +1646,45 @@ stop_desktop_instances_for_slug() {
   fi
 }
 
+schedule_self_relaunch_macos() {
+  bundle_path=${1-}
+  app_name=${2-}
+
+  [ -n "$bundle_path" ] || return 1
+  [ -d "$bundle_path" ] || return 1
+  [ -n "$app_name" ] || return 1
+  command -v open >/dev/null 2>&1 || return 1
+
+  # Run detached so the currently running app can exit cleanly without killing
+  # the relaunch sequence.
+  if command -v osascript >/dev/null 2>&1; then
+    if command -v nohup >/dev/null 2>&1; then
+      nohup osascript - "$bundle_path" "$app_name" >/dev/null 2>&1 <<'OSA' &
+on run argv
+  set bundlePath to POSIX file (item 1 of argv)
+  set appName to item 2 of argv
+  tell application appName to quit
+  delay 0.7
+  tell application "Finder" to open bundlePath
+end run
+OSA
+    else
+      osascript - "$bundle_path" "$app_name" >/dev/null 2>&1 <<'OSA' &
+on run argv
+  set bundlePath to POSIX file (item 1 of argv)
+  set appName to item 2 of argv
+  tell application appName to quit
+  delay 0.7
+  tell application "Finder" to open bundlePath
+end run
+OSA
+    fi
+    return 0
+  fi
+
+  return 1
+}
+
 cmd_doctor() {
   root_hint=${1-}
   root=''
@@ -3827,8 +3866,10 @@ cmd_run_desktop() {
           exit 1
         }
         if [ "$self_relaunch" -eq 1 ]; then
-          # Running Forge from inside Forge should request a fresh instance.
-          open -n "$installed_path"
+          schedule_self_relaunch_macos "$installed_path" "$app_name" || {
+            printf '%s\n' "forge-backend: failed to schedule Forge self-relaunch" >&2
+            exit 1
+          }
         else
           open "$installed_path"
         fi
@@ -3910,8 +3951,10 @@ cmd_run_desktop() {
         exit 1
       }
       if [ "$self_relaunch" -eq 1 ]; then
-        # Running Forge from inside Forge should request a fresh instance.
-        open -n "$launch_bundle"
+        schedule_self_relaunch_macos "$launch_bundle" "$app_name" || {
+          printf '%s\n' "forge-backend: failed to schedule Forge self-relaunch" >&2
+          exit 1
+        }
       else
         open "$launch_bundle"
       fi
