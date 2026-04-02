@@ -18,7 +18,11 @@
       <header class="wd-rail-head" aria-hidden="true"></header>
       <nav id="left-nav" class="wd-nav" role="listbox" aria-label="Wizardry pages"></nav>
       <footer class="wd-rail-footer">
-        <button id="settings-toggle" type="button" class="wd-icon-btn" title="Settings" aria-label="Open settings">⚙</button>
+        <button id="settings-toggle" type="button" class="wd-icon-btn wd-icon-settings" title="Settings" aria-label="Open settings">
+          <svg viewBox="0 0 14 14" focusable="false" aria-hidden="true">
+            <path d="M14 8.3V5.73l-1.58-.264c-.117-.44-.292-.848-.496-1.2l.93-1.285-1.81-1.84-1.31.908c-.371-.205-.781-.38-1.187-.497L8.288 0H5.72l-.263 1.578c-.437.117-.816.293-1.196.497L2.979 1.17 1.141 2.98l.934 1.287c-.2.38-.376.79-.493 1.228L.004 5.73V8.3l1.575.264c.117.438.292.818.496 1.198l-.93 1.315 1.809 1.813 1.312-.938c.38.205.787.38 1.224.497l.26 1.55h2.566l.263-1.58c.408-.117.817-.293 1.196-.497l1.315.935 1.81-1.812-.935-1.315c.203-.38.38-.76.495-1.2L14 8.305zM7 9.704c-1.488 0-2.683-1.2-2.683-2.69S5.542 4.327 7 4.327s2.683 1.198 2.683 2.69c0 1.49-1.195 2.688-2.683 2.688z"></path>
+          </svg>
+        </button>
         <div class="wd-theme-wrap">
           <button id="theme-picker-btn" type="button" class="wd-icon-btn wd-theme-btn" title="Theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-menu">Theme</button>
           <div id="theme-menu" class="wd-floating wd-hidden" role="menu" aria-label="Theme selector">
@@ -237,6 +241,7 @@
         activityWatchTimer: null,
         activityRowsLimit: 220,
         actionInFlight: false,
+        prefWriteQueue: Promise.resolve(),
         composer: {
           open: false,
           startupLock: true,
@@ -1984,7 +1989,16 @@
       }
 
       function savePreference(key, value) {
-        callBackend('set-ui-pref', [key, value]).catch(function () {});
+        var prefKey = String(key || '').trim();
+        if (!prefKey) {
+          return Promise.resolve();
+        }
+        var prefValue = String(value == null ? '' : value);
+        var run = function () {
+          return callBackend('set-ui-pref', [prefKey, prefValue]).catch(function () {});
+        };
+        state.prefWriteQueue = (state.prefWriteQueue || Promise.resolve()).then(run, run);
+        return state.prefWriteQueue;
       }
 
       function loadRootHint() {
@@ -2081,6 +2095,7 @@
 
       function applyTheme(themeName, options) {
         options = options || {};
+        var persist = options.persist !== false;
         ensureThemes();
         if (state.themes.indexOf(themeName) < 0) {
           if (options.allowUnlisted && themeName) {
@@ -2091,7 +2106,9 @@
         }
         state.activeTheme = themeName;
         setThemeStylesheet(themeName);
-        savePreference('theme', themeName);
+        if (persist) {
+          savePreference('theme', themeName);
+        }
         if (els.themePickerBtn) {
           els.themePickerBtn.textContent = themeLabel(themeName);
         }
@@ -2131,11 +2148,13 @@
       }
 
       function loadPreferences() {
+        var preferredTheme = state.activeTheme || 'adept';
         return callBackend('get-ui-prefs').then(function (text) {
           var prefs = parseKeyValueBlob(text);
           state.prefsLoaded = true;
           syncPrefsStatus();
-          state.activeTheme = prefs.theme || prefs.desktop_theme || 'adept';
+          preferredTheme = prefs.theme || prefs.desktop_theme || 'adept';
+          state.activeTheme = preferredTheme;
           state.railWidth = Number(prefs.leftRailWidth || state.railWidth);
           return ensureThemes();
         }).catch(function () {
@@ -2144,7 +2163,7 @@
           return ensureThemes();
         }).then(function () {
           state.railWidth = Math.min(420, Math.max(220, Number(state.railWidth) || 300));
-          applyTheme(state.activeTheme, { allowUnlisted: true });
+          applyTheme(preferredTheme, { allowUnlisted: true, persist: false });
         });
       }
 

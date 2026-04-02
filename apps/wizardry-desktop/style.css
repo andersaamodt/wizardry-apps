@@ -228,6 +228,16 @@ body::before {
   stroke: none;
 }
 
+.wd-icon-settings svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.wd-icon-settings path {
+  fill: currentColor;
+}
+
 .wd-icon-btn.wd-compact {
   width: 24px;
   height: 22px;
@@ -310,6 +320,11 @@ body::before {
 
 .wd-theme-item-active .wd-theme-check {
   opacity: 1;
+}
+
+#theme-menu {
+  width: min(148px, calc(var(--wd-rail-width, 260px) - 0.7rem));
+  max-width: min(148px, calc(var(--wd-rail-width, 260px) - 0.7rem));
 }
 
 #theme-list {
