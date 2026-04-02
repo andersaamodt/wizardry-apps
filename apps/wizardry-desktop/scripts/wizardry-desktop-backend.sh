@@ -23,6 +23,7 @@ Actions:
   open-menu-terminal MENU_NAME [MENU_ARG] [ROOT_HINT]
   list-memorized-spells
   list-arcana-install [INSTALL_ROOT]
+  list-arcana-module-items MODULE [INSTALL_ROOT]
   run-arcana-install MODULE
   run-action ACTION [ARG1] [ARG2] [ROOT_HINT]
   run-system ACTION
@@ -1220,10 +1221,9 @@ arcana_entry_names() {
   done
 }
 
-cmd_list_arcana_install() {
+arcana_install_roots() {
   install_root=${1-}
   root=$(require_root "")
-  roots=''
   seen_roots=''
   for candidate in "$install_root" "$root/spells/.arcana" "$WIZARDRY_DIR_FALLBACK/spells/.arcana" "$WIZARDRY_APPS_ROOT_FALLBACK/spells/.arcana"; do
     [ -n "$candidate" ] || continue
@@ -1232,8 +1232,170 @@ cmd_list_arcana_install() {
       *" $candidate "*) continue ;;
     esac
     seen_roots="$seen_roots $candidate "
-    roots="$roots $candidate"
+    printf '%s\n' "$candidate"
   done
+}
+
+arcana_status_script_for_module() {
+  module_name=${1-}
+  roots=${2-}
+  for root_dir in $roots; do
+    if [ -x "$root_dir/$module_name-status" ] && [ -f "$root_dir/$module_name-status" ]; then
+      printf '%s\n' "$root_dir/$module_name-status"
+      return
+    fi
+    if [ -x "$root_dir/$module_name/$module_name-status" ] && [ -f "$root_dir/$module_name/$module_name-status" ]; then
+      printf '%s\n' "$root_dir/$module_name/$module_name-status"
+      return
+    fi
+  done
+  printf '\n'
+}
+
+arcana_status_output_for_module() {
+  module_name=${1-}
+  status_script=${2-}
+  if [ -n "$status_script" ]; then
+    if [ "$module_name" = "wizardry-apps" ]; then
+      merged=''
+      for section in web desktop mobile; do
+        section_output=$(sh "$status_script" --section "$section" 2>/dev/null || printf '')
+        [ -n "$section_output" ] || continue
+        if [ -n "$merged" ]; then
+          merged="$merged
+$section_output"
+        else
+          merged=$section_output
+        fi
+      done
+      if [ -n "$merged" ]; then
+        printf '%s\n' "$merged"
+        return
+      fi
+    fi
+    sh "$status_script" 2>/dev/null || true
+    return
+  fi
+  if hascmd "${module_name}-status" 2>/dev/null; then
+    "${module_name}-status" 2>/dev/null || true
+    return
+  fi
+}
+
+resolve_arcana_status() {
+  module_name=$1
+  roots=${2-}
+  output=''
+  status_script=$(arcana_status_script_for_module "$module_name" "$roots")
+  output=$(arcana_status_output_for_module "$module_name" "$status_script")
+
+  if [ -z "$output" ]; then
+    normalize_status 'coming soon'
+    return
+  fi
+
+  checked=$(printf '%s\n' "$output" | grep -E '^\[[Xx]\][[:space:]]' | wc -l | tr -d ' ')
+  unchecked=$(printf '%s\n' "$output" | grep -E '^\[[[:space:]]\][[:space:]]' | wc -l | tr -d ' ')
+  case "$checked" in
+    ''|*[!0-9]*) checked=0 ;;
+  esac
+  case "$unchecked" in
+    ''|*[!0-9]*) unchecked=0 ;;
+  esac
+  if [ "$checked" -gt 0 ] || [ "$unchecked" -gt 0 ]; then
+    if [ "$checked" -gt 0 ] && [ "$unchecked" -eq 0 ]; then
+      normalize_status "installed ($checked/$checked)"
+      return
+    fi
+    if [ "$checked" -eq 0 ] && [ "$unchecked" -gt 0 ]; then
+      normalize_status "not installed (0/$unchecked)"
+      return
+    fi
+    total=$((checked + unchecked))
+    normalize_status "partial install ($checked/$total)"
+    return
+  fi
+
+  summary=$(printf '%s\n' "$output" | sed '/^[[:space:]]*$/d' | head -n 1)
+  normalize_status "$summary"
+}
+
+arcana_item_kind_for_file() {
+  case ${1-} in
+    *-menu) printf '%s\n' "menu" ;;
+    *-status) printf '%s\n' "status" ;;
+    install-*) printf '%s\n' "install" ;;
+    uninstall-*) printf '%s\n' "uninstall" ;;
+    toggle-*) printf '%s\n' "toggle" ;;
+    is-*) printf '%s\n' "check" ;;
+    *) printf '%s\n' "action" ;;
+  esac
+}
+
+arcana_item_label_for_file() {
+  printf '%s\n' "${1-}" | tr '-' ' '
+}
+
+arcana_module_script_dirs() {
+  module_name=${1-}
+  roots=${2-}
+  seen=''
+  for root_dir in $roots; do
+    module_dir="$root_dir/$module_name"
+    [ -d "$module_dir" ] || continue
+    case " $seen " in
+      *" $module_dir "*) continue ;;
+    esac
+    seen="$seen $module_dir "
+    printf '%s\n' "$module_dir"
+  done
+}
+
+arcana_status_details_for_module() {
+  module_name=${1-}
+  roots=${2-}
+  status_script=$(arcana_status_script_for_module "$module_name" "$roots")
+  output=$(arcana_status_output_for_module "$module_name" "$status_script")
+  [ -n "$output" ] || return 0
+  printf '%s\n' "$output" | while IFS= read -r line || [ -n "$line" ]; do
+    line=$(printf '%s' "$line" | tr -d '\r')
+    case "$line" in
+      \[*\]\ *) printf 'status-detail|%s|%s\n' "$line" "$line" ;;
+      *) continue ;;
+    esac
+  done
+}
+
+cmd_list_arcana_module_items() {
+  module_name=${1-}
+  safe_name "$module_name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid arcana module: $module_name" >&2
+    exit 2
+  }
+  install_root=${2-}
+  roots=$(arcana_install_roots "$install_root" | tr '\n' ' ')
+  [ -n "$roots" ] || return 0
+
+  {
+    arcana_status_details_for_module "$module_name" "$roots"
+    for module_dir in $(arcana_module_script_dirs "$module_name" "$roots"); do
+      find "$module_dir" -maxdepth 1 -type f 2>/dev/null | while IFS= read -r file || [ -n "$file" ]; do
+        [ -n "$file" ] || continue
+        item_name=$(basename "$file")
+        case "$item_name" in
+          ''|.*|_*) continue ;;
+        esac
+        kind=$(arcana_item_kind_for_file "$item_name")
+        label=$(arcana_item_label_for_file "$item_name")
+        printf '%s|%s|%s\n' "$kind" "$item_name" "$label"
+      done
+    done
+  } | awk -F'|' '!seen[$2]++' | sort -t '|' -k1,1 -k2,2
+}
+
+cmd_list_arcana_install() {
+  install_root=${1-}
+  roots=$(arcana_install_roots "$install_root" | tr '\n' ' ')
   [ -n "$roots" ] || return 0
 
   list_entries=""
@@ -1254,26 +1416,6 @@ $(arcana_entry_names "$root_dir")
 EOF
   done
 
-  resolve_arcana_status() {
-    module_name=$1
-    status='coming soon'
-    if hascmd "${module_name}-status" 2>/dev/null; then
-      status=$("${module_name}-status" 2>/dev/null | head -n 1)
-    else
-      for root_dir in $roots; do
-        if [ -x "$root_dir/$module_name-status" ] && [ -f "$root_dir/$module_name-status" ]; then
-          status=$("$root_dir/$module_name-status" 2>/dev/null | head -n 1)
-          break
-        fi
-        if [ -x "$root_dir/$module_name/$module_name-status" ] && [ -f "$root_dir/$module_name/$module_name-status" ]; then
-          status=$("$root_dir/$module_name/$module_name-status" 2>/dev/null | head -n 1)
-          break
-        fi
-      done
-    fi
-    normalize_status "$status"
-  }
-
   for name in $list_entries; do
     case "$name" in
       import-arcanum| '')
@@ -1292,7 +1434,7 @@ EOF
       done
     fi
     if [ "$emit" = "true" ]; then
-      printf '%s|%s|%s\n' "$name" "$(resolve_arcana_status "$name")" "$(arcana_label_for_name "$name")"
+      printf '%s|%s|%s\n' "$name" "$(resolve_arcana_status "$name" "$roots")" "$(arcana_label_for_name "$name")"
     fi
   done
 
@@ -1595,6 +1737,9 @@ case "$action" in
     ;;
   list-arcana-install)
     cmd_list_arcana_install "$@"
+    ;;
+  list-arcana-module-items)
+    cmd_list_arcana_module_items "$@"
     ;;
   list-watch)
     list_watch "$@"

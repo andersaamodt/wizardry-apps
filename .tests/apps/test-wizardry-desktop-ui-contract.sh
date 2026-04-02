@@ -82,6 +82,9 @@ assert_contains "$ui" "callBackend('list-synonyms')"
 assert_contains "$ui" "Wizardry aliases"
 assert_contains "$ui" "callBackend('list-spells', [catId])"
 assert_not_contains "$ui" "callBackend('list-spells', [kind, id])"
+assert_matches "$ui" "function loadArcanaModuleItems\\(moduleName\\)"
+assert_contains "$ui" "callBackend('list-arcana-module-items', [name])"
+assert_contains "$ui" "data-arcana-module="
 
 # Centralized theme and backend root contracts.
 assert_matches "$ui" "buildThemeStylesheetHref\\(themeName\\)"

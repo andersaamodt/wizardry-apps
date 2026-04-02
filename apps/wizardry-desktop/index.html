@@ -194,6 +194,9 @@
         menuCatalog: [],
         spellCache: {},
         arcanaInstall: [],
+        arcanaExpandedModule: '',
+        arcanaModuleItems: {},
+        arcanaModuleItemsLoading: {},
         spellbookAliasesLoaded: false,
         spellbookBuiltin: [],
         activityLoading: false,
@@ -2314,19 +2317,82 @@
         return html;
       }
 
+      function arcanaStatusTone(statusText) {
+        var normalized = String(statusText || '').toLowerCase();
+        if (!normalized) {
+          return 'neutral';
+        }
+        if (normalized.indexOf('not installed') >= 0 || normalized.indexOf('missing') >= 0 || normalized.indexOf('coming soon') >= 0) {
+          return 'bad';
+        }
+        if (normalized.indexOf('partial') >= 0) {
+          return 'warn';
+        }
+        if (normalized.indexOf('installed') >= 0 || normalized.indexOf('ready') >= 0 || normalized.indexOf('running') >= 0 || normalized.indexOf('enabled') >= 0 || normalized.indexOf('ok') >= 0) {
+          return 'good';
+        }
+        return 'neutral';
+      }
+
+      function arcanaItemKindLabel(kind) {
+        switch (String(kind || '')) {
+          case 'menu':
+            return 'menu';
+          case 'install':
+            return 'install';
+          case 'uninstall':
+            return 'uninstall';
+          case 'toggle':
+            return 'toggle';
+          case 'check':
+            return 'check';
+          case 'status':
+            return 'status';
+          case 'status-detail':
+            return 'status detail';
+          default:
+            return 'action';
+        }
+      }
+
       function renderArcanaPage() {
         var rows = state.arcanaInstall || [];
         var html = '<section class="wd-panel"><h3>Arcana Install Menu</h3>' +
-          '<p class="wd-subline">Matches wizardry POSIX install menu ordering and status labels.</p>' +
-          '<div id="arcana-list" class="wd-list wd-compact-list">';
+          '<p class="wd-subline">Accurate install state from arcana status scripts. Expand a module to inspect its menu/actions.</p>' +
+          '<div id="arcana-list" class="wd-arcana-modules">';
         for (var i = 0; i < rows.length; i += 1) {
           var row = rows[i];
-          html += '<div class="wd-list-row"><span class="wd-list-main wd-col-2">' + safeShortText(row.label) + '</span>';
-          html += '<span class="wd-list-meta">' + safeShortText(row.status) + '</span>';
-          html += '<span class="wd-row-actions">';
+          var expanded = state.arcanaExpandedModule === row.name;
+          var statusTone = arcanaStatusTone(row.status);
+          var moduleItems = state.arcanaModuleItems[row.name] || [];
+          var loadingItems = !!state.arcanaModuleItemsLoading[row.name];
+          html += '<details class="wd-arcana-module"' + (expanded ? ' open' : '') + ' data-arcana-module="' + escapeAttrValue(row.name) + '">';
+          html += '<summary class="wd-arcana-head"><span class="wd-list-main wd-col-2">' + safeShortText(row.label) + '</span>';
+          html += '<span class="wd-pill wd-arcana-status wd-arcana-status-' + escapeAttrValue(statusTone) + '">' + safeShortText(row.status) + '</span></summary>';
+          html += '<div class="wd-arcana-body">';
+          html += '<div class="wd-row-actions wd-arcana-actions">';
           html += '<button type="button" class="wd-polite-btn wd-tiny" data-install-arcana="' + escapeAttrValue(row.name) + '">Install</button>';
           html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-arcana-menu="' + escapeAttrValue(row.name) + '">Menu</button>';
-          html += '</span></div>';
+          html += '</div>';
+          if (loadingItems) {
+            html += '<p class="wd-empty">Loading module actions…</p>';
+          } else if (!moduleItems.length) {
+            html += '<p class="wd-empty">No module actions found.</p>';
+          } else {
+            html += '<div class="wd-list wd-compact-list wd-scroll-area">';
+            for (var itemIdx = 0; itemIdx < moduleItems.length; itemIdx += 1) {
+              var item = moduleItems[itemIdx];
+              var label = item.kind === 'status-detail' ? String(item.value || '') : safeShortText(item.label || item.value || item.name || '');
+              html += '<div class="wd-list-row">';
+              html += '<span class="wd-list-main wd-col-2">' + escapeText(label) + '</span>';
+              html += '<span class="wd-list-meta"><code>' + safeShortText(item.name || item.value || '') + '</code></span>';
+              html += '<span class="wd-row-actions"><span class="wd-pill">' + escapeText(arcanaItemKindLabel(item.kind)) + '</span></span>';
+              html += '</div>';
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+          html += '</details>';
         }
         if (!rows.length) {
           html += '<p class="wd-empty">No arcana entries.</p>';
@@ -2712,6 +2778,12 @@
             parsed.push({ name: name, status: status || 'coming soon', label: label || name });
           }
           state.arcanaInstall = parsed;
+          if (state.arcanaExpandedModule) {
+            var stillExists = parsed.some(function (row) { return row.name === state.arcanaExpandedModule; });
+            if (!stillExists) {
+              state.arcanaExpandedModule = '';
+            }
+          }
           if (state.activePage === 'arcana') {
             renderPage();
           }
@@ -2720,6 +2792,50 @@
           }
         }).catch(function () {
           state.arcanaInstall = [];
+        });
+      }
+
+      function loadArcanaModuleItems(moduleName) {
+        var name = String(moduleName || '').trim();
+        if (!name) {
+          return Promise.resolve([]);
+        }
+        state.arcanaModuleItemsLoading[name] = true;
+        if (state.activePage === 'arcana') {
+          renderPage();
+        }
+        return callBackend('list-arcana-module-items', [name]).then(function (text) {
+          var lines = String(text || '').split('\n');
+          var items = [];
+          for (var i = 0; i < lines.length; i += 1) {
+            var line = String(lines[i] || '').trim();
+            if (!line) {
+              continue;
+            }
+            var parts = line.split('|');
+            var kind = String(parts[0] || '').trim();
+            var value = String(parts[1] || '').trim();
+            var label = String(parts[2] || '').trim();
+            if (!kind || !value) {
+              continue;
+            }
+            items.push({
+              kind: kind,
+              value: value,
+              name: value,
+              label: label || value
+            });
+          }
+          state.arcanaModuleItems[name] = items;
+          return items;
+        }).catch(function () {
+          state.arcanaModuleItems[name] = [];
+          return [];
+        }).finally(function () {
+          state.arcanaModuleItemsLoading[name] = false;
+          if (state.activePage === 'arcana') {
+            renderPage();
+          }
         });
       }
 
@@ -3619,6 +3735,21 @@
           return;
         }
         els.contentArea.addEventListener('toggle', function (event) {
+          var arcanaDetails = event.target.closest('[data-arcana-module]');
+          if (arcanaDetails && arcanaDetails.tagName === 'DETAILS') {
+            var moduleName = arcanaDetails.getAttribute('data-arcana-module');
+            if (!moduleName) {
+              return;
+            }
+            if (arcanaDetails.open) {
+              state.arcanaExpandedModule = moduleName;
+              loadArcanaModuleItems(moduleName).catch(function () {});
+            } else if (state.arcanaExpandedModule === moduleName) {
+              state.arcanaExpandedModule = '';
+            }
+            return;
+          }
+
           var details = event.target.closest('[data-category]');
           if (!details || details.tagName !== 'DETAILS') {
             return;

@@ -481,6 +481,66 @@ body::before {
   background: var(--wd-surface);
 }
 
+.wd-arcana-modules {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.wd-arcana-module {
+  border: 1px solid var(--wd-line);
+  border-radius: var(--wd-radius);
+  background: var(--wd-surface);
+  overflow: hidden;
+}
+
+.wd-arcana-head {
+  padding: 0.28rem 0.34rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.36rem;
+  list-style: none;
+  cursor: pointer;
+}
+
+.wd-arcana-head::-webkit-details-marker {
+  display: none;
+}
+
+.wd-arcana-body {
+  border-top: 1px solid var(--wd-line);
+  padding: 0.28rem 0.34rem;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.wd-arcana-actions {
+  justify-content: flex-start;
+  gap: 0.22rem;
+}
+
+.wd-arcana-status {
+  white-space: nowrap;
+}
+
+.wd-arcana-status-good {
+  color: var(--wd-good);
+  border-color: color-mix(in srgb, var(--wd-good) 45%, var(--wd-line));
+  background: color-mix(in srgb, var(--wd-good) 8%, transparent);
+}
+
+.wd-arcana-status-warn {
+  color: var(--wd-warn);
+  border-color: color-mix(in srgb, var(--wd-warn) 40%, var(--wd-line));
+  background: color-mix(in srgb, var(--wd-warn) 10%, transparent);
+}
+
+.wd-arcana-status-bad {
+  color: var(--wd-bad);
+  border-color: color-mix(in srgb, var(--wd-bad) 40%, var(--wd-line));
+  background: color-mix(in srgb, var(--wd-bad) 10%, transparent);
+}
+
 .wd-category-head {
   padding: 0.28rem 0.34rem;
   border-bottom: 1px solid var(--wd-line);

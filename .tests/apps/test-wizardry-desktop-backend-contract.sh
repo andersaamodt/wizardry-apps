@@ -95,6 +95,16 @@ printf '%s\n' "$arcana" | grep -F "web-wizardry|" >/dev/null 2>&1 || {
   printf '%s\n' "list-arcana-install missing web-wizardry" >&2
   exit 1
 }
+printf '%s\n' "$arcana" | grep -E '^wizardry-apps\|(installed|partial install|not installed|coming soon|ready|running)' >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-install should normalize wizardry-apps status" >&2
+  exit 1
+}
+
+arcana_items=$(sh "$backend" list-arcana-module-items web-wizardry "$root/spells/.arcana")
+printf '%s\n' "$arcana_items" | grep -F "|web-wizardry-menu|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-module-items missing web-wizardry-menu" >&2
+  exit 1
+}
 
 system_status=$(sh "$backend" run-system status)
 printf '%s\n' "$system_status" | grep -F "status=ok" >/dev/null 2>&1 || {
