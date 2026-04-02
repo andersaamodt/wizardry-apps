@@ -2252,7 +2252,7 @@
             var expanded = state.cast.expandedCategory === cat.id ? ' wd-expanded' : '';
             var summary = String(cat.count) + ' spell' + (cat.count === 1 ? '' : 's');
             html += '<details class="wd-category' + expanded + '"' + (expanded ? ' open' : '') + ' data-category="' + cat.id + '">';
-            html += '<summary class="wd-category-head"><span>' + castCategoryDisplay(cat) + '</span><span>' + escapeText(summary) + '</span><span class="wd-pill">' + escapeText(cat.kind) + '</span></summary>';
+            html += '<summary class="wd-category-head"><span class="wd-category-name">' + castCategoryDisplay(cat) + '</span><span class="wd-category-count">' + escapeText(summary) + '</span><span class="wd-pill wd-category-kind">' + escapeText(cat.kind) + '</span></summary>';
             if (state.spellCache[cat.id]) {
               html += '<div class="wd-category-body">';
               for (var s = 0; s < state.spellCache[cat.id].length; s += 1) {

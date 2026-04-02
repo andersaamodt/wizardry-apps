@@ -484,10 +484,10 @@ body::before {
 .wd-category-head {
   padding: 0.28rem 0.34rem;
   border-bottom: 1px solid var(--wd-line);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.8rem auto 0.7rem;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  column-gap: 0.45rem;
   cursor: pointer;
   list-style: none;
 }
@@ -498,6 +498,9 @@ body::before {
 
 .wd-category .wd-category-head::after {
   content: "▸";
+  justify-self: end;
+  color: var(--wd-muted);
+  font-size: 0.62rem;
 }
 
 .wd-category-body,
@@ -510,6 +513,24 @@ body::before {
 .wd-category-head span {
   color: var(--wd-muted);
   font-size: 0.64rem;
+}
+
+.wd-category-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wd-category-count {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.wd-category-kind {
+  justify-self: start;
+  white-space: nowrap;
 }
 
 .wd-pill {
