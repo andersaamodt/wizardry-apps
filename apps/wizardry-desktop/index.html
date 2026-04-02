@@ -40,8 +40,8 @@
     <section id="main-column" class="wd-main-column">
       <header class="wd-content-head">
         <div class="wd-title-wrap">
-          <h2 id="page-title">Home</h2>
-          <p id="page-subtitle">Operational console for wizardry flows.</p>
+          <h2 id="page-title">Menu</h2>
+          <p id="page-subtitle">Comprehensive wizardry menu index.</p>
         </div>
         <div class="wd-head-actions">
           <button id="command-composer-toggle" type="button" class="wd-icon-btn wd-composer-btn" title="Compose command..." aria-label="Compose command..." aria-expanded="false" aria-controls="command-composer-modal">
@@ -169,8 +169,7 @@
         'app-help': { label: 'Show app help', requiresArg: true, minArgs: 1, maxArgs: 1 }
       };
       var NAV_PAGES = [
-        { id: 'home', title: 'Home', blurb: 'Overview and diagnostics.' },
-        { id: 'menus', title: 'Menus', blurb: 'Full wizardry menu command index.' },
+        { id: 'menus', title: 'Menu', blurb: 'Full wizardry menu command index.' },
         { id: 'cast', title: 'Cast', blurb: 'Cast spells and monitor memorized commands.' },
         { id: 'spellbook', title: 'Spellbook', blurb: 'Manage in-app spell aliases.' },
         { id: 'arcana', title: 'Arcana', blurb: 'Tools for wizardry app setup.' },
@@ -179,7 +178,7 @@
       ];
 
       var state = {
-        activePage: 'home',
+        activePage: 'menus',
         busy: false,
         bridgeReady: false,
         hostBootReadySent: false,
@@ -2181,16 +2180,6 @@
         renderPage();
       }
 
-      function renderHomePage() {
-        return '<section class="wd-panel"><h3>Overview</h3><p class="wd-subline">Wizardry Desktop is the control plane for shell actions and spell workflows.</p><div class="wd-card-grid">' +
-          card('Console', state.actionInFlight ? 'Busy' : 'Ready', 'Actions execute directly from UI controls and command composer.') +
-          card('Theme', themeLabel(state.activeTheme), 'Theme is persisted using backend prefs and applied instantly.') +
-          card('Menus', state.menuCatalog.length + ' indexed', 'Menus page tracks the full wizardry menu command surface.') +
-          card('Categories', state.cast.categories.length + ' loaded', 'Cast page keeps spell categories in a persistent structure.') +
-          card('Watch', ((Number(state.activity.casting.length) || 0) + (Number(state.activity.app.length) || 0)) + ' events', 'Casting Watch tracks all command results.') +
-          '</div></section>';
-      }
-
       function card(title, metric, body) {
         return '<article class="wd-mini-card"><h4>' + escapeText(title) + '</h4><p class="wd-metric">' + escapeText(metric) + '</p><p>' + escapeText(body) + '</p></article>';
       }
@@ -2438,16 +2427,12 @@
       }
 
       function renderPage() {
-        var title = 'Home';
+        var title = 'Menu';
         var subtitle = '';
         var content = '';
 
-        if (state.activePage === 'home') {
-          title = 'Home';
-          subtitle = 'Wizardry operations in one place.';
-          content = renderHomePage();
-        } else if (state.activePage === 'menus') {
-          title = 'Menus';
+        if (state.activePage === 'menus') {
+          title = 'Menu';
           subtitle = 'Comprehensive wizardry menu index.';
           content = renderMenusPage();
         } else if (state.activePage === 'cast') {
