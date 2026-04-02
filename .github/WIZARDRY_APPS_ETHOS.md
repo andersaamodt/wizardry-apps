@@ -26,6 +26,8 @@
 - Hosted web apps may use `localStorage` when web deployment behavior requires it.
 - Desktop UI preferences persist through backend file APIs, not browser-owned storage.
 - Read operations remain non-mutating unless the action is explicitly a write/update flow.
+- Runtime logs, assay reports, transcripts, downloads, and other operator-local output belong in documented user/XDG state paths, not inside app repos.
+- Generated executables, packaged releases, and build products stay ignored locally and are published through CI/release flows instead of being committed.
 
 ## Standard Storage Locations
 - App config defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/...`.
@@ -33,6 +35,7 @@
 - Workspace metadata belongs in `wizardry.workspace.conf` near the managed workspace root.
 - Hosted site runtime settings belong in site-local files like `site.conf`.
 - Any new storage path must be documented in app README and AI-facing docs.
+- Repo-local generated paths are a last resort; when unavoidable, ignore them and document why they cannot live in state/temp locations.
 
 ## Security and Execution Model
 - GUI-triggered commands are hardcoded argv arrays, not user-composed shell strings.
@@ -54,3 +57,5 @@
 - Canonicality order is: Wizardry core ethos, this file, app-specific standards.
 - When policy and existing code disagree, update code toward policy unless user directs otherwise.
 - New conventions should be added here immediately after adoption.
+- Reuse `~/.wizardry/.github/PUSH_READY_CHECKLIST.md` for general repo-hygiene policy; keep only app-specific additions here.
+- App publish surfaces must be scrubbed of local paths, personal identifiers, private notes, and repo-local runtime/test debris before push.
