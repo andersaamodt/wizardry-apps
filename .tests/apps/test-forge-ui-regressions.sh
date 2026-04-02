@@ -57,6 +57,9 @@ assert_matches "$ui" 'function installBeforeRunPreferenceForSelected\(selected\)
 assert_matches "$ui" 'assignmentKeysForItem\(selected\)'
 assert_matches "$ui" 'state\.installBeforeRunByItemKey\[keys\[0\]\][[:space:]]*=[[:space:]]*!!enabled;'
 assert_not_contains "$ui" 'installBeforeRunHasUserPref'
+assert_matches "$ui" 'function hostTargetId\(\)'
+assert_matches "$ui" 'navigator\.platform'
+assert_matches "$ui" 'runtimePlatform\.indexOf\('"'"'mac'"'"'\)[[:space:]]*>=[[:space:]]*0'
 
 # Backend actions should remain explicit and structured.
 assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context\]\);"

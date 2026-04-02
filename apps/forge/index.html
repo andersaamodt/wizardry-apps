@@ -109,6 +109,8 @@
                 <button type="button" data-organize-show="both"><span>All apps</span><span class="check" aria-hidden="true">&check;</span></button>
                 <button type="button" data-organize-show="builtin"><span>Wizardry apps only</span><span class="check" aria-hidden="true">&check;</span></button>
                 <button type="button" data-organize-show="workspace"><span>User-created only</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-show="installed"><span>Installed</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-show="uninstalled"><span>Uninstalled</span><span class="check" aria-hidden="true">&check;</span></button>
                 <p class="organize-title organize-heading">Filter</p>
                 <button type="button" data-organize-sort="alphabetical"><span>Alphabetical</span><span class="check" aria-hidden="true">&check;</span></button>
                 <button type="button" data-organize-sort="newest"><span>Newest</span><span class="check" aria-hidden="true">&check;</span></button>
@@ -1811,6 +1813,19 @@
           if (showMode === 'workspace' && item.listGroup !== 'user') {
             return false;
           }
+          if (showMode === 'installed' || showMode === 'uninstalled') {
+            if (item.kind !== 'builtin') {
+              return false;
+            }
+            var selectedApp = appById(item.id);
+            var isInstalled = !!(selectedApp && selectedApp.installedOnHost);
+            if (showMode === 'installed' && !isInstalled) {
+              return false;
+            }
+            if (showMode === 'uninstalled' && isInstalled) {
+              return false;
+            }
+          }
           if (!query) {
             return true;
           }
@@ -2841,7 +2856,7 @@
 
       function setOrganizeShow(mode) {
         var value = mode;
-        if (value !== 'builtin' && value !== 'workspace' && value !== 'both') {
+        if (value !== 'builtin' && value !== 'workspace' && value !== 'both' && value !== 'installed' && value !== 'uninstalled') {
           value = 'both';
         }
         state.organizeShow = value;
@@ -4042,7 +4057,32 @@
       }
 
       function hostTargetId() {
-        return state.os === 'darwin' ? 'macos' : (state.os === 'linux' ? 'linux' : '');
+        if (state.os === 'darwin') {
+          return 'macos';
+        }
+        if (state.os === 'linux') {
+          return 'linux';
+        }
+        var runtimePlatform = '';
+        if (typeof navigator !== 'undefined') {
+          if (navigator.userAgentData && navigator.userAgentData.platform) {
+            runtimePlatform = String(navigator.userAgentData.platform || '');
+          }
+          if (!runtimePlatform && navigator.platform) {
+            runtimePlatform = String(navigator.platform || '');
+          }
+          if (!runtimePlatform && navigator.userAgent) {
+            runtimePlatform = String(navigator.userAgent || '');
+          }
+        }
+        runtimePlatform = runtimePlatform.toLowerCase();
+        if (runtimePlatform.indexOf('mac') >= 0 || runtimePlatform.indexOf('darwin') >= 0) {
+          return 'macos';
+        }
+        if (runtimePlatform.indexOf('linux') >= 0) {
+          return 'linux';
+        }
+        return '';
       }
 
       function hasEnabledHostRunTarget(selected) {
@@ -5841,7 +5881,7 @@
         });
 
         var specs = targetSpecs(projectType);
-        var hostTarget = state.os === 'darwin' ? 'macos' : (state.os === 'linux' ? 'linux' : '');
+        var hostTarget = hostTargetId();
         if (hostTarget) {
           specs.sort(function (a, b) {
             var aHost = a.id === hostTarget ? -1 : 0;
@@ -6016,7 +6056,6 @@
         els.targetActiveList.appendChild(activeFragment);
         els.targetInactiveList.appendChild(inactiveFragment);
         var showInstallBeforeRun = !!(
-          selected.kind === 'builtin' &&
           hostTarget &&
           activeSet[hostTarget] &&
           isTargetSupportedForSelected(selected, hostTarget)
@@ -6461,7 +6500,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-apps', [], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 10);
+        var rows = parseTSV(res.stdout || '', 12);
         state.apps = rows.map(function (row) {
           return {
             id: row[0],
@@ -6473,7 +6512,9 @@
             distribution: row[6] || 'optional',
             resolvedStatus: row[7] || '',
             resolvedPath: row[8] || '',
-            sortTimestamp: row[9] || '0'
+            sortTimestamp: row[9] || '0',
+            installedOnHost: row[10] === '1',
+            installedPath: row[11] || ''
           };
         });
         state.appsLoaded = true;

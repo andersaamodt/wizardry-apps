@@ -617,6 +617,48 @@ app_status() {
   esac
 }
 
+host_install_status_for_app() {
+  root=$1
+  slug=$2
+  app_name_hint=${3-}
+  os=$(os_id)
+
+  case "$os" in
+    darwin)
+      app_name=$app_name_hint
+      [ -n "$app_name" ] || app_name=$slug
+      for candidate in "/Applications/$app_name.app" "$HOME/Applications/$app_name.app"; do
+        if [ -d "$candidate" ]; then
+          printf '%s\t%s\n' "1" "$candidate"
+          return 0
+        fi
+      done
+      ;;
+    linux)
+      for candidate in \
+        "$HOME/.local/bin/wizardry-$slug" \
+        "/usr/local/bin/wizardry-$slug" \
+        "/usr/bin/wizardry-$slug"; do
+        if [ -x "$candidate" ]; then
+          printf '%s\t%s\n' "1" "$candidate"
+          return 0
+        fi
+      done
+      for candidate in \
+        "$HOME/.local/share/applications/wizardry-$slug.desktop" \
+        "/usr/local/share/applications/wizardry-$slug.desktop" \
+        "/usr/share/applications/wizardry-$slug.desktop"; do
+        if [ -f "$candidate" ]; then
+          printf '%s\t%s\n' "1" "$candidate"
+          return 0
+        fi
+      done
+      ;;
+  esac
+
+  printf '%s\t%s\n' "0" ""
+}
+
 resolve_template_dir() {
   root=$1
   slug=$2
@@ -1682,8 +1724,12 @@ cmd_list_apps() {
       fi
     fi
 
+    install_line=$(host_install_status_for_app "$root" "$slug" "$name")
+    host_installed=$(printf '%s\n' "$install_line" | cut -f1)
+    host_install_path=$(printf '%s\n' "$install_line" | cut -f2)
+
     mtime_epoch=$(path_mtime_epoch "$resolved_path")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path" "$mtime_epoch"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path" "$mtime_epoch" "$host_installed" "$host_install_path"
   done
 }
 
@@ -3764,7 +3810,13 @@ cmd_run_desktop() {
     case "$os" in
       darwin)
         app_name=$(app_name_from_manifest "$root" "$slug")
-        stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
+        self_relaunch=0
+        if [ "$slug" = "forge" ]; then
+          self_relaunch=1
+        fi
+        if [ "$self_relaunch" -eq 0 ]; then
+          stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os"
+        fi
         [ -n "$installed_path" ] || installed_path="$bundle_artifact"
         [ -d "$installed_path" ] || {
           printf '%s\n' "forge-backend: installed macOS bundle missing: $installed_path" >&2
@@ -3774,7 +3826,11 @@ cmd_run_desktop() {
           printf '%s\n' "forge-backend: open command not available on this system" >&2
           exit 1
         }
-        open "$installed_path"
+        if [ "$self_relaunch" -eq 1 ]; then
+          open -n "$installed_path"
+        else
+          open "$installed_path"
+        fi
         printf 'launched=1\n'
         printf 'mode=desktop-installed\n'
         printf 'artifact=%s\n' "$installed_path"

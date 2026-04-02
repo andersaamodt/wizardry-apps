@@ -3139,6 +3139,12 @@ input[type="checkbox"]:disabled {
   word-break: break-word;
 }
 
+#log.mono.command-log {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .toast {
   position: fixed;
   left: 50%;
