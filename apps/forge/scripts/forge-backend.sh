@@ -1646,43 +1646,33 @@ stop_desktop_instances_for_slug() {
   fi
 }
 
-schedule_self_relaunch_macos() {
+schedule_bundle_open_macos() {
   bundle_path=${1-}
-  app_name=${2-}
-
+  delay_seconds=${2-}
   [ -n "$bundle_path" ] || return 1
   [ -d "$bundle_path" ] || return 1
-  [ -n "$app_name" ] || return 1
+  [ -n "$delay_seconds" ] || delay_seconds=0
   command -v open >/dev/null 2>&1 || return 1
 
-  # Run detached so the currently running app can exit cleanly without killing
-  # the relaunch sequence.
-  if command -v osascript >/dev/null 2>&1; then
-    if command -v nohup >/dev/null 2>&1; then
-      nohup osascript - "$bundle_path" "$app_name" >/dev/null 2>&1 <<'OSA' &
-on run argv
-  set bundlePath to POSIX file (item 1 of argv)
-  set appName to item 2 of argv
-  tell application appName to quit
-  delay 0.7
-  tell application "Finder" to open bundlePath
-end run
-OSA
-    else
-      osascript - "$bundle_path" "$app_name" >/dev/null 2>&1 <<'OSA' &
-on run argv
-  set bundlePath to POSIX file (item 1 of argv)
-  set appName to item 2 of argv
-  tell application appName to quit
-  delay 0.7
-  tell application "Finder" to open bundlePath
-end run
-OSA
-    fi
+  if command -v nohup >/dev/null 2>&1; then
+    nohup sh -c '
+      set -eu
+      delay=$1
+      bundle=$2
+      sleep "$delay"
+      open "$bundle"
+    ' sh "$delay_seconds" "$bundle_path" >/dev/null 2>&1 &
     return 0
   fi
 
-  return 1
+  sh -c '
+    set -eu
+    delay=$1
+    bundle=$2
+    sleep "$delay"
+    open "$bundle"
+  ' sh "$delay_seconds" "$bundle_path" >/dev/null 2>&1 &
+  return 0
 }
 
 cmd_doctor() {
@@ -3866,10 +3856,13 @@ cmd_run_desktop() {
           exit 1
         }
         if [ "$self_relaunch" -eq 1 ]; then
-          schedule_self_relaunch_macos "$installed_path" "$app_name" || {
-            printf '%s\n' "forge-backend: failed to schedule Forge self-relaunch" >&2
+          # Restart Forge by scheduling a fresh open request after we stop the
+          # current host process (no duplicate instance handoff).
+          schedule_bundle_open_macos "$installed_path" 2.5 || {
+            printf '%s\n' "forge-backend: failed to schedule Forge restart" >&2
             exit 1
           }
+          stop_desktop_instances_for_slug "$root" "$slug" "" "$os"
         else
           open "$installed_path"
         fi
@@ -3951,10 +3944,13 @@ cmd_run_desktop() {
         exit 1
       }
       if [ "$self_relaunch" -eq 1 ]; then
-        schedule_self_relaunch_macos "$launch_bundle" "$app_name" || {
-          printf '%s\n' "forge-backend: failed to schedule Forge self-relaunch" >&2
+        # Restart Forge by scheduling a fresh open request after we stop the
+        # current host process (no duplicate instance handoff).
+        schedule_bundle_open_macos "$launch_bundle" 2.5 || {
+          printf '%s\n' "forge-backend: failed to schedule Forge restart" >&2
           exit 1
         }
+        stop_desktop_instances_for_slug "$root" "$slug" "" "$os"
       else
         open "$launch_bundle"
       fi
