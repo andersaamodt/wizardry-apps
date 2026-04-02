@@ -25,7 +25,10 @@ body {
   min-width: 0;
   min-height: 0;
   font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   background: var(--wd-bg);
   color: var(--wd-text);
   overflow: hidden;
@@ -158,14 +161,14 @@ body::before {
 .wd-nav-title {
   font-weight: 620;
   letter-spacing: 0.01em;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .wd-nav-row span {
   display: block;
   color: var(--wd-muted);
-  font-size: 0.56rem;
-  line-height: 1.2;
+  font-size: 0.62rem;
+  line-height: 1.28;
 }
 
 .wd-nav-row-active,
@@ -367,13 +370,13 @@ body::before {
 
 .wd-title-wrap h2 {
   margin: 0;
-  font-size: 0.84rem;
+  font-size: 0.9rem;
 }
 
 .wd-title-wrap p {
   margin: 0.08rem 0 0;
   color: var(--wd-muted);
-  font-size: 0.64rem;
+  font-size: 0.68rem;
 }
 
 .wd-head-actions {
@@ -395,7 +398,7 @@ body::before {
   background: transparent;
   color: var(--wd-text);
   padding: 0.15rem 0.42rem;
-  font-size: 0.64rem;
+  font-size: 0.67rem;
   line-height: 1.2;
   min-height: 22px;
   cursor: pointer;
@@ -412,7 +415,7 @@ body::before {
 
 .wd-tiny {
   padding: 0.08rem 0.28rem;
-  font-size: 0.58rem;
+  font-size: 0.61rem;
 }
 
 .wd-danger {
@@ -446,7 +449,8 @@ body::before {
 .wd-subline {
   margin: 0 0 0.45rem;
   color: var(--wd-muted);
-  font-size: 0.64rem;
+  font-size: 0.68rem;
+  line-height: 1.35;
 }
 
 .wd-empty {
@@ -584,7 +588,7 @@ body::before {
 
 .wd-category-head span {
   color: var(--wd-muted);
-  font-size: 0.64rem;
+  font-size: 0.67rem;
 }
 
 .wd-category-name {
@@ -609,7 +613,7 @@ body::before {
   border: 1px solid var(--wd-line);
   border-radius: 999px;
   padding: 0.04rem 0.3rem;
-  font-size: 0.56rem;
+  font-size: 0.6rem;
   line-height: 1.1;
   display: inline-flex;
   align-items: center;
@@ -650,13 +654,13 @@ body::before {
 }
 
 .wd-list-meta {
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   color: var(--wd-muted);
 }
 
 .wd-list-compact .wd-list-row {
   grid-template-columns: 1fr 96px auto;
-  font-size: 0.62rem;
+  font-size: 0.65rem;
 }
 
 .wd-system-actions {
@@ -678,10 +682,10 @@ body::before {
 }
 
 .wd-system-desc {
-  font-size: 0.6rem;
+  font-size: 0.64rem;
   color: var(--wd-muted);
   white-space: normal;
-  line-height: 1.25;
+  line-height: 1.35;
 }
 
 .wd-system-actions-right {
@@ -694,7 +698,7 @@ body::before {
   border: 0;
   background: transparent;
   color: var(--wd-text);
-  font-size: 0.68rem;
+  font-size: 0.71rem;
   line-height: 1.25;
   text-align: left;
   padding: 0;
@@ -770,7 +774,7 @@ body::before {
   min-height: 22px;
   min-width: 0;
   width: 100%;
-  font-size: 0.6rem;
+  font-size: 0.64rem;
   line-height: 1.25;
 }
 
@@ -805,7 +809,7 @@ body::before {
   padding: 0.24rem;
   background: var(--wd-surface);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   line-height: 1.35;
   min-height: 58px;
   white-space: pre-wrap;
@@ -1033,7 +1037,7 @@ body::before {
 
 .wd-composer-group h4 {
   margin: 0 0 0.2rem;
-  font-size: 0.66rem;
+  font-size: 0.7rem;
 }
 
 .wd-composer-group-entries {
@@ -1043,7 +1047,7 @@ body::before {
 }
 
 .wd-composer-block {
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   line-height: 1.1;
   border-radius: 999px;
   padding: 0.18rem 0.52rem;
@@ -1074,7 +1078,7 @@ body::before {
 
 .wd-composer-label {
   color: var(--wd-muted);
-  font-size: 0.62rem;
+  font-size: 0.66rem;
 }
 
 .wd-composer-preview {
@@ -1106,7 +1110,7 @@ body::before {
   border-radius: 7px;
   padding: 0.06rem 0.22rem;
   background: color-mix(in srgb, var(--wd-surface) 82%, transparent);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   max-width: 100%;
   line-height: 1.08;
 }
@@ -1118,7 +1122,7 @@ body::before {
   color: var(--wd-text);
   cursor: pointer;
   min-height: 18px;
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   line-height: 1.2;
   max-width: 28ch;
   overflow: hidden;
@@ -1200,7 +1204,7 @@ body::before {
 
 .wd-composer-empty {
   color: var(--wd-muted);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
 }
 
 .wd-composer-input {
@@ -1212,7 +1216,7 @@ body::before {
   background: transparent;
   color: var(--wd-text);
   padding: 0;
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   height: 18px;
 }
 
@@ -1294,7 +1298,7 @@ body::before {
   grid-template-columns: 62px auto auto;
   gap: 0.2rem;
   align-items: baseline;
-  font-size: 0.6rem;
+  font-size: 0.64rem;
 }
 
 .wd-log-message {
@@ -1306,7 +1310,7 @@ body::before {
 
 .wd-log-meta {
   color: var(--wd-muted);
-  font-size: 0.56rem;
+  font-size: 0.6rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
