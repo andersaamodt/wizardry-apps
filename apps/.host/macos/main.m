@@ -1303,8 +1303,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     logoView.imageAlignment = NSImageAlignCenter;
     logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
     logoView.translatesAutoresizingMaskIntoConstraints = NO;
-    logoView.wantsLayer = YES;
-    logoView.layer.cornerRadius = 4.0;
     if (logoImage) {
         logoView.image = logoImage;
     } else {
@@ -1320,6 +1318,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     [overlay addSubview:stack];
     CGFloat logoSize = self.bootSplashLogoSize > 0.0 ? self.bootSplashLogoSize : 192.0;
+    logoView.wantsLayer = YES;
+    logoView.layer.masksToBounds = YES;
+    logoView.layer.cornerRadius = floor(logoSize * 0.223);
+    if (@available(macOS 10.15, *)) {
+        logoView.layer.cornerCurve = kCACornerCurveContinuous;
+    }
     [NSLayoutConstraint activateConstraints:@[
         [logoView.widthAnchor constraintEqualToConstant:logoSize],
         [logoView.heightAnchor constraintEqualToConstant:logoSize],
