@@ -5,6 +5,8 @@
 @import Cocoa;
 @import WebKit;
 @import Carbon;
+@import QuartzCore;
+#include <math.h>
 
 @interface WizardryDragStripView : NSView
 @end
@@ -21,6 +23,58 @@
         return;
     }
     [super mouseDown:event];
+}
+@end
+
+static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) {
+    if (steps < 16) {
+        steps = 16;
+    }
+    const CGFloat appleSuperellipseExponent = 5.0;
+    const CGFloat appleRadiusFactor = (1872.0 / 2048.0);
+    CGMutablePathRef path = CGPathCreateMutable();
+    CGFloat halfWidth = CGRectGetWidth(rect) * 0.5 * appleRadiusFactor;
+    CGFloat halfHeight = CGRectGetHeight(rect) * 0.5 * appleRadiusFactor;
+    CGFloat centerX = CGRectGetMidX(rect);
+    CGFloat centerY = CGRectGetMidY(rect);
+    for (NSUInteger index = 0; index < steps; index += 1) {
+        double theta = (-M_PI_2) + ((double)index / (double)steps) * (M_PI * 2.0);
+        double unitX = cos(theta);
+        double unitY = sin(theta);
+        CGFloat pointX = centerX + halfWidth * copysign(pow(fabs(unitX), 2.0 / appleSuperellipseExponent), unitX);
+        CGFloat pointY = centerY + halfHeight * copysign(pow(fabs(unitY), 2.0 / appleSuperellipseExponent), unitY);
+        if (index == 0) {
+            CGPathMoveToPoint(path, NULL, pointX, pointY);
+        } else {
+            CGPathAddLineToPoint(path, NULL, pointX, pointY);
+        }
+    }
+    CGPathCloseSubpath(path);
+    return path;
+}
+
+@interface WizardrySquircleImageView : NSImageView
+@end
+
+@implementation WizardrySquircleImageView
+- (void)layout {
+    [super layout];
+    if (!self.layer) {
+        return;
+    }
+    CGRect bounds = self.bounds;
+    if (CGRectGetWidth(bounds) <= 0.0 || CGRectGetHeight(bounds) <= 0.0) {
+        return;
+    }
+    CAShapeLayer *maskLayer = (CAShapeLayer *)self.layer.mask;
+    if (![maskLayer isKindOfClass:[CAShapeLayer class]]) {
+        maskLayer = [CAShapeLayer layer];
+        self.layer.mask = maskLayer;
+    }
+    maskLayer.frame = bounds;
+    CGPathRef path = WizardryCreateAppleSquirclePath(bounds, 256);
+    maskLayer.path = path;
+    CGPathRelease(path);
 }
 @end
 
@@ -1299,10 +1353,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     overlay.layer.backgroundColor = [bg CGColor];
 
     NSImage *logoImage = self.appIconImage;
-    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSZeroRect];
+    WizardrySquircleImageView *logoView = [[WizardrySquircleImageView alloc] initWithFrame:NSZeroRect];
     logoView.imageAlignment = NSImageAlignCenter;
     logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
     logoView.translatesAutoresizingMaskIntoConstraints = NO;
+    logoView.wantsLayer = YES;
+    logoView.layer.masksToBounds = YES;
     if (logoImage) {
         logoView.image = logoImage;
     } else {
@@ -1318,12 +1374,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     [overlay addSubview:stack];
     CGFloat logoSize = self.bootSplashLogoSize > 0.0 ? self.bootSplashLogoSize : 192.0;
-    logoView.wantsLayer = YES;
-    logoView.layer.masksToBounds = YES;
-    logoView.layer.cornerRadius = floor(logoSize * 0.223);
-    if (@available(macOS 10.15, *)) {
-        logoView.layer.cornerCurve = kCACornerCurveContinuous;
-    }
     [NSLayoutConstraint activateConstraints:@[
         [logoView.widthAnchor constraintEqualToConstant:logoSize],
         [logoView.heightAnchor constraintEqualToConstant:logoSize],
