@@ -510,6 +510,12 @@ apply_optional_app_icon_override_if_present() {
 
 project_preferred_bundle_icon_path() {
   project_dir=$1
+  original_source=$(project_original_icon_source "$project_dir" 2>/dev/null || true)
+
+  if [ -n "$original_source" ] && [ -f "$original_source" ]; then
+    printf '%s\n' "$original_source"
+    return 0
+  fi
 
   for candidate in \
     "$project_dir/assets/forge-icon.png" \
@@ -4249,6 +4255,8 @@ cmd_run_workspace() {
     fi
 
     bundle_id="com.wizardry.workspace.$workspace_slug"
+    bundle_version=$(printf '%s' "${icon_hash:-$workspace_slug}" | cksum | awk '{ print $1 }')
+    [ -n "$bundle_version" ] || bundle_version=1
     cat > "$staged_bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -4256,7 +4264,7 @@ cmd_run_workspace() {
 <key>CFBundleName</key><string>$workspace_title</string>
 <key>CFBundleDisplayName</key><string>$workspace_title</string>
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
-<key>CFBundleVersion</key><string>1.0</string>
+<key>CFBundleVersion</key><string>$bundle_version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>wizardry-host</string>
 <key>WizardryAppEntry</key><string>$bundle_app_dir</string>

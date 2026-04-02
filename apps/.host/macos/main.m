@@ -2193,25 +2193,28 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedBundleIcon = [NSApp applicationIconImage];
     }
     NSString *resolvedIconPath = nil;
-    NSMutableArray<NSString *> *iconCandidates = [NSMutableArray arrayWithArray:@[
-        [self.appPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
-        [self.appPath stringByAppendingPathComponent:@"assets/icons/meta/apple-master.png"],
-        [self.appPath stringByAppendingPathComponent:@"assets/icons/meta/plain-master.png"],
-        [self.appPath stringByAppendingPathComponent:@"assets/icons/macos/forge.icns"],
-        [self.appPath stringByAppendingPathComponent:@"assets/forge.icns"],
-        [self.appPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
-        [self.appPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
-    ]];
+    NSMutableArray<NSString *> *iconCandidates = [NSMutableArray array];
+    NSMutableArray<NSString *> *iconRoots = [NSMutableArray arrayWithObject:self.appPath];
     if (isNestedWorkspaceApp) {
-        NSString *parentPath = [self.appPath stringByDeletingLastPathComponent];
+        [iconRoots addObject:[self.appPath stringByDeletingLastPathComponent]];
+    }
+    for (NSString *rootPath in iconRoots) {
+        NSString *metaDir = [rootPath stringByAppendingPathComponent:@"assets/icons/meta"];
+        NSArray<NSString *> *metaEntries = [fileManager contentsOfDirectoryAtPath:metaDir error:nil];
+        for (NSString *entry in metaEntries) {
+            if ([entry hasPrefix:@"original-source."]) {
+                [iconCandidates addObject:[metaDir stringByAppendingPathComponent:entry]];
+                break;
+            }
+        }
         [iconCandidates addObjectsFromArray:@[
-            [parentPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
-            [parentPath stringByAppendingPathComponent:@"assets/icons/meta/apple-master.png"],
-            [parentPath stringByAppendingPathComponent:@"assets/icons/meta/plain-master.png"],
-            [parentPath stringByAppendingPathComponent:@"assets/icons/macos/forge.icns"],
-            [parentPath stringByAppendingPathComponent:@"assets/forge.icns"],
-            [parentPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
-            [parentPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
+            [rootPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/meta/apple-master.png"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/meta/plain-master.png"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/macos/forge.icns"],
+            [rootPath stringByAppendingPathComponent:@"assets/forge.icns"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
         ]];
     }
     for (NSString *candidate in iconCandidates) {
