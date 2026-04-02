@@ -22,6 +22,7 @@ Actions:
   list-menu-spells [ROOT_HINT]
   list-main-menu-entries [ROOT_HINT]
   list-system-menu-actions [ROOT_HINT]
+  list-mud-actions [ROOT_HINT]
   menu-help MENU_NAME [ROOT_HINT]
   run-menu MENU_NAME [MENU_ARG] [ROOT_HINT]
   open-menu-terminal MENU_NAME [MENU_ARG] [ROOT_HINT]
@@ -31,6 +32,7 @@ Actions:
   run-arcana-install MODULE
   run-action ACTION [ARG1] [ARG2] [ROOT_HINT]
   run-system ACTION
+  run-mud-action ACTION [ARG] [ROOT_HINT]
   list-watch [N]
 USAGE
   exit 0
@@ -44,6 +46,20 @@ PREFS_ROOT=${XDG_CONFIG_HOME:-${HOME}/.config}/wizardry-apps/wizardry-desktop
 
 hascmd() {
   [ -n "${1-}" ] && command -v "$1" >/dev/null 2>&1
+}
+
+platform_id() {
+  if hascmd os_id; then
+    os_id 2>/dev/null || true
+    return
+  fi
+  kernel=$(uname -s 2>/dev/null || printf 'unknown')
+  case "$kernel" in
+    Darwin) printf '%s\n' "darwin" ;;
+    Linux) printf '%s\n' "linux" ;;
+    FreeBSD|OpenBSD|NetBSD) printf '%s\n' "bsd" ;;
+    *) printf '%s\n' "$kernel" ;;
+  esac
 }
 
 safe_name() {
@@ -1200,6 +1216,479 @@ cmd_list_system_menu_actions() {
   fi
 }
 
+mud_spell_dirs() {
+  root=${1-}
+  for dir in \
+    "$root/spells/mud" \
+    "$WIZARDRY_DIR_FALLBACK/spells/mud" \
+    "$WIZARDRY_APPS_ROOT_FALLBACK/spells/mud" \
+    "$HOME/.wizardry/spells/mud" \
+    "$HOME/spells/mud"
+  do
+    [ -d "$dir" ] || continue
+    printf '%s\n' "$dir"
+  done | awk '!seen[$0]++'
+}
+
+path_in_mud_spell_dirs() {
+  root=${1-}
+  candidate=${2-}
+  [ -n "$candidate" ] || return 1
+  dirs=$(mud_spell_dirs "$root")
+  while IFS= read -r dir || [ -n "$dir" ]; do
+    [ -n "$dir" ] || continue
+    case "$candidate" in
+      "$dir"|"$dir"/*)
+        return 0
+        ;;
+      *)
+        ;;
+    esac
+  done <<EOF
+$dirs
+EOF
+  return 1
+}
+
+resolve_mud_spell() {
+  root=${1-}
+  spell_name=${2-}
+  safe_name "$spell_name" || return 1
+
+  dirs=$(mud_spell_dirs "$root")
+  while IFS= read -r dir || [ -n "$dir" ]; do
+    [ -n "$dir" ] || continue
+    for candidate in "$dir/$spell_name" "$dir/$spell_name.sh"; do
+      if [ -f "$candidate" ] && [ ! -d "$candidate" ]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+  done <<EOF
+$dirs
+EOF
+
+  if hascmd "$spell_name"; then
+    resolved=$(command -v "$spell_name" 2>/dev/null | awk '{print $1}')
+    if [ -n "$resolved" ] && path_in_mud_spell_dirs "$root" "$resolved"; then
+      printf '%s\n' "$resolved"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+mud_action_menu_name() {
+  action_id=${1-}
+  case "$action_id" in
+    mud:menu) printf '%s\n' "mud" ;;
+    mud:settings-menu) printf '%s\n' "mud-settings" ;;
+    mud:admin-menu) printf '%s\n' "mud-admin-menu" ;;
+    mud:install-menu) printf '%s\n' "mud-menu" ;;
+    *) printf '\n' ;;
+  esac
+}
+
+mud_action_spell_name() {
+  action_id=${1-}
+  case "$action_id" in
+    mud:look) printf '%s\n' "look" ;;
+    mud:listen) printf '%s\n' "listen" ;;
+    mud:stats) printf '%s\n' "stats" ;;
+    mud:say) printf '%s\n' "say" ;;
+    mud:think) printf '%s\n' "think" ;;
+    mud:magic-missile) printf '%s\n' "magic-missile" ;;
+    mud:shocking-grasp) printf '%s\n' "shocking-grasp" ;;
+    mud:heal) printf '%s\n' "heal" ;;
+    mud:lesser-heal) printf '%s\n' "lesser-heal" ;;
+    mud:greater-heal) printf '%s\n' "greater-heal" ;;
+    mud:resurrect) printf '%s\n' "resurrect" ;;
+    mud:demo-multiplayer) printf '%s\n' "demo-multiplayer" ;;
+    *) printf '\n' ;;
+  esac
+}
+
+mud_action_spec() {
+  action_id=${1-}
+  case "$action_id" in
+    mud:menu)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Open MUD Menu" \
+        "menu" \
+        "Open the interactive MUD menu in Terminal." \
+        "none" \
+        "" \
+        ""
+      ;;
+    mud:look)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Look Around" \
+        "spell" \
+        "Inspect the current room or a target path." \
+        "optional" \
+        "Path" \
+        "."
+      ;;
+    mud:listen)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Listen" \
+        "command" \
+        "Start live room monitoring in Terminal (sourced listener)." \
+        "optional" \
+        "Room Path" \
+        "."
+      ;;
+    mud:stats)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "View Stats" \
+        "spell" \
+        "Show avatar or target stats (HP/MP/XP)." \
+        "optional" \
+        "Target" \
+        "."
+      ;;
+    mud:say)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Say" \
+        "spell" \
+        "Speak in the current room log so other players can hear you." \
+        "required" \
+        "Message" \
+        "Hello, adventurers."
+      ;;
+    mud:think)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Think" \
+        "spell" \
+        "Write a private thought to your avatar log." \
+        "required" \
+        "Thought" \
+        "I should inspect this room."
+      ;;
+    mud:magic-missile)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Magic Missile" \
+        "spell" \
+        "Cast a ranged attack at a target or random object in the room." \
+        "optional" \
+        "Target" \
+        "goblin"
+      ;;
+    mud:shocking-grasp)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Shocking Grasp" \
+        "spell" \
+        "Charge your avatar so your next touch deals damage." \
+        "none" \
+        "" \
+        ""
+      ;;
+    mud:heal)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Heal" \
+        "spell" \
+        "Cast the best available healing spell for you or a target." \
+        "optional" \
+        "Target" \
+        "other-avatar"
+      ;;
+    mud:lesser-heal)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Lesser Heal" \
+        "spell" \
+        "Restore a small amount of HP (10)." \
+        "optional" \
+        "Target" \
+        "other-avatar"
+      ;;
+    mud:greater-heal)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Greater Heal" \
+        "spell" \
+        "Restore a large amount of HP (100)." \
+        "optional" \
+        "Target" \
+        "other-avatar"
+      ;;
+    mud:resurrect)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Resurrect" \
+        "spell" \
+        "Resurrect your avatar when dead, if location rules permit." \
+        "none" \
+        "" \
+        ""
+      ;;
+    mud:demo-multiplayer)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "Demo Multiplayer" \
+        "spell" \
+        "Run the built-in multiplayer MUD demonstration script." \
+        "none" \
+        "" \
+        ""
+      ;;
+    mud:settings-menu)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "MUD Settings" \
+        "menu" \
+        "Open MUD settings menu in Terminal." \
+        "none" \
+        "" \
+        ""
+      ;;
+    mud:admin-menu)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "MUD Admin" \
+        "menu" \
+        "Open MUD admin hosting menu in Terminal." \
+        "none" \
+        "" \
+        ""
+      ;;
+    mud:install-menu)
+      printf '%s|%s|%s|%s|%s|%s\n' \
+        "MUD Install Menu" \
+        "menu" \
+        "Open MUD install/toggle menu in Terminal." \
+        "none" \
+        "" \
+        ""
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+print_mud_action() {
+  action_id=${1-}
+  label=${2-}
+  mode=${3-}
+  description=${4-}
+  arg_mode=${5-}
+  arg_label=${6-}
+  arg_example=${7-}
+  available=${8-1}
+  reason=${9-}
+  printf '%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \
+    "$action_id" \
+    "$label" \
+    "$mode" \
+    "$description" \
+    "$arg_mode" \
+    "$arg_label" \
+    "$arg_example" \
+    "$available" \
+    "$reason"
+}
+
+mud_action_available() {
+  root=${1-}
+  action_id=${2-}
+  mode=${3-}
+  reason=''
+  available=0
+
+  if [ "$mode" = "menu" ]; then
+    menu_name=$(mud_action_menu_name "$action_id")
+    if [ -n "$menu_name" ] && menu_action_available "$root" "$menu_name"; then
+      available=1
+    else
+      reason="$menu_name menu is unavailable."
+    fi
+  else
+    spell_name=$(mud_action_spell_name "$action_id")
+    if [ -n "$spell_name" ] && [ -n "$(resolve_mud_spell "$root" "$spell_name" || true)" ]; then
+      available=1
+    else
+      reason="$spell_name spell is unavailable."
+    fi
+  fi
+
+  printf '%s|%s\n' "$available" "$reason"
+}
+
+cmd_list_mud_actions() {
+  root=$(require_root "${1-}")
+  for action_id in \
+    mud:menu \
+    mud:look \
+    mud:listen \
+    mud:stats \
+    mud:say \
+    mud:think \
+    mud:magic-missile \
+    mud:shocking-grasp \
+    mud:heal \
+    mud:lesser-heal \
+    mud:greater-heal \
+    mud:resurrect \
+    mud:demo-multiplayer \
+    mud:settings-menu \
+    mud:admin-menu \
+    mud:install-menu
+  do
+    spec=$(mud_action_spec "$action_id" || true)
+    [ -n "$spec" ] || continue
+    label=$(printf '%s\n' "$spec" | cut -d'|' -f1)
+    mode=$(printf '%s\n' "$spec" | cut -d'|' -f2)
+    description=$(printf '%s\n' "$spec" | cut -d'|' -f3)
+    arg_mode=$(printf '%s\n' "$spec" | cut -d'|' -f4)
+    arg_label=$(printf '%s\n' "$spec" | cut -d'|' -f5)
+    arg_example=$(printf '%s\n' "$spec" | cut -d'|' -f6)
+    availability=$(mud_action_available "$root" "$action_id" "$mode")
+    available=$(printf '%s\n' "$availability" | cut -d'|' -f1)
+    reason=$(printf '%s\n' "$availability" | cut -d'|' -f2-)
+    print_mud_action "$action_id" "$label" "$mode" "$description" "$arg_mode" "$arg_label" "$arg_example" "$available" "$reason"
+  done
+}
+
+run_mud_spell_action() {
+  root=${1-}
+  action_id=${2-}
+  spell_name=${3-}
+  arg_mode=${4-}
+  action_arg=${5-}
+
+  executable=$(resolve_mud_spell "$root" "$spell_name" || true)
+  if [ -z "$executable" ]; then
+    printf '%s\n' "wizardry-desktop-backend: spell unavailable for $action_id: $spell_name" >&2
+    record_watch "app" "$action_id" "wizardry-core" "failed:missing"
+    exit 2
+  fi
+
+  if [ "$arg_mode" = "required" ] && [ -z "$action_arg" ]; then
+    printf '%s\n' "wizardry-desktop-backend: action '$action_id' requires an argument" >&2
+    exit 2
+  fi
+  if [ "$arg_mode" = "none" ] && [ -n "$action_arg" ]; then
+    printf '%s\n' "wizardry-desktop-backend: action '$action_id' does not take an argument" >&2
+    exit 2
+  fi
+
+  if [ -f "$executable" ] && [ ! -d "$executable" ]; then
+    if [ -n "$action_arg" ]; then
+      run_system_command "$action_id" "sh" "$executable" "$action_arg"
+    else
+      run_system_command "$action_id" "sh" "$executable"
+    fi
+    return
+  fi
+
+  if [ -n "$action_arg" ]; then
+    run_system_command "$action_id" "$executable" "$action_arg"
+  else
+    run_system_command "$action_id" "$executable"
+  fi
+}
+
+run_mud_sourced_spell_action() {
+  root=${1-}
+  action_id=${2-}
+  spell_name=${3-}
+  arg_mode=${4-}
+  action_arg=${5-}
+
+  executable=$(resolve_mud_spell "$root" "$spell_name" || true)
+  if [ -z "$executable" ]; then
+    printf '%s\n' "wizardry-desktop-backend: spell unavailable for $action_id: $spell_name" >&2
+    record_watch "app" "$action_id" "wizardry-core" "failed:missing"
+    exit 2
+  fi
+
+  if [ "$arg_mode" = "required" ] && [ -z "$action_arg" ]; then
+    printf '%s\n' "wizardry-desktop-backend: action '$action_id' requires an argument" >&2
+    exit 2
+  fi
+  if [ "$arg_mode" = "none" ] && [ -n "$action_arg" ]; then
+    printf '%s\n' "wizardry-desktop-backend: action '$action_id' does not take an argument" >&2
+    exit 2
+  fi
+
+  command_text=". $(shell_quote "$executable")"
+  if [ -n "$action_arg" ]; then
+    command_text="$command_text $(shell_quote "$action_arg")"
+  fi
+  run_terminal_command "$command_text" "$action_id" "wizardry-core"
+}
+
+cmd_run_mud_action() {
+  action_id=${1-}
+  action_arg=${2-}
+  root=$(require_root "${3-}")
+
+  [ -n "$action_id" ] || {
+    printf '%s\n' "wizardry-desktop-backend: run-mud-action requires ACTION" >&2
+    exit 2
+  }
+
+  case "$action_arg" in
+    *'
+'*|*''*)
+      printf '%s\n' "wizardry-desktop-backend: MUD action argument must be one line" >&2
+      exit 2
+      ;;
+    *)
+      ;;
+  esac
+
+  case "$action_id" in
+    mud:menu)
+      cmd_open_menu_terminal "mud" "" "$root"
+      ;;
+    mud:settings-menu)
+      cmd_open_menu_terminal "mud-settings" "" "$root"
+      ;;
+    mud:admin-menu)
+      cmd_open_menu_terminal "mud-admin-menu" "" "$root"
+      ;;
+    mud:install-menu)
+      cmd_open_menu_terminal "mud-menu" "" "$root"
+      ;;
+    mud:look)
+      run_mud_spell_action "$root" "$action_id" "look" "optional" "$action_arg"
+      ;;
+    mud:listen)
+      run_mud_sourced_spell_action "$root" "$action_id" "listen" "optional" "$action_arg"
+      ;;
+    mud:stats)
+      run_mud_spell_action "$root" "$action_id" "stats" "optional" "$action_arg"
+      ;;
+    mud:say)
+      run_mud_spell_action "$root" "$action_id" "say" "required" "$action_arg"
+      ;;
+    mud:think)
+      run_mud_spell_action "$root" "$action_id" "think" "required" "$action_arg"
+      ;;
+    mud:magic-missile)
+      run_mud_spell_action "$root" "$action_id" "magic-missile" "optional" "$action_arg"
+      ;;
+    mud:shocking-grasp)
+      run_mud_spell_action "$root" "$action_id" "shocking-grasp" "none" "$action_arg"
+      ;;
+    mud:heal)
+      run_mud_spell_action "$root" "$action_id" "heal" "optional" "$action_arg"
+      ;;
+    mud:lesser-heal)
+      run_mud_spell_action "$root" "$action_id" "lesser-heal" "optional" "$action_arg"
+      ;;
+    mud:greater-heal)
+      run_mud_spell_action "$root" "$action_id" "greater-heal" "optional" "$action_arg"
+      ;;
+    mud:resurrect)
+      run_mud_spell_action "$root" "$action_id" "resurrect" "none" "$action_arg"
+      ;;
+    mud:demo-multiplayer)
+      run_mud_spell_action "$root" "$action_id" "demo-multiplayer" "none" "$action_arg"
+      ;;
+    *)
+      printf '%s\n' "wizardry-desktop-backend: unsupported MUD action: $action_id" >&2
+      exit 2
+      ;;
+  esac
+}
+
 cmd_menu_help() {
   name=${1-}
   root=$(require_root "${2-}")
@@ -1394,7 +1883,7 @@ cmd_open_menu_terminal() {
     command_text="$command_text $(shell_quote "$menu_arg")"
   fi
 
-  if [ "$(os_id)" != "darwin" ] || ! command -v osascript >/dev/null 2>&1; then
+  if [ "$(platform_id)" != "darwin" ] || ! command -v osascript >/dev/null 2>&1; then
     printf 'mode=%s\n' "manual"
     printf 'command=%s\n' "$command_text"
     printf '%s\n' "Automatic terminal launch is unavailable on this platform."
@@ -1438,7 +1927,7 @@ run_terminal_command() {
     exit 2
   }
 
-  if [ "$(os_id)" != "darwin" ] || ! command -v osascript >/dev/null 2>&1; then
+  if [ "$(platform_id)" != "darwin" ] || ! command -v osascript >/dev/null 2>&1; then
     printf 'mode=%s\n' "manual"
     printf 'command=%s\n' "$command_text"
     printf '%s\n' "Automatic terminal launch is unavailable on this platform."
@@ -2170,6 +2659,9 @@ case "$action" in
   list-system-menu-actions)
     cmd_list_system_menu_actions "$@"
     ;;
+  list-mud-actions)
+    cmd_list_mud_actions "$@"
+    ;;
   menu-help)
     cmd_menu_help "$@"
     ;;
@@ -2199,6 +2691,9 @@ case "$action" in
     ;;
   run-system)
     cmd_run_system "$@"
+    ;;
+  run-mud-action)
+    cmd_run_mud_action "$@"
     ;;
   *)
     printf '%s\n' "wizardry-desktop-backend: unknown action: $action" >&2

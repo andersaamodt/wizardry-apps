@@ -93,6 +93,11 @@ assert_matches "$ui" "function loadSystemMenuActions\\(\\)"
 assert_contains "$ui" "callBackend('list-system-menu-actions')"
 assert_contains "$ui" "data-system-menu-action="
 assert_contains "$ui" "Mirrors the wizardry <code>system-menu</code> structure."
+assert_matches "$ui" "function loadMudActions\\(\\)"
+assert_contains "$ui" "callBackend('list-mud-actions')"
+assert_contains "$ui" "callBackend('run-mud-action', [id, argValue])"
+assert_contains "$ui" "data-mud-run-action="
+assert_contains "$ui" "Play the MUD with the currently installed wizardry capabilities."
 
 # Centralized theme and backend root contracts.
 assert_matches "$ui" "buildThemeStylesheetHref\\(themeName\\)"

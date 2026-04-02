@@ -168,7 +168,7 @@
       var COMPOSER_REF_RE = /^[a-z0-9._-]+:[a-z0-9._-]+$/i;
       var NAV_PAGE_MAP = {
         cast: { id: 'cast', title: 'Cast', blurb: 'Cast spells and monitor memorized commands.' },
-        mud: { id: 'mud', title: 'Mud', blurb: 'MUD-focused runtime commands.' },
+        mud: { id: 'mud', title: 'MUD', blurb: 'MUD-focused runtime commands.' },
         spellbook: { id: 'spellbook', title: 'Spellbook', blurb: 'Manage in-app spell aliases.' },
         arcana: { id: 'arcana', title: 'Arcana', blurb: 'Tools for wizardry app setup.' },
         system: { id: 'system', title: 'Computer', blurb: 'System maintenance and wizardry operations.' }
@@ -218,6 +218,10 @@
         systemMenuLoading: false,
         systemMenuActions: [],
         systemOutput: 'Choose a Computer action to run.',
+        mudActionsLoading: false,
+        mudActions: [],
+        mudOutput: 'Choose a MUD action to run.',
+        mudDraftArgs: {},
         systemSelectedAction: '',
         mudSelectedAction: '',
         castDrillTransition: '',
@@ -2262,6 +2266,9 @@
         if (pageId === 'system' && !state.systemMenuActions.length) {
           loadSystemMenuActions();
         }
+        if (pageId === 'mud' && !state.mudActions.length) {
+          loadMudActions();
+        }
         renderPage();
       }
 
@@ -2333,22 +2340,15 @@
         return null;
       }
 
-      function mudActionRows() {
-        return [
-          { id: 'status', label: 'Status', description: 'Show MUD runtime status.' },
-          { id: 'environment', label: 'Environment', description: 'Show active MUD shell environment.' }
-        ];
-      }
-
-      function mudActionById(actionId) {
+      function findMudActionById(actionId) {
         var id = String(actionId || '').trim();
         if (!id) {
           return null;
         }
-        var rows = mudActionRows();
-        for (var i = 0; i < rows.length; i += 1) {
-          if (rows[i].id === id) {
-            return rows[i];
+        for (var i = 0; i < state.mudActions.length; i += 1) {
+          var row = state.mudActions[i];
+          if (row && row.id === id) {
+            return row;
           }
         }
         return null;
@@ -2405,7 +2405,7 @@
 
       function setMudSelectedAction(actionId, transition) {
         var id = String(actionId || '').trim();
-        if (id && !mudActionById(id)) {
+        if (id && !findMudActionById(id)) {
           return;
         }
         if (state.mudSelectedAction === id && !transition) {
@@ -2685,6 +2685,16 @@
         return 'spell';
       }
 
+      function mudActionModeLabel(mode) {
+        if (mode === 'menu') {
+          return 'menu';
+        }
+        if (mode === 'spell') {
+          return 'spell';
+        }
+        return 'command';
+      }
+
       function renderSystemPage() {
         var selectedAction = findSystemActionById(state.systemSelectedAction);
         if (!selectedAction) {
@@ -2752,41 +2762,69 @@
       }
 
       function renderMudPage() {
-        var rows = mudActionRows();
-        var selected = mudActionById(state.mudSelectedAction);
+        var rows = state.mudActions || [];
+        var selected = findMudActionById(state.mudSelectedAction);
         if (!selected) {
           state.mudSelectedAction = '';
         }
         var transition = state.mudDrillTransition;
         state.mudDrillTransition = '';
-        var rootHtml = '<div class="wd-drill-list wd-system-actions">';
-        for (var i = 0; i < rows.length; i += 1) {
-          var row = rows[i];
-          var active = selected && selected.id === row.id ? ' wd-drill-item-active' : '';
-          rootHtml += '<button type="button" class="wd-drill-item wd-system-row' + active + '" data-mud-select="' + escapeAttrValue(row.id) + '" title="' + escapeAttrValue(row.label) + '">';
-          rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span><span class="wd-system-desc">' + escapeText(row.description) + '</span></span>';
-          rootHtml += '<span class="wd-pill">command</span>';
-          rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
-          rootHtml += '</button>';
+
+        var rootHtml = '';
+        if (state.mudActionsLoading) {
+          rootHtml = '<p class="wd-empty">Loading MUD actions…</p>';
+        } else if (!rows.length) {
+          rootHtml = '<p class="wd-empty">No MUD actions found. Install/enable MUD in wizardry.</p>';
+        } else {
+          rootHtml = '<div class="wd-drill-list wd-system-actions">';
+          for (var i = 0; i < rows.length; i += 1) {
+            var row = rows[i];
+            var active = selected && selected.id === row.id ? ' wd-drill-item-active' : '';
+            var disabled = row.available ? '' : ' disabled';
+            var buttonTitle = row.available
+              ? (' title="' + escapeAttrValue(row.label) + '"')
+              : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
+            rootHtml += '<button type="button" class="wd-drill-item wd-system-row' + active + '" data-mud-select="' + escapeAttrValue(row.id) + '"' + disabled + buttonTitle + '>';
+            rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span><span class="wd-system-desc">' + escapeText(row.description) + '</span></span>';
+            rootHtml += '<span class="wd-pill">' + escapeText(mudActionModeLabel(row.mode)) + '</span>';
+            rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
+            rootHtml += '</button>';
+          }
+          rootHtml += '</div>';
         }
-        rootHtml += '</div>';
 
         var detailHtml = '';
         if (!selected) {
-          detailHtml += '<p class="wd-empty">Select a Mud command to inspect and run it.</p>';
+          detailHtml += '<p class="wd-empty">Select a MUD command to inspect and run it.</p>';
         } else {
+          var runLabel = selected.mode === 'menu' || selected.mode === 'command' ? 'Open' : 'Run';
+          var disabledAction = selected.available ? '' : ' disabled';
+          var actionTitle = selected.available
+            ? (' title="' + escapeAttrValue(runLabel + ' ' + selected.label) + '"')
+            : (' title="' + escapeAttrValue(selected.reason || 'Unavailable') + '"');
+          var argValue = String(state.mudDraftArgs[selected.id] || '');
           detailHtml += '<div class="wd-drill-head">';
           detailHtml += drillBackButton('mud');
           detailHtml += '<h4>' + escapeText(selected.label) + '</h4>';
-          detailHtml += '<span class="wd-pill">command</span>';
+          detailHtml += '<span class="wd-pill">' + escapeText(mudActionModeLabel(selected.mode)) + '</span>';
           detailHtml += '</div>';
           detailHtml += '<p class="wd-subline">' + escapeText(selected.description) + '</p>';
-          detailHtml += '<div class="wd-tool-strip"><button type="button" class="wd-polite-btn" data-mud-action="' + escapeAttrValue(selected.id) + '">Run ' + escapeText(selected.label) + '</button></div>';
-          detailHtml += '<pre id="mud-output" class="wd-mono-box" aria-live="polite">No output.</pre>';
+          if (!selected.available && selected.reason) {
+            detailHtml += '<p class="wd-empty">' + escapeText(selected.reason) + '</p>';
+          }
+          if (selected.argMode === 'required' || selected.argMode === 'optional') {
+            detailHtml += '<label class="wd-row-label" for="mud-action-arg">' + escapeText(selected.argLabel || 'Argument') + '</label>';
+            detailHtml += '<input id="mud-action-arg" type="text" class="wd-inline-input wd-mud-arg-input" data-mud-arg="' + escapeAttrValue(selected.id) + '" value="' + escapeAttrValue(argValue) + '" placeholder="' + escapeAttrValue(selected.argExample || '') + '">';
+            if (selected.argMode === 'optional') {
+              detailHtml += '<p class="wd-subline">Argument is optional.</p>';
+            }
+          }
+          detailHtml += '<div class="wd-tool-strip"><button type="button" class="wd-polite-btn" data-mud-run-action="' + escapeAttrValue(selected.id) + '"' + disabledAction + actionTitle + '>' + runLabel + ' ' + escapeText(selected.label) + '</button></div>';
+          detailHtml += '<pre id="mud-output" class="wd-mono-box" aria-live="polite">' + escapeText(state.mudOutput || 'Choose a MUD action to run.') + '</pre>';
         }
 
-        return '<section class="wd-panel"><h3>Mud Tools</h3>' +
-          '<p class="wd-subline">MUD-focused checks and status probes.</p>' +
+        return '<section class="wd-panel"><h3>MUD Tools</h3>' +
+          '<p class="wd-subline">Play the MUD with the currently installed wizardry capabilities.</p>' +
           '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selected, transition) + '">' +
           '<section class="wd-drill-panel">' + rootHtml + '</section>' +
           '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
@@ -2817,8 +2855,11 @@
           subtitle = 'System maintenance menu and wizardry tooling.';
           content = renderSystemPage();
         } else if (state.activePage === 'mud') {
-          title = 'Mud';
-          subtitle = 'MUD-oriented status checks.';
+          title = 'MUD';
+          subtitle = 'Play and manage MUD actions.';
+          if (!state.mudActions.length && !state.mudActionsLoading) {
+            loadMudActions();
+          }
           content = renderMudPage();
         }
 
@@ -3081,6 +3122,67 @@
         }).finally(function () {
           state.systemMenuLoading = false;
           if (state.activePage === 'system') {
+            renderPage();
+          }
+        });
+      }
+
+      function loadMudActions() {
+        if (state.mudActionsLoading) {
+          return Promise.resolve(state.mudActions);
+        }
+        state.mudActionsLoading = true;
+        if (state.activePage === 'mud') {
+          renderPage();
+        }
+        return callBackend('list-mud-actions').then(function (text) {
+          var lines = String(text || '').split('\n');
+          var parsed = [];
+          for (var i = 0; i < lines.length; i += 1) {
+            var line = String(lines[i] || '').trim();
+            if (!line) {
+              continue;
+            }
+            var parts = line.split('|');
+            var id = String(parts[0] || '').trim();
+            var label = String(parts[1] || '').trim();
+            var mode = String(parts[2] || '').trim() || 'spell';
+            var description = String(parts[3] || '').trim();
+            var argMode = String(parts[4] || '').trim() || 'none';
+            var argLabel = String(parts[5] || '').trim();
+            var argExample = String(parts[6] || '').trim();
+            var available = String(parts[7] || '').trim() !== '0';
+            var reason = String(parts[8] || '').trim();
+            if (!id || !label) {
+              continue;
+            }
+            parsed.push({
+              id: id,
+              label: label,
+              mode: mode,
+              description: description,
+              argMode: argMode,
+              argLabel: argLabel,
+              argExample: argExample,
+              available: available,
+              reason: reason
+            });
+          }
+          state.mudActions = parsed;
+          if (state.mudSelectedAction) {
+            var stillExists = parsed.some(function (row) { return row.id === state.mudSelectedAction; });
+            if (!stillExists) {
+              state.mudSelectedAction = '';
+            }
+          }
+          return parsed;
+        }).catch(function () {
+          state.mudActions = [];
+          state.mudSelectedAction = '';
+          return [];
+        }).finally(function () {
+          state.mudActionsLoading = false;
+          if (state.activePage === 'mud') {
             renderPage();
           }
         });
@@ -3404,6 +3506,38 @@
         }).catch(function (error) {
           state.systemOutput = String(error && error.message ? error.message : error || 'Action failed.');
           setOutputBlock('system-output', state.systemOutput);
+          pushActivity('app', id + ' failed', { kind: id, section: 'app', app: 'wizardry-core', status: 'error' });
+        }).finally(function () {
+          state.actionInFlight = false;
+          loadWatchHistory();
+        });
+      }
+
+      function runMudAction(actionId, actionArg, options) {
+        options = options || {};
+        var id = String(actionId || '').trim();
+        if (!id || state.actionInFlight) {
+          return;
+        }
+        var selectedAction = findMudActionById(id);
+        var label = String(options.label || (selectedAction ? selectedAction.label : id));
+        var argValue = String(actionArg == null ? '' : actionArg);
+
+        state.actionInFlight = true;
+        state.mudOutput = 'Running ' + label + ' ...';
+        setOutputBlock('mud-output', state.mudOutput);
+        pushActivity('app', 'Queued ' + id, { kind: id, section: 'app', app: 'wizardry-core', status: 'queued' });
+
+        callBackend('run-mud-action', [id, argValue]).then(function (text) {
+          state.mudOutput = String(text || '').trim() || (label + ' complete.');
+          setOutputBlock('mud-output', state.mudOutput);
+          pushActivity('app', id + ' completed', { kind: id, section: 'app', app: 'wizardry-core', status: 'ok' });
+          if (id === 'mud:menu' || id === 'mud:settings-menu' || id === 'mud:admin-menu') {
+            loadMudActions();
+          }
+        }).catch(function (error) {
+          state.mudOutput = String(error && error.message ? error.message : error || 'Action failed.');
+          setOutputBlock('mud-output', state.mudOutput);
           pushActivity('app', id + ' failed', { kind: id, section: 'app', app: 'wizardry-core', status: 'error' });
         }).finally(function () {
           state.actionInFlight = false;
@@ -4206,17 +4340,18 @@
               return;
             }
 
-            var mudAction = event.target.closest('[data-mud-action]');
-            if (mudAction) {
-              var mudCmd = mudAction.getAttribute('data-mud-action');
-              if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                composerOpenWithTokens(['run-system', 'system:' + mudCmd], { userInitiated: true });
+            var mudRunAction = event.target.closest('[data-mud-run-action]');
+            if (mudRunAction) {
+              var mudActionId = String(mudRunAction.getAttribute('data-mud-run-action') || '').trim();
+              var mudRow = findMudActionById(mudActionId);
+              var mudArgValue = String(state.mudDraftArgs[mudActionId] || '');
+              if (mudRow && mudRow.argMode === 'required' && mudArgValue.trim() === '') {
+                state.mudOutput = (mudRow.argLabel || 'Argument') + ' is required.';
+                setOutputBlock('mud-output', state.mudOutput);
                 return;
               }
-              callBackend('run-system', [mudCmd]).then(function (text) {
-                setOutputBlock('mud-output', text || 'no output');
-              }).catch(function (error) {
-                setOutputBlock('mud-output', String(error && error.message ? error.message : error || 'failure'));
+              runMudAction(mudActionId, mudArgValue, {
+                label: mudRow ? mudRow.label : mudActionId
               });
               return;
             }
@@ -4243,10 +4378,33 @@
               removeSynonymFromElement(removeSynonym.getAttribute('data-remove-synonym'));
             }
           });
+
+          els.contentArea.addEventListener('input', function (event) {
+            var mudArgInput = event.target.closest('[data-mud-arg]');
+            if (!mudArgInput) {
+              return;
+            }
+            var mudActionId = String(mudArgInput.getAttribute('data-mud-arg') || '').trim();
+            if (!mudActionId) {
+              return;
+            }
+            state.mudDraftArgs[mudActionId] = String(mudArgInput.value || '');
+          });
         }
 
         if (els.contentArea) {
           els.contentArea.addEventListener('keydown', function (event) {
+            var mudArgInput = event.target && event.target.closest && event.target.closest('[data-mud-arg]');
+            if (mudArgInput && event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              var mudActionId = String(mudArgInput.getAttribute('data-mud-arg') || '').trim();
+              var runButton = mudActionId ? document.querySelector('[data-mud-run-action="' + mudActionId + '"]') : null;
+              if (runButton && typeof runButton.click === 'function') {
+                runButton.click();
+              }
+              return;
+            }
+
             var dialog = document.getElementById('spellbook-add-dialog');
             if (!dialog || dialog.classList.contains('wd-hidden')) {
               return;

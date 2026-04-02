@@ -37,9 +37,12 @@ assert_matches() {
 assert_contains "$backend" "list-menu-spells [ROOT_HINT]"
 assert_contains "$backend" "list-main-menu-entries [ROOT_HINT]"
 assert_contains "$backend" "list-system-menu-actions [ROOT_HINT]"
+assert_contains "$backend" "list-mud-actions [ROOT_HINT]"
 assert_contains "$backend" "open-menu-terminal MENU_NAME [MENU_ARG] [ROOT_HINT]"
+assert_contains "$backend" "run-mud-action ACTION [ARG] [ROOT_HINT]"
 assert_matches "$backend" 'menu_argument_spec\(\)'
 assert_matches "$backend" 'cmd_open_menu_terminal\(\)'
+assert_matches "$backend" 'cmd_run_mud_action\(\)'
 assert_matches "$backend" 'run-action ACTION \[ARG1\] \[ARG2\] \[ROOT_HINT\]'
 assert_contains "$backend" "menu:terminal)"
 assert_contains "$backend" "open-menu-terminal)"
@@ -51,6 +54,7 @@ assert_matches "$ui" "function parseComposerText\\(value\\)"
 assert_matches "$ui" "function collectComposerAssistEntries\\(plan\\)"
 assert_matches "$ui" "function routeMenuActionToGui\\(actionName, params\\)"
 assert_matches "$ui" "function runSystemMenuAction\\(actionId, options\\)"
+assert_matches "$ui" "function runMudAction\\(actionId, actionArg, options\\)"
 assert_contains "$ui" "data-composer-assist-token"
 assert_contains "$ui" "data-composer-assist-args"
 assert_contains "$ui" "'menu:terminal': { label: 'Open menu in terminal'"

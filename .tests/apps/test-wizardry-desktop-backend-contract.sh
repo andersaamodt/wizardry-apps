@@ -137,6 +137,41 @@ printf '%s\n' "$system_actions" | grep -F "system:uninstall-wizardry|Uninstall w
   exit 1
 }
 
+mud_actions=$(sh "$backend" list-mud-actions "$root")
+printf '%s\n' "$mud_actions" | grep -F "mud:menu|Open MUD Menu|menu|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-mud-actions missing mud:menu row" >&2
+  exit 1
+}
+printf '%s\n' "$mud_actions" | grep -F "mud:listen|Listen|command|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-mud-actions missing mud:listen command row" >&2
+  exit 1
+}
+printf '%s\n' "$mud_actions" | grep -F "mud:say|Say|spell|" >/dev/null 2>&1 || {
+  printf '%s\n' "list-mud-actions missing mud:say row" >&2
+  exit 1
+}
+
+mud_menu_run=$(sh "$backend" run-mud-action mud:menu "" "$root")
+printf '%s\n' "$mud_menu_run" | grep -E '^mode=(terminal|manual)$' >/dev/null 2>&1 || {
+  printf '%s\n' "run-mud-action mud:menu should return terminal/manual mode" >&2
+  exit 1
+}
+
+if sh "$backend" run-mud-action mud:say "" "$root" >/tmp/wizardry-desktop-run-mud.out 2>/tmp/wizardry-desktop-run-mud.err; then
+  printf '%s\n' "run-mud-action mud:say should fail without required argument" >&2
+  exit 1
+fi
+grep -F "requires an argument" /tmp/wizardry-desktop-run-mud.err >/dev/null 2>&1 || {
+  printf '%s\n' "run-mud-action mud:say missing required argument error" >&2
+  exit 1
+}
+
+if ! sh "$backend" run-mud-action mud:look . "$root" >/tmp/wizardry-desktop-run-mud-look.out 2>/tmp/wizardry-desktop-run-mud-look.err; then
+  printf '%s\n' "run-mud-action mud:look should succeed" >&2
+  cat /tmp/wizardry-desktop-run-mud-look.err >&2 || true
+  exit 1
+fi
+
 menu_help=$(sh "$backend" menu-help cast "$root" 2>&1)
 printf '%s\n' "$menu_help" | grep -E '^Usage: cast' >/dev/null 2>&1 || {
   printf '%s\n' "menu-help cast missing Usage output" >&2
