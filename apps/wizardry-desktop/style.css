@@ -255,14 +255,17 @@ body::before {
 .wd-floating {
   position: absolute;
   left: 0;
-  bottom: 36px;
-  min-width: 200px;
-  max-width: 240px;
+  bottom: calc(100% + 0.28rem);
+  min-width: 0;
+  width: min(220px, calc(var(--wd-rail-width, 260px) - 0.7rem));
+  max-width: min(220px, calc(var(--wd-rail-width, 260px) - 0.7rem));
+  max-height: min(16rem, calc(100vh - var(--wd-host-top-inset) - 1.6rem));
+  overflow: auto;
   background: var(--wd-panel);
   border: 1px solid var(--wd-line);
   border-radius: var(--wd-radius);
   box-shadow: 0 12px 30px var(--wd-shadow);
-  padding: 0.35rem;
+  padding: 0.28rem;
   z-index: 30;
 }
 
@@ -271,23 +274,44 @@ body::before {
 }
 
 .wd-theme-item {
-  width: 100%;
+  width: auto;
   border: 0;
   background: transparent;
   text-align: left;
-  border-radius: 7px;
-  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  padding: 0.34rem 0.42rem;
   cursor: pointer;
   color: var(--wd-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 560;
 }
 
 .wd-theme-item:hover,
 .wd-theme-item:focus-visible {
-  background: color-mix(in srgb, var(--wd-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--wd-accent) 16%, transparent);
 }
 
 .wd-theme-item-active {
   background: color-mix(in srgb, var(--wd-accent) 24%, transparent);
+  border-color: color-mix(in srgb, var(--wd-accent) 34%, var(--wd-line));
+}
+
+.wd-theme-check {
+  opacity: 0;
+  color: color-mix(in srgb, var(--wd-text) 70%, transparent);
+}
+
+.wd-theme-item-active .wd-theme-check {
+  opacity: 1;
+}
+
+#theme-list {
+  display: grid;
+  gap: 0.2rem;
 }
 
 .wd-rail-divider {

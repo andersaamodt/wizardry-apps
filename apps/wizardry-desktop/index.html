@@ -2015,7 +2015,8 @@
         for (var i = 0; i < state.themes.length; i += 1) {
           var theme = state.themes[i];
           var active = theme === state.activeTheme ? ' wd-theme-item-active' : '';
-          html += '<button type="button" class="wd-theme-item' + active + '" data-theme-name="' + escapeAttrValue(theme) + '">' + themeLabel(theme) + '</button>';
+          html += '<button type="button" class="wd-theme-item' + active + '" data-theme-name="' + escapeAttrValue(theme) + '" aria-pressed="' + (theme === state.activeTheme ? 'true' : 'false') + '">' +
+            '<span>' + themeLabel(theme) + '</span><span class="wd-theme-check" aria-hidden="true">✓</span></button>';
         }
         els.themeList.innerHTML = html;
         if (els.themePickerBtn) {
