@@ -122,7 +122,7 @@ body::before {
 }
 
 .wd-rail-head {
-  min-height: 0.26rem;
+  min-height: calc(var(--wd-host-top-inset) + 0.26rem);
   padding: 0;
   border-bottom: 1px solid var(--wd-line);
 }
