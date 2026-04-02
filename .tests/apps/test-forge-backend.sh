@@ -10,10 +10,9 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
   exit 1
 }
 
-# Forge self-run should restart via scheduled native open + host stop (no AppleScript).
-grep -F 'schedule_bundle_open_macos "$installed_path" 3.0' "$backend" >/dev/null
-grep -F 'schedule_bundle_open_macos "$launch_bundle" 3.0' "$backend" >/dev/null
-grep -F 'stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os" "1"' "$backend" >/dev/null
+# Forge self-run should return a restart bundle for host-owned relaunch.
+grep -F 'printf '\''restart_bundle=%s\n'\'' "$installed_path"' "$backend" >/dev/null
+grep -F 'printf '\''restart_bundle=%s\n'\'' "$launch_bundle"' "$backend" >/dev/null
 grep -F "elif [ -f \"\$app_dir/assets/forge-icon.png\" ];" "$backend" >/dev/null
 
 if ! command -v jq >/dev/null 2>&1; then

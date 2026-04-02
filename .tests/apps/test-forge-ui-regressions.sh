@@ -60,6 +60,7 @@ assert_not_contains "$ui" 'installBeforeRunHasUserPref'
 assert_matches "$ui" 'function hostTargetId\(\)'
 assert_matches "$ui" 'navigator\.platform'
 assert_matches "$ui" 'runtimePlatform\.indexOf\('"'"'mac'"'"'\)[[:space:]]*>=[[:space:]]*0'
+assert_matches "$ui" "__wizardry_host_restart_self"
 
 # Backend actions should remain explicit and structured.
 assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context\]\);"
@@ -89,6 +90,7 @@ assert_contains "$host_macos" 'NSPasteboardTypeFileURL'
 assert_contains "$host_macos" '"public.file-url"'
 assert_contains "$host_macos" '"text/uri-list"'
 assert_contains "$host_macos" 'NSFilenamesPboardType'
+assert_contains "$host_macos" '__wizardry_host_restart_self'
 assert_contains "$host_macos" 'if (launchedFromPackagedBundle && resolvedBundleIcon)'
 assert_contains "$host_macos" 'else if (resolvedFileIcon)'
 assert_contains "$host_macos" '[NSApp setApplicationIconImage:resolvedBundleIcon];'

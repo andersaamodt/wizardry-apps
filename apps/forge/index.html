@@ -6789,15 +6789,25 @@
             var runInstallFirst = shouldInstallBeforeRun(selected);
             var run = await backend('run-desktop', runInstallFirst ? [app.id, 'install-first'] : [app.id]);
             var runOut = kv(run.stdout || '');
+            var restartBundle = String(runOut.restart_bundle || '').trim();
             var runningLabel = 'Running ' + itemStatusName(app) + '...';
             setActivity('working', runningLabel);
             setFooterStatus('working', runningLabel);
 
+            if (restartBundle && bridgeAvailable()) {
+              // Ask the native host to restart this running app instance.
+              execArgv(['__wizardry_host_restart_self', restartBundle]).catch(function () {
+                return;
+              });
+            }
+
             renderResult({
               status: 'ok',
-              summary: runInstallFirst
-                ? (app.title + ' installed and launched from the installed desktop app.')
-                : (app.title + ' built and launched from the compiled desktop app bundle.'),
+              summary: restartBundle
+                ? (app.title + ' rebuild finished; restarting this app instance.')
+                : (runInstallFirst
+                  ? (app.title + ' installed and launched from the installed desktop app.')
+                  : (app.title + ' built and launched from the compiled desktop app bundle.')),
               paths: [
                 runOut.installed ? { label: 'Installed app', path: runOut.installed, canReveal: true } : null,
                 runOut.launcher ? { label: 'Launcher', path: runOut.launcher, canReveal: true } : null,
@@ -6808,9 +6818,11 @@
               ].filter(Boolean),
               help: {
                 title: 'Launch details',
-                body: runInstallFirst
-                  ? ('PID: ' + (runOut.pid || '(managed by OS)') + '\nRun built, installed, and launched the installed desktop app for this platform.')
-                  : ('PID: ' + (runOut.pid || '(managed by OS)') + '\nRun builds and launches the native desktop executable for this platform.')
+                body: restartBundle
+                  ? ('Bundle: ' + restartBundle + '\nRun requested a native self-restart for the current app instance.')
+                  : (runInstallFirst
+                    ? ('PID: ' + (runOut.pid || '(managed by OS)') + '\nRun built, installed, and launched the installed desktop app for this platform.')
+                    : ('PID: ' + (runOut.pid || '(managed by OS)') + '\nRun builds and launches the native desktop executable for this platform.'))
               }
             });
             setTargetRuntime(projectKey, nativeTarget, 'running', runOut.installed || runOut.launcher || runOut.artifact || runOut.entry || '');

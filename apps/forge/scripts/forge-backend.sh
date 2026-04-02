@@ -1647,35 +1647,6 @@ stop_desktop_instances_for_slug() {
   fi
 }
 
-schedule_bundle_open_macos() {
-  bundle_path=${1-}
-  delay_seconds=${2-}
-  [ -n "$bundle_path" ] || return 1
-  [ -d "$bundle_path" ] || return 1
-  [ -n "$delay_seconds" ] || delay_seconds=0
-  command -v open >/dev/null 2>&1 || return 1
-
-  if command -v nohup >/dev/null 2>&1; then
-    nohup sh -c '
-      set -eu
-      delay=$1
-      bundle=$2
-      sleep "$delay"
-      open "$bundle"
-    ' sh "$delay_seconds" "$bundle_path" >/dev/null 2>&1 &
-    return 0
-  fi
-
-  sh -c '
-    set -eu
-    delay=$1
-    bundle=$2
-    sleep "$delay"
-    open "$bundle"
-  ' sh "$delay_seconds" "$bundle_path" >/dev/null 2>&1 &
-  return 0
-}
-
 cmd_doctor() {
   root_hint=${1-}
   root=''
@@ -3858,13 +3829,15 @@ cmd_run_desktop() {
           exit 1
         }
         if [ "$self_relaunch" -eq 1 ]; then
-          # Restart Forge by scheduling a fresh open request after we stop the
-          # current host process (no duplicate instance handoff).
-          schedule_bundle_open_macos "$installed_path" 3.0 || {
-            printf '%s\n' "forge-backend: failed to schedule Forge restart" >&2
-            exit 1
-          }
-          stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os" "1"
+          # Let the active host process perform a native self-restart.
+          printf 'launched=1\n'
+          printf 'mode=desktop-installed\n'
+          printf 'artifact=%s\n' "$installed_path"
+          printf 'built_artifact=%s\n' "$bundle_artifact"
+          printf 'installed=%s\n' "$installed_path"
+          printf 'restart_bundle=%s\n' "$installed_path"
+          [ -n "$launcher_path" ] && printf 'launcher=%s\n' "$launcher_path"
+          exit 0
         else
           open "$installed_path"
         fi
@@ -3946,13 +3919,14 @@ cmd_run_desktop() {
         exit 1
       }
       if [ "$self_relaunch" -eq 1 ]; then
-        # Restart Forge by scheduling a fresh open request after we stop the
-        # current host process (no duplicate instance handoff).
-        schedule_bundle_open_macos "$launch_bundle" 3.0 || {
-          printf '%s\n' "forge-backend: failed to schedule Forge restart" >&2
-          exit 1
-        }
-        stop_desktop_instances_for_slug "$root" "$slug" "$app_name" "$os" "1"
+        # Let the active host process perform a native self-restart.
+        printf 'launched=1\n'
+        printf 'mode=desktop-executable\n'
+        printf 'artifact=%s\n' "$launch_bundle"
+        printf 'built_artifact=%s\n' "$bundle_artifact"
+        [ -n "$synced_install" ] && printf 'installed_synced=%s\n' "$synced_install"
+        printf 'restart_bundle=%s\n' "$launch_bundle"
+        exit 0
       else
         open "$launch_bundle"
       fi

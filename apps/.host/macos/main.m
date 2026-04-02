@@ -2220,10 +2220,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
     }
 
-    if (launchedFromPackagedBundle) {
-        // Leave the packaged app icon under system control. AppKit documents
-        // applicationIconImage as a temporary Dock-tile override, which can
-        // diverge from the non-running bundle icon styling.
+    if (launchedFromPackagedBundle && resolvedBundleIcon) {
+        // Keep packaged launches aligned with the bundle icon metadata.
+        [NSApp setApplicationIconImage:resolvedBundleIcon];
     } else if (resolvedFileIcon) {
         // Non-packaged launches do not have a stable bundle icon resource, so
         // prefer the app-local file icon when available.
@@ -2600,6 +2599,69 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                                  width:width
                                                 height:height];
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"ok" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_restart_self"]) {
+            NSString *bundlePath = [[[NSBundle mainBundle] bundlePath] stringByStandardizingPath];
+            if (args.count >= 1) {
+                bundlePath = [[[NSString stringWithFormat:@"%@", args[0]] stringByExpandingTildeInPath] stringByStandardizingPath];
+            }
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSFileManager *fm = [NSFileManager defaultManager];
+                BOOL isDirectory = NO;
+                if (bundlePath.length == 0 || ![fm fileExistsAtPath:bundlePath isDirectory:&isDirectory] || !isDirectory) {
+                    [self sendResultToWebView:sourceWebViewCopy
+                                     messageId:messageIdCopy
+                                        stdout:@""
+                                        stderr:@"restart bundle not found"
+                                      exitCode:1
+                                         error:nil];
+                    return;
+                }
+
+                NSTask *task = [[NSTask alloc] init];
+                task.launchPath = @"/bin/sh";
+                task.arguments = @[
+                    @"-c",
+                    @"sleep \"$WIZARDRY_RESTART_DELAY\"; /usr/bin/open \"$WIZARDRY_RESTART_BUNDLE\""
+                ];
+                NSMutableDictionary *env = [NSMutableDictionary dictionaryWithDictionary:[[NSProcessInfo processInfo] environment]];
+                env[@"WIZARDRY_RESTART_BUNDLE"] = bundlePath;
+                env[@"WIZARDRY_RESTART_DELAY"] = @"0.8";
+                task.environment = env;
+
+                NSFileHandle *nullDevice = [NSFileHandle fileHandleWithNullDevice];
+                task.standardOutput = nullDevice;
+                task.standardError = nullDevice;
+                task.standardInput = nullDevice;
+
+                @try {
+                    [task launch];
+                } @catch (NSException *exception) {
+                    NSString *err = [NSString stringWithFormat:@"failed to schedule restart: %@", exception.reason ?: @"unknown"];
+                    [self sendResultToWebView:sourceWebViewCopy
+                                     messageId:messageIdCopy
+                                        stdout:@""
+                                        stderr:err
+                                      exitCode:1
+                                         error:nil];
+                    return;
+                }
+
+                [self sendResultToWebView:sourceWebViewCopy
+                                 messageId:messageIdCopy
+                                    stdout:@"scheduled"
+                                    stderr:@""
+                                  exitCode:0
+                                     error:nil];
+
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.12 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    self.explicitQuitRequested = YES;
+                    [NSApp terminate:nil];
+                });
             });
             return;
         }
