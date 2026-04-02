@@ -68,29 +68,17 @@ body::before {
 .wd-splash {
   position: fixed;
   inset: 0;
-  display: grid;
-  gap: 1rem;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--wd-bg);
   z-index: 1000;
 }
 
-.wd-splash-logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--wd-accent);
-  border: 2px solid color-mix(in srgb, var(--wd-accent) 45%, transparent);
-  font-size: 2rem;
-  font-weight: 700;
-}
-
-.wd-splash p {
-  margin: 0;
-  color: var(--wd-text);
-  font-weight: 600;
+.wd-splash-icon {
+  width: clamp(72px, 16vw, 112px);
+  height: clamp(72px, 16vw, 112px);
+  display: block;
 }
 
 .wd-splash-fade {
