@@ -122,7 +122,8 @@ body::before {
 }
 
 .wd-nav {
-  flex: 1;
+  flex: 1 1 0%;
+  height: 0;
   min-height: 0;
   overflow: auto;
   padding: 0;
@@ -171,10 +172,6 @@ body::before {
   padding: 0.26rem 0.24rem;
   border-top: 1px solid var(--wd-line);
   flex: 0 0 auto;
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
-  background: var(--wd-panel);
 }
 
 .wd-icon-btn {
