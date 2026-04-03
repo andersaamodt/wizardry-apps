@@ -221,6 +221,7 @@
         mudActions: [],
         mudOutput: 'Choose a MUD action to run.',
         mudDraftArgs: {},
+        menuDraftArgs: {},
         mudLastCommand: '',
         mudCurrentPath: '~',
         mudRoomDescription: 'No room description yet.',
@@ -2424,6 +2425,75 @@
         }
       }
 
+      function systemMenuPanelConfig(actionId) {
+        var id = String(actionId || '').trim();
+        if (id === 'system:services-menu') {
+          return {
+            menuName: 'services-menu',
+            title: 'Services',
+            argLabel: 'Command',
+            argPlaceholder: 'status',
+            presets: ['status', 'list', 'start', 'stop', 'restart', 'enable', 'disable']
+          };
+        }
+        if (id === 'system:restart-menu') {
+          return {
+            menuName: 'shutdown-menu',
+            title: 'Power',
+            argLabel: 'Command',
+            argPlaceholder: 'restart',
+            presets: ['restart', 'shutdown', 'sleep', 'cancel']
+          };
+        }
+        return null;
+      }
+
+      function mudMenuPanelConfig(actionId) {
+        var id = String(actionId || '').trim();
+        if (id === 'mud:menu') {
+          return { menuName: 'mud', title: 'MUD', argLabel: 'Command', argPlaceholder: '', presets: ['--help'] };
+        }
+        if (id === 'mud:settings-menu') {
+          return { menuName: 'mud-settings', title: 'MUD Settings', argLabel: 'Command', argPlaceholder: '', presets: ['--help'] };
+        }
+        if (id === 'mud:admin-menu') {
+          return { menuName: 'mud-admin-menu', title: 'MUD Admin', argLabel: 'Command', argPlaceholder: '', presets: ['--help'] };
+        }
+        if (id === 'mud:install-menu') {
+          return { menuName: 'mud-menu', title: 'MUD Install', argLabel: 'Command', argPlaceholder: '', presets: ['--help'] };
+        }
+        return null;
+      }
+
+      function renderMenuGuiPanel(config, outputId, contextName) {
+        if (!config || !config.menuName) {
+          return '';
+        }
+        var menuName = String(config.menuName || '').trim();
+        var argValue = String(state.menuDraftArgs[menuName] || '');
+        var html = '<section class="wd-menu-gui-panel">';
+        html += '<h5 class="wd-rule-title">In-App Menu Controls</h5>';
+        if (Array.isArray(config.presets) && config.presets.length) {
+          html += '<div class="wd-tool-strip wd-menu-gui-presets">';
+          for (var i = 0; i < config.presets.length; i += 1) {
+            var preset = String(config.presets[i] || '').trim();
+            if (!preset) {
+              continue;
+            }
+            html += '<button type="button" class="wd-polite-btn wd-tiny wd-secondary" data-menu-gui-preset="' + escapeAttrValue(menuName + '|' + preset) + '">' + escapeText(preset) + '</button>';
+          }
+          html += '</div>';
+        }
+        html += '<label class="wd-row-label" for="menu-gui-arg-' + escapeAttrValue(menuName) + '">' + escapeText(config.argLabel || 'Argument') + '</label>';
+        html += '<div class="wd-menu-gui-row">';
+        html += '<input id="menu-gui-arg-' + escapeAttrValue(menuName) + '" type="text" class="wd-inline-input" data-menu-gui-arg="' + escapeAttrValue(menuName) + '" value="' + escapeAttrValue(argValue) + '" placeholder="' + escapeAttrValue(config.argPlaceholder || '') + '">';
+        html += '<button type="button" class="wd-polite-btn wd-secondary" data-menu-gui-help="' + escapeAttrValue(menuName + '|' + outputId + '|' + contextName) + '">Help</button>';
+        html += '<button type="button" class="wd-polite-btn" data-menu-gui-run="' + escapeAttrValue(menuName + '|' + outputId + '|' + contextName) + '">Run</button>';
+        html += '</div>';
+        html += '</section>';
+        return html;
+      }
+
       function renderArcanaPage() {
         var rows = state.arcanaInstall || [];
         var selectedModule = findArcanaModuleByName(state.arcanaSelectedModule);
@@ -2536,6 +2606,7 @@
         if (!selectedAction) {
           detailHtml += '<p class="wd-empty">Select a Computer action to inspect and run it.</p>';
         } else {
+          var menuPanel = selectedAction.mode === 'menu' ? systemMenuPanelConfig(selectedAction.id) : null;
           var runLabel = selectedAction.mode === 'menu' ? 'Open' : 'Run';
           var disabledAction = selectedAction.available ? '' : ' disabled';
           var actionTitle = selectedAction.available
@@ -2548,9 +2619,13 @@
           if (!selectedAction.available && selectedAction.reason) {
             detailHtml += '<p class="wd-empty">' + escapeText(selectedAction.reason) + '</p>';
           }
-          detailHtml += '<div class="wd-tool-strip">';
-          detailHtml += '<button type="button" class="wd-polite-btn" data-system-menu-action="' + escapeAttrValue(selectedAction.id) + '" data-system-label="' + escapeAttrValue(selectedAction.label) + '"' + disabledAction + actionTitle + '>' + runLabel + ' ' + escapeText(selectedAction.label) + '</button>';
-          detailHtml += '</div>';
+          if (menuPanel) {
+            detailHtml += renderMenuGuiPanel(menuPanel, 'system-output', 'system');
+          } else {
+            detailHtml += '<div class="wd-tool-strip">';
+            detailHtml += '<button type="button" class="wd-polite-btn" data-system-menu-action="' + escapeAttrValue(selectedAction.id) + '" data-system-label="' + escapeAttrValue(selectedAction.label) + '"' + disabledAction + actionTitle + '>' + runLabel + ' ' + escapeText(selectedAction.label) + '</button>';
+            detailHtml += '</div>';
+          }
           detailHtml += '<pre id="system-output" class="wd-mono-box" aria-live="polite">' + escapeText(state.systemOutput || 'Choose a Computer action to run.') + '</pre>';
         }
 
@@ -2657,6 +2732,7 @@
         if (!selected) {
           detailHtml += '<p class="wd-empty">Select a MUD command to inspect and run it.</p>';
         } else {
+          var mudMenuPanel = selected.mode === 'menu' ? mudMenuPanelConfig(selected.id) : null;
           var runLabel = selected.mode === 'menu' || selected.mode === 'command' ? 'Open' : 'Run';
           var disabledAction = selected.available ? '' : ' disabled';
           var actionTitle = selected.available
@@ -2678,7 +2754,11 @@
               detailHtml += '<p class="wd-subline">Argument is optional.</p>';
             }
           }
-          detailHtml += '<div class="wd-tool-strip"><button type="button" class="wd-polite-btn" data-mud-run-action="' + escapeAttrValue(selected.id) + '"' + disabledAction + actionTitle + '>' + runLabel + ' ' + escapeText(selected.label) + '</button></div>';
+          if (mudMenuPanel) {
+            detailHtml += renderMenuGuiPanel(mudMenuPanel, 'mud-output', 'mud');
+          } else {
+            detailHtml += '<div class="wd-tool-strip"><button type="button" class="wd-polite-btn" data-mud-run-action="' + escapeAttrValue(selected.id) + '"' + disabledAction + actionTitle + '>' + runLabel + ' ' + escapeText(selected.label) + '</button></div>';
+          }
         }
 
         return '<section class="wd-panel wd-mud-panel" title="Play the MUD with the currently installed wizardry capabilities.">' +
@@ -3365,6 +3445,72 @@
         runQuickAction(kind, module, options);
       }
 
+      function runMenuInApp(menuName, menuArg, outputId, contextName) {
+        var name = String(menuName || '').trim();
+        if (!name || state.actionInFlight) {
+          return;
+        }
+        var argValue = String(menuArg == null ? '' : menuArg);
+        var callArgs = ['menu:run', name, argValue];
+        state.actionInFlight = true;
+        setOutputBlock(outputId, 'Running ' + name + (argValue.trim() ? (' ' + argValue.trim()) : '') + ' ...');
+        pushActivity('app', 'Queued menu ' + name, { kind: 'menu:run', target: name, section: 'app', app: 'wizardry-core', status: 'queued' });
+        callBackend('run-action', callArgs).then(function (text) {
+          var output = String(text || '').trim() || ('Menu ' + name + ' complete.');
+          if (contextName === 'system') {
+            state.systemOutput = output;
+          } else if (contextName === 'mud') {
+            state.mudOutput = output;
+          }
+          setOutputBlock(outputId, output);
+          pushActivity('app', 'menu ' + name + ' completed', { kind: 'menu:run', target: name, section: 'app', app: 'wizardry-core', status: 'ok' });
+        }).catch(function (error) {
+          var message = String(error && error.message ? error.message : error || 'Action failed.');
+          if (contextName === 'system') {
+            state.systemOutput = message;
+          } else if (contextName === 'mud') {
+            state.mudOutput = message;
+          }
+          setOutputBlock(outputId, message);
+          pushActivity('app', 'menu ' + name + ' failed', { kind: 'menu:run', target: name, section: 'app', app: 'wizardry-core', status: 'error' });
+        }).finally(function () {
+          state.actionInFlight = false;
+          if (state.activePage === 'system' || state.activePage === 'mud') {
+            renderPage();
+          }
+          loadWatchHistory();
+        });
+      }
+
+      function runMenuHelpInApp(menuName, outputId, contextName) {
+        var name = String(menuName || '').trim();
+        if (!name || state.actionInFlight) {
+          return;
+        }
+        state.actionInFlight = true;
+        setOutputBlock(outputId, 'Loading help for ' + name + ' ...');
+        callBackend('run-action', ['menu:help', name]).then(function (text) {
+          var output = String(text || '').trim() || ('No help output for ' + name + '.');
+          if (contextName === 'system') {
+            state.systemOutput = output;
+          } else if (contextName === 'mud') {
+            state.mudOutput = output;
+          }
+          setOutputBlock(outputId, output);
+        }).catch(function (error) {
+          var message = String(error && error.message ? error.message : error || 'Help action failed.');
+          if (contextName === 'system') {
+            state.systemOutput = message;
+          } else if (contextName === 'mud') {
+            state.mudOutput = message;
+          }
+          setOutputBlock(outputId, message);
+        }).finally(function () {
+          state.actionInFlight = false;
+          loadWatchHistory();
+        });
+      }
+
       function runSystemMenuAction(actionId, options) {
         options = options || {};
         var id = String(actionId || '').trim();
@@ -3372,6 +3518,11 @@
           return;
         }
         var label = String(options.label || id);
+        var panelConfig = systemMenuPanelConfig(id);
+        if (panelConfig && panelConfig.menuName) {
+          runMenuInApp(panelConfig.menuName, state.menuDraftArgs[panelConfig.menuName] || '', 'system-output', 'system');
+          return;
+        }
 
         state.actionInFlight = true;
         state.systemOutput = 'Running ' + label + ' ...';
@@ -3401,6 +3552,11 @@
         options = options || {};
         var id = String(actionId || '').trim();
         if (!id || state.actionInFlight) {
+          return;
+        }
+        var mudMenuConfig = mudMenuPanelConfig(id);
+        if (mudMenuConfig && mudMenuConfig.menuName) {
+          runMenuInApp(mudMenuConfig.menuName, state.menuDraftArgs[mudMenuConfig.menuName] || actionArg || '', 'mud-output', 'mud');
           return;
         }
         var selectedAction = findMudActionById(id);
@@ -4190,6 +4346,45 @@
               return;
             }
 
+            var menuGuiPreset = event.target.closest('[data-menu-gui-preset]');
+            if (menuGuiPreset) {
+              var presetValue = String(menuGuiPreset.getAttribute('data-menu-gui-preset') || '');
+              var presetParts = presetValue.split('|');
+              var presetMenu = String(presetParts[0] || '').trim();
+              var presetArg = String(presetParts[1] || '').trim();
+              if (presetMenu) {
+                state.menuDraftArgs[presetMenu] = presetArg;
+                renderPage();
+              }
+              return;
+            }
+
+            var menuGuiHelp = event.target.closest('[data-menu-gui-help]');
+            if (menuGuiHelp) {
+              var helpPayload = String(menuGuiHelp.getAttribute('data-menu-gui-help') || '');
+              var helpParts = helpPayload.split('|');
+              var helpMenu = String(helpParts[0] || '').trim();
+              var helpOutput = String(helpParts[1] || '').trim() || 'system-output';
+              var helpContext = String(helpParts[2] || '').trim() || 'system';
+              if (helpMenu) {
+                runMenuHelpInApp(helpMenu, helpOutput, helpContext);
+              }
+              return;
+            }
+
+            var menuGuiRun = event.target.closest('[data-menu-gui-run]');
+            if (menuGuiRun) {
+              var runPayload = String(menuGuiRun.getAttribute('data-menu-gui-run') || '');
+              var runParts = runPayload.split('|');
+              var runMenu = String(runParts[0] || '').trim();
+              var runOutput = String(runParts[1] || '').trim() || 'system-output';
+              var runContext = String(runParts[2] || '').trim() || 'system';
+              if (runMenu) {
+                runMenuInApp(runMenu, state.menuDraftArgs[runMenu] || '', runOutput, runContext);
+              }
+              return;
+            }
+
             var systemMenuAction = event.target.closest('[data-system-menu-action]');
             if (systemMenuAction) {
               var systemActionId = systemMenuAction.getAttribute('data-system-menu-action');
@@ -4262,6 +4457,14 @@
           });
 
           els.contentArea.addEventListener('input', function (event) {
+            var menuGuiArgInput = event.target.closest('[data-menu-gui-arg]');
+            if (menuGuiArgInput) {
+              var menuArgName = String(menuGuiArgInput.getAttribute('data-menu-gui-arg') || '').trim();
+              if (menuArgName) {
+                state.menuDraftArgs[menuArgName] = String(menuGuiArgInput.value || '');
+              }
+              return;
+            }
             var mudArgInput = event.target.closest('[data-mud-arg]');
             if (!mudArgInput) {
               return;
@@ -4276,6 +4479,19 @@
 
         if (els.contentArea) {
           els.contentArea.addEventListener('keydown', function (event) {
+            var menuArgInput = event.target && event.target.closest && event.target.closest('[data-menu-gui-arg]');
+            if (menuArgInput && event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              var menuName = String(menuArgInput.getAttribute('data-menu-gui-arg') || '').trim();
+              if (!menuName) {
+                return;
+              }
+              var menuRunButton = document.querySelector('[data-menu-gui-run^="' + menuName + '|"]');
+              if (menuRunButton && typeof menuRunButton.click === 'function') {
+                menuRunButton.click();
+              }
+              return;
+            }
             var mudArgInput = event.target && event.target.closest && event.target.closest('[data-mud-arg]');
             if (mudArgInput && event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();

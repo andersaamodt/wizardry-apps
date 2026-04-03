@@ -1231,6 +1231,31 @@ body::before {
   flex-wrap: wrap;
 }
 
+.wd-menu-gui-panel {
+  display: grid;
+  gap: 0.28rem;
+  margin: 0.22rem 0 0.3rem;
+  padding: 0.34rem 0.36rem;
+  border: 1px solid var(--wd-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--wd-surface) 72%, transparent);
+}
+
+.wd-menu-gui-panel .wd-rule-title {
+  margin: 0;
+}
+
+.wd-menu-gui-presets {
+  gap: 0.22rem;
+}
+
+.wd-menu-gui-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.3rem;
+  align-items: center;
+}
+
 .wd-mono-box {
   margin: 0.35rem 0 0;
   border: 1px solid var(--wd-line);
