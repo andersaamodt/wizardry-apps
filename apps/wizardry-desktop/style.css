@@ -633,6 +633,8 @@ body::before {
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 800;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 
 .wd-drill-back:hover,

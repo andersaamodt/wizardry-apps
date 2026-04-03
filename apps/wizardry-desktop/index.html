@@ -3654,6 +3654,13 @@
 
       function bindEvents() {
         document.addEventListener('click', function (event) {
+          var globalDrillBack = event.target && event.target.closest && event.target.closest('[data-drill-back]');
+          if (globalDrillBack) {
+            event.preventDefault();
+            event.stopPropagation();
+            runDrillBack(globalDrillBack.getAttribute('data-drill-back'));
+            return;
+          }
           var path = typeof event.composedPath === 'function' ? event.composedPath() : [];
           var insideComposer = path.indexOf(els.composerPanel) >= 0 || path.indexOf(els.composerToggle) >= 0;
           if (state.composer.open && !insideComposer && !event.target.closest('.wd-composer-panel') && !event.target.closest('#command-composer-toggle')) {
