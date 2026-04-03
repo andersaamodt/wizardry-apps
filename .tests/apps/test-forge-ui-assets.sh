@@ -35,6 +35,8 @@ grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/nul
 grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "territory-master.png" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "plain-master.png" "$root/apps/.host/macos/main.m" >/dev/null
+grep -F "underPageBackgroundColor = childPageBackingColor" "$root/apps/.host/macos/main.m" >/dev/null
+grep -F "underPageBackgroundColor = pageBackingColor" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "DESKTOP_BRIDGE_BOOTSTRAP" "$root/apps/.host/linux/main.c" >/dev/null
 grep -F "window.wizardry.rpc = rpcBridge;" "$root/apps/.host/linux/main.c" >/dev/null
 grep -F 'id="toggle-settings-panel"' "$root/apps/forge/index.html" >/dev/null
@@ -60,6 +62,8 @@ grep -F "placeholder=\"Filter\"" "$root/apps/forge/index.html" >/dev/null
 ! grep -F "stage-nav" "$root/apps/forge/index.html" >/dev/null
 ! grep -F "stage-tab" "$root/apps/forge/index.html" >/dev/null
 grep -F -- "--accent" "$root/apps/forge/style.css" >/dev/null
+grep -F -- "--catalog-thumb-image" "$root/apps/forge/style.css" >/dev/null
+grep -F -- "-webkit-mask-image: -webkit-radial-gradient(white, black);" "$root/apps/forge/style.css" >/dev/null
 grep -F "scaffold-app" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "Install user-local launchers/integration" "$root/apps/forge/README.md" >/dev/null
 grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-forge.sh" >/dev/null
@@ -68,6 +72,7 @@ grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-for
 grep -F "territory_master=" "$root/apps/forge/assets/icons/meta/icon-settings.conf" >/dev/null
 grep -F "territory_master=" "$root/apps/wizardry-desktop/assets/icons/meta/icon-settings.conf" >/dev/null
 grep -F "assets/forge-icon.png" "$root/apps/forge/index.html" >/dev/null
+grep -F "thumb.style.setProperty('--catalog-thumb-image'" "$root/apps/forge/index.html" >/dev/null
 grep -F 'plain_master="$project_dir/assets/icons/meta/plain-master.png"' "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "territory-master.png" "$root/apps/wizardry-desktop/index.html" >/dev/null
 grep -F "territory-master.png" "$root/tools/forge/build-forge-icon.sh" >/dev/null

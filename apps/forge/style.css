@@ -1080,22 +1080,45 @@ input[type="checkbox"]:disabled {
   height: 1.58rem;
   border-radius: 6px;
   flex: 0 0 auto;
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: transparent;
+  isolation: isolate;
   background: var(--catalog-row-surface, var(--bg-panel));
-  background-clip: padding-box;
+}
+
+.catalog-thumb::before,
+.catalog-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.catalog-thumb::before {
+  background: var(--catalog-row-surface, var(--bg-panel));
+}
+
+.catalog-thumb::after {
+  background-color: var(--catalog-row-surface, var(--bg-panel));
+  background-image: var(--catalog-thumb-image, none);
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
 
 .catalog-thumb.no-icon {
   overflow: visible;
   border-radius: 0;
   background: var(--catalog-row-surface, var(--bg-panel));
+}
+
+.catalog-thumb.no-icon::after {
+  display: none;
 }
 
 .list-row .meta {

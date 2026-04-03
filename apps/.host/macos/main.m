@@ -482,7 +482,8 @@ completionHandler:(void (^)(BOOL result))completionHandler {
         (void)exception;
     }
     if (@available(macOS 11.0, *)) {
-        childWebView.underPageBackgroundColor = self.prioritiesBootBgColor ?: [NSColor clearColor];
+        NSColor *childPageBackingColor = self.prioritiesBootBgColor ?: childWindow.backgroundColor ?: [NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0];
+        childWebView.underPageBackgroundColor = childPageBackingColor;
     }
     [childWebView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
     [childWindow setContentView:childWebView];
@@ -2430,7 +2431,8 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         (void)exception;
     }
     if (@available(macOS 11.0, *)) {
-        self.webView.underPageBackgroundColor = self.prioritiesBootBgColor ?: [NSColor clearColor];
+        NSColor *pageBackingColor = self.prioritiesBootBgColor ?: self.window.backgroundColor ?: [NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0];
+        self.webView.underPageBackgroundColor = pageBackingColor;
     }
     NSString *pageZoomEnv = [[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_PAGE_ZOOM"];
     if (pageZoomEnv) {
