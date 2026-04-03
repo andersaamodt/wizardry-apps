@@ -36,8 +36,9 @@ assert_contains "$host" "activateIgnoringOtherApps"
 
 # Nested workspace app launches should include workspace icon candidates.
 assert_contains "$host" "isNestedWorkspaceApp"
-assert_contains "$host" '[self.appPath stringByAppendingPathComponent:@"assets/forge-icon.png"]'
-assert_contains "$host" '[parentPath stringByAppendingPathComponent:@"assets/forge-icon.png"]'
-assert_contains "$host" "self.appIconImage = resolvedFileIcon ?: resolvedBundleIcon;"
+assert_contains "$host" '[rootPath stringByAppendingPathComponent:@"assets/forge-icon.png"]'
+assert_contains "$host" "resolvedRuntimeIconPath"
+assert_contains "$host" "resolvedSplashIconPath"
+assert_contains "$host" "self.appIconImage = resolvedSplashIcon ?: resolvedBundleIcon;"
 
 printf '%s\n' "macOS host menu contract tests passed"

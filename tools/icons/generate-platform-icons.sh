@@ -50,6 +50,19 @@ esac
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-icon-pipeline.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
+canonical_path() {
+  target_path=$1
+  if [ -z "$target_path" ]; then
+    return 1
+  fi
+  target_dir=$(dirname "$target_path")
+  target_name=$(basename "$target_path")
+  (
+    CDPATH= cd -- "$target_dir" 2>/dev/null &&
+      printf '%s/%s\n' "$(pwd -P)" "$target_name"
+  )
+}
+
 assets_dir="$project_dir/assets"
 icons_dir="$assets_dir/icons"
 macos_dir="$icons_dir/macos"
@@ -257,7 +270,9 @@ for existing_original in "$meta_dir"/original-source.*; do
   [ -f "$existing_original" ] || continue
   [ "$existing_original" = "$stored_original" ] || rm -f "$existing_original"
 done
-if [ "$input_image" != "$stored_original" ]; then
+input_canonical=$(canonical_path "$input_image" || true)
+stored_canonical=$(canonical_path "$stored_original" || true)
+if [ "$input_canonical" != "$stored_canonical" ]; then
   cp "$input_image" "$stored_original"
 fi
 
@@ -265,9 +280,10 @@ rm -rf "$macos_dir/iconset.iconset"
 iconset_dir="$macos_dir/iconset.iconset"
 mkdir -p "$iconset_dir"
 for size in 16 32 64 128 256 512; do
-  # macOS assets should stay unmasked; system rendering applies final shape/effects.
-  magick "$plain_master" -resize "${size}x${size}" "$iconset_dir/icon_${size}x${size}.png"
-  magick "$plain_master" -resize "$((size * 2))x$((size * 2))" "$iconset_dir/icon_${size}x${size}@2x.png"
+  # macOS now visibly jails square icon masters inside the appplate, so keep
+  # the platform-specific iconset on the composed Apple-ready master.
+  magick "$apple_base" -resize "${size}x${size}" "$iconset_dir/icon_${size}x${size}.png"
+  magick "$apple_base" -resize "$((size * 2))x$((size * 2))" "$iconset_dir/icon_${size}x${size}@2x.png"
 done
 if command -v iconutil >/dev/null 2>&1; then
   iconutil -c icns "$iconset_dir" -o "$macos_dir/forge.icns" >/dev/null 2>&1 || true

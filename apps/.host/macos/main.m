@@ -2246,24 +2246,36 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     if (!resolvedBundleIcon) {
         resolvedBundleIcon = [NSApp applicationIconImage];
     }
-    NSString *resolvedIconPath = nil;
-    NSMutableArray<NSString *> *iconCandidates = [NSMutableArray array];
+    NSString *resolvedRuntimeIconPath = nil;
+    NSString *resolvedSplashIconPath = nil;
+    NSMutableArray<NSString *> *runtimeIconCandidates = [NSMutableArray array];
+    NSMutableArray<NSString *> *splashIconCandidates = [NSMutableArray array];
     NSMutableArray<NSString *> *iconRoots = [NSMutableArray arrayWithObject:self.appPath];
     if (isNestedWorkspaceApp) {
         [iconRoots addObject:[self.appPath stringByDeletingLastPathComponent]];
     }
     for (NSString *rootPath in iconRoots) {
         NSString *metaDir = [rootPath stringByAppendingPathComponent:@"assets/icons/meta"];
-        [iconCandidates addObject:[metaDir stringByAppendingPathComponent:@"territory-master.png"]];
-        [iconCandidates addObject:[metaDir stringByAppendingPathComponent:@"plain-master.png"]];
+        [splashIconCandidates addObject:[metaDir stringByAppendingPathComponent:@"territory-master.png"]];
+        [splashIconCandidates addObject:[metaDir stringByAppendingPathComponent:@"plain-master.png"]];
         NSArray<NSString *> *metaEntries = [fileManager contentsOfDirectoryAtPath:metaDir error:nil];
         for (NSString *entry in metaEntries) {
             if ([entry hasPrefix:@"original-source."]) {
-                [iconCandidates addObject:[metaDir stringByAppendingPathComponent:entry]];
+                [splashIconCandidates addObject:[metaDir stringByAppendingPathComponent:entry]];
                 break;
             }
         }
-        [iconCandidates addObjectsFromArray:@[
+        [runtimeIconCandidates addObjectsFromArray:@[
+            [rootPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/meta/apple-master.png"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/macos/forge.icns"],
+            [rootPath stringByAppendingPathComponent:@"assets/forge.icns"],
+            [metaDir stringByAppendingPathComponent:@"territory-master.png"],
+            [metaDir stringByAppendingPathComponent:@"plain-master.png"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/web/icon-512.png"],
+            [rootPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
+        ]];
+        [splashIconCandidates addObjectsFromArray:@[
             [rootPath stringByAppendingPathComponent:@"assets/forge-icon.png"],
             [rootPath stringByAppendingPathComponent:@"assets/icons/meta/apple-master.png"],
             [rootPath stringByAppendingPathComponent:@"assets/icons/macos/forge.icns"],
@@ -2272,16 +2284,27 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             [rootPath stringByAppendingPathComponent:@"assets/icons/web/icon-192.png"]
         ]];
     }
-    for (NSString *candidate in iconCandidates) {
+    for (NSString *candidate in runtimeIconCandidates) {
         if ([fileManager fileExistsAtPath:candidate]) {
-            resolvedIconPath = candidate;
+            resolvedRuntimeIconPath = candidate;
+            break;
+        }
+    }
+    for (NSString *candidate in splashIconCandidates) {
+        if ([fileManager fileExistsAtPath:candidate]) {
+            resolvedSplashIconPath = candidate;
             break;
         }
     }
 
     NSImage *resolvedFileIcon = nil;
-    if (resolvedIconPath && [fileManager fileExistsAtPath:resolvedIconPath]) {
-        resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedIconPath];
+    if (resolvedRuntimeIconPath && [fileManager fileExistsAtPath:resolvedRuntimeIconPath]) {
+        resolvedFileIcon = [[NSImage alloc] initWithContentsOfFile:resolvedRuntimeIconPath];
+    }
+
+    NSImage *resolvedSplashIcon = nil;
+    if (resolvedSplashIconPath && [fileManager fileExistsAtPath:resolvedSplashIconPath]) {
+        resolvedSplashIcon = [[NSImage alloc] initWithContentsOfFile:resolvedSplashIconPath];
     }
 
     if (launchedFromPackagedBundle && resolvedBundleIcon) {
@@ -2297,7 +2320,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     // Prefer a direct packaged/workspace icon file for the splash logo because
     // it is more reliable than bundle-icon lookup during early startup.
-    self.appIconImage = resolvedFileIcon ?: resolvedBundleIcon;
+    self.appIconImage = resolvedSplashIcon ?: resolvedBundleIcon;
     [NSApp unhide:nil];
     [NSApp activateIgnoringOtherApps:YES];
     
