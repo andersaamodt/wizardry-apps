@@ -9,13 +9,14 @@ Usage: build-forge-icon.sh [--root ROOT_DIR] [--out ICON_FILE]
 
 Ensures a valid .icns icon exists by selecting the first available source.
 Priority:
-  1) ROOT_DIR/apps/forge/assets/icons/macos/forge.icns
+  1) ROOT_DIR/apps/forge/assets/icons/meta/apple-master.png (converted to .icns)
   2) ROOT_DIR/apps/forge/assets/forge-icon.png (converted to .icns)
-  3) ROOT_DIR/apps/forge/assets/icons/meta/territory-master.png (converted to .icns)
-  4) ROOT_DIR/apps/forge/assets/icons/meta/original-source.* (converted to .icns)
-  5) macOS CoreTypes ToolbarCustomizeIcon.icns
-  6) macOS CoreTypes ApplicationsFolderIcon.icns
-  7) macOS CoreTypes GenericApplicationIcon.icns
+  3) ROOT_DIR/apps/forge/assets/icons/macos/forge.icns
+  4) ROOT_DIR/apps/forge/assets/icons/meta/territory-master.png (converted to .icns)
+  5) ROOT_DIR/apps/forge/assets/icons/meta/original-source.* (converted to .icns)
+  6) macOS CoreTypes ToolbarCustomizeIcon.icns
+  7) macOS CoreTypes ApplicationsFolderIcon.icns
+  8) macOS CoreTypes GenericApplicationIcon.icns
 USAGE
   exit 0
   ;;
@@ -65,13 +66,28 @@ fi
 
 icon_meta_dir="$root/apps/forge/assets/icons/meta"
 config_path="$icon_meta_dir/icon-settings.conf"
+apple_source="$root/apps/forge/assets/icons/meta/apple-master.png"
 
-generated_icns="$root/apps/forge/assets/icons/macos/forge.icns"
-if [ -f "$generated_icns" ]; then
+if [ -f "$config_path" ]; then
+  configured_apple=$(awk -F= '/^apple_master=/{print substr($0, index($0, "=") + 1); exit}' "$config_path" 2>/dev/null | tr -d '\r')
+  if [ -n "$configured_apple" ] && [ -f "$configured_apple" ]; then
+    apple_source=$configured_apple
+  fi
+fi
+
+if [ -f "$apple_source" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
+  iconset="${iconset_tmp}.iconset"
+  mv "$iconset_tmp" "$iconset"
+  trap 'rm -rf "$iconset"' EXIT INT TERM
+  for size in 16 32 128 256 512; do
+    sips -s format png -z "$size" "$size" "$apple_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+    sips -s format png -z $((size * 2)) $((size * 2)) "$apple_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+  done
   mkdir -p "$(dirname "$out_file")"
-  cp "$generated_icns" "$out_file"
+  iconutil -c icns "$iconset" -o "$out_file"
   printf '%s\n' "built_icon=$out_file"
-  printf '%s\n' "source_icon=$generated_icns"
+  printf '%s\n' "source_icon=$apple_source"
   exit 0
 fi
 
@@ -89,6 +105,15 @@ if [ -f "$png_icon" ] && command -v sips >/dev/null 2>&1 && command -v iconutil 
   iconutil -c icns "$iconset" -o "$out_file"
   printf '%s\n' "built_icon=$out_file"
   printf '%s\n' "source_icon=$png_icon"
+  exit 0
+fi
+
+generated_icns="$root/apps/forge/assets/icons/macos/forge.icns"
+if [ -f "$generated_icns" ]; then
+  mkdir -p "$(dirname "$out_file")"
+  cp "$generated_icns" "$out_file"
+  printf '%s\n' "built_icon=$out_file"
+  printf '%s\n' "source_icon=$generated_icns"
   exit 0
 fi
 

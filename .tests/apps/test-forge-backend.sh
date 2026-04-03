@@ -10,6 +10,21 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
   exit 1
 }
 
+build_icns_from_png() {
+  png_source=$1
+  out_path=$2
+  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
+  iconset="${iconset_tmp}.iconset"
+  mv "$iconset_tmp" "$iconset"
+  for size in 16 32 128 256 512; do
+    sips -s format png -z "$size" "$size" "$png_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+    sips -s format png -z $((size * 2)) $((size * 2)) "$png_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  mkdir -p "$(dirname "$out_path")"
+  iconutil -c icns "$iconset" -o "$out_path" >/dev/null 2>&1
+  rm -rf "$iconset"
+}
+
 # Forge self-run should return a restart bundle for host-owned relaunch.
 grep -F 'printf '\''restart_bundle=%s\n'\'' "$installed_path"' "$backend" >/dev/null
 grep -F 'printf '\''restart_bundle=%s\n'\'' "$launch_bundle"' "$backend" >/dev/null
@@ -60,10 +75,15 @@ if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ]; then
     exit 1
   }
   if [ "${forge_icon_path##*.}" = "icns" ]; then
-    cmp -s "$forge_icon_path" "$test_root/apps/forge/assets/icons/macos/forge.icns" || {
-      printf '%s\n' "forge backend test: desktop bundle icon drifted from generated macOS icon asset" >&2
+    expected_forge_base=$(mktemp "${TMPDIR:-/tmp}/forge-backend-expected.XXXXXX")
+    expected_forge_icon="$expected_forge_base.icns"
+    rm -f "$expected_forge_icon"
+    build_icns_from_png "$test_root/apps/forge/assets/icons/meta/apple-master.png" "$expected_forge_icon"
+    cmp -s "$forge_icon_path" "$expected_forge_icon" || {
+      printf '%s\n' "forge backend test: desktop bundle icon drifted from Apple-ready macOS icon master" >&2
       exit 1
     }
+    rm -f "$expected_forge_icon"
   fi
 fi
 
@@ -97,6 +117,9 @@ mkdir -p "$scratch/config" "$scratch/apps" "$scratch/web" "$scratch/godot/tools/
 printf '%s\n' "; test scaffold" > "$scratch/godot/tools/base-tool/project.godot"
 cp "$test_root/config/apps.manifest.json" "$scratch/config/apps.manifest.json"
 cp "$test_root/config/templates.manifest.json" "$scratch/config/templates.manifest.json"
+cp -R "$test_root/apps/.host" "$scratch/apps/.host"
+cp -R "$test_root/core" "$scratch/core"
+cp -R "$test_root/tools" "$scratch/tools"
 cp -R "$test_root/web/demo" "$scratch/web/demo"
 cp -R "$test_root/web/.themes" "$scratch/web/.themes"
 
@@ -105,6 +128,48 @@ sh "$backend" scaffold-app "$scratch" sandbox-tool "Sandbox Tool" minimal >/tmp/
 [ -f "$scratch/apps/sandbox-tool/style.css" ]
 
 jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false)' "$scratch/config/apps.manifest.json" >/dev/null
+
+if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ] && command -v iconutil >/dev/null 2>&1 && command -v sips >/dev/null 2>&1; then
+  sandbox_assets="$scratch/apps/sandbox-tool/assets"
+  sandbox_icons="$sandbox_assets/icons"
+  mkdir -p "$sandbox_icons/meta" "$sandbox_icons/macos"
+  cp "$test_root/apps/forge/assets/forge-icon.png" "$sandbox_assets/forge-icon.png"
+  cp "$test_root/apps/forge/assets/icons/meta/apple-master.png" "$sandbox_icons/meta/apple-master.png"
+  cp "$test_root/apps/forge/assets/icons/meta/plain-master.png" "$sandbox_icons/meta/plain-master.png"
+  build_icns_from_png "$sandbox_icons/meta/plain-master.png" "$sandbox_icons/macos/forge.icns"
+
+  sandbox_expected_base=$(mktemp "${TMPDIR:-/tmp}/sandbox-tool-expected.XXXXXX")
+  sandbox_expected_icon="$sandbox_expected_base.icns"
+  rm -f "$sandbox_expected_icon"
+  build_icns_from_png "$sandbox_icons/meta/apple-master.png" "$sandbox_expected_icon"
+
+  sandbox_build=$(sh "$backend" build-desktop "$scratch" sandbox-tool)
+  sandbox_artifact=$(printf '%s\n' "$sandbox_build" | awk -F= '/^artifact=/{print $2; exit}')
+  [ -n "$sandbox_artifact" ] || {
+    printf '%s\n' "forge backend test: missing build artifact path for sandbox-tool" >&2
+    exit 1
+  }
+  sandbox_icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$sandbox_artifact/Contents/Info.plist")
+  sandbox_icon_path="$sandbox_artifact/Contents/Resources/$sandbox_icon_file"
+  if [ ! -f "$sandbox_icon_path" ] && [ -f "$sandbox_icon_path.icns" ]; then
+    sandbox_icon_path="$sandbox_icon_path.icns"
+  fi
+  [ -f "$sandbox_icon_path" ] || {
+    printf '%s\n' "forge backend test: sandbox-tool icon file referenced by CFBundleIconFile is missing" >&2
+    exit 1
+  }
+  if [ "${sandbox_icon_path##*.}" = "icns" ]; then
+    cmp -s "$sandbox_icon_path" "$sandbox_icons/macos/forge.icns" && {
+      printf '%s\n' "forge backend test: stale cached .icns overrode fresher PNG icon masters" >&2
+      exit 1
+    }
+    cmp -s "$sandbox_icon_path" "$sandbox_expected_icon" || {
+      printf '%s\n' "forge backend test: sandbox-tool bundle icon did not use the Apple-ready PNG master" >&2
+      exit 1
+    }
+  fi
+  rm -f "$sandbox_expected_icon"
+fi
 
 site_out=$(sh "$backend" scaffold-site "$scratch" sandbox-site demo "$scratch/sites")
 printf '%s\n' "$site_out" | grep -F "created=$scratch/sites/sandbox-site" >/dev/null

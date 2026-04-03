@@ -16,6 +16,21 @@ uninstall="$root/tools/forge/uninstall-forge.sh"
 [ -x "$root/install-forge" ]
 [ -x "$root/uninstall-forge" ]
 
+build_icns_from_png() {
+  png_source=$1
+  out_path=$2
+  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
+  iconset="${iconset_tmp}.iconset"
+  mv "$iconset_tmp" "$iconset"
+  for size in 16 32 128 256 512; do
+    sips -s format png -z "$size" "$size" "$png_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+    sips -s format png -z $((size * 2)) $((size * 2)) "$png_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  mkdir -p "$(dirname "$out_path")"
+  iconutil -c icns "$iconset" -o "$out_path" >/dev/null 2>&1
+  rm -rf "$iconset"
+}
+
 sh "$launch" --help | grep -F "Usage:" >/dev/null
 sh "$install" --help | grep -F "Usage:" >/dev/null
 sh "$uninstall" --help | grep -F "Usage:" >/dev/null
@@ -42,9 +57,13 @@ case "$os" in
   Darwin)
     icon_out="$scratch/forge-test.icns"
     icon_build_out=$(sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$icon_out")
-    printf '%s\n' "$icon_build_out" | grep -F "source_icon=$root/apps/forge/assets/icons/macos/forge.icns" >/dev/null
+    printf '%s\n' "$icon_build_out" | grep -F "source_icon=$root/apps/forge/assets/icons/meta/apple-master.png" >/dev/null
     [ -f "$icon_out" ]
-    cmp -s "$icon_out" "$root/apps/forge/assets/icons/macos/forge.icns"
+    expected_icon_base=$(mktemp "${TMPDIR:-/tmp}/forge-install-expected.XXXXXX")
+    expected_icon="$expected_icon_base.icns"
+    rm -f "$expected_icon"
+    build_icns_from_png "$root/apps/forge/assets/icons/meta/apple-master.png" "$expected_icon"
+    cmp -s "$icon_out" "$expected_icon"
 
     mac_build_out="$scratch/mac-build/App Forge.app"
     sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$mac_build_out" >/tmp/forge-mac-build.log
@@ -73,12 +92,13 @@ case "$os" in
     fi
     [ -f "$app_icon_path" ]
     if [ "${app_icon_path##*.}" = "icns" ]; then
-      cmp -s "$app_icon_path" "$root/apps/forge/assets/icons/macos/forge.icns"
+      cmp -s "$app_icon_path" "$expected_icon"
     fi
     [ -f "$app_bundle/Contents/Resources/.host/shared/wizardry-bridge.js" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-build-input.sha256" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-apps-root.txt" ]
     [ "$(head -n 1 "$app_bundle/Contents/Resources/wizardry-apps-root.txt")" = "$root" ]
+    rm -f "$expected_icon"
     ;;
   Linux)
     [ -f "$fake_home/.local/share/applications/app-forge.desktop" ]
