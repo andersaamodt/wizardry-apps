@@ -221,6 +221,9 @@
         mudActions: [],
         mudOutput: 'Choose a MUD action to run.',
         mudDraftArgs: {},
+        mudLastCommand: '',
+        mudCurrentPath: '~',
+        mudRoomDescription: 'No room description yet.',
         systemSelectedAction: '',
         mudSelectedAction: '',
         castDrillTransition: '',
@@ -2575,20 +2578,77 @@
         } else if (!rows.length) {
           rootHtml = '<p class="wd-empty">No MUD actions found. Install/enable MUD in wizardry.</p>';
         } else {
-          rootHtml = '<div class="wd-drill-list wd-system-actions">';
+          var mudSections = [
+            { id: 'navigation', title: 'Navigation', rows: [] },
+            { id: 'awareness', title: 'Awareness', rows: [] },
+            { id: 'social', title: 'Social', rows: [] },
+            { id: 'combat', title: 'Combat', rows: [] },
+            { id: 'restoration', title: 'Restoration', rows: [] },
+            { id: 'menu', title: 'Menus', rows: [] },
+            { id: 'admin', title: 'Admin', rows: [] }
+          ];
+
+          function mudSectionIdForRow(row) {
+            var actionId = String(row && row.id || '');
+            if (actionId === 'mud:look') {
+              return 'navigation';
+            }
+            if (actionId === 'mud:listen' || actionId === 'mud:stats') {
+              return 'awareness';
+            }
+            if (actionId === 'mud:say' || actionId === 'mud:think') {
+              return 'social';
+            }
+            if (actionId === 'mud:magic-missile' || actionId === 'mud:shocking-grasp' || actionId === 'mud:demo-multiplayer') {
+              return 'combat';
+            }
+            if (actionId === 'mud:heal' || actionId === 'mud:lesser-heal' || actionId === 'mud:greater-heal' || actionId === 'mud:resurrect') {
+              return 'restoration';
+            }
+            if (actionId === 'mud:admin-menu') {
+              return 'admin';
+            }
+            if (actionId.indexOf('mud:') === 0 && actionId.indexOf('-menu') > 0) {
+              return 'menu';
+            }
+            return 'menu';
+          }
+
           for (var i = 0; i < rows.length; i += 1) {
-            var row = rows[i];
-            var active = selected && selected.id === row.id ? ' wd-drill-item-active' : '';
-            var disabled = row.available ? '' : ' disabled';
-            var buttonTitle = row.available
-              ? (' title="' + escapeAttrValue(row.description || row.label) + '"')
-              : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
-            rootHtml += '<div class="wd-menu-action-row">';
-            rootHtml += '<button type="button" class="wd-drill-item wd-system-row' + active + '" data-mud-select="' + escapeAttrValue(row.id) + '"' + disabled + buttonTitle + '>';
-            rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span></span>';
-            rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
-            rootHtml += '</button>';
+            var sectionId = mudSectionIdForRow(rows[i]);
+            for (var s = 0; s < mudSections.length; s += 1) {
+              if (mudSections[s].id === sectionId) {
+                mudSections[s].rows.push(rows[i]);
+                break;
+              }
+            }
+          }
+
+          rootHtml = '<div class="wd-mud-sections">';
+          for (var secIdx = 0; secIdx < mudSections.length; secIdx += 1) {
+            var section = mudSections[secIdx];
+            if (!section.rows.length) {
+              continue;
+            }
+            rootHtml += '<section class="wd-mud-section">';
+            rootHtml += '<h4 class="wd-rule-title">' + escapeText(section.title) + '</h4>';
+            rootHtml += '<div class="wd-drill-list wd-system-actions">';
+            for (var rowIdx = 0; rowIdx < section.rows.length; rowIdx += 1) {
+              var row = section.rows[rowIdx];
+              var active = selected && selected.id === row.id ? ' wd-drill-item-active' : '';
+              var disabled = row.available ? '' : ' disabled';
+              var buttonTitle = row.available
+                ? (' title="' + escapeAttrValue(row.description || row.label) + '"')
+                : (' title="' + escapeAttrValue(row.reason || 'Unavailable') + '"');
+              rootHtml += '<div class="wd-menu-action-row">';
+              rootHtml += '<button type="button" class="wd-drill-item wd-system-row' + active + '" data-mud-select="' + escapeAttrValue(row.id) + '"' + disabled + buttonTitle + '>';
+              rootHtml += '<span class="wd-drill-item-main"><span class="wd-system-row-title">' + escapeText(row.label) + '</span></span>';
+              rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';
+              rootHtml += '</button>';
+              rootHtml += '</div>';
+            }
             rootHtml += '</div>';
+            rootHtml += '</section>';
           }
           rootHtml += '</div>';
         }
@@ -2618,11 +2678,15 @@
             }
           }
           detailHtml += '<div class="wd-tool-strip"><button type="button" class="wd-polite-btn" data-mud-run-action="' + escapeAttrValue(selected.id) + '"' + disabledAction + actionTitle + '>' + runLabel + ' ' + escapeText(selected.label) + '</button></div>';
-          detailHtml += '<pre id="mud-output" class="wd-mono-box" aria-live="polite">' + escapeText(state.mudOutput || 'Choose a MUD action to run.') + '</pre>';
         }
 
-        return '<section class="wd-panel"><h3>MUD Tools</h3>' +
-          '<p class="wd-subline">Play the MUD with the currently installed wizardry capabilities.</p>' +
+        return '<section class="wd-panel wd-mud-panel" title="Play the MUD with the currently installed wizardry capabilities.">' +
+          '<section class="wd-mud-terminal" aria-label="MUD status">' +
+          '<div class="wd-mud-terminal-row"><span class="wd-mud-label">Current Path</span><code class="wd-mud-value">' + escapeText(state.mudCurrentPath || '~') + '</code></div>' +
+          '<div class="wd-mud-terminal-row"><span class="wd-mud-label">Room</span><span class="wd-mud-value">' + escapeText(state.mudRoomDescription || 'No room description yet.') + '</span></div>' +
+          '<div class="wd-mud-terminal-row"><span class="wd-mud-label">Last Command</span><code class="wd-mud-value">' + escapeText(state.mudLastCommand || 'none') + '</code></div>' +
+          '</section>' +
+          '<pre id="mud-output" class="wd-mono-box wd-mud-last-output" aria-live="polite">' + escapeText(state.mudOutput || 'Choose a MUD action to run.') + '</pre>' +
           '<div class="wd-drill-shell"><div class="' + drillTrackClass(!!selected, transition) + '">' +
           '<section class="wd-drill-panel">' + rootHtml + '</section>' +
           '<section class="wd-drill-panel wd-drill-panel-detail">' + detailHtml + '</section>' +
@@ -3341,14 +3405,38 @@
         var selectedAction = findMudActionById(id);
         var label = String(options.label || (selectedAction ? selectedAction.label : id));
         var argValue = String(actionArg == null ? '' : actionArg);
+        var trimmedArg = argValue.trim();
 
         state.actionInFlight = true;
+        state.mudLastCommand = trimmedArg ? (id + ' ' + trimmedArg) : id;
+        if ((id === 'mud:look' || id === 'mud:listen') && trimmedArg) {
+          state.mudCurrentPath = trimmedArg;
+        }
         state.mudOutput = 'Running ' + label + ' ...';
+        if (id === 'mud:look') {
+          state.mudRoomDescription = 'Scanning room...';
+        } else if (id === 'mud:listen') {
+          state.mudRoomDescription = 'Listening for room activity...';
+        }
         setOutputBlock('mud-output', state.mudOutput);
         pushActivity('app', 'Queued ' + id, { kind: id, section: 'app', app: 'wizardry-core', status: 'queued' });
 
         callBackend('run-mud-action', [id, argValue]).then(function (text) {
-          state.mudOutput = String(text || '').trim() || (label + ' complete.');
+          var output = String(text || '').trim();
+          state.mudOutput = output || (label + ' complete.');
+          if ((id === 'mud:look' || id === 'mud:listen' || id === 'mud:stats') && output) {
+            var roomLine = output.split('\n').map(function (line) {
+              return String(line || '').trim();
+            }).find(function (line) {
+              return !!line;
+            });
+            if (roomLine) {
+              state.mudRoomDescription = roomLine;
+            }
+          }
+          if (state.activePage === 'mud') {
+            renderPage();
+          }
           setOutputBlock('mud-output', state.mudOutput);
           pushActivity('app', id + ' completed', { kind: id, section: 'app', app: 'wizardry-core', status: 'ok' });
           if (id === 'mud:menu' || id === 'mud:settings-menu' || id === 'mud:admin-menu') {
@@ -3356,6 +3444,9 @@
           }
         }).catch(function (error) {
           state.mudOutput = String(error && error.message ? error.message : error || 'Action failed.');
+          if (state.activePage === 'mud') {
+            renderPage();
+          }
           setOutputBlock('mud-output', state.mudOutput);
           pushActivity('app', id + ' failed', { kind: id, section: 'app', app: 'wizardry-core', status: 'error' });
         }).finally(function () {
