@@ -2442,7 +2442,7 @@
             var row = rows[i];
             var active = selectedModule && selectedModule.name === row.name ? ' wd-drill-item-active' : '';
             var statusTone = arcanaStatusTone(row.status);
-            rootHtml += '<div class="wd-menu-action-row">';
+            rootHtml += '<div class="wd-menu-action-row wd-arcana-module-row">';
             rootHtml += '<button type="button" class="wd-drill-item wd-arcana-module-item' + active + '" data-arcana-module-open="' + escapeAttrValue(row.name) + '" data-arcana-module="' + escapeAttrValue(row.name) + '">';
             rootHtml += '<span class="wd-drill-item-main">' + safeShortText(row.label) + '</span>';
             rootHtml += '<span class="wd-drill-arrow" aria-hidden="true">›</span>';

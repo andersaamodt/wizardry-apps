@@ -755,6 +755,18 @@ body::before {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.wd-arcana-module-row {
+  display: grid;
+  grid-template-columns: 12.2rem 7.2rem;
+  align-items: center;
+  column-gap: 0.34rem;
+}
+
+.wd-arcana-module-row .wd-arcana-module-item {
+  width: max-content;
+  max-width: 100%;
+}
+
 .wd-arcana-modules .wd-drill-arrow,
 .wd-system-actions .wd-drill-arrow {
   margin-left: 0;
