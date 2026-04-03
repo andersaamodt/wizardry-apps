@@ -710,7 +710,8 @@ body::before {
 
 .wd-cast-list .wd-drill-item {
   grid-template-columns: minmax(0, 1fr) auto;
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
 }
 
 .wd-cast-item-main {
