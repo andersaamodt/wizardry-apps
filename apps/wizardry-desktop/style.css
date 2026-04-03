@@ -428,6 +428,7 @@ body::before {
   flex-direction: column;
   min-height: 0;
   padding-bottom: 0;
+  overflow: hidden;
 }
 
 .wd-content-scroll-spellbook > #content-area {
@@ -1050,6 +1051,7 @@ body::before {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .wd-synonym-row {
