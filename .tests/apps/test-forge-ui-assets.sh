@@ -67,7 +67,7 @@ grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-for
 [ -f "$root/apps/wizardry-desktop/assets/icons/meta/territory-master.png" ]
 grep -F "territory_master=" "$root/apps/forge/assets/icons/meta/icon-settings.conf" >/dev/null
 grep -F "territory_master=" "$root/apps/wizardry-desktop/assets/icons/meta/icon-settings.conf" >/dev/null
-grep -F "assets/icons/meta/plain-master.png" "$root/apps/forge/index.html" >/dev/null
+grep -F "assets/forge-icon.png" "$root/apps/forge/index.html" >/dev/null
 grep -F 'plain_master="$project_dir/assets/icons/meta/plain-master.png"' "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "territory-master.png" "$root/apps/wizardry-desktop/index.html" >/dev/null
 grep -F "territory-master.png" "$root/tools/forge/build-forge-icon.sh" >/dev/null
