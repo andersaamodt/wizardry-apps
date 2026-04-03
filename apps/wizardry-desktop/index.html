@@ -2663,7 +2663,8 @@
             ? (' title="' + escapeAttrValue(runLabel + ' ' + selected.label) + '"')
             : (' title="' + escapeAttrValue(selected.reason || 'Unavailable') + '"');
           var argValue = String(state.mudDraftArgs[selected.id] || '');
-          detailHtml += '<div class="wd-drill-head">';
+          detailHtml += '<div class="wd-drill-head wd-drill-head-with-back">';
+          detailHtml += drillBackButton('mud');
           detailHtml += '<h4>' + escapeText(selected.label) + '</h4>';
           detailHtml += '</div>';
           detailHtml += '<p class="wd-subline">' + escapeText(selected.description) + '</p>';
