@@ -59,6 +59,12 @@ if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ]; then
     printf '%s\n' "forge backend test: icon file referenced by CFBundleIconFile is missing" >&2
     exit 1
   }
+  if [ "${forge_icon_path##*.}" = "icns" ]; then
+    cmp -s "$forge_icon_path" "$test_root/apps/forge/assets/icons/macos/forge.icns" || {
+      printf '%s\n' "forge backend test: desktop bundle icon drifted from generated macOS icon asset" >&2
+      exit 1
+    }
+  fi
 fi
 
 apps=$(sh "$backend" list-apps "$test_root")

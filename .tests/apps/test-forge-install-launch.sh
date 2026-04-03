@@ -41,8 +41,10 @@ os=$(uname -s 2>/dev/null || printf unknown)
 case "$os" in
   Darwin)
     icon_out="$scratch/forge-test.icns"
-    sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$icon_out" >/tmp/forge-icon-build.log
+    icon_build_out=$(sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$icon_out")
+    printf '%s\n' "$icon_build_out" | grep -F "source_icon=$root/apps/forge/assets/icons/macos/forge.icns" >/dev/null
     [ -f "$icon_out" ]
+    cmp -s "$icon_out" "$root/apps/forge/assets/icons/macos/forge.icns"
 
     mac_build_out="$scratch/mac-build/App Forge.app"
     sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$mac_build_out" >/tmp/forge-mac-build.log
@@ -70,6 +72,9 @@ case "$os" in
       app_icon_path="$app_icon_path.png"
     fi
     [ -f "$app_icon_path" ]
+    if [ "${app_icon_path##*.}" = "icns" ]; then
+      cmp -s "$app_icon_path" "$root/apps/forge/assets/icons/macos/forge.icns"
+    fi
     [ -f "$app_bundle/Contents/Resources/.host/shared/wizardry-bridge.js" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-build-input.sha256" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-apps-root.txt" ]

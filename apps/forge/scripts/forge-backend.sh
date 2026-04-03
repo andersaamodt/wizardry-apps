@@ -514,25 +514,10 @@ project_preferred_bundle_icon_path() {
   plain_master="$project_dir/assets/icons/meta/plain-master.png"
   original_source=$(project_original_icon_source "$project_dir" 2>/dev/null || true)
 
-  if [ -f "$territory_master" ]; then
-    printf '%s\n' "$territory_master"
-    return 0
-  fi
-
-  if [ -f "$plain_master" ]; then
-    printf '%s\n' "$plain_master"
-    return 0
-  fi
-
-  if [ -n "$original_source" ] && [ -f "$original_source" ]; then
-    printf '%s\n' "$original_source"
-    return 0
-  fi
-
   for candidate in \
+    "$project_dir/assets/icons/macos/forge.icns" \
     "$project_dir/assets/forge-icon.png" \
     "$project_dir/assets/icons/meta/apple-master.png" \
-    "$project_dir/assets/icons/macos/forge.icns" \
     "$project_dir/assets/icons/meta/plain-master.png" \
     "$project_dir/assets/forge.icns"
   do
@@ -541,6 +526,16 @@ project_preferred_bundle_icon_path() {
       return 0
     fi
   done
+
+  if [ -f "$territory_master" ]; then
+    printf '%s\n' "$territory_master"
+    return 0
+  fi
+
+  if [ -n "$original_source" ] && [ -f "$original_source" ]; then
+    printf '%s\n' "$original_source"
+    return 0
+  fi
 
   return 1
 }
