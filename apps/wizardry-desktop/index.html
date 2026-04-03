@@ -2472,7 +2472,7 @@
           } else if (!moduleItems.length) {
             detailHtml += '<p class="wd-empty">No module actions found.</p>';
           } else {
-            detailHtml += '<div class="wd-list wd-compact-list wd-scroll-area">';
+            detailHtml += '<div class="wd-list wd-compact-list wd-scroll-area wd-arcana-detail-list">';
             for (var itemIdx = 0; itemIdx < moduleItems.length; itemIdx += 1) {
               var item = moduleItems[itemIdx];
               var label = item.kind === 'status-detail' ? String(item.value || '') : safeShortText(item.label || item.value || item.name || '');
