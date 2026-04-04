@@ -22,9 +22,13 @@
 - File-first is mandatory: state belongs in plain-text files.
 - State paths stay standardized, documented, and easy to locate.
 - State scattering is avoided; choose the fewest durable locations that cover the need.
+- Desktop durable state must have one canonical app-owned home, usually under XDG config/state roots.
+- Desktop durable state must not depend on deployment-instance variables such as site names, served-site roots, browser profiles, or other launch-context-specific paths.
+- If a desktop app also has hosted-web or served-site surfaces, site-local storage may support that deployment, but desktop durable data still belongs in the app-owned XDG location.
 - Desktop-first apps do not use browser `localStorage` for durable data.
 - Hosted web apps may use `localStorage` when web deployment behavior requires it.
 - Desktop UI preferences persist through backend file APIs, not browser-owned storage.
+- Use migration-on-read or startup migration when moving durable state paths; do not strand existing user data behind an old runtime root.
 - Read operations remain non-mutating unless the action is explicitly a write/update flow.
 - Runtime logs, assay reports, transcripts, downloads, and other operator-local output belong in documented user/XDG state paths, not inside app repos.
 - Generated executables, packaged releases, and build products stay ignored locally and are published through CI/release flows instead of being committed.
@@ -32,6 +36,7 @@
 ## Standard Storage Locations
 - App config defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps/...`.
 - App runtime/state defaults to `${XDG_STATE_HOME:-$HOME/.local/state}/wizardry/...` when needed.
+- App conversation history, queues, automations, runtime transcripts, and similar durable operator data belong in one documented app-owned XDG state root unless there is a strong documented reason to split them.
 - Workspace metadata belongs in `wizardry.workspace.conf` near the managed workspace root.
 - Hosted site runtime settings belong in site-local files like `site.conf`.
 - Any new storage path must be documented in app README and AI-facing docs.
