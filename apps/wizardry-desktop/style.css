@@ -119,6 +119,10 @@ body::before {
   transition: grid-template-columns 190ms ease;
 }
 
+body.wd-resizing .wd-app-shell {
+  transition: none;
+}
+
 .wd-left-rail {
   min-width: 180px;
   max-width: 340px;

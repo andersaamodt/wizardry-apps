@@ -1950,6 +1950,11 @@
         savePreference('leftRailWidth', String(state.railWidth));
       }
 
+      function setRailWidthLive(width) {
+        state.railWidth = Math.min(420, Math.max(180, Number(width) || 300));
+        applyRailWidth();
+      }
+
       function applyRailWidth() {
         if (!els.leftRail || !els.mainColumn) {
           return;
@@ -3774,7 +3779,7 @@
           }
           var clientX = event.clientX;
           var delta = clientX - startX;
-          saveRailWidth(startW + delta);
+          setRailWidthLive(startW + delta);
         }
 
         function onEnd() {
@@ -3782,6 +3787,7 @@
           if (els.body) {
             els.body.classList.remove('wd-resizing');
           }
+          savePreference('leftRailWidth', String(state.railWidth));
           document.removeEventListener('pointermove', onMove);
           document.removeEventListener('pointerup', onEnd);
         }
