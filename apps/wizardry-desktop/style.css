@@ -110,7 +110,7 @@ body::before {
   position: fixed;
   inset: 0;
   display: grid;
-  grid-template-columns: var(--wd-rail-width, 260px) 0px minmax(0, 1fr) var(--wd-activity-width, 0px);
+  grid-template-columns: var(--wd-rail-width, 260px) 1px minmax(0, 1fr) var(--wd-activity-width, 0px);
   width: 100vw;
   height: 100%;
   background: var(--wd-bg);
@@ -349,12 +349,13 @@ body::before {
 }
 
 .wd-rail-divider {
-  width: 0;
-  min-width: 0;
+  width: 1px;
+  min-width: 1px;
   position: relative;
-  background: transparent;
+  background: var(--wd-line);
   border: 0;
   pointer-events: auto;
+  cursor: col-resize;
 }
 
 .wd-rail-divider::before {
@@ -362,13 +363,19 @@ body::before {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -4px;
-  width: 8px;
+  left: -5px;
+  width: 11px;
   cursor: col-resize;
 }
 
 .wd-rail-divider:focus-visible {
   outline: none;
+}
+
+body.wd-resizing,
+body.wd-resizing * {
+  user-select: none;
+  cursor: col-resize !important;
 }
 
 .wd-main-column {

@@ -1958,9 +1958,6 @@
         els.leftRail.style.width = px;
         document.documentElement.style.setProperty('--wd-rail-width', px);
         applyLayoutColumns();
-        if (els.railDivider) {
-          els.railDivider.style.width = '8px';
-        }
       }
 
       function applyLayoutColumns() {
@@ -3782,6 +3779,9 @@
 
         function onEnd() {
           state.dividerDragging = false;
+          if (els.body) {
+            els.body.classList.remove('wd-resizing');
+          }
           document.removeEventListener('pointermove', onMove);
           document.removeEventListener('pointerup', onEnd);
         }
@@ -3792,6 +3792,9 @@
         els.railDivider.addEventListener('pointerdown', function (event) {
           event.preventDefault();
           state.dividerDragging = true;
+          if (els.body) {
+            els.body.classList.add('wd-resizing');
+          }
           startX = event.clientX;
           startW = state.railWidth;
           document.addEventListener('pointermove', onMove);
