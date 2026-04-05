@@ -63,7 +63,9 @@ grep -F "placeholder=\"Filter\"" "$root/apps/forge/index.html" >/dev/null
 ! grep -F "stage-tab" "$root/apps/forge/index.html" >/dev/null
 grep -F -- "--accent" "$root/apps/forge/style.css" >/dev/null
 grep -F -- "--catalog-thumb-image" "$root/apps/forge/style.css" >/dev/null
-grep -F -- "-webkit-mask-image: -webkit-radial-gradient(white, black);" "$root/apps/forge/style.css" >/dev/null
+grep -F -- "-webkit-mask-image: var(--catalog-thumb-image, none);" "$root/apps/forge/style.css" >/dev/null
+grep -F -- "-webkit-mask-image: linear-gradient(white, white);" "$root/apps/forge/style.css" >/dev/null
+grep -F -- "background-size: contain;" "$root/apps/forge/style.css" >/dev/null
 grep -F "scaffold-app" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "Install user-local launchers/integration" "$root/apps/forge/README.md" >/dev/null
 grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-forge.sh" >/dev/null

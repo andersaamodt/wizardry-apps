@@ -59,6 +59,7 @@
 - Dense catalog rows should disable text/image selection on labels, pills, icons, and row action glyphs; only true text-entry controls inside the row should remain selectable.
 - If a view change rerenders a catalog, keep thumbnail nodes stable by item key instead of recreating them; rebuilding empty thumb slots can reintroduce white flicker even when selection updates are otherwise in-place.
 - For transparent image-backed thumbs in WebKit, give the image layer its own themed backing and WebKit mask inside the rounded thumb; otherwise view-change repaints can briefly outline icon detail against white.
+- In Forge catalog rows, mask the anti-flash backing to the icon alpha and draw icon art slightly inset; full-tile or edge-to-edge small previews read as white boxed outlines even when the asset itself is correct.
 - For catalog view changes, reusing only thumbnail nodes is not enough if the parent row is still rebuilt; keep the whole row DOM stable by item key so transparent icons are not detached/reinserted during filtering or tab switches.
 - For pure view filters like tab switches, preserve row order and toggle visibility in place instead of re-appending rows; moving transparent-icon rows is enough to trigger one-frame white detailing in WebKit.
 - For transparent-icon catalogs, do not hide filtered rows with `display:none`; use an in-place filtered state that removes layout footprint without destroying the row/image layers, or WebKit will white-flash the icons when rows reappear.

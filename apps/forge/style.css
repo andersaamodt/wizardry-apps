@@ -1086,29 +1086,35 @@ input[type="checkbox"]:disabled {
   justify-content: center;
   overflow: hidden;
   isolation: isolate;
-  background: var(--catalog-row-surface, var(--bg-panel));
+  background: transparent;
 }
 
 .catalog-thumb::before,
 .catalog-thumb::after {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  inset: 1px;
+  border-radius: 5px;
   pointer-events: none;
 }
 
 .catalog-thumb::before {
   background: var(--catalog-row-surface, var(--bg-panel));
+  -webkit-mask-image: var(--catalog-thumb-image, none);
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
 }
 
 .catalog-thumb::after {
-  background-color: var(--catalog-row-surface, var(--bg-panel));
   background-image: var(--catalog-thumb-image, none);
   background-position: center;
   background-repeat: no-repeat;
-  background-size: cover;
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
+  background-size: contain;
+  -webkit-mask-image: linear-gradient(white, white);
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
 }
 
 .catalog-thumb.no-icon {
@@ -1117,6 +1123,7 @@ input[type="checkbox"]:disabled {
   background: var(--catalog-row-surface, var(--bg-panel));
 }
 
+.catalog-thumb.no-icon::before,
 .catalog-thumb.no-icon::after {
   display: none;
 }
