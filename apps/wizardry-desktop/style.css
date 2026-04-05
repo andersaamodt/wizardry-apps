@@ -125,7 +125,7 @@ body.wd-resizing .wd-app-shell {
 
 .wd-left-rail {
   min-width: 180px;
-  max-width: 340px;
+  max-width: 420px;
   min-height: 0;
   background: var(--wd-panel);
   border-right: 1px solid var(--wd-line);
