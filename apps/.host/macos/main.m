@@ -1478,10 +1478,21 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return 1;
     }
 
-    [task waitUntilExit];
+    dispatch_group_t streamGroup = dispatch_group_create();
+    dispatch_queue_t streamQueue = dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0);
+    __block NSData *outData = [NSData data];
+    __block NSData *errData = [NSData data];
+    dispatch_group_async(streamGroup, streamQueue, ^{
+        NSData *captured = [[outPipe fileHandleForReading] readDataToEndOfFile];
+        outData = captured ?: [NSData data];
+    });
+    dispatch_group_async(streamGroup, streamQueue, ^{
+        NSData *captured = [[errPipe fileHandleForReading] readDataToEndOfFile];
+        errData = captured ?: [NSData data];
+    });
 
-    NSData *outData = [[outPipe fileHandleForReading] readDataToEndOfFile];
-    NSData *errData = [[errPipe fileHandleForReading] readDataToEndOfFile];
+    [task waitUntilExit];
+    dispatch_group_wait(streamGroup, DISPATCH_TIME_FOREVER);
     NSString *capturedStdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
     NSString *capturedStderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
     if (stdout) {
@@ -3064,10 +3075,21 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             return;
         }
 
-        [task waitUntilExit];
+        dispatch_group_t streamGroup = dispatch_group_create();
+        dispatch_queue_t streamQueue = dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0);
+        __block NSData *outData = [NSData data];
+        __block NSData *errData = [NSData data];
+        dispatch_group_async(streamGroup, streamQueue, ^{
+            NSData *captured = [[outPipe fileHandleForReading] readDataToEndOfFile];
+            outData = captured ?: [NSData data];
+        });
+        dispatch_group_async(streamGroup, streamQueue, ^{
+            NSData *captured = [[errPipe fileHandleForReading] readDataToEndOfFile];
+            errData = captured ?: [NSData data];
+        });
 
-        NSData *outData = [[outPipe fileHandleForReading] readDataToEndOfFile];
-        NSData *errData = [[errPipe fileHandleForReading] readDataToEndOfFile];
+        [task waitUntilExit];
+        dispatch_group_wait(streamGroup, DISPATCH_TIME_FOREVER);
 
         NSString *stdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
         NSString *stderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
