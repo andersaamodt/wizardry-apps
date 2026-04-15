@@ -106,7 +106,7 @@ assert_matches "$ui" "function loadMudActions\\(\\)"
 assert_contains "$ui" "callBackend('list-mud-actions')"
 assert_contains "$ui" "callBackend('run-mud-action', [id, argValue])"
 assert_contains "$ui" "data-mud-run-action="
-assert_contains "$ui" "Play the MUD with the currently installed wizardry capabilities."
+assert_not_contains "$ui" "Play the MUD with the currently installed wizardry capabilities."
 
 # Centralized theme and backend root contracts.
 assert_matches "$ui" "buildThemeStylesheetHref\\(themeName\\)"
