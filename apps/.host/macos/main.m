@@ -3513,6 +3513,20 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             return;
         }
 
+        if ([program isEqualToString:@"__wizardry_host_test_log"]) {
+            NSString *tag = args.count >= 1 ? [NSString stringWithFormat:@"%@", args[0]] : @"host-test";
+            NSArray *parts = args.count > 1 ? [args subarrayWithRange:NSMakeRange(1, args.count - 1)] : @[];
+            NSMutableArray<NSString *> *resolvedParts = [NSMutableArray array];
+            for (id value in parts) {
+                [resolvedParts addObject:[NSString stringWithFormat:@"%@", value ?: @""]];
+            }
+            NSLog(@"[%@] %@", tag, [resolvedParts componentsJoinedByString:@" | "]);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
         if ([program isEqualToString:@"__wizardry_host_forge_icon_drop_target"]) {
             NSString *rootHint = @"";
             NSString *itemKey = @"";
