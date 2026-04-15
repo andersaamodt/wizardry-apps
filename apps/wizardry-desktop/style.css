@@ -599,11 +599,6 @@ body.wd-resizing * {
   display: grid;
   gap: 0.28rem;
   align-content: start;
-  border-right: 1px solid var(--wd-line);
-}
-
-.wd-drill-panel:last-child {
-  border-right: 0;
 }
 
 .wd-drill-panel-detail {
