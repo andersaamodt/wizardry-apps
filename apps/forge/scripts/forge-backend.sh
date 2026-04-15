@@ -2633,6 +2633,21 @@ workspace_git_collect_release_info() {
   refresh_release=${3-0}
   state_file=$(workspace_git_state_file "$workspace_path")
   now_epoch=$(date +%s 2>/dev/null || printf '0')
+  if [ -z "$github_slug" ]; then
+    printf 'git_release_check_epoch=%s\n' ""
+    printf 'git_release_name=%s\n' ""
+    printf 'git_release_tag=%s\n' ""
+    printf 'git_release_url=%s\n' ""
+    printf 'git_release_published_at=%s\n' ""
+    printf 'git_release_asset_name=%s\n' ""
+    printf 'git_release_asset_url=%s\n' ""
+    printf 'git_release_install_supported=%s\n' "no"
+    printf 'git_release_install_reason=%s\n' ""
+    printf 'git_release_available=%s\n' "no"
+    printf 'git_release_error=%s\n' ""
+    return 0
+  fi
+
   release_check_epoch=$(workspace_git_cached_value_file "$state_file" release_check_epoch)
   release_name=$(workspace_git_cached_value_file "$state_file" release_name)
   release_tag=$(workspace_git_cached_value_file "$state_file" release_tag)
@@ -2646,7 +2661,6 @@ workspace_git_collect_release_info() {
   release_error=$(workspace_git_cached_value_file "$state_file" release_error)
 
   if [ "$refresh_release" = "1" ] &&
-     [ -n "$github_slug" ] &&
      command -v curl >/dev/null 2>&1 &&
      command -v jq >/dev/null 2>&1; then
     api_url="https://api.github.com/repos/$github_slug/releases/latest"
@@ -2662,84 +2676,58 @@ workspace_git_collect_release_info() {
       release_install_reason='No supported release asset was found for this host.'
       release_error=''
       os_name=$(os_id)
-      candidates=$(printf '%s' "$release_json" | jq -r '.assets[]? | [.name // "", .browser_download_url // ""] | @tsv' 2>/dev/null || true)
-      candidate_count=0
-      selected_name=''
-      selected_url=''
-      printf '%s\n' "$candidates" | while IFS="$(printf '\t')" read -r asset_name asset_url; do
-        [ -n "$asset_name" ] || continue
-        name_lower=$(printf '%s' "$asset_name" | tr '[:upper:]' '[:lower:]')
-        match='no'
-        case "$os_name" in
-          darwin)
-            case "$name_lower" in
-              *.zip|*.tar.gz|*.tgz)
-                case "$name_lower" in
-                  *macos*|*darwin*|*osx*|*mac*|*universal*)
-                    match='yes'
-                    ;;
-                esac
-                ;;
-            esac
-            ;;
-          linux)
-            case "$name_lower" in
-              *.appimage)
-                match='yes'
-                ;;
-              *.tar.gz|*.tgz)
-                case "$name_lower" in
-                  *linux*)
-                    match='yes'
-                    ;;
-                esac
-                ;;
-            esac
-            ;;
-        esac
-        [ "$match" = 'yes' ] || continue
-        candidate_count=$((candidate_count + 1))
-        if [ "$candidate_count" -eq 1 ]; then
-          selected_name=$asset_name
-          selected_url=$asset_url
-        fi
-        printf '__forge_candidate__\t%s\t%s\t%s\n' "$candidate_count" "$selected_name" "$selected_url"
-      done | tail -n 1 | {
-        IFS="$(printf '\t')" read -r marker selected_count selected_name_pipe selected_url_pipe || true
-        if [ "${marker-}" = "__forge_candidate__" ]; then
-          candidate_count=$selected_count
-          selected_name=$selected_name_pipe
-          selected_url=$selected_url_pipe
-        else
-          candidate_count=0
-          selected_name=''
-          selected_url=''
-        fi
+      candidate_summary=$(printf '%s' "$release_json" | jq -r --arg os "$os_name" '
+        [
+          .assets[]?
+          | { name: (.name // ""), url: (.browser_download_url // ""), lower: ((.name // "") | ascii_downcase) }
+          | select(
+              ($os == "darwin"
+                and (.lower | test("(macos|darwin|osx|mac|universal)"))
+                and ((.lower | endswith(".zip")) or (.lower | endswith(".tar.gz")) or (.lower | endswith(".tgz"))))
+              or
+              ($os == "linux"
+                and (.lower | endswith(".appimage")))
+            )
+        ] as $matches
+        | [($matches | length), ($matches[0].name // ""), ($matches[0].url // "")]
+        | @tsv
+      ' 2>/dev/null || true)
+      candidate_count=$(printf '%s' "$candidate_summary" | awk -F'\t' 'NF { print $1; exit }')
+      selected_name=$(printf '%s' "$candidate_summary" | awk -F'\t' 'NF { print $2; exit }')
+      selected_url=$(printf '%s' "$candidate_summary" | awk -F'\t' 'NF { print $3; exit }')
+      candidate_count=${candidate_count:-0}
 
-        if [ "$candidate_count" -eq 1 ] && [ -n "$selected_name" ] && [ -n "$selected_url" ]; then
-          release_asset_name=$selected_name
-          release_asset_url=$selected_url
-          release_install_supported='yes'
-          release_install_reason=''
-        elif [ "$candidate_count" -gt 1 ]; then
-          release_asset_name=''
-          release_asset_url=''
-          release_install_supported='no'
-          release_install_reason='Multiple release assets matched this host. Pick one manually on GitHub.'
-        fi
+      if [ "$candidate_count" -eq 1 ] && [ -n "$selected_name" ] && [ -n "$selected_url" ]; then
+        release_asset_name=$selected_name
+        release_asset_url=$selected_url
+        release_install_supported='yes'
+        release_install_reason=''
+      elif [ "$candidate_count" -gt 1 ]; then
+        release_asset_name=''
+        release_asset_url=''
+        release_install_supported='no'
+        release_install_reason='Multiple release assets matched this host. Pick one manually on GitHub.'
+      fi
 
-        workspace_git_state_write "$workspace_path" release_check_epoch "$now_epoch"
-        workspace_git_state_write "$workspace_path" release_name "$release_name"
-        workspace_git_state_write "$workspace_path" release_tag "$release_tag"
-        workspace_git_state_write "$workspace_path" release_html_url "$release_html_url"
-        workspace_git_state_write "$workspace_path" release_published_at "$release_published_at"
-        workspace_git_state_write "$workspace_path" release_asset_name "$release_asset_name"
-        workspace_git_state_write "$workspace_path" release_asset_url "$release_asset_url"
-        workspace_git_state_write "$workspace_path" release_install_supported "$release_install_supported"
-        workspace_git_state_write "$workspace_path" release_install_reason "$release_install_reason"
-        workspace_git_state_write "$workspace_path" release_available "$( [ "$release_install_supported" = "yes" ] && printf yes || printf no )"
-        workspace_git_state_write "$workspace_path" release_error "$release_error"
-      }
+      release_available='no'
+      if [ "$release_install_supported" = "yes" ] && [ -n "$release_tag" ]; then
+        current_tag=$(git -C "$workspace_path" describe --tags --exact-match HEAD 2>/dev/null || true)
+        if [ "$current_tag" != "$release_tag" ]; then
+          release_available='yes'
+        fi
+      fi
+
+      workspace_git_state_write "$workspace_path" release_check_epoch "$now_epoch"
+      workspace_git_state_write "$workspace_path" release_name "$release_name"
+      workspace_git_state_write "$workspace_path" release_tag "$release_tag"
+      workspace_git_state_write "$workspace_path" release_html_url "$release_html_url"
+      workspace_git_state_write "$workspace_path" release_published_at "$release_published_at"
+      workspace_git_state_write "$workspace_path" release_asset_name "$release_asset_name"
+      workspace_git_state_write "$workspace_path" release_asset_url "$release_asset_url"
+      workspace_git_state_write "$workspace_path" release_install_supported "$release_install_supported"
+      workspace_git_state_write "$workspace_path" release_install_reason "$release_install_reason"
+      workspace_git_state_write "$workspace_path" release_available "$release_available"
+      workspace_git_state_write "$workspace_path" release_error "$release_error"
 
       release_check_epoch=$(workspace_git_cached_value_file "$state_file" release_check_epoch)
       release_name=$(workspace_git_cached_value_file "$state_file" release_name)
@@ -2752,7 +2740,7 @@ workspace_git_collect_release_info() {
       release_install_reason=$(workspace_git_cached_value_file "$state_file" release_install_reason)
       release_available=$(workspace_git_cached_value_file "$state_file" release_available)
       release_error=$(workspace_git_cached_value_file "$state_file" release_error)
-    elif [ -n "$github_slug" ]; then
+    else
       workspace_git_state_write "$workspace_path" release_check_epoch "$now_epoch"
       workspace_git_state_write "$workspace_path" release_error "GitHub latest release could not be loaded."
       release_check_epoch=$now_epoch
@@ -6888,6 +6876,39 @@ case "$cmd" in
     ;;
   get-workspace-profile)
     cmd_get_workspace_profile "${2-}" "${3-}"
+    ;;
+  workspace-git-status)
+    cmd_workspace_git_status "${2-}" "${3-}"
+    ;;
+  workspace-git-init)
+    cmd_workspace_git_init "${2-}" "${3-}" "${4-}" "${5-}"
+    ;;
+  workspace-git-set-remote)
+    cmd_workspace_git_set_remote "${2-}" "${3-}" "${4-}"
+    ;;
+  workspace-git-set-branch)
+    cmd_workspace_git_set_branch "${2-}" "${3-}" "${4-}"
+    ;;
+  workspace-git-fetch)
+    cmd_workspace_git_fetch "${2-}" "${3-}"
+    ;;
+  workspace-git-pull)
+    cmd_workspace_git_pull "${2-}" "${3-}"
+    ;;
+  workspace-git-push)
+    cmd_workspace_git_push "${2-}" "${3-}"
+    ;;
+  workspace-git-repo-url)
+    cmd_workspace_git_repo_url "${2-}" "${3-}"
+    ;;
+  workspace-git-pr-url)
+    cmd_workspace_git_pr_url "${2-}" "${3-}"
+    ;;
+  workspace-git-release)
+    cmd_workspace_git_release "${2-}" "${3-}"
+    ;;
+  workspace-git-install-release)
+    cmd_workspace_git_install_release "${2-}" "${3-}"
     ;;
   pick-workspace-subpath)
     cmd_pick_workspace_subpath "${2-}" "${3-}"
