@@ -129,8 +129,8 @@ body.wd-resizing .wd-app-shell {
   min-height: 0;
   background: var(--wd-panel);
   border-right: 1px solid var(--wd-line);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
 }
 
@@ -146,8 +146,6 @@ body.wd-resizing .wd-app-shell {
 }
 
 .wd-nav {
-  flex: 1 1 0%;
-  height: 0;
   min-height: 0;
   overflow: auto;
   padding: 0;
