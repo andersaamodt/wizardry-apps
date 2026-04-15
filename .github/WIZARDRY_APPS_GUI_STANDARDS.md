@@ -12,6 +12,7 @@
 - Build GUIs with care and polish; avoid rushed or placeholder-feeling interfaces.
 - Never ship half-ass GUI work; finish layout, spacing, and state feedback details.
 - Always use app theme colors/tokens instead of ad-hoc hardcoded color choices.
+- Do not add app title banners, app description blurbs, or miscellaneous explanatory header text in app GUIs; use clear structure and actionable controls instead.
 
 ## Startup Splash Contract
 - Desktop apps use one standard splash treatment: centered app logo on the active theme background.
