@@ -3,6 +3,7 @@
 ## Read First
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/AI_DOCS.md` first.
 - Then read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_ETHOS.md`.
+- Then read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_LICENSING.md` before changing Forge scaffolding, starter templates, emitted project files, or licensing behavior.
 - Then read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md`.
 - For cross-app GUI checks, read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_AUDIT.md`.
 

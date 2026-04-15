@@ -4,6 +4,7 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/README.md` for repo stance and boundaries.
 - Read `/Users/andersaamodt/.wizardry/.github/PUSH_READY_CHECKLIST.md` for canonical repo-hygiene, artifact, and publish-surface rules.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_ETHOS.md` for policy and tone.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_LICENSING.md` before changing licensing, scaffolding, starter templates, emitted project files, or Forge project-generation behavior.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md` for mandatory GUI patterns and behavior contracts.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_AUDIT.md` when doing cross-app GUI sweeps so audits stay source-linked and non-redundant.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_LESSONS.md` for known host/WebView pitfalls and regression lessons.
