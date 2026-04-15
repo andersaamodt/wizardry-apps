@@ -1239,6 +1239,23 @@ input[type="checkbox"]:disabled {
   margin-left: 0.12rem;
 }
 
+.row-run-spinner {
+  width: 0;
+  height: 0.76rem;
+  margin-left: 0;
+  opacity: 0;
+  overflow: hidden;
+  border-width: 1.5px;
+  color: color-mix(in srgb, var(--accent-strong, var(--accent)) 74%, var(--text) 26%);
+  transition: width 140ms ease, margin-left 140ms ease, opacity 140ms ease;
+}
+
+.catalog-row.run-pending .row-run-spinner {
+  width: 0.76rem;
+  margin-left: 0.12rem;
+  opacity: 1;
+}
+
 .row-overflow {
   border: 1px solid transparent;
   border-radius: 8px;

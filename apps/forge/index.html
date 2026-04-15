@@ -240,6 +240,20 @@
                   </div>
                 </details>
 
+                <details id="workspace-git-section" class="pipeline-section hidden">
+                  <summary class="pipeline-section-head workspace-profile-summary">
+                    <span>Git</span>
+                    <span id="workspace-git-summary-pill" class="workspace-profile-kind-pill hidden"></span>
+                  </summary>
+                  <div class="pipeline-section-body">
+                    <div class="workspace-profile-head">
+                      <p class="workspace-profile-copy">Controls the actual repo in this project folder.</p>
+                      <span id="workspace-git-status" class="workspace-profile-status hidden" aria-live="polite"></span>
+                    </div>
+                    <div id="workspace-git-form" class="workspace-profile-form"></div>
+                  </div>
+                </details>
+
                 <details class="pipeline-section" open>
                   <summary class="pipeline-section-head with-action">
                     <span>Log</span>
@@ -386,7 +400,7 @@
       var SELECTED_CATALOG_KEY = 'wizardry.forge.selected.catalog.v1';
       var HIDDEN_WORKSPACES_KEY = 'wizardry.forge.hidden.workspaces.v1';
       var CACHED_APPS_KEY = 'wizardry.forge.cached_apps.v1';
-      var CACHED_WORKSPACES_KEY = 'wizardry.forge.cached_workspaces.v1';
+      var CACHED_WORKSPACES_KEY = 'wizardry.forge.cached_workspaces.v2';
       var MINI_TABS_KEY = 'wizardry.forge.mini_tabs.v1';
       var ACTIVE_MINI_TAB_KEY = 'wizardry.forge.active_mini_tab.v1';
       var MINI_TAB_ASSIGNMENTS_KEY = 'wizardry.forge.mini_tab_assignments.v1';
@@ -483,7 +497,12 @@
         workspaceProfileStatusKey: '',
         workspaceProfileStatusKind: '',
         workspaceProfileStatusMessage: '',
+        workspaceGitStatusKey: '',
+        workspaceGitStatusKind: '',
+        workspaceGitStatusMessage: '',
+        workspaceGitDraftByPath: {},
         inlineRenameKey: '',
+        catalogRunPendingKey: '',
         miniTabs: [],
         activeMiniTab: 'all',
         editingMiniTabId: '',
@@ -1479,6 +1498,10 @@
 
         opts = opts || {};
         var showFooterStatus = shouldShowFooterStatusForAction(label, opts);
+        var runPendingKey = String(opts.catalogRunKey || '').trim();
+        if (runPendingKey) {
+          setCatalogRunPendingKey(runPendingKey);
+        }
         setBusy(true);
         setActivity('working', label + '...');
         if (showFooterStatus) {
@@ -1535,6 +1558,9 @@
             throw err;
           }
         } finally {
+          if (runPendingKey) {
+            setCatalogRunPendingKey('');
+          }
           setBusy(false);
           if (!document.body.classList.contains('bridge-missing')) {
             setActivity('ready', 'Ready');
@@ -2143,7 +2169,12 @@
             targets: String(row && row.targets || ''),
             path: String(row && row.path || ''),
             sortTimestamp: String(row && row.sortTimestamp || '0'),
-            runnable: row && row.runnable !== false
+            runnable: row && row.runnable !== false,
+            gitRepoPresent: String(row && row.gitRepoPresent || 'no'),
+            gitStatusLabel: String(row && row.gitStatusLabel || ''),
+            gitStatusTone: String(row && row.gitStatusTone || 'muted'),
+            gitStatusReason: String(row && row.gitStatusReason || ''),
+            gitReleaseAvailable: String(row && row.gitReleaseAvailable || 'no')
           };
         }).filter(function (row) {
           return !!row.id && !!row.path && !hiddenPaths[normalizePathForCompare(row.path)];
@@ -2906,7 +2937,12 @@
             targets: ws.targets || '',
             path: ws.path,
             sortTimestamp: parseInt(ws.sortTimestamp, 10) || 0,
-            runnable: ws.runnable !== false
+            runnable: ws.runnable !== false,
+            gitRepoPresent: ws.gitRepoPresent || 'no',
+            gitStatusLabel: ws.gitStatusLabel || '',
+            gitStatusTone: ws.gitStatusTone || 'muted',
+            gitStatusReason: ws.gitStatusReason || '',
+            gitReleaseAvailable: ws.gitReleaseAvailable || 'no'
           };
         });
         if (state.createDraftActive) {
@@ -3241,6 +3277,43 @@
         });
       }
 
+      function syncCatalogRunPendingState(previousKey, nextKey) {
+        if (!els.catalogList) {
+          return;
+        }
+        var previous = String(previousKey || '').trim();
+        var next = String(nextKey || state.catalogRunPendingKey || '').trim();
+        if (previous || next) {
+          if (previous && previous !== next) {
+            var previousRow = state.catalogRowCache[previous] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + previous.replace(/'/g, "\\'") + "']");
+            if (previousRow) {
+              previousRow.classList.remove('run-pending');
+            }
+          }
+          if (next) {
+            var nextRow = state.catalogRowCache[next] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + next.replace(/'/g, "\\'") + "']");
+            if (nextRow && !nextRow.classList.contains('catalog-row-filtered')) {
+              nextRow.classList.add('run-pending');
+            }
+          }
+          return;
+        }
+        els.catalogList.querySelectorAll('.catalog-row[data-catalog-item-key]').forEach(function (row) {
+          var itemKey = String(row.getAttribute('data-catalog-item-key') || '');
+          row.classList.toggle('run-pending', itemKey === state.catalogRunPendingKey);
+        });
+      }
+
+      function setCatalogRunPendingKey(value) {
+        var previous = state.catalogRunPendingKey || '';
+        var next = String(value || '').trim();
+        if (previous === next) {
+          return;
+        }
+        state.catalogRunPendingKey = next;
+        syncCatalogRunPendingState(previous, next);
+      }
+
       function captureMiniTabRects() {
         if (!els.catalogMiniTabs) {
           return null;
@@ -3557,6 +3630,7 @@
 
       function syncCatalogRowState(row, item) {
         row.classList.toggle('active', state.selectedCatalog === item.key);
+        row.classList.toggle('run-pending', state.catalogRunPendingKey === item.key);
         row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
         row.classList.remove('catalog-row-filtered');
         row.removeAttribute('aria-hidden');
@@ -3730,6 +3804,11 @@
           rowActions.className = 'catalog-row-actions menu-anchor';
           var canRowRun = hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item);
           if (canRowRun) {
+            var rowRunSpinner = document.createElement('span');
+            rowRunSpinner.className = 'row-run-spinner status-inline-spinner';
+            rowRunSpinner.setAttribute('aria-hidden', 'true');
+            rowActions.appendChild(rowRunSpinner);
+
             var play = document.createElement('button');
             play.type = 'button';
             play.className = 'row-play';
@@ -3749,10 +3828,10 @@
               setSelectedCatalog(item.key);
               if (item.kind === 'builtin') {
                 state.selectedBuiltIn = item.id;
-                perform(runActionLabel(item), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(item) });
+                perform(runActionLabel(item), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(item), catalogRunKey: item.key });
               } else {
                 state.selectedWorkspace = item.id;
-                perform(runActionLabel(item), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(item) });
+                perform(runActionLabel(item), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(item), catalogRunKey: item.key });
               }
               renderSelectedBuiltIn();
             });
@@ -6714,7 +6793,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-workspaces', [state.projectsRoot], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 8);
+        var rows = parseTSV(res.stdout || '', 13);
         var hiddenPaths = hiddenWorkspacePathSet();
         state.workspaces = rows.map(function (row) {
           return {
@@ -6725,7 +6804,12 @@
             targets: row[4],
             path: row[5],
             sortTimestamp: row[6] || '0',
-            runnable: row[7] === '1'
+            runnable: row[7] === '1',
+            gitRepoPresent: row[8] || 'no',
+            gitStatusLabel: row[9] || '',
+            gitStatusTone: row[10] || 'muted',
+            gitStatusReason: row[11] || '',
+            gitReleaseAvailable: row[12] || 'no'
           };
         }).filter(function (ws) {
           return !hiddenPaths[normalizePathForCompare(ws.path)];
@@ -7647,7 +7731,7 @@
             toast('Enable Hosted Web or the ' + runTargetName + ' target to run this app.', 'bad');
             return;
           }
-          perform(runActionLabel(selected), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(selected) });
+          perform(runActionLabel(selected), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(selected), catalogRunKey: selected.key });
         });
 
         els.actionStage.addEventListener('click', function () {
@@ -8333,6 +8417,10 @@
         els.workspaceProfileKindPill = document.getElementById('workspace-profile-kind-pill');
         els.workspaceProfileStatus = document.getElementById('workspace-profile-status');
         els.workspaceProfileForm = document.getElementById('workspace-profile-form');
+        els.workspaceGitSection = document.getElementById('workspace-git-section');
+        els.workspaceGitSummaryPill = document.getElementById('workspace-git-summary-pill');
+        els.workspaceGitStatus = document.getElementById('workspace-git-status');
+        els.workspaceGitForm = document.getElementById('workspace-git-form');
         els.activeTargetsSubhead = document.getElementById('active-targets-subhead');
         els.targetActiveList = document.getElementById('target-active-list');
         els.targetInactiveList = document.getElementById('target-inactive-list');
