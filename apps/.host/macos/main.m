@@ -137,6 +137,8 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 @property (strong) NSDictionary<NSString *, id> *artificerStatusSnapshot;
 @property (assign) BOOL stonrStatusCommandInFlight;
 @property (strong) NSString *stonrStatusCommandLabel;
+- (BOOL)hostTestHiddenModeEnabled;
+- (NSString *)hostTestQueryString;
 - (void)emitGlobalFavoriteTrackHotkey;
 - (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment;
 - (NSString *)normalizedCommandPath;
@@ -154,6 +156,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (NSString *)forgeDropTargetAtDomX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths hasImagePayload:(BOOL)hasImagePayload;
 - (void)dispatchForgeFileDragPhase:(NSString *)phase target:(NSString *)target domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths hasImagePayload:(BOOL)hasImagePayload;
 - (void)dispatchForgeHostCallbackNamed:(NSString *)functionName payload:(NSDictionary *)payload toWebView:(WKWebView *)targetWebView;
+- (BOOL)dispatchSimulatedFileDropPhase:(NSString *)phase domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths errorMessage:(NSString **)errorMessage;
 - (NSArray<NSString *> *)forgeIconDropCommandArgumentsForPath:(NSString *)imagePath;
 - (void)runForgeIconDropForPath:(NSString *)imagePath fromWebView:(WKWebView *)sourceWebView;
 - (WKWebView *)createAuxWindowWithConfiguration:(WKWebViewConfiguration *)configuration
@@ -164,6 +167,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem;
 - (void)updateStatusItemVisibility;
 - (NSImage *)renderedStatusItemImageForRelayState:(NSString *)relayState busy:(BOOL)busy;
+- (NSString *)writePNGPreviewForImage:(NSImage *)image prefix:(NSString *)prefix preferredPath:(NSString *)preferredPath;
 - (BOOL)isStatusItemRendered;
 - (BOOL)handleDuplicateLaunchByActivatingExistingInstance;
 - (void)handleDistributedShowWindowRequest:(NSNotification *)notification;
@@ -835,6 +839,53 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSError *writeError = nil;
     if (![pngData writeToFile:path options:NSDataWritingAtomic error:&writeError]) {
         NSLog(@"Forge staged image write failed: %@", writeError);
+        return @"";
+    }
+    return path;
+}
+
+- (NSString *)writePNGPreviewForImage:(NSImage *)image prefix:(NSString *)prefix preferredPath:(NSString *)preferredPath {
+    if (!image) {
+        return @"";
+    }
+
+    NSBitmapImageRep *bitmapRep = nil;
+    for (NSImageRep *candidate in [image representations]) {
+        if ([candidate isKindOfClass:[NSBitmapImageRep class]]) {
+            bitmapRep = (NSBitmapImageRep *)candidate;
+            break;
+        }
+    }
+    if (!bitmapRep) {
+        NSData *tiffData = [image TIFFRepresentation];
+        if (tiffData.length) {
+            bitmapRep = [NSBitmapImageRep imageRepWithData:tiffData];
+        }
+    }
+    if (!bitmapRep) {
+        return @"";
+    }
+
+    NSData *pngData = [bitmapRep representationUsingType:NSPNGFileType properties:@{}];
+    if (!pngData.length) {
+        return @"";
+    }
+
+    NSString *requestedPath = preferredPath ?: @"";
+    NSString *path = [requestedPath stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!path.length) {
+        NSString *tempDir = NSTemporaryDirectory();
+        if (!tempDir.length) {
+            tempDir = @"/tmp";
+        }
+        NSString *safePrefix = prefix.length ? prefix : @"wizardry-status-item";
+        NSString *fileName = [NSString stringWithFormat:@"%@-%@.png", safePrefix, [[NSUUID UUID] UUIDString]];
+        path = [tempDir stringByAppendingPathComponent:fileName];
+    }
+
+    NSError *writeError = nil;
+    if (![pngData writeToFile:path options:NSDataWritingAtomic error:&writeError]) {
+        NSLog(@"Status item preview write failed: %@", writeError);
         return @"";
     }
     return path;
@@ -3252,6 +3303,35 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                     [self isStatusItemRendered] ? 1 : 0,
                                     buttonAttached ? 1 : 0,
                                     (long)self.statusItemRepairAttempts];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:stdout stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_status_item_preview"]) {
+            NSString *requestedState = args.count >= 1 ? [NSString stringWithFormat:@"%@", args[0]] : @"";
+            NSString *preferredPath = args.count >= 2 ? [NSString stringWithFormat:@"%@", args[1]] : @"";
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *requestedStateText = requestedState ?: @"";
+                NSString *relayState = [requestedStateText stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                if (!relayState.length) {
+                    if ([self isArtificerApp]) {
+                        NSDictionary<NSString *, id> *snapshot = [self.artificerStatusSnapshot isKindOfClass:[NSDictionary class]] ? self.artificerStatusSnapshot : @{};
+                        relayState = [snapshot[@"status"] isKindOfClass:[NSString class]] ? snapshot[@"status"] : @"idle";
+                    } else if ([self isStonrApp]) {
+                        NSDictionary<NSString *, NSString *> *snapshot = [self stonrRelayStatusSnapshot];
+                        relayState = [snapshot[@"status"] isKindOfClass:[NSString class]] ? snapshot[@"status"] : @"unknown";
+                    } else {
+                        relayState = @"idle";
+                    }
+                }
+                NSImage *preview = [self renderedStatusItemImageForRelayState:relayState busy:NO];
+                NSString *outputPath = [self writePNGPreviewForImage:preview prefix:([self isArtificerApp] ? @"artificer-status-item" : @"wizardry-status-item") preferredPath:preferredPath];
+                if (!outputPath.length) {
+                    [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"status item preview render failed" exitCode:1 error:nil];
+                    return;
+                }
+                NSString *stdout = [NSString stringWithFormat:@"path=%@\nstate=%@\n", outputPath, relayState];
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:stdout stderr:@"" exitCode:0 error:nil];
             });
             return;
