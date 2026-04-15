@@ -3520,7 +3520,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             for (id value in parts) {
                 [resolvedParts addObject:[NSString stringWithFormat:@"%@", value ?: @""]];
             }
-            NSLog(@"[%@] %@", tag, [resolvedParts componentsJoinedByString:@" | "]);
+            fprintf(stderr, "[%s] %s\n",
+                    [[NSString stringWithFormat:@"%@", tag] UTF8String],
+                    [[resolvedParts componentsJoinedByString:@" | "] UTF8String]);
+            fflush(stderr);
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
