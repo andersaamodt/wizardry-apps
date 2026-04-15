@@ -56,7 +56,7 @@ TASK values:
   validate-manifest | test-core | test-adapters | test-release-tools
 
 TEMPLATE values for scaffold-app:
-  minimal | panel | clone
+  minimal | panel | sidebar | topbar | dashboard | studio | clone
 
 CONTEXT values for scaffold-workspace:
   web | godot
@@ -2477,6 +2477,9 @@ cmd_import_workspace() {
   profile_meta=$(ensure_importable_workspace_profile "$workspace_abs")
   profile_path=$(printf '%s\n' "$profile_meta" | cut -f1)
   profile_created=$(printf '%s\n' "$profile_meta" | cut -f2)
+  project_title=$(workspace_field "$profile_path" title "$(basename "$workspace_abs")")
+  project_context=$(workspace_field "$profile_path" development_context "web")
+  write_imported_project_readme_if_missing "$workspace_abs" "$project_title" "$project_context"
   workspace_id=$(resolve_workspace_slug "$profile_path" "$workspace_abs")
   registered_path=""
   existing_registered_path=""
@@ -2786,7 +2789,7 @@ cmd_set_workspace_field() {
       ;;
     starter)
       case "$normalized_value" in
-        ""|import-web|import-godot|import-generic|blank|panel|clone)
+        ""|import-web|import-godot|import-generic|blank|minimal|panel|sidebar|topbar|dashboard|studio|clone)
           ;;
         *)
           printf '%s\n' "forge-backend: unsupported starter '$normalized_value'" >&2
@@ -4042,6 +4045,7 @@ cmd_rebuild_workspace() {
     printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2
     exit 1
   }
+  ensure_workspace_emitted_legal_files "$root" "$workspace_path" "$workspace_conf"
 
   context=$context_hint
   if [ -z "$context" ]; then
@@ -4081,6 +4085,7 @@ cmd_run_workspace() {
     printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2
     exit 1
   }
+  ensure_workspace_emitted_legal_files "$root" "$workspace_path" "$workspace_conf"
   run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
 
   case "$context" in
@@ -4454,6 +4459,7 @@ cmd_serve_hosted_web() {
         printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2
         exit 1
       }
+      ensure_workspace_emitted_legal_files "$root" "$workspace_path" "$workspace_conf"
       run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
       workspace_hosted_web_mode=$(workspace_field "$workspace_conf" hosted_web_mode "")
       case "$workspace_hosted_web_mode" in
@@ -4634,226 +4640,115 @@ run_logged_step() {
   return 1
 }
 
-write_minimal_template() {
-  app_dir=$1
+is_generic_web_starter() {
+  starter=${1-}
+  case "$starter" in
+    minimal|panel|sidebar|topbar|dashboard|studio)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+workspace_uses_emitted_project_license() {
+  starter=${1-}
+  context=${2-}
+  case "$context:$starter" in
+    web:minimal|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+escape_sed_replacement() {
+  printf '%s' "${1-}" | sed 's/[\/&]/\\&/g'
+}
+
+render_named_template_file() {
+  src_path=$1
+  dest_path=$2
+  app_name=$3
+  escaped_name=$(escape_sed_replacement "$app_name")
+  sed "s/__APP_NAME__/$escaped_name/g" "$src_path" > "$dest_path"
+}
+
+write_web_starter_template() {
+  root=$1
+  starter=$2
+  app_dir=$3
+  app_name=$4
+
+  template_dir="$root/apps/forge/starter-templates/web/$starter"
+  [ -d "$template_dir" ] || {
+    printf '%s\n' "forge-backend: web starter template directory missing: $template_dir" >&2
+    exit 1
+  }
+
+  mkdir -p "$app_dir"
+  render_named_template_file "$template_dir/index.html" "$app_dir/index.html" "$app_name"
+  render_named_template_file "$template_dir/style.css" "$app_dir/style.css" "$app_name"
+}
+
+write_emitted_project_legal_files() {
+  root=$1
+  project_dir=$2
+
+  mkdir -p "$project_dir"
+  cp "$root/licenses/AGPL-3.0-or-later.txt" "$project_dir/LICENSE"
+  cp "$root/licenses/WIZARDRY_ADDENDUM.md" "$project_dir/WIZARDRY_ADDENDUM.md"
+}
+
+write_emitted_project_readme_if_missing() {
+  project_dir=$1
   app_name=$2
+  context=$3
+  readme_path="$project_dir/README.md"
+  [ -f "$readme_path" ] && return 0
 
-  cat > "$app_dir/index.html" <<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>$app_name</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <main class="shell">
-    <h1>$app_name</h1>
-    <p>This app is scaffolded from App Forge.</p>
-    <button id="ping">Ping bridge</button>
-    <pre id="out">ready</pre>
-  </main>
+  cat > "$readme_path" <<README
+# $app_name
 
-  <script src="./.host/shared/wizardry-bridge.js"></script>
-  <script>
-    document.getElementById('ping').addEventListener('click', async function () {
-      var out = document.getElementById('out');
-      if (!window.wizardry || !window.wizardry.exec) {
-        out.textContent = 'wizardry bridge unavailable';
-        return;
-      }
-      try {
-        var res = await window.wizardry.exec(['sh', '-c', 'printf ping']);
-        out.textContent = JSON.stringify(res, null, 2);
-      } catch (err) {
-        out.textContent = String(err && err.message ? err.message : err);
-      }
-    });
-  </script>
-</body>
-</html>
-HTML
+Generated by App Forge.
 
-  cat > "$app_dir/style.css" <<'CSS'
-:root {
-  --bg: #141821;
-  --panel: #1b2230;
-  --line: #2c3648;
-  --fg: #eff6ff;
-  --muted: #a6b7cc;
-  --accent: #5dc2a6;
+- Development context: $context
+- License: GNU AGPL-3.0-or-later
+- Additional terms: see WIZARDRY_ADDENDUM.md
+README
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: radial-gradient(circle at 20% 0%, #253146 0%, #141821 55%);
-  color: var(--fg);
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.shell {
-  max-width: 760px;
-  margin: 5rem auto;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 1.2rem;
-}
-
-h1 {
-  margin: 0 0 0.7rem;
-}
-
-p {
-  margin: 0 0 1rem;
-  color: var(--muted);
-}
-
-button {
-  border: 1px solid transparent;
-  background: var(--accent);
-  color: #0b1715;
-  border-radius: 10px;
-  padding: 0.45rem 0.8rem;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-pre {
-  background: #0f141d;
-  border: 1px solid #232f40;
-  border-radius: 10px;
-  margin: 1rem 0 0;
-  padding: 0.75rem;
-  min-height: 7rem;
-  overflow: auto;
-}
-CSS
-}
-
-write_panel_template() {
-  app_dir=$1
+write_imported_project_readme_if_missing() {
+  project_dir=$1
   app_name=$2
+  context=$3
+  readme_path="$project_dir/README.md"
+  [ -f "$readme_path" ] && return 0
 
-  cat > "$app_dir/index.html" <<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>$app_name</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <header>
-    <h1>$app_name</h1>
-    <p>Control panel starter generated by App Forge.</p>
-  </header>
+  cat > "$readme_path" <<README
+# $app_name
 
-  <section class="buttons">
-    <button data-cmd="status">Status</button>
-    <button data-cmd="build">Build Site</button>
-    <button data-cmd="serve">Serve Site</button>
-    <button data-cmd="stop">Stop Site</button>
-  </section>
+Imported into App Forge as a managed workspace.
 
-  <pre id="out">ready</pre>
-
-  <script src="./.host/shared/wizardry-bridge.js"></script>
-  <script>
-    var out = document.getElementById('out');
-    var site = 'demo';
-    var commands = {
-      status: ['web-wizardry', 'status', site],
-      build: ['web-wizardry', 'build', site],
-      serve: ['web-wizardry', 'serve', site],
-      stop: ['web-wizardry', 'stop', site]
-    };
-
-    document.querySelectorAll('button[data-cmd]').forEach(function (btn) {
-      btn.addEventListener('click', async function () {
-        var key = btn.getAttribute('data-cmd');
-        var argv = commands[key];
-        if (!window.wizardry || !window.wizardry.exec) {
-          out.textContent = 'wizardry bridge unavailable';
-          return;
-        }
-        out.textContent = 'running: ' + argv.join(' ');
-        try {
-          var res = await window.wizardry.exec(argv);
-          out.textContent = ['exit=' + res.exit_code, res.stdout || '', res.stderr || ''].filter(Boolean).join('\n');
-        } catch (err) {
-          out.textContent = String(err && err.message ? err.message : err);
-        }
-      });
-    });
-  </script>
-</body>
-</html>
-HTML
-
-  cat > "$app_dir/style.css" <<'CSS'
-:root {
-  --bg: #faf5ee;
-  --line: #d7c7b2;
-  --ink: #2f2314;
-  --panel: #fff8f0;
-  --action: #b16900;
+- Development context: $context
+README
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: linear-gradient(160deg, #f2e7d9 0%, #f9f3ea 62%);
-  color: var(--ink);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
-}
+ensure_workspace_emitted_legal_files() {
+  root=$1
+  workspace_path=$2
+  workspace_conf=$3
 
-header {
-  padding: 1rem 1.2rem;
-  border-bottom: 1px solid var(--line);
-}
+  starter=$(workspace_field "$workspace_conf" starter "")
+  context=$(workspace_field "$workspace_conf" development_context "")
+  if ! workspace_uses_emitted_project_license "$starter" "$context"; then
+    return 0
+  fi
 
-header h1 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-header p {
-  margin: 0.35rem 0 0;
-  color: #71553a;
-}
-
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  padding: 1rem 1.2rem;
-}
-
-button {
-  border: 1px solid transparent;
-  background: var(--action);
-  color: #fff;
-  border-radius: 8px;
-  padding: 0.45rem 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-pre {
-  margin: 0 1.2rem 1.2rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  min-height: 12rem;
-  padding: 0.8rem;
-  overflow: auto;
-  white-space: pre-wrap;
-}
-CSS
+  license_path="$workspace_path/LICENSE"
+  addendum_path="$workspace_path/WIZARDRY_ADDENDUM.md"
+  if [ ! -f "$license_path" ] || [ ! -f "$addendum_path" ]; then
+    write_emitted_project_legal_files "$root" "$workspace_path"
+  fi
 }
 
 append_manifest_app() {
@@ -4908,7 +4803,7 @@ cmd_scaffold_app() {
   }
 
   case "$template" in
-    minimal|panel) ;;
+    minimal|panel|sidebar|topbar|dashboard|studio) ;;
     clone)
       [ -n "$source_app" ] || {
         printf '%s\n' "forge-backend: scaffold-app clone requires SOURCE_APP" >&2
@@ -4931,11 +4826,8 @@ cmd_scaffold_app() {
   mkdir -p "$app_dir"
 
   case "$template" in
-    minimal)
-      write_minimal_template "$app_dir" "$app_name"
-      ;;
-    panel)
-      write_panel_template "$app_dir" "$app_name"
+    minimal|panel|sidebar|topbar|dashboard|studio)
+      write_web_starter_template "$root" "$template" "$app_dir" "$app_name"
       ;;
     clone)
       rm -rf "$app_dir"
@@ -4996,7 +4888,7 @@ cmd_scaffold_workspace() {
       development_context=web
 
       case "$starter" in
-        minimal|panel|clone) ;;
+        minimal|panel|sidebar|topbar|dashboard|studio|clone) ;;
         *)
           printf '%s\n' "forge-backend: scaffold-workspace unknown web starter: $starter" >&2
           exit 2
@@ -5007,11 +4899,8 @@ cmd_scaffold_workspace() {
       mkdir -p "$app_dir"
 
       case "$starter" in
-        minimal)
-          write_minimal_template "$app_dir" "$app_name"
-          ;;
-        panel)
-          write_panel_template "$app_dir" "$app_name"
+        minimal|panel|sidebar|topbar|dashboard|studio)
+          write_web_starter_template "$root" "$starter" "$app_dir" "$app_name"
           ;;
         clone)
           [ -n "$source" ] || {
@@ -5031,14 +4920,12 @@ cmd_scaffold_workspace() {
           ;;
       esac
 
-      cat > "$workspace_dir/README.md" <<README
-# $app_name
-
-Application project scaffolded by App Forge.
-
-- Development context: web
-- App files: app/
-README
+      if workspace_uses_emitted_project_license "$starter" "$development_context"; then
+        write_emitted_project_legal_files "$root" "$workspace_dir"
+        write_emitted_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
+      else
+        write_imported_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
+      fi
       ;;
 
     godot)
@@ -5065,17 +4952,14 @@ PROJECT
 [node name="Main" type="Node"]
 script = ExtResource("1_tool")
 TSCN
-          cat > "$workspace_dir/README.md" <<README
-# $app_name
-
-Godot project scaffold generated by App Forge.
-README
           cat > "$workspace_dir/tool_main.gd" <<'GDSCRIPT'
 extends Node
 
 func _ready():
     print("Wizardry Godot tool project ready.")
 GDSCRIPT
+          write_emitted_project_legal_files "$root" "$workspace_dir"
+          write_emitted_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
           ;;
         clone)
           [ -n "$source" ] || {
@@ -5099,13 +4983,7 @@ GDSCRIPT
             exit 1
           }
           cp -R "$source_dir" "$workspace_dir"
-          if [ ! -f "$workspace_dir/README.md" ]; then
-            cat > "$workspace_dir/README.md" <<README
-# $app_name
-
-Godot project cloned by App Forge.
-README
-          fi
+          write_imported_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
           ;;
         *)
           printf '%s\n' "forge-backend: scaffold-workspace unknown godot starter: $starter" >&2

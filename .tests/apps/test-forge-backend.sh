@@ -117,7 +117,10 @@ mkdir -p "$scratch/config" "$scratch/apps" "$scratch/web" "$scratch/godot/tools/
 printf '%s\n' "; test scaffold" > "$scratch/godot/tools/base-tool/project.godot"
 cp "$test_root/config/apps.manifest.json" "$scratch/config/apps.manifest.json"
 cp "$test_root/config/templates.manifest.json" "$scratch/config/templates.manifest.json"
+cp -R "$test_root/licenses" "$scratch/licenses"
 cp -R "$test_root/apps/.host" "$scratch/apps/.host"
+mkdir -p "$scratch/apps/forge"
+cp -R "$test_root/apps/forge/starter-templates" "$scratch/apps/forge/starter-templates"
 cp -R "$test_root/core" "$scratch/core"
 cp -R "$test_root/tools" "$scratch/tools"
 cp -R "$test_root/web/demo" "$scratch/web/demo"
@@ -182,13 +185,29 @@ godot_tools=$(sh "$backend" list-godot-tools "$scratch")
 printf '%s\n' "$godot_tools" | grep -E '^base-tool$' >/dev/null
 
 workspaces_root="$scratch/workspaces"
-workspace_web_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-web "Workspace Web" web panel "hosted-web,macos,linux" "" "$workspaces_root")
+workspace_web_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-web "Workspace Web" web sidebar "hosted-web,macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_web_out" | grep -F "created=$workspaces_root/workspace-web" >/dev/null
+workspace_web_abs=$(CDPATH= cd -- "$workspaces_root/workspace-web" && pwd -P)
 [ -f "$workspaces_root/workspace-web/wizardry.workspace.conf" ]
 [ -f "$workspaces_root/workspace-web/app/index.html" ]
+[ -f "$workspaces_root/workspace-web/LICENSE" ]
+[ -f "$workspaces_root/workspace-web/WIZARDRY_ADDENDUM.md" ]
+[ -f "$workspaces_root/workspace-web/README.md" ]
 grep -F "development_context=web" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 grep -F "project_type=application" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 grep -F "targets=hosted-web,macos,linux" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+grep -F "GNU AGPL-3.0-or-later" "$workspaces_root/workspace-web/README.md" >/dev/null
+grep -F "Wizardry Addendum 1.0" "$workspaces_root/workspace-web/WIZARDRY_ADDENDUM.md" >/dev/null
+grep -F "Starter: Sidebar" "$workspaces_root/workspace-web/app/index.html" >/dev/null
+grep -F "Emission material notice" "$workspaces_root/workspace-web/app/index.html" >/dev/null
+
+printf '%s\n' "custom readme" > "$workspaces_root/workspace-web/README.md"
+rm -f "$workspaces_root/workspace-web/LICENSE" "$workspaces_root/workspace-web/WIZARDRY_ADDENDUM.md"
+rebuild_workspace_web_out=$(sh "$backend" rebuild-workspace "$scratch" "$workspaces_root/workspace-web" web)
+printf '%s\n' "$rebuild_workspace_web_out" | grep -F "workspace=$workspace_web_abs" >/dev/null
+[ -f "$workspaces_root/workspace-web/LICENSE" ]
+[ -f "$workspaces_root/workspace-web/WIZARDRY_ADDENDUM.md" ]
+grep -Fx "custom readme" "$workspaces_root/workspace-web/README.md" >/dev/null
 
 workspace_godot_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-godot "Workspace Godot" godot clone "macos,linux,godot-desktop" base-tool "$workspaces_root")
 printf '%s\n' "$workspace_godot_out" | grep -F "created=$workspaces_root/workspace-godot" >/dev/null
@@ -218,8 +237,10 @@ printf '%s\n' "$import_workspace_out" | grep -F "profile_created=1" >/dev/null
 [ -L "$workspaces_root_abs/plain-web" ]
 [ ! -e "$workspaces_root_abs/plain-web-2" ]
 [ -f "$external_workspace_abs/wizardry.workspace.conf" ]
+[ -f "$external_workspace_abs/README.md" ]
 grep -F "project_type=application" "$external_workspace_abs/wizardry.workspace.conf" >/dev/null
 grep -F "development_context=web" "$external_workspace_abs/wizardry.workspace.conf" >/dev/null
+grep -F "Imported into App Forge as a managed workspace." "$external_workspace_abs/README.md" >/dev/null
 
 import_workspace_dup_out=$(sh "$backend" import-workspace "$scratch" "$external_workspace_abs" "$workspaces_root")
 printf '%s\n' "$import_workspace_dup_out" | grep -F "workspace=$external_workspace_abs" >/dev/null
@@ -256,6 +277,7 @@ grep -F "development_context=web" "$generic_workspace_abs/wizardry.workspace.con
 grep -F "starter=import-generic" "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
 grep -F "profile_kind=generic" "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
 grep -E '^targets=$' "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
+grep -Fx "hello" "$generic_workspace_abs/README.md" >/dev/null
 
 workspaces_after_import=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces_after_import" | grep -E '^plain-web\t' >/dev/null

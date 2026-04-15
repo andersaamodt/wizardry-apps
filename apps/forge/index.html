@@ -307,7 +307,11 @@
                   <label for="starter-application-select">Application starter</label>
                   <select id="starter-application-select" class="starter-select">
                     <option value="minimal">Blank application project</option>
-                    <option value="panel">Template: Control panel project</option>
+                    <option value="panel">Starter: Control panel</option>
+                    <option value="sidebar">Starter: Left sidebar</option>
+                    <option value="topbar">Starter: Top bar + graph</option>
+                    <option value="dashboard">Starter: Dashboard</option>
+                    <option value="studio">Starter: Studio</option>
                   </select>
                 </div>
 
@@ -2138,7 +2142,11 @@
           els.starterApplicationSelect.innerHTML = '';
           [
             { value: 'minimal', label: 'Blank application project' },
-            { value: 'panel', label: 'Template: Control panel project' }
+            { value: 'panel', label: 'Starter: Control panel' },
+            { value: 'sidebar', label: 'Starter: Left sidebar' },
+            { value: 'topbar', label: 'Starter: Top bar + graph' },
+            { value: 'dashboard', label: 'Starter: Dashboard' },
+            { value: 'studio', label: 'Starter: Studio' }
           ].forEach(function (item) {
             var opt = document.createElement('option');
             opt.value = item.value;

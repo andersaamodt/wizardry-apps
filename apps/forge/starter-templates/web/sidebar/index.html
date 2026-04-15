@@ -1,0 +1,100 @@
+<!--
+  Emission material notice:
+  Repo-internal Wizardry use follows OWL 3.0.
+  Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__APP_NAME__</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail">
+      <p class="eyebrow">Starter: Sidebar</p>
+      <h1>__APP_NAME__</h1>
+      <nav class="nav">
+        <button type="button" data-view="overview" class="active">Overview</button>
+        <button type="button" data-view="queue">Queue</button>
+        <button type="button" data-view="history">History</button>
+      </nav>
+    </aside>
+
+    <main class="stage">
+      <section class="pane active" data-pane="overview">
+        <h2>Overview</h2>
+        <p>Use the left rail for categories, sections, or tools. The main pane can change without rebuilding the whole frame.</p>
+        <div class="actions">
+          <button id="refresh" type="button">Refresh</button>
+          <button id="inspect" type="button" class="ghost">Inspect</button>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="queue">
+        <h2>Queue</h2>
+        <ul>
+          <li>Draft item</li>
+          <li>Review item</li>
+          <li>Ship item</li>
+        </ul>
+      </section>
+
+      <section class="pane" data-pane="history">
+        <h2>History</h2>
+        <p>This pane is a placeholder for events, audit trails, or notes.</p>
+      </section>
+
+      <pre id="out">ready</pre>
+    </main>
+  </div>
+
+  <script src="./.host/shared/wizardry-bridge.js"></script>
+  <script>
+    var out = document.getElementById('out');
+
+    function setOutput(text) {
+      out.textContent = String(text || '').trim() || 'no output';
+    }
+
+    function showPane(name) {
+      document.querySelectorAll('[data-view]').forEach(function (button) {
+        button.classList.toggle('active', button.getAttribute('data-view') === name);
+      });
+      document.querySelectorAll('[data-pane]').forEach(function (pane) {
+        pane.classList.toggle('active', pane.getAttribute('data-pane') === name);
+      });
+    }
+
+    document.querySelectorAll('[data-view]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        showPane(button.getAttribute('data-view'));
+      });
+    });
+
+    async function run(argv) {
+      if (!window.wizardry || !window.wizardry.exec) {
+        setOutput('wizardry bridge unavailable');
+        return;
+      }
+      setOutput('running: ' + argv.join(' '));
+      try {
+        var res = await window.wizardry.exec(argv);
+        setOutput([res.stdout || '', res.stderr || ''].filter(Boolean).join('\n'));
+      } catch (err) {
+        setOutput(String(err && err.message ? err.message : err));
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', function () {
+      run(['sh', '-c', 'printf "overview refreshed"']);
+    });
+
+    document.getElementById('inspect').addEventListener('click', function () {
+      run(['sh', '-c', 'printf "selection: overview"']);
+    });
+  </script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 ## Scope
 - This file defines licensing and emission policy for `wizardry-apps`.
-- Treat this file as the canonical AI-facing spec for scaffolded project licensing until root license files and Forge behavior are updated to match.
+- Treat this file as the canonical AI-facing spec for scaffolded project licensing and keep implementation aligned with it.
 - Keep this file aligned with user-approved policy decisions from the thread that introduced it.
 
 ## Repo License Split
@@ -115,8 +115,10 @@ or association.
 
 ## Planned Generic Starter Set
 - Maintain a minimal blank starter.
-- Add a blank starter built around a left sidebar layout.
-- Add a blank starter built around a top menu bar plus main content region below it.
+- Maintain a blank starter built around a left sidebar layout.
+- Maintain a blank starter built around a top menu bar plus main content region below it.
+- Maintain a dashboard starter for metrics-first products.
+- Maintain a studio starter for canvas-plus-inspector products.
 - Treat those generic starters as emission material for sellable non-Wizardry apps.
 - Do not treat Wizardry-branded built-ins as sellable starter templates.
 
@@ -131,7 +133,7 @@ or association.
 ## Generated Project Files
 - Blank emitted projects should receive a root `LICENSE` file containing `AGPL-3.0-or-later`.
 - Blank emitted projects should receive a root `WIZARDRY_ADDENDUM.md` file containing `Wizardry Addendum 1.0`.
-- Blank emitted projects should receive a default `README.md` created by the starter itself.
+- Blank emitted projects should receive a default `README.md` only when one does not already exist.
 - The default generated README should include this short notice:
 
 ```text
@@ -141,8 +143,9 @@ Additional terms apply; see WIZARDRY_ADDENDUM.md.
 
 ## README Mutation Rules
 - Prefer generating the README correctly up front instead of patching it afterward.
-- Forge must never rewrite or patch an existing README in a project it did not just generate.
-- Dropped folders, imported projects, and clone-based starters must not have their README mutated by Forge.
+- Forge must never rewrite or patch an existing README.
+- Forge may create a default README only when creating a new project or when importing a folder that has no README at all.
+- Imported projects, dropped folders, and clone-based starters with an existing README must keep that README untouched.
 - Run/build/compile flows must not rewrite README files.
 - If a generated project's README is later user-edited or deleted, Forge must leave it alone.
 

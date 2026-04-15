@@ -1,0 +1,77 @@
+<!--
+  Emission material notice:
+  Repo-internal Wizardry use follows OWL 3.0.
+  Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__APP_NAME__</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="toolbar">
+      <div>
+        <p class="eyebrow">Starter: Studio</p>
+        <h1>__APP_NAME__</h1>
+      </div>
+      <div class="actions">
+        <button id="simulate" type="button">Simulate</button>
+        <button id="export" type="button" class="ghost">Export</button>
+      </div>
+    </header>
+
+    <main class="workbench">
+      <section class="canvas">
+        <div class="node a">Source</div>
+        <div class="node b">Transform</div>
+        <div class="node c">Preview</div>
+      </section>
+      <aside class="inspector">
+        <h2>Inspector</h2>
+        <dl>
+          <div><dt>Mode</dt><dd>Draft</dd></div>
+          <div><dt>Selection</dt><dd>Transform</dd></div>
+          <div><dt>Status</dt><dd>Idle</dd></div>
+        </dl>
+      </aside>
+    </main>
+
+    <pre id="out">ready</pre>
+  </div>
+
+  <script src="./.host/shared/wizardry-bridge.js"></script>
+  <script>
+    var out = document.getElementById('out');
+
+    function setOutput(text) {
+      out.textContent = String(text || '').trim() || 'no output';
+    }
+
+    async function run(argv) {
+      if (!window.wizardry || !window.wizardry.exec) {
+        setOutput('wizardry bridge unavailable');
+        return;
+      }
+      setOutput('running: ' + argv.join(' '));
+      try {
+        var res = await window.wizardry.exec(argv);
+        setOutput([res.stdout || '', res.stderr || ''].filter(Boolean).join('\n'));
+      } catch (err) {
+        setOutput(String(err && err.message ? err.message : err));
+      }
+    }
+
+    document.getElementById('simulate').addEventListener('click', function () {
+      run(['sh', '-c', 'printf "simulation: ok\\nselection: Transform"']);
+    });
+
+    document.getElementById('export').addEventListener('click', function () {
+      run(['sh', '-c', 'printf "export: preview-package.zip"']);
+    });
+  </script>
+</body>
+</html>

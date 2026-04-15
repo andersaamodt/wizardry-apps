@@ -1,3 +1,9 @@
+/*
+ * Emission material notice:
+ * - Repo-internal Wizardry use follows OWL 3.0.
+ * - Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+ * - See /LICENSE plus /licenses/AGPL-3.0-or-later.txt and /licenses/WIZARDRY_ADDENDUM.md.
+ */
 (function () {
   window.__wizardry_callbacks = window.__wizardry_callbacks || {};
 

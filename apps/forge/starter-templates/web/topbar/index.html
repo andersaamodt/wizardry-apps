@@ -1,0 +1,72 @@
+<!--
+  Emission material notice:
+  Repo-internal Wizardry use follows OWL 3.0.
+  Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__APP_NAME__</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Starter: Top Bar</p>
+      <h1>__APP_NAME__</h1>
+    </div>
+    <nav class="tabs">
+      <button type="button" class="active">Graph</button>
+      <button type="button">Signals</button>
+      <button type="button">Export</button>
+    </nav>
+  </header>
+
+  <main class="stage">
+    <section class="canvas-card">
+      <div class="card-head">
+        <div>
+          <h2>Graph Surface</h2>
+          <p>Good for dashboards, maps, graphs, or timeline-heavy interfaces.</p>
+        </div>
+        <button id="sample" type="button">Sample data</button>
+      </div>
+      <div class="chart">
+        <span style="height: 34%"></span>
+        <span style="height: 52%"></span>
+        <span style="height: 71%"></span>
+        <span style="height: 48%"></span>
+        <span style="height: 83%"></span>
+        <span style="height: 64%"></span>
+        <span style="height: 92%"></span>
+      </div>
+    </section>
+    <pre id="out">ready</pre>
+  </main>
+
+  <script src="./.host/shared/wizardry-bridge.js"></script>
+  <script>
+    var out = document.getElementById('out');
+
+    function setOutput(text) {
+      out.textContent = String(text || '').trim() || 'no output';
+    }
+
+    document.getElementById('sample').addEventListener('click', async function () {
+      if (!window.wizardry || !window.wizardry.exec) {
+        setOutput('wizardry bridge unavailable');
+        return;
+      }
+      setOutput('running: sample data');
+      try {
+        var res = await window.wizardry.exec(['sh', '-c', 'printf "nodes: 7\\nedges: 12\\nstatus: ready"']);
+        setOutput([res.stdout || '', res.stderr || ''].filter(Boolean).join('\n'));
+      } catch (err) {
+        setOutput(String(err && err.message ? err.message : err));
+      }
+    });
+  </script>
+</body>
+</html>

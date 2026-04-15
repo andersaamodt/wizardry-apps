@@ -1,0 +1,150 @@
+/*
+ * Emission material notice:
+ * Repo-internal Wizardry use follows OWL 3.0.
+ * Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+ */
+:root {
+  --bg: #f0f5f0;
+  --card: #fcfffc;
+  --line: #ccdbcc;
+  --ink: #1c2520;
+  --muted: #667168;
+  --accent: #1e726f;
+  --accent-soft: #d9f2f0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(30, 114, 111, 0.09), transparent 22%),
+    linear-gradient(180deg, #f8fbf8 0%, var(--bg) 100%);
+  color: var(--ink);
+  font-family: "Trebuchet MS", "Avenir Next", sans-serif;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: end;
+  padding: 1.2rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(252, 255, 252, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.eyebrow {
+  margin: 0 0 0.3rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.tabs button,
+#sample {
+  appearance: none;
+  width: fit-content;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tabs button {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.tabs button.active,
+#sample {
+  background: var(--accent);
+  color: #fff;
+}
+
+.stage {
+  padding: 1.4rem;
+}
+
+.canvas-card {
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: var(--card);
+}
+
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-head h2 {
+  margin: 0;
+}
+
+.card-head p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.8rem;
+  min-height: 18rem;
+  margin-top: 1.2rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(30, 114, 111, 0.06), transparent),
+    repeating-linear-gradient(
+      to top,
+      rgba(102, 113, 104, 0.16),
+      rgba(102, 113, 104, 0.16) 1px,
+      transparent 1px,
+      transparent 3.3rem
+    );
+}
+
+.chart span {
+  display: block;
+  border-radius: 999px 999px 0.6rem 0.6rem;
+  background: linear-gradient(180deg, var(--accent) 0%, #2f9a96 100%);
+}
+
+pre {
+  margin: 1rem 0 0;
+  padding: 0.9rem 1rem;
+  min-height: 8rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: #fff;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: "SFMono-Regular", "Menlo", monospace;
+}

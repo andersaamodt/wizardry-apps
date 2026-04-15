@@ -1,0 +1,73 @@
+<!--
+  Emission material notice:
+  Repo-internal Wizardry use follows OWL 3.0.
+  Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__APP_NAME__</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Starter: Dashboard</p>
+    <h1>__APP_NAME__</h1>
+    <button id="refresh" type="button">Refresh metrics</button>
+  </header>
+
+  <main class="grid">
+    <section class="card stat">
+      <span>Sessions</span>
+      <strong>128</strong>
+    </section>
+    <section class="card stat">
+      <span>Errors</span>
+      <strong>3</strong>
+    </section>
+    <section class="card stat">
+      <span>Queued</span>
+      <strong>17</strong>
+    </section>
+    <section class="card wide">
+      <h2>Activity</h2>
+      <ul>
+        <li>09:10 Imported source data</li>
+        <li>09:24 Rebuilt summary view</li>
+        <li>09:41 Published preview package</li>
+      </ul>
+    </section>
+    <section class="card wide">
+      <h2>Notes</h2>
+      <p>Use this layout for products that need a quick high-level read before drilling into detail.</p>
+    </section>
+  </main>
+
+  <pre id="out">ready</pre>
+
+  <script src="./.host/shared/wizardry-bridge.js"></script>
+  <script>
+    var out = document.getElementById('out');
+
+    function setOutput(text) {
+      out.textContent = String(text || '').trim() || 'no output';
+    }
+
+    document.getElementById('refresh').addEventListener('click', async function () {
+      if (!window.wizardry || !window.wizardry.exec) {
+        setOutput('wizardry bridge unavailable');
+        return;
+      }
+      setOutput('running: refresh metrics');
+      try {
+        var res = await window.wizardry.exec(['sh', '-c', 'printf "sessions: 128\\nerrors: 3\\nqueued: 17"']);
+        setOutput([res.stdout || '', res.stderr || ''].filter(Boolean).join('\n'));
+      } catch (err) {
+        setOutput(String(err && err.message ? err.message : err));
+      }
+    });
+  </script>
+</body>
+</html>

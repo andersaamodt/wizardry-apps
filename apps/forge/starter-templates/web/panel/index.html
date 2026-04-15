@@ -1,0 +1,64 @@
+<!--
+  Emission material notice:
+  Repo-internal Wizardry use follows OWL 3.0.
+  Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__APP_NAME__</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Starter: Control Panel</p>
+    <h1>__APP_NAME__</h1>
+    <p>Use this layout for command consoles, status dashboards, or operational surfaces.</p>
+  </header>
+
+  <main class="shell">
+    <section class="actions">
+      <button data-action="status" type="button">Status</button>
+      <button data-action="build" type="button">Build</button>
+      <button data-action="publish" type="button">Publish</button>
+      <button data-action="logs" type="button" class="ghost">Logs</button>
+    </section>
+    <pre id="out">ready</pre>
+  </main>
+
+  <script src="./.host/shared/wizardry-bridge.js"></script>
+  <script>
+    var out = document.getElementById('out');
+    var commands = {
+      status: ['sh', '-c', 'printf "status: ok\\nqueue: idle"'],
+      build: ['sh', '-c', 'printf "build: complete\\nartifact: dist/app"'],
+      publish: ['sh', '-c', 'printf "publish: dry-run\\nchannel: preview"'],
+      logs: ['sh', '-c', 'printf "logs: no entries yet"']
+    };
+
+    function setOutput(text) {
+      out.textContent = String(text || '').trim() || 'no output';
+    }
+
+    document.querySelectorAll('button[data-action]').forEach(function (button) {
+      button.addEventListener('click', async function () {
+        var key = button.getAttribute('data-action');
+        var argv = commands[key];
+        if (!window.wizardry || !window.wizardry.exec) {
+          setOutput('wizardry bridge unavailable');
+          return;
+        }
+        setOutput('running: ' + argv.join(' '));
+        try {
+          var res = await window.wizardry.exec(argv);
+          setOutput([res.stdout || '', res.stderr || ''].filter(Boolean).join('\n'));
+        } catch (err) {
+          setOutput(String(err && err.message ? err.message : err));
+        }
+      });
+    });
+  </script>
+</body>
+</html>

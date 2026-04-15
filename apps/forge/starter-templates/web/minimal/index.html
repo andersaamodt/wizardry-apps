@@ -1,0 +1,57 @@
+<!--
+  Emission material notice:
+  Repo-internal Wizardry use follows OWL 3.0.
+  Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__APP_NAME__</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <p class="eyebrow">Starter: Minimal</p>
+    <h1>__APP_NAME__</h1>
+    <p class="lede">A compact starting point for a utility, micro-tool, or focused desktop surface.</p>
+    <div class="actions">
+      <button id="ping" type="button">Ping bridge</button>
+      <button id="stamp" type="button" class="ghost">Print timestamp</button>
+    </div>
+    <pre id="out">ready</pre>
+  </main>
+
+  <script src="./.host/shared/wizardry-bridge.js"></script>
+  <script>
+    var out = document.getElementById('out');
+
+    function setOutput(text) {
+      out.textContent = String(text || '').trim() || 'no output';
+    }
+
+    async function run(argv) {
+      if (!window.wizardry || !window.wizardry.exec) {
+        setOutput('wizardry bridge unavailable');
+        return;
+      }
+      setOutput('running: ' + argv.join(' '));
+      try {
+        var res = await window.wizardry.exec(argv);
+        setOutput([res.stdout || '', res.stderr || ''].filter(Boolean).join('\n'));
+      } catch (err) {
+        setOutput(String(err && err.message ? err.message : err));
+      }
+    }
+
+    document.getElementById('ping').addEventListener('click', function () {
+      run(['sh', '-c', 'printf ping']);
+    });
+
+    document.getElementById('stamp').addEventListener('click', function () {
+      run(['sh', '-c', 'date +"%Y-%m-%d %H:%M:%S"']);
+    });
+  </script>
+</body>
+</html>

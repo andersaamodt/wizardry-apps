@@ -1,0 +1,188 @@
+/*
+ * Emission material notice:
+ * Repo-internal Wizardry use follows OWL 3.0.
+ * Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+ */
+:root {
+  --bg: #16171d;
+  --panel: #1f212b;
+  --panel-2: #262938;
+  --line: #3a3f53;
+  --ink: #eef0f7;
+  --muted: #aab0c6;
+  --accent: #efc14a;
+  --accent-2: #f39c5f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(239, 193, 74, 0.12), transparent 25%),
+    linear-gradient(180deg, #1b1d26 0%, var(--bg) 100%);
+  color: var(--ink);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.shell {
+  min-height: 100vh;
+  padding: 1.2rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.eyebrow {
+  margin: 0 0 0.3rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toolbar h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.actions button {
+  appearance: none;
+  width: fit-content;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.56rem 0.9rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--accent);
+  color: #2a2208;
+}
+
+.actions button.ghost {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 19rem);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.canvas,
+.inspector,
+pre {
+  border: 1px solid var(--line);
+  border-radius: 1.1rem;
+  background: var(--panel);
+}
+
+.canvas {
+  position: relative;
+  min-height: 24rem;
+  overflow: hidden;
+  background:
+    linear-gradient(transparent 31px, rgba(255, 255, 255, 0.04) 32px),
+    linear-gradient(90deg, transparent 31px, rgba(255, 255, 255, 0.04) 32px),
+    var(--panel);
+  background-size: 32px 32px, 32px 32px, auto;
+}
+
+.node {
+  position: absolute;
+  width: fit-content;
+  min-width: 8rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 1rem;
+  font-weight: 700;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #241705;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.25);
+}
+
+.node.a { top: 2.2rem; left: 2rem; }
+.node.b { top: 9rem; left: 15rem; }
+.node.c { top: 16rem; left: 29rem; }
+
+.inspector {
+  padding: 1rem;
+  background: var(--panel-2);
+}
+
+.inspector h2 {
+  margin-top: 0;
+}
+
+.inspector dl {
+  margin: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.inspector dt {
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.inspector dd {
+  margin: 0.18rem 0 0;
+}
+
+pre {
+  margin: 1rem 0 0;
+  padding: 0.9rem 1rem;
+  min-height: 8rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: "SFMono-Regular", "Menlo", monospace;
+}
+
+@media (max-width: 980px) {
+  .workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .canvas {
+    min-height: 18rem;
+  }
+
+  .node.b {
+    left: 11rem;
+  }
+
+  .node.c {
+    left: 20rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .canvas {
+    min-height: 16rem;
+  }
+
+  .node {
+    position: static;
+    display: inline-block;
+    margin: 1rem 0 0 1rem;
+  }
+}

@@ -1,0 +1,101 @@
+/*
+ * Emission material notice:
+ * Repo-internal Wizardry use follows OWL 3.0.
+ * Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+ */
+:root {
+  --bg: #f6ecdf;
+  --panel: #fff9f2;
+  --line: #d9c4ab;
+  --ink: #322213;
+  --muted: #7d5f3d;
+  --accent: #a45314;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at top right, rgba(164, 83, 20, 0.16), transparent 32%),
+    linear-gradient(180deg, #f1dfca 0%, var(--bg) 100%);
+  color: var(--ink);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.hero,
+.shell {
+  width: min(56rem, 100%);
+  margin: 0 auto;
+}
+
+.hero {
+  margin-bottom: 1rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.1rem, 4vw, 3rem);
+}
+
+.hero p {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  max-width: 42rem;
+}
+
+.shell {
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: var(--panel);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+button {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  padding: 0.58rem 0.9rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff9f4;
+}
+
+button.ghost {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
+pre {
+  margin: 1rem 0 0;
+  min-height: 14rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: #fffdf9;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: "SFMono-Regular", "Menlo", monospace;
+}
