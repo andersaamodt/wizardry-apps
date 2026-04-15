@@ -86,6 +86,11 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 @property (copy) NSString *nativeFileDragTarget;
 @end
 
+@interface WizardrySimulatedDraggingInfo : NSObject
+@property (strong) NSPasteboard *pasteboard;
+@property (assign) NSPoint windowPoint;
+@end
+
 @interface AppDelegate : NSObject <NSApplicationDelegate, WKScriptMessageHandler, NSWindowDelegate, WKUIDelegate>
 @property (strong) NSWindow *window;
 @property (strong) WKWebView *webView;
@@ -349,6 +354,18 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
         self.nativeFileDragTarget = nil;
     }
     return [super performDragOperation:sender];
+}
+
+@end
+
+@implementation WizardrySimulatedDraggingInfo
+
+- (NSPasteboard *)draggingPasteboard {
+    return self.pasteboard;
+}
+
+- (NSPoint)draggingLocation {
+    return self.windowPoint;
 }
 
 @end
@@ -1021,14 +1038,44 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
         return NO;
     }
-    NSString *target = @"";
     NSArray<NSString *> *safePaths = paths ?: @[];
+    if (!self.webView || ![self.webView isKindOfClass:[WizardryForgeWebView class]]) {
+        if (errorMessage) {
+            *errorMessage = @"native workspace drop simulation requires a forge web view";
+        }
+        return NO;
+    }
+
+    WizardryForgeWebView *forgeWebView = (WizardryForgeWebView *)self.webView;
+    NSPasteboard *pasteboard = [NSPasteboard pasteboardWithUniqueName];
+    [pasteboard clearContents];
+    NSMutableArray<NSURL *> *fileURLs = [NSMutableArray array];
+    for (NSString *candidatePath in safePaths) {
+        NSString *trimmedPath = [[NSString stringWithFormat:@"%@", candidatePath ?: @""] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (!trimmedPath.length) {
+            continue;
+        }
+        BOOL isDirectory = NO;
+        [[NSFileManager defaultManager] fileExistsAtPath:trimmedPath isDirectory:&isDirectory];
+        [fileURLs addObject:[NSURL fileURLWithPath:trimmedPath isDirectory:isDirectory]];
+    }
+    if (fileURLs.count) {
+        [pasteboard writeObjects:fileURLs];
+    }
+
+    NSPoint localPoint = NSMakePoint(domX, forgeWebView.bounds.size.height - domY);
+    NSPoint windowPoint = [forgeWebView convertPoint:localPoint toView:nil];
+    WizardrySimulatedDraggingInfo *draggingInfo = [[WizardrySimulatedDraggingInfo alloc] init];
+    draggingInfo.pasteboard = pasteboard;
+    draggingInfo.windowPoint = windowPoint;
+
     if (![normalizedPhase isEqualToString:@"leave"]) {
-        target = [self forgeDropTargetAtDomX:domX domY:domY paths:safePaths hasImagePayload:NO];
+        NSArray<NSString *> *resolvedPaths = [self filePathsFromDraggingInfo:(id<NSDraggingInfo>)draggingInfo];
+        NSString *target = [self forgeDropTargetAtDomX:domX domY:domY paths:resolvedPaths hasImagePayload:NO];
         if (!target.length) {
             if (errorMessage) {
                 NSMutableArray<NSString *> *pathStates = [NSMutableArray array];
-                for (NSString *candidatePath in safePaths) {
+                for (NSString *candidatePath in resolvedPaths.count ? resolvedPaths : safePaths) {
                     BOOL isDirectory = NO;
                     BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:candidatePath isDirectory:&isDirectory];
                     [pathStates addObject:[NSString stringWithFormat:@"%@ exists=%@ dir=%@",
@@ -1049,8 +1096,18 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             return NO;
         }
     }
-    [self dispatchForgeFileDragPhase:normalizedPhase target:target domX:domX domY:domY paths:([normalizedPhase isEqualToString:@"leave"] ? @[] : safePaths) hasImagePayload:NO nativeHandled:NO];
-    return YES;
+
+    if ([normalizedPhase isEqualToString:@"enter"]) {
+        return [forgeWebView draggingEntered:(id<NSDraggingInfo>)draggingInfo] != NSDragOperationNone;
+    }
+    if ([normalizedPhase isEqualToString:@"update"]) {
+        return [forgeWebView draggingUpdated:(id<NSDraggingInfo>)draggingInfo] != NSDragOperationNone;
+    }
+    if ([normalizedPhase isEqualToString:@"leave"]) {
+        [forgeWebView draggingExited:(id<NSDraggingInfo>)draggingInfo];
+        return YES;
+    }
+    return [forgeWebView performDragOperation:(id<NSDraggingInfo>)draggingInfo];
 }
 
 - (NSArray<NSString *> *)forgeIconDropCommandArgumentsForPath:(NSString *)imagePath {
@@ -1910,72 +1967,57 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
     } else if ([self isArtificerApp]) {
         NSString *normalized = [[relayState ?: @"idle" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        CGFloat inset = MAX(1.0, floor(side * 0.10));
+        CGFloat inset = MAX(0.0, floor(side * 0.04));
         NSRect glyphRect = NSInsetRect(NSMakeRect(0.0, 0.0, side, side), inset, inset);
         CGFloat minX = NSMinX(glyphRect);
         CGFloat maxX = NSMaxX(glyphRect);
         CGFloat minY = NSMinY(glyphRect);
         CGFloat maxY = NSMaxY(glyphRect);
         CGFloat midX = NSMidX(glyphRect);
-        CGFloat midY = NSMidY(glyphRect);
-        CGFloat strokeWidth = MAX(1.1, floor(side * 0.09));
-        CGFloat shaftWidth = MAX(1.8, floor(side * 0.16));
+        CGFloat strokeWidth = 2.0;
+        CGFloat footSpan = side * 0.12;
+        CGFloat diamondHalfWidth = side * 0.11;
+        CGFloat diamondHalfHeight = side * 0.12;
+        CGFloat topY = minY + side * 0.05;
+        CGFloat sharedY = topY + diamondHalfHeight * 2.0;
+        CGFloat bottomY = topY + diamondHalfHeight * 4.0;
+        CGFloat footY = maxY - side * 0.05;
+        CGFloat upperDiamondTopY = topY;
 
-        NSBezierPath *shaft = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(floor(midX - shaftWidth * 0.5),
-                                                                                  floor(minY + side * 0.12),
-                                                                                  shaftWidth,
-                                                                                  floor((maxY - minY) * 0.70))
-                                                             xRadius:shaftWidth * 0.5
-                                                             yRadius:shaftWidth * 0.5];
-        NSBezierPath *topSpike = [NSBezierPath bezierPath];
-        [topSpike moveToPoint:NSMakePoint(midX, minY)];
-        [topSpike lineToPoint:NSMakePoint(midX + shaftWidth * 0.95, minY + side * 0.17)];
-        [topSpike lineToPoint:NSMakePoint(midX, minY + side * 0.28)];
-        [topSpike lineToPoint:NSMakePoint(midX - shaftWidth * 0.95, minY + side * 0.17)];
-        [topSpike closePath];
+        NSPoint leftFoot = NSMakePoint(midX - footSpan, footY);
+        NSPoint rightFoot = NSMakePoint(midX + footSpan, footY);
+        NSPoint upperTop = NSMakePoint(midX, upperDiamondTopY);
+        NSPoint upperLeft = NSMakePoint(midX - diamondHalfWidth, sharedY - diamondHalfHeight * 0.5);
+        NSPoint upperRight = NSMakePoint(midX + diamondHalfWidth, sharedY - diamondHalfHeight * 0.5);
+        NSPoint sharedPoint = NSMakePoint(midX, sharedY);
+        NSPoint lowerLeft = NSMakePoint(midX - diamondHalfWidth, sharedY + diamondHalfHeight * 0.5);
+        NSPoint lowerRight = NSMakePoint(midX + diamondHalfWidth, sharedY + diamondHalfHeight * 0.5);
+        NSPoint lowerBottom = NSMakePoint(midX, bottomY);
 
-        NSBezierPath *bottomSpike = [NSBezierPath bezierPath];
-        [bottomSpike moveToPoint:NSMakePoint(midX, maxY)];
-        [bottomSpike lineToPoint:NSMakePoint(midX + shaftWidth * 0.95, maxY - side * 0.17)];
-        [bottomSpike lineToPoint:NSMakePoint(midX, maxY - side * 0.28)];
-        [bottomSpike lineToPoint:NSMakePoint(midX - shaftWidth * 0.95, maxY - side * 0.17)];
-        [bottomSpike closePath];
+        NSBezierPath *leftStroke = [NSBezierPath bezierPath];
+        [leftStroke moveToPoint:upperTop];
+        [leftStroke lineToPoint:upperLeft];
+        [leftStroke lineToPoint:sharedPoint];
+        [leftStroke lineToPoint:lowerLeft];
+        [leftStroke lineToPoint:lowerBottom];
+        [leftStroke lineToPoint:leftFoot];
 
-        NSBezierPath *blade = [NSBezierPath bezierPath];
-        [blade moveToPoint:NSMakePoint(midX - shaftWidth * 0.10, midY - side * 0.06)];
-        [blade lineToPoint:NSMakePoint(minX + side * 0.02, midY - side * 0.30)];
-        [blade lineToPoint:NSMakePoint(midX - side * 0.03, midY - side * 0.52)];
-        [blade lineToPoint:NSMakePoint(midX + side * 0.14, midY - side * 0.18)];
-        [blade lineToPoint:NSMakePoint(midX + side * 0.06, midY + side * 0.04)];
-        [blade closePath];
+        NSBezierPath *rightStroke = [NSBezierPath bezierPath];
+        [rightStroke moveToPoint:upperTop];
+        [rightStroke lineToPoint:upperRight];
+        [rightStroke lineToPoint:sharedPoint];
+        [rightStroke lineToPoint:lowerRight];
+        [rightStroke lineToPoint:lowerBottom];
+        [rightStroke lineToPoint:rightFoot];
 
-        NSBezierPath *hammerFace = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(midX + side * 0.02,
-                                                                                       midY - side * 0.30,
-                                                                                       side * 0.20,
-                                                                                       side * 0.13)
-                                                                  xRadius:side * 0.04
-                                                                  yRadius:side * 0.04];
-
-        NSBezierPath *gem = [NSBezierPath bezierPath];
-        [gem moveToPoint:NSMakePoint(midX, midY - side * 0.16)];
-        [gem lineToPoint:NSMakePoint(midX + side * 0.11, midY)];
-        [gem lineToPoint:NSMakePoint(midX, midY + side * 0.16)];
-        [gem lineToPoint:NSMakePoint(midX - side * 0.11, midY)];
-        [gem closePath];
-
-        NSArray<NSBezierPath *> *weaponPaths = @[shaft, topSpike, bottomSpike, blade, hammerFace, gem];
-        void (^fillWeapon)(void) = ^{
-            [[NSColor blackColor] setFill];
-            for (NSBezierPath *path in weaponPaths) {
-                [path fill];
-            }
-        };
-        void (^strokeWeapon)(void) = ^{
-                [[NSColor blackColor] setStroke];
-            for (NSBezierPath *path in weaponPaths) {
+        NSArray<NSBezierPath *> *braidStrokes = @[leftStroke, rightStroke];
+        void (^strokeGlyphWithColor)(NSColor *) = ^(NSColor *strokeColor) {
+            NSColor *resolvedStrokeColor = strokeColor ? strokeColor : [NSColor blackColor];
+            [resolvedStrokeColor setStroke];
+            for (NSBezierPath *path in braidStrokes) {
                 [path setLineWidth:strokeWidth];
-                [path setLineJoinStyle:NSLineJoinStyleRound];
-                [path setLineCapStyle:NSLineCapStyleRound];
+                [path setLineJoinStyle:NSLineJoinStyleMiter];
+                [path setLineCapStyle:NSLineCapStyleButt];
                 [path stroke];
             }
         };
@@ -1986,9 +2028,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         };
 
         if ([normalized isEqualToString:@"running"]) {
-            fillWeapon();
+            strokeGlyphWithColor([NSColor blackColor]);
         } else if ([normalized isEqualToString:@"paused"]) {
-            fillWeapon();
+            strokeGlyphWithColor([NSColor blackColor]);
             CGFloat badgeRadius = MAX(2.8, floor(side * 0.18));
             CGFloat badgeX = maxX - badgeRadius;
             CGFloat badgeY = maxY - badgeRadius * 0.85;
@@ -2005,7 +2047,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             [[NSBezierPath bezierPathWithRoundedRect:rightBar xRadius:barWidth * 0.45 yRadius:barWidth * 0.45] fill];
             [[NSGraphicsContext currentContext] restoreGraphicsState];
         } else if ([normalized isEqualToString:@"error"]) {
-            fillWeapon();
+            strokeGlyphWithColor([NSColor blackColor]);
             CGFloat badgeRadius = MAX(2.8, floor(side * 0.18));
             CGFloat badgeX = maxX - badgeRadius;
             CGFloat badgeY = maxY - badgeRadius * 0.85;
@@ -2022,7 +2064,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(floor(badgeX - 0.8), floor(badgeY - badgeRadius * 0.72), 1.6, 1.6)] fill];
             [[NSGraphicsContext currentContext] restoreGraphicsState];
         } else {
-            strokeWeapon();
+            NSColor *idleStroke = [normalized isEqualToString:@"disabled"]
+                ? [[NSColor blackColor] colorWithAlphaComponent:0.70]
+                : [[NSColor blackColor] colorWithAlphaComponent:0.82];
+            strokeGlyphWithColor(idleStroke);
             if ([normalized isEqualToString:@"disabled"]) {
                 NSBezierPath *slash = [NSBezierPath bezierPath];
                 [slash setLineWidth:MAX(1.2, floor(side * 0.09))];
