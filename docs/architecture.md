@@ -10,6 +10,8 @@
 - Hosted web remains shell/CGI reference semantics.
 - Desktop/mobile use embedded `wizardry-core` for fast-path operations.
 - `App Forge` (`apps/forge`) is the desktop control-plane app for build/run/scaffold workflows, implemented as WebView UI + POSIX shell backend.
+- Forge can scaffold three workspace contexts in-repo: cross-platform web (`web`), native desktop IR (`native-desktop`), and Godot (`godot`).
+- Native desktop workspaces keep canonical UI in `ir/app.ir.yaml` and regenerate platform source into standard macOS and GTK/Linux project trees.
 - Core API contract is transport-agnostic JSON-RPC 2.0.
 - Core v1 methods implemented in repository:
   - `core.ping`, `vault.mount`, `vault.info`

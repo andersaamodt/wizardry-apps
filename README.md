@@ -6,6 +6,7 @@ This repository owns:
 - hosted web templates and packaging
 - desktop WebView hosts (macOS + Linux)
 - mobile WebView hosts (iOS + Android)
+- native desktop app scaffolding and IR schemas for Forge-generated projects
 - wizardry-core runtime contracts and implementation
 - release pipelines for app distribution
 

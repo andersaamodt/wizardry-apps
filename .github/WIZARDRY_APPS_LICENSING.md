@@ -119,6 +119,7 @@ or association.
 - Maintain a blank starter built around a top menu bar plus main content region below it.
 - Maintain a dashboard starter for metrics-first products.
 - Maintain a studio starter for canvas-plus-inspector products.
+- Maintain a blank native desktop starter whose canonical UI is emitted as IR plus generated native source trees.
 - Treat those generic starters as emission material for sellable non-Wizardry apps.
 - Do not treat Wizardry-branded built-ins as sellable starter templates.
 

@@ -273,9 +273,15 @@
                 <div class="type-picker">
                   <label class="type-option" id="type-application-card">
                     <input type="radio" name="project-type" value="application" checked>
-                    <span class="type-icon">🖥</span>
-                    <span class="type-title">Application</span>
-                    <span class="type-desc">A website-based app packaged as a real app. Good for most applications.</span>
+                    <span class="type-icon">🧭</span>
+                    <span class="type-title">Cross-Platform App</span>
+                    <span class="type-desc">A website-based app packaged for desktop, mobile, and hosted web targets. Good for most applications.</span>
+                  </label>
+                  <label class="type-option" id="type-native-desktop-card">
+                    <input type="radio" name="project-type" value="native-desktop">
+                    <span class="type-icon">🪟</span>
+                    <span class="type-title">Native Desktop App</span>
+                    <span class="type-desc">A macOS and Linux desktop project driven by a canonical native UI IR.</span>
                   </label>
                   <label class="type-option" id="type-game-card">
                     <input type="radio" name="project-type" value="game">
@@ -304,7 +310,7 @@
               <summary class="pipeline-section-head">Starter</summary>
               <div class="pipeline-section-body">
                 <div id="starter-application" class="starter-pane active">
-                  <label for="starter-application-select">Application starter</label>
+                  <label for="starter-application-select">Cross-platform starter</label>
                   <select id="starter-application-select" class="starter-select">
                     <option value="minimal">Blank application project</option>
                     <option value="panel">Starter: Control panel</option>
@@ -312,6 +318,13 @@
                     <option value="topbar">Starter: Top bar + graph</option>
                     <option value="dashboard">Starter: Dashboard</option>
                     <option value="studio">Starter: Studio</option>
+                  </select>
+                </div>
+
+                <div id="starter-native-desktop" class="starter-pane">
+                  <label for="starter-native-desktop-select">Native desktop starter</label>
+                  <select id="starter-native-desktop-select" class="starter-select">
+                    <option value="blank">Blank native desktop project</option>
                   </select>
                 </div>
 
@@ -329,8 +342,8 @@
               <div class="pipeline-section-body">
                 <div class="target-grid">
                   <div class="target-item" data-target-groups="application"><input id="target-hosted-web" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-hosted-web.svg" alt=""></span>Hosted Web</div>
-                  <div class="target-item" data-target-groups="application,game"><input id="target-macos" type="checkbox" checked><span class="target-icon" aria-hidden="true"></span>macOS Desktop</div>
-                  <div class="target-item" data-target-groups="application,game"><input id="target-linux" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-linux.svg" alt=""></span>Linux Desktop</div>
+                  <div class="target-item" data-target-groups="application,native-desktop,game"><input id="target-macos" type="checkbox" checked><span class="target-icon" aria-hidden="true"></span>macOS Desktop</div>
+                  <div class="target-item" data-target-groups="application,native-desktop,game"><input id="target-linux" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-linux.svg" alt=""></span>Linux Desktop</div>
                   <div class="target-item" data-target-groups="application,game"><input id="target-ios" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-ios.svg" alt=""></span>iOS</div>
                   <div class="target-item" data-target-groups="application,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</div>
                 </div>
@@ -2160,6 +2173,21 @@
             els.starterApplicationSelect.appendChild(opt);
           });
         }
+        if (els.starterNativeDesktopSelect) {
+          els.starterNativeDesktopSelect.innerHTML = '';
+          var nativeBlank = document.createElement('option');
+          nativeBlank.value = 'blank';
+          nativeBlank.textContent = 'Blank native desktop project';
+          els.starterNativeDesktopSelect.appendChild(nativeBlank);
+          state.workspaces
+            .filter(function (ws) { return ws.projectType === nativeDesktopProjectTypeKey(); })
+            .forEach(function (ws) {
+              var opt = document.createElement('option');
+              opt.value = 'clone:' + ws.id;
+              opt.textContent = 'Clone ' + ws.title;
+              els.starterNativeDesktopSelect.appendChild(opt);
+            });
+        }
         if (els.starterGameSelect) {
           els.starterGameSelect.innerHTML = '';
           var blank = document.createElement('option');
@@ -2301,8 +2329,49 @@
         scheduleWindowFit();
       }
 
+      function nativeDesktopProjectTypeKey() {
+        return 'native-desktop';
+      }
+
+      function createProjectTypeConfig(projectType) {
+        if (projectType === 'game') {
+          return {
+            key: 'game',
+            label: 'Game',
+            context: 'godot',
+            starterPaneId: 'starter-game',
+            starterSelectId: 'starterGameSelect',
+            targetGroups: ['game']
+          };
+        }
+        if (projectType === nativeDesktopProjectTypeKey()) {
+          return {
+            key: nativeDesktopProjectTypeKey(),
+            label: 'Native Desktop App',
+            context: 'native-desktop',
+            starterPaneId: 'starter-native-desktop',
+            starterSelectId: 'starterNativeDesktopSelect',
+            targetGroups: [nativeDesktopProjectTypeKey()]
+          };
+        }
+        return {
+          key: 'application',
+          label: 'Cross-Platform App',
+          context: 'web',
+          starterPaneId: 'starter-application',
+          starterSelectId: 'starterApplicationSelect',
+          targetGroups: ['application']
+        };
+      }
+
       function inferProjectTypeFromContext(ctx) {
-        return ctx === 'godot' ? 'Game' : 'Application';
+        if (ctx === 'godot') {
+          return 'Game';
+        }
+        if (ctx === 'native-desktop') {
+          return 'Native Desktop App';
+        }
+        return 'Cross-Platform App';
       }
 
       function syncSelectedPathCompactMode() {
@@ -2351,7 +2420,13 @@
       }
 
       function projectTypeKeyForContext(ctx) {
-        return ctx === 'godot' ? 'game' : 'application';
+        if (ctx === 'godot') {
+          return 'game';
+        }
+        if (ctx === 'native-desktop') {
+          return nativeDesktopProjectTypeKey();
+        }
+        return 'application';
       }
 
       function parseTargetsCSV(value) {
@@ -2380,6 +2455,11 @@
         if (projectType === 'game') {
           return specs.filter(function (item) {
             return item.id !== 'hosted-web';
+          });
+        }
+        if (projectType === nativeDesktopProjectTypeKey()) {
+          return specs.filter(function (item) {
+            return item.id === 'macos' || item.id === 'linux';
           });
         }
         return specs;
@@ -2504,6 +2584,15 @@
           return false;
         }
         return false;
+      }
+
+      function isTargetRunnableForSelected(selected, targetId) {
+        if (selected && selected.kind === 'workspace' && selected.context === 'native-desktop') {
+          if (targetId === 'macos' || targetId === 'linux') {
+            return false;
+          }
+        }
+        return isTargetRunnable(targetId);
       }
 
       function captureTargetRowRects() {
@@ -3597,9 +3686,10 @@
         }
         var contextPill = document.createElement('span');
         contextPill.className = 'context-dot';
-        var isGameContext = item.context === 'godot';
-        contextPill.classList.add(isGameContext ? 'game' : 'web');
-        contextPill.textContent = isGameContext ? 'game' : 'web';
+        var contextClass = item.context === 'godot' ? 'game' : (item.context === 'native-desktop' ? 'native-desktop' : 'web');
+        var contextLabel = item.context === 'godot' ? 'game' : (item.context === 'native-desktop' ? 'native' : 'web');
+        contextPill.classList.add(contextClass);
+        contextPill.textContent = contextLabel;
         nameWrap.appendChild(contextPill);
         if (item.kind === 'builtin' && isWizardrySuiteItem(item)) {
           var suiteDot = document.createElement('span');
@@ -3911,13 +4001,16 @@
         }
         if (els.selectedTypeBadge) {
           var isGameType = selected.context === 'godot';
-          var typeText = inferProjectTypeFromContext(selected.context) + ' (' + (isGameType ? 'Godot' : selected.context) + ')';
+          var isNativeDesktopType = selected.context === 'native-desktop';
+          var typeContextLabel = isGameType ? 'Godot' : (isNativeDesktopType ? 'native-desktop' : selected.context);
+          var typeText = inferProjectTypeFromContext(selected.context) + ' (' + typeContextLabel + ')';
           els.selectedTypeBadge.innerHTML = '';
           var typeLabel = document.createElement('span');
           typeLabel.textContent = typeText;
           els.selectedTypeBadge.appendChild(typeLabel);
           els.selectedTypeBadge.classList.toggle('game', isGameType);
-          els.selectedTypeBadge.classList.toggle('web', !isGameType);
+          els.selectedTypeBadge.classList.toggle('native-desktop', isNativeDesktopType);
+          els.selectedTypeBadge.classList.toggle('web', !isGameType && !isNativeDesktopType);
           els.selectedTypeBadge.classList.remove('hidden');
         }
         if (els.selectedSuiteBadge) {
@@ -4060,6 +4153,9 @@
         }
         if (isBuiltInNotDownloaded(selected)) {
           return false;
+        }
+        if (selected.kind === 'workspace') {
+          return hasEnabledHostRunTarget(selected) || hasEnabledHostedWebTarget(selected);
         }
         return true;
       }
@@ -5294,6 +5390,7 @@
           root: String(raw.root || raw.workspace || ''),
           profile_kind: String(raw.profile_kind || ''),
           app_subpath: String(raw.app_subpath || ''),
+          native_ir_path: String(raw.native_ir_path || ''),
           hosted_web_mode: String(raw.hosted_web_mode || ''),
           hosted_web_site_name: String(raw.hosted_web_site_name || ''),
           hosted_web_serve_script: String(raw.hosted_web_serve_script || ''),
@@ -5433,9 +5530,18 @@
         }
         var nextValue = String(value == null ? '' : value);
         if (fieldKey === 'kind') {
-          var targetProjectType = nextValue === 'game:godot' ? 'game' : 'application';
-          var targetContext = nextValue === 'game:godot' ? 'godot' : 'web';
-          var targetStarter = nextValue === 'game:godot' ? 'import-godot' : 'import-web';
+          var targetProjectType = 'application';
+          var targetContext = 'web';
+          var targetStarter = 'import-web';
+          if (nextValue === 'game:godot') {
+            targetProjectType = 'game';
+            targetContext = 'godot';
+            targetStarter = 'import-godot';
+          } else if (nextValue === 'native-desktop:native-desktop') {
+            targetProjectType = nativeDesktopProjectTypeKey();
+            targetContext = 'native-desktop';
+            targetStarter = 'import-native-desktop';
+          }
           if (profile.project_type === targetProjectType && profile.development_context === targetContext) {
             preserveActiveRouteScroll(function () {
               renderWorkspaceProfileEditor(selected);
@@ -5805,14 +5911,28 @@
           field: 'kind',
           label: 'Project kind',
           compact: true,
-          value: profile.development_context === 'godot' ? 'game:godot' : 'application:web',
+          value: profile.development_context === 'godot'
+            ? 'game:godot'
+            : (profile.development_context === 'native-desktop'
+              ? 'native-desktop:native-desktop'
+              : 'application:web'),
           options: [
-            { value: 'application:web', label: 'Web application project' },
+            { value: 'application:web', label: 'Cross-platform app project' },
+            { value: 'native-desktop:native-desktop', label: 'Native desktop app project' },
             { value: 'game:godot', label: 'Godot game project' }
           ],
           help: 'This updates the project type and development context together.'
         }));
-        if (profile.development_context !== 'godot') {
+        if (profile.development_context === 'native-desktop') {
+          fields.appendChild(createWorkspaceProfilePathField(selected, {
+            field: 'native_ir_path',
+            label: 'Canonical IR path',
+            value: profile.native_ir_path,
+            path: true,
+            placeholder: 'ir/app.ir.yaml',
+            help: 'This JSON-compatible YAML file is the single source of truth for the native desktop UI.'
+          }));
+        } else if (profile.development_context !== 'godot') {
           fields.appendChild(createWorkspaceProfilePathField(selected, {
             field: 'app_subpath',
             label: 'App subpath',
@@ -5977,7 +6097,7 @@
           });
           rowActions.appendChild(openBtn);
 
-          var runnable = isTargetRunnable(spec.id);
+          var runnable = isTargetRunnableForSelected(selected, spec.id);
           var runBtn = document.createElement('button');
           runBtn.type = 'button';
           runBtn.className = 'row-mini';
@@ -6054,6 +6174,7 @@
         els.targetActiveList.appendChild(activeFragment);
         els.targetInactiveList.appendChild(inactiveFragment);
         var showInstallBeforeRun = !!(
+          selected.kind === 'builtin' &&
           hostTarget &&
           activeSet[hostTarget] &&
           isTargetSupportedForSelected(selected, hostTarget)
@@ -6223,6 +6344,10 @@
           await serveHostedWebTarget(selected);
           return;
         }
+        if (selected.context === 'native-desktop') {
+          await runWorkspacePipelineAction('build', selected);
+          return;
+        }
         if (targetId === 'macos' && state.os !== 'darwin') {
           throw new Error('macOS target can only be run on macOS.');
         }
@@ -6314,6 +6439,14 @@
       }
 
       function applyTargetPreset(projectType) {
+        if (projectType === nativeDesktopProjectTypeKey()) {
+          els.targetHostedWeb.checked = false;
+          els.targetMacos.checked = true;
+          els.targetLinux.checked = true;
+          els.targetIos.checked = false;
+          els.targetAndroid.checked = false;
+          return;
+        }
         if (projectType === 'game') {
           els.targetHostedWeb.checked = false;
           els.targetMacos.checked = true;
@@ -6348,12 +6481,16 @@
       function syncCreateUI() {
         var projectType = selectedProjectType();
         var applicationActive = projectType === 'application';
+        var nativeDesktopActive = projectType === nativeDesktopProjectTypeKey();
+        var gameActive = projectType === 'game';
 
         document.getElementById('starter-application').classList.toggle('active', applicationActive);
-        document.getElementById('starter-game').classList.toggle('active', !applicationActive);
+        document.getElementById('starter-native-desktop').classList.toggle('active', nativeDesktopActive);
+        document.getElementById('starter-game').classList.toggle('active', gameActive);
 
         document.getElementById('type-application-card').classList.toggle('active', applicationActive);
-        document.getElementById('type-game-card').classList.toggle('active', !applicationActive);
+        document.getElementById('type-native-desktop-card').classList.toggle('active', nativeDesktopActive);
+        document.getElementById('type-game-card').classList.toggle('active', gameActive);
 
         if (state.lastProjectType !== projectType) {
           applyTargetPreset(projectType);
@@ -6375,6 +6512,9 @@
         }
         if (els.starterApplicationSelect && els.starterApplicationSelect.options.length) {
           els.starterApplicationSelect.selectedIndex = 0;
+        }
+        if (els.starterNativeDesktopSelect && els.starterNativeDesktopSelect.options.length) {
+          els.starterNativeDesktopSelect.selectedIndex = 0;
         }
         if (els.starterGameSelect && els.starterGameSelect.options.length) {
           els.starterGameSelect.selectedIndex = 0;
@@ -6933,7 +7073,9 @@
         var title = els.createTitle.value.trim();
         var folder = deriveCreateFolder();
         var projectType = selectedProjectType();
-        var starterValue = projectType === 'application' ? els.starterApplicationSelect.value : els.starterGameSelect.value;
+        var projectConfig = createProjectTypeConfig(projectType);
+        var starterSelect = els[projectConfig.starterSelectId];
+        var starterValue = starterSelect ? starterSelect.value : 'blank';
         var starter = starterValue;
         var source = '';
         if (starterValue.indexOf('clone:') === 0) {
@@ -6957,7 +7099,7 @@
 
         setProjectsRoot(projectsRoot);
 
-        var context = projectType === 'game' ? 'godot' : 'web';
+        var context = projectConfig.context;
         var args = [folder, title, context, starter, targets.join(',')];
         if (starter === 'clone') {
           args.push(source);
@@ -7537,6 +7679,7 @@
         });
 
         els.starterApplicationSelect.addEventListener('change', syncCreateUI);
+        els.starterNativeDesktopSelect.addEventListener('change', syncCreateUI);
         els.starterGameSelect.addEventListener('change', syncCreateUI);
         [els.targetHostedWeb, els.targetMacos, els.targetLinux, els.targetIos, els.targetAndroid].forEach(function (checkbox) {
           checkbox.addEventListener('change', syncCreateDraftList);
@@ -8176,6 +8319,7 @@
         els.createTitle = document.getElementById('create-title');
         els.createPathPreview = document.getElementById('create-path-preview');
         els.starterApplicationSelect = document.getElementById('starter-application-select');
+        els.starterNativeDesktopSelect = document.getElementById('starter-native-desktop-select');
         els.starterGameSelect = document.getElementById('starter-game-select');
         els.createSubmit = document.getElementById('create-submit');
 

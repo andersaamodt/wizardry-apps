@@ -1164,6 +1164,12 @@ input[type="checkbox"]:disabled {
   color: var(--pill-green-fg);
 }
 
+.context-dot.native-desktop {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  color: color-mix(in srgb, var(--accent) 86%, var(--text));
+}
+
 .list-row.active {
   --catalog-row-surface: rgba(10, 132, 255, 0.11);
   background: rgba(10, 132, 255, 0.11);
@@ -1744,6 +1750,12 @@ input[type="checkbox"]:disabled {
   border-color: var(--pill-green-border);
   background: var(--pill-green-soft);
   color: var(--pill-green-fg);
+}
+
+.type-badge.native-desktop {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--toolbar-surface));
+  color: color-mix(in srgb, var(--accent) 88%, var(--text));
 }
 
 .badge-icon {
@@ -2841,7 +2853,7 @@ input[type="checkbox"]:disabled {
 .type-picker {
   margin-top: 0.52rem;
   display: grid;
-  grid-template-columns: repeat(2, minmax(142px, 168px));
+  grid-template-columns: repeat(auto-fit, minmax(142px, 168px));
   justify-content: center;
   align-items: stretch;
   gap: 0.62rem;
