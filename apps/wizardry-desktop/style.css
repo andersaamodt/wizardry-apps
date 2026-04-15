@@ -548,10 +548,13 @@ body.wd-resizing * {
   border-radius: 0;
   background: transparent;
   overflow: hidden;
+  min-height: 0;
 }
 
 .wd-drill-track {
   width: 200%;
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 50% 50%;
   transform: translateX(0);
@@ -596,11 +599,15 @@ body.wd-resizing * {
 
 .wd-drill-panel {
   min-width: 0;
+  min-height: 0;
   padding: 0.22rem 0.04rem;
   display: grid;
   gap: 0.28rem;
   align-content: start;
   border-right: 1px solid var(--wd-line);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 .wd-drill-panel:last-child {
@@ -948,6 +955,10 @@ body.wd-resizing * {
 .wd-cast-drill .wd-drill-panel-detail {
   padding-left: 0;
   padding-right: 0;
+}
+
+.wd-cast-drill .wd-drill-shell {
+  max-height: min(64vh, calc(100vh - var(--wd-host-top-inset) - 10rem));
 }
 
 .wd-cast-drill .wd-drill-head {
