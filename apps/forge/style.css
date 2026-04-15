@@ -987,6 +987,17 @@ input[type="checkbox"]:disabled {
   background: transparent;
   padding: 0.56rem 0;
   cursor: pointer;
+  position: relative;
+}
+
+.list-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 0.18rem 0 0.22rem;
+  border-radius: 8px;
+  background: transparent;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .catalog-row {
@@ -1033,6 +1044,8 @@ input[type="checkbox"]:disabled {
 .catalog-content {
   min-width: 0;
   display: block;
+  position: relative;
+  z-index: 1;
 }
 
 .catalog-line {
@@ -1087,6 +1100,7 @@ input[type="checkbox"]:disabled {
   overflow: hidden;
   isolation: isolate;
   background: transparent;
+  z-index: 1;
 }
 
 .catalog-thumb::before,
@@ -1171,12 +1185,14 @@ input[type="checkbox"]:disabled {
 }
 
 .list-row.active {
-  --catalog-row-surface: rgba(10, 132, 255, 0.11);
+  background: transparent;
+}
+
+.list-row.active::before {
   background: rgba(10, 132, 255, 0.11);
 }
 
-.list-row:not(.active):hover {
-  --catalog-row-surface: rgba(10, 132, 255, 0.07);
+.list-row:not(.active):hover::before {
   background: rgba(10, 132, 255, 0.07);
 }
 
