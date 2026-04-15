@@ -881,7 +881,7 @@ select {
   width: 100%;
   border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
   background: color-mix(in srgb, var(--panel-solid, #fff) 95%, transparent);
-  color: color-mix(in srgb, var(--text) 92%, transparent);
+  color: var(--text);
   padding: 0.46rem 0.56rem;
 }
 
@@ -898,7 +898,7 @@ button {
   font-size: 0.83rem;
   font-weight: 660;
   cursor: pointer;
-  color: color-mix(in srgb, var(--text) 88%, transparent);
+  color: var(--text);
   background: color-mix(in srgb, var(--panel-solid, #fff) 94%, transparent);
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
 }
@@ -1399,7 +1399,7 @@ input[type="checkbox"]:disabled {
   --toolbar-surface: var(--bg-panel, var(--panel-solid, #f8f7fc));
   --toolbar-surface-soft: var(--bg-panel-2, var(--toolbar-surface));
   --toolbar-line: var(--line, var(--border, #cdd9ea));
-  --toolbar-text: var(--text, #223a55);
+  --toolbar-text: color-mix(in srgb, var(--text, #223a55) 96%, #ffffff 4%);
   --toolbar-muted: var(--text-muted, var(--muted, #607592));
   --toolbar-accent: var(--accent, #3b82f6);
   --toolbar-accent-strong: var(--accent-strong, var(--toolbar-accent));
@@ -1997,7 +1997,7 @@ input[type="checkbox"]:disabled {
   --section-bg: color-mix(in srgb, var(--panel-solid, #fff) 94%, transparent);
   --section-head-bg: color-mix(in srgb, var(--bg-panel-2, #f2f1f8) 92%, transparent);
   --section-border: color-mix(in srgb, var(--line) 86%, transparent);
-  --section-text: color-mix(in srgb, var(--text) 90%, transparent);
+  --section-text: var(--text);
   --section-muted: color-mix(in srgb, var(--text-muted, var(--muted)) 92%, transparent);
   --section-code-bg: color-mix(in srgb, var(--panel-solid, #fff) 90%, var(--bg-panel-2, #f2f1f8));
   --section-accent-soft: color-mix(in srgb, var(--accent-soft, var(--section-head-bg)) 72%, transparent);
