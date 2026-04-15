@@ -177,7 +177,7 @@ assert_contains "$help_out" "run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]"
 assert_contains "$help_out" "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]"
 assert_contains "$help_out" "rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE"
 assert_contains "$help_out" "CONTEXT values for scaffold-workspace:"
-assert_contains "$help_out" "  web | godot"
+assert_contains "$help_out" "  web | native-desktop | godot"
 
 # Behavior: desktop app targets launch desktop host mode.
 desktop_log="$scratch/desktop-host.log"

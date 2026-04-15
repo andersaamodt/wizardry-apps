@@ -122,6 +122,8 @@ cp -R "$test_root/apps/.host" "$scratch/apps/.host"
 mkdir -p "$scratch/apps/forge"
 cp -R "$test_root/apps/forge/starter-templates" "$scratch/apps/forge/starter-templates"
 cp -R "$test_root/core" "$scratch/core"
+mkdir -p "$scratch/schemas"
+cp "$test_root/schemas/native-desktop-ir-v1.json" "$scratch/schemas/native-desktop-ir-v1.json"
 cp -R "$test_root/tools" "$scratch/tools"
 cp -R "$test_root/web/demo" "$scratch/web/demo"
 cp -R "$test_root/web/.themes" "$scratch/web/.themes"
@@ -201,6 +203,30 @@ grep -F "Wizardry Addendum 1.0" "$workspaces_root/workspace-web/WIZARDRY_ADDENDU
 grep -F "Starter: Sidebar" "$workspaces_root/workspace-web/app/index.html" >/dev/null
 grep -F "Emission material notice" "$workspaces_root/workspace-web/app/index.html" >/dev/null
 
+workspace_native_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native "Workspace Native" native-desktop blank "macos,linux" "" "$workspaces_root")
+printf '%s\n' "$workspace_native_out" | grep -F "created=$workspaces_root/workspace-native" >/dev/null
+workspace_native_abs=$(CDPATH= cd -- "$workspaces_root/workspace-native" && pwd -P)
+[ -f "$workspaces_root/workspace-native/wizardry.workspace.conf" ]
+[ -f "$workspaces_root/workspace-native/ir/app.ir.yaml" ]
+[ -f "$workspaces_root/workspace-native/scripts/render-native-desktop.sh" ]
+[ -f "$workspaces_root/workspace-native/generated/macos/Package.swift" ]
+[ -f "$workspaces_root/workspace-native/generated/linux/meson.build" ]
+[ -f "$workspaces_root/workspace-native/README.md" ]
+[ -f "$workspaces_root/workspace-native/LICENSE" ]
+[ -f "$workspaces_root/workspace-native/WIZARDRY_ADDENDUM.md" ]
+grep -F "project_type=native-desktop" "$workspaces_root/workspace-native/wizardry.workspace.conf" >/dev/null
+grep -F "development_context=native-desktop" "$workspaces_root/workspace-native/wizardry.workspace.conf" >/dev/null
+grep -F "targets=macos,linux" "$workspaces_root/workspace-native/wizardry.workspace.conf" >/dev/null
+grep -F "run_rebuild_command=sh scripts/render-native-desktop.sh" "$workspaces_root/workspace-native/wizardry.workspace.conf" >/dev/null
+grep -F '"type": "Window"' "$workspaces_root/workspace-native/ir/app.ir.yaml" >/dev/null
+grep -F "Native desktop app scaffolded by App Forge." "$workspaces_root/workspace-native/README.md" >/dev/null
+
+rebuild_workspace_native_out=$(sh "$backend" rebuild-workspace "$scratch" "$workspaces_root/workspace-native" native-desktop)
+printf '%s\n' "$rebuild_workspace_native_out" | grep -F "workspace=$workspace_native_abs" >/dev/null
+printf '%s\n' "$rebuild_workspace_native_out" | grep -F "context=native-desktop" >/dev/null
+grep -F "WindowGroup" "$workspaces_root/workspace-native/generated/macos/Sources/App/App.swift" >/dev/null
+grep -F "GtkApplication" "$workspaces_root/workspace-native/generated/linux/src/main.c" >/dev/null
+
 printf '%s\n' "custom readme" > "$workspaces_root/workspace-web/README.md"
 rm -f "$workspaces_root/workspace-web/LICENSE" "$workspaces_root/workspace-web/WIZARDRY_ADDENDUM.md"
 rebuild_workspace_web_out=$(sh "$backend" rebuild-workspace "$scratch" "$workspaces_root/workspace-web" web)
@@ -218,6 +244,7 @@ grep -F "starter=clone" "$workspaces_root/workspace-godot/wizardry.workspace.con
 
 workspaces=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
+printf '%s\n' "$workspaces" | grep -E '^workspace-native\t' >/dev/null
 printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
 
 external_workspace="$scratch/external/plain-web"

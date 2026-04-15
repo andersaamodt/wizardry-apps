@@ -68,6 +68,11 @@ assert_matches "$ui" "backend\('rebuild-workspace', \[selected\.path, selected\.
 assert_matches "$ui" "perform\('Import project folder'"
 assert_matches "$ui" "backend\('import-workspace'"
 assert_matches "$ui" "backend\('rename-workspace'"
+assert_contains "$ui" 'Cross-Platform App'
+assert_contains "$ui" 'Native Desktop App'
+assert_contains "$ui" 'value="native-desktop"'
+assert_matches "$ui" "function nativeDesktopProjectTypeKey\(\)"
+assert_matches "$ui" "function createProjectTypeConfig\(projectType\)"
 
 # Native host icon-drop bridge contracts (allow variable renames in callsites).
 assert_matches "$ui" "window\.forgeHostFileDrag[[:space:]]*=[[:space:]]*handleForgeHostFileDrag;"

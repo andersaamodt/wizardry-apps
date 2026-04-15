@@ -59,7 +59,7 @@ TEMPLATE values for scaffold-app:
   minimal | panel | sidebar | topbar | dashboard | studio | clone
 
 CONTEXT values for scaffold-workspace:
-  web | godot
+  web | native-desktop | godot
 USAGE
   exit 0
   ;;
@@ -2156,6 +2156,21 @@ detect_workspace_godot_subpath() {
   return 1
 }
 
+detect_workspace_native_ir_path() {
+  workspace_path=${1-}
+  for candidate in \
+    "$workspace_path/ir/app.ir.yaml" \
+    "$workspace_path/ir/app.ir.yml" \
+    "$workspace_path/app.ir.yaml" \
+    "$workspace_path/app.ir.yml"
+  do
+    [ -f "$candidate" ] || continue
+    printf '%s\n' "${candidate#"$workspace_path"/}"
+    return 0
+  done
+  return 1
+}
+
 resolve_workspace_godot_subpath() {
   workspace_path=${1-}
   conf_path=${2-}
@@ -2183,6 +2198,31 @@ resolve_workspace_godot_subpath() {
   fi
 
   detect_workspace_godot_subpath "$workspace_path"
+}
+
+resolve_workspace_native_ir_path() {
+  workspace_path=${1-}
+  conf_path=${2-}
+
+  native_ir_path=""
+  if [ -n "$conf_path" ] && [ -f "$conf_path" ]; then
+    native_ir_path=$(workspace_field "$conf_path" native_ir_path "")
+  fi
+
+  if [ -n "$native_ir_path" ]; then
+    case "$native_ir_path" in
+      "." | */ | */.. | *".."*)
+        ;;
+      *)
+        if [ -f "$workspace_path/$native_ir_path" ]; then
+          printf '%s\n' "$native_ir_path"
+          return 0
+        fi
+        ;;
+    esac
+  fi
+
+  detect_workspace_native_ir_path "$workspace_path"
 }
 
 resolve_workspace_app_dir() {
@@ -2246,10 +2286,13 @@ ensure_importable_workspace_profile() {
     existing_targets=$(workspace_field "$conf_path" targets "")
     existing_app_subpath=$(workspace_field "$conf_path" app_subpath "")
     existing_godot_subpath=$(workspace_field "$conf_path" godot_subpath "")
+    existing_native_ir_path=$(workspace_field "$conf_path" native_ir_path "")
     needs_detection=0
     if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ]; then
       needs_detection=1
     elif [ "$existing_context" = "godot" ]; then
+      needs_detection=0
+    elif [ "$existing_context" = "native-desktop" ] && [ -n "$existing_native_ir_path" ]; then
       needs_detection=0
     elif [ "$existing_context" = "web" ] && [ -n "$existing_app_subpath" ]; then
       needs_detection=0
@@ -2261,6 +2304,7 @@ ensure_importable_workspace_profile() {
 
     if [ "$needs_detection" -eq 1 ]; then
       detected_godot_subpath=$(detect_workspace_godot_subpath "$workspace_path" 2>/dev/null || true)
+      detected_native_ir_path=$(detect_workspace_native_ir_path "$workspace_path" 2>/dev/null || true)
       detected_app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true)
       if [ -n "$detected_godot_subpath" ]; then
         if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ "$existing_context" != "godot" ]; then
@@ -2276,6 +2320,17 @@ ensure_importable_workspace_profile() {
           fi
         elif [ "$existing_godot_subpath" != "$detected_godot_subpath" ]; then
           write_key_value_file "$conf_path" godot_subpath "$detected_godot_subpath"
+        fi
+      elif [ -n "$detected_native_ir_path" ] && [ "$existing_context" != "godot" ]; then
+        if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ "$existing_context" != "native-desktop" ]; then
+          write_key_value_file "$conf_path" project_type "native-desktop"
+          write_key_value_file "$conf_path" development_context "native-desktop"
+          write_key_value_file "$conf_path" starter "import-native-desktop"
+          write_key_value_file "$conf_path" profile_kind "detected"
+          write_key_value_file "$conf_path" targets "macos,linux"
+        fi
+        if [ "$existing_native_ir_path" != "$detected_native_ir_path" ]; then
+          write_key_value_file "$conf_path" native_ir_path "$detected_native_ir_path"
         fi
       elif [ -n "$detected_app_subpath" ] && [ "$existing_context" != "godot" ]; then
         if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ -z "$existing_app_subpath" ]; then
@@ -2308,11 +2363,17 @@ ensure_importable_workspace_profile() {
   starter="import"
   profile_kind="detected"
   app_subpath=""
+  native_ir_path=""
   if godot_subpath=$(detect_workspace_godot_subpath "$workspace_path" 2>/dev/null || true) && [ -n "$godot_subpath" ]; then
     context="godot"
     project_type="game"
     targets="macos,linux,godot-desktop"
     starter="import-godot"
+  elif native_ir_path=$(detect_workspace_native_ir_path "$workspace_path" 2>/dev/null || true) && [ -n "$native_ir_path" ]; then
+    context="native-desktop"
+    project_type="native-desktop"
+    targets="macos,linux"
+    starter="import-native-desktop"
   elif app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true) && [ -n "$app_subpath" ]; then
     context="web"
     project_type="application"
@@ -2346,6 +2407,9 @@ CONF
   fi
   if [ -n "$godot_subpath" ]; then
     printf 'godot_subpath=%s\n' "$godot_subpath" >>"$conf_path"
+  fi
+  if [ -n "$native_ir_path" ]; then
+    printf 'native_ir_path=%s\n' "$native_ir_path" >>"$conf_path"
   fi
   printf 'run_rebuild_command=%s\n' ":" >>"$conf_path"
 
@@ -2422,6 +2486,8 @@ cmd_list_workspaces() {
       needs_profile_repair=1
     elif [ "$profile_context" = "godot" ] && [ -z "$profile_godot_subpath" ] && [ ! -f "$path/project.godot" ] && [ ! -f "$path/tool_main.gd" ]; then
       needs_profile_repair=1
+    elif [ "$profile_context" = "native-desktop" ] && ! resolve_workspace_native_ir_path "$path" "$conf" >/dev/null 2>&1; then
+      needs_profile_repair=1
     fi
     if [ "$needs_profile_repair" -eq 1 ]; then
       ensure_importable_workspace_profile "$path" >/dev/null 2>&1 || true
@@ -2444,6 +2510,9 @@ cmd_list_workspaces() {
         if resolve_workspace_godot_subpath "$path" "$conf" >/dev/null 2>&1; then
           runnable=1
         fi
+        ;;
+      native-desktop)
+        runnable=0
         ;;
       *)
         if resolve_workspace_app_dir "$path" "$conf" >/dev/null 2>&1; then
@@ -2611,6 +2680,7 @@ cmd_get_workspace_profile() {
   printf 'root=%s\n' "$(workspace_field "$conf" root "$workspace_abs")"
   printf 'profile_kind=%s\n' "$(workspace_field "$conf" profile_kind "")"
   printf 'app_subpath=%s\n' "$(workspace_field "$conf" app_subpath "")"
+  printf 'native_ir_path=%s\n' "$(workspace_field "$conf" native_ir_path "")"
   printf 'hosted_web_mode=%s\n' "$(workspace_field "$conf" hosted_web_mode "")"
   printf 'hosted_web_site_name=%s\n' "$(workspace_field "$conf" hosted_web_site_name "")"
   printf 'hosted_web_serve_script=%s\n' "$(workspace_field "$conf" hosted_web_serve_script "")"
@@ -2704,7 +2774,7 @@ cmd_pick_workspace_subpath() {
 validate_workspace_profile_field_key() {
   key=${1-}
   case "$key" in
-    project_type|development_context|starter|app_subpath|hosted_web_mode|hosted_web_site_name|hosted_web_serve_script|hosted_web_serve_action|run_rebuild_command)
+    project_type|development_context|starter|app_subpath|native_ir_path|hosted_web_mode|hosted_web_site_name|hosted_web_serve_script|hosted_web_serve_action|run_rebuild_command)
       return 0
       ;;
   esac
@@ -2771,25 +2841,25 @@ cmd_set_workspace_field() {
   case "$key" in
     project_type)
       case "$normalized_value" in
-        application|game) ;;
+        application|native-desktop|game) ;;
         *)
-          printf '%s\n' "forge-backend: project_type must be application or game" >&2
+          printf '%s\n' "forge-backend: project_type must be application, native-desktop, or game" >&2
           exit 2
           ;;
       esac
       ;;
     development_context)
       case "$normalized_value" in
-        web|godot) ;;
+        web|native-desktop|godot) ;;
         *)
-          printf '%s\n' "forge-backend: development_context must be web or godot" >&2
+          printf '%s\n' "forge-backend: development_context must be web, native-desktop, or godot" >&2
           exit 2
           ;;
       esac
       ;;
     starter)
       case "$normalized_value" in
-        ""|import-web|import-godot|import-generic|blank|minimal|panel|sidebar|topbar|dashboard|studio|clone)
+        ""|import-web|import-native-desktop|import-godot|import-generic|blank|minimal|panel|sidebar|topbar|dashboard|studio|clone)
           ;;
         *)
           printf '%s\n' "forge-backend: unsupported starter '$normalized_value'" >&2
@@ -2810,6 +2880,16 @@ cmd_set_workspace_field() {
           exit 1
         }
       fi
+      ;;
+    native_ir_path)
+      validate_workspace_relative_field "$workspace_abs" "$normalized_value" "native_ir_path" "file"
+      case "$normalized_value" in
+        *.yaml|*.yml) ;;
+        *)
+          printf '%s\n' "forge-backend: native_ir_path must point to a .yaml or .yml file" >&2
+          exit 2
+          ;;
+      esac
       ;;
     hosted_web_mode)
       case "$normalized_value" in
@@ -4057,7 +4137,15 @@ cmd_rebuild_workspace() {
   printf '%s\n' "$rebuild_out"
   printf 'workspace=%s\n' "$workspace_path"
   printf 'context=%s\n' "$context"
-  printf 'app_entry=%s\n' "$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path")"
+  case "$context" in
+    native-desktop)
+      printf 'app_entry=%s\n' "$workspace_path/generated"
+      printf 'native_ir=%s\n' "$(resolve_workspace_native_ir_path "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path/ir/app.ir.yaml")"
+      ;;
+    *)
+      printf 'app_entry=%s\n' "$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path")"
+      ;;
+  esac
 }
 
 cmd_run_workspace() {
@@ -4134,10 +4222,14 @@ cmd_run_workspace() {
       printf 'log=%s\n' "$log_path"
       return 0
       ;;
+    native-desktop)
+      printf '%s\n' "forge-backend: native desktop workspaces currently rebuild generated sources only; open generated/macos or generated/linux in native tooling." >&2
+      exit 1
+      ;;
     web)
       ;;
     *)
-      printf '%s\n' "forge-backend: project context must be web or godot" >&2
+      printf '%s\n' "forge-backend: project context must be web, native-desktop, or godot" >&2
       exit 2
       ;;
   esac
@@ -4654,7 +4746,7 @@ workspace_uses_emitted_project_license() {
   starter=${1-}
   context=${2-}
   case "$context:$starter" in
-    web:minimal|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank)
+    web:minimal|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank)
       return 0
       ;;
   esac
@@ -4671,6 +4763,19 @@ render_named_template_file() {
   app_name=$3
   escaped_name=$(escape_sed_replacement "$app_name")
   sed "s/__APP_NAME__/$escaped_name/g" "$src_path" > "$dest_path"
+}
+
+render_native_template_file() {
+  src_path=$1
+  dest_path=$2
+  app_name=$3
+  app_id=$4
+  escaped_name=$(escape_sed_replacement "$app_name")
+  escaped_id=$(escape_sed_replacement "$app_id")
+  sed \
+    -e "s/__APP_NAME__/$escaped_name/g" \
+    -e "s/__APP_ID__/$escaped_id/g" \
+    "$src_path" > "$dest_path"
 }
 
 write_web_starter_template() {
@@ -4690,6 +4795,36 @@ write_web_starter_template() {
   render_named_template_file "$template_dir/style.css" "$app_dir/style.css" "$app_name"
 }
 
+write_native_desktop_starter_template() {
+  root=$1
+  workspace_dir=$2
+  app_name=$3
+  app_id=$4
+
+  template_dir="$root/apps/forge/starter-templates/native-desktop/blank"
+  [ -d "$template_dir" ] || {
+    printf '%s\n' "forge-backend: native desktop starter template directory missing: $template_dir" >&2
+    exit 1
+  }
+
+  mkdir -p \
+    "$workspace_dir/ir" \
+    "$workspace_dir/scripts" \
+    "$workspace_dir/generated/macos/Sources/App" \
+    "$workspace_dir/generated/linux/src" \
+    "$workspace_dir/schemas"
+
+  render_native_template_file "$template_dir/ir/app.ir.yaml" "$workspace_dir/ir/app.ir.yaml" "$app_name" "$app_id"
+  render_native_template_file "$template_dir/scripts/render-native-desktop.sh" "$workspace_dir/scripts/render-native-desktop.sh" "$app_name" "$app_id"
+  render_native_template_file "$template_dir/scripts/validate-native-desktop-ir.sh" "$workspace_dir/scripts/validate-native-desktop-ir.sh" "$app_name" "$app_id"
+  chmod +x "$workspace_dir/scripts/render-native-desktop.sh" "$workspace_dir/scripts/validate-native-desktop-ir.sh"
+  cp "$root/schemas/native-desktop-ir-v1.json" "$workspace_dir/schemas/native-desktop-ir-v1.json"
+  (
+    cd "$workspace_dir"
+    sh "scripts/render-native-desktop.sh"
+  )
+}
+
 write_emitted_project_legal_files() {
   root=$1
   project_dir=$2
@@ -4706,10 +4841,17 @@ write_emitted_project_readme_if_missing() {
   readme_path="$project_dir/README.md"
   [ -f "$readme_path" ] && return 0
 
+  summary="Generated by App Forge."
+  case "$context" in
+    native-desktop)
+      summary="Native desktop app scaffolded by App Forge."
+      ;;
+  esac
+
   cat > "$readme_path" <<README
 # $app_name
 
-Generated by App Forge.
+$summary
 
 - Development context: $context
 - License: GNU AGPL-3.0-or-later
@@ -4928,6 +5070,58 @@ cmd_scaffold_workspace() {
       fi
       ;;
 
+    native-desktop)
+      project_type=native-desktop
+      development_context=native-desktop
+
+      case "$starter" in
+        blank|clone) ;;
+        *)
+          printf '%s\n' "forge-backend: scaffold-workspace unknown native desktop starter: $starter" >&2
+          exit 2
+          ;;
+      esac
+
+      mkdir -p "$workspace_dir"
+      native_ir_path="ir/app.ir.yaml"
+
+      case "$starter" in
+        blank)
+          write_native_desktop_starter_template "$root" "$workspace_dir" "$app_name" "$slug"
+          write_emitted_project_legal_files "$root" "$workspace_dir"
+          write_emitted_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
+          ;;
+        clone)
+          [ -n "$source" ] || {
+            printf '%s\n' "forge-backend: scaffold-workspace native desktop clone requires SOURCE" >&2
+            exit 2
+          }
+          validate_slug "$source"
+
+          source_dir=''
+          for candidate in \
+            "$project_root/$source" \
+            "$root/apps/$source"; do
+            if [ -d "$candidate" ]; then
+              source_dir=$candidate
+              break
+            fi
+          done
+
+          [ -d "$source_dir" ] || {
+            printf '%s\n' "forge-backend: source native desktop project not found: $source" >&2
+            exit 1
+          }
+          rm -rf "$workspace_dir"
+          mkdir -p "$workspace_dir"
+          cp -R "$source_dir"/. "$workspace_dir/"
+          native_ir_path=$(resolve_workspace_native_ir_path "$workspace_dir" "$workspace_dir/wizardry.workspace.conf" 2>/dev/null || printf '%s' "ir/app.ir.yaml")
+          write_imported_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
+          ;;
+      esac
+
+      ;;
+
     godot)
       project_type=game
       development_context=godot
@@ -4994,8 +5188,15 @@ GDSCRIPT
       ;;
 
     *)
-      printf '%s\n' "forge-backend: scaffold-workspace context must be web or godot" >&2
+      printf '%s\n' "forge-backend: scaffold-workspace context must be web, native-desktop, or godot" >&2
       exit 2
+      ;;
+  esac
+
+  run_rebuild_command=":"
+  case "$development_context" in
+    native-desktop)
+      run_rebuild_command="sh scripts/render-native-desktop.sh"
       ;;
   esac
 
@@ -5008,10 +5209,21 @@ project_type=$project_type
 development_context=$development_context
 starter=$starter
 targets=$targets
-run_rebuild_command=:
+run_rebuild_command=$run_rebuild_command
 source=${source-}
 root=$workspace_dir
 CONF
+
+  case "$development_context" in
+    web)
+      if [ -f "$workspace_dir/app/index.html" ]; then
+        printf 'app_subpath=%s\n' "app" >>"$profile"
+      fi
+      ;;
+    native-desktop)
+      printf 'native_ir_path=%s\n' "${native_ir_path:-ir/app.ir.yaml}" >>"$profile"
+      ;;
+  esac
 
   printf 'created=%s\n' "$workspace_dir"
   printf 'workspace_profile=%s\n' "$profile"
