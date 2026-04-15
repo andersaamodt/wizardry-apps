@@ -726,6 +726,14 @@ body.wd-resizing * {
   max-width: 100%;
 }
 
+.wd-cast-list {
+  max-height: calc(100vh - var(--wd-host-top-inset) - 11.5rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.14rem;
+  scrollbar-gutter: stable;
+}
+
 .wd-cast-list .wd-drill-item {
   grid-template-columns: minmax(0, 1fr) auto;
   width: max-content;
