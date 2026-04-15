@@ -4600,18 +4600,19 @@
           return;
         }
         if (phase === 'drop') {
-          clearNativeHostIconDropFallback();
           clearWorkspaceDropCue();
           setSelectedIconDropCue(false);
           if (target === 'icon' && (paths.length || hasImagePayload)) {
             if (nativeHandled) {
+              clearNativeHostIconDropFallback();
               markNativeHostIconDropHandled();
               beginNativeHostIconDrop(paths[0] || '');
               return;
             }
-            triggerSelectedIconDropFallback(paths[0] || '', null);
+            setNativeHostIconDropExpected(false);
             return;
           }
+          clearNativeHostIconDropFallback();
           setNativeHostIconDropExpected(false);
           if (!paths.length) {
             toast('Drop a project folder to import.', 'bad');
@@ -5259,17 +5260,6 @@
           };
           reader.readAsDataURL(file);
         });
-      }
-
-      function localPathFromImageFile(file) {
-        if (!file || typeof file !== 'object') {
-          return '';
-        }
-        var candidate = String(file.path || '').trim();
-        if (candidate) {
-          return candidate;
-        }
-        return '';
       }
 
       function openSelectedIconPicker() {
@@ -7570,12 +7560,9 @@
             if (!file) {
               return;
             }
-            var filePath = localPathFromImageFile(file);
-            var applyPromise = filePath
-              ? applySelectedIconPath(filePath)
-              : readImageFileToDataUrl(file).then(function (dataUrl) {
-                  return applySelectedIconData(dataUrl);
-                });
+            var applyPromise = readImageFileToDataUrl(file).then(function (dataUrl) {
+              return applySelectedIconData(dataUrl);
+            });
             applyPromise.catch(function (err) {
               toast(String(err && err.message ? err.message : err), 'bad');
             }).finally(function () {
@@ -7636,7 +7623,6 @@
             var droppedPath = firstPathFromDropData(event.dataTransfer);
             var files = event.dataTransfer && event.dataTransfer.files;
             var file = files && files[0] ? files[0] : null;
-            var droppedFilePath = droppedPath || localPathFromImageFile(file);
             if (state.os === 'darwin' && bridgeAvailable()) {
               setNativeHostIconDropExpected(true);
               if (nativeHostRecentlyHandledIconDrop()) {
@@ -7646,15 +7632,15 @@
                 setItemIconPreviewOverride(selected, '');
                 setHostIconDropVisualPending(selected, true);
                 renderSelectedIconEditor(selected);
-                scheduleNativeHostIconDropFallback(droppedFilePath, file);
+                scheduleNativeHostIconDropFallback(droppedPath, file);
                 return;
               }
             }
             if (nativeHostShouldOwnIconDrop()) {
               return;
             }
-            if (droppedFilePath) {
-              applySelectedIconPath(droppedFilePath).catch(function (err) {
+            if (droppedPath) {
+              applySelectedIconPath(droppedPath).catch(function (err) {
                 toast(String(err && err.message ? err.message : err), 'bad');
               });
               return;

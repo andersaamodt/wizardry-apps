@@ -31,6 +31,7 @@
 - Finder image drops into Forge’s icon zone should execute the backend directly in the native host after hit-testing; routing the actual icon write back through the WebView bridge can fail even when shell commands work.
 - Finder image drags on macOS do not reliably arrive as file URLs; Forge’s native host must register image pasteboard types too and stage pasteboard image data into a temp PNG for icon-drop handling.
 - Finder PNG drags can expose the real file through raw pasteboard string/property-list types even when NSURL drag reading returns nothing; native hosts should parse `public.file-url`, `text/uri-list`, plain-text path payloads, and `NSFilenamesPboardType` before falling back to a staged pasteboard preview image.
+- Forge icon imports must not trust browser `File.path` or staged Finder preview PNGs as the canonical source; when the real file path is missing, fall back to reading the dropped/selected file bytes instead of freezing a 320px preview into `original-source.png`.
 - Icon import pipelines must not transcode non-JPEG sources to JPEG just to shrink payload size; that strips real alpha from PNG/WebP/SVG icons.
 - On macOS, `sips -z ... --out file.png` does not guarantee PNG output; set `-s format png` explicitly or Forge can write JPEG bytes into `forge-icon.png`.
 - Focus/visibility-triggered auto-refresh right after launching another app/browser can tear down and redraw transparent catalog icons, causing a brief white-edge flash during Run handoff.
