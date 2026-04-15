@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Wizardry Desktop</title>
-  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260415b">
-  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260415b">
+  <link rel="stylesheet" href="style.css?v=wizardry-desktop20260415c">
+  <link id="wd-theme-stylesheet" rel="stylesheet" href="themes/psionic.css?v=wizardry-desktop20260415c">
   <link rel="icon" href="assets/forge-icon.png" type="image/png">
 </head>
   <body class="wd-booting">
     <div id="splash" class="wd-splash" aria-live="polite">
-      <img class="wd-splash-icon" src="assets/icons/meta/territory-master.png?v=wizardry-desktop20260415b" alt="" aria-hidden="true">
+      <img class="wd-splash-icon" src="assets/icons/meta/territory-master.png?v=wizardry-desktop20260415c" alt="" aria-hidden="true">
     </div>
 
   <main id="wd-app" class="wd-app-shell hidden" aria-hidden="true">
@@ -142,7 +142,7 @@
     (function () {
       'use strict';
 
-      var ASSET_VERSION = 'wizardry-desktop20260415b';
+      var ASSET_VERSION = 'wizardry-desktop20260415c';
       var THEME_FALLBACK = ['archmage', 'adept', 'chrono', 'chronomancer', 'conjurer', 'druid', 'empath'];
       var COMPOSER_ACTIONS = ['run-spell', 'spell-help', 'run-action', 'run-system'];
       var COMPOSER_SYSTEM_ACTIONS = [
@@ -2831,11 +2831,7 @@
             els.pageDrillBack.setAttribute('data-drill-back', '');
           }
         }
-        if (els.contentScroll) {
-          els.contentScroll.classList.toggle('wd-content-scroll-spellbook', state.activePage === 'spellbook');
-        }
         if (els.contentArea) {
-          els.contentArea.classList.toggle('wd-page-spellbook', state.activePage === 'spellbook');
           els.contentArea.innerHTML = content;
         }
         setRowSelection();
@@ -4484,6 +4480,27 @@
             }
             state.mudDraftArgs[mudActionId] = String(mudArgInput.value || '');
           });
+
+          els.contentArea.addEventListener('wheel', function (event) {
+            if (!els.contentScroll || state.activePage === 'spellbook') {
+              return;
+            }
+            var targetScrollable = event.target && event.target.closest
+              ? event.target.closest('.wd-scroll-area, .wd-synonym-list, .wd-composer-output, .wd-composer-autocomplete, #activity-feed')
+              : null;
+            if (targetScrollable) {
+              return;
+            }
+            var deltaY = Number(event.deltaY || 0);
+            if (!deltaY) {
+              return;
+            }
+            var before = els.contentScroll.scrollTop;
+            els.contentScroll.scrollTop = before + deltaY;
+            if (els.contentScroll.scrollTop !== before) {
+              event.preventDefault();
+            }
+          }, { passive: false });
         }
 
         if (els.contentArea) {

@@ -1047,10 +1047,7 @@ body.wd-resizing * {
 }
 
 .wd-mud-panel {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 0.34rem;
-  min-height: 0;
+  display: block;
 }
 
 .wd-mud-terminal {
@@ -1085,7 +1082,7 @@ body.wd-resizing * {
 }
 
 .wd-mud-last-output {
-  margin-top: 0;
+  margin-top: 0.34rem;
   min-height: 74px;
   max-height: min(24vh, 180px);
 }
@@ -1093,6 +1090,7 @@ body.wd-resizing * {
 .wd-mud-sections {
   display: grid;
   gap: 0.38rem;
+  margin-top: 0.34rem;
 }
 
 .wd-mud-section .wd-drill-list {
