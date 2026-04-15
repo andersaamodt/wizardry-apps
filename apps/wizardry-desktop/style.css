@@ -446,7 +446,8 @@ body.wd-resizing * {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
+  overflow-x: hidden;
 }
 
 .wd-content-scroll-spellbook > #content-area {
@@ -984,8 +985,12 @@ body.wd-resizing * {
 
 #content-area.wd-page-cast .wd-cast-drill .wd-drill-shell {
   min-height: 0;
-  height: 100%;
+  height: auto;
   max-height: none;
+}
+
+#content-area.wd-page-cast .wd-drill-panel {
+  overflow: visible;
 }
 
 .wd-cast-drill .wd-drill-head {
