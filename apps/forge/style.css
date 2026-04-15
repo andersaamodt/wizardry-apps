@@ -1155,7 +1155,7 @@ input[type="checkbox"]:disabled {
   padding: 0 0.14rem;
   white-space: nowrap;
   text-transform: lowercase;
-  cursor: default;
+  cursor: pointer;
 }
 
 .context-dot.game {
@@ -1733,7 +1733,7 @@ input[type="checkbox"]:disabled {
   padding: 0 0.14rem;
   white-space: nowrap;
   text-transform: lowercase;
-  cursor: default;
+  cursor: pointer;
 }
 
 .type-badge {

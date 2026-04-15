@@ -2434,6 +2434,518 @@ forge_ui_prefs_file() {
   printf '%s\n' "$base/forge-ui.conf"
 }
 
+forge_workspace_git_state_dir() {
+  base="${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps/forge/git"
+  mkdir -p "$base/cache" "$base/releases"
+  printf '%s\n' "$base"
+}
+
+workspace_git_state_key() {
+  workspace_path=${1-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace_git_state_key requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  printf '%s' "$workspace_path" | hash_stdin_sha256
+}
+
+workspace_git_state_file() {
+  workspace_path=${1-}
+  printf '%s/%s.conf\n' "$(forge_workspace_git_state_dir)/cache" "$(workspace_git_state_key "$workspace_path")"
+}
+
+workspace_git_release_dir() {
+  workspace_path=${1-}
+  dir="$(forge_workspace_git_state_dir)/releases/$(workspace_git_state_key "$workspace_path")"
+  mkdir -p "$dir"
+  printf '%s\n' "$dir"
+}
+
+workspace_git_cached_value() {
+  workspace_path=${1-}
+  key=${2-}
+  state_file=$(workspace_git_state_file "$workspace_path")
+  if [ -f "$state_file" ]; then
+    workspace_field "$state_file" "$key" ""
+    return 0
+  fi
+  printf '%s\n' ""
+}
+
+workspace_git_cached_value_file() {
+  state_file=${1-}
+  key=${2-}
+  if [ -f "$state_file" ]; then
+    workspace_field "$state_file" "$key" ""
+    return 0
+  fi
+  printf '%s\n' ""
+}
+
+workspace_git_state_write() {
+  workspace_path=${1-}
+  key=${2-}
+  value=${3-}
+  state_file=$(workspace_git_state_file "$workspace_path")
+  [ -f "$state_file" ] || : > "$state_file"
+  write_key_value_file "$state_file" "$key" "$(printf '%s' "${value-}" | tr '\r\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+}
+
+workspace_git_browser_url_from_remote() {
+  remote_url=${1-}
+  case "$remote_url" in
+    https://github.com/*|http://github.com/*)
+      printf '%s\n' "$(printf '%s' "$remote_url" | sed 's#\.git$##')"
+      return 0
+      ;;
+    git@github.com:*)
+      repo_path=${remote_url#git@github.com:}
+      printf 'https://github.com/%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      return 0
+      ;;
+    ssh://git@github.com/*)
+      repo_path=${remote_url#ssh://git@github.com/}
+      printf 'https://github.com/%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      return 0
+      ;;
+    https://*|http://*)
+      printf '%s\n' "$(printf '%s' "$remote_url" | sed 's#\.git$##')"
+      return 0
+      ;;
+  esac
+  printf '%s\n' ""
+}
+
+workspace_git_github_slug_from_remote() {
+  remote_url=${1-}
+  case "$remote_url" in
+    https://github.com/*|http://github.com/*)
+      repo_path=${remote_url#https://github.com/}
+      repo_path=${repo_path#http://github.com/}
+      printf '%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      return 0
+      ;;
+    git@github.com:*)
+      repo_path=${remote_url#git@github.com:}
+      printf '%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      return 0
+      ;;
+    ssh://git@github.com/*)
+      repo_path=${remote_url#ssh://git@github.com/}
+      printf '%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      return 0
+      ;;
+  esac
+  printf '%s\n' ""
+}
+
+workspace_git_repo_exists() {
+  workspace_path=${1-}
+  command -v git >/dev/null 2>&1 || return 1
+  git -C "$workspace_path" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+workspace_git_repo_root() {
+  workspace_path=${1-}
+  git -C "$workspace_path" rev-parse --show-toplevel 2>/dev/null || true
+}
+
+workspace_git_current_branch() {
+  workspace_path=${1-}
+  branch=$(git -C "$workspace_path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  if [ -n "$branch" ]; then
+    printf '%s\n' "$branch"
+    return 0
+  fi
+  branch=$(git -C "$workspace_path" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+  case "$branch" in
+    ""|HEAD)
+      printf '%s\n' ""
+      ;;
+    *)
+      printf '%s\n' "$branch"
+      ;;
+  esac
+}
+
+workspace_git_head_commit() {
+  workspace_path=${1-}
+  git -C "$workspace_path" rev-parse HEAD 2>/dev/null || true
+}
+
+workspace_git_head_short() {
+  workspace_path=${1-}
+  git -C "$workspace_path" rev-parse --short HEAD 2>/dev/null || true
+}
+
+workspace_git_default_base_branch() {
+  workspace_path=${1-}
+  remote_head=$(git -C "$workspace_path" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  case "$remote_head" in
+    origin/*)
+      printf '%s\n' "${remote_head#origin/}"
+      return 0
+      ;;
+  esac
+  if git -C "$workspace_path" show-ref --verify --quiet refs/heads/main; then
+    printf '%s\n' "main"
+    return 0
+  fi
+  if git -C "$workspace_path" show-ref --verify --quiet refs/heads/master; then
+    printf '%s\n' "master"
+    return 0
+  fi
+  printf '%s\n' "main"
+}
+
+workspace_git_fetch_origin() {
+  workspace_path=${1-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace_git_fetch_origin requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  command -v git >/dev/null 2>&1 || {
+    printf '%s\n' "forge-backend: git not available on PATH" >&2
+    exit 1
+  }
+  git -C "$workspace_path" remote get-url origin >/dev/null 2>&1 || {
+    printf '%s\n' "forge-backend: origin remote is not configured" >&2
+    exit 1
+  }
+  GIT_TERMINAL_PROMPT=0 git -C "$workspace_path" fetch --quiet --prune origin
+}
+
+workspace_git_sync_label() {
+  pill_state=${1-}
+  case "$pill_state" in
+    check_git) printf '%s\n' "Check Git" ;;
+    sync) printf '%s\n' "Sync" ;;
+    push) printf '%s\n' "Push" ;;
+    update) printf '%s\n' "Update" ;;
+    current) printf '%s\n' "Current" ;;
+    *) printf '%s\n' "" ;;
+  esac
+}
+
+workspace_git_collect_release_info() {
+  workspace_path=${1-}
+  github_slug=${2-}
+  refresh_release=${3-0}
+  state_file=$(workspace_git_state_file "$workspace_path")
+  now_epoch=$(date +%s 2>/dev/null || printf '0')
+  release_check_epoch=$(workspace_git_cached_value_file "$state_file" release_check_epoch)
+  release_name=$(workspace_git_cached_value_file "$state_file" release_name)
+  release_tag=$(workspace_git_cached_value_file "$state_file" release_tag)
+  release_html_url=$(workspace_git_cached_value_file "$state_file" release_html_url)
+  release_published_at=$(workspace_git_cached_value_file "$state_file" release_published_at)
+  release_asset_name=$(workspace_git_cached_value_file "$state_file" release_asset_name)
+  release_asset_url=$(workspace_git_cached_value_file "$state_file" release_asset_url)
+  release_install_supported=$(workspace_git_cached_value_file "$state_file" release_install_supported)
+  release_install_reason=$(workspace_git_cached_value_file "$state_file" release_install_reason)
+  release_available=$(workspace_git_cached_value_file "$state_file" release_available)
+  release_error=$(workspace_git_cached_value_file "$state_file" release_error)
+
+  if [ "$refresh_release" = "1" ] &&
+     [ -n "$github_slug" ] &&
+     command -v curl >/dev/null 2>&1 &&
+     command -v jq >/dev/null 2>&1; then
+    api_url="https://api.github.com/repos/$github_slug/releases/latest"
+    release_json=$(curl -fsSL -H "Accept: application/vnd.github+json" "$api_url" 2>/dev/null || true)
+    if [ -n "$release_json" ]; then
+      release_name=$(printf '%s' "$release_json" | jq -r '.name // ""' 2>/dev/null || true)
+      release_tag=$(printf '%s' "$release_json" | jq -r '.tag_name // ""' 2>/dev/null || true)
+      release_html_url=$(printf '%s' "$release_json" | jq -r '.html_url // ""' 2>/dev/null || true)
+      release_published_at=$(printf '%s' "$release_json" | jq -r '.published_at // ""' 2>/dev/null || true)
+      release_asset_name=''
+      release_asset_url=''
+      release_install_supported='no'
+      release_install_reason='No supported release asset was found for this host.'
+      release_error=''
+      os_name=$(os_id)
+      candidates=$(printf '%s' "$release_json" | jq -r '.assets[]? | [.name // "", .browser_download_url // ""] | @tsv' 2>/dev/null || true)
+      candidate_count=0
+      selected_name=''
+      selected_url=''
+      printf '%s\n' "$candidates" | while IFS="$(printf '\t')" read -r asset_name asset_url; do
+        [ -n "$asset_name" ] || continue
+        name_lower=$(printf '%s' "$asset_name" | tr '[:upper:]' '[:lower:]')
+        match='no'
+        case "$os_name" in
+          darwin)
+            case "$name_lower" in
+              *.zip|*.tar.gz|*.tgz)
+                case "$name_lower" in
+                  *macos*|*darwin*|*osx*|*mac*|*universal*)
+                    match='yes'
+                    ;;
+                esac
+                ;;
+            esac
+            ;;
+          linux)
+            case "$name_lower" in
+              *.appimage)
+                match='yes'
+                ;;
+              *.tar.gz|*.tgz)
+                case "$name_lower" in
+                  *linux*)
+                    match='yes'
+                    ;;
+                esac
+                ;;
+            esac
+            ;;
+        esac
+        [ "$match" = 'yes' ] || continue
+        candidate_count=$((candidate_count + 1))
+        if [ "$candidate_count" -eq 1 ]; then
+          selected_name=$asset_name
+          selected_url=$asset_url
+        fi
+        printf '__forge_candidate__\t%s\t%s\t%s\n' "$candidate_count" "$selected_name" "$selected_url"
+      done | tail -n 1 | {
+        IFS="$(printf '\t')" read -r marker selected_count selected_name_pipe selected_url_pipe || true
+        if [ "${marker-}" = "__forge_candidate__" ]; then
+          candidate_count=$selected_count
+          selected_name=$selected_name_pipe
+          selected_url=$selected_url_pipe
+        else
+          candidate_count=0
+          selected_name=''
+          selected_url=''
+        fi
+
+        if [ "$candidate_count" -eq 1 ] && [ -n "$selected_name" ] && [ -n "$selected_url" ]; then
+          release_asset_name=$selected_name
+          release_asset_url=$selected_url
+          release_install_supported='yes'
+          release_install_reason=''
+        elif [ "$candidate_count" -gt 1 ]; then
+          release_asset_name=''
+          release_asset_url=''
+          release_install_supported='no'
+          release_install_reason='Multiple release assets matched this host. Pick one manually on GitHub.'
+        fi
+
+        workspace_git_state_write "$workspace_path" release_check_epoch "$now_epoch"
+        workspace_git_state_write "$workspace_path" release_name "$release_name"
+        workspace_git_state_write "$workspace_path" release_tag "$release_tag"
+        workspace_git_state_write "$workspace_path" release_html_url "$release_html_url"
+        workspace_git_state_write "$workspace_path" release_published_at "$release_published_at"
+        workspace_git_state_write "$workspace_path" release_asset_name "$release_asset_name"
+        workspace_git_state_write "$workspace_path" release_asset_url "$release_asset_url"
+        workspace_git_state_write "$workspace_path" release_install_supported "$release_install_supported"
+        workspace_git_state_write "$workspace_path" release_install_reason "$release_install_reason"
+        workspace_git_state_write "$workspace_path" release_available "$( [ "$release_install_supported" = "yes" ] && printf yes || printf no )"
+        workspace_git_state_write "$workspace_path" release_error "$release_error"
+      }
+
+      release_check_epoch=$(workspace_git_cached_value_file "$state_file" release_check_epoch)
+      release_name=$(workspace_git_cached_value_file "$state_file" release_name)
+      release_tag=$(workspace_git_cached_value_file "$state_file" release_tag)
+      release_html_url=$(workspace_git_cached_value_file "$state_file" release_html_url)
+      release_published_at=$(workspace_git_cached_value_file "$state_file" release_published_at)
+      release_asset_name=$(workspace_git_cached_value_file "$state_file" release_asset_name)
+      release_asset_url=$(workspace_git_cached_value_file "$state_file" release_asset_url)
+      release_install_supported=$(workspace_git_cached_value_file "$state_file" release_install_supported)
+      release_install_reason=$(workspace_git_cached_value_file "$state_file" release_install_reason)
+      release_available=$(workspace_git_cached_value_file "$state_file" release_available)
+      release_error=$(workspace_git_cached_value_file "$state_file" release_error)
+    elif [ -n "$github_slug" ]; then
+      workspace_git_state_write "$workspace_path" release_check_epoch "$now_epoch"
+      workspace_git_state_write "$workspace_path" release_error "GitHub latest release could not be loaded."
+      release_check_epoch=$now_epoch
+      release_error='GitHub latest release could not be loaded.'
+    fi
+  fi
+
+  printf 'git_release_check_epoch=%s\n' "$release_check_epoch"
+  printf 'git_release_name=%s\n' "$release_name"
+  printf 'git_release_tag=%s\n' "$release_tag"
+  printf 'git_release_url=%s\n' "$release_html_url"
+  printf 'git_release_published_at=%s\n' "$release_published_at"
+  printf 'git_release_asset_name=%s\n' "$release_asset_name"
+  printf 'git_release_asset_url=%s\n' "$release_asset_url"
+  printf 'git_release_install_supported=%s\n' "${release_install_supported:-no}"
+  printf 'git_release_install_reason=%s\n' "$release_install_reason"
+  printf 'git_release_available=%s\n' "${release_available:-no}"
+  printf 'git_release_error=%s\n' "$release_error"
+}
+
+workspace_git_collect_status() {
+  workspace_path=${1-}
+  refresh_remote=${2-0}
+  refresh_release=${3-0}
+
+  git_available='no'
+  git_repo_present='no'
+  git_repo_root=''
+  git_remote_origin=''
+  git_remote_browser_url=''
+  git_github_slug=''
+  git_branch=''
+  git_head=''
+  git_head_short=''
+  git_dirty='no'
+  git_upstream=''
+  git_upstream_present='no'
+  git_ahead='0'
+  git_behind='0'
+  git_diverged='no'
+  git_status_label=''
+  git_status_tone='muted'
+  git_status_reason=''
+  git_last_checked_epoch=$(date +%s 2>/dev/null || printf '0')
+  git_last_fetch_epoch=''
+  git_last_fetch_error=''
+  git_has_release='no'
+
+  if command -v git >/dev/null 2>&1; then
+    git_available='yes'
+  fi
+
+  state_file=$(workspace_git_state_file "$workspace_path")
+  git_last_fetch_epoch=$(workspace_git_cached_value_file "$state_file" remote_check_epoch)
+  git_last_fetch_error=$(workspace_git_cached_value_file "$state_file" remote_check_error)
+
+  if [ "$git_available" != 'yes' ]; then
+    printf 'git_available=%s\n' "$git_available"
+    printf 'git_repo_present=%s\n' "$git_repo_present"
+    printf 'git_status_label=%s\n' ""
+    printf 'git_status_tone=%s\n' "$git_status_tone"
+    printf 'git_status_reason=%s\n' "git is not available on this machine."
+    printf 'git_last_checked_epoch=%s\n' "$git_last_checked_epoch"
+    workspace_git_collect_release_info "$workspace_path" "" "0"
+    return 0
+  fi
+
+  if ! workspace_git_repo_exists "$workspace_path"; then
+    printf 'git_available=%s\n' "$git_available"
+    printf 'git_repo_present=%s\n' "$git_repo_present"
+    printf 'git_status_label=%s\n' ""
+    printf 'git_status_tone=%s\n' "$git_status_tone"
+    printf 'git_status_reason=%s\n' ""
+    printf 'git_last_checked_epoch=%s\n' "$git_last_checked_epoch"
+    workspace_git_collect_release_info "$workspace_path" "" "0"
+    return 0
+  fi
+
+  git_repo_present='yes'
+  git_repo_root=$(workspace_git_repo_root "$workspace_path")
+  git_remote_origin=$(git -C "$workspace_path" remote get-url origin 2>/dev/null || true)
+  git_remote_browser_url=$(workspace_git_browser_url_from_remote "$git_remote_origin")
+  git_github_slug=$(workspace_git_github_slug_from_remote "$git_remote_origin")
+  git_branch=$(workspace_git_current_branch "$workspace_path")
+  git_head=$(workspace_git_head_commit "$workspace_path")
+  git_head_short=$(workspace_git_head_short "$workspace_path")
+  if [ -n "$(git -C "$workspace_path" status --porcelain 2>/dev/null || true)" ]; then
+    git_dirty='yes'
+  fi
+
+  if [ "$refresh_remote" = "1" ] && [ -n "$git_remote_origin" ]; then
+    if workspace_git_fetch_origin "$workspace_path" >/dev/null 2>&1; then
+      git_last_fetch_epoch=$(date +%s 2>/dev/null || printf '0')
+      git_last_fetch_error=''
+      workspace_git_state_write "$workspace_path" remote_check_epoch "$git_last_fetch_epoch"
+      workspace_git_state_write "$workspace_path" remote_check_error ""
+    else
+      git_last_fetch_epoch=$(date +%s 2>/dev/null || printf '0')
+      git_last_fetch_error='Fetch from origin failed.'
+      workspace_git_state_write "$workspace_path" remote_check_epoch "$git_last_fetch_epoch"
+      workspace_git_state_write "$workspace_path" remote_check_error "$git_last_fetch_error"
+    fi
+  fi
+
+  git_upstream=$(git -C "$workspace_path" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
+  if [ -n "$git_upstream" ]; then
+    git_upstream_present='yes'
+  elif [ -n "$git_branch" ] && git -C "$workspace_path" show-ref --verify --quiet "refs/remotes/origin/$git_branch"; then
+    git_upstream="origin/$git_branch"
+    git_upstream_present='yes'
+  fi
+
+  if [ -n "$git_head" ] && [ "$git_upstream_present" = 'yes' ]; then
+    ahead_behind=$(git -C "$workspace_path" rev-list --left-right --count "HEAD...$git_upstream" 2>/dev/null || printf '0 0')
+    git_ahead=$(printf '%s' "$ahead_behind" | awk '{print $1}')
+    git_behind=$(printf '%s' "$ahead_behind" | awk '{print $2}')
+  else
+    git_ahead='0'
+    git_behind='0'
+  fi
+
+  case "${git_ahead:-0}:${git_behind:-0}" in
+    [1-9]*:[1-9]*|[1-9][0-9]*:[1-9][0-9]*)
+      git_diverged='yes'
+      ;;
+  esac
+
+  release_info=$(workspace_git_collect_release_info "$workspace_path" "$git_github_slug" "$refresh_release")
+  git_release_available=$(printf '%s\n' "$release_info" | kv_read git_release_available)
+  if [ "$git_release_available" = 'yes' ]; then
+    git_has_release='yes'
+  fi
+
+  if [ -n "$git_last_fetch_error" ] || { [ -z "$git_remote_origin" ] && [ -n "$git_repo_root" ]; }; then
+    git_status_label='Check Git'
+    git_status_tone='bad'
+    if [ -n "$git_last_fetch_error" ]; then
+      git_status_reason=$git_last_fetch_error
+    else
+      git_status_reason='origin is not configured for this repo yet.'
+    fi
+  elif [ "$git_diverged" = 'yes' ] || { [ "${git_behind:-0}" -gt 0 ] && { [ "${git_ahead:-0}" -gt 0 ] || [ "$git_dirty" = 'yes' ]; }; }; then
+    git_status_label='Sync'
+    git_status_tone='working'
+    git_status_reason='Local and remote changes both need attention before the repo is current.'
+  elif [ "$git_dirty" = 'yes' ] || [ "${git_ahead:-0}" -gt 0 ] || { [ -n "$git_remote_origin" ] && [ "$git_upstream_present" != 'yes' ]; }; then
+    git_status_label='Push'
+    git_status_tone='ok'
+    if [ "$git_dirty" = 'yes' ]; then
+      git_status_reason='Local code changes are ready to review and push.'
+    elif [ "${git_ahead:-0}" -gt 0 ]; then
+      git_status_reason='Local commits are ahead of origin.'
+    else
+      git_status_reason='The current branch is not tracking origin yet.'
+    fi
+  elif [ "${git_behind:-0}" -gt 0 ] || [ "$git_has_release" = 'yes' ]; then
+    git_status_label='Update'
+    git_status_tone='working'
+    if [ "${git_behind:-0}" -gt 0 ]; then
+      git_status_reason='Upstream code changes are available to pull.'
+    else
+      git_status_reason='A newer GitHub release is available for this host.'
+    fi
+  else
+    git_status_label='Current'
+    git_status_tone='ok'
+    git_status_reason='The repo is clean and up to date.'
+  fi
+
+  printf 'git_available=%s\n' "$git_available"
+  printf 'git_repo_present=%s\n' "$git_repo_present"
+  printf 'git_repo_root=%s\n' "$git_repo_root"
+  printf 'git_remote_origin=%s\n' "$git_remote_origin"
+  printf 'git_remote_browser_url=%s\n' "$git_remote_browser_url"
+  printf 'git_github_slug=%s\n' "$git_github_slug"
+  printf 'git_branch=%s\n' "$git_branch"
+  printf 'git_head=%s\n' "$git_head"
+  printf 'git_head_short=%s\n' "$git_head_short"
+  printf 'git_dirty=%s\n' "$git_dirty"
+  printf 'git_upstream=%s\n' "$git_upstream"
+  printf 'git_upstream_present=%s\n' "$git_upstream_present"
+  printf 'git_ahead=%s\n' "$git_ahead"
+  printf 'git_behind=%s\n' "$git_behind"
+  printf 'git_diverged=%s\n' "$git_diverged"
+  printf 'git_status_label=%s\n' "$git_status_label"
+  printf 'git_status_tone=%s\n' "$git_status_tone"
+  printf 'git_status_reason=%s\n' "$git_status_reason"
+  printf 'git_last_checked_epoch=%s\n' "$git_last_checked_epoch"
+  printf 'git_last_fetch_epoch=%s\n' "$git_last_fetch_epoch"
+  printf 'git_last_fetch_error=%s\n' "$git_last_fetch_error"
+  printf '%s\n' "$release_info"
+}
+
 validate_ui_pref_key() {
   key=${1-}
   case "$key" in
@@ -2534,8 +3046,27 @@ cmd_list_workspaces() {
         fi
         ;;
     esac
+    git_info=$(workspace_git_collect_status "$path" "0" "0")
+    git_repo_present=$(printf '%s\n' "$git_info" | kv_read git_repo_present)
+    git_status_label=$(printf '%s\n' "$git_info" | kv_read git_status_label)
+    git_status_tone=$(printf '%s\n' "$git_info" | kv_read git_status_tone)
+    git_status_reason=$(printf '%s\n' "$git_info" | kv_read git_status_reason)
+    git_release_available=$(printf '%s\n' "$git_info" | kv_read git_release_available)
     mtime_epoch=$(path_mtime_epoch "$path")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$project_id" "$title" "$project_type" "$development_context" "$targets" "$path" "$mtime_epoch" "$runnable"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$project_id" \
+      "$title" \
+      "$project_type" \
+      "$development_context" \
+      "$targets" \
+      "$path" \
+      "$mtime_epoch" \
+      "$runnable" \
+      "$git_repo_present" \
+      "$git_status_label" \
+      "$git_status_tone" \
+      "$git_status_reason" \
+      "$git_release_available"
   done | sort
 }
 
@@ -2681,6 +3212,17 @@ cmd_get_workspace_profile() {
     exit 1
   }
 
+  git_info=$(workspace_git_collect_status "$workspace_abs" "1" "1")
+  git_repo_present=$(printf '%s\n' "$git_info" | kv_read git_repo_present)
+  git_remote_origin=$(printf '%s\n' "$git_info" | kv_read git_remote_origin)
+  git_branch=$(printf '%s\n' "$git_info" | kv_read git_branch)
+  if [ -n "$git_repo_present" ] && [ -n "$git_branch" ] && [ "$git_repo_present" = "yes" ]; then
+    :
+  elif [ "$git_repo_present" != "yes" ]; then
+    git_branch=$(workspace_git_cached_value "$workspace_abs" default_branch)
+    [ -n "$git_branch" ] || git_branch=main
+  fi
+
   printf 'root_hint=%s\n' "$root"
   printf 'workspace=%s\n' "$workspace_abs"
   printf 'profile=%s\n' "$conf"
@@ -2700,6 +3242,487 @@ cmd_get_workspace_profile() {
   printf 'hosted_web_serve_script=%s\n' "$(workspace_field "$conf" hosted_web_serve_script "")"
   printf 'hosted_web_serve_action=%s\n' "$(workspace_field "$conf" hosted_web_serve_action "")"
   printf 'run_rebuild_command=%s\n' "$(workspace_rebuild_command "$conf")"
+  printf 'git_default_branch=%s\n' "$git_branch"
+  printf '%s\n' "$git_info"
+}
+
+validate_git_branch_name() {
+  branch_name=${1-}
+  [ -n "$branch_name" ] || {
+    printf '%s\n' "forge-backend: branch name is required" >&2
+    exit 2
+  }
+  if command -v git >/dev/null 2>&1 && git check-ref-format --branch "$branch_name" >/dev/null 2>&1; then
+    return 0
+  fi
+  case "$branch_name" in
+    *".."*|*' '*|*~*|*^*|*:*|*\\*|*\?*|*\[*|*@\{*|*//*|/*|.|..)
+      printf '%s\n' "forge-backend: invalid branch name '$branch_name'" >&2
+      exit 2
+      ;;
+  esac
+}
+
+workspace_profile_path() {
+  workspace_path=${1-}
+  conf="$workspace_path/wizardry.workspace.conf"
+  [ -f "$conf" ] || {
+    printf '%s\n' "forge-backend: project profile missing: $workspace_path" >&2
+    exit 1
+  }
+  printf '%s\n' "$conf"
+}
+
+cmd_workspace_git_status() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-status requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  conf=$(workspace_profile_path "$workspace_abs")
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "1" "1")"
+}
+
+cmd_workspace_git_init() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  remote_url=${3-}
+  branch_name=${4-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-init requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -n "$branch_name" ] || branch_name=main
+  validate_git_branch_name "$branch_name"
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  conf=$(workspace_profile_path "$workspace_abs")
+  if workspace_git_repo_exists "$workspace_abs"; then
+    printf '%s\n' "forge-backend: project already has a git repo" >&2
+    exit 1
+  fi
+
+  if git -C "$workspace_abs" init -b "$branch_name" >/dev/null 2>&1; then
+    :
+  else
+    git -C "$workspace_abs" init >/dev/null
+    git -C "$workspace_abs" symbolic-ref HEAD "refs/heads/$branch_name" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$remote_url" ]; then
+    git -C "$workspace_abs" remote add origin "$remote_url" >/dev/null 2>&1 || git -C "$workspace_abs" remote set-url origin "$remote_url" >/dev/null 2>&1
+  fi
+  workspace_git_state_write "$workspace_abs" default_branch "$branch_name"
+
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf 'status=ok\n'
+  printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "0" "1")"
+}
+
+cmd_workspace_git_set_remote() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  remote_url=${3-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-set-remote requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  [ -n "$remote_url" ] || {
+    printf '%s\n' "forge-backend: workspace-git-set-remote requires REMOTE_URL" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  conf=$(workspace_profile_path "$workspace_abs")
+  workspace_git_repo_exists "$workspace_abs" || {
+    printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
+    exit 1
+  }
+  if git -C "$workspace_abs" remote get-url origin >/dev/null 2>&1; then
+    git -C "$workspace_abs" remote set-url origin "$remote_url"
+  else
+    git -C "$workspace_abs" remote add origin "$remote_url"
+  fi
+  workspace_git_state_write "$workspace_abs" remote_check_error ""
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf 'status=ok\n'
+  printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "0" "1")"
+}
+
+cmd_workspace_git_set_branch() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  branch_name=${3-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-set-branch requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  validate_git_branch_name "$branch_name"
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  conf=$(workspace_profile_path "$workspace_abs")
+  workspace_git_repo_exists "$workspace_abs" || {
+    printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
+    exit 1
+  }
+
+  current_head=$(workspace_git_head_commit "$workspace_abs")
+  if git -C "$workspace_abs" show-ref --verify --quiet "refs/heads/$branch_name"; then
+    git -C "$workspace_abs" checkout "$branch_name" >/dev/null
+  elif git -C "$workspace_abs" show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+    git -C "$workspace_abs" checkout -B "$branch_name" --track "origin/$branch_name" >/dev/null
+  elif [ -n "$current_head" ]; then
+    git -C "$workspace_abs" checkout -b "$branch_name" >/dev/null
+  else
+    git -C "$workspace_abs" symbolic-ref HEAD "refs/heads/$branch_name" >/dev/null 2>&1 || true
+  fi
+  workspace_git_state_write "$workspace_abs" default_branch "$branch_name"
+
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf 'status=ok\n'
+  printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "0" "1")"
+}
+
+cmd_workspace_git_fetch() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-fetch requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  conf=$(workspace_profile_path "$workspace_abs")
+  workspace_git_repo_exists "$workspace_abs" || {
+    printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
+    exit 1
+  }
+  workspace_git_fetch_origin "$workspace_abs"
+  workspace_git_state_write "$workspace_abs" remote_check_epoch "$(date +%s 2>/dev/null || printf '0')"
+  workspace_git_state_write "$workspace_abs" remote_check_error ""
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf 'status=ok\n'
+  printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "0" "1")"
+}
+
+cmd_workspace_git_pull() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-pull requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  conf=$(workspace_profile_path "$workspace_abs")
+  workspace_git_repo_exists "$workspace_abs" || {
+    printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
+    exit 1
+  }
+  if [ -n "$(git -C "$workspace_abs" status --porcelain 2>/dev/null || true)" ]; then
+    printf '%s\n' "forge-backend: commit or stash local changes before pull" >&2
+    exit 1
+  fi
+
+  branch_name=$(workspace_git_current_branch "$workspace_abs")
+  [ -n "$branch_name" ] || branch_name=$(workspace_git_cached_value "$workspace_abs" default_branch)
+  [ -n "$branch_name" ] || branch_name=main
+  workspace_git_fetch_origin "$workspace_abs"
+  workspace_git_state_write "$workspace_abs" remote_check_epoch "$(date +%s 2>/dev/null || printf '0')"
+  workspace_git_state_write "$workspace_abs" remote_check_error ""
+
+  if [ -z "$(workspace_git_head_commit "$workspace_abs")" ] && git -C "$workspace_abs" show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+    git -C "$workspace_abs" checkout -B "$branch_name" "origin/$branch_name" >/dev/null
+  else
+    if ! git -C "$workspace_abs" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1 && git -C "$workspace_abs" show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+      git -C "$workspace_abs" branch --set-upstream-to "origin/$branch_name" "$branch_name" >/dev/null 2>&1 || true
+    fi
+    GIT_TERMINAL_PROMPT=0 git -C "$workspace_abs" pull --ff-only origin "$branch_name"
+  fi
+
+  rebuild_out=$(run_workspace_rebuild "$root" "$workspace_abs" "$conf")
+
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf 'status=ok\n'
+  printf '%s\n' "$rebuild_out"
+  printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "0" "1")"
+}
+
+cmd_workspace_git_push() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-push requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  conf=$(workspace_profile_path "$workspace_abs")
+  workspace_git_repo_exists "$workspace_abs" || {
+    printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
+    exit 1
+  }
+  if [ -n "$(git -C "$workspace_abs" status --porcelain 2>/dev/null || true)" ]; then
+    printf '%s\n' "forge-backend: commit local changes before push" >&2
+    exit 1
+  fi
+
+  git_info=$(workspace_git_collect_status "$workspace_abs" "1" "0")
+  git_diverged=$(printf '%s\n' "$git_info" | kv_read git_diverged)
+  git_behind=$(printf '%s\n' "$git_info" | kv_read git_behind)
+  branch_name=$(printf '%s\n' "$git_info" | kv_read git_branch)
+  [ -n "$branch_name" ] || {
+    printf '%s\n' "forge-backend: current branch could not be determined" >&2
+    exit 1
+  }
+  if [ "$git_diverged" = 'yes' ] || [ "${git_behind:-0}" -gt 0 ]; then
+    printf '%s\n' "forge-backend: pull and resolve upstream changes before push" >&2
+    exit 1
+  fi
+
+  if git -C "$workspace_abs" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+    GIT_TERMINAL_PROMPT=0 git -C "$workspace_abs" push origin "$branch_name"
+  else
+    GIT_TERMINAL_PROMPT=0 git -C "$workspace_abs" push -u origin "$branch_name"
+  fi
+  workspace_git_state_write "$workspace_abs" remote_check_epoch "$(date +%s 2>/dev/null || printf '0')"
+  workspace_git_state_write "$workspace_abs" remote_check_error ""
+
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'profile=%s\n' "$conf"
+  printf 'status=ok\n'
+  printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "0" "1")"
+}
+
+cmd_workspace_git_repo_url() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-repo-url requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  git_info=$(workspace_git_collect_status "$workspace_abs" "0" "0")
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'remote_url=%s\n' "$(printf '%s\n' "$git_info" | kv_read git_remote_origin)"
+  printf 'browser_url=%s\n' "$(printf '%s\n' "$git_info" | kv_read git_remote_browser_url)"
+  printf 'github_slug=%s\n' "$(printf '%s\n' "$git_info" | kv_read git_github_slug)"
+}
+
+cmd_workspace_git_pr_url() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-pr-url requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  git_info=$(workspace_git_collect_status "$workspace_abs" "0" "1")
+  github_slug=$(printf '%s\n' "$git_info" | kv_read git_github_slug)
+  branch_name=$(printf '%s\n' "$git_info" | kv_read git_branch)
+  [ -n "$github_slug" ] || {
+    printf '%s\n' "forge-backend: PR URL is available for GitHub remotes only" >&2
+    exit 1
+  }
+  [ -n "$branch_name" ] || {
+    printf '%s\n' "forge-backend: current branch could not be determined" >&2
+    exit 1
+  }
+  base_branch=$(workspace_git_default_base_branch "$workspace_abs")
+  repo_url=$(workspace_git_browser_url_from_remote "$(printf '%s\n' "$git_info" | kv_read git_remote_origin)")
+  pr_url="$repo_url/compare/$base_branch...$branch_name?expand=1"
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf 'repo_url=%s\n' "$repo_url"
+  printf 'base_branch=%s\n' "$base_branch"
+  printf 'branch=%s\n' "$branch_name"
+  printf 'pr_url=%s\n' "$pr_url"
+}
+
+cmd_workspace_git_release() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-release requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  printf 'root_hint=%s\n' "$root"
+  printf 'workspace=%s\n' "$workspace_abs"
+  printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "0" "1" | awk -F= '/^git_release_/ { print }')"
+}
+
+cmd_workspace_git_install_release() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: workspace-git-install-release requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  workspace_abs=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$workspace_abs" ] || {
+    printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
+    exit 1
+  }
+  conf=$(workspace_profile_path "$workspace_abs")
+  git_info=$(workspace_git_collect_status "$workspace_abs" "1" "1")
+  asset_url=$(printf '%s\n' "$git_info" | kv_read git_release_asset_url)
+  asset_name=$(printf '%s\n' "$git_info" | kv_read git_release_asset_name)
+  install_supported=$(printf '%s\n' "$git_info" | kv_read git_release_install_supported)
+  install_reason=$(printf '%s\n' "$git_info" | kv_read git_release_install_reason)
+  release_tag=$(printf '%s\n' "$git_info" | kv_read git_release_tag)
+  github_slug=$(printf '%s\n' "$git_info" | kv_read git_github_slug)
+  [ "$install_supported" = 'yes' ] || {
+    printf '%s\n' "forge-backend: ${install_reason:-No supported release install flow is available.}" >&2
+    exit 1
+  }
+  [ -n "$asset_url" ] || {
+    printf '%s\n' "forge-backend: release asset URL missing" >&2
+    exit 1
+  }
+  command -v curl >/dev/null 2>&1 || {
+    printf '%s\n' "forge-backend: curl is required to install a GitHub release asset" >&2
+    exit 1
+  }
+
+  release_dir=$(workspace_git_release_dir "$workspace_abs")
+  workspace_slug=$(workspace_field "$conf" project_id "$(basename "$workspace_abs")")
+  download_path="$release_dir/$asset_name"
+  extract_dir="$release_dir/extracted"
+  rm -rf "$extract_dir"
+  mkdir -p "$extract_dir"
+  curl -fsSL "$asset_url" -o "$download_path"
+
+  os_name=$(os_id)
+  case "$os_name" in
+    darwin)
+      case "$asset_name" in
+        *.zip)
+          if command -v ditto >/dev/null 2>&1; then
+            ditto -x -k "$download_path" "$extract_dir"
+          elif command -v unzip >/dev/null 2>&1; then
+            unzip -oq "$download_path" -d "$extract_dir" >/dev/null
+          else
+            printf '%s\n' "forge-backend: ditto or unzip is required to install macOS release archives" >&2
+            exit 1
+          fi
+          ;;
+        *.tar.gz|*.tgz)
+          tar -xzf "$download_path" -C "$extract_dir"
+          ;;
+        *)
+          printf '%s\n' "forge-backend: unsupported macOS release asset: $asset_name" >&2
+          exit 1
+          ;;
+      esac
+      app_bundle=$(find "$extract_dir" -type d -name '*.app' -print | head -n 1)
+      [ -n "$app_bundle" ] || {
+        printf '%s\n' "forge-backend: no macOS app bundle was found in the release archive" >&2
+        exit 1
+      }
+      install_path="/Applications/$(basename "$app_bundle")"
+      rm -rf "$install_path"
+      if command -v ditto >/dev/null 2>&1; then
+        ditto "$app_bundle" "$install_path"
+      else
+        cp -R "$app_bundle" "$install_path"
+      fi
+      printf 'root_hint=%s\n' "$root"
+      printf 'workspace=%s\n' "$workspace_abs"
+      printf 'profile=%s\n' "$conf"
+      printf 'status=ok\n'
+      printf 'github_slug=%s\n' "$github_slug"
+      printf 'release_tag=%s\n' "$release_tag"
+      printf 'asset=%s\n' "$download_path"
+      printf 'installed=%s\n' "$install_path"
+      ;;
+    linux)
+      case "$(printf '%s' "$asset_name" | tr '[:upper:]' '[:lower:]')" in
+        *.appimage)
+          install_root="$HOME/.local/share/wizardry-apps/$workspace_slug-release"
+          launcher_dir="$HOME/.local/bin"
+          launcher_path="$launcher_dir/wizardry-$workspace_slug-release"
+          mkdir -p "$install_root" "$launcher_dir"
+          install_path="$install_root/$asset_name"
+          cp "$download_path" "$install_path"
+          chmod +x "$install_path"
+          cat > "$launcher_path" <<LAUNCHER
+#!/bin/sh
+set -eu
+exec "$install_path" "\$@"
+LAUNCHER
+          chmod +x "$launcher_path"
+          printf 'root_hint=%s\n' "$root"
+          printf 'workspace=%s\n' "$workspace_abs"
+          printf 'profile=%s\n' "$conf"
+          printf 'status=ok\n'
+          printf 'github_slug=%s\n' "$github_slug"
+          printf 'release_tag=%s\n' "$release_tag"
+          printf 'asset=%s\n' "$download_path"
+          printf 'installed=%s\n' "$install_path"
+          printf 'launcher=%s\n' "$launcher_path"
+          ;;
+        *)
+          printf '%s\n' "forge-backend: unsupported Linux release asset: $asset_name" >&2
+          exit 1
+          ;;
+      esac
+      ;;
+    *)
+      printf '%s\n' "forge-backend: release install is supported on macOS and Linux only" >&2
+      exit 1
+      ;;
+  esac
 }
 
 pick_directory_under_workspace() {
