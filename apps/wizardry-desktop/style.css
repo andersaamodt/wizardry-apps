@@ -135,7 +135,7 @@ body.wd-resizing .wd-app-shell {
   max-width: 420px;
   min-height: 0;
   background: var(--wd-panel);
-  border-right: 1px solid var(--wd-line);
+  border-right: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -144,7 +144,7 @@ body.wd-resizing .wd-app-shell {
 .wd-rail-head {
   min-height: calc(var(--wd-host-top-inset) + 0.26rem);
   padding: 0;
-  border-bottom: 1px solid var(--wd-line);
+  border-bottom: 0;
 }
 
 .wd-rail-head h1 {
@@ -160,7 +160,6 @@ body.wd-resizing .wd-app-shell {
   display: flex;
   flex-direction: column;
   gap: 0.08rem;
-  scrollbar-gutter: stable;
 }
 
 .wd-nav-row {
@@ -441,7 +440,6 @@ body.wd-resizing * {
   padding: 0.24rem 0.28rem;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-gutter: stable;
 }
 
 #content-area {
@@ -1409,7 +1407,6 @@ body.wd-resizing * {
   overflow: auto;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-gutter: stable;
   padding-right: 0.12rem;
 }
 

@@ -1783,46 +1783,125 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
     } else if ([self isArtificerApp]) {
         NSString *normalized = [[relayState ?: @"idle" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        CGFloat inset = MAX(1.5, floor(side * 0.13));
+        CGFloat inset = MAX(1.0, floor(side * 0.10));
         NSRect glyphRect = NSInsetRect(NSMakeRect(0.0, 0.0, side, side), inset, inset);
-        NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:glyphRect];
-        CGFloat strokeWidth = MAX(1.35, floor(side * 0.10));
+        CGFloat minX = NSMinX(glyphRect);
+        CGFloat maxX = NSMaxX(glyphRect);
+        CGFloat minY = NSMinY(glyphRect);
+        CGFloat maxY = NSMaxY(glyphRect);
+        CGFloat midX = NSMidX(glyphRect);
+        CGFloat midY = NSMidY(glyphRect);
+        CGFloat strokeWidth = MAX(1.1, floor(side * 0.09));
+        CGFloat shaftWidth = MAX(1.8, floor(side * 0.16));
+
+        NSBezierPath *shaft = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(floor(midX - shaftWidth * 0.5),
+                                                                                  floor(minY + side * 0.12),
+                                                                                  shaftWidth,
+                                                                                  floor((maxY - minY) * 0.70))
+                                                             xRadius:shaftWidth * 0.5
+                                                             yRadius:shaftWidth * 0.5];
+        NSBezierPath *topSpike = [NSBezierPath bezierPath];
+        [topSpike moveToPoint:NSMakePoint(midX, minY)];
+        [topSpike lineToPoint:NSMakePoint(midX + shaftWidth * 0.95, minY + side * 0.17)];
+        [topSpike lineToPoint:NSMakePoint(midX, minY + side * 0.28)];
+        [topSpike lineToPoint:NSMakePoint(midX - shaftWidth * 0.95, minY + side * 0.17)];
+        [topSpike closePath];
+
+        NSBezierPath *bottomSpike = [NSBezierPath bezierPath];
+        [bottomSpike moveToPoint:NSMakePoint(midX, maxY)];
+        [bottomSpike lineToPoint:NSMakePoint(midX + shaftWidth * 0.95, maxY - side * 0.17)];
+        [bottomSpike lineToPoint:NSMakePoint(midX, maxY - side * 0.28)];
+        [bottomSpike lineToPoint:NSMakePoint(midX - shaftWidth * 0.95, maxY - side * 0.17)];
+        [bottomSpike closePath];
+
+        NSBezierPath *blade = [NSBezierPath bezierPath];
+        [blade moveToPoint:NSMakePoint(midX - shaftWidth * 0.10, midY - side * 0.06)];
+        [blade lineToPoint:NSMakePoint(minX + side * 0.02, midY - side * 0.30)];
+        [blade lineToPoint:NSMakePoint(midX - side * 0.03, midY - side * 0.52)];
+        [blade lineToPoint:NSMakePoint(midX + side * 0.14, midY - side * 0.18)];
+        [blade lineToPoint:NSMakePoint(midX + side * 0.06, midY + side * 0.04)];
+        [blade closePath];
+
+        NSBezierPath *hammerFace = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(midX + side * 0.02,
+                                                                                       midY - side * 0.30,
+                                                                                       side * 0.20,
+                                                                                       side * 0.13)
+                                                                  xRadius:side * 0.04
+                                                                  yRadius:side * 0.04];
+
+        NSBezierPath *gem = [NSBezierPath bezierPath];
+        [gem moveToPoint:NSMakePoint(midX, midY - side * 0.16)];
+        [gem lineToPoint:NSMakePoint(midX + side * 0.11, midY)];
+        [gem lineToPoint:NSMakePoint(midX, midY + side * 0.16)];
+        [gem lineToPoint:NSMakePoint(midX - side * 0.11, midY)];
+        [gem closePath];
+
+        NSArray<NSBezierPath *> *weaponPaths = @[shaft, topSpike, bottomSpike, blade, hammerFace, gem];
+        void (^fillWeapon)(void) = ^{
+            [[NSColor blackColor] setFill];
+            for (NSBezierPath *path in weaponPaths) {
+                [path fill];
+            }
+        };
+        void (^strokeWeapon)(void) = ^{
+                [[NSColor blackColor] setStroke];
+            for (NSBezierPath *path in weaponPaths) {
+                [path setLineWidth:strokeWidth];
+                [path setLineJoinStyle:NSLineJoinStyleRound];
+                [path setLineCapStyle:NSLineCapStyleRound];
+                [path stroke];
+            }
+        };
+        void (^drawBadgeCircle)(CGFloat, CGFloat, CGFloat) = ^(CGFloat cx, CGFloat cy, CGFloat radius) {
+            NSBezierPath *badge = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(cx - radius, cy - radius, radius * 2.0, radius * 2.0)];
+            [[NSColor blackColor] setFill];
+            [badge fill];
+        };
+
         if ([normalized isEqualToString:@"running"]) {
-            [[NSColor blackColor] setFill];
-            [circle fill];
+            fillWeapon();
         } else if ([normalized isEqualToString:@"paused"]) {
-            [[NSColor blackColor] setFill];
-            [circle fill];
-            [[NSColor whiteColor] setFill];
-            CGFloat barWidth = MAX(1.6, floor(side * 0.12));
-            CGFloat barHeight = MAX(6.0, floor(side * 0.44));
-            CGFloat gap = MAX(1.6, floor(side * 0.08));
-            CGFloat midX = NSMidX(glyphRect);
-            CGFloat originY = floor(NSMidY(glyphRect) - (barHeight * 0.5));
-            NSRect leftBar = NSMakeRect(floor(midX - gap - barWidth), originY, barWidth, barHeight);
-            NSRect rightBar = NSMakeRect(floor(midX + gap), originY, barWidth, barHeight);
+            fillWeapon();
+            CGFloat badgeRadius = MAX(2.8, floor(side * 0.18));
+            CGFloat badgeX = maxX - badgeRadius;
+            CGFloat badgeY = maxY - badgeRadius * 0.85;
+            drawBadgeCircle(badgeX, badgeY, badgeRadius);
+            [[NSGraphicsContext currentContext] saveGraphicsState];
+            [[NSColor clearColor] setFill];
+            [NSGraphicsContext currentContext].compositingOperation = NSCompositingOperationClear;
+            CGFloat barWidth = MAX(1.2, floor(side * 0.07));
+            CGFloat barHeight = badgeRadius * 1.2;
+            CGFloat gap = MAX(1.0, floor(side * 0.05));
+            NSRect leftBar = NSMakeRect(floor(badgeX - gap - barWidth), floor(badgeY - barHeight * 0.5), barWidth, barHeight);
+            NSRect rightBar = NSMakeRect(floor(badgeX + gap), floor(badgeY - barHeight * 0.5), barWidth, barHeight);
             [[NSBezierPath bezierPathWithRoundedRect:leftBar xRadius:barWidth * 0.45 yRadius:barWidth * 0.45] fill];
             [[NSBezierPath bezierPathWithRoundedRect:rightBar xRadius:barWidth * 0.45 yRadius:barWidth * 0.45] fill];
+            [[NSGraphicsContext currentContext] restoreGraphicsState];
         } else if ([normalized isEqualToString:@"error"]) {
-            [[NSColor blackColor] setFill];
-            [circle fill];
-            [[NSColor whiteColor] setStroke];
+            fillWeapon();
+            CGFloat badgeRadius = MAX(2.8, floor(side * 0.18));
+            CGFloat badgeX = maxX - badgeRadius;
+            CGFloat badgeY = maxY - badgeRadius * 0.85;
+            drawBadgeCircle(badgeX, badgeY, badgeRadius);
+            [[NSGraphicsContext currentContext] saveGraphicsState];
+            [[NSColor clearColor] setStroke];
+            [[NSColor clearColor] setFill];
+            [NSGraphicsContext currentContext].compositingOperation = NSCompositingOperationClear;
             NSBezierPath *mark = [NSBezierPath bezierPath];
-            [mark setLineWidth:MAX(1.5, floor(side * 0.11))];
-            [mark moveToPoint:NSMakePoint(NSMidX(glyphRect), NSMinY(glyphRect) + floor(side * 0.22))];
-            [mark lineToPoint:NSMakePoint(NSMidX(glyphRect), NSMaxY(glyphRect) - floor(side * 0.28))];
+            [mark setLineWidth:MAX(1.2, floor(side * 0.08))];
+            [mark moveToPoint:NSMakePoint(badgeX, badgeY - badgeRadius * 0.40)];
+            [mark lineToPoint:NSMakePoint(badgeX, badgeY + badgeRadius * 0.32)];
             [mark stroke];
-            [[NSColor whiteColor] setFill];
-            [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(floor(NSMidX(glyphRect) - 1.0), NSMinY(glyphRect) + floor(side * 0.08), 2.0, 2.0)] fill];
+            [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(floor(badgeX - 0.8), floor(badgeY - badgeRadius * 0.72), 1.6, 1.6)] fill];
+            [[NSGraphicsContext currentContext] restoreGraphicsState];
         } else {
-            [[NSColor blackColor] setStroke];
-            [circle setLineWidth:strokeWidth];
-            [circle stroke];
+            strokeWeapon();
             if ([normalized isEqualToString:@"disabled"]) {
                 NSBezierPath *slash = [NSBezierPath bezierPath];
-                [slash setLineWidth:MAX(1.3, floor(side * 0.09))];
-                [slash moveToPoint:NSMakePoint(NSMinX(glyphRect) + 1.0, NSMinY(glyphRect) + 1.0)];
-                [slash lineToPoint:NSMakePoint(NSMaxX(glyphRect) - 1.0, NSMaxY(glyphRect) - 1.0)];
+                [slash setLineWidth:MAX(1.2, floor(side * 0.09))];
+                [slash moveToPoint:NSMakePoint(minX + side * 0.06, maxY - side * 0.06)];
+                [slash lineToPoint:NSMakePoint(maxX - side * 0.06, minY + side * 0.06)];
+                [[NSColor blackColor] setStroke];
                 [slash stroke];
             }
         }
