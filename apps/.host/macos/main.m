@@ -1024,7 +1024,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         target = [self forgeDropTargetAtDomX:domX domY:domY paths:safePaths hasImagePayload:NO];
         if (!target.length) {
             if (errorMessage) {
-                *errorMessage = @"simulated drop point is outside the active native drop zone";
+                NSMutableArray<NSString *> *pathStates = [NSMutableArray array];
+                for (NSString *candidatePath in safePaths) {
+                    BOOL isDirectory = NO;
+                    BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:candidatePath isDirectory:&isDirectory];
+                    [pathStates addObject:[NSString stringWithFormat:@"%@ exists=%@ dir=%@",
+                                           candidatePath,
+                                           (exists ? @"yes" : @"no"),
+                                           (isDirectory ? @"yes" : @"no")]];
+                }
+                *errorMessage = [NSString stringWithFormat:@"simulated drop point (%.1f, %.1f) is outside the active native drop zone [%.1f, %.1f, %.1f, %.1f] active=%@ paths=%@",
+                                 domX,
+                                 domY,
+                                 self.forgeWorkspaceDropZoneLeft,
+                                 self.forgeWorkspaceDropZoneTop,
+                                 self.forgeWorkspaceDropZoneRight,
+                                 self.forgeWorkspaceDropZoneBottom,
+                                 (self.forgeWorkspaceDropZoneActive ? @"yes" : @"no"),
+                                 [pathStates componentsJoinedByString:@"; "]];
             }
             return NO;
         }
