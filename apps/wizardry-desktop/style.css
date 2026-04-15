@@ -442,24 +442,11 @@ body.wd-resizing * {
   overflow: hidden;
 }
 
-.wd-content-scroll-cast {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: auto;
-  overflow-x: hidden;
-}
-
 .wd-content-scroll-spellbook > #content-area {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.wd-content-scroll-cast > #content-area {
-  flex: 1;
-  min-height: 0;
 }
 
 .wd-polite-btn {
@@ -618,9 +605,6 @@ body.wd-resizing * {
   gap: 0.28rem;
   align-content: start;
   border-right: 1px solid var(--wd-line);
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
 }
 
 .wd-drill-panel:last-child {
@@ -968,29 +952,6 @@ body.wd-resizing * {
 .wd-cast-drill .wd-drill-panel-detail {
   padding-left: 0;
   padding-right: 0;
-}
-
-#content-area.wd-page-cast {
-  min-height: 0;
-  height: 100%;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-#content-area.wd-page-cast .wd-cast-drill {
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-#content-area.wd-page-cast .wd-cast-drill .wd-drill-shell {
-  min-height: 0;
-  height: auto;
-  max-height: none;
-}
-
-#content-area.wd-page-cast .wd-drill-panel {
-  overflow: visible;
 }
 
 .wd-cast-drill .wd-drill-head {
