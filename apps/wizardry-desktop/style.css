@@ -30,8 +30,8 @@ body {
   min-width: 0;
   min-height: 0;
   font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   background: var(--wd-bg);
@@ -1116,19 +1116,14 @@ body.wd-resizing * {
   border: 0;
   border-radius: 0;
   background: transparent;
-  border-bottom: 1px solid var(--wd-line);
   padding: 0.14rem 0.26rem;
   grid-template-columns: minmax(110px, 1fr) minmax(170px, 1.8fr) 66px auto;
   gap: 0.32rem;
 }
 
-.wd-synonym-row:last-of-type {
-  border-bottom: 0;
-}
-
 .wd-synonym-row .wd-list-main {
   font-weight: 560;
-  font-size: 0.67rem;
+  font-size: 0.72rem;
 }
 
 .wd-scroll-area {
@@ -1171,10 +1166,9 @@ body.wd-resizing * {
   grid-template-columns: minmax(110px, 1fr) minmax(170px, 1.8fr) 66px auto;
   gap: 0.32rem;
   padding: 0.16rem 0.26rem;
-  font-size: 0.58rem;
+  font-size: 0.64rem;
   letter-spacing: 0.01em;
   color: var(--wd-muted);
-  border-bottom: 1px solid var(--wd-line);
   background: transparent;
 }
 
