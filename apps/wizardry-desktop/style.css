@@ -16,6 +16,11 @@
   --wd-scrollbar-thumb: color-mix(in srgb, var(--wd-text) 52%, var(--wd-bg) 48%);
 }
 
+html,
+body {
+  height: 100%;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -112,7 +117,9 @@ body::before {
   display: grid;
   grid-template-columns: var(--wd-rail-width, 260px) 1px minmax(0, 1fr) var(--wd-activity-width, 0px);
   width: 100vw;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   background: var(--wd-bg);
   opacity: 1;
   overflow: hidden;
@@ -147,11 +154,13 @@ body.wd-resizing .wd-app-shell {
 
 .wd-nav {
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0.08rem;
+  scrollbar-gutter: stable;
 }
 
 .wd-nav-row {
@@ -194,6 +203,7 @@ body.wd-resizing .wd-app-shell {
   padding: 0.26rem 0.24rem;
   border-top: 1px solid var(--wd-line);
   flex: 0 0 auto;
+  background: var(--wd-panel);
 }
 
 .wd-icon-btn {
@@ -382,6 +392,7 @@ body.wd-resizing * {
 
 .wd-main-column {
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr;
   background: var(--wd-bg);
@@ -427,24 +438,14 @@ body.wd-resizing * {
 
 .wd-content-scroll {
   min-height: 0;
-  padding: 0.24rem 0.28rem 0.2rem;
-  overflow: auto;
+  padding: 0.24rem 0.28rem;
+  overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
-.wd-content-scroll-spellbook {
-  display: flex;
-  flex-direction: column;
+#content-area {
   min-height: 0;
-  padding-bottom: 0;
-  overflow: hidden;
-}
-
-.wd-content-scroll-spellbook > #content-area {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .wd-polite-btn {
@@ -1100,16 +1101,15 @@ body.wd-resizing * {
   overflow: visible;
 }
 
-#content-area.wd-page-spellbook .wd-spellbook-panel {
-  height: 100%;
-  min-height: 0;
-  flex: 1;
+.wd-spellbook-panel {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto auto;
+  height: 100%;
+  min-height: 0;
   align-content: stretch;
 }
 
-#content-area.wd-page-spellbook .wd-synonym-list-wrap {
+.wd-spellbook-panel .wd-synonym-list-wrap {
   height: 100%;
   margin-bottom: 0.28rem;
   min-height: 0;
@@ -1161,7 +1161,7 @@ body.wd-resizing * {
   scrollbar-width: thin;
 }
 
-#content-area.wd-page-spellbook .wd-synonym-list {
+.wd-spellbook-panel .wd-synonym-list {
   max-height: none;
   height: 100%;
   overflow-y: auto;

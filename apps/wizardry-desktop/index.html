@@ -1963,11 +1963,52 @@
         els.leftRail.style.width = px;
         document.documentElement.style.setProperty('--wd-rail-width', px);
         applyLayoutColumns();
+        enforceLayoutGuards();
       }
 
       function applyLayoutColumns() {
         var activityWidth = state.activityOpen ? state.activityDrawerWidth : 0;
         document.documentElement.style.setProperty('--wd-activity-width', activityWidth + 'px');
+      }
+
+      function enforceLayoutGuards() {
+        if (els.app) {
+          els.app.style.height = '100dvh';
+          els.app.style.minHeight = '0';
+          els.app.style.overflow = 'hidden';
+        }
+        if (els.leftRail) {
+          els.leftRail.style.display = 'grid';
+          els.leftRail.style.gridTemplateRows = 'auto minmax(0, 1fr) auto';
+          els.leftRail.style.minHeight = '0';
+          els.leftRail.style.height = '100%';
+          els.leftRail.style.overflow = 'hidden';
+        }
+        if (els.leftNav) {
+          els.leftNav.style.minHeight = '0';
+          els.leftNav.style.overflowY = 'auto';
+          els.leftNav.style.overflowX = 'hidden';
+        }
+        if (els.mainColumn) {
+          els.mainColumn.style.minHeight = '0';
+        }
+        if (els.contentScroll) {
+          els.contentScroll.classList.remove('wd-content-scroll-spellbook');
+          els.contentScroll.style.minHeight = '0';
+          els.contentScroll.style.height = '100%';
+          els.contentScroll.style.overflowY = 'auto';
+          els.contentScroll.style.overflowX = 'hidden';
+        }
+        if (els.contentArea) {
+          els.contentArea.classList.remove('wd-page-spellbook');
+          els.contentArea.style.minHeight = '0';
+        }
+        var footer = document.querySelector('.wd-rail-footer');
+        if (footer) {
+          footer.style.position = 'relative';
+          footer.style.bottom = '0';
+          footer.style.flex = '0 0 auto';
+        }
       }
 
       function getNavPages() {
@@ -2831,13 +2872,10 @@
             els.pageDrillBack.setAttribute('data-drill-back', '');
           }
         }
-        if (els.contentScroll) {
-          els.contentScroll.classList.toggle('wd-content-scroll-spellbook', state.activePage === 'spellbook');
-        }
         if (els.contentArea) {
-          els.contentArea.classList.toggle('wd-page-spellbook', state.activePage === 'spellbook');
           els.contentArea.innerHTML = content;
         }
+        enforceLayoutGuards();
         setRowSelection();
       }
 
@@ -4485,26 +4523,6 @@
             state.mudDraftArgs[mudActionId] = String(mudArgInput.value || '');
           });
 
-          els.contentArea.addEventListener('wheel', function (event) {
-            if (!els.contentScroll || state.activePage === 'spellbook') {
-              return;
-            }
-            var targetScrollable = event.target && event.target.closest
-              ? event.target.closest('.wd-scroll-area, .wd-synonym-list, .wd-composer-output, .wd-composer-autocomplete, #activity-feed')
-              : null;
-            if (targetScrollable) {
-              return;
-            }
-            var deltaY = Number(event.deltaY || 0);
-            if (!deltaY) {
-              return;
-            }
-            var before = els.contentScroll.scrollTop;
-            els.contentScroll.scrollTop = before + deltaY;
-            if (els.contentScroll.scrollTop !== before) {
-              event.preventDefault();
-            }
-          }, { passive: false });
         }
 
         if (els.contentArea) {
@@ -4635,6 +4653,7 @@
         renderPage();
         renderThemeMenu();
         renderActivity();
+        enforceLayoutGuards();
         initThemeControlFallback();
         ensureBridge();
         setBridgeState(bridgeAvailable());
@@ -4644,6 +4663,9 @@
         window.addEventListener('keydown', function () {
           state.composer.startupLock = false;
         }, { once: true, capture: true });
+        window.addEventListener('resize', function () {
+          enforceLayoutGuards();
+        });
         var startupCloseTicks = 0;
         var startupCloseTimer = setInterval(function () {
           if (!state.composer.startupLock || startupCloseTicks >= 10) {
@@ -4667,6 +4689,7 @@
               applyLayoutColumns();
               setComposerOpen(false, { skipFocus: true });
               renderPage();
+              enforceLayoutGuards();
               pushActivity('boot', 'Wizardry Desktop is ready. Theme: ' + state.activeTheme, {});
               notifyHostBootReady(0);
               revealUI();
