@@ -39,6 +39,8 @@ out=$(sh "$backend" --help)
 printf '%s' "$out" | grep -F "Usage:" >/dev/null
 printf '%s\n' "$out" | grep -F "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]" >/dev/null
 printf '%s\n' "$out" | grep -F "rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE" >/dev/null
+printf '%s\n' "$out" | grep -F "workspace-git-init [ROOT_HINT] WORKSPACE_PATH [REMOTE_URL] [BRANCH]" >/dev/null
+printf '%s\n' "$out" | grep -F "workspace-git-install-release [ROOT_HINT] WORKSPACE_PATH" >/dev/null
 grep -F 'self_relaunch=1' "$backend" >/dev/null
 grep -F 'open "$launch_bundle"' "$backend" >/dev/null
 
@@ -245,8 +247,58 @@ grep -F "starter=clone" "$workspaces_root/workspace-godot/wizardry.workspace.con
 
 workspaces=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
-printf '%s\n' "$workspaces" | grep -E '^workspace-native\t.*\t1$' >/dev/null
 printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
+printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-native" { if (NF != 13 || $8 != "1" || $9 != "no") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-web" { if (NF != 13 || $9 != "no" || $10 != "") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+
+workspace_web_profile=$(sh "$backend" get-workspace-profile "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_profile" | grep -F "git_repo_present=no" >/dev/null
+printf '%s\n' "$workspace_web_profile" | grep -F "git_default_branch=main" >/dev/null
+
+workspace_native_git_init=$(sh "$backend" workspace-git-init "$scratch" "$workspaces_root/workspace-native" "" "main")
+printf '%s\n' "$workspace_native_git_init" | grep -F "git_repo_present=yes" >/dev/null
+printf '%s\n' "$workspace_native_git_init" | grep -F "git_status_label=Check Git" >/dev/null
+
+git_remote_dir="$scratch/git-remotes"
+mkdir -p "$git_remote_dir"
+workspace_web_remote="$git_remote_dir/workspace-web-origin.git"
+git init --bare "$workspace_web_remote" >/dev/null 2>&1
+
+workspace_web_git_init=$(sh "$backend" workspace-git-init "$scratch" "$workspaces_root/workspace-web" "$workspace_web_remote" "main")
+printf '%s\n' "$workspace_web_git_init" | grep -F "git_repo_present=yes" >/dev/null
+printf '%s\n' "$workspace_web_git_init" | grep -F "git_status_label=Push" >/dev/null
+
+git -C "$workspaces_root/workspace-web" config user.name "Forge Test"
+git -C "$workspaces_root/workspace-web" config user.email "forge@example.com"
+git -C "$workspaces_root/workspace-web" add . >/dev/null
+git -C "$workspaces_root/workspace-web" commit -m "Initial workspace commit" >/dev/null
+
+workspace_web_push=$(sh "$backend" workspace-git-push "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_push" | grep -F "git_status_label=Current" >/dev/null
+printf '%s\n' "$workspace_web_push" | grep -F "git_upstream_present=yes" >/dev/null
+
+workspace_web_remote_clone="$scratch/workspace-web-remote-clone"
+git clone "$workspace_web_remote" "$workspace_web_remote_clone" >/dev/null 2>&1
+git -C "$workspace_web_remote_clone" config user.name "Forge Test"
+git -C "$workspace_web_remote_clone" config user.email "forge@example.com"
+printf '%s\n' "<!-- remote update -->" >> "$workspace_web_remote_clone/README.md"
+git -C "$workspace_web_remote_clone" add README.md >/dev/null
+git -C "$workspace_web_remote_clone" commit -m "Remote update" >/dev/null
+git -C "$workspace_web_remote_clone" push origin main >/dev/null 2>&1
+
+workspace_web_fetch=$(sh "$backend" workspace-git-fetch "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_fetch" | grep -F "git_status_label=Update" >/dev/null
+printf '%s\n' "$workspace_web_fetch" | grep -F "git_behind=1" >/dev/null
+
+workspace_web_pull=$(sh "$backend" workspace-git-pull "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_pull" | grep -F "git_status_label=Current" >/dev/null
+printf '%s\n' "$workspace_web_pull" | grep -F "git_behind=0" >/dev/null
+
+git -C "$workspaces_root/workspace-web" remote set-url origin "$git_remote_dir/missing-origin.git"
+workspace_web_broken=$(sh "$backend" workspace-git-status "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_broken" | grep -F "git_status_label=Check Git" >/dev/null
+printf '%s\n' "$workspace_web_broken" | grep -F "git_last_fetch_error=Fetch from origin failed." >/dev/null
+git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
 
 external_workspace="$scratch/external/plain-web"
 mkdir -p "$external_workspace/app"

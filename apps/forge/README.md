@@ -24,6 +24,8 @@ The GUI is organized around two primary use-cases:
 - Projects are external by default under `~/git`, and only folders with `wizardry.workspace.conf` are shown as managed workspaces.
 - Workspace `Run` now executes `run_rebuild_command` from `wizardry.workspace.conf` first when that field is set; use `run_rebuild_command=:` for workspaces that do not need a pre-run rebuild step.
 - Workspace selections in the right pane include a structured `Workspace settings` section for validated edits to supported `wizardry.workspace.conf` fields.
+- Workspace rows can show a compact Git status pill (`Check Git`, `Sync`, `Push`, `Update`, `Current`) when the project folder is connected to a git repo.
+- Workspace selections in the right pane include a `Git` section for repo initialization, `origin` URL updates, branch switching, fetch/pull/push flows, GitHub PR links, and latest-release installs when a supported asset exists for the current host.
 - Native desktop workspaces keep their canonical UI in `ir/app.ir.yaml` as JSON-compatible YAML and regenerate platform source into `generated/macos` and `generated/linux`.
 
 ## Backend
@@ -33,6 +35,9 @@ The GUI calls:
 - `apps/forge/scripts/forge-backend.sh`
 
 This backend is the CLI parity surface for all Forge actions.
+
+Forge stores transient Git cache/release-install state outside the repo under:
+- `${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps/forge/git`
 
 Dropped icons are now normalized into platform asset sets under `assets/icons/` when
 ImageMagick is available, including:

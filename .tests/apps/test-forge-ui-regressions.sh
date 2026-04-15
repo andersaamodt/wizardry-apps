@@ -46,6 +46,9 @@ assert_matches() {
 assert_contains "$ui" 'id="footer-status"'
 assert_contains "$ui" 'id="selected-icon-menu-btn"'
 assert_contains "$ui" 'id="selected-icon-regenerate"'
+assert_contains "$ui" 'id="workspace-git-section"'
+assert_contains "$ui" 'id="workspace-git-form"'
+assert_contains "$ui" 'id="workspace-git-status"'
 assert_matches "$ui" 'function setFooterStatus\(kind, msg\)'
 assert_matches "$ui" 'function shouldShowFooterStatusForAction\(label, opts\)'
 assert_matches "$ui" 'function buildActionLabel\(item\)'
@@ -58,6 +61,16 @@ assert_matches "$ui" 'assignmentKeysForItem\(selected\)'
 assert_matches "$ui" 'state\.installBeforeRunByItemKey\[keys\[0\]\][[:space:]]*=[[:space:]]*!!enabled;'
 assert_not_contains "$ui" 'installBeforeRunHasUserPref'
 assert_matches "$ui" 'function hostTargetId\(\)'
+assert_matches "$ui" 'function renderWorkspaceGitEditor\(selected\)'
+assert_matches "$ui" 'function saveWorkspaceGitRemote\(selected, value\)'
+assert_matches "$ui" 'function saveWorkspaceGitBranch\(selected, value\)'
+assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Fetch git remote', 'workspace-git-fetch'"
+assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Pull and rebuild workspace', 'workspace-git-pull'"
+assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Push workspace branch', 'workspace-git-push'"
+assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Install latest release', 'workspace-git-install-release'"
+assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 13\)'
+assert_matches "$ui" 'function buildCatalogGitPill\(item\)'
+assert_contains "$ui" 'catalog-git-pill'
 assert_matches "$ui" 'navigator\.platform'
 assert_matches "$ui" 'runtimePlatform\.indexOf\('"'"'mac'"'"'\)[[:space:]]*>=[[:space:]]*0'
 assert_matches "$ui" "__wizardry_host_restart_self"

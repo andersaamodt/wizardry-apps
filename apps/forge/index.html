@@ -3623,6 +3623,10 @@
           state.activeCatalogRowMenuKey === item.key ? 'menu' : 'closed',
           isWizardrySuiteItem(item) ? 'suite' : 'plain',
           hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item) ? 'run' : 'norun',
+          item.gitRepoPresent || 'no',
+          item.gitStatusLabel || '',
+          item.gitStatusTone || '',
+          item.gitStatusReason || '',
           rowApp ? rowApp.distribution : '',
           rowApp && rowApp.exists === false ? 'missing' : 'present'
         ].join('|');
@@ -3690,6 +3694,18 @@
           return;
         }
         row.insertBefore(thumb, row.firstChild || null);
+      }
+
+      function buildCatalogGitPill(item) {
+        if (!item || item.kind !== 'workspace' || item.gitRepoPresent !== 'yes' || !item.gitStatusLabel) {
+          return null;
+        }
+        var pill = document.createElement('span');
+        pill.className = 'catalog-git-pill ' + workspaceGitToneClass(item.gitStatusTone);
+        pill.textContent = item.gitStatusLabel;
+        pill.title = item.gitStatusReason || item.gitStatusLabel;
+        pill.setAttribute('aria-label', 'Git status: ' + item.gitStatusLabel + (item.gitStatusReason ? '. ' + item.gitStatusReason : ''));
+        return pill;
       }
 
       function buildCatalogRow(item) {
@@ -3802,6 +3818,10 @@
         if (!item.draft) {
           var rowActions = document.createElement('span');
           rowActions.className = 'catalog-row-actions menu-anchor';
+          var gitPill = buildCatalogGitPill(item);
+          if (gitPill) {
+            rowActions.appendChild(gitPill);
+          }
           var canRowRun = hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item);
           if (canRowRun) {
             var rowRunSpinner = document.createElement('span');
@@ -4082,6 +4102,7 @@
           scheduleSelectedPathCompactSync();
           renderSelectedIconEditor(null);
           renderWorkspaceProfileEditor(null);
+          renderWorkspaceGitEditor(null);
           return;
         }
         syncStageActionVisibility(selected);
@@ -4125,6 +4146,7 @@
           }
           renderSelectedIconEditor(null);
           renderWorkspaceProfileEditor(null);
+          renderWorkspaceGitEditor(null);
           els.selectedAppGrid.classList.remove('hidden');
           var statusCard = document.createElement('div');
           statusCard.className = 'kv-item';
@@ -4184,6 +4206,7 @@
         renderSelectedTargetsEditor(selected);
         renderSelectedIconEditor(selected);
         renderWorkspaceProfileEditor(selected);
+        renderWorkspaceGitEditor(selected);
       }
 
       function hasMobileTargets(selected) {
@@ -5501,7 +5524,40 @@
           hosted_web_site_name: String(raw.hosted_web_site_name || ''),
           hosted_web_serve_script: String(raw.hosted_web_serve_script || ''),
           hosted_web_serve_action: String(raw.hosted_web_serve_action || ''),
-          run_rebuild_command: String(raw.run_rebuild_command || '')
+          run_rebuild_command: String(raw.run_rebuild_command || ''),
+          git_available: String(raw.git_available || 'no'),
+          git_repo_present: String(raw.git_repo_present || 'no'),
+          git_repo_root: String(raw.git_repo_root || ''),
+          git_remote_origin: String(raw.git_remote_origin || ''),
+          git_remote_browser_url: String(raw.git_remote_browser_url || ''),
+          git_github_slug: String(raw.git_github_slug || ''),
+          git_branch: String(raw.git_branch || ''),
+          git_default_branch: String(raw.git_default_branch || 'main'),
+          git_head: String(raw.git_head || ''),
+          git_head_short: String(raw.git_head_short || ''),
+          git_dirty: String(raw.git_dirty || 'no'),
+          git_upstream: String(raw.git_upstream || ''),
+          git_upstream_present: String(raw.git_upstream_present || 'no'),
+          git_ahead: String(raw.git_ahead || '0'),
+          git_behind: String(raw.git_behind || '0'),
+          git_diverged: String(raw.git_diverged || 'no'),
+          git_status_label: String(raw.git_status_label || ''),
+          git_status_tone: String(raw.git_status_tone || 'muted'),
+          git_status_reason: String(raw.git_status_reason || ''),
+          git_last_checked_epoch: String(raw.git_last_checked_epoch || ''),
+          git_last_fetch_epoch: String(raw.git_last_fetch_epoch || ''),
+          git_last_fetch_error: String(raw.git_last_fetch_error || ''),
+          git_release_check_epoch: String(raw.git_release_check_epoch || ''),
+          git_release_name: String(raw.git_release_name || ''),
+          git_release_tag: String(raw.git_release_tag || ''),
+          git_release_url: String(raw.git_release_url || ''),
+          git_release_published_at: String(raw.git_release_published_at || ''),
+          git_release_asset_name: String(raw.git_release_asset_name || ''),
+          git_release_asset_url: String(raw.git_release_asset_url || ''),
+          git_release_install_supported: String(raw.git_release_install_supported || 'no'),
+          git_release_install_reason: String(raw.git_release_install_reason || ''),
+          git_release_available: String(raw.git_release_available || 'no'),
+          git_release_error: String(raw.git_release_error || '')
         };
       }
 
@@ -5539,6 +5595,40 @@
         els.workspaceProfileStatus.classList.toggle('working', state.workspaceProfileStatusKind === 'working');
       }
 
+      function setWorkspaceGitStatus(path, kind, message) {
+        state.workspaceGitStatusKey = workspaceProfileCacheKey(path);
+        state.workspaceGitStatusKind = String(kind || '');
+        state.workspaceGitStatusMessage = String(message || '');
+      }
+
+      function clearWorkspaceGitStatus(path) {
+        var key = workspaceProfileCacheKey(path);
+        if (state.workspaceGitStatusKey !== key) {
+          return;
+        }
+        state.workspaceGitStatusKey = '';
+        state.workspaceGitStatusKind = '';
+        state.workspaceGitStatusMessage = '';
+      }
+
+      function renderWorkspaceGitStatus(path) {
+        if (!els.workspaceGitStatus) {
+          return;
+        }
+        var key = workspaceProfileCacheKey(path);
+        var visible = !!key && state.workspaceGitStatusKey === key && !!state.workspaceGitStatusMessage;
+        els.workspaceGitStatus.classList.toggle('hidden', !visible);
+        if (!visible) {
+          els.workspaceGitStatus.textContent = '';
+          els.workspaceGitStatus.classList.remove('ok', 'bad', 'working');
+          return;
+        }
+        els.workspaceGitStatus.textContent = state.workspaceGitStatusMessage;
+        els.workspaceGitStatus.classList.toggle('ok', state.workspaceGitStatusKind === 'ok');
+        els.workspaceGitStatus.classList.toggle('bad', state.workspaceGitStatusKind === 'bad');
+        els.workspaceGitStatus.classList.toggle('working', state.workspaceGitStatusKind === 'working');
+      }
+
       function cachedWorkspaceProfile(path) {
         return state.workspaceProfileCache[workspaceProfileCacheKey(path)] || null;
       }
@@ -5573,6 +5663,7 @@
           if (current && current.kind === 'workspace' && workspaceProfileCacheKey(current.path) === key) {
             preserveActiveRouteScroll(function () {
               renderWorkspaceProfileEditor(current);
+              renderWorkspaceGitEditor(current);
             });
           }
         }
@@ -5960,6 +6051,495 @@
           return 'Generic';
         }
         return 'Manual';
+      }
+
+      function workspaceGitToneClass(tone) {
+        var value = String(tone || 'muted');
+        if (value === 'ok' || value === 'bad' || value === 'working') {
+          return value;
+        }
+        return 'muted';
+      }
+
+      function workspaceGitDraft(path, profile) {
+        var key = workspaceProfileCacheKey(path);
+        if (!state.workspaceGitDraftByPath[key]) {
+          state.workspaceGitDraftByPath[key] = {
+            remote: String(profile && profile.git_remote_origin || ''),
+            branch: String(profile && (profile.git_branch || profile.git_default_branch) || 'main')
+          };
+        }
+        return state.workspaceGitDraftByPath[key];
+      }
+
+      function formatEpochLabel(epochValue) {
+        var epoch = parseInt(epochValue, 10);
+        if (!epoch) {
+          return '—';
+        }
+        try {
+          return new Date(epoch * 1000).toLocaleString();
+        } catch (_err) {
+          return String(epochValue);
+        }
+      }
+
+      function workspaceGitSyncSummary(profile) {
+        var parts = [];
+        var ahead = parseInt(profile && profile.git_ahead, 10) || 0;
+        var behind = parseInt(profile && profile.git_behind, 10) || 0;
+        if (profile && profile.git_dirty === 'yes') {
+          parts.push('dirty');
+        }
+        if (ahead > 0) {
+          parts.push('ahead ' + ahead);
+        }
+        if (behind > 0) {
+          parts.push('behind ' + behind);
+        }
+        if (profile && profile.git_upstream_present !== 'yes' && profile.git_remote_origin) {
+          parts.push('not tracking');
+        }
+        if (!parts.length) {
+          return 'clean';
+        }
+        return parts.join(' • ');
+      }
+
+      async function refreshWorkspaceAfterGitChange(previousPath, statusKind, statusMessage) {
+        var cacheKey = workspaceProfileCacheKey(previousPath);
+        delete state.workspaceProfileCache[cacheKey];
+        await refreshWorkspaces({ quiet: true, render: false });
+        var current = state.workspaces.find(function (ws) {
+          return workspaceProfileCacheKey(ws.path) === cacheKey;
+        }) || null;
+        if (current) {
+          state.selectedWorkspace = current.id;
+          setSelectedCatalog('workspace:' + current.id);
+          try {
+            state.workspaceProfileCache[cacheKey] = await fetchWorkspaceProfile(current.path);
+          } catch (err) {
+            setWorkspaceGitStatus(previousPath, 'bad', String(err && err.message ? err.message : err));
+          }
+        }
+        if (statusMessage) {
+          setWorkspaceGitStatus(current ? current.path : previousPath, statusKind || 'ok', statusMessage);
+        }
+        preserveActiveRouteScroll(function () {
+          renderCatalogList();
+          renderSelectedBuiltIn();
+        });
+        return current;
+      }
+
+      async function saveWorkspaceGitMutation(selected, label, mutator) {
+        if (!selected || selected.kind !== 'workspace' || !selected.path || state.busy) {
+          return null;
+        }
+        var statusPath = selected.path;
+        setBusy(true);
+        setActivity('working', label + '...');
+        setWorkspaceGitStatus(statusPath, 'working', 'Working...');
+        renderWorkspaceGitStatus(statusPath);
+        try {
+          return await mutator();
+        } catch (err) {
+          var message = String(err && err.message ? err.message : err);
+          if (err && err.fullStderr) {
+            appendLog('[stderr] ' + String(err.fullStderr).trim());
+          }
+          if (err && err.fullStdout) {
+            appendLog('[stdout] ' + String(err.fullStdout).trim());
+          }
+          appendLog('error: ' + message);
+          setWorkspaceGitStatus(statusPath, 'bad', message);
+          renderWorkspaceGitStatus(statusPath);
+          toast(message, 'bad');
+          throw err;
+        } finally {
+          setBusy(false);
+          if (!document.body.classList.contains('bridge-missing')) {
+            setActivity('ready', 'Ready');
+          }
+        }
+      }
+
+      async function saveWorkspaceGitRemote(selected, value) {
+        var profile = cachedWorkspaceProfile(selected.path);
+        var nextValue = String(value || '').trim();
+        if (!profile) {
+          return;
+        }
+        if (profile.git_repo_present !== 'yes') {
+          workspaceGitDraft(selected.path, profile).remote = nextValue;
+          preserveActiveRouteScroll(function () {
+            renderWorkspaceGitEditor(selected);
+          });
+          return;
+        }
+        if (nextValue === String(profile.git_remote_origin || '')) {
+          return;
+        }
+        var result = await saveWorkspaceGitMutation(selected, 'Save git remote', async function () {
+          return backend('workspace-git-set-remote', [selected.path, nextValue], { quiet: true });
+        });
+        if (!result) {
+          return;
+        }
+        await refreshWorkspaceAfterGitChange(selected.path, 'ok', 'Saved');
+      }
+
+      async function saveWorkspaceGitBranch(selected, value) {
+        var profile = cachedWorkspaceProfile(selected.path);
+        var nextValue = String(value || '').trim();
+        if (!profile) {
+          return;
+        }
+        if (profile.git_repo_present !== 'yes') {
+          workspaceGitDraft(selected.path, profile).branch = nextValue || 'main';
+          preserveActiveRouteScroll(function () {
+            renderWorkspaceGitEditor(selected);
+          });
+          return;
+        }
+        if (nextValue === String(profile.git_branch || '')) {
+          return;
+        }
+        var result = await saveWorkspaceGitMutation(selected, 'Switch git branch', async function () {
+          return backend('workspace-git-set-branch', [selected.path, nextValue], { quiet: true });
+        });
+        if (!result) {
+          return;
+        }
+        await refreshWorkspaceAfterGitChange(selected.path, 'ok', 'Branch updated');
+      }
+
+      async function initializeWorkspaceGit(selected) {
+        var profile = cachedWorkspaceProfile(selected.path);
+        var draft = workspaceGitDraft(selected.path, profile);
+        var remote = String(draft.remote || '').trim();
+        var branch = String(draft.branch || profile.git_default_branch || 'main').trim() || 'main';
+        var result = await saveWorkspaceGitMutation(selected, 'Initialize git repo', async function () {
+          return backend('workspace-git-init', [selected.path, remote, branch], { quiet: true });
+        });
+        if (!result) {
+          return;
+        }
+        delete state.workspaceGitDraftByPath[workspaceProfileCacheKey(selected.path)];
+        await refreshWorkspaceAfterGitChange(selected.path, 'ok', 'Repo initialized');
+      }
+
+      async function runWorkspaceGitCommand(selected, label, command, args, successMessage) {
+        var result = await saveWorkspaceGitMutation(selected, label, async function () {
+          return backend(command, args, { quiet: false });
+        });
+        if (!result) {
+          return null;
+        }
+        await refreshWorkspaceAfterGitChange(selected.path, 'ok', successMessage);
+        return result;
+      }
+
+      function attachWorkspaceGitCommit(control, onCommit, normalize) {
+        normalize = typeof normalize === 'function'
+          ? normalize
+          : function (value) { return String(value || '').trim(); };
+        control.dataset.lastCommitted = normalize(control.value);
+        var commit = function () {
+          var nextValue = normalize(control.value);
+          control.value = nextValue;
+          if (nextValue === String(control.dataset.lastCommitted || '')) {
+            return;
+          }
+          control.dataset.lastCommitted = nextValue;
+          var pending = onCommit(nextValue);
+          if (pending && typeof pending.catch === 'function') {
+            pending.catch(function () {});
+          }
+        };
+        control.addEventListener('blur', commit);
+        control.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            commit();
+          }
+        });
+        return commit;
+      }
+
+      function createWorkspaceGitTextField(selected, config) {
+        var row = createWorkspaceProfileFieldShell(config);
+        var control = document.createElement('input');
+        control.type = 'text';
+        control.className = 'workspace-profile-control';
+        control.value = String(config.value || '');
+        control.spellcheck = false;
+        control.disabled = !!config.disabled;
+        if (config.placeholder) {
+          control.placeholder = config.placeholder;
+        }
+        if (typeof config.onInput === 'function') {
+          control.addEventListener('input', function () {
+            config.onInput(control.value);
+          });
+        }
+        if (typeof config.onCommit === 'function') {
+          attachWorkspaceGitCommit(control, config.onCommit, config.normalize);
+        }
+        row.appendChild(control);
+        appendWorkspaceProfileHelp(row, config.help);
+        return row;
+      }
+
+      function createWorkspaceGitActionButton(label, title, disabled, handler) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'action workspace-git-action';
+        button.textContent = label;
+        button.disabled = !!disabled;
+        if (title) {
+          button.title = title;
+          button.setAttribute('aria-label', title);
+        }
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          handler();
+        });
+        return button;
+      }
+
+      function renderWorkspaceGitEditor(selected) {
+        if (!els.workspaceGitSection || !els.workspaceGitForm) {
+          return;
+        }
+        var show = !!selected && selected.kind === 'workspace' && !!selected.path && !selected.draft;
+        els.workspaceGitSection.classList.toggle('hidden', !show);
+        if (!show) {
+          els.workspaceGitForm.innerHTML = '';
+          if (els.workspaceGitSummaryPill) {
+            els.workspaceGitSummaryPill.classList.add('hidden');
+            els.workspaceGitSummaryPill.textContent = '';
+          }
+          if (els.workspaceGitStatus) {
+            els.workspaceGitStatus.classList.add('hidden');
+          }
+          return;
+        }
+
+        renderWorkspaceGitStatus(selected.path);
+        var profile = cachedWorkspaceProfile(selected.path);
+        if (!profile) {
+          els.workspaceGitForm.innerHTML = '';
+          if (els.workspaceGitSummaryPill) {
+            els.workspaceGitSummaryPill.classList.add('hidden');
+            els.workspaceGitSummaryPill.textContent = '';
+          }
+          var loading = document.createElement('div');
+          loading.className = 'workspace-profile-empty';
+          loading.textContent = state.workspaceProfileLoadingKey === workspaceProfileCacheKey(selected.path)
+            ? 'Loading git status...'
+            : 'Git controls will appear here.';
+          els.workspaceGitForm.appendChild(loading);
+          ensureWorkspaceProfileLoaded(selected);
+          return;
+        }
+
+        var hasRepo = profile.git_repo_present === 'yes';
+        var draft = workspaceGitDraft(selected.path, profile);
+        els.workspaceGitForm.innerHTML = '';
+        if (els.workspaceGitSummaryPill) {
+          els.workspaceGitSummaryPill.textContent = hasRepo ? (profile.git_status_label || 'Git') : 'Not connected';
+          els.workspaceGitSummaryPill.classList.remove('hidden');
+        }
+
+        if (profile.git_available !== 'yes') {
+          var unavailable = document.createElement('div');
+          unavailable.className = 'workspace-profile-empty';
+          unavailable.textContent = 'git is not available on this machine.';
+          els.workspaceGitForm.appendChild(unavailable);
+          return;
+        }
+
+        var meta = document.createElement('div');
+        meta.className = 'workspace-profile-meta';
+        if (hasRepo) {
+          meta.appendChild(createWorkspaceProfileMeta('Repo state', workspaceGitSyncSummary(profile), {
+            help: profile.git_status_reason || ''
+          }));
+          meta.appendChild(createWorkspaceProfileMeta('Current commit', profile.git_head_short || 'No commits yet'));
+          meta.appendChild(createWorkspaceProfileMeta('Tracked branch', profile.git_branch || profile.git_default_branch || 'main'));
+          meta.appendChild(createWorkspaceProfileMeta('Last fetch check', formatEpochLabel(profile.git_last_fetch_epoch)));
+          if (profile.git_release_name || profile.git_release_tag || profile.git_release_error) {
+            meta.appendChild(createWorkspaceProfileMeta('Latest release', profile.git_release_tag || profile.git_release_name || 'Unavailable', {
+              wide: true,
+              help: profile.git_release_error || profile.git_release_asset_name || profile.git_release_install_reason || ''
+            }));
+          }
+        } else {
+          meta.appendChild(createWorkspaceProfileMeta('Repo status', 'Not connected'));
+          meta.appendChild(createWorkspaceProfileMeta('Default branch', draft.branch || profile.git_default_branch || 'main'));
+        }
+        els.workspaceGitForm.appendChild(meta);
+
+        var fields = document.createElement('div');
+        fields.className = 'workspace-profile-fields';
+        fields.appendChild(createWorkspaceGitTextField(selected, {
+          label: 'Remote URL',
+          wide: true,
+          value: hasRepo ? profile.git_remote_origin : draft.remote,
+          placeholder: 'https://github.com/owner/repo.git',
+          disabled: state.busy,
+          onInput: hasRepo ? null : function (value) {
+            draft.remote = String(value || '');
+          },
+          onCommit: hasRepo ? function (value) {
+            saveWorkspaceGitRemote(selected, value);
+          } : null,
+          help: hasRepo
+            ? 'This updates origin for the repo in this project folder.'
+            : 'Optional while initializing. Leave blank to create a local-only repo first.'
+        }));
+        fields.appendChild(createWorkspaceGitTextField(selected, {
+          label: 'Branch',
+          value: hasRepo ? (profile.git_branch || profile.git_default_branch || 'main') : (draft.branch || profile.git_default_branch || 'main'),
+          placeholder: 'main',
+          disabled: state.busy,
+          onInput: hasRepo ? null : function (value) {
+            draft.branch = String(value || '');
+          },
+          onCommit: hasRepo ? function (value) {
+            saveWorkspaceGitBranch(selected, value);
+          } : null,
+          help: hasRepo
+            ? 'Changing this checks out or creates the local branch.'
+            : 'Used when initializing the repo.'
+        }));
+        els.workspaceGitForm.appendChild(fields);
+
+        var actions = document.createElement('div');
+        actions.className = 'workspace-git-actions';
+        if (!hasRepo) {
+          actions.appendChild(createWorkspaceGitActionButton(
+            'Initialize Repo Here',
+            'Initialize a git repo in this project folder',
+            state.busy,
+            function () {
+              initializeWorkspaceGit(selected).catch(function (err) {
+                setWorkspaceGitStatus(selected.path, 'bad', String(err && err.message ? err.message : err));
+                renderWorkspaceGitStatus(selected.path);
+              });
+            }
+          ));
+          els.workspaceGitForm.appendChild(actions);
+          return;
+        }
+
+        var ahead = parseInt(profile.git_ahead, 10) || 0;
+        var behind = parseInt(profile.git_behind, 10) || 0;
+        var dirty = profile.git_dirty === 'yes';
+        var diverged = profile.git_diverged === 'yes';
+        var hasRemote = !!profile.git_remote_origin;
+        var hasGithub = !!profile.git_github_slug;
+        var canOpenRepo = !!(profile.git_remote_browser_url || profile.git_remote_origin);
+        var canInstallRelease = profile.git_release_available === 'yes' && profile.git_release_install_supported === 'yes';
+        var canPush = hasRemote && !dirty && !diverged && behind === 0 && !!(profile.git_branch || profile.git_default_branch);
+        var canOpenPr = hasGithub && canPush && (profile.git_branch || '') !== (profile.git_default_branch || '');
+
+        actions.appendChild(createWorkspaceGitActionButton(
+          'Fetch',
+          hasRemote ? 'Fetch latest refs from origin' : 'Set origin first',
+          state.busy || !hasRemote,
+          function () {
+            runWorkspaceGitCommand(selected, 'Fetch git remote', 'workspace-git-fetch', [selected.path], 'Fetched').catch(function (err) {
+              setWorkspaceGitStatus(selected.path, 'bad', String(err && err.message ? err.message : err));
+              renderWorkspaceGitStatus(selected.path);
+            });
+          }
+        ));
+        actions.appendChild(createWorkspaceGitActionButton(
+          'Pull + Rebuild',
+          !hasRemote ? 'Set origin first'
+            : dirty ? 'Commit or stash local changes first'
+            : diverged ? 'Resolve sync conflicts first'
+            : 'Fast-forward pull from origin, then run the configured rebuild step',
+          state.busy || !hasRemote || dirty || diverged,
+          function () {
+            runWorkspaceGitCommand(selected, 'Pull and rebuild workspace', 'workspace-git-pull', [selected.path], 'Pulled and rebuilt').catch(function (err) {
+              setWorkspaceGitStatus(selected.path, 'bad', String(err && err.message ? err.message : err));
+              renderWorkspaceGitStatus(selected.path);
+            });
+          }
+        ));
+        actions.appendChild(createWorkspaceGitActionButton(
+          'Install Latest Release',
+          canInstallRelease
+            ? 'Download and install the latest supported precompiled release for this host'
+            : (profile.git_release_install_reason || 'No supported latest release install is available'),
+          state.busy || !canInstallRelease,
+          function () {
+            runWorkspaceGitCommand(selected, 'Install latest release', 'workspace-git-install-release', [selected.path], 'Installed latest release').catch(function (err) {
+              setWorkspaceGitStatus(selected.path, 'bad', String(err && err.message ? err.message : err));
+              renderWorkspaceGitStatus(selected.path);
+            });
+          }
+        ));
+        actions.appendChild(createWorkspaceGitActionButton(
+          'Push',
+          !hasRemote ? 'Set origin first'
+            : dirty ? 'Commit local changes first'
+            : diverged ? 'Resolve sync conflicts first'
+            : behind > 0 ? 'Pull remote updates first'
+            : 'Push the current branch to origin',
+          state.busy || !canPush,
+          function () {
+            runWorkspaceGitCommand(selected, 'Push workspace branch', 'workspace-git-push', [selected.path], 'Pushed').catch(function (err) {
+              setWorkspaceGitStatus(selected.path, 'bad', String(err && err.message ? err.message : err));
+              renderWorkspaceGitStatus(selected.path);
+            });
+          }
+        ));
+        actions.appendChild(createWorkspaceGitActionButton(
+          'Open PR',
+          canOpenPr ? 'Open the GitHub compare page for a new pull request' : 'Requires a GitHub origin and a non-default branch that is ready to push',
+          state.busy || !canOpenPr,
+          function () {
+            saveWorkspaceGitMutation(selected, 'Open pull request page', async function () {
+              var res = await backend('workspace-git-pr-url', [selected.path], { quiet: true });
+              var out = kv((res && res.stdout) || '');
+              var url = String(out.pr_url || '');
+              if (!url) {
+                throw new Error('Pull request URL is not available for this repo.');
+              }
+              await openPath(url, false);
+              setWorkspaceGitStatus(selected.path, 'ok', 'Opened pull request page');
+              renderWorkspaceGitStatus(selected.path);
+            }).catch(function (err) {
+              setWorkspaceGitStatus(selected.path, 'bad', String(err && err.message ? err.message : err));
+              renderWorkspaceGitStatus(selected.path);
+            });
+          }
+        ));
+        actions.appendChild(createWorkspaceGitActionButton(
+          'Open Repo',
+          canOpenRepo ? 'Open this repo in the browser' : 'No remote repo URL is available',
+          state.busy || !canOpenRepo,
+          function () {
+            saveWorkspaceGitMutation(selected, 'Open repo page', async function () {
+              var url = profile.git_remote_browser_url || profile.git_remote_origin;
+              if (!url) {
+                throw new Error('Repo URL is not available for this workspace.');
+              }
+              await openPath(url, false);
+              setWorkspaceGitStatus(selected.path, 'ok', 'Opened repo page');
+              renderWorkspaceGitStatus(selected.path);
+            }).catch(function (err) {
+              setWorkspaceGitStatus(selected.path, 'bad', String(err && err.message ? err.message : err));
+              renderWorkspaceGitStatus(selected.path);
+            });
+          }
+        ));
+        els.workspaceGitForm.appendChild(actions);
       }
 
       function renderWorkspaceProfileEditor(selected) {

@@ -1065,6 +1065,41 @@ input[type="checkbox"]:disabled {
   margin-left: 0.26rem;
 }
 
+.catalog-git-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1rem;
+  padding: 0.04rem 0.38rem;
+  margin-right: 0.14rem;
+  border: 1px solid var(--section-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--section-bg) 92%, transparent);
+  color: var(--section-muted);
+  font-size: 0.64rem;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.catalog-git-pill.ok {
+  border-color: var(--pill-green-border);
+  background: var(--pill-green-soft);
+  color: var(--pill-green-fg);
+}
+
+.catalog-git-pill.bad {
+  border-color: var(--section-bad-border);
+  background: color-mix(in srgb, #d92d20 12%, transparent);
+  color: color-mix(in srgb, #d92d20 82%, var(--text));
+}
+
+.catalog-git-pill.working {
+  border-color: var(--pill-blue-border);
+  background: color-mix(in srgb, var(--pill-blue-soft) 82%, transparent);
+  color: var(--pill-blue-fg);
+}
+
 .list-row:last-child {
   border-bottom: 0;
 }
@@ -2201,6 +2236,18 @@ input[type="checkbox"]:disabled {
 .workspace-profile-form {
   display: grid;
   gap: 0.68rem;
+}
+
+.workspace-git-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+}
+
+.workspace-git-action {
+  width: auto;
+  min-height: 2rem;
+  padding: 0.36rem 0.68rem;
 }
 
 .workspace-profile-empty {
