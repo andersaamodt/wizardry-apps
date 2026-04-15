@@ -1452,7 +1452,7 @@
       function setBusy(flag) {
         state.busy = flag;
         document.body.classList.toggle('is-busy', flag);
-        document.querySelectorAll('.action, .row-play, .row-mini').forEach(function (btn) {
+        document.querySelectorAll('.action, .row-play, .row-mini, .row-overflow, .catalog-row-menu button').forEach(function (btn) {
           btn.disabled = flag;
         });
         document.querySelectorAll('.catalog-mini-tab, .catalog-mini-tab-add').forEach(function (btn) {
@@ -3735,6 +3735,7 @@
             play.className = 'row-play';
             play.title = 'Run';
             play.textContent = '▶';
+            play.disabled = state.busy;
             if (item.kind === 'builtin') {
               var itemApp = appById(item.id);
               if (itemApp && itemApp.distribution === 'optional' && itemApp.exists === false) {
@@ -3764,6 +3765,7 @@
           rowMenuBtn.title = 'More actions';
           rowMenuBtn.setAttribute('aria-label', 'More actions');
           rowMenuBtn.textContent = '⋮';
+          rowMenuBtn.disabled = state.busy;
           rowMenuBtn.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
@@ -3854,6 +3856,7 @@
           var button = document.createElement('button');
           button.type = 'button';
           button.textContent = label;
+          button.disabled = state.busy;
           button.addEventListener('click', function (event) {
             event.preventDefault();
             event.stopPropagation();
