@@ -134,6 +134,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 @property (strong) NSStatusItem *statusItem;
 @property (assign) NSInteger statusItemRepairAttempts;
 @property (strong) NSDictionary<NSString *, NSString *> *stonrStatusSnapshot;
+@property (strong) NSDictionary<NSString *, id> *artificerStatusSnapshot;
 @property (assign) BOOL stonrStatusCommandInFlight;
 @property (strong) NSString *stonrStatusCommandLabel;
 - (void)emitGlobalFavoriteTrackHotkey;
@@ -172,6 +173,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)toggleMainWindowFromStatusItem:(id)sender;
 - (void)quitFromStatusItem:(id)sender;
 - (BOOL)isStonrApp;
+- (BOOL)isArtificerApp;
 - (NSString *)stonrBackendScriptPath;
 - (NSDictionary<NSString *, NSString *> *)dictionaryFromKeyValueBlob:(NSString *)blob;
 - (int)runCommandWithLaunchPath:(NSString *)launchPath
@@ -181,9 +183,15 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (NSDictionary<NSString *, NSString *> *)stonrRelayStatusSnapshot;
 - (void)runStonrBackendCommandAsync:(NSString *)command actionLabel:(NSString *)actionLabel;
 - (void)dispatchStonrMenuAction:(NSString *)actionName;
+- (void)dispatchArtificerMenuAction:(NSString *)actionName payload:(NSDictionary *)payload;
 - (void)nativeStonrToggleRelayFromStatusItem:(id)sender;
 - (void)nativeStonrOpenStoreRootFromStatusItem:(id)sender;
 - (void)nativeStonrOpenLogFromStatusItem:(id)sender;
+- (void)nativeArtificerPauseResumeFromStatusItem:(id)sender;
+- (void)nativeArtificerTerminateFromStatusItem:(id)sender;
+- (void)nativeArtificerOpenRecentTasksFromStatusItem:(id)sender;
+- (void)nativeArtificerOpenTaskFromStatusItem:(id)sender;
+- (void)nativeArtificerOpenLogFromStatusItem:(id)sender;
 @end
 
 static NSString *const WizardryHostShowWindowNotification = @"com.wizardry.host.show-window";
@@ -214,6 +222,17 @@ static BOOL wizardryPrefBoolFromEnvFile(NSString *filePath, NSString *key, BOOL 
         return [@[@"1", @"true", @"yes", @"on"] containsObject:normalized];
     }
     return NO;
+}
+
+static BOOL wizardryTruthyObject(id value) {
+    if (!value || value == [NSNull null]) {
+        return NO;
+    }
+    if ([value isKindOfClass:[NSNumber class]]) {
+        return [(NSNumber *)value boolValue];
+    }
+    NSString *normalized = [[[NSString stringWithFormat:@"%@", value] lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return [@[@"1", @"true", @"yes", @"on", @"enabled"] containsObject:normalized];
 }
 
 static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, EventRef event, void *userData) {
@@ -1411,6 +1430,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return [self stonrBackendScriptPath].length > 0;
 }
 
+- (BOOL)isArtificerApp {
+    NSString *slug = [[[self.appSlug ?: @"" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+    return [slug isEqualToString:@"artificer"];
+}
+
 - (NSString *)stonrBackendScriptPath {
     if (!self.appPath.length) {
         return @"";
@@ -1540,6 +1564,29 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }];
 }
 
+- (void)dispatchArtificerMenuAction:(NSString *)actionName payload:(NSDictionary *)payload {
+    if (![self isArtificerApp] || !self.webView || !actionName.length) {
+        return;
+    }
+    NSString *escapedAction = [[actionName stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
+        stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
+    NSString *payloadJson = @"null";
+    if ([payload isKindOfClass:[NSDictionary class]] && payload.count) {
+        NSData *payloadData = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
+        NSString *rawPayload = payloadData ? [[NSString alloc] initWithData:payloadData encoding:NSUTF8StringEncoding] : nil;
+        if (rawPayload.length) {
+            payloadJson = rawPayload;
+        }
+    }
+    NSString *js = [NSString stringWithFormat:@"if (window && typeof window.artificerHostAction === 'function') { window.artificerHostAction('%@', %@); }", escapedAction, payloadJson];
+    [self.webView evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
+        (void)result;
+        if (error) {
+            NSLog(@"Artificer host action dispatch error: %@", error);
+        }
+    }];
+}
+
 - (void)runStonrBackendCommandAsync:(NSString *)command actionLabel:(NSString *)actionLabel {
     if (![self isStonrApp] || !command.length) {
         return;
@@ -1619,7 +1666,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)syncStonrActivationPolicy {
-    if (![self isStonrApp]) {
+    if (![self isStonrApp] && ![self isArtificerApp]) {
         return;
     }
     BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
@@ -1734,6 +1781,51 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             [slash lineToPoint:NSMakePoint(NSMaxX(runningRect) - 2.0, NSMaxY(runningRect) - 1.0)];
             [slash stroke];
         }
+    } else if ([self isArtificerApp]) {
+        NSString *normalized = [[relayState ?: @"idle" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        CGFloat inset = MAX(1.5, floor(side * 0.13));
+        NSRect glyphRect = NSInsetRect(NSMakeRect(0.0, 0.0, side, side), inset, inset);
+        NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:glyphRect];
+        CGFloat strokeWidth = MAX(1.35, floor(side * 0.10));
+        if ([normalized isEqualToString:@"running"]) {
+            [[NSColor blackColor] setFill];
+            [circle fill];
+        } else if ([normalized isEqualToString:@"paused"]) {
+            [[NSColor blackColor] setFill];
+            [circle fill];
+            [[NSColor whiteColor] setFill];
+            CGFloat barWidth = MAX(1.6, floor(side * 0.12));
+            CGFloat barHeight = MAX(6.0, floor(side * 0.44));
+            CGFloat gap = MAX(1.6, floor(side * 0.08));
+            CGFloat midX = NSMidX(glyphRect);
+            CGFloat originY = floor(NSMidY(glyphRect) - (barHeight * 0.5));
+            NSRect leftBar = NSMakeRect(floor(midX - gap - barWidth), originY, barWidth, barHeight);
+            NSRect rightBar = NSMakeRect(floor(midX + gap), originY, barWidth, barHeight);
+            [[NSBezierPath bezierPathWithRoundedRect:leftBar xRadius:barWidth * 0.45 yRadius:barWidth * 0.45] fill];
+            [[NSBezierPath bezierPathWithRoundedRect:rightBar xRadius:barWidth * 0.45 yRadius:barWidth * 0.45] fill];
+        } else if ([normalized isEqualToString:@"error"]) {
+            [[NSColor blackColor] setFill];
+            [circle fill];
+            [[NSColor whiteColor] setStroke];
+            NSBezierPath *mark = [NSBezierPath bezierPath];
+            [mark setLineWidth:MAX(1.5, floor(side * 0.11))];
+            [mark moveToPoint:NSMakePoint(NSMidX(glyphRect), NSMinY(glyphRect) + floor(side * 0.22))];
+            [mark lineToPoint:NSMakePoint(NSMidX(glyphRect), NSMaxY(glyphRect) - floor(side * 0.28))];
+            [mark stroke];
+            [[NSColor whiteColor] setFill];
+            [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(floor(NSMidX(glyphRect) - 1.0), NSMinY(glyphRect) + floor(side * 0.08), 2.0, 2.0)] fill];
+        } else {
+            [[NSColor blackColor] setStroke];
+            [circle setLineWidth:strokeWidth];
+            [circle stroke];
+            if ([normalized isEqualToString:@"disabled"]) {
+                NSBezierPath *slash = [NSBezierPath bezierPath];
+                [slash setLineWidth:MAX(1.3, floor(side * 0.09))];
+                [slash moveToPoint:NSMakePoint(NSMinX(glyphRect) + 1.0, NSMinY(glyphRect) + 1.0)];
+                [slash lineToPoint:NSMakePoint(NSMaxX(glyphRect) - 1.0, NSMaxY(glyphRect) - 1.0)];
+                [slash stroke];
+            }
+        }
     } else {
         [[NSColor blackColor] set];
         CGFloat fontSize = MAX(11.0, side - 2.0);
@@ -1789,12 +1881,17 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
     }
     NSDictionary<NSString *, NSString *> *relayStatus = @{};
+    NSDictionary<NSString *, id> *artificerStatus = @{};
     if ([self isStonrApp]) {
         relayStatus = [self stonrRelayStatusSnapshot];
         if (relayStatus.count) {
             self.stonrStatusSnapshot = relayStatus;
         } else if (self.stonrStatusSnapshot.count) {
             relayStatus = self.stonrStatusSnapshot;
+        }
+    } else if ([self isArtificerApp]) {
+        if ([self.artificerStatusSnapshot isKindOfClass:[NSDictionary class]]) {
+            artificerStatus = self.artificerStatusSnapshot;
         }
     }
     NSStatusBarButton *button = self.statusItem.button;
@@ -1803,6 +1900,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             NSString *relayState = relayStatus[@"status"] ?: @"unknown";
             button.title = @"";
             button.image = [self renderedStatusItemImageForRelayState:relayState busy:self.stonrStatusCommandInFlight];
+            button.imagePosition = NSImageOnly;
+        } else if ([self isArtificerApp]) {
+            NSString *agentState = [artificerStatus[@"status"] isKindOfClass:[NSString class]] ? artificerStatus[@"status"] : @"idle";
+            button.title = @"";
+            button.image = [self renderedStatusItemImageForRelayState:agentState busy:NO];
             button.imagePosition = NSImageOnly;
         } else {
             button.image = nil;
@@ -1860,9 +1962,85 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [menu addItem:openLogItem];
 
         [menu addItem:[NSMenuItem separatorItem]];
+    } else if ([self isArtificerApp]) {
+        NSString *agentState = [artificerStatus[@"status"] isKindOfClass:[NSString class]] ? artificerStatus[@"status"] : @"idle";
+        NSString *stateLabel = [agentState.capitalizedString stringByReplacingOccurrencesOfString:@"-" withString:@" "];
+        NSMenuItem *openArtificerItem = [[NSMenuItem alloc] initWithTitle:@"Open Artificer"
+                                                                    action:@selector(openMainWindowFromStatusItem:)
+                                                             keyEquivalent:@""];
+        [openArtificerItem setTarget:self];
+        [menu addItem:openArtificerItem];
+
+        NSMenuItem *statusItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Agent: %@", stateLabel.length ? stateLabel : @"Idle"]
+                                                             action:nil
+                                                      keyEquivalent:@""];
+        statusItem.enabled = NO;
+        [menu addItem:statusItem];
+        [menu addItem:[NSMenuItem separatorItem]];
+
+        BOOL enabled = wizardryTruthyObject(artificerStatus[@"enabled"]);
+        BOOL paused = wizardryTruthyObject(artificerStatus[@"paused"]);
+
+        NSMenuItem *pauseResumeItem = [[NSMenuItem alloc] initWithTitle:(paused ? @"Resume agent" : @"Pause agent")
+                                                                  action:@selector(nativeArtificerPauseResumeFromStatusItem:)
+                                                           keyEquivalent:@""];
+        [pauseResumeItem setTarget:self];
+        pauseResumeItem.enabled = enabled;
+        [menu addItem:pauseResumeItem];
+
+        NSMenuItem *terminateItem = [[NSMenuItem alloc] initWithTitle:@"Terminate agent"
+                                                                action:@selector(nativeArtificerTerminateFromStatusItem:)
+                                                         keyEquivalent:@""];
+        [terminateItem setTarget:self];
+        terminateItem.enabled = enabled;
+        [menu addItem:terminateItem];
+
+        NSMenuItem *recentTasksItem = [[NSMenuItem alloc] initWithTitle:@"Recent tasks"
+                                                                  action:nil
+                                                           keyEquivalent:@""];
+        NSMenu *recentTasksMenu = [[NSMenu alloc] initWithTitle:@"Recent tasks"];
+        NSArray *recentTasks = [artificerStatus[@"recent_tasks"] isKindOfClass:[NSArray class]] ? artificerStatus[@"recent_tasks"] : @[];
+        if (recentTasks.count) {
+            for (NSDictionary *task in recentTasks) {
+                if (![task isKindOfClass:[NSDictionary class]]) {
+                    continue;
+                }
+                NSString *title = [task[@"title"] isKindOfClass:[NSString class]] ? task[@"title"] : @"Task";
+                NSString *status = [task[@"status"] isKindOfClass:[NSString class]] ? task[@"status"] : @"pending";
+                NSString *menuTitle = [NSString stringWithFormat:@"%@ · %@", title, [status isEqualToString:@"running"] ? @"Running" : @"Queued"];
+                NSMenuItem *taskItem = [[NSMenuItem alloc] initWithTitle:menuTitle
+                                                                  action:@selector(nativeArtificerOpenTaskFromStatusItem:)
+                                                           keyEquivalent:@""];
+                [taskItem setTarget:self];
+                taskItem.representedObject = task;
+                [recentTasksMenu addItem:taskItem];
+            }
+        } else {
+            NSMenuItem *emptyItem = [[NSMenuItem alloc] initWithTitle:@"No recent tasks"
+                                                               action:nil
+                                                        keyEquivalent:@""];
+            emptyItem.enabled = NO;
+            [recentTasksMenu addItem:emptyItem];
+        }
+        recentTasksItem.submenu = recentTasksMenu;
+        [menu addItem:recentTasksItem];
+
+        NSMenuItem *openRecentTasksItem = [[NSMenuItem alloc] initWithTitle:@"Show task list"
+                                                                      action:@selector(nativeArtificerOpenRecentTasksFromStatusItem:)
+                                                               keyEquivalent:@""];
+        [openRecentTasksItem setTarget:self];
+        [menu addItem:openRecentTasksItem];
+
+        NSMenuItem *openLogItem = [[NSMenuItem alloc] initWithTitle:@"Open logs"
+                                                              action:@selector(nativeArtificerOpenLogFromStatusItem:)
+                                                       keyEquivalent:@""];
+        [openLogItem setTarget:self];
+        [menu addItem:openLogItem];
+
+        [menu addItem:[NSMenuItem separatorItem]];
     }
 
-    if (![self isStonrApp]) {
+    if (![self isStonrApp] && ![self isArtificerApp]) {
         NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:([self.window isVisible] ? @"Hide Window" : @"Show Window")
                                                             action:@selector(toggleMainWindowFromStatusItem:)
                                                      keyEquivalent:@""];
@@ -1904,6 +2082,49 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     self.showStatusItem = showStatusItem;
     [self syncStonrActivationPolicy];
     [self updateStatusItemVisibility];
+}
+
+- (void)nativeArtificerPauseResumeFromStatusItem:(id)sender {
+    (void)sender;
+    NSDictionary<NSString *, id> *snapshot = [self.artificerStatusSnapshot isKindOfClass:[NSDictionary class]] ? self.artificerStatusSnapshot : @{};
+    BOOL paused = wizardryTruthyObject(snapshot[@"paused"]);
+    [self dispatchArtificerMenuAction:(paused ? @"resume" : @"pause") payload:nil];
+}
+
+- (void)nativeArtificerTerminateFromStatusItem:(id)sender {
+    (void)sender;
+    [self dispatchArtificerMenuAction:@"terminate" payload:nil];
+}
+
+- (void)nativeArtificerOpenRecentTasksFromStatusItem:(id)sender {
+    (void)sender;
+    [self showMainWindow];
+    [self dispatchArtificerMenuAction:@"open-recent-tasks" payload:nil];
+}
+
+- (void)nativeArtificerOpenTaskFromStatusItem:(id)sender {
+    NSMenuItem *menuItem = [sender isKindOfClass:[NSMenuItem class]] ? (NSMenuItem *)sender : nil;
+    NSDictionary *task = [menuItem.representedObject isKindOfClass:[NSDictionary class]] ? menuItem.representedObject : nil;
+    [self showMainWindow];
+    if (task.count) {
+        [self dispatchArtificerMenuAction:@"open-task" payload:task];
+    }
+}
+
+- (void)nativeArtificerOpenLogFromStatusItem:(id)sender {
+    (void)sender;
+    NSDictionary<NSString *, id> *snapshot = [self.artificerStatusSnapshot isKindOfClass:[NSDictionary class]] ? self.artificerStatusSnapshot : @{};
+    NSString *logPath = [snapshot[@"log_path"] isKindOfClass:[NSString class]] ? snapshot[@"log_path"] : @"";
+    logPath = [[logPath stringByExpandingTildeInPath] stringByStandardizingPath];
+    if (!logPath.length) {
+        [self showMainWindow];
+        return;
+    }
+    if (![[NSFileManager defaultManager] fileExistsAtPath:logPath]) {
+        [[NSFileManager defaultManager] createFileAtPath:logPath contents:[NSData data] attributes:nil];
+    }
+    NSURL *logURL = [NSURL fileURLWithPath:logPath isDirectory:NO];
+    [[NSWorkspace sharedWorkspace] openURL:logURL];
 }
 
 - (void)setupMainMenuWithAppName:(NSString *)appName {
@@ -2211,6 +2432,23 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         // Backward-compatibility: older prefs files may only have menu_bar_icon.
         // If status-item is enabled, keep background mode enabled too so closing
         // the window does not terminate the app and remove the tray icon.
+        if (!foundBackground && foundStatusItem && showStatusItem) {
+            self.keepRunningInBackground = YES;
+        }
+    } else if ([appSlug isEqualToString:@"artificer"]) {
+        NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
+        NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
+        NSString *prefsPath = [[configRoot stringByAppendingPathComponent:@"artificer"] stringByAppendingPathComponent:@"ui-prefs.env"];
+        BOOL foundBackground = NO;
+        BOOL foundStatusItem = NO;
+        BOOL keepRunning = wizardryPrefBoolFromEnvFile(prefsPath, @"background_mode", &foundBackground);
+        BOOL showStatusItem = wizardryPrefBoolFromEnvFile(prefsPath, @"menu_bar_icon", &foundStatusItem);
+        if (foundBackground) {
+            self.keepRunningInBackground = keepRunning;
+        }
+        if (foundStatusItem) {
+            self.showStatusItem = showStatusItem;
+        }
         if (!foundBackground && foundStatusItem && showStatusItem) {
             self.keepRunningInBackground = YES;
         }
@@ -2936,6 +3174,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                     buttonAttached ? 1 : 0,
                                     (long)self.statusItemRepairAttempts];
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:stdout stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_artificer_status_item_sync"]) {
+            NSString *rawPayload = args.count >= 1 ? [NSString stringWithFormat:@"%@", args[0]] : @"{}";
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSDictionary *snapshot = @{};
+                NSData *payloadData = [rawPayload dataUsingEncoding:NSUTF8StringEncoding];
+                if (payloadData.length) {
+                    id parsed = [NSJSONSerialization JSONObjectWithData:payloadData options:0 error:nil];
+                    if ([parsed isKindOfClass:[NSDictionary class]]) {
+                        snapshot = parsed;
+                    }
+                }
+                self.artificerStatusSnapshot = snapshot;
+                [self updateStatusItemVisibility];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
             return;
         }
