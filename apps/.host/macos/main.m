@@ -3021,7 +3021,13 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     [self updateStatusItemVisibility];
 
-    if (!hiddenTestMode) {
+    if (hiddenTestMode) {
+        NSRect offscreenFrame = [self.window frame];
+        offscreenFrame.origin.x = -20000.0;
+        offscreenFrame.origin.y = -20000.0;
+        [self.window setFrame:offscreenFrame display:NO];
+        [self.window orderFront:nil];
+    } else {
         [self.window makeKeyAndOrderFront:nil];
         [self.window orderFrontRegardless];
         // Re-activate after the window exists so workspace launches behave like
