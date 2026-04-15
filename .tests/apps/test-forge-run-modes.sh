@@ -137,7 +137,7 @@ mode=${WIZARDRY_FAKE_HOST_MODE-loop}
 sleep_seconds=${WIZARDRY_FAKE_HOST_SLEEP-30}
 
 if [ -n "$log_file" ]; then
-  printf '%s\n' "$app_dir" >>"$log_file"
+  printf 'exec=%s app=%s\n' "$0" "$app_dir" >>"$log_file"
 fi
 
 case "$mode" in
@@ -170,6 +170,16 @@ exit 0
 SH_OPEN
 chmod +x "$fake_bin/open"
 
+test_home="$scratch/home"
+mkdir -p "$test_home"
+
+test_env() {
+  env \
+    HOME="$test_home" \
+    PATH="$fake_bin:$PATH" \
+    "$@"
+}
+
 help_out=$(sh "$backend" --help)
 assert_contains "$help_out" "install-desktop [ROOT_HINT] APP_SLUG [TARGET_ID]"
 assert_contains "$help_out" "run-desktop [ROOT_HINT] APP_SLUG"
@@ -181,7 +191,7 @@ assert_contains "$help_out" "  web | native-desktop | godot"
 
 # Behavior: desktop app targets launch desktop host mode.
 desktop_log="$scratch/desktop-host.log"
-desktop_out=$(PATH="$fake_bin:$PATH" FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$desktop_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-desktop "$root" forge)
+desktop_out=$(test_env FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$desktop_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-desktop "$root" forge)
 assert_contains "$desktop_out" "launched=1"
 assert_contains "$desktop_out" "mode=desktop-executable"
 desktop_pid=$(printf '%s\n' "$desktop_out" | kv_read pid)
@@ -195,7 +205,7 @@ wait_for_file_contains "$desktop_log" "$desktop_entry" 60
 workspace_host="$scratch/workspace-host"
 make_workspace "$workspace_host" "workspace-host" "Workspace Host" "hosted-web,linux"
 workspace_host_log="$scratch/workspace-host.log"
-workspace_host_out=$(PATH="$fake_bin:$PATH" FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$workspace_host_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-workspace "$root" "$workspace_host" web)
+workspace_host_out=$(test_env FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$workspace_host_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-workspace "$root" "$workspace_host" web)
 assert_contains "$workspace_host_out" "launched=1"
 assert_contains "$workspace_host_out" "mode=desktop-executable"
 workspace_host_pid=$(printf '%s\n' "$workspace_host_out" | kv_read pid)
@@ -207,11 +217,87 @@ wait_for_file_contains "$workspace_host_log" "$workspace_host_entry" 60
 # Behavior: workspace with no native host target falls back to hosted-web mode.
 workspace_web="$scratch/workspace-web"
 make_workspace "$workspace_web" "workspace-web" "Workspace Web" "hosted-web"
-workspace_web_out=$(PATH="$fake_bin:$PATH" FORGE_TEST_UNAME=Linux sh "$backend" run-workspace "$root" "$workspace_web" web)
+workspace_web_out=$(test_env FORGE_TEST_UNAME=Linux sh "$backend" run-workspace "$root" "$workspace_web" web)
 assert_contains "$workspace_web_out" "mode=python-http"
 workspace_web_url=$(printf '%s\n' "$workspace_web_out" | kv_read url)
 printf '%s\n' "$workspace_web_url" | grep -E '^http://127\.0\.0\.1:[0-9]+$' >/dev/null
 workspace_web_pid=$(printf '%s\n' "$workspace_web_out" | kv_read pid)
 register_pid "$workspace_web_pid"
+
+make_native_workspace() {
+  workspace=$1
+  project_id=$2
+  title=$3
+  targets=$4
+  app_id=$5
+  app_name=$6
+
+  mkdir -p "$workspace/ir" "$workspace/generated/linux/src"
+  cat > "$workspace/ir/app.ir.yaml" <<IR
+{
+  "schemaVersion": "1.0",
+  "app": {
+    "id": "$app_id",
+    "name": "$app_name"
+  },
+  "window": {
+    "id": "main-window",
+    "type": "Window",
+    "title": "$app_name"
+  }
+}
+IR
+  cat > "$workspace/generated/linux/src/main.c" <<'C'
+int main(void) {
+  return 0;
+}
+C
+  cat > "$workspace/wizardry.workspace.conf" <<CONF
+project_id=$project_id
+title=$title
+project_type=native-desktop
+development_context=native-desktop
+targets=$targets
+root=$workspace
+starter=import-native-desktop
+native_ir_path=ir/app.ir.yaml
+run_rebuild_command=:
+CONF
+}
+
+# Behavior: native workspace runs directly on the host target.
+workspace_native="$scratch/workspace-native"
+make_native_workspace "$workspace_native" "workspace-native" "Workspace Native" "linux" "binder-native" "Binder Native"
+workspace_native_log="$scratch/workspace-native.log"
+workspace_native_out=$(test_env FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$workspace_native_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-workspace "$root" "$workspace_native" native-desktop normal)
+assert_contains "$workspace_native_out" "launched=1"
+assert_contains "$workspace_native_out" "mode=native-desktop-executable"
+workspace_native_pid=$(printf '%s\n' "$workspace_native_out" | kv_read pid)
+register_pid "$workspace_native_pid"
+workspace_native_artifact=$(printf '%s\n' "$workspace_native_out" | kv_read artifact)
+[ -x "$workspace_native_artifact" ]
+wait_for_file_contains "$workspace_native_log" "$workspace_native_artifact" 60
+
+# Behavior: native install builds local install assets and returns launcher metadata.
+workspace_native_install_out=$(test_env FORGE_TEST_UNAME=Linux sh "$backend" install-workspace "$root" "$workspace_native" native-desktop linux)
+assert_contains "$workspace_native_install_out" "status=ok"
+assert_contains "$workspace_native_install_out" "target=linux"
+workspace_native_install_root=$(printf '%s\n' "$workspace_native_install_out" | kv_read installed)
+workspace_native_launcher=$(printf '%s\n' "$workspace_native_install_out" | kv_read launcher)
+[ -d "$workspace_native_install_root" ]
+[ -x "$workspace_native_launcher" ]
+
+# Behavior: install-first runs the installed launcher instead of the build artifact.
+workspace_native_install_log="$scratch/workspace-native-install.log"
+workspace_native_install_run_out=$(test_env FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$workspace_native_install_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-workspace "$root" "$workspace_native" native-desktop install-first)
+assert_contains "$workspace_native_install_run_out" "launched=1"
+assert_contains "$workspace_native_install_run_out" "mode=native-desktop-installed"
+workspace_native_install_pid=$(printf '%s\n' "$workspace_native_install_run_out" | kv_read pid)
+register_pid "$workspace_native_install_pid"
+workspace_native_install_run_launcher=$(printf '%s\n' "$workspace_native_install_run_out" | kv_read launcher)
+workspace_native_install_run_root=$(printf '%s\n' "$workspace_native_install_run_out" | kv_read installed)
+[ -x "$workspace_native_install_run_launcher" ]
+[ -x "$workspace_native_install_run_root/bin/binder-native" ]
+wait_for_file_contains "$workspace_native_install_log" "$workspace_native_install_run_root/bin/binder-native" 60
 
 printf '%s\n' "forge run-mode behavior tests passed"

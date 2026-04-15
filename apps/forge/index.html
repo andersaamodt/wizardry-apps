@@ -2587,11 +2587,6 @@
       }
 
       function isTargetRunnableForSelected(selected, targetId) {
-        if (selected && selected.kind === 'workspace' && selected.context === 'native-desktop') {
-          if (targetId === 'macos' || targetId === 'linux') {
-            return false;
-          }
-        }
         return isTargetRunnable(targetId);
       }
 
@@ -3123,16 +3118,20 @@
         }
       }
 
-      async function runWorkspaceItem(item) {
+      async function runWorkspaceItem(item, runMode) {
         if (!item || item.kind !== 'workspace') {
           throw new Error('Select a user-created app to run');
         }
+        runMode = String(runMode || 'normal').trim();
+        if (!runMode) {
+          runMode = 'normal';
+        }
 
         suppressTransientRefresh();
-        var res = await backend('run-workspace', [item.path, item.context]);
+        var res = await backend('run-workspace', [item.path, item.context, runMode]);
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || ('workspace:' + item.id);
-        var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : 'desktop-executable');
+        var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : (item.context === 'native-desktop' ? 'native-desktop-executable' : 'desktop-executable'));
         var launchedUrl = String(out.url || '').trim();
         if (item.context === 'web') {
           if (launchedUrl) {
@@ -3147,6 +3146,16 @@
           setTargetRuntime(workspaceKey, 'macos', 'running', out.entry || item.path || '');
           setTargetRuntime(workspaceKey, 'android', 'enabled', out.entry || item.path || '');
           setTargetRuntime(workspaceKey, 'ios', 'enabled', out.entry || item.path || '');
+        } else if (item.context === 'native-desktop') {
+          var workspaceHostTarget = hostTargetId();
+          if (workspaceHostTarget) {
+            setTargetRuntime(
+              workspaceKey,
+              workspaceHostTarget,
+              'running',
+              out.installed || out.launcher || out.artifact || out.entry || item.path || ''
+            );
+          }
         } else {
           setTargetRuntime(workspaceKey, 'linux', 'ready', out.entry || item.path || '');
           setTargetRuntime(workspaceKey, 'macos', 'ready', out.entry || item.path || '');
@@ -3154,6 +3163,10 @@
         renderSelectedTargetsEditor(selectedCatalogItem());
         var launchedSummary = item.context === 'godot'
           ? (item.title + ' launched in Godot.')
+          : item.context === 'native-desktop'
+            ? (runMode === 'install-first'
+              ? (item.title + ' installed and launched as a native desktop app.')
+              : (item.title + ' compiled and launched as a native desktop app.'))
           : (launchedMode === 'python-http'
             ? (item.title + ' launched as hosted web.')
             : (item.title + ' built and launched from the desktop app bundle.'));
@@ -3738,7 +3751,7 @@
                 perform(runActionLabel(item), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(item) });
               } else {
                 state.selectedWorkspace = item.id;
-                perform(runActionLabel(item), function () { return runWorkspaceItem(item); }, { swallow: true, successLabel: ranActionLabel(item) });
+                perform(runActionLabel(item), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(item) });
               }
               renderSelectedBuiltIn();
             });
@@ -4223,6 +4236,17 @@
         return activeTargets.indexOf('hosted-web') >= 0;
       }
 
+      function canInstallHostTargetForSelected(selected) {
+        var hostTarget = hostTargetId();
+        if (!selected || !hostTarget) {
+          return false;
+        }
+        if (selected.kind === 'builtin') {
+          return true;
+        }
+        return selected.kind === 'workspace' && selected.context === 'native-desktop';
+      }
+
       function defaultInstallBeforeRunForSelected(selected) {
         return !!(selected && selected.kind === 'builtin');
       }
@@ -4239,7 +4263,7 @@
         if (!selected || !effectiveInstallBeforeRunForSelected(selected)) {
           return false;
         }
-        if (selected.kind !== 'builtin') {
+        if (!canInstallHostTargetForSelected(selected)) {
           return false;
         }
         return hasEnabledHostRunTarget(selected);
@@ -6114,7 +6138,7 @@
 
           var hostTarget = hostTargetId();
           var canInstall = (
-            selected.kind === 'builtin' &&
+            canInstallHostTargetForSelected(selected) &&
             active &&
             supported &&
             !!hostTarget &&
@@ -6174,7 +6198,7 @@
         els.targetActiveList.appendChild(activeFragment);
         els.targetInactiveList.appendChild(inactiveFragment);
         var showInstallBeforeRun = !!(
-          selected.kind === 'builtin' &&
+          canInstallHostTargetForSelected(selected) &&
           hostTarget &&
           activeSet[hostTarget] &&
           isTargetSupportedForSelected(selected, hostTarget)
@@ -6295,6 +6319,7 @@
         if (!selected) {
           throw new Error('Select an app first');
         }
+        var hostTarget = hostTargetId();
         if (selected.kind === 'builtin') {
           state.selectedBuiltIn = selected.id;
           if (targetId === 'ios') {
@@ -6345,6 +6370,10 @@
           return;
         }
         if (selected.context === 'native-desktop') {
+          if (hostTarget && targetId === hostTarget) {
+            await runWorkspacePipelineAction('run', selected);
+            return;
+          }
           await runWorkspacePipelineAction('build', selected);
           return;
         }
@@ -6361,9 +6390,6 @@
         if (!selected) {
           throw new Error('Select an app first');
         }
-        if (selected.kind !== 'builtin') {
-          throw new Error('Install is currently available for wizardry apps only.');
-        }
         var hostTarget = hostTargetId();
         if (!hostTarget) {
           throw new Error('Install is only available on macOS and Linux hosts.');
@@ -6376,18 +6402,29 @@
           throw new Error('Enable this target before installing.');
         }
 
-        var res = await backend('install-desktop', [selected.id, targetId]);
+        var res;
+        if (selected.kind === 'builtin') {
+          res = await backend('install-desktop', [selected.id, targetId]);
+        } else if (selected.kind === 'workspace' && selected.context === 'native-desktop') {
+          res = await backend('install-workspace', [selected.path, selected.context, targetId]);
+        } else {
+          throw new Error('Install is currently available for wizardry apps and native desktop projects only.');
+        }
         var out = kv(res.stdout || '');
         var installPath = String(out.installed || '').trim();
         var launcherPath = String(out.launcher || '').trim();
-        var projectKey = selected.key || ('builtin:' + selected.id);
+        var projectKey = selected.key || (selected.kind === 'builtin' ? ('builtin:' + selected.id) : ('workspace:' + selected.id));
         setTargetRuntime(projectKey, targetId, 'installed', installPath || launcherPath || '');
         renderSelectedTargetsEditor(selectedCatalogItem());
 
         var summary = selected.title + ' installed for ' + (targetId === 'macos' ? 'macOS' : 'Linux') + '.';
-        var installHelp = targetId === 'macos'
-          ? 'Install auto-builds latest output, then copies the .app bundle into /Applications.'
-          : 'Install auto-builds latest output, then installs AppDir to ~/.local/share with a launcher in ~/.local/bin.';
+        var installHelp = selected.kind === 'builtin'
+          ? (targetId === 'macos'
+            ? 'Install auto-builds latest output, then copies the .app bundle into /Applications.'
+            : 'Install auto-builds latest output, then installs AppDir to ~/.local/share with a launcher in ~/.local/bin.')
+          : (targetId === 'macos'
+            ? 'Install compiles the native workspace, then copies the .app bundle into /Applications.'
+            : 'Install compiles the native workspace, then installs the launcher under ~/.local with a desktop entry.');
         renderResult({
           status: 'ok',
           summary: summary,
@@ -6795,7 +6832,7 @@
         if (kind === 'run') {
           var hostTarget = hostTargetId();
           if (hostTarget && hasEnabledHostRunTarget(selected)) {
-            await runWorkspaceItem(selected);
+            await runWorkspaceItem(selected, shouldInstallBeforeRun(selected) ? 'install-first' : 'normal');
             return;
           }
           if (hasEnabledHostedWebTarget(selected)) {

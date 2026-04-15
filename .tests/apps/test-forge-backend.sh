@@ -220,6 +220,7 @@ grep -F "targets=macos,linux" "$workspaces_root/workspace-native/wizardry.worksp
 grep -F "run_rebuild_command=sh scripts/render-native-desktop.sh" "$workspaces_root/workspace-native/wizardry.workspace.conf" >/dev/null
 grep -F '"type": "Window"' "$workspaces_root/workspace-native/ir/app.ir.yaml" >/dev/null
 grep -F "Native desktop app scaffolded by App Forge." "$workspaces_root/workspace-native/README.md" >/dev/null
+grep -F "// swift-tools-version:" "$workspaces_root/workspace-native/generated/macos/Package.swift" >/dev/null
 
 rebuild_workspace_native_out=$(sh "$backend" rebuild-workspace "$scratch" "$workspaces_root/workspace-native" native-desktop)
 printf '%s\n' "$rebuild_workspace_native_out" | grep -F "workspace=$workspace_native_abs" >/dev/null
@@ -244,7 +245,7 @@ grep -F "starter=clone" "$workspaces_root/workspace-godot/wizardry.workspace.con
 
 workspaces=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
-printf '%s\n' "$workspaces" | grep -E '^workspace-native\t' >/dev/null
+printf '%s\n' "$workspaces" | grep -E '^workspace-native\t.*\t1$' >/dev/null
 printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
 
 external_workspace="$scratch/external/plain-web"

@@ -63,7 +63,8 @@ assert_matches "$ui" 'runtimePlatform\.indexOf\('"'"'mac'"'"'\)[[:space:]]*>=[[:
 assert_matches "$ui" "__wizardry_host_restart_self"
 
 # Backend actions should remain explicit and structured.
-assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context\]\);"
+assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context, runMode\]\);"
+assert_matches "$ui" "backend\('install-workspace', \[selected\.path, selected\.context, targetId\]\);"
 assert_matches "$ui" "backend\('rebuild-workspace', \[selected\.path, selected\.context\]\);"
 assert_matches "$ui" "perform\('Import project folder'"
 assert_matches "$ui" "backend\('import-workspace'"

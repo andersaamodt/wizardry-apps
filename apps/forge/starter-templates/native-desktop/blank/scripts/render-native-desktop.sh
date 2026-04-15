@@ -26,6 +26,7 @@ mkdir -p "$macos_dir/Sources/App" "$linux_dir/src"
 
 cat > "$macos_dir/Package.swift" <<EOF
 // Generated from ir/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
