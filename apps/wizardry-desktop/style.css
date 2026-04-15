@@ -727,11 +727,9 @@ body.wd-resizing * {
 }
 
 .wd-cast-list {
-  max-height: calc(100vh - var(--wd-host-top-inset) - 11.5rem);
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 0.14rem;
-  scrollbar-gutter: stable;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .wd-cast-list .wd-drill-item {
