@@ -1236,9 +1236,15 @@ input[type="checkbox"]:disabled {
   margin-left: 0.04rem;
 }
 
-.row-play:hover {
+.row-play:not(:disabled):hover {
   border-color: transparent;
   background: color-mix(in srgb, var(--toolbar-accent-soft, var(--accent-soft, var(--bg-panel, var(--panel-solid, #fff)))) 78%, var(--toolbar-surface, var(--bg-panel, var(--panel-solid, #fff))));
+  color: color-mix(in srgb, var(--text) 78%, var(--muted));
+}
+
+.row-play:disabled:hover {
+  border-color: transparent;
+  background: transparent;
   color: color-mix(in srgb, var(--text) 78%, var(--muted));
 }
 

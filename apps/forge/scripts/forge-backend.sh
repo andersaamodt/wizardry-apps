@@ -18,6 +18,17 @@ Commands:
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
   import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]
   get-workspace-profile [ROOT_HINT] WORKSPACE_PATH
+  workspace-git-status [ROOT_HINT] WORKSPACE_PATH
+  workspace-git-init [ROOT_HINT] WORKSPACE_PATH [REMOTE_URL] [BRANCH]
+  workspace-git-set-remote [ROOT_HINT] WORKSPACE_PATH REMOTE_URL
+  workspace-git-set-branch [ROOT_HINT] WORKSPACE_PATH BRANCH
+  workspace-git-fetch [ROOT_HINT] WORKSPACE_PATH
+  workspace-git-pull [ROOT_HINT] WORKSPACE_PATH
+  workspace-git-push [ROOT_HINT] WORKSPACE_PATH
+  workspace-git-repo-url [ROOT_HINT] WORKSPACE_PATH
+  workspace-git-pr-url [ROOT_HINT] WORKSPACE_PATH
+  workspace-git-release [ROOT_HINT] WORKSPACE_PATH
+  workspace-git-install-release [ROOT_HINT] WORKSPACE_PATH
   pick-workspace-subpath [ROOT_HINT] WORKSPACE_PATH
   get-ui-prefs [ROOT_HINT]
   set-ui-pref [ROOT_HINT] KEY VALUE
