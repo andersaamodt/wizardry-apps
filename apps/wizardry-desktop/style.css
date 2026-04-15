@@ -442,11 +442,23 @@ body.wd-resizing * {
   overflow: hidden;
 }
 
+.wd-content-scroll-cast {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .wd-content-scroll-spellbook > #content-area {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.wd-content-scroll-cast > #content-area {
+  flex: 1;
+  min-height: 0;
 }
 
 .wd-polite-btn {
@@ -957,8 +969,23 @@ body.wd-resizing * {
   padding-right: 0;
 }
 
-.wd-cast-drill .wd-drill-shell {
-  max-height: min(64vh, calc(100vh - var(--wd-host-top-inset) - 10rem));
+#content-area.wd-page-cast {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+#content-area.wd-page-cast .wd-cast-drill {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+#content-area.wd-page-cast .wd-cast-drill .wd-drill-shell {
+  min-height: 0;
+  height: 100%;
+  max-height: none;
 }
 
 .wd-cast-drill .wd-drill-head {

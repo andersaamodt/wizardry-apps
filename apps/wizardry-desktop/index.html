@@ -2832,9 +2832,11 @@
           }
         }
         if (els.contentScroll) {
+          els.contentScroll.classList.toggle('wd-content-scroll-cast', state.activePage === 'cast');
           els.contentScroll.classList.toggle('wd-content-scroll-spellbook', state.activePage === 'spellbook');
         }
         if (els.contentArea) {
+          els.contentArea.classList.toggle('wd-page-cast', state.activePage === 'cast');
           els.contentArea.classList.toggle('wd-page-spellbook', state.activePage === 'spellbook');
           els.contentArea.innerHTML = content;
         }
