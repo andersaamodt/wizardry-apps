@@ -2665,6 +2665,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     BOOL prefersLeftOnlyHeaderDragArea = [appSlug isEqualToString:@"boycott"];
     BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
+    BOOL prefersMaxInitialFrame = [appSlug isEqualToString:@"binder"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.enableHeaderDragHoles = prefersHeaderDragHoles;
     self.prefersLeftOnlyHeaderDragArea = prefersLeftOnlyHeaderDragArea;
@@ -2812,6 +2813,13 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             frame.origin.x = NSMinX(visible) + floor((visible.size.width - width) / 2.0);
             frame.origin.y = NSMinY(visible);
         }
+    } else if (prefersMaxInitialFrame) {
+        NSScreen *screen = [NSScreen mainScreen];
+        if (screen) {
+            NSRect visible = [screen visibleFrame];
+            frame = visible;
+            minSize = NSMakeSize(860, 620);
+        }
     }
     NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |
                                    NSWindowStyleMaskClosable |
@@ -2825,7 +2833,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                                   defer:NO];
     self.window.delegate = self;
     [self.window setMinSize:minSize];
-    if (!prefersNarrowTallLayout && !self.enableNativeViewMenu) {
+    if (!prefersNarrowTallLayout && !self.enableNativeViewMenu && !prefersMaxInitialFrame) {
         [self.window center];
     }
     [self.window setTitle:[NSString stringWithFormat:@"Wizardry - %@", appName]];
