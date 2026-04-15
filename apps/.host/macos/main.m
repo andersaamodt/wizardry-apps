@@ -662,6 +662,29 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return environment;
 }
 
+- (BOOL)hostTestHiddenModeEnabled {
+    NSString *raw = [[[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_HOST_TEST_HIDDEN"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!raw.length) {
+        return NO;
+    }
+    NSString *lower = [raw lowercaseString];
+    return !([lower isEqualToString:@"0"] ||
+             [lower isEqualToString:@"false"] ||
+             [lower isEqualToString:@"no"] ||
+             [lower isEqualToString:@"off"]);
+}
+
+- (NSString *)hostTestQueryString {
+    NSString *raw = [[[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_HOST_TEST_QUERY"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!raw.length) {
+        return @"";
+    }
+    if ([raw hasPrefix:@"?"]) {
+        return [raw substringFromIndex:1];
+    }
+    return raw;
+}
+
 - (void)addResolvedDraggedPathCandidate:(NSString *)candidate
                                 toPaths:(NSMutableArray<NSString *> *)paths
                                    seen:(NSMutableSet<NSString *> *)seen
@@ -825,7 +848,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return @"";
     }
 
-    NSData *pngData = [bitmapRep representationUsingType:NSPNGFileType properties:@{}];
+    NSData *pngData = [bitmapRep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
     if (!pngData.length) {
         return @"";
     }
@@ -866,7 +889,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return @"";
     }
 
-    NSData *pngData = [bitmapRep representationUsingType:NSPNGFileType properties:@{}];
+    NSData *pngData = [bitmapRep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
     if (!pngData.length) {
         return @"";
     }
@@ -976,6 +999,38 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             }
         }];
     });
+}
+
+- (BOOL)dispatchSimulatedFileDropPhase:(NSString *)phase domX:(CGFloat)domX domY:(CGFloat)domY paths:(NSArray<NSString *> *)paths errorMessage:(NSString **)errorMessage {
+    NSString *normalizedPhase = [[[NSString stringWithFormat:@"%@", phase ?: @""] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lowercaseString];
+    if (normalizedPhase.length == 0) {
+        if (errorMessage) {
+            *errorMessage = @"missing drag phase";
+        }
+        return NO;
+    }
+    if (!([normalizedPhase isEqualToString:@"enter"] ||
+          [normalizedPhase isEqualToString:@"update"] ||
+          [normalizedPhase isEqualToString:@"leave"] ||
+          [normalizedPhase isEqualToString:@"drop"])) {
+        if (errorMessage) {
+            *errorMessage = [NSString stringWithFormat:@"unsupported drag phase: %@", normalizedPhase];
+        }
+        return NO;
+    }
+    NSString *target = @"";
+    NSArray<NSString *> *safePaths = paths ?: @[];
+    if (![normalizedPhase isEqualToString:@"leave"]) {
+        target = [self forgeDropTargetAtDomX:domX domY:domY paths:safePaths hasImagePayload:NO];
+        if (!target.length) {
+            if (errorMessage) {
+                *errorMessage = @"simulated drop point is outside the active native drop zone";
+            }
+            return NO;
+        }
+    }
+    [self dispatchForgeFileDragPhase:normalizedPhase target:target domX:domX domY:domY paths:([normalizedPhase isEqualToString:@"leave"] ? @[] : safePaths) hasImagePayload:NO];
+    return YES;
 }
 
 - (NSArray<NSString *> *)forgeIconDropCommandArgumentsForPath:(NSString *)imagePath {
@@ -1798,6 +1853,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     CGFloat side = MAX(14.0, [NSStatusBar systemStatusBar].thickness - 4.0);
     NSImage *rendered = [[NSImage alloc] initWithSize:NSMakeSize(side, side)];
     [rendered lockFocus];
+    NSRectFillUsingOperation(NSMakeRect(0.0, 0.0, side, side), NSCompositingOperationClear);
     if ([self isStonrApp]) {
         [[NSColor blackColor] setFill];
         CGFloat stoneWidth = floor(side * 0.70);
@@ -2592,7 +2648,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.enableHeaderDragHoles = prefersHeaderDragHoles;
     self.prefersLeftOnlyHeaderDragArea = prefersLeftOnlyHeaderDragArea;
-    self.enableForgeAppMenu = isForgeApp;
+    self.enableForgeAppMenu = (isForgeApp || isArtificerApp);
     self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp;
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
     self.bootSplashLogoSize = isForgeApp ? 156.0 : (isArtificerApp ? 176.0 : 192.0);
@@ -2701,8 +2757,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     // Prefer a direct packaged/workspace icon file for the splash logo because
     // it is more reliable than bundle-icon lookup during early startup.
     self.appIconImage = resolvedSplashIcon ?: resolvedBundleIcon;
-    [NSApp unhide:nil];
-    [NSApp activateIgnoringOtherApps:YES];
+    BOOL hiddenTestMode = [self hostTestHiddenModeEnabled];
+    if (!hiddenTestMode) {
+        [NSApp unhide:nil];
+        [NSApp activateIgnoringOtherApps:YES];
+    }
     
     // Create window
     NSRect frame = NSMakeRect(0, 0, 860, 620);
@@ -2962,27 +3021,37 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     [self updateStatusItemVisibility];
 
-    [self.window makeKeyAndOrderFront:nil];
-    [self.window orderFrontRegardless];
-    // Re-activate after the window exists so workspace launches behave like
-    // regular desktop apps (not hidden/background-only processes).
-    NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
-    [currentApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
-    [NSApp unhide:nil];
-    [NSApp activateIgnoringOtherApps:YES];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self.window makeMainWindow];
+    if (!hiddenTestMode) {
         [self.window makeKeyAndOrderFront:nil];
         [self.window orderFrontRegardless];
-        if (self.webView) {
-            [self.window makeFirstResponder:self.webView];
-        }
+        // Re-activate after the window exists so workspace launches behave like
+        // regular desktop apps (not hidden/background-only processes).
+        NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
+        [currentApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
         [NSApp unhide:nil];
         [NSApp activateIgnoringOtherApps:YES];
-    });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self.window makeMainWindow];
+            [self.window makeKeyAndOrderFront:nil];
+            [self.window orderFrontRegardless];
+            if (self.webView) {
+                [self.window makeFirstResponder:self.webView];
+            }
+            [NSApp unhide:nil];
+            [NSApp activateIgnoringOtherApps:YES];
+        });
+    }
     
     // Load the app HTML
     NSURL *url = [NSURL fileURLWithPath:indexPath];
+    NSString *hostTestQuery = [self hostTestQueryString];
+    if (hostTestQuery.length > 0) {
+        NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+        components.percentEncodedQuery = hostTestQuery;
+        if (components.URL) {
+            url = components.URL;
+        }
+    }
     // Forge renders app/workspace icons from absolute file paths (often outside the
     // current app folder), so read access must include the broader filesystem tree.
     NSURL *allowDir = [NSURL fileURLWithPath:@"/" isDirectory:YES];
@@ -3422,6 +3491,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                 self.forgeIconDropZoneBottom = bottom;
                 self.forgeIconDropZoneActive = active;
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_test_simulate_file_drop"]) {
+            NSString *phase = args.count >= 1 ? [NSString stringWithFormat:@"%@", args[0]] : @"";
+            CGFloat domX = args.count >= 2 ? [[NSString stringWithFormat:@"%@", args[1]] doubleValue] : 0.0;
+            CGFloat domY = args.count >= 3 ? [[NSString stringWithFormat:@"%@", args[2]] doubleValue] : 0.0;
+            NSArray *pathArgs = args.count > 3 ? [args subarrayWithRange:NSMakeRange(3, args.count - 3)] : @[];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *errorMessage = nil;
+                BOOL ok = [self dispatchSimulatedFileDropPhase:phase domX:domX domY:domY paths:pathArgs errorMessage:&errorMessage];
+                [self sendResultToWebView:sourceWebViewCopy
+                                messageId:messageIdCopy
+                                   stdout:(ok ? @"ok" : @"")
+                                   stderr:(ok ? @"" : (errorMessage ?: @"simulated file drop failed"))
+                                 exitCode:(ok ? 0 : 1)
+                                    error:nil];
             });
             return;
         }
