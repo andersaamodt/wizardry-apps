@@ -1313,18 +1313,21 @@ input[type="checkbox"]:disabled {
 .row-run-spinner {
   display: inline-block;
   width: 0;
-  height: 0.76rem;
+  height: 0.75rem;
   aspect-ratio: 1 / 1;
+  min-width: 0;
+  min-height: 0.75rem;
   margin-left: 0;
   opacity: 0;
   overflow: hidden;
   box-sizing: border-box;
   border-width: 1.5px;
+  border-radius: 50%;
   color: color-mix(in srgb, var(--accent-strong, var(--accent)) 74%, var(--text) 26%);
 }
 
 .catalog-row.run-pending .row-run-spinner {
-  width: 0.76rem;
+  width: 0.75rem;
   margin-left: 0.12rem;
   opacity: 0;
 }
