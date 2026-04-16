@@ -458,7 +458,7 @@
         organizeSort: 'alphabetical',
         organizeGitFilter: 'all',
         organizeBuiltinFirst: true,
-        showNoRemotePill: true,
+        showNoRemotePill: false,
         useMiniTabs: false,
         installBeforeRunByItemKey: {},
         installBeforeRunLegacyValue: null,
@@ -2236,7 +2236,7 @@
         state.organizeSort = normalizeOrganizeSort(loadStorage(ORGANIZE_SORT_KEY) || 'alphabetical');
         state.organizeGitFilter = normalizeOrganizeGitFilter(loadStorage(ORGANIZE_GIT_FILTER_KEY) || 'all');
         state.organizeBuiltinFirst = loadStorage(ORGANIZE_BUILTIN_FIRST_KEY) !== 'false';
-        state.showNoRemotePill = loadStorage(SHOW_NO_REMOTE_PILL_KEY) !== 'false';
+        state.showNoRemotePill = loadStorage(SHOW_NO_REMOTE_PILL_KEY) === 'true';
         state.useMiniTabs = loadStorage(USE_MINI_TABS_KEY) === 'true';
         state.systemMiniTabMode = loadStorage(SYSTEM_MINI_TAB_MODE_KEY) === 'other' ? 'other' : 'all';
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
