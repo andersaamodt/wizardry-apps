@@ -2213,7 +2213,14 @@
             distribution: String(row && row.distribution || 'optional'),
             resolvedStatus: String(row && row.resolvedStatus || ''),
             resolvedPath: String(row && row.resolvedPath || ''),
-            sortTimestamp: String(row && row.sortTimestamp || '0')
+            sortTimestamp: String(row && row.sortTimestamp || '0'),
+            installedOnHost: !!(row && row.installedOnHost),
+            installedPath: String(row && row.installedPath || ''),
+            gitRepoPresent: String(row && row.gitRepoPresent || 'no'),
+            gitStatusLabel: String(row && row.gitStatusLabel || ''),
+            gitStatusTone: String(row && row.gitStatusTone || 'muted'),
+            gitStatusReason: String(row && row.gitStatusReason || ''),
+            gitReleaseAvailable: String(row && row.gitReleaseAvailable || 'no')
           };
         }).filter(function (row) {
           return !!row.id;
@@ -2983,7 +2990,12 @@
             targets: app.targets || '',
             path: app.resolvedPath || (state.rootHint ? (state.rootHint + '/apps/' + app.id) : ''),
             sortTimestamp: parseInt(app.sortTimestamp, 10) || 0,
-            runnable: true
+            runnable: true,
+            gitRepoPresent: app.gitRepoPresent || 'no',
+            gitStatusLabel: app.gitStatusLabel || '',
+            gitStatusTone: app.gitStatusTone || 'muted',
+            gitStatusReason: app.gitStatusReason || '',
+            gitReleaseAvailable: app.gitReleaseAvailable || 'no'
           };
         });
         var workspaces = state.workspaces.map(function (ws) {
@@ -3800,6 +3812,8 @@
         switch (raw) {
           case 'Push':
             return 'changes';
+          case 'Current':
+            return 'clean';
           case 'Update':
             return 'updates';
           case 'Sync':
@@ -3810,10 +3824,10 @@
       }
 
       function buildCatalogGitPill(item) {
-        if (!item || item.kind !== 'workspace' || item.gitRepoPresent !== 'yes' || !item.gitStatusLabel) {
+        if (!item || item.gitRepoPresent !== 'yes' || !item.gitStatusLabel) {
           return null;
         }
-        if (item.gitStatusLabel === 'Check Git' && item.gitStatusReason === 'origin is not configured for this repo yet.') {
+        if (item.gitStatusReason === 'origin is not configured for this repo yet.') {
           return null;
         }
         var displayLabel = workspaceGitCatalogLabel(item.gitStatusLabel);
@@ -6193,7 +6207,7 @@
 
       function workspaceGitToneClass(tone) {
         var value = String(tone || 'muted');
-        if (value === 'ok' || value === 'bad' || value === 'working' || value === 'info') {
+        if (value === 'ok' || value === 'bad' || value === 'working' || value === 'info' || value === 'warning') {
           return value;
         }
         return 'muted';
@@ -6204,6 +6218,8 @@
         switch (raw) {
           case 'Push':
             return 'Changes';
+          case 'Current':
+            return 'Clean';
           case 'Update':
             return 'Updates';
           default:
@@ -6212,6 +6228,9 @@
       }
 
       function workspaceGitDisplayTone(label, tone) {
+        if (String(label || '').trim() === 'Push') {
+          return 'warning';
+        }
         return workspaceGitToneClass(tone);
       }
 
@@ -7622,7 +7641,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-apps', [], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 12);
+        var rows = parseTSV(res.stdout || '', 17);
         state.apps = rows.map(function (row) {
           return {
             id: row[0],
@@ -7636,7 +7655,12 @@
             resolvedPath: row[8] || '',
             sortTimestamp: row[9] || '0',
             installedOnHost: row[10] === '1',
-            installedPath: row[11] || ''
+            installedPath: row[11] || '',
+            gitRepoPresent: row[12] || 'no',
+            gitStatusLabel: row[13] || '',
+            gitStatusTone: row[14] || 'muted',
+            gitStatusReason: row[15] || '',
+            gitReleaseAvailable: row[16] || 'no'
           };
         });
         state.appsLoaded = true;

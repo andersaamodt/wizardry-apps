@@ -1110,6 +1110,12 @@ input[type="checkbox"]:disabled {
   color: var(--pill-blue-fg);
 }
 
+.catalog-git-pill.warning {
+  border-color: color-mix(in srgb, #d97706 42%, var(--line));
+  background: color-mix(in srgb, #d97706 14%, transparent);
+  color: color-mix(in srgb, #d97706 84%, var(--text));
+}
+
 .catalog-git-pill.info {
   border-color: var(--pill-blue-border);
   background: var(--pill-blue-soft);
@@ -2196,6 +2202,12 @@ input[type="checkbox"]:disabled {
   border-color: var(--pill-blue-border);
   background: color-mix(in srgb, var(--pill-blue-soft) 82%, transparent);
   color: var(--pill-blue-fg);
+}
+
+.workspace-summary-pill.warning {
+  border-color: color-mix(in srgb, #d97706 42%, var(--section-border));
+  background: color-mix(in srgb, #d97706 14%, transparent);
+  color: color-mix(in srgb, #d97706 84%, var(--text));
 }
 
 .workspace-summary-pill.bad {
