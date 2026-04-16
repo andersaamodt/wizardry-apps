@@ -3261,6 +3261,16 @@ workspace_profile_path() {
   printf '%s\n' "$conf"
 }
 
+workspace_profile_path_if_exists() {
+  workspace_path=${1-}
+  conf="$workspace_path/wizardry.workspace.conf"
+  if [ -f "$conf" ]; then
+    printf '%s\n' "$conf"
+    return 0
+  fi
+  printf '%s\n' ""
+}
+
 cmd_workspace_git_status() {
   root=$(require_root "${1-}")
   workspace_path=${2-}
@@ -3273,7 +3283,7 @@ cmd_workspace_git_status() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
-  conf=$(workspace_profile_path "$workspace_abs")
+  conf=$(workspace_profile_path_if_exists "$workspace_abs")
   printf 'root_hint=%s\n' "$root"
   printf 'workspace=%s\n' "$workspace_abs"
   printf 'profile=%s\n' "$conf"
@@ -3296,7 +3306,7 @@ cmd_workspace_git_init() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
-  conf=$(workspace_profile_path "$workspace_abs")
+  conf=$(workspace_profile_path_if_exists "$workspace_abs")
   if workspace_git_repo_exists "$workspace_abs"; then
     printf '%s\n' "forge-backend: project already has a git repo" >&2
     exit 1
@@ -3337,7 +3347,7 @@ cmd_workspace_git_set_remote() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
-  conf=$(workspace_profile_path "$workspace_abs")
+  conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
     exit 1
@@ -3369,7 +3379,7 @@ cmd_workspace_git_set_branch() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
-  conf=$(workspace_profile_path "$workspace_abs")
+  conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
     exit 1
@@ -3406,7 +3416,7 @@ cmd_workspace_git_fetch() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
-  conf=$(workspace_profile_path "$workspace_abs")
+  conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
     exit 1
@@ -3433,7 +3443,7 @@ cmd_workspace_git_pull() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
-  conf=$(workspace_profile_path "$workspace_abs")
+  conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
     exit 1
@@ -3459,7 +3469,11 @@ cmd_workspace_git_pull() {
     GIT_TERMINAL_PROMPT=0 git -C "$workspace_abs" pull --ff-only origin "$branch_name"
   fi
 
-  rebuild_out=$(run_workspace_rebuild "$root" "$workspace_abs" "$conf")
+  if [ -n "$conf" ]; then
+    rebuild_out=$(run_workspace_rebuild "$root" "$workspace_abs" "$conf")
+  else
+    rebuild_out=$(printf 'status=noop\nmode=none\n')
+  fi
 
   printf 'root_hint=%s\n' "$root"
   printf 'workspace=%s\n' "$workspace_abs"
@@ -3481,7 +3495,7 @@ cmd_workspace_git_push() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
-  conf=$(workspace_profile_path "$workspace_abs")
+  conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
     exit 1
@@ -3602,7 +3616,7 @@ cmd_workspace_git_install_release() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
-  conf=$(workspace_profile_path "$workspace_abs")
+  conf=$(workspace_profile_path_if_exists "$workspace_abs")
   git_info=$(workspace_git_collect_status "$workspace_abs" "1" "1")
   asset_url=$(printf '%s\n' "$git_info" | kv_read git_release_asset_url)
   asset_name=$(printf '%s\n' "$git_info" | kv_read git_release_asset_name)
