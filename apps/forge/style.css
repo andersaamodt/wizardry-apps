@@ -679,7 +679,7 @@ body.settings-open #settings-panel {
   z-index: 3;
   background: color-mix(in srgb, var(--panel-solid, #fff) 96%, transparent);
   box-shadow: -10px 0 12px color-mix(in srgb, var(--bg-panel) 78%, transparent);
-  margin-top: calc(0.02rem - 3px);
+  margin-top: calc(0.02rem - 5px);
   margin-bottom: 1px;
   border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
   border-radius: 5px;
