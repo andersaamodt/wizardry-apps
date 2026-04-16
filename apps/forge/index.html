@@ -3700,6 +3700,9 @@
         if (!item || item.kind !== 'workspace' || item.gitRepoPresent !== 'yes' || !item.gitStatusLabel) {
           return null;
         }
+        if (item.gitStatusLabel === 'Check Git' && item.gitStatusReason === 'origin is not configured for this repo yet.') {
+          return null;
+        }
         var pill = document.createElement('span');
         var displayLabel = workspaceGitDisplayLabel(item.gitStatusLabel);
         pill.className = 'catalog-git-pill ' + workspaceGitDisplayTone(item.gitStatusLabel, item.gitStatusTone);
