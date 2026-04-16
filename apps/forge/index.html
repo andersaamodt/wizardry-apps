@@ -8493,6 +8493,10 @@
           renderSelectedBuiltIn();
         });
 
+        els.organizeBtn.addEventListener('mousedown', function (event) {
+          event.preventDefault();
+        });
+
         els.organizeBtn.addEventListener('click', function () {
           toggleFloatingMenu(els.organizeMenu, els.organizeBtn);
         });
