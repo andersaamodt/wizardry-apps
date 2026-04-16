@@ -5003,6 +5003,217 @@ PLIST
   esac
 }
 
+workspace_display_title() {
+  workspace_path=${1-}
+  workspace_conf=${2-}
+
+  [ -n "$workspace_path" ] || return 1
+  [ -n "$workspace_conf" ] || return 1
+
+  workspace_title=$(workspace_field "$workspace_conf" title "")
+  [ -n "$workspace_title" ] || workspace_title=$(workspace_field "$workspace_conf" name "")
+  [ -n "$workspace_title" ] || workspace_title=$(basename "$workspace_path")
+  printf '%s\n' "$workspace_title"
+}
+
+host_workspace_target_id() {
+  case "$(os_id)" in
+    darwin) printf '%s\n' "macos" ;;
+    linux) printf '%s\n' "linux" ;;
+    *) return 1 ;;
+  esac
+}
+
+build_workspace_desktop_host() {
+  root=${1-}
+  workspace_path=${2-}
+  workspace_conf=${3-}
+
+  [ -n "$root" ] || return 1
+  [ -n "$workspace_path" ] || return 1
+  [ -n "$workspace_conf" ] || return 1
+
+  run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+  if ! app_dir=$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null); then
+    printf '%s\n' "forge-backend: project app index not found: $workspace_path" >&2
+    exit 1
+  fi
+
+  app_entry_suffix=''
+  if [ "$app_dir" != "$workspace_path" ]; then
+    app_entry_suffix=${app_dir#"$workspace_path"}
+  fi
+
+  host_target=$(host_workspace_target_id 2>/dev/null || true)
+  [ -n "$host_target" ] || {
+    printf '%s\n' "forge-backend: install-workspace is only supported on macOS and Linux hosts" >&2
+    exit 1
+  }
+
+  targets_csv=$(workspace_field "$workspace_conf" targets "")
+  case ",$targets_csv," in
+    *,"$host_target",*)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: project has no installable target for this host (enable $host_target)" >&2
+      exit 1
+      ;;
+  esac
+
+  workspace_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
+  workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
+
+  os=$(os_id)
+  case "$os" in
+    darwin)
+      host_bin=$(ensure_macos_host "$root")
+      bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
+      final_bundle="$bundle_root/$workspace_title.app"
+      staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")
+      staged_bundle="$staged_root/$workspace_title.app"
+      mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources/$workspace_slug" "$staged_bundle/Contents/Resources/.host"
+
+      copy_tree_for_bundle "$workspace_path" "$staged_bundle/Contents/Resources/$workspace_slug/"
+      rm -rf "$staged_bundle/Contents/Resources/$workspace_slug/themes"
+      mkdir -p "$staged_bundle/Contents/Resources/$workspace_slug/.host"
+      cp -R "$root/apps/.host/shared" "$staged_bundle/Contents/Resources/$workspace_slug/.host/"
+      cp -R "$root/apps/.host/shared" "$staged_bundle/Contents/Resources/.host/"
+      printf '%s\n' "$root" > "$staged_bundle/Contents/Resources/wizardry-apps-root.txt"
+      cp "$host_bin" "$staged_bundle/Contents/MacOS/wizardry-host"
+
+      bundle_app_dir="$app_dir"
+
+      icon_source=''
+      icon_source_format=''
+      workspace_icon_source=$(project_preferred_bundle_icon_path "$workspace_path" || true)
+      app_icon_source=$(project_preferred_bundle_icon_path "$app_dir" || true)
+      if [ -n "$workspace_icon_source" ]; then
+        icon_source="$workspace_icon_source"
+        icon_source_format=$(icon_source_format_for_path "$icon_source")
+      elif [ -n "$app_icon_source" ]; then
+        icon_source="$app_icon_source"
+        icon_source_format=$(icon_source_format_for_path "$icon_source")
+      fi
+
+      icon_key=''
+      icon_hash=''
+      if [ -n "$icon_source" ]; then
+        icon_hash=$(hash_path_sha256 "$icon_source")
+      fi
+      if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+        iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-ws-iconset.XXXXXX")
+        iconset="${iconset_tmp}.iconset"
+        mv "$iconset_tmp" "$iconset"
+        for size in 16 32 128 256 512; do
+          sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+          sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+        done
+        icon_name="forge-${icon_hash}.icns"
+        if iconutil -c icns "$iconset" -o "$staged_bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
+          icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
+        else
+          icon_name="forge-icon-${icon_hash}.png"
+          cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
+          icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
+        fi
+        rm -rf "$iconset"
+      elif [ "$icon_source_format" = 'png' ]; then
+        icon_name="forge-icon-${icon_hash}.png"
+        cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
+        icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
+      elif [ "$icon_source_format" = 'icns' ]; then
+        icon_name="forge-${icon_hash}.icns"
+        cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
+        icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
+      fi
+
+      bundle_id="com.wizardry.workspace.$workspace_slug"
+      bundle_version=$(printf '%s' "${icon_hash:-$workspace_slug}" | cksum | awk '{ print $1 }')
+      [ -n "$bundle_version" ] || bundle_version=1
+      cat > "$staged_bundle/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>$workspace_title</string>
+<key>CFBundleDisplayName</key><string>$workspace_title</string>
+<key>CFBundleIdentifier</key><string>$bundle_id</string>
+<key>CFBundleVersion</key><string>$bundle_version</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleExecutable</key><string>wizardry-host</string>
+<key>WizardryAppEntry</key><string>$bundle_app_dir</string>
+$icon_key
+</dict></plist>
+PLIST
+
+      ensure_macos_bundle_signature "$staged_bundle" || {
+        printf '%s\n' "forge-backend: failed to sign macOS project bundle: $staged_bundle" >&2
+        exit 1
+      }
+
+      mkdir -p "$bundle_root"
+      rm -rf "$final_bundle"
+      mv "$staged_bundle" "$final_bundle"
+      rmdir "$staged_root" 2>/dev/null || :
+
+      printf 'status=ok\n'
+      printf 'target=macos\n'
+      printf 'workspace_title=%s\n' "$workspace_title"
+      printf 'workspace_slug=%s\n' "$workspace_slug"
+      printf 'artifact=%s\n' "$final_bundle"
+      printf 'entry=%s\n' "$bundle_app_dir"
+      ;;
+    linux)
+      host_bin=$(ensure_linux_host "$root")
+      bundle_root="$root/_tmp/workbench/dist/linux-workspaces/$workspace_slug"
+      appdir="$bundle_root/AppDir"
+      rm -rf "$appdir"
+      mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$workspace_slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
+
+      copy_tree_for_bundle "$workspace_path" "$appdir/usr/share/$workspace_slug/"
+      linux_ws_icon_source=''
+      if [ -f "$workspace_path/assets/icons/linux/256x256/forge-icon.png" ]; then
+        linux_ws_icon_source="$workspace_path/assets/icons/linux/256x256/forge-icon.png"
+      elif [ -f "$workspace_path/assets/forge-icon.png" ]; then
+        linux_ws_icon_source="$workspace_path/assets/forge-icon.png"
+      elif [ -f "$app_dir/assets/icons/linux/256x256/forge-icon.png" ]; then
+        linux_ws_icon_source="$app_dir/assets/icons/linux/256x256/forge-icon.png"
+      elif [ -f "$app_dir/assets/forge-icon.png" ]; then
+        linux_ws_icon_source="$app_dir/assets/forge-icon.png"
+      fi
+      if [ -n "$linux_ws_icon_source" ]; then
+        mkdir -p "$appdir/usr/share/$workspace_slug/assets"
+        cp "$linux_ws_icon_source" "$appdir/usr/share/$workspace_slug/assets/forge-icon.png"
+      fi
+      mkdir -p "$appdir/usr/share/$workspace_slug/.host"
+      cp -R "$root/apps/.host/shared" "$appdir/usr/share/$workspace_slug/.host/"
+      cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
+      cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
+      cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
+      cp "$host_bin" "$appdir/usr/bin/wizardry-host"
+
+      cat > "$appdir/AppRun" <<APP
+#!/bin/sh
+set -eu
+HERE=\$(CDPATH= cd -- "\$(dirname "\$0")" && pwd -P)
+exec env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" "\$HERE/usr/bin/wizardry-host" "\$HERE/usr/share/$workspace_slug$app_entry_suffix"
+APP
+      chmod +x "$appdir/AppRun"
+
+      app_entry="$appdir/usr/share/$workspace_slug$app_entry_suffix"
+      printf 'status=ok\n'
+      printf 'target=linux\n'
+      printf 'workspace_title=%s\n' "$workspace_title"
+      printf 'workspace_slug=%s\n' "$workspace_slug"
+      printf 'artifact=%s\n' "$appdir"
+      printf 'entry=%s\n' "$app_entry"
+      ;;
+    *)
+      printf '%s\n' "forge-backend: unsupported desktop OS: $os" >&2
+      exit 1
+      ;;
+  esac
+}
+
 cmd_install_workspace() {
   root=$(require_root "${1-}")
   workspace_path=${2-}
@@ -5029,10 +5240,14 @@ cmd_install_workspace() {
     context=$(workspace_field "$workspace_conf" development_context "")
   fi
   [ -n "$context" ] || context='web'
-  [ "$context" = 'native-desktop' ] || {
-    printf '%s\n' "forge-backend: install-workspace currently supports native-desktop projects only" >&2
-    exit 1
-  }
+  case "$context" in
+    native-desktop|web)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: install-workspace currently supports web and native-desktop projects only" >&2
+      exit 1
+      ;;
+  esac
 
   os=$(os_id)
   case "$os" in
@@ -5052,68 +5267,70 @@ cmd_install_workspace() {
     exit 2
   fi
 
-  run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
-  build_out=$(build_native_workspace_host "$root" "$workspace_path" "$workspace_conf")
-  artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
-  app_name=$(printf '%s\n' "$build_out" | kv_read app_name)
-  built_exec=$(printf '%s\n' "$build_out" | kv_read built_exec)
-  meta=$(resolve_native_workspace_metadata "$workspace_path" "$workspace_conf")
-  workspace_slug=$(printf '%s\n' "$meta" | kv_read workspace_slug)
-  app_id=$(printf '%s\n' "$meta" | kv_read app_id)
+  case "$context" in
+    native-desktop)
+      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+      build_out=$(build_native_workspace_host "$root" "$workspace_path" "$workspace_conf")
+      artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
+      app_name=$(printf '%s\n' "$build_out" | kv_read app_name)
+      built_exec=$(printf '%s\n' "$build_out" | kv_read built_exec)
+      meta=$(resolve_native_workspace_metadata "$workspace_path" "$workspace_conf")
+      workspace_slug=$(printf '%s\n' "$meta" | kv_read workspace_slug)
+      app_id=$(printf '%s\n' "$meta" | kv_read app_id)
 
-  case "$os" in
-    darwin)
-      [ -d "$artifact" ] || {
-        printf '%s\n' "forge-backend: expected native macOS app bundle artifact, got: $artifact" >&2
-        exit 1
-      }
-      install_path="/Applications/$(basename "$artifact")"
-      rm -rf "$install_path"
-      if command -v ditto >/dev/null 2>&1; then
-        ditto "$artifact" "$install_path"
-      else
-        cp -R "$artifact" "$install_path"
-      fi
-      printf 'status=ok\n'
-      printf 'target=macos\n'
-      printf 'install_mode=system-applications\n'
-      printf 'artifact=%s\n' "$artifact"
-      printf 'built_exec=%s\n' "$built_exec"
-      printf 'installed=%s\n' "$install_path"
-      printf 'app_name=%s\n' "$app_name"
-      ;;
-    linux)
-      install_root="$HOME/.local/share/wizardry-apps/$workspace_slug-native"
-      launcher_dir="$HOME/.local/bin"
-      launcher_path="$launcher_dir/wizardry-$workspace_slug-native"
-      bin_dir="$install_root/bin"
-      exec_path="$bin_dir/$app_id"
-      icon_path=''
-      desktop_file=''
+      case "$os" in
+        darwin)
+          [ -d "$artifact" ] || {
+            printf '%s\n' "forge-backend: expected native macOS app bundle artifact, got: $artifact" >&2
+            exit 1
+          }
+          install_path="/Applications/$(basename "$artifact")"
+          rm -rf "$install_path"
+          if command -v ditto >/dev/null 2>&1; then
+            ditto "$artifact" "$install_path"
+          else
+            cp -R "$artifact" "$install_path"
+          fi
+          printf 'status=ok\n'
+          printf 'target=macos\n'
+          printf 'install_mode=system-applications\n'
+          printf 'artifact=%s\n' "$artifact"
+          printf 'built_exec=%s\n' "$built_exec"
+          printf 'installed=%s\n' "$install_path"
+          printf 'app_name=%s\n' "$app_name"
+          ;;
+        linux)
+          install_root="$HOME/.local/share/wizardry-apps/$workspace_slug-native"
+          launcher_dir="$HOME/.local/bin"
+          launcher_path="$launcher_dir/wizardry-$workspace_slug-native"
+          bin_dir="$install_root/bin"
+          exec_path="$bin_dir/$app_id"
+          icon_path=''
+          desktop_file=''
 
-      rm -rf "$install_root"
-      mkdir -p "$bin_dir" "$launcher_dir"
-      cp "$artifact" "$exec_path"
-      chmod +x "$exec_path"
+          rm -rf "$install_root"
+          mkdir -p "$bin_dir" "$launcher_dir"
+          cp "$artifact" "$exec_path"
+          chmod +x "$exec_path"
 
-      cat > "$launcher_path" <<LAUNCHER
+          cat > "$launcher_path" <<LAUNCHER
 #!/bin/sh
 set -eu
 exec "$exec_path" "\$@"
 LAUNCHER
-      chmod +x "$launcher_path"
+          chmod +x "$launcher_path"
 
-      icon_source=$(workspace_native_bundle_icon_path "$workspace_path" || true)
-      if [ -n "$icon_source" ]; then
-        mkdir -p "$install_root/assets"
-        icon_path="$install_root/assets/forge-icon.png"
-        cp "$icon_source" "$icon_path"
-      fi
+          icon_source=$(workspace_native_bundle_icon_path "$workspace_path" || true)
+          if [ -n "$icon_source" ]; then
+            mkdir -p "$install_root/assets"
+            icon_path="$install_root/assets/forge-icon.png"
+            cp "$icon_source" "$icon_path"
+          fi
 
-      desktop_dir="$HOME/.local/share/applications"
-      mkdir -p "$desktop_dir"
-      desktop_file="$desktop_dir/wizardry-$workspace_slug-native.desktop"
-      cat > "$desktop_file" <<DESKTOP
+          desktop_dir="$HOME/.local/share/applications"
+          mkdir -p "$desktop_dir"
+          desktop_file="$desktop_dir/wizardry-$workspace_slug-native.desktop"
+          cat > "$desktop_file" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=$app_name
@@ -5123,15 +5340,90 @@ Categories=Development;
 Icon=$icon_path
 DESKTOP
 
-      printf 'status=ok\n'
-      printf 'target=linux\n'
-      printf 'install_mode=%s\n' "$(normalize_linux_install_mode)"
-      printf 'artifact=%s\n' "$artifact"
-      printf 'built_exec=%s\n' "$built_exec"
-      printf 'launcher=%s\n' "$launcher_path"
-      printf 'installed=%s\n' "$install_root"
-      printf 'desktop_entry=%s\n' "$desktop_file"
-      printf 'app_name=%s\n' "$app_name"
+          printf 'status=ok\n'
+          printf 'target=linux\n'
+          printf 'install_mode=%s\n' "$(normalize_linux_install_mode)"
+          printf 'artifact=%s\n' "$artifact"
+          printf 'built_exec=%s\n' "$built_exec"
+          printf 'launcher=%s\n' "$launcher_path"
+          printf 'installed=%s\n' "$install_root"
+          printf 'desktop_entry=%s\n' "$desktop_file"
+          printf 'app_name=%s\n' "$app_name"
+          ;;
+      esac
+      ;;
+    web)
+      build_out=$(build_workspace_desktop_host "$root" "$workspace_path" "$workspace_conf")
+      artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
+      app_entry=$(printf '%s\n' "$build_out" | kv_read entry)
+      workspace_title=$(printf '%s\n' "$build_out" | kv_read workspace_title)
+      workspace_slug=$(printf '%s\n' "$build_out" | kv_read workspace_slug)
+
+      case "$os" in
+        darwin)
+          [ -d "$artifact" ] || {
+            printf '%s\n' "forge-backend: expected project macOS app bundle artifact, got: $artifact" >&2
+            exit 1
+          }
+          install_path="/Applications/$(basename "$artifact")"
+          rm -rf "$install_path"
+          if command -v ditto >/dev/null 2>&1; then
+            ditto "$artifact" "$install_path"
+          else
+            cp -R "$artifact" "$install_path"
+          fi
+          printf 'status=ok\n'
+          printf 'target=macos\n'
+          printf 'install_mode=system-applications\n'
+          printf 'artifact=%s\n' "$artifact"
+          printf 'entry=%s\n' "$app_entry"
+          printf 'installed=%s\n' "$install_path"
+          printf 'app_name=%s\n' "$workspace_title"
+          ;;
+        linux)
+          [ -d "$artifact" ] || {
+            printf '%s\n' "forge-backend: expected project Linux AppDir artifact, got: $artifact" >&2
+            exit 1
+          }
+          install_root="$HOME/.local/share/wizardry-apps/$workspace_slug"
+          launcher_dir="$HOME/.local/bin"
+          launcher_path="$launcher_dir/wizardry-$workspace_slug"
+          desktop_dir="$HOME/.local/share/applications"
+          desktop_file="$desktop_dir/wizardry-$workspace_slug.desktop"
+          icon_path="$install_root/usr/share/$workspace_slug/assets/forge-icon.png"
+
+          rm -rf "$install_root"
+          mkdir -p "$(dirname "$install_root")" "$launcher_dir" "$desktop_dir"
+          cp -R "$artifact" "$install_root"
+
+          cat > "$launcher_path" <<LAUNCHER
+#!/bin/sh
+set -eu
+exec "$install_root/AppRun" "\$@"
+LAUNCHER
+          chmod +x "$launcher_path"
+
+          cat > "$desktop_file" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=$workspace_title
+Exec=$launcher_path
+Terminal=false
+Categories=Development;
+Icon=$icon_path
+DESKTOP
+
+          printf 'status=ok\n'
+          printf 'target=linux\n'
+          printf 'install_mode=%s\n' "$(normalize_linux_install_mode)"
+          printf 'artifact=%s\n' "$artifact"
+          printf 'entry=%s\n' "$app_entry"
+          printf 'launcher=%s\n' "$launcher_path"
+          printf 'installed=%s\n' "$install_root"
+          printf 'desktop_entry=%s\n' "$desktop_file"
+          printf 'app_name=%s\n' "$workspace_title"
+          ;;
+      esac
       ;;
   esac
 }
@@ -5726,6 +6018,76 @@ cmd_run_workspace() {
       esac
       ;;
     web)
+      os=$(os_id)
+      host_target=$(host_workspace_target_id 2>/dev/null || true)
+      workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
+      log_dir="$root/_tmp/workbench/log"
+      mkdir -p "$log_dir"
+      log_path="$log_dir/workspace-$workspace_slug-run.log"
+      if [ "$run_mode" = 'install-first' ]; then
+        install_out=$(cmd_install_workspace "$root" "$workspace_path" "$context" "$host_target")
+        built_artifact=$(printf '%s\n' "$install_out" | kv_read artifact)
+        installed_path=$(printf '%s\n' "$install_out" | kv_read installed)
+        launcher_path=$(printf '%s\n' "$install_out" | kv_read launcher)
+        workspace_title=$(printf '%s\n' "$install_out" | kv_read app_name)
+        [ -n "$workspace_title" ] || workspace_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
+        stop_desktop_instances_for_slug "$root" "$workspace_slug" "$workspace_title" "$os"
+        case "$os" in
+          darwin)
+            [ -n "$installed_path" ] || installed_path="$built_artifact"
+            [ -d "$installed_path" ] || {
+              printf '%s\n' "forge-backend: installed project macOS bundle missing: $installed_path" >&2
+              exit 1
+            }
+            command -v open >/dev/null 2>&1 || {
+              printf '%s\n' "forge-backend: open command not available on this system" >&2
+              exit 1
+            }
+            open "$installed_path"
+            printf 'launched=1\n'
+            printf 'mode=desktop-installed\n'
+            printf 'artifact=%s\n' "$installed_path"
+            printf 'built_artifact=%s\n' "$built_artifact"
+            printf 'installed=%s\n' "$installed_path"
+            [ -n "$launcher_path" ] && printf 'launcher=%s\n' "$launcher_path"
+            printf 'entry=%s\n' "$(printf '%s\n' "$install_out" | kv_read entry)"
+            printf 'log=%s\n' "$log_path"
+            return 0
+            ;;
+          linux)
+            launch_exec=''
+            if [ -n "$launcher_path" ] && [ -x "$launcher_path" ]; then
+              launch_exec="$launcher_path"
+            elif [ -n "$installed_path" ] && [ -x "$installed_path/AppRun" ]; then
+              launch_exec="$installed_path/AppRun"
+            fi
+            [ -n "$launch_exec" ] || {
+              printf '%s\n' "forge-backend: installed project Linux launcher missing for $workspace_path" >&2
+              exit 1
+            }
+            if command -v nohup >/dev/null 2>&1; then
+              nohup "$launch_exec" >"$log_path" 2>&1 &
+            else
+              "$launch_exec" >"$log_path" 2>&1 &
+            fi
+            pid=$!
+            printf 'launched=1\n'
+            printf 'mode=desktop-installed\n'
+            printf 'artifact=%s\n' "$launch_exec"
+            printf 'built_artifact=%s\n' "$built_artifact"
+            printf 'installed=%s\n' "$installed_path"
+            [ -n "$launcher_path" ] && printf 'launcher=%s\n' "$launcher_path"
+            printf 'entry=%s\n' "$(printf '%s\n' "$install_out" | kv_read entry)"
+            printf 'pid=%s\n' "$pid"
+            printf 'log=%s\n' "$log_path"
+            return 0
+            ;;
+          *)
+            printf '%s\n' "forge-backend: unsupported desktop OS: $os" >&2
+            exit 1
+            ;;
+        esac
+      fi
       ;;
     *)
       printf '%s\n' "forge-backend: project context must be web, native-desktop, or godot" >&2

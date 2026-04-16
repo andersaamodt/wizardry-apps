@@ -214,6 +214,29 @@ workspace_host_entry=$(printf '%s\n' "$workspace_host_out" | kv_read entry)
 [ -n "$workspace_host_entry" ]
 wait_for_file_contains "$workspace_host_log" "$workspace_host_entry" 60
 
+# Behavior: web workspace install builds local desktop install assets and returns launcher metadata.
+workspace_host_install_out=$(test_env FORGE_TEST_UNAME=Linux sh "$backend" install-workspace "$root" "$workspace_host" web linux)
+assert_contains "$workspace_host_install_out" "status=ok"
+assert_contains "$workspace_host_install_out" "target=linux"
+workspace_host_install_root=$(printf '%s\n' "$workspace_host_install_out" | kv_read installed)
+workspace_host_launcher=$(printf '%s\n' "$workspace_host_install_out" | kv_read launcher)
+[ -d "$workspace_host_install_root" ]
+[ -x "$workspace_host_launcher" ]
+[ -f "$workspace_host_install_root/usr/share/workspace-host/app/index.html" ]
+
+# Behavior: web workspace install-first runs the installed launcher instead of the transient bundle.
+workspace_host_install_log="$scratch/workspace-host-install.log"
+workspace_host_install_run_out=$(test_env FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$workspace_host_install_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-workspace "$root" "$workspace_host" web install-first)
+assert_contains "$workspace_host_install_run_out" "launched=1"
+assert_contains "$workspace_host_install_run_out" "mode=desktop-installed"
+workspace_host_install_pid=$(printf '%s\n' "$workspace_host_install_run_out" | kv_read pid)
+register_pid "$workspace_host_install_pid"
+workspace_host_install_run_launcher=$(printf '%s\n' "$workspace_host_install_run_out" | kv_read launcher)
+workspace_host_install_run_root=$(printf '%s\n' "$workspace_host_install_run_out" | kv_read installed)
+[ -x "$workspace_host_install_run_launcher" ]
+[ -d "$workspace_host_install_run_root" ]
+wait_for_file_contains "$workspace_host_install_log" "$workspace_host_install_run_root/usr/share/workspace-host/app" 60
+
 # Behavior: workspace with no native host target falls back to hosted-web mode.
 workspace_web="$scratch/workspace-web"
 make_workspace "$workspace_web" "workspace-web" "Workspace Web" "hosted-web"

@@ -3204,12 +3204,17 @@
               : (item.title + ' compiled and launched as a native desktop app.'))
           : (launchedMode === 'python-http'
             ? (item.title + ' launched as hosted web.')
-            : (item.title + ' built and launched from the desktop app bundle.'));
+            : (runMode === 'install-first'
+              ? (item.title + ' installed and launched from the installed desktop app.')
+              : (item.title + ' built and launched from the desktop app bundle.')));
         renderResult({
           status: 'ok',
           summary: launchedSummary,
           paths: [
             launchedUrl ? { label: 'Hosted web URL', path: launchedUrl, canReveal: false } : null,
+            out.artifact ? { label: 'Launched app', path: out.artifact, canReveal: true } : null,
+            out.installed ? { label: 'Installed path', path: out.installed, canReveal: true } : null,
+            out.launcher ? { label: 'Launcher', path: out.launcher, canReveal: true } : null,
             out.entry ? { label: (item.context === 'godot' ? 'Godot project' : 'Entry folder'), path: out.entry, canReveal: true } : null,
             out.log ? { label: 'Launch log', path: out.log, canReveal: true } : null
           ].filter(Boolean),
@@ -4352,7 +4357,7 @@
         if (selected.kind === 'builtin') {
           return true;
         }
-        return selected.kind === 'workspace' && selected.context === 'native-desktop';
+        return selected.kind === 'workspace' && selected.context !== 'godot';
       }
 
       function defaultInstallBeforeRunForSelected(selected) {
@@ -7230,10 +7235,10 @@
         var res;
         if (selected.kind === 'builtin') {
           res = await backend('install-desktop', [selected.id, targetId]);
-        } else if (selected.kind === 'workspace' && selected.context === 'native-desktop') {
+        } else if (selected.kind === 'workspace' && canInstallHostTargetForSelected(selected)) {
           res = await backend('install-workspace', [selected.path, selected.context, targetId]);
         } else {
-          throw new Error('Install is currently available for wizardry apps and native desktop projects only.');
+          throw new Error('Install is currently available for desktop-targeted apps on this host.');
         }
         var out = kv(res.stdout || '');
         var installPath = String(out.installed || '').trim();
@@ -7247,9 +7252,13 @@
           ? (targetId === 'macos'
             ? 'Install auto-builds latest output, then copies the .app bundle into /Applications.'
             : 'Install auto-builds latest output, then installs AppDir to ~/.local/share with a launcher in ~/.local/bin.')
-          : (targetId === 'macos'
-            ? 'Install compiles the native workspace, then copies the .app bundle into /Applications.'
-            : 'Install compiles the native workspace, then installs the launcher under ~/.local with a desktop entry.');
+          : (selected.context === 'native-desktop'
+            ? (targetId === 'macos'
+              ? 'Install compiles the native workspace, then copies the .app bundle into /Applications.'
+              : 'Install compiles the native workspace, then installs the launcher under ~/.local with a desktop entry.')
+            : (targetId === 'macos'
+              ? 'Install rebuilds the project and copies the desktop app bundle into /Applications.'
+              : 'Install rebuilds the project and installs its AppDir under ~/.local/share with a launcher in ~/.local/bin.'));
         renderResult({
           status: 'ok',
           summary: summary,
