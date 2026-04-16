@@ -1417,6 +1417,11 @@ input[type="checkbox"]:disabled {
   overflow: auto;
 }
 
+#organize-menu {
+  max-height: min(28rem, calc(100dvh - 5rem));
+  overflow: auto;
+}
+
 .floating-menu.hidden {
   display: none;
 }
