@@ -3442,19 +3442,55 @@
         if (!els.catalogList) {
           return;
         }
+        function animateGitPillShift(row, mutate) {
+          if (!row || typeof mutate !== 'function') {
+            return;
+          }
+          var pill = row.querySelector('.catalog-git-pill');
+          var first = pill ? pill.getBoundingClientRect() : null;
+          mutate();
+          if (!first || !pill) {
+            return;
+          }
+          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            return;
+          }
+          requestAnimationFrame(function () {
+            var nextPill = row.querySelector('.catalog-git-pill');
+            if (!nextPill) {
+              return;
+            }
+            var last = nextPill.getBoundingClientRect();
+            var dx = first.left - last.left;
+            if (Math.abs(dx) < 0.5) {
+              return;
+            }
+            nextPill.animate([
+              { transform: 'translateX(' + dx + 'px)' },
+              { transform: 'translateX(0)' }
+            ], {
+              duration: 180,
+              easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)'
+            });
+          });
+        }
         var previous = String(previousKey || '').trim();
         var next = String(nextKey || state.catalogRunPendingKey || '').trim();
         if (previous || next) {
           if (previous && previous !== next) {
             var previousRow = state.catalogRowCache[previous] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + previous.replace(/'/g, "\\'") + "']");
             if (previousRow) {
-              previousRow.classList.remove('run-pending');
+              animateGitPillShift(previousRow, function () {
+                previousRow.classList.remove('run-pending');
+              });
             }
           }
           if (next) {
             var nextRow = state.catalogRowCache[next] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + next.replace(/'/g, "\\'") + "']");
             if (nextRow && !nextRow.classList.contains('catalog-row-filtered')) {
-              nextRow.classList.add('run-pending');
+              animateGitPillShift(nextRow, function () {
+                nextRow.classList.add('run-pending');
+              });
             }
           }
           return;
