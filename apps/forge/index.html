@@ -9262,9 +9262,7 @@
           if (bridgeAvailable()) {
             setBridgeStatus(true, 'Bridge: connected');
             setActivity('idle', 'Loading');
-            window.setTimeout(function () {
-              runInitialBridgeBootstrap();
-            }, 0);
+            await runInitialBridgeBootstrap();
             return;
           }
 
