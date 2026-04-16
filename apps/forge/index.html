@@ -3760,6 +3760,20 @@
         row.insertBefore(thumb, row.firstChild || null);
       }
 
+      function workspaceGitCatalogLabel(label) {
+        var raw = String(label || '').trim();
+        switch (raw) {
+          case 'Push':
+            return 'changes';
+          case 'Update':
+            return 'updates';
+          case 'Sync':
+            return 'sync';
+          default:
+            return '';
+        }
+      }
+
       function buildCatalogGitPill(item) {
         if (!item || item.kind !== 'workspace' || item.gitRepoPresent !== 'yes' || !item.gitStatusLabel) {
           return null;
@@ -3767,8 +3781,11 @@
         if (item.gitStatusLabel === 'Check Git' && item.gitStatusReason === 'origin is not configured for this repo yet.') {
           return null;
         }
+        var displayLabel = workspaceGitCatalogLabel(item.gitStatusLabel);
+        if (!displayLabel) {
+          return null;
+        }
         var pill = document.createElement('span');
-        var displayLabel = workspaceGitDisplayLabel(item.gitStatusLabel);
         pill.className = 'catalog-git-pill ' + workspaceGitDisplayTone(item.gitStatusLabel, item.gitStatusTone);
         pill.textContent = displayLabel;
         pill.title = item.gitStatusReason || displayLabel;
@@ -6149,16 +6166,17 @@
 
       function workspaceGitDisplayLabel(label) {
         var raw = String(label || '').trim();
-        if (raw === 'Check Git') {
-          return 'Updates';
+        switch (raw) {
+          case 'Push':
+            return 'Changes';
+          case 'Update':
+            return 'Updates';
+          default:
+            return raw;
         }
-        return raw;
       }
 
       function workspaceGitDisplayTone(label, tone) {
-        if (String(label || '').trim() === 'Check Git') {
-          return 'info';
-        }
         return workspaceGitToneClass(tone);
       }
 
