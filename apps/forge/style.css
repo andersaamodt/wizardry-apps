@@ -1326,6 +1326,10 @@ input[type="checkbox"]:disabled {
 .catalog-row.run-pending .row-run-spinner {
   width: 0.76rem;
   margin-left: 0.12rem;
+  opacity: 0;
+}
+
+.catalog-row.run-pending.run-pending-spinner-visible .row-run-spinner {
   opacity: 1;
 }
 

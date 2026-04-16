@@ -535,7 +535,9 @@
         footerStatusMessage: ''
       };
 
+      var CATALOG_RUN_PENDING_PILL_SHIFT_MS = 180;
       var els = {};
+      var catalogRunPendingSpinnerTimers = new WeakMap();
 
       function inferAppDir() {
         var p = decodeURIComponent(window.location.pathname || '');
@@ -3442,6 +3444,39 @@
         if (!els.catalogList) {
           return;
         }
+        function clearRunPendingSpinnerTimer(row) {
+          if (!row) {
+            return;
+          }
+          var timer = catalogRunPendingSpinnerTimers.get(row);
+          if (timer) {
+            window.clearTimeout(timer);
+            catalogRunPendingSpinnerTimers.delete(row);
+          }
+        }
+        function setRowRunPending(row, pending, options) {
+          if (!row) {
+            return;
+          }
+          clearRunPendingSpinnerTimer(row);
+          if (!pending) {
+            row.classList.remove('run-pending-spinner-visible');
+            row.classList.remove('run-pending');
+            return;
+          }
+          row.classList.add('run-pending');
+          if (options && options.deferSpinnerVisibility) {
+            row.classList.remove('run-pending-spinner-visible');
+            catalogRunPendingSpinnerTimers.set(row, window.setTimeout(function () {
+              catalogRunPendingSpinnerTimers.delete(row);
+              if (row.classList.contains('run-pending')) {
+                row.classList.add('run-pending-spinner-visible');
+              }
+            }, CATALOG_RUN_PENDING_PILL_SHIFT_MS));
+            return;
+          }
+          row.classList.add('run-pending-spinner-visible');
+        }
         function animateGitPillShift(row, mutate) {
           if (!row || typeof mutate !== 'function') {
             return;
@@ -3469,7 +3504,7 @@
               { transform: 'translateX(' + dx + 'px)' },
               { transform: 'translateX(0)' }
             ], {
-              duration: 180,
+              duration: CATALOG_RUN_PENDING_PILL_SHIFT_MS,
               easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)'
             });
           });
@@ -3481,15 +3516,16 @@
             var previousRow = state.catalogRowCache[previous] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + previous.replace(/'/g, "\\'") + "']");
             if (previousRow) {
               animateGitPillShift(previousRow, function () {
-                previousRow.classList.remove('run-pending');
+                setRowRunPending(previousRow, false);
               });
             }
           }
           if (next) {
             var nextRow = state.catalogRowCache[next] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + next.replace(/'/g, "\\'") + "']");
             if (nextRow && !nextRow.classList.contains('catalog-row-filtered')) {
+              var deferSpinnerVisibility = !!nextRow.querySelector('.catalog-git-pill');
               animateGitPillShift(nextRow, function () {
-                nextRow.classList.add('run-pending');
+                setRowRunPending(nextRow, true, { deferSpinnerVisibility: deferSpinnerVisibility });
               });
             }
           }
@@ -3497,7 +3533,7 @@
         }
         els.catalogList.querySelectorAll('.catalog-row[data-catalog-item-key]').forEach(function (row) {
           var itemKey = String(row.getAttribute('data-catalog-item-key') || '');
-          row.classList.toggle('run-pending', itemKey === state.catalogRunPendingKey);
+          setRowRunPending(row, itemKey === state.catalogRunPendingKey);
         });
       }
 
@@ -3866,6 +3902,9 @@
         row.classList.toggle('active', state.selectedCatalog === item.key);
         row.classList.toggle('menu-open', state.activeCatalogRowMenuKey === item.key);
         row.classList.toggle('run-pending', state.catalogRunPendingKey === item.key);
+        if (state.catalogRunPendingKey !== item.key) {
+          row.classList.remove('run-pending-spinner-visible');
+        }
         row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
         row.classList.remove('catalog-row-filtered');
         row.removeAttribute('aria-hidden');
@@ -4085,6 +4124,9 @@
             rowRunSpinner.className = 'row-run-spinner status-inline-spinner';
             rowRunSpinner.setAttribute('aria-hidden', 'true');
             rowActions.appendChild(rowRunSpinner);
+            if (state.catalogRunPendingKey === item.key) {
+              row.classList.add('run-pending-spinner-visible');
+            }
 
             var play = document.createElement('button');
             play.type = 'button';
