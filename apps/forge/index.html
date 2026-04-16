@@ -3820,6 +3820,7 @@
           item.gitStatusLabel || '',
           item.gitStatusTone || '',
           item.gitStatusReason || '',
+          state.showNoRemotePill ? 'show-no-remote' : 'hide-no-remote',
           rowApp ? rowApp.distribution : '',
           rowApp && rowApp.exists === false ? 'missing' : 'present'
         ].join('|');
