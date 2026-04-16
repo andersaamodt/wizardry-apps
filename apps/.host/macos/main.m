@@ -1967,7 +1967,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
     } else if ([self isArtificerApp]) {
         NSString *normalized = [[relayState ?: @"idle" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        CGFloat inset = MAX(0.0, floor(side * 0.04));
+        CGFloat inset = MAX(0.0, floor(side * 0.02));
         NSRect glyphRect = NSInsetRect(NSMakeRect(0.0, 0.0, side, side), inset, inset);
         CGFloat minX = NSMinX(glyphRect);
         CGFloat maxX = NSMaxX(glyphRect);
@@ -1975,34 +1975,31 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         CGFloat maxY = NSMaxY(glyphRect);
         CGFloat midX = NSMidX(glyphRect);
         CGFloat strokeWidth = 2.0;
-        CGFloat segmentDx = MAX(1.5, floor(side * 0.16 * 2.0) / 2.0);
-        CGFloat segmentDy = MAX(1.5, floor(side * 0.15 * 2.0) / 2.0);
-        CGFloat topY = floor((minY + side * 0.03) * 2.0) / 2.0;
-        CGFloat bottomFootY = topY + segmentDy * 5.0;
-        if (bottomFootY > maxY - side * 0.03) {
-            CGFloat availableHeight = (maxY - side * 0.03) - topY;
+        CGFloat segmentDx = MAX(1.5, floor(side * 0.17 * 2.0) / 2.0);
+        CGFloat segmentDy = MAX(1.5, floor(side * 0.16 * 2.0) / 2.0);
+        CGFloat topY = ceil((maxY - side * 0.02) * 2.0) / 2.0;
+        CGFloat bottomFootY = topY - segmentDy * 5.0;
+        if (bottomFootY < minY + side * 0.02) {
+            CGFloat availableHeight = topY - (minY + side * 0.02);
             segmentDy = MAX(1.5, floor((availableHeight / 5.0) * 2.0) / 2.0);
-            segmentDx = MAX(1.5, floor((segmentDy * (0.16 / 0.15)) * 2.0) / 2.0);
-            bottomFootY = topY + segmentDy * 5.0;
+            segmentDx = MAX(1.5, floor((segmentDy * (0.17 / 0.16)) * 2.0) / 2.0);
+            bottomFootY = topY - segmentDy * 5.0;
         }
 
         NSPoint upperTop = NSMakePoint(midX, topY);
-        NSPoint upperLeft = NSMakePoint(midX - segmentDx, topY + segmentDy);
-        NSPoint upperRight = NSMakePoint(midX + segmentDx, topY + segmentDy);
-        NSPoint sharedUpperBottom = NSMakePoint(midX, topY + segmentDy * 2.0);
-        NSPoint lowerLeft = NSMakePoint(midX - segmentDx, topY + segmentDy * 3.0);
-        NSPoint lowerRight = NSMakePoint(midX + segmentDx, topY + segmentDy * 3.0);
-        NSPoint lowerBottom = NSMakePoint(midX, topY + segmentDy * 4.0);
+        NSPoint upperLeft = NSMakePoint(midX - segmentDx, topY - segmentDy);
+        NSPoint upperRight = NSMakePoint(midX + segmentDx, topY - segmentDy);
+        NSPoint sharedUpperBottom = NSMakePoint(midX, topY - segmentDy * 2.0);
+        NSPoint lowerLeft = NSMakePoint(midX - segmentDx, topY - segmentDy * 3.0);
+        NSPoint lowerRight = NSMakePoint(midX + segmentDx, topY - segmentDy * 3.0);
+        NSPoint lowerBottom = NSMakePoint(midX, topY - segmentDy * 4.0);
         NSPoint leftFoot = NSMakePoint(midX - segmentDx, bottomFootY);
         NSPoint rightFoot = NSMakePoint(midX + segmentDx, bottomFootY);
 
-        NSBezierPath *capLeft = [NSBezierPath bezierPath];
-        [capLeft moveToPoint:upperTop];
-        [capLeft lineToPoint:upperLeft];
-
-        NSBezierPath *capRight = [NSBezierPath bezierPath];
-        [capRight moveToPoint:upperTop];
-        [capRight lineToPoint:upperRight];
+        NSBezierPath *capTip = [NSBezierPath bezierPath];
+        [capTip moveToPoint:upperLeft];
+        [capTip lineToPoint:upperTop];
+        [capTip lineToPoint:upperRight];
 
         NSBezierPath *upperCross = [NSBezierPath bezierPath];
         [upperCross moveToPoint:upperLeft];
@@ -2024,7 +2021,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [lowerCrossMirror lineToPoint:lowerBottom];
         [lowerCrossMirror lineToPoint:leftFoot];
 
-        NSArray<NSBezierPath *> *braidStrokes = @[capLeft, capRight, upperCross, upperCrossMirror, lowerCross, lowerCrossMirror];
+        NSArray<NSBezierPath *> *braidStrokes = @[capTip, upperCross, upperCrossMirror, lowerCross, lowerCrossMirror];
         void (^strokeGlyphWithColor)(NSColor *) = ^(NSColor *strokeColor) {
             NSColor *resolvedStrokeColor = strokeColor ? strokeColor : [NSColor blackColor];
             [resolvedStrokeColor setStroke];
@@ -2032,6 +2029,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                 [path setLineWidth:strokeWidth];
                 [path setLineJoinStyle:NSLineJoinStyleMiter];
                 [path setLineCapStyle:NSLineCapStyleButt];
+                [path setMiterLimit:12.0];
                 [path stroke];
             }
         };
