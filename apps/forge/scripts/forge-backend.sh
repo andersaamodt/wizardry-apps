@@ -2898,9 +2898,9 @@ workspace_git_collect_status() {
       git_status_reason='origin is not configured for this repo yet.'
     fi
   elif [ "$git_diverged" = 'yes' ] || { [ "${git_behind:-0}" -gt 0 ] && { [ "${git_ahead:-0}" -gt 0 ] || [ "$git_dirty" = 'yes' ]; }; }; then
-    git_status_label='Sync'
-    git_status_tone='working'
-    git_status_reason='Local and remote changes both need attention before the repo is current.'
+    git_status_label='Conflict'
+    git_status_tone='bad'
+    git_status_reason='Local and remote changes both need reconciliation before the repo is current.'
   elif [ "$git_dirty" = 'yes' ] || [ "${git_ahead:-0}" -gt 0 ] || { [ -n "$git_remote_origin" ] && [ "$git_upstream_present" != 'yes' ]; }; then
     git_status_label='Push'
     git_status_tone='ok'

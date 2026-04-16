@@ -3817,8 +3817,9 @@
             return 'clean';
           case 'Update':
             return 'updates';
+          case 'Conflict':
           case 'Sync':
-            return 'sync';
+            return 'conflict';
           default:
             return '';
         }
@@ -6223,14 +6224,21 @@
             return 'Clean';
           case 'Update':
             return 'Updates';
+          case 'Conflict':
+          case 'Sync':
+            return 'Conflict';
           default:
             return raw;
         }
       }
 
       function workspaceGitDisplayTone(label, tone) {
-        if (String(label || '').trim() === 'Push') {
+        var raw = String(label || '').trim();
+        if (raw === 'Push') {
           return 'warning';
+        }
+        if (raw === 'Conflict' || raw === 'Sync') {
+          return 'bad';
         }
         return workspaceGitToneClass(tone);
       }
