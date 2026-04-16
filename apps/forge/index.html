@@ -3745,6 +3745,7 @@
 
       function syncCatalogRowState(row, item) {
         row.classList.toggle('active', state.selectedCatalog === item.key);
+        row.classList.toggle('menu-open', state.activeCatalogRowMenuKey === item.key);
         row.classList.toggle('run-pending', state.catalogRunPendingKey === item.key);
         row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
         row.classList.remove('catalog-row-filtered');

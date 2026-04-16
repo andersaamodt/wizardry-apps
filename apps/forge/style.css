@@ -1016,6 +1016,11 @@ input[type="checkbox"]:disabled {
   min-height: 1.9rem;
 }
 
+.catalog-row.menu-open {
+  isolation: isolate;
+  z-index: 40;
+}
+
 .catalog-row.dragging {
   opacity: 0.52;
 }
@@ -1068,6 +1073,7 @@ input[type="checkbox"]:disabled {
   gap: 0.08rem;
   flex: 0 0 auto;
   position: relative;
+  z-index: 2;
   margin-left: 0.26rem;
 }
 
@@ -1349,6 +1355,7 @@ input[type="checkbox"]:disabled {
   top: calc(100% + 0.2rem);
   min-width: 116px;
   padding: 0.24rem;
+  z-index: 60 !important;
 }
 
 .catalog-inline-rename {
