@@ -404,6 +404,122 @@ resolve_godot_engine() {
   return 1
 }
 
+resolve_godot_app_bundle() {
+  if [ "$(os_id)" != "darwin" ]; then
+    return 1
+  fi
+  if [ -n "${GODOT_APP-}" ] && [ -x "$GODOT_APP/Contents/MacOS/Godot" ]; then
+    printf '%s\n' "$GODOT_APP"
+    return 0
+  fi
+  for candidate in \
+    "/Applications/Godot.app" \
+    "$HOME/Applications/Godot.app"; do
+    if [ -x "$candidate/Contents/MacOS/Godot" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+godot_project_icon_res_path() {
+  project_dir=${1-}
+  [ -n "$project_dir" ] || return 1
+  for rel in \
+    "assets/forge-icon.png" \
+    "icon.svg" \
+    "icon.png"; do
+    if [ -f "$project_dir/$rel" ]; then
+      printf 'res://%s\n' "$rel"
+      return 0
+    fi
+  done
+  return 1
+}
+
+sync_godot_project_icon_config() {
+  project_dir=${1-}
+  [ -n "$project_dir" ] || return 1
+  project_file="$project_dir/project.godot"
+  [ -f "$project_file" ] || return 0
+  icon_res=$(godot_project_icon_res_path "$project_dir" 2>/dev/null || true)
+  [ -n "$icon_res" ] || return 0
+  icon_line="config/icon=\"$icon_res\""
+  if grep -Fqx "$icon_line" "$project_file" 2>/dev/null; then
+    return 0
+  fi
+
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/forge-godot-project.XXXXXX")
+  awk -v icon_line="$icon_line" '
+    BEGIN {
+      in_application = 0
+      saw_application = 0
+      inserted = 0
+    }
+    /^\[application\]$/ {
+      if (in_application && inserted == 0) {
+        print icon_line
+        inserted = 1
+      }
+      in_application = 1
+      saw_application = 1
+      print
+      next
+    }
+    /^\[/ {
+      if (in_application && inserted == 0) {
+        print icon_line
+        inserted = 1
+      }
+      in_application = 0
+      print
+      next
+    }
+    {
+      if (in_application && $0 ~ /^config\/icon=/) {
+        if (inserted == 0) {
+          print icon_line
+          inserted = 1
+        }
+        next
+      }
+      print
+    }
+    END {
+      if (in_application && inserted == 0) {
+        print icon_line
+        inserted = 1
+      }
+      if (saw_application == 0) {
+        if (NR > 0) {
+          print ""
+        }
+        print "[application]"
+        print icon_line
+      }
+    }
+  ' "$project_file" > "$tmp_file"
+  mv "$tmp_file" "$project_file"
+}
+
+sync_workspace_godot_icon_config_if_needed() {
+  workspace_path=${1-}
+  [ -n "$workspace_path" ] || return 1
+  conf_path="$workspace_path/wizardry.workspace.conf"
+  if godot_subpath=$(resolve_workspace_godot_subpath "$workspace_path" "$conf_path" 2>/dev/null || true) && [ -n "$godot_subpath" ]; then
+    case "$godot_subpath" in
+      ".")
+        project_path="$workspace_path"
+        ;;
+      *)
+        project_path="$workspace_path/$godot_subpath"
+        ;;
+    esac
+    sync_godot_project_icon_config "$project_path"
+  fi
+}
+
 ensure_godot_project() {
   workspace_path=$1
   project_title=${2-}
@@ -448,6 +564,7 @@ run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.2")
 PROJECT
 
+  sync_godot_project_icon_config "$workspace_path"
   printf '%s\n' "$workspace_path"
   return 0
 }
@@ -4442,6 +4559,7 @@ cmd_set_workspace_icon() {
     # splash, and bundle icon resolution cannot diverge.
   write_project_icon_from_data_url "$workspace_app_dir" "$data_url" "$shape_mode" >/dev/null
   fi
+  sync_workspace_godot_icon_config_if_needed "$workspace_path"
   printf 'workspace=%s\n' "$workspace_path"
 }
 
@@ -4498,6 +4616,7 @@ cmd_set_workspace_icon_file() {
   if [ -f "$workspace_app_dir/index.html" ]; then
     write_project_icon_from_file "$workspace_app_dir" "$image_path" "$shape_mode" >/dev/null
   fi
+  sync_workspace_godot_icon_config_if_needed "$workspace_path"
   printf 'workspace=%s\n' "$workspace_path"
 }
 
@@ -4556,6 +4675,7 @@ cmd_regenerate_workspace_icon_assets() {
   if [ -f "$workspace_app_dir/index.html" ]; then
     regenerate_project_icon_assets "$root" "$workspace_app_dir" "$requested_mode"
   fi
+  sync_workspace_godot_icon_config_if_needed "$workspace_path"
   printf 'icon=%s\n' "$workspace_path/assets/forge-icon.png"
   printf 'status=regenerated\n'
   printf 'workspace=%s\n' "$workspace_path"
@@ -4867,6 +4987,142 @@ workspace_native_bundle_icon_path() {
     fi
   fi
   return 1
+}
+
+build_godot_workspace_macos_launcher() {
+  root=${1-}
+  workspace_path=${2-}
+  workspace_conf=${3-}
+  project_path=${4-}
+  godot_app=${5-}
+
+  [ -n "$root" ] || return 1
+  [ -n "$workspace_path" ] || return 1
+  [ -n "$workspace_conf" ] || return 1
+  [ -n "$project_path" ] || return 1
+  [ -n "$godot_app" ] || return 1
+  [ -d "$godot_app" ] || return 1
+
+  workspace_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
+  workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
+  bundle_root="$root/_tmp/workbench/dist/macos-godot-workspaces/$workspace_slug"
+  final_bundle="$bundle_root/$workspace_title.app"
+  hash_path="$final_bundle/Contents/Resources/wizardry-build-input.sha256"
+
+  icon_source=''
+  workspace_icon_source=$(project_preferred_bundle_icon_path "$workspace_path" || true)
+  project_icon_source=$(project_preferred_bundle_icon_path "$project_path" || true)
+  if [ -n "$workspace_icon_source" ]; then
+    icon_source="$workspace_icon_source"
+  elif [ -n "$project_icon_source" ]; then
+    icon_source="$project_icon_source"
+  fi
+  icon_source_format=''
+  icon_hash=''
+  if [ -n "$icon_source" ]; then
+    icon_source_format=$(icon_source_format_for_path "$icon_source")
+    icon_hash=$(hash_path_sha256 "$icon_source")
+  fi
+
+  expected_hash=$({
+    printf 'backend=%s\n' "$(hash_path_sha256 "$SCRIPT_DIR/forge-backend.sh")"
+    printf 'godot_app=%s\n' "$(hash_path_sha256 "$godot_app")"
+    printf 'project=%s\n' "$(hash_path_sha256 "$project_path")"
+    printf 'project_path=%s\n' "$project_path"
+    printf 'workspace_title=%s\n' "$workspace_title"
+    printf 'workspace_slug=%s\n' "$workspace_slug"
+    printf 'icon=%s\n' "${icon_hash:-missing}"
+  } | hash_stdin_sha256)
+
+  cache_hit=false
+  if [ -d "$final_bundle" ] &&
+     [ -f "$hash_path" ] &&
+     [ "$(head -n 1 "$hash_path" 2>/dev/null | tr -d '\r')" = "$expected_hash" ] &&
+     ensure_macos_bundle_signature "$final_bundle"; then
+    cache_hit=true
+  fi
+
+  if [ "$cache_hit" = false ]; then
+    staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-godot-workspace.XXXXXX")
+    staged_bundle="$staged_root/$workspace_title.app"
+    if command -v ditto >/dev/null 2>&1; then
+      ditto "$godot_app" "$staged_bundle"
+    else
+      cp -R "$godot_app" "$staged_bundle"
+    fi
+
+    mkdir -p "$staged_bundle/Contents/Resources"
+    bundled_exec="$staged_bundle/Contents/MacOS/Godot"
+    bundled_real_exec="$staged_bundle/Contents/MacOS/Godot-real"
+    mv "$bundled_exec" "$bundled_real_exec"
+    cat > "$bundled_exec" <<'APP'
+#!/bin/sh
+set -eu
+HERE=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+PROJECT_PATH=$(cat "$HERE/../Resources/wizardry-godot-project-path.txt")
+exec "$HERE/Godot-real" --path "$PROJECT_PATH" "$@"
+APP
+    chmod +x "$bundled_exec"
+
+    printf '%s\n' "$project_path" > "$staged_bundle/Contents/Resources/wizardry-godot-project-path.txt"
+    printf '%s\n' "$expected_hash" > "$staged_bundle/Contents/Resources/wizardry-build-input.sha256"
+
+    plist_path="$staged_bundle/Contents/Info.plist"
+    if command -v plutil >/dev/null 2>&1; then
+      plutil -replace CFBundleName -string "$workspace_title" "$plist_path" >/dev/null
+      plutil -replace CFBundleDisplayName -string "$workspace_title" "$plist_path" >/dev/null
+      plutil -replace CFBundleIdentifier -string "com.wizardry.workspace.$workspace_slug.godot" "$plist_path" >/dev/null
+      plutil -replace CFBundleVersion -string "$(printf '%s' "$expected_hash" | cksum | awk '{ print $1 }')" "$plist_path" >/dev/null
+      plutil -replace CFBundleShortVersionString -string "1.0" "$plist_path" >/dev/null
+    fi
+
+    if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+      iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-godot-iconset.XXXXXX")
+      iconset="${iconset_tmp}.iconset"
+      mv "$iconset_tmp" "$iconset"
+      for size in 16 32 128 256 512; do
+        sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+        sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+      done
+      icon_name="forge-${icon_hash}.icns"
+      if iconutil -c icns "$iconset" -o "$staged_bundle/Contents/Resources/$icon_name" >/dev/null 2>&1; then
+        :
+      else
+        icon_name="forge-icon-${icon_hash}.png"
+        cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
+      fi
+      rm -rf "$iconset"
+    elif [ "$icon_source_format" = 'png' ]; then
+      icon_name="forge-icon-${icon_hash}.png"
+      cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
+    elif [ "$icon_source_format" = 'icns' ]; then
+      icon_name="forge-${icon_hash}.icns"
+      cp "$icon_source" "$staged_bundle/Contents/Resources/$icon_name"
+    else
+      icon_name=''
+    fi
+
+    if [ -n "${icon_name-}" ] && command -v plutil >/dev/null 2>&1; then
+      plutil -replace CFBundleIconFile -string "${icon_name%.icns}" "$plist_path" >/dev/null
+      plutil -remove CFBundleIconName "$plist_path" >/dev/null 2>&1 || true
+    fi
+
+    ensure_macos_bundle_signature "$staged_bundle" || {
+      printf '%s\n' "forge-backend: failed to sign macOS Godot workspace bundle: $staged_bundle" >&2
+      exit 1
+    }
+
+    mkdir -p "$bundle_root"
+    rm -rf "$final_bundle"
+    mv "$staged_bundle" "$final_bundle"
+    rmdir "$staged_root" 2>/dev/null || :
+  fi
+
+  printf 'status=ok\n'
+  printf 'target=macos\n'
+  printf 'app_name=%s\n' "$workspace_title"
+  printf 'artifact=%s\n' "$final_bundle"
+  printf 'cache=%s\n' "$([ "$cache_hit" = true ] && printf hit || printf miss)"
 }
 
 build_native_workspace_host() {
@@ -5256,10 +5512,10 @@ cmd_install_workspace() {
   fi
   [ -n "$context" ] || context='web'
   case "$context" in
-    native-desktop|web)
+    native-desktop|web|godot)
       ;;
     *)
-      printf '%s\n' "forge-backend: install-workspace currently supports web and native-desktop projects only" >&2
+      printf '%s\n' "forge-backend: install-workspace currently supports web, native-desktop, and macOS Godot projects only" >&2
       exit 1
       ;;
   esac
@@ -5283,6 +5539,44 @@ cmd_install_workspace() {
   fi
 
   case "$context" in
+    godot)
+      [ "$os" = "darwin" ] || {
+        printf '%s\n' "forge-backend: install-workspace currently supports Godot projects on macOS only" >&2
+        exit 1
+      }
+      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+      workspace_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
+      if ! project_path=$(ensure_godot_project "$workspace_path" "$workspace_title"); then
+        printf '%s\n' "forge-backend: Godot project is missing project.godot: $workspace_path" >&2
+        exit 1
+      fi
+      sync_godot_project_icon_config "$project_path"
+      godot_app=$(resolve_godot_app_bundle 2>/dev/null || true)
+      [ -n "$godot_app" ] || {
+        printf '%s\n' "forge-backend: Godot.app is required to install Godot workspaces on macOS" >&2
+        exit 1
+      }
+      build_out=$(build_godot_workspace_macos_launcher "$root" "$workspace_path" "$workspace_conf" "$project_path" "$godot_app")
+      artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
+      [ -d "$artifact" ] || {
+        printf '%s\n' "forge-backend: expected Godot workspace launcher bundle artifact, got: $artifact" >&2
+        exit 1
+      }
+      install_path="/Applications/$(basename "$artifact")"
+      rm -rf "$install_path"
+      if command -v ditto >/dev/null 2>&1; then
+        ditto "$artifact" "$install_path"
+      else
+        cp -R "$artifact" "$install_path"
+      fi
+      printf 'status=ok\n'
+      printf 'target=macos\n'
+      printf 'install_mode=system-applications\n'
+      printf 'artifact=%s\n' "$artifact"
+      printf 'entry=%s\n' "$project_path"
+      printf 'installed=%s\n' "$install_path"
+      printf 'app_name=%s\n' "$workspace_title"
+      ;;
     native-desktop)
       run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
       build_out=$(build_native_workspace_host "$root" "$workspace_path" "$workspace_conf")
@@ -5861,6 +6155,32 @@ cmd_run_workspace() {
       if ! project_path=$(ensure_godot_project "$workspace_path" "$project_title"); then
         printf '%s\n' "forge-backend: Godot project is missing project.godot: $workspace_path" >&2
         exit 1
+      fi
+      sync_godot_project_icon_config "$project_path"
+
+      if [ "$(os_id)" = "darwin" ] && godot_app=$(resolve_godot_app_bundle 2>/dev/null || true) && [ -n "$godot_app" ]; then
+        bundle_out=$(build_godot_workspace_macos_launcher "$root" "$workspace_path" "$workspace_conf" "$project_path" "$godot_app")
+        launcher_bundle=$(printf '%s\n' "$bundle_out" | kv_read artifact)
+        [ -d "$launcher_bundle" ] || {
+          printf '%s\n' "forge-backend: failed to build Godot workspace launcher bundle: $workspace_path" >&2
+          exit 1
+        }
+
+        workspace_id=$(basename "$workspace_path")
+        log_dir="$root/_tmp/workbench/log"
+        mkdir -p "$log_dir"
+        log_path="$log_dir/workspace-$workspace_id-godot.log"
+
+        open -na "$launcher_bundle" >/dev/null 2>&1 || {
+          printf '%s\n' "forge-backend: failed to launch Godot workspace bundle: $launcher_bundle" >&2
+          exit 1
+        }
+        printf 'launched=1\n'
+        printf 'mode=godot-workspace-bundle\n'
+        printf 'entry=%s\n' "$project_path"
+        printf 'artifact=%s\n' "$launcher_bundle"
+        printf 'log=%s\n' "$log_path"
+        return 0
       fi
 
       engine=$(resolve_godot_engine) || {
@@ -7029,6 +7349,7 @@ extends Node
 func _ready():
     print("Wizardry Godot tool project ready.")
 GDSCRIPT
+          sync_godot_project_icon_config "$workspace_dir"
           write_emitted_project_legal_files "$root" "$workspace_dir"
           write_emitted_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
           ;;
