@@ -2921,7 +2921,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     CGFloat dragStripHeight = 44.0;
     NSRect webFrame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
-    if (isForgeApp) {
+    if (isForgeApp || isArtificerApp) {
         WizardryForgeWebView *forgeWebView = [[WizardryForgeWebView alloc] initWithFrame:webFrame configuration:config];
         forgeWebView.appDelegate = self;
         NSMutableArray<NSPasteboardType> *dragTypes = [NSMutableArray arrayWithArray:[NSImage imagePasteboardTypes]];
