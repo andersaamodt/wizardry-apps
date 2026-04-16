@@ -3693,7 +3693,7 @@
             label.className = 'catalog-mini-tab-label';
             label.textContent = tab.label;
             button.appendChild(label);
-            if (!tab.system && miniTabItemCount(tab.id) === 0) {
+            if (!tab.system) {
               var remove = document.createElement('span');
               remove.className = 'catalog-mini-tab-remove';
               remove.setAttribute('aria-hidden', 'true');
