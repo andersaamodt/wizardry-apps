@@ -1066,20 +1066,24 @@ input[type="checkbox"]:disabled {
 }
 
 .catalog-git-pill {
+  min-width: 0;
+  height: 0.62rem;
+  border: 1px solid var(--pill-blue-border);
+  border-radius: 999px;
+  background: var(--pill-blue-soft);
+  color: var(--pill-blue-fg);
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 0.1rem;
+  margin-right: 0.08rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 1rem;
-  padding: 0.04rem 0.38rem;
-  margin-right: 0.14rem;
-  border: 1px solid var(--section-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--section-bg) 92%, transparent);
-  color: var(--section-muted);
-  font-size: 0.64rem;
-  font-weight: 650;
-  line-height: 1;
+  flex: 0 0 auto;
+  padding: 0 0.14rem;
   white-space: nowrap;
+  text-transform: lowercase;
 }
 
 .catalog-git-pill.ok {
@@ -1097,6 +1101,12 @@ input[type="checkbox"]:disabled {
 .catalog-git-pill.working {
   border-color: var(--pill-blue-border);
   background: color-mix(in srgb, var(--pill-blue-soft) 82%, transparent);
+  color: var(--pill-blue-fg);
+}
+
+.catalog-git-pill.info {
+  border-color: var(--pill-blue-border);
+  background: var(--pill-blue-soft);
   color: var(--pill-blue-fg);
 }
 
@@ -2142,6 +2152,48 @@ input[type="checkbox"]:disabled {
   justify-self: end;
 }
 
+.workspace-summary-pills {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 0.26rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.workspace-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.08rem;
+  padding: 0.06rem 0.46rem;
+  border: 1px solid var(--section-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--section-bg) 90%, transparent);
+  color: var(--section-muted);
+  font-size: 0.69rem;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.workspace-summary-pill.ok {
+  border-color: var(--pill-green-border);
+  background: var(--pill-green-soft);
+  color: var(--pill-green-fg);
+}
+
+.workspace-summary-pill.working,
+.workspace-summary-pill.info {
+  border-color: var(--pill-blue-border);
+  background: color-mix(in srgb, var(--pill-blue-soft) 82%, transparent);
+  color: var(--pill-blue-fg);
+}
+
+.workspace-summary-pill.bad {
+  border-color: var(--section-bad-border);
+  background: color-mix(in srgb, #d92d20 12%, transparent);
+  color: color-mix(in srgb, #d92d20 82%, var(--text));
+}
+
 .pipeline-section[open] > .pipeline-section-head {
   border-bottom: 1px solid var(--section-border);
 }
@@ -2254,6 +2306,31 @@ input[type="checkbox"]:disabled {
   color: var(--section-muted);
   font-size: 0.82rem;
   padding: 0.08rem 0;
+}
+
+.workspace-info-list {
+  display: grid;
+  gap: 0.32rem;
+}
+
+.workspace-info-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 0.62rem;
+  align-items: baseline;
+}
+
+.workspace-info-label {
+  color: var(--section-muted);
+  font-size: 0.76rem;
+  font-weight: 620;
+}
+
+.workspace-info-value {
+  color: var(--section-text);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .workspace-profile-fields {
@@ -2391,6 +2468,12 @@ input[type="checkbox"]:disabled {
 .pipeline-sections button:hover {
   border-color: color-mix(in srgb, var(--accent) 38%, var(--section-border));
   box-shadow: 0 5px 12px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.pipeline-sections button:disabled:hover {
+  border-color: var(--section-border);
+  box-shadow: none;
+  background: color-mix(in srgb, var(--section-bg) 95%, transparent);
 }
 
 .pipeline-sections :is(input, select, button):focus-visible {
@@ -3128,6 +3211,8 @@ input[type="checkbox"]:disabled {
   opacity: 0.5;
   color: color-mix(in srgb, var(--section-muted) 88%, transparent);
   border-color: transparent;
+  box-shadow: none;
+  pointer-events: none;
 }
 
 .row-mini.row-install {
