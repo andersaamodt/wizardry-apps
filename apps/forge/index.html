@@ -993,6 +993,11 @@
       }
 
       function cancelMiniTabEdit() {
+        if (state.creatingMiniTabId) {
+          state.miniTabs = state.miniTabs.filter(function (tab) {
+            return tab.id !== state.creatingMiniTabId;
+          });
+        }
         state.editingMiniTabId = '';
         state.editingMiniTabDraft = '';
         state.creatingMiniTabId = '';
@@ -1046,7 +1051,6 @@
           label: label
         };
         state.miniTabs.push(tab);
-        saveMiniTabs();
         state.editingMiniTabId = tab.id;
         state.editingMiniTabDraft = '';
         state.creatingMiniTabId = tab.id;
@@ -3470,6 +3474,7 @@
         els.catalogMiniTabs.innerHTML = '';
         allMiniTabs().forEach(function (tab) {
           var isEditing = state.editingMiniTabId === tab.id;
+          var isCreating = state.creatingMiniTabId === tab.id;
           var button = document.createElement('button');
           button.type = 'button';
           button.className = 'catalog-mini-tab' + (state.activeMiniTab === tab.id ? ' active' : '') + (state.dragMiniTabTargetId === tab.id ? ' drag-target' : '');
@@ -3485,7 +3490,7 @@
             input.type = 'text';
             input.className = 'catalog-mini-tab-input';
             input.value = state.editingMiniTabDraft || '';
-            input.placeholder = 'Tab name';
+            input.placeholder = isCreating ? 'New Tab' : 'Tab name';
             input.setAttribute('aria-label', 'Tab name');
             input.addEventListener('click', function (event) {
               event.preventDefault();

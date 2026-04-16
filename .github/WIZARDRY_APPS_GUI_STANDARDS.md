@@ -20,6 +20,8 @@
 - During splash, any underlying host/WebView regions must be pre-colored to the same theme surface so nothing flashes through.
 - During splash, no browser/WebView/host scrollbar should be visible; boot state must suppress overflow until the first ready frame is shown.
 - Desktop windows must start at their intended initial size before splash handoff; do not visibly resize the host window after opening just to reach the correct startup height.
+- For desktop hosts, compute startup geometry in native host code before constructing `NSWindow`/WebView, including any app-specific ratio/height policy.
+- Do not rely on web boot scripts to "fix up" initial host window size with bridge resize commands during normal startup; reserve host resize RPCs for explicit user actions or true fallback recovery.
 - Splash handoff must be an atomic flip from splash to ready UI with no fade, no crossfade, and no staggered reveal.
 - The main interface must stay hidden until initial data/theme/layout state is ready for first interaction.
 - After splash hides, no delayed boot-only animations should continue loading core interface structure.

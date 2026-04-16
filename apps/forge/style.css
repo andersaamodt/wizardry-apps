@@ -637,12 +637,16 @@ body.settings-open #settings-panel {
 .catalog-mini-tab-remove {
   width: 0.72rem;
   height: 0.72rem;
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   color: color-mix(in srgb, var(--muted) 78%, var(--text) 22%);
   flex: 0 0 auto;
+}
+
+.catalog-mini-tab.active .catalog-mini-tab-remove {
+  display: inline-flex;
 }
 
 .catalog-mini-tab-remove svg {
