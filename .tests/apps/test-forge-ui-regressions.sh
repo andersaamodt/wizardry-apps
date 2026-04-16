@@ -70,6 +70,7 @@ assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Pull and rebuild worksp
 assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Push workspace branch', 'workspace-git-push'"
 assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Install latest release', 'workspace-git-install-release'"
 assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 13\)'
+assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 17\)'
 assert_matches "$ui" 'function buildCatalogGitPill\(item\)'
 assert_contains "$ui" 'catalog-git-pill'
 assert_matches "$ui" 'navigator\.platform'

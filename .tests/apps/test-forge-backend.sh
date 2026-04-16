@@ -245,6 +245,9 @@ printf '%s\n' "$workspace_godot_out" | grep -F "created=$workspaces_root/workspa
 grep -F "development_context=godot" "$workspaces_root/workspace-godot/wizardry.workspace.conf" >/dev/null
 grep -F "starter=clone" "$workspaces_root/workspace-godot/wizardry.workspace.conf" >/dev/null
 
+apps_list=$(sh "$backend" list-apps "$scratch")
+printf '%s\n' "$apps_list" | awk -F'\t' 'NF != 17 { exit 1 } END { exit(NR > 0 ? 0 : 1) }'
+
 workspaces=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
 printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
@@ -257,7 +260,7 @@ printf '%s\n' "$workspace_web_profile" | grep -F "git_default_branch=main" >/dev
 
 workspace_native_git_init=$(sh "$backend" workspace-git-init "$scratch" "$workspaces_root/workspace-native" "" "main")
 printf '%s\n' "$workspace_native_git_init" | grep -F "git_repo_present=yes" >/dev/null
-printf '%s\n' "$workspace_native_git_init" | grep -F "git_status_label=Check Git" >/dev/null
+printf '%s\n' "$workspace_native_git_init" | grep -F "git_status_label=Attention" >/dev/null
 
 git_remote_dir="$scratch/git-remotes"
 mkdir -p "$git_remote_dir"
@@ -296,7 +299,7 @@ printf '%s\n' "$workspace_web_pull" | grep -F "git_behind=0" >/dev/null
 
 git -C "$workspaces_root/workspace-web" remote set-url origin "$git_remote_dir/missing-origin.git"
 workspace_web_broken=$(sh "$backend" workspace-git-status "$scratch" "$workspaces_root/workspace-web")
-printf '%s\n' "$workspace_web_broken" | grep -F "git_status_label=Check Git" >/dev/null
+printf '%s\n' "$workspace_web_broken" | grep -F "git_status_label=Attention" >/dev/null
 printf '%s\n' "$workspace_web_broken" | grep -F "git_last_fetch_error=Fetch from origin failed." >/dev/null
 git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
 

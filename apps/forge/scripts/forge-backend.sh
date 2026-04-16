@@ -1745,7 +1745,8 @@ cmd_list_apps() {
   require_jq
 
   manifest="$root/config/apps.manifest.json"
-  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (if has("targets") then (.targets // "") else "__FORGE_TARGETS_MISSING__" end), (.distribution // "optional")] | @tsv' "$manifest" |
+  list_apps_tmp=$(mktemp "${TMPDIR:-/tmp}/forge-list-apps.XXXXXX")
+  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (if has("targets") then (.targets // "") else "__FORGE_TARGETS_MISSING__" end), (.distribution // "optional")] | @tsv' "$manifest" > "$list_apps_tmp"
   while IFS="$(printf '\t')" read -r slug name production bundle_targets manifest_targets distribution; do
     status_line=$(app_status "$root" "$slug")
     resolved_status=$(printf '%s\n' "$status_line" | cut -f1)
@@ -1783,10 +1784,24 @@ cmd_list_apps() {
     install_line=$(host_install_status_for_app "$root" "$slug" "$name")
     host_installed=$(printf '%s\n' "$install_line" | cut -f1)
     host_install_path=$(printf '%s\n' "$install_line" | cut -f2)
+    git_repo_present='no'
+    git_status_label=''
+    git_status_tone='muted'
+    git_status_reason=''
+    git_release_available='no'
+    if [ -n "$resolved_path" ] && [ -d "$resolved_path" ]; then
+      git_info=$(workspace_git_collect_status "$resolved_path" "0" "0")
+      git_repo_present=$(printf '%s\n' "$git_info" | kv_read git_repo_present)
+      git_status_label=$(printf '%s\n' "$git_info" | kv_read git_status_label)
+      git_status_tone=$(printf '%s\n' "$git_info" | kv_read git_status_tone)
+      git_status_reason=$(printf '%s\n' "$git_info" | kv_read git_status_reason)
+      git_release_available=$(printf '%s\n' "$git_info" | kv_read git_release_available)
+    fi
 
     mtime_epoch=$(path_mtime_epoch "$resolved_path")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path" "$mtime_epoch" "$host_installed" "$host_install_path"
-  done
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path" "$mtime_epoch" "$host_installed" "$host_install_path" "$git_repo_present" "$git_status_label" "$git_status_tone" "$git_status_reason" "$git_release_available"
+  done < "$list_apps_tmp"
+  rm -f "$list_apps_tmp"
 }
 
 cmd_list_templates() {
@@ -2618,7 +2633,7 @@ workspace_git_fetch_origin() {
 workspace_git_sync_label() {
   pill_state=${1-}
   case "$pill_state" in
-    check_git) printf '%s\n' "Check Git" ;;
+    check_git) printf '%s\n' "Attention" ;;
     sync) printf '%s\n' "Sync" ;;
     push) printf '%s\n' "Push" ;;
     update) printf '%s\n' "Update" ;;
@@ -2875,7 +2890,7 @@ workspace_git_collect_status() {
   fi
 
   if [ -n "$git_last_fetch_error" ] || { [ -z "$git_remote_origin" ] && [ -n "$git_repo_root" ]; }; then
-    git_status_label='Check Git'
+    git_status_label='Attention'
     git_status_tone='bad'
     if [ -n "$git_last_fetch_error" ]; then
       git_status_reason=$git_last_fetch_error
