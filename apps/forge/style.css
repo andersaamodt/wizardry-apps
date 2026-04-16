@@ -1075,6 +1075,7 @@ input[type="checkbox"]:disabled {
   position: relative;
   z-index: 2;
   margin-left: 0.26rem;
+  transform: translateY(-2px);
 }
 
 .catalog-git-pill {
