@@ -767,6 +767,16 @@
         return state.systemMiniTabMode === 'other' ? uncategorizedMiniTab() : defaultMiniTab();
       }
 
+      function miniTabTooltip(tab) {
+        if (!tab || !tab.system) {
+          return tab && tab.label ? tab.label : '';
+        }
+        if (tab.id === 'other') {
+          return 'Showing uncategorized apps. Click to show all apps.';
+        }
+        return 'Showing all apps. Click to show uncategorized apps.';
+      }
+
       function setSystemMiniTabMode(mode) {
         var next = String(mode || '').trim().toLowerCase() === 'other' ? 'other' : 'all';
         state.systemMiniTabMode = next;
@@ -3504,7 +3514,7 @@
           }
           button.setAttribute('data-mini-tab-id', tab.id);
           button.setAttribute('aria-pressed', state.activeMiniTab === tab.id ? 'true' : 'false');
-          button.title = tab.label;
+          button.title = miniTabTooltip(tab);
           if (isEditing) {
             button.classList.add('editing');
             var input = document.createElement('input');
