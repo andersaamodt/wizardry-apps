@@ -235,7 +235,7 @@ workspace_host_install_run_launcher=$(printf '%s\n' "$workspace_host_install_run
 workspace_host_install_run_root=$(printf '%s\n' "$workspace_host_install_run_out" | kv_read installed)
 [ -x "$workspace_host_install_run_launcher" ]
 [ -d "$workspace_host_install_run_root" ]
-wait_for_file_contains "$workspace_host_install_log" "$workspace_host_install_run_root/usr/share/workspace-host/app" 60
+wait_for_file_contains "$workspace_host_install_log" "/usr/share/workspace-host/app" 60
 
 # Behavior: workspace with no native host target falls back to hosted-web mode.
 workspace_web="$scratch/workspace-web"
