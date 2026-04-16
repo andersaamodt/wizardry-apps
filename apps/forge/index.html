@@ -918,9 +918,21 @@
 
       function applyPreferredSystemMiniTabMode() {
         var preferred = preferredSystemMiniTabMode();
-        setSystemMiniTabMode(preferred);
-        // Never auto-switch users from "All" to "Other" during background refresh.
-        if (!state.activeMiniTab || (state.activeMiniTab === 'other' && preferred === 'all')) {
+        var hasSavedSystemMode = !!loadStorage(SYSTEM_MINI_TAB_MODE_KEY);
+        var hasSavedActiveMiniTab = !!loadStorage(ACTIVE_MINI_TAB_KEY);
+        if (!hasSavedSystemMode && !hasSavedActiveMiniTab) {
+          setSystemMiniTabMode(preferred);
+          setActiveMiniTab(preferred);
+          return;
+        }
+        if (!hasSavedSystemMode) {
+          if (state.activeMiniTab === 'all' || state.activeMiniTab === 'other') {
+            setSystemMiniTabMode(state.activeMiniTab);
+          } else {
+            setSystemMiniTabMode(preferred);
+          }
+        }
+        if (!hasSavedActiveMiniTab) {
           setActiveMiniTab(preferred);
         }
       }
