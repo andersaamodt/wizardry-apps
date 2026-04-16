@@ -115,9 +115,20 @@
                 <button type="button" data-organize-sort="alphabetical"><span>Alphabetical</span><span class="check" aria-hidden="true">&check;</span></button>
                 <button type="button" data-organize-sort="newest"><span>Newest</span><span class="check" aria-hidden="true">&check;</span></button>
                 <button type="button" data-organize-sort="oldest"><span>Oldest</span><span class="check" aria-hidden="true">&check;</span></button>
+                <p class="organize-title organize-heading">Git</p>
+                <button type="button" data-organize-git="all"><span>All git states</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-git="changes"><span>Changes</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-git="updates"><span>Updates</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-git="conflict"><span>Conflict</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-git="clean"><span>Clean</span><span class="check" aria-hidden="true">&check;</span></button>
+                <button type="button" data-organize-git="no-remote"><span>No Remote</span><span class="check" aria-hidden="true">&check;</span></button>
                 <label class="organize-checkbox" for="organize-builtin-first">
                   <input id="organize-builtin-first" type="checkbox" checked>
                   <span>Wizardry apps first</span>
+                </label>
+                <label class="organize-checkbox" for="organize-show-no-remote-pill">
+                  <input id="organize-show-no-remote-pill" type="checkbox" checked>
+                  <span>Show No Remote pill</span>
                 </label>
                 <label class="organize-checkbox" for="organize-use-minitabs">
                   <input id="organize-use-minitabs" type="checkbox">
@@ -390,7 +401,9 @@
       var PROJECTS_ROOT_KEY = 'wizardry.forge.projects.root';
       var ORGANIZE_SHOW_KEY = 'wizardry.forge.organize.show';
       var ORGANIZE_SORT_KEY = 'wizardry.forge.organize.sort';
+      var ORGANIZE_GIT_FILTER_KEY = 'wizardry.forge.organize.git_filter';
       var ORGANIZE_BUILTIN_FIRST_KEY = 'wizardry.forge.organize.builtin_first';
+      var SHOW_NO_REMOTE_PILL_KEY = 'wizardry.forge.show_no_remote_pill';
       var USE_MINI_TABS_KEY = 'wizardry.forge.use_mini_tabs.v1';
       var SYSTEM_MINI_TAB_MODE_KEY = 'wizardry.forge.system_mini_tab_mode.v1';
       var THEME_KEY = 'wizardry.forge.theme';
@@ -412,7 +425,9 @@
         'wizardry.forge.projects.root': 'projects_root',
         'wizardry.forge.organize.show': 'organize_show',
         'wizardry.forge.organize.sort': 'organize_sort',
+        'wizardry.forge.organize.git_filter': 'organize_git_filter',
         'wizardry.forge.organize.builtin_first': 'organize_builtin_first',
+        'wizardry.forge.show_no_remote_pill': 'show_no_remote_pill',
         'wizardry.forge.use_mini_tabs.v1': 'use_mini_tabs',
         'wizardry.forge.system_mini_tab_mode.v1': 'system_mini_tab_mode',
         'wizardry.forge.theme': 'theme',
@@ -441,7 +456,9 @@
         workspacesLoaded: false,
         organizeShow: 'both',
         organizeSort: 'alphabetical',
+        organizeGitFilter: 'all',
         organizeBuiltinFirst: true,
+        showNoRemotePill: true,
         useMiniTabs: false,
         installBeforeRunByItemKey: {},
         installBeforeRunLegacyValue: null,
@@ -1866,7 +1883,7 @@
       function filteredCatalogItems() {
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
         var items = catalogItems().filter(function (item) {
-          if (!itemMatchesActiveMiniTab(item) || !itemMatchesOrganizeShow(item)) {
+          if (!itemMatchesActiveMiniTab(item) || !itemMatchesOrganizeShow(item) || !itemMatchesGitFilter(item)) {
             return false;
           }
           if (!query) {
@@ -1915,11 +1932,40 @@
         return true;
       }
 
+      function itemMatchesGitFilter(item) {
+        var filter = normalizeOrganizeGitFilter(state.organizeGitFilter);
+        if (filter === 'all') {
+          return true;
+        }
+        if (!item || item.gitRepoPresent !== 'yes') {
+          return false;
+        }
+        var label = String(item.gitStatusLabel || '').trim().toLowerCase();
+        if (filter === 'changes') {
+          return label === 'push';
+        }
+        if (filter === 'updates') {
+          return label === 'update';
+        }
+        if (filter === 'conflict') {
+          return label === 'conflict' || label === 'sync';
+        }
+        if (filter === 'clean') {
+          return label === 'current' || label === 'clean';
+        }
+        if (filter === 'no-remote') {
+          return label === 'no remote';
+        }
+        return true;
+      }
+
       function emptyCatalogMessage() {
         var activeTabId = String(state.activeMiniTab || 'all').trim().toLowerCase() || 'all';
         var query = (els.builtinSearch.value || '').trim();
         var tabItems = catalogItems().filter(itemMatchesActiveMiniTab);
-        var showItems = tabItems.filter(itemMatchesOrganizeShow);
+        var showItems = tabItems.filter(function (item) {
+          return itemMatchesOrganizeShow(item) && itemMatchesGitFilter(item);
+        });
         if (activeTabId === 'other') {
           if (!tabItems.length) {
             return 'No uncategorized apps to show.';
@@ -2170,12 +2216,27 @@
         return String(value || '').trim();
       }
 
+      function normalizeOrganizeGitFilter(value) {
+        switch (String(value || '').trim().toLowerCase()) {
+          case 'changes':
+          case 'updates':
+          case 'conflict':
+          case 'clean':
+          case 'no-remote':
+            return String(value || '').trim().toLowerCase();
+          default:
+            return 'all';
+        }
+      }
+
       function refreshStateFromStorage() {
         state.rootHint = loadStorage(ROOT_KEY);
         state.projectsRoot = loadStorage(PROJECTS_ROOT_KEY);
         state.organizeShow = loadStorage(ORGANIZE_SHOW_KEY) || 'both';
         state.organizeSort = normalizeOrganizeSort(loadStorage(ORGANIZE_SORT_KEY) || 'alphabetical');
+        state.organizeGitFilter = normalizeOrganizeGitFilter(loadStorage(ORGANIZE_GIT_FILTER_KEY) || 'all');
         state.organizeBuiltinFirst = loadStorage(ORGANIZE_BUILTIN_FIRST_KEY) !== 'false';
+        state.showNoRemotePill = loadStorage(SHOW_NO_REMOTE_PILL_KEY) !== 'false';
         state.useMiniTabs = loadStorage(USE_MINI_TABS_KEY) === 'true';
         state.systemMiniTabMode = loadStorage(SYSTEM_MINI_TAB_MODE_KEY) === 'other' ? 'other' : 'all';
         state.activeTheme = loadStorage(THEME_KEY) || 'psionic';
@@ -3081,9 +3142,23 @@
         renderCatalogList();
       }
 
+      function setOrganizeGitFilter(mode) {
+        state.organizeGitFilter = normalizeOrganizeGitFilter(mode);
+        saveStorage(ORGANIZE_GIT_FILTER_KEY, state.organizeGitFilter);
+        renderOrganizeMenuState();
+        renderCatalogList();
+      }
+
       function setOrganizeBuiltinFirst(enabled) {
         state.organizeBuiltinFirst = !!enabled;
         saveStorage(ORGANIZE_BUILTIN_FIRST_KEY, state.organizeBuiltinFirst ? 'true' : 'false');
+        renderOrganizeMenuState();
+        renderCatalogList();
+      }
+
+      function setShowNoRemotePill(enabled) {
+        state.showNoRemotePill = !!enabled;
+        saveStorage(SHOW_NO_REMOTE_PILL_KEY, state.showNoRemotePill ? 'true' : 'false');
         renderOrganizeMenuState();
         renderCatalogList();
       }
@@ -3112,8 +3187,15 @@
           var value = btn.getAttribute('data-organize-sort');
           btn.classList.toggle('active', value === state.organizeSort);
         });
+        els.organizeMenu.querySelectorAll('button[data-organize-git]').forEach(function (btn) {
+          var value = btn.getAttribute('data-organize-git');
+          btn.classList.toggle('active', value === state.organizeGitFilter);
+        });
         if (els.organizeBuiltinFirst) {
           els.organizeBuiltinFirst.checked = !!state.organizeBuiltinFirst;
+        }
+        if (els.organizeShowNoRemotePill) {
+          els.organizeShowNoRemotePill.checked = !!state.showNoRemotePill;
         }
         if (els.organizeUseMiniTabs) {
           els.organizeUseMiniTabs.checked = !!state.useMiniTabs;
@@ -3829,6 +3911,9 @@
 
       function buildCatalogGitPill(item) {
         if (!item || item.gitRepoPresent !== 'yes' || !item.gitStatusLabel) {
+          return null;
+        }
+        if (!state.showNoRemotePill && String(item.gitStatusLabel || '').trim() === 'No Remote') {
           return null;
         }
         var displayLabel = workspaceGitCatalogLabel(item.gitStatusLabel);
@@ -6239,7 +6324,7 @@
           return 'warning';
         }
         if (raw === 'No Remote') {
-          return 'bad';
+          return 'muted';
         }
         if (raw === 'Conflict' || raw === 'Sync') {
           return 'bad';
@@ -8423,11 +8508,21 @@
           if (button) {
             setOrganizeSort(button.getAttribute('data-organize-sort'));
             closeFloatingMenus();
+            return;
+          }
+          button = event.target.closest('button[data-organize-git]');
+          if (button) {
+            setOrganizeGitFilter(button.getAttribute('data-organize-git'));
+            closeFloatingMenus();
           }
         });
 
         els.organizeBuiltinFirst.addEventListener('change', function () {
           setOrganizeBuiltinFirst(!!els.organizeBuiltinFirst.checked);
+        });
+
+        els.organizeShowNoRemotePill.addEventListener('change', function () {
+          setShowNoRemotePill(!!els.organizeShowNoRemotePill.checked);
         });
 
         els.organizeUseMiniTabs.addEventListener('change', function () {
@@ -9287,6 +9382,7 @@
         els.organizeBtn = document.getElementById('organize-btn');
         els.organizeMenu = document.getElementById('organize-menu');
         els.organizeBuiltinFirst = document.getElementById('organize-builtin-first');
+        els.organizeShowNoRemotePill = document.getElementById('organize-show-no-remote-pill');
         els.organizeUseMiniTabs = document.getElementById('organize-use-minitabs');
         els.themePickerBtn = document.getElementById('theme-picker-btn');
         els.themePickerMenu = document.getElementById('theme-picker-menu');

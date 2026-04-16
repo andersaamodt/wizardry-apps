@@ -1128,6 +1128,12 @@ input[type="checkbox"]:disabled {
   color: var(--pill-blue-fg);
 }
 
+.catalog-git-pill.muted {
+  border-color: color-mix(in srgb, var(--line) 88%, transparent);
+  background: color-mix(in srgb, var(--panel-solid, #fff) 72%, var(--bg-panel));
+  color: color-mix(in srgb, var(--muted) 82%, var(--text) 18%);
+}
+
 .list-row:last-child {
   border-bottom: 0;
 }
@@ -2215,6 +2221,12 @@ input[type="checkbox"]:disabled {
   border-color: color-mix(in srgb, #d97706 42%, var(--section-border));
   background: color-mix(in srgb, #d97706 14%, transparent);
   color: color-mix(in srgb, #d97706 84%, var(--text));
+}
+
+.workspace-summary-pill.muted {
+  border-color: color-mix(in srgb, var(--line) 88%, transparent);
+  background: color-mix(in srgb, var(--panel-solid, #fff) 72%, var(--bg-panel));
+  color: color-mix(in srgb, var(--muted) 82%, var(--text) 18%);
 }
 
 .workspace-summary-pill.bad {
