@@ -1975,42 +1975,56 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         CGFloat maxY = NSMaxY(glyphRect);
         CGFloat midX = NSMidX(glyphRect);
         CGFloat strokeWidth = 2.0;
-        CGFloat footSpan = side * 0.12;
-        CGFloat diamondHalfWidth = side * 0.11;
-        CGFloat diamondHalfHeight = side * 0.12;
-        CGFloat topY = minY + side * 0.05;
-        CGFloat sharedY = topY + diamondHalfHeight * 2.0;
-        CGFloat bottomY = topY + diamondHalfHeight * 4.0;
-        CGFloat footY = maxY - side * 0.05;
-        CGFloat upperDiamondTopY = topY;
+        CGFloat segmentDx = MAX(1.5, floor(side * 0.16 * 2.0) / 2.0);
+        CGFloat segmentDy = MAX(1.5, floor(side * 0.15 * 2.0) / 2.0);
+        CGFloat topY = floor((minY + side * 0.03) * 2.0) / 2.0;
+        CGFloat bottomFootY = topY + segmentDy * 5.0;
+        if (bottomFootY > maxY - side * 0.03) {
+            CGFloat availableHeight = (maxY - side * 0.03) - topY;
+            segmentDy = MAX(1.5, floor((availableHeight / 5.0) * 2.0) / 2.0);
+            segmentDx = MAX(1.5, floor((segmentDy * (0.16 / 0.15)) * 2.0) / 2.0);
+            bottomFootY = topY + segmentDy * 5.0;
+        }
 
-        NSPoint leftFoot = NSMakePoint(midX - footSpan, footY);
-        NSPoint rightFoot = NSMakePoint(midX + footSpan, footY);
-        NSPoint upperTop = NSMakePoint(midX, upperDiamondTopY);
-        NSPoint upperLeft = NSMakePoint(midX - diamondHalfWidth, sharedY - diamondHalfHeight * 0.5);
-        NSPoint upperRight = NSMakePoint(midX + diamondHalfWidth, sharedY - diamondHalfHeight * 0.5);
-        NSPoint sharedPoint = NSMakePoint(midX, sharedY);
-        NSPoint lowerLeft = NSMakePoint(midX - diamondHalfWidth, sharedY + diamondHalfHeight * 0.5);
-        NSPoint lowerRight = NSMakePoint(midX + diamondHalfWidth, sharedY + diamondHalfHeight * 0.5);
-        NSPoint lowerBottom = NSMakePoint(midX, bottomY);
+        NSPoint upperTop = NSMakePoint(midX, topY);
+        NSPoint upperLeft = NSMakePoint(midX - segmentDx, topY + segmentDy);
+        NSPoint upperRight = NSMakePoint(midX + segmentDx, topY + segmentDy);
+        NSPoint sharedUpperBottom = NSMakePoint(midX, topY + segmentDy * 2.0);
+        NSPoint lowerLeft = NSMakePoint(midX - segmentDx, topY + segmentDy * 3.0);
+        NSPoint lowerRight = NSMakePoint(midX + segmentDx, topY + segmentDy * 3.0);
+        NSPoint lowerBottom = NSMakePoint(midX, topY + segmentDy * 4.0);
+        NSPoint leftFoot = NSMakePoint(midX - segmentDx, bottomFootY);
+        NSPoint rightFoot = NSMakePoint(midX + segmentDx, bottomFootY);
 
-        NSBezierPath *leftStroke = [NSBezierPath bezierPath];
-        [leftStroke moveToPoint:upperTop];
-        [leftStroke lineToPoint:upperLeft];
-        [leftStroke lineToPoint:sharedPoint];
-        [leftStroke lineToPoint:lowerLeft];
-        [leftStroke lineToPoint:lowerBottom];
-        [leftStroke lineToPoint:leftFoot];
+        NSBezierPath *capLeft = [NSBezierPath bezierPath];
+        [capLeft moveToPoint:upperTop];
+        [capLeft lineToPoint:upperLeft];
 
-        NSBezierPath *rightStroke = [NSBezierPath bezierPath];
-        [rightStroke moveToPoint:upperTop];
-        [rightStroke lineToPoint:upperRight];
-        [rightStroke lineToPoint:sharedPoint];
-        [rightStroke lineToPoint:lowerRight];
-        [rightStroke lineToPoint:lowerBottom];
-        [rightStroke lineToPoint:rightFoot];
+        NSBezierPath *capRight = [NSBezierPath bezierPath];
+        [capRight moveToPoint:upperTop];
+        [capRight lineToPoint:upperRight];
 
-        NSArray<NSBezierPath *> *braidStrokes = @[leftStroke, rightStroke];
+        NSBezierPath *upperCross = [NSBezierPath bezierPath];
+        [upperCross moveToPoint:upperLeft];
+        [upperCross lineToPoint:sharedUpperBottom];
+        [upperCross lineToPoint:lowerRight];
+
+        NSBezierPath *upperCrossMirror = [NSBezierPath bezierPath];
+        [upperCrossMirror moveToPoint:upperRight];
+        [upperCrossMirror lineToPoint:sharedUpperBottom];
+        [upperCrossMirror lineToPoint:lowerLeft];
+
+        NSBezierPath *lowerCross = [NSBezierPath bezierPath];
+        [lowerCross moveToPoint:lowerLeft];
+        [lowerCross lineToPoint:lowerBottom];
+        [lowerCross lineToPoint:rightFoot];
+
+        NSBezierPath *lowerCrossMirror = [NSBezierPath bezierPath];
+        [lowerCrossMirror moveToPoint:lowerRight];
+        [lowerCrossMirror lineToPoint:lowerBottom];
+        [lowerCrossMirror lineToPoint:leftFoot];
+
+        NSArray<NSBezierPath *> *braidStrokes = @[capLeft, capRight, upperCross, upperCrossMirror, lowerCross, lowerCrossMirror];
         void (^strokeGlyphWithColor)(NSColor *) = ^(NSColor *strokeColor) {
             NSColor *resolvedStrokeColor = strokeColor ? strokeColor : [NSColor blackColor];
             [resolvedStrokeColor setStroke];
