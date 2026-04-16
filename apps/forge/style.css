@@ -1079,12 +1079,12 @@ input[type="checkbox"]:disabled {
 
 .catalog-git-pill {
   min-width: 0;
-  height: 0.62rem;
+  height: 0.72rem;
   border: 1px solid var(--pill-blue-border);
   border-radius: 999px;
   background: var(--pill-blue-soft);
   color: var(--pill-blue-fg);
-  font-size: 0.5rem;
+  font-size: 0.54rem;
   font-weight: 700;
   line-height: 1;
   margin-left: 0.1rem;
@@ -1093,7 +1093,7 @@ input[type="checkbox"]:disabled {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  padding: 0 0.14rem;
+  padding: 0 0.18rem;
   white-space: nowrap;
   text-transform: lowercase;
 }
@@ -1216,12 +1216,12 @@ input[type="checkbox"]:disabled {
 
 .context-dot {
   min-width: 0;
-  height: 0.62rem;
+  height: 0.72rem;
   border-radius: 999px;
   background: var(--pill-blue-soft);
   border: 1px solid var(--pill-blue-border);
   color: var(--pill-blue-fg);
-  font-size: 0.5rem;
+  font-size: 0.54rem;
   font-weight: 700;
   line-height: 1;
   margin-left: 0.1rem;
@@ -1229,7 +1229,7 @@ input[type="checkbox"]:disabled {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  padding: 0 0.14rem;
+  padding: 0 0.18rem;
   white-space: nowrap;
   text-transform: lowercase;
   cursor: pointer;
@@ -1818,12 +1818,12 @@ input[type="checkbox"]:disabled {
 
 .suite-dot {
   min-width: 0;
-  height: 0.62rem;
+  height: 0.72rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--pill-purple-soft) 88%, transparent);
   border: 1px solid var(--pill-purple-border);
   color: var(--pill-purple-fg);
-  font-size: 0.5rem;
+  font-size: 0.54rem;
   font-weight: 700;
   line-height: 1;
   margin-left: 0.1rem;
@@ -1831,7 +1831,7 @@ input[type="checkbox"]:disabled {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  padding: 0 0.14rem;
+  padding: 0 0.18rem;
   white-space: nowrap;
   text-transform: lowercase;
   cursor: pointer;
