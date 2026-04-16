@@ -1865,34 +1865,9 @@
 
       function filteredCatalogItems() {
         var query = (els.builtinSearch.value || '').toLowerCase().trim();
-        var showMode = state.organizeShow || 'both';
         var items = catalogItems().filter(function (item) {
-          if (state.useMiniTabs) {
-            if (state.activeMiniTab === 'other' && itemAssignedMiniTab(item.key)) {
-              return false;
-            }
-            if (state.activeMiniTab && state.activeMiniTab !== 'all' && state.activeMiniTab !== 'other' && itemAssignedMiniTab(item.key) !== state.activeMiniTab) {
-              return false;
-            }
-          }
-          if (showMode === 'builtin' && item.kind !== 'builtin') {
+          if (!itemMatchesActiveMiniTab(item) || !itemMatchesOrganizeShow(item)) {
             return false;
-          }
-          if (showMode === 'workspace' && item.listGroup !== 'user') {
-            return false;
-          }
-          if (showMode === 'installed' || showMode === 'uninstalled') {
-            if (item.kind !== 'builtin') {
-              return false;
-            }
-            var selectedApp = appById(item.id);
-            var isInstalled = !!(selectedApp && selectedApp.installedOnHost);
-            if (showMode === 'installed' && !isInstalled) {
-              return false;
-            }
-            if (showMode === 'uninstalled' && isInstalled) {
-              return false;
-            }
           }
           if (!query) {
             return true;
@@ -1901,6 +1876,68 @@
         });
         items.sort(compareCatalogItems);
         return items;
+      }
+
+      function itemMatchesActiveMiniTab(item) {
+        if (!state.useMiniTabs) {
+          return true;
+        }
+        if (state.activeMiniTab === 'other' && itemAssignedMiniTab(item.key)) {
+          return false;
+        }
+        if (state.activeMiniTab && state.activeMiniTab !== 'all' && state.activeMiniTab !== 'other' && itemAssignedMiniTab(item.key) !== state.activeMiniTab) {
+          return false;
+        }
+        return true;
+      }
+
+      function itemMatchesOrganizeShow(item) {
+        var showMode = state.organizeShow || 'both';
+        if (showMode === 'builtin' && item.kind !== 'builtin') {
+          return false;
+        }
+        if (showMode === 'workspace' && item.listGroup !== 'user') {
+          return false;
+        }
+        if (showMode === 'installed' || showMode === 'uninstalled') {
+          if (item.kind !== 'builtin') {
+            return false;
+          }
+          var selectedApp = appById(item.id);
+          var isInstalled = !!(selectedApp && selectedApp.installedOnHost);
+          if (showMode === 'installed' && !isInstalled) {
+            return false;
+          }
+          if (showMode === 'uninstalled' && isInstalled) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function emptyCatalogMessage() {
+        var activeTabId = String(state.activeMiniTab || 'all').trim().toLowerCase() || 'all';
+        var query = (els.builtinSearch.value || '').trim();
+        var tabItems = catalogItems().filter(itemMatchesActiveMiniTab);
+        var showItems = tabItems.filter(itemMatchesOrganizeShow);
+        if (activeTabId === 'other') {
+          if (!tabItems.length) {
+            return 'No uncategorized apps to show.';
+          }
+          return 'No uncategorized apps match current filters.';
+        }
+        if (activeTabId !== 'all') {
+          var activeTab = miniTabById(activeTabId);
+          var label = activeTab && activeTab.label ? activeTab.label : 'this tab';
+          if (!tabItems.length) {
+            return 'No apps assigned to ' + label + '.';
+          }
+          return 'No apps in ' + label + ' match current filters.';
+        }
+        if (!showItems.length && !query) {
+          return 'No apps to show.';
+        }
+        return 'No apps match current filters.';
       }
 
       function builtInListGroup(appId) {
@@ -3646,9 +3683,7 @@
         if (!visibleItems.length) {
           var empty = document.createElement('p');
           empty.className = 'empty';
-          empty.textContent = state.activeMiniTab === 'all'
-            ? 'No apps match current filters.'
-            : 'No apps in this tab match current filters.';
+          empty.textContent = emptyCatalogMessage();
           els.catalogList.appendChild(empty);
           syncHostDropZones();
           return;
