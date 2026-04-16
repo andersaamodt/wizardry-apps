@@ -3811,6 +3811,8 @@
       function workspaceGitCatalogLabel(label) {
         var raw = String(label || '').trim();
         switch (raw) {
+          case 'No Remote':
+            return 'no remote';
           case 'Push':
             return 'changes';
           case 'Current':
@@ -3827,9 +3829,6 @@
 
       function buildCatalogGitPill(item) {
         if (!item || item.gitRepoPresent !== 'yes' || !item.gitStatusLabel) {
-          return null;
-        }
-        if (item.gitStatusReason === 'origin is not configured for this repo yet.') {
           return null;
         }
         var displayLabel = workspaceGitCatalogLabel(item.gitStatusLabel);
@@ -6218,6 +6217,8 @@
       function workspaceGitDisplayLabel(label) {
         var raw = String(label || '').trim();
         switch (raw) {
+          case 'No Remote':
+            return 'No Remote';
           case 'Push':
             return 'Changes';
           case 'Current':
@@ -6236,6 +6237,9 @@
         var raw = String(label || '').trim();
         if (raw === 'Push') {
           return 'warning';
+        }
+        if (raw === 'No Remote') {
+          return 'bad';
         }
         if (raw === 'Conflict' || raw === 'Sync') {
           return 'bad';

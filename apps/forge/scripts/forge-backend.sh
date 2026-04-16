@@ -2633,7 +2633,7 @@ workspace_git_fetch_origin() {
 workspace_git_sync_label() {
   pill_state=${1-}
   case "$pill_state" in
-    check_git) printf '%s\n' "Attention" ;;
+    check_git) printf '%s\n' "No Remote" ;;
     sync) printf '%s\n' "Sync" ;;
     push) printf '%s\n' "Push" ;;
     update) printf '%s\n' "Update" ;;
@@ -2890,7 +2890,7 @@ workspace_git_collect_status() {
   fi
 
   if [ -n "$git_last_fetch_error" ] || { [ -z "$git_remote_origin" ] && [ -n "$git_repo_root" ]; }; then
-    git_status_label='Attention'
+    git_status_label='No Remote'
     git_status_tone='bad'
     if [ -n "$git_last_fetch_error" ]; then
       git_status_reason=$git_last_fetch_error
