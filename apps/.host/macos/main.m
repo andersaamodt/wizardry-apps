@@ -2726,7 +2726,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     self.enableForgeAppMenu = (isForgeApp || isArtificerApp);
     self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp;
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
-    self.bootSplashLogoSize = isForgeApp ? 156.0 : (isArtificerApp ? 176.0 : 192.0);
+    self.bootSplashLogoSize = isForgeApp ? 156.0 : (isArtificerApp ? 96.0 : 192.0);
     if (self.enableNativeViewMenu) {
         [self loadPrioritiesBootPalette];
     } else if (isArtificerApp) {
