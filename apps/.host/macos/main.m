@@ -2715,7 +2715,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
-    BOOL prefersHeaderDragHoles = ([appSlug isEqualToString:@"headquarters"] || [appSlug isEqualToString:@"priorities"] || [appSlug isEqualToString:@"serenity"] || [appSlug isEqualToString:@"boycott"]);
+    BOOL prefersHeaderDragHoles = ([appSlug isEqualToString:@"headquarters"] || [appSlug isEqualToString:@"priorities"] || [appSlug isEqualToString:@"serenity"] || [appSlug isEqualToString:@"boycott"] || [appSlug isEqualToString:@"artificer"]);
     BOOL prefersLeftOnlyHeaderDragArea = [appSlug isEqualToString:@"boycott"];
     BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
@@ -3029,6 +3029,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             self.prioritiesTitleHoleLeftWidth = 420.0;
             self.prioritiesTitleHoleRightWidth = 24.0;
             self.prioritiesRightControlsReservedWidth = 320.0;
+        } else if ([appSlug isEqualToString:@"artificer"]) {
+            self.prioritiesTitleHoleLeftWidth = 176.0;
+            self.prioritiesTitleHoleRightWidth = 128.0;
+            self.prioritiesRightControlsReservedWidth = 176.0;
         } else {
             self.prioritiesTitleHoleLeftWidth = 36.0;
             self.prioritiesTitleHoleRightWidth = 10.0;
