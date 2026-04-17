@@ -1977,7 +1977,8 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         CGFloat strokeWidth = 2.0;
         CGFloat segmentDx = MAX(1.5, floor(side * 0.17 * 2.0) / 2.0);
         CGFloat segmentDy = MAX(1.5, floor(side * 0.16 * 2.0) / 2.0);
-        CGFloat topY = ceil((maxY - side * 0.02) * 2.0) / 2.0;
+        CGFloat topPadding = MAX(2.0, floor(side * 0.14 * 2.0) / 2.0);
+        CGFloat topY = ceil((maxY - topPadding) * 2.0) / 2.0;
         CGFloat bottomFootY = topY - segmentDy * 5.0;
         if (bottomFootY < minY + side * 0.02) {
             CGFloat availableHeight = topY - (minY + side * 0.02);
