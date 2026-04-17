@@ -535,9 +535,7 @@
         footerStatusMessage: ''
       };
 
-      var CATALOG_RUN_PENDING_PILL_SHIFT_MS = 180;
       var els = {};
-      var catalogRunPendingSpinnerTimers = new WeakMap();
 
       function inferAppDir() {
         var p = decodeURIComponent(window.location.pathname || '');
@@ -3444,70 +3442,11 @@
         if (!els.catalogList) {
           return;
         }
-        function clearRunPendingSpinnerTimer(row) {
+        function setRowRunPending(row, pending) {
           if (!row) {
             return;
           }
-          var timer = catalogRunPendingSpinnerTimers.get(row);
-          if (timer) {
-            window.clearTimeout(timer);
-            catalogRunPendingSpinnerTimers.delete(row);
-          }
-        }
-        function setRowRunPending(row, pending, options) {
-          if (!row) {
-            return;
-          }
-          clearRunPendingSpinnerTimer(row);
-          if (!pending) {
-            row.classList.remove('run-pending-spinner-visible');
-            row.classList.remove('run-pending');
-            return;
-          }
-          row.classList.add('run-pending');
-          if (options && options.deferSpinnerVisibility) {
-            row.classList.remove('run-pending-spinner-visible');
-            catalogRunPendingSpinnerTimers.set(row, window.setTimeout(function () {
-              catalogRunPendingSpinnerTimers.delete(row);
-              if (row.classList.contains('run-pending')) {
-                row.classList.add('run-pending-spinner-visible');
-              }
-            }, CATALOG_RUN_PENDING_PILL_SHIFT_MS));
-            return;
-          }
-          row.classList.add('run-pending-spinner-visible');
-        }
-        function animateGitPillShift(row, mutate) {
-          if (!row || typeof mutate !== 'function') {
-            return;
-          }
-          var pill = row.querySelector('.catalog-git-pill');
-          var first = pill ? pill.getBoundingClientRect() : null;
-          mutate();
-          if (!first || !pill) {
-            return;
-          }
-          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            return;
-          }
-          requestAnimationFrame(function () {
-            var nextPill = row.querySelector('.catalog-git-pill');
-            if (!nextPill) {
-              return;
-            }
-            var last = nextPill.getBoundingClientRect();
-            var dx = first.left - last.left;
-            if (Math.abs(dx) < 0.5) {
-              return;
-            }
-            nextPill.animate([
-              { transform: 'translateX(' + dx + 'px)' },
-              { transform: 'translateX(0)' }
-            ], {
-              duration: CATALOG_RUN_PENDING_PILL_SHIFT_MS,
-              easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)'
-            });
-          });
+          row.classList.toggle('run-pending', !!pending);
         }
         var previous = String(previousKey || '').trim();
         var next = String(nextKey || state.catalogRunPendingKey || '').trim();
@@ -3515,18 +3454,13 @@
           if (previous && previous !== next) {
             var previousRow = state.catalogRowCache[previous] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + previous.replace(/'/g, "\\'") + "']");
             if (previousRow) {
-              animateGitPillShift(previousRow, function () {
-                setRowRunPending(previousRow, false);
-              });
+              setRowRunPending(previousRow, false);
             }
           }
           if (next) {
             var nextRow = state.catalogRowCache[next] || els.catalogList.querySelector(".catalog-row[data-catalog-item-key='" + next.replace(/'/g, "\\'") + "']");
             if (nextRow && !nextRow.classList.contains('catalog-row-filtered')) {
-              var deferSpinnerVisibility = !!nextRow.querySelector('.catalog-git-pill');
-              animateGitPillShift(nextRow, function () {
-                setRowRunPending(nextRow, true, { deferSpinnerVisibility: deferSpinnerVisibility });
-              });
+              setRowRunPending(nextRow, true);
             }
           }
           return;
@@ -3902,9 +3836,6 @@
         row.classList.toggle('active', state.selectedCatalog === item.key);
         row.classList.toggle('menu-open', state.activeCatalogRowMenuKey === item.key);
         row.classList.toggle('run-pending', state.catalogRunPendingKey === item.key);
-        if (state.catalogRunPendingKey !== item.key) {
-          row.classList.remove('run-pending-spinner-visible');
-        }
         row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
         row.classList.remove('catalog-row-filtered');
         row.removeAttribute('aria-hidden');
@@ -4120,13 +4051,13 @@
           }
           var canRowRun = hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item);
           if (canRowRun) {
+            var rowRunSlot = document.createElement('span');
+            rowRunSlot.className = 'row-run-slot';
+
             var rowRunSpinner = document.createElement('span');
             rowRunSpinner.className = 'row-run-spinner status-inline-spinner';
             rowRunSpinner.setAttribute('aria-hidden', 'true');
-            rowActions.appendChild(rowRunSpinner);
-            if (state.catalogRunPendingKey === item.key) {
-              row.classList.add('run-pending-spinner-visible');
-            }
+            rowRunSlot.appendChild(rowRunSpinner);
 
             var play = document.createElement('button');
             play.type = 'button';
@@ -4154,7 +4085,8 @@
               }
               renderSelectedBuiltIn();
             });
-            rowActions.appendChild(play);
+            rowRunSlot.appendChild(play);
+            rowActions.appendChild(rowRunSlot);
           }
 
           var rowMenuBtn = document.createElement('button');
