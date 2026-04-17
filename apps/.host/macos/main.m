@@ -1975,27 +1975,23 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         CGFloat maxY = NSMaxY(glyphRect);
         CGFloat midX = NSMidX(glyphRect);
         CGFloat strokeWidth = 2.0;
-        CGFloat segmentDx = MAX(1.5, floor(side * 0.17 * 2.0) / 2.0);
-        CGFloat segmentDy = MAX(1.5, floor(side * 0.16 * 2.0) / 2.0);
         CGFloat topPadding = MAX(2.0, floor(side * 0.14 * 2.0) / 2.0);
+        CGFloat bottomPadding = MAX(0.5, floor(side * 0.02 * 2.0) / 2.0);
         CGFloat topY = ceil((maxY - topPadding) * 2.0) / 2.0;
-        CGFloat bottomFootY = topY - segmentDy * 5.0;
-        if (bottomFootY < minY + side * 0.02) {
-            CGFloat availableHeight = topY - (minY + side * 0.02);
-            segmentDy = MAX(1.5, floor((availableHeight / 5.0) * 2.0) / 2.0);
-            segmentDx = MAX(1.5, floor((segmentDy * (0.17 / 0.16)) * 2.0) / 2.0);
-            bottomFootY = topY - segmentDy * 5.0;
-        }
+        CGFloat maxSegmentByWidth = floor(MIN(midX - minX, maxX - midX) * 2.0) / 2.0;
+        CGFloat maxSegmentByHeight = floor(((topY - (minY + bottomPadding)) / 5.0) * 2.0) / 2.0;
+        CGFloat segment = MAX(1.5, MIN(maxSegmentByWidth, maxSegmentByHeight));
+        CGFloat bottomFootY = topY - segment * 5.0;
 
         NSPoint upperTop = NSMakePoint(midX, topY);
-        NSPoint upperLeft = NSMakePoint(midX - segmentDx, topY - segmentDy);
-        NSPoint upperRight = NSMakePoint(midX + segmentDx, topY - segmentDy);
-        NSPoint sharedUpperBottom = NSMakePoint(midX, topY - segmentDy * 2.0);
-        NSPoint lowerLeft = NSMakePoint(midX - segmentDx, topY - segmentDy * 3.0);
-        NSPoint lowerRight = NSMakePoint(midX + segmentDx, topY - segmentDy * 3.0);
-        NSPoint lowerBottom = NSMakePoint(midX, topY - segmentDy * 4.0);
-        NSPoint leftFoot = NSMakePoint(midX - segmentDx, bottomFootY);
-        NSPoint rightFoot = NSMakePoint(midX + segmentDx, bottomFootY);
+        NSPoint upperLeft = NSMakePoint(midX - segment, topY - segment);
+        NSPoint upperRight = NSMakePoint(midX + segment, topY - segment);
+        NSPoint sharedUpperBottom = NSMakePoint(midX, topY - segment * 2.0);
+        NSPoint lowerLeft = NSMakePoint(midX - segment, topY - segment * 3.0);
+        NSPoint lowerRight = NSMakePoint(midX + segment, topY - segment * 3.0);
+        NSPoint lowerBottom = NSMakePoint(midX, topY - segment * 4.0);
+        NSPoint leftFoot = NSMakePoint(midX - segment, bottomFootY);
+        NSPoint rightFoot = NSMakePoint(midX + segment, bottomFootY);
 
         NSBezierPath *capTip = [NSBezierPath bezierPath];
         [capTip moveToPoint:upperLeft];
