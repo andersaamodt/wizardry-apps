@@ -140,6 +140,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 @property (assign) NSInteger statusItemRepairAttempts;
 @property (strong) NSDictionary<NSString *, NSString *> *stonrStatusSnapshot;
 @property (strong) NSDictionary<NSString *, id> *artificerStatusSnapshot;
+@property (strong) NSDictionary<NSString *, id> *matchbookStatusSnapshot;
 @property (assign) BOOL stonrStatusCommandInFlight;
 @property (strong) NSString *stonrStatusCommandLabel;
 - (BOOL)hostTestHiddenModeEnabled;
@@ -183,7 +184,9 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)quitFromStatusItem:(id)sender;
 - (BOOL)isStonrApp;
 - (BOOL)isArtificerApp;
+- (BOOL)isMatchbookApp;
 - (NSString *)stonrBackendScriptPath;
+- (NSString *)matchbookPrefsPath;
 - (NSDictionary<NSString *, NSString *> *)dictionaryFromKeyValueBlob:(NSString *)blob;
 - (int)runCommandWithLaunchPath:(NSString *)launchPath
                        arguments:(NSArray<NSString *> *)arguments
@@ -193,6 +196,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)runStonrBackendCommandAsync:(NSString *)command actionLabel:(NSString *)actionLabel;
 - (void)dispatchStonrMenuAction:(NSString *)actionName;
 - (void)dispatchArtificerMenuAction:(NSString *)actionName payload:(NSDictionary *)payload;
+- (void)dispatchMatchbookMenuAction:(NSString *)actionName;
 - (void)nativeStonrToggleRelayFromStatusItem:(id)sender;
 - (void)nativeStonrOpenStoreRootFromStatusItem:(id)sender;
 - (void)nativeStonrOpenLogFromStatusItem:(id)sender;
@@ -201,6 +205,9 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)nativeArtificerOpenRecentTasksFromStatusItem:(id)sender;
 - (void)nativeArtificerOpenTaskFromStatusItem:(id)sender;
 - (void)nativeArtificerOpenLogFromStatusItem:(id)sender;
+- (void)nativeMatchbookToggleMatchingFromStatusItem:(id)sender;
+- (void)nativeMatchbookPauseResumeFromStatusItem:(id)sender;
+- (void)nativeMatchbookOpenLogFromStatusItem:(id)sender;
 @end
 
 static NSString *const WizardryHostShowWindowNotification = @"com.wizardry.host.show-window";
@@ -231,6 +238,27 @@ static BOOL wizardryPrefBoolFromEnvFile(NSString *filePath, NSString *key, BOOL 
         return [@[@"1", @"true", @"yes", @"on"] containsObject:normalized];
     }
     return NO;
+}
+
+static NSString *wizardryMatchbookPrefsPath(void) {
+    NSString *home = NSHomeDirectory();
+    NSString *storageRoot = [home stringByAppendingPathComponent:@".matchbook"];
+    NSString *pointerPath = [storageRoot stringByAppendingPathComponent:@"settings.conf"];
+    NSString *pointerContent = [NSString stringWithContentsOfFile:pointerPath encoding:NSUTF8StringEncoding error:nil];
+    if (pointerContent.length) {
+        NSArray<NSString *> *lines = [pointerContent componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+        for (NSString *line in lines) {
+            if (![line hasPrefix:@"storageRoot="]) {
+                continue;
+            }
+            NSString *candidate = [[line substringFromIndex:[@"storageRoot=" length]] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (candidate.length) {
+                storageRoot = [candidate stringByExpandingTildeInPath];
+                break;
+            }
+        }
+    }
+    return [storageRoot stringByAppendingPathComponent:@"ui-prefs.conf"];
 }
 
 static BOOL wizardryTruthyObject(id value) {
@@ -1618,6 +1646,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return [slug isEqualToString:@"artificer"];
 }
 
+- (BOOL)isMatchbookApp {
+    NSString *slug = [[[self.appSlug ?: @"" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+    return [slug isEqualToString:@"matchbook"];
+}
+
 - (NSString *)stonrBackendScriptPath {
     if (!self.appPath.length) {
         return @"";
@@ -1627,6 +1660,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return scriptPath;
     }
     return @"";
+}
+
+- (NSString *)matchbookPrefsPath {
+    return wizardryMatchbookPrefsPath();
 }
 
 - (NSDictionary<NSString *, NSString *> *)dictionaryFromKeyValueBlob:(NSString *)blob {
@@ -1770,6 +1807,21 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }];
 }
 
+- (void)dispatchMatchbookMenuAction:(NSString *)actionName {
+    if (![self isMatchbookApp] || !self.webView || !actionName.length) {
+        return;
+    }
+    NSString *escapedAction = [[actionName stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
+        stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
+    NSString *js = [NSString stringWithFormat:@"if (window && typeof window.matchbookHostAction === 'function') { window.matchbookHostAction('%@'); }", escapedAction];
+    [self.webView evaluateJavaScript:js completionHandler:^(id result, NSError *error) {
+        (void)result;
+        if (error) {
+            NSLog(@"Matchbook host action dispatch error: %@", error);
+        }
+    }];
+}
+
 - (void)runStonrBackendCommandAsync:(NSString *)command actionLabel:(NSString *)actionLabel {
     if (![self isStonrApp] || !command.length) {
         return;
@@ -1849,7 +1901,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)syncStonrActivationPolicy {
-    if (![self isStonrApp] && ![self isArtificerApp]) {
+    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp]) {
         return;
     }
     BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
@@ -1964,6 +2016,119 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             [slash moveToPoint:NSMakePoint(NSMinX(runningRect) + 2.0, NSMinY(runningRect) + 1.0)];
             [slash lineToPoint:NSMakePoint(NSMaxX(runningRect) - 2.0, NSMaxY(runningRect) - 1.0)];
             [slash stroke];
+        }
+    } else if ([self isMatchbookApp]) {
+        NSDictionary<NSString *, id> *snapshot = [self.matchbookStatusSnapshot isKindOfClass:[NSDictionary class]] ? self.matchbookStatusSnapshot : @{};
+        NSString *snapshotStatus = [snapshot[@"status"] isKindOfClass:[NSString class]] ? snapshot[@"status"] : @"disabled";
+        NSString *resolvedState = relayState.length ? relayState : snapshotStatus;
+        NSString *normalized = [[resolvedState lowercaseString]
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        CGFloat inset = MAX(1.0, floor(side * 0.08));
+        CGFloat minX = inset;
+        CGFloat maxX = side - inset;
+        CGFloat minY = inset;
+        CGFloat maxY = side - inset;
+        CGFloat midX = floor(side * 0.5);
+        CGFloat stemWidth = MAX(1.5, floor(side * 0.14));
+        CGFloat stemBottom = minY + side * 0.10;
+        CGFloat stemTop = minY + side * 0.42;
+        CGFloat headRadius = MAX(1.5, floor(side * 0.12));
+        CGFloat flameBottomY = stemTop + headRadius * 1.1;
+        CGFloat flameTopY = maxY - side * 0.04;
+        CGFloat flameHalfWidth = MAX(2.5, floor(side * 0.18));
+        NSInteger unreadCount = 0;
+        if ([snapshot[@"unread_count"] respondsToSelector:@selector(integerValue)]) {
+            unreadCount = [snapshot[@"unread_count"] integerValue];
+        }
+
+        NSBezierPath *stem = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(floor(midX - stemWidth * 0.5), floor(stemBottom), stemWidth, floor(stemTop - stemBottom)) xRadius:stemWidth * 0.45 yRadius:stemWidth * 0.45];
+        NSBezierPath *head = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(floor(midX - headRadius), floor(stemTop - headRadius), headRadius * 2.0, headRadius * 2.0)];
+        NSBezierPath *flame = [NSBezierPath bezierPath];
+        [flame moveToPoint:NSMakePoint(midX, flameTopY)];
+        [flame curveToPoint:NSMakePoint(midX + flameHalfWidth, flameBottomY)
+              controlPoint1:NSMakePoint(midX + flameHalfWidth * 0.92, flameTopY - side * 0.07)
+              controlPoint2:NSMakePoint(midX + flameHalfWidth * 1.05, flameBottomY - side * 0.16)];
+        [flame curveToPoint:NSMakePoint(midX, flameBottomY - side * 0.03)
+              controlPoint1:NSMakePoint(midX + flameHalfWidth * 0.45, flameBottomY + side * 0.02)
+              controlPoint2:NSMakePoint(midX + flameHalfWidth * 0.12, flameBottomY + side * 0.01)];
+        [flame curveToPoint:NSMakePoint(midX - flameHalfWidth, flameBottomY)
+              controlPoint1:NSMakePoint(midX - flameHalfWidth * 0.12, flameBottomY + side * 0.01)
+              controlPoint2:NSMakePoint(midX - flameHalfWidth * 0.45, flameBottomY + side * 0.02)];
+        [flame curveToPoint:NSMakePoint(midX, flameTopY)
+              controlPoint1:NSMakePoint(midX - flameHalfWidth * 1.05, flameBottomY - side * 0.16)
+              controlPoint2:NSMakePoint(midX - flameHalfWidth * 0.92, flameTopY - side * 0.07)];
+        [flame closePath];
+
+        void (^drawBadgeCircle)(CGFloat, CGFloat, CGFloat) = ^(CGFloat cx, CGFloat cy, CGFloat radius) {
+            NSBezierPath *badge = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(cx - radius, cy - radius, radius * 2.0, radius * 2.0)];
+            [[NSColor blackColor] setFill];
+            [badge fill];
+        };
+
+        NSString *activeState = normalized.length ? normalized : @"disabled";
+        BOOL lit = [@[@"active", @"running", @"matched"] containsObject:activeState];
+        BOOL paused = [activeState isEqualToString:@"paused"];
+        BOOL errored = [activeState isEqualToString:@"error"];
+        BOOL disabled = [@[@"disabled", @"off", @"stopped"] containsObject:activeState];
+
+        [[NSColor blackColor] setStroke];
+        [[NSColor blackColor] setFill];
+        [stem fill];
+        [head fill];
+
+        if (lit || paused || errored || busy) {
+            [flame fill];
+        } else {
+            [flame setLineWidth:MAX(1.2, floor(side * 0.10))];
+            [flame stroke];
+        }
+
+        if (disabled) {
+            NSBezierPath *slash = [NSBezierPath bezierPath];
+            [slash setLineWidth:MAX(1.2, floor(side * 0.09))];
+            [slash moveToPoint:NSMakePoint(minX + side * 0.10, maxY - side * 0.08)];
+            [slash lineToPoint:NSMakePoint(maxX - side * 0.10, minY + side * 0.08)];
+            [slash stroke];
+        }
+
+        if (busy) {
+            [[NSColor whiteColor] setFill];
+            CGFloat dotSide = MAX(1.8, floor(side * 0.14));
+            NSRect dotRect = NSMakeRect(floor(midX - dotSide * 0.5), floor(flameBottomY + dotSide * 0.1), dotSide, dotSide);
+            [[NSBezierPath bezierPathWithOvalInRect:dotRect] fill];
+        }
+
+        if (paused || errored) {
+            CGFloat badgeRadius = MAX(2.8, floor(side * 0.18));
+            CGFloat badgeX = maxX - badgeRadius;
+            CGFloat badgeY = maxY - badgeRadius * 0.85;
+            drawBadgeCircle(badgeX, badgeY, badgeRadius);
+            [[NSGraphicsContext currentContext] saveGraphicsState];
+            [[NSColor clearColor] setFill];
+            [[NSColor clearColor] setStroke];
+            [NSGraphicsContext currentContext].compositingOperation = NSCompositingOperationClear;
+            if (paused) {
+                CGFloat barWidth = MAX(1.2, floor(side * 0.07));
+                CGFloat barHeight = badgeRadius * 1.2;
+                CGFloat gap = MAX(1.0, floor(side * 0.05));
+                NSRect leftBar = NSMakeRect(floor(badgeX - gap - barWidth), floor(badgeY - barHeight * 0.5), barWidth, barHeight);
+                NSRect rightBar = NSMakeRect(floor(badgeX + gap), floor(badgeY - barHeight * 0.5), barWidth, barHeight);
+                [[NSBezierPath bezierPathWithRoundedRect:leftBar xRadius:barWidth * 0.45 yRadius:barWidth * 0.45] fill];
+                [[NSBezierPath bezierPathWithRoundedRect:rightBar xRadius:barWidth * 0.45 yRadius:barWidth * 0.45] fill];
+            } else {
+                NSBezierPath *mark = [NSBezierPath bezierPath];
+                [mark setLineWidth:MAX(1.2, floor(side * 0.08))];
+                [mark moveToPoint:NSMakePoint(badgeX, badgeY - badgeRadius * 0.40)];
+                [mark lineToPoint:NSMakePoint(badgeX, badgeY + badgeRadius * 0.32)];
+                [mark stroke];
+                [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(floor(badgeX - 0.8), floor(badgeY - badgeRadius * 0.72), 1.6, 1.6)] fill];
+            }
+            [[NSGraphicsContext currentContext] restoreGraphicsState];
+        } else if (unreadCount > 0) {
+            CGFloat badgeRadius = MAX(2.2, floor(side * 0.15));
+            CGFloat badgeX = maxX - badgeRadius * 0.8;
+            CGFloat badgeY = minY + badgeRadius * 0.95;
+            drawBadgeCircle(badgeX, badgeY, badgeRadius);
         }
     } else if ([self isArtificerApp]) {
         NSString *normalized = [[relayState ?: @"idle" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -2142,6 +2307,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     NSDictionary<NSString *, NSString *> *relayStatus = @{};
     NSDictionary<NSString *, id> *artificerStatus = @{};
+    NSDictionary<NSString *, id> *matchbookStatus = @{};
     if ([self isStonrApp]) {
         relayStatus = [self stonrRelayStatusSnapshot];
         if (relayStatus.count) {
@@ -2152,6 +2318,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     } else if ([self isArtificerApp]) {
         if ([self.artificerStatusSnapshot isKindOfClass:[NSDictionary class]]) {
             artificerStatus = self.artificerStatusSnapshot;
+        }
+    } else if ([self isMatchbookApp]) {
+        if ([self.matchbookStatusSnapshot isKindOfClass:[NSDictionary class]]) {
+            matchbookStatus = self.matchbookStatusSnapshot;
         }
     }
     NSStatusBarButton *button = self.statusItem.button;
@@ -2166,16 +2336,28 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             button.title = @"";
             button.image = [self renderedStatusItemImageForRelayState:agentState busy:NO];
             button.imagePosition = NSImageOnly;
+        } else if ([self isMatchbookApp]) {
+            NSString *matchState = [matchbookStatus[@"status"] isKindOfClass:[NSString class]] ? matchbookStatus[@"status"] : @"disabled";
+            NSInteger unreadCount = [matchbookStatus[@"unread_count"] respondsToSelector:@selector(integerValue)] ? [matchbookStatus[@"unread_count"] integerValue] : 0;
+            NSString *label = [matchbookStatus[@"label"] isKindOfClass:[NSString class]] ? matchbookStatus[@"label"] : @"";
+            button.title = @"";
+            button.image = [self renderedStatusItemImageForRelayState:matchState busy:NO];
+            button.imagePosition = NSImageOnly;
+            if (unreadCount > 0) {
+                button.toolTip = [NSString stringWithFormat:@"Matchbook • %@ • %ld unread%@", matchState.length ? matchState : @"idle", (long)unreadCount, label.length ? [NSString stringWithFormat:@" • %@", label] : @""];
+            } else {
+                button.toolTip = [NSString stringWithFormat:@"Matchbook • %@%@", matchState.length ? matchState : @"idle", label.length ? [NSString stringWithFormat:@" • %@", label] : @""];
+            }
         } else {
             button.image = nil;
             button.title = @"St";
             button.imagePosition = NSNoImage;
+            button.toolTip = self.window ? self.window.title : @"Wizardry";
         }
-        button.toolTip = self.window ? self.window.title : @"Wizardry";
     } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        self.statusItem.title = [self isStonrApp] ? @"" : @"St";
+        self.statusItem.title = ([self isStonrApp] || [self isArtificerApp] || [self isMatchbookApp]) ? @"" : @"St";
 #pragma clang diagnostic pop
     }
 
@@ -2298,9 +2480,58 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [menu addItem:openLogItem];
 
         [menu addItem:[NSMenuItem separatorItem]];
+    } else if ([self isMatchbookApp]) {
+        NSString *matchState = [matchbookStatus[@"status"] isKindOfClass:[NSString class]] ? matchbookStatus[@"status"] : @"disabled";
+        NSString *statusLabel = [matchState.capitalizedString stringByReplacingOccurrencesOfString:@"-" withString:@" "];
+        BOOL enabled = wizardryTruthyObject(matchbookStatus[@"enabled"]);
+        BOOL paused = wizardryTruthyObject(matchbookStatus[@"paused"]);
+        NSInteger unreadCount = [matchbookStatus[@"unread_count"] respondsToSelector:@selector(integerValue)] ? [matchbookStatus[@"unread_count"] integerValue] : 0;
+        NSString *logPath = [matchbookStatus[@"log_path"] isKindOfClass:[NSString class]] ? matchbookStatus[@"log_path"] : @"";
+
+        NSMenuItem *openMatchbookItem = [[NSMenuItem alloc] initWithTitle:@"Open Matchbook"
+                                                                    action:@selector(openMainWindowFromStatusItem:)
+                                                             keyEquivalent:@""];
+        [openMatchbookItem setTarget:self];
+        [menu addItem:openMatchbookItem];
+
+        NSMenuItem *statusItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"Matching: %@", statusLabel.length ? statusLabel : @"Disabled"]
+                                                             action:nil
+                                                      keyEquivalent:@""];
+        statusItem.enabled = NO;
+        [menu addItem:statusItem];
+        if (unreadCount > 0) {
+            NSMenuItem *unreadItem = [[NSMenuItem alloc] initWithTitle:[NSString stringWithFormat:@"%ld unread thread%@", (long)unreadCount, unreadCount == 1 ? @"" : @"s"]
+                                                                 action:nil
+                                                          keyEquivalent:@""];
+            unreadItem.enabled = NO;
+            [menu addItem:unreadItem];
+        }
+        [menu addItem:[NSMenuItem separatorItem]];
+
+        NSMenuItem *toggleMatchingItem = [[NSMenuItem alloc] initWithTitle:(enabled ? @"Stop searching" : @"Start searching")
+                                                                     action:@selector(nativeMatchbookToggleMatchingFromStatusItem:)
+                                                              keyEquivalent:@""];
+        [toggleMatchingItem setTarget:self];
+        [menu addItem:toggleMatchingItem];
+
+        NSMenuItem *pauseResumeItem = [[NSMenuItem alloc] initWithTitle:(paused ? @"Resume searching" : @"Pause searching")
+                                                                  action:@selector(nativeMatchbookPauseResumeFromStatusItem:)
+                                                           keyEquivalent:@""];
+        [pauseResumeItem setTarget:self];
+        pauseResumeItem.enabled = enabled;
+        [menu addItem:pauseResumeItem];
+
+        NSMenuItem *openLogItem = [[NSMenuItem alloc] initWithTitle:@"Open log"
+                                                              action:@selector(nativeMatchbookOpenLogFromStatusItem:)
+                                                       keyEquivalent:@""];
+        [openLogItem setTarget:self];
+        openLogItem.enabled = logPath.length > 0;
+        [menu addItem:openLogItem];
+
+        [menu addItem:[NSMenuItem separatorItem]];
     }
 
-    if (![self isStonrApp] && ![self isArtificerApp]) {
+    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp]) {
         NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:([self.window isVisible] ? @"Hide Window" : @"Show Window")
                                                             action:@selector(toggleMainWindowFromStatusItem:)
                                                      keyEquivalent:@""];
@@ -2378,6 +2609,33 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     logPath = [[logPath stringByExpandingTildeInPath] stringByStandardizingPath];
     if (!logPath.length) {
         [self showMainWindow];
+        return;
+    }
+    if (![[NSFileManager defaultManager] fileExistsAtPath:logPath]) {
+        [[NSFileManager defaultManager] createFileAtPath:logPath contents:[NSData data] attributes:nil];
+    }
+    NSURL *logURL = [NSURL fileURLWithPath:logPath isDirectory:NO];
+    [[NSWorkspace sharedWorkspace] openURL:logURL];
+}
+
+- (void)nativeMatchbookToggleMatchingFromStatusItem:(id)sender {
+    (void)sender;
+    [self dispatchMatchbookMenuAction:@"toggle-search"];
+}
+
+- (void)nativeMatchbookPauseResumeFromStatusItem:(id)sender {
+    (void)sender;
+    [self dispatchMatchbookMenuAction:@"pause-resume"];
+}
+
+- (void)nativeMatchbookOpenLogFromStatusItem:(id)sender {
+    (void)sender;
+    NSDictionary<NSString *, id> *snapshot = [self.matchbookStatusSnapshot isKindOfClass:[NSDictionary class]] ? self.matchbookStatusSnapshot : @{};
+    NSString *logPath = [snapshot[@"log_path"] isKindOfClass:[NSString class]] ? snapshot[@"log_path"] : @"";
+    logPath = [[logPath stringByExpandingTildeInPath] stringByStandardizingPath];
+    if (!logPath.length) {
+        [self showMainWindow];
+        [self dispatchMatchbookMenuAction:@"open-log"];
         return;
     }
     if (![[NSFileManager defaultManager] fileExistsAtPath:logPath]) {
@@ -2699,6 +2957,21 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
         NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
         NSString *prefsPath = [[configRoot stringByAppendingPathComponent:@"artificer"] stringByAppendingPathComponent:@"ui-prefs.env"];
+        BOOL foundBackground = NO;
+        BOOL foundStatusItem = NO;
+        BOOL keepRunning = wizardryPrefBoolFromEnvFile(prefsPath, @"background_mode", &foundBackground);
+        BOOL showStatusItem = wizardryPrefBoolFromEnvFile(prefsPath, @"menu_bar_icon", &foundStatusItem);
+        if (foundBackground) {
+            self.keepRunningInBackground = keepRunning;
+        }
+        if (foundStatusItem) {
+            self.showStatusItem = showStatusItem;
+        }
+        if (!foundBackground && foundStatusItem && showStatusItem) {
+            self.keepRunningInBackground = YES;
+        }
+    } else if ([appSlug isEqualToString:@"matchbook"]) {
+        NSString *prefsPath = [self matchbookPrefsPath];
         BOOL foundBackground = NO;
         BOOL foundStatusItem = NO;
         BOOL keepRunning = wizardryPrefBoolFromEnvFile(prefsPath, @"background_mode", &foundBackground);
@@ -3487,7 +3760,8 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                     }
                 }
                 NSImage *preview = [self renderedStatusItemImageForRelayState:relayState busy:NO];
-                NSString *outputPath = [self writePNGPreviewForImage:preview prefix:([self isArtificerApp] ? @"artificer-status-item" : @"wizardry-status-item") preferredPath:preferredPath];
+                NSString *previewPrefix = [self isArtificerApp] ? @"artificer-status-item" : ([self isMatchbookApp] ? @"matchbook-status-item" : @"wizardry-status-item");
+                NSString *outputPath = [self writePNGPreviewForImage:preview prefix:previewPrefix preferredPath:preferredPath];
                 if (!outputPath.length) {
                     [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"status item preview render failed" exitCode:1 error:nil];
                     return;
@@ -3510,6 +3784,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                     }
                 }
                 self.artificerStatusSnapshot = snapshot;
+                [self updateStatusItemVisibility];
+                [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
+            });
+            return;
+        }
+
+        if ([program isEqualToString:@"__wizardry_host_matchbook_status_item_sync"]) {
+            NSString *rawPayload = args.count >= 1 ? [NSString stringWithFormat:@"%@", args[0]] : @"{}";
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSDictionary *snapshot = @{};
+                NSData *payloadData = [rawPayload dataUsingEncoding:NSUTF8StringEncoding];
+                if (payloadData.length) {
+                    id parsed = [NSJSONSerialization JSONObjectWithData:payloadData options:0 error:nil];
+                    if ([parsed isKindOfClass:[NSDictionary class]]) {
+                        snapshot = parsed;
+                    }
+                }
+                self.matchbookStatusSnapshot = snapshot;
                 [self updateStatusItemVisibility];
                 [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:@"" stderr:@"" exitCode:0 error:nil];
             });
