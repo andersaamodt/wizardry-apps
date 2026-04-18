@@ -26,7 +26,7 @@ wizardry-apps follows wizardry ethos:
 - `spells/.arcana/wizardry-apps` provides the top-level app pipeline arcana and menus
 - `web` templates are migrated from `~/.wizardry/web`
 - `apps` desktop app surfaces are migrated from `~/.wizardry/apps`
-- `stock/` is a flat convenience shelf of copied reusable non-app-specific assets; canonical runtime sources remain under `apps/<slug>/assets`
+- `stock/` is a flat convenience shelf of copied and extracted reusable non-app-specific icons/SVGs; canonical runtime sources remain under `apps/<slug>/assets`
 - manifests in `config/` define production release allowlists
 - contracts in `schemas/` define RPC/events/metadata formats
 - CI workflows in `.github/workflows/` implement lint/test/build/release gates
