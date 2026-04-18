@@ -1,12 +1,12 @@
 # stock
 
-`stock/` is a convenience shelf of copied reusable Wizardry app assets.
+`stock/` is a flat convenience shelf of copied reusable non-app-specific Wizardry app assets.
 
 - It is not a runtime source of truth.
 - Canonical asset sources remain under `apps/<slug>/assets`.
-- Each app subfolder mirrors that app's `assets/` tree after the `assets/` segment.
-- `forge/` contains 67 copied assets, including UI glyphs, target icons, and platform icon packs.
-- `wizardry-desktop/` contains 62 copied assets, including app icons, splash/source masters, and platform icon packs.
+- This folder stays flat on purpose; no app-specific subfolders live here.
+- App icons and platform icon packs are intentionally excluded.
+- Current copied files are `settings-gear.svg`, `target-android.svg`, `target-hosted-web.svg`, `target-ios.svg`, `target-linux.svg`, and `terminal-icon.png`.
+- Those files currently come from `apps/forge/assets/`.
+- `wizardry-desktop` is not represented here because its repo-local assets are app-specific icon material.
 - `chatroom` is not represented here because it currently has no repo-local asset directory.
-- `icons/meta/icon-settings.conf` is intentionally excluded because it stores machine-specific absolute paths, not reusable art.
-- `Contents.json` is kept inside copied iOS icon sets because it belongs with those icon packs.
