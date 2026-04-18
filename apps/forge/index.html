@@ -506,6 +506,7 @@
         nativeHostIconDropHandledUntil: 0,
         nativeHostIconDropArmed: false,
         nativeHostIconDropFallbackTimer: 0,
+        dragCueWatchdogTimer: 0,
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
         workspaceProfileCache: {},
@@ -4856,6 +4857,27 @@
         setWorkspaceDropCue(false);
       }
 
+      function clearDragCueWatchdog() {
+        if (state.dragCueWatchdogTimer) {
+          clearTimeout(state.dragCueWatchdogTimer);
+          state.dragCueWatchdogTimer = 0;
+        }
+      }
+
+      function resetTransientDragCues() {
+        clearDragCueWatchdog();
+        clearWorkspaceDropCue();
+        setSelectedIconDropCue(false);
+      }
+
+      function armDragCueWatchdog() {
+        clearDragCueWatchdog();
+        state.dragCueWatchdogTimer = setTimeout(function () {
+          state.dragCueWatchdogTimer = 0;
+          resetTransientDragCues();
+        }, 220);
+      }
+
       function dragEventInsideElementBounds(event, el) {
         if (!event || !el || typeof el.getBoundingClientRect !== 'function') {
           return false;
@@ -5039,6 +5061,7 @@
         var hasImagePayload = !!payload.hasImagePayload;
         var paths = Array.isArray(payload.paths) ? payload.paths : [];
         if (phase === 'enter' || phase === 'update') {
+          armDragCueWatchdog();
           if (target === 'workspace' && paths.length) {
             setWorkspaceDropCue(true);
           } else if (target === 'icon' && (paths.length || hasImagePayload)) {
@@ -5049,15 +5072,13 @@
         }
         if (phase === 'leave') {
           clearNativeHostIconDropFallback();
-          clearWorkspaceDropCue();
+          resetTransientDragCues();
           setNativeHostIconDropExpected(false);
-          setSelectedIconDropCue(false);
           setHostIconDropVisualPending(selectedCatalogItem(), false);
           return;
         }
         if (phase === 'drop') {
-          clearWorkspaceDropCue();
-          setSelectedIconDropCue(false);
+          resetTransientDragCues();
           if (target === 'icon' && (paths.length || hasImagePayload)) {
             if (nativeHandled) {
               clearNativeHostIconDropFallback();
@@ -5172,6 +5193,7 @@
             }
             event.preventDefault();
             event.stopPropagation();
+            armDragCueWatchdog();
             if (eventName === 'dragenter') {
               state.workspaceDropDepth += 1;
             }
@@ -5197,7 +5219,7 @@
           var maybeFolderDrop = dragPayloadLooksLikeFolderDrop(event.dataTransfer);
           event.preventDefault();
           event.stopPropagation();
-          clearWorkspaceDropCue();
+          resetTransientDragCues();
           var droppedPath = await dropPathFromTransfer(event.dataTransfer);
           if (!maybeFolderDrop && !droppedPath) {
             return;
@@ -5213,17 +5235,21 @@
 
         ['dragend', 'drop'].forEach(function (eventName) {
           window.addEventListener(eventName, function () {
-            clearWorkspaceDropCue();
+            resetTransientDragCues();
           });
         });
 
         window.addEventListener('blur', function () {
-          clearWorkspaceDropCue();
+          resetTransientDragCues();
+        });
+
+        window.addEventListener('pagehide', function () {
+          resetTransientDragCues();
         });
 
         document.addEventListener('visibilitychange', function () {
           if (document.hidden) {
-            clearWorkspaceDropCue();
+            resetTransientDragCues();
           }
         });
       }
@@ -8878,6 +8904,7 @@
             els.selectedIconDrop.addEventListener(name, function (event) {
               event.preventDefault();
               event.stopPropagation();
+              armDragCueWatchdog();
               if (state.os === 'darwin' && bridgeAvailable()) {
                 setNativeHostIconDropExpected(true);
               }
