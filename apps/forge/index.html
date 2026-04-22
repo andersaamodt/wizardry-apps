@@ -372,9 +372,22 @@
                   <div class="target-item" data-target-groups="application,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</div>
                 </div>
                 <p class="sub target-grid-note">You can change this later.</p>
-                <button id="create-submit" type="button" class="action primary">Create Project</button>
               </div>
             </details>
+
+            <details class="pipeline-section" open>
+              <summary class="pipeline-section-head">Git</summary>
+              <div class="pipeline-section-body">
+                <label class="organize-checkbox" for="create-init-git">
+                  <input id="create-init-git" type="checkbox" checked>
+                  <span>Initialize git repo</span>
+                </label>
+              </div>
+            </details>
+
+            <div class="button-row single create-submit-row">
+              <button id="create-submit" type="button" class="action primary">Create Project</button>
+            </div>
           </div>
         </section>
       </main>
@@ -7665,6 +7678,9 @@
         if (els.starterGameSelect && els.starterGameSelect.options.length) {
           els.starterGameSelect.selectedIndex = 0;
         }
+        if (els.createInitGit) {
+          els.createInitGit.checked = true;
+        }
         state.lastProjectType = '';
         syncCreateUI();
       }
@@ -8240,6 +8256,8 @@
         }
         var targets = selectedTargets();
         var projectsRoot = state.projectsRoot;
+        var initGit = !els.createInitGit || !!els.createInitGit.checked;
+        var gitInitError = '';
 
         if (!title) {
           throw new Error('Create App requires an app title');
@@ -8267,9 +8285,16 @@
         var res = await backend('scaffold-workspace', args);
         var out = kv(res.stdout || '');
         unhideWorkspacePath(out.created || '');
+        if (initGit && out.created && starter !== 'clone') {
+          try {
+            await backend('workspace-git-init', [out.created, '', 'main'], { quiet: true });
+          } catch (err) {
+            gitInitError = String(err && err.message ? err.message : err);
+          }
+        }
 
         renderResult({
-          status: 'ok',
+          status: gitInitError ? 'warn' : 'ok',
           summary: title + ' created successfully.',
           paths: [
             out.created ? { label: 'Project folder', path: out.created, canReveal: true } : null,
@@ -8277,7 +8302,14 @@
           ].filter(Boolean),
           help: {
             title: 'Project profile',
-            body: 'Type: ' + (out.project_type || projectType) + '\nDevelopment context: ' + (out.development_context || context) + '\nTargets: ' + (out.targets || targets.join(','))
+            body: 'Type: ' + (out.project_type || projectType)
+              + '\nDevelopment context: ' + (out.development_context || context)
+              + '\nTargets: ' + (out.targets || targets.join(','))
+              + '\nGit: ' + (initGit
+                ? (starter === 'clone'
+                  ? 'Existing repo preserved'
+                  : (gitInitError ? ('Initialization failed: ' + gitInitError) : 'Initialized'))
+                : 'Not initialized')
           }
         });
 
@@ -9497,6 +9529,7 @@
         els.starterApplicationSelect = document.getElementById('starter-application-select');
         els.starterNativeDesktopSelect = document.getElementById('starter-native-desktop-select');
         els.starterGameSelect = document.getElementById('starter-game-select');
+        els.createInitGit = document.getElementById('create-init-git');
         els.createSubmit = document.getElementById('create-submit');
 
         els.targetHostedWeb = document.getElementById('target-hosted-web');
