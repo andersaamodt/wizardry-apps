@@ -1572,6 +1572,17 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.365 green:0.392 blue:0.525 alpha:1.0];
 }
 
+- (void)loadCounterspellBootPalette {
+    NSString *styleFile = [self.appPath stringByAppendingPathComponent:@"style.css"];
+    NSDictionary<NSString *, NSString *> *vars = [self readThemeVariablesFromFile:styleFile];
+    NSColor *bg = [self parseCSSColorToken:vars[@"bg"]];
+    NSColor *text = [self parseCSSColorToken:vars[@"ink"]];
+    NSColor *muted = [self parseCSSColorToken:vars[@"muted"]];
+
+    self.prioritiesBootBgColor = bg ?: [NSColor colorWithSRGBRed:0.961 green:0.937 blue:0.890 alpha:1.0];
+    self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.427 green:0.357 blue:0.314 alpha:1.0];
+}
+
 - (void)showNativeBootSplashInView:(NSView *)rootView {
     if (!rootView || self.nativeBootSplashView) {
         return;
@@ -2992,16 +3003,19 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     BOOL prefersLeftOnlyHeaderDragArea = [appSlug isEqualToString:@"boycott"];
     BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
+    BOOL isCounterspellApp = [appSlug isEqualToString:@"counterspell"];
     BOOL prefersMaxInitialFrame = [appSlug isEqualToString:@"binder"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.enableHeaderDragHoles = prefersHeaderDragHoles;
     self.prefersLeftOnlyHeaderDragArea = prefersLeftOnlyHeaderDragArea;
     self.enableForgeAppMenu = (isForgeApp || isArtificerApp);
-    self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp;
+    self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp || isCounterspellApp;
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
-    self.bootSplashLogoSize = isForgeApp ? 156.0 : (isArtificerApp ? 96.0 : 192.0);
+    self.bootSplashLogoSize = isForgeApp ? 156.0 : ((isArtificerApp || isCounterspellApp) ? 96.0 : 192.0);
     if (self.enableNativeViewMenu) {
         [self loadPrioritiesBootPalette];
+    } else if (isCounterspellApp) {
+        [self loadCounterspellBootPalette];
     } else if (isArtificerApp) {
         [self loadArtificerBootPalette];
     } else if (self.enableNativeBootSplash) {
