@@ -3160,6 +3160,14 @@
       function setShowNoRemotePill(enabled) {
         state.showNoRemotePill = !!enabled;
         saveStorage(SHOW_NO_REMOTE_PILL_KEY, state.showNoRemotePill ? 'true' : 'false');
+        if (els.catalogList) {
+          els.catalogList.querySelectorAll('.catalog-row[data-catalog-item-key]').forEach(function (row) {
+            if (row && row.parentNode) {
+              row.parentNode.removeChild(row);
+            }
+          });
+        }
+        state.catalogRowCache = {};
         renderOrganizeMenuState();
         renderCatalogList();
       }
