@@ -1084,14 +1084,14 @@ require_jq() {
 app_name_from_manifest() {
   root=$1
   slug=$2
-  sh "$root/tools/release/get-app-name.sh" "$slug"
+  env WIZARDRY_APPS_ROOT="$root" sh "$root/tools/release/get-app-name.sh" "$slug"
 }
 
 bundle_id_from_manifest() {
   root=$1
   platform=$2
   slug=$3
-  sh "$root/tools/release/get-app-bundle-id.sh" "$platform" "$slug"
+  env WIZARDRY_APPS_ROOT="$root" sh "$root/tools/release/get-app-bundle-id.sh" "$platform" "$slug"
 }
 
 ensure_macos_host() {
