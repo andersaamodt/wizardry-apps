@@ -16,6 +16,7 @@
 
 ## Startup Splash Contract
 - Desktop apps use one standard splash treatment: centered app logo on the active theme background.
+- Do not use letter tiles, monograms, or placeholder initials for desktop splashes; the splash graphic must be the app icon asset.
 - For icon-based desktop splashes, use the pipeline-generated `assets/icons/meta/territory-master.png` as the displayed asset; do not point splash at `plain-master`, and do not reuse the Dock/Finder bundle icon export just because it looks close.
 - If the splash should match modern macOS icon shape, apply the standard superellipse clip to `territory-master` in the web UI; reserve `apple-master` plus `CFBundleIconFile` for packaged bundle identity in Dock/Finder/runtime app icon paths.
 - Use the splash instead of rendering partial app chrome or placeholder runtime data before initial app state is ready.
