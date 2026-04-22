@@ -3173,14 +3173,6 @@
       function setShowNoRemotePill(enabled) {
         state.showNoRemotePill = !!enabled;
         saveStorage(SHOW_NO_REMOTE_PILL_KEY, state.showNoRemotePill ? 'true' : 'false');
-        if (els.catalogList) {
-          els.catalogList.querySelectorAll('.catalog-row[data-catalog-item-key]').forEach(function (row) {
-            if (row && row.parentNode) {
-              row.parentNode.removeChild(row);
-            }
-          });
-        }
-        state.catalogRowCache = {};
         renderOrganizeMenuState();
         renderCatalogList();
       }
@@ -3848,7 +3840,6 @@
           item.gitStatusLabel || '',
           item.gitStatusTone || '',
           item.gitStatusReason || '',
-          state.showNoRemotePill ? 'show-no-remote' : 'hide-no-remote',
           rowApp ? rowApp.distribution : '',
           rowApp && rowApp.exists === false ? 'missing' : 'present'
         ].join('|');
@@ -3899,6 +3890,7 @@
           }
         }
         syncCatalogRowThumb(row, item);
+        syncCatalogRowGitPill(row, item);
         syncCatalogRowState(row, item);
         return row;
       }
@@ -3917,6 +3909,38 @@
           return;
         }
         row.insertBefore(thumb, row.firstChild || null);
+      }
+
+      function syncCatalogRowGitPill(row, item) {
+        if (!row || !item || item.draft) {
+          return;
+        }
+        var rowActions = row.querySelector('.catalog-row-actions');
+        if (!rowActions) {
+          return;
+        }
+        var nextPill = buildCatalogGitPill(item);
+        var existingPill = rowActions.querySelector('.catalog-git-pill');
+        var runSlot = rowActions.querySelector('.row-run-slot');
+        if (!nextPill) {
+          if (existingPill && existingPill.parentNode === rowActions) {
+            existingPill.parentNode.removeChild(existingPill);
+          }
+          return;
+        }
+        if (!existingPill) {
+          rowActions.insertBefore(nextPill, runSlot || rowActions.firstChild || null);
+          return;
+        }
+        if (
+          existingPill.className === nextPill.className &&
+          existingPill.textContent === nextPill.textContent &&
+          existingPill.title === nextPill.title &&
+          existingPill.getAttribute('aria-label') === nextPill.getAttribute('aria-label')
+        ) {
+          return;
+        }
+        rowActions.replaceChild(nextPill, existingPill);
       }
 
       function workspaceGitCatalogLabel(label) {
