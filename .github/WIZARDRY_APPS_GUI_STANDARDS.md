@@ -20,6 +20,9 @@
 - For icon-based desktop splashes, use the pipeline-generated `assets/icons/meta/territory-master.png` as the displayed asset; do not point splash at `plain-master`, and do not reuse the Dock/Finder bundle icon export just because it looks close.
 - If the splash should match modern macOS icon shape, apply the standard superellipse clip to `territory-master` in the web UI; reserve `apple-master` plus `CFBundleIconFile` for packaged bundle identity in Dock/Finder/runtime app icon paths.
 - Critical splash background color and icon styling must be present inline in the HTML head so the very first paint is already correct before external stylesheets finish loading.
+- If a desktop app uses the shared macOS `wizardry-host`, and there is still a grey or wrong-colored first frame before web content paints, fix that in native host code instead of trying to paper over it in page CSS.
+- For `wizardry-host` apps, the correct first-frame path is: enable native boot splash for the app slug in `apps/.host/macos/main.m`, load the app's boot palette from its real theme/style source, set the host window/root/WebView under-page background to that same color, and let the native splash logo stay up until `__wizardry_host_boot_ready`.
+- Do not treat a web-only splash as sufficient evidence for startup correctness on macOS; if the host window appears before the page splash with the wrong color or delayed icon, the native host boot path is incomplete.
 - Preload the splash icon asset with high fetch priority when using an image-based splash so the icon does not pop in a beat after the background.
 - Use the splash instead of rendering partial app chrome or placeholder runtime data before initial app state is ready.
 - During splash, any underlying host/WebView regions must be pre-colored to the same theme surface so nothing flashes through.
@@ -105,6 +108,7 @@
 - In scrollable desktop panes, do not leave decorative gutter outside the scrollbar; if the pane is intended to reach the window edge, make the scroll track sit flush to that edge and keep content padding inside the scrolling area instead.
 - Validate GUI layout and interaction quality with Safari automations for desktop app surfaces when making GUI changes.
 - Validate startup (no flicker), focus states, hover states, and split-pane behavior in that QA pass.
+- When validating startup for macOS desktop apps, explicitly check the very first visible frame for correct host background color and immediate icon presence, not just the later web splash state.
 
 ## Command and Bridge Rules
 - Bridge calls use explicit argv arrays passed to `wizardry.exec(argv)`.
