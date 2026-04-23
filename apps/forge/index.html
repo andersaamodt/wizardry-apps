@@ -337,6 +337,7 @@
                   <label for="starter-application-select">Cross-platform starter</label>
                   <select id="starter-application-select" class="starter-select">
                     <option value="minimal">Blank application project</option>
+                    <option value="homestead">Reference: Homestead</option>
                     <option value="panel">Starter: Control panel</option>
                     <option value="sidebar">Starter: Left sidebar</option>
                     <option value="topbar">Starter: Top bar + graph</option>
@@ -978,7 +979,6 @@
         var changed = false;
         var catalogReady = state.appsLoaded && state.workspacesLoaded;
         if (catalogReady) {
-          var validItems = {};
           catalogItems().forEach(function (item) {
             var itemKeys = assignmentKeysForItem(item);
             var stableKey = stableAssignmentKeyForItem(item);
@@ -996,13 +996,10 @@
                 migrated = true;
               });
             }
-            itemKeys.forEach(function (assignmentKey) {
-              validItems[assignmentKey] = true;
-            });
           });
           Object.keys(assignments).forEach(function (itemKey) {
             var tabId = String(assignments[itemKey] || '').trim().toLowerCase();
-            if (!validItems[itemKey] || !validTabs[tabId]) {
+            if (!validTabs[tabId]) {
               delete assignments[itemKey];
               changed = true;
             }
@@ -2330,6 +2327,7 @@
           els.starterApplicationSelect.innerHTML = '';
           [
             { value: 'minimal', label: 'Blank application project' },
+            { value: 'homestead', label: 'Reference: Homestead' },
             { value: 'panel', label: 'Starter: Control panel' },
             { value: 'sidebar', label: 'Starter: Left sidebar' },
             { value: 'topbar', label: 'Starter: Top bar + graph' },

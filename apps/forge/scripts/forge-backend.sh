@@ -68,7 +68,7 @@ TASK values:
   validate-manifest | test-core | test-adapters | test-release-tools
 
 TEMPLATE values for scaffold-app:
-  minimal | panel | sidebar | topbar | dashboard | studio | clone
+  minimal | homestead | panel | sidebar | topbar | dashboard | studio | clone
 
 CONTEXT values for scaffold-workspace:
   web | native-desktop | godot
@@ -4030,7 +4030,7 @@ cmd_set_workspace_field() {
       ;;
     starter)
       case "$normalized_value" in
-        ""|import-web|import-native-desktop|import-godot|import-generic|blank|minimal|panel|sidebar|topbar|dashboard|studio|clone)
+        ""|import-web|import-native-desktop|import-godot|import-generic|blank|minimal|homestead|panel|sidebar|topbar|dashboard|studio|clone)
           ;;
         *)
           printf '%s\n' "forge-backend: unsupported starter '$normalized_value'" >&2
@@ -6932,7 +6932,7 @@ run_logged_step() {
 is_generic_web_starter() {
   starter=${1-}
   case "$starter" in
-    minimal|panel|sidebar|topbar|dashboard|studio)
+    minimal|homestead|panel|sidebar|topbar|dashboard|studio)
       return 0
       ;;
   esac
@@ -6943,7 +6943,7 @@ workspace_uses_emitted_project_license() {
   starter=${1-}
   context=${2-}
   case "$context:$starter" in
-    web:minimal|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank)
+    web:minimal|web:homestead|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank)
       return 0
       ;;
   esac
@@ -6954,12 +6954,17 @@ escape_sed_replacement() {
   printf '%s' "${1-}" | sed 's/[\/&]/\\&/g'
 }
 
-render_named_template_file() {
+render_app_template_file() {
   src_path=$1
   dest_path=$2
   app_name=$3
+  app_slug=$4
   escaped_name=$(escape_sed_replacement "$app_name")
-  sed "s/__APP_NAME__/$escaped_name/g" "$src_path" > "$dest_path"
+  escaped_slug=$(escape_sed_replacement "$app_slug")
+  sed \
+    -e "s/__APP_NAME__/$escaped_name/g" \
+    -e "s/__APP_SLUG__/$escaped_slug/g" \
+    "$src_path" > "$dest_path"
 }
 
 render_native_template_file() {
@@ -6980,6 +6985,7 @@ write_web_starter_template() {
   starter=$2
   app_dir=$3
   app_name=$4
+  app_slug=$5
 
   template_dir="$root/apps/forge/starter-templates/web/$starter"
   [ -d "$template_dir" ] || {
@@ -6988,8 +6994,45 @@ write_web_starter_template() {
   }
 
   mkdir -p "$app_dir"
-  render_named_template_file "$template_dir/index.html" "$app_dir/index.html" "$app_name"
-  render_named_template_file "$template_dir/style.css" "$app_dir/style.css" "$app_name"
+  (
+    cd "$template_dir"
+    find . -type d | while IFS= read -r rel_dir; do
+      rel_dir=$(printf '%s' "$rel_dir" | sed 's#^\./##')
+      [ -n "$rel_dir" ] || continue
+      rendered_dir=$(printf '%s' "$rel_dir" | sed "s/__APP_SLUG__/$app_slug/g")
+      mkdir -p "$app_dir/$rendered_dir"
+    done
+
+    find . -type f | while IFS= read -r rel_file; do
+      rel_file=$(printf '%s' "$rel_file" | sed 's#^\./##')
+      rendered_rel=$(printf '%s' "$rel_file" | sed "s/__APP_SLUG__/$app_slug/g")
+      src_path="$template_dir/$rel_file"
+      dest_path="$app_dir/$rendered_rel"
+      mkdir -p "$(dirname "$dest_path")"
+      case "$src_path" in
+        *.html|*.css|*.js|*.md|*.txt|*.json|*.svg|*.conf|*.sh|*.yaml|*.yml)
+          render_app_template_file "$src_path" "$dest_path" "$app_name" "$app_slug"
+          ;;
+        *)
+          cp "$src_path" "$dest_path"
+          ;;
+      esac
+      if [ -x "$src_path" ]; then
+        chmod +x "$dest_path"
+      fi
+    done
+  )
+}
+
+seed_reference_app_icon_assets() {
+  root=$1
+  app_dir=$2
+
+  source_assets="$root/apps/forge/assets"
+  [ -d "$source_assets/icons" ] || return 0
+  mkdir -p "$app_dir/assets/icons"
+  cp "$source_assets/forge-icon.png" "$app_dir/assets/forge-icon.png"
+  cp -R "$source_assets/icons/." "$app_dir/assets/icons/"
 }
 
 write_native_desktop_starter_template() {
@@ -7140,9 +7183,13 @@ cmd_scaffold_app() {
     printf '%s\n' "forge-backend: app path already exists: $app_dir" >&2
     exit 1
   }
+  if manifest_app_exists "$root" "$slug"; then
+    printf '%s\n' "forge-backend: app slug already exists in manifest: $slug" >&2
+    exit 1
+  fi
 
   case "$template" in
-    minimal|panel|sidebar|topbar|dashboard|studio) ;;
+    minimal|homestead|panel|sidebar|topbar|dashboard|studio) ;;
     clone)
       [ -n "$source_app" ] || {
         printf '%s\n' "forge-backend: scaffold-app clone requires SOURCE_APP" >&2
@@ -7165,8 +7212,11 @@ cmd_scaffold_app() {
   mkdir -p "$app_dir"
 
   case "$template" in
-    minimal|panel|sidebar|topbar|dashboard|studio)
-      write_web_starter_template "$root" "$template" "$app_dir" "$app_name"
+    minimal|homestead|panel|sidebar|topbar|dashboard|studio)
+      write_web_starter_template "$root" "$template" "$app_dir" "$app_name" "$slug"
+      if [ "$template" = "homestead" ]; then
+        seed_reference_app_icon_assets "$root" "$app_dir"
+      fi
       ;;
     clone)
       rm -rf "$app_dir"
@@ -7227,7 +7277,7 @@ cmd_scaffold_workspace() {
       development_context=web
 
       case "$starter" in
-        minimal|panel|sidebar|topbar|dashboard|studio|clone) ;;
+        minimal|homestead|panel|sidebar|topbar|dashboard|studio|clone) ;;
         *)
           printf '%s\n' "forge-backend: scaffold-workspace unknown web starter: $starter" >&2
           exit 2
@@ -7238,8 +7288,11 @@ cmd_scaffold_workspace() {
       mkdir -p "$app_dir"
 
       case "$starter" in
-        minimal|panel|sidebar|topbar|dashboard|studio)
-          write_web_starter_template "$root" "$starter" "$app_dir" "$app_name"
+        minimal|homestead|panel|sidebar|topbar|dashboard|studio)
+          write_web_starter_template "$root" "$starter" "$app_dir" "$app_name" "$slug"
+          if [ "$starter" = "homestead" ]; then
+            seed_reference_app_icon_assets "$root" "$app_dir"
+          fi
           ;;
         clone)
           [ -n "$source" ] || {

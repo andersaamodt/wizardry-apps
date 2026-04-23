@@ -136,6 +136,17 @@ sh "$backend" scaffold-app "$scratch" sandbox-tool "Sandbox Tool" minimal >/tmp/
 
 jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false)' "$scratch/config/apps.manifest.json" >/dev/null
 
+homestead_slug="forge-homestead-smoke"
+sh "$backend" scaffold-app "$scratch" "$homestead_slug" "Forge Homestead Smoke" homestead >/tmp/forge-scaffold-homestead.log
+[ -f "$scratch/apps/$homestead_slug/index.html" ]
+[ -f "$scratch/apps/$homestead_slug/style.css" ]
+[ -f "$scratch/apps/$homestead_slug/script.js" ]
+[ -x "$scratch/apps/$homestead_slug/scripts/$homestead_slug-backend.sh" ]
+[ -f "$scratch/apps/$homestead_slug/assets/forge-icon.png" ]
+[ -f "$scratch/apps/$homestead_slug/assets/icons/meta/territory-master.png" ]
+grep -F "__wizardry_host_boot_ready" "$scratch/apps/$homestead_slug/script.js" >/dev/null
+grep -F "Reference shell" "$scratch/apps/$homestead_slug/index.html" >/dev/null
+
 if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ] && command -v iconutil >/dev/null 2>&1 && command -v sips >/dev/null 2>&1; then
   sandbox_assets="$scratch/apps/sandbox-tool/assets"
   sandbox_icons="$sandbox_assets/icons"
@@ -205,6 +216,13 @@ grep -F "Wizardry Addendum 1.0" "$workspaces_root/workspace-web/WIZARDRY_ADDENDU
 grep -F "Starter: Sidebar" "$workspaces_root/workspace-web/app/index.html" >/dev/null
 grep -F "Emission material notice" "$workspaces_root/workspace-web/app/index.html" >/dev/null
 
+workspace_home_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-home "Workspace Home" web homestead "hosted-web,macos,linux" "" "$workspaces_root")
+printf '%s\n' "$workspace_home_out" | grep -F "created=$workspaces_root/workspace-home" >/dev/null
+[ -f "$workspaces_root/workspace-home/app/script.js" ]
+[ -x "$workspaces_root/workspace-home/app/scripts/workspace-home-backend.sh" ]
+[ -f "$workspaces_root/workspace-home/app/assets/icons/meta/territory-master.png" ]
+grep -F "Wizardry reference shell" "$workspaces_root/workspace-home/app/index.html" >/dev/null
+
 workspace_native_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native "Workspace Native" native-desktop blank "macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_native_out" | grep -F "created=$workspaces_root/workspace-native" >/dev/null
 workspace_native_abs=$(CDPATH= cd -- "$workspaces_root/workspace-native" && pwd -P)
@@ -260,7 +278,7 @@ printf '%s\n' "$workspace_web_profile" | grep -F "git_default_branch=main" >/dev
 
 workspace_native_git_init=$(sh "$backend" workspace-git-init "$scratch" "$workspaces_root/workspace-native" "" "main")
 printf '%s\n' "$workspace_native_git_init" | grep -F "git_repo_present=yes" >/dev/null
-printf '%s\n' "$workspace_native_git_init" | grep -F "git_status_label=Attention" >/dev/null
+printf '%s\n' "$workspace_native_git_init" | grep -F "git_status_label=No Remote" >/dev/null
 
 git_remote_dir="$scratch/git-remotes"
 mkdir -p "$git_remote_dir"
@@ -299,7 +317,7 @@ printf '%s\n' "$workspace_web_pull" | grep -F "git_behind=0" >/dev/null
 
 git -C "$workspaces_root/workspace-web" remote set-url origin "$git_remote_dir/missing-origin.git"
 workspace_web_broken=$(sh "$backend" workspace-git-status "$scratch" "$workspaces_root/workspace-web")
-printf '%s\n' "$workspace_web_broken" | grep -F "git_status_label=Attention" >/dev/null
+printf '%s\n' "$workspace_web_broken" | grep -F "git_status_label=No Remote" >/dev/null
 printf '%s\n' "$workspace_web_broken" | grep -F "git_last_fetch_error=Fetch from origin failed." >/dev/null
 git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
 

@@ -13,7 +13,7 @@ It provides a native WebView UI backed by POSIX shell scripts for:
 The GUI is organized around two primary use-cases:
 - App Pipeline: select app -> compile/run -> stage/publish checks
 - Create App: project type -> starter -> platforms -> scaffold workspace
-- Cross-platform starters: minimal, control panel, left sidebar, top bar + graph, dashboard, and studio
+- Cross-platform starters: minimal, Homestead reference shell, control panel, left sidebar, top bar + graph, dashboard, and studio
 - Native desktop starter: blank IR-driven native desktop scaffold with macOS and Linux renderer outputs
 - Unified left app list: built-in and user-created apps together, with organize filters and per-row run action
 - Drag-and-drop import: drop a project folder onto Forge to register it into the left list
@@ -98,6 +98,7 @@ sh apps/forge/scripts/forge-backend.sh run-desktop /path/to/wizardry-apps artifi
 
 # Scaffold a new app and a new site
 sh apps/forge/scripts/forge-backend.sh scaffold-app /path/to/wizardry-apps my-tool "My Tool" minimal
+sh apps/forge/scripts/forge-backend.sh scaffold-app /path/to/wizardry-apps reference-tool "Reference Tool" homestead
 sh apps/forge/scripts/forge-backend.sh scaffold-workspace /path/to/wizardry-apps my-tool "My Tool" web sidebar "hosted-web,macos,linux"
 sh apps/forge/scripts/forge-backend.sh scaffold-workspace /path/to/wizardry-apps my-native-tool "My Native Tool" native-desktop blank "macos,linux"
 sh apps/forge/scripts/forge-backend.sh scaffold-site /path/to/wizardry-apps my-site demo "$HOME/sites"

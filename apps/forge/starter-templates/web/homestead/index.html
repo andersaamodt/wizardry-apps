@@ -1,0 +1,151 @@
+<!--
+  Emission material notice:
+  Repo-internal Wizardry use follows OWL 3.0.
+  Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
+
+  Canonical reference note:
+  This Homestead starter is the Wizardry reference shell for new cross-platform apps.
+  Keep it aligned with current GUI standards and startup contracts as those evolve.
+-->
+<!DOCTYPE html>
+<html lang="en" class="homestead-booting">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>__APP_NAME__</title>
+  <link rel="icon" href="assets/icons/web/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/icons/web/apple-touch-icon.png">
+  <link rel="preload" as="image" href="assets/icons/meta/territory-master.png" fetchpriority="high">
+  <style>
+    :root {
+      --boot-bg: #f3efe6;
+      --boot-ink: #201810;
+      --boot-line: rgba(66, 48, 32, 0.14);
+    }
+
+    html.homestead-booting,
+    html.homestead-booting body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--boot-bg) !important;
+      background-image: none !important;
+    }
+
+    body.homestead-booting {
+      background: var(--boot-bg) !important;
+      background-image: none !important;
+      color: var(--boot-ink);
+    }
+
+    body.homestead-booting .app-shell {
+      visibility: hidden;
+    }
+
+    .boot-splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.52), transparent 32%),
+        linear-gradient(180deg, #faf7f0 0%, var(--boot-bg) 100%);
+      z-index: 20;
+    }
+
+    .boot-mark {
+      width: clamp(92px, 14vw, 132px);
+      height: clamp(92px, 14vw, 132px);
+      display: block;
+      border-radius: 28%;
+      box-shadow: 0 20px 42px rgba(36, 24, 16, 0.12);
+    }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="homestead-booting">
+  <div id="boot-splash" class="boot-splash" aria-busy="true" aria-label="Loading __APP_NAME__">
+    <img class="boot-mark" src="assets/icons/meta/territory-master.png" alt="" aria-hidden="true">
+  </div>
+
+  <main id="app-shell" class="app-shell hidden" aria-hidden="true">
+    <aside class="left-rail" aria-label="Primary navigation">
+      <header class="left-rail-head">
+        <div>
+          <p class="rail-kicker">Wizardry Reference Shell</p>
+          <h1>__APP_NAME__</h1>
+        </div>
+      </header>
+
+      <nav id="worklist" class="worklist" role="listbox" aria-label="Views"></nav>
+
+      <footer class="left-rail-footer">
+        <button id="settings-toggle" type="button" class="icon-btn" title="Settings" aria-label="Open settings">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.77 1.22h2.46l.25 1.52c.37.1.72.24 1.03.43l1.27-.83 1.74 1.73-.84 1.28c.16.3.3.64.4 1l1.54.25v2.46l-1.53.25c-.1.36-.24.7-.42 1.02l.84 1.29-1.74 1.73-1.28-.84c-.31.18-.65.32-1.01.42l-.25 1.52H6.77l-.25-1.52a4.6 4.6 0 0 1-1.02-.42l-1.28.84-1.73-1.73.84-1.3a4.1 4.1 0 0 1-.42-1L1.4 9.23V6.77l1.52-.25c.1-.37.24-.7.42-1.02l-.84-1.29L4.23 2.5l1.28.84c.31-.18.64-.33 1.01-.43l.25-1.52Zm1.23 4.3a2.48 2.48 0 1 0 0 4.96 2.48 2.48 0 0 0 0-4.96Z"/></svg>
+        </button>
+
+        <div class="menu-anchor footer-theme-anchor">
+          <button id="theme-picker-btn" type="button" class="theme-btn" aria-haspopup="menu" aria-expanded="false" title="Theme">Theme</button>
+          <div id="theme-picker-menu" class="floating-menu hidden" role="menu" aria-label="Theme selector">
+            <div id="theme-list" class="menu-list"></div>
+          </div>
+        </div>
+      </footer>
+    </aside>
+
+    <div class="rail-divider" aria-hidden="true"></div>
+
+    <section class="main-column">
+      <header class="content-head">
+        <div class="title-group">
+          <div class="title-row">
+            <h2 id="page-title">Overview</h2>
+            <button id="path-chip" type="button" class="path-chip" title="Copy app path">apps/__APP_SLUG__</button>
+          </div>
+          <p id="page-subtitle" class="page-subtitle">Reference shell with standard Wizardry startup, left-right layout, drawer settings, and bridge-safe actions.</p>
+        </div>
+
+        <div class="head-actions">
+          <button id="action-ping" type="button" class="polite-btn">Ping Bridge</button>
+          <button id="action-timestamp" type="button" class="polite-btn secondary">Timestamp</button>
+        </div>
+      </header>
+
+      <section class="content-scroll">
+        <div id="content-area"></div>
+      </section>
+    </section>
+
+    <aside id="settings-panel" class="settings-panel hidden" aria-label="Settings panel">
+      <header class="settings-head">
+        <div>
+          <h2>Settings</h2>
+          <p class="settings-copy">This drawer models the standard Wizardry side-utility pattern.</p>
+        </div>
+        <button id="settings-close" type="button" class="icon-btn compact" aria-label="Close settings">×</button>
+      </header>
+
+      <section class="settings-card">
+        <h3>Rail Width</h3>
+        <label for="rail-width" class="field-label">Persist left rail width</label>
+        <input id="rail-width" type="range" min="220" max="380" step="10">
+      </section>
+
+      <section class="settings-card">
+        <h3>Theme</h3>
+        <p id="theme-summary" class="settings-copy">Theme selection is available in the rail footer.</p>
+      </section>
+
+      <section class="settings-card">
+        <h3>Backend</h3>
+        <pre id="prefs-status" class="mono-box">Loading backend diagnostics…</pre>
+      </section>
+    </aside>
+  </main>
+
+  <script src="../.host/shared/wizardry-bridge.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

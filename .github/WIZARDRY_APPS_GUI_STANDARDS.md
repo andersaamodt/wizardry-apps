@@ -237,6 +237,7 @@
 ## AI Agent Delivery Rules
 - Prefer surgical edits that preserve each app’s existing visual language.
 - Extend shared patterns already present in Forge/Priorities/Virtual Redditor first.
+- Treat `apps/forge/starter-templates/web/homestead/` as the canonical reference shell for new cross-platform Wizardry apps and refresh it when startup, layout, or GUI standards improve.
 - For periodic cross-app GUI drift checks, run the checklist in `/Users/andersaamodt/git/wizardry-apps/.github/GUI_AUDIT.md` and cite evidence per app.
 - When introducing a new pattern, document it in this file within the same change.
 - Avoid speculative frameworks or architectural rewrites without explicit user request.
