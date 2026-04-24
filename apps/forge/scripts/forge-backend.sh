@@ -7024,17 +7024,6 @@ write_web_starter_template() {
   )
 }
 
-seed_reference_app_icon_assets() {
-  root=$1
-  app_dir=$2
-
-  source_assets="$root/apps/forge/assets"
-  [ -d "$source_assets/icons" ] || return 0
-  mkdir -p "$app_dir/assets/icons"
-  cp "$source_assets/forge-icon.png" "$app_dir/assets/forge-icon.png"
-  cp -R "$source_assets/icons/." "$app_dir/assets/icons/"
-}
-
 write_native_desktop_starter_template() {
   root=$1
   workspace_dir=$2
@@ -7214,9 +7203,6 @@ cmd_scaffold_app() {
   case "$template" in
     minimal|reference-app|panel|sidebar|topbar|dashboard|studio)
       write_web_starter_template "$root" "$template" "$app_dir" "$app_name" "$slug"
-      if [ "$template" = "reference-app" ]; then
-        seed_reference_app_icon_assets "$root" "$app_dir"
-      fi
       ;;
     clone)
       rm -rf "$app_dir"
@@ -7290,9 +7276,6 @@ cmd_scaffold_workspace() {
       case "$starter" in
         minimal|reference-app|panel|sidebar|topbar|dashboard|studio)
           write_web_starter_template "$root" "$starter" "$app_dir" "$app_name" "$slug"
-          if [ "$starter" = "reference-app" ]; then
-            seed_reference_app_icon_assets "$root" "$app_dir"
-          fi
           ;;
         clone)
           [ -n "$source" ] || {

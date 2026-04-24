@@ -49,6 +49,8 @@ grep -F "Emission material notice" "$root/apps/forge/starter-templates/web/minim
 grep -F "Canonical reference note" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
 grep -F "__wizardry_host_boot_ready" "$root/apps/forge/starter-templates/web/reference-app/script.js" >/dev/null
 grep -F "get-ui-prefs" "$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh" >/dev/null
+grep -F "assets/forge-icon.png" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
+grep -F "Reference App" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
 grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "territory-master.png" "$root/apps/.host/macos/main.m" >/dev/null

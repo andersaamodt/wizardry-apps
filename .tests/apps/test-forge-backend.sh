@@ -143,9 +143,11 @@ sh "$backend" scaffold-app "$scratch" "$reference_app_slug" "Forge Reference App
 [ -f "$scratch/apps/$reference_app_slug/script.js" ]
 [ -x "$scratch/apps/$reference_app_slug/scripts/$reference_app_slug-backend.sh" ]
 [ -f "$scratch/apps/$reference_app_slug/assets/forge-icon.png" ]
-[ -f "$scratch/apps/$reference_app_slug/assets/icons/meta/territory-master.png" ]
+[ ! -d "$scratch/apps/$reference_app_slug/assets/icons/meta" ]
+[ ! -d "$scratch/apps/$reference_app_slug/assets/icons/web" ]
 grep -F "__wizardry_host_boot_ready" "$scratch/apps/$reference_app_slug/script.js" >/dev/null
 grep -F "Reference app" "$scratch/apps/$reference_app_slug/index.html" >/dev/null
+grep -F "assets/forge-icon.png" "$scratch/apps/$reference_app_slug/index.html" >/dev/null
 
 if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ] && command -v iconutil >/dev/null 2>&1 && command -v sips >/dev/null 2>&1; then
   sandbox_assets="$scratch/apps/sandbox-tool/assets"
@@ -220,8 +222,10 @@ workspace_home_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-home 
 printf '%s\n' "$workspace_home_out" | grep -F "created=$workspaces_root/workspace-home" >/dev/null
 [ -f "$workspaces_root/workspace-home/app/script.js" ]
 [ -x "$workspaces_root/workspace-home/app/scripts/workspace-home-backend.sh" ]
-[ -f "$workspaces_root/workspace-home/app/assets/icons/meta/territory-master.png" ]
-grep -F "Wizardry reference app" "$workspaces_root/workspace-home/app/index.html" >/dev/null
+[ -f "$workspaces_root/workspace-home/app/assets/forge-icon.png" ]
+[ ! -d "$workspaces_root/workspace-home/app/assets/icons/meta" ]
+[ ! -d "$workspaces_root/workspace-home/app/assets/icons/web" ]
+grep -F "Wizardry Reference App" "$workspaces_root/workspace-home/app/index.html" >/dev/null
 
 workspace_native_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native "Workspace Native" native-desktop blank "macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_native_out" | grep -F "created=$workspaces_root/workspace-native" >/dev/null

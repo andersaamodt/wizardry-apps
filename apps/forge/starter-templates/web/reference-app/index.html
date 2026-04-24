@@ -4,7 +4,7 @@
   Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
 
   Canonical reference note:
-  This reference app starter is the Wizardry reference app for new cross-platform apps.
+  This reference app starter is the Wizardry Reference App for new cross-platform apps.
   Keep it aligned with current GUI standards and startup contracts as those evolve.
 -->
 <!DOCTYPE html>
@@ -13,9 +13,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>__APP_NAME__</title>
-  <link rel="icon" href="assets/icons/web/favicon.png" type="image/png">
-  <link rel="apple-touch-icon" href="assets/icons/web/apple-touch-icon.png">
-  <link rel="preload" as="image" href="assets/icons/meta/territory-master.png" fetchpriority="high">
+  <link rel="icon" href="assets/forge-icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/forge-icon.png">
+  <link rel="preload" as="image" href="assets/forge-icon.png" fetchpriority="high">
   <style>
     :root {
       --boot-bg: #f3efe6;
@@ -67,14 +67,14 @@
 </head>
 <body class="reference-app-booting">
   <div id="boot-splash" class="boot-splash" aria-busy="true" aria-label="Loading __APP_NAME__">
-    <img class="boot-mark" src="assets/icons/meta/territory-master.png" alt="" aria-hidden="true">
+    <img class="boot-mark" src="assets/forge-icon.png" alt="" aria-hidden="true">
   </div>
 
   <main id="app-shell" class="app-shell hidden" aria-hidden="true">
     <aside class="left-rail" aria-label="Primary navigation">
       <header class="left-rail-head">
         <div>
-          <p class="rail-kicker">Wizardry Reference Shell</p>
+          <p class="rail-kicker">Reference App</p>
           <h1>__APP_NAME__</h1>
         </div>
       </header>
@@ -104,7 +104,7 @@
             <h2 id="page-title">Overview</h2>
             <button id="path-chip" type="button" class="path-chip" title="Copy app path">apps/__APP_SLUG__</button>
           </div>
-          <p id="page-subtitle" class="page-subtitle">Reference app with standard Wizardry startup, left-right layout, drawer settings, and bridge-safe actions.</p>
+          <p id="page-subtitle" class="page-subtitle">Reference app with standard startup, left-right layout, drawer settings, and bridge-safe actions.</p>
         </div>
 
         <div class="head-actions">
@@ -122,7 +122,7 @@
       <header class="settings-head">
         <div>
           <h2>Settings</h2>
-          <p class="settings-copy">This drawer models the standard Wizardry side-utility pattern.</p>
+          <p class="settings-copy">This drawer models the standard side-utility pattern.</p>
         </div>
         <button id="settings-close" type="button" class="icon-btn compact" aria-label="Close settings">×</button>
       </header>

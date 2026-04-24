@@ -4,7 +4,7 @@
  * Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
  *
  * Canonical reference note:
- * Treat this file as the baseline reference for new Wizardry web app shells.
+ * Treat this file as the baseline reference for new desktop reference apps.
  */
 (function () {
   'use strict';
@@ -78,7 +78,7 @@
       title: 'Overview',
       status: 'Ready',
       statusTone: 'ok',
-      subtitle: 'Reference app with standard Wizardry startup, left-right layout, drawer settings, and bridge-safe actions.',
+      subtitle: 'Reference app with standard startup, left-right layout, drawer settings, and bridge-safe actions.',
       render: function () {
         return [
           '<div class="content-grid">',
@@ -92,7 +92,7 @@
           '    </header>',
           '    <div class="section-body">',
           '      <div class="signal-grid">',
-          '        <div class="signal-item"><span class="signal-label">Splash asset</span><span class="signal-value">territory-master</span></div>',
+          '        <div class="signal-item"><span class="signal-label">Splash asset</span><span class="signal-value">app icon</span></div>',
           '        <div class="signal-item"><span class="signal-label">Ready signal</span><span class="signal-value">host boot hook</span></div>',
           '        <div class="signal-item"><span class="signal-label">Chrome reveal</span><span class="signal-value">atomic</span></div>',
           '      </div>',
@@ -102,7 +102,7 @@
           '    <header class="section-head">',
           '      <div>',
           '        <h3>Included Patterns</h3>',
-          '        <p class="section-copy">Use this starter as the baseline for new Wizardry control-plane apps.</p>',
+          '        <p class="section-copy">Use this starter as the baseline for new desktop control-plane apps.</p>',
           '      </div>',
           '    </header>',
           '    <div class="section-body">',
