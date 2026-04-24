@@ -3005,6 +3005,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
     BOOL isCounterspellApp = [appSlug isEqualToString:@"counterspell"];
     BOOL prefersMaxInitialFrame = [appSlug isEqualToString:@"binder"];
+    BOOL prefersTallerInitialFrame = [appSlug isEqualToString:@"bellheim"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.enableHeaderDragHoles = prefersHeaderDragHoles;
     self.prefersLeftOnlyHeaderDragArea = prefersLeftOnlyHeaderDragArea;
@@ -3128,6 +3129,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     // Create window
     NSRect frame = NSMakeRect(0, 0, 860, 620);
     NSSize minSize = NSMakeSize(860, 620);
+    if (prefersTallerInitialFrame) {
+        frame = NSMakeRect(0, 0, 860, 700);
+        minSize = NSMakeSize(860, 680);
+    }
     if (self.enableNativeViewMenu) {
         // Priorities starts narrow and should remain resizable down to a compact width.
         frame = NSMakeRect(0, 0, 420, 640);
