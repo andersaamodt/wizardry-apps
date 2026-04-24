@@ -78,7 +78,7 @@
       title: 'Overview',
       status: 'Ready',
       statusTone: 'ok',
-      subtitle: 'Reference shell with standard Wizardry startup, left-right layout, drawer settings, and bridge-safe actions.',
+      subtitle: 'Reference app with standard Wizardry startup, left-right layout, drawer settings, and bridge-safe actions.',
       render: function () {
         return [
           '<div class="content-grid">',
@@ -152,7 +152,7 @@
           '  <section class="section-card">',
           '    <header class="section-head"><div><h3>Operator Log</h3><p class="section-copy">Use this as the durable status surface for commands and bridge actions.</p></div></header>',
           '    <div class="section-body">',
-          '      <pre id="log-output" class="mono-box" tabindex="0" role="textbox" aria-readonly="true" aria-label="Log output">Homestead ready.</pre>',
+          '      <pre id="log-output" class="mono-box" tabindex="0" role="textbox" aria-readonly="true" aria-label="Log output">Reference app ready.</pre>',
           '    </div>',
           '  </section>',
           '</div>'
@@ -170,7 +170,7 @@
     themeMenuOpen: false,
     backendInfo: '',
     hostBootReadySent: false,
-    logLines: ['Homestead ready.']
+    logLines: ['Reference app ready.']
   };
 
   function $(id) {
@@ -412,8 +412,8 @@
   }
 
   function finishBoot() {
-    document.documentElement.classList.remove('homestead-booting');
-    document.body.classList.remove('homestead-booting');
+    document.documentElement.classList.remove('reference-app-booting');
+    document.body.classList.remove('reference-app-booting');
     document.body.classList.add('booted');
     els.bootSplash.classList.add('hidden');
     els.appShell.classList.remove('hidden');

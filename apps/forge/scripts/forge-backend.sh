@@ -68,7 +68,7 @@ TASK values:
   validate-manifest | test-core | test-adapters | test-release-tools
 
 TEMPLATE values for scaffold-app:
-  minimal | homestead | panel | sidebar | topbar | dashboard | studio | clone
+  minimal | reference-app | panel | sidebar | topbar | dashboard | studio | clone
 
 CONTEXT values for scaffold-workspace:
   web | native-desktop | godot
@@ -4030,7 +4030,7 @@ cmd_set_workspace_field() {
       ;;
     starter)
       case "$normalized_value" in
-        ""|import-web|import-native-desktop|import-godot|import-generic|blank|minimal|homestead|panel|sidebar|topbar|dashboard|studio|clone)
+        ""|import-web|import-native-desktop|import-godot|import-generic|blank|minimal|reference-app|panel|sidebar|topbar|dashboard|studio|clone)
           ;;
         *)
           printf '%s\n' "forge-backend: unsupported starter '$normalized_value'" >&2
@@ -6932,7 +6932,7 @@ run_logged_step() {
 is_generic_web_starter() {
   starter=${1-}
   case "$starter" in
-    minimal|homestead|panel|sidebar|topbar|dashboard|studio)
+    minimal|reference-app|panel|sidebar|topbar|dashboard|studio)
       return 0
       ;;
   esac
@@ -6943,7 +6943,7 @@ workspace_uses_emitted_project_license() {
   starter=${1-}
   context=${2-}
   case "$context:$starter" in
-    web:minimal|web:homestead|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank)
+    web:minimal|web:reference-app|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank)
       return 0
       ;;
   esac
@@ -7189,7 +7189,7 @@ cmd_scaffold_app() {
   fi
 
   case "$template" in
-    minimal|homestead|panel|sidebar|topbar|dashboard|studio) ;;
+    minimal|reference-app|panel|sidebar|topbar|dashboard|studio) ;;
     clone)
       [ -n "$source_app" ] || {
         printf '%s\n' "forge-backend: scaffold-app clone requires SOURCE_APP" >&2
@@ -7212,9 +7212,9 @@ cmd_scaffold_app() {
   mkdir -p "$app_dir"
 
   case "$template" in
-    minimal|homestead|panel|sidebar|topbar|dashboard|studio)
+    minimal|reference-app|panel|sidebar|topbar|dashboard|studio)
       write_web_starter_template "$root" "$template" "$app_dir" "$app_name" "$slug"
-      if [ "$template" = "homestead" ]; then
+      if [ "$template" = "reference-app" ]; then
         seed_reference_app_icon_assets "$root" "$app_dir"
       fi
       ;;
@@ -7277,7 +7277,7 @@ cmd_scaffold_workspace() {
       development_context=web
 
       case "$starter" in
-        minimal|homestead|panel|sidebar|topbar|dashboard|studio|clone) ;;
+        minimal|reference-app|panel|sidebar|topbar|dashboard|studio|clone) ;;
         *)
           printf '%s\n' "forge-backend: scaffold-workspace unknown web starter: $starter" >&2
           exit 2
@@ -7288,9 +7288,9 @@ cmd_scaffold_workspace() {
       mkdir -p "$app_dir"
 
       case "$starter" in
-        minimal|homestead|panel|sidebar|topbar|dashboard|studio)
+        minimal|reference-app|panel|sidebar|topbar|dashboard|studio)
           write_web_starter_template "$root" "$starter" "$app_dir" "$app_name" "$slug"
-          if [ "$starter" = "homestead" ]; then
+          if [ "$starter" = "reference-app" ]; then
             seed_reference_app_icon_assets "$root" "$app_dir"
           fi
           ;;

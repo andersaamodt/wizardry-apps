@@ -13,9 +13,9 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 [ -f "$root/apps/forge/starter-templates/web/topbar/index.html" ]
 [ -f "$root/apps/forge/starter-templates/web/dashboard/index.html" ]
 [ -f "$root/apps/forge/starter-templates/web/studio/index.html" ]
-[ -f "$root/apps/forge/starter-templates/web/homestead/index.html" ]
-[ -f "$root/apps/forge/starter-templates/web/homestead/script.js" ]
-[ -f "$root/apps/forge/starter-templates/web/homestead/scripts/__APP_SLUG__-backend.sh" ]
+[ -f "$root/apps/forge/starter-templates/web/reference-app/index.html" ]
+[ -f "$root/apps/forge/starter-templates/web/reference-app/script.js" ]
+[ -f "$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh" ]
 [ -f "$root/apps/forge/starter-templates/web/minimal/style.css" ]
 [ -f "$root/apps/.host/shared/wizardry-bridge.js" ]
 [ -f "$root/apps/.host/macos/main.m" ]
@@ -46,9 +46,9 @@ grep -F "version 3 or (at your option) any later version" "$root/licenses/AGPL-3
 grep -F "Remote Network Interaction" "$root/licenses/AGPL-3.0-or-later.txt" >/dev/null
 grep -F "Emission material notice" "$root/apps/forge/starter-templates/web/minimal/index.html" >/dev/null
 grep -F "Emission material notice" "$root/apps/forge/starter-templates/web/minimal/style.css" >/dev/null
-grep -F "Canonical reference note" "$root/apps/forge/starter-templates/web/homestead/index.html" >/dev/null
-grep -F "__wizardry_host_boot_ready" "$root/apps/forge/starter-templates/web/homestead/script.js" >/dev/null
-grep -F "get-ui-prefs" "$root/apps/forge/starter-templates/web/homestead/scripts/__APP_SLUG__-backend.sh" >/dev/null
+grep -F "Canonical reference note" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
+grep -F "__wizardry_host_boot_ready" "$root/apps/forge/starter-templates/web/reference-app/script.js" >/dev/null
+grep -F "get-ui-prefs" "$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh" >/dev/null
 grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "territory-master.png" "$root/apps/.host/macos/main.m" >/dev/null
@@ -68,7 +68,7 @@ grep -F ">Log<" "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="target-active-list"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="target-inactive-list"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Left sidebar' "$root/apps/forge/index.html" >/dev/null
-grep -F 'Reference: Homestead' "$root/apps/forge/index.html" >/dev/null
+grep -F 'Wizardry Desktop Reference App' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Top bar + graph' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Dashboard' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Studio' "$root/apps/forge/index.html" >/dev/null

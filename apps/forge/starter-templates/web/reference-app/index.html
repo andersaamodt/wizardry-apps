@@ -4,11 +4,11 @@
   Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
 
   Canonical reference note:
-  This Homestead starter is the Wizardry reference shell for new cross-platform apps.
+  This reference app starter is the Wizardry reference app for new cross-platform apps.
   Keep it aligned with current GUI standards and startup contracts as those evolve.
 -->
 <!DOCTYPE html>
-<html lang="en" class="homestead-booting">
+<html lang="en" class="reference-app-booting">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,8 +23,8 @@
       --boot-line: rgba(66, 48, 32, 0.14);
     }
 
-    html.homestead-booting,
-    html.homestead-booting body {
+    html.reference-app-booting,
+    html.reference-app-booting body {
       margin: 0;
       width: 100%;
       height: 100%;
@@ -33,13 +33,13 @@
       background-image: none !important;
     }
 
-    body.homestead-booting {
+    body.reference-app-booting {
       background: var(--boot-bg) !important;
       background-image: none !important;
       color: var(--boot-ink);
     }
 
-    body.homestead-booting .app-shell {
+    body.reference-app-booting .app-shell {
       visibility: hidden;
     }
 
@@ -65,7 +65,7 @@
   </style>
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="homestead-booting">
+<body class="reference-app-booting">
   <div id="boot-splash" class="boot-splash" aria-busy="true" aria-label="Loading __APP_NAME__">
     <img class="boot-mark" src="assets/icons/meta/territory-master.png" alt="" aria-hidden="true">
   </div>
@@ -104,7 +104,7 @@
             <h2 id="page-title">Overview</h2>
             <button id="path-chip" type="button" class="path-chip" title="Copy app path">apps/__APP_SLUG__</button>
           </div>
-          <p id="page-subtitle" class="page-subtitle">Reference shell with standard Wizardry startup, left-right layout, drawer settings, and bridge-safe actions.</p>
+          <p id="page-subtitle" class="page-subtitle">Reference app with standard Wizardry startup, left-right layout, drawer settings, and bridge-safe actions.</p>
         </div>
 
         <div class="head-actions">
