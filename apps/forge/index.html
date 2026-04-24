@@ -4093,11 +4093,10 @@
           if (gitPill) {
             rowActions.appendChild(gitPill);
           }
+          var rowRunSlot = document.createElement('span');
+          rowRunSlot.className = 'row-run-slot';
           var canRowRun = hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item);
           if (canRowRun) {
-            var rowRunSlot = document.createElement('span');
-            rowRunSlot.className = 'row-run-slot';
-
             var rowRunSpinner = document.createElement('span');
             rowRunSpinner.className = 'row-run-spinner status-inline-spinner';
             rowRunSpinner.setAttribute('aria-hidden', 'true');
@@ -4130,8 +4129,10 @@
               renderSelectedBuiltIn();
             });
             rowRunSlot.appendChild(play);
-            rowActions.appendChild(rowRunSlot);
+          } else {
+            rowRunSlot.setAttribute('aria-hidden', 'true');
           }
+          rowActions.appendChild(rowRunSlot);
 
           var rowMenuBtn = document.createElement('button');
           rowMenuBtn.type = 'button';
