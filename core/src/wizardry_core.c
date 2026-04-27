@@ -297,17 +297,58 @@ static int json_unescape(const char *in, char *out, size_t out_size) {
   return 0;
 }
 
-static int json_escape(const char *in, char *out, size_t out_size) {
+static int json_escape_required(const char *in, size_t in_len, size_t *out_size) {
+  size_t i;
+  size_t needed;
+
+  if (!in || !out_size) {
+    return -1;
+  }
+
+  needed = 1;
+  for (i = 0; i < in_len; i++) {
+    unsigned char ch = (unsigned char)in[i];
+    size_t add = 1;
+
+    switch (ch) {
+      case '"':
+      case '\\':
+      case '\b':
+      case '\f':
+      case '\n':
+      case '\r':
+      case '\t':
+        add = 2;
+        break;
+      default:
+        if (ch < 0x20) {
+          add = 6;
+        }
+        break;
+    }
+
+    if (needed > ((size_t)-1) - add) {
+      return -1;
+    }
+    needed += add;
+  }
+
+  *out_size = needed;
+  return 0;
+}
+
+static int json_escape_n(const char *in, size_t in_len, char *out, size_t out_size) {
   size_t oi;
+  size_t i;
 
   if (!in || !out || out_size == 0) {
     return -1;
   }
 
   oi = 0;
-  while (*in) {
+  for (i = 0; i < in_len; i++) {
     const char *esc = NULL;
-    char ch = *in;
+    unsigned char ch = (unsigned char)in[i];
 
     switch (ch) {
       case '"': esc = "\\\""; break;
@@ -341,15 +382,21 @@ static int json_escape(const char *in, char *out, size_t out_size) {
       } else if (oi + 1 >= out_size) {
         return -1;
       } else {
-        out[oi++] = ch;
+        out[oi++] = (char)ch;
       }
     }
-
-    in++;
   }
 
   out[oi] = '\0';
   return 0;
+}
+
+static int json_escape(const char *in, char *out, size_t out_size) {
+  if (!in) {
+    return -1;
+  }
+
+  return json_escape_n(in, strlen(in), out, out_size);
 }
 
 static const char *skip_json_string_token(const char *p) {
@@ -1406,11 +1453,26 @@ static int handle_doc_read(wizardry_core *core,
                        "path escaping failed");
   }
 
-  escaped_cap = content_len * 2 + 8;
+  if (json_escape_required(content, content_len, &escaped_cap) != 0) {
+    free(content);
+    return write_error(response_json,
+                       response_size,
+                       id_raw,
+                       JSONRPC_INTERNAL_ERROR,
+                       "content escaping failed");
+  }
   if (escaped_cap < 32) {
     escaped_cap = 32;
   }
 
+  if (escaped_cap > ((size_t)-1) - strlen(escaped_path) - 64) {
+    free(content);
+    return write_error(response_json,
+                       response_size,
+                       id_raw,
+                       JSONRPC_INTERNAL_ERROR,
+                       "allocation failure");
+  }
   result_cap = escaped_cap + strlen(escaped_path) + 64;
   result = (char *)malloc(result_cap);
   if (!result) {
@@ -1434,7 +1496,7 @@ static int handle_doc_read(wizardry_core *core,
                          "allocation failure");
     }
 
-    if (json_escape(content, escaped_content, escaped_cap) != 0) {
+    if (json_escape_n(content, content_len, escaped_content, escaped_cap) != 0) {
       free(content);
       free(escaped_content);
       free(result);

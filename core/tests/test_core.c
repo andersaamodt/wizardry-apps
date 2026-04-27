@@ -140,6 +140,74 @@ int main(void) {
     return 1;
   }
 
+  {
+    char control_path[4096];
+    unsigned char raw_content[32];
+    FILE *fp;
+    size_t i;
+
+    snprintf(control_path, sizeof(control_path), "%s/notes/control.md", vault_dir);
+    memcpy(raw_content, "controls:", 9);
+    for (i = 9; i < sizeof(raw_content); i++) {
+      raw_content[i] = 1;
+    }
+
+    fp = fopen(control_path, "wb");
+    if (!fp) {
+      fprintf(stderr, "failed to create control character fixture\n");
+      return 1;
+    }
+    if (fwrite(raw_content, 1, sizeof(raw_content), fp) != sizeof(raw_content)) {
+      fclose(fp);
+      fprintf(stderr, "failed to write control character fixture\n");
+      return 1;
+    }
+    fclose(fp);
+
+    if (run_rpc(&core,
+                "{\"jsonrpc\":\"2.0\",\"id\":404,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/control.md\"}}",
+                response,
+                sizeof(response)) != 0) {
+      return 1;
+    }
+
+    if (!contains(response, "\"content\":\"controls:\\u0001\\u0001\\u0001")) {
+      fprintf(stderr, "doc.read failed to escape dense control characters: %s\n", response);
+      return 1;
+    }
+  }
+
+  {
+    char nul_path[4096];
+    unsigned char raw_content[] = {'b', 'e', 'f', 'o', 'r', 'e', 0, 'a', 'f', 't', 'e', 'r'};
+    FILE *fp;
+
+    snprintf(nul_path, sizeof(nul_path), "%s/notes/nul-existing.md", vault_dir);
+    fp = fopen(nul_path, "wb");
+    if (!fp) {
+      fprintf(stderr, "failed to create existing NUL fixture\n");
+      return 1;
+    }
+    if (fwrite(raw_content, 1, sizeof(raw_content), fp) != sizeof(raw_content)) {
+      fclose(fp);
+      fprintf(stderr, "failed to write existing NUL fixture\n");
+      return 1;
+    }
+    fclose(fp);
+
+    if (run_rpc(&core,
+                "{\"jsonrpc\":\"2.0\",\"id\":405,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/nul-existing.md\"}}",
+                response,
+                sizeof(response)) != 0) {
+      return 1;
+    }
+
+    if (!contains(response, "\"content\":\"before\\u0000after\"")) {
+      fprintf(stderr, "doc.read truncated existing NUL content: %s\n", response);
+      return 1;
+    }
+  }
+
   if (run_rpc(&core,
               "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"doc.list\",\"params\":{\"path\":\"notes\"}}",
               response,
