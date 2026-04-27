@@ -352,12 +352,176 @@ static int json_escape(const char *in, char *out, size_t out_size) {
   return 0;
 }
 
+static const char *skip_json_string_token(const char *p) {
+  if (!p || *p != '"') {
+    return NULL;
+  }
+
+  p++;
+  while (*p) {
+    if (*p == '\\') {
+      p++;
+      if (!*p) {
+        return NULL;
+      }
+      p++;
+      continue;
+    }
+    if (*p == '"') {
+      return p + 1;
+    }
+    p++;
+  }
+
+  return NULL;
+}
+
+static const char *skip_json_value_token(const char *p) {
+  p = skip_ws(p);
+  if (!p || !*p) {
+    return NULL;
+  }
+
+  if (*p == '"') {
+    return skip_json_string_token(p);
+  }
+
+  if (*p == '{' || *p == '[') {
+    const char *q = p;
+    int depth = 0;
+    int in_string = 0;
+    int escaped = 0;
+
+    while (*q) {
+      if (in_string) {
+        if (escaped) {
+          escaped = 0;
+        } else if (*q == '\\') {
+          escaped = 1;
+        } else if (*q == '"') {
+          in_string = 0;
+        }
+      } else if (*q == '"') {
+        in_string = 1;
+      } else if (*q == '{' || *q == '[') {
+        depth++;
+      } else if (*q == '}' || *q == ']') {
+        depth--;
+        if (depth == 0) {
+          return q + 1;
+        }
+        if (depth < 0) {
+          return NULL;
+        }
+      }
+      q++;
+    }
+
+    return NULL;
+  }
+
+  while (*p && *p != ',' && *p != '}' && *p != ']') {
+    p++;
+  }
+
+  return p;
+}
+
+static int key_span_matches(const char *start, const char *end, const char *field) {
+  const char *p;
+  size_t field_len;
+
+  if (!start || !end || !field || end < start) {
+    return 0;
+  }
+
+  for (p = start; p < end; p++) {
+    if (*p == '\\') {
+      return 0;
+    }
+  }
+
+  field_len = strlen(field);
+  return (size_t)(end - start) == field_len && memcmp(start, field, field_len) == 0;
+}
+
+static int find_json_object_value(const char *json,
+                                  const char *field,
+                                  const char **value_start,
+                                  const char **value_end) {
+  const char *p;
+
+  if (!json || !field || !value_start || !value_end) {
+    return -1;
+  }
+
+  p = skip_ws(json);
+  if (!p || *p != '{') {
+    return -1;
+  }
+
+  p++;
+  while (1) {
+    const char *key_start;
+    const char *key_after;
+    const char *key_end;
+    const char *start;
+    const char *end;
+
+    p = skip_ws(p);
+    if (!p || !*p) {
+      return -1;
+    }
+    if (*p == '}') {
+      return -1;
+    }
+    if (*p != '"') {
+      return -1;
+    }
+
+    key_start = p + 1;
+    key_after = skip_json_string_token(p);
+    if (!key_after) {
+      return -1;
+    }
+    key_end = key_after - 1;
+
+    p = skip_ws(key_after);
+    if (!p || *p != ':') {
+      return -1;
+    }
+
+    start = skip_ws(p + 1);
+    end = skip_json_value_token(start);
+    if (!start || !end) {
+      return -1;
+    }
+
+    if (key_span_matches(key_start, key_end, field)) {
+      *value_start = start;
+      *value_end = end;
+      return 0;
+    }
+
+    p = skip_ws(end);
+    if (!p || !*p) {
+      return -1;
+    }
+    if (*p == ',') {
+      p++;
+      continue;
+    }
+    if (*p == '}') {
+      return -1;
+    }
+    return -1;
+  }
+}
+
 static int extract_json_string_value(const char *json,
                                      const char *field,
                                      char *out,
                                      size_t out_size) {
-  char needle[128];
-  const char *pos;
   const char *start;
   const char *end;
   size_t len;
@@ -366,36 +530,48 @@ static int extract_json_string_value(const char *json,
     return -1;
   }
 
-  if (snprintf(needle, sizeof(needle), "\"%s\"", field) >= (int)sizeof(needle)) {
+  if (find_json_object_value(json, field, &start, &end) != 0) {
     return -1;
   }
 
-  pos = strstr(json, needle);
-  if (!pos) {
+  if (!start || *start != '"') {
     return -1;
   }
 
-  pos = strchr(pos, ':');
-  if (!pos) {
+  end = skip_json_string_token(start);
+  if (!end) {
     return -1;
   }
 
-  pos = skip_ws(pos + 1);
-  if (!pos || *pos != '"') {
+  start++;
+  end--;
+  len = (size_t)(end - start);
+  if (len >= out_size) {
     return -1;
   }
 
-  start = pos + 1;
-  end = start;
-  while (*end && *end != '"') {
-    if (*end == '\\' && *(end + 1)) {
-      end += 2;
-      continue;
-    }
-    end++;
+  memcpy(out, start, len);
+  out[len] = '\0';
+  return 0;
+}
+
+static int extract_json_object_value(const char *json,
+                                     const char *field,
+                                     char *out,
+                                     size_t out_size) {
+  const char *start;
+  const char *end;
+  size_t len;
+
+  if (!json || !field || !out || out_size == 0) {
+    return -1;
   }
 
-  if (*end != '"') {
+  if (find_json_object_value(json, field, &start, &end) != 0) {
+    return -1;
+  }
+
+  if (!start || *start != '{') {
     return -1;
   }
 
@@ -409,56 +585,45 @@ static int extract_json_string_value(const char *json,
   return 0;
 }
 
-static int extract_json_raw_id(const char *json, char *id_out, size_t id_out_size) {
-  const char *pos;
+static int extract_json_raw_value(const char *json,
+                                  const char *field,
+                                  char *out,
+                                  size_t out_size) {
   const char *start;
   const char *end;
+  size_t len;
 
+  if (!json || !field || !out || out_size == 0) {
+    return -1;
+  }
+
+  if (find_json_object_value(json, field, &start, &end) != 0) {
+    return -1;
+  }
+
+  while (end > start && isspace((unsigned char)*(end - 1))) {
+    end--;
+  }
+
+  len = (size_t)(end - start);
+  if (len >= out_size) {
+    return -1;
+  }
+
+  memcpy(out, start, len);
+  out[len] = '\0';
+  return 0;
+}
+
+static int extract_json_raw_id(const char *json, char *id_out, size_t id_out_size) {
   if (!json || !id_out || id_out_size == 0) {
     return -1;
   }
 
-  pos = strstr(json, "\"id\"");
-  if (!pos) {
+  if (extract_json_raw_value(json, "id", id_out, id_out_size) != 0) {
     return safe_copy(id_out, id_out_size, "null");
   }
 
-  pos = strchr(pos, ':');
-  if (!pos) {
-    return safe_copy(id_out, id_out_size, "null");
-  }
-
-  start = skip_ws(pos + 1);
-  if (!start || !*start) {
-    return safe_copy(id_out, id_out_size, "null");
-  }
-
-  if (*start == '"') {
-    end = start + 1;
-    while (*end && *end != '"') {
-      if (*end == '\\' && *(end + 1)) {
-        end += 2;
-        continue;
-      }
-      end++;
-    }
-    if (*end != '"') {
-      return safe_copy(id_out, id_out_size, "null");
-    }
-    end++;
-  } else {
-    end = start;
-    while (*end && *end != ',' && *end != '}') {
-      end++;
-    }
-  }
-
-  if ((size_t)(end - start) >= id_out_size) {
-    return safe_copy(id_out, id_out_size, "null");
-  }
-
-  memcpy(id_out, start, (size_t)(end - start));
-  id_out[end - start] = '\0';
   return 0;
 }
 
@@ -466,78 +631,16 @@ static int extract_params_string(const char *json,
                                  const char *field,
                                  char *out,
                                  size_t out_size) {
-  const char *params;
-  const char *object_start;
-  const char *p;
-  const char *object_end;
   char raw[8192];
   char scoped_params[8192];
-  int depth;
-  int in_string;
-  int escaped;
-  size_t len;
 
   if (!json || !field || !out || out_size == 0) {
     return -1;
   }
 
-  params = strstr(json, "\"params\"");
-  if (!params) {
+  if (extract_json_object_value(json, "params", scoped_params, sizeof(scoped_params)) != 0) {
     return -1;
   }
-
-  params = strchr(params, ':');
-  if (!params) {
-    return -1;
-  }
-
-  object_start = skip_ws(params + 1);
-  if (!object_start || *object_start != '{') {
-    return -1;
-  }
-
-  p = object_start;
-  depth = 0;
-  in_string = 0;
-  escaped = 0;
-  object_end = NULL;
-  while (*p) {
-    if (in_string) {
-      if (escaped) {
-        escaped = 0;
-      } else if (*p == '\\') {
-        escaped = 1;
-      } else if (*p == '"') {
-        in_string = 0;
-      }
-    } else if (*p == '"') {
-      in_string = 1;
-    } else if (*p == '{') {
-      depth++;
-    } else if (*p == '}') {
-      depth--;
-      if (depth == 0) {
-        object_end = p + 1;
-        break;
-      }
-      if (depth < 0) {
-        return -1;
-      }
-    }
-    p++;
-  }
-
-  if (!object_end) {
-    return -1;
-  }
-
-  len = (size_t)(object_end - object_start);
-  if (len >= sizeof(scoped_params)) {
-    return -1;
-  }
-  memcpy(scoped_params, object_start, len);
-  scoped_params[len] = '\0';
-
   if (extract_json_string_value(scoped_params, field, raw, sizeof(raw)) != 0) {
     return -1;
   }

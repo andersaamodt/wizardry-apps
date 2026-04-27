@@ -219,6 +219,78 @@ int main(void) {
   }
 
   if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":509,\"method\":\"doc.write\",\"params\":{\"shadow\":{\"path\":\"notes/nested.md\",\"content\":\"nested content\"}}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"error\"")) {
+    fprintf(stderr, "doc.write accepted nested-only params.path/content: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":510,\"method\":\"doc.write\",\"params\":{\"shadow\":{\"path\":\"notes/wrong.md\"},\"path\":\"notes/right.md\",\"content\":\"right content\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"written\":true")) {
+    fprintf(stderr, "unexpected nested shadow doc.write response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":511,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/right.md\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "right content")) {
+    fprintf(stderr, "doc.write ignored top-level params.path after nested path: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":512,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/wrong.md\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"error\"")) {
+    fprintf(stderr, "doc.write used nested params.path before top-level path: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":513,\"params\":{\"method\":\"core.ping\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"error\"")) {
+    fprintf(stderr, "rpc accepted method inside params without top-level method: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"params\":{\"jsonrpc\":\"2.0\",\"method\":\"core.ping\"},\"id\":514}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"error\"")) {
+    fprintf(stderr, "rpc accepted jsonrpc/method inside params without top-level fields: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
               "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"meta.set\",\"params\":{\"path\":\"notes/one.md\",\"key\":\"user.tag\",\"value\":\"alpha\"}}",
               response,
               sizeof(response)) != 0) {
