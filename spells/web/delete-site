@@ -24,6 +24,12 @@ if [ -z "$site_name" ]; then
   die 2 "delete-site: SITENAME required"
 fi
 
+case "$site_name" in
+  .|..|*/*|*\\*)
+    die 2 "delete-site: invalid site name"
+    ;;
+esac
+
 SITES_DIR="${WIZARDRY_SITES_DIR}"
 SITE_DIR="$SITES_DIR/$site_name"
 SITE_DATA_DIR="$SITES_DIR/.sitedata/$site_name"

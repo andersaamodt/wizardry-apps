@@ -33,6 +33,18 @@ if [ -z "$template" ]; then
   die 2 "create-from-template: TEMPLATE required"
 fi
 
+case "$site_name" in
+  .|..|*/*|*\\*)
+    die 2 "create-from-template: invalid site name"
+    ;;
+esac
+
+case "$template" in
+  .|..|*/*|*\\*)
+    die 2 "create-from-template: invalid template name"
+    ;;
+esac
+
 WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
 SITES_DIR="$WEB_ROOT"
 SITE_DIR="$SITES_DIR/$site_name"

@@ -188,11 +188,48 @@ EOF
   rm -rf "$test_web_root" "$fake_wizardry_root"
 }
 
+test_rejects_template_path_traversal() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  fake_wizardry_root=$(temp-dir wizardry-template-root)
+  site_dir="$test_web_root/minisite"
+
+  mkdir -p "$fake_wizardry_root/web" "$fake_wizardry_root/outside-template/pages"
+  printf '# outside template\n' > "$fake_wizardry_root/outside-template/pages/index.md"
+  mkdir -p "$site_dir/site/pages" "$site_dir/site/static" "$site_dir/cgi"
+  printf '# original\n' > "$site_dir/site/pages/index.md"
+  cat > "$site_dir/site.conf" <<'EOF'
+site-name=minisite
+site-user=
+template=../outside-template
+port=8080
+domain=localhost
+https=false
+EOF
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/update-from-template minisite --force
+  assert_status 2 || {
+    rm -rf "$test_web_root" "$fake_wizardry_root"
+    return 1
+  }
+
+  if ! grep -q '# original' "$site_dir/site/pages/index.md"; then
+    TEST_FAILURE_REASON="update-from-template used template path outside WIZARDRY_DIR/web"
+    rm -rf "$test_web_root" "$fake_wizardry_root"
+    return 1
+  fi
+
+  rm -rf "$test_web_root" "$fake_wizardry_root"
+}
+
 run_test_case "update-from-template shows help" test_help
 run_test_case "update-from-template updates files from template" test_updates_from_template
 run_test_case "update-from-template preserves uploads" test_preserves_uploads
 run_test_case "update-from-template fails for nonexistent site" test_fails_for_nonexistent_site
 run_test_case "update-from-template resolves templates from web" test_update_uses_web_template_directory
 run_test_case "update-from-template refreshes requirements file" test_update_refreshes_requirements_file
+run_test_case "update-from-template rejects template path traversal" test_rejects_template_path_traversal
 
 finish_tests

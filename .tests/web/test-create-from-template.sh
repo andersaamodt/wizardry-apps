@@ -147,11 +147,61 @@ EOF
   rm -rf "$fake_wizardry_root"
 }
 
+test_rejects_site_name_path_traversal() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  escape_dir="$(dirname "$test_web_root")/wizardry-template-escape-$$"
+  rm -rf "$escape_dir"
+
+  WIZARDRY_DIR="$ROOT_DIR" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template "../$(basename "$escape_dir")" demo
+  assert_status 2 || {
+    rm -rf "$test_web_root" "$escape_dir"
+    return 1
+  }
+
+  [ ! -e "$escape_dir" ] || {
+    TEST_FAILURE_REASON="create-from-template created site outside WEB_WIZARDRY_ROOT"
+    rm -rf "$test_web_root" "$escape_dir"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$escape_dir"
+}
+
+test_rejects_template_path_traversal() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  fake_wizardry_root=$(temp-dir wizardry-template-root)
+
+  mkdir -p "$fake_wizardry_root/web" "$fake_wizardry_root/outside-template/pages"
+  printf '# Outside Template\n' > "$fake_wizardry_root/outside-template/pages/index.md"
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template badtemplate ../outside-template
+  assert_status 2 || {
+    rm -rf "$test_web_root" "$fake_wizardry_root"
+    return 1
+  }
+
+  [ ! -e "$test_web_root/badtemplate" ] || {
+    TEST_FAILURE_REASON="create-from-template copied template outside WIZARDRY_DIR/web"
+    rm -rf "$test_web_root" "$fake_wizardry_root"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$fake_wizardry_root"
+}
+
 run_test_case "create-from-template shows help" test_help
 if [ -d "$ROOT_DIR/web/blog" ]; then
   run_test_case "blog template has sample posts" test_blog_template_has_sample_posts
 fi
 run_test_case "all templates create expected site structure" test_all_web_templates_create_expected_structure
 run_test_case "create-from-template resolves templates from web" test_create_from_template_uses_web_directory
+run_test_case "create-from-template rejects site path traversal" test_rejects_site_name_path_traversal
+run_test_case "create-from-template rejects template path traversal" test_rejects_template_path_traversal
 
 finish_tests
