@@ -786,6 +786,67 @@ static int resolve_vault_path(const wizardry_core *core,
   return 0;
 }
 
+static int path_is_inside_vault(const wizardry_core *core, const char *absolute) {
+  size_t vault_len;
+
+  if (!core || !core->mounted_vault[0] || !absolute) {
+    return 0;
+  }
+
+  vault_len = strlen(core->mounted_vault);
+  if (strcmp(absolute, core->mounted_vault) == 0) {
+    return 1;
+  }
+
+  return strncmp(absolute, core->mounted_vault, vault_len) == 0 &&
+         absolute[vault_len] == '/';
+}
+
+static int validate_vault_target_path(const wizardry_core *core,
+                                      const char *absolute,
+                                      int must_exist) {
+  char resolved[WIZARDRY_CORE_PATH_MAX * 2];
+  char parent[WIZARDRY_CORE_PATH_MAX * 2];
+  char *slash;
+
+  if (!core || !absolute || !absolute[0]) {
+    return -1;
+  }
+
+  if (realpath(absolute, resolved)) {
+    return path_is_inside_vault(core, resolved) ? 0 : -1;
+  }
+
+  if (must_exist) {
+    return -1;
+  }
+
+  if (safe_copy(parent, sizeof(parent), absolute) != 0) {
+    return -1;
+  }
+
+  while (1) {
+    slash = strrchr(parent, '/');
+    if (!slash) {
+      return -1;
+    }
+
+    if (slash == parent) {
+      parent[1] = '\0';
+    } else {
+      *slash = '\0';
+    }
+
+    if (realpath(parent, resolved)) {
+      return path_is_inside_vault(core, resolved) ? 0 : -1;
+    }
+
+    if (slash == parent) {
+      return -1;
+    }
+  }
+}
+
 static int ensure_parent_dirs(const char *path) {
   char tmp[WIZARDRY_CORE_PATH_MAX * 2];
   char *p;
@@ -1123,6 +1184,16 @@ static ssize_t find_sidecar_entry(sidecar_entry *entries, size_t count, const ch
   return -1;
 }
 
+static int validate_vault_sidecar_path(const wizardry_core *core, const char *doc_path) {
+  char sidecar_path[WIZARDRY_CORE_PATH_MAX * 2 + 32];
+
+  if (wizardry_sidecar_path(doc_path, sidecar_path, sizeof(sidecar_path)) != 0) {
+    return -1;
+  }
+
+  return validate_vault_target_path(core, sidecar_path, 0);
+}
+
 static int handle_doc_list(wizardry_core *core,
                            const char *request_json,
                            const char *id_raw,
@@ -1144,6 +1215,14 @@ static int handle_doc_list(wizardry_core *core,
                        id_raw,
                        JSONRPC_INVALID_PARAMS,
                        "doc.list requires mounted vault and safe params.path");
+  }
+
+  if (validate_vault_target_path(core, abs_dir, 1) != 0) {
+    return write_error(response_json,
+                       response_size,
+                       id_raw,
+                       JSONRPC_INVALID_PARAMS,
+                       "doc.list path is not readable");
   }
 
   dir = opendir(abs_dir);
@@ -1190,6 +1269,10 @@ static int handle_doc_list(wizardry_core *core,
     }
 
     if (snprintf(abs_item, sizeof(abs_item), "%s/%s", abs_dir, entry->d_name) < 0) {
+      continue;
+    }
+
+    if (validate_vault_target_path(core, abs_item, 1) != 0) {
       continue;
     }
 
@@ -1280,6 +1363,14 @@ static int handle_doc_read(wizardry_core *core,
                        id_raw,
                        JSONRPC_INVALID_PARAMS,
                        "doc.read requires mounted vault and params.path");
+  }
+
+  if (validate_vault_target_path(core, abs_path, 1) != 0) {
+    return write_error(response_json,
+                       response_size,
+                       id_raw,
+                       JSONRPC_INVALID_PARAMS,
+                       "doc.read path is not readable");
   }
 
   if (read_file_to_string(abs_path, &content, &content_len) != 0) {
@@ -1398,7 +1489,10 @@ static int handle_doc_write(wizardry_core *core,
                        "doc.write requires params.content");
   }
 
-  if (ensure_parent_dirs(abs_path) != 0 || write_string_to_file(abs_path, content) != 0) {
+  if (validate_vault_target_path(core, abs_path, 0) != 0 ||
+      ensure_parent_dirs(abs_path) != 0 ||
+      validate_vault_target_path(core, abs_path, 0) != 0 ||
+      write_string_to_file(abs_path, content) != 0) {
     return write_error(response_json,
                        response_size,
                        id_raw,
@@ -1429,6 +1523,14 @@ static int handle_doc_delete(wizardry_core *core,
                        id_raw,
                        JSONRPC_INVALID_PARAMS,
                        "doc.delete requires mounted vault and params.path");
+  }
+
+  if (validate_vault_target_path(core, abs_path, 1) != 0) {
+    return write_error(response_json,
+                       response_size,
+                       id_raw,
+                       JSONRPC_INVALID_PARAMS,
+                       "doc.delete failed (path missing?)");
   }
 
   if (unlink(abs_path) != 0) {
@@ -1463,6 +1565,15 @@ static int handle_meta_get(wizardry_core *core,
   if (extract_params_string(request_json, "path", logical_path, sizeof(logical_path)) != 0 ||
       !logical_path[0] ||
       resolve_vault_path(core, logical_path, abs_path, sizeof(abs_path)) != 0) {
+    return write_error(response_json,
+                       response_size,
+                       id_raw,
+                       JSONRPC_INVALID_PARAMS,
+                       "meta.get requires mounted vault and params.path");
+  }
+
+  if (validate_vault_target_path(core, abs_path, 0) != 0 ||
+      validate_vault_sidecar_path(core, abs_path) != 0) {
     return write_error(response_json,
                        response_size,
                        id_raw,
@@ -1643,6 +1754,15 @@ static int handle_meta_set(wizardry_core *core,
                        "meta.set requires params.key and params.value");
   }
 
+  if (validate_vault_target_path(core, abs_path, 0) != 0 ||
+      validate_vault_sidecar_path(core, abs_path) != 0) {
+    return write_error(response_json,
+                       response_size,
+                       id_raw,
+                       JSONRPC_INVALID_PARAMS,
+                       "meta.set requires mounted vault and params.path");
+  }
+
   if (load_sidecar_entries(abs_path, entries, 128, &count) != 0) {
     return write_error(response_json,
                        response_size,
@@ -1723,6 +1843,15 @@ static int handle_meta_unset(wizardry_core *core,
                        "meta.unset requires params.key");
   }
 
+  if (validate_vault_target_path(core, abs_path, 0) != 0 ||
+      validate_vault_sidecar_path(core, abs_path) != 0) {
+    return write_error(response_json,
+                       response_size,
+                       id_raw,
+                       JSONRPC_INVALID_PARAMS,
+                       "meta.unset requires mounted vault and params.path");
+  }
+
   if (load_sidecar_entries(abs_path, entries, 128, &count) != 0) {
     return write_error(response_json,
                        response_size,
@@ -1773,11 +1902,17 @@ int wizardry_core_shutdown(wizardry_core *core) {
 }
 
 int wizardry_core_mount_vault(wizardry_core *core, const char *path) {
+  char resolved[WIZARDRY_CORE_PATH_MAX * 2];
+  struct stat st;
+
   if (!core || !path || path[0] == '\0') {
     return -1;
   }
 
-  if (safe_copy(core->mounted_vault, sizeof(core->mounted_vault), path) != 0) {
+  if (!realpath(path, resolved) ||
+      stat(resolved, &st) != 0 ||
+      !S_ISDIR(st.st_mode) ||
+      safe_copy(core->mounted_vault, sizeof(core->mounted_vault), resolved) != 0) {
     return -1;
   }
 

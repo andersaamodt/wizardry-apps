@@ -34,7 +34,9 @@ int main(void) {
   char response[16384];
   char sidecar_path[2048];
   char tmp_template[] = "/tmp/wizardry-core-test-XXXXXX";
+  char outside_template[] = "/tmp/wizardry-core-outside-XXXXXX";
   char *vault_dir;
+  char *outside_dir;
 
   if (wizardry_core_init(&core) != 0) {
     fprintf(stderr, "core init failed\n");
@@ -49,6 +51,11 @@ int main(void) {
   vault_dir = mkdtemp(tmp_template);
   if (!vault_dir) {
     fprintf(stderr, "mkdtemp failed\n");
+    return 1;
+  }
+  outside_dir = mkdtemp(outside_template);
+  if (!outside_dir) {
+    fprintf(stderr, "outside mkdtemp failed\n");
     return 1;
   }
 
@@ -120,6 +127,73 @@ int main(void) {
   if (!contains(response, "notes/one.md")) {
     fprintf(stderr, "unexpected doc.list response: %s\n", response);
     return 1;
+  }
+
+  {
+    char link_path[4096];
+    char outside_file[4096];
+    char outside_link[4096];
+    char req[4096];
+
+    snprintf(link_path, sizeof(link_path), "%s/escape", vault_dir);
+    snprintf(outside_file, sizeof(outside_file), "%s/pwned.md", outside_dir);
+    if (symlink(outside_dir, link_path) != 0) {
+      fprintf(stderr, "failed to create escape symlink\n");
+      return 1;
+    }
+
+    if (run_rpc(&core,
+                "{\"jsonrpc\":\"2.0\",\"id\":601,\"method\":\"doc.write\",\"params\":{\"path\":\"escape/pwned.md\",\"content\":\"outside\"}}",
+                response,
+                sizeof(response)) != 0) {
+      return 1;
+    }
+
+    if (!contains(response, "\"error\"") || access(outside_file, F_OK) == 0) {
+      fprintf(stderr, "doc.write escaped vault through symlink: %s\n", response);
+      return 1;
+    }
+
+    snprintf(outside_file, sizeof(outside_file), "%s/secret.md", outside_dir);
+    {
+      FILE *fp = fopen(outside_file, "wb");
+      if (!fp) {
+        fprintf(stderr, "failed to create outside secret\n");
+        return 1;
+      }
+      fputs("secret", fp);
+      fclose(fp);
+    }
+
+    snprintf(outside_link, sizeof(outside_link), "%s/notes/outside-link.md", vault_dir);
+    if (symlink(outside_file, outside_link) != 0) {
+      fprintf(stderr, "failed to create outside file symlink\n");
+      return 1;
+    }
+
+    if (run_rpc(&core,
+                "{\"jsonrpc\":\"2.0\",\"id\":602,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/outside-link.md\"}}",
+                response,
+                sizeof(response)) != 0) {
+      return 1;
+    }
+
+    if (!contains(response, "\"error\"")) {
+      fprintf(stderr, "doc.read escaped vault through symlink: %s\n", response);
+      return 1;
+    }
+
+    snprintf(req,
+             sizeof(req),
+             "{\"jsonrpc\":\"2.0\",\"id\":603,\"method\":\"doc.list\",\"params\":{\"path\":\"notes\"}}");
+    if (run_rpc(&core, req, response, sizeof(response)) != 0) {
+      return 1;
+    }
+
+    if (contains(response, "outside-link.md")) {
+      fprintf(stderr, "doc.list exposed symlinked outside doc: %s\n", response);
+      return 1;
+    }
   }
 
   if (run_rpc(&core,
@@ -417,6 +491,8 @@ int main(void) {
   {
     char cleanup_cmd[4096];
     snprintf(cleanup_cmd, sizeof(cleanup_cmd), "rm -rf '%s'", vault_dir);
+    (void)system(cleanup_cmd);
+    snprintf(cleanup_cmd, sizeof(cleanup_cmd), "rm -rf '%s'", outside_dir);
     (void)system(cleanup_cmd);
   }
 
