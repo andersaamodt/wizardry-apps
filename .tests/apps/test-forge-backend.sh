@@ -99,6 +99,14 @@ printf '%s\n' "$templates" | grep -E '^demo\t' >/dev/null
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-backend.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
+prefs_home="$scratch/prefs-home"
+mkdir -p "$prefs_home"
+if XDG_CONFIG_HOME="$prefs_home/.config" sh "$backend" set-ui-pref "$scratch" "ab/key" value >/tmp/forge-invalid-pref.out 2>/tmp/forge-invalid-pref.err; then
+  printf '%s\n' "forge backend test: invalid UI pref key accepted" >&2
+  exit 1
+fi
+grep -F "invalid UI pref key" /tmp/forge-invalid-pref.err >/dev/null
+
 bundle_scripts="$scratch/App Forge.app/Contents/Resources/forge/scripts"
 bundle_root_file="$scratch/App Forge.app/Contents/Resources/wizardry-apps-root.txt"
 mkdir -p "$bundle_scripts"
@@ -198,6 +206,15 @@ printf '%s\n' "$site_out" | grep -F "created=$scratch/sites/sandbox-site" >/dev/
 [ -d "$scratch/sites/sandbox-site/site/pages" ]
 [ -d "$scratch/sites/sandbox-site/build" ]
 
+for invalid_site in 'ab/../../escape-site' 'ab;semi' 'ab space'; do
+  if sh "$backend" scaffold-site "$scratch" "$invalid_site" demo "$scratch/sites" >/tmp/forge-invalid-site.out 2>/tmp/forge-invalid-site.err; then
+    printf '%s\n' "forge backend test: invalid site name accepted: $invalid_site" >&2
+    exit 1
+  fi
+  grep -F "invalid site name" /tmp/forge-invalid-site.err >/dev/null
+done
+[ ! -d "$scratch/escape-site" ]
+
 godot_tools=$(sh "$backend" list-godot-tools "$scratch")
 printf '%s\n' "$godot_tools" | grep -E '^base-tool$' >/dev/null
 
@@ -226,6 +243,12 @@ printf '%s\n' "$workspace_home_out" | grep -F "created=$workspaces_root/workspac
 [ ! -d "$workspaces_root/workspace-home/app/assets/icons/meta" ]
 [ ! -d "$workspaces_root/workspace-home/app/assets/icons/web" ]
 grep -F "Wizardry Reference App" "$workspaces_root/workspace-home/app/index.html" >/dev/null
+
+if sh "$backend" set-workspace-field "$scratch" "$workspaces_root/workspace-home" hosted_web_serve_action "ab/action" >/tmp/forge-invalid-action.out 2>/tmp/forge-invalid-action.err; then
+  printf '%s\n' "forge backend test: invalid hosted_web_serve_action accepted" >&2
+  exit 1
+fi
+grep -F "invalid hosted_web_serve_action" /tmp/forge-invalid-action.err >/dev/null
 
 workspace_native_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native "Workspace Native" native-desktop blank "macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_native_out" | grep -F "created=$workspaces_root/workspace-native" >/dev/null
@@ -384,6 +407,25 @@ grep -F "profile_kind=generic" "$generic_workspace_abs/wizardry.workspace.conf" 
 grep -E '^targets=$' "$generic_workspace_abs/wizardry.workspace.conf" >/dev/null
 grep -Fx "hello" "$generic_workspace_abs/README.md" >/dev/null
 
+tmp_profile=$(mktemp "${TMPDIR:-/tmp}/forge-profile.XXXXXX")
+awk '
+  BEGIN { replaced = 0 }
+  /^project_id=/ {
+    print "project_id=ab/../../escape"
+    replaced = 1
+    next
+  }
+  { print }
+  END {
+    if (replaced == 0) {
+      print "project_id=ab/../../escape"
+    }
+  }
+' "$generic_workspace_abs/wizardry.workspace.conf" >"$tmp_profile"
+mv "$tmp_profile" "$generic_workspace_abs/wizardry.workspace.conf"
+generic_profile_out=$(sh "$backend" get-workspace-profile "$scratch" "$generic_workspace_abs")
+printf '%s\n' "$generic_profile_out" | grep -F "project_id=generic-repo" >/dev/null
+
 workspaces_after_import=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces_after_import" | grep -E '^plain-web\t' >/dev/null
 printf '%s\n' "$workspaces_after_import" | grep -E '^direct-space\t' >/dev/null
@@ -401,6 +443,14 @@ jq -e '.apps[] | select(.slug == "sandbox-tool" and .targets == "hosted-web,maco
 apps_after_set=$(sh "$backend" list-apps "$scratch")
 printf '%s\n' "$apps_after_set" | grep -E '^sandbox-tool\t' | grep -F "$(printf '\thosted-web,macos,linux,ios,android')" >/dev/null
 
+for invalid_slug in 'ab/../../escape-app' 'ab;semi' 'ab space'; do
+  if sh "$backend" set-app-targets "$scratch" "$invalid_slug" hosted-web >/tmp/forge-invalid-slug.out 2>/tmp/forge-invalid-slug.err; then
+    printf '%s\n' "forge backend test: invalid slug accepted: $invalid_slug" >&2
+    exit 1
+  fi
+  grep -F "invalid slug" /tmp/forge-invalid-slug.err >/dev/null
+done
+
 set_workspace_targets_out=$(sh "$backend" set-workspace-targets "$scratch" "$workspaces_root/workspace-web" "hosted-web,macos,linux,android")
 printf '%s\n' "$set_workspace_targets_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
 grep -F "targets=hosted-web,macos,linux,android" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
@@ -408,6 +458,14 @@ grep -F "targets=hosted-web,macos,linux,android" "$workspaces_root/workspace-web
 set_workspace_web_only_out=$(sh "$backend" set-workspace-targets "$scratch" "$workspaces_root/workspace-web" "hosted-web")
 printf '%s\n' "$set_workspace_web_only_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
 grep -F "targets=hosted-web" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+
+if sh "$backend" set-workspace-targets "$scratch" "$workspaces_root/workspace-web" "hosted-web
+run_rebuild_command=bad" >/tmp/forge-invalid-targets.out 2>/tmp/forge-invalid-targets.err; then
+  printf '%s\n' "forge backend test: newline-injected workspace targets accepted" >&2
+  exit 1
+fi
+grep -F "invalid targets" /tmp/forge-invalid-targets.err >/dev/null
+! grep -F "run_rebuild_command=bad" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
 
 rename_workspace_out=$(sh "$backend" rename-workspace "$scratch" "$workspaces_root/workspace-web" "Workspace Web Renamed")
 renamed_workspace="$workspaces_root_abs/workspace-web-renamed"

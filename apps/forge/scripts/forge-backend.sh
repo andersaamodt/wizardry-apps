@@ -569,33 +569,62 @@ PROJECT
   return 0
 }
 
-validate_slug() {
+is_valid_slug_value() {
   candidate=${1-}
   case "$candidate" in
-    [a-z][a-z0-9-]*) ;;
+    [a-z]*) ;;
     *)
-      printf '%s\n' "forge-backend: invalid slug '$candidate' (expected [a-z][a-z0-9-]*)" >&2
-      exit 2
+      return 1
       ;;
   esac
 
   case "$candidate" in
-    *-|*--*)
-      printf '%s\n' "forge-backend: invalid slug '$candidate' (no trailing or consecutive hyphens)" >&2
-      exit 2
+    *[!a-z0-9-]*|*-|*--*)
+      return 1
       ;;
   esac
+
+  return 0
+}
+
+validate_slug() {
+  candidate=${1-}
+  if ! is_valid_slug_value "$candidate"; then
+    printf '%s\n' "forge-backend: invalid slug '$candidate' (expected [a-z][a-z0-9-]* with no trailing or consecutive hyphens)" >&2
+    exit 2
+  fi
 }
 
 validate_site_name() {
   site=${1-}
   case "$site" in
-    [A-Za-z0-9][A-Za-z0-9._-]*) ;;
+    [A-Za-z0-9]*) ;;
     *)
       printf '%s\n' "forge-backend: invalid site name '$site'" >&2
       exit 2
       ;;
   esac
+
+  case "$site" in
+    *[!A-Za-z0-9._-]*)
+      printf '%s\n' "forge-backend: invalid site name '$site'" >&2
+      exit 2
+      ;;
+  esac
+}
+
+normalize_targets_value() {
+  value=${1-}
+  value=$(printf '%s' "$value" | tr '\r\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+
+  case "$value" in
+    *[!A-Za-z0-9,-]*|*,|,*|*,,*)
+      printf '%s\n' "forge-backend: invalid targets '$value'" >&2
+      exit 2
+      ;;
+  esac
+
+  printf '%s\n' "$value"
 }
 
 app_exists() {
@@ -2404,18 +2433,9 @@ resolve_workspace_slug() {
   workspace_path=${2-}
   project_id=$(workspace_field "$conf_path" project_id "")
   if [ -n "$project_id" ]; then
-    case "$project_id" in
-      [a-z][a-z0-9-]*)
-        case "$project_id" in
-          *-|*--*)
-            project_id=""
-            ;;
-        esac
-        ;;
-      *)
-        project_id=""
-        ;;
-    esac
+    if ! is_valid_slug_value "$project_id"; then
+      project_id=""
+    fi
   fi
   [ -n "$project_id" ] || project_id=$(derive_workspace_slug "$(basename "$workspace_path")")
   printf '%s\n' "$project_id"
@@ -3069,9 +3089,16 @@ workspace_git_collect_status() {
 validate_ui_pref_key() {
   key=${1-}
   case "$key" in
-    [a-z0-9][a-z0-9._-]*)
+    [a-z0-9]*)
       ;;
     *)
+      printf '%s\n' "forge-backend: invalid UI pref key: $key" >&2
+      exit 2
+      ;;
+  esac
+
+  case "$key" in
+    *[!a-z0-9._-]*)
       printf '%s\n' "forge-backend: invalid UI pref key: $key" >&2
       exit 2
       ;;
@@ -3138,7 +3165,10 @@ cmd_list_workspaces() {
     fi
 
     project_id=$(workspace_field "$conf" project_id "")
-    [ -n "$project_id" ] || project_id=$(workspace_field "$conf" slug "$(basename "$path")")
+    [ -n "$project_id" ] || project_id=$(workspace_field "$conf" slug "")
+    if ! is_valid_slug_value "$project_id"; then
+      project_id=$(derive_workspace_slug "$(basename "$path")")
+    fi
 
     title=$(workspace_field "$conf" title "")
     [ -n "$title" ] || title=$(workspace_field "$conf" name "$project_id")
@@ -3346,7 +3376,12 @@ cmd_get_workspace_profile() {
   printf 'root_hint=%s\n' "$root"
   printf 'workspace=%s\n' "$workspace_abs"
   printf 'profile=%s\n' "$conf"
-  printf 'project_id=%s\n' "$(workspace_field "$conf" project_id "$(workspace_field "$conf" slug "$(basename "$workspace_abs")")")"
+  profile_project_id=$(workspace_field "$conf" project_id "")
+  [ -n "$profile_project_id" ] || profile_project_id=$(workspace_field "$conf" slug "")
+  if ! is_valid_slug_value "$profile_project_id"; then
+    profile_project_id=$(derive_workspace_slug "$(basename "$workspace_abs")")
+  fi
+  printf 'project_id=%s\n' "$profile_project_id"
   printf 'title=%s\n' "$(workspace_field "$conf" title "$(workspace_field "$conf" name "$(basename "$workspace_abs")")")"
   printf 'project_type=%s\n' "$(workspace_field "$conf" project_type "application")"
   printf 'development_context=%s\n' "$(workspace_field "$conf" development_context "web")"
@@ -4081,7 +4116,16 @@ cmd_set_workspace_field() {
       ;;
     hosted_web_serve_action)
       case "$normalized_value" in
-        ""|[A-Za-z0-9][A-Za-z0-9._:-]*) ;;
+        "")
+          ;;
+        [A-Za-z0-9]*)
+          case "$normalized_value" in
+            *[!A-Za-z0-9._:-]*)
+              printf '%s\n' "forge-backend: invalid hosted_web_serve_action '$normalized_value'" >&2
+              exit 2
+              ;;
+          esac
+          ;;
         *)
           printf '%s\n' "forge-backend: invalid hosted_web_serve_action '$normalized_value'" >&2
           exit 2
@@ -4111,6 +4155,7 @@ cmd_set_app_targets() {
     exit 2
   }
   validate_slug "$slug"
+  targets=$(normalize_targets_value "$targets")
   require_jq
 
   manifest="$root/config/apps.manifest.json"
@@ -4153,6 +4198,7 @@ cmd_set_workspace_targets() {
     exit 1
   }
 
+  targets=$(normalize_targets_value "$targets")
   write_key_value_file "$conf" targets "$targets"
   printf 'workspace=%s\n' "$workspace_path"
   printf 'targets=%s\n' "$targets"

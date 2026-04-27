@@ -49,6 +49,15 @@ fi
 
 tmp_home=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-desktop-home.XXXXXX")
 trap 'rm -rf "$tmp_spellbook" "$tmp_home"' EXIT
+if HOME="$tmp_home" sh "$backend" set-ui-pref "ab/key" value >/tmp/wizardry-desktop-invalid-pref.out 2>/tmp/wizardry-desktop-invalid-pref.err; then
+  printf '%s\n' "wizardry-desktop backend accepted invalid UI pref key" >&2
+  exit 1
+fi
+grep -F "invalid key" /tmp/wizardry-desktop-invalid-pref.err >/dev/null 2>&1 || {
+  printf '%s\n' "wizardry-desktop invalid key error missing" >&2
+  exit 1
+}
+
 memorized_custom=$(HOME="$tmp_home" SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" memorize-spell quick-look "look ." 2>/dev/null)
 printf '%s\n' "$memorized_custom" | grep -F "quick-look	look ." >/dev/null 2>&1 || {
   printf '%s\n' "memorize-spell did not return expected tab-separated row" >&2

@@ -65,13 +65,11 @@ platform_id() {
 
 safe_name() {
   case "${1-}" in
-    [a-zA-Z0-9._-]*)
-      return 0
-      ;;
-    *)
+    ""|*[!a-zA-Z0-9._-]*)
       return 1
       ;;
   esac
+  return 0
 }
 
 config_path() {
@@ -80,14 +78,12 @@ config_path() {
 
 normalize_pref_key() {
   case "${1-}" in
-    [a-zA-Z0-9._-]*)
-      printf '%s\n' "$1"
-      return 0
-      ;;
-    *)
+    ""|*[!a-zA-Z0-9._-]*)
       return 1
       ;;
   esac
+  printf '%s\n' "$1"
+  return 0
 }
 
 sanitize_value() {

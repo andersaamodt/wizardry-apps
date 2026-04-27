@@ -28,9 +28,16 @@ config_file() {
 validate_key() {
   key=${1-}
   case "$key" in
-    [a-z0-9][a-z0-9._-]*)
+    [a-z0-9]*)
       ;;
     *)
+      printf '%s\n' "chatroom-backend: invalid key: $key" >&2
+      exit 2
+      ;;
+  esac
+
+  case "$key" in
+    *[!a-z0-9._-]*)
       printf '%s\n' "chatroom-backend: invalid key: $key" >&2
       exit 2
       ;;
