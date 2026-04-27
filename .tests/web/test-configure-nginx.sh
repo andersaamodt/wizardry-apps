@@ -166,9 +166,62 @@ test_configure_nginx_preserves_existing_port() {
   rm -rf "$test_web_root" "$stub_dir"
 }
 
+test_configure_nginx_rejects_site_path_traversal() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  outside_dir="$(dirname "$test_web_root")/wizardry-nginx-escape-$$"
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-sudo "$stub_dir"
+  rm -rf "$outside_dir"
+  mkdir -p "$outside_dir"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/configure-nginx "../$(basename "$outside_dir")"
+  assert_status 2 || {
+    rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+    return 1
+  }
+
+  [ ! -e "$outside_dir/nginx/nginx.conf" ] || {
+    TEST_FAILURE_REASON="configure-nginx wrote nginx.conf outside WEB_WIZARDRY_ROOT"
+    rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+}
+
+test_configure_nginx_rejects_config_injection_values() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-sudo "$stub_dir"
+  mkdir -p "$test_web_root/mytestsite"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/configure-nginx mytestsite --port '8080; return 200'
+  assert_status 2 || {
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/configure-nginx mytestsite --domain 'example.com; return 200'
+  assert_status 2 || {
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
 run_test_case "configure-nginx --help" test_configure_nginx_help
 run_test_case "configure-nginx creates local mime.types" test_configure_nginx_creates_local_mimetypes
 run_test_case "configure-nginx supports .onion addresses" test_configure_nginx_supports_onion_addresses
 run_test_case "configure-nginx preserves existing port" test_configure_nginx_preserves_existing_port
+run_test_case "configure-nginx rejects site path traversal" test_configure_nginx_rejects_site_path_traversal
+run_test_case "configure-nginx rejects config injection values" test_configure_nginx_rejects_config_injection_values
 
 finish_tests
