@@ -2610,6 +2610,28 @@ workspace_git_release_dir() {
   printf '%s\n' "$dir"
 }
 
+validate_release_asset_name() {
+  asset_name=${1-}
+  clean_name=$(printf '%s' "$asset_name" | tr -d '\r\n')
+
+  [ -n "$asset_name" ] || {
+    printf '%s\n' "forge-backend: release asset name missing" >&2
+    exit 1
+  }
+
+  [ "$clean_name" = "$asset_name" ] || {
+    printf '%s\n' "forge-backend: invalid release asset name: $asset_name" >&2
+    exit 1
+  }
+
+  case "$asset_name" in
+    .|..|/*|*/*|*\\*)
+      printf '%s\n' "forge-backend: invalid release asset name: $asset_name" >&2
+      exit 1
+      ;;
+  esac
+}
+
 workspace_git_cached_value() {
   workspace_path=${1-}
   key=${2-}
@@ -3796,13 +3818,14 @@ cmd_workspace_git_install_release() {
     printf '%s\n' "forge-backend: release asset URL missing" >&2
     exit 1
   }
+  validate_release_asset_name "$asset_name"
   command -v curl >/dev/null 2>&1 || {
     printf '%s\n' "forge-backend: curl is required to install a GitHub release asset" >&2
     exit 1
   }
 
   release_dir=$(workspace_git_release_dir "$workspace_abs")
-  workspace_slug=$(workspace_field "$conf" project_id "$(basename "$workspace_abs")")
+  workspace_slug=$(resolve_workspace_slug "$conf" "$workspace_abs")
   download_path="$release_dir/$asset_name"
   extract_dir="$release_dir/extracted"
   rm -rf "$extract_dir"
