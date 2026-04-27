@@ -71,6 +71,29 @@ int main(void) {
     return 1;
   }
 
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2\\u002e0\",\"id\":101,\"method\":\"core.\\u0070ing\"}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"result\"") || !contains(response, "\"ok\":true")) {
+    fprintf(stderr, "escaped jsonrpc/method response failed: %s\n", response);
+    return 1;
+  }
+
+  {
+    char invalid_method[] = "{\"jsonrpc\":\"2.0\",\"id\":102,\"method\":\"core\n.ping\"}";
+    if (run_rpc(&core, invalid_method, response, sizeof(response)) != 0) {
+      return 1;
+    }
+    if (!contains(response, "\"error\"")) {
+      fprintf(stderr, "raw control character in JSON string was accepted: %s\n", response);
+      return 1;
+    }
+  }
+
   {
     char req[4096];
     snprintf(req,

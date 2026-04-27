@@ -367,6 +367,9 @@ static const char *skip_json_string_token(const char *p) {
       p++;
       continue;
     }
+    if ((unsigned char)*p < 0x20) {
+      return NULL;
+    }
     if (*p == '"') {
       return p + 1;
     }
@@ -553,6 +556,19 @@ static int extract_json_string_value(const char *json,
   memcpy(out, start, len);
   out[len] = '\0';
   return 0;
+}
+
+static int extract_json_decoded_string_value(const char *json,
+                                             const char *field,
+                                             char *out,
+                                             size_t out_size) {
+  char raw[8192];
+
+  if (extract_json_string_value(json, field, raw, sizeof(raw)) != 0) {
+    return -1;
+  }
+
+  return json_unescape(raw, out, out_size);
 }
 
 static int extract_json_object_value(const char *json,
@@ -1955,7 +1971,7 @@ int wizardry_core_rpc(wizardry_core *core,
     safe_copy(id_raw, sizeof(id_raw), "null");
   }
 
-  if (extract_json_string_value(request_json, "jsonrpc", method, sizeof(method)) != 0 ||
+  if (extract_json_decoded_string_value(request_json, "jsonrpc", method, sizeof(method)) != 0 ||
       strcmp(method, "2.0") != 0) {
     return write_error(response_json,
                        response_size,
@@ -1964,7 +1980,7 @@ int wizardry_core_rpc(wizardry_core *core,
                        "jsonrpc must be 2.0");
   }
 
-  if (extract_json_string_value(request_json, "method", method, sizeof(method)) != 0) {
+  if (extract_json_decoded_string_value(request_json, "method", method, sizeof(method)) != 0) {
     return write_error(response_json,
                        response_size,
                        id_raw,
