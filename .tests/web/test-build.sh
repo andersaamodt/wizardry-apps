@@ -391,11 +391,45 @@ EOF
   rm -rf "$test_web_root" "$stub_dir"
 }
 
+test_build_rejects_site_path_traversal() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-build-root)
+  stub_dir=$(make_build_stub_dir)
+  outside_dir="$(dirname "$test_web_root")/wizardry-build-escape-$$"
+  rm -rf "$outside_dir"
+
+  mkdir -p "$outside_dir/site/pages" "$outside_dir/site/static" "$outside_dir/cgi"
+  printf '# Outside\n' > "$outside_dir/site/pages/index.md"
+  cat > "$outside_dir/cgi/pre-build" <<EOF
+#!/bin/sh
+set -eu
+printf 'ran\n' > "$outside_dir/hook-ran"
+EOF
+  chmod +x "$outside_dir/cgi/pre-build"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    run_spell spells/web/build "../$(basename "$outside_dir")" --full
+  assert_status 2 || {
+    rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+    return 1
+  }
+
+  [ ! -f "$outside_dir/hook-ran" ] || {
+    TEST_FAILURE_REASON="build ran a pre-build hook outside WEB_WIZARDRY_ROOT"
+    rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+}
+
 run_test_case "build --help works" test_build_help
 run_test_case "build generates output for every template" test_build_generates_html_for_every_template
 run_test_case "build cache falls back to site data cache" test_build_cache_falls_back_to_site_data_only
 run_test_case "build runs site pre-build hook" test_build_runs_site_pre_build_hook
 run_test_case "build prunes stale html for removed pages" test_build_prunes_stale_html_for_removed_pages
+run_test_case "build rejects site path traversal" test_build_rejects_site_path_traversal
 if [ -d "$ROOT_DIR/web/blog" ]; then
   run_test_case "blog build renders nested posts and feeds" test_build_blog_generates_posts_and_feeds
 fi
