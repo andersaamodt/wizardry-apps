@@ -250,6 +250,25 @@ if sh "$backend" set-workspace-field "$scratch" "$workspaces_root/workspace-home
 fi
 grep -F "invalid hosted_web_serve_action" /tmp/forge-invalid-action.err >/dev/null
 
+escape_workspace="$workspaces_root/escape-workspace"
+escape_outside="$workspaces_root/escape-outside"
+mkdir -p "$escape_workspace" "$escape_outside"
+printf '%s\n' '<!doctype html><title>outside</title>' >"$escape_outside/index.html"
+cat > "$escape_workspace/wizardry.workspace.conf" <<CONF
+project_id=escape-workspace
+title=Escape Workspace
+project_type=application
+development_context=web
+targets=hosted-web,macos,linux
+app_subpath=../escape-outside
+run_rebuild_command=:
+CONF
+if sh "$backend" run-workspace "$scratch" "$escape_workspace" web >/tmp/forge-escape-subpath.out 2>/tmp/forge-escape-subpath.err; then
+  printf '%s\n' "forge backend test: escaping app_subpath was runnable" >&2
+  exit 1
+fi
+grep -F "project app index not found" /tmp/forge-escape-subpath.err >/dev/null
+
 workspace_native_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native "Workspace Native" native-desktop blank "macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_native_out" | grep -F "created=$workspaces_root/workspace-native" >/dev/null
 workspace_native_abs=$(CDPATH= cd -- "$workspaces_root/workspace-native" && pwd -P)

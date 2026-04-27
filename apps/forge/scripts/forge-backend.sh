@@ -2362,7 +2362,8 @@ resolve_workspace_godot_subpath() {
         fi
         ;;
       *)
-        if [ -f "$workspace_path/$godot_subpath/project.godot" ]; then
+        godot_project_file=$(resolve_workspace_relative_path "$workspace_path" "$godot_subpath/project.godot" 2>/dev/null || true)
+        if [ -n "$godot_project_file" ] && [ -f "$godot_project_file" ]; then
           printf '%s\n' "$godot_subpath"
           return 0
         fi
@@ -2383,16 +2384,11 @@ resolve_workspace_native_ir_path() {
   fi
 
   if [ -n "$native_ir_path" ]; then
-    case "$native_ir_path" in
-      "." | */ | */.. | *".."*)
-        ;;
-      *)
-        if [ -f "$workspace_path/$native_ir_path" ]; then
-          printf '%s\n' "$native_ir_path"
-          return 0
-        fi
-        ;;
-    esac
+    native_ir_abs=$(resolve_workspace_relative_path "$workspace_path" "$native_ir_path" 2>/dev/null || true)
+    if [ -n "$native_ir_abs" ] && [ -f "$native_ir_abs" ]; then
+      printf '%s\n' "$native_ir_path"
+      return 0
+    fi
   fi
 
   detect_workspace_native_ir_path "$workspace_path"
@@ -2418,8 +2414,9 @@ resolve_workspace_app_dir() {
       return 0
       ;;
     *)
-      if [ -f "$workspace_path/$app_subpath/index.html" ]; then
-        printf '%s\n' "$workspace_path/$app_subpath"
+      app_index_abs=$(resolve_workspace_relative_path "$workspace_path" "$app_subpath/index.html" 2>/dev/null || true)
+      if [ -n "$app_index_abs" ] && [ -f "$app_index_abs" ]; then
+        dirname "$app_index_abs"
         return 0
       fi
       ;;
