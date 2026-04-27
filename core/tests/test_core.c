@@ -123,6 +123,102 @@ int main(void) {
   }
 
   if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":501,\"method\":\"doc.write\",\"params\":{\"path\":\"notes/out-of-scope.md\"},\"content\":\"not in params\"}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"error\"")) {
+    fprintf(stderr, "doc.write accepted content outside params object: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":502,\"method\":\"doc.write\",\"params\":{\"path\":\"notes/escapes.md\",\"content\":\"a\\bb\\fc\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"written\":true")) {
+    fprintf(stderr, "unexpected escape doc.write response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":503,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/escapes.md\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "a\\bb\\fc")) {
+    fprintf(stderr, "doc.read did not preserve backspace/formfeed escapes: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":504,\"method\":\"doc.write\",\"params\":{\"path\":\"notes/unicode.md\",\"content\":\"snowman=\\u2603\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"written\":true")) {
+    fprintf(stderr, "unexpected unicode doc.write response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":505,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/unicode.md\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "snowman=\xE2\x98\x83")) {
+    fprintf(stderr, "doc.read did not decode unicode escape: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":506,\"method\":\"doc.write\",\"params\":{\"path\":\"notes/surrogate.md\",\"content\":\"emoji=\\uD83D\\uDE00\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"written\":true")) {
+    fprintf(stderr, "unexpected surrogate doc.write response: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":507,\"method\":\"doc.read\",\"params\":{\"path\":\"notes/surrogate.md\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "emoji=\xF0\x9F\x98\x80")) {
+    fprintf(stderr, "doc.read did not decode unicode surrogate pair: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
+              "{\"jsonrpc\":\"2.0\",\"id\":508,\"method\":\"doc.write\",\"params\":{\"path\":\"notes/nul.md\",\"content\":\"bad\\u0000value\"}}",
+              response,
+              sizeof(response)) != 0) {
+    return 1;
+  }
+
+  if (!contains(response, "\"error\"")) {
+    fprintf(stderr, "doc.write accepted embedded NUL content: %s\n", response);
+    return 1;
+  }
+
+  if (run_rpc(&core,
               "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"meta.set\",\"params\":{\"path\":\"notes/one.md\",\"key\":\"user.tag\",\"value\":\"alpha\"}}",
               response,
               sizeof(response)) != 0) {

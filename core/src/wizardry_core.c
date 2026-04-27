@@ -187,15 +187,101 @@ static int json_unescape(const char *in, char *out, size_t out_size) {
       }
 
       switch (*in) {
+        case 'b': ch = '\b'; break;
+        case 'f': ch = '\f'; break;
         case 'n': ch = '\n'; break;
         case 'r': ch = '\r'; break;
         case 't': ch = '\t'; break;
         case '"': ch = '"'; break;
         case '\\': ch = '\\'; break;
         case '/': ch = '/'; break;
+        case 'u': {
+          unsigned long code = 0;
+          int i;
+
+          for (i = 0; i < 4; i++) {
+            unsigned char hx = (unsigned char)in[1 + i];
+            code <<= 4;
+            if (hx >= '0' && hx <= '9') {
+              code |= (unsigned long)(hx - '0');
+            } else if (hx >= 'a' && hx <= 'f') {
+              code |= (unsigned long)(hx - 'a' + 10);
+            } else if (hx >= 'A' && hx <= 'F') {
+              code |= (unsigned long)(hx - 'A' + 10);
+            } else {
+              return -1;
+            }
+          }
+
+          if (code >= 0xD800 && code <= 0xDBFF) {
+            unsigned long low = 0;
+
+            if (in[5] != '\\' || in[6] != 'u') {
+              return -1;
+            }
+
+            for (i = 0; i < 4; i++) {
+              unsigned char hx = (unsigned char)in[7 + i];
+              low <<= 4;
+              if (hx >= '0' && hx <= '9') {
+                low |= (unsigned long)(hx - '0');
+              } else if (hx >= 'a' && hx <= 'f') {
+                low |= (unsigned long)(hx - 'a' + 10);
+              } else if (hx >= 'A' && hx <= 'F') {
+                low |= (unsigned long)(hx - 'A' + 10);
+              } else {
+                return -1;
+              }
+            }
+
+            if (low < 0xDC00 || low > 0xDFFF) {
+              return -1;
+            }
+
+            code = 0x10000 + (((code - 0xD800) << 10) | (low - 0xDC00));
+          } else if (code >= 0xDC00 && code <= 0xDFFF) {
+            return -1;
+          }
+
+          if (code == 0) {
+            return -1;
+          }
+
+          if (code <= 0x7F) {
+            if (oi + 1 >= out_size) {
+              return -1;
+            }
+            out[oi++] = (char)code;
+          } else if (code <= 0x7FF) {
+            if (oi + 2 >= out_size) {
+              return -1;
+            }
+            out[oi++] = (char)(0xC0 | ((code >> 6) & 0x1F));
+            out[oi++] = (char)(0x80 | (code & 0x3F));
+          } else if (code <= 0xFFFF) {
+            if (oi + 3 >= out_size) {
+              return -1;
+            }
+            out[oi++] = (char)(0xE0 | ((code >> 12) & 0x0F));
+            out[oi++] = (char)(0x80 | ((code >> 6) & 0x3F));
+            out[oi++] = (char)(0x80 | (code & 0x3F));
+          } else if (code <= 0x10FFFF) {
+            if (oi + 4 >= out_size) {
+              return -1;
+            }
+            out[oi++] = (char)(0xF0 | ((code >> 18) & 0x07));
+            out[oi++] = (char)(0x80 | ((code >> 12) & 0x3F));
+            out[oi++] = (char)(0x80 | ((code >> 6) & 0x3F));
+            out[oi++] = (char)(0x80 | (code & 0x3F));
+          } else {
+            return -1;
+          }
+
+          in += code > 0xFFFF ? 11 : 5;
+          continue;
+        }
         default:
-          ch = *in;
-          break;
+          return -1;
       }
     }
 
@@ -226,6 +312,8 @@ static int json_escape(const char *in, char *out, size_t out_size) {
     switch (ch) {
       case '"': esc = "\\\""; break;
       case '\\': esc = "\\\\"; break;
+      case '\b': esc = "\\b"; break;
+      case '\f': esc = "\\f"; break;
       case '\n': esc = "\\n"; break;
       case '\r': esc = "\\r"; break;
       case '\t': esc = "\\t"; break;
@@ -240,10 +328,21 @@ static int json_escape(const char *in, char *out, size_t out_size) {
       memcpy(out + oi, esc, elen);
       oi += elen;
     } else {
-      if (oi + 1 >= out_size) {
+      if ((unsigned char)ch < 0x20) {
+        int n;
+        if (oi + 6 >= out_size) {
+          return -1;
+        }
+        n = snprintf(out + oi, out_size - oi, "\\u%04x", (unsigned char)ch);
+        if (n != 6) {
+          return -1;
+        }
+        oi += 6;
+      } else if (oi + 1 >= out_size) {
         return -1;
+      } else {
+        out[oi++] = ch;
       }
-      out[oi++] = ch;
     }
 
     in++;
@@ -368,7 +467,15 @@ static int extract_params_string(const char *json,
                                  char *out,
                                  size_t out_size) {
   const char *params;
+  const char *object_start;
+  const char *p;
+  const char *object_end;
   char raw[8192];
+  char scoped_params[8192];
+  int depth;
+  int in_string;
+  int escaped;
+  size_t len;
 
   if (!json || !field || !out || out_size == 0) {
     return -1;
@@ -379,7 +486,59 @@ static int extract_params_string(const char *json,
     return -1;
   }
 
-  if (extract_json_string_value(params, field, raw, sizeof(raw)) != 0) {
+  params = strchr(params, ':');
+  if (!params) {
+    return -1;
+  }
+
+  object_start = skip_ws(params + 1);
+  if (!object_start || *object_start != '{') {
+    return -1;
+  }
+
+  p = object_start;
+  depth = 0;
+  in_string = 0;
+  escaped = 0;
+  object_end = NULL;
+  while (*p) {
+    if (in_string) {
+      if (escaped) {
+        escaped = 0;
+      } else if (*p == '\\') {
+        escaped = 1;
+      } else if (*p == '"') {
+        in_string = 0;
+      }
+    } else if (*p == '"') {
+      in_string = 1;
+    } else if (*p == '{') {
+      depth++;
+    } else if (*p == '}') {
+      depth--;
+      if (depth == 0) {
+        object_end = p + 1;
+        break;
+      }
+      if (depth < 0) {
+        return -1;
+      }
+    }
+    p++;
+  }
+
+  if (!object_end) {
+    return -1;
+  }
+
+  len = (size_t)(object_end - object_start);
+  if (len >= sizeof(scoped_params)) {
+    return -1;
+  }
+  memcpy(scoped_params, object_start, len);
+  scoped_params[len] = '\0';
+
+  if (extract_json_string_value(scoped_params, field, raw, sizeof(raw)) != 0) {
     return -1;
   }
 
