@@ -108,3 +108,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Deploy and notarization secrets should reject control/path metacharacters before reaching remote-shell, codesign, or notarytool arguments.
 - Icon generators emit backend rows and metadata files, so input/project paths and stored extensions must be output-safe before generation starts.
 - Icon staging should preflight every required output before copying so missing fallbacks cannot leave stale platform assets in place.
+- Installer paths rendered into shell shims or desktop files must reject shell-expansion characters unless they are structurally escaped.

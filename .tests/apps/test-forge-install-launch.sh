@@ -41,6 +41,28 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 fake_home="$scratch/home"
 mkdir -p "$fake_home"
 
+unsafe_root="$scratch/unsafe\$root"
+fake_uname_bin="$scratch/fake-uname-bin"
+mkdir -p "$unsafe_root/tools/forge" "$unsafe_root/apps/forge" "$fake_uname_bin"
+cat >"$unsafe_root/tools/forge/launch-forge" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$unsafe_root/tools/forge/build-forge-macos-app" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$fake_uname_bin/uname" <<'SH'
+#!/bin/sh
+printf '%s\n' "Linux"
+SH
+chmod +x "$unsafe_root/tools/forge/launch-forge" "$unsafe_root/tools/forge/build-forge-macos-app" "$fake_uname_bin/uname"
+if PATH="$fake_uname_bin:$PATH" sh "$install" --root "$unsafe_root" --home "$fake_home" >"$scratch/unsafe-root.out" 2>"$scratch/unsafe-root.err"; then
+  printf '%s\n' "install-forge accepted shell-unsafe root path" >&2
+  exit 1
+fi
+grep -F "unsafe root path" "$scratch/unsafe-root.err" >/dev/null
+
 install_out=$(sh "$install" --root "$root" --home "$fake_home")
 printf '%s\n' "$install_out" | grep -F "installed_command=$fake_home/.local/bin/app-forge" >/dev/null
 printf '%s\n' "$install_out" | grep -F "workspace_root_file=$fake_home/.config/wizardry-apps/forge-root" >/dev/null

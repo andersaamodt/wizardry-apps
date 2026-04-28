@@ -79,6 +79,36 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
+shell_generated_path_is_safe() {
+  case "${1-}" in *'"'*|*'$'*|*'`'*|*'\'*) return 1 ;; esac
+  has_line_break "$1" && return 1
+  return 0
+}
+
+shell_generated_path_is_safe "$root" || {
+  printf '%s\n' "install-forge: unsafe root path" >&2
+  exit 2
+}
+
+shell_generated_path_is_safe "$home_dir" || {
+  printf '%s\n' "install-forge: unsafe home path" >&2
+  exit 2
+}
+
+if [ -n "$app_dir" ] && has_line_break "$app_dir"; then
+  printf '%s\n' "install-forge: unsafe app path" >&2
+  exit 2
+fi
+
 if [ ! -x "$root/tools/forge/launch-forge" ] || [ ! -d "$root/apps/forge" ]; then
   printf '%s\n' "install-forge: invalid wizardry-apps root: $root" >&2
   exit 1
