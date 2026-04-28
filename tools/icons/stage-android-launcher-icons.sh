@@ -26,11 +26,12 @@ source_icon="$app_dir/assets/forge-icon.png"
 
 for folder in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
   mkdir -p "$res_dir/$folder"
-  if [ -d "$icons_dir/$folder" ]; then
-    cp "$icons_dir/$folder"/ic_launcher*.png "$res_dir/$folder/"
-    continue
-  fi
-  [ -f "$source_icon" ] || continue
-  cp "$source_icon" "$res_dir/$folder/ic_launcher.png"
-  cp "$source_icon" "$res_dir/$folder/ic_launcher_round.png"
+  for icon_name in ic_launcher.png ic_launcher_round.png; do
+    generated_icon="$icons_dir/$folder/$icon_name"
+    if [ -f "$generated_icon" ]; then
+      cp "$generated_icon" "$res_dir/$folder/$icon_name"
+    elif [ -f "$source_icon" ]; then
+      cp "$source_icon" "$res_dir/$folder/$icon_name"
+    fi
+  done
 done

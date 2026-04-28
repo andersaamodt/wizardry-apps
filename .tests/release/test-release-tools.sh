@@ -26,6 +26,17 @@ sh "$ROOT_DIR/tools/release/stage-web-assets.sh" chatroom "$tmp_dir/chatroom-ass
 [ -f "$tmp_dir/chatroom-assets/app/index.html" ]
 [ -f "$tmp_dir/chatroom-assets/app/.host/shared/wizardry-bridge.js" ]
 
+partial_icon_app="$tmp_dir/partial-icon-app"
+partial_icon_res="$tmp_dir/partial-icon-res"
+mkdir -p "$partial_icon_app/assets/icons/android/mipmap-mdpi" "$partial_icon_app/assets/icons/android/mipmap-hdpi" "$partial_icon_app/assets"
+printf '%s\n' "fallback icon" > "$partial_icon_app/assets/forge-icon.png"
+printf '%s\n' "generated icon" > "$partial_icon_app/assets/icons/android/mipmap-hdpi/ic_launcher.png"
+sh "$ROOT_DIR/tools/icons/stage-android-launcher-icons.sh" "$partial_icon_app" "$partial_icon_res"
+grep -Fx "fallback icon" "$partial_icon_res/mipmap-mdpi/ic_launcher.png" >/dev/null
+grep -Fx "fallback icon" "$partial_icon_res/mipmap-mdpi/ic_launcher_round.png" >/dev/null
+grep -Fx "generated icon" "$partial_icon_res/mipmap-hdpi/ic_launcher.png" >/dev/null
+grep -Fx "fallback icon" "$partial_icon_res/mipmap-hdpi/ic_launcher_round.png" >/dev/null
+
 if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" ../web/demo "$tmp_dir/traversed-assets" >/dev/null 2>&1; then
   printf '%s\n' "stage-web-assets accepted slug path traversal" >&2
   exit 1
