@@ -2254,6 +2254,16 @@ ensure_dir_path() {
   (CDPATH= cd -- "$path" && pwd -P)
 }
 
+reject_line_breaks() {
+  value=${1-}
+  label=${2-value}
+  single_line=$(printf '%s' "$value" | tr '\r\n' '  ')
+  [ "$single_line" = "$value" ] || {
+    printf '%s\n' "forge-backend: $label must not contain line breaks" >&2
+    exit 2
+  }
+}
+
 derive_workspace_slug() {
   name=${1-}
   slug=$(printf '%s' "$name" \
@@ -2459,6 +2469,7 @@ resolve_workspace_slug() {
 
 ensure_importable_workspace_profile() {
   workspace_path=${1-}
+  reject_line_breaks "$workspace_path" "project path"
   conf_path="$workspace_path/wizardry.workspace.conf"
   if [ -f "$conf_path" ]; then
     existing_profile_kind=$(workspace_field "$conf_path" profile_kind "")
@@ -3274,7 +3285,9 @@ cmd_import_workspace() {
   }
 
   [ -n "$project_root" ] || project_root=$(workspace_default_root)
+  reject_line_breaks "$project_root" "project root"
   project_root_abs=$(ensure_dir_path "$project_root")
+  reject_line_breaks "$project_root_abs" "project root"
 
   profile_meta=$(ensure_importable_workspace_profile "$workspace_abs")
   profile_path=$(printf '%s\n' "$profile_meta" | cut -f1)
@@ -3393,6 +3406,7 @@ cmd_get_workspace_profile() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
 
   conf="$workspace_abs/wizardry.workspace.conf"
   [ -f "$conf" ] || {
@@ -4284,6 +4298,7 @@ cmd_rename_workspace() {
   parent_dir=$(dirname "$workspace_abs")
   new_slug=$(derive_workspace_slug "$cleaned_title")
   target_path="$parent_dir/$new_slug"
+  reject_line_breaks "$target_path" "project path"
   moved=0
 
   if [ "$workspace_abs" != "$target_path" ]; then
@@ -7338,9 +7353,11 @@ cmd_scaffold_workspace() {
       project_root="$(pwd -P)/$project_root"
       ;;
   esac
+  reject_line_breaks "$project_root" "project root"
   mkdir -p "$project_root"
 
   workspace_dir="$project_root/$slug"
+  reject_line_breaks "$workspace_dir" "project path"
   [ ! -e "$workspace_dir" ] || {
     printf '%s\n' "forge-backend: project path already exists: $workspace_dir" >&2
     exit 1

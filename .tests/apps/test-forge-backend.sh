@@ -226,6 +226,15 @@ godot_tools=$(sh "$backend" list-godot-tools "$scratch")
 printf '%s\n' "$godot_tools" | grep -E '^base-tool$' >/dev/null
 
 workspaces_root="$scratch/workspaces"
+bad_project_root="$scratch/workspaces-bad
+run_rebuild_command=bad"
+if sh "$backend" scaffold-workspace "$scratch" bad-root "Bad Root" web sidebar "hosted-web" "" "$bad_project_root" >/tmp/forge-invalid-project-root.out 2>/tmp/forge-invalid-project-root.err; then
+  printf '%s\n' "forge backend test: line-break project root accepted" >&2
+  exit 1
+fi
+grep -F "project root must not contain line breaks" /tmp/forge-invalid-project-root.err >/dev/null
+[ ! -e "$bad_project_root/bad-root" ]
+
 workspace_web_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-web "Workspace Web" web sidebar "hosted-web,macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_web_out" | grep -F "created=$workspaces_root/workspace-web" >/dev/null
 workspace_web_abs=$(CDPATH= cd -- "$workspaces_root/workspace-web" && pwd -P)
@@ -386,6 +395,21 @@ workspace_web_broken=$(sh "$backend" workspace-git-status "$scratch" "$workspace
 printf '%s\n' "$workspace_web_broken" | grep -F "git_status_label=No Remote" >/dev/null
 printf '%s\n' "$workspace_web_broken" | grep -F "git_last_fetch_error=Fetch from origin failed." >/dev/null
 git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
+
+bad_import_workspace="$scratch/external/bad
+run_rebuild_command=bad"
+mkdir -p "$bad_import_workspace/app"
+cat > "$bad_import_workspace/app/index.html" <<'HTML'
+<!doctype html>
+<meta charset="utf-8">
+<title>Bad Import</title>
+HTML
+if sh "$backend" import-workspace "$scratch" "$bad_import_workspace" "$workspaces_root" >/tmp/forge-invalid-import-path.out 2>/tmp/forge-invalid-import-path.err; then
+  printf '%s\n' "forge backend test: line-break import path accepted" >&2
+  exit 1
+fi
+grep -F "project path must not contain line breaks" /tmp/forge-invalid-import-path.err >/dev/null
+[ ! -f "$bad_import_workspace/wizardry.workspace.conf" ]
 
 external_workspace="$scratch/external/plain-web"
 mkdir -p "$external_workspace/app"
