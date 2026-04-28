@@ -307,7 +307,11 @@ while [ "$#" -gt 0 ]; do
 done
 case "$url" in
   https://oauth2.googleapis.com/token)
-    printf '%s\n' '{"access_token":"token123"}'
+    if [ "${PLAY_FAKE_BAD_ACCESS_TOKEN-}" = "1" ]; then
+      printf '%s\n' '{"access_token":"token123\nInjected: bad"}'
+    else
+      printf '%s\n' '{"access_token":"token123"}'
+    fi
     ;;
   *'/edits/edit123/bundles?uploadType=media')
     if [ "${PLAY_FAKE_BAD_VERSION_CODE-}" = "1" ]; then
@@ -349,6 +353,15 @@ grep -F "invalid service account json (client_email)" "$tmp_dir/play-upload-bad-
 
 good_service_json='{"client_email":"svc@example.iam.gserviceaccount.com","private_key":"key"}'
 if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$good_service_json" \
+   PLAY_FAKE_BAD_ACCESS_TOKEN=1 \
+   PATH="$fake_play_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" com.example.app internal >"$tmp_dir/play-upload-bad-token.out" 2>"$tmp_dir/play-upload-bad-token.err"; then
+  printf '%s\n' "upload-play-internal accepted invalid API access token" >&2
+  exit 1
+fi
+grep -F "invalid access token from API" "$tmp_dir/play-upload-bad-token.err" >/dev/null
+
+if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$good_service_json" \
    PLAY_FAKE_BAD_VERSION_CODE=1 \
    PATH="$fake_play_bin:$PATH" \
    sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" com.example.app internal >"$tmp_dir/play-upload-bad-version.out" 2>"$tmp_dir/play-upload-bad-version.err"; then
@@ -356,6 +369,15 @@ if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$good_service_json" \
   exit 1
 fi
 grep -F "invalid version code from API" "$tmp_dir/play-upload-bad-version.err" >/dev/null
+
+if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$good_service_json" \
+   PLAY_FAKE_BAD_ACCESS_TOKEN=1 \
+   PATH="$fake_play_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/promote-play-track.sh" com.example.app internal production >"$tmp_dir/play-promote-bad-token.out" 2>"$tmp_dir/play-promote-bad-token.err"; then
+  printf '%s\n' "promote-play-track accepted invalid API access token" >&2
+  exit 1
+fi
+grep -F "invalid access token from API" "$tmp_dir/play-promote-bad-token.err" >/dev/null
 
 if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$good_service_json" \
    PLAY_FAKE_BAD_SOURCE_CODES=1 \

@@ -47,6 +47,10 @@ valid_version_code() {
   case "${1-}" in ""|*[!0-9]*) return 1 ;; esac
 }
 
+valid_bearer_token() {
+  case "${1-}" in ""|*[!A-Za-z0-9._~+/=-]*) return 1 ;; esac
+}
+
 valid_service_account_email() {
   case "${1-}" in ""|*[!A-Za-z0-9._%+@-]*|*@*@*|@*|*@|*.|*@.*) return 1 ;; esac
   case "$1" in *@*.*) return 0 ;; *) return 1 ;; esac
@@ -135,6 +139,10 @@ if [ -z "$access_token" ] || [ "$access_token" = "null" ]; then
   printf '%s\n' "$token_json" >&2
   exit 1
 fi
+valid_bearer_token "$access_token" || {
+  printf '%s\n' "upload-play-internal: invalid access token from API" >&2
+  exit 1
+}
 
 api_base="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$package_name/edits"
 

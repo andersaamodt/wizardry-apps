@@ -104,6 +104,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Release upload helpers should adversarially test each credential field, not just the credential field used in a temp filename.
 - Release version strings are project-file inputs; validate them before rendering Xcode, Gradle, plist, YAML, or package metadata.
 - Remote API IDs, versions, and states need revalidation after `jq` extraction before reuse in URLs or machine-readable status rows.
+- Remote API tokens should be revalidated after parsing before they are used in HTTP headers.
 - Service account JSON is release input; validate identity fields before rendering JWT claims.
 - Deploy and notarization secrets should reject control/path metacharacters before reaching remote-shell, codesign, or notarytool arguments.
 - Icon generators emit backend rows and metadata files, so input/project paths and stored extensions must be output-safe before generation starts.
