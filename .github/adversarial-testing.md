@@ -41,6 +41,8 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Workspace mutation commands must enforce the same path output contract as list/status commands before writing profiles or renaming folders.
 - Workspace rebuild/run/install and icon mutation commands also emit machine-readable rows; reject line-break project paths before build, launch, install, or asset writes.
 - Imported project profiles are untrusted input; runtime/build paths should sanitize or fall back before writing bundle IDs, file names, or launchers.
+- Imported display names can contain CR even when the key/value reader is line-based; sanitize or fall back before printing `app_name`, writing desktop entries, or naming bundles.
+- When deriving bundled entry suffixes, compare canonical workspace and app paths; `/var` versus `/private/var` mismatches can turn a relative app path into a nested absolute path.
 - Bridge commands must use fixed action names and argv arrays; never let GUI input choose executables, shell fragments, or free-form argv vectors.
 - Busy/write actions must reject overlapping triggers so double-clicks cannot race profile writes, installs, icon generation, or release downloads.
 

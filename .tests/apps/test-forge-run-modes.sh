@@ -224,6 +224,26 @@ workspace_host_launcher=$(printf '%s\n' "$workspace_host_install_out" | kv_read 
 [ -x "$workspace_host_launcher" ]
 [ -f "$workspace_host_install_root/usr/share/workspace-host/app/index.html" ]
 
+workspace_bad_title="$scratch/workspace-bad-title"
+make_workspace "$workspace_bad_title" "workspace-bad-title" "Workspace Bad Title" "linux"
+{
+  printf 'project_id=workspace-bad-title\n'
+  printf 'title=Bad\rlauncher=forged\n'
+  printf 'project_type=application\n'
+  printf 'development_context=web\n'
+  printf 'targets=linux\n'
+  printf 'root=%s\n' "$workspace_bad_title"
+  printf 'starter=import-web\n'
+} > "$workspace_bad_title/wizardry.workspace.conf"
+workspace_bad_title_out=$(test_env FORGE_TEST_UNAME=Linux sh "$backend" install-workspace "$root" "$workspace_bad_title" web linux)
+if printf '%s\n' "$workspace_bad_title_out" | tr '\r' '\n' | grep -Fx "launcher=forged" >/dev/null 2>&1; then
+  printf '%s\n' "install-workspace emitted forged launcher row from imported workspace title" >&2
+  exit 1
+fi
+assert_contains "$workspace_bad_title_out" "app_name=workspace-bad-title"
+workspace_bad_title_desktop=$(printf '%s\n' "$workspace_bad_title_out" | kv_read desktop_entry)
+grep -F "Name=workspace-bad-title" "$workspace_bad_title_desktop" >/dev/null
+
 # Behavior: web workspace install-first runs the installed launcher instead of the transient bundle.
 workspace_host_install_log="$scratch/workspace-host-install.log"
 workspace_host_install_run_out=$(test_env FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$workspace_host_install_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-workspace "$root" "$workspace_host" web install-first)

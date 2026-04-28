@@ -631,6 +631,29 @@ normalize_generated_display_name() {
   printf '%s' "${1-}" | tr '\r\n\t' '   ' | sed 's/[[:space:]][[:space:]]*/ /g; s/^[[:space:]]*//; s/[[:space:]]*$//'
 }
 
+is_generated_display_name() {
+  value=${1-}
+  [ -n "$value" ] || return 1
+  printf '%s\n' "$value" | LC_ALL=C grep -Eq '^[A-Za-z0-9 .,_()-]+$'
+}
+
+safe_generated_display_name() {
+  value=$(normalize_generated_display_name "${1-}")
+  fallback=$(normalize_generated_display_name "${2-Workspace}")
+
+  if is_generated_display_name "$value"; then
+    printf '%s\n' "$value"
+    return 0
+  fi
+
+  if is_generated_display_name "$fallback"; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+
+  printf '%s\n' "Workspace"
+}
+
 validate_generated_display_name() {
   value=${1-}
   label=${2-APP_NAME}
@@ -640,7 +663,7 @@ validate_generated_display_name() {
     exit 2
   }
 
-  if ! printf '%s\n' "$value" | LC_ALL=C grep -Eq '^[A-Za-z0-9 .,_()-]+$'; then
+  if ! is_generated_display_name "$value"; then
     printf '%s\n' "forge-backend: unsupported $label '$value' (use letters, numbers, spaces, '.', ',', '_', '-', or parentheses)" >&2
     exit 2
   fi
@@ -5234,7 +5257,8 @@ resolve_native_workspace_metadata() {
   app_id=$(jq -r '.app.id // ""' "$native_ir")
   app_name=$(jq -r '.app.name // ""' "$native_ir")
   [ -n "$app_id" ] || return 1
-  [ -n "$app_name" ] || app_name=$(workspace_field "$workspace_conf" title "$(basename "$workspace_path")")
+  printf '%s\n' "$app_id" | LC_ALL=C grep -Eq '^[A-Za-z][A-Za-z0-9-]*$' || return 1
+  app_name=$(safe_generated_display_name "$app_name" "$(workspace_display_title "$workspace_path" "$workspace_conf")")
   workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
 
   printf 'ir=%s\n' "$native_ir"
@@ -5549,8 +5573,7 @@ workspace_display_title() {
 
   workspace_title=$(workspace_field "$workspace_conf" title "")
   [ -n "$workspace_title" ] || workspace_title=$(workspace_field "$workspace_conf" name "")
-  [ -n "$workspace_title" ] || workspace_title=$(basename "$workspace_path")
-  printf '%s\n' "$workspace_title"
+  safe_generated_display_name "$workspace_title" "$(basename "$workspace_path")"
 }
 
 host_workspace_target_id() {
@@ -5577,8 +5600,9 @@ build_workspace_desktop_host() {
   fi
 
   app_entry_suffix=''
-  if [ "$app_dir" != "$workspace_path" ]; then
-    app_entry_suffix=${app_dir#"$workspace_path"}
+  workspace_abs=$(CDPATH= cd -- "$workspace_path" && pwd -P) || workspace_abs=$workspace_path
+  if [ "$app_dir" != "$workspace_abs" ]; then
+    app_entry_suffix=${app_dir#"$workspace_abs"}
   fi
 
   host_target=$(host_workspace_target_id 2>/dev/null || true)
@@ -6420,7 +6444,7 @@ cmd_run_workspace() {
       run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
       project_title=''
       if [ -f "$workspace_path/wizardry.workspace.conf" ]; then
-        project_title=$(workspace_field "$workspace_path/wizardry.workspace.conf" title "")
+        project_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
       fi
       if ! project_path=$(ensure_godot_project "$workspace_path" "$project_title"); then
         printf '%s\n' "forge-backend: Godot project is missing project.godot: $workspace_path" >&2
@@ -6706,8 +6730,9 @@ cmd_run_workspace() {
     exit 1
   fi
   app_entry_suffix=''
-  if [ "$app_dir" != "$workspace_path" ]; then
-    app_entry_suffix=${app_dir#"$workspace_path"}
+  workspace_abs=$(CDPATH= cd -- "$workspace_path" && pwd -P) || workspace_abs=$workspace_path
+  if [ "$app_dir" != "$workspace_abs" ]; then
+    app_entry_suffix=${app_dir#"$workspace_abs"}
   fi
 
   targets_csv=''
@@ -6760,13 +6785,8 @@ cmd_run_workspace() {
   log_path="$log_dir/workspace-$workspace_id-run.log"
 
   if [ "$os" = "darwin" ] && command -v open >/dev/null 2>&1; then
-    workspace_title=$(workspace_field "$workspace_conf" title "")
-    [ -n "$workspace_title" ] || workspace_title=$(workspace_field "$workspace_conf" name "")
-    [ -n "$workspace_title" ] || workspace_title=$(basename "$workspace_path")
-
-    workspace_slug=$(workspace_field "$workspace_conf" project_id "")
-    [ -n "$workspace_slug" ] || workspace_slug=$(basename "$workspace_path")
-    workspace_slug=$(sanitize_bundle_component "$workspace_slug")
+    workspace_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
+    workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
 
     bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
     final_bundle="$bundle_root/$workspace_title.app"
