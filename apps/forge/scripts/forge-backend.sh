@@ -3262,7 +3262,7 @@ cmd_set_ui_pref() {
   write_key_value_file "$prefs_file" "$key" "$value"
   printf 'key=%s\n' "$key"
   printf 'value=%s\n' "$value"
-  printf 'file=%s\n' "$prefs_file"
+  printf 'file=%s\n' "$(kv_output_value "$prefs_file")"
 }
 
 cmd_list_workspaces() {

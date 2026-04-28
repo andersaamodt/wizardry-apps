@@ -130,6 +130,15 @@ if printf '%s\n' "$ui_prefs_out" | grep -F "ab/key=" >/dev/null 2>&1; then
   exit 1
 fi
 
+bad_prefs_home="$scratch/prefs-home
+forged=1"
+set_pref_out=$(XDG_CONFIG_HOME="$bad_prefs_home/.config" sh "$backend" set-ui-pref "$scratch" "theme" "dark")
+if printf '%s\n' "$set_pref_out" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge set-ui-pref emitted forged key-value output from config path" >&2
+  exit 1
+fi
+printf '%s\n' "$set_pref_out" | grep -F "file=" >/dev/null
+
 bundle_scripts="$scratch/App Forge.app/Contents/Resources/forge/scripts"
 bundle_root_file="$scratch/App Forge.app/Contents/Resources/wizardry-apps-root.txt"
 mkdir -p "$bundle_scripts"
