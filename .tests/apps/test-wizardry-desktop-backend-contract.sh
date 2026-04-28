@@ -71,6 +71,18 @@ grep -F "quick-look	look ." "$tmp_spellbook/.memorized" >/dev/null 2>&1 || {
   printf '%s\n' "memorize-spell did not persist expected command entry" >&2
   exit 1
 }
+if HOME="$tmp_home" SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" memorize-spell tabbed "$(printf 'look\tbad')" >/tmp/wizardry-desktop-tabbed-spell.out 2>/tmp/wizardry-desktop-tabbed-spell.err; then
+  printf '%s\n' "memorize-spell accepted tab-delimited command text" >&2
+  exit 1
+fi
+grep -F "without tabs" /tmp/wizardry-desktop-tabbed-spell.err >/dev/null 2>&1 || {
+  printf '%s\n' "memorize-spell tab-delimited command error missing" >&2
+  exit 1
+}
+if grep -F "tabbed" "$tmp_spellbook/.memorized" >/dev/null 2>&1; then
+  printf '%s\n' "memorize-spell persisted rejected tab-delimited command" >&2
+  exit 1
+fi
 
 printf '%s\n' "arcana=install-menu" >"$tmp_spellbook/.default-synonyms"
 SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" add-synonym leap jump-to-marker >/dev/null 2>&1 || {
@@ -82,6 +94,18 @@ printf '%s\n' "$tmp_synonyms" | grep -F "leap|jump-to-marker|custom" >/dev/null 
   printf '%s\n' "add-synonym did not create expected custom row" >&2
   exit 1
 }
+if SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" add-synonym badpipe 'jump|bad' >/tmp/wizardry-desktop-pipe-synonym.out 2>/tmp/wizardry-desktop-pipe-synonym.err; then
+  printf '%s\n' "add-synonym accepted pipe-delimited target text" >&2
+  exit 1
+fi
+grep -F "without tabs or pipes" /tmp/wizardry-desktop-pipe-synonym.err >/dev/null 2>&1 || {
+  printf '%s\n' "add-synonym pipe-delimited target error missing" >&2
+  exit 1
+}
+if grep -F "badpipe=" "$tmp_spellbook/.synonyms" >/dev/null 2>&1; then
+  printf '%s\n' "add-synonym persisted rejected pipe-delimited target" >&2
+  exit 1
+fi
 SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" remove-synonym leap >/dev/null 2>&1 || {
   printf '%s\n' "remove-synonym action failed" >&2
   exit 1

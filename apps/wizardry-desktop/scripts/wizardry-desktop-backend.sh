@@ -664,9 +664,10 @@ cmd_memorize_spell() {
   nl_char=$(printf '\nX')
   nl_char=${nl_char%X}
   cr_char=$(printf '\r')
+  tab_char=$(printf '\t')
   case "$command_value" in
-    *"$nl_char"*|*"$cr_char"*)
-      printf '%s\n' "wizardry-desktop-backend: spell command must be one line" >&2
+    *"$nl_char"*|*"$cr_char"*|*"$tab_char"*)
+      printf '%s\n' "wizardry-desktop-backend: spell command must be one line without tabs" >&2
       exit 2
       ;;
     *)
@@ -696,7 +697,6 @@ cmd_memorize_spell() {
   fi
   [ -f "$memorized_file" ] || : >"$memorized_file"
 
-  tab_char=$(printf '\t')
   tmp_file=$(mktemp "${TMPDIR:-/tmp}/wizardry-desktop-memorized.XXXXXX")
   while IFS= read -r line || [ -n "$line" ]; do
     current_name=$line
@@ -795,10 +795,13 @@ cmd_add_synonym() {
     printf '%s\n' "wizardry-desktop-backend: invalid synonym alias: $alias_name" >&2
     exit 2
   }
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  tab_char=$(printf '\t')
   case "$target" in
-    *'
-'*|*''*)
-      printf '%s\n' "wizardry-desktop-backend: synonym target must be one line" >&2
+    *"$nl_char"*|*"$cr_char"*|*"$tab_char"*|*"|"*)
+      printf '%s\n' "wizardry-desktop-backend: synonym target must be one line without tabs or pipes" >&2
       exit 2
       ;;
     *)

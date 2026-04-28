@@ -17,6 +17,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Identifiers used in both paths and metadata need one shared validator across create, edit, rename, build, and release paths.
 - CSV-like fields must reject leading commas, trailing commas, empty entries, unsupported characters, and line-break injection.
 - Key-value profile writes must keep keys allowlisted and values single-line unless multi-line is the explicit contract.
+- Tab-, pipe-, and comma-delimited records must reject delimiter characters in fields before persisting or emitting rows for GUI parsers.
 - Generated config, plist, desktop, JSON, YAML, and shell files must not receive raw GUI text that can break the target format.
 - Release asset names must be basenames only; reject archive or API metadata before download, extraction, install, or chmod.
 - Store/release IDs such as App Store key IDs, bundle IDs, Play package names, tracks, and version lists must be validated before paths, JWTs, query strings, or API URLs are built.
@@ -59,3 +60,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Release automation should reject unsafe metadata before invoking credentials, curl, xcrun, tar, unzip, chmod, or platform installers.
 - GUI adversarial testing should include stale state, racing clicks, WebKit drag payload differences, and narrow-width layout pressure.
 - Native desktop IR display strings are code-generation inputs; validate or escape them before rendering Swift, C, plist, desktop, or package files.
+- Backend text records consumed by GUIs need record-shape tests: line-break rejection alone does not protect tab- or pipe-separated output.
