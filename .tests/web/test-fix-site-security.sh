@@ -139,9 +139,49 @@ EOF
   rm -rf "$web_root" "$stub_dir"
 }
 
+test_fix_site_security_rejects_path_traversal() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  outside_dir="$(dirname "$web_root")/wizardry-fix-security-escape-$$"
+  rm -rf "$outside_dir"
+  mkdir -p "$outside_dir/site" "$outside_dir/build" "$outside_dir/nginx"
+  cat > "$outside_dir/site.conf" <<'EOF'
+site-name=outside
+site-user=
+EOF
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  cat > "$stub_dir/sudo" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+  cat > "$stub_dir/useradd" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+  chmod +x "$stub_dir/sudo" "$stub_dir/useradd"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" \
+    run_spell spells/web/fix-site-security "../$(basename "$outside_dir")"
+  assert_status 2 || {
+    rm -rf "$web_root" "$stub_dir" "$outside_dir"
+    return 1
+  }
+
+  if grep -q '^site-user=ww_' "$outside_dir/site.conf"; then
+    TEST_FAILURE_REASON="fix-site-security modified site.conf outside WEB_WIZARDRY_ROOT"
+    rm -rf "$web_root" "$stub_dir" "$outside_dir"
+    return 1
+  fi
+
+  rm -rf "$web_root" "$stub_dir" "$outside_dir"
+}
+
 run_test_case "fix-site-security --help works" test_fix_site_security_help
 run_test_case "fix-site-security sets site-user" test_fix_site_security_sets_site_user
 run_test_case "fix-site-security makes sitedata files writable" test_fix_site_security_sitedata_writable
 run_test_case "fix-site-security does not create site .web-libs cache" test_fix_site_security_does_not_create_site_web_lib_cache
+run_test_case "fix-site-security rejects path traversal" test_fix_site_security_rejects_path_traversal
 
 finish_tests
