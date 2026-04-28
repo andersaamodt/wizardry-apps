@@ -130,6 +130,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Release version strings are project-file inputs; validate them before rendering Xcode, Gradle, plist, YAML, or package metadata.
 - Remote API IDs, versions, and states need revalidation after `jq` extraction before reuse in URLs or machine-readable status rows.
 - Remote API tokens should be revalidated after parsing before they are used in HTTP headers.
+- Installer/release tests that harden `PATH` should inject the downloader explicitly so fake-network regressions cannot silently hit the host `curl`.
 - Remote API download URLs need scheme and source validation before `curl`, not just filename validation after asset selection.
 - Service account JSON is release input; validate identity fields before rendering JWT claims.
 - Deploy and notarization secrets should reject control/path metacharacters before reaching remote-shell, codesign, or notarytool arguments.
