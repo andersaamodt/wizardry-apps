@@ -8,6 +8,7 @@
 ## Audit Inputs
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md` first.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_LESSONS.md` for known regressions.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/adversarial-testing.md` for hostile input, bridge, drag/drop, and WebKit edge-case sweeps.
 - Audit all shipped app surfaces in `apps/`: `forge`, `wizardry-desktop`, and `chatroom`.
 
 ## Audit Output Contract
@@ -39,6 +40,10 @@
 - [ ] If LLM controls exist, settings menus prioritize app-recommended models and expose install/uninstall via Wizardry `ai-dev` script-backed flows (`LLM Controls Contract`).
 - [ ] Runtime endpoint/port handling avoids fixed localhost ports and resolves canonical config (`Port and Runtime Safety`).
 - [ ] Bridge execution remains hardcoded argv with no user-composed shell fragments (`Command and Bridge Rules`).
+- [ ] GUI inputs are adversarially tested with empty, long, quoted, slash-containing, comma-invalid, and line-break values where those values reach backend/profile/release code (`adversarial-testing.md`).
+- [ ] Create, edit, rename, import, and advanced-settings paths share equivalent validators for the same stored value (`adversarial-testing.md`).
+- [ ] Rapid repeated actions cannot race writes, installs, icon generation, release downloads, or backend commands (`adversarial-testing.md` + `Cross-App Interaction Patterns`).
+- [ ] Drag/drop flows reject unsupported payloads and clean up stale cues on leave, drop, dragend, and window blur (`adversarial-testing.md` + `GUI_LESSONS.md`).
 - [ ] Safari GUI QA is run for GUI changes and verifies layout, focus/hover, and panel behavior (`Desktop Window Fit And GUI QA`).
 
 ## App-Specific Minimum Checks
