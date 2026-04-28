@@ -93,3 +93,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Sync/import helpers that print `key=value` rows must reject line-break paths before echoing canonical source or target paths.
 - Icon metadata is project state, not host state; store project-relative paths and test that regeneration will not read absolute paths outside the project.
 - Manifest validation should include hostile records added by future commits, not just the currently checked-in happy path.
+- Single-record manifest status commands must sanitize manifest fields as output too; a separate validator does not protect GUI calls that read a hand-edited manifest directly.

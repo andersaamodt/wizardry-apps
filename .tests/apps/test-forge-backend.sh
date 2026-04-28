@@ -161,6 +161,32 @@ cp -R "$test_root/tools" "$scratch/tools"
 cp -R "$test_root/web/demo" "$scratch/web/demo"
 cp -R "$test_root/web/.themes" "$scratch/web/.themes"
 
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
+jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main\rforged=1") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+app_status_injected=$(sh "$backend" app-status "$scratch" artificer)
+if printf '%s\n' "$app_status_injected" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge app-status emitted forged key-value output from manifest source ref" >&2
+  exit 1
+fi
+printf '%s\n' "$app_status_injected" | grep -F "ref=main forged=1" >/dev/null
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
+jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
+jq '.templates |= map(if .slug == "blog" then (.source.ref = "main\rforged=1") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
+template_status_injected=$(sh "$backend" template-status "$scratch" blog)
+if printf '%s\n' "$template_status_injected" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge template-status emitted forged key-value output from manifest source ref" >&2
+  exit 1
+fi
+printf '%s\n' "$template_status_injected" | grep -F "ref=main forged=1" >/dev/null
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
+jq '.templates |= map(if .slug == "blog" then (.source.ref = "main") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
+
 if sh "$backend" run-task "$scratch" "../escape-task" >/tmp/forge-invalid-run-task.out 2>/tmp/forge-invalid-run-task.err; then
   printf '%s\n' "forge backend test: invalid run-task name accepted" >&2
   exit 1

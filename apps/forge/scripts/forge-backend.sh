@@ -2032,13 +2032,13 @@ cmd_app_status() {
   subdir=$(app_source_field "$root" "$slug" subdir)
   [ -n "$subdir" ] || subdir=.
 
-  printf 'slug=%s\n' "$slug"
-  printf 'distribution=%s\n' "$distribution"
-  printf 'status=%s\n' "$resolved_status"
-  [ -n "$resolved_path" ] && printf 'path=%s\n' "$resolved_path"
-  [ -n "$repo" ] && printf 'repo=%s\n' "$repo"
-  printf 'ref=%s\n' "$ref"
-  printf 'subdir=%s\n' "$subdir"
+  printf 'slug=%s\n' "$(kv_output_value "$slug")"
+  printf 'distribution=%s\n' "$(kv_output_value "$distribution")"
+  printf 'status=%s\n' "$(kv_output_value "$resolved_status")"
+  [ -n "$resolved_path" ] && printf 'path=%s\n' "$(kv_output_value "$resolved_path")"
+  [ -n "$repo" ] && printf 'repo=%s\n' "$(kv_output_value "$repo")"
+  printf 'ref=%s\n' "$(kv_output_value "$ref")"
+  printf 'subdir=%s\n' "$(kv_output_value "$subdir")"
 }
 
 cmd_template_status() {
@@ -2065,13 +2065,13 @@ cmd_template_status() {
   subdir=$(template_source_field "$root" "$slug" subdir)
   [ -n "$subdir" ] || subdir=.
 
-  printf 'slug=%s\n' "$slug"
-  printf 'distribution=%s\n' "$distribution"
-  printf 'status=%s\n' "$resolved_status"
-  [ -n "$resolved_path" ] && printf 'path=%s\n' "$resolved_path"
-  [ -n "$repo" ] && printf 'repo=%s\n' "$repo"
-  printf 'ref=%s\n' "$ref"
-  printf 'subdir=%s\n' "$subdir"
+  printf 'slug=%s\n' "$(kv_output_value "$slug")"
+  printf 'distribution=%s\n' "$(kv_output_value "$distribution")"
+  printf 'status=%s\n' "$(kv_output_value "$resolved_status")"
+  [ -n "$resolved_path" ] && printf 'path=%s\n' "$(kv_output_value "$resolved_path")"
+  [ -n "$repo" ] && printf 'repo=%s\n' "$(kv_output_value "$repo")"
+  printf 'ref=%s\n' "$(kv_output_value "$ref")"
+  printf 'subdir=%s\n' "$(kv_output_value "$subdir")"
 }
 
 cmd_download_app() {
