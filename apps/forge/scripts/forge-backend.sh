@@ -4293,6 +4293,7 @@ cmd_rename_workspace() {
     printf '%s\n' "forge-backend: rename-workspace requires a non-empty NEW_TITLE" >&2
     exit 2
   }
+  validate_generated_display_name "$cleaned_title" "NEW_TITLE"
 
   old_path="$workspace_abs"
   parent_dir=$(dirname "$workspace_abs")
@@ -7339,12 +7340,11 @@ cmd_scaffold_workspace() {
   app_name=$(normalize_generated_display_name "$app_name")
   validate_generated_display_name "$app_name" "APP_NAME"
 
-  case "$targets" in
-    *[!a-zA-Z0-9,._-]*)
-      printf '%s\n' "forge-backend: scaffold-workspace targets contain invalid characters" >&2
-      exit 2
-      ;;
-  esac
+  targets=$(normalize_targets_value "$targets")
+  [ -n "$targets" ] || {
+    printf '%s\n' "forge-backend: scaffold-workspace requires non-empty TARGETS" >&2
+    exit 2
+  }
 
   [ -n "$project_root" ] || project_root=$(workspace_default_root)
   case "$project_root" in

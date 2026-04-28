@@ -298,6 +298,13 @@ fi
 grep -F "unsupported APP_NAME" /tmp/forge-invalid-workspace-name.err >/dev/null
 [ ! -e "$workspaces_root/bad-native" ]
 
+if sh "$backend" scaffold-workspace "$scratch" bad-targets "Bad Targets" web minimal "hosted-web,,linux" "" "$workspaces_root" >/tmp/forge-invalid-scaffold-targets.out 2>/tmp/forge-invalid-scaffold-targets.err; then
+  printf '%s\n' "forge backend test: invalid scaffold workspace targets accepted" >&2
+  exit 1
+fi
+grep -F "invalid targets" /tmp/forge-invalid-scaffold-targets.err >/dev/null
+[ ! -e "$workspaces_root/bad-targets" ]
+
 workspace_native_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native "Workspace Native" native-desktop blank "macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_native_out" | grep -F "created=$workspaces_root/workspace-native" >/dev/null
 workspace_native_abs=$(CDPATH= cd -- "$workspaces_root/workspace-native" && pwd -P)
@@ -529,6 +536,14 @@ run_rebuild_command=bad" >/tmp/forge-invalid-targets.out 2>/tmp/forge-invalid-ta
 fi
 grep -F "invalid targets" /tmp/forge-invalid-targets.err >/dev/null
 ! grep -F "run_rebuild_command=bad" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+
+if sh "$backend" rename-workspace "$scratch" "$workspaces_root/workspace-web" 'Bad "Name' >/tmp/forge-invalid-rename-title.out 2>/tmp/forge-invalid-rename-title.err; then
+  printf '%s\n' "forge backend test: invalid rename title accepted" >&2
+  exit 1
+fi
+grep -F "unsupported NEW_TITLE" /tmp/forge-invalid-rename-title.err >/dev/null
+[ -d "$workspaces_root/workspace-web" ]
+[ ! -e "$workspaces_root/bad-name" ]
 
 rename_workspace_out=$(sh "$backend" rename-workspace "$scratch" "$workspaces_root/workspace-web" "Workspace Web Renamed")
 renamed_workspace="$workspaces_root_abs/workspace-web-renamed"
