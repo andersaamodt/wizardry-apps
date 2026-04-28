@@ -27,6 +27,21 @@ if [ -z "$slug" ] || [ -z "$dest" ]; then
   exit 2
 fi
 
+case "$slug" in
+  [a-z]*)
+    ;;
+  *)
+    printf '%s\n' "stage-web-assets: invalid app slug: $slug" >&2
+    exit 2
+    ;;
+esac
+case "$slug" in
+  *[!a-z0-9-]*|*-|*--*)
+    printf '%s\n' "stage-web-assets: invalid app slug: $slug" >&2
+    exit 2
+    ;;
+esac
+
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 app_dir="$ROOT_DIR/apps/$slug"
 shared_dir="$ROOT_DIR/apps/.host/shared"

@@ -26,4 +26,10 @@ sh "$ROOT_DIR/tools/release/stage-web-assets.sh" chatroom "$tmp_dir/chatroom-ass
 [ -f "$tmp_dir/chatroom-assets/app/index.html" ]
 [ -f "$tmp_dir/chatroom-assets/app/.host/shared/wizardry-bridge.js" ]
 
+if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" ../web/demo "$tmp_dir/traversed-assets" >/dev/null 2>&1; then
+  printf '%s\n' "stage-web-assets accepted slug path traversal" >&2
+  exit 1
+fi
+[ ! -e "$tmp_dir/traversed-assets" ]
+
 printf '%s\n' "release tools smoke passed"
