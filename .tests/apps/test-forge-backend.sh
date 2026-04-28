@@ -144,6 +144,13 @@ sh "$backend" scaffold-app "$scratch" sandbox-tool "Sandbox Tool" minimal >/tmp/
 
 jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false)' "$scratch/config/apps.manifest.json" >/dev/null
 
+if sh "$backend" scaffold-app "$scratch" bad-name 'Bad "Name' minimal >/tmp/forge-invalid-app-name.out 2>/tmp/forge-invalid-app-name.err; then
+  printf '%s\n' "forge backend test: invalid scaffold app name accepted" >&2
+  exit 1
+fi
+grep -F "unsupported APP_NAME" /tmp/forge-invalid-app-name.err >/dev/null
+[ ! -e "$scratch/apps/bad-name" ]
+
 reference_app_slug="forge-reference-app-smoke"
 sh "$backend" scaffold-app "$scratch" "$reference_app_slug" "Forge Reference App Smoke" reference-app >/tmp/forge-scaffold-reference-app.log
 [ -f "$scratch/apps/$reference_app_slug/index.html" ]
@@ -235,6 +242,12 @@ grep -F "Wizardry Addendum 1.0" "$workspaces_root/workspace-web/WIZARDRY_ADDENDU
 grep -F "Starter: Sidebar" "$workspaces_root/workspace-web/app/index.html" >/dev/null
 grep -F "Emission material notice" "$workspaces_root/workspace-web/app/index.html" >/dev/null
 
+source_inject_workspace_out=$(sh "$backend" scaffold-workspace "$scratch" source-inject "Source Inject" web sidebar "hosted-web" "unused
+run_rebuild_command=bad" "$workspaces_root")
+printf '%s\n' "$source_inject_workspace_out" | grep -F "created=$workspaces_root/source-inject" >/dev/null
+grep -Fx "source=" "$workspaces_root/source-inject/wizardry.workspace.conf" >/dev/null
+! grep -F "run_rebuild_command=bad" "$workspaces_root/source-inject/wizardry.workspace.conf" >/dev/null
+
 workspace_home_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-home "Workspace Home" web reference-app "hosted-web,macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_home_out" | grep -F "created=$workspaces_root/workspace-home" >/dev/null
 [ -f "$workspaces_root/workspace-home/app/script.js" ]
@@ -268,6 +281,13 @@ if sh "$backend" run-workspace "$scratch" "$escape_workspace" web >/tmp/forge-es
   exit 1
 fi
 grep -F "project app index not found" /tmp/forge-escape-subpath.err >/dev/null
+
+if sh "$backend" scaffold-workspace "$scratch" bad-native 'Bad "Name' native-desktop blank "macos,linux" "" "$workspaces_root" >/tmp/forge-invalid-workspace-name.out 2>/tmp/forge-invalid-workspace-name.err; then
+  printf '%s\n' "forge backend test: invalid scaffold workspace name accepted" >&2
+  exit 1
+fi
+grep -F "unsupported APP_NAME" /tmp/forge-invalid-workspace-name.err >/dev/null
+[ ! -e "$workspaces_root/bad-native" ]
 
 workspace_native_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native "Workspace Native" native-desktop blank "macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_native_out" | grep -F "created=$workspaces_root/workspace-native" >/dev/null

@@ -627,6 +627,25 @@ normalize_targets_value() {
   printf '%s\n' "$value"
 }
 
+normalize_generated_display_name() {
+  printf '%s' "${1-}" | tr '\r\n\t' '   ' | sed 's/[[:space:]][[:space:]]*/ /g; s/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+validate_generated_display_name() {
+  value=${1-}
+  label=${2-APP_NAME}
+
+  [ -n "$value" ] || {
+    printf '%s\n' "forge-backend: $label requires a non-empty value" >&2
+    exit 2
+  }
+
+  if ! printf '%s\n' "$value" | LC_ALL=C grep -Eq '^[A-Za-z0-9 .,_()-]+$'; then
+    printf '%s\n' "forge-backend: unsupported $label '$value' (use letters, numbers, spaces, '.', ',', '_', '-', or parentheses)" >&2
+    exit 2
+  fi
+}
+
 app_exists() {
   root=$1
   slug=$2
@@ -7231,6 +7250,8 @@ cmd_scaffold_app() {
   [ -n "$template" ] || { printf '%s\n' "forge-backend: scaffold-app requires TEMPLATE" >&2; exit 2; }
 
   validate_slug "$slug"
+  app_name=$(normalize_generated_display_name "$app_name")
+  validate_generated_display_name "$app_name" "APP_NAME"
   require_jq
 
   app_dir="$root/apps/$slug"
@@ -7300,6 +7321,8 @@ cmd_scaffold_workspace() {
   [ -n "$targets" ] || { printf '%s\n' "forge-backend: scaffold-workspace requires TARGETS" >&2; exit 2; }
 
   validate_slug "$slug"
+  app_name=$(normalize_generated_display_name "$app_name")
+  validate_generated_display_name "$app_name" "APP_NAME"
 
   case "$targets" in
     *[!a-zA-Z0-9,._-]*)
@@ -7500,6 +7523,13 @@ GDSCRIPT
       ;;
   esac
 
+  profile_source=""
+  case "$starter" in
+    clone)
+      profile_source=${source-}
+      ;;
+  esac
+
   profile="$workspace_dir/wizardry.workspace.conf"
   cat > "$profile" <<CONF
 # Wizardry Apps project profile
@@ -7510,7 +7540,7 @@ development_context=$development_context
 starter=$starter
 targets=$targets
 run_rebuild_command=$run_rebuild_command
-source=${source-}
+source=$profile_source
 root=$workspace_dir
 CONF
 
