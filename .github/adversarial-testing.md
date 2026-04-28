@@ -109,3 +109,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Icon generators emit backend rows and metadata files, so input/project paths and stored extensions must be output-safe before generation starts.
 - Icon staging should preflight every required output before copying so missing fallbacks cannot leave stale platform assets in place.
 - Installer paths rendered into shell shims or desktop files must reject shell-expansion characters unless they are structurally escaped.
+- Bundle IDs rendered into plist or native project files need direct validation at each packaging entrypoint, not just manifest-derived paths.

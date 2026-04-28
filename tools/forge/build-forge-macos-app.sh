@@ -169,6 +169,35 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
+valid_bundle_id() {
+  case "${1-}" in *.*) ;; *) return 1 ;; esac
+  case "$1" in .|.*|*.|*..*|*[!A-Za-z0-9.-]*) return 1 ;; esac
+}
+
+if has_line_break "$root"; then
+  printf '%s\n' "build-forge-macos-app: root path must not contain line breaks" >&2
+  exit 2
+fi
+
+if has_line_break "$out_bundle"; then
+  printf '%s\n' "build-forge-macos-app: output path must not contain line breaks" >&2
+  exit 2
+fi
+
+valid_bundle_id "$bundle_id" || {
+  printf '%s\n' "build-forge-macos-app: invalid bundle id" >&2
+  exit 2
+}
+
 [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ] || {
   printf '%s\n' "build-forge-macos-app: macOS required" >&2
   exit 1

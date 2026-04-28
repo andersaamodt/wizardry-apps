@@ -41,6 +41,12 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 fake_home="$scratch/home"
 mkdir -p "$fake_home"
 
+if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$scratch/Bad.app" --bundle-id 'com.example/../../bad' >"$scratch/bad-bundle.out" 2>"$scratch/bad-bundle.err"; then
+  printf '%s\n' "build-forge-macos-app accepted invalid bundle id" >&2
+  exit 1
+fi
+grep -F "invalid bundle id" "$scratch/bad-bundle.err" >/dev/null
+
 unsafe_root="$scratch/unsafe\$root"
 fake_uname_bin="$scratch/fake-uname-bin"
 mkdir -p "$unsafe_root/tools/forge" "$unsafe_root/apps/forge" "$fake_uname_bin"
