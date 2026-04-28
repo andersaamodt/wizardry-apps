@@ -34,9 +34,9 @@ done
 
 jq -e '
   def one_line_string:
-    type == "string" and length > 0 and (test("[\r\n]") | not);
+    type == "string" and length > 0 and (test("[\r\n\t]") | not);
   def optional_one_line_string:
-    type == "string" and (test("[\r\n]") | not);
+    type == "string" and (test("[\r\n\t]") | not);
   def valid_slug:
     one_line_string
     and test("^[a-z][a-z0-9-]*$")
@@ -81,9 +81,9 @@ jq -e '
 
 jq -e '
   def one_line_string:
-    type == "string" and length > 0 and (test("[\r\n]") | not);
+    type == "string" and length > 0 and (test("[\r\n\t]") | not);
   def optional_one_line_string:
-    type == "string" and (test("[\r\n]") | not);
+    type == "string" and (test("[\r\n\t]") | not);
   def valid_slug:
     one_line_string
     and test("^[a-z][a-z0-9-]*$")
