@@ -619,6 +619,19 @@ printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$renamed_workspac
 [ ! -f "$renamed_workspace/assets/forge-icon.png" ]
 [ ! -f "$renamed_workspace/app/assets/forge-icon.png" ]
 
+icon_escape_workspace="$scratch/icon-escape"
+mkdir -p "$icon_escape_workspace/assets/icons/meta"
+printf '%s\n' "not an icon" > "$scratch/outside-original.png"
+cat > "$icon_escape_workspace/assets/icons/meta/icon-settings.conf" <<CONF
+generator=wizardry-forge-icon-pipeline
+original_source=$scratch/outside-original.png
+CONF
+if sh "$backend" regenerate-workspace-icon-assets "$scratch" "$icon_escape_workspace" >/tmp/forge-icon-outside-source.out 2>/tmp/forge-icon-outside-source.err; then
+  printf '%s\n' "forge backend test: outside-project icon original source accepted" >&2
+  exit 1
+fi
+grep -F "no saved original icon source" /tmp/forge-icon-outside-source.err >/dev/null
+
 managed_site_workspace="$workspaces_root/workspace-managed-site"
 managed_site_workspace_abs=$(CDPATH= cd -- "$workspaces_root" && mkdir -p "workspace-managed-site/scripts" && cd -- "workspace-managed-site" && pwd -P)
 wizardry_home="$scratch/home/.wizardry"

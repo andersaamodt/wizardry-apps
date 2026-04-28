@@ -4539,6 +4539,43 @@ project_icon_shape_mode() {
   printf '%s\n' squircle
 }
 
+resolve_project_icon_config_file() {
+  project_dir=$1
+  configured_path=${2-}
+
+  [ -n "$configured_path" ] || return 1
+  has_line_break "$configured_path" && return 1
+
+  project_abs=$(CDPATH= cd -- "$project_dir" && pwd -P) || return 1
+
+  case "$configured_path" in
+    /*)
+      candidate=$configured_path
+      ;;
+    *)
+      candidate=$(resolve_workspace_relative_path "$project_abs" "$configured_path" 2>/dev/null) || return 1
+      [ -f "$candidate" ] || return 1
+      printf '%s\n' "$candidate"
+      return 0
+      ;;
+  esac
+
+  [ -f "$candidate" ] || return 1
+  candidate_dir=$(dirname "$candidate")
+  candidate_base=$(basename "$candidate")
+  candidate_abs_dir=$(CDPATH= cd -- "$candidate_dir" 2>/dev/null && pwd -P) || return 1
+  candidate_abs="$candidate_abs_dir/$candidate_base"
+
+  case "$candidate_abs" in
+    "$project_abs"/*)
+      printf '%s\n' "$candidate_abs"
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 project_original_icon_source() {
   project_dir=$1
   meta_dir=$(project_icon_meta_dir "$project_dir")
@@ -4547,8 +4584,9 @@ project_original_icon_source() {
 
   if [ -f "$config_path" ]; then
     configured_path=$(awk -F= '/^original_source=/{print substr($0, index($0, "=") + 1); exit}' "$config_path" 2>/dev/null | tr -d '\r')
-    if [ -n "$configured_path" ] && [ -f "$configured_path" ]; then
-      printf '%s\n' "$configured_path"
+    resolved_path=$(resolve_project_icon_config_file "$project_dir" "$configured_path" 2>/dev/null || true)
+    if [ -n "$resolved_path" ]; then
+      printf '%s\n' "$resolved_path"
       return 0
     fi
   fi

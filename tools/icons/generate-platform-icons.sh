@@ -81,6 +81,7 @@ case "$input_name" in
 esac
 original_ext=$(printf '%s' "$original_ext" | tr '[:upper:]' '[:lower:]')
 stored_original="$meta_dir/original-source.$original_ext"
+stored_original_rel="assets/icons/meta/original-source.$original_ext"
 
 plain_master="$tmp_dir/plain-master.png"
 territory_master="$tmp_dir/territory-master.png"
@@ -363,11 +364,11 @@ cat > "$meta_dir/icon-settings.conf" <<CONF
 generator=wizardry-forge-icon-pipeline
 squircle=$use_squircle
 full_bleed=$full_bleed_mode
-master=$assets_dir/forge-icon.png
-territory_master=$meta_dir/territory-master.png
-plain_master=$meta_dir/plain-master.png
-apple_master=$meta_dir/apple-master.png
-original_source=$stored_original
+master=assets/forge-icon.png
+territory_master=assets/icons/meta/territory-master.png
+plain_master=assets/icons/meta/plain-master.png
+apple_master=assets/icons/meta/apple-master.png
+original_source=$stored_original_rel
 CONF
 
 printf 'icon=%s\n' "$assets_dir/forge-icon.png"

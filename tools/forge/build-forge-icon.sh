@@ -64,14 +64,58 @@ if [ -z "$out_file" ]; then
   out_file="$root/_tmp/forge-build-cache/forge.icns"
 fi
 
-icon_meta_dir="$root/apps/forge/assets/icons/meta"
+forge_project_dir="$root/apps/forge"
+icon_meta_dir="$forge_project_dir/assets/icons/meta"
 config_path="$icon_meta_dir/icon-settings.conf"
 apple_source="$root/apps/forge/assets/icons/meta/apple-master.png"
 
+resolve_project_config_file() {
+  project_dir=$1
+  configured_path=${2-}
+
+  [ -n "$configured_path" ] || return 1
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$configured_path" in
+    *"$nl_char"*|*"$cr_char"*) return 1 ;;
+  esac
+
+  project_abs=$(CDPATH= cd -- "$project_dir" && pwd -P) || return 1
+
+  case "$configured_path" in
+    /*)
+      candidate=$configured_path
+      ;;
+    *)
+      rel_dir=$(dirname "$configured_path")
+      rel_base=$(basename "$configured_path")
+      rel_abs_dir=$(CDPATH= cd -- "$project_abs/$rel_dir" 2>/dev/null && pwd -P) || return 1
+      candidate="$rel_abs_dir/$rel_base"
+      ;;
+  esac
+
+  [ -f "$candidate" ] || return 1
+  candidate_dir=$(dirname "$candidate")
+  candidate_base=$(basename "$candidate")
+  candidate_abs_dir=$(CDPATH= cd -- "$candidate_dir" 2>/dev/null && pwd -P) || return 1
+  candidate_abs="$candidate_abs_dir/$candidate_base"
+
+  case "$candidate_abs" in
+    "$project_abs"/*)
+      printf '%s\n' "$candidate_abs"
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 if [ -f "$config_path" ]; then
   configured_apple=$(awk -F= '/^apple_master=/{print substr($0, index($0, "=") + 1); exit}' "$config_path" 2>/dev/null | tr -d '\r')
-  if [ -n "$configured_apple" ] && [ -f "$configured_apple" ]; then
-    apple_source=$configured_apple
+  resolved_apple=$(resolve_project_config_file "$forge_project_dir" "$configured_apple" 2>/dev/null || true)
+  if [ -n "$resolved_apple" ]; then
+    apple_source=$resolved_apple
   fi
 fi
 
@@ -120,8 +164,9 @@ fi
 territory_source="$icon_meta_dir/territory-master.png"
 if [ -f "$config_path" ]; then
   configured_territory=$(awk -F= '/^territory_master=/{print substr($0, index($0, "=") + 1); exit}' "$config_path" 2>/dev/null | tr -d '\r')
-  if [ -n "$configured_territory" ] && [ -f "$configured_territory" ]; then
-    territory_source=$configured_territory
+  resolved_territory=$(resolve_project_config_file "$forge_project_dir" "$configured_territory" 2>/dev/null || true)
+  if [ -n "$resolved_territory" ]; then
+    territory_source=$resolved_territory
   fi
 fi
 if [ -f "$territory_source" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
@@ -143,8 +188,9 @@ fi
 icon_source=''
 if [ -f "$config_path" ]; then
   configured_icon=$(awk -F= '/^original_source=/{print substr($0, index($0, "=") + 1); exit}' "$config_path" 2>/dev/null | tr -d '\r')
-  if [ -n "$configured_icon" ] && [ -f "$configured_icon" ]; then
-    icon_source=$configured_icon
+  resolved_icon=$(resolve_project_config_file "$forge_project_dir" "$configured_icon" 2>/dev/null || true)
+  if [ -n "$resolved_icon" ]; then
+    icon_source=$resolved_icon
   fi
 fi
 

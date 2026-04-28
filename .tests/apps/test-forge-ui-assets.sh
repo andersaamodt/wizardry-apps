@@ -98,6 +98,12 @@ grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-for
 [ -f "$root/apps/wizardry-desktop/assets/icons/meta/territory-master.png" ]
 grep -F "territory_master=" "$root/apps/forge/assets/icons/meta/icon-settings.conf" >/dev/null
 grep -F "territory_master=" "$root/apps/wizardry-desktop/assets/icons/meta/icon-settings.conf" >/dev/null
+grep -F "original_source=assets/icons/meta/original-source.png" "$root/apps/forge/assets/icons/meta/icon-settings.conf" >/dev/null
+grep -F "original_source=assets/icons/meta/original-source.png" "$root/apps/wizardry-desktop/assets/icons/meta/icon-settings.conf" >/dev/null
+if grep -F "/Users/" "$root/apps/forge/assets/icons/meta/icon-settings.conf" "$root/apps/wizardry-desktop/assets/icons/meta/icon-settings.conf" >/dev/null; then
+  printf '%s\n' "forge UI asset tests: icon settings contain machine-local absolute paths" >&2
+  exit 1
+fi
 grep -F "assets/forge-icon.png" "$root/apps/forge/index.html" >/dev/null
 grep -F "thumb.style.setProperty('--catalog-thumb-image'" "$root/apps/forge/index.html" >/dev/null
 grep -F 'plain_master="$project_dir/assets/icons/meta/plain-master.png"' "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
