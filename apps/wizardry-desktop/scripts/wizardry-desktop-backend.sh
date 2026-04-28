@@ -746,6 +746,7 @@ parse_synonym_kv_file() {
   file=${1-}
   scope=${2-}
   [ -f "$file" ] || return 0
+  tab_char=$(printf '\t')
   while IFS= read -r line || [ -n "$line" ]; do
     line=$(printf '%s' "$line" | sed 's/\r//g')
     case "$line" in
@@ -755,6 +756,10 @@ parse_synonym_kv_file() {
         target=$(printf '%s' "${line#*=}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
         [ -n "$word" ] || continue
         [ -n "$target" ] || continue
+        safe_name "$word" || continue
+        case "$target" in
+          *"$tab_char"*|*"|"*) continue ;;
+        esac
         printf '%s|%s|%s\n' "$word" "$target" "$scope"
         ;;
       *)

@@ -120,7 +120,13 @@ if grep -F "tabbed" "$tmp_spellbook/.memorized" >/dev/null 2>&1; then
   exit 1
 fi
 
-printf '%s\n' "arcana=install-menu" >"$tmp_spellbook/.default-synonyms"
+{
+  printf '%s\n' "arcana=install-menu"
+  printf '%s\n' "bad alias=look"
+  printf '%s\n' "bad|alias=look"
+  printf '%s\n' "badtarget=jump|bad"
+  printf 'badtab=jump\tbad\n'
+} >"$tmp_spellbook/.default-synonyms"
 SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" add-synonym leap jump-to-marker >/dev/null 2>&1 || {
   printf '%s\n' "add-synonym action failed" >&2
   exit 1
@@ -130,6 +136,18 @@ printf '%s\n' "$tmp_synonyms" | grep -F "leap|jump-to-marker|custom" >/dev/null 
   printf '%s\n' "add-synonym did not create expected custom row" >&2
   exit 1
 }
+printf '%s\n' "$tmp_synonyms" | grep -F "arcana|install-menu|default" >/dev/null 2>&1 || {
+  printf '%s\n' "list-synonyms did not include safe default row" >&2
+  exit 1
+}
+if printf '%s\n' "$tmp_synonyms" | awk -F'|' 'NF != 3 { bad = 1 } END { exit bad ? 0 : 1 }'; then
+  printf '%s\n' "list-synonyms emitted malformed pipe-delimited rows" >&2
+  exit 1
+fi
+if printf '%s\n' "$tmp_synonyms" | grep -E 'bad alias|bad[|]alias|badtarget|badtab' >/dev/null 2>&1; then
+  printf '%s\n' "list-synonyms emitted unsafe imported synonym rows" >&2
+  exit 1
+fi
 if SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" add-synonym badpipe 'jump|bad' >/tmp/wizardry-desktop-pipe-synonym.out 2>/tmp/wizardry-desktop-pipe-synonym.err; then
   printf '%s\n' "add-synonym accepted pipe-delimited target text" >&2
   exit 1
