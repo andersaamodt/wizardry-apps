@@ -2295,9 +2295,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [bell curveToPoint:NSMakePoint(maxX - side * 0.005, lipY)
              controlPoint1:NSMakePoint(maxX - side * 0.035, skirtY - side * 0.06)
              controlPoint2:NSMakePoint(maxX - side * 0.005, skirtY - side * 0.10)];
-        [bell curveToPoint:NSMakePoint(minX + side * 0.005, lipY)
-             controlPoint1:NSMakePoint(midX + side * 0.31, lipY - side * 0.075)
-             controlPoint2:NSMakePoint(midX - side * 0.31, lipY - side * 0.075)];
+        [bell lineToPoint:NSMakePoint(minX + side * 0.005, lipY)];
         [bell curveToPoint:NSMakePoint(minX + side * 0.07, skirtY)
              controlPoint1:NSMakePoint(minX + side * 0.005, skirtY - side * 0.10)
              controlPoint2:NSMakePoint(minX + side * 0.035, skirtY - side * 0.06)];
@@ -2309,19 +2307,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
              controlPoint2:NSMakePoint(midX - side * 0.10, topY - side * 0.02)];
         [bell closePath];
         [bell fill];
-
-        [[NSColor clearColor] setStroke];
-        [[NSGraphicsContext currentContext] saveGraphicsState];
-        [NSGraphicsContext currentContext].compositingOperation = NSCompositingOperationClear;
-        NSBezierPath *mouth = [NSBezierPath bezierPath];
-        [mouth setLineWidth:MAX(1.35, floor(side * 0.105))];
-        [mouth setLineCapStyle:NSLineCapStyleRound];
-        [mouth moveToPoint:NSMakePoint(minX + side * 0.12, lipY + side * 0.03)];
-        [mouth curveToPoint:NSMakePoint(maxX - side * 0.12, lipY + side * 0.03)
-              controlPoint1:NSMakePoint(midX - side * 0.17, lipY - side * 0.06)
-              controlPoint2:NSMakePoint(midX + side * 0.17, lipY - side * 0.06)];
-        [mouth stroke];
-        [[NSGraphicsContext currentContext] restoreGraphicsState];
 
         [[NSColor blackColor] setFill];
         [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(midX - clapperRadius,
