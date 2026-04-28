@@ -3488,31 +3488,32 @@ cmd_get_workspace_profile() {
     [ -n "$git_branch" ] || git_branch=main
   fi
 
-  printf 'root_hint=%s\n' "$root"
-  printf 'workspace=%s\n' "$workspace_abs"
-  printf 'profile=%s\n' "$conf"
+  printf 'root_hint=%s\n' "$(kv_output_value "$root")"
+  printf 'workspace=%s\n' "$(kv_output_value "$workspace_abs")"
+  printf 'profile=%s\n' "$(kv_output_value "$conf")"
   profile_project_id=$(workspace_field "$conf" project_id "")
   [ -n "$profile_project_id" ] || profile_project_id=$(workspace_field "$conf" slug "")
   if ! is_valid_slug_value "$profile_project_id"; then
     profile_project_id=$(derive_workspace_slug "$(basename "$workspace_abs")")
   fi
-  printf 'project_id=%s\n' "$profile_project_id"
-  printf 'title=%s\n' "$(workspace_field "$conf" title "$(workspace_field "$conf" name "$(basename "$workspace_abs")")")"
-  printf 'project_type=%s\n' "$(workspace_field "$conf" project_type "application")"
-  printf 'development_context=%s\n' "$(workspace_field "$conf" development_context "web")"
-  printf 'starter=%s\n' "$(workspace_field "$conf" starter "")"
-  printf 'targets=%s\n' "$(workspace_field "$conf" targets "")"
-  printf 'source=%s\n' "$(workspace_field "$conf" source "")"
-  printf 'root=%s\n' "$(workspace_field "$conf" root "$workspace_abs")"
-  printf 'profile_kind=%s\n' "$(workspace_field "$conf" profile_kind "")"
-  printf 'app_subpath=%s\n' "$(workspace_field "$conf" app_subpath "")"
-  printf 'native_ir_path=%s\n' "$(workspace_field "$conf" native_ir_path "")"
-  printf 'hosted_web_mode=%s\n' "$(workspace_field "$conf" hosted_web_mode "")"
-  printf 'hosted_web_site_name=%s\n' "$(workspace_field "$conf" hosted_web_site_name "")"
-  printf 'hosted_web_serve_script=%s\n' "$(workspace_field "$conf" hosted_web_serve_script "")"
-  printf 'hosted_web_serve_action=%s\n' "$(workspace_field "$conf" hosted_web_serve_action "")"
-  printf 'run_rebuild_command=%s\n' "$(workspace_rebuild_command "$conf")"
-  printf 'git_default_branch=%s\n' "$git_branch"
+  title_value=$(workspace_field "$conf" title "$(workspace_field "$conf" name "$(basename "$workspace_abs")")")
+  printf 'project_id=%s\n' "$(kv_output_value "$profile_project_id")"
+  printf 'title=%s\n' "$(kv_output_value "$title_value")"
+  printf 'project_type=%s\n' "$(kv_output_value "$(workspace_field "$conf" project_type "application")")"
+  printf 'development_context=%s\n' "$(kv_output_value "$(workspace_field "$conf" development_context "web")")"
+  printf 'starter=%s\n' "$(kv_output_value "$(workspace_field "$conf" starter "")")"
+  printf 'targets=%s\n' "$(kv_output_value "$(workspace_field "$conf" targets "")")"
+  printf 'source=%s\n' "$(kv_output_value "$(workspace_field "$conf" source "")")"
+  printf 'root=%s\n' "$(kv_output_value "$(workspace_field "$conf" root "$workspace_abs")")"
+  printf 'profile_kind=%s\n' "$(kv_output_value "$(workspace_field "$conf" profile_kind "")")"
+  printf 'app_subpath=%s\n' "$(kv_output_value "$(workspace_field "$conf" app_subpath "")")"
+  printf 'native_ir_path=%s\n' "$(kv_output_value "$(workspace_field "$conf" native_ir_path "")")"
+  printf 'hosted_web_mode=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_mode "")")"
+  printf 'hosted_web_site_name=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_site_name "")")"
+  printf 'hosted_web_serve_script=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_serve_script "")")"
+  printf 'hosted_web_serve_action=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_serve_action "")")"
+  printf 'run_rebuild_command=%s\n' "$(kv_output_value "$(workspace_rebuild_command "$conf")")"
+  printf 'git_default_branch=%s\n' "$(kv_output_value "$git_branch")"
   printf '%s\n' "$git_info"
 }
 

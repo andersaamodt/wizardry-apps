@@ -537,6 +537,27 @@ awk '
 mv "$tmp_profile" "$generic_workspace_abs/wizardry.workspace.conf"
 generic_profile_out=$(sh "$backend" get-workspace-profile "$scratch" "$generic_workspace_abs")
 printf '%s\n' "$generic_profile_out" | grep -F "project_id=generic-repo" >/dev/null
+tmp_profile=$(mktemp "${TMPDIR:-/tmp}/forge-profile.XXXXXX")
+awk -v injected="$(printf 'title=Generic Imported\rforged=1')" '
+  BEGIN { replaced = 0 }
+  /^title=/ {
+    print injected
+    replaced = 1
+    next
+  }
+  { print }
+  END {
+    if (replaced == 0) {
+      print injected
+    }
+  }
+' "$generic_workspace_abs/wizardry.workspace.conf" >"$tmp_profile"
+mv "$tmp_profile" "$generic_workspace_abs/wizardry.workspace.conf"
+generic_profile_injected=$(sh "$backend" get-workspace-profile "$scratch" "$generic_workspace_abs")
+if printf '%s\n' "$generic_profile_injected" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge get-workspace-profile emitted forged key-value output from title" >&2
+  exit 1
+fi
 
 workspaces_after_import=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces_after_import" | grep -E '^plain-web\t' >/dev/null
