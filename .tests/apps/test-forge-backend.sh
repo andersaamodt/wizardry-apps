@@ -649,6 +649,21 @@ printf '%s\n' "$workspace_web_path_remote" | grep -Fx "git_remote_browser_url=" 
 printf '%s\n' "$workspace_web_path_remote" | grep -Fx "git_github_slug=" >/dev/null
 git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
 
+git -C "$workspaces_root/workspace-web" checkout -b 'feat#fragment' >/dev/null 2>&1
+git -C "$workspaces_root/workspace-web" remote set-url origin 'https://github.com/example/workspace-web.git'
+if sh "$backend" workspace-git-pr-url "$scratch" "$workspaces_root/workspace-web" >"$scratch/forge-bad-pr-ref.out" 2>"$scratch/forge-bad-pr-ref.err"; then
+  printf '%s\n' "forge workspace-git-pr-url accepted URL-fragment branch name" >&2
+  exit 1
+fi
+grep -F "branch name is not safe for a GitHub compare URL" "$scratch/forge-bad-pr-ref.err" >/dev/null
+if grep -F "pr_url=" "$scratch/forge-bad-pr-ref.out" >/dev/null 2>&1; then
+  printf '%s\n' "forge workspace-git-pr-url emitted PR URL for URL-fragment branch" >&2
+  exit 1
+fi
+git -C "$workspaces_root/workspace-web" checkout main >/dev/null 2>&1
+git -C "$workspaces_root/workspace-web" branch -D 'feat#fragment' >/dev/null 2>&1
+git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
+
 bad_git_status_workspace="$scratch/git-status/bad
 forged=1"
 mkdir -p "$bad_git_status_workspace"

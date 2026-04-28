@@ -3680,6 +3680,16 @@ validate_git_branch_name() {
   esac
 }
 
+github_compare_ref_is_safe() {
+  ref_name=${1-}
+  case "$ref_name" in
+    ""|*[!A-Za-z0-9._/-]*|/*|*//*)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 workspace_profile_path() {
   workspace_path=${1-}
   conf="$workspace_path/wizardry.workspace.conf"
@@ -4017,6 +4027,10 @@ cmd_workspace_git_pr_url() {
     exit 1
   }
   base_branch=$(workspace_git_default_base_branch "$workspace_abs")
+  if ! github_compare_ref_is_safe "$base_branch" || ! github_compare_ref_is_safe "$branch_name"; then
+    printf '%s\n' "forge-backend: branch name is not safe for a GitHub compare URL" >&2
+    exit 2
+  fi
   repo_url=$(workspace_git_browser_url_from_remote "$(printf '%s\n' "$git_info" | kv_read git_remote_origin)")
   pr_url="$repo_url/compare/$base_branch...$branch_name?expand=1"
   printf 'root_hint=%s\n' "$root"
