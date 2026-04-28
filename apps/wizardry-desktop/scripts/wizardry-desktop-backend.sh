@@ -90,6 +90,10 @@ sanitize_value() {
   printf '%s' "${1-}" | tr '\r\n' ' '
 }
 
+sanitize_record_field() {
+  printf '%s' "${1-}" | tr '\r\n\t|' '    '
+}
+
 normalize_watch_actor() {
   actor=${1-}
   if [ -z "$actor" ]; then
@@ -163,7 +167,7 @@ strip_ansi() {
 normalize_status() {
   status=${1-}
   status=$(strip_ansi "$status")
-  status=$(printf '%s' "$status" | tr '\r' ' ')
+  status=$(sanitize_record_field "$status")
   status=$(printf '%s' "$status" | awk '{$1=$1; print}' )
   if [ -z "$status" ]; then
     status='not installed'
@@ -2406,7 +2410,7 @@ arcana_status_details_for_module() {
   output=$(arcana_status_output_for_module "$module_name" "$status_script")
   [ -n "$output" ] || return 0
   printf '%s\n' "$output" | while IFS= read -r line || [ -n "$line" ]; do
-    line=$(printf '%s' "$line" | tr -d '\r')
+    line=$(sanitize_record_field "$line")
     case "$line" in
       \[*\]\ *) printf 'status-detail|%s|%s\n' "$line" "$line" ;;
       *) continue ;;
@@ -2433,6 +2437,7 @@ cmd_list_arcana_module_items() {
         case "$item_name" in
           ''|.*|_*) continue ;;
         esac
+        safe_name "$item_name" || continue
         kind=$(arcana_item_kind_for_file "$item_name")
         label=$(arcana_item_label_for_file "$item_name")
         printf '%s|%s|%s\n' "$kind" "$item_name" "$label"
@@ -2452,6 +2457,7 @@ cmd_list_arcana_install() {
   for root_dir in $roots; do
     while IFS= read -r name || [ -n "$name" ]; do
       [ -n "$name" ] || continue
+      safe_name "$name" || continue
       case " $seen_entries " in
         *" $name "*)
           continue

@@ -73,6 +73,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - GUI adversarial testing should include stale state, racing clicks, WebKit drag payload differences, and narrow-width layout pressure.
 - Native desktop IR display strings are code-generation inputs; validate or escape them before rendering Swift, C, plist, desktop, or package files.
 - Backend text records consumed by GUIs need record-shape tests: line-break rejection alone does not protect tab- or pipe-separated output.
+- Installed helper output is GUI input when backend rows forward it; sanitize record delimiters in status/details text and reject delimiter-shaped module or action filenames before emitting rows.
 - GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.
 - Git accepts newline-bearing remote URLs, so Forge status rows must sanitize remotes before deriving browser URLs, GitHub slugs, or release checks.

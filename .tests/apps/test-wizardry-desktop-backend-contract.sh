@@ -280,6 +280,39 @@ printf '%s\n' "$arcana_items" | grep -F "|web-wizardry-menu|" >/dev/null 2>&1 ||
   exit 1
 }
 
+hostile_arcana_root="$tmp_home/hostile-arcana"
+hostile_module_dir="$hostile_arcana_root/evilmod"
+mkdir -p "$hostile_module_dir"
+: >"$hostile_module_dir/bad|item"
+cat >"$hostile_module_dir/evilmod-status" <<'SH'
+#!/bin/sh
+printf '%s\n' 'ready|forged|extra'
+printf '%s\n' '[x] detail|forged|extra'
+SH
+chmod +x "$hostile_module_dir/evilmod-status"
+mkdir -p "$hostile_arcana_root/bad|module"
+: >"$hostile_arcana_root/bad|module/bad|module-menu"
+
+hostile_arcana=$(sh "$backend" list-arcana-install "$hostile_arcana_root")
+if printf '%s\n' "$hostile_arcana" | awk -F'|' 'NF != 3 { bad = 1 } END { exit bad ? 0 : 1 }'; then
+  printf '%s\n' "list-arcana-install emitted malformed pipe-delimited rows" >&2
+  exit 1
+fi
+if printf '%s\n' "$hostile_arcana" | grep -F "bad|module" >/dev/null 2>&1; then
+  printf '%s\n' "list-arcana-install emitted unsafe module name" >&2
+  exit 1
+fi
+
+hostile_arcana_items=$(sh "$backend" list-arcana-module-items evilmod "$hostile_arcana_root")
+if printf '%s\n' "$hostile_arcana_items" | awk -F'|' 'NF != 3 { bad = 1 } END { exit bad ? 0 : 1 }'; then
+  printf '%s\n' "list-arcana-module-items emitted malformed pipe-delimited rows" >&2
+  exit 1
+fi
+if printf '%s\n' "$hostile_arcana_items" | grep -F "bad|item" >/dev/null 2>&1; then
+  printf '%s\n' "list-arcana-module-items emitted unsafe item name" >&2
+  exit 1
+fi
+
 system_status=$(sh "$backend" run-system status)
 printf '%s\n' "$system_status" | grep -F "status=ok" >/dev/null 2>&1 || {
   printf '%s\n' "run-system status did not return status=ok" >&2
