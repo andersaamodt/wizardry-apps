@@ -56,6 +56,21 @@ fi
 grep -F "output path must be a .app bundle" "$scratch/bad-out-bundle.err" >/dev/null
 [ -d "$not_app_bundle" ]
 
+bad_icon_out="$scratch/forge-icon.png"
+if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$bad_icon_out" >"$scratch/bad-icon-out.out" 2>"$scratch/bad-icon-out.err"; then
+  printf '%s\n' "build-forge-icon accepted non-icns output path" >&2
+  exit 1
+fi
+grep -F "output path must be an .icns file" "$scratch/bad-icon-out.err" >/dev/null
+
+icon_newline_out="$scratch/forge-icon
+status=forged.icns"
+if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$icon_newline_out" >"$scratch/icon-newline.out" 2>"$scratch/icon-newline.err"; then
+  printf '%s\n' "build-forge-icon accepted newline output path" >&2
+  exit 1
+fi
+grep -F "output path must not contain line breaks" "$scratch/icon-newline.err" >/dev/null
+
 unsafe_root="$scratch/unsafe\$root"
 fake_uname_bin="$scratch/fake-uname-bin"
 mkdir -p "$unsafe_root/tools/forge" "$unsafe_root/apps/forge" "$fake_uname_bin"

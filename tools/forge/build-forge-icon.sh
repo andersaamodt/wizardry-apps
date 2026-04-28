@@ -55,14 +55,45 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-[ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ] || {
-  printf '%s\n' "build-forge-icon: macOS required" >&2
-  exit 1
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
 }
 
 if [ -z "$out_file" ]; then
   out_file="$root/_tmp/forge-build-cache/forge.icns"
 fi
+
+valid_icns_output_path() {
+  case "${1-}" in
+    *.icns) return 0 ;;
+  esac
+  return 1
+}
+
+if has_line_break "$root"; then
+  printf '%s\n' "build-forge-icon: root path must not contain line breaks" >&2
+  exit 2
+fi
+
+if has_line_break "$out_file"; then
+  printf '%s\n' "build-forge-icon: output path must not contain line breaks" >&2
+  exit 2
+fi
+
+valid_icns_output_path "$out_file" || {
+  printf '%s\n' "build-forge-icon: output path must be an .icns file" >&2
+  exit 2
+}
+
+[ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ] || {
+  printf '%s\n' "build-forge-icon: macOS required" >&2
+  exit 1
+}
 
 forge_project_dir="$root/apps/forge"
 icon_meta_dir="$forge_project_dir/assets/icons/meta"
