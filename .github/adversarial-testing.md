@@ -15,6 +15,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 ## High-Value App Bug Classes
 - Path segment values must reject `.`, `..`, `/`, `\`, line breaks, and empty values before filesystem side effects.
 - Identifiers used in both paths and metadata need one shared validator across create, edit, rename, build, and release paths.
+- Composite refs such as `source:name` must be parsed structurally; shell word splitting must not accept trailing words or unsupported source kinds.
 - CSV-like fields must reject leading commas, trailing commas, empty entries, unsupported characters, and line-break injection.
 - Key-value profile writes must keep keys allowlisted and values single-line unless multi-line is the explicit contract.
 - Tab-, pipe-, and comma-delimited records must reject delimiter characters in fields before persisting or emitting rows for GUI parsers.
@@ -61,3 +62,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - GUI adversarial testing should include stale state, racing clicks, WebKit drag payload differences, and narrow-width layout pressure.
 - Native desktop IR display strings are code-generation inputs; validate or escape them before rendering Swift, C, plist, desktop, or package files.
 - Backend text records consumed by GUIs need record-shape tests: line-break rejection alone does not protect tab- or pipe-separated output.
+- GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.

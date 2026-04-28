@@ -41,6 +41,22 @@ printf '%s\n' "$spells" | grep -F "status" >/dev/null 2>&1 || {
   printf '%s\n' "list-spells builtin:system missing status" >&2
   exit 1
 }
+if sh "$backend" list-spells "evil:system" "$root" >/tmp/wizardry-desktop-evil-spell-ref.out 2>/tmp/wizardry-desktop-evil-spell-ref.err; then
+  printf '%s\n' "list-spells accepted unsupported spell source" >&2
+  exit 1
+fi
+grep -F "invalid spell reference" /tmp/wizardry-desktop-evil-spell-ref.err >/dev/null 2>&1 || {
+  printf '%s\n' "list-spells unsupported source error missing" >&2
+  exit 1
+}
+if sh "$backend" list-spells "builtin:system extra" "$root" >/tmp/wizardry-desktop-trailing-spell-ref.out 2>/tmp/wizardry-desktop-trailing-spell-ref.err; then
+  printf '%s\n' "list-spells accepted trailing words in spell reference" >&2
+  exit 1
+fi
+grep -F "invalid spell reference" /tmp/wizardry-desktop-trailing-spell-ref.err >/dev/null 2>&1 || {
+  printf '%s\n' "list-spells trailing words error missing" >&2
+  exit 1
+}
 
 if ! sh "$backend" list-synonyms "$root" >/dev/null 2>&1; then
   printf '%s\n' "list-synonyms action failed" >&2

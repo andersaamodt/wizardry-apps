@@ -449,18 +449,33 @@ $(find "$dir" -maxdepth 1 -type f 2>/dev/null | sort)
 EOF
 }
 
+parse_spell_ref() {
+  ref=${1-}
+  case "$ref" in
+    builtin:*|custom:*)
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  source=${ref%%:*}
+  category=${ref#*:}
+  [ "$source" = "builtin" ] || [ "$source" = "custom" ] || return 1
+  safe_name "$category" || return 1
+  return 0
+}
+
 cmd_list_spells() {
   ref=${1-}
   [ -n "$ref" ] || exit 0
   root=$(require_root "${2-}")
 
-  set -- $(printf '%s\n' "$ref" | sed 's/:/ /')
-  source=$1
-  category=$2
-  [ -n "$category" ] && safe_name "$category" || {
-    printf '%s\n' "wizardry-desktop-backend: invalid category: $category" >&2
+  parse_spell_ref "$ref" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid spell reference: $ref" >&2
     exit 2
   }
+  source=${ref%%:*}
+  category=${ref#*:}
 
   spell_dir_for "$root" "$source" "$category" | while IFS= read -r file_dir || [ -n "$file_dir" ]; do
     list_spell_files_in_dir "$file_dir"
@@ -494,14 +509,12 @@ cmd_run_spell() {
     exit 2
   }
 
-  set -- $(printf '%s\n' "$ref" | sed 's/:/ /')
-  source=$1
-  category=$2
-
-  safe_name "$category" || {
-    printf '%s\n' "wizardry-desktop-backend: invalid category: $category" >&2
+  parse_spell_ref "$ref" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid spell reference: $ref" >&2
     exit 2
   }
+  source=${ref%%:*}
+  category=${ref#*:}
   safe_name "$spell" || {
     printf '%s\n' "wizardry-desktop-backend: invalid spell name: $spell" >&2
     exit 2
@@ -568,14 +581,12 @@ cmd_spell_help() {
     exit 2
   }
 
-  set -- $(printf '%s\n' "$ref" | sed 's/:/ /')
-  source=$1
-  category=$2
-
-  safe_name "$category" || {
-    printf '%s\n' "wizardry-desktop-backend: invalid category: $category" >&2
+  parse_spell_ref "$ref" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid spell reference: $ref" >&2
     exit 2
   }
+  source=${ref%%:*}
+  category=${ref#*:}
   safe_name "$spell" || {
     printf '%s\n' "wizardry-desktop-backend: invalid spell name: $spell" >&2
     exit 2
