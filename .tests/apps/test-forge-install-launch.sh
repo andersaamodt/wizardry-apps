@@ -41,6 +41,18 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 fake_home="$scratch/home"
 mkdir -p "$fake_home"
 
+newline_root="$scratch/root
+status=forged"
+mkdir -p "$newline_root/apps/forge/scripts"
+printf '%s\n' '#!/bin/sh' 'printf "%s\n" pid=1234' > "$newline_root/apps/forge/scripts/forge-backend"
+chmod +x "$newline_root/apps/forge/scripts/forge-backend"
+if XDG_CONFIG_HOME="$scratch/launch-config" XDG_STATE_HOME="$scratch/launch-state" sh "$launch" --root "$newline_root" >"$scratch/launch-newline.out" 2>"$scratch/launch-newline.err"; then
+  printf '%s\n' "launch-forge accepted newline root path" >&2
+  exit 1
+fi
+grep -F "root path must not contain line breaks" "$scratch/launch-newline.err" >/dev/null
+[ ! -e "$scratch/launch-config/wizardry-apps/forge-root" ]
+
 if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$scratch/Bad.app" --bundle-id 'com.example/../../bad' >"$scratch/bad-bundle.out" 2>"$scratch/bad-bundle.err"; then
   printf '%s\n' "build-forge-macos-app accepted invalid bundle id" >&2
   exit 1

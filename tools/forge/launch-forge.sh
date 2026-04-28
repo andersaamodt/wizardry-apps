@@ -34,6 +34,20 @@ USAGE
   esac
 done
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
+if has_line_break "$root"; then
+  printf '%s\n' "launch-forge: root path must not contain line breaks" >&2
+  exit 2
+fi
+
 if [ ! -d "$root/apps/forge" ] || [ ! -x "$root/apps/forge/scripts/forge-backend" ]; then
   printf '%s\n' "launch-forge: invalid wizardry-apps root: $root" >&2
   exit 1
