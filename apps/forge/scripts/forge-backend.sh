@@ -4366,6 +4366,7 @@ cmd_set_workspace_targets() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_path" "project path"
 
   conf="$workspace_path/wizardry.workspace.conf"
   [ -f "$conf" ] || {
@@ -4813,6 +4814,7 @@ cmd_set_workspace_icon() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_path" "project path"
 
   write_project_icon_from_data_url "$workspace_path" "$data_url" "$shape_mode"
   workspace_app_dir="$workspace_path/app"
@@ -4872,6 +4874,7 @@ cmd_set_workspace_icon_file() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_path" "project path"
 
   write_project_icon_from_file "$workspace_path" "$image_path" "$shape_mode"
   workspace_app_dir="$workspace_path/app"
@@ -4930,6 +4933,7 @@ cmd_regenerate_workspace_icon_assets() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_path" "project path"
 
   root=$(require_root "${1-}")
   regenerate_project_icon_assets "$root" "$workspace_path" "$requested_mode"
@@ -5761,6 +5765,7 @@ cmd_install_workspace() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_path" "project path"
 
   workspace_conf="$workspace_path/wizardry.workspace.conf"
   [ -f "$workspace_conf" ] || {
@@ -6337,8 +6342,10 @@ cmd_rebuild_workspace() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_path" "project path"
 
   workspace_path=$(CDPATH= cd -- "$workspace_path" && pwd -P)
+  reject_line_breaks "$workspace_path" "project path"
   workspace_conf="$workspace_path/wizardry.workspace.conf"
   [ -f "$workspace_conf" ] || {
     printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2
@@ -6382,6 +6389,7 @@ cmd_run_workspace() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_path" "project path"
 
   context=$context_hint
   if [ -z "$context" ] && [ -f "$workspace_path/wizardry.workspace.conf" ]; then

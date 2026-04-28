@@ -381,6 +381,24 @@ if tr '\r' '\n' <"$scratch/forge-bad-set-field.out" | grep -E '^value=' >/dev/nu
   printf '%s\n' "forge set-workspace-field emitted forged rows from project path" >&2
   exit 1
 fi
+if sh "$backend" set-workspace-targets "$scratch" "$bad_set_field_workspace" hosted-web >"$scratch/forge-bad-set-targets.out" 2>"$scratch/forge-bad-set-targets.err"; then
+  printf '%s\n' "forge set-workspace-targets accepted line-break project path" >&2
+  exit 1
+fi
+grep -F "project path must not contain line breaks" "$scratch/forge-bad-set-targets.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-bad-set-targets.out" | grep -E '^(workspace|profile)=' >/dev/null 2>&1; then
+  printf '%s\n' "forge set-workspace-targets emitted forged rows from project path" >&2
+  exit 1
+fi
+if sh "$backend" rebuild-workspace "$scratch" "$bad_set_field_workspace" web >"$scratch/forge-bad-rebuild-path.out" 2>"$scratch/forge-bad-rebuild-path.err"; then
+  printf '%s\n' "forge rebuild-workspace accepted line-break project path" >&2
+  exit 1
+fi
+grep -F "project path must not contain line breaks" "$scratch/forge-bad-rebuild-path.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-bad-rebuild-path.out" | grep -E '^(workspace|app_entry)=' >/dev/null 2>&1; then
+  printf '%s\n' "forge rebuild-workspace emitted forged rows from project path" >&2
+  exit 1
+fi
 
 bad_rename_workspace="$scratch/rename-field/bad
 old_workspace=forged"

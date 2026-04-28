@@ -39,6 +39,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Workspace relative paths must resolve inside the workspace after symlinks, not just pass string checks.
 - Workspace path arguments should reject line breaks before Git/status helpers echo paths or run Git side effects.
 - Workspace mutation commands must enforce the same path output contract as list/status commands before writing profiles or renaming folders.
+- Workspace rebuild/run/install and icon mutation commands also emit machine-readable rows; reject line-break project paths before build, launch, install, or asset writes.
 - Imported project profiles are untrusted input; runtime/build paths should sanitize or fall back before writing bundle IDs, file names, or launchers.
 - Bridge commands must use fixed action names and argv arrays; never let GUI input choose executables, shell fragments, or free-form argv vectors.
 - Busy/write actions must reject overlapping triggers so double-clicks cannot race profile writes, installs, icon generation, or release downloads.
