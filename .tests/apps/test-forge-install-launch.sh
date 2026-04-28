@@ -79,6 +79,15 @@ printf '%s\n' "$(cat "$shim")" | grep -F "$root/tools/forge/launch-forge" >/dev/
 [ -f "$fake_home/.config/wizardry-apps/forge-root" ]
 [ "$(head -n 1 "$fake_home/.config/wizardry-apps/forge-root")" = "$root" ]
 
+danger_dir="$scratch/not-an-app"
+mkdir -p "$danger_dir"
+if sh "$uninstall" --home "$fake_home" --app-dir "$danger_dir" >"$scratch/uninstall-danger.out" 2>"$scratch/uninstall-danger.err"; then
+  printf '%s\n' "uninstall-forge accepted non-app removal path" >&2
+  exit 1
+fi
+grep -F "app path must be a .app bundle" "$scratch/uninstall-danger.err" >/dev/null
+[ -d "$danger_dir" ]
+
 # Desktop integration files are OS-specific.
 os=$(uname -s 2>/dev/null || printf unknown)
 case "$os" in

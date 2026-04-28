@@ -57,6 +57,34 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
+if has_line_break "$home_dir"; then
+  printf '%s\n' "uninstall-forge: unsafe home path" >&2
+  exit 2
+fi
+
+if [ -n "$app_dir" ]; then
+  if has_line_break "$app_dir"; then
+    printf '%s\n' "uninstall-forge: unsafe app path" >&2
+    exit 2
+  fi
+  case "$app_dir" in
+    *.app) ;;
+    *)
+      printf '%s\n' "uninstall-forge: app path must be a .app bundle" >&2
+      exit 2
+      ;;
+  esac
+fi
+
 rm -f "$home_dir/.local/bin/app-forge"
 rm -f "$home_dir/.local/share/applications/app-forge.desktop"
 rm -f "$home_dir/.config/wizardry-apps/forge-root"
