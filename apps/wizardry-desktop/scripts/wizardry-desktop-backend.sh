@@ -371,6 +371,8 @@ count_spell_files() {
     case "$name" in
       .* ) continue ;;
     esac
+    spell_name=${name%.sh}
+    safe_name "$spell_name" || continue
     n=$((n + 1))
   done <<EOF
 $(find "$dir" -maxdepth 1 -type f 2>/dev/null | sort)
@@ -447,7 +449,9 @@ list_spell_files_in_dir() {
     case "$name" in
       .* ) continue ;;
     esac
-    printf '%s\n' "${name%.sh}"
+    spell_name=${name%.sh}
+    safe_name "$spell_name" || continue
+    printf '%s\n' "$spell_name"
   done <<EOF
 $(find "$dir" -maxdepth 1 -type f 2>/dev/null | sort)
 EOF

@@ -74,6 +74,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Native desktop IR display strings are code-generation inputs; validate or escape them before rendering Swift, C, plist, desktop, or package files.
 - Backend text records consumed by GUIs need record-shape tests: line-break rejection alone does not protect tab- or pipe-separated output.
 - Installed helper output is GUI input when backend rows forward it; sanitize record delimiters in status/details text and reject delimiter-shaped module or action filenames before emitting rows.
+- GUI list/count commands must share the same name validator as run commands; otherwise unsafe files can create visible but un-runnable rows or inflated category counts.
 - GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.
 - Terminal-launch helpers that print `command=...` rows should sanitize CR/LF in the displayed command, even when the underlying argv/script path remains valid for execution.

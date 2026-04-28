@@ -74,6 +74,26 @@ grep -F "invalid key" /tmp/wizardry-desktop-invalid-pref.err >/dev/null 2>&1 || 
   exit 1
 }
 
+hostile_spell_dir="$tmp_home/.wizardry/spells/hostilecat"
+mkdir -p "$hostile_spell_dir"
+: >"$hostile_spell_dir/good-spell"
+: >"$hostile_spell_dir/bad|spell"
+: >"$hostile_spell_dir/bad spell"
+hostile_categories=$(HOME="$tmp_home" sh "$backend" list-spell-categories "$root")
+printf '%s\n' "$hostile_categories" | grep -F "custom:hostilecat|custom|hostilecat|1" >/dev/null 2>&1 || {
+  printf '%s\n' "list-spell-categories counted unsafe spell filenames" >&2
+  exit 1
+}
+hostile_spells=$(HOME="$tmp_home" sh "$backend" list-spells "custom:hostilecat" "$root")
+printf '%s\n' "$hostile_spells" | grep -E '^good-spell$' >/dev/null 2>&1 || {
+  printf '%s\n' "list-spells missing safe hostile category spell" >&2
+  exit 1
+}
+if printf '%s\n' "$hostile_spells" | grep -E 'bad[| ]spell' >/dev/null 2>&1; then
+  printf '%s\n' "list-spells emitted unsafe spell filenames" >&2
+  exit 1
+fi
+
 memorized_custom=$(HOME="$tmp_home" SPELLBOOK_DIR="$tmp_spellbook" sh "$backend" memorize-spell quick-look "look ." 2>/dev/null)
 printf '%s\n' "$memorized_custom" | grep -F "quick-look	look ." >/dev/null 2>&1 || {
   printf '%s\n' "memorize-spell did not return expected tab-separated row" >&2
