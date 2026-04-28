@@ -1539,6 +1539,21 @@ kv_read() {
   '
 }
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in
+    *"$nl_char"*|*"$cr_char"*) return 0 ;;
+  esac
+  return 1
+}
+
+kv_output_value() {
+  printf '%s' "${1-}" | tr '\r\n' '  '
+}
+
 normalize_linux_install_mode() {
   printf '%s\n' "local-share"
 }
@@ -2694,19 +2709,40 @@ workspace_git_state_write() {
 
 workspace_git_browser_url_from_remote() {
   remote_url=${1-}
+  has_line_break "$remote_url" && {
+    printf '%s\n' ""
+    return 0
+  }
   case "$remote_url" in
     https://github.com/*|http://github.com/*)
-      printf '%s\n' "$(printf '%s' "$remote_url" | sed 's#\.git$##')"
+      repo_path=${remote_url#https://github.com/}
+      repo_path=${repo_path#http://github.com/}
+      repo_path=$(printf '%s' "$repo_path" | sed 's#\.git$##')
+      if valid_github_slug "$repo_path"; then
+        printf 'https://github.com/%s\n' "$repo_path"
+      else
+        printf '%s\n' ""
+      fi
       return 0
       ;;
     git@github.com:*)
       repo_path=${remote_url#git@github.com:}
-      printf 'https://github.com/%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      repo_path=$(printf '%s' "$repo_path" | sed 's#\.git$##')
+      if valid_github_slug "$repo_path"; then
+        printf 'https://github.com/%s\n' "$repo_path"
+      else
+        printf '%s\n' ""
+      fi
       return 0
       ;;
     ssh://git@github.com/*)
       repo_path=${remote_url#ssh://git@github.com/}
-      printf 'https://github.com/%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      repo_path=$(printf '%s' "$repo_path" | sed 's#\.git$##')
+      if valid_github_slug "$repo_path"; then
+        printf 'https://github.com/%s\n' "$repo_path"
+      else
+        printf '%s\n' ""
+      fi
       return 0
       ;;
     https://*|http://*)
@@ -2717,23 +2753,50 @@ workspace_git_browser_url_from_remote() {
   printf '%s\n' ""
 }
 
+valid_github_slug() {
+  slug=${1-}
+  case "$slug" in
+    */*) ;;
+    *) return 1 ;;
+  esac
+  owner=${slug%%/*}
+  repo=${slug#*/}
+  case "$repo" in
+    */*) return 1 ;;
+  esac
+  case "$owner" in
+    ""|.|..|*..*|*[!A-Za-z0-9._-]*) return 1 ;;
+  esac
+  case "$repo" in
+    ""|.|..|*..*|*[!A-Za-z0-9._-]*) return 1 ;;
+  esac
+  return 0
+}
+
 workspace_git_github_slug_from_remote() {
   remote_url=${1-}
+  has_line_break "$remote_url" && {
+    printf '%s\n' ""
+    return 0
+  }
   case "$remote_url" in
     https://github.com/*|http://github.com/*)
       repo_path=${remote_url#https://github.com/}
       repo_path=${repo_path#http://github.com/}
-      printf '%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      repo_path=$(printf '%s' "$repo_path" | sed 's#\.git$##')
+      valid_github_slug "$repo_path" && printf '%s\n' "$repo_path" || printf '%s\n' ""
       return 0
       ;;
     git@github.com:*)
       repo_path=${remote_url#git@github.com:}
-      printf '%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      repo_path=$(printf '%s' "$repo_path" | sed 's#\.git$##')
+      valid_github_slug "$repo_path" && printf '%s\n' "$repo_path" || printf '%s\n' ""
       return 0
       ;;
     ssh://git@github.com/*)
       repo_path=${remote_url#ssh://git@github.com/}
-      printf '%s\n' "$(printf '%s' "$repo_path" | sed 's#\.git$##')"
+      repo_path=$(printf '%s' "$repo_path" | sed 's#\.git$##')
+      valid_github_slug "$repo_path" && printf '%s\n' "$repo_path" || printf '%s\n' ""
       return 0
       ;;
   esac
@@ -2950,16 +3013,16 @@ workspace_git_collect_release_info() {
   fi
 
   printf 'git_release_check_epoch=%s\n' "$release_check_epoch"
-  printf 'git_release_name=%s\n' "$release_name"
-  printf 'git_release_tag=%s\n' "$release_tag"
-  printf 'git_release_url=%s\n' "$release_html_url"
-  printf 'git_release_published_at=%s\n' "$release_published_at"
-  printf 'git_release_asset_name=%s\n' "$release_asset_name"
-  printf 'git_release_asset_url=%s\n' "$release_asset_url"
+  printf 'git_release_name=%s\n' "$(kv_output_value "$release_name")"
+  printf 'git_release_tag=%s\n' "$(kv_output_value "$release_tag")"
+  printf 'git_release_url=%s\n' "$(kv_output_value "$release_html_url")"
+  printf 'git_release_published_at=%s\n' "$(kv_output_value "$release_published_at")"
+  printf 'git_release_asset_name=%s\n' "$(kv_output_value "$release_asset_name")"
+  printf 'git_release_asset_url=%s\n' "$(kv_output_value "$release_asset_url")"
   printf 'git_release_install_supported=%s\n' "${release_install_supported:-no}"
-  printf 'git_release_install_reason=%s\n' "$release_install_reason"
+  printf 'git_release_install_reason=%s\n' "$(kv_output_value "$release_install_reason")"
   printf 'git_release_available=%s\n' "${release_available:-no}"
-  printf 'git_release_error=%s\n' "$release_error"
+  printf 'git_release_error=%s\n' "$(kv_output_value "$release_error")"
 }
 
 workspace_git_collect_status() {
@@ -3113,25 +3176,25 @@ workspace_git_collect_status() {
 
   printf 'git_available=%s\n' "$git_available"
   printf 'git_repo_present=%s\n' "$git_repo_present"
-  printf 'git_repo_root=%s\n' "$git_repo_root"
-  printf 'git_remote_origin=%s\n' "$git_remote_origin"
-  printf 'git_remote_browser_url=%s\n' "$git_remote_browser_url"
-  printf 'git_github_slug=%s\n' "$git_github_slug"
-  printf 'git_branch=%s\n' "$git_branch"
+  printf 'git_repo_root=%s\n' "$(kv_output_value "$git_repo_root")"
+  printf 'git_remote_origin=%s\n' "$(kv_output_value "$git_remote_origin")"
+  printf 'git_remote_browser_url=%s\n' "$(kv_output_value "$git_remote_browser_url")"
+  printf 'git_github_slug=%s\n' "$(kv_output_value "$git_github_slug")"
+  printf 'git_branch=%s\n' "$(kv_output_value "$git_branch")"
   printf 'git_head=%s\n' "$git_head"
   printf 'git_head_short=%s\n' "$git_head_short"
   printf 'git_dirty=%s\n' "$git_dirty"
-  printf 'git_upstream=%s\n' "$git_upstream"
+  printf 'git_upstream=%s\n' "$(kv_output_value "$git_upstream")"
   printf 'git_upstream_present=%s\n' "$git_upstream_present"
   printf 'git_ahead=%s\n' "$git_ahead"
   printf 'git_behind=%s\n' "$git_behind"
   printf 'git_diverged=%s\n' "$git_diverged"
-  printf 'git_status_label=%s\n' "$git_status_label"
+  printf 'git_status_label=%s\n' "$(kv_output_value "$git_status_label")"
   printf 'git_status_tone=%s\n' "$git_status_tone"
-  printf 'git_status_reason=%s\n' "$git_status_reason"
+  printf 'git_status_reason=%s\n' "$(kv_output_value "$git_status_reason")"
   printf 'git_last_checked_epoch=%s\n' "$git_last_checked_epoch"
   printf 'git_last_fetch_epoch=%s\n' "$git_last_fetch_epoch"
-  printf 'git_last_fetch_error=%s\n' "$git_last_fetch_error"
+  printf 'git_last_fetch_error=%s\n' "$(kv_output_value "$git_last_fetch_error")"
   printf '%s\n' "$release_info"
 }
 

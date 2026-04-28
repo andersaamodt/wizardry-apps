@@ -420,6 +420,26 @@ printf '%s\n' "$workspace_web_broken" | grep -F "git_status_label=No Remote" >/d
 printf '%s\n' "$workspace_web_broken" | grep -F "git_last_fetch_error=Fetch from origin failed." >/dev/null
 git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
 
+git -C "$workspaces_root/workspace-web" remote set-url origin "$(printf 'https://github.com/example/workspace-web.git\ngit_status_label=Owned')"
+workspace_web_injected_remote=$(sh "$backend" workspace-git-status "$scratch" "$workspaces_root/workspace-web")
+injected_status_count=$(printf '%s\n' "$workspace_web_injected_remote" | grep -c '^git_status_label=' | tr -d ' ')
+[ "$injected_status_count" = "1" ] || {
+  printf '%s\n' "forge backend emitted injected git_status_label rows from remote URL" >&2
+  exit 1
+}
+if printf '%s\n' "$workspace_web_injected_remote" | grep -Fx "git_status_label=Owned" >/dev/null 2>&1; then
+  printf '%s\n' "forge backend preserved forged git_status_label from remote URL" >&2
+  exit 1
+fi
+printf '%s\n' "$workspace_web_injected_remote" | grep -Fx "git_remote_browser_url=" >/dev/null
+printf '%s\n' "$workspace_web_injected_remote" | grep -Fx "git_github_slug=" >/dev/null
+
+git -C "$workspaces_root/workspace-web" remote set-url origin 'https://github.com/example/workspace-web/../../other.git'
+workspace_web_path_remote=$(sh "$backend" workspace-git-status "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_path_remote" | grep -Fx "git_remote_browser_url=" >/dev/null
+printf '%s\n' "$workspace_web_path_remote" | grep -Fx "git_github_slug=" >/dev/null
+git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
+
 bad_import_workspace="$scratch/external/bad
 run_rebuild_command=bad"
 mkdir -p "$bad_import_workspace/app"

@@ -25,6 +25,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Imported config paths rendered into nginx, service, plist, or shell snippets must reject the target format's control characters.
 - Release asset names must be basenames only; reject archive or API metadata before download, extraction, install, or chmod.
 - Store/release IDs such as App Store key IDs, bundle IDs, Play package names, tracks, and version lists must be validated before paths, JWTs, query strings, or API URLs are built.
+- Git remotes are user-controlled metadata; sanitize CR/LF and validate `owner/repo` slugs before emitting status rows or GitHub API URLs.
 - Workspace relative paths must resolve inside the workspace after symlinks, not just pass string checks.
 - Imported project profiles are untrusted input; runtime/build paths should sanitize or fall back before writing bundle IDs, file names, or launchers.
 - Bridge commands must use fixed action names and argv arrays; never let GUI input choose executables, shell fragments, or free-form argv vectors.
@@ -70,3 +71,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Backend text records consumed by GUIs need record-shape tests: line-break rejection alone does not protect tab- or pipe-separated output.
 - GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.
+- Git accepts newline-bearing remote URLs, so Forge status rows must sanitize remotes before deriving browser URLs, GitHub slugs, or release checks.
