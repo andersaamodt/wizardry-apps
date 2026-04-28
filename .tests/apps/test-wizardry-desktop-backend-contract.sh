@@ -28,6 +28,14 @@ grep -F "root hint must not contain line breaks" /tmp/wizardry-desktop-bad-root.
   printf '%s\n' "root-hint newline error missing" >&2
   exit 1
 }
+if sh "$backend" list-themes "$bad_root_hint" >/tmp/wizardry-desktop-bad-root-list.out 2>/tmp/wizardry-desktop-bad-root-list.err; then
+  printf '%s\n' "list-themes accepted newline-bearing root hint" >&2
+  exit 1
+fi
+grep -F "root hint must not contain line breaks" /tmp/wizardry-desktop-bad-root-list.err >/dev/null 2>&1 || {
+  printf '%s\n' "list-themes newline root hint error missing" >&2
+  exit 1
+}
 
 themes=$(sh "$backend" list-themes "$root")
 printf '%s\n' "$themes" | grep -F "adept" >/dev/null 2>&1 || {
@@ -392,12 +400,46 @@ grep -F "requires an argument" /tmp/wizardry-desktop-run-menu.err >/dev/null 2>&
   printf '%s\n' "run-menu spell-menu missing required argument error" >&2
   exit 1
 }
+if sh "$backend" run-menu spellbook "$(printf 'x\nstatus=forged')" "$root" >/tmp/wizardry-desktop-run-menu-newline.out 2>/tmp/wizardry-desktop-run-menu-newline.err; then
+  printf '%s\n' "run-menu accepted newline-bearing menu argument" >&2
+  exit 1
+fi
+grep -F "menu argument must be one line" /tmp/wizardry-desktop-run-menu-newline.err >/dev/null 2>&1 || {
+  printf '%s\n' "run-menu newline argument error missing" >&2
+  exit 1
+}
 
 menu_help_via_action=$(sh "$backend" run-action menu:help cast "" "$root" 2>&1)
 printf '%s\n' "$menu_help_via_action" | grep -E '^Usage: cast' >/dev/null 2>&1 || {
   printf '%s\n' "run-action menu:help cast missing Usage output" >&2
   exit 1
 }
+app_help_via_action=$(sh "$backend" run-action app-help cast "" "$root" 2>&1)
+printf '%s\n' "$app_help_via_action" | grep -E '^Usage: cast' >/dev/null 2>&1 || {
+  printf '%s\n' "run-action app-help cast missing Usage output" >&2
+  exit 1
+}
+hostile_help_bin="$tmp_home/help-bin"
+hostile_help_marker="$tmp_home/app-help-ran"
+mkdir -p "$hostile_help_bin"
+cat >"$hostile_help_bin/evil-help" <<SH
+#!/bin/sh
+printf '%s\n' ran >"$hostile_help_marker"
+printf '%s\n' 'evil help'
+SH
+chmod +x "$hostile_help_bin/evil-help"
+if PATH="$hostile_help_bin:$PATH" sh "$backend" run-action app-help evil-help "" "$root" >/tmp/wizardry-desktop-app-help-evil.out 2>/tmp/wizardry-desktop-app-help-evil.err; then
+  printf '%s\n' "run-action app-help accepted arbitrary executable target" >&2
+  exit 1
+fi
+grep -F "unsupported app help target" /tmp/wizardry-desktop-app-help-evil.err >/dev/null 2>&1 || {
+  printf '%s\n' "run-action app-help arbitrary executable error missing" >&2
+  exit 1
+}
+if [ -e "$hostile_help_marker" ]; then
+  printf '%s\n' "run-action app-help executed rejected arbitrary target" >&2
+  exit 1
+fi
 
 hostile_menu_root="$tmp_home/menu-root$(printf '\r')status=forged"
 hostile_menu_dir="$hostile_menu_root/spells/menu"
@@ -414,15 +456,14 @@ cat >"$hostile_path/os_id" <<'SH'
 printf '%s\n' linux
 SH
 chmod +x "$hostile_path/os_id"
-terminal_output=$(PATH="$hostile_path:$PATH" sh "$backend" open-menu-terminal hostile-menu "" "$hostile_menu_root")
-printf '%s\n' "$terminal_output" | grep -F "mode=manual" >/dev/null 2>&1 || {
-  printf '%s\n' "open-menu-terminal should use manual mode in platform stub" >&2
-  exit 1
-}
-if printf '%s\n' "$terminal_output" | tr '\r' '\n' | grep -E '^status=' >/dev/null 2>&1; then
-  printf '%s\n' "open-menu-terminal emitted forged key-value output from path newline" >&2
+if PATH="$hostile_path:$PATH" sh "$backend" open-menu-terminal hostile-menu "" "$hostile_menu_root" >/tmp/wizardry-desktop-terminal-bad-root.out 2>/tmp/wizardry-desktop-terminal-bad-root.err; then
+  printf '%s\n' "open-menu-terminal accepted newline-bearing root hint" >&2
   exit 1
 fi
+grep -F "root hint must not contain line breaks" /tmp/wizardry-desktop-terminal-bad-root.err >/dev/null 2>&1 || {
+  printf '%s\n' "open-menu-terminal newline root hint error missing" >&2
+  exit 1
+}
 
 arcana=$(sh "$backend" list-arcana-install "$root/spells/.arcana")
 printf '%s\n' "$arcana" | grep -F "web-wizardry|" >/dev/null 2>&1 || {

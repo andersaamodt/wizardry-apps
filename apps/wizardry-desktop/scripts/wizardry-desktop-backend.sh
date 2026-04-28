@@ -253,6 +253,10 @@ write_pref_file() {
 require_root() {
   hint=${1-}
   if [ -n "$hint" ]; then
+    if has_line_break "$hint"; then
+      printf '%s\n' "wizardry-desktop-backend: root hint must not contain line breaks" >&2
+      exit 2
+    fi
     printf '%s\n' "$hint"
     return 0
   fi
@@ -281,10 +285,6 @@ require_root() {
 
 cmd_root_hint() {
   hint=${1-}
-  if [ -n "$hint" ] && has_line_break "$hint"; then
-    printf '%s\n' "wizardry-desktop-backend: root hint must not contain line breaks" >&2
-    exit 2
-  fi
   root=$(require_root "$hint")
   printf '%s\n' "$root"
 }
@@ -1892,6 +1892,16 @@ cmd_run_menu() {
     exit 2
   }
 
+  case "$menu_arg" in
+    *'
+'*|*''*)
+      printf '%s\n' "wizardry-desktop-backend: menu argument must be one line" >&2
+      exit 2
+      ;;
+    *)
+      ;;
+  esac
+
   script=$(resolve_menu_script "$root" "$name" || true)
   [ -n "$script" ] || {
     printf '%s\n' "wizardry-desktop-backend: menu not found: $name" >&2
@@ -2650,6 +2660,32 @@ cmd_run_arcana_menu() {
   exit 2
 }
 
+cmd_app_help() {
+  target=${1-}
+  root=${2-}
+
+  [ -n "$target" ] || {
+    printf '%s\n' "wizardry-desktop-backend: app-help requires a target command" >&2
+    return 2
+  }
+
+  case "$target" in
+    cast|mud|spellbook|main-menu)
+      cmd_menu_help "$target" "$root"
+      ;;
+    arcana)
+      cmd_menu_help "install-menu" "$root"
+      ;;
+    system)
+      cmd_menu_help "system-menu" "$root"
+      ;;
+    *)
+      printf '%s\n' "wizardry-desktop-backend: unsupported app help target: $target" >&2
+      return 2
+      ;;
+  esac
+}
+
 cmd_run_action() {
   action=${1-}
   arg1=${2-}
@@ -2701,11 +2737,7 @@ cmd_run_action() {
       printf '%s\n' "wizardry-desktop-backend: arcana cache reload requested"
       ;;
     app-help)
-      [ -n "$arg1" ] || {
-        printf '%s\n' "wizardry-desktop-backend: app-help requires a target command" >&2
-        exit 2
-      }
-      if "$arg1" --help; then
+      if cmd_app_help "$arg1" "$root"; then
         record_watch "app" "app-help:$arg1" "wizardry-core" "ok"
         return
       fi
