@@ -32,6 +32,50 @@ if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" ../web/demo "$tmp_dir/traver
 fi
 [ ! -e "$tmp_dir/traversed-assets" ]
 
+sync_source="$tmp_dir/sync-source"
+sync_target="$tmp_dir/sync-target"
+mkdir -p \
+  "$sync_source/spells/web" \
+  "$sync_source/spells/.arcana/web-wizardry" \
+  "$sync_source/web" \
+  "$sync_source/apps/.host" \
+  "$sync_source/apps/forge" \
+  "$sync_source/.tests/web" \
+  "$sync_source/.tests/.arcana/web-wizardry" \
+  "$sync_target/apps/.host"
+printf '%s\n' "site spell" > "$sync_source/spells/web/site-spell"
+printf '%s\n' "hidden site metadata" > "$sync_source/spells/web/.site-hidden"
+printf '%s\n' "arcana spell" > "$sync_source/spells/.arcana/web-wizardry/install"
+printf '%s\n' "web page" > "$sync_source/web/index.html"
+printf '%s\n' "source host should not sync" > "$sync_source/apps/.host/source-host.txt"
+printf '%s\n' "forge app" > "$sync_source/apps/forge/app.txt"
+printf '%s\n' "web test" > "$sync_source/.tests/web/test-web"
+printf '%s\n' "arcana test" > "$sync_source/.tests/.arcana/web-wizardry/test-arcana"
+printf '%s\n' "local host stays local" > "$sync_target/apps/.host/local-host.txt"
+
+sh "$ROOT_DIR/tools/sync-from-wizardry.sh" "$sync_source" "$sync_target" > "$tmp_dir/sync.out"
+[ -f "$sync_target/spells/web/site-spell" ]
+[ -f "$sync_target/spells/web/.site-hidden" ]
+[ -f "$sync_target/spells/.arcana/web-wizardry/install" ]
+[ -f "$sync_target/web/index.html" ]
+[ -f "$sync_target/apps/forge/app.txt" ]
+[ -f "$sync_target/.tests/web/test-web" ]
+[ -f "$sync_target/.tests/.arcana/web-wizardry/test-arcana" ]
+[ -f "$sync_target/apps/.host/local-host.txt" ]
+[ ! -e "$sync_target/apps/.host/source-host.txt" ]
+
+if sh "$ROOT_DIR/tools/sync-from-wizardry.sh" "$sync_source" "$sync_source" >"$tmp_dir/sync-same.out" 2>&1; then
+  printf '%s\n' "sync-from-wizardry accepted identical source and target" >&2
+  exit 1
+fi
+grep -F "source and target must be different" "$tmp_dir/sync-same.out" >/dev/null
+
+if sh "$ROOT_DIR/tools/sync-from-wizardry.sh" "$tmp_dir/missing-source" "$sync_target" >"$tmp_dir/sync-missing.out" 2>&1; then
+  printf '%s\n' "sync-from-wizardry accepted missing source" >&2
+  exit 1
+fi
+grep -F "source directory not found" "$tmp_dir/sync-missing.out" >/dev/null
+
 aab_path="$tmp_dir/app.aab"
 : > "$aab_path"
 if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example/../../other" internal >"$tmp_dir/play-upload-invalid-package.err" 2>&1; then
