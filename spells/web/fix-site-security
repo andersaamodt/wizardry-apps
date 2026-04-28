@@ -68,6 +68,11 @@ if [ -z "$site_user" ]; then
     warn "fix-site-security: cannot update site.conf without root or sudo"
   fi
 fi
+case "$site_user" in
+  ''|[!A-Za-z_]*|*[!A-Za-z0-9_-]*)
+    die 2 "fix-site-security: invalid site user"
+    ;;
+esac
 site_group="$site_user"
 
 group_exists() {

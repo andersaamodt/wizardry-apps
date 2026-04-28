@@ -178,10 +178,32 @@ EOF
   rm -rf "$web_root" "$stub_dir" "$outside_dir"
 }
 
+test_fix_site_security_rejects_invalid_configured_site_user() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  site_dir="$web_root/mysite"
+  mkdir -p "$site_dir/site"
+  cat > "$site_dir/site.conf" <<'EOF'
+site-name=mysite
+site-user=bad/user
+EOF
+
+  WEB_WIZARDRY_ROOT="$web_root" run_spell spells/web/fix-site-security mysite
+  assert_status 2 || {
+    rm -rf "$web_root"
+    return 1
+  }
+  assert_error_contains "invalid site user"
+
+  rm -rf "$web_root"
+}
+
 run_test_case "fix-site-security --help works" test_fix_site_security_help
 run_test_case "fix-site-security sets site-user" test_fix_site_security_sets_site_user
 run_test_case "fix-site-security makes sitedata files writable" test_fix_site_security_sitedata_writable
 run_test_case "fix-site-security does not create site .web-libs cache" test_fix_site_security_does_not_create_site_web_lib_cache
 run_test_case "fix-site-security rejects path traversal" test_fix_site_security_rejects_path_traversal
+run_test_case "fix-site-security rejects invalid configured site-user" test_fix_site_security_rejects_invalid_configured_site_user
 
 finish_tests

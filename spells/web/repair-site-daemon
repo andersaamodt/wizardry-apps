@@ -40,6 +40,11 @@ fi
 site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '-' '_')"
 site_user=$(config-get "$SITE_CONFIG" site-user 2>/dev/null || printf '')
 [ -z "$site_user" ] && site_user="$site_user_default"
+case "$site_user" in
+  ''|[!A-Za-z_]*|*[!A-Za-z0-9_-]*)
+    die 2 "repair-site-daemon: invalid site user"
+    ;;
+esac
 if ! id -u "$site_user" >/dev/null 2>&1; then
   warn "repair-site-daemon: site user '$site_user' missing; run fix-site-security first"
 fi
