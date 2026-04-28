@@ -446,6 +446,13 @@ workspace_web_git_init=$(sh "$backend" workspace-git-init "$scratch" "$workspace
 printf '%s\n' "$workspace_web_git_init" | grep -F "git_repo_present=yes" >/dev/null
 printf '%s\n' "$workspace_web_git_init" | grep -F "git_status_label=Push" >/dev/null
 
+bad_remote_url=$(printf 'https://github.com/example/workspace-web.git\ngit_status_label=Owned')
+if sh "$backend" workspace-git-set-remote "$scratch" "$workspaces_root/workspace-web" "$bad_remote_url" >"$scratch/forge-bad-remote.out" 2>"$scratch/forge-bad-remote.err"; then
+  printf '%s\n' "forge workspace-git-set-remote accepted line-break remote URL" >&2
+  exit 1
+fi
+grep -F "remote URL must not contain line breaks" "$scratch/forge-bad-remote.err" >/dev/null
+
 git -C "$workspaces_root/workspace-web" config user.name "Forge Test"
 git -C "$workspaces_root/workspace-web" config user.email "forge@example.com"
 git -C "$workspaces_root/workspace-web" add . >/dev/null

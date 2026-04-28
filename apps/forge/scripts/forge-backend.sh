@@ -3611,6 +3611,7 @@ cmd_workspace_git_init() {
     exit 1
   }
   reject_line_breaks "$workspace_abs" "project path"
+  [ -z "$remote_url" ] || reject_line_breaks "$remote_url" "remote URL"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   if workspace_git_repo_exists "$workspace_abs"; then
     printf '%s\n' "forge-backend: project already has a git repo" >&2
@@ -3653,6 +3654,7 @@ cmd_workspace_git_set_remote() {
     exit 1
   }
   reject_line_breaks "$workspace_abs" "project path"
+  reject_line_breaks "$remote_url" "remote URL"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
