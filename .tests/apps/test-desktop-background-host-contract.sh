@@ -18,6 +18,9 @@ grep -F 'showStatusItem:' "$mac_host" >/dev/null
 grep -F 'NSStatusItem *statusItem' "$mac_host" >/dev/null
 grep -F 'renderedStatusItemImage' "$mac_host" >/dev/null
 grep -F 'isMatchbookApp' "$mac_host" >/dev/null
+grep -F 'isBellheimApp' "$mac_host" >/dev/null
+grep -F 'Bellheim is running in background' "$mac_host" >/dev/null
+grep -F 'backgroundMode' "$mac_host" >/dev/null
 grep -F 'NSVariableStatusItemLength' "$mac_host" >/dev/null
 grep -F 'setTemplate:YES' "$mac_host" >/dev/null
 grep -F 'windowShouldClose:' "$mac_host" >/dev/null

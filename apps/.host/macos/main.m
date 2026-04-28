@@ -185,6 +185,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (BOOL)isStonrApp;
 - (BOOL)isArtificerApp;
 - (BOOL)isMatchbookApp;
+- (BOOL)isBellheimApp;
 - (NSString *)stonrBackendScriptPath;
 - (NSString *)matchbookPrefsPath;
 - (NSDictionary<NSString *, NSString *> *)dictionaryFromKeyValueBlob:(NSString *)blob;
@@ -1662,6 +1663,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return [slug isEqualToString:@"matchbook"];
 }
 
+- (BOOL)isBellheimApp {
+    NSString *slug = [[[self.appSlug ?: @"" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+    return [slug isEqualToString:@"bellheim"];
+}
+
 - (NSString *)stonrBackendScriptPath {
     if (!self.appPath.length) {
         return @"";
@@ -2262,6 +2268,56 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                 [slash stroke];
             }
         }
+    } else if ([self isBellheimApp]) {
+        CGFloat inset = MAX(1.0, floor(side * 0.08));
+        CGFloat minX = inset;
+        CGFloat maxX = side - inset;
+        CGFloat minY = inset;
+        CGFloat maxY = side - inset;
+        CGFloat midX = floor(side * 0.5);
+        CGFloat topY = maxY - side * 0.10;
+        CGFloat shoulderY = minY + side * 0.54;
+        CGFloat lipY = minY + side * 0.28;
+        CGFloat clapperRadius = MAX(1.5, floor(side * 0.11));
+
+        [[NSColor blackColor] setStroke];
+        [[NSColor blackColor] setFill];
+
+        NSBezierPath *bell = [NSBezierPath bezierPath];
+        [bell moveToPoint:NSMakePoint(midX, topY)];
+        [bell curveToPoint:NSMakePoint(maxX - side * 0.12, shoulderY)
+             controlPoint1:NSMakePoint(midX + side * 0.16, topY - side * 0.02)
+             controlPoint2:NSMakePoint(maxX - side * 0.12, topY - side * 0.18)];
+        [bell curveToPoint:NSMakePoint(maxX - side * 0.08, lipY)
+             controlPoint1:NSMakePoint(maxX - side * 0.12, shoulderY - side * 0.12)
+             controlPoint2:NSMakePoint(maxX - side * 0.08, shoulderY - side * 0.18)];
+        [bell lineToPoint:NSMakePoint(minX + side * 0.08, lipY)];
+        [bell curveToPoint:NSMakePoint(minX + side * 0.12, shoulderY)
+             controlPoint1:NSMakePoint(minX + side * 0.08, shoulderY - side * 0.18)
+             controlPoint2:NSMakePoint(minX + side * 0.12, shoulderY - side * 0.12)];
+        [bell curveToPoint:NSMakePoint(midX, topY)
+             controlPoint1:NSMakePoint(minX + side * 0.12, topY - side * 0.18)
+             controlPoint2:NSMakePoint(midX - side * 0.16, topY - side * 0.02)];
+        [bell closePath];
+        [bell fill];
+
+        [[NSColor clearColor] setStroke];
+        [[NSGraphicsContext currentContext] saveGraphicsState];
+        [NSGraphicsContext currentContext].compositingOperation = NSCompositingOperationClear;
+        NSBezierPath *mouth = [NSBezierPath bezierPath];
+        [mouth setLineWidth:MAX(1.3, floor(side * 0.10))];
+        [mouth moveToPoint:NSMakePoint(minX + side * 0.18, lipY + side * 0.02)];
+        [mouth curveToPoint:NSMakePoint(maxX - side * 0.18, lipY + side * 0.02)
+              controlPoint1:NSMakePoint(midX - side * 0.12, lipY - side * 0.06)
+              controlPoint2:NSMakePoint(midX + side * 0.12, lipY - side * 0.06)];
+        [mouth stroke];
+        [[NSGraphicsContext currentContext] restoreGraphicsState];
+
+        [[NSColor blackColor] setFill];
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(midX - clapperRadius,
+                                                           minY + side * 0.02,
+                                                           clapperRadius * 2.0,
+                                                           clapperRadius * 2.0)] fill];
     } else {
         [[NSColor blackColor] set];
         CGFloat fontSize = MAX(11.0, side - 2.0);
@@ -2359,6 +2415,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             } else {
                 button.toolTip = [NSString stringWithFormat:@"Matchbook • %@%@", matchState.length ? matchState : @"idle", label.length ? [NSString stringWithFormat:@" • %@", label] : @""];
             }
+        } else if ([self isBellheimApp]) {
+            button.title = @"";
+            button.image = [self renderedStatusItemImageForRelayState:@"running" busy:NO];
+            button.imagePosition = NSImageOnly;
+            button.toolTip = @"Bellheim is running in background";
         } else {
             button.image = nil;
             button.title = @"St";
@@ -2368,7 +2429,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        self.statusItem.title = ([self isStonrApp] || [self isArtificerApp] || [self isMatchbookApp]) ? @"" : @"St";
+        self.statusItem.title = ([self isStonrApp] || [self isArtificerApp] || [self isMatchbookApp] || [self isBellheimApp]) ? @"" : @"St";
 #pragma clang diagnostic pop
     }
 
@@ -2543,7 +2604,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
 
     if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp]) {
-        NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:([self.window isVisible] ? @"Hide Window" : @"Show Window")
+        NSString *toggleTitle = [self.window isVisible] ? @"Hide Window" : @"Show Window";
+        if ([self isBellheimApp]) {
+            toggleTitle = [self.window isVisible] ? @"Hide Bellheim" : @"Open Bellheim";
+        }
+        NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:toggleTitle
                                                             action:@selector(toggleMainWindowFromStatusItem:)
                                                      keyEquivalent:@""];
         [toggleItem setTarget:self];
@@ -2995,6 +3060,22 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
         if (!foundBackground && foundStatusItem && showStatusItem) {
             self.keepRunningInBackground = YES;
+        }
+    } else if ([appSlug isEqualToString:@"bellheim"]) {
+        NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
+        NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
+        NSString *configPath = [[[configRoot stringByAppendingPathComponent:@"wizardry-apps"] stringByAppendingPathComponent:@"bellheim"] stringByAppendingPathComponent:@"config.json"];
+        NSData *configData = [NSData dataWithContentsOfFile:configPath];
+        if (configData.length > 0) {
+            id parsedConfig = [NSJSONSerialization JSONObjectWithData:configData options:0 error:nil];
+            NSDictionary *config = [parsedConfig isKindOfClass:[NSDictionary class]] ? parsedConfig : nil;
+            NSDictionary *settings = [config[@"settings"] isKindOfClass:[NSDictionary class]] ? config[@"settings"] : nil;
+            NSDictionary *desktop = [settings[@"desktop"] isKindOfClass:[NSDictionary class]] ? settings[@"desktop"] : nil;
+            id backgroundMode = desktop[@"backgroundMode"];
+            if ([backgroundMode respondsToSelector:@selector(boolValue)] && [backgroundMode boolValue]) {
+                self.keepRunningInBackground = YES;
+                self.showStatusItem = YES;
+            }
         }
     }
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
