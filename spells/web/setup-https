@@ -100,6 +100,7 @@ case "$confirm" in
 esac
 
 # Get the domain from site.conf or prompt for it
+domain_prompted=0
 domain=$(config-get "$SITE_DIR/site.conf" domain 2>/dev/null || echo "")
 if [ -z "$domain" ] || [ "$domain" = "localhost" ]; then
   printf '\n'
@@ -109,8 +110,16 @@ if [ -z "$domain" ] || [ "$domain" = "localhost" ]; then
   if [ -z "$domain" ]; then
     die 2 "setup-https: domain required"
   fi
-  
-  # Update domain in site.conf
+  domain_prompted=1
+fi
+
+case "$domain" in
+  ''|*[!A-Za-z0-9._-]*)
+    die 2 "setup-https: invalid domain"
+    ;;
+esac
+
+if [ "$domain_prompted" -eq 1 ]; then
   config-set "$SITE_DIR/site.conf" domain "$domain"
 fi
 

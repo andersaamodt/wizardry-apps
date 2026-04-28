@@ -49,6 +49,17 @@ if [ -n "$site_user" ] && [ "$(id -un)" != "$site_user" ] && [ -z "${WIZARDRY_SI
   fi
 fi
 
+# Get domain from config
+domain=$(config-get "$SITE_DIR/site.conf" domain 2>/dev/null || echo "")
+if [ -z "$domain" ] || [ "$domain" = "localhost" ]; then
+  die "renew-https: valid domain required"
+fi
+case "$domain" in
+  ''|*[!A-Za-z0-9._-]*)
+    die 2 "renew-https: invalid domain"
+    ;;
+esac
+
 # Check for certbot
 if ! has certbot; then
   warn "renew-https: certbot is not installed"
@@ -56,12 +67,6 @@ if ! has certbot; then
   info "On Debian/Ubuntu: sudo apt-get install certbot"
   info "On macOS: brew install certbot"
   exit 1
-fi
-
-# Get domain from config
-domain=$(config-get "$SITE_DIR/site.conf" domain 2>/dev/null || echo "")
-if [ -z "$domain" ] || [ "$domain" = "localhost" ]; then
-  die "renew-https: valid domain required"
 fi
 
 # Check if HTTPS is configured
