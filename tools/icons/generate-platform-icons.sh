@@ -22,6 +22,29 @@ if [ -z "$input_image" ] || [ -z "$project_dir" ]; then
   exit 2
 fi
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
+valid_original_ext() {
+  case "${1-}" in ""|*[!a-z0-9]*) return 1 ;; esac
+}
+
+if has_line_break "$input_image"; then
+  printf '%s\n' "generate-platform-icons: input image path must not contain line breaks" >&2
+  exit 2
+fi
+
+if has_line_break "$project_dir"; then
+  printf '%s\n' "generate-platform-icons: project directory must not contain line breaks" >&2
+  exit 2
+fi
+
 [ -f "$input_image" ] || {
   printf '%s\n' "generate-platform-icons: input image not found: $input_image" >&2
   exit 1
@@ -80,6 +103,10 @@ case "$input_name" in
   *) original_ext=png ;;
 esac
 original_ext=$(printf '%s' "$original_ext" | tr '[:upper:]' '[:lower:]')
+valid_original_ext "$original_ext" || {
+  printf '%s\n' "generate-platform-icons: invalid input image extension" >&2
+  exit 2
+}
 stored_original="$meta_dir/original-source.$original_ext"
 stored_original_rel="assets/icons/meta/original-source.$original_ext"
 

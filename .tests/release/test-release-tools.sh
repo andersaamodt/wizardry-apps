@@ -431,4 +431,37 @@ if APPLE_P12_BASE64='bad' \
 fi
 grep -F "invalid Apple notary issuer id" "$tmp_dir/sign-bad-issuer.err" >/dev/null
 
+fake_magick_bin="$tmp_dir/fake-magick-bin"
+mkdir -p "$fake_magick_bin"
+cat >"$fake_magick_bin/magick" <<'SH'
+#!/bin/sh
+if [ "${1-}" = "identify" ]; then
+  case "${3-}" in
+    *'%[opaque]'*) printf '%s\n' "100 100 true" ;;
+    *) printf '%s\n' "100 100" ;;
+  esac
+  exit 0
+fi
+out=''
+for arg in "$@"; do
+  out=$arg
+done
+[ -n "$out" ] || exit 0
+mkdir -p "$(dirname "$out")"
+printf '%s\n' "image" >"$out"
+SH
+chmod +x "$fake_magick_bin/magick"
+icon_input="$tmp_dir/icon.png"
+icon_project="$tmp_dir/icon-project"
+bad_icon_project="$tmp_dir/icon-project
+forged=1"
+: >"$icon_input"
+mkdir -p "$icon_project" "$bad_icon_project"
+if PATH="$fake_magick_bin:$PATH" \
+   sh "$ROOT_DIR/tools/icons/generate-platform-icons.sh" "$icon_input" "$bad_icon_project" >"$tmp_dir/icons-bad-project.out" 2>"$tmp_dir/icons-bad-project.err"; then
+  printf '%s\n' "generate-platform-icons accepted newline project path" >&2
+  exit 1
+fi
+grep -F "project directory must not contain line breaks" "$tmp_dir/icons-bad-project.err" >/dev/null
+
 printf '%s\n' "release tools smoke passed"
