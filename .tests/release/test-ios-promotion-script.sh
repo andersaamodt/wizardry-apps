@@ -28,6 +28,26 @@ if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
 fi
 grep -F "invalid bundle id" "$tmp_dir/ios-promote-invalid-bundle.err" >/dev/null
 
+if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
+   APP_STORE_CONNECT_ISSUER_ID='11111111-1111-1111-1111-111111111111' \
+   APP_STORE_CONNECT_PRIVATE_KEY_BASE64='bad' \
+   IOS_SUBMIT_FOR_REVIEW='maybe' \
+   sh "$ROOT_DIR/tools/release/promote-ios-release.sh" com.example.app >"$tmp_dir/ios-promote-invalid-submit-flag.err" 2>&1; then
+  printf '%s\n' "promote-ios-release accepted invalid submit flag" >&2
+  exit 1
+fi
+grep -F "invalid IOS_SUBMIT_FOR_REVIEW" "$tmp_dir/ios-promote-invalid-submit-flag.err" >/dev/null
+
+if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
+   APP_STORE_CONNECT_ISSUER_ID='11111111-1111-1111-1111-111111111111' \
+   APP_STORE_CONNECT_PRIVATE_KEY_BASE64='bad' \
+   IOS_RELEASE_AFTER_APPROVAL='maybe' \
+   sh "$ROOT_DIR/tools/release/promote-ios-release.sh" com.example.app >"$tmp_dir/ios-promote-invalid-release-flag.err" 2>&1; then
+  printf '%s\n' "promote-ios-release accepted invalid release flag" >&2
+  exit 1
+fi
+grep -F "invalid IOS_RELEASE_AFTER_APPROVAL" "$tmp_dir/ios-promote-invalid-release-flag.err" >/dev/null
+
 fake_promote_bin="$tmp_dir/fake-promote-bin"
 mkdir -p "$fake_promote_bin"
 cat >"$fake_promote_bin/openssl" <<'SH'

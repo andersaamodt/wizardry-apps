@@ -64,6 +64,11 @@ valid_query_token() {
   case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
 }
 
+valid_bool_flag() {
+  case "${1-}" in 0|1) return 0 ;; esac
+  return 1
+}
+
 require_api_token() {
   field=$1
   value=$2
@@ -104,13 +109,23 @@ if [ -n "$version_string" ] && ! valid_query_token "$version_string"; then
   exit 2
 fi
 
+submit_for_review=${IOS_SUBMIT_FOR_REVIEW:-1}
+release_after_approval=${IOS_RELEASE_AFTER_APPROVAL:-0}
+
+valid_bool_flag "$submit_for_review" || {
+  printf '%s\n' "promote-ios-release: invalid IOS_SUBMIT_FOR_REVIEW" >&2
+  exit 2
+}
+
+valid_bool_flag "$release_after_approval" || {
+  printf '%s\n' "promote-ios-release: invalid IOS_RELEASE_AFTER_APPROVAL" >&2
+  exit 2
+}
+
 if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
   printf '%s\n' "promote-ios-release: curl, jq, and openssl are required" >&2
   exit 1
 fi
-
-submit_for_review=${IOS_SUBMIT_FOR_REVIEW:-1}
-release_after_approval=${IOS_RELEASE_AFTER_APPROVAL:-0}
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/asc-promote.XXXXXX")
 key_file="$tmp_dir/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
