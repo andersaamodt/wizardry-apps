@@ -204,7 +204,8 @@ list_watch() {
       ;;
   esac
   if [ -f "$path" ]; then
-    tail -n "$limit" "$path"
+    tab=$(printf '\t')
+    tail -n "$limit" "$path" | awk -F "$tab" 'NF == 5 { gsub(/\r/, " "); print }'
   fi
 }
 

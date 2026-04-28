@@ -91,6 +91,24 @@ if printf '%s\n' "$desktop_prefs_out" | grep -F "ab/key=" >/dev/null 2>&1; then
   printf '%s\n' "wizardry-desktop get-ui-prefs emitted invalid key from hand-edited prefs" >&2
   exit 1
 fi
+watch_log="$tmp_home/.local/share/wizardry/wizardry-desktop/watch.log"
+mkdir -p "$(dirname "$watch_log")"
+{
+  printf '1\tapp\tmenu:demo\twizardry-core\tok\rforged=1\n'
+  printf '2\tapp\tbad\twizardry-core\ttoo\tmany\n'
+  printf '3\tapp\tmenu:good\twizardry-core\tok\n'
+} >"$watch_log"
+watch_out=$(HOME="$tmp_home" sh "$backend" list-watch 10)
+if printf '%s\n' "$watch_out" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "wizardry-desktop list-watch emitted forged rows from hand-edited log" >&2
+  exit 1
+fi
+if printf '%s\n' "$watch_out" | grep -F "too	many" >/dev/null 2>&1; then
+  printf '%s\n' "wizardry-desktop list-watch emitted malformed hand-edited log row" >&2
+  exit 1
+fi
+printf '%s\n' "$watch_out" | grep -F "1	app	menu:demo	wizardry-core	ok forged=1" >/dev/null
+printf '%s\n' "$watch_out" | grep -F "3	app	menu:good	wizardry-core	ok" >/dev/null
 
 hostile_spell_dir="$tmp_home/.wizardry/spells/hostilecat"
 mkdir -p "$hostile_spell_dir"
