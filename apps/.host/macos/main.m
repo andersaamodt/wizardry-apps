@@ -3005,7 +3005,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
     BOOL isCounterspellApp = [appSlug isEqualToString:@"counterspell"];
     BOOL prefersMaxInitialFrame = [appSlug isEqualToString:@"binder"];
-    BOOL prefersTallerInitialFrame = [appSlug isEqualToString:@"bellheim"];
+    BOOL prefersFullHeightInitialFrame = [appSlug isEqualToString:@"bellheim"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.enableHeaderDragHoles = prefersHeaderDragHoles;
     self.prefersLeftOnlyHeaderDragArea = prefersLeftOnlyHeaderDragArea;
@@ -3129,9 +3129,14 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     // Create window
     NSRect frame = NSMakeRect(0, 0, 860, 620);
     NSSize minSize = NSMakeSize(860, 620);
-    if (prefersTallerInitialFrame) {
-        frame = NSMakeRect(0, 0, 860, 700);
-        minSize = NSMakeSize(860, 680);
+    if (prefersFullHeightInitialFrame) {
+        NSScreen *screen = [NSScreen mainScreen];
+        if (screen) {
+            NSRect visible = [screen visibleFrame];
+            frame.size.height = visible.size.height;
+            frame.origin.x = NSMinX(visible) + floor((visible.size.width - frame.size.width) / 2.0);
+            frame.origin.y = NSMinY(visible);
+        }
     }
     if (self.enableNativeViewMenu) {
         // Priorities starts narrow and should remain resizable down to a compact width.
@@ -3179,7 +3184,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                                   defer:NO];
     self.window.delegate = self;
     [self.window setMinSize:minSize];
-    if (!prefersNarrowTallLayout && !self.enableNativeViewMenu && !prefersMaxInitialFrame) {
+    if (!prefersNarrowTallLayout && !self.enableNativeViewMenu && !prefersMaxInitialFrame && !prefersFullHeightInitialFrame) {
         [self.window center];
     }
     [self.window setTitle:[NSString stringWithFormat:@"Wizardry - %@", appName]];
