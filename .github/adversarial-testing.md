@@ -74,6 +74,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Release automation should reject unsafe metadata before invoking credentials, curl, xcrun, tar, unzip, chmod, or platform installers.
 - Release helper scripts must revalidate manifest fields they print, even when CI normally runs the manifest validator first.
 - Generated asset directories should be treated as partial unless each expected file exists; avoid all-or-nothing globs under `set -e`.
+- Platform icon staging must verify generated icon sets are complete before copying them; partial generated directories should fall back or fail loudly.
 - GUI adversarial testing should include stale state, racing clicks, WebKit drag payload differences, and narrow-width layout pressure.
 - Native desktop IR display strings are code-generation inputs; validate or escape them before rendering Swift, C, plist, desktop, or package files.
 - Backend text records consumed by GUIs need record-shape tests: line-break rejection alone does not protect tab- or pipe-separated output.

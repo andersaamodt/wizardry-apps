@@ -22,14 +22,31 @@ if [ -z "$app_dir" ] || [ -z "$xcassets_dir" ]; then
 fi
 
 source_dir="$app_dir/assets/icons/ios/AppIcon.appiconset"
+required_icon_files="Contents.json icon-20@2x.png icon-20@3x.png icon-29@2x.png icon-29@3x.png icon-40@2x.png icon-40@3x.png icon-60@2x.png icon-60@3x.png icon-20@1x-ipad.png icon-20@2x-ipad.png icon-29@1x-ipad.png icon-29@2x-ipad.png icon-40@1x-ipad.png icon-40@2x-ipad.png icon-76@1x-ipad.png icon-76@2x-ipad.png icon-83.5@2x-ipad.png icon-1024.png"
+
+icon_set_complete() {
+  dir=$1
+  [ -d "$dir" ] || return 1
+  for icon_file in $required_icon_files; do
+    [ -f "$dir/$icon_file" ] || return 1
+  done
+  return 0
+}
+
 mkdir -p "$xcassets_dir/AppIcon.appiconset"
-if [ -d "$source_dir" ]; then
+if icon_set_complete "$source_dir"; then
   cp -R "$source_dir"/. "$xcassets_dir/AppIcon.appiconset/"
   exit 0
 fi
 
 source_icon="$app_dir/assets/forge-icon.png"
-[ -f "$source_icon" ] || exit 0
+[ -f "$source_icon" ] || {
+  if [ -d "$source_dir" ]; then
+    printf '%s\n' "stage-ios-appiconset: generated icon set is incomplete and fallback source icon is missing" >&2
+    exit 1
+  fi
+  exit 0
+}
 
 command -v sips >/dev/null 2>&1 || {
   printf '%s\n' "stage-ios-appiconset: generated icon set missing and sips is unavailable" >&2

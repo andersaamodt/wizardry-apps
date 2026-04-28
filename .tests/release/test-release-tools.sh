@@ -89,6 +89,32 @@ grep -Fx "fallback icon" "$partial_icon_res/mipmap-mdpi/ic_launcher_round.png" >
 grep -Fx "generated icon" "$partial_icon_res/mipmap-hdpi/ic_launcher.png" >/dev/null
 grep -Fx "fallback icon" "$partial_icon_res/mipmap-hdpi/ic_launcher_round.png" >/dev/null
 
+partial_ios_app="$tmp_dir/partial-ios-app"
+partial_ios_assets="$tmp_dir/partial-ios-xcassets"
+fake_icon_bin="$tmp_dir/fake-icon-bin"
+mkdir -p "$partial_ios_app/assets/icons/ios/AppIcon.appiconset" "$partial_ios_app/assets" "$fake_icon_bin"
+printf '%s\n' "partial generated icon" >"$partial_ios_app/assets/icons/ios/AppIcon.appiconset/icon-20@2x.png"
+printf '%s\n' "fallback icon" >"$partial_ios_app/assets/forge-icon.png"
+cat >"$fake_icon_bin/sips" <<'SH'
+#!/bin/sh
+out=''
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--out" ]; then
+    shift
+    out=${1-}
+    break
+  fi
+  shift
+done
+[ -n "$out" ] || exit 2
+mkdir -p "$(dirname "$out")"
+printf '%s\n' "rendered icon" >"$out"
+SH
+chmod +x "$fake_icon_bin/sips"
+PATH="$fake_icon_bin:$PATH" sh "$ROOT_DIR/tools/icons/stage-ios-appiconset.sh" "$partial_ios_app" "$partial_ios_assets"
+grep -Fx "rendered icon" "$partial_ios_assets/AppIcon.appiconset/icon-1024.png" >/dev/null
+[ -f "$partial_ios_assets/AppIcon.appiconset/Contents.json" ]
+
 if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" ../web/demo "$tmp_dir/traversed-assets" >/dev/null 2>&1; then
   printf '%s\n' "stage-web-assets accepted slug path traversal" >&2
   exit 1
