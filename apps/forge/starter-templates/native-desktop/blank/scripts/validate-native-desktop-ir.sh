@@ -5,6 +5,25 @@ set -eu
 ir_path=${1:-ir/app.ir.yaml}
 schema_path=${2:-schemas/native-desktop-ir-v1.json}
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
+if has_line_break "$ir_path"; then
+  printf '%s\n' "native-desktop-ir: IR path must not contain line breaks." >&2
+  exit 2
+fi
+
+if has_line_break "$schema_path"; then
+  printf '%s\n' "native-desktop-ir: schema path must not contain line breaks." >&2
+  exit 2
+fi
+
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "native-desktop-ir: jq is required to validate the canonical IR." >&2
   exit 1

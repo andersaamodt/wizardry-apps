@@ -439,6 +439,19 @@ fi
 grep -F "render-safe" /tmp/forge-bad-native-ir.err >/dev/null
 rm -f "$bad_native_ir"
 
+bad_native_ir_path="$scratch/native-ir
+status=forged.json"
+cp "$workspaces_root/workspace-native/ir/app.ir.yaml" "$bad_native_ir_path"
+if sh "$workspaces_root/workspace-native/scripts/validate-native-desktop-ir.sh" "$bad_native_ir_path" "$workspaces_root/workspace-native/schemas/native-desktop-ir-v1.json" >"$scratch/forge-native-ir-path.out" 2>"$scratch/forge-native-ir-path.err"; then
+  printf '%s\n' "forge backend test: native desktop IR accepted line-break IR path" >&2
+  exit 1
+fi
+grep -F "IR path must not contain line breaks" "$scratch/forge-native-ir-path.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-native-ir-path.out" | grep -E '^status=' >/dev/null 2>&1; then
+  printf '%s\n' "forge native desktop IR emitted forged status from IR path" >&2
+  exit 1
+fi
+
 rebuild_workspace_native_out=$(sh "$backend" rebuild-workspace "$scratch" "$workspaces_root/workspace-native" native-desktop)
 printf '%s\n' "$rebuild_workspace_native_out" | grep -F "workspace=$workspace_native_abs" >/dev/null
 printf '%s\n' "$rebuild_workspace_native_out" | grep -F "context=native-desktop" >/dev/null

@@ -83,6 +83,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - GUI adversarial testing should include stale state, racing clicks, WebKit drag payload differences, and narrow-width layout pressure.
 - Native desktop IR display strings are code-generation inputs; validate or escape them before rendering Swift, C, plist, desktop, or package files.
 - Backend text records consumed by GUIs need record-shape tests: line-break rejection alone does not protect tab- or pipe-separated output.
+- Validators that print `key=value` summaries must validate or sanitize the file paths they echo, not only the structured data being validated.
 - TSV list rows need tab-specific sanitization; key/value sanitizers that only replace CR/LF are not enough for sidebar/catalog rows.
 - Installed helper output is GUI input when backend rows forward it; sanitize record delimiters in status/details text and reject delimiter-shaped module or action filenames before emitting rows.
 - GUI list/count commands must share the same name validator as run commands; otherwise unsafe files can create visible but un-runnable rows or inflated category counts.
