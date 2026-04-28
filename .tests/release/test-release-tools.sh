@@ -355,4 +355,80 @@ if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$good_service_json" \
 fi
 grep -F "invalid version codes from API" "$tmp_dir/play-promote-bad-codes.err" >/dev/null
 
+deploy_bundle="$tmp_dir/deploy-bundle"
+mkdir -p "$deploy_bundle"
+fake_deploy_bin="$tmp_dir/fake-deploy-bin"
+mkdir -p "$fake_deploy_bin"
+cat >"$fake_deploy_bin/openssl" <<'SH'
+#!/bin/sh
+cat
+SH
+cat >"$fake_deploy_bin/ssh" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$fake_deploy_bin/rsync" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$fake_deploy_bin/openssl" "$fake_deploy_bin/ssh" "$fake_deploy_bin/rsync"
+bad_deploy_host=$(printf 'example.com\nforged=1')
+if WEB_DEPLOY_HOST="$bad_deploy_host" \
+   WEB_DEPLOY_USER='deploy' \
+   WEB_DEPLOY_PATH='/var/www/wizardry' \
+   WEB_DEPLOY_SSH_KEY_BASE64='bad' \
+   PATH="$fake_deploy_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/deploy-hosted-web.sh" "$deploy_bundle" >"$tmp_dir/deploy-bad-host.out" 2>"$tmp_dir/deploy-bad-host.err"; then
+  printf '%s\n' "deploy-hosted-web accepted invalid host" >&2
+  exit 1
+fi
+grep -F "invalid deploy host" "$tmp_dir/deploy-bad-host.err" >/dev/null
+
+if WEB_DEPLOY_HOST='example.com' \
+   WEB_DEPLOY_USER='deploy' \
+   WEB_DEPLOY_PATH='/var/www/../../other' \
+   WEB_DEPLOY_SSH_KEY_BASE64='bad' \
+   PATH="$fake_deploy_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/deploy-hosted-web.sh" "$deploy_bundle" >"$tmp_dir/deploy-bad-path.out" 2>"$tmp_dir/deploy-bad-path.err"; then
+  printf '%s\n' "deploy-hosted-web accepted invalid path" >&2
+  exit 1
+fi
+grep -F "invalid deploy path" "$tmp_dir/deploy-bad-path.err" >/dev/null
+
+sign_app="$tmp_dir/Test.app"
+mkdir -p "$sign_app"
+fake_sign_bin="$tmp_dir/fake-sign-bin"
+mkdir -p "$fake_sign_bin"
+cat >"$fake_sign_bin/openssl" <<'SH'
+#!/bin/sh
+cat
+SH
+cat >"$fake_sign_bin/security" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$fake_sign_bin/codesign" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$fake_sign_bin/xcrun" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$fake_sign_bin/openssl" "$fake_sign_bin/security" "$fake_sign_bin/codesign" "$fake_sign_bin/xcrun"
+bad_notary_issuer=$(printf '11111111-1111-1111-1111-111111111111\nforged=1')
+if APPLE_P12_BASE64='bad' \
+   APPLE_P12_PASSWORD='password' \
+   APPLE_DEVELOPER_ID_APP='Developer ID Application: Example (TEAM123456)' \
+   APPLE_TEAM_ID='TEAM123456' \
+   APPLE_NOTARY_KEY_ID='ABC123DEF4' \
+   APPLE_NOTARY_ISSUER_ID="$bad_notary_issuer" \
+   APPLE_NOTARY_PRIVATE_KEY_BASE64='bad' \
+   PATH="$fake_sign_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/sign-and-notarize-macos.sh" "$sign_app" >"$tmp_dir/sign-bad-issuer.out" 2>"$tmp_dir/sign-bad-issuer.err"; then
+  printf '%s\n' "sign-and-notarize-macos accepted invalid notary issuer id" >&2
+  exit 1
+fi
+grep -F "invalid Apple notary issuer id" "$tmp_dir/sign-bad-issuer.err" >/dev/null
+
 printf '%s\n' "release tools smoke passed"

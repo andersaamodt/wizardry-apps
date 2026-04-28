@@ -30,6 +30,43 @@ for v in $required_vars; do
   fi
 done
 
+valid_alnum() {
+  case "${1-}" in ""|*[!A-Za-z0-9]*) return 1 ;; esac
+}
+
+valid_hex_dash() {
+  case "${1-}" in ""|*[!A-Fa-f0-9-]*) return 1 ;; esac
+}
+
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
+valid_alnum "$APPLE_TEAM_ID" || {
+  printf '%s\n' "sign-and-notarize-macos: invalid Apple team id" >&2
+  exit 2
+}
+
+valid_alnum "$APPLE_NOTARY_KEY_ID" || {
+  printf '%s\n' "sign-and-notarize-macos: invalid Apple notary key id" >&2
+  exit 2
+}
+
+valid_hex_dash "$APPLE_NOTARY_ISSUER_ID" || {
+  printf '%s\n' "sign-and-notarize-macos: invalid Apple notary issuer id" >&2
+  exit 2
+}
+
+if has_line_break "$APPLE_DEVELOPER_ID_APP"; then
+  printf '%s\n' "sign-and-notarize-macos: invalid Developer ID application identity" >&2
+  exit 2
+fi
+
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-macos-sign.XXXXXX")
 keychain="$tmp_dir/signing.keychain-db"
 keychain_password="wizardry-sign-$(date +%s)"

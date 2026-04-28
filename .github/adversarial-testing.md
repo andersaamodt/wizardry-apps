@@ -105,3 +105,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Release version strings are project-file inputs; validate them before rendering Xcode, Gradle, plist, YAML, or package metadata.
 - Remote API IDs, versions, and states need revalidation after `jq` extraction before reuse in URLs or machine-readable status rows.
 - Service account JSON is release input; validate identity fields before rendering JWT claims.
+- Deploy and notarization secrets should reject control/path metacharacters before reaching remote-shell, codesign, or notarytool arguments.

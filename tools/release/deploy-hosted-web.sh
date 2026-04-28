@@ -27,6 +27,35 @@ if [ -z "${WEB_DEPLOY_HOST-}" ] || [ -z "${WEB_DEPLOY_USER-}" ] || [ -z "${WEB_D
   exit 1
 fi
 
+valid_deploy_host() {
+  case "${1-}" in ""|*[!A-Za-z0-9.-]*|.*|*.|*..*) return 1 ;; esac
+}
+
+valid_deploy_user() {
+  case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
+}
+
+valid_deploy_path() {
+  case "${1-}" in /*) ;; *) return 1 ;; esac
+  case "$1" in *..*|*'//'*) return 1 ;; esac
+  case "$1" in *[!A-Za-z0-9._/-]*) return 1 ;; esac
+}
+
+valid_deploy_host "$WEB_DEPLOY_HOST" || {
+  printf '%s\n' "deploy-hosted-web: invalid deploy host" >&2
+  exit 2
+}
+
+valid_deploy_user "$WEB_DEPLOY_USER" || {
+  printf '%s\n' "deploy-hosted-web: invalid deploy user" >&2
+  exit 2
+}
+
+valid_deploy_path "$WEB_DEPLOY_PATH" || {
+  printf '%s\n' "deploy-hosted-web: invalid deploy path" >&2
+  exit 2
+}
+
 if ! command -v rsync >/dev/null 2>&1 || ! command -v ssh >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
   printf '%s\n' "deploy-hosted-web: rsync, ssh, and openssl are required" >&2
   exit 1
