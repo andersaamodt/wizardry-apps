@@ -115,6 +115,85 @@ PATH="$fake_icon_bin:$PATH" sh "$ROOT_DIR/tools/icons/stage-ios-appiconset.sh" "
 grep -Fx "rendered icon" "$partial_ios_assets/AppIcon.appiconset/icon-1024.png" >/dev/null
 [ -f "$partial_ios_assets/AppIcon.appiconset/Contents.json" ]
 
+fake_ios_bin="$tmp_dir/fake-ios-bin"
+mkdir -p "$fake_ios_bin"
+cat >"$fake_ios_bin/xcodegen" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$fake_ios_bin/xcodebuild" <<'SH'
+#!/bin/sh
+derived=''
+export_path=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -derivedDataPath)
+      shift
+      derived=${1-}
+      ;;
+    -exportPath)
+      shift
+      export_path=${1-}
+      ;;
+  esac
+  shift
+done
+if [ -n "$derived" ]; then
+  mkdir -p "$derived/Build/Products/Debug-iphonesimulator/WizardryHost.app"
+fi
+if [ -n "$export_path" ]; then
+  mkdir -p "$export_path"
+  : >"$export_path/WizardryHost.ipa"
+fi
+exit 0
+SH
+cat >"$fake_ios_bin/openssl" <<'SH'
+#!/bin/sh
+cat
+SH
+cat >"$fake_ios_bin/security" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$fake_ios_bin/xcodegen" "$fake_ios_bin/xcodebuild" "$fake_ios_bin/openssl" "$fake_ios_bin/security"
+if RELEASE_VERSION='v1.2.3/../../bad' \
+   PATH="$fake_ios_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/build-ios-app.sh" forge "$tmp_dir/ios-version-out" smoke >"$tmp_dir/ios-invalid-version.out" 2>"$tmp_dir/ios-invalid-version.err"; then
+  rm -rf "$ROOT_DIR/_tmp/ios-build-forge"
+  printf '%s\n' "build-ios-app accepted invalid release version" >&2
+  exit 1
+fi
+grep -F "invalid release version" "$tmp_dir/ios-invalid-version.err" >/dev/null
+
+bad_build_issuer=$(printf '11111111-1111-1111-1111-111111111111\nforged=1')
+if APPLE_P12_BASE64='bad' \
+   APPLE_P12_PASSWORD='password' \
+   APPLE_TEAM_ID='TEAM123456' \
+   APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
+   APP_STORE_CONNECT_ISSUER_ID="$bad_build_issuer" \
+   APP_STORE_CONNECT_PRIVATE_KEY_BASE64='bad' \
+   PATH="$fake_ios_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/build-ios-app.sh" forge "$tmp_dir/ios-issuer-out" release >"$tmp_dir/ios-invalid-issuer.out" 2>"$tmp_dir/ios-invalid-issuer.err"; then
+  rm -rf "$ROOT_DIR/_tmp/ios-build-forge"
+  printf '%s\n' "build-ios-app accepted invalid issuer id" >&2
+  exit 1
+fi
+grep -F "invalid App Store Connect issuer id" "$tmp_dir/ios-invalid-issuer.err" >/dev/null
+
+if APPLE_P12_BASE64='bad' \
+   APPLE_P12_PASSWORD='password' \
+   APPLE_TEAM_ID='TEAM/../../BAD' \
+   APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
+   APP_STORE_CONNECT_ISSUER_ID='11111111-1111-1111-1111-111111111111' \
+   APP_STORE_CONNECT_PRIVATE_KEY_BASE64='bad' \
+   PATH="$fake_ios_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/build-ios-app.sh" forge "$tmp_dir/ios-team-out" release >"$tmp_dir/ios-invalid-team.out" 2>"$tmp_dir/ios-invalid-team.err"; then
+  rm -rf "$ROOT_DIR/_tmp/ios-build-forge"
+  printf '%s\n' "build-ios-app accepted invalid Apple team id" >&2
+  exit 1
+fi
+grep -F "invalid Apple team id" "$tmp_dir/ios-invalid-team.err" >/dev/null
+
 if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" ../web/demo "$tmp_dir/traversed-assets" >/dev/null 2>&1; then
   printf '%s\n' "stage-web-assets accepted slug path traversal" >&2
   exit 1

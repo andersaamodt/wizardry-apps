@@ -43,6 +43,50 @@ case "$VERSION_NAME" in
   v*) VERSION_NAME=${VERSION_NAME#v} ;;
 esac
 
+valid_alnum() {
+  case "${1-}" in ""|*[!A-Za-z0-9]*) return 1 ;; esac
+}
+
+valid_hex_dash() {
+  case "${1-}" in ""|*[!A-Fa-f0-9-]*) return 1 ;; esac
+}
+
+valid_ios_version() {
+  case "${1-}" in ""|*[!0-9.]*|.*|*.|*..*) return 1 ;; esac
+  printf '%s\n' "$1" | grep -Eq '^[0-9]+(\.[0-9]+){0,2}$'
+}
+
+valid_ios_version "$VERSION_NAME" || {
+  printf '%s\n' "build-ios-app: invalid release version" >&2
+  exit 2
+}
+
+if [ "$mode" = "release" ]; then
+  required_vars="APPLE_P12_BASE64 APPLE_P12_PASSWORD APPLE_TEAM_ID APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY_BASE64"
+  for v in $required_vars; do
+    eval "val=\${$v-}"
+    if [ -z "$val" ]; then
+      printf '%s\n' "build-ios-app: missing required env: $v" >&2
+      exit 1
+    fi
+  done
+
+  valid_alnum "$APPLE_TEAM_ID" || {
+    printf '%s\n' "build-ios-app: invalid Apple team id" >&2
+    exit 2
+  }
+
+  valid_alnum "$APP_STORE_CONNECT_KEY_ID" || {
+    printf '%s\n' "build-ios-app: invalid App Store Connect key id" >&2
+    exit 2
+  }
+
+  valid_hex_dash "$APP_STORE_CONNECT_ISSUER_ID" || {
+    printf '%s\n' "build-ios-app: invalid App Store Connect issuer id" >&2
+    exit 2
+  }
+fi
+
 if ! command -v xcodebuild >/dev/null 2>&1; then
   printf '%s\n' "build-ios-app: xcodebuild is required" >&2
   exit 1
@@ -115,24 +159,6 @@ if [ "$mode" = "smoke" ]; then
 fi
 
 # release mode requires signing credentials.
-required_vars="APPLE_P12_BASE64 APPLE_P12_PASSWORD APPLE_TEAM_ID APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY_BASE64"
-for v in $required_vars; do
-  eval "val=\${$v-}"
-  if [ -z "$val" ]; then
-    printf '%s\n' "build-ios-app: missing required env: $v" >&2
-    exit 1
-  fi
-done
-
-valid_alnum() {
-  case "${1-}" in ""|*[!A-Za-z0-9]*) return 1 ;; esac
-}
-
-valid_alnum "$APP_STORE_CONNECT_KEY_ID" || {
-  printf '%s\n' "build-ios-app: invalid App Store Connect key id" >&2
-  exit 2
-}
-
 keychain="$build_root/wizardry-signing.keychain-db"
 keychain_password="wizardry-ci-$(date +%s)"
 cert_file="$build_root/apple-cert.p12"

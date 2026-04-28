@@ -102,3 +102,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Manifest validation should include hostile records added by future commits, not just the currently checked-in happy path.
 - Single-record manifest status commands must sanitize manifest fields as output too; a separate validator does not protect GUI calls that read a hand-edited manifest directly.
 - Release upload helpers should adversarially test each credential field, not just the credential field used in a temp filename.
+- Release version strings are project-file inputs; validate them before rendering Xcode, Gradle, plist, YAML, or package metadata.
