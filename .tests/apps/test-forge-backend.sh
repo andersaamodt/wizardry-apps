@@ -47,6 +47,11 @@ grep -F 'open "$launch_bundle"' "$backend" >/dev/null
 out=$(sh "$backend" doctor "$test_root")
 printf '%s\n' "$out" | grep -F "root=$test_root" >/dev/null
 printf '%s\n' "$out" | grep -F "os=" >/dev/null
+doctor_injected=$(HOME="${TMPDIR:-/tmp}/forge-home$(printf '\r')forged=1" sh "$backend" doctor "$test_root")
+if printf '%s\n' "$doctor_injected" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge doctor emitted forged key-value output from HOME" >&2
+  exit 1
+fi
 
 os_name=$(uname -s 2>/dev/null || printf unknown)
 if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ]; then

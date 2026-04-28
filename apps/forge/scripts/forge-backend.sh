@@ -1890,9 +1890,9 @@ cmd_doctor() {
     root=$resolved
   fi
 
-  printf 'root=%s\n' "$root"
+  printf 'root=%s\n' "$(kv_output_value "$root")"
   printf 'os=%s\n' "$(os_id)"
-  printf 'home=%s\n' "$HOME"
+  printf 'home=%s\n' "$(kv_output_value "${HOME-}")"
 
   for t in jq clang cc gcc xcodebuild xcodegen pkg-config gradle java brew open xdg-open appimagetool magick; do
     if command -v "$t" >/dev/null 2>&1; then
@@ -1912,8 +1912,8 @@ cmd_doctor() {
   done
 
   if [ -n "$root" ] && command -v jq >/dev/null 2>&1; then
-    printf 'apps_manifest=%s\n' "$root/config/apps.manifest.json"
-    printf 'templates_manifest=%s\n' "$root/config/templates.manifest.json"
+    printf 'apps_manifest=%s\n' "$(kv_output_value "$root/config/apps.manifest.json")"
+    printf 'templates_manifest=%s\n' "$(kv_output_value "$root/config/templates.manifest.json")"
     printf 'apps_total=%s\n' "$(jq -r '.apps | length' "$root/config/apps.manifest.json")"
     printf 'apps_production=%s\n' "$(jq -r '[.apps[] | select(.production == true)] | length' "$root/config/apps.manifest.json")"
     printf 'templates_total=%s\n' "$(jq -r '.templates | length' "$root/config/templates.manifest.json")"
