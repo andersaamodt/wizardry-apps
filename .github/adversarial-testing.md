@@ -65,6 +65,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Prefer backend shell tests for command contracts and static UI contract tests for required controls/semantics.
 - Use temp workspaces, fake homes, fake bins, and stubbed tools to keep tests realistic without touching user state.
 - Assert both failure message and absence of side effects, especially outside sibling paths or install roots.
+- For eval-printing helpers, evaluate the success output with quote-bearing paths and assert no injected command runs.
 - For create/edit parity bugs, test the edit path that bypassed create-time validation.
 - For release/API bugs, stub network tools and feed hostile metadata before any real network access.
 - For GUI-only regressions, pair a static contract test with a Safari automation note or screenshot stored outside the repo.
