@@ -16,8 +16,23 @@ esac
 set -eu
 
 app_bundle=${1-}
+
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
 if [ -z "$app_bundle" ] || [ ! -d "$app_bundle" ]; then
   printf '%s\n' "sign-and-notarize-macos: app bundle required" >&2
+  exit 2
+fi
+
+if has_line_break "$app_bundle"; then
+  printf '%s\n' "sign-and-notarize-macos: app bundle path must not contain line breaks" >&2
   exit 2
 fi
 
@@ -36,15 +51,6 @@ valid_alnum() {
 
 valid_hex_dash() {
   case "${1-}" in ""|*[!A-Fa-f0-9-]*) return 1 ;; esac
-}
-
-has_line_break() {
-  value=${1-}
-  nl_char=$(printf '\nX')
-  nl_char=${nl_char%X}
-  cr_char=$(printf '\r')
-  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
-  return 1
 }
 
 valid_alnum "$APPLE_TEAM_ID" || {

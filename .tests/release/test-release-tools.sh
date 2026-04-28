@@ -67,6 +67,14 @@ if sh "$fake_stage_root/tools/release/stage-web-assets.sh" forge "$fake_stage_ro
 fi
 grep -F "destination overlaps source" "$tmp_dir/stage-into-source.err" >/dev/null
 grep -Fx "source marker" "$fake_stage_root/apps/forge/index.html" >/dev/null
+bad_stage_dest="$tmp_dir/forge-assets
+forged=1"
+if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" forge "$bad_stage_dest" >"$tmp_dir/stage-newline-dest.out" 2>"$tmp_dir/stage-newline-dest.err"; then
+  printf '%s\n' "stage-web-assets accepted newline destination path" >&2
+  exit 1
+fi
+grep -F "destination must not contain line breaks" "$tmp_dir/stage-newline-dest.err" >/dev/null
+[ ! -e "$bad_stage_dest" ]
 
 sh "$ROOT_DIR/tools/release/stage-web-assets.sh" forge "$tmp_dir/forge-assets"
 [ -f "$tmp_dir/forge-assets/app/index.html" ]
@@ -167,6 +175,17 @@ cat >"$fake_ios_bin/security" <<'SH'
 exit 0
 SH
 chmod +x "$fake_ios_bin/xcodegen" "$fake_ios_bin/xcodebuild" "$fake_ios_bin/openssl" "$fake_ios_bin/security"
+bad_ios_out="$tmp_dir/ios-out
+forged=1"
+if PATH="$fake_ios_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/build-ios-app.sh" forge "$bad_ios_out" smoke >"$tmp_dir/ios-bad-out.out" 2>"$tmp_dir/ios-bad-out.err"; then
+  rm -rf "$ROOT_DIR/_tmp/ios-build-forge"
+  printf '%s\n' "build-ios-app accepted newline output directory" >&2
+  exit 1
+fi
+grep -F "output directory must not contain line breaks" "$tmp_dir/ios-bad-out.err" >/dev/null
+[ ! -e "$bad_ios_out" ]
+
 if RELEASE_VERSION='v1.2.3/../../bad' \
    PATH="$fake_ios_bin:$PATH" \
    sh "$ROOT_DIR/tools/release/build-ios-app.sh" forge "$tmp_dir/ios-version-out" smoke >"$tmp_dir/ios-invalid-version.out" 2>"$tmp_dir/ios-invalid-version.err"; then
@@ -456,6 +475,15 @@ cat >"$fake_sign_bin/xcrun" <<'SH'
 exit 0
 SH
 chmod +x "$fake_sign_bin/openssl" "$fake_sign_bin/security" "$fake_sign_bin/codesign" "$fake_sign_bin/xcrun"
+bad_sign_app="$tmp_dir/Bad
+forged=1.app"
+mkdir -p "$bad_sign_app"
+if sh "$ROOT_DIR/tools/release/sign-and-notarize-macos.sh" "$bad_sign_app" >"$tmp_dir/sign-bad-app-path.out" 2>"$tmp_dir/sign-bad-app-path.err"; then
+  printf '%s\n' "sign-and-notarize-macos accepted newline app bundle path" >&2
+  exit 1
+fi
+grep -F "app bundle path must not contain line breaks" "$tmp_dir/sign-bad-app-path.err" >/dev/null
+
 bad_notary_issuer=$(printf '11111111-1111-1111-1111-111111111111\nforged=1')
 if APPLE_P12_BASE64='bad' \
    APPLE_P12_PASSWORD='password' \

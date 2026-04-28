@@ -26,6 +26,20 @@ if [ -z "$slug" ] || [ -z "$out_dir" ]; then
   exit 2
 fi
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
+if has_line_break "$out_dir"; then
+  printf '%s\n' "build-ios-app: output directory must not contain line breaks" >&2
+  exit 2
+fi
+
 case "$mode" in
   smoke|release) ;;
   *)

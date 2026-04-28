@@ -16,8 +16,23 @@ esac
 set -eu
 
 ipa=${1-}
+
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
 if [ -z "$ipa" ] || [ ! -f "$ipa" ]; then
   printf '%s\n' "upload-testflight: IPA_PATH required" >&2
+  exit 2
+fi
+
+if has_line_break "$ipa"; then
+  printf '%s\n' "upload-testflight: IPA path must not contain line breaks" >&2
   exit 2
 fi
 

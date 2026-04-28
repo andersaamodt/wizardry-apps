@@ -100,6 +100,18 @@ grep -F "invalid version string from API" "$tmp_dir/ios-promote-api-version.err"
 
 ipa_path="$tmp_dir/app.ipa"
 : > "$ipa_path"
+bad_ipa_path="$tmp_dir/app
+forged=1.ipa"
+: > "$bad_ipa_path"
+if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
+   APP_STORE_CONNECT_ISSUER_ID='11111111-1111-1111-1111-111111111111' \
+   APP_STORE_CONNECT_PRIVATE_KEY_BASE64='bad' \
+   sh "$ROOT_DIR/tools/release/upload-testflight.sh" "$bad_ipa_path" >"$tmp_dir/upload-testflight-bad-path.out" 2>"$tmp_dir/upload-testflight-bad-path.err"; then
+  printf '%s\n' "upload-testflight accepted newline IPA path" >&2
+  exit 1
+fi
+grep -F "IPA path must not contain line breaks" "$tmp_dir/upload-testflight-bad-path.err" >/dev/null
+
 if APP_STORE_CONNECT_KEY_ID='BAD/../../KEY' \
    APP_STORE_CONNECT_ISSUER_ID='11111111-1111-1111-1111-111111111111' \
    APP_STORE_CONNECT_PRIVATE_KEY_BASE64='bad' \

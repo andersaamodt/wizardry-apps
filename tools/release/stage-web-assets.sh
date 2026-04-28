@@ -27,6 +27,15 @@ if [ -z "$slug" ] || [ -z "$dest" ]; then
   exit 2
 fi
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
 case "$slug" in
   [a-z]*)
     ;;
@@ -41,6 +50,11 @@ case "$slug" in
     exit 2
     ;;
 esac
+
+if has_line_break "$dest"; then
+  printf '%s\n' "stage-web-assets: destination must not contain line breaks" >&2
+  exit 2
+fi
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 app_dir="$ROOT_DIR/apps/$slug"
