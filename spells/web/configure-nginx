@@ -125,6 +125,37 @@ case "$domain" in
     ;;
 esac
 
+validate_cgi_dir_value() {
+  cgi_value=${1-}
+  [ -n "$cgi_value" ] || return 0
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$cgi_value" in
+    *"$nl_char"*|*"$cr_char"*|*'"'*|*'\'*|*'$'*|*';'*|*'{'*|*'}'*|*'#'*)
+      die 2 "configure-nginx: invalid cgi-dir"
+      ;;
+  esac
+  case "$cgi_value" in
+    /*)
+      ;;
+    .|..|../*|*/../*|*/..)
+      die 2 "configure-nginx: invalid cgi-dir"
+      ;;
+  esac
+}
+
+# Path to CGI scripts (site-specific first, then shared)
+WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
+CGI_DIR="$WIZARDRY_DIR/spells/.imps/cgi"
+SITE_CGI_DIR=$(config-get "$SITE_DIR/site.conf" cgi-dir 2>/dev/null || printf '')
+validate_cgi_dir_value "$SITE_CGI_DIR"
+if [ -z "$SITE_CGI_DIR" ]; then
+  SITE_CGI_DIR="$SITE_DIR/cgi"
+elif [ "${SITE_CGI_DIR#/*}" = "$SITE_CGI_DIR" ]; then
+  SITE_CGI_DIR="$SITE_DIR/$SITE_CGI_DIR"
+fi
+
 # Create nginx config directory
 NGINX_CONF_DIR="$SITE_DIR/nginx"
 mkdir -p "$NGINX_CONF_DIR"
@@ -145,16 +176,6 @@ if [ ! -d "$NGINX_CONF_DIR/temp/client_body" ] || \
   mkdir -p "$NGINX_CONF_DIR/temp/fastcgi" 2>/dev/null || true
   mkdir -p "$NGINX_CONF_DIR/temp/uwsgi" 2>/dev/null || true
   mkdir -p "$NGINX_CONF_DIR/temp/scgi" 2>/dev/null || true
-fi
-
-# Path to CGI scripts (site-specific first, then shared)
-WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
-CGI_DIR="$WIZARDRY_DIR/spells/.imps/cgi"
-SITE_CGI_DIR=$(config-get "$SITE_DIR/site.conf" cgi-dir 2>/dev/null || printf '')
-if [ -z "$SITE_CGI_DIR" ]; then
-  SITE_CGI_DIR="$SITE_DIR/cgi"
-elif [ "${SITE_CGI_DIR#/*}" = "$SITE_CGI_DIR" ]; then
-  SITE_CGI_DIR="$SITE_DIR/$SITE_CGI_DIR"
 fi
 
 # Copy mime.types to local directory if not exists

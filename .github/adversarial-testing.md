@@ -21,6 +21,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Tab-, pipe-, and comma-delimited records must reject delimiter characters in fields before persisting or emitting rows for GUI parsers.
 - Machine-readable `key=value` backend output must not echo raw request values that can introduce newlines or forged keys.
 - Generated config, plist, desktop, JSON, YAML, and shell files must not receive raw GUI text that can break the target format.
+- Imported config paths rendered into nginx, service, plist, or shell snippets must reject the target format's control characters.
 - Release asset names must be basenames only; reject archive or API metadata before download, extraction, install, or chmod.
 - Store/release IDs such as App Store key IDs, bundle IDs, Play package names, tracks, and version lists must be validated before paths, JWTs, query strings, or API URLs are built.
 - Workspace relative paths must resolve inside the workspace after symlinks, not just pass string checks.
@@ -60,6 +61,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - A create path having validation does not prove rename/edit/import paths share the same contract.
 - Template-create paths write both filesystem paths and profile metadata; use the same site/template validators as blank-create paths.
 - Profile fields later used in shell, XML, desktop files, API URLs, or filesystem paths need validation at the write boundary and fallback at the read boundary.
+- Site config paths such as `cgi-dir` are code-generation inputs when they render into nginx directives.
 - Release automation should reject unsafe metadata before invoking credentials, curl, xcrun, tar, unzip, chmod, or platform installers.
 - GUI adversarial testing should include stale state, racing clicks, WebKit drag payload differences, and narrow-width layout pressure.
 - Native desktop IR display strings are code-generation inputs; validate or escape them before rendering Swift, C, plist, desktop, or package files.
