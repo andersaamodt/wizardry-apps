@@ -489,6 +489,19 @@ printf '%s\n' "$workspace_web_path_remote" | grep -Fx "git_remote_browser_url=" 
 printf '%s\n' "$workspace_web_path_remote" | grep -Fx "git_github_slug=" >/dev/null
 git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
 
+bad_git_status_workspace="$scratch/git-status/bad
+forged=1"
+mkdir -p "$bad_git_status_workspace"
+if sh "$backend" workspace-git-status "$scratch" "$bad_git_status_workspace" >"$scratch/forge-bad-git-status.out" 2>"$scratch/forge-bad-git-status.err"; then
+  printf '%s\n' "forge workspace-git-status accepted line-break project path" >&2
+  exit 1
+fi
+grep -F "project path must not contain line breaks" "$scratch/forge-bad-git-status.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-bad-git-status.out" | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge workspace-git-status emitted forged rows from project path" >&2
+  exit 1
+fi
+
 bad_import_workspace="$scratch/external/bad
 run_rebuild_command=bad"
 mkdir -p "$bad_import_workspace/app"

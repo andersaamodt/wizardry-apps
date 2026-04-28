@@ -32,6 +32,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Staging helpers that delete/recreate destinations must reject destinations that overlap any source directory before `rm -rf`.
 - Generated metadata committed to the repo must not preserve machine-local absolute paths; readers should resolve project-relative paths and ignore out-of-project config paths.
 - Workspace relative paths must resolve inside the workspace after symlinks, not just pass string checks.
+- Workspace path arguments should reject line breaks before Git/status helpers echo paths or run Git side effects.
 - Imported project profiles are untrusted input; runtime/build paths should sanitize or fall back before writing bundle IDs, file names, or launchers.
 - Bridge commands must use fixed action names and argv arrays; never let GUI input choose executables, shell fragments, or free-form argv vectors.
 - Busy/write actions must reject overlapping triggers so double-clicks cannot race profile writes, installs, icon generation, or release downloads.

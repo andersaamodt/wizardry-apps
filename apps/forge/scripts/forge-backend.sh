@@ -3586,6 +3586,7 @@ cmd_workspace_git_status() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   printf 'root_hint=%s\n' "$root"
   printf 'workspace=%s\n' "$workspace_abs"
@@ -3609,6 +3610,7 @@ cmd_workspace_git_init() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   if workspace_git_repo_exists "$workspace_abs"; then
     printf '%s\n' "forge-backend: project already has a git repo" >&2
@@ -3650,6 +3652,7 @@ cmd_workspace_git_set_remote() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
@@ -3682,6 +3685,7 @@ cmd_workspace_git_set_branch() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
@@ -3719,6 +3723,7 @@ cmd_workspace_git_fetch() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
@@ -3746,6 +3751,7 @@ cmd_workspace_git_pull() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
@@ -3798,6 +3804,7 @@ cmd_workspace_git_push() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   workspace_git_repo_exists "$workspace_abs" || {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
@@ -3848,6 +3855,7 @@ cmd_workspace_git_repo_url() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   git_info=$(workspace_git_collect_status "$workspace_abs" "0" "0")
   printf 'root_hint=%s\n' "$root"
   printf 'workspace=%s\n' "$workspace_abs"
@@ -3868,6 +3876,7 @@ cmd_workspace_git_pr_url() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   git_info=$(workspace_git_collect_status "$workspace_abs" "0" "1")
   github_slug=$(printf '%s\n' "$git_info" | kv_read git_github_slug)
   branch_name=$(printf '%s\n' "$git_info" | kv_read git_branch)
@@ -3902,6 +3911,7 @@ cmd_workspace_git_release() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   printf 'root_hint=%s\n' "$root"
   printf 'workspace=%s\n' "$workspace_abs"
   printf '%s\n' "$(workspace_git_collect_status "$workspace_abs" "0" "1" | awk -F= '/^git_release_/ { print }')"
@@ -3919,6 +3929,7 @@ cmd_workspace_git_install_release() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf=$(workspace_profile_path_if_exists "$workspace_abs")
   git_info=$(workspace_git_collect_status "$workspace_abs" "1" "1")
   asset_url=$(printf '%s\n' "$git_info" | kv_read git_release_asset_url)
