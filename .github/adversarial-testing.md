@@ -25,6 +25,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Imported config paths rendered into nginx, service, plist, or shell snippets must reject the target format's control characters.
 - Release asset names must be basenames only; reject archive or API metadata before download, extraction, install, or chmod.
 - Store/release IDs such as App Store key IDs, bundle IDs, Play package names, tracks, and version lists must be validated before paths, JWTs, query strings, or API URLs are built.
+- Release manifests are build inputs; validate slugs, names, targets, bundle IDs, publish flags, and optional source records before workflows iterate them.
 - Git remotes are user-controlled metadata; sanitize CR/LF and validate `owner/repo` slugs before emitting status rows or GitHub API URLs.
 - Publish-surface sync helpers must be argument-driven, scoped to documented paths, preserve local-only host directories, and copy dotfiles explicitly.
 - Generated metadata committed to the repo must not preserve machine-local absolute paths; readers should resolve project-relative paths and ignore out-of-project config paths.
@@ -76,3 +77,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Git accepts newline-bearing remote URLs, so Forge status rows must sanitize remotes before deriving browser URLs, GitHub slugs, or release checks.
 - Sync/import helpers are release tools: test missing sources, source=target, dotfile copies, and local-only host directory preservation before relying on workflow automation.
 - Icon metadata is project state, not host state; store project-relative paths and test that regeneration will not read absolute paths outside the project.
+- Manifest validation should include hostile records added by future commits, not just the currently checked-in happy path.
