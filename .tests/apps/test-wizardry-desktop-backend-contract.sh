@@ -514,6 +514,25 @@ if printf '%s\n' "$hostile_arcana_items" | grep -F "bad|item" >/dev/null 2>&1; t
   exit 1
 fi
 
+space_arcana_root="$tmp_home/arcana root with spaces"
+space_module_dir="$space_arcana_root/spaceapp"
+mkdir -p "$space_module_dir"
+cat >"$space_module_dir/spaceapp-status" <<'SH'
+#!/bin/sh
+printf '%s\n' 'ready'
+SH
+chmod +x "$space_module_dir/spaceapp-status"
+space_arcana=$(sh "$backend" list-arcana-install "$space_arcana_root")
+printf '%s\n' "$space_arcana" | grep -F "spaceapp|ready|spaceapp" >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-install missed module under path with spaces" >&2
+  exit 1
+}
+space_arcana_items=$(sh "$backend" list-arcana-module-items spaceapp "$space_arcana_root")
+printf '%s\n' "$space_arcana_items" | grep -F "status|spaceapp-status|spaceapp status" >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-module-items missed item under path with spaces" >&2
+  exit 1
+}
+
 system_status=$(sh "$backend" run-system status)
 printf '%s\n' "$system_status" | grep -F "status=ok" >/dev/null 2>&1 || {
   printf '%s\n' "run-system status did not return status=ok" >&2

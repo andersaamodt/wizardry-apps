@@ -2225,12 +2225,11 @@ resolve_arcana_module_script() {
   script_suffix=${3-}
   safe_name "$name" || return 1
 
-  candidates="$install_root/$name-${script_suffix}"
-  candidates="$candidates $install_root/$name/$name-${script_suffix}"
-  candidates="$candidates $install_root/$name/${script_suffix}"
-  candidates="$candidates $install_root/$name/$name/$script_suffix"
-
-  for file in $candidates; do
+  for file in \
+    "$install_root/$name-${script_suffix}" \
+    "$install_root/$name/$name-${script_suffix}" \
+    "$install_root/$name/${script_suffix}" \
+    "$install_root/$name/$name/$script_suffix"; do
     [ -f "$file" ] && [ ! -d "$file" ] && printf '%s\n' "$file" && return
   done
 
@@ -2286,14 +2285,19 @@ arcana_entry_names() {
 arcana_install_roots() {
   install_root=${1-}
   root=$(require_root "")
-  seen_roots=''
+  seen_roots='
+'
   for candidate in "$install_root" "$root/spells/.arcana" "$WIZARDRY_DIR_FALLBACK/spells/.arcana" "$WIZARDRY_APPS_ROOT_FALLBACK/spells/.arcana"; do
     [ -n "$candidate" ] || continue
+    has_line_break "$candidate" && continue
     [ -d "$candidate" ] || continue
-    case " $seen_roots " in
-      *" $candidate "*) continue ;;
+    case "$seen_roots" in
+      *"
+$candidate
+"*) continue ;;
     esac
-    seen_roots="$seen_roots $candidate "
+    seen_roots="$seen_roots$candidate
+"
     printf '%s\n' "$candidate"
   done
 }
@@ -2301,7 +2305,8 @@ arcana_install_roots() {
 arcana_status_script_for_module() {
   module_name=${1-}
   roots=${2-}
-  for root_dir in $roots; do
+  while IFS= read -r root_dir || [ -n "$root_dir" ]; do
+    [ -n "$root_dir" ] || continue
     if [ -x "$root_dir/$module_name-status" ] && [ ! -d "$root_dir/$module_name-status" ]; then
       printf '%s\n' "$root_dir/$module_name-status"
       return
@@ -2310,7 +2315,9 @@ arcana_status_script_for_module() {
       printf '%s\n' "$root_dir/$module_name/$module_name-status"
       return
     fi
-  done
+  done <<EOF
+$roots
+EOF
   printf '\n'
 }
 
@@ -2452,16 +2459,24 @@ arcana_item_label_for_file() {
 arcana_module_script_dirs() {
   module_name=${1-}
   roots=${2-}
-  seen=''
-  for root_dir in $roots; do
+  seen='
+'
+  while IFS= read -r root_dir || [ -n "$root_dir" ]; do
+    [ -n "$root_dir" ] || continue
     module_dir="$root_dir/$module_name"
     [ -d "$module_dir" ] || continue
-    case " $seen " in
-      *" $module_dir "*) continue ;;
+    has_line_break "$module_dir" && continue
+    case "$seen" in
+      *"
+$module_dir
+"*) continue ;;
     esac
-    seen="$seen $module_dir "
+    seen="$seen$module_dir
+"
     printf '%s\n' "$module_dir"
-  done
+  done <<EOF
+$roots
+EOF
 }
 
 arcana_status_details_for_module() {
@@ -2486,12 +2501,13 @@ cmd_list_arcana_module_items() {
     exit 2
   }
   install_root=${2-}
-  roots=$(arcana_install_roots "$install_root" | tr '\n' ' ')
+  roots=$(arcana_install_roots "$install_root")
   [ -n "$roots" ] || return 0
 
   {
     arcana_status_details_for_module "$module_name" "$roots"
-    for module_dir in $(arcana_module_script_dirs "$module_name" "$roots"); do
+    arcana_module_script_dirs "$module_name" "$roots" | while IFS= read -r module_dir || [ -n "$module_dir" ]; do
+      [ -n "$module_dir" ] || continue
       find "$module_dir" -maxdepth 1 -type f 2>/dev/null | while IFS= read -r file || [ -n "$file" ]; do
         [ -n "$file" ] || continue
         item_name=$(basename "$file")
@@ -2509,13 +2525,14 @@ cmd_list_arcana_module_items() {
 
 cmd_list_arcana_install() {
   install_root=${1-}
-  roots=$(arcana_install_roots "$install_root" | tr '\n' ' ')
+  roots=$(arcana_install_roots "$install_root")
   [ -n "$roots" ] || return 0
 
   list_entries=""
   seen_entries=""
 
-  for root_dir in $roots; do
+  while IFS= read -r root_dir || [ -n "$root_dir" ]; do
+    [ -n "$root_dir" ] || continue
     while IFS= read -r name || [ -n "$name" ]; do
       [ -n "$name" ] || continue
       safe_name "$name" || continue
@@ -2529,7 +2546,9 @@ cmd_list_arcana_install() {
     done <<EOF
 $(arcana_entry_names "$root_dir")
 EOF
-  done
+  done <<EOF
+$roots
+EOF
 
   for name in $list_entries; do
     case "$name" in
@@ -2541,12 +2560,15 @@ EOF
     if hascmd "$name-menu" || hascmd "$name-status" || hascmd "$name"; then
       emit=true
     else
-      for root_dir in $roots; do
+      while IFS= read -r root_dir || [ -n "$root_dir" ]; do
+        [ -n "$root_dir" ] || continue
         if [ -d "$root_dir/$name" ] || [ -f "$root_dir/$name-menu" ] || [ -f "$root_dir/$name" ] || [ -f "$root_dir/$name/$name-status" ] || [ -f "$root_dir/$name-status" ] || [ -f "$root_dir/$name/$name" ] || [ -f "$root_dir/$name/install-$name" ]; then
           emit=true
           break
         fi
-      done
+      done <<EOF
+$roots
+EOF
     fi
     if [ "$emit" = "true" ]; then
       printf '%s|%s|%s\n' "$name" "$(resolve_arcana_status "$name" "$roots")" "$(arcana_label_for_name "$name")"
@@ -2557,12 +2579,15 @@ EOF
   if hascmd import-arcanum; then
     import_ready=true
   else
-    for root_dir in $roots; do
+    while IFS= read -r root_dir || [ -n "$root_dir" ]; do
+      [ -n "$root_dir" ] || continue
       if [ -f "$root_dir/import-arcanum" ]; then
         import_ready=true
         break
       fi
-    done
+    done <<EOF
+$roots
+EOF
   fi
   if [ "$import_ready" = "true" ]; then
     printf 'import-arcanum|%s|import arcanum\n' "ready"
