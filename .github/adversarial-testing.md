@@ -110,6 +110,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Helper list commands are GUI input; filter helper TSV output for exact column count and CR before forwarding rows.
 - GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.
 - GUI menus and wrappers must validate project/site labels before building rows or delegating to downstream commands; wrapper code can leak or mutate state before a deeper validator runs.
+- GUI actions that enable watchers, cron jobs, daemons, or background jobs should validate labels before building persistent job names, lock paths, release paths, or status rows.
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.
 - GUI backend root/path candidate lists must stay newline-delimited or argument-list based; space-delimited path lists break valid project roots containing spaces.
 - Workspace-relative paths from config and auto-detected child directories need one-line validation before they are served, launched, persisted, or echoed as GUI rows.
