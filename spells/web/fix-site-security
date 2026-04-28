@@ -185,6 +185,22 @@ set_secure_perms() {
   run_priv find "$target" -type f -exec chmod 640 {} +
 }
 
+allowlist_path_is_too_broad() {
+  candidate=$1
+  candidate_real=$(CDPATH= cd -- "$candidate" 2>/dev/null && pwd -P) || return 1
+  web_root_real=$(CDPATH= cd -- "$WEB_ROOT" 2>/dev/null && pwd -P) || web_root_real=$WEB_ROOT
+
+  if [ "$candidate_real" = "/" ]; then
+    return 0
+  fi
+  case "$web_root_real" in
+    "$candidate_real"|"$candidate_real"/*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 apply_allowlist() {
   if [ ! -f "$ALLOWLIST_FILE" ]; then
     return 0
@@ -204,6 +220,14 @@ apply_allowlist() {
 
     if [ ! -e "$line" ]; then
       warn "fix-site-security: allowlist path not found: $line"
+      continue
+    fi
+    if [ ! -d "$line" ]; then
+      warn "fix-site-security: allowlist path must be a directory: $line"
+      continue
+    fi
+    if allowlist_path_is_too_broad "$line"; then
+      warn "fix-site-security: allowlist path is too broad: $line"
       continue
     fi
 

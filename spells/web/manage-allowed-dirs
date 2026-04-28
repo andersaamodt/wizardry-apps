@@ -68,6 +68,22 @@ list_allowlist_entries() {
   done < "$ALLOWLIST_FILE"
 }
 
+allowlist_path_is_too_broad() {
+  candidate=$1
+  candidate_real=$(CDPATH= cd -- "$candidate" 2>/dev/null && pwd -P) || return 1
+  web_root_real=$(CDPATH= cd -- "$WEB_ROOT" 2>/dev/null && pwd -P) || web_root_real=$WEB_ROOT
+
+  if [ "$candidate_real" = "/" ]; then
+    return 0
+  fi
+  case "$web_root_real" in
+    "$candidate_real"|"$candidate_real"/*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 add_allowlist_entry() {
   printf 'Enter absolute path to allow: '
   read -r new_path || return 1
@@ -85,6 +101,14 @@ add_allowlist_entry() {
   esac
   if [ ! -e "$new_path" ]; then
     warn "Path does not exist: $new_path"
+    return 1
+  fi
+  if [ ! -d "$new_path" ]; then
+    warn "Path must be a directory"
+    return 1
+  fi
+  if allowlist_path_is_too_broad "$new_path"; then
+    warn "Path is too broad to allowlist: $new_path"
     return 1
   fi
   if list_allowlist_entries | grep -Fx "$new_path" >/dev/null 2>&1; then

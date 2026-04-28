@@ -199,11 +199,50 @@ EOF
   rm -rf "$web_root"
 }
 
+test_fix_site_security_skips_broad_allowlist_path() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  site_dir="$web_root/mysite"
+  mkdir -p "$site_dir/site" "$web_root/.sitedata/mysite"
+  cat > "$site_dir/site.conf" <<EOF
+site-name=mysite
+site-user=ww_mysite
+EOF
+  printf '/\n' > "$site_dir/site.allowlist"
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  sudo_log="$stub_dir/sudo.log"
+  cat > "$stub_dir/sudo" <<EOF
+#!/bin/sh
+printf '%s\n' "\$*" >> "$sudo_log"
+exit 0
+EOF
+  chmod +x "$stub_dir/sudo"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" \
+    run_spell spells/web/fix-site-security mysite
+  assert_success || {
+    rm -rf "$web_root" "$stub_dir"
+    return 1
+  }
+  assert_error_contains "allowlist path is too broad"
+
+  if [ -f "$sudo_log" ] && grep -E '^chown -R .* /$' "$sudo_log" >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="fix-site-security attempted recursive chown on broad allowlist path"
+    rm -rf "$web_root" "$stub_dir"
+    return 1
+  fi
+
+  rm -rf "$web_root" "$stub_dir"
+}
+
 run_test_case "fix-site-security --help works" test_fix_site_security_help
 run_test_case "fix-site-security sets site-user" test_fix_site_security_sets_site_user
 run_test_case "fix-site-security makes sitedata files writable" test_fix_site_security_sitedata_writable
 run_test_case "fix-site-security does not create site .web-libs cache" test_fix_site_security_does_not_create_site_web_lib_cache
 run_test_case "fix-site-security rejects path traversal" test_fix_site_security_rejects_path_traversal
 run_test_case "fix-site-security rejects invalid configured site-user" test_fix_site_security_rejects_invalid_configured_site_user
+run_test_case "fix-site-security skips broad allowlist path" test_fix_site_security_skips_broad_allowlist_path
 
 finish_tests

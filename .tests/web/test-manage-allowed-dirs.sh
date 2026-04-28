@@ -70,7 +70,41 @@ EOF
   rm -rf "$web_root" "$stub_dir" "$allow_dir"
 }
 
+test_manage_allowed_dirs_rejects_root_allowlist_entry() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  site_dir="$web_root/mysite"
+  mkdir -p "$site_dir/site"
+  current_user=$(id -un)
+  cat > "$site_dir/site.conf" <<EOF
+# Site configuration for mysite
+site-name=mysite
+site-user=$current_user
+EOF
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-menu "$stub_dir"
+
+  run_cmd env PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" \
+    sh -c "printf 'y\n/\n' | '$ROOT_DIR/spells/web/manage-allowed-dirs' mysite"
+  assert_failure || {
+    rm -rf "$web_root" "$stub_dir"
+    return 1
+  }
+  assert_output_contains "too broad"
+
+  if [ -f "$site_dir/site.allowlist" ] && grep -Fx "/" "$site_dir/site.allowlist" >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="manage-allowed-dirs persisted root allowlist entry"
+    rm -rf "$web_root" "$stub_dir"
+    return 1
+  fi
+
+  rm -rf "$web_root" "$stub_dir"
+}
+
 run_test_case "manage-allowed-dirs --help works" test_manage_allowed_dirs_help
 run_test_case "manage-allowed-dirs adds allowlist entry" test_manage_allowed_dirs_adds_entry
+run_test_case "manage-allowed-dirs rejects root allowlist entry" test_manage_allowed_dirs_rejects_root_allowlist_entry
 
 finish_tests
