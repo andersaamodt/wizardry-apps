@@ -58,6 +58,13 @@ if [ -n "$out" ]; then
   exit 0
 fi
 
+if [ "${FORGE_FAKE_BAD_RELEASE_URL-}" = "1" ]; then
+cat <<'JSON'
+{"name":"v1","tag_name":"v1","html_url":"https://example.invalid/release","published_at":"2026-01-01T00:00:00Z","assets":[{"name":"safe.AppImage","browser_download_url":"file:///tmp/evil.AppImage"}]}
+JSON
+exit 0
+fi
+
 cat <<'JSON'
 {"name":"v1","tag_name":"v1","html_url":"https://example.invalid/release","published_at":"2026-01-01T00:00:00Z","assets":[{"name":"../evil.AppImage","browser_download_url":"https://example.invalid/evil.AppImage"}]}
 JSON
@@ -72,6 +79,17 @@ fi
 grep -F "invalid release asset name" /tmp/forge-release-install.err >/dev/null
 [ ! -e "$home_dir/.local/share/wizardry-apps/evil.AppImage" ] || {
   printf '%s\n' "path-traversing asset escaped the release install directory" >&2
+  exit 1
+}
+
+if HOME="$home_dir" FORGE_FAKE_BAD_RELEASE_URL=1 PATH="$fake_bin:$PATH" sh "$backend" workspace-git-install-release "$root" "$workspace" >/tmp/forge-release-url.out 2>/tmp/forge-release-url.err; then
+  printf '%s\n' "forge release install accepted a non-GitHub release asset URL" >&2
+  exit 1
+fi
+
+grep -F "invalid release asset URL" /tmp/forge-release-url.err >/dev/null
+[ ! -e "$home_dir/.local/share/wizardry-apps/release-app-release/safe.AppImage" ] || {
+  printf '%s\n' "invalid release asset URL was downloaded" >&2
   exit 1
 }
 

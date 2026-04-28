@@ -2768,6 +2768,37 @@ validate_release_asset_name() {
   esac
 }
 
+validate_release_asset_url() {
+  asset_url=${1-}
+  tab_char=$(printf '\t')
+
+  [ -n "$asset_url" ] || {
+    printf '%s\n' "forge-backend: release asset URL missing" >&2
+    exit 1
+  }
+
+  if has_line_break "$asset_url"; then
+    printf '%s\n' "forge-backend: invalid release asset URL" >&2
+    exit 1
+  fi
+
+  case "$asset_url" in
+    *" "*|*"$tab_char"*)
+      printf '%s\n' "forge-backend: invalid release asset URL" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$asset_url" in
+    https://github.com/*)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: invalid release asset URL" >&2
+      exit 1
+      ;;
+  esac
+}
+
 workspace_git_cached_value() {
   workspace_path=${1-}
   key=${2-}
@@ -4036,6 +4067,7 @@ cmd_workspace_git_install_release() {
     exit 1
   }
   validate_release_asset_name "$asset_name"
+  validate_release_asset_url "$asset_url"
   command -v curl >/dev/null 2>&1 || {
     printf '%s\n' "forge-backend: curl is required to install a GitHub release asset" >&2
     exit 1
