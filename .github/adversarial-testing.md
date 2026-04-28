@@ -76,6 +76,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Installed helper output is GUI input when backend rows forward it; sanitize record delimiters in status/details text and reject delimiter-shaped module or action filenames before emitting rows.
 - GUI list/count commands must share the same name validator as run commands; otherwise unsafe files can create visible but un-runnable rows or inflated category counts.
 - Hand-edited user metadata files can bypass create-time GUI/backend validation; list/import paths must reapply delimiter and identifier contracts before emitting GUI rows.
+- Fallback/cache readers that emit tab-delimited GUI rows must reject unsafe filenames and tab/CR/LF-bearing contents even when the primary writer already validates them.
 - GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.
 - Terminal-launch helpers that print `command=...` rows should sanitize CR/LF in the displayed command, even when the underlying argv/script path remains valid for execution.

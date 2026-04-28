@@ -120,6 +120,28 @@ if grep -F "tabbed" "$tmp_spellbook/.memorized" >/dev/null 2>&1; then
   exit 1
 fi
 
+memorized_data_home="$tmp_home/xdg"
+memorized_rows_dir="$memorized_data_home/wizardry/spellbook"
+mkdir -p "$memorized_rows_dir"
+printf '%s' "look ." >"$memorized_rows_dir/good-spell"
+printf 'look\tbad' >"$memorized_rows_dir/bad-command"
+printf 'look\nstatus=forged' >"$memorized_rows_dir/bad-multiline"
+printf '%s' "look ." >"$memorized_rows_dir/bad name"
+memorized_rows=$(HOME="$tmp_home" XDG_DATA_HOME="$memorized_data_home" PATH="/bin:/usr/bin" sh "$backend" list-memorized-spells)
+printf '%s\n' "$memorized_rows" | grep -F "good-spell	look ." >/dev/null 2>&1 || {
+  printf '%s\n' "list-memorized-spells missing safe fallback row" >&2
+  exit 1
+}
+row_tab=$(printf '\t')
+if printf '%s\n' "$memorized_rows" | awk -F "$row_tab" 'NF != 2 { bad = 1 } END { exit bad ? 0 : 1 }'; then
+  printf '%s\n' "list-memorized-spells emitted malformed tab-delimited rows" >&2
+  exit 1
+fi
+if printf '%s\n' "$memorized_rows" | grep -E 'bad-command|bad-multiline|bad name|^status=' >/dev/null 2>&1; then
+  printf '%s\n' "list-memorized-spells emitted unsafe fallback rows" >&2
+  exit 1
+fi
+
 {
   printf '%s\n' "arcana=install-menu"
   printf '%s\n' "bad alias=look"

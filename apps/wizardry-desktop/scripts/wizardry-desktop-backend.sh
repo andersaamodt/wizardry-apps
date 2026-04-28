@@ -621,6 +621,10 @@ EOF
 
 cmd_list_memorized_spells() {
   spellbook_dir="${XDG_DATA_HOME:-$HOME/.local/share}/wizardry/spellbook"
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  tab_char=$(printf '\t')
   if [ -x "$HOME/.wizardry/spells/menu/cast" ]; then
     sh "$HOME/.wizardry/spells/menu/cast" --list 2>/dev/null
     return
@@ -636,7 +640,11 @@ cmd_list_memorized_spells() {
       case "$file_base" in
         .* ) continue ;;
       esac
+      safe_name "$file_base" || continue
       cmd=$(cat "$f" 2>/dev/null || printf '')
+      case "$cmd" in
+        *"$nl_char"*|*"$cr_char"*|*"$tab_char"*) continue ;;
+      esac
       [ -n "$cmd" ] && printf '%s\t%s\n' "$file_base" "$cmd"
     done
   fi
