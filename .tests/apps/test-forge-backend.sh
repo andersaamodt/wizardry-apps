@@ -332,6 +332,15 @@ grep -F '"type": "Window"' "$workspaces_root/workspace-native/ir/app.ir.yaml" >/
 grep -F "Native desktop app scaffolded by App Forge." "$workspaces_root/workspace-native/README.md" >/dev/null
 grep -F "// swift-tools-version:" "$workspaces_root/workspace-native/generated/macos/Package.swift" >/dev/null
 
+bad_native_ir=$(mktemp "${TMPDIR:-/tmp}/forge-bad-native-ir.XXXXXX")
+jq '.app.name = "Bad \"Name" | .app.window.title = "Bad \"Title"' "$workspaces_root/workspace-native/ir/app.ir.yaml" >"$bad_native_ir"
+if sh "$workspaces_root/workspace-native/scripts/validate-native-desktop-ir.sh" "$bad_native_ir" "$workspaces_root/workspace-native/schemas/native-desktop-ir-v1.json" >/tmp/forge-bad-native-ir.out 2>/tmp/forge-bad-native-ir.err; then
+  printf '%s\n' "forge backend test: native desktop IR accepted render-breaking strings" >&2
+  exit 1
+fi
+grep -F "render-safe" /tmp/forge-bad-native-ir.err >/dev/null
+rm -f "$bad_native_ir"
+
 rebuild_workspace_native_out=$(sh "$backend" rebuild-workspace "$scratch" "$workspaces_root/workspace-native" native-desktop)
 printf '%s\n' "$rebuild_workspace_native_out" | grep -F "workspace=$workspace_native_abs" >/dev/null
 printf '%s\n' "$rebuild_workspace_native_out" | grep -F "context=native-desktop" >/dev/null

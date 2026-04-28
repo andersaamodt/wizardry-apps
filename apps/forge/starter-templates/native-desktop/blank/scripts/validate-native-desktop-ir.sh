@@ -44,6 +44,16 @@ if ! jq -e '
 fi
 
 if ! jq -e '
+  (.app.id | test("^[A-Za-z][A-Za-z0-9-]*$")) and
+  (.app.name | test("^[A-Za-z0-9 .,_()\\-]+$")) and
+  ((.app.window.title // .app.name) | test("^[A-Za-z0-9 .,_()\\-]+$"))
+' "$ir_path" >/dev/null 2>&1; then
+  printf '%s\n' "native-desktop-ir: app.id, app.name, and app.window.title must be render-safe." >&2
+  printf '%s\n' "repair: use a slug-like app.id and display names with letters, numbers, spaces, '.', ',', '_', '-', or parentheses." >&2
+  exit 1
+fi
+
+if ! jq -e '
   (.app.targets | type) == "array" and
   (.app.targets | length) > 0 and
   (.app.targets | all(. == "macos" or . == "linux"))
