@@ -89,6 +89,17 @@ grep -Fx "fallback icon" "$partial_icon_res/mipmap-mdpi/ic_launcher_round.png" >
 grep -Fx "generated icon" "$partial_icon_res/mipmap-hdpi/ic_launcher.png" >/dev/null
 grep -Fx "fallback icon" "$partial_icon_res/mipmap-hdpi/ic_launcher_round.png" >/dev/null
 
+missing_icon_app="$tmp_dir/missing-icon-app"
+missing_icon_res="$tmp_dir/missing-icon-res"
+mkdir -p "$missing_icon_app/assets" "$missing_icon_res/mipmap-mdpi"
+printf '%s\n' "stale icon" >"$missing_icon_res/mipmap-mdpi/ic_launcher.png"
+if sh "$ROOT_DIR/tools/icons/stage-android-launcher-icons.sh" "$missing_icon_app" "$missing_icon_res" >"$tmp_dir/android-missing-icon.out" 2>"$tmp_dir/android-missing-icon.err"; then
+  printf '%s\n' "stage-android-launcher-icons accepted missing icon source" >&2
+  exit 1
+fi
+grep -F "missing icon source" "$tmp_dir/android-missing-icon.err" >/dev/null
+grep -Fx "stale icon" "$missing_icon_res/mipmap-mdpi/ic_launcher.png" >/dev/null
+
 partial_ios_app="$tmp_dir/partial-ios-app"
 partial_ios_assets="$tmp_dir/partial-ios-xcassets"
 fake_icon_bin="$tmp_dir/fake-icon-bin"
