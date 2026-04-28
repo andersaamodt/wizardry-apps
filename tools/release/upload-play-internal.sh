@@ -30,6 +30,25 @@ if [ -z "$package_name" ]; then
   exit 2
 fi
 
+valid_package_name() {
+  case "${1-}" in *.*) ;; *) return 1 ;; esac
+  case "$1" in .|.*|*.|*..*|*[!A-Za-z0-9._]*) return 1 ;; esac
+}
+
+valid_track_name() {
+  case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
+}
+
+valid_package_name "$package_name" || {
+  printf '%s\n' "upload-play-internal: invalid package name" >&2
+  exit 2
+}
+
+valid_track_name "$track" || {
+  printf '%s\n' "upload-play-internal: invalid track" >&2
+  exit 2
+}
+
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "upload-play-internal: jq is required" >&2
   exit 1

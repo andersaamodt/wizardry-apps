@@ -124,6 +124,15 @@ for v in $required_vars; do
   fi
 done
 
+valid_alnum() {
+  case "${1-}" in ""|*[!A-Za-z0-9]*) return 1 ;; esac
+}
+
+valid_alnum "$APP_STORE_CONNECT_KEY_ID" || {
+  printf '%s\n' "build-ios-app: invalid App Store Connect key id" >&2
+  exit 2
+}
+
 keychain="$build_root/wizardry-signing.keychain-db"
 keychain_password="wizardry-ci-$(date +%s)"
 cert_file="$build_root/apple-cert.p12"

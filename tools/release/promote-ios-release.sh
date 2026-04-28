@@ -47,6 +47,48 @@ for v in $required_vars; do
   fi
 done
 
+valid_alnum() {
+  case "${1-}" in ""|*[!A-Za-z0-9]*) return 1 ;; esac
+}
+
+valid_hex_dash() {
+  case "${1-}" in ""|*[!A-Fa-f0-9-]*) return 1 ;; esac
+}
+
+valid_bundle_id() {
+  case "${1-}" in *.*) ;; *) return 1 ;; esac
+  case "$1" in .|.*|*.|*..*|*[!A-Za-z0-9.-]*) return 1 ;; esac
+}
+
+valid_query_token() {
+  case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
+}
+
+valid_alnum "$APP_STORE_CONNECT_KEY_ID" || {
+  printf '%s\n' "promote-ios-release: invalid App Store Connect key id" >&2
+  exit 2
+}
+
+valid_hex_dash "$APP_STORE_CONNECT_ISSUER_ID" || {
+  printf '%s\n' "promote-ios-release: invalid App Store Connect issuer id" >&2
+  exit 2
+}
+
+valid_bundle_id "$bundle_id" || {
+  printf '%s\n' "promote-ios-release: invalid bundle id" >&2
+  exit 2
+}
+
+if [ -n "$build_number" ] && ! valid_query_token "$build_number"; then
+  printf '%s\n' "promote-ios-release: invalid build number" >&2
+  exit 2
+fi
+
+if [ -n "$version_string" ] && ! valid_query_token "$version_string"; then
+  printf '%s\n' "promote-ios-release: invalid version string" >&2
+  exit 2
+fi
+
 if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
   printf '%s\n' "promote-ios-release: curl, jq, and openssl are required" >&2
   exit 1

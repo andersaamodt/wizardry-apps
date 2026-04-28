@@ -32,4 +32,30 @@ if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" ../web/demo "$tmp_dir/traver
 fi
 [ ! -e "$tmp_dir/traversed-assets" ]
 
+aab_path="$tmp_dir/app.aab"
+: > "$aab_path"
+if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example/../../other" internal >"$tmp_dir/play-upload-invalid-package.err" 2>&1; then
+  printf '%s\n' "upload-play-internal accepted invalid package name" >&2
+  exit 1
+fi
+grep -F "invalid package name" "$tmp_dir/play-upload-invalid-package.err" >/dev/null
+
+if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example.app" "internal/../../production" >"$tmp_dir/play-upload-invalid-track.err" 2>&1; then
+  printf '%s\n' "upload-play-internal accepted invalid track" >&2
+  exit 1
+fi
+grep -F "invalid track" "$tmp_dir/play-upload-invalid-track.err" >/dev/null
+
+if sh "$ROOT_DIR/tools/release/promote-play-track.sh" "com.example/../../other" internal production >"$tmp_dir/play-promote-invalid-package.err" 2>&1; then
+  printf '%s\n' "promote-play-track accepted invalid package name" >&2
+  exit 1
+fi
+grep -F "invalid package name" "$tmp_dir/play-promote-invalid-package.err" >/dev/null
+
+if sh "$ROOT_DIR/tools/release/promote-play-track.sh" "com.example.app" "internal/../../prod" production >"$tmp_dir/play-promote-invalid-track.err" 2>&1; then
+  printf '%s\n' "promote-play-track accepted invalid track" >&2
+  exit 1
+fi
+grep -F "invalid track" "$tmp_dir/play-promote-invalid-track.err" >/dev/null
+
 printf '%s\n' "release tools smoke passed"

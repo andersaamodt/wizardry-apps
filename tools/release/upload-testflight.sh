@@ -26,6 +26,15 @@ if [ -z "${APP_STORE_CONNECT_KEY_ID-}" ] || [ -z "${APP_STORE_CONNECT_ISSUER_ID-
   exit 1
 fi
 
+valid_alnum() {
+  case "${1-}" in ""|*[!A-Za-z0-9]*) return 1 ;; esac
+}
+
+valid_alnum "$APP_STORE_CONNECT_KEY_ID" || {
+  printf '%s\n' "upload-testflight: invalid App Store Connect key id" >&2
+  exit 2
+}
+
 if ! command -v xcrun >/dev/null 2>&1; then
   printf '%s\n' "upload-testflight: xcrun is required" >&2
   exit 1

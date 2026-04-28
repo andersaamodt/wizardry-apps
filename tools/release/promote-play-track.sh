@@ -28,6 +28,34 @@ if [ -z "$package_name" ]; then
   exit 2
 fi
 
+valid_package_name() {
+  case "${1-}" in *.*) ;; *) return 1 ;; esac
+  case "$1" in .|.*|*.|*..*|*[!A-Za-z0-9._]*) return 1 ;; esac
+}
+
+valid_track_name() {
+  case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
+}
+
+valid_version_codes() {
+  case "${1-}" in ""|*[!0-9,]*|*,|,*|*,,*) return 1 ;; esac
+}
+
+valid_package_name "$package_name" || {
+  printf '%s\n' "promote-play-track: invalid package name" >&2
+  exit 2
+}
+
+valid_track_name "$from_track" && valid_track_name "$to_track" || {
+  printf '%s\n' "promote-play-track: invalid track" >&2
+  exit 2
+}
+
+if [ -n "$version_codes_csv" ] && ! valid_version_codes "$version_codes_csv"; then
+  printf '%s\n' "promote-play-track: invalid version codes" >&2
+  exit 2
+fi
+
 if [ -z "${PLAY_SERVICE_ACCOUNT_JSON_BASE64-}" ]; then
   printf '%s\n' "promote-play-track: missing PLAY_SERVICE_ACCOUNT_JSON_BASE64" >&2
   exit 1
