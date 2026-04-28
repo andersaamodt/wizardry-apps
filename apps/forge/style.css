@@ -483,6 +483,12 @@ body.settings-open #settings-panel {
   background: var(--bg-panel);
   padding: calc(0.5rem + 20px) 0.5rem 0.42rem;
   -webkit-app-region: drag;
+  position: relative;
+  z-index: 0;
+}
+
+.apps-list-card:has(.catalog-row.menu-open) {
+  z-index: 70;
 }
 
 .apps-list-head {
