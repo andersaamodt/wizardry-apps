@@ -613,6 +613,45 @@ validate_site_name() {
   esac
 }
 
+validate_hosted_web_domain() {
+  domain=${1-}
+  [ -n "$domain" ] || {
+    printf '%s\n' "forge-backend: hosted web site config has an invalid domain" >&2
+    return 1
+  }
+  if has_line_break "$domain"; then
+    printf '%s\n' "forge-backend: hosted web site config has an invalid domain" >&2
+    return 1
+  fi
+  case "$domain" in
+    localhost|127.0.0.1)
+      return 0
+      ;;
+    *[!A-Za-z0-9.-]*|.*|*.|*..*)
+      printf '%s\n' "forge-backend: hosted web site config has an invalid domain" >&2
+      return 1
+      ;;
+  esac
+  printf '%s\n' "$domain" | LC_ALL=C grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$' || {
+    printf '%s\n' "forge-backend: hosted web site config has an invalid domain" >&2
+    return 1
+  }
+}
+
+validate_hosted_web_port() {
+  port=${1-}
+  case "$port" in
+    ''|*[!0-9]*)
+      printf '%s\n' "forge-backend: hosted web site config has an invalid port" >&2
+      return 1
+      ;;
+  esac
+  [ "$port" -ge 1 ] && [ "$port" -le 65535 ] || {
+    printf '%s\n' "forge-backend: hosted web site config has an invalid port" >&2
+    return 1
+  }
+}
+
 normalize_targets_value() {
   value=${1-}
   value=$(printf '%s' "$value" | tr '\r\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
@@ -1561,6 +1600,8 @@ serve_workspace_managed_hosted_web() {
   domain=$(config_field "$site_conf" domain "localhost")
   port=$(config_field "$site_conf" port "8080")
   https=$(config_field "$site_conf" https "false")
+  validate_hosted_web_domain "$domain" || return 1
+  validate_hosted_web_port "$port" || return 1
   scheme=http
   if [ "$https" = "true" ]; then
     scheme=https
@@ -7026,6 +7067,8 @@ cmd_serve_hosted_web() {
       domain=$(config_field "$site_conf" domain "localhost")
       port=$(config_field "$site_conf" port "8080")
       https=$(config_field "$site_conf" https "false")
+      validate_hosted_web_domain "$domain" || exit 1
+      validate_hosted_web_port "$port" || exit 1
       scheme=http
       if [ "$https" = "true" ]; then
         scheme=https

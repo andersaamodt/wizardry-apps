@@ -909,6 +909,34 @@ printf '%s\n' "$serve_workspace_managed_site" | grep -F "site=workspace-managed-
 printf '%s\n' "$serve_workspace_managed_site" | grep -F "entry=$scratch/web-root/workspace-managed-site" >/dev/null
 printf '%s\n' "$serve_workspace_managed_site" | grep -F "url=http://localhost:43123" >/dev/null
 
+cat > "$wizardry_home/spells/web/write-managed-site-conf" <<'SH'
+#!/bin/sh
+set -eu
+
+site_name=${1-}
+web_root=${2-}
+[ -n "$site_name" ] || exit 2
+[ -n "$web_root" ] || exit 2
+
+site_dir="$web_root/$site_name"
+mkdir -p "$site_dir"
+{
+  printf 'domain=localhost\rforged=1\n'
+  printf 'port=43123\n'
+  printf 'https=false\n'
+} > "$site_dir/site.conf"
+SH
+chmod +x "$wizardry_home/spells/web/write-managed-site-conf"
+if env -i HOME="$scratch/home" PATH='/usr/bin:/bin:/usr/sbin:/sbin' WIZARDRY_DIR="$scratch/invalid-wizardry" WEB_WIZARDRY_ROOT="$scratch/web-root" sh "$backend" serve-hosted-web "$scratch" workspace "$managed_site_workspace" >"$scratch/forge-bad-hosted-web.out" 2>"$scratch/forge-bad-hosted-web.err"; then
+  printf '%s\n' "forge serve-hosted-web accepted CR-injected site.conf domain" >&2
+  exit 1
+fi
+grep -F "invalid domain" "$scratch/forge-bad-hosted-web.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-bad-hosted-web.out" | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge serve-hosted-web emitted forged rows from site.conf domain" >&2
+  exit 1
+fi
+
 run_workspace_web=$(sh "$backend" run-workspace "$scratch" "$renamed_workspace" web)
 printf '%s\n' "$run_workspace_web" | grep -F "mode=python-http" >/dev/null
 printf '%s\n' "$run_workspace_web" | grep -F "entry=$renamed_workspace/app" >/dev/null
