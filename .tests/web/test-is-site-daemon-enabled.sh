@@ -63,8 +63,25 @@ test_is_site_daemon_enabled_false() {
   rm -rf "$web_root" "$stub_dir"
 }
 
+test_is_site_daemon_enabled_rejects_unit_shaped_name() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  mkdir -p "$web_root/foo.*/site"
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  write_systemctl_stub "$stub_dir"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" run_spell spells/web/is-site-daemon-enabled 'foo.*'
+  assert_status 2 || return 1
+  assert_error_contains "invalid site name" || return 1
+
+  rm -rf "$web_root" "$stub_dir"
+}
+
 run_test_case "is-site-daemon-enabled --help works" test_is_site_daemon_enabled_help
 run_test_case "is-site-daemon-enabled returns success when enabled" test_is_site_daemon_enabled_true
 run_test_case "is-site-daemon-enabled returns failure when disabled" test_is_site_daemon_enabled_false
+run_test_case "is-site-daemon-enabled rejects unit-shaped site name" test_is_site_daemon_enabled_rejects_unit_shaped_name
 
 finish_tests

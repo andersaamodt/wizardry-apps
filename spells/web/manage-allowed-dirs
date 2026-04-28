@@ -24,7 +24,7 @@ if [ -z "$site_name" ]; then
   die 2 "manage-allowed-dirs: SITENAME required"
 fi
 case "$site_name" in
-  .|..|*/*|*\\*)
+  ""|*[!A-Za-z0-9_-]*)
     die 2 "manage-allowed-dirs: invalid site name"
     ;;
 esac

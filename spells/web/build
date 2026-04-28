@@ -32,7 +32,7 @@ if [ -z "$site_name" ]; then
 fi
 
 case "$site_name" in
-  .|..|*/*|*\\*)
+  ""|*[!A-Za-z0-9_-]*)
     die 2 "build: invalid site name"
     ;;
 esac

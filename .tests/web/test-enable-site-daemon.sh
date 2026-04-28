@@ -51,7 +51,32 @@ EOF
   rm -rf "$web_root" "$stub_dir" "$state_dir"
 }
 
+test_enable_site_daemon_rejects_unit_shaped_name() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  mkdir -p "$web_root/foo.*/site"
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-systemctl-simple "$stub_dir"
+  stub-sudo "$stub_dir"
+  state_dir=$(temp-dir web-wizardry-state)
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    SYSTEMCTL_STATE_DIR="$state_dir" run_spell spells/web/enable-site-daemon 'foo.*'
+  assert_status 2 || return 1
+  assert_error_contains "invalid site name" || return 1
+
+  if [ -f "$state_dir/systemctl.log" ]; then
+    TEST_FAILURE_REASON="systemctl was called for invalid site name"
+    return 1
+  fi
+
+  rm -rf "$web_root" "$stub_dir" "$state_dir"
+}
+
 run_test_case "enable-site-daemon --help works" test_enable_site_daemon_help
 run_test_case "enable-site-daemon calls systemctl enable" test_enable_site_daemon_calls_systemctl
+run_test_case "enable-site-daemon rejects unit-shaped site name" test_enable_site_daemon_rejects_unit_shaped_name
 
 finish_tests

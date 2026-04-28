@@ -23,7 +23,7 @@ if [ -z "$site_name" ]; then
   die 2 "disable-site-daemon: SITENAME required"
 fi
 case "$site_name" in
-  .|..|*/*|*\\*)
+  ""|*[!A-Za-z0-9_-]*)
     die 2 "disable-site-daemon: invalid site name"
     ;;
 esac

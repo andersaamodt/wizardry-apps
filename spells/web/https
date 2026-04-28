@@ -31,7 +31,7 @@ if [ -z "$site_name" ]; then
   die 2 "https: SITENAME required"
 fi
 case "$site_name" in
-  .|..|*/*|*\\*)
+  ""|*[!A-Za-z0-9_-]*)
     die 2 "https: invalid site name"
     ;;
 esac

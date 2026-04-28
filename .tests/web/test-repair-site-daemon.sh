@@ -91,8 +91,39 @@ EOF
   rm -rf "$base_dir" "$stub_dir"
 }
 
+test_repair_site_daemon_rejects_unit_shaped_name() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  site_dir="$web_root/foo.*"
+  mkdir -p "$site_dir/site"
+  cat > "$site_dir/site.conf" <<EOF
+# Site configuration for foo.*
+site-name=foo.*
+site-user=$(id -un)
+EOF
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-systemctl-simple "$stub_dir"
+  service_dir="$stub_dir/services"
+  mkdir -p "$service_dir"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    SERVICE_DIR="$service_dir" run_spell spells/web/repair-site-daemon 'foo.*'
+  assert_status 2 || return 1
+  assert_error_contains "invalid site name" || return 1
+
+  if find "$service_dir" -type f | grep . >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="daemon unit was created for unit-shaped site name"
+    return 1
+  fi
+
+  rm -rf "$web_root" "$stub_dir"
+}
+
 run_test_case "repair-site-daemon --help works" test_repair_site_daemon_help
 run_test_case "repair-site-daemon installs systemd unit" test_repair_site_daemon_installs_systemd_unit
 run_test_case "repair-site-daemon rejects path site name" test_repair_site_daemon_rejects_path_site_name
+run_test_case "repair-site-daemon rejects unit-shaped site name" test_repair_site_daemon_rejects_unit_shaped_name
 
 finish_tests
