@@ -2786,8 +2786,8 @@ cmd_run_system() {
       record_watch "app" "system:status" "host" "ok"
       ;;
     environment)
-      printf '%s\n' "shell=$SHELL"
-      printf '%s\n' "pwd=$PWD"
+      printf 'shell=%s\n' "$(sanitize_value "${SHELL-}")"
+      printf 'pwd=%s\n' "$(sanitize_value "${PWD-}")"
       record_watch "app" "system:environment" "host" "ok"
       ;;
     *)

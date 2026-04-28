@@ -404,4 +404,10 @@ printf '%s\n' "$system_status" | grep -F "status=ok" >/dev/null 2>&1 || {
   exit 1
 }
 
+hostile_environment=$(SHELL="zsh$(printf '\r')status=forged" sh "$backend" run-system environment)
+if printf '%s\n' "$hostile_environment" | tr '\r' '\n' | grep -E '^status=' >/dev/null 2>&1; then
+  printf '%s\n' "run-system environment emitted forged key-value output" >&2
+  exit 1
+fi
+
 printf '%s\n' "wizardry-desktop backend contract tests passed"
