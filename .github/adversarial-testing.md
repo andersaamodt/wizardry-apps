@@ -30,6 +30,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Store release-status values should be allowlisted before upload/promotion helpers perform irreversible API work.
 - Release manifests are build inputs; validate slugs, names, targets, bundle IDs, publish flags, and optional source records before workflows iterate them.
 - Manifest "single-line" string validators should reject tabs as well as CR/LF because tabs are row delimiters in GUI/backend contracts.
+- Manifest catalog `source.subdir` values are repo-internal paths; reject absolute paths, empty path components, `.`, `..`, backslashes, tabs, and CR/LF before clone/copy/cache removal code runs.
 - Git remotes are user-controlled metadata; sanitize CR/LF and validate `owner/repo` slugs before emitting status rows or GitHub API URLs.
 - Git remote write commands must reject CR/LF before persisting URLs, even if imported remote status readers sanitize later.
 - Publish-surface sync helpers must be argument-driven, scoped to documented paths, preserve local-only host directories, and copy dotfiles explicitly.
@@ -113,6 +114,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Icon metadata is project state, not host state; store project-relative paths and test that regeneration will not read absolute paths outside the project.
 - Manifest validation should include hostile records added by future commits, not just the currently checked-in happy path.
 - Single-record manifest status commands must sanitize manifest fields as output too; a separate validator does not protect GUI calls that read a hand-edited manifest directly.
+- Optional app/template download paths must revalidate manifest source subdirs at runtime, because a hand-edited manifest can bypass CI validation and reach catalog cache replacement.
 - Release upload helpers should adversarially test each credential field, not just the credential field used in a temp filename.
 - Release version strings are project-file inputs; validate them before rendering Xcode, Gradle, plist, YAML, or package metadata.
 - Remote API IDs, versions, and states need revalidation after `jq` extraction before reuse in URLs or machine-readable status rows.

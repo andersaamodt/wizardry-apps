@@ -54,6 +54,13 @@ if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-bundle.o
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-bundle.out" >/dev/null
 
+jq '.apps |= map(if (.distribution // "optional") == "optional" then (.source.subdir = "../escape") else . end)' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-app-subdir.out" 2>&1; then
+  printf '%s\n' "validate-manifest accepted escaping app source subdir" >&2
+  exit 1
+fi
+grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-app-subdir.out" >/dev/null
+
 cp "$fixture_root/config/apps.manifest.json" "$bad_root/config/apps.manifest.json"
 jq '.templates += [{
   "slug":"bad/../../template",
@@ -65,5 +72,12 @@ if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-template
   exit 1
 fi
 grep -F "templates.manifest.json validation failed" "$tmp_dir/bad-template.out" >/dev/null
+
+jq '.templates |= map(if (.distribution // "optional") == "optional" then (.source.subdir = "../escape") else . end)' "$fixture_root/config/templates.manifest.json" > "$bad_root/config/templates.manifest.json"
+if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-template-subdir.out" 2>&1; then
+  printf '%s\n' "validate-manifest accepted escaping template source subdir" >&2
+  exit 1
+fi
+grep -F "templates.manifest.json validation failed" "$tmp_dir/bad-template-subdir.out" >/dev/null
 
 printf '%s\n' "manifest validation tests passed"

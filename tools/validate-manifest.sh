@@ -57,11 +57,25 @@ jq -e '
       and all(.[]; . as $target | ["hosted-web", "macos", "linux", "ios", "android", "godot-desktop"] | index($target) != null)
       and (length == (unique | length))
     );
+  def valid_source_subdir:
+    type == "string"
+    and (test("[\r\n\t]") | not)
+    and (
+      . == ""
+      or . == "."
+      or (
+        test("^[A-Za-z0-9._/-]+$")
+        and (startswith("/") | not)
+        and (endswith("/") | not)
+        and (contains("//") | not)
+        and (split("/") | all(. != "" and . != "." and . != ".."))
+      )
+    );
   def valid_source:
     type == "object"
     and (.repo | one_line_string)
     and ((.ref // "") | optional_one_line_string)
-    and ((.subdir // "") | optional_one_line_string);
+    and ((.subdir // "") | valid_source_subdir);
 
   .apps
   | type == "array"
@@ -89,11 +103,25 @@ jq -e '
     and test("^[a-z][a-z0-9-]*$")
     and (test("--") | not)
     and (test("-$") | not);
+  def valid_source_subdir:
+    type == "string"
+    and (test("[\r\n\t]") | not)
+    and (
+      . == ""
+      or . == "."
+      or (
+        test("^[A-Za-z0-9._/-]+$")
+        and (startswith("/") | not)
+        and (endswith("/") | not)
+        and (contains("//") | not)
+        and (split("/") | all(. != "" and . != "." and . != ".."))
+      )
+    );
   def valid_source:
     type == "object"
     and (.repo | one_line_string)
     and ((.ref // "") | optional_one_line_string)
-    and ((.subdir // "") | optional_one_line_string);
+    and ((.subdir // "") | valid_source_subdir);
 
   .templates
   | type == "array"

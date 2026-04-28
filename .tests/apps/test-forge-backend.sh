@@ -196,6 +196,30 @@ tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
 jq '.templates |= map(if .slug == "blog" then (.source.ref = "main") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
 
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
+jq '.apps |= map(if .slug == "artificer" then (.source.subdir = "../escape") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+if sh "$backend" download-app "$scratch" artificer >"$scratch/forge-bad-app-subdir.out" 2>"$scratch/forge-bad-app-subdir.err"; then
+  printf '%s\n' "forge download-app accepted escaping source subdir" >&2
+  exit 1
+fi
+grep -F "invalid source subdir" "$scratch/forge-bad-app-subdir.err" >/dev/null
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
+jq '.apps |= map(if .slug == "artificer" then (.source.subdir = ".") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
+jq '.templates |= map(if .slug == "blog" then (.source.subdir = "../escape") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
+if sh "$backend" download-template "$scratch" blog >"$scratch/forge-bad-template-subdir.out" 2>"$scratch/forge-bad-template-subdir.err"; then
+  printf '%s\n' "forge download-template accepted escaping source subdir" >&2
+  exit 1
+fi
+grep -F "invalid source subdir" "$scratch/forge-bad-template-subdir.err" >/dev/null
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
+jq '.templates |= map(if .slug == "blog" then (.source.subdir = ".") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
+
 if sh "$backend" run-task "$scratch" "../escape-task" >/tmp/forge-invalid-run-task.out 2>/tmp/forge-invalid-run-task.err; then
   printf '%s\n' "forge backend test: invalid run-task name accepted" >&2
   exit 1

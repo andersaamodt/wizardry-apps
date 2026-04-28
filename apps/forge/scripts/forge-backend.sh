@@ -989,6 +989,28 @@ fetched_at=$now
 EOF
 }
 
+validate_source_subdir() {
+  subdir=${1-}
+  label=${2-source subdir}
+
+  [ -n "$subdir" ] || return 0
+  [ "$subdir" = "." ] && return 0
+
+  if has_line_break "$subdir"; then
+    printf '%s\n' "forge-backend: invalid $label" >&2
+    exit 2
+  fi
+
+  tab_char=$(printf '\t')
+  case "$subdir" in
+    *"$tab_char"*|/*|*\\*|*//*|*/|./*|*/./*|*/.|..|../*|*/../*|*/..|*[!A-Za-z0-9._/-]*)
+      safe_subdir=$(printf '%s' "$subdir" | tr '\t' ' ')
+      printf '%s\n' "forge-backend: invalid $label '$safe_subdir'" >&2
+      exit 2
+      ;;
+  esac
+}
+
 download_into_cache() {
   repo=$1
   ref=$2
@@ -998,6 +1020,7 @@ download_into_cache() {
   slug=${6-}
 
   require_tool git
+  validate_source_subdir "$subdir" "source subdir"
   tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/forge-catalog.XXXXXX")
   trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
