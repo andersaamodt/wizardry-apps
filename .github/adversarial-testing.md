@@ -78,6 +78,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - GUI list/count commands must share the same name validator as run commands; otherwise unsafe files can create visible but un-runnable rows or inflated category counts.
 - Hand-edited user metadata files can bypass create-time GUI/backend validation; list/import paths must reapply delimiter and identifier contracts before emitting GUI rows.
 - Workspace profile fields are imported metadata; sanitize every field before printing profile `key=value` rows, not only the fields that are validated for write actions.
+- GUI preference/config readers must not `cat` hand-edited files back to the bridge; parse valid keys and sanitize values just like the writer.
 - Fallback/cache readers that emit tab-delimited GUI rows must reject unsafe filenames and tab/CR/LF-bearing contents even when the primary writer already validates them.
 - GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.

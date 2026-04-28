@@ -111,6 +111,24 @@ if XDG_CONFIG_HOME="$prefs_home/.config" sh "$backend" set-ui-pref "$scratch" "a
   exit 1
 fi
 grep -F "invalid UI pref key" /tmp/forge-invalid-pref.err >/dev/null
+prefs_file="$prefs_home/.config/wizardry-apps/forge-ui.conf"
+mkdir -p "$(dirname "$prefs_file")"
+{
+  printf 'sidebar.width=320\rforged=1\n'
+  printf 'ab/key=value\n'
+  printf 'theme=dark\n'
+} >"$prefs_file"
+ui_prefs_out=$(XDG_CONFIG_HOME="$prefs_home/.config" sh "$backend" get-ui-prefs "$scratch")
+printf '%s\n' "$ui_prefs_out" | grep -F "sidebar.width=320 forged=1" >/dev/null
+printf '%s\n' "$ui_prefs_out" | grep -F "theme=dark" >/dev/null
+if printf '%s\n' "$ui_prefs_out" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge get-ui-prefs emitted forged key-value output" >&2
+  exit 1
+fi
+if printf '%s\n' "$ui_prefs_out" | grep -F "ab/key=" >/dev/null 2>&1; then
+  printf '%s\n' "forge get-ui-prefs emitted invalid key from hand-edited prefs" >&2
+  exit 1
+fi
 
 bundle_scripts="$scratch/App Forge.app/Contents/Resources/forge/scripts"
 bundle_root_file="$scratch/App Forge.app/Contents/Resources/wizardry-apps-root.txt"

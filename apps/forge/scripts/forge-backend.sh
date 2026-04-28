@@ -3202,23 +3202,30 @@ workspace_git_collect_status() {
   printf '%s\n' "$release_info"
 }
 
-validate_ui_pref_key() {
+ui_pref_key_is_valid() {
   key=${1-}
   case "$key" in
     [a-z0-9]*)
       ;;
     *)
-      printf '%s\n' "forge-backend: invalid UI pref key: $key" >&2
-      exit 2
+      return 1
       ;;
   esac
 
   case "$key" in
     *[!a-z0-9._-]*)
-      printf '%s\n' "forge-backend: invalid UI pref key: $key" >&2
-      exit 2
+      return 1
       ;;
   esac
+  return 0
+}
+
+validate_ui_pref_key() {
+  key=${1-}
+  if ! ui_pref_key_is_valid "$key"; then
+    printf '%s\n' "forge-backend: invalid UI pref key: $key" >&2
+    exit 2
+  fi
 }
 
 sanitize_ui_pref_value() {
@@ -3229,7 +3236,16 @@ sanitize_ui_pref_value() {
 cmd_get_ui_prefs() {
   prefs_file=$(forge_ui_prefs_file)
   [ -f "$prefs_file" ] || exit 0
-  cat "$prefs_file"
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      *=*)
+        key=${line%%=*}
+        value=${line#*=}
+        ui_pref_key_is_valid "$key" || continue
+        printf '%s=%s\n' "$key" "$(sanitize_ui_pref_value "$value")"
+        ;;
+    esac
+  done <"$prefs_file"
 }
 
 cmd_set_ui_pref() {
