@@ -60,7 +60,39 @@ EOF
   rm -rf "$web_root" "$stub_dir" "$state_dir"
 }
 
+test_repair_site_daemon_rejects_path_site_name() {
+  skip-if-compiled || return $?
+
+  base_dir=$(temp-dir web-wizardry-test)
+  web_root="$base_dir/sites"
+  outside_site="$base_dir/sibling"
+  mkdir -p "$web_root" "$outside_site/site"
+  cat > "$outside_site/site.conf" <<EOF
+# Site configuration for sibling
+site-name=sibling
+site-user=$(id -un)
+EOF
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-systemctl-simple "$stub_dir"
+  service_dir="$stub_dir/services"
+  mkdir -p "$service_dir"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_DIR="$ROOT_DIR" \
+    SERVICE_DIR="$service_dir" run_spell spells/web/repair-site-daemon ../sibling
+  assert_status 2
+  assert_error_contains "invalid site name"
+
+  if find "$service_dir" -type f | grep . >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="daemon unit was created for invalid site name"
+    return 1
+  fi
+
+  rm -rf "$base_dir" "$stub_dir"
+}
+
 run_test_case "repair-site-daemon --help works" test_repair_site_daemon_help
 run_test_case "repair-site-daemon installs systemd unit" test_repair_site_daemon_installs_systemd_unit
+run_test_case "repair-site-daemon rejects path site name" test_repair_site_daemon_rejects_path_site_name
 
 finish_tests

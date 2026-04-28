@@ -24,6 +24,12 @@ if [ -z "$site_name" ]; then
   printf 'run-site-daemon: SITENAME required\n' >&2
   exit 2
 fi
+case "$site_name" in
+  .|..|*/*|*\\*)
+    printf 'run-site-daemon: invalid site name\n' >&2
+    exit 2
+    ;;
+esac
 
 WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
 SITES_DIR="$WEB_ROOT"

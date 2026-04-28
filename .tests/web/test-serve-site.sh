@@ -13,6 +13,22 @@ test_serve_site_help() {
   assert_output_contains "Usage:"
 }
 
+test_serve_site_rejects_path_site_name() {
+  skip-if-compiled || return $?
+
+  base_dir=$(temp-dir web-wizardry-test)
+  web_root="$base_dir/sites"
+  outside_site="$base_dir/sibling"
+  mkdir -p "$web_root" "$outside_site"
+
+  WEB_WIZARDRY_ROOT="$web_root" run_spell spells/web/serve-site ../sibling
+  assert_status 2
+  assert_error_contains "invalid site name"
+
+  rm -rf "$base_dir"
+}
+
 run_test_case "serve-site --help" test_serve_site_help
+run_test_case "serve-site rejects path site name" test_serve_site_rejects_path_site_name
 
 finish_tests
