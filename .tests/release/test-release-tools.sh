@@ -278,6 +278,13 @@ if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example
 fi
 grep -F "invalid track" "$tmp_dir/play-upload-invalid-track.err" >/dev/null
 
+if PLAY_RELEASE_STATUS='maybe' \
+   sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example.app" internal >"$tmp_dir/play-upload-invalid-status.err" 2>&1; then
+  printf '%s\n' "upload-play-internal accepted invalid release status" >&2
+  exit 1
+fi
+grep -F "invalid release status" "$tmp_dir/play-upload-invalid-status.err" >/dev/null
+
 if sh "$ROOT_DIR/tools/release/promote-play-track.sh" "com.example/../../other" internal production >"$tmp_dir/play-promote-invalid-package.err" 2>&1; then
   printf '%s\n' "promote-play-track accepted invalid package name" >&2
   exit 1

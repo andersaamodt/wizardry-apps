@@ -39,6 +39,11 @@ valid_track_name() {
   case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
 }
 
+valid_release_status() {
+  case "${1-}" in completed|draft|halted|inProgress) return 0 ;; esac
+  return 1
+}
+
 valid_query_token() {
   case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
 }
@@ -63,6 +68,12 @@ valid_package_name "$package_name" || {
 
 valid_track_name "$track" || {
   printf '%s\n' "upload-play-internal: invalid track" >&2
+  exit 2
+}
+
+release_status=${PLAY_RELEASE_STATUS:-completed}
+valid_release_status "$release_status" || {
+  printf '%s\n' "upload-play-internal: invalid release status" >&2
   exit 2
 }
 
@@ -180,7 +191,6 @@ valid_version_code "$version_code" || {
 }
 
 release_name=${PLAY_RELEASE_NAME:-wizardry-apps-$package_name-$version_code}
-release_status=${PLAY_RELEASE_STATUS:-completed}
 
 track_payload=$(jq -n \
   --arg vc "$version_code" \
