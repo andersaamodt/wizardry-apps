@@ -183,6 +183,13 @@ valid_bundle_id() {
   case "$1" in .|.*|*.|*..*|*[!A-Za-z0-9.-]*) return 1 ;; esac
 }
 
+valid_app_bundle_path() {
+  case "${1-}" in
+    *.app) return 0 ;;
+  esac
+  return 1
+}
+
 if has_line_break "$root"; then
   printf '%s\n' "build-forge-macos-app: root path must not contain line breaks" >&2
   exit 2
@@ -192,6 +199,11 @@ if has_line_break "$out_bundle"; then
   printf '%s\n' "build-forge-macos-app: output path must not contain line breaks" >&2
   exit 2
 fi
+
+valid_app_bundle_path "$out_bundle" || {
+  printf '%s\n' "build-forge-macos-app: output path must be a .app bundle" >&2
+  exit 2
+}
 
 valid_bundle_id "$bundle_id" || {
   printf '%s\n' "build-forge-macos-app: invalid bundle id" >&2

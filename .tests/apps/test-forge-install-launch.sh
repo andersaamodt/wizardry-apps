@@ -47,6 +47,15 @@ if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$scratc
 fi
 grep -F "invalid bundle id" "$scratch/bad-bundle.err" >/dev/null
 
+not_app_bundle="$scratch/not-a-bundle"
+mkdir -p "$not_app_bundle"
+if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$not_app_bundle" >"$scratch/bad-out-bundle.out" 2>"$scratch/bad-out-bundle.err"; then
+  printf '%s\n' "build-forge-macos-app accepted non-app output path" >&2
+  exit 1
+fi
+grep -F "output path must be a .app bundle" "$scratch/bad-out-bundle.err" >/dev/null
+[ -d "$not_app_bundle" ]
+
 unsafe_root="$scratch/unsafe\$root"
 fake_uname_bin="$scratch/fake-uname-bin"
 mkdir -p "$unsafe_root/tools/forge" "$unsafe_root/apps/forge" "$fake_uname_bin"

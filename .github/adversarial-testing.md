@@ -113,3 +113,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Backend status paths derived from XDG or environment values must be sanitized even when the command only writes a preference file.
 - Root hints are GUI/backend inputs even when output is plain text; reject line breaks before fallback resolution.
 - Install/uninstall helpers that accept explicit replacement or removal paths must constrain them to the artifact type they own before `rm -rf`.
+- Build helpers that accept explicit artifact output paths must constrain them to the artifact type they own before replacing the destination.
