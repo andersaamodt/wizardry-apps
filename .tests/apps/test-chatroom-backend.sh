@@ -27,6 +27,21 @@ valid_out=$(HOME="$tmp_home" sh "$backend" set-ui-pref "theme.id" "adept")
 printf '%s\n' "$valid_out" | grep -F "key=theme.id" >/dev/null
 prefs=$(HOME="$tmp_home" sh "$backend" get-ui-prefs)
 printf '%s\n' "$prefs" | grep -F "theme.id=adept" >/dev/null
+cfg="$tmp_home/.config/wizardry-apps/chatroom/config"
+{
+  printf 'theme.id=adept\rforged=1\n'
+  printf 'ab/key=value\n'
+} >"$cfg"
+prefs=$(HOME="$tmp_home" sh "$backend" get-ui-prefs)
+if printf '%s\n' "$prefs" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "chatroom get-ui-prefs emitted forged key-value output" >&2
+  exit 1
+fi
+printf '%s\n' "$prefs" | grep -F "theme.id=adept forged=1" >/dev/null
+if printf '%s\n' "$prefs" | grep -F "ab/key=" >/dev/null 2>&1; then
+  printf '%s\n' "chatroom get-ui-prefs emitted invalid key from hand-edited prefs" >&2
+  exit 1
+fi
 
 newline_url=$(printf 'http://localhost:9/pages/chat.html\nstatus=running')
 newline_url_out=$(HOME="$tmp_home" sh "$backend" check-chat "$newline_url")

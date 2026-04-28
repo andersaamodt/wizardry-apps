@@ -25,23 +25,30 @@ config_file() {
   printf '%s\n' "$base/config"
 }
 
-validate_key() {
+key_is_valid() {
   key=${1-}
   case "$key" in
     [a-z0-9]*)
       ;;
     *)
-      printf '%s\n' "chatroom-backend: invalid key: $key" >&2
-      exit 2
+      return 1
       ;;
   esac
 
   case "$key" in
     *[!a-z0-9._-]*)
-      printf '%s\n' "chatroom-backend: invalid key: $key" >&2
-      exit 2
+      return 1
       ;;
   esac
+  return 0
+}
+
+validate_key() {
+  key=${1-}
+  if ! key_is_valid "$key"; then
+    printf '%s\n' "chatroom-backend: invalid key: $key" >&2
+    exit 2
+  fi
 }
 
 sanitize_value() {
@@ -204,7 +211,18 @@ shift || true
 case "$action" in
   get-ui-prefs)
     cfg=$(config_file)
-    [ -f "$cfg" ] && cat "$cfg"
+    if [ -f "$cfg" ]; then
+      while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+          *=*)
+            key=${line%%=*}
+            value=${line#*=}
+            key_is_valid "$key" || continue
+            printf '%s=%s\n' "$key" "$(sanitize_value "$value")"
+            ;;
+        esac
+      done <"$cfg"
+    fi
     ;;
   set-ui-pref)
     key=${1-}

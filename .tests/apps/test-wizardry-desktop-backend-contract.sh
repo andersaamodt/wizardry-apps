@@ -73,6 +73,24 @@ grep -F "invalid key" /tmp/wizardry-desktop-invalid-pref.err >/dev/null 2>&1 || 
   printf '%s\n' "wizardry-desktop invalid key error missing" >&2
   exit 1
 }
+desktop_prefs="$tmp_home/.config/wizardry-apps/wizardry-desktop/config"
+mkdir -p "$(dirname "$desktop_prefs")"
+{
+  printf 'leftRailWidth=280\rforged=1\n'
+  printf 'ab/key=value\n'
+  printf 'theme=adept\n'
+} >"$desktop_prefs"
+desktop_prefs_out=$(HOME="$tmp_home" sh "$backend" get-ui-prefs)
+if printf '%s\n' "$desktop_prefs_out" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "wizardry-desktop get-ui-prefs emitted forged key-value output" >&2
+  exit 1
+fi
+printf '%s\n' "$desktop_prefs_out" | grep -F "leftRailWidth=280 forged=1" >/dev/null
+printf '%s\n' "$desktop_prefs_out" | grep -F "theme=adept" >/dev/null
+if printf '%s\n' "$desktop_prefs_out" | grep -F "ab/key=" >/dev/null 2>&1; then
+  printf '%s\n' "wizardry-desktop get-ui-prefs emitted invalid key from hand-edited prefs" >&2
+  exit 1
+fi
 
 hostile_spell_dir="$tmp_home/.wizardry/spells/hostilecat"
 mkdir -p "$hostile_spell_dir"

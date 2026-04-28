@@ -299,7 +299,19 @@ cmd_list_themes() {
 
 cmd_get_ui_prefs() {
   cfg=$(config_path)
-  [ -f "$cfg" ] && cat "$cfg"
+  if [ -f "$cfg" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+        *=*)
+          key=${line%%=*}
+          value=${line#*=}
+          if normalized_key=$(normalize_pref_key "$key" 2>/dev/null); then
+            printf '%s=%s\n' "$normalized_key" "$(sanitize_value "$value")"
+          fi
+          ;;
+      esac
+    done <"$cfg"
+  fi
 }
 
 cmd_set_ui_pref() {

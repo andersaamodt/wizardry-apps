@@ -3,6 +3,8 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/forge-ui-assets.XXXXXX")
+trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
 [ -f "$root/apps/forge/index.html" ]
 [ -f "$root/apps/forge/style.css" ]
@@ -48,7 +50,30 @@ grep -F "Emission material notice" "$root/apps/forge/starter-templates/web/minim
 grep -F "Emission material notice" "$root/apps/forge/starter-templates/web/minimal/style.css" >/dev/null
 grep -F "Canonical reference note" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
 grep -F "__wizardry_host_boot_ready" "$root/apps/forge/starter-templates/web/reference-app/script.js" >/dev/null
-grep -F "get-ui-prefs" "$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh" >/dev/null
+reference_backend="$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh"
+grep -F "get-ui-prefs" "$reference_backend" >/dev/null
+sh -n "$reference_backend"
+if XDG_CONFIG_HOME="$scratch/.config" sh "$reference_backend" set-ui-pref "ab/key" value >/tmp/forge-reference-invalid-pref.out 2>/tmp/forge-reference-invalid-pref.err; then
+  printf '%s\n' "reference app backend accepted invalid UI pref key" >&2
+  exit 1
+fi
+grep -F "invalid key" /tmp/forge-reference-invalid-pref.err >/dev/null
+reference_prefs="$scratch/.config/wizardry-apps/__APP_SLUG__.conf"
+mkdir -p "$(dirname "$reference_prefs")"
+{
+  printf 'selected_view=home\rforged=1\n'
+  printf 'ab/key=value\n'
+} >"$reference_prefs"
+reference_pref_out=$(XDG_CONFIG_HOME="$scratch/.config" sh "$reference_backend" get-ui-prefs)
+printf '%s\n' "$reference_pref_out" | grep -F "selected_view=home forged=1" >/dev/null
+if printf '%s\n' "$reference_pref_out" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "reference app backend emitted forged UI pref output" >&2
+  exit 1
+fi
+if printf '%s\n' "$reference_pref_out" | grep -F "ab/key=" >/dev/null 2>&1; then
+  printf '%s\n' "reference app backend emitted invalid hand-edited UI pref key" >&2
+  exit 1
+fi
 grep -F "assets/forge-icon.png" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
 grep -F "Reference App" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
 grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/null
