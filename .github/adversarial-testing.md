@@ -112,4 +112,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Bundle IDs rendered into plist or native project files need direct validation at each packaging entrypoint, not just manifest-derived paths.
 - Backend status paths derived from XDG or environment values must be sanitized even when the command only writes a preference file.
 - Root hints are GUI/backend inputs even when output is plain text; reject line breaks before fallback resolution.
-- Uninstall helpers that accept explicit removal paths must constrain them to the artifact type they own before `rm -rf`.
+- Install/uninstall helpers that accept explicit replacement or removal paths must constrain them to the artifact type they own before `rm -rf`.

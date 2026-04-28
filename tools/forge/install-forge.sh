@@ -108,6 +108,15 @@ if [ -n "$app_dir" ] && has_line_break "$app_dir"; then
   printf '%s\n' "install-forge: unsafe app path" >&2
   exit 2
 fi
+if [ -n "$app_dir" ]; then
+  case "$app_dir" in
+    *.app) ;;
+    *)
+      printf '%s\n' "install-forge: app path must be a .app bundle" >&2
+      exit 2
+      ;;
+  esac
+fi
 
 if [ ! -x "$root/tools/forge/launch-forge" ] || [ ! -d "$root/apps/forge" ]; then
   printf '%s\n' "install-forge: invalid wizardry-apps root: $root" >&2

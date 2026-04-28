@@ -69,6 +69,15 @@ if PATH="$fake_uname_bin:$PATH" sh "$install" --root "$unsafe_root" --home "$fak
 fi
 grep -F "unsafe root path" "$scratch/unsafe-root.err" >/dev/null
 
+not_app_install_target="$scratch/not-an-install-app"
+mkdir -p "$not_app_install_target"
+if sh "$install" --root "$root" --home "$fake_home" --app-dir "$not_app_install_target" >"$scratch/install-not-app.out" 2>"$scratch/install-not-app.err"; then
+  printf '%s\n' "install-forge accepted non-app install path" >&2
+  exit 1
+fi
+grep -F "app path must be a .app bundle" "$scratch/install-not-app.err" >/dev/null
+[ -d "$not_app_install_target" ]
+
 install_out=$(sh "$install" --root "$root" --home "$fake_home")
 printf '%s\n' "$install_out" | grep -F "installed_command=$fake_home/.local/bin/app-forge" >/dev/null
 printf '%s\n' "$install_out" | grep -F "workspace_root_file=$fake_home/.config/wizardry-apps/forge-root" >/dev/null
