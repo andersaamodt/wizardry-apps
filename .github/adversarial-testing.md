@@ -73,6 +73,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Site names, workspace slugs, release asset names, and store IDs are path-like even when they look like labels.
 - Site names that become service units, launchd labels, Tor blocks, process matches, or security users need the same strict validator as create/configure paths.
 - A create path having validation does not prove rename/edit/import paths share the same contract.
+- Hand-edited service config values such as Tor hidden-service ports must be revalidated before rendering daemon config, even if the normal edit command validates them.
 - Template-create paths write both filesystem paths and profile metadata; use the same site/template validators as blank-create paths.
 - Profile fields later used in shell, XML, desktop files, API URLs, or filesystem paths need validation at the write boundary and fallback at the read boundary.
 - Site config paths such as `cgi-dir` are code-generation inputs when they render into nginx directives.

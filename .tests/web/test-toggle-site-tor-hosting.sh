@@ -43,4 +43,38 @@ rejects_regex_site_name() {
 }
 
 run_test_case "toggle-site-tor-hosting rejects regex site name" rejects_regex_site_name
+
+rejects_configured_nonnumeric_port_before_tor_side_effects() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  mkdir -p "$web_root/mysite"
+  printf 'site-name=mysite\nport=abc;HiddenServiceDir /tmp/owned\n' > "$web_root/mysite/site.conf"
+
+  WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_SITES_DIR="$web_root" \
+    run_spell spells/web/toggle-site-tor-hosting mysite
+  assert_status 2
+  assert_error_contains "port must be numeric"
+
+  rm -rf "$web_root"
+}
+
+run_test_case "toggle-site-tor-hosting rejects configured nonnumeric port before tor side effects" rejects_configured_nonnumeric_port_before_tor_side_effects
+
+rejects_configured_out_of_range_port_before_tor_side_effects() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  mkdir -p "$web_root/mysite"
+  printf 'site-name=mysite\nport=70000\n' > "$web_root/mysite/site.conf"
+
+  WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_SITES_DIR="$web_root" \
+    run_spell spells/web/toggle-site-tor-hosting mysite
+  assert_status 2
+  assert_error_contains "port must be between 1 and 65535"
+
+  rm -rf "$web_root"
+}
+
+run_test_case "toggle-site-tor-hosting rejects configured out-of-range port before tor side effects" rejects_configured_out_of_range_port_before_tor_side_effects
 finish_tests
