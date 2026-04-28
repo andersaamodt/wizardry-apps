@@ -58,6 +58,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 ## Current Wizardry Apps Lessons
 - Site names, workspace slugs, release asset names, and store IDs are path-like even when they look like labels.
 - A create path having validation does not prove rename/edit/import paths share the same contract.
+- Template-create paths write both filesystem paths and profile metadata; use the same site/template validators as blank-create paths.
 - Profile fields later used in shell, XML, desktop files, API URLs, or filesystem paths need validation at the write boundary and fallback at the read boundary.
 - Release automation should reject unsafe metadata before invoking credentials, curl, xcrun, tar, unzip, chmod, or platform installers.
 - GUI adversarial testing should include stale state, racing clicks, WebKit drag payload differences, and narrow-width layout pressure.

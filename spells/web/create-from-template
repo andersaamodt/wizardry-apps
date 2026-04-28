@@ -34,14 +34,14 @@ if [ -z "$template" ]; then
 fi
 
 case "$site_name" in
-  .|..|*/*|*\\*)
-    die 2 "create-from-template: invalid site name"
+  ""|*[!a-zA-Z0-9_-]*)
+    die 2 "create-from-template: invalid site name (use alphanumeric, dash, underscore only)"
     ;;
 esac
 
 case "$template" in
-  .|..|*/*|*\\*)
-    die 2 "create-from-template: invalid template name"
+  ""|*[!a-zA-Z0-9_-]*)
+    die 2 "create-from-template: invalid template name (use alphanumeric, dash, underscore only)"
     ;;
 esac
 

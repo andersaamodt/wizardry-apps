@@ -195,6 +195,50 @@ test_rejects_template_path_traversal() {
   rm -rf "$test_web_root" "$fake_wizardry_root"
 }
 
+test_rejects_site_name_config_injection() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  injected_name=$(printf 'bad\nsite-user=root')
+
+  WIZARDRY_DIR="$ROOT_DIR" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template "$injected_name" demo
+  assert_status 2 || {
+    rm -rf "$test_web_root"
+    return 1
+  }
+
+  if find "$test_web_root" -mindepth 1 -print 2>/dev/null | grep . >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="create-from-template created files for newline-delimited site name"
+    rm -rf "$test_web_root"
+    return 1
+  fi
+
+  rm -rf "$test_web_root"
+}
+
+test_rejects_template_name_config_injection() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  injected_template=$(printf 'demo\nsite-user=root')
+
+  WIZARDRY_DIR="$ROOT_DIR" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template injected "$injected_template"
+  assert_status 2 || {
+    rm -rf "$test_web_root"
+    return 1
+  }
+
+  [ ! -e "$test_web_root/injected" ] || {
+    TEST_FAILURE_REASON="create-from-template created site for newline-delimited template name"
+    rm -rf "$test_web_root"
+    return 1
+  }
+
+  rm -rf "$test_web_root"
+}
+
 run_test_case "create-from-template shows help" test_help
 if [ -d "$ROOT_DIR/web/blog" ]; then
   run_test_case "blog template has sample posts" test_blog_template_has_sample_posts
@@ -203,5 +247,7 @@ run_test_case "all templates create expected site structure" test_all_web_templa
 run_test_case "create-from-template resolves templates from web" test_create_from_template_uses_web_directory
 run_test_case "create-from-template rejects site path traversal" test_rejects_site_name_path_traversal
 run_test_case "create-from-template rejects template path traversal" test_rejects_template_path_traversal
+run_test_case "create-from-template rejects site name config injection" test_rejects_site_name_config_injection
+run_test_case "create-from-template rejects template name config injection" test_rejects_template_name_config_injection
 
 finish_tests
