@@ -47,6 +47,31 @@ app_dir="$ROOT_DIR/apps/$slug"
 shared_dir="$ROOT_DIR/apps/.host/shared"
 theme_dir="$ROOT_DIR/web/.themes"
 
+dest_abs() {
+  path=$1
+  parent=$(dirname "$path")
+  base=$(basename "$path")
+  mkdir -p "$parent"
+  parent_abs=$(CDPATH= cd -- "$parent" && pwd -P)
+  printf '%s/%s\n' "$parent_abs" "$base"
+}
+
+paths_overlap() {
+  first=$1
+  second=$2
+  case "$first" in
+    "$second"|"$second"/*)
+      return 0
+      ;;
+  esac
+  case "$second" in
+    "$first"|"$first"/*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 [ -d "$app_dir" ] || {
   printf '%s\n' "stage-web-assets: app not found: $slug" >&2
   exit 1
@@ -61,6 +86,20 @@ theme_dir="$ROOT_DIR/web/.themes"
   printf '%s\n' "stage-web-assets: theme directory not found: $theme_dir" >&2
   exit 1
 }
+
+dest=$(dest_abs "$dest")
+case "$dest" in
+  /)
+    printf '%s\n' "stage-web-assets: destination overlaps source: $dest" >&2
+    exit 2
+    ;;
+esac
+for source_dir in "$app_dir" "$shared_dir" "$theme_dir" "$ROOT_DIR/core"; do
+  if paths_overlap "$dest" "$source_dir"; then
+    printf '%s\n' "stage-web-assets: destination overlaps source: $dest" >&2
+    exit 2
+  fi
+done
 
 rm -rf "$dest"
 mkdir -p "$dest/app" "$dest/app/.host/shared" "$dest/core"

@@ -48,6 +48,26 @@ if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/list-prod
 fi
 grep -F "unsafe app slug" "$tmp_dir/bad-production-slug.err" >/dev/null
 
+fake_stage_root="$tmp_dir/fake-stage-root"
+mkdir -p \
+  "$fake_stage_root/tools/release" \
+  "$fake_stage_root/apps/forge" \
+  "$fake_stage_root/apps/.host/shared" \
+  "$fake_stage_root/web/.themes" \
+  "$fake_stage_root/core/include" \
+  "$fake_stage_root/core/src"
+cp "$ROOT_DIR/tools/release/stage-web-assets.sh" "$fake_stage_root/tools/release/stage-web-assets.sh"
+printf '%s\n' "source marker" >"$fake_stage_root/apps/forge/index.html"
+printf '%s\n' "bridge" >"$fake_stage_root/apps/.host/shared/wizardry-bridge.js"
+printf '%s\n' "header" >"$fake_stage_root/core/include/wizardry.h"
+printf '%s\n' "source" >"$fake_stage_root/core/src/wizardry.c"
+if sh "$fake_stage_root/tools/release/stage-web-assets.sh" forge "$fake_stage_root/apps/forge" >"$tmp_dir/stage-into-source.out" 2>"$tmp_dir/stage-into-source.err"; then
+  printf '%s\n' "stage-web-assets accepted destination inside app source" >&2
+  exit 1
+fi
+grep -F "destination overlaps source" "$tmp_dir/stage-into-source.err" >/dev/null
+grep -Fx "source marker" "$fake_stage_root/apps/forge/index.html" >/dev/null
+
 sh "$ROOT_DIR/tools/release/stage-web-assets.sh" forge "$tmp_dir/forge-assets"
 [ -f "$tmp_dir/forge-assets/app/index.html" ]
 [ -f "$tmp_dir/forge-assets/app/.host/shared/wizardry-bridge.js" ]

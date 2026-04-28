@@ -29,6 +29,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Manifest "single-line" string validators should reject tabs as well as CR/LF because tabs are row delimiters in GUI/backend contracts.
 - Git remotes are user-controlled metadata; sanitize CR/LF and validate `owner/repo` slugs before emitting status rows or GitHub API URLs.
 - Publish-surface sync helpers must be argument-driven, scoped to documented paths, preserve local-only host directories, and copy dotfiles explicitly.
+- Staging helpers that delete/recreate destinations must reject destinations that overlap any source directory before `rm -rf`.
 - Generated metadata committed to the repo must not preserve machine-local absolute paths; readers should resolve project-relative paths and ignore out-of-project config paths.
 - Workspace relative paths must resolve inside the workspace after symlinks, not just pass string checks.
 - Imported project profiles are untrusted input; runtime/build paths should sanitize or fall back before writing bundle IDs, file names, or launchers.
