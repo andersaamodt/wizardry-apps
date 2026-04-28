@@ -39,6 +39,19 @@ valid_track_name() {
   case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
 }
 
+valid_query_token() {
+  case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
+}
+
+valid_version_code() {
+  case "${1-}" in ""|*[!0-9]*) return 1 ;; esac
+}
+
+valid_service_account_email() {
+  case "${1-}" in ""|*[!A-Za-z0-9._%+@-]*|*@*@*|@*|*@|*.|*@.*) return 1 ;; esac
+  case "$1" in *@*.*) return 0 ;; *) return 1 ;; esac
+}
+
 valid_package_name "$package_name" || {
   printf '%s\n' "upload-play-internal: invalid package name" >&2
   exit 2
@@ -87,6 +100,11 @@ if [ -z "$client_email" ] || [ "$client_email" = "null" ]; then
   exit 1
 fi
 
+valid_service_account_email "$client_email" || {
+  printf '%s\n' "upload-play-internal: invalid service account json (client_email)" >&2
+  exit 1
+}
+
 if [ -z "$private_key" ] || [ "$private_key" = "null" ]; then
   printf '%s\n' "upload-play-internal: invalid service account json (private_key)" >&2
   exit 1
@@ -131,6 +149,10 @@ if [ -z "$edit_id" ] || [ "$edit_id" = "null" ]; then
   printf '%s\n' "$edit_json" >&2
   exit 1
 fi
+valid_query_token "$edit_id" || {
+  printf '%s\n' "upload-play-internal: invalid edit id from API" >&2
+  exit 1
+}
 
 bundle_json=$(curl -sS -X POST \
   "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$package_name/edits/$edit_id/bundles?uploadType=media" \
@@ -144,6 +166,10 @@ if [ -z "$version_code" ] || [ "$version_code" = "null" ]; then
   printf '%s\n' "$bundle_json" >&2
   exit 1
 fi
+valid_version_code "$version_code" || {
+  printf '%s\n' "upload-play-internal: invalid version code from API" >&2
+  exit 1
+}
 
 release_name=${PLAY_RELEASE_NAME:-wizardry-apps-$package_name-$version_code}
 release_status=${PLAY_RELEASE_STATUS:-completed}

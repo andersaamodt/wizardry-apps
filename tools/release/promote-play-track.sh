@@ -41,6 +41,15 @@ valid_version_codes() {
   case "${1-}" in ""|*[!0-9,]*|*,|,*|*,,*) return 1 ;; esac
 }
 
+valid_query_token() {
+  case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
+}
+
+valid_service_account_email() {
+  case "${1-}" in ""|*[!A-Za-z0-9._%+@-]*|*@*@*|@*|*@|*.|*@.*) return 1 ;; esac
+  case "$1" in *@*.*) return 0 ;; *) return 1 ;; esac
+}
+
 valid_package_name "$package_name" || {
   printf '%s\n' "promote-play-track: invalid package name" >&2
   exit 2
@@ -78,6 +87,22 @@ printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_BASE64" | openssl base64 -d -A > "$svc_j
 
 client_email=$(jq -r '.client_email' "$svc_json")
 private_key=$(jq -r '.private_key' "$svc_json")
+
+if [ -z "$client_email" ] || [ "$client_email" = "null" ]; then
+  printf '%s\n' "promote-play-track: invalid service account json (client_email)" >&2
+  exit 1
+fi
+
+valid_service_account_email "$client_email" || {
+  printf '%s\n' "promote-play-track: invalid service account json (client_email)" >&2
+  exit 1
+}
+
+if [ -z "$private_key" ] || [ "$private_key" = "null" ]; then
+  printf '%s\n' "promote-play-track: invalid service account json (private_key)" >&2
+  exit 1
+fi
+
 printf '%s' "$private_key" > "$svc_key"
 
 b64url() {
@@ -116,6 +141,10 @@ if [ -z "$edit_id" ] || [ "$edit_id" = "null" ]; then
   printf '%s\n' "$edit_json" >&2
   exit 1
 fi
+valid_query_token "$edit_id" || {
+  printf '%s\n' "promote-play-track: invalid edit id from API" >&2
+  exit 1
+}
 
 if [ -z "$version_codes_csv" ]; then
   source_track_json=$(curl -sS -X GET "$api_base/$edit_id/tracks/$from_track" \
@@ -128,6 +157,10 @@ if [ -z "$version_codes_csv" ]; then
   fi
 
   version_codes_csv=$(printf '%s' "$source_track_json" | jq -r '[.releases[0].versionCodes[]] | join(",")')
+  valid_version_codes "$version_codes_csv" || {
+    printf '%s\n' "promote-play-track: invalid version codes from API" >&2
+    exit 1
+  }
 fi
 
 if [ -z "$version_codes_csv" ]; then

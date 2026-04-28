@@ -279,4 +279,80 @@ if sh "$ROOT_DIR/tools/release/promote-play-track.sh" "com.example.app" "interna
 fi
 grep -F "invalid track" "$tmp_dir/play-promote-invalid-track.err" >/dev/null
 
+fake_play_bin="$tmp_dir/fake-play-bin"
+mkdir -p "$fake_play_bin"
+cat >"$fake_play_bin/openssl" <<'SH'
+#!/bin/sh
+cat
+SH
+cat >"$fake_play_bin/curl" <<'SH'
+#!/bin/sh
+url=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    https://*) url=$1 ;;
+  esac
+  shift
+done
+case "$url" in
+  https://oauth2.googleapis.com/token)
+    printf '%s\n' '{"access_token":"token123"}'
+    ;;
+  *'/edits/edit123/bundles?uploadType=media')
+    if [ "${PLAY_FAKE_BAD_VERSION_CODE-}" = "1" ]; then
+      printf '%s\n' '{"versionCode":"123\nforged=1"}'
+    else
+      printf '%s\n' '{"versionCode":"123"}'
+    fi
+    ;;
+  *'/edits/edit123/tracks/internal')
+    if [ "${PLAY_FAKE_BAD_SOURCE_CODES-}" = "1" ]; then
+      printf '%s\n' '{"releases":[{"versionCodes":["123\nforged=1"]}]}'
+    else
+      printf '%s\n' '{"releases":[{"versionCodes":["123"]}]}'
+    fi
+    ;;
+  *'/edits/edit123/tracks/'*)
+    printf '%s\n' '{"releases":[{}]}'
+    ;;
+  *'/edits/edit123:commit')
+    printf '%s\n' '{"id":"edit123"}'
+    ;;
+  *'/edits')
+    printf '%s\n' '{"id":"edit123"}'
+    ;;
+  *)
+    printf '%s\n' '{}'
+    ;;
+esac
+SH
+chmod +x "$fake_play_bin/openssl" "$fake_play_bin/curl"
+bad_service_json='{"client_email":"bad\nemail@example.com","private_key":"key"}'
+if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$bad_service_json" \
+   PATH="$fake_play_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" com.example.app internal >"$tmp_dir/play-upload-bad-email.out" 2>"$tmp_dir/play-upload-bad-email.err"; then
+  printf '%s\n' "upload-play-internal accepted invalid service account email" >&2
+  exit 1
+fi
+grep -F "invalid service account json (client_email)" "$tmp_dir/play-upload-bad-email.err" >/dev/null
+
+good_service_json='{"client_email":"svc@example.iam.gserviceaccount.com","private_key":"key"}'
+if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$good_service_json" \
+   PLAY_FAKE_BAD_VERSION_CODE=1 \
+   PATH="$fake_play_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" com.example.app internal >"$tmp_dir/play-upload-bad-version.out" 2>"$tmp_dir/play-upload-bad-version.err"; then
+  printf '%s\n' "upload-play-internal accepted invalid API version code" >&2
+  exit 1
+fi
+grep -F "invalid version code from API" "$tmp_dir/play-upload-bad-version.err" >/dev/null
+
+if PLAY_SERVICE_ACCOUNT_JSON_BASE64="$good_service_json" \
+   PLAY_FAKE_BAD_SOURCE_CODES=1 \
+   PATH="$fake_play_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/promote-play-track.sh" com.example.app internal production >"$tmp_dir/play-promote-bad-codes.out" 2>"$tmp_dir/play-promote-bad-codes.err"; then
+  printf '%s\n' "promote-play-track accepted invalid API version codes" >&2
+  exit 1
+fi
+grep -F "invalid version codes from API" "$tmp_dir/play-promote-bad-codes.err" >/dev/null
+
 printf '%s\n' "release tools smoke passed"
