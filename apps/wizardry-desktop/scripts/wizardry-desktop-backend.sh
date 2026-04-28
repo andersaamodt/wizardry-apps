@@ -94,6 +94,15 @@ sanitize_record_field() {
   printf '%s' "${1-}" | tr '\r\n\t|' '    '
 }
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
 normalize_watch_actor() {
   actor=${1-}
   if [ -z "$actor" ]; then
@@ -271,7 +280,12 @@ require_root() {
 }
 
 cmd_root_hint() {
-  root=$(require_root "${1-}")
+  hint=${1-}
+  if [ -n "$hint" ] && has_line_break "$hint"; then
+    printf '%s\n' "wizardry-desktop-backend: root hint must not contain line breaks" >&2
+    exit 2
+  fi
+  root=$(require_root "$hint")
   printf '%s\n' "$root"
 }
 

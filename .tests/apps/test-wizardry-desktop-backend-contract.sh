@@ -19,6 +19,15 @@ root_hint=$(sh "$backend" root-hint "$root" | head -n 1 | tr -d '\r')
   printf '%s\n' "root-hint mismatch: expected $root got $root_hint" >&2
   exit 1
 }
+bad_root_hint=$(printf '%s\nforged=1' "$root")
+if sh "$backend" root-hint "$bad_root_hint" >/tmp/wizardry-desktop-bad-root.out 2>/tmp/wizardry-desktop-bad-root.err; then
+  printf '%s\n' "root-hint accepted newline-bearing root" >&2
+  exit 1
+fi
+grep -F "root hint must not contain line breaks" /tmp/wizardry-desktop-bad-root.err >/dev/null 2>&1 || {
+  printf '%s\n' "root-hint newline error missing" >&2
+  exit 1
+}
 
 themes=$(sh "$backend" list-themes "$root")
 printf '%s\n' "$themes" | grep -F "adept" >/dev/null 2>&1 || {

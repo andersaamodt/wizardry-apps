@@ -111,3 +111,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Installer paths rendered into shell shims or desktop files must reject shell-expansion characters unless they are structurally escaped.
 - Bundle IDs rendered into plist or native project files need direct validation at each packaging entrypoint, not just manifest-derived paths.
 - Backend status paths derived from XDG or environment values must be sanitized even when the command only writes a preference file.
+- Root hints are GUI/backend inputs even when output is plain text; reject line breaks before fallback resolution.
