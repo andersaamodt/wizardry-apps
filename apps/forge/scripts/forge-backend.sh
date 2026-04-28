@@ -1273,7 +1273,7 @@ run_workspace_rebuild() {
     :|true)
       printf 'status=noop\n'
       printf 'mode=command-noop\n'
-      printf 'command=%s\n' "$rebuild_command"
+      printf 'command=%s\n' "$(kv_output_value "$rebuild_command")"
       return 0
       ;;
   esac
@@ -1289,8 +1289,8 @@ run_workspace_rebuild() {
   ) >"$log_path" 2>&1; then
     printf 'status=ok\n'
     printf 'mode=command\n'
-    printf 'command=%s\n' "$rebuild_command"
-    printf 'log=%s\n' "$log_path"
+    printf 'command=%s\n' "$(kv_output_value "$rebuild_command")"
+    printf 'log=%s\n' "$(kv_output_value "$log_path")"
     return 0
   fi
 

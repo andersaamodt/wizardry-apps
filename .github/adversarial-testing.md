@@ -84,6 +84,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Environment-derived status fields such as shell, cwd, platform, and helper-detected labels are hostile output values when echoed in `key=value` rows.
 - Diagnostic commands such as `doctor` are GUI/backend contracts too; sanitize env and path fields there the same way as action results.
 - Terminal-launch helpers that print `command=...` rows should sanitize CR/LF in the displayed command, even when the underlying argv/script path remains valid for execution.
+- Rebuild/run helpers that print configured shell commands or log paths must sanitize those status fields; a successful command can hide CR/LF inside shell comments and still forge GUI rows.
 - Git accepts newline-bearing remote URLs, so Forge status rows must sanitize remotes before deriving browser URLs, GitHub slugs, or release checks.
 - Sync/import helpers are release tools: test missing sources, source=target, dotfile copies, and local-only host directory preservation before relying on workflow automation.
 - Sync/import helpers that print `key=value` rows must reject line-break paths before echoing canonical source or target paths.

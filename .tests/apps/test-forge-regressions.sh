@@ -260,6 +260,20 @@ assert_contains "$legacy_fallback_out" "status=ok"
 assert_contains "$legacy_fallback_out" "mode=command"
 assert_file_contains "$scratch/legacy-fallback.log" "legacy-rebuild"
 
+rebuild_status_ws="$scratch/rebuild-status"
+make_workspace "$rebuild_status_ws" "rebuild-status" "Rebuild Status" "linux"
+cat >> "$rebuild_status_ws/wizardry.workspace.conf" <<CONF
+run_rebuild_command=true #$(printf '\r')forged=1
+CONF
+
+rebuild_status_out=$(test_env sh "$backend" rebuild-workspace "$root" "$rebuild_status_ws")
+assert_contains "$rebuild_status_out" "status=ok"
+assert_contains "$rebuild_status_out" "mode=command"
+if printf '%s\n' "$rebuild_status_out" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "rebuild-workspace emitted forged key-value output from rebuild command" >&2
+  exit 1
+fi
+
 pick_ws="$scratch/pick-workspace"
 make_workspace "$pick_ws" "pick-workspace" "Pick Workspace" "hosted-web"
 mkdir -p "$pick_ws/sub-app"
