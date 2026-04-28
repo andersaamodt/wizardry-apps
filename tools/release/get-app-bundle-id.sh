@@ -57,12 +57,27 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+is_safe_bundle_id() {
+  value=${1-}
+  [ -n "$value" ] || return 1
+  case "$value" in
+    *..*|*./*|*/.*|*/*|*\\*|*[!A-Za-z0-9.-]*)
+      return 1
+      ;;
+  esac
+  printf '%s\n' "$value" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'
+}
+
 bundle_id=$(jq -r --arg slug "$slug" --arg platform "$platform" '
   .apps[] | select(.slug == $slug) | .bundleIds[$platform]
 ' "$manifest")
 
 if [ -z "$bundle_id" ] || [ "$bundle_id" = "null" ]; then
   printf '%s\n' "get-app-bundle-id: missing bundle id for app=$slug platform=$platform" >&2
+  exit 1
+fi
+if ! is_safe_bundle_id "$bundle_id"; then
+  printf '%s\n' "get-app-bundle-id: unsafe bundle id in manifest for app=$slug platform=$platform" >&2
   exit 1
 fi
 

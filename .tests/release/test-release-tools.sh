@@ -16,6 +16,38 @@ printf '%s' "$bundle_id" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-stage-assets.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
+bad_manifest_root="$tmp_dir/bad-manifest-root"
+mkdir -p "$bad_manifest_root/config" "$bad_manifest_root/apps" "$bad_manifest_root/web"
+cp "$ROOT_DIR/config/templates.manifest.json" "$bad_manifest_root/config/templates.manifest.json"
+cp "$ROOT_DIR/config/apps.manifest.json" "$bad_manifest_root/config/apps.manifest.json"
+jq '.apps[0].name = "Bad\nName"' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
+if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer >"$tmp_dir/bad-app-name.out" 2>"$tmp_dir/bad-app-name.err"; then
+  printf '%s\n' "get-app-name accepted unsafe manifest app name" >&2
+  exit 1
+fi
+grep -F "unsafe app name" "$tmp_dir/bad-app-name.err" >/dev/null
+
+jq '.apps[0].bundleIds.android = "com.example/../../bad"' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
+if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer >"$tmp_dir/bad-bundle-id.out" 2>"$tmp_dir/bad-bundle-id.err"; then
+  printf '%s\n' "get-app-bundle-id accepted unsafe manifest bundle id" >&2
+  exit 1
+fi
+grep -F "unsafe bundle id" "$tmp_dir/bad-bundle-id.err" >/dev/null
+
+jq '.apps += [{
+  "slug":"bad/../../slug",
+  "name":"Bad",
+  "production":true,
+  "distribution":"core",
+  "bundleIds":{"macos":"com.example.bad","ios":"com.example.bad","android":"com.example.bad"},
+  "targets":"macos"
+}]' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
+if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/list-production-apps.sh" >"$tmp_dir/bad-production-slug.out" 2>"$tmp_dir/bad-production-slug.err"; then
+  printf '%s\n' "list-production-apps accepted unsafe production app slug" >&2
+  exit 1
+fi
+grep -F "unsafe app slug" "$tmp_dir/bad-production-slug.err" >/dev/null
+
 sh "$ROOT_DIR/tools/release/stage-web-assets.sh" forge "$tmp_dir/forge-assets"
 [ -f "$tmp_dir/forge-assets/app/index.html" ]
 [ -f "$tmp_dir/forge-assets/app/.host/shared/wizardry-bridge.js" ]

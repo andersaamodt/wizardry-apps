@@ -45,9 +45,25 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+has_control_delimiter() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  tab_char=$(printf '\t')
+  case "$value" in
+    *"$nl_char"*|*"$cr_char"*|*"$tab_char"*) return 0 ;;
+  esac
+  return 1
+}
+
 name=$(jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | .name' "$manifest")
 if [ -z "$name" ] || [ "$name" = "null" ]; then
   printf '%s\n' "get-app-name: unknown slug: $slug" >&2
+  exit 1
+fi
+if has_control_delimiter "$name"; then
+  printf '%s\n' "get-app-name: unsafe app name in manifest for slug: $slug" >&2
   exit 1
 fi
 
