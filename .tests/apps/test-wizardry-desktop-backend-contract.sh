@@ -264,6 +264,31 @@ printf '%s\n' "$menu_help_via_action" | grep -E '^Usage: cast' >/dev/null 2>&1 |
   exit 1
 }
 
+hostile_menu_root="$tmp_home/menu-root$(printf '\r')status=forged"
+hostile_menu_dir="$hostile_menu_root/spells/menu"
+mkdir -p "$hostile_menu_dir"
+cat >"$hostile_menu_dir/hostile-menu" <<'SH'
+#!/bin/sh
+printf '%s\n' 'hostile menu'
+SH
+chmod +x "$hostile_menu_dir/hostile-menu"
+hostile_path="$tmp_home/path"
+mkdir -p "$hostile_path"
+cat >"$hostile_path/os_id" <<'SH'
+#!/bin/sh
+printf '%s\n' linux
+SH
+chmod +x "$hostile_path/os_id"
+terminal_output=$(PATH="$hostile_path:$PATH" sh "$backend" open-menu-terminal hostile-menu "" "$hostile_menu_root")
+printf '%s\n' "$terminal_output" | grep -F "mode=manual" >/dev/null 2>&1 || {
+  printf '%s\n' "open-menu-terminal should use manual mode in platform stub" >&2
+  exit 1
+}
+if printf '%s\n' "$terminal_output" | tr '\r' '\n' | grep -E '^status=' >/dev/null 2>&1; then
+  printf '%s\n' "open-menu-terminal emitted forged key-value output from path newline" >&2
+  exit 1
+fi
+
 arcana=$(sh "$backend" list-arcana-install "$root/spells/.arcana")
 printf '%s\n' "$arcana" | grep -F "web-wizardry|" >/dev/null 2>&1 || {
   printf '%s\n' "list-arcana-install missing web-wizardry" >&2

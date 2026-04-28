@@ -1998,10 +1998,11 @@ cmd_open_menu_terminal() {
   if [ -n "$menu_arg" ]; then
     command_text="$command_text $(shell_quote "$menu_arg")"
   fi
+  command_output=$(sanitize_value "$command_text")
 
   if [ "$(platform_id)" != "darwin" ] || ! command -v osascript >/dev/null 2>&1; then
     printf 'mode=%s\n' "manual"
-    printf 'command=%s\n' "$command_text"
+    printf 'command=%s\n' "$command_output"
     printf '%s\n' "Automatic terminal launch is unavailable on this platform."
     record_watch "app" "menu:terminal:$name" "wizardry-core" "manual"
     return
@@ -2019,14 +2020,14 @@ end run
 OSA
   then
     printf 'mode=%s\n' "terminal"
-    printf 'command=%s\n' "$command_text"
+    printf 'command=%s\n' "$command_output"
     printf '%s\n' "Opened Terminal and sent command."
     record_watch "app" "menu:terminal:$name" "wizardry-core" "ok"
     return
   fi
 
   printf 'mode=%s\n' "manual"
-  printf 'command=%s\n' "$command_text"
+  printf 'command=%s\n' "$command_output"
   printf '%s\n' "Terminal automation failed; run command manually."
   record_watch "app" "menu:terminal:$name" "wizardry-core" "failed:osascript"
 }
@@ -2042,10 +2043,11 @@ run_terminal_command() {
     printf '%s\n' "wizardry-desktop-backend: terminal command is required" >&2
     exit 2
   }
+  command_output=$(sanitize_value "$command_text")
 
   if [ "$(platform_id)" != "darwin" ] || ! command -v osascript >/dev/null 2>&1; then
     printf 'mode=%s\n' "manual"
-    printf 'command=%s\n' "$command_text"
+    printf 'command=%s\n' "$command_output"
     printf '%s\n' "Automatic terminal launch is unavailable on this platform."
     record_watch "app" "$source" "$app" "manual"
     return 0
@@ -2063,14 +2065,14 @@ end run
 OSA
   then
     printf 'mode=%s\n' "terminal"
-    printf 'command=%s\n' "$command_text"
+    printf 'command=%s\n' "$command_output"
     printf '%s\n' "Opened Terminal and sent command."
     record_watch "app" "$source" "$app" "ok"
     return 0
   fi
 
   printf 'mode=%s\n' "manual"
-  printf 'command=%s\n' "$command_text"
+  printf 'command=%s\n' "$command_output"
   printf '%s\n' "Terminal automation failed; run command manually."
   record_watch "app" "$source" "$app" "failed:osascript"
 }
