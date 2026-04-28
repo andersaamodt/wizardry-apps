@@ -3263,6 +3263,35 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             minSize = NSMakeSize(860, 620);
         }
     }
+    NSDictionary *hostInfoDictionary = [[NSBundle mainBundle] infoDictionary];
+    id configuredInitialWidth = hostInfoDictionary[@"WizardryInitialWidth"];
+    id configuredInitialHeight = hostInfoDictionary[@"WizardryInitialHeight"];
+    id configuredMinimumWidth = hostInfoDictionary[@"WizardryMinimumWidth"];
+    id configuredMinimumHeight = hostInfoDictionary[@"WizardryMinimumHeight"];
+    if ([configuredMinimumWidth respondsToSelector:@selector(doubleValue)]) {
+        CGFloat width = [configuredMinimumWidth doubleValue];
+        if (width >= 320.0) {
+            minSize.width = width;
+        }
+    }
+    if ([configuredMinimumHeight respondsToSelector:@selector(doubleValue)]) {
+        CGFloat height = [configuredMinimumHeight doubleValue];
+        if (height >= 260.0) {
+            minSize.height = height;
+        }
+    }
+    if ([configuredInitialWidth respondsToSelector:@selector(doubleValue)]) {
+        CGFloat width = [configuredInitialWidth doubleValue];
+        if (width >= minSize.width) {
+            frame.size.width = width;
+        }
+    }
+    if ([configuredInitialHeight respondsToSelector:@selector(doubleValue)]) {
+        CGFloat height = [configuredInitialHeight doubleValue];
+        if (height >= minSize.height) {
+            frame.size.height = height;
+        }
+    }
     NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |
                                    NSWindowStyleMaskClosable |
                                    NSWindowStyleMaskMiniaturizable |

@@ -6662,6 +6662,19 @@ cmd_run_workspace() {
     bundle_id="com.wizardry.workspace.$workspace_slug"
     bundle_version=$(printf '%s' "${icon_hash:-$workspace_slug}" | cksum | awk '{ print $1 }')
     [ -n "$bundle_version" ] || bundle_version=1
+    desktop_window_keys=''
+    desktop_initial_width=$(workspace_field "$workspace_conf" desktop_initial_width "")
+    desktop_initial_height=$(workspace_field "$workspace_conf" desktop_initial_height "")
+    desktop_min_width=$(workspace_field "$workspace_conf" desktop_min_width "")
+    desktop_min_height=$(workspace_field "$workspace_conf" desktop_min_height "")
+    case "$desktop_initial_width" in ''|*[!0-9]*) ;; *) desktop_window_keys="${desktop_window_keys}<key>WizardryInitialWidth</key><integer>$desktop_initial_width</integer>
+" ;; esac
+    case "$desktop_initial_height" in ''|*[!0-9]*) ;; *) desktop_window_keys="${desktop_window_keys}<key>WizardryInitialHeight</key><integer>$desktop_initial_height</integer>
+" ;; esac
+    case "$desktop_min_width" in ''|*[!0-9]*) ;; *) desktop_window_keys="${desktop_window_keys}<key>WizardryMinimumWidth</key><integer>$desktop_min_width</integer>
+" ;; esac
+    case "$desktop_min_height" in ''|*[!0-9]*) ;; *) desktop_window_keys="${desktop_window_keys}<key>WizardryMinimumHeight</key><integer>$desktop_min_height</integer>
+" ;; esac
     cat > "$staged_bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -6673,7 +6686,7 @@ cmd_run_workspace() {
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>wizardry-host</string>
 <key>WizardryAppEntry</key><string>$bundle_app_dir</string>
-$icon_key
+$desktop_window_keys$icon_key
 </dict></plist>
 PLIST
 
