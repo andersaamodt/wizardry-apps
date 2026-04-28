@@ -439,6 +439,55 @@ if sh "$backend" run-workspace "$scratch" "$escape_workspace" web >/tmp/forge-es
 fi
 grep -F "project app index not found" /tmp/forge-escape-subpath.err >/dev/null
 
+cr_subpath_workspace="$workspaces_root/cr-subpath-workspace"
+cr_subpath=$(printf 'app\rforged=1')
+mkdir -p "$cr_subpath_workspace/$cr_subpath"
+printf '%s\n' '<!doctype html><title>cr app</title>' >"$cr_subpath_workspace/$cr_subpath/index.html"
+{
+  printf '%s\n' "project_id=cr-subpath-workspace"
+  printf '%s\n' "title=CR Subpath Workspace"
+  printf '%s\n' "project_type=application"
+  printf '%s\n' "development_context=web"
+  printf '%s\n' "targets=hosted-web"
+  printf 'app_subpath=%s\n' "$cr_subpath"
+  printf '%s\n' "run_rebuild_command=:"
+} >"$cr_subpath_workspace/wizardry.workspace.conf"
+if sh "$backend" run-workspace "$scratch" "$cr_subpath_workspace" web >"$scratch/forge-cr-subpath.out" 2>"$scratch/forge-cr-subpath.err"; then
+  cr_subpath_pid=$(awk -F= '/^pid=/{print $2; exit}' "$scratch/forge-cr-subpath.out")
+  [ -n "$cr_subpath_pid" ] && kill "$cr_subpath_pid" >/dev/null 2>&1 || true
+  printf '%s\n' "forge backend test: CR-injected app_subpath was runnable" >&2
+  exit 1
+fi
+grep -F "project app index not found" "$scratch/forge-cr-subpath.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-cr-subpath.out" | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge run-workspace emitted forged rows from app_subpath" >&2
+  exit 1
+fi
+
+cr_detect_workspace="$workspaces_root/cr-detect-workspace"
+cr_detect_subdir=$(printf 'crapp\rforged=1')
+mkdir -p "$cr_detect_workspace/apps/$cr_detect_subdir"
+printf '%s\n' '<!doctype html><title>cr detected app</title>' >"$cr_detect_workspace/apps/$cr_detect_subdir/index.html"
+cat >"$cr_detect_workspace/wizardry.workspace.conf" <<'CONF'
+project_id=cr-detect-workspace
+title=CR Detect Workspace
+project_type=application
+development_context=web
+targets=hosted-web
+run_rebuild_command=:
+CONF
+if sh "$backend" run-workspace "$scratch" "$cr_detect_workspace" web >"$scratch/forge-cr-detect-subpath.out" 2>"$scratch/forge-cr-detect-subpath.err"; then
+  cr_detect_pid=$(awk -F= '/^pid=/{print $2; exit}' "$scratch/forge-cr-detect-subpath.out")
+  [ -n "$cr_detect_pid" ] && kill "$cr_detect_pid" >/dev/null 2>&1 || true
+  printf '%s\n' "forge backend test: CR-bearing detected app subpath was runnable" >&2
+  exit 1
+fi
+grep -F "project app index not found" "$scratch/forge-cr-detect-subpath.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-cr-detect-subpath.out" | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge run-workspace emitted forged rows from detected app subpath" >&2
+  exit 1
+fi
+
 if sh "$backend" scaffold-workspace "$scratch" bad-native 'Bad "Name' native-desktop blank "macos,linux" "" "$workspaces_root" >/tmp/forge-invalid-workspace-name.out 2>/tmp/forge-invalid-workspace-name.err; then
   printf '%s\n' "forge backend test: invalid scaffold workspace name accepted" >&2
   exit 1

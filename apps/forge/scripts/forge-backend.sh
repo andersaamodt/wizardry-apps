@@ -1438,6 +1438,8 @@ resolve_workspace_relative_path() {
 
   [ -n "$workspace_path" ] || return 1
   [ -n "$rel_path" ] || return 1
+  has_line_break "$workspace_path" && return 1
+  has_line_break "$rel_path" && return 1
 
   case "$rel_path" in
     /*)
@@ -2405,7 +2407,9 @@ detect_workspace_app_subpath() {
     for candidate in "$apps_dir"/*; do
       [ -d "$candidate" ] || continue
       if [ -f "$candidate/index.html" ]; then
-        found_subpath="apps/$(basename "$candidate")"
+        candidate_name=$(basename "$candidate")
+        has_line_break "$candidate_name" && continue
+        found_subpath="apps/$candidate_name"
         found_count=$((found_count + 1))
       fi
     done
@@ -2437,20 +2441,24 @@ detect_workspace_godot_subpath() {
   found_count=0
   for level_one in "$workspace_path"/*; do
     [ -d "$level_one" ] || continue
-    case "$(basename "$level_one")" in
+    level_one_name=$(basename "$level_one")
+    has_line_break "$level_one_name" && continue
+    case "$level_one_name" in
       .* ) continue ;;
     esac
     if [ -f "$level_one/project.godot" ]; then
-      found_subpath="$(basename "$level_one")"
+      found_subpath="$level_one_name"
       found_count=$((found_count + 1))
     fi
     for level_two in "$level_one"/*; do
       [ -d "$level_two" ] || continue
-      case "$(basename "$level_two")" in
+      level_two_name=$(basename "$level_two")
+      has_line_break "$level_two_name" && continue
+      case "$level_two_name" in
         .* ) continue ;;
       esac
       if [ -f "$level_two/project.godot" ]; then
-        found_subpath="$(basename "$level_one")/$(basename "$level_two")"
+        found_subpath="$level_one_name/$level_two_name"
         found_count=$((found_count + 1))
       fi
     done
