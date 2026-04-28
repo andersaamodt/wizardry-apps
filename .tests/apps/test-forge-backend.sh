@@ -538,7 +538,7 @@ mv "$tmp_profile" "$generic_workspace_abs/wizardry.workspace.conf"
 generic_profile_out=$(sh "$backend" get-workspace-profile "$scratch" "$generic_workspace_abs")
 printf '%s\n' "$generic_profile_out" | grep -F "project_id=generic-repo" >/dev/null
 tmp_profile=$(mktemp "${TMPDIR:-/tmp}/forge-profile.XXXXXX")
-awk -v injected="$(printf 'title=Generic Imported\rforged=1')" '
+awk -v injected="$(printf 'title=Generic\tImported\rforged=1')" '
   BEGIN { replaced = 0 }
   /^title=/ {
     print injected
@@ -563,6 +563,15 @@ workspaces_after_import=$(sh "$backend" list-workspaces "$scratch" "$workspaces_
 printf '%s\n' "$workspaces_after_import" | grep -E '^plain-web\t' >/dev/null
 printf '%s\n' "$workspaces_after_import" | grep -E '^direct-space\t' >/dev/null
 printf '%s\n' "$workspaces_after_import" | grep -E '^generic-repo\t' >/dev/null
+row_tab=$(printf '\t')
+if printf '%s\n' "$workspaces_after_import" | awk -F "$row_tab" 'NF != 13 { bad = 1 } END { exit bad ? 0 : 1 }'; then
+  printf '%s\n' "forge list-workspaces emitted malformed tab-delimited rows" >&2
+  exit 1
+fi
+if printf '%s\n' "$workspaces_after_import" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge list-workspaces emitted forged key-value-shaped row from profile title" >&2
+  exit 1
+fi
 
 if sh "$backend" run-workspace "$scratch" "$generic_workspace_abs" web >/tmp/forge-run-generic.out 2>/tmp/forge-run-generic.err; then
   printf '%s\n' "forge backend test: generic workspace unexpectedly runnable" >&2

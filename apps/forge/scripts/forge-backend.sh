@@ -1554,6 +1554,10 @@ kv_output_value() {
   printf '%s' "${1-}" | tr '\r\n' '  '
 }
 
+tsv_output_value() {
+  printf '%s' "${1-}" | tr '\r\n\t' '   '
+}
+
 normalize_linux_install_mode() {
   printf '%s\n' "local-share"
 }
@@ -3316,19 +3320,19 @@ cmd_list_workspaces() {
     git_release_available=$(printf '%s\n' "$git_info" | kv_read git_release_available)
     mtime_epoch=$(path_mtime_epoch "$path")
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$project_id" \
-      "$title" \
-      "$project_type" \
-      "$development_context" \
-      "$targets" \
-      "$path" \
+      "$(tsv_output_value "$project_id")" \
+      "$(tsv_output_value "$title")" \
+      "$(tsv_output_value "$project_type")" \
+      "$(tsv_output_value "$development_context")" \
+      "$(tsv_output_value "$targets")" \
+      "$(tsv_output_value "$path")" \
       "$mtime_epoch" \
       "$runnable" \
-      "$git_repo_present" \
-      "$git_status_label" \
-      "$git_status_tone" \
-      "$git_status_reason" \
-      "$git_release_available"
+      "$(tsv_output_value "$git_repo_present")" \
+      "$(tsv_output_value "$git_status_label")" \
+      "$(tsv_output_value "$git_status_tone")" \
+      "$(tsv_output_value "$git_status_reason")" \
+      "$(tsv_output_value "$git_release_available")"
   done | sort
 }
 
