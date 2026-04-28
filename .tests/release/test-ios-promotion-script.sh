@@ -28,6 +28,56 @@ if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
 fi
 grep -F "invalid bundle id" "$tmp_dir/ios-promote-invalid-bundle.err" >/dev/null
 
+fake_promote_bin="$tmp_dir/fake-promote-bin"
+mkdir -p "$fake_promote_bin"
+cat >"$fake_promote_bin/openssl" <<'SH'
+#!/bin/sh
+cat
+SH
+cat >"$fake_promote_bin/curl" <<'SH'
+#!/bin/sh
+url=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    https://api.appstoreconnect.apple.com*) url=$1 ;;
+  esac
+  shift
+done
+case "$url" in
+  *'/v1/apps?'*)
+    printf '%s\n' '{"data":[{"id":"app123"}]}'
+    ;;
+  *'/v1/builds?'*)
+    printf '%s\n' '{"data":[{"id":"build123","attributes":{"version":"42"},"relationships":{"preReleaseVersion":{"data":{"id":"pre123"}}}}],"included":[{"type":"preReleaseVersions","id":"pre123","attributes":{"version":"1.2.3\nforged=1"}}]}'
+    ;;
+  *'/v1/appStoreVersions/version123/relationships/build')
+    printf '%s\n' '{}'
+    ;;
+  *'/v1/appStoreVersions/version123')
+    printf '%s\n' '{"data":{"attributes":{"appStoreState":"PREPARE_FOR_SUBMISSION"}}}'
+    ;;
+  *'/v1/appStoreVersionSubmissions')
+    printf '%s\n' '{}'
+    ;;
+  *'/v1/appStoreVersions?'*)
+    printf '%s\n' '{"data":[{"id":"version123"}]}'
+    ;;
+  *)
+    printf '%s\n' '{"data":[]}'
+    ;;
+esac
+SH
+chmod +x "$fake_promote_bin/openssl" "$fake_promote_bin/curl"
+if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
+   APP_STORE_CONNECT_ISSUER_ID='11111111-1111-1111-1111-111111111111' \
+   APP_STORE_CONNECT_PRIVATE_KEY_BASE64='bad' \
+   PATH="$fake_promote_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/promote-ios-release.sh" com.example.app >"$tmp_dir/ios-promote-api-version.out" 2>"$tmp_dir/ios-promote-api-version.err"; then
+  printf '%s\n' "promote-ios-release accepted invalid API version string" >&2
+  exit 1
+fi
+grep -F "invalid version string from API" "$tmp_dir/ios-promote-api-version.err" >/dev/null
+
 ipa_path="$tmp_dir/app.ipa"
 : > "$ipa_path"
 if APP_STORE_CONNECT_KEY_ID='BAD/../../KEY' \

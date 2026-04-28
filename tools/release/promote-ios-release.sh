@@ -64,6 +64,21 @@ valid_query_token() {
   case "${1-}" in ""|*[!A-Za-z0-9._-]*) return 1 ;; esac
 }
 
+require_api_token() {
+  field=$1
+  value=$2
+  valid_query_token "$value" || {
+    printf '%s\n' "promote-ios-release: invalid $field from API" >&2
+    exit 1
+  }
+}
+
+require_optional_api_token() {
+  field=$1
+  value=$2
+  [ -z "$value" ] || require_api_token "$field" "$value"
+}
+
 valid_alnum "$APP_STORE_CONNECT_KEY_ID" || {
   printf '%s\n' "promote-ios-release: invalid App Store Connect key id" >&2
   exit 2
@@ -165,6 +180,7 @@ if [ -z "$app_id" ]; then
   printf '%s\n' "promote-ios-release: app not found for bundle id: $bundle_id" >&2
   exit 1
 fi
+require_api_token "app id" "$app_id"
 
 if [ -n "$build_number" ]; then
   builds_path="/v1/builds?filter[app]=$app_id&filter[processingState]=VALID&filter[version]=$build_number&sort=-uploadedDate&limit=1&include=preReleaseVersion"
@@ -181,15 +197,21 @@ if [ -z "$build_id" ]; then
   printf '%s\n' "promote-ios-release: no VALID build found for app" >&2
   exit 1
 fi
+require_api_token "build id" "$build_id"
+require_optional_api_token "build number" "$resolved_build_number"
 
 if [ -z "$version_string" ] && [ -n "$pre_rel_id" ]; then
-  version_string=$(printf '%s' "$builds_json" | jq -r --arg id "$pre_rel_id" '.included[]? | select(.type == "preReleaseVersions" and .id == $id) | .attributes.version' | head -n 1)
+  version_string=$(printf '%s' "$builds_json" | jq -r --arg id "$pre_rel_id" 'first(.included[]? | select(.type == "preReleaseVersions" and .id == $id) | .attributes.version) // empty')
 fi
 
 if [ -z "$version_string" ]; then
   printf '%s\n' "promote-ios-release: VERSION_STRING required (argument 3) when it cannot be inferred" >&2
   exit 1
 fi
+valid_query_token "$version_string" || {
+  printf '%s\n' "promote-ios-release: invalid version string from API" >&2
+  exit 1
+}
 
 versions_json=$(api_json GET "/v1/appStoreVersions?filter[app]=$app_id&filter[platform]=IOS&filter[versionString]=$version_string&limit=1")
 version_id=$(printf '%s' "$versions_json" | jq -r '.data[0].id // empty')
@@ -207,12 +229,14 @@ if [ -z "$version_id" ]; then
   printf '%s\n' "promote-ios-release: failed to resolve App Store version id" >&2
   exit 1
 fi
+require_api_token "version id" "$version_id"
 
 assign_payload=$(jq -n --arg build_id "$build_id" '{data:{type:"builds",id:$build_id}}')
 api_json PATCH "/v1/appStoreVersions/$version_id/relationships/build" "$assign_payload" >/dev/null
 
 version_json=$(api_json GET "/v1/appStoreVersions/$version_id")
 state=$(printf '%s' "$version_json" | jq -r '.data.attributes.appStoreState // ""')
+require_optional_api_token "version state" "$state"
 
 if [ "$submit_for_review" = "1" ] && [ "$state" = "PREPARE_FOR_SUBMISSION" ]; then
   submit_payload=$(jq -n --arg version_id "$version_id" '{data:{type:"appStoreVersionSubmissions",relationships:{appStoreVersion:{data:{type:"appStoreVersions",id:$version_id}}}}}')
@@ -223,6 +247,7 @@ fi
 if [ "$release_after_approval" = "1" ]; then
   version_json=$(api_json GET "/v1/appStoreVersions/$version_id")
   state=$(printf '%s' "$version_json" | jq -r '.data.attributes.appStoreState // ""')
+  require_optional_api_token "version state" "$state"
 
   if [ "$state" = "PENDING_DEVELOPER_RELEASE" ]; then
     release_payload=$(jq -n --arg version_id "$version_id" '{data:{type:"appStoreVersionReleases",relationships:{appStoreVersion:{data:{type:"appStoreVersions",id:$version_id}}}}}')
