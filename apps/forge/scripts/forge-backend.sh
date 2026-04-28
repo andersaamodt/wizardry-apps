@@ -7660,6 +7660,15 @@ cmd_run_task() {
     exit 2
   }
 
+  case "$task" in
+    validate-manifest|test-core|test-adapters|test-release-tools)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: unknown task: $task" >&2
+      exit 2
+      ;;
+  esac
+
   task_log_dir="$root/_tmp/workbench/log/tasks"
   mkdir -p "$task_log_dir"
   task_log="$task_log_dir/$task-$(date +%Y%m%d-%H%M%S).log"

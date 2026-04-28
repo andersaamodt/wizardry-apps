@@ -138,6 +138,14 @@ cp -R "$test_root/tools" "$scratch/tools"
 cp -R "$test_root/web/demo" "$scratch/web/demo"
 cp -R "$test_root/web/.themes" "$scratch/web/.themes"
 
+if sh "$backend" run-task "$scratch" "../escape-task" >/tmp/forge-invalid-run-task.out 2>/tmp/forge-invalid-run-task.err; then
+  printf '%s\n' "forge backend test: invalid run-task name accepted" >&2
+  exit 1
+fi
+grep -F "unknown task" /tmp/forge-invalid-run-task.err >/dev/null
+escaped_task_logs=$(find "$scratch/_tmp/workbench/log" -type f -name 'escape-task-*' -print 2>/dev/null || true)
+[ -z "$escaped_task_logs" ]
+
 sh "$backend" scaffold-app "$scratch" sandbox-tool "Sandbox Tool" minimal >/tmp/forge-scaffold-app.log
 [ -f "$scratch/apps/sandbox-tool/index.html" ]
 [ -f "$scratch/apps/sandbox-tool/style.css" ]
