@@ -4093,6 +4093,7 @@ cmd_pick_workspace_subpath() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
 
   picked_path=$(pick_directory_under_workspace "$workspace_abs" "Choose app subpath")
   [ -n "$picked_path" ] || exit 0
@@ -4185,6 +4186,7 @@ cmd_set_workspace_field() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
   conf="$workspace_abs/wizardry.workspace.conf"
   [ -f "$conf" ] || {
     printf '%s\n' "forge-backend: project profile missing: $workspace_abs" >&2
@@ -4378,6 +4380,7 @@ cmd_rename_workspace() {
     printf '%s\n' "forge-backend: project not found: $workspace_path" >&2
     exit 1
   }
+  reject_line_breaks "$workspace_abs" "project path"
 
   conf="$workspace_abs/wizardry.workspace.conf"
   [ -f "$conf" ] || {

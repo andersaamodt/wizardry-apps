@@ -338,6 +338,46 @@ if sh "$backend" set-workspace-field "$scratch" "$workspaces_root/workspace-home
 fi
 grep -F "invalid hosted_web_serve_action" /tmp/forge-invalid-action.err >/dev/null
 
+bad_set_field_workspace="$scratch/set-field/bad
+value=forged"
+mkdir -p "$bad_set_field_workspace"
+cat >"$bad_set_field_workspace/wizardry.workspace.conf" <<'CONF'
+project_id=bad-set-field
+title=Bad Set Field
+project_type=application
+development_context=web
+targets=hosted-web
+CONF
+if sh "$backend" set-workspace-field "$scratch" "$bad_set_field_workspace" starter blank >"$scratch/forge-bad-set-field.out" 2>"$scratch/forge-bad-set-field.err"; then
+  printf '%s\n' "forge set-workspace-field accepted line-break project path" >&2
+  exit 1
+fi
+grep -F "project path must not contain line breaks" "$scratch/forge-bad-set-field.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-bad-set-field.out" | grep -E '^value=' >/dev/null 2>&1; then
+  printf '%s\n' "forge set-workspace-field emitted forged rows from project path" >&2
+  exit 1
+fi
+
+bad_rename_workspace="$scratch/rename-field/bad
+old_workspace=forged"
+mkdir -p "$bad_rename_workspace"
+cat >"$bad_rename_workspace/wizardry.workspace.conf" <<'CONF'
+project_id=bad-rename
+title=Bad Rename
+project_type=application
+development_context=web
+targets=hosted-web
+CONF
+if sh "$backend" rename-workspace "$scratch" "$bad_rename_workspace" "Better Name" >"$scratch/forge-bad-rename.out" 2>"$scratch/forge-bad-rename.err"; then
+  printf '%s\n' "forge rename-workspace accepted line-break project path" >&2
+  exit 1
+fi
+grep -F "project path must not contain line breaks" "$scratch/forge-bad-rename.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-bad-rename.out" | grep -E '^old_workspace=' >/dev/null 2>&1; then
+  printf '%s\n' "forge rename-workspace emitted forged rows from project path" >&2
+  exit 1
+fi
+
 escape_workspace="$workspaces_root/escape-workspace"
 escape_outside="$workspaces_root/escape-outside"
 mkdir -p "$escape_workspace" "$escape_outside"
