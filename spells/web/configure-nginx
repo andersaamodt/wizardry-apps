@@ -30,8 +30,8 @@ if [ -z "$site_name" ]; then
   die 2 "configure-nginx: SITENAME required"
 fi
 case "$site_name" in
-  .|..|*/*|*\\*)
-    die 2 "configure-nginx: invalid site name"
+  ""|*[!a-zA-Z0-9_-]*)
+    die 2 "configure-nginx: invalid site name (use alphanumeric, dash, underscore only)"
     ;;
 esac
 shift

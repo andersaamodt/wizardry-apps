@@ -15,6 +15,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 ## High-Value App Bug Classes
 - Path segment values must reject `.`, `..`, `/`, `\`, line breaks, and empty values before filesystem side effects.
 - Identifiers used in both paths and metadata need one shared validator across create, edit, rename, build, and release paths.
+- Names later interpolated into `grep`, nginx, Tor, or service-file matching must reject regex metacharacters even when paths are quoted.
 - Composite refs such as `source:name` must be parsed structurally; shell word splitting must not accept trailing words or unsupported source kinds.
 - CSV-like fields must reject leading commas, trailing commas, empty entries, unsupported characters, and line-break injection.
 - Key-value profile writes must keep keys allowlisted and values single-line unless multi-line is the explicit contract.
@@ -62,6 +63,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Template-create paths write both filesystem paths and profile metadata; use the same site/template validators as blank-create paths.
 - Profile fields later used in shell, XML, desktop files, API URLs, or filesystem paths need validation at the write boundary and fallback at the read boundary.
 - Site config paths such as `cgi-dir` are code-generation inputs when they render into nginx directives.
+- Legacy/imported site directories can bypass create-time rules; maintenance spells must revalidate site names before Tor or nginx matching.
 - Release automation should reject unsafe metadata before invoking credentials, curl, xcrun, tar, unzip, chmod, or platform installers.
 - GUI adversarial testing should include stale state, racing clicks, WebKit drag payload differences, and narrow-width layout pressure.
 - Native desktop IR display strings are code-generation inputs; validate or escape them before rendering Swift, C, plist, desktop, or package files.

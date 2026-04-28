@@ -78,9 +78,31 @@ EOF
   rm -rf "$base_dir"
 }
 
+test_change_site_port_rejects_regex_site_name() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  mkdir -p "$web_root/foo.*"
+  printf 'site-name=foo.*\nsite-user=%s\nport=8080\ndomain=localhost\nhttps=false\n' "$(id -un)" > "$web_root/foo.*/site.conf"
+
+  WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_SITES_DIR="$web_root" \
+    run_spell spells/web/change-site-port 'foo.*' 9090
+  assert_status 2
+  assert_error_contains "invalid site name"
+
+  if ! grep -Fx "port=8080" "$web_root/foo.*/site.conf" >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="regex-shaped site name changed port"
+    rm -rf "$web_root"
+    return 1
+  fi
+
+  rm -rf "$web_root"
+}
+
 run_test_case "change-site-port --help" test_change_site_port_help
 run_test_case "change-site-port validates sitename" test_change_site_port_validates_sitename
 run_test_case "change-site-port validates port" test_change_site_port_validates_port
 run_test_case "change-site-port rejects path site name" test_change_site_port_rejects_path_site_name
+run_test_case "change-site-port rejects regex site name" test_change_site_port_rejects_regex_site_name
 
 finish_tests

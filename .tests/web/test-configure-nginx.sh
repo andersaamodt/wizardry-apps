@@ -192,6 +192,35 @@ test_configure_nginx_rejects_site_path_traversal() {
   rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
 }
 
+test_configure_nginx_rejects_regex_site_name() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-sudo "$stub_dir"
+  mkdir -p "$test_web_root/foo.*"
+  printf 'site-name=foo.*\nport=8080\ndomain=localhost\nhttps=false\n' > "$test_web_root/foo.*/site.conf"
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/configure-nginx 'foo.*'
+  assert_status 2 || {
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+  assert_error_contains "invalid site name" || {
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+
+  [ ! -f "$test_web_root/foo.*/nginx/nginx.conf" ] || {
+    TEST_FAILURE_REASON="configure-nginx wrote nginx.conf for regex-shaped site name"
+    rm -rf "$test_web_root" "$stub_dir"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
 test_configure_nginx_rejects_config_injection_values() {
   skip-if-compiled || return $?
 
@@ -269,6 +298,7 @@ run_test_case "configure-nginx creates local mime.types" test_configure_nginx_cr
 run_test_case "configure-nginx supports .onion addresses" test_configure_nginx_supports_onion_addresses
 run_test_case "configure-nginx preserves existing port" test_configure_nginx_preserves_existing_port
 run_test_case "configure-nginx rejects site path traversal" test_configure_nginx_rejects_site_path_traversal
+run_test_case "configure-nginx rejects regex site name" test_configure_nginx_rejects_regex_site_name
 run_test_case "configure-nginx rejects config injection values" test_configure_nginx_rejects_config_injection_values
 run_test_case "configure-nginx rejects unsafe cgi-dir" test_configure_nginx_rejects_unsafe_cgi_dir
 
