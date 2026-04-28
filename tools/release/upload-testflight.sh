@@ -30,8 +30,17 @@ valid_alnum() {
   case "${1-}" in ""|*[!A-Za-z0-9]*) return 1 ;; esac
 }
 
+valid_hex_dash() {
+  case "${1-}" in ""|*[!A-Fa-f0-9-]*) return 1 ;; esac
+}
+
 valid_alnum "$APP_STORE_CONNECT_KEY_ID" || {
   printf '%s\n' "upload-testflight: invalid App Store Connect key id" >&2
+  exit 2
+}
+
+valid_hex_dash "$APP_STORE_CONNECT_ISSUER_ID" || {
+  printf '%s\n' "upload-testflight: invalid App Store Connect issuer id" >&2
   exit 2
 }
 

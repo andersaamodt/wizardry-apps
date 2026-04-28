@@ -25,6 +25,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Imported config paths rendered into nginx, service, plist, or shell snippets must reject the target format's control characters.
 - Release asset names must be basenames only; reject archive or API metadata before download, extraction, install, or chmod.
 - Store/release IDs such as App Store key IDs, bundle IDs, Play package names, tracks, and version lists must be validated before paths, JWTs, query strings, or API URLs are built.
+- Store credential IDs should be validated consistently across upload, promote, and build helpers before platform tools receive them.
 - Release manifests are build inputs; validate slugs, names, targets, bundle IDs, publish flags, and optional source records before workflows iterate them.
 - Manifest "single-line" string validators should reject tabs as well as CR/LF because tabs are row delimiters in GUI/backend contracts.
 - Git remotes are user-controlled metadata; sanitize CR/LF and validate `owner/repo` slugs before emitting status rows or GitHub API URLs.
@@ -100,3 +101,4 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Icon metadata is project state, not host state; store project-relative paths and test that regeneration will not read absolute paths outside the project.
 - Manifest validation should include hostile records added by future commits, not just the currently checked-in happy path.
 - Single-record manifest status commands must sanitize manifest fields as output too; a separate validator does not protect GUI calls that read a hand-edited manifest directly.
+- Release upload helpers should adversarially test each credential field, not just the credential field used in a temp filename.

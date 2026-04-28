@@ -39,4 +39,26 @@ if APP_STORE_CONNECT_KEY_ID='BAD/../../KEY' \
 fi
 grep -F "invalid App Store Connect key id" "$tmp_dir/upload-testflight-invalid-key.err" >/dev/null
 
+fake_bin="$tmp_dir/fake-bin"
+mkdir -p "$fake_bin"
+cat >"$fake_bin/openssl" <<'SH'
+#!/bin/sh
+cat
+SH
+cat >"$fake_bin/xcrun" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$fake_bin/openssl" "$fake_bin/xcrun"
+bad_issuer=$(printf '11111111-1111-1111-1111-111111111111\nforged=1')
+if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
+   APP_STORE_CONNECT_ISSUER_ID="$bad_issuer" \
+   APP_STORE_CONNECT_PRIVATE_KEY_BASE64='bad' \
+   PATH="$fake_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/upload-testflight.sh" "$ipa_path" >"$tmp_dir/upload-testflight-invalid-issuer.err" 2>&1; then
+  printf '%s\n' "upload-testflight accepted invalid issuer id" >&2
+  exit 1
+fi
+grep -F "invalid App Store Connect issuer id" "$tmp_dir/upload-testflight-invalid-issuer.err" >/dev/null
+
 printf '%s\n' "ios promotion script checks passed"
