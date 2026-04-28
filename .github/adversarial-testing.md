@@ -77,5 +77,6 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.
 - Git accepts newline-bearing remote URLs, so Forge status rows must sanitize remotes before deriving browser URLs, GitHub slugs, or release checks.
 - Sync/import helpers are release tools: test missing sources, source=target, dotfile copies, and local-only host directory preservation before relying on workflow automation.
+- Sync/import helpers that print `key=value` rows must reject line-break paths before echoing canonical source or target paths.
 - Icon metadata is project state, not host state; store project-relative paths and test that regeneration will not read absolute paths outside the project.
 - Manifest validation should include hostile records added by future commits, not just the currently checked-in happy path.

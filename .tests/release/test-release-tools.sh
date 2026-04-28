@@ -87,6 +87,15 @@ if sh "$ROOT_DIR/tools/sync-from-wizardry.sh" "$tmp_dir/missing-source" "$sync_t
 fi
 grep -F "source directory not found" "$tmp_dir/sync-missing.out" >/dev/null
 
+sync_newline_source="$tmp_dir/sync-newline
+source"
+mkdir -p "$sync_newline_source/spells/web"
+if sh "$ROOT_DIR/tools/sync-from-wizardry.sh" "$sync_newline_source" "$sync_target" >"$tmp_dir/sync-newline.out" 2>&1; then
+  printf '%s\n' "sync-from-wizardry accepted newline source path" >&2
+  exit 1
+fi
+grep -F "source directory must not contain line breaks" "$tmp_dir/sync-newline.out" >/dev/null
+
 aab_path="$tmp_dir/app.aab"
 : > "$aab_path"
 if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example/../../other" internal >"$tmp_dir/play-upload-invalid-package.err" 2>&1; then

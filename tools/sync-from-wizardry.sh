@@ -11,6 +11,17 @@ fail() {
   exit 1
 }
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in
+    *"$nl_char"*|*"$cr_char"*) return 0 ;;
+  esac
+  return 1
+}
+
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
 
@@ -21,6 +32,9 @@ source_arg=${1-}
 }
 
 target_arg=${2-$repo_root}
+
+has_line_break "$source_arg" && fail "source directory must not contain line breaks"
+has_line_break "$target_arg" && fail "target directory must not contain line breaks"
 
 [ -d "$source_arg" ] || fail "source directory not found: $source_arg"
 [ -d "$target_arg" ] || fail "target directory not found: $target_arg"
