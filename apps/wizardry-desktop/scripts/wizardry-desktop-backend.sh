@@ -632,6 +632,11 @@ EOF
   exit 2
 }
 
+filter_memorized_rows() {
+  tab_char=$(printf '\t')
+  awk -F "$tab_char" 'NF == 2 { gsub(/\r/, " "); print }'
+}
+
 cmd_list_memorized_spells() {
   spellbook_dir="${XDG_DATA_HOME:-$HOME/.local/share}/wizardry/spellbook"
   nl_char=$(printf '\nX')
@@ -639,11 +644,11 @@ cmd_list_memorized_spells() {
   cr_char=$(printf '\r')
   tab_char=$(printf '\t')
   if [ -x "$HOME/.wizardry/spells/menu/cast" ]; then
-    sh "$HOME/.wizardry/spells/menu/cast" --list 2>/dev/null
+    sh "$HOME/.wizardry/spells/menu/cast" --list 2>/dev/null | filter_memorized_rows
     return
   fi
   if hascmd cast; then
-    cast --list 2>/dev/null
+    cast --list 2>/dev/null | filter_memorized_rows
     return
   fi
   if [ -d "$spellbook_dir" ]; then

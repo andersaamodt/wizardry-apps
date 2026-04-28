@@ -177,6 +177,36 @@ if printf '%s\n' "$memorized_rows" | grep -E 'bad-command|bad-multiline|bad name
   printf '%s\n' "list-memorized-spells emitted unsafe fallback rows" >&2
   exit 1
 fi
+helper_home="$tmp_home/helper-home"
+mkdir -p "$helper_home/.wizardry/spells/menu"
+cat >"$helper_home/.wizardry/spells/menu/cast" <<'SH'
+#!/bin/sh
+if [ "${1-}" = "--list" ]; then
+  printf 'good-helper\tlook .\n'
+  printf 'bad-helper\tlook\rforged=1\n'
+  printf 'extra-helper\tlook\tbad\n'
+  exit 0
+fi
+exit 2
+SH
+chmod +x "$helper_home/.wizardry/spells/menu/cast"
+memorized_helper_rows=$(HOME="$helper_home" PATH="/bin:/usr/bin" sh "$backend" list-memorized-spells)
+printf '%s\n' "$memorized_helper_rows" | grep -F "good-helper	look ." >/dev/null 2>&1 || {
+  printf '%s\n' "list-memorized-spells missing safe helper row" >&2
+  exit 1
+}
+printf '%s\n' "$memorized_helper_rows" | grep -F "bad-helper	look forged=1" >/dev/null 2>&1 || {
+  printf '%s\n' "list-memorized-spells did not sanitize CR in helper row" >&2
+  exit 1
+}
+if printf '%s\n' "$memorized_helper_rows" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "list-memorized-spells emitted forged helper rows" >&2
+  exit 1
+fi
+if printf '%s\n' "$memorized_helper_rows" | grep -F "extra-helper" >/dev/null 2>&1; then
+  printf '%s\n' "list-memorized-spells emitted malformed helper rows" >&2
+  exit 1
+fi
 
 {
   printf '%s\n' "arcana=install-menu"

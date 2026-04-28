@@ -82,6 +82,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Starter templates need the same preference/config import checks as first-party apps, or new projects will regenerate fixed bug classes.
 - Fallback/cache readers that emit tab-delimited GUI rows must reject unsafe filenames and tab/CR/LF-bearing contents even when the primary writer already validates them.
 - Imported logs are GUI state too; list/tail commands should re-check row shape and strip CR before emitting historical rows.
+- Helper list commands are GUI input; filter helper TSV output for exact column count and CR before forwarding rows.
 - GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.
 - Environment-derived status fields such as shell, cwd, platform, and helper-detected labels are hostile output values when echoed in `key=value` rows.
