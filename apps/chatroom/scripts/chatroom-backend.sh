@@ -136,6 +136,14 @@ stop_demo_site() {
 
 is_http_url() {
   value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in
+    *"$nl_char"*|*"$cr_char"*)
+      return 1
+      ;;
+  esac
   case "$value" in
     http://*|https://*)
       return 0
