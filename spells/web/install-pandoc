@@ -13,7 +13,12 @@ esac
 
 set -eu
 
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}
+default_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+if [ -n "${PATH:-}" ]; then
+  PATH="$PATH:$default_path"
+else
+  PATH="$default_path"
+fi
 
 say() {
   printf '%s\n' "$1"
@@ -59,6 +64,10 @@ run_privileged() {
 }
 
 install_target_bin_dir() {
+  if [ -n "${XDG_BIN_HOME:-}" ]; then
+    printf '%s\n' "$XDG_BIN_HOME"
+    return 0
+  fi
   if [ "$(id -u)" -eq 0 ]; then
     printf '%s\n' /usr/local/bin
     return 0

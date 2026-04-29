@@ -15,6 +15,14 @@ test_success_when_syncthing_already_present() {
   tmp_bin=$(temp-dir install-syncthing-bin)
   cat > "$tmp_bin/syncthing" <<'EOF'
 #!/bin/sh
+case "${1-}" in
+  version)
+    printf '%s\n' 'syncthing v1.29.0'
+    ;;
+  cli)
+    printf '%s\n' 'Command line interface'
+    ;;
+esac
 exit 0
 EOF
   chmod +x "$tmp_bin/syncthing"
@@ -28,7 +36,16 @@ EOF
 
 test_failure_without_supported_package_manager() {
   tmp_bin=$(temp-dir install-syncthing-bin)
-  run_cmd env PATH="$tmp_bin" sh "$ROOT_DIR/spells/web/install-syncthing"
+  for tool in syncthing curl tar unzip apt-get dnf brew sudo; do
+    cat > "$tmp_bin/$tool" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+    chmod +x "$tmp_bin/$tool"
+  done
+
+  run_cmd env PATH="$tmp_bin:/usr/bin:/bin:/usr/sbin:/sbin" XDG_BIN_HOME="$tmp_bin" \
+    sh "$ROOT_DIR/spells/web/install-syncthing"
   assert_failure
   assert_output_contains "no supported package manager"
   rm -rf "$tmp_bin"

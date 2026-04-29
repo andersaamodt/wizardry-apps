@@ -23,7 +23,8 @@ exit 0
 EOF
   chmod +x "$tmp_bin/nostril" "$tmp_bin/nak"
 
-  PATH="$tmp_bin:/usr/bin:/bin:/usr/sbin:/sbin" run_spell spells/web/install-nostril
+  run_cmd env PATH="$tmp_bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+    sh "$ROOT_DIR/spells/web/install-nostril"
   assert_success
   assert_output_contains "already installed"
 
@@ -32,7 +33,16 @@ EOF
 
 test_failure_without_supported_package_manager() {
   tmp_bin=$(temp-dir install-nostril-bin)
-  PATH="$tmp_bin" run_spell spells/web/install-nostril
+  for tool in curl go git make cc autoreconf apt-get dnf brew sudo; do
+    cat > "$tmp_bin/$tool" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+    chmod +x "$tmp_bin/$tool"
+  done
+
+  run_cmd env PATH="$tmp_bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+    sh "$ROOT_DIR/spells/web/install-nostril"
   assert_failure
   assert_output_contains "no supported package manager"
   rm -rf "$tmp_bin"
@@ -81,7 +91,8 @@ esac
 EOF
   chmod +x "$tmp_bin/nostril" "$tmp_bin/curl"
 
-  XDG_BIN_HOME="$tmp_bin" PATH="$tmp_bin:/usr/bin:/bin:/usr/sbin:/sbin" run_spell spells/web/install-nostril
+  run_cmd env XDG_BIN_HOME="$tmp_bin" PATH="$tmp_bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+    sh "$ROOT_DIR/spells/web/install-nostril"
   assert_success
   assert_output_contains "Installed Nostr server tooling"
   [ -x "$tmp_bin/nak" ] || {
