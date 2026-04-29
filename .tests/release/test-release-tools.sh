@@ -204,6 +204,20 @@ cat >"$fake_ios_bin/security" <<'SH'
 exit 0
 SH
 chmod +x "$fake_ios_bin/xcodegen" "$fake_ios_bin/xcodebuild" "$fake_ios_bin/openssl" "$fake_ios_bin/security"
+
+bad_ios_slug=$(printf 'forge\nforged=1')
+if PATH="$fake_ios_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/build-ios-app.sh" "$bad_ios_slug" "$tmp_dir/ios-bad-slug-out" smoke >"$tmp_dir/ios-bad-slug.out" 2>"$tmp_dir/ios-bad-slug.err"; then
+  printf '%s\n' "build-ios-app accepted newline app slug" >&2
+  exit 1
+fi
+grep -F "invalid app slug" "$tmp_dir/ios-bad-slug.err" >/dev/null
+[ ! -e "$tmp_dir/ios-bad-slug-out" ]
+if tr '\r' '\n' <"$tmp_dir/ios-bad-slug.err" | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "build-ios-app emitted forged rows from invalid app slug" >&2
+  exit 1
+fi
+
 bad_ios_out="$tmp_dir/ios-out
 forged=1"
 if PATH="$fake_ios_bin:$PATH" \

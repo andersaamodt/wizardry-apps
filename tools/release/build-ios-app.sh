@@ -40,6 +40,27 @@ if has_line_break "$out_dir"; then
   exit 2
 fi
 
+valid_app_slug() {
+  case "${1-}" in
+    [a-z]*)
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  case "$1" in
+    *[!a-z0-9-]*|*-|*--*)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+valid_app_slug "$slug" || {
+  printf '%s\n' "build-ios-app: invalid app slug" >&2
+  exit 2
+}
+
 case "$mode" in
   smoke|release) ;;
   *)
