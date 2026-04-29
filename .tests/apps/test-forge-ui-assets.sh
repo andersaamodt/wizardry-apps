@@ -42,6 +42,7 @@ grep -F "window.wizardry.exec" "$root/apps/forge/index.html" >/dev/null
 ! grep -F "window.wizardry.rpc('bridge.exec'" "$root/apps/forge/index.html" >/dev/null
 grep -F "window.wizardry.exec" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "window.wizardry.rpc" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
+grep -F "window.wizardry.nativeAvailable" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "method !== 'bridge.exec'" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "Emission material notice" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "version 3 or (at your option) any later version" "$root/licenses/AGPL-3.0-or-later.txt" >/dev/null
@@ -84,6 +85,7 @@ grep -F "underPageBackgroundColor = childPageBackingColor" "$root/apps/.host/mac
 grep -F "underPageBackgroundColor = pageBackingColor" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "DESKTOP_BRIDGE_BOOTSTRAP" "$root/apps/.host/linux/main.c" >/dev/null
 grep -F "window.wizardry.rpc = rpcBridge;" "$root/apps/.host/linux/main.c" >/dev/null
+grep -F "window.wizardry.nativeAvailable" "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="toggle-settings-panel"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="organize-menu"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="open-create-workflow"' "$root/apps/forge/index.html" >/dev/null

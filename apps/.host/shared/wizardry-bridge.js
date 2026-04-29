@@ -11,6 +11,18 @@
     return Math.random().toString(36).slice(2);
   }
 
+  function nativeTransportAvailable() {
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.wizardry) {
+      return true;
+    }
+
+    if (window.WizardryBridge && typeof window.WizardryBridge.postMessage === 'function') {
+      return true;
+    }
+
+    return false;
+  }
+
   function post(message) {
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.wizardry) {
       window.webkit.messageHandlers.wizardry.postMessage(message);
@@ -70,5 +82,8 @@
   }
   if (typeof window.wizardry.rpc !== 'function') {
     window.wizardry.rpc = rpcBridge;
+  }
+  if (typeof window.wizardry.nativeAvailable !== 'function') {
+    window.wizardry.nativeAvailable = nativeTransportAvailable;
   }
 })();

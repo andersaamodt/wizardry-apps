@@ -1354,7 +1354,13 @@
       }
 
       function bridgeAvailable() {
-        return !!(window.wizardry && window.wizardry.exec);
+        if (!(window.wizardry && typeof window.wizardry.exec === 'function')) {
+          return false;
+        }
+        if (typeof window.wizardry.nativeAvailable === 'function') {
+          return !!window.wizardry.nativeAvailable();
+        }
+        return true;
       }
 
       function waitForStartupPaint() {

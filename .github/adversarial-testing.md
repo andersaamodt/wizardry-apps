@@ -114,6 +114,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Imported logs are GUI state too; list/tail commands should re-check row shape and strip CR before emitting historical rows.
 - Helper list commands are GUI input; filter helper TSV output for exact column count and CR before forwarding rows.
 - GUI bridge refs should reject unsupported namespaces and extra tokens before listing or running backend actions.
+- GUI bridge availability must distinguish a loaded JavaScript shim from a real native transport; Safari browser-preview mode should show unavailable instead of connected.
 - GUI menus and wrappers must validate project/site labels before building rows or delegating to downstream commands; wrapper code can leak or mutate state before a deeper validator runs.
 - GUI actions that enable watchers, cron jobs, daemons, or background jobs should validate labels before building persistent job names, lock paths, release paths, or status rows.
 - URL-shaped bridge inputs are still output fields; reject CR/LF before echoing them as `key=value` rows.
