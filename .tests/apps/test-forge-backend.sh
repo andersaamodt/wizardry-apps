@@ -43,6 +43,15 @@ printf '%s\n' "$out" | grep -F "workspace-git-init [ROOT_HINT] WORKSPACE_PATH [R
 printf '%s\n' "$out" | grep -F "workspace-git-install-release [ROOT_HINT] WORKSPACE_PATH" >/dev/null
 grep -F 'self_relaunch=1' "$backend" >/dev/null
 grep -F 'open "$launch_bundle"' "$backend" >/dev/null
+grep -F 'install_macos_bundle "$artifact" "$install_path"' "$backend" >/dev/null
+if grep -F 'rm -rf "$install_path"' "$backend" >/dev/null; then
+  printf '%s\n' "forge backend test: macOS install path is removed before replacement" >&2
+  exit 1
+fi
+if grep -F 'rm -rf "$dest_bundle"' "$backend" >/dev/null; then
+  printf '%s\n' "forge backend test: macOS bundle sync removes existing install before copy" >&2
+  exit 1
+fi
 
 out=$(sh "$backend" doctor "$test_root")
 printf '%s\n' "$out" | grep -F "root=$test_root" >/dev/null

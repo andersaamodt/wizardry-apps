@@ -147,6 +147,57 @@ fi
 grep -F "app path must be a safe .app bundle path" "$scratch/install-traversal.err" >/dev/null
 grep -Fx "preserve" "$traversal_install_parent/victim.app/marker" >/dev/null
 
+preserve_install_root="$scratch/preserve-install-root"
+preserve_install_bin="$scratch/preserve-install-bin"
+preserve_install_target="$scratch/preserve-install/App Forge.app"
+mkdir -p "$preserve_install_root/tools/forge" "$preserve_install_root/apps/forge" \
+  "$preserve_install_bin" "$preserve_install_target/Contents"
+printf '%s\n' "preserve" >"$preserve_install_target/marker"
+cat >"$preserve_install_root/tools/forge/launch-forge" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$preserve_install_root/tools/forge/build-forge-macos-app" <<'SH'
+#!/bin/sh
+out=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --out)
+      shift
+      out=${1-}
+      ;;
+  esac
+  shift
+done
+[ -n "$out" ] || exit 2
+mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$out/Contents/MacOS/app-forge"
+chmod +x "$out/Contents/MacOS/app-forge"
+printf '%s\n' '<plist></plist>' >"$out/Contents/Info.plist"
+SH
+cat >"$preserve_install_bin/uname" <<'SH'
+#!/bin/sh
+printf '%s\n' Darwin
+SH
+cat >"$preserve_install_bin/cp" <<'SH'
+#!/bin/sh
+exit 1
+SH
+cat >"$preserve_install_bin/ditto" <<'SH'
+#!/bin/sh
+exit 1
+SH
+chmod +x "$preserve_install_root/tools/forge/launch-forge" \
+  "$preserve_install_root/tools/forge/build-forge-macos-app" \
+  "$preserve_install_bin/uname" "$preserve_install_bin/cp" "$preserve_install_bin/ditto"
+if PATH="$preserve_install_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
+    sh "$install" --root "$preserve_install_root" --home "$fake_home" \
+    --app-dir "$preserve_install_target" >"$scratch/install-preserve.out" 2>"$scratch/install-preserve.err"; then
+  printf '%s\n' "install-forge succeeded with failing bundle copy" >&2
+  exit 1
+fi
+grep -Fx "preserve" "$preserve_install_target/marker" >/dev/null
+
 install_out=$(sh "$install" --root "$root" --home "$fake_home")
 printf '%s\n' "$install_out" | grep -F "installed_command=$fake_home/.local/bin/app-forge" >/dev/null
 printf '%s\n' "$install_out" | grep -F "workspace_root_file=$fake_home/.config/wizardry-apps/forge-root" >/dev/null

@@ -166,8 +166,30 @@ install_macos_bundle() {
 
   if [ -w "$parent_dir" ] || [ ! -e "$parent_dir" ]; then
     mkdir -p "$parent_dir"
-    rm -rf "$target"
-    cp -R "$stage_bundle" "$target"
+    if command -v ditto >/dev/null 2>&1; then
+      ditto "$stage_bundle" "$target" || {
+        rm -rf "$stage_root"
+        return 1
+      }
+    else
+      if [ -d "$target" ]; then
+        (
+          cd "$stage_bundle" || exit 1
+          tar -cf - .
+        ) | (
+          cd "$target" || exit 1
+          tar -xf -
+        ) || {
+          rm -rf "$stage_root"
+          return 1
+        }
+      else
+        cp -R "$stage_bundle" "$target" || {
+          rm -rf "$stage_root"
+          return 1
+        }
+      fi
+    fi
     rm -rf "$stage_root"
     printf '%s\n' "$target"
     return 0
@@ -175,9 +197,17 @@ install_macos_bundle() {
 
   if command -v sudo >/dev/null 2>&1; then
     set +e
-    sudo mkdir -p "$parent_dir" && \
-      sudo rm -rf "$target" && \
-      sudo cp -R "$stage_bundle" "$target"
+    if command -v ditto >/dev/null 2>&1; then
+      sudo mkdir -p "$parent_dir" && sudo ditto "$stage_bundle" "$target"
+    else
+      (
+        cd "$stage_bundle" || exit 1
+        tar -cf - .
+      ) | (
+        sudo mkdir -p "$target" || exit 1
+        sudo tar -xf - -C "$target"
+      )
+    fi
     sudo_rc=$?
     set -e
     if [ "$sudo_rc" -eq 0 ]; then

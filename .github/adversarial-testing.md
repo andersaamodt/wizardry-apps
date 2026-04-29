@@ -152,6 +152,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Upload helpers that print artifact paths should reject CR/LF in artifact input files as well as output directories.
 - Icon staging should preflight every required output before copying so missing fallbacks cannot leave stale platform assets in place.
 - Installer paths rendered into shell shims or desktop files must reject shell-expansion characters unless they are structurally escaped.
+- macOS app installers must stage and verify the new bundle before copying over an existing Applications bundle; never delete the installed app before the replacement copy succeeds.
 - Bundle IDs rendered into plist or native project files need direct validation at each packaging entrypoint, not just manifest-derived paths.
 - App bundle names discovered inside downloaded release archives are remote metadata; reject CR/LF before deriving install paths or printing `installed=`.
 - Backend status paths derived from XDG or environment values must be sanitized even when the command only writes a preference file.

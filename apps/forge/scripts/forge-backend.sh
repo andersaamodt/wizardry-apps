@@ -1775,21 +1775,96 @@ copy_tree_for_bundle() {
   )
 }
 
-copy_macos_bundle() {
+validate_macos_app_bundle_name() {
+  bundle_name=${1-}
+  label=${2-macOS app bundle name}
+  [ -n "$bundle_name" ] || {
+    printf '%s\n' "forge-backend: $label missing" >&2
+    exit 1
+  }
+
+  if has_line_break "$bundle_name"; then
+    printf '%s\n' "forge-backend: invalid $label" >&2
+    exit 1
+  fi
+
+  case "$bundle_name" in
+    .|..|/*|*/*|*\\*)
+      printf '%s\n' "forge-backend: invalid $label" >&2
+      exit 1
+      ;;
+    *.app)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: invalid $label" >&2
+      exit 1
+      ;;
+  esac
+}
+
+copy_macos_bundle_contents() {
   src_bundle=${1-}
   dest_bundle=${2-}
   [ -d "$src_bundle" ] || return 1
   [ -n "$dest_bundle" ] || return 1
-  rm -rf "$dest_bundle"
   if command -v ditto >/dev/null 2>&1; then
     ditto "$src_bundle" "$dest_bundle" || return 1
   else
-    cp -R "$src_bundle" "$dest_bundle" || return 1
+    if [ -d "$dest_bundle" ]; then
+      (
+        cd "$src_bundle" || exit 1
+        tar -cf - .
+      ) | (
+        mkdir -p "$dest_bundle" || exit 1
+        cd "$dest_bundle" || exit 1
+        tar -xf -
+      ) || return 1
+    else
+      cp -R "$src_bundle" "$dest_bundle" || return 1
+    fi
+  fi
+}
+
+install_macos_bundle() {
+  src_bundle=${1-}
+  dest_bundle=${2-}
+  [ -d "$src_bundle" ] || return 1
+  [ -n "$dest_bundle" ] || return 1
+
+  bundle_name=$(basename "$dest_bundle")
+  validate_macos_app_bundle_name "$bundle_name"
+  parent_dir=$(dirname "$dest_bundle")
+  mkdir -p "$parent_dir" || return 1
+
+  stage_root=$(mktemp -d "$parent_dir/.${bundle_name}.install.XXXXXX") || return 1
+  stage_bundle="$stage_root/$bundle_name"
+  if ! copy_macos_bundle_contents "$src_bundle" "$stage_bundle"; then
+    rm -rf "$stage_root"
+    return 1
+  fi
+  touch "$stage_bundle" >/dev/null 2>&1 || :
+  touch "$stage_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
+  if ! ensure_macos_bundle_signature "$stage_bundle"; then
+    rm -rf "$stage_root"
+    return 1
+  fi
+
+  if ! copy_macos_bundle_contents "$stage_bundle" "$dest_bundle"; then
+    rm -rf "$stage_root"
+    return 1
   fi
   touch "$dest_bundle" >/dev/null 2>&1 || :
   touch "$dest_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
-  ensure_macos_bundle_signature "$dest_bundle" || return 1
+  if ! ensure_macos_bundle_signature "$dest_bundle"; then
+    rm -rf "$stage_root"
+    return 1
+  fi
+  rm -rf "$stage_root"
   return 0
+}
+
+copy_macos_bundle() {
+  install_macos_bundle "${1-}" "${2-}"
 }
 
 macos_app_is_running() {
@@ -2897,29 +2972,7 @@ validate_release_asset_url() {
 }
 
 validate_release_app_bundle_name() {
-  bundle_name=${1-}
-  [ -n "$bundle_name" ] || {
-    printf '%s\n' "forge-backend: release app bundle name missing" >&2
-    exit 1
-  }
-
-  if has_line_break "$bundle_name"; then
-    printf '%s\n' "forge-backend: invalid release app bundle name" >&2
-    exit 1
-  fi
-
-  case "$bundle_name" in
-    .|..|/*|*/*|*\\*)
-      printf '%s\n' "forge-backend: invalid release app bundle name" >&2
-      exit 1
-      ;;
-    *.app)
-      ;;
-    *)
-      printf '%s\n' "forge-backend: invalid release app bundle name" >&2
-      exit 1
-      ;;
-  esac
+  validate_macos_app_bundle_name "${1-}" "release app bundle name"
 }
 
 workspace_git_cached_value() {
@@ -4248,12 +4301,7 @@ cmd_workspace_git_install_release() {
       app_bundle_name=$(basename "$app_bundle")
       validate_release_app_bundle_name "$app_bundle_name"
       install_path="/Applications/$app_bundle_name"
-      rm -rf "$install_path"
-      if command -v ditto >/dev/null 2>&1; then
-        ditto "$app_bundle" "$install_path"
-      else
-        cp -R "$app_bundle" "$install_path"
-      fi
+      install_macos_bundle "$app_bundle" "$install_path"
       printf 'root_hint=%s\n' "$root"
       printf 'workspace=%s\n' "$workspace_abs"
       printf 'profile=%s\n' "$conf"
@@ -6066,12 +6114,7 @@ cmd_install_workspace() {
         exit 1
       }
       install_path="/Applications/$(basename "$artifact")"
-      rm -rf "$install_path"
-      if command -v ditto >/dev/null 2>&1; then
-        ditto "$artifact" "$install_path"
-      else
-        cp -R "$artifact" "$install_path"
-      fi
+      install_macos_bundle "$artifact" "$install_path"
       printf 'status=ok\n'
       printf 'target=macos\n'
       printf 'install_mode=system-applications\n'
@@ -6097,12 +6140,7 @@ cmd_install_workspace() {
             exit 1
           }
           install_path="/Applications/$(basename "$artifact")"
-          rm -rf "$install_path"
-          if command -v ditto >/dev/null 2>&1; then
-            ditto "$artifact" "$install_path"
-          else
-            cp -R "$artifact" "$install_path"
-          fi
+          install_macos_bundle "$artifact" "$install_path"
           printf 'status=ok\n'
           printf 'target=macos\n'
           printf 'install_mode=system-applications\n'
@@ -6178,12 +6216,7 @@ DESKTOP
             exit 1
           }
           install_path="/Applications/$(basename "$artifact")"
-          rm -rf "$install_path"
-          if command -v ditto >/dev/null 2>&1; then
-            ditto "$artifact" "$install_path"
-          else
-            cp -R "$artifact" "$install_path"
-          fi
+          install_macos_bundle "$artifact" "$install_path"
           printf 'status=ok\n'
           printf 'target=macos\n'
           printf 'install_mode=system-applications\n'
@@ -6286,12 +6319,7 @@ cmd_install_desktop() {
       }
       bundle_name=$(basename "$artifact")
       install_path="/Applications/$bundle_name"
-      rm -rf "$install_path"
-      if command -v ditto >/dev/null 2>&1; then
-        ditto "$artifact" "$install_path"
-      else
-        cp -R "$artifact" "$install_path"
-      fi
+      install_macos_bundle "$artifact" "$install_path"
 
       printf 'status=ok\n'
       printf 'target=macos\n'
