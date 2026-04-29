@@ -94,6 +94,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Template-create paths write both filesystem paths and profile metadata; use the same site/template validators as blank-create paths.
 - Profile fields later used in shell, XML, desktop files, API URLs, or filesystem paths need validation at the write boundary and fallback at the read boundary.
 - Site config paths such as `cgi-dir` are code-generation inputs when they render into nginx directives.
+- Daemon worker-count environment overrides should be range-validated before process supervisors spawn optional helpers.
 - Legacy/imported site directories can bypass create-time rules; maintenance spells must revalidate site names before Tor or nginx matching.
 - Release automation should reject unsafe metadata before invoking credentials, curl, xcrun, tar, unzip, chmod, or platform installers.
 - Release helper scripts must revalidate manifest fields they print, even when CI normally runs the manifest validator first.
