@@ -154,6 +154,8 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Upload/signing helpers should verify artifact shape such as `.ipa`, `.aab`, or `.app` before invoking store or platform tooling.
 - Icon staging should preflight every required output before copying so missing fallbacks cannot leave stale platform assets in place.
 - Installer paths rendered into shell shims or desktop files must reject shell-expansion characters unless they are structurally escaped.
+- Linux `.desktop` `Exec` fields need quoted paths and must treat `%` in generated paths as field-code injection unless escaped.
+- AppImage and launcher installers should reject remote artifact names that would break generated shell scripts, including `"`, `$`, backticks, and backslashes.
 - macOS app installers must stage and verify the new bundle before copying over an existing Applications bundle; never delete the installed app before the replacement copy succeeds.
 - macOS app bundle builders with explicit `--out` paths must copy and sign a staged bundle before moving aside an existing output bundle.
 - Explicit artifact paths passed to BSD tools should reject bare leading-dash basenames unless every downstream command uses `--`.

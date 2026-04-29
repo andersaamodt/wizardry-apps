@@ -1728,6 +1728,26 @@ has_line_break() {
   return 1
 }
 
+generated_shell_path_is_safe() {
+  case "${1-}" in ""|-*|*'"'*|*'$'*|*'`'*|*'\'*) return 1 ;; esac
+  has_line_break "$1" && return 1
+  return 0
+}
+
+generated_desktop_path_is_safe() {
+  generated_shell_path_is_safe "${1-}" || return 1
+  case "${1-}" in *'%'*) return 1 ;; esac
+  return 0
+}
+
+require_linux_home_for_generated_launchers() {
+  home_path=${HOME-}
+  generated_desktop_path_is_safe "$home_path" || {
+    printf '%s\n' "forge-backend: unsafe home path for Linux launchers" >&2
+    exit 2
+  }
+}
+
 kv_output_value() {
   printf '%s' "${1-}" | tr '\r\n' '  '
 }
@@ -2934,6 +2954,13 @@ validate_release_asset_name() {
 
   case "$asset_name" in
     .|..|/*|*/*|*\\*)
+      printf '%s\n' "forge-backend: invalid release asset name: $asset_name" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$asset_name" in
+    *'"'*|*'$'*|*'`'*|*'\'*)
       printf '%s\n' "forge-backend: invalid release asset name: $asset_name" >&2
       exit 1
       ;;
@@ -4258,6 +4285,12 @@ cmd_workspace_git_install_release() {
   }
   validate_release_asset_name "$asset_name"
   validate_release_asset_url "$asset_url"
+  os_name=$(os_id)
+  case "$os_name" in
+    linux)
+      require_linux_home_for_generated_launchers
+      ;;
+  esac
   command -v curl >/dev/null 2>&1 || {
     printf '%s\n' "forge-backend: curl is required to install a GitHub release asset" >&2
     exit 1
@@ -4271,7 +4304,6 @@ cmd_workspace_git_install_release() {
   mkdir -p "$extract_dir"
   curl -fsSL "$asset_url" -o "$download_path"
 
-  os_name=$(os_id)
   case "$os_name" in
     darwin)
       case "$asset_name" in
@@ -6088,6 +6120,9 @@ cmd_install_workspace() {
     printf '%s\n' "forge-backend: install-workspace target '$target_id' does not match current host '$expected_target'" >&2
     exit 2
   fi
+  if [ "$os" = "linux" ]; then
+    require_linux_home_for_generated_launchers
+  fi
 
   case "$context" in
     godot)
@@ -6184,7 +6219,7 @@ LAUNCHER
 [Desktop Entry]
 Type=Application
 Name=$app_name
-Exec=$launcher_path
+Exec="$launcher_path"
 Terminal=false
 Categories=Development;
 Icon=$icon_path
@@ -6252,7 +6287,7 @@ LAUNCHER
 [Desktop Entry]
 Type=Application
 Name=$workspace_title
-Exec=$launcher_path
+Exec="$launcher_path"
 Terminal=false
 Categories=Development;
 Icon=$icon_path
@@ -6330,6 +6365,7 @@ cmd_install_desktop() {
       ;;
 
     linux)
+      require_linux_home_for_generated_launchers
       launcher_dir="$HOME/.local/bin"
       launcher_path="$launcher_dir/wizardry-$slug"
       mkdir -p "$launcher_dir"
@@ -6361,7 +6397,7 @@ LAUNCHER
 [Desktop Entry]
 Type=Application
 Name=$app_name
-Exec=$launcher_path
+Exec="$launcher_path"
 Terminal=false
 Categories=Development;
 Icon=$icon_path

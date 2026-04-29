@@ -220,9 +220,11 @@ assert_contains "$workspace_host_install_out" "status=ok"
 assert_contains "$workspace_host_install_out" "target=linux"
 workspace_host_install_root=$(printf '%s\n' "$workspace_host_install_out" | kv_read installed)
 workspace_host_launcher=$(printf '%s\n' "$workspace_host_install_out" | kv_read launcher)
+workspace_host_desktop=$(printf '%s\n' "$workspace_host_install_out" | kv_read desktop_entry)
 [ -d "$workspace_host_install_root" ]
 [ -x "$workspace_host_launcher" ]
 [ -f "$workspace_host_install_root/usr/share/workspace-host/app/index.html" ]
+grep -F "Exec=\"$workspace_host_launcher\"" "$workspace_host_desktop" >/dev/null
 
 workspace_bad_title="$scratch/workspace-bad-title"
 make_workspace "$workspace_bad_title" "workspace-bad-title" "Workspace Bad Title" "linux"
@@ -327,8 +329,10 @@ assert_contains "$workspace_native_install_out" "status=ok"
 assert_contains "$workspace_native_install_out" "target=linux"
 workspace_native_install_root=$(printf '%s\n' "$workspace_native_install_out" | kv_read installed)
 workspace_native_launcher=$(printf '%s\n' "$workspace_native_install_out" | kv_read launcher)
+workspace_native_desktop=$(printf '%s\n' "$workspace_native_install_out" | kv_read desktop_entry)
 [ -d "$workspace_native_install_root" ]
 [ -x "$workspace_native_launcher" ]
+grep -F "Exec=\"$workspace_native_launcher\"" "$workspace_native_desktop" >/dev/null
 
 # Behavior: install-first runs the installed launcher instead of the build artifact.
 workspace_native_install_log="$scratch/workspace-native-install.log"

@@ -86,6 +86,13 @@ if has_line_break "$home_dir"; then
   exit 2
 fi
 
+case "$home_dir" in
+  ""|-*)
+    printf '%s\n' "uninstall-forge: unsafe home path" >&2
+    exit 2
+    ;;
+esac
+
 if [ -n "$app_dir" ]; then
   app_bundle_path_is_safe "$app_dir" || {
     printf '%s\n' "uninstall-forge: app path must be a safe .app bundle path" >&2

@@ -213,6 +213,28 @@ if PATH="$fake_uname_bin:$PATH" sh "$install" --root "$unsafe_root" --home "$fak
 fi
 grep -F "unsafe root path" "$scratch/unsafe-root.err" >/dev/null
 
+if (cd "$scratch" && PATH="$fake_uname_bin:$PATH" sh "$install" --root "$root" --home "-forge-home" >"$scratch/unsafe-dash-home.out" 2>"$scratch/unsafe-dash-home.err"); then
+  printf '%s\n' "install-forge accepted leading-dash home path" >&2
+  exit 1
+fi
+grep -F "unsafe home path" "$scratch/unsafe-dash-home.err" >/dev/null
+[ ! -e "$scratch/-forge-home" ]
+
+unsafe_desktop_home="$scratch/home%f"
+mkdir -p "$unsafe_desktop_home"
+if PATH="$fake_uname_bin:$PATH" sh "$install" --root "$root" --home "$unsafe_desktop_home" >"$scratch/unsafe-desktop-home.out" 2>"$scratch/unsafe-desktop-home.err"; then
+  printf '%s\n' "install-forge accepted desktop field-code home path" >&2
+  exit 1
+fi
+grep -F "unsafe home path" "$scratch/unsafe-desktop-home.err" >/dev/null
+[ ! -e "$unsafe_desktop_home/.local/bin/app-forge" ]
+
+linux_space_home="$scratch/linux home"
+mkdir -p "$linux_space_home"
+linux_install_out=$(PATH="$fake_uname_bin:$PATH" sh "$install" --root "$root" --home "$linux_space_home")
+printf '%s\n' "$linux_install_out" | grep -F "installed_desktop=$linux_space_home/.local/share/applications/app-forge.desktop" >/dev/null
+grep -F "Exec=/bin/sh \"$linux_space_home/.local/bin/app-forge\"" "$linux_space_home/.local/share/applications/app-forge.desktop" >/dev/null
+
 not_app_install_target="$scratch/not-an-install-app"
 mkdir -p "$not_app_install_target"
 if sh "$install" --root "$root" --home "$fake_home" --app-dir "$not_app_install_target" >"$scratch/install-not-app.out" 2>"$scratch/install-not-app.err"; then
@@ -316,6 +338,12 @@ if (cd "$scratch" && sh "$uninstall" --home "$fake_home" --app-dir "-Bad.app" >"
 fi
 grep -F "app path must be a safe .app bundle path" "$scratch/uninstall-leading-dash.err" >/dev/null
 [ ! -e "$scratch/-Bad.app" ]
+
+if (cd "$scratch" && sh "$uninstall" --home "-forge-home" >"$scratch/uninstall-leading-dash-home.out" 2>"$scratch/uninstall-leading-dash-home.err"); then
+  printf '%s\n' "uninstall-forge accepted leading-dash home path" >&2
+  exit 1
+fi
+grep -F "unsafe home path" "$scratch/uninstall-leading-dash-home.err" >/dev/null
 
 traversal_remove_parent="$scratch/remove-parent"
 traversal_remove_target="$traversal_remove_parent/safe.app/../victim.app"

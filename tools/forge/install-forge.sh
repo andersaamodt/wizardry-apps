@@ -89,8 +89,14 @@ has_line_break() {
 }
 
 shell_generated_path_is_safe() {
-  case "${1-}" in *'"'*|*'$'*|*'`'*|*'\'*) return 1 ;; esac
+  case "${1-}" in ""|-*|*'"'*|*'$'*|*'`'*|*'\'*) return 1 ;; esac
   has_line_break "$1" && return 1
+  return 0
+}
+
+desktop_generated_path_is_safe() {
+  shell_generated_path_is_safe "${1-}" || return 1
+  case "${1-}" in *'%'*) return 1 ;; esac
   return 0
 }
 
@@ -136,6 +142,16 @@ fi
   exit 1
 }
 
+os=$(uname -s 2>/dev/null || printf unknown)
+case "$os" in
+  Linux)
+    desktop_generated_path_is_safe "$home_dir" || {
+      printf '%s\n' "install-forge: unsafe home path" >&2
+      exit 2
+    }
+    ;;
+esac
+
 mkdir -p "$home_dir/.local/bin"
 shim="$home_dir/.local/bin/app-forge"
 config_root="$home_dir/.config/wizardry-apps"
@@ -150,8 +166,6 @@ chmod +x "$shim"
 
 mkdir -p "$config_root"
 printf '%s\n' "$root" > "$config_file"
-
-os=$(uname -s 2>/dev/null || printf unknown)
 
 install_macos_bundle() {
   target=$1

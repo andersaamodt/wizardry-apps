@@ -72,6 +72,20 @@ JSON
 exit 0
 fi
 
+if [ "${FORGE_FAKE_SHELL_ASSET_NAME-}" = "1" ]; then
+cat <<'JSON'
+{"name":"v1","tag_name":"v1","html_url":"https://example.invalid/release","published_at":"2026-01-01T00:00:00Z","assets":[{"name":"safe\"$HOME.AppImage","browser_download_url":"https://github.com/example/release-app/releases/download/v1/safe.AppImage"}]}
+JSON
+exit 0
+fi
+
+if [ "${FORGE_FAKE_GOOD_RELEASE-}" = "1" ]; then
+cat <<'JSON'
+{"name":"v1","tag_name":"v1","html_url":"https://example.invalid/release","published_at":"2026-01-01T00:00:00Z","assets":[{"name":"safe.AppImage","browser_download_url":"https://github.com/example/release-app/releases/download/v1/safe.AppImage"}]}
+JSON
+exit 0
+fi
+
 cat <<'JSON'
 {"name":"v1","tag_name":"v1","html_url":"https://example.invalid/release","published_at":"2026-01-01T00:00:00Z","assets":[{"name":"../evil.AppImage","browser_download_url":"https://example.invalid/evil.AppImage"}]}
 JSON
@@ -126,6 +140,30 @@ fi
 grep -F "invalid release asset URL" /tmp/forge-release-url.err >/dev/null
 [ ! -e "$home_dir/.local/share/wizardry-apps/release-app-release/safe.AppImage" ] || {
   printf '%s\n' "invalid release asset URL was downloaded" >&2
+  exit 1
+}
+
+if HOME="$home_dir" FORGE_FAKE_SHELL_ASSET_NAME=1 PATH="$fake_bin:$PATH" sh "$backend" workspace-git-install-release "$root" "$workspace" >/tmp/forge-release-shell-asset.out 2>/tmp/forge-release-shell-asset.err; then
+  printf '%s\n' "forge release install accepted a shell-shaped AppImage asset name" >&2
+  exit 1
+fi
+
+grep -F "invalid release asset name" /tmp/forge-release-shell-asset.err >/dev/null
+[ ! -e "$home_dir/.local/bin/wizardry-release-app-release" ] || {
+  printf '%s\n' "shell-shaped asset name left a release launcher behind" >&2
+  exit 1
+}
+
+unsafe_home="$scratch/home%f"
+mkdir -p "$unsafe_home"
+if HOME="$unsafe_home" FORGE_FAKE_GOOD_RELEASE=1 PATH="$fake_bin:$PATH" sh "$backend" workspace-git-install-release "$root" "$workspace" >/tmp/forge-release-unsafe-home.out 2>/tmp/forge-release-unsafe-home.err; then
+  printf '%s\n' "forge release install accepted a desktop field-code home path" >&2
+  exit 1
+fi
+
+grep -F "unsafe home path for Linux launchers" /tmp/forge-release-unsafe-home.err >/dev/null
+[ ! -e "$unsafe_home/.local/bin/wizardry-release-app-release" ] || {
+  printf '%s\n' "unsafe home path left a release launcher behind" >&2
   exit 1
 }
 
