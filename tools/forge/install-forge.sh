@@ -94,6 +94,21 @@ shell_generated_path_is_safe() {
   return 0
 }
 
+app_bundle_path_is_safe() {
+  path_value=${1-}
+  has_line_break "$path_value" && return 1
+  case "$path_value" in
+    *.app) ;;
+    *) return 1 ;;
+  esac
+  case "$path_value" in
+    .|..|./*|../*|*/./*|*/../*|*/.|*/..)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 shell_generated_path_is_safe "$root" || {
   printf '%s\n' "install-forge: unsafe root path" >&2
   exit 2
@@ -104,18 +119,11 @@ shell_generated_path_is_safe "$home_dir" || {
   exit 2
 }
 
-if [ -n "$app_dir" ] && has_line_break "$app_dir"; then
-  printf '%s\n' "install-forge: unsafe app path" >&2
-  exit 2
-fi
 if [ -n "$app_dir" ]; then
-  case "$app_dir" in
-    *.app) ;;
-    *)
-      printf '%s\n' "install-forge: app path must be a .app bundle" >&2
-      exit 2
-      ;;
-  esac
+  app_bundle_path_is_safe "$app_dir" || {
+    printf '%s\n' "install-forge: app path must be a safe .app bundle path" >&2
+    exit 2
+  }
 fi
 
 if [ ! -x "$root/tools/forge/launch-forge" ] || [ ! -d "$root/apps/forge" ]; then

@@ -111,8 +111,19 @@ if sh "$install" --root "$root" --home "$fake_home" --app-dir "$not_app_install_
   printf '%s\n' "install-forge accepted non-app install path" >&2
   exit 1
 fi
-grep -F "app path must be a .app bundle" "$scratch/install-not-app.err" >/dev/null
+grep -F "app path must be a safe .app bundle path" "$scratch/install-not-app.err" >/dev/null
 [ -d "$not_app_install_target" ]
+
+traversal_install_parent="$scratch/install-parent"
+traversal_install_target="$traversal_install_parent/safe.app/../victim.app"
+mkdir -p "$traversal_install_parent/victim.app"
+printf '%s\n' "preserve" >"$traversal_install_parent/victim.app/marker"
+if sh "$install" --root "$root" --home "$fake_home" --app-dir "$traversal_install_target" >"$scratch/install-traversal.out" 2>"$scratch/install-traversal.err"; then
+  printf '%s\n' "install-forge accepted traversal app install path" >&2
+  exit 1
+fi
+grep -F "app path must be a safe .app bundle path" "$scratch/install-traversal.err" >/dev/null
+grep -Fx "preserve" "$traversal_install_parent/victim.app/marker" >/dev/null
 
 install_out=$(sh "$install" --root "$root" --home "$fake_home")
 printf '%s\n' "$install_out" | grep -F "installed_command=$fake_home/.local/bin/app-forge" >/dev/null
@@ -130,8 +141,19 @@ if sh "$uninstall" --home "$fake_home" --app-dir "$danger_dir" >"$scratch/uninst
   printf '%s\n' "uninstall-forge accepted non-app removal path" >&2
   exit 1
 fi
-grep -F "app path must be a .app bundle" "$scratch/uninstall-danger.err" >/dev/null
+grep -F "app path must be a safe .app bundle path" "$scratch/uninstall-danger.err" >/dev/null
 [ -d "$danger_dir" ]
+
+traversal_remove_parent="$scratch/remove-parent"
+traversal_remove_target="$traversal_remove_parent/safe.app/../victim.app"
+mkdir -p "$traversal_remove_parent/victim.app"
+printf '%s\n' "preserve" >"$traversal_remove_parent/victim.app/marker"
+if sh "$uninstall" --home "$fake_home" --app-dir "$traversal_remove_target" >"$scratch/uninstall-traversal.out" 2>"$scratch/uninstall-traversal.err"; then
+  printf '%s\n' "uninstall-forge accepted traversal app removal path" >&2
+  exit 1
+fi
+grep -F "app path must be a safe .app bundle path" "$scratch/uninstall-traversal.err" >/dev/null
+grep -Fx "preserve" "$traversal_remove_parent/victim.app/marker" >/dev/null
 
 # Desktop integration files are OS-specific.
 os=$(uname -s 2>/dev/null || printf unknown)

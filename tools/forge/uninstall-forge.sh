@@ -66,23 +66,31 @@ has_line_break() {
   return 1
 }
 
+app_bundle_path_is_safe() {
+  path_value=${1-}
+  has_line_break "$path_value" && return 1
+  case "$path_value" in
+    *.app) ;;
+    *) return 1 ;;
+  esac
+  case "$path_value" in
+    .|..|./*|../*|*/./*|*/../*|*/.|*/..)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 if has_line_break "$home_dir"; then
   printf '%s\n' "uninstall-forge: unsafe home path" >&2
   exit 2
 fi
 
 if [ -n "$app_dir" ]; then
-  if has_line_break "$app_dir"; then
-    printf '%s\n' "uninstall-forge: unsafe app path" >&2
+  app_bundle_path_is_safe "$app_dir" || {
+    printf '%s\n' "uninstall-forge: app path must be a safe .app bundle path" >&2
     exit 2
-  fi
-  case "$app_dir" in
-    *.app) ;;
-    *)
-      printf '%s\n' "uninstall-forge: app path must be a .app bundle" >&2
-      exit 2
-      ;;
-  esac
+  }
 fi
 
 rm -f "$home_dir/.local/bin/app-forge"
