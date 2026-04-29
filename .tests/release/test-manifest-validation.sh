@@ -61,6 +61,20 @@ if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-app-subd
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-app-subdir.out" >/dev/null
 
+jq '.apps[0].hostedWeb.path = "../escape"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-hosted-web-path.out" 2>&1; then
+  printf '%s\n' "validate-manifest accepted escaping hosted web path" >&2
+  exit 1
+fi
+grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-hosted-web-path.out" >/dev/null
+
+jq '.apps[0].hostedWeb.mode = "external/../../local"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-hosted-web-mode.out" 2>&1; then
+  printf '%s\n' "validate-manifest accepted unsafe hosted web mode" >&2
+  exit 1
+fi
+grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-hosted-web-mode.out" >/dev/null
+
 cp "$fixture_root/config/apps.manifest.json" "$bad_root/config/apps.manifest.json"
 jq '.templates += [{
   "slug":"bad/../../template",
