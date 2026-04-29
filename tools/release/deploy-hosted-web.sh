@@ -61,12 +61,20 @@ if ! command -v rsync >/dev/null 2>&1 || ! command -v ssh >/dev/null 2>&1 || ! c
   exit 1
 fi
 
+shell_quote() {
+  printf "'"
+  printf '%s' "$1" | sed "s/'/'\\\\''/g"
+  printf "'"
+}
+
 key_file=$(mktemp "${TMPDIR:-/tmp}/web-deploy.XXXXXX.key")
 trap 'rm -f "$key_file"' EXIT HUP INT TERM
 printf '%s' "$WEB_DEPLOY_SSH_KEY_BASE64" | openssl base64 -d -A > "$key_file"
 chmod 600 "$key_file"
 
+ssh_cmd="ssh -i $(shell_quote "$key_file") -o StrictHostKeyChecking=no"
+
 rsync -az --delete \
-  -e "ssh -i $key_file -o StrictHostKeyChecking=no" \
+  -e "$ssh_cmd" \
   "$bundle_dir/" \
   "$WEB_DEPLOY_USER@$WEB_DEPLOY_HOST:$WEB_DEPLOY_PATH/"

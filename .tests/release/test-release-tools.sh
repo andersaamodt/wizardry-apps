@@ -453,10 +453,27 @@ cat
 SH
 cat >"$fake_deploy_bin/ssh" <<'SH'
 #!/bin/sh
+[ -n "${FAKE_SSH_LOG-}" ] || exit 0
+: >"$FAKE_SSH_LOG"
+for arg in "$@"; do
+  printf '%s\n' "$arg" >>"$FAKE_SSH_LOG"
+done
 exit 0
 SH
 cat >"$fake_deploy_bin/rsync" <<'SH'
 #!/bin/sh
+ssh_cmd=''
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-e" ]; then
+    shift
+    ssh_cmd=${1-}
+    break
+  fi
+  shift
+done
+if [ -n "$ssh_cmd" ] && [ -n "${FAKE_SSH_LOG-}" ]; then
+  sh -c "$ssh_cmd --fake-probe"
+fi
 exit 0
 SH
 chmod +x "$fake_deploy_bin/openssl" "$fake_deploy_bin/ssh" "$fake_deploy_bin/rsync"
@@ -482,6 +499,31 @@ if WEB_DEPLOY_HOST='example.com' \
   exit 1
 fi
 grep -F "invalid deploy path" "$tmp_dir/deploy-bad-path.err" >/dev/null
+
+deploy_tmpdir="$tmp_dir/deploy tmp 'quote"
+deploy_ssh_log="$tmp_dir/deploy-ssh-args.log"
+mkdir -p "$deploy_tmpdir"
+if ! WEB_DEPLOY_HOST='example.com' \
+     WEB_DEPLOY_USER='deploy' \
+     WEB_DEPLOY_PATH='/var/www/wizardry' \
+     WEB_DEPLOY_SSH_KEY_BASE64='bad' \
+     FAKE_SSH_LOG="$deploy_ssh_log" \
+     TMPDIR="$deploy_tmpdir" \
+     PATH="$fake_deploy_bin:$PATH" \
+     sh "$ROOT_DIR/tools/release/deploy-hosted-web.sh" "$deploy_bundle" >"$tmp_dir/deploy-quoted-key.out" 2>"$tmp_dir/deploy-quoted-key.err"; then
+  printf '%s\n' "deploy-hosted-web failed with a quote-bearing TMPDIR" >&2
+  cat "$tmp_dir/deploy-quoted-key.err" >&2
+  exit 1
+fi
+deploy_key_arg=$(awk 'previous == "-i" { print; exit } { previous = $0 }' "$deploy_ssh_log")
+case "$deploy_key_arg" in
+  "$deploy_tmpdir"/web-deploy.*.key)
+    ;;
+  *)
+    printf '%s\n' "deploy-hosted-web did not preserve quoted ssh key path as one argument" >&2
+    exit 1
+    ;;
+esac
 
 sign_app="$tmp_dir/Test.app"
 mkdir -p "$sign_app"
