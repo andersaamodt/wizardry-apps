@@ -235,6 +235,55 @@ tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
 jq '.templates |= map(if .slug == "blog" then (.source.subdir = ".") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
 
+source_repo_cr="$scratch/source$(printf '\r')forged=1"
+mkdir -p "$source_repo_cr"
+(
+  cd "$source_repo_cr"
+  git init -q
+  printf '%s\n' "source" > index.html
+  git add index.html
+  git -c user.name=Forge -c user.email=forge@example.invalid commit -q -m init
+)
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
+jq --arg repo "$source_repo_cr" '.apps |= map(if .slug == "artificer" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = ".") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+if XDG_STATE_HOME="$scratch/bad-source-state" sh "$backend" download-app "$scratch" artificer >"$scratch/forge-bad-source-repo.out" 2>"$scratch/forge-bad-source-repo.err"; then
+  printf '%s\n' "forge download-app accepted line-break source repo" >&2
+  exit 1
+fi
+grep -F "source repo must not contain line breaks" "$scratch/forge-bad-source-repo.err" >/dev/null
+if find "$scratch/bad-source-state" -name .forge-source.lock -print 2>/dev/null | grep . >/dev/null 2>&1; then
+  printf '%s\n' "forge download-app wrote source lock for rejected source repo" >&2
+  exit 1
+fi
+
+source_repo_escape="$scratch/source-escape"
+source_repo_outside="$scratch/source-outside"
+mkdir -p "$source_repo_escape" "$source_repo_outside"
+printf '%s\n' "outside" >"$source_repo_outside/leaked.txt"
+(
+  cd "$source_repo_escape"
+  git init -q
+  ln -s "$source_repo_outside" payload
+  git add payload
+  git -c user.name=Forge -c user.email=forge@example.invalid commit -q -m init
+)
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
+jq --arg repo "$source_repo_escape" '.apps |= map(if .slug == "artificer" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = "payload") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+if XDG_STATE_HOME="$scratch/escape-source-state" sh "$backend" download-app "$scratch" artificer >"$scratch/forge-escape-source-subdir.out" 2>"$scratch/forge-escape-source-subdir.err"; then
+  printf '%s\n' "forge download-app accepted source subdir symlink escaping repo" >&2
+  exit 1
+fi
+grep -F "source subdir must stay inside the cloned repo" "$scratch/forge-escape-source-subdir.err" >/dev/null
+if [ -e "$scratch/escape-source-state/wizardry-apps/forge/catalog/apps/artificer" ] || [ -L "$scratch/escape-source-state/wizardry-apps/forge/catalog/apps/artificer" ]; then
+  printf '%s\n' "forge download-app left cache path for rejected source subdir" >&2
+  exit 1
+fi
+tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
+jq '.apps |= map(if .slug == "artificer" then (.source.repo = "https://github.com/example/artificer.git" | .source.ref = "main" | .source.subdir = ".") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+
 if sh "$backend" run-task "$scratch" "../escape-task" >/tmp/forge-invalid-run-task.out 2>/tmp/forge-invalid-run-task.err; then
   printf '%s\n' "forge backend test: invalid run-task name accepted" >&2
   exit 1
@@ -247,7 +296,17 @@ sh "$backend" scaffold-app "$scratch" sandbox-tool "Sandbox Tool" minimal >/tmp/
 [ -f "$scratch/apps/sandbox-tool/index.html" ]
 [ -f "$scratch/apps/sandbox-tool/style.css" ]
 
-jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false)' "$scratch/config/apps.manifest.json" >/dev/null
+jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false and .targets == "hosted-web,macos,linux")' "$scratch/config/apps.manifest.json" >/dev/null
+sh "$test_root/tools/validate-manifest.sh" "$scratch" >/tmp/forge-scaffold-manifest-valid.out
+
+for web_starter in panel topbar dashboard studio; do
+  starter_slug="sandbox-$web_starter"
+  sh "$backend" scaffold-app "$scratch" "$starter_slug" "Sandbox $web_starter" "$web_starter" >/tmp/forge-scaffold-"$web_starter".log
+  [ -f "$scratch/apps/$starter_slug/index.html" ]
+  [ -f "$scratch/apps/$starter_slug/style.css" ]
+  jq -e --arg slug "$starter_slug" '.apps[] | select(.slug == $slug and .targets == "hosted-web,macos,linux")' "$scratch/config/apps.manifest.json" >/dev/null
+done
+sh "$test_root/tools/validate-manifest.sh" "$scratch" >/tmp/forge-scaffold-all-web-manifest-valid.out
 
 if sh "$backend" scaffold-app "$scratch" bad-name 'Bad "Name' minimal >/tmp/forge-invalid-app-name.out 2>/tmp/forge-invalid-app-name.err; then
   printf '%s\n' "forge backend test: invalid scaffold app name accepted" >&2
@@ -832,6 +891,14 @@ jq -e '.apps[] | select(.slug == "sandbox-tool" and .targets == "hosted-web,maco
 apps_after_set=$(sh "$backend" list-apps "$scratch")
 printf '%s\n' "$apps_after_set" | grep -E '^sandbox-tool\t' | grep -F "$(printf '\thosted-web,macos,linux,ios,android')" >/dev/null
 
+for invalid_targets in 'not-a-target' 'hosted-web,not-a-target' 'hosted-web,hosted-web' ''; do
+  if sh "$backend" set-app-targets "$scratch" sandbox-tool "$invalid_targets" >/tmp/forge-invalid-app-targets.out 2>/tmp/forge-invalid-app-targets.err; then
+    printf '%s\n' "forge backend test: invalid app targets accepted: $invalid_targets" >&2
+    exit 1
+  fi
+  grep -F "invalid targets" /tmp/forge-invalid-app-targets.err >/dev/null
+done
+
 for invalid_slug in 'ab/../../escape-app' 'ab;semi' 'ab space'; do
   if sh "$backend" set-app-targets "$scratch" "$invalid_slug" hosted-web >/tmp/forge-invalid-slug.out 2>/tmp/forge-invalid-slug.err; then
     printf '%s\n' "forge backend test: invalid slug accepted: $invalid_slug" >&2
@@ -855,6 +922,14 @@ run_rebuild_command=bad" >/tmp/forge-invalid-targets.out 2>/tmp/forge-invalid-ta
 fi
 grep -F "invalid targets" /tmp/forge-invalid-targets.err >/dev/null
 ! grep -F "run_rebuild_command=bad" "$workspaces_root/workspace-web/wizardry.workspace.conf" >/dev/null
+
+for invalid_targets in 'not-a-target' 'hosted-web,not-a-target' 'hosted-web,hosted-web'; do
+  if sh "$backend" set-workspace-targets "$scratch" "$workspaces_root/workspace-web" "$invalid_targets" >/tmp/forge-invalid-workspace-targets.out 2>/tmp/forge-invalid-workspace-targets.err; then
+    printf '%s\n' "forge backend test: invalid workspace targets accepted: $invalid_targets" >&2
+    exit 1
+  fi
+  grep -F "invalid targets" /tmp/forge-invalid-workspace-targets.err >/dev/null
+done
 
 if sh "$backend" rename-workspace "$scratch" "$workspaces_root/workspace-web" 'Bad "Name' >/tmp/forge-invalid-rename-title.out 2>/tmp/forge-invalid-rename-title.err; then
   printf '%s\n' "forge backend test: invalid rename title accepted" >&2

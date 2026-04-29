@@ -658,7 +658,17 @@ validate_hosted_web_port() {
 
 normalize_targets_value() {
   value=${1-}
+  allow_empty=${2-0}
   value=$(printf '%s' "$value" | tr '\r\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+
+  if [ -z "$value" ]; then
+    if [ "$allow_empty" = "1" ]; then
+      printf '%s\n' ""
+      return 0
+    fi
+    printf '%s\n' "forge-backend: invalid targets '$value'" >&2
+    exit 2
+  fi
 
   case "$value" in
     *[!A-Za-z0-9,-]*|*,|,*|*,,*)
@@ -666,6 +676,40 @@ normalize_targets_value() {
       exit 2
       ;;
   esac
+
+  remaining=$value
+  seen=","
+  while :; do
+    case "$remaining" in
+      *,*)
+        target=${remaining%%,*}
+        remaining=${remaining#*,}
+        ;;
+      *)
+        target=$remaining
+        remaining=
+        ;;
+    esac
+
+    case "$target" in
+      hosted-web|macos|linux|ios|android|godot-desktop)
+        ;;
+      *)
+        printf '%s\n' "forge-backend: invalid targets '$value'" >&2
+        exit 2
+        ;;
+    esac
+
+    case "$seen" in
+      *",$target,"*)
+        printf '%s\n' "forge-backend: invalid targets '$value'" >&2
+        exit 2
+        ;;
+    esac
+    seen="$seen$target,"
+
+    [ -n "$remaining" ] || break
+  done
 
   printf '%s\n' "$value"
 }
@@ -1046,6 +1090,10 @@ write_source_lock() {
   subdir=$4
   commit=$5
   now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  reject_line_breaks "$repo" "source repo"
+  reject_line_breaks "$ref" "source ref"
+  reject_line_breaks "$subdir" "source subdir"
+  reject_line_breaks "$commit" "source commit"
   cat > "$lock_file" <<EOF
 repo=$repo
 ref=$ref
@@ -1077,6 +1125,27 @@ validate_source_subdir() {
   esac
 }
 
+validate_source_repo() {
+  repo=${1-}
+  [ -n "$repo" ] || {
+    printf '%s\n' "forge-backend: source repo is required" >&2
+    exit 2
+  }
+  if has_line_break "$repo"; then
+    printf '%s\n' "forge-backend: source repo must not contain line breaks" >&2
+    exit 2
+  fi
+}
+
+validate_source_ref() {
+  ref=${1-}
+  [ -n "$ref" ] || return 0
+  if has_line_break "$ref"; then
+    printf '%s\n' "forge-backend: source ref must not contain line breaks" >&2
+    exit 2
+  fi
+}
+
 download_into_cache() {
   repo=$1
   ref=$2
@@ -1086,6 +1155,8 @@ download_into_cache() {
   slug=${6-}
 
   require_tool git
+  validate_source_repo "$repo"
+  validate_source_ref "$ref"
   validate_source_subdir "$subdir" "source subdir"
   tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/forge-catalog.XXXXXX")
   trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
@@ -1105,10 +1176,22 @@ download_into_cache() {
     trap - EXIT HUP INT TERM
     exit 1
   }
+  repo_abs=$(CDPATH= cd -- "$tmp_dir/repo" && pwd -P)
+  src_dir_abs=$(CDPATH= cd -- "$src_dir" && pwd -P)
+  case "$src_dir_abs" in
+    "$repo_abs"|"$repo_abs"/*)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: source subdir must stay inside the cloned repo: $subdir" >&2
+      rm -rf "$tmp_dir"
+      trap - EXIT HUP INT TERM
+      exit 1
+      ;;
+  esac
 
   rm -rf "$dest_dir"
-  mkdir -p "$(dirname "$dest_dir")"
-  cp -R "$src_dir" "$dest_dir"
+  mkdir -p "$dest_dir"
+  cp -R "$src_dir_abs"/. "$dest_dir/"
   if [ -n "$slug" ]; then
     apply_optional_app_icon_override_if_present "$slug" "$dest_dir"
   fi
@@ -1165,6 +1248,8 @@ resolve_source_ref_commit() {
   ref=$2
   [ -n "$repo" ] || return 1
   [ -n "$ref" ] || ref=HEAD
+  validate_source_repo "$repo"
+  validate_source_ref "$ref"
   require_tool git
 
   if [ -d "$repo/.git" ] || git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -2811,6 +2896,32 @@ validate_release_asset_url() {
   esac
 }
 
+validate_release_app_bundle_name() {
+  bundle_name=${1-}
+  [ -n "$bundle_name" ] || {
+    printf '%s\n' "forge-backend: release app bundle name missing" >&2
+    exit 1
+  }
+
+  if has_line_break "$bundle_name"; then
+    printf '%s\n' "forge-backend: invalid release app bundle name" >&2
+    exit 1
+  fi
+
+  case "$bundle_name" in
+    .|..|/*|*/*|*\\*)
+      printf '%s\n' "forge-backend: invalid release app bundle name" >&2
+      exit 1
+      ;;
+    *.app)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: invalid release app bundle name" >&2
+      exit 1
+      ;;
+  esac
+}
+
 workspace_git_cached_value() {
   workspace_path=${1-}
   key=${2-}
@@ -4134,7 +4245,9 @@ cmd_workspace_git_install_release() {
         printf '%s\n' "forge-backend: no macOS app bundle was found in the release archive" >&2
         exit 1
       }
-      install_path="/Applications/$(basename "$app_bundle")"
+      app_bundle_name=$(basename "$app_bundle")
+      validate_release_app_bundle_name "$app_bundle_name"
+      install_path="/Applications/$app_bundle_name"
       rm -rf "$install_path"
       if command -v ditto >/dev/null 2>&1; then
         ditto "$app_bundle" "$install_path"
@@ -4496,7 +4609,7 @@ cmd_set_workspace_targets() {
     exit 1
   }
 
-  targets=$(normalize_targets_value "$targets")
+  targets=$(normalize_targets_value "$targets" 1)
   write_key_value_file "$conf" targets "$targets"
   printf 'workspace=%s\n' "$workspace_path"
   printf 'targets=%s\n' "$targets"
@@ -7546,6 +7659,7 @@ append_manifest_app() {
       "name": $name,
       "production": false,
       "distribution": "core",
+      "targets": "hosted-web,macos,linux",
       "bundleIds": {
         "macos": ("com.wizardry.apps." + $slug + ".macos"),
         "ios": ("com.wizardry.apps." + $slug + ".ios"),

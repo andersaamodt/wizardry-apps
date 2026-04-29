@@ -129,9 +129,13 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Sync/import helpers that print `key=value` rows must reject line-break paths before echoing canonical source or target paths.
 - Icon metadata is project state, not host state; store project-relative paths and test that regeneration will not read absolute paths outside the project.
 - Manifest validation should include hostile records added by future commits, not just the currently checked-in happy path.
+- Target-list writers must allowlist every target and reject duplicates, not rely on later manifest validation to catch bad values.
+- Scaffolded apps must write release-safe manifest defaults immediately so a newly generated app never makes the repo invalid before edits.
 - Optional catalog app tests should skip when the optional checkout is absent but still fail when the checkout exists and required files are broken.
 - Single-record manifest status commands must sanitize manifest fields as output too; a separate validator does not protect GUI calls that read a hand-edited manifest directly.
 - Optional app/template download paths must revalidate manifest source subdirs at runtime, because a hand-edited manifest can bypass CI validation and reach catalog cache replacement.
+- Optional app/template downloaders must canonicalize cloned source subdirs after checkout so a symlinked subdir cannot make the cache point outside the repo.
+- Optional app/template source repos and refs are cache-lock metadata; reject line breaks before clone, lock writes, or refresh comparisons.
 - Release upload helpers should adversarially test each credential field, not just the credential field used in a temp filename.
 - Release version strings are project-file inputs; validate them before rendering Xcode, Gradle, plist, YAML, or package metadata.
 - Remote API IDs, versions, and states need revalidation after `jq` extraction before reuse in URLs or machine-readable status rows.
@@ -149,6 +153,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Icon staging should preflight every required output before copying so missing fallbacks cannot leave stale platform assets in place.
 - Installer paths rendered into shell shims or desktop files must reject shell-expansion characters unless they are structurally escaped.
 - Bundle IDs rendered into plist or native project files need direct validation at each packaging entrypoint, not just manifest-derived paths.
+- App bundle names discovered inside downloaded release archives are remote metadata; reject CR/LF before deriving install paths or printing `installed=`.
 - Backend status paths derived from XDG or environment values must be sanitized even when the command only writes a preference file.
 - Root hints are GUI/backend inputs even when output is plain text; reject line breaks before fallback resolution.
 - Centralize root-hint validation in the shared resolver so every list, help, run, and terminal action enforces the same path contract.

@@ -92,8 +92,21 @@ done
 
 [ -n "$bundle" ] || exit 2
 launcher=$(find "$bundle/Contents/MacOS" -maxdepth 1 -type f ! -name 'wizardry-host' | head -n 1)
+if [ -z "$launcher" ] && [ -x "$bundle/Contents/MacOS/wizardry-host" ]; then
+  launcher="$bundle/Contents/MacOS/wizardry-host"
+fi
 [ -n "$launcher" ] || exit 1
-nohup "$launcher" >/dev/null 2>&1 &
+entry=$(
+  awk '
+    /<key>WizardryAppEntry<\/key>/ {
+      sub(/^.*<string>/, "")
+      sub(/<\/string>.*$/, "")
+      print
+      exit
+    }
+  ' "$bundle/Contents/Info.plist"
+)
+nohup "$launcher" "$entry" "$@" >/dev/null 2>&1 &
 exit 0
 SH
 chmod +x "$fake_bin/open"
@@ -121,7 +134,7 @@ root=$workspace
 starter=import-web
 CONF
 
-app_entry="$workspace/app"
+app_entry=$(CDPATH= cd -- "$workspace/app" && pwd -P)
 
 host_log="$scratch/host.log"
 run_out=$(

@@ -33,7 +33,7 @@ git -C "$workspace" remote add origin https://github.com/example/release-app.git
 
 cat > "$fake_bin/uname" <<'SH'
 #!/bin/sh
-printf '%s\n' Linux
+printf '%s\n' "${FORGE_FAKE_UNAME:-Linux}"
 SH
 chmod +x "$fake_bin/uname"
 
@@ -58,6 +58,13 @@ if [ -n "$out" ]; then
   exit 0
 fi
 
+if [ "${FORGE_FAKE_DARWIN_BAD_APP_BUNDLE-}" = "1" ]; then
+cat <<'JSON'
+{"name":"v1","tag_name":"v1","html_url":"https://example.invalid/release","published_at":"2026-01-01T00:00:00Z","assets":[{"name":"tool-macos.tar.gz","browser_download_url":"https://github.com/example/release-app/releases/download/v1/tool-macos.tar.gz"}]}
+JSON
+exit 0
+fi
+
 if [ "${FORGE_FAKE_BAD_RELEASE_URL-}" = "1" ]; then
 cat <<'JSON'
 {"name":"v1","tag_name":"v1","html_url":"https://example.invalid/release","published_at":"2026-01-01T00:00:00Z","assets":[{"name":"safe.AppImage","browser_download_url":"file:///tmp/evil.AppImage"}]}
@@ -70,6 +77,35 @@ cat <<'JSON'
 JSON
 SH
 chmod +x "$fake_bin/curl"
+
+cat > "$fake_bin/tar" <<'SH'
+#!/bin/sh
+extract_dir=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -C)
+      shift
+      extract_dir=${1-}
+      ;;
+  esac
+  shift
+done
+[ -n "$extract_dir" ] || exit 2
+mkdir -p "$extract_dir/Bad$(printf '\r')forged.app/Contents"
+SH
+chmod +x "$fake_bin/tar"
+
+cat > "$fake_bin/ditto" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$fake_bin/ditto"
+
+cat > "$fake_bin/rm" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$fake_bin/rm"
 
 if HOME="$home_dir" PATH="$fake_bin:$PATH" sh "$backend" workspace-git-install-release "$root" "$workspace" >/tmp/forge-release-install.out 2>/tmp/forge-release-install.err; then
   printf '%s\n' "forge release install accepted a path-traversing asset name" >&2
@@ -92,5 +128,16 @@ grep -F "invalid release asset URL" /tmp/forge-release-url.err >/dev/null
   printf '%s\n' "invalid release asset URL was downloaded" >&2
   exit 1
 }
+
+if HOME="$home_dir" FORGE_FAKE_UNAME=Darwin FORGE_FAKE_DARWIN_BAD_APP_BUNDLE=1 PATH="$fake_bin:$PATH" sh "$backend" workspace-git-install-release "$root" "$workspace" >/tmp/forge-release-app-bundle.out 2>/tmp/forge-release-app-bundle.err; then
+  printf '%s\n' "forge release install accepted a CR-bearing app bundle name" >&2
+  exit 1
+fi
+
+grep -F "invalid release app bundle name" /tmp/forge-release-app-bundle.err >/dev/null
+if tr '\r' '\n' </tmp/forge-release-app-bundle.out | grep -E '^forged[.]app$' >/dev/null 2>&1; then
+  printf '%s\n' "forge release install emitted forged output from app bundle name" >&2
+  exit 1
+fi
 
 printf '%s\n' "forge release install adversarial tests passed"
