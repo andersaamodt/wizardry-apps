@@ -19,6 +19,11 @@ esac
 
 set -eu
 
+if [ "$#" -ne 2 ]; then
+  printf '%s\n' "stage-web-assets: APP_SLUG and DEST_DIR required" >&2
+  exit 2
+fi
+
 slug=${1-}
 dest=${2-}
 

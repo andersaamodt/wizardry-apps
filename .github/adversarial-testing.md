@@ -150,6 +150,8 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - File-artifact builders that print `key=value` status rows should reject line-break output paths and constrain output suffixes before writing.
 - Release and packaging helpers that print artifact paths should reject CR/LF in output directories, bundle paths, and upload paths before staging or invoking platform tools.
 - Upload helpers that print artifact paths should reject CR/LF in artifact input files as well as output directories.
+- Release helpers with fixed usage should reject extra operands before credentials, uploaders, signers, deployers, or deletion/replacement code can run.
+- Upload/signing helpers should verify artifact shape such as `.ipa`, `.aab`, or `.app` before invoking store or platform tooling.
 - Icon staging should preflight every required output before copying so missing fallbacks cannot leave stale platform assets in place.
 - Installer paths rendered into shell shims or desktop files must reject shell-expansion characters unless they are structurally escaped.
 - macOS app installers must stage and verify the new bundle before copying over an existing Applications bundle; never delete the installed app before the replacement copy succeeds.

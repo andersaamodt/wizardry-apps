@@ -15,6 +15,11 @@ esac
 
 set -eu
 
+if [ "$#" -ne 1 ]; then
+  printf '%s\n' "deploy-hosted-web: exactly one BUNDLE_DIR required" >&2
+  exit 2
+fi
+
 bundle_dir=${1-}
 
 if [ -z "$bundle_dir" ] || [ ! -d "$bundle_dir" ]; then

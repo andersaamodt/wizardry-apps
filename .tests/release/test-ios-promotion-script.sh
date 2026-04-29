@@ -48,6 +48,12 @@ if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
 fi
 grep -F "invalid IOS_RELEASE_AFTER_APPROVAL" "$tmp_dir/ios-promote-invalid-release-flag.err" >/dev/null
 
+if sh "$ROOT_DIR/tools/release/promote-ios-release.sh" com.example.app 42 1.2.3 ignored >"$tmp_dir/ios-promote-extra.err" 2>&1; then
+  printf '%s\n' "promote-ios-release accepted an extra operand" >&2
+  exit 1
+fi
+grep -F "BUNDLE_ID and optional BUILD_NUMBER VERSION_STRING required" "$tmp_dir/ios-promote-extra.err" >/dev/null
+
 fake_promote_bin="$tmp_dir/fake-promote-bin"
 mkdir -p "$fake_promote_bin"
 cat >"$fake_promote_bin/openssl" <<'SH'
@@ -111,6 +117,20 @@ if APP_STORE_CONNECT_KEY_ID='ABC123DEF4' \
   exit 1
 fi
 grep -F "IPA path must not contain line breaks" "$tmp_dir/upload-testflight-bad-path.err" >/dev/null
+
+bad_ipa_suffix="$tmp_dir/app.txt"
+: > "$bad_ipa_suffix"
+if sh "$ROOT_DIR/tools/release/upload-testflight.sh" "$bad_ipa_suffix" >"$tmp_dir/upload-testflight-bad-suffix.err" 2>&1; then
+  printf '%s\n' "upload-testflight accepted a non-IPA artifact path" >&2
+  exit 1
+fi
+grep -F "IPA path must end with .ipa" "$tmp_dir/upload-testflight-bad-suffix.err" >/dev/null
+
+if sh "$ROOT_DIR/tools/release/upload-testflight.sh" "$ipa_path" ignored >"$tmp_dir/upload-testflight-extra.err" 2>&1; then
+  printf '%s\n' "upload-testflight accepted an extra operand" >&2
+  exit 1
+fi
+grep -F "exactly one IPA_PATH required" "$tmp_dir/upload-testflight-extra.err" >/dev/null
 
 if APP_STORE_CONNECT_KEY_ID='BAD/../../KEY' \
    APP_STORE_CONNECT_ISSUER_ID='11111111-1111-1111-1111-111111111111' \

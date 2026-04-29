@@ -15,6 +15,11 @@ esac
 
 set -eu
 
+if [ "$#" -ne 1 ]; then
+  printf '%s\n' "upload-testflight: exactly one IPA_PATH required" >&2
+  exit 2
+fi
+
 ipa=${1-}
 
 has_line_break() {
@@ -35,6 +40,14 @@ if has_line_break "$ipa"; then
   printf '%s\n' "upload-testflight: IPA path must not contain line breaks" >&2
   exit 2
 fi
+
+case "$ipa" in
+  *.ipa) ;;
+  *)
+    printf '%s\n' "upload-testflight: IPA path must end with .ipa" >&2
+    exit 2
+    ;;
+esac
 
 if [ -z "${APP_STORE_CONNECT_KEY_ID-}" ] || [ -z "${APP_STORE_CONNECT_ISSUER_ID-}" ] || [ -z "${APP_STORE_CONNECT_PRIVATE_KEY_BASE64-}" ]; then
   printf '%s\n' "upload-testflight: missing App Store Connect credentials" >&2

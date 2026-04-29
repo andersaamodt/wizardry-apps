@@ -15,6 +15,11 @@ esac
 
 set -eu
 
+if [ "$#" -ne 1 ]; then
+  printf '%s\n' "sign-and-notarize-macos: exactly one APP_BUNDLE required" >&2
+  exit 2
+fi
+
 app_bundle=${1-}
 
 has_line_break() {
@@ -35,6 +40,18 @@ if has_line_break "$app_bundle"; then
   printf '%s\n' "sign-and-notarize-macos: app bundle path must not contain line breaks" >&2
   exit 2
 fi
+
+case "$app_bundle" in
+  -*)
+    printf '%s\n' "sign-and-notarize-macos: app bundle path must be a safe .app bundle path" >&2
+    exit 2
+    ;;
+  *.app) ;;
+  *)
+    printf '%s\n' "sign-and-notarize-macos: app bundle path must be a .app bundle" >&2
+    exit 2
+    ;;
+esac
 
 required_vars="APPLE_P12_BASE64 APPLE_P12_PASSWORD APPLE_DEVELOPER_ID_APP APPLE_TEAM_ID APPLE_NOTARY_KEY_ID APPLE_NOTARY_ISSUER_ID APPLE_NOTARY_PRIVATE_KEY_BASE64"
 for v in $required_vars; do

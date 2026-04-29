@@ -18,6 +18,11 @@ esac
 
 set -eu
 
+if [ "$#" -lt 1 ] || [ "$#" -gt 4 ]; then
+  printf '%s\n' "promote-play-track: PACKAGE_NAME and optional FROM_TRACK TO_TRACK VERSION_CODES required" >&2
+  exit 2
+fi
+
 package_name=${1-}
 from_track=${2-internal}
 to_track=${3-production}

@@ -257,6 +257,26 @@ fi
 grep -F "output directory must not contain line breaks" "$tmp_dir/ios-bad-out.err" >/dev/null
 [ ! -e "$bad_ios_out" ]
 
+if (
+  cd "$tmp_dir" &&
+  PATH="$fake_ios_bin:$PATH" sh "$ROOT_DIR/tools/release/build-ios-app.sh" forge "-ios-out" smoke >"$tmp_dir/ios-leading-dash-out.out" 2>"$tmp_dir/ios-leading-dash-out.err"
+); then
+  rm -rf "$ROOT_DIR/_tmp/ios-build-forge"
+  printf '%s\n' "build-ios-app accepted leading-dash output directory" >&2
+  exit 1
+fi
+grep -F "output directory must be a safe path" "$tmp_dir/ios-leading-dash-out.err" >/dev/null
+[ ! -e "$tmp_dir/-ios-out" ]
+
+if PATH="$fake_ios_bin:$PATH" \
+   sh "$ROOT_DIR/tools/release/build-ios-app.sh" forge "$tmp_dir/ios-extra-out" smoke ignored >"$tmp_dir/ios-extra.out" 2>"$tmp_dir/ios-extra.err"; then
+  rm -rf "$ROOT_DIR/_tmp/ios-build-forge"
+  printf '%s\n' "build-ios-app accepted an extra operand" >&2
+  exit 1
+fi
+grep -F "APP_SLUG OUT_DIR and optional mode required" "$tmp_dir/ios-extra.err" >/dev/null
+[ ! -e "$tmp_dir/ios-extra-out" ]
+
 if RELEASE_VERSION='v1.2.3/../../bad' \
    PATH="$fake_ios_bin:$PATH" \
    sh "$ROOT_DIR/tools/release/build-ios-app.sh" forge "$tmp_dir/ios-version-out" smoke >"$tmp_dir/ios-invalid-version.out" 2>"$tmp_dir/ios-invalid-version.err"; then
@@ -300,6 +320,13 @@ if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" ../web/demo "$tmp_dir/traver
   exit 1
 fi
 [ ! -e "$tmp_dir/traversed-assets" ]
+
+if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" forge "$tmp_dir/extra-assets" ignored >"$tmp_dir/stage-extra.out" 2>"$tmp_dir/stage-extra.err"; then
+  printf '%s\n' "stage-web-assets accepted an extra operand before replacing the destination" >&2
+  exit 1
+fi
+grep -F "APP_SLUG and DEST_DIR required" "$tmp_dir/stage-extra.err" >/dev/null
+[ ! -e "$tmp_dir/extra-assets" ]
 
 sync_source="$tmp_dir/sync-source"
 sync_target="$tmp_dir/sync-target"
@@ -365,6 +392,20 @@ if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$bad_aab_path" "com.exa
 fi
 grep -F "AAB path must not contain line breaks" "$tmp_dir/play-upload-bad-aab-path.err" >/dev/null
 
+bad_aab_suffix="$tmp_dir/app.txt"
+: > "$bad_aab_suffix"
+if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$bad_aab_suffix" "com.example.app" internal >"$tmp_dir/play-upload-bad-aab-suffix.err" 2>&1; then
+  printf '%s\n' "upload-play-internal accepted a non-AAB artifact path" >&2
+  exit 1
+fi
+grep -F "AAB path must end with .aab" "$tmp_dir/play-upload-bad-aab-suffix.err" >/dev/null
+
+if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example.app" internal ignored >"$tmp_dir/play-upload-extra.err" 2>&1; then
+  printf '%s\n' "upload-play-internal accepted an extra operand" >&2
+  exit 1
+fi
+grep -F "AAB_PATH PACKAGE_NAME and optional TRACK required" "$tmp_dir/play-upload-extra.err" >/dev/null
+
 if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example/../../other" internal >"$tmp_dir/play-upload-invalid-package.err" 2>&1; then
   printf '%s\n' "upload-play-internal accepted invalid package name" >&2
   exit 1
@@ -395,6 +436,12 @@ if sh "$ROOT_DIR/tools/release/promote-play-track.sh" "com.example.app" "interna
   exit 1
 fi
 grep -F "invalid track" "$tmp_dir/play-promote-invalid-track.err" >/dev/null
+
+if sh "$ROOT_DIR/tools/release/promote-play-track.sh" "com.example.app" internal production 123 ignored >"$tmp_dir/play-promote-extra.err" 2>&1; then
+  printf '%s\n' "promote-play-track accepted an extra operand" >&2
+  exit 1
+fi
+grep -F "PACKAGE_NAME and optional FROM_TRACK TO_TRACK VERSION_CODES required" "$tmp_dir/play-promote-extra.err" >/dev/null
 
 fake_play_bin="$tmp_dir/fake-play-bin"
 mkdir -p "$fake_play_bin"
@@ -576,6 +623,12 @@ case "$deploy_key_arg" in
     ;;
 esac
 
+if sh "$ROOT_DIR/tools/release/deploy-hosted-web.sh" "$deploy_bundle" ignored >"$tmp_dir/deploy-extra.out" 2>"$tmp_dir/deploy-extra.err"; then
+  printf '%s\n' "deploy-hosted-web accepted an extra operand" >&2
+  exit 1
+fi
+grep -F "exactly one BUNDLE_DIR required" "$tmp_dir/deploy-extra.err" >/dev/null
+
 sign_app="$tmp_dir/Test.app"
 mkdir -p "$sign_app"
 fake_sign_bin="$tmp_dir/fake-sign-bin"
@@ -605,6 +658,30 @@ if sh "$ROOT_DIR/tools/release/sign-and-notarize-macos.sh" "$bad_sign_app" >"$tm
   exit 1
 fi
 grep -F "app bundle path must not contain line breaks" "$tmp_dir/sign-bad-app-path.err" >/dev/null
+
+sign_not_app="$tmp_dir/NotApp"
+mkdir -p "$sign_not_app"
+if sh "$ROOT_DIR/tools/release/sign-and-notarize-macos.sh" "$sign_not_app" >"$tmp_dir/sign-not-app.out" 2>"$tmp_dir/sign-not-app.err"; then
+  printf '%s\n' "sign-and-notarize-macos accepted a non-.app directory" >&2
+  exit 1
+fi
+grep -F "app bundle path must be a .app bundle" "$tmp_dir/sign-not-app.err" >/dev/null
+
+mkdir -p "$tmp_dir/-Bad.app"
+if (
+  cd "$tmp_dir" &&
+  sh "$ROOT_DIR/tools/release/sign-and-notarize-macos.sh" "-Bad.app" >"$tmp_dir/sign-leading-dash.out" 2>"$tmp_dir/sign-leading-dash.err"
+); then
+  printf '%s\n' "sign-and-notarize-macos accepted a leading-dash app bundle path" >&2
+  exit 1
+fi
+grep -F "app bundle path must be a safe .app bundle path" "$tmp_dir/sign-leading-dash.err" >/dev/null
+
+if sh "$ROOT_DIR/tools/release/sign-and-notarize-macos.sh" "$sign_app" ignored >"$tmp_dir/sign-extra.out" 2>"$tmp_dir/sign-extra.err"; then
+  printf '%s\n' "sign-and-notarize-macos accepted an extra operand" >&2
+  exit 1
+fi
+grep -F "exactly one APP_BUNDLE required" "$tmp_dir/sign-extra.err" >/dev/null
 
 bad_notary_issuer=$(printf '11111111-1111-1111-1111-111111111111\nforged=1')
 if APPLE_P12_BASE64='bad' \

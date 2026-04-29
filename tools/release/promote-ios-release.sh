@@ -29,6 +29,11 @@ esac
 
 set -eu
 
+if [ "$#" -lt 1 ] || [ "$#" -gt 3 ]; then
+  printf '%s\n' "promote-ios-release: BUNDLE_ID and optional BUILD_NUMBER VERSION_STRING required" >&2
+  exit 2
+fi
+
 bundle_id=${1-}
 build_number=${2-}
 version_string=${3-}

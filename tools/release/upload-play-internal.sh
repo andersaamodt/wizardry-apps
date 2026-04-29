@@ -16,6 +16,11 @@ esac
 
 set -eu
 
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+  printf '%s\n' "upload-play-internal: AAB_PATH PACKAGE_NAME and optional TRACK required" >&2
+  exit 2
+fi
+
 aab=${1-}
 package_name=${2-}
 track=${3-internal}
@@ -74,6 +79,14 @@ if has_line_break "$aab"; then
   printf '%s\n' "upload-play-internal: AAB path must not contain line breaks" >&2
   exit 2
 fi
+
+case "$aab" in
+  *.aab) ;;
+  *)
+    printf '%s\n' "upload-play-internal: AAB path must end with .aab" >&2
+    exit 2
+    ;;
+esac
 
 valid_package_name "$package_name" || {
   printf '%s\n' "upload-play-internal: invalid package name" >&2

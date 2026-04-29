@@ -17,6 +17,11 @@ esac
 
 set -eu
 
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+  printf '%s\n' "build-ios-app: APP_SLUG OUT_DIR and optional mode required" >&2
+  exit 2
+fi
+
 slug=${1-}
 out_dir=${2-}
 mode=${3-smoke}
@@ -39,6 +44,13 @@ if has_line_break "$out_dir"; then
   printf '%s\n' "build-ios-app: output directory must not contain line breaks" >&2
   exit 2
 fi
+
+case "$out_dir" in
+  -*)
+    printf '%s\n' "build-ios-app: output directory must be a safe path" >&2
+    exit 2
+    ;;
+esac
 
 valid_app_slug() {
   case "${1-}" in
