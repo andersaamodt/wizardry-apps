@@ -23,6 +23,23 @@ if [ -z "$platform" ] || [ -z "$slug" ]; then
   exit 2
 fi
 
+is_safe_slug() {
+  value=${1-}
+  case "$value" in
+    [a-z]*)
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  case "$value" in
+    *[!a-z0-9-]*|*-|*--*)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 case "$platform" in
   macos|ios|android) ;;
   *)
@@ -30,6 +47,11 @@ case "$platform" in
     exit 2
     ;;
   esac
+
+is_safe_slug "$slug" || {
+  printf '%s\n' "get-app-bundle-id: invalid app slug" >&2
+  exit 2
+}
 
 is_workspace_root() {
   root=${1-}

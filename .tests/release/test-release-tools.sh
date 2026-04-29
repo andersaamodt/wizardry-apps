@@ -16,6 +16,27 @@ printf '%s' "$bundle_id" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-stage-assets.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
+bad_lookup_slug=$(printf 'forge\nforged=1')
+if sh "$ROOT_DIR/tools/release/get-app-name.sh" "$bad_lookup_slug" >"$tmp_dir/get-name-bad-slug.out" 2>"$tmp_dir/get-name-bad-slug.err"; then
+  printf '%s\n' "get-app-name accepted newline app slug" >&2
+  exit 1
+fi
+grep -F "invalid app slug" "$tmp_dir/get-name-bad-slug.err" >/dev/null
+if tr '\r' '\n' <"$tmp_dir/get-name-bad-slug.err" | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "get-app-name emitted forged rows from invalid app slug" >&2
+  exit 1
+fi
+
+if sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" ios "$bad_lookup_slug" >"$tmp_dir/get-bundle-bad-slug.out" 2>"$tmp_dir/get-bundle-bad-slug.err"; then
+  printf '%s\n' "get-app-bundle-id accepted newline app slug" >&2
+  exit 1
+fi
+grep -F "invalid app slug" "$tmp_dir/get-bundle-bad-slug.err" >/dev/null
+if tr '\r' '\n' <"$tmp_dir/get-bundle-bad-slug.err" | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "get-app-bundle-id emitted forged rows from invalid app slug" >&2
+  exit 1
+fi
+
 bad_manifest_root="$tmp_dir/bad-manifest-root"
 mkdir -p "$bad_manifest_root/config" "$bad_manifest_root/apps" "$bad_manifest_root/web"
 cp "$ROOT_DIR/config/templates.manifest.json" "$bad_manifest_root/config/templates.manifest.json"
