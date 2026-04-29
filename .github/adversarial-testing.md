@@ -107,6 +107,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - TSV list rows need tab-specific sanitization; key/value sanitizers that only replace CR/LF are not enough for sidebar/catalog rows.
 - Installed helper output is GUI input when backend rows forward it; sanitize record delimiters in status/details text and reject delimiter-shaped module or action filenames before emitting rows.
 - GUI list/count commands must share the same name validator as run commands; otherwise unsafe files can create visible but un-runnable rows or inflated category counts.
+- Read-only CGI list/count endpoints must revalidate imported filesystem names before composing paths, JSON, HTML, or counts; create-time validators do not protect hand-created state.
 - Hand-edited user metadata files can bypass create-time GUI/backend validation; list/import paths must reapply delimiter and identifier contracts before emitting GUI rows.
 - Workspace profile fields are imported metadata; sanitize every field before printing profile `key=value` rows, not only the fields that are validated for write actions.
 - GUI preference/config readers must not `cat` hand-edited files back to the bridge; parse valid keys and sanitize values just like the writer.
