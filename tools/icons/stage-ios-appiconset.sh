@@ -33,8 +33,8 @@ icon_set_complete() {
   return 0
 }
 
-mkdir -p "$xcassets_dir/AppIcon.appiconset"
 if icon_set_complete "$source_dir"; then
+  mkdir -p "$xcassets_dir/AppIcon.appiconset"
   cp -R "$source_dir"/. "$xcassets_dir/AppIcon.appiconset/"
   exit 0
 fi
@@ -52,6 +52,8 @@ command -v sips >/dev/null 2>&1 || {
   printf '%s\n' "stage-ios-appiconset: generated icon set missing and sips is unavailable" >&2
   exit 1
 }
+
+mkdir -p "$xcassets_dir/AppIcon.appiconset"
 
 render_icon() {
   pixels=$1

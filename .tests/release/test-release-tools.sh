@@ -108,6 +108,29 @@ fi
 grep -F "missing icon source" "$tmp_dir/android-missing-icon.err" >/dev/null
 grep -Fx "stale icon" "$missing_icon_res/mipmap-mdpi/ic_launcher.png" >/dev/null
 
+missing_ios_app="$tmp_dir/missing-ios-app"
+missing_ios_assets="$tmp_dir/missing-ios-xcassets"
+mkdir -p "$missing_ios_app/assets/icons/ios/AppIcon.appiconset" "$missing_ios_assets"
+printf '%s\n' "partial generated icon" >"$missing_ios_app/assets/icons/ios/AppIcon.appiconset/icon-20@2x.png"
+if sh "$ROOT_DIR/tools/icons/stage-ios-appiconset.sh" "$missing_ios_app" "$missing_ios_assets" >"$tmp_dir/ios-missing-icon.out" 2>"$tmp_dir/ios-missing-icon.err"; then
+  printf '%s\n' "stage-ios-appiconset accepted incomplete icon set without fallback" >&2
+  exit 1
+fi
+grep -F "generated icon set is incomplete and fallback source icon is missing" "$tmp_dir/ios-missing-icon.err" >/dev/null
+[ ! -e "$missing_ios_assets/AppIcon.appiconset" ] || {
+  printf '%s\n' "stage-ios-appiconset left an empty AppIcon.appiconset on failure" >&2
+  exit 1
+}
+
+absent_ios_app="$tmp_dir/absent-ios-app"
+absent_ios_assets="$tmp_dir/absent-ios-xcassets"
+mkdir -p "$absent_ios_app" "$absent_ios_assets"
+sh "$ROOT_DIR/tools/icons/stage-ios-appiconset.sh" "$absent_ios_app" "$absent_ios_assets"
+[ ! -e "$absent_ios_assets/AppIcon.appiconset" ] || {
+  printf '%s\n' "stage-ios-appiconset created AppIcon.appiconset when no icon inputs existed" >&2
+  exit 1
+}
+
 partial_ios_app="$tmp_dir/partial-ios-app"
 partial_ios_assets="$tmp_dir/partial-ios-xcassets"
 fake_icon_bin="$tmp_dir/fake-icon-bin"
