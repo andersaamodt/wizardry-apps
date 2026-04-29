@@ -168,6 +168,10 @@ resolve_root() {
 require_root() {
   hint=${1-}
   if root=$(resolve_root "$hint" 2>/dev/null); then
+    if has_line_break "$root"; then
+      printf '%s\n' "forge-backend: root path must not contain line breaks" >&2
+      exit 2
+    fi
     printf '%s\n' "$root"
     return 0
   fi

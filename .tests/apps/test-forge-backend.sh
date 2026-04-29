@@ -170,6 +170,21 @@ cp -R "$test_root/tools" "$scratch/tools"
 cp -R "$test_root/web/demo" "$scratch/web/demo"
 cp -R "$test_root/web/.themes" "$scratch/web/.themes"
 
+bad_root_hint="$scratch/root
+forged=1"
+mkdir -p "$bad_root_hint/config" "$bad_root_hint/apps" "$bad_root_hint/web"
+cp "$scratch/config/apps.manifest.json" "$bad_root_hint/config/apps.manifest.json"
+cp "$scratch/config/templates.manifest.json" "$bad_root_hint/config/templates.manifest.json"
+if sh "$backend" list-apps "$bad_root_hint" >"$scratch/forge-bad-root-hint.out" 2>"$scratch/forge-bad-root-hint.err"; then
+  printf '%s\n' "forge list-apps accepted line-break root hint" >&2
+  exit 1
+fi
+grep -F "root path must not contain line breaks" "$scratch/forge-bad-root-hint.err" >/dev/null
+if tr '\r' '\n' <"$scratch/forge-bad-root-hint.out" | grep -E '^forged=' >/dev/null 2>&1; then
+  printf '%s\n' "forge list-apps emitted forged rows from root hint" >&2
+  exit 1
+fi
+
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
 jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main\rforged=1") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
