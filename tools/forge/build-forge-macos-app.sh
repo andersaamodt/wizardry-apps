@@ -288,9 +288,11 @@ stage_bundle="$stage_root/App Forge.app"
 macos_dir="$stage_bundle/Contents/MacOS"
 resources_dir="$stage_bundle/Contents/Resources"
 plist="$stage_bundle/Contents/Info.plist"
+final_stage_root=''
 
 cleanup() {
   rm -rf "$stage_root"
+  [ -z "$final_stage_root" ] || rm -rf "$final_stage_root"
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -408,13 +410,37 @@ $icon_key
 </dict></plist>
 PLIST
 
-mkdir -p "$(dirname "$out_bundle")"
-rm -rf "$out_bundle"
-cp -R "$stage_bundle" "$out_bundle"
-ensure_macos_bundle_signature "$out_bundle" || {
+out_parent=$(dirname "$out_bundle")
+out_base=$(basename "$out_bundle")
+mkdir -p "$out_parent"
+final_stage_root=$(mktemp -d "$out_parent/.${out_base}.build.XXXXXX")
+final_bundle="$final_stage_root/$out_base"
+backup_bundle="$final_stage_root/previous-$out_base"
+
+cp -R "$stage_bundle" "$final_bundle" || {
+  printf '%s\n' "build-forge-macos-app: failed to copy macOS app bundle: $out_bundle" >&2
+  exit 1
+}
+ensure_macos_bundle_signature "$final_bundle" || {
   printf '%s\n' "build-forge-macos-app: failed to sign macOS app bundle: $out_bundle" >&2
   exit 1
 }
+
+if [ -e "$out_bundle" ] || [ -L "$out_bundle" ]; then
+  mv "$out_bundle" "$backup_bundle" || {
+    printf '%s\n' "build-forge-macos-app: failed to replace macOS app bundle: $out_bundle" >&2
+    exit 1
+  }
+fi
+
+if ! mv "$final_bundle" "$out_bundle"; then
+  if [ -e "$backup_bundle" ] || [ -L "$backup_bundle" ]; then
+    mv "$backup_bundle" "$out_bundle" >/dev/null 2>&1 || :
+  fi
+  printf '%s\n' "build-forge-macos-app: failed to replace macOS app bundle: $out_bundle" >&2
+  exit 1
+fi
+rm -rf "$backup_bundle"
 
 printf '%s\n' "app_bundle=$out_bundle"
 printf '%s\n' "host_binary=$host_bin"

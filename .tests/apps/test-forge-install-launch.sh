@@ -79,6 +79,78 @@ fi
 grep -F "output path must be a safe .app bundle path" "$scratch/build-traversal.err" >/dev/null
 grep -Fx "preserve" "$traversal_build_parent/victim.app/marker" >/dev/null
 
+preserve_build_root="$scratch/preserve-build-root"
+preserve_build_bin="$scratch/preserve-build-bin"
+preserve_build_target="$scratch/preserve-build/App Forge.app"
+mkdir -p \
+  "$preserve_build_root/tools/forge" \
+  "$preserve_build_root/apps/.host/macos" \
+  "$preserve_build_root/apps/.host/shared" \
+  "$preserve_build_root/apps/forge" \
+  "$preserve_build_root/web/.themes" \
+  "$preserve_build_root/core/include" \
+  "$preserve_build_root/core/src" \
+  "$preserve_build_bin" \
+  "$preserve_build_target/Contents"
+cp "$root/tools/forge/build-forge-macos-app.sh" "$preserve_build_root/tools/forge/build-forge-macos-app.sh"
+printf '%s\n' "int main(void){return 0;}" >"$preserve_build_root/apps/.host/macos/main.m"
+printf '%s\n' "<main></main>" >"$preserve_build_root/apps/forge/index.html"
+printf '%s\n' "bridge" >"$preserve_build_root/apps/.host/shared/wizardry-bridge.js"
+printf '%s\n' "header" >"$preserve_build_root/core/include/wizardry.h"
+printf '%s\n' "source" >"$preserve_build_root/core/src/wizardry.c"
+printf '%s\n' "preserve" >"$preserve_build_target/marker"
+cat >"$preserve_build_bin/uname" <<'SH'
+#!/bin/sh
+printf '%s\n' Darwin
+SH
+cat >"$preserve_build_bin/clang" <<'SH'
+#!/bin/sh
+out=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o)
+      shift
+      out=${1-}
+      ;;
+  esac
+  shift
+done
+[ -n "$out" ] || exit 2
+mkdir -p "$(dirname "$out")"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$out"
+chmod +x "$out"
+SH
+cat >"$preserve_build_bin/codesign" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$preserve_build_bin/cp" <<'SH'
+#!/bin/sh
+last=''
+for arg in "$@"; do
+  last=$arg
+done
+if [ "${1-}" = "-R" ]; then
+  case "${2-}:$last" in
+    *"/App Forge.app:"*"/App Forge.app")
+      exit 1
+      ;;
+  esac
+fi
+exec /bin/cp "$@"
+SH
+chmod +x "$preserve_build_bin/uname" "$preserve_build_bin/clang" \
+  "$preserve_build_bin/codesign" "$preserve_build_bin/cp"
+if PATH="$preserve_build_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
+    sh "$root/tools/forge/build-forge-macos-app.sh" \
+      --root "$preserve_build_root" \
+      --out "$preserve_build_target" >"$scratch/build-preserve.out" 2>"$scratch/build-preserve.err"; then
+  printf '%s\n' "build-forge-macos-app succeeded with failing final bundle copy" >&2
+  exit 1
+fi
+grep -F "failed to copy macOS app bundle" "$scratch/build-preserve.err" >/dev/null
+grep -Fx "preserve" "$preserve_build_target/marker" >/dev/null
+
 bad_icon_out="$scratch/forge-icon.png"
 if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$bad_icon_out" >"$scratch/bad-icon-out.out" 2>"$scratch/bad-icon-out.err"; then
   printf '%s\n' "build-forge-icon accepted non-icns output path" >&2
