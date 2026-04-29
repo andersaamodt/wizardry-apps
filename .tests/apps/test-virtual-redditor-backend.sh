@@ -8,6 +8,11 @@ backend="$app_dir/scripts/virtual-redditor-backend.sh"
 daemon="$app_dir/scripts/virtual-redditor-daemon.sh"
 extractor="$app_dir/scripts/extract_norms.sh"
 
+[ -d "$app_dir" ] || {
+  printf '%s\n' "skip: optional virtual-redditor app is not checked out"
+  exit 0
+}
+
 [ -d "$app_dir" ]
 [ -f "$app_dir/index.html" ]
 [ -f "$app_dir/style.css" ]

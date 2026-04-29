@@ -3,7 +3,13 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
+app_dir="$root/apps/priorities"
 backend="$root/apps/priorities/scripts/priorities-backend.sh"
+
+[ -d "$app_dir" ] || {
+  printf '%s\n' "skip: optional priorities app is not checked out"
+  exit 0
+}
 
 [ -x "$backend" ] || {
   printf '%s\n' "priorities backend missing or not executable: $backend" >&2
