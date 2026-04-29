@@ -314,6 +314,15 @@ grep -F "source directory must not contain line breaks" "$tmp_dir/sync-newline.o
 
 aab_path="$tmp_dir/app.aab"
 : > "$aab_path"
+bad_aab_path="$tmp_dir/app
+forged=1.aab"
+: > "$bad_aab_path"
+if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$bad_aab_path" "com.example.app" internal >"$tmp_dir/play-upload-bad-aab-path.err" 2>&1; then
+  printf '%s\n' "upload-play-internal accepted newline AAB path" >&2
+  exit 1
+fi
+grep -F "AAB path must not contain line breaks" "$tmp_dir/play-upload-bad-aab-path.err" >/dev/null
+
 if sh "$ROOT_DIR/tools/release/upload-play-internal.sh" "$aab_path" "com.example/../../other" internal >"$tmp_dir/play-upload-invalid-package.err" 2>&1; then
   printf '%s\n' "upload-play-internal accepted invalid package name" >&2
   exit 1

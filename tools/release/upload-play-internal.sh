@@ -30,6 +30,15 @@ if [ -z "$package_name" ]; then
   exit 2
 fi
 
+has_line_break() {
+  value=${1-}
+  nl_char=$(printf '\nX')
+  nl_char=${nl_char%X}
+  cr_char=$(printf '\r')
+  case "$value" in *"$nl_char"*|*"$cr_char"*) return 0 ;; esac
+  return 1
+}
+
 valid_package_name() {
   case "${1-}" in *.*) ;; *) return 1 ;; esac
   case "$1" in .|.*|*.|*..*|*[!A-Za-z0-9._]*) return 1 ;; esac
@@ -60,6 +69,11 @@ valid_service_account_email() {
   case "${1-}" in ""|*[!A-Za-z0-9._%+@-]*|*@*@*|@*|*@|*.|*@.*) return 1 ;; esac
   case "$1" in *@*.*) return 0 ;; *) return 1 ;; esac
 }
+
+if has_line_break "$aab"; then
+  printf '%s\n' "upload-play-internal: AAB path must not contain line breaks" >&2
+  exit 2
+fi
 
 valid_package_name "$package_name" || {
   printf '%s\n' "upload-play-internal: invalid package name" >&2
