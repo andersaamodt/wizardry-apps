@@ -79,12 +79,19 @@ has_control_delimiter() {
   return 1
 }
 
+is_safe_app_name() {
+  value=${1-}
+  [ -n "$value" ] || return 1
+  has_control_delimiter "$value" && return 1
+  printf '%s\n' "$value" | grep -Eq "^[A-Za-z0-9 .,_()'-]+$"
+}
+
 name=$(jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | .name' "$manifest")
 if [ -z "$name" ] || [ "$name" = "null" ]; then
   printf '%s\n' "get-app-name: unknown slug: $slug" >&2
   exit 1
 fi
-if has_control_delimiter "$name"; then
+if ! is_safe_app_name "$name"; then
   printf '%s\n' "get-app-name: unsafe app name in manifest for slug: $slug" >&2
   exit 1
 fi

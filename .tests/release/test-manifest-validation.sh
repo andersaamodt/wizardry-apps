@@ -47,6 +47,13 @@ if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-tab-name
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-tab-name.out" >/dev/null
 
+jq '.apps[0].name = "Bad</string><key>Injected</key>"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-plist-name.out" 2>&1; then
+  printf '%s\n' "validate-manifest accepted plist-shaped app name" >&2
+  exit 1
+fi
+grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-plist-name.out" >/dev/null
+
 jq '.apps[0].bundleIds.ios = "com.example/../../bad"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-bundle.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted path-shaped bundle id" >&2

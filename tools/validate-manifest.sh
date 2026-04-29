@@ -37,6 +37,8 @@ jq -e '
     type == "string" and length > 0 and (test("[\r\n\t]") | not);
   def optional_one_line_string:
     type == "string" and (test("[\r\n\t]") | not);
+  def valid_display_name:
+    one_line_string and test("^[A-Za-z0-9 .,_()'\''-]+$");
   def valid_slug:
     one_line_string
     and test("^[a-z][a-z0-9-]*$")
@@ -84,7 +86,7 @@ jq -e '
   .apps
   | type == "array"
   and all(.[]; .slug | valid_slug)
-  and all(.[]; .name | one_line_string)
+  and all(.[]; .name | valid_display_name)
   and all(.[]; (.production | type == "boolean"))
   and all(.[]; (.distribution // "optional") | (. == "core" or . == "optional"))
   and all(.[]; .targets | valid_targets)

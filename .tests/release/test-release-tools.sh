@@ -48,6 +48,13 @@ if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-n
 fi
 grep -F "unsafe app name" "$tmp_dir/bad-app-name.err" >/dev/null
 
+jq '.apps[0].name = "Bad/../../Name"' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
+if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer >"$tmp_dir/bad-app-path-name.out" 2>"$tmp_dir/bad-app-path-name.err"; then
+  printf '%s\n' "get-app-name accepted path-shaped manifest app name" >&2
+  exit 1
+fi
+grep -F "unsafe app name" "$tmp_dir/bad-app-path-name.err" >/dev/null
+
 jq '.apps[0].bundleIds.android = "com.example/../../bad"' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
 if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer >"$tmp_dir/bad-bundle-id.out" 2>"$tmp_dir/bad-bundle-id.err"; then
   printf '%s\n' "get-app-bundle-id accepted unsafe manifest bundle id" >&2
