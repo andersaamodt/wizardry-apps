@@ -70,6 +70,17 @@ case "$shape_flag" in
     ;;
 esac
 
+input_name=$(basename "$input_image")
+case "$input_name" in
+  *.*) original_ext=${input_name##*.} ;;
+  *) original_ext=png ;;
+esac
+original_ext=$(printf '%s' "$original_ext" | tr '[:upper:]' '[:lower:]')
+valid_original_ext "$original_ext" || {
+  printf '%s\n' "generate-platform-icons: invalid input image extension" >&2
+  exit 2
+}
+
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-icon-pipeline.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
@@ -97,16 +108,6 @@ meta_dir="$icons_dir/meta"
 
 mkdir -p "$assets_dir" "$macos_dir" "$linux_dir" "$android_dir" "$ios_dir" "$web_dir" "$meta_dir"
 
-input_name=$(basename "$input_image")
-case "$input_name" in
-  *.*) original_ext=${input_name##*.} ;;
-  *) original_ext=png ;;
-esac
-original_ext=$(printf '%s' "$original_ext" | tr '[:upper:]' '[:lower:]')
-valid_original_ext "$original_ext" || {
-  printf '%s\n' "generate-platform-icons: invalid input image extension" >&2
-  exit 2
-}
 stored_original="$meta_dir/original-source.$original_ext"
 stored_original_rel="assets/icons/meta/original-source.$original_ext"
 

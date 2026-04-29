@@ -561,4 +561,16 @@ if PATH="$fake_magick_bin:$PATH" \
 fi
 grep -F "project directory must not contain line breaks" "$tmp_dir/icons-bad-project.err" >/dev/null
 
+bad_ext_icon="$tmp_dir/icon.bad-ext"
+bad_ext_project="$tmp_dir/icon-bad-ext-project"
+: >"$bad_ext_icon"
+mkdir -p "$bad_ext_project"
+if PATH="$fake_magick_bin:$PATH" \
+   sh "$ROOT_DIR/tools/icons/generate-platform-icons.sh" "$bad_ext_icon" "$bad_ext_project" >"$tmp_dir/icons-bad-ext.out" 2>"$tmp_dir/icons-bad-ext.err"; then
+  printf '%s\n' "generate-platform-icons accepted invalid input image extension" >&2
+  exit 1
+fi
+grep -F "invalid input image extension" "$tmp_dir/icons-bad-ext.err" >/dev/null
+[ ! -e "$bad_ext_project/assets" ]
+
 printf '%s\n' "release tools smoke passed"
