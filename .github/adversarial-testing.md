@@ -42,6 +42,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Workspace path arguments should reject line breaks before Git/status helpers echo paths or run Git side effects.
 - Workspace mutation commands must enforce the same path output contract as list/status commands before writing profiles or renaming folders.
 - Workspace rebuild/run/install and icon mutation commands also emit machine-readable rows; reject line-break project paths before build, launch, install, or asset writes.
+- Shared root resolvers should reject line-break roots before returning, because many downstream commands echo `root_hint=` or use the root in status rows.
 - Imported project profiles are untrusted input; runtime/build paths should sanitize or fall back before writing bundle IDs, file names, or launchers.
 - Imported display names can contain CR even when the key/value reader is line-based; sanitize or fall back before printing `app_name`, writing desktop entries, or naming bundles.
 - When deriving bundled entry suffixes, compare canonical workspace and app paths; `/var` versus `/private/var` mismatches can turn a relative app path into a nested absolute path.
@@ -137,10 +138,12 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Remote API download URLs need scheme and source validation before `curl`, not just filename validation after asset selection.
 - Service account JSON is release input; validate identity fields before rendering JWT claims.
 - Deploy and notarization secrets should reject control/path metacharacters before reaching remote-shell, codesign, or notarytool arguments.
+- Remote-shell command strings such as `rsync -e` need shell quoting inside the string; test `TMPDIR` or key paths containing spaces and quotes.
 - Icon generators emit backend rows and metadata files, so input/project paths and stored extensions must be output-safe before generation starts.
 - Icon generators should validate stored source extensions before creating output trees so invalid image metadata leaves no partial assets.
 - File-artifact builders that print `key=value` status rows should reject line-break output paths and constrain output suffixes before writing.
 - Release and packaging helpers that print artifact paths should reject CR/LF in output directories, bundle paths, and upload paths before staging or invoking platform tools.
+- Upload helpers that print artifact paths should reject CR/LF in artifact input files as well as output directories.
 - Icon staging should preflight every required output before copying so missing fallbacks cannot leave stale platform assets in place.
 - Installer paths rendered into shell shims or desktop files must reject shell-expansion characters unless they are structurally escaped.
 - Bundle IDs rendered into plist or native project files need direct validation at each packaging entrypoint, not just manifest-derived paths.
