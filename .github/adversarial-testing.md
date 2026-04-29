@@ -22,6 +22,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Tab-, pipe-, and comma-delimited records must reject delimiter characters in fields before persisting or emitting rows for GUI parsers.
 - Machine-readable `key=value` backend output must not echo raw request values that can introduce newlines or forged keys.
 - Generated config, plist, desktop, JSON, YAML, and shell files must not receive raw GUI text that can break the target format.
+- App display names are release inputs when they become bundle paths, archive names, plist text, or Gradle/Xcode metadata; validate them beyond "single line".
 - Imported config paths rendered into nginx, service, plist, or shell snippets must reject the target format's control characters.
 - Release asset names must be basenames only; reject archive or API metadata before download, extraction, install, or chmod.
 - Store/release IDs such as App Store key IDs, bundle IDs, Play package names, tracks, and version lists must be validated before paths, JWTs, query strings, or API URLs are built.
@@ -128,6 +129,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Sync/import helpers that print `key=value` rows must reject line-break paths before echoing canonical source or target paths.
 - Icon metadata is project state, not host state; store project-relative paths and test that regeneration will not read absolute paths outside the project.
 - Manifest validation should include hostile records added by future commits, not just the currently checked-in happy path.
+- Optional catalog app tests should skip when the optional checkout is absent but still fail when the checkout exists and required files are broken.
 - Single-record manifest status commands must sanitize manifest fields as output too; a separate validator does not protect GUI calls that read a hand-edited manifest directly.
 - Optional app/template download paths must revalidate manifest source subdirs at runtime, because a hand-edited manifest can bypass CI validation and reach catalog cache replacement.
 - Release upload helpers should adversarially test each credential field, not just the credential field used in a temp filename.
