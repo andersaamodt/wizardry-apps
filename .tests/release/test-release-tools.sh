@@ -67,6 +67,12 @@ if sh "$fake_stage_root/tools/release/stage-web-assets.sh" forge "$fake_stage_ro
 fi
 grep -F "destination overlaps source" "$tmp_dir/stage-into-source.err" >/dev/null
 grep -Fx "source marker" "$fake_stage_root/apps/forge/index.html" >/dev/null
+if sh "$fake_stage_root/tools/release/stage-web-assets.sh" forge "$fake_stage_root/apps/forge/generated-parent/out" >"$tmp_dir/stage-nested-source.out" 2>"$tmp_dir/stage-nested-source.err"; then
+  printf '%s\n' "stage-web-assets accepted nested destination inside app source" >&2
+  exit 1
+fi
+grep -F "destination overlaps source" "$tmp_dir/stage-nested-source.err" >/dev/null
+[ ! -e "$fake_stage_root/apps/forge/generated-parent" ]
 bad_stage_dest="$tmp_dir/forge-assets
 forged=1"
 if sh "$ROOT_DIR/tools/release/stage-web-assets.sh" forge "$bad_stage_dest" >"$tmp_dir/stage-newline-dest.out" 2>"$tmp_dir/stage-newline-dest.err"; then

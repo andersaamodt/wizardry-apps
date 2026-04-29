@@ -65,9 +65,16 @@ dest_abs() {
   path=$1
   parent=$(dirname "$path")
   base=$(basename "$path")
-  mkdir -p "$parent"
+  suffix=$base
+  while [ ! -d "$parent" ]; do
+    parent_base=$(basename "$parent")
+    suffix=$parent_base/$suffix
+    next_parent=$(dirname "$parent")
+    [ "$next_parent" != "$parent" ] || return 1
+    parent=$next_parent
+  done
   parent_abs=$(CDPATH= cd -- "$parent" && pwd -P)
-  printf '%s/%s\n' "$parent_abs" "$base"
+  printf '%s/%s\n' "$parent_abs" "$suffix"
 }
 
 paths_overlap() {
