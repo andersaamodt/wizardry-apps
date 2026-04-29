@@ -31,10 +31,12 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Release manifests are build inputs; validate slugs, names, targets, bundle IDs, publish flags, and optional source records before workflows iterate them.
 - Manifest "single-line" string validators should reject tabs as well as CR/LF because tabs are row delimiters in GUI/backend contracts.
 - Manifest catalog `source.subdir` values are repo-internal paths; reject absolute paths, empty path components, `.`, `..`, backslashes, tabs, and CR/LF before clone/copy/cache removal code runs.
+- Manifest `hostedWeb` fields are also release/runtime inputs; constrain modes to known values and treat paths like repo-internal relative paths, not generic strings.
 - Git remotes are user-controlled metadata; sanitize CR/LF and validate `owner/repo` slugs before emitting status rows or GitHub API URLs.
 - Git remote write commands must reject CR/LF before persisting URLs, even if imported remote status readers sanitize later.
 - Publish-surface sync helpers must be argument-driven, scoped to documented paths, preserve local-only host directories, and copy dotfiles explicitly.
 - Staging helpers that delete/recreate destinations must reject destinations that overlap any source directory before `rm -rf`.
+- Preflight path canonicalization must be side-effect-free; do not create missing destination parents until after overlap and metadata validation succeeds.
 - Generated metadata committed to the repo must not preserve machine-local absolute paths; readers should resolve project-relative paths and ignore out-of-project config paths.
 - Workspace relative paths must resolve inside the workspace after symlinks, not just pass string checks.
 - Workspace path arguments should reject line breaks before Git/status helpers echo paths or run Git side effects.
@@ -72,6 +74,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Prefer backend shell tests for command contracts and static UI contract tests for required controls/semantics.
 - Use temp workspaces, fake homes, fake bins, and stubbed tools to keep tests realistic without touching user state.
 - Assert both failure message and absence of side effects, especially outside sibling paths or install roots.
+- For rejected output destinations, assert missing parent directories inside sources were not created by canonicalization.
 - For eval-printing helpers, evaluate the success output with quote-bearing paths and assert no injected command runs.
 - For create/edit parity bugs, test the edit path that bypassed create-time validation.
 - For release/API bugs, stub network tools and feed hostile metadata before any real network access.
@@ -135,6 +138,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Service account JSON is release input; validate identity fields before rendering JWT claims.
 - Deploy and notarization secrets should reject control/path metacharacters before reaching remote-shell, codesign, or notarytool arguments.
 - Icon generators emit backend rows and metadata files, so input/project paths and stored extensions must be output-safe before generation starts.
+- Icon generators should validate stored source extensions before creating output trees so invalid image metadata leaves no partial assets.
 - File-artifact builders that print `key=value` status rows should reject line-break output paths and constrain output suffixes before writing.
 - Release and packaging helpers that print artifact paths should reject CR/LF in output directories, bundle paths, and upload paths before staging or invoking platform tools.
 - Icon staging should preflight every required output before copying so missing fallbacks cannot leave stale platform assets in place.
