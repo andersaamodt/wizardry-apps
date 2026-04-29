@@ -3,7 +3,13 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-app="$root/apps/priorities/index.html"
+app_dir="$root/apps/priorities"
+app="$app_dir/index.html"
+
+[ -d "$app_dir" ] || {
+  printf '%s\n' "skip: optional priorities app is not checked out"
+  exit 0
+}
 
 [ -f "$app" ] || {
   printf '%s\n' "priorities app file missing: $app" >&2

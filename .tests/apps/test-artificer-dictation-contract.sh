@@ -3,6 +3,11 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
+artificer_dir="$root/web/artificer"
+[ -d "$artificer_dir" ] || {
+  printf '%s\n' "skip: optional artificer app is not checked out"
+  exit 0
+}
 api="$root/web/artificer/cgi/artificer-api"
 page_html="$root/web/artificer/pages/index.html"
 page_md="$root/web/artificer/pages/index.md"

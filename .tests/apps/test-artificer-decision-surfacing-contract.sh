@@ -2,6 +2,11 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+artificer_dir="$root/web/artificer"
+[ -d "$artificer_dir" ] || {
+  printf '%s\n' "skip: optional artificer app is not checked out"
+  exit 0
+}
 api="$root/web/artificer/cgi/artificer-api"
 
 assert_contains() {

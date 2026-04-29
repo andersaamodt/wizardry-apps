@@ -135,6 +135,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Target-list writers must allowlist every target and reject duplicates, not rely on later manifest validation to catch bad values.
 - Scaffolded apps must write release-safe manifest defaults immediately so a newly generated app never makes the repo invalid before edits.
 - Optional catalog app tests should skip when the optional checkout is absent but still fail when the checkout exists and required files are broken.
+- Optional app tests should check the optional checkout directory before sourcing app files; missing sourced files can print errors while still letting a test script exit 0.
 - Single-record manifest status commands must sanitize manifest fields as output too; a separate validator does not protect GUI calls that read a hand-edited manifest directly.
 - Optional app/template download paths must revalidate manifest source subdirs at runtime, because a hand-edited manifest can bypass CI validation and reach catalog cache replacement.
 - Optional app/template downloaders must canonicalize cloned source subdirs after checkout so a symlinked subdir cannot make the cache point outside the repo.
