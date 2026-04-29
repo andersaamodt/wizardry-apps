@@ -78,7 +78,7 @@ valid_icns_output_path() {
 safe_icns_output_path() {
   valid_icns_output_path "${1-}" || return 1
   case "${1-}" in
-    .|..|./*|../*|*/./*|*/../*|*/.|*/..)
+    -*|.|..|./*|../*|*/./*|*/../*|*/.|*/..)
       return 1
       ;;
   esac

@@ -74,7 +74,7 @@ app_bundle_path_is_safe() {
     *) return 1 ;;
   esac
   case "$path_value" in
-    .|..|./*|../*|*/./*|*/../*|*/.|*/..)
+    -*|.|..|./*|../*|*/./*|*/../*|*/.|*/..)
       return 1
       ;;
   esac

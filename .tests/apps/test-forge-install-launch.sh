@@ -68,6 +68,13 @@ fi
 grep -F "output path must be a .app bundle" "$scratch/bad-out-bundle.err" >/dev/null
 [ -d "$not_app_bundle" ]
 
+if (cd "$scratch" && sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "-Bad.app" >"$scratch/build-leading-dash.out" 2>"$scratch/build-leading-dash.err"); then
+  printf '%s\n' "build-forge-macos-app accepted leading-dash output path" >&2
+  exit 1
+fi
+grep -F "output path must be a safe .app bundle path" "$scratch/build-leading-dash.err" >/dev/null
+[ ! -e "$scratch/-Bad.app" ]
+
 traversal_build_parent="$scratch/build-parent"
 traversal_build_target="$traversal_build_parent/safe.app/../victim.app"
 mkdir -p "$traversal_build_parent/victim.app"
@@ -158,6 +165,13 @@ if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$bad_icon_ou
 fi
 grep -F "output path must be an .icns file" "$scratch/bad-icon-out.err" >/dev/null
 
+if (cd "$scratch" && sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "-forge.icns" >"$scratch/icon-leading-dash.out" 2>"$scratch/icon-leading-dash.err"); then
+  printf '%s\n' "build-forge-icon accepted leading-dash output path" >&2
+  exit 1
+fi
+grep -F "output path must be a safe .icns file path" "$scratch/icon-leading-dash.err" >/dev/null
+[ ! -e "$scratch/-forge.icns" ]
+
 icon_newline_out="$scratch/forge-icon
 status=forged.icns"
 if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$icon_newline_out" >"$scratch/icon-newline.out" 2>"$scratch/icon-newline.err"; then
@@ -207,6 +221,13 @@ if sh "$install" --root "$root" --home "$fake_home" --app-dir "$not_app_install_
 fi
 grep -F "app path must be a safe .app bundle path" "$scratch/install-not-app.err" >/dev/null
 [ -d "$not_app_install_target" ]
+
+if (cd "$scratch" && sh "$install" --root "$root" --home "$fake_home" --app-dir "-Bad.app" >"$scratch/install-leading-dash.out" 2>"$scratch/install-leading-dash.err"); then
+  printf '%s\n' "install-forge accepted leading-dash app install path" >&2
+  exit 1
+fi
+grep -F "app path must be a safe .app bundle path" "$scratch/install-leading-dash.err" >/dev/null
+[ ! -e "$scratch/-Bad.app" ]
 
 traversal_install_parent="$scratch/install-parent"
 traversal_install_target="$traversal_install_parent/safe.app/../victim.app"
@@ -288,6 +309,13 @@ if sh "$uninstall" --home "$fake_home" --app-dir "$danger_dir" >"$scratch/uninst
 fi
 grep -F "app path must be a safe .app bundle path" "$scratch/uninstall-danger.err" >/dev/null
 [ -d "$danger_dir" ]
+
+if (cd "$scratch" && sh "$uninstall" --home "$fake_home" --app-dir "-Bad.app" >"$scratch/uninstall-leading-dash.out" 2>"$scratch/uninstall-leading-dash.err"); then
+  printf '%s\n' "uninstall-forge accepted leading-dash app removal path" >&2
+  exit 1
+fi
+grep -F "app path must be a safe .app bundle path" "$scratch/uninstall-leading-dash.err" >/dev/null
+[ ! -e "$scratch/-Bad.app" ]
 
 traversal_remove_parent="$scratch/remove-parent"
 traversal_remove_target="$traversal_remove_parent/safe.app/../victim.app"

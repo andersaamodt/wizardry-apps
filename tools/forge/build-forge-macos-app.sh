@@ -193,7 +193,7 @@ valid_app_bundle_path() {
 safe_app_bundle_path() {
   valid_app_bundle_path "${1-}" || return 1
   case "${1-}" in
-    .|..|./*|../*|*/./*|*/../*|*/.|*/..)
+    -*|.|..|./*|../*|*/./*|*/../*|*/.|*/..)
       return 1
       ;;
   esac
