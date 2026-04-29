@@ -68,6 +68,17 @@ fi
 grep -F "output path must be a .app bundle" "$scratch/bad-out-bundle.err" >/dev/null
 [ -d "$not_app_bundle" ]
 
+traversal_build_parent="$scratch/build-parent"
+traversal_build_target="$traversal_build_parent/safe.app/../victim.app"
+mkdir -p "$traversal_build_parent/victim.app"
+printf '%s\n' "preserve" >"$traversal_build_parent/victim.app/marker"
+if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$traversal_build_target" >"$scratch/build-traversal.out" 2>"$scratch/build-traversal.err"; then
+  printf '%s\n' "build-forge-macos-app accepted traversal app output path" >&2
+  exit 1
+fi
+grep -F "output path must be a safe .app bundle path" "$scratch/build-traversal.err" >/dev/null
+grep -Fx "preserve" "$traversal_build_parent/victim.app/marker" >/dev/null
+
 bad_icon_out="$scratch/forge-icon.png"
 if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$bad_icon_out" >"$scratch/bad-icon-out.out" 2>"$scratch/bad-icon-out.err"; then
   printf '%s\n' "build-forge-icon accepted non-icns output path" >&2
@@ -82,6 +93,17 @@ if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$icon_newlin
   exit 1
 fi
 grep -F "output path must not contain line breaks" "$scratch/icon-newline.err" >/dev/null
+
+traversal_icon_parent="$scratch/icon-parent"
+traversal_icon_target="$traversal_icon_parent/safe.icns/../victim.icns"
+mkdir -p "$traversal_icon_parent"
+printf '%s\n' "preserve" >"$traversal_icon_parent/victim.icns"
+if sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$traversal_icon_target" >"$scratch/icon-traversal.out" 2>"$scratch/icon-traversal.err"; then
+  printf '%s\n' "build-forge-icon accepted traversal icon output path" >&2
+  exit 1
+fi
+grep -F "output path must be a safe .icns file path" "$scratch/icon-traversal.err" >/dev/null
+grep -Fx "preserve" "$traversal_icon_parent/victim.icns" >/dev/null
 
 unsafe_root="$scratch/unsafe\$root"
 fake_uname_bin="$scratch/fake-uname-bin"

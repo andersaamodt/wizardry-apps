@@ -75,6 +75,16 @@ valid_icns_output_path() {
   return 1
 }
 
+safe_icns_output_path() {
+  valid_icns_output_path "${1-}" || return 1
+  case "${1-}" in
+    .|..|./*|../*|*/./*|*/../*|*/.|*/..)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 if has_line_break "$root"; then
   printf '%s\n' "build-forge-icon: root path must not contain line breaks" >&2
   exit 2
@@ -87,6 +97,11 @@ fi
 
 valid_icns_output_path "$out_file" || {
   printf '%s\n' "build-forge-icon: output path must be an .icns file" >&2
+  exit 2
+}
+
+safe_icns_output_path "$out_file" || {
+  printf '%s\n' "build-forge-icon: output path must be a safe .icns file path" >&2
   exit 2
 }
 

@@ -190,6 +190,16 @@ valid_app_bundle_path() {
   return 1
 }
 
+safe_app_bundle_path() {
+  valid_app_bundle_path "${1-}" || return 1
+  case "${1-}" in
+    .|..|./*|../*|*/./*|*/../*|*/.|*/..)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 if has_line_break "$root"; then
   printf '%s\n' "build-forge-macos-app: root path must not contain line breaks" >&2
   exit 2
@@ -202,6 +212,11 @@ fi
 
 valid_app_bundle_path "$out_bundle" || {
   printf '%s\n' "build-forge-macos-app: output path must be a .app bundle" >&2
+  exit 2
+}
+
+safe_app_bundle_path "$out_bundle" || {
+  printf '%s\n' "build-forge-macos-app: output path must be a safe .app bundle path" >&2
   exit 2
 }
 
