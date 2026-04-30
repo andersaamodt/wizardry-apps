@@ -178,6 +178,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (BOOL)handleDuplicateLaunchByActivatingExistingInstance;
 - (void)handleDistributedShowWindowRequest:(NSNotification *)notification;
 - (void)syncStonrActivationPolicy;
+- (BOOL)syncBellheimBackgroundModeFromConfig;
 - (void)showMainWindow;
 - (void)openMainWindowFromStatusItem:(id)sender;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
@@ -1668,6 +1669,30 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return [slug isEqualToString:@"bellheim"];
 }
 
+- (BOOL)syncBellheimBackgroundModeFromConfig {
+    if (![self isBellheimApp]) {
+        return NO;
+    }
+    NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
+    NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
+    NSString *configPath = [[[configRoot stringByAppendingPathComponent:@"wizardry-apps"] stringByAppendingPathComponent:@"bellheim"] stringByAppendingPathComponent:@"config.json"];
+    NSData *configData = [NSData dataWithContentsOfFile:configPath];
+    if (configData.length <= 0) {
+        return NO;
+    }
+    id parsedConfig = [NSJSONSerialization JSONObjectWithData:configData options:0 error:nil];
+    NSDictionary *config = [parsedConfig isKindOfClass:[NSDictionary class]] ? parsedConfig : nil;
+    NSDictionary *settings = [config[@"settings"] isKindOfClass:[NSDictionary class]] ? config[@"settings"] : nil;
+    NSDictionary *desktop = [settings[@"desktop"] isKindOfClass:[NSDictionary class]] ? settings[@"desktop"] : nil;
+    id backgroundMode = desktop[@"backgroundMode"];
+    if ([backgroundMode respondsToSelector:@selector(boolValue)] && [backgroundMode boolValue]) {
+        self.keepRunningInBackground = YES;
+        self.showStatusItem = YES;
+        return YES;
+    }
+    return NO;
+}
+
 - (NSString *)stonrBackendScriptPath {
     if (!self.appPath.length) {
         return @"";
@@ -3057,21 +3082,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             self.keepRunningInBackground = YES;
         }
     } else if ([appSlug isEqualToString:@"bellheim"]) {
-        NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
-        NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
-        NSString *configPath = [[[configRoot stringByAppendingPathComponent:@"wizardry-apps"] stringByAppendingPathComponent:@"bellheim"] stringByAppendingPathComponent:@"config.json"];
-        NSData *configData = [NSData dataWithContentsOfFile:configPath];
-        if (configData.length > 0) {
-            id parsedConfig = [NSJSONSerialization JSONObjectWithData:configData options:0 error:nil];
-            NSDictionary *config = [parsedConfig isKindOfClass:[NSDictionary class]] ? parsedConfig : nil;
-            NSDictionary *settings = [config[@"settings"] isKindOfClass:[NSDictionary class]] ? config[@"settings"] : nil;
-            NSDictionary *desktop = [settings[@"desktop"] isKindOfClass:[NSDictionary class]] ? settings[@"desktop"] : nil;
-            id backgroundMode = desktop[@"backgroundMode"];
-            if ([backgroundMode respondsToSelector:@selector(boolValue)] && [backgroundMode boolValue]) {
-                self.keepRunningInBackground = YES;
-                self.showStatusItem = YES;
-            }
-        }
+        [self syncBellheimBackgroundModeFromConfig];
     }
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
@@ -4196,12 +4207,14 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     (void)sender;
+    [self syncBellheimBackgroundModeFromConfig];
     [self syncStonrActivationPolicy];
     return !(self.keepRunningInBackground || self.showStatusItem);
 }
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     (void)sender;
+    [self syncBellheimBackgroundModeFromConfig];
     if (self.explicitQuitRequested) {
         return NSTerminateNow;
     }
@@ -4225,6 +4238,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (BOOL)windowShouldClose:(NSWindow *)sender {
+    [self syncBellheimBackgroundModeFromConfig];
     if ((self.keepRunningInBackground || self.showStatusItem) && sender == self.window) {
         [sender orderOut:nil];
         [self syncStonrActivationPolicy];

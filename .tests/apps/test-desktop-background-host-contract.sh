@@ -23,6 +23,8 @@ grep -F 'Bellheim is running in background' "$mac_host" >/dev/null
 grep -F 'clapperRadius' "$mac_host" >/dev/null
 grep -F 'lineToPoint:NSMakePoint(minX + side * 0.005, lipY)' "$mac_host" >/dev/null
 grep -F 'backgroundMode' "$mac_host" >/dev/null
+grep -F 'syncBellheimBackgroundModeFromConfig' "$mac_host" >/dev/null
+grep -F '[self syncBellheimBackgroundModeFromConfig];' "$mac_host" >/dev/null
 grep -F 'NSVariableStatusItemLength' "$mac_host" >/dev/null
 grep -F 'setTemplate:YES' "$mac_host" >/dev/null
 grep -F 'windowShouldClose:' "$mac_host" >/dev/null
