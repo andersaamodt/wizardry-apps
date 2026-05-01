@@ -113,6 +113,73 @@ printf '%s\n' "$templates" | grep -E '^demo\t' >/dev/null
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-backend.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
+bundle_install_functions=$(awk '
+  /^copy_macos_bundle_contents\(\)/ { printing = 1 }
+  /^macos_app_is_running\(\)/ { printing = 0 }
+  printing { print }
+' "$backend")
+bundle_install_probe="$scratch/bundle-install-probe.sh"
+cat >"$bundle_install_probe" <<SH
+#!/bin/sh
+set -eu
+
+validate_macos_app_bundle_name() {
+  case "\${1-}" in
+    *.app) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+ensure_macos_bundle_signature() {
+  return 0
+}
+
+$bundle_install_functions
+
+src="\${1?missing source bundle}"
+dest="\${2?missing destination bundle}"
+install_macos_bundle "\$src" "\$dest"
+SH
+chmod +x "$bundle_install_probe"
+
+bundle_install_bin="$scratch/bundle-install-bin"
+bundle_install_src="$scratch/Source.app"
+bundle_install_dest="$scratch/Installed.app"
+mkdir -p "$bundle_install_bin" "$bundle_install_src/Contents/MacOS" "$bundle_install_dest/Contents"
+printf '%s\n' '<plist></plist>' >"$bundle_install_src/Contents/Info.plist"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$bundle_install_src/Contents/MacOS/probe"
+chmod +x "$bundle_install_src/Contents/MacOS/probe"
+cat >"$bundle_install_bin/ditto" <<'SH'
+#!/bin/sh
+set -eu
+src=${1?missing source}
+dest=${2?missing destination}
+if [ "$src" = "$dest" ]; then
+  printf '%s\n' "ditto received identical source and destination: $src" >&2
+  exit 7
+fi
+printf '%s\t%s\n' "$src" "$dest" >>"${FORGE_DITTO_LOG?missing log path}"
+mkdir -p "$dest"
+cp -R "$src/." "$dest"
+SH
+chmod +x "$bundle_install_bin/ditto"
+FORGE_DITTO_LOG="$scratch/bundle-install-ditto.log" \
+  PATH="$bundle_install_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
+  sh "$bundle_install_probe" "$bundle_install_src" "$bundle_install_dest"
+[ -x "$bundle_install_dest/Contents/MacOS/probe" ] || {
+  printf '%s\n' "forge backend test: macOS bundle install did not populate destination" >&2
+  exit 1
+}
+ditto_calls=$(wc -l <"$scratch/bundle-install-ditto.log" | tr -d ' ')
+[ "$ditto_calls" = "2" ] || {
+  printf '%s\n' "forge backend test: expected staged and final bundle ditto calls" >&2
+  exit 1
+}
+if awk -F '\t' '$1 == $2 { found = 1 } END { exit found ? 0 : 1 }' "$scratch/bundle-install-ditto.log"; then
+  printf '%s\n' "forge backend test: macOS bundle install copied a bundle onto itself" >&2
+  exit 1
+fi
+
 prefs_home="$scratch/prefs-home"
 mkdir -p "$prefs_home"
 if XDG_CONFIG_HOME="$prefs_home/.config" sh "$backend" set-ui-pref "$scratch" "ab/key" value >/tmp/forge-invalid-pref.out 2>/tmp/forge-invalid-pref.err; then

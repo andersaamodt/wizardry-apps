@@ -1823,63 +1823,63 @@ validate_macos_app_bundle_name() {
 }
 
 copy_macos_bundle_contents() {
-  src_bundle=${1-}
-  dest_bundle=${2-}
-  [ -d "$src_bundle" ] || return 1
-  [ -n "$dest_bundle" ] || return 1
+  macos_copy_src_bundle=${1-}
+  macos_copy_dest_bundle=${2-}
+  [ -d "$macos_copy_src_bundle" ] || return 1
+  [ -n "$macos_copy_dest_bundle" ] || return 1
   if command -v ditto >/dev/null 2>&1; then
-    ditto "$src_bundle" "$dest_bundle" || return 1
+    ditto "$macos_copy_src_bundle" "$macos_copy_dest_bundle" || return 1
   else
-    if [ -d "$dest_bundle" ]; then
+    if [ -d "$macos_copy_dest_bundle" ]; then
       (
-        cd "$src_bundle" || exit 1
+        cd "$macos_copy_src_bundle" || exit 1
         tar -cf - .
       ) | (
-        mkdir -p "$dest_bundle" || exit 1
-        cd "$dest_bundle" || exit 1
+        mkdir -p "$macos_copy_dest_bundle" || exit 1
+        cd "$macos_copy_dest_bundle" || exit 1
         tar -xf -
       ) || return 1
     else
-      cp -R "$src_bundle" "$dest_bundle" || return 1
+      cp -R "$macos_copy_src_bundle" "$macos_copy_dest_bundle" || return 1
     fi
   fi
 }
 
 install_macos_bundle() {
-  src_bundle=${1-}
-  dest_bundle=${2-}
-  [ -d "$src_bundle" ] || return 1
-  [ -n "$dest_bundle" ] || return 1
+  macos_install_src_bundle=${1-}
+  macos_install_dest_bundle=${2-}
+  [ -d "$macos_install_src_bundle" ] || return 1
+  [ -n "$macos_install_dest_bundle" ] || return 1
 
-  bundle_name=$(basename "$dest_bundle")
-  validate_macos_app_bundle_name "$bundle_name"
-  parent_dir=$(dirname "$dest_bundle")
-  mkdir -p "$parent_dir" || return 1
+  macos_install_bundle_name=$(basename "$macos_install_dest_bundle")
+  validate_macos_app_bundle_name "$macos_install_bundle_name"
+  macos_install_parent_dir=$(dirname "$macos_install_dest_bundle")
+  mkdir -p "$macos_install_parent_dir" || return 1
 
-  stage_root=$(mktemp -d "$parent_dir/.${bundle_name}.install.XXXXXX") || return 1
-  stage_bundle="$stage_root/$bundle_name"
-  if ! copy_macos_bundle_contents "$src_bundle" "$stage_bundle"; then
-    rm -rf "$stage_root"
+  macos_install_stage_root=$(mktemp -d "$macos_install_parent_dir/.${macos_install_bundle_name}.install.XXXXXX") || return 1
+  macos_install_stage_bundle="$macos_install_stage_root/$macos_install_bundle_name"
+  if ! copy_macos_bundle_contents "$macos_install_src_bundle" "$macos_install_stage_bundle"; then
+    rm -rf "$macos_install_stage_root"
     return 1
   fi
-  touch "$stage_bundle" >/dev/null 2>&1 || :
-  touch "$stage_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
-  if ! ensure_macos_bundle_signature "$stage_bundle"; then
-    rm -rf "$stage_root"
+  touch "$macos_install_stage_bundle" >/dev/null 2>&1 || :
+  touch "$macos_install_stage_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
+  if ! ensure_macos_bundle_signature "$macos_install_stage_bundle"; then
+    rm -rf "$macos_install_stage_root"
     return 1
   fi
 
-  if ! copy_macos_bundle_contents "$stage_bundle" "$dest_bundle"; then
-    rm -rf "$stage_root"
+  if ! copy_macos_bundle_contents "$macos_install_stage_bundle" "$macos_install_dest_bundle"; then
+    rm -rf "$macos_install_stage_root"
     return 1
   fi
-  touch "$dest_bundle" >/dev/null 2>&1 || :
-  touch "$dest_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
-  if ! ensure_macos_bundle_signature "$dest_bundle"; then
-    rm -rf "$stage_root"
+  touch "$macos_install_dest_bundle" >/dev/null 2>&1 || :
+  touch "$macos_install_dest_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
+  if ! ensure_macos_bundle_signature "$macos_install_dest_bundle"; then
+    rm -rf "$macos_install_stage_root"
     return 1
   fi
-  rm -rf "$stage_root"
+  rm -rf "$macos_install_stage_root"
   return 0
 }
 
