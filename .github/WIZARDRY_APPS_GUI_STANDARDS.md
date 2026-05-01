@@ -226,6 +226,18 @@
 - Do not make buttons, pills, selects, or ordinary text inputs weirdly tall or fat; default control sizing should stay compact unless a larger target is required by a specific workflow.
 - Keep motion subtle and meaningful, never required for comprehension.
 
+## Native macOS App Contract
+- For SwiftUI/AppKit native macOS apps, prefer platform-owned controls over web-style reproductions of controls.
+- Use `NavigationSplitView` with `List(selection:)` for source lists and selector sidebars. Do not rebuild selectable listboxes from `ScrollView`, custom `Button` rows, and manual selection backgrounds unless a native control cannot represent the interaction.
+- Put window-level actions in SwiftUI `.toolbar`/`NSToolbar`, not in a custom in-window title bar that imitates a toolbar.
+- Put document commands such as Export, import/open, preview toggles, indentation visibility, review actions, and settings access in macOS menus with correct keyboard shortcuts and validation/state.
+- Use a `Settings` scene or AppKit settings/preferences window for app preferences. Do not present routine app settings as a generic modal web-form sheet.
+- Use native `Form`, `GroupBox`, `List`, `Table`, `OutlineGroup`, `DisclosureGroup`, inspectors, and split views before inventing card-heavy surfaces.
+- For document-like apps, keep the primary surface readable as a document with native text selection/editing behavior. When the domain has independently editable mini-documents, represent those sections as first-class native document parts with in-place editing/proposal affordances instead of isolated decorative bubbles.
+- Composer/create flows should be specific to the command that opened them. Do not expose unrelated object types or summaries/preambles when the user chose a narrow native command such as New Constitution.
+- Keep web/product/process implementation terms out of native UI labels unless they are user-facing domain concepts.
+- Validate native GUI changes in the running macOS app, including row hit targets, menu state, toolbar layout, settings window behavior, and text editing shortcuts.
+
 ## Conflict Resolution Order
 - If an app implementation conflicts with this file, treat this file as canonical for new work and move touched legacy code toward it.
 - Use Forge interaction patterns as the default baseline for new desktop control-plane apps.
@@ -237,7 +249,7 @@
 ## AI Agent Delivery Rules
 - Prefer surgical edits that preserve each app’s existing visual language.
 - Extend shared patterns already present in Forge/Priorities/Virtual Redditor first.
-- Treat `apps/forge/starter-templates/web/reference-app/` as the canonical reference app for new cross-platform Wizardry apps and refresh it when startup, layout, or GUI standards improve.
+- Treat `apps/forge/starter-templates/web/reference-app/` as the canonical reference app for cross-platform Wizardry apps and `apps/forge/starter-templates/native-desktop/reference-app/` as the canonical reference app for native-style Wizardry desktop apps. Refresh the relevant reference whenever startup, layout, or GUI standards improve.
 - For periodic cross-app GUI drift checks, run the checklist in `/Users/andersaamodt/git/wizardry-apps/.github/GUI_AUDIT.md` and cite evidence per app.
 - When introducing a new pattern, document it in this file within the same change.
 - Avoid speculative frameworks or architectural rewrites without explicit user request.

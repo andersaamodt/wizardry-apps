@@ -350,6 +350,7 @@
                   <label for="starter-native-desktop-select">Native desktop starter</label>
                   <select id="starter-native-desktop-select" class="starter-select">
                     <option value="blank">Blank native desktop project</option>
+                    <option value="reference-app">Native reference desktop app</option>
                   </select>
                 </div>
 
@@ -2358,6 +2359,10 @@
           nativeBlank.value = 'blank';
           nativeBlank.textContent = 'Blank native desktop project';
           els.starterNativeDesktopSelect.appendChild(nativeBlank);
+          var nativeReference = document.createElement('option');
+          nativeReference.value = 'reference-app';
+          nativeReference.textContent = 'Native reference desktop app';
+          els.starterNativeDesktopSelect.appendChild(nativeReference);
           state.workspaces
             .filter(function (ws) { return ws.projectType === nativeDesktopProjectTypeKey(); })
             .forEach(function (ws) {

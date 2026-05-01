@@ -7524,7 +7524,7 @@ workspace_uses_emitted_project_license() {
   starter=${1-}
   context=${2-}
   case "$context:$starter" in
-    web:minimal|web:reference-app|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank)
+    web:minimal|web:reference-app|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank|native-desktop:reference-app)
       return 0
       ;;
   esac
@@ -7610,8 +7610,17 @@ write_native_desktop_starter_template() {
   workspace_dir=$2
   app_name=$3
   app_id=$4
+  starter=${5:-blank}
 
-  template_dir="$root/apps/forge/starter-templates/native-desktop/blank"
+  case "$starter" in
+    blank|reference-app) ;;
+    *)
+      printf '%s\n' "forge-backend: unknown native desktop starter template: $starter" >&2
+      exit 2
+      ;;
+  esac
+
+  template_dir="$root/apps/forge/starter-templates/native-desktop/$starter"
   [ -d "$template_dir" ] || {
     printf '%s\n' "forge-backend: native desktop starter template directory missing: $template_dir" >&2
     exit 1
@@ -7895,7 +7904,7 @@ cmd_scaffold_workspace() {
       development_context=native-desktop
 
       case "$starter" in
-        blank|clone) ;;
+        blank|reference-app|clone) ;;
         *)
           printf '%s\n' "forge-backend: scaffold-workspace unknown native desktop starter: $starter" >&2
           exit 2
@@ -7906,8 +7915,8 @@ cmd_scaffold_workspace() {
       native_ir_path="ir/app.ir.yaml"
 
       case "$starter" in
-        blank)
-          write_native_desktop_starter_template "$root" "$workspace_dir" "$app_name" "$slug"
+        blank|reference-app)
+          write_native_desktop_starter_template "$root" "$workspace_dir" "$app_name" "$slug" "$starter"
           write_emitted_project_legal_files "$root" "$workspace_dir"
           write_emitted_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
           ;;
