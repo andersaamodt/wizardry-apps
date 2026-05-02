@@ -1,6 +1,8 @@
-# Native Desktop Reference App
+# __APP_NAME__
 
-This Forge starter is the canonical native-style reference for Wizardry native desktop apps.
+This Forge starter is the canonical Wizardry Native Desktop Reference App.
+
+It is the native counterpart to the cross-platform `web/reference-app` starter: both demonstrate the same starting workflow shape, while this template converts chrome, sidebars, menus, settings, search, file actions, and editable content into platform-owned controls.
 
 The generated macOS app intentionally demonstrates platform-owned controls:
 
@@ -43,3 +45,6 @@ Native conversion checklist covered by this reference:
 12. Import/export/path flows use native open/save panels or GTK file chooser dialogs.
 
 Keep this starter updated whenever Wizardry native desktop guidance changes.
+
+This project is licensed under GNU AGPL-3.0-or-later.
+Additional terms apply; see WIZARDRY_ADDENDUM.md.

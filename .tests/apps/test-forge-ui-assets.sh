@@ -97,7 +97,8 @@ grep -F ">Log<" "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="target-active-list"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="target-inactive-list"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Left sidebar' "$root/apps/forge/index.html" >/dev/null
-grep -F 'Wizardry Reference Desktop App' "$root/apps/forge/index.html" >/dev/null
+grep -F 'Wizardry Cross-Platform Desktop Reference App' "$root/apps/forge/index.html" >/dev/null
+grep -F 'Wizardry Native Desktop Reference App' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Top bar + graph' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Dashboard' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Studio' "$root/apps/forge/index.html" >/dev/null

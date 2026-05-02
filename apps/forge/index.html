@@ -337,7 +337,7 @@
                   <label for="starter-application-select">Cross-platform starter</label>
                   <select id="starter-application-select" class="starter-select">
                     <option value="minimal">Blank application project</option>
-                    <option value="reference-app">Wizardry Reference Desktop App</option>
+                    <option value="reference-app">Wizardry Cross-Platform Desktop Reference App</option>
                     <option value="panel">Starter: Control panel</option>
                     <option value="sidebar">Starter: Left sidebar</option>
                     <option value="topbar">Starter: Top bar + graph</option>
@@ -350,7 +350,7 @@
                   <label for="starter-native-desktop-select">Native desktop starter</label>
                   <select id="starter-native-desktop-select" class="starter-select">
                     <option value="blank">Blank native desktop project</option>
-                    <option value="reference-app">Native reference desktop app</option>
+                    <option value="reference-app">Wizardry Native Desktop Reference App</option>
                   </select>
                 </div>
 
@@ -2334,7 +2334,7 @@
           els.starterApplicationSelect.innerHTML = '';
           [
             { value: 'minimal', label: 'Blank application project' },
-            { value: 'reference-app', label: 'Wizardry Reference Desktop App' },
+            { value: 'reference-app', label: 'Wizardry Cross-Platform Desktop Reference App' },
             { value: 'panel', label: 'Starter: Control panel' },
             { value: 'sidebar', label: 'Starter: Left sidebar' },
             { value: 'topbar', label: 'Starter: Top bar + graph' },
@@ -2361,7 +2361,7 @@
           els.starterNativeDesktopSelect.appendChild(nativeBlank);
           var nativeReference = document.createElement('option');
           nativeReference.value = 'reference-app';
-          nativeReference.textContent = 'Native reference desktop app';
+          nativeReference.textContent = 'Wizardry Native Desktop Reference App';
           els.starterNativeDesktopSelect.appendChild(nativeReference);
           state.workspaces
             .filter(function (ws) { return ws.projectType === nativeDesktopProjectTypeKey(); })

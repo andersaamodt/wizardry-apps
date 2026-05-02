@@ -7636,6 +7636,9 @@ write_native_desktop_starter_template() {
   render_native_template_file "$template_dir/ir/app.ir.yaml" "$workspace_dir/ir/app.ir.yaml" "$app_name" "$app_id"
   render_native_template_file "$template_dir/scripts/render-native-desktop.sh" "$workspace_dir/scripts/render-native-desktop.sh" "$app_name" "$app_id"
   render_native_template_file "$template_dir/scripts/validate-native-desktop-ir.sh" "$workspace_dir/scripts/validate-native-desktop-ir.sh" "$app_name" "$app_id"
+  if [ -f "$template_dir/README.md" ]; then
+    render_native_template_file "$template_dir/README.md" "$workspace_dir/README.md" "$app_name" "$app_id"
+  fi
   chmod +x "$workspace_dir/scripts/render-native-desktop.sh" "$workspace_dir/scripts/validate-native-desktop-ir.sh"
   cp "$root/schemas/native-desktop-ir-v1.json" "$workspace_dir/schemas/native-desktop-ir-v1.json"
   (

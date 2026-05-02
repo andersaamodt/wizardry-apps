@@ -671,6 +671,16 @@ grep -F '"type": "Window"' "$workspaces_root/workspace-native/ir/app.ir.yaml" >/
 grep -F "Native desktop app scaffolded by App Forge." "$workspaces_root/workspace-native/README.md" >/dev/null
 grep -F "// swift-tools-version:" "$workspaces_root/workspace-native/generated/macos/Package.swift" >/dev/null
 
+workspace_native_reference_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native-reference "Workspace Native Reference" native-desktop reference-app "macos,linux" "" "$workspaces_root")
+printf '%s\n' "$workspace_native_reference_out" | grep -F "created=$workspaces_root/workspace-native-reference" >/dev/null
+[ -f "$workspaces_root/workspace-native-reference/ir/app.ir.yaml" ]
+[ -f "$workspaces_root/workspace-native-reference/generated/macos/Sources/App/App.swift" ]
+[ -f "$workspaces_root/workspace-native-reference/generated/linux/src/main.c" ]
+grep -F "Native Desktop Reference App" "$workspaces_root/workspace-native-reference/README.md" >/dev/null
+grep -F "NSOutlineView" "$workspaces_root/workspace-native-reference/generated/macos/Sources/App/App.swift" >/dev/null
+grep -F "gtk_header_bar_new" "$workspaces_root/workspace-native-reference/generated/linux/src/main.c" >/dev/null
+grep -F "starter=reference-app" "$workspaces_root/workspace-native-reference/wizardry.workspace.conf" >/dev/null
+
 bad_native_ir=$(mktemp "${TMPDIR:-/tmp}/forge-bad-native-ir.XXXXXX")
 jq '.app.name = "Bad \"Name" | .app.window.title = "Bad \"Title"' "$workspaces_root/workspace-native/ir/app.ir.yaml" >"$bad_native_ir"
 if sh "$workspaces_root/workspace-native/scripts/validate-native-desktop-ir.sh" "$bad_native_ir" "$workspaces_root/workspace-native/schemas/native-desktop-ir-v1.json" >/tmp/forge-bad-native-ir.out 2>/tmp/forge-bad-native-ir.err; then
