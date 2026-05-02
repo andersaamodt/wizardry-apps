@@ -232,6 +232,7 @@
 - Put window-level actions in SwiftUI `.toolbar`/`NSToolbar`, not in a custom in-window title bar that imitates a toolbar.
 - Put document commands such as Export, import/open, preview toggles, indentation visibility, review actions, and settings access in macOS menus with correct keyboard shortcuts and validation/state.
 - Use a `Settings` scene or AppKit settings/preferences window for app preferences. Do not present routine app settings as a generic modal web-form sheet.
+- In AppKit-lifecycle SwiftUI apps, let the app delegate own the settings/preferences `NSWindow`; do not attach a hidden `NSViewRepresentable` presenter to root content just to open settings.
 - Use native `Form`, `GroupBox`, `List`, `Table`, `OutlineGroup`, `DisclosureGroup`, inspectors, and split views before inventing card-heavy surfaces.
 - For document-like apps, keep the primary surface readable as a document with native text selection/editing behavior. When the domain has independently editable mini-documents, represent those sections as first-class native document parts with in-place editing/proposal affordances instead of isolated decorative bubbles.
 - Composer/create flows should be specific to the command that opened them. Do not expose unrelated object types or summaries/preambles when the user chose a narrow native command such as New Constitution.

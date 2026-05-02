@@ -349,8 +349,14 @@ private struct SettingsView: View {
 
   var body: some View {
     Form {
-      Toggle("Autosave proposals", isOn: \$model.autosave)
-      Toggle("Sync review state", isOn: \$model.sync)
+      GroupBox("Document Review") {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Use GroupBox for bounded native preference groups instead of custom cards.")
+            .foregroundStyle(.secondary)
+          Toggle("Autosave proposals", isOn: \$model.autosave)
+          Toggle("Sync review state", isOn: \$model.sync)
+        }
+      }
       Picker("Document style", selection: .constant("Native")) {
         Text("Native").tag("Native")
         Text("Compact").tag("Compact")
