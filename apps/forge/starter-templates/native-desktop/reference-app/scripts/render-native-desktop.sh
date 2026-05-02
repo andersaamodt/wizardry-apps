@@ -10,7 +10,7 @@ generated_root="$project_dir/generated"
 macos_dir="$generated_root/macos"
 linux_dir="$generated_root/linux"
 
-"$script_dir/validate-native-desktop-ir.sh" "$ir_path" "$schema_path" >/dev/null
+sh "$script_dir/validate-native-desktop-ir.sh" "$ir_path" "$schema_path" >/dev/null
 
 app_name=$(jq -r '.app.name' "$ir_path")
 app_id=$(jq -r '.app.id' "$ir_path")
@@ -97,6 +97,7 @@ private final class NativeReferenceModel: ObservableObject {
   @Published var selection: String? = "constitution"
   @Published var status = "Ready"
   @Published var search = ""
+  @Published var find = ""
   @Published var showInspector = true
   @Published var selectedSection: SectionDraft.ID? = SectionDraft.samples.first?.id
   @Published var editorText = SectionDraft.samples.first?.body ?? ""
@@ -410,8 +411,8 @@ private struct CollaboratorDraft: Identifiable {
   var body: some View {
     NavigationSplitView {
       VStack(spacing: 0) {
-        TextField("Search", text: \$model.search)
-          .textFieldStyle(.roundedBorder)
+        NativeSearchField(text: \$model.search, placeholder: "Search")
+          .frame(height: 28)
           .padding([.horizontal, .top], 12)
           .padding(.bottom, 8)
 	        NativeSourceList(selection: \$model.selection)
@@ -421,6 +422,10 @@ private struct CollaboratorDraft: Identifiable {
       DetailView(model: model)
         .navigationTitle(model.title)
         .toolbar {
+          ToolbarItem(placement: .automatic) {
+            NativeSearchField(text: \$model.find, placeholder: "Find in Document")
+              .frame(width: 220)
+          }
           ToolbarItemGroup(placement: .primaryAction) {
             Button {
               model.status = "Created a native document section."
@@ -591,6 +596,44 @@ private struct SettingsView: View {
     }
   }
 }
+
+private struct NativeSearchField: NSViewRepresentable {
+  @Binding var text: String
+  let placeholder: String
+
+  func makeNSView(context: Context) -> NSSearchField {
+    let searchField = NSSearchField(frame: .zero)
+    searchField.placeholderString = placeholder
+    searchField.delegate = context.coordinator
+    searchField.sendsSearchStringImmediately = true
+    searchField.sendsWholeSearchString = false
+    return searchField
+  }
+
+  func updateNSView(_ nsView: NSSearchField, context: Context) {
+    nsView.placeholderString = placeholder
+    if nsView.stringValue != text {
+      nsView.stringValue = text
+    }
+  }
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator(text: \$text)
+  }
+
+  final class Coordinator: NSObject, NSSearchFieldDelegate {
+    @Binding var text: String
+
+    init(text: Binding<String>) {
+      _text = text
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+      guard let searchField = notification.object as? NSSearchField else { return }
+      text = searchField.stringValue
+    }
+  }
+}
 EOF
 
 linux_ir_literal=$(printf '%s' "$pretty_ir" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n')
@@ -616,35 +659,202 @@ cat > "$linux_dir/src/main.c" <<EOF
 static const char *wizardry_app_ir =
   "$linux_ir_literal";
 
-static void activate(GtkApplication *app, gpointer user_data) {
-  GtkWidget *window = gtk_application_window_new(app);
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-  GtkWidget *title = gtk_label_new("$app_name");
-  GtkWidget *summary = gtk_label_new("Generated from the canonical native desktop IR.");
-  GtkWidget *targets = gtk_label_new("Targets: $targets_csv");
+typedef struct {
+  GtkStack *main_stack;
+} AppState;
 
-  (void)user_data;
+static void set_margin(GtkWidget *widget, int margin) {
+  gtk_widget_set_margin_top(widget, margin);
+  gtk_widget_set_margin_bottom(widget, margin);
+  gtk_widget_set_margin_start(widget, margin);
+  gtk_widget_set_margin_end(widget, margin);
+}
+
+static void append_label(GtkWidget *box, const char *text) {
+  GtkWidget *label = gtk_label_new(text);
+  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+  gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+  gtk_box_append(GTK_BOX(box), label);
+}
+
+static void append_sidebar_row(GtkListBox *list, const char *page_name, const char *title, const char *subtitle) {
+  GtkWidget *row = gtk_list_box_row_new();
+  GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+  set_margin(content, 8);
+  append_label(content, title);
+  append_label(content, subtitle);
+  g_object_set_data_full(G_OBJECT(row), "native-page", g_strdup(page_name), g_free);
+  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), content);
+  gtk_list_box_append(list, row);
+}
+
+static void sidebar_row_selected(GtkListBox *list, GtkListBoxRow *row, gpointer user_data) {
+  AppState *state = user_data;
+  const char *page_name;
+  (void)list;
+  if (row == NULL) {
+    return;
+  }
+  page_name = g_object_get_data(G_OBJECT(row), "native-page");
+  if (page_name != NULL) {
+    gtk_stack_set_visible_child_name(state->main_stack, page_name);
+  }
+}
+
+static GtkWidget *make_text_editor(const char *text) {
+  GtkWidget *scroller = gtk_scrolled_window_new();
+  GtkWidget *text_view = gtk_text_view_new();
+  GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text_view));
+  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(text_view), GTK_WRAP_WORD_CHAR);
+  gtk_text_buffer_set_text(buffer, text, -1);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroller), text_view);
+  gtk_widget_set_size_request(scroller, -1, 160);
+  gtk_widget_set_hexpand(scroller, TRUE);
+  return scroller;
+}
+
+static GtkWidget *make_document_page(void) {
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+  GtkWidget *document_list = gtk_list_box_new();
+  GtkWidget *section = gtk_frame_new("Editable Section");
+  GtkWidget *section_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  set_margin(box, 18);
+  set_margin(section_box, 12);
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(document_list), GTK_SELECTION_SINGLE);
+  append_sidebar_row(GTK_LIST_BOX(document_list), "document", "Reference Constitution", "Native document list row");
+  append_sidebar_row(GTK_LIST_BOX(document_list), "document", "Supporting Memo", "Full-row selectable supporting document");
+  gtk_box_append(GTK_BOX(box), document_list);
+  append_label(section_box, "Each section behaves like an independently editable mini-document.");
+  gtk_box_append(GTK_BOX(section_box), make_text_editor("Edit this section in place, then save it as a proposal."));
+  gtk_box_append(GTK_BOX(section_box), gtk_button_new_with_label("Save Proposal"));
+  gtk_frame_set_child(GTK_FRAME(section), section_box);
+  gtk_box_append(GTK_BOX(box), section);
+  return box;
+}
+
+static GtkWidget *make_proposals_page(void) {
+  GtkWidget *list = gtk_list_box_new();
+  set_margin(list, 18);
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list), GTK_SELECTION_SINGLE);
+  append_sidebar_row(GTK_LIST_BOX(list), "proposals", "Notice and hearing", "Review queue");
+  append_sidebar_row(GTK_LIST_BOX(list), "proposals", "Archive duty", "Draft proposal");
+  return list;
+}
+
+static GtkWidget *make_collaborators_page(void) {
+  GtkWidget *list = gtk_list_box_new();
+  set_margin(list, 18);
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list), GTK_SELECTION_SINGLE);
+  append_sidebar_row(GTK_LIST_BOX(list), "people", "Aster Vale", "Editor");
+  append_sidebar_row(GTK_LIST_BOX(list), "people", "Lin Arbor", "Reviewer");
+  return list;
+}
+
+static GtkWidget *make_inspector_section(const char *title, const char *body) {
+  GtkWidget *frame = gtk_frame_new(title);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  set_margin(box, 12);
+  append_label(box, body);
+  gtk_frame_set_child(GTK_FRAME(frame), box);
+  return frame;
+}
+
+static GtkWidget *make_inspector_pane(void) {
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  GtkWidget *switcher = gtk_stack_switcher_new();
+  GtkWidget *stack = gtk_stack_new();
+  GtkWidget *section = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  GtkWidget *preview = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  GtkWidget *review = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  set_margin(box, 12);
+  set_margin(section, 6);
+  set_margin(preview, 6);
+  set_margin(review, 6);
+  gtk_box_append(GTK_BOX(section), make_inspector_section("Section", "Status: Draft\nReview: 2 proposals"));
+  gtk_box_append(GTK_BOX(preview), make_inspector_section("Preview", "Show rendered document context without overlay drawers."));
+  gtk_box_append(GTK_BOX(review), make_inspector_section("Review", "Use native right-pane modes for review support."));
+  gtk_stack_add_titled(GTK_STACK(stack), section, "section", "Section");
+  gtk_stack_add_titled(GTK_STACK(stack), preview, "preview", "Preview");
+  gtk_stack_add_titled(GTK_STACK(stack), review, "review", "Review");
+  gtk_stack_switcher_set_stack(GTK_STACK_SWITCHER(switcher), GTK_STACK(stack));
+  gtk_box_append(GTK_BOX(box), switcher);
+  gtk_box_append(GTK_BOX(box), stack);
+  return box;
+}
+
+static GtkWidget *make_preferences_page(void) {
+  GtkWidget *paned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
+  GtkWidget *stack = gtk_stack_new();
+  GtkWidget *sidebar = gtk_stack_sidebar_new();
+  GtkWidget *general = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  GtkWidget *review = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  set_margin(general, 18);
+  set_margin(review, 18);
+  append_label(general, "Autosave proposals");
+  gtk_box_append(GTK_BOX(general), gtk_check_button_new_with_label("Sync review state"));
+  append_label(review, "Review mode");
+  gtk_box_append(GTK_BOX(review), gtk_check_button_new_with_label("Show inspector"));
+  gtk_stack_add_titled(GTK_STACK(stack), general, "general", "General");
+  gtk_stack_add_titled(GTK_STACK(stack), review, "review", "Review");
+  gtk_stack_sidebar_set_stack(GTK_STACK_SIDEBAR(sidebar), GTK_STACK(stack));
+  gtk_paned_set_start_child(GTK_PANED(paned), sidebar);
+  gtk_paned_set_end_child(GTK_PANED(paned), stack);
+  gtk_paned_set_position(GTK_PANED(paned), 160);
+  return paned;
+}
+
+static void activate(GtkApplication *app, gpointer user_data) {
+  AppState *state = user_data;
+  GtkWidget *window = gtk_application_window_new(app);
+  GtkWidget *header = gtk_header_bar_new();
+  GtkWidget *header_search = gtk_search_entry_new();
+  GtkWidget *body = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
+  GtkWidget *sidebar = gtk_list_box_new();
+  GtkWidget *center = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
+  GtkWidget *inspector = make_inspector_pane();
+
   (void)wizardry_app_ir;
 
   gtk_window_set_title(GTK_WINDOW(window), "$window_title");
   gtk_window_set_default_size(GTK_WINDOW(window), 960, 640);
-  gtk_widget_set_margin_top(box, 20);
-  gtk_widget_set_margin_bottom(box, 20);
-  gtk_widget_set_margin_start(box, 20);
-  gtk_widget_set_margin_end(box, 20);
-  gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
-  gtk_label_set_xalign(GTK_LABEL(summary), 0.0f);
-  gtk_label_set_xalign(GTK_LABEL(targets), 0.0f);
-  gtk_box_append(GTK_BOX(box), title);
-  gtk_box_append(GTK_BOX(box), summary);
-  gtk_box_append(GTK_BOX(box), targets);
-  gtk_window_set_child(GTK_WINDOW(window), box);
+  gtk_window_set_titlebar(GTK_WINDOW(window), header);
+  gtk_widget_set_size_request(header_search, 220, -1);
+  gtk_header_bar_pack_start(GTK_HEADER_BAR(header), gtk_button_new_with_label("New Section"));
+  gtk_header_bar_pack_start(GTK_HEADER_BAR(header), gtk_button_new_with_label("Review"));
+  gtk_header_bar_pack_end(GTK_HEADER_BAR(header), gtk_button_new_with_label("Export"));
+  gtk_header_bar_pack_end(GTK_HEADER_BAR(header), header_search);
+
+  state->main_stack = GTK_STACK(gtk_stack_new());
+  gtk_stack_set_transition_type(state->main_stack, GTK_STACK_TRANSITION_TYPE_CROSSFADE);
+  gtk_stack_add_titled(state->main_stack, make_document_page(), "document", "Document");
+  gtk_stack_add_titled(state->main_stack, make_proposals_page(), "proposals", "Proposals");
+  gtk_stack_add_titled(state->main_stack, make_collaborators_page(), "people", "Collaborators");
+  gtk_stack_add_titled(state->main_stack, make_preferences_page(), "preferences", "Preferences");
+  gtk_stack_set_visible_child_name(state->main_stack, "document");
+
+  set_margin(sidebar, 12);
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(sidebar), GTK_SELECTION_BROWSE);
+  append_sidebar_row(GTK_LIST_BOX(sidebar), "document", "Reference Constitution", "Document");
+  append_sidebar_row(GTK_LIST_BOX(sidebar), "proposals", "Proposals", "Review queue");
+  append_sidebar_row(GTK_LIST_BOX(sidebar), "people", "Collaborators", "People");
+  append_sidebar_row(GTK_LIST_BOX(sidebar), "preferences", "Preferences", "Settings");
+  g_signal_connect(sidebar, "row-selected", G_CALLBACK(sidebar_row_selected), state);
+  gtk_list_box_select_row(GTK_LIST_BOX(sidebar), gtk_list_box_get_row_at_index(GTK_LIST_BOX(sidebar), 0));
+
+  gtk_paned_set_start_child(GTK_PANED(center), GTK_WIDGET(state->main_stack));
+  gtk_paned_set_end_child(GTK_PANED(center), inspector);
+  gtk_paned_set_position(GTK_PANED(center), 620);
+  gtk_paned_set_start_child(GTK_PANED(body), sidebar);
+  gtk_paned_set_end_child(GTK_PANED(body), center);
+  gtk_paned_set_position(GTK_PANED(body), 230);
+  gtk_window_set_child(GTK_WINDOW(window), body);
   gtk_window_present(GTK_WINDOW(window));
 }
 
 int main(int argc, char **argv) {
+  AppState state = {0};
   GtkApplication *app = gtk_application_new("app.$app_id", G_APPLICATION_DEFAULT_FLAGS);
-  g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+  g_signal_connect(app, "activate", G_CALLBACK(activate), &state);
   int status = g_application_run(G_APPLICATION(app), argc, argv);
   g_object_unref(app);
   return status;
