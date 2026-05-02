@@ -228,7 +228,7 @@
 
 ## Native macOS App Contract
 - For SwiftUI/AppKit native macOS apps, prefer platform-owned controls over web-style reproductions of controls.
-- Use `NavigationSplitView` with `List(selection:)` for source lists and selector sidebars. Do not rebuild selectable listboxes from `ScrollView`, custom `Button` rows, and manual selection backgrounds unless a native control cannot represent the interaction.
+- Use `NavigationSplitView` with native source-list controls for selector sidebars. `List(selection:)` is acceptable for straightforward SwiftUI sidebars; use an AppKit `NSOutlineView`/`NSTableView` wrapper when the app needs source-list group rows, full-row hit testing, embedded row controls, or warning-free accessibility traversal. Do not rebuild selectable listboxes from `ScrollView`, custom `Button` rows, and manual selection backgrounds unless a native control cannot represent the interaction.
 - Put window-level actions in SwiftUI `.toolbar`/`NSToolbar`, not in a custom in-window title bar that imitates a toolbar.
 - Put document commands such as Export, import/open, preview toggles, indentation visibility, review actions, and settings access in macOS menus with correct keyboard shortcuts and validation/state.
 - Use a `Settings` scene or AppKit settings/preferences window for app preferences. Do not present routine app settings as a generic modal web-form sheet.
@@ -238,7 +238,7 @@
 - Composer/create flows should be specific to the command that opened them. Do not expose unrelated object types or summaries/preambles when the user chose a narrow native command such as New Constitution.
 - Keep web/product/process implementation terms out of native UI labels unless they are user-facing domain concepts.
 - Validate native GUI changes in the running macOS app, including row hit targets, menu state, toolbar layout, settings window behavior, and text editing shortcuts.
-- The native reference starter must continue to demonstrate these ten conversion targets: native source list selection, document-feeling mini-doc editing, native toolbar, native forms/sheets, `List`/`Table` data surfaces instead of cards, native sidebar behavior, validated menu state, Settings-window preferences, domain terminology, and platform controls for routine chrome.
+- The native reference starter must continue to demonstrate these ten conversion targets: native source list selection, document-feeling mini-doc editing, native toolbar, native forms/sheets, `List`/`Table`/`NSOutlineView` data surfaces instead of cards, native sidebar behavior, validated menu state, Settings-window preferences, domain terminology, and platform controls for routine chrome.
 
 ## Conflict Resolution Order
 - If an app implementation conflicts with this file, treat this file as canonical for new work and move touched legacy code toward it.

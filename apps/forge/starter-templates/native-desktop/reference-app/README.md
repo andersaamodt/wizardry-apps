@@ -4,7 +4,7 @@ This Forge starter is the canonical native-style reference for Wizardry native d
 
 The generated macOS app intentionally demonstrates platform-owned controls:
 
-- `NavigationSplitView` with `List(selection:)` for source-list selection.
+- `NavigationSplitView` with an AppKit-backed `NSOutlineView` source list for grouped sidebar selection.
 - SwiftUI toolbar items instead of a custom in-window top bar.
 - macOS `Commands` and a `Settings` scene for menu and preferences behavior.
 - `Form`, `GroupBox`, `List`, and `Table` instead of card-heavy custom selectors.
@@ -16,7 +16,7 @@ The generated macOS app intentionally demonstrates platform-owned controls:
 
 Native conversion checklist covered by this reference:
 
-1. Source lists use `NavigationSplitView` and `List(selection:)`.
+1. Source lists use `NavigationSplitView` with native `List(selection:)` or AppKit `NSOutlineView` controls, depending on interaction complexity.
 2. Document sections remain readable as a document while mini-doc sections are explicit editable parts.
 3. Window actions live in `.toolbar` and Commands.
 4. Creation/settings surfaces use `Form`, `Section`, `LabeledContent`, and bounded controls.

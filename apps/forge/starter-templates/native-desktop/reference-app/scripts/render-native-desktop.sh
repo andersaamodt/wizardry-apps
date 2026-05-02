@@ -48,7 +48,8 @@ EOF
 
 cat > "$macos_dir/Sources/App/App.swift" <<EOF
 // Generated from ir/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
-import SwiftUI
+	import AppKit
+	import SwiftUI
 
 private let canonicalIR = """
 $pretty_ir
@@ -140,11 +141,11 @@ private struct CollaboratorDraft: Identifiable {
   ]
 }
 
-private struct SectionDraft: Identifiable {
-  let id: String
-  let number: String
-  let title: String
-  let body: String
+	private struct SectionDraft: Identifiable {
+	  let id: String
+	  let number: String
+	  let title: String
+	  let body: String
 
   static let samples = [
     SectionDraft(
@@ -165,10 +166,245 @@ private struct SectionDraft: Identifiable {
       title: "Amendment Process",
       body: "Review commands live in the toolbar and menu bar instead of a custom web-style overflow menu."
     )
-  ]
-}
+	  ]
+	}
 
-private struct RootView: View {
+	private final class SourceListItem: NSObject {
+	  let identifier: String
+	  let title: String
+	  let subtitle: String?
+	  let symbolName: String?
+	  let isGroup: Bool
+	  let children: [SourceListItem]
+
+	  init(identifier: String, title: String, subtitle: String?, symbolName: String?, isGroup: Bool = false, children: [SourceListItem] = []) {
+	    self.identifier = identifier
+	    self.title = title
+	    self.subtitle = subtitle
+	    self.symbolName = symbolName
+	    self.isGroup = isGroup
+	    self.children = children
+	    super.init()
+	  }
+	}
+
+	private struct NativeSourceList: NSViewRepresentable {
+	  @Binding var selection: String?
+
+	  private var nodes: [SourceListItem] {
+	    [
+	      SourceListItem(
+	        identifier: "group:documents",
+	        title: "Documents",
+	        subtitle: nil,
+	        symbolName: nil,
+	        isGroup: true,
+	        children: [
+	          SourceListItem(identifier: "constitution", title: "Reference Constitution", subtitle: "Document", symbolName: "doc.text"),
+	          SourceListItem(identifier: "proposals", title: "Proposals", subtitle: "Review queue", symbolName: "checklist"),
+	          SourceListItem(identifier: "people", title: "Collaborators", subtitle: "People", symbolName: "person.2")
+	        ]
+	      )
+	    ]
+	  }
+
+	  func makeCoordinator() -> Coordinator {
+	    Coordinator(selection: \$selection)
+	  }
+
+	  func makeNSView(context: Context) -> NSScrollView {
+	    context.coordinator.makeScrollView()
+	  }
+
+	  func updateNSView(_ scrollView: NSScrollView, context: Context) {
+	    context.coordinator.selection = \$selection
+	    context.coordinator.update(nodes: nodes, selectedIdentifier: selection)
+	  }
+
+	  @MainActor
+	  final class Coordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
+	    private static let columnIdentifier = NSUserInterfaceItemIdentifier("source")
+	    private var outlineView: NSOutlineView?
+	    private var nodes: [SourceListItem] = []
+	    private var programmaticSelection = false
+	    var selection: Binding<String?>
+
+	    init(selection: Binding<String?>) {
+	      self.selection = selection
+	    }
+
+	    func makeScrollView() -> NSScrollView {
+	      let outlineView = NSOutlineView()
+	      outlineView.headerView = nil
+	      outlineView.backgroundColor = .clear
+	      outlineView.usesAlternatingRowBackgroundColors = false
+	      outlineView.rowSizeStyle = .default
+	      outlineView.allowsEmptySelection = false
+	      outlineView.allowsMultipleSelection = false
+	      outlineView.floatsGroupRows = false
+	      outlineView.indentationPerLevel = 0
+	      outlineView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
+	      outlineView.autoresizesOutlineColumn = true
+	      outlineView.dataSource = self
+	      outlineView.delegate = self
+	      if #available(macOS 11.0, *) {
+	        outlineView.style = .sourceList
+	      }
+
+	      let column = NSTableColumn(identifier: Self.columnIdentifier)
+	      column.minWidth = 180
+	      column.width = 240
+	      column.resizingMask = .autoresizingMask
+	      outlineView.addTableColumn(column)
+	      outlineView.outlineTableColumn = column
+
+	      let scrollView = NSScrollView()
+	      scrollView.borderType = .noBorder
+	      scrollView.drawsBackground = false
+	      scrollView.hasVerticalScroller = true
+	      scrollView.autohidesScrollers = true
+	      scrollView.documentView = outlineView
+	      self.outlineView = outlineView
+	      return scrollView
+	    }
+
+	    func update(nodes: [SourceListItem], selectedIdentifier: String?) {
+	      guard let outlineView else { return }
+	      self.nodes = nodes
+	      programmaticSelection = true
+	      outlineView.reloadData()
+	      nodes.forEach { outlineView.expandItem(\$0) }
+	      outlineView.sizeLastColumnToFit()
+	      if let selectedIdentifier {
+	        select(identifier: selectedIdentifier)
+	      }
+	      programmaticSelection = false
+	    }
+
+	    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+	      guard let item = item as? SourceListItem else { return nodes.count }
+	      return item.children.count
+	    }
+
+	    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+	      guard let item = item as? SourceListItem else { return nodes[index] }
+	      return item.children[index]
+	    }
+
+	    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+	      (item as? SourceListItem)?.children.isEmpty == false
+	    }
+
+	    func outlineView(_ outlineView: NSOutlineView, isGroupItem item: Any) -> Bool {
+	      (item as? SourceListItem)?.isGroup == true
+	    }
+
+	    func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool {
+	      (item as? SourceListItem)?.isGroup == false
+	    }
+
+	    func outlineViewSelectionDidChange(_ notification: Notification) {
+	      guard !programmaticSelection, let outlineView else { return }
+	      let row = outlineView.selectedRow
+	      guard row >= 0, let item = outlineView.item(atRow: row) as? SourceListItem, !item.isGroup else { return }
+	      selection.wrappedValue = item.identifier
+	    }
+
+	    func outlineView(_ outlineView: NSOutlineView, heightOfRowByItem item: Any) -> CGFloat {
+	      guard let item = item as? SourceListItem else { return 30 }
+	      return item.isGroup ? 28 : 44
+	    }
+
+	    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+	      guard let item = item as? SourceListItem else { return nil }
+	      return item.isGroup ? groupCell(for: item) : rowCell(for: item)
+	    }
+
+	    private func select(identifier: String) {
+	      guard let outlineView, let item = item(withIdentifier: identifier, in: nodes) else { return }
+	      let row = outlineView.row(forItem: item)
+	      guard row >= 0 else { return }
+	      outlineView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+	    }
+
+	    private func item(withIdentifier identifier: String, in items: [SourceListItem]) -> SourceListItem? {
+	      for item in items {
+	        if item.identifier == identifier { return item }
+	        if let match = self.item(withIdentifier: identifier, in: item.children) { return match }
+	      }
+	      return nil
+	    }
+
+	    private func groupCell(for item: SourceListItem) -> NSTableCellView {
+	      let cell = NSTableCellView()
+	      let title = label(item.title, font: .systemFont(ofSize: 11, weight: .semibold), color: .secondaryLabelColor)
+	      let stack = horizontalStack()
+	      stack.addArrangedSubview(title)
+	      attach(stack, to: cell)
+	      return cell
+	    }
+
+	    private func rowCell(for item: SourceListItem) -> NSTableCellView {
+	      let cell = NSTableCellView()
+	      let stack = horizontalStack()
+	      if let symbolName = item.symbolName {
+	        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: item.title) ?? NSImage()
+	        let imageView = NSImageView(image: image)
+	        imageView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+	        imageView.contentTintColor = .secondaryLabelColor
+	        imageView.translatesAutoresizingMaskIntoConstraints = false
+	        imageView.widthAnchor.constraint(equalToConstant: 16).isActive = true
+	        imageView.heightAnchor.constraint(equalToConstant: 16).isActive = true
+	        stack.addArrangedSubview(imageView)
+	      }
+
+	      let textStack = NSStackView()
+	      textStack.orientation = .vertical
+	      textStack.alignment = .leading
+	      textStack.spacing = 1
+	      let title = label(item.title, font: .systemFont(ofSize: 13), color: .labelColor)
+	      cell.textField = title
+	      textStack.addArrangedSubview(title)
+	      if let subtitle = item.subtitle {
+	        textStack.addArrangedSubview(label(subtitle, font: .systemFont(ofSize: 11), color: .secondaryLabelColor))
+	      }
+	      stack.addArrangedSubview(textStack)
+	      attach(stack, to: cell)
+	      return cell
+	    }
+
+	    private func horizontalStack() -> NSStackView {
+	      let stack = NSStackView()
+	      stack.orientation = .horizontal
+	      stack.alignment = .centerY
+	      stack.spacing = 8
+	      stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+	      return stack
+	    }
+
+	    private func label(_ text: String, font: NSFont, color: NSColor) -> NSTextField {
+	      let field = NSTextField(labelWithString: text)
+	      field.font = font
+	      field.textColor = color
+	      field.maximumNumberOfLines = 1
+	      field.lineBreakMode = .byTruncatingTail
+	      return field
+	    }
+
+	    private func attach(_ view: NSView, to cell: NSTableCellView) {
+	      view.translatesAutoresizingMaskIntoConstraints = false
+	      cell.addSubview(view)
+	      NSLayoutConstraint.activate([
+	        view.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+	        view.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
+	        view.topAnchor.constraint(equalTo: cell.topAnchor),
+	        view.bottomAnchor.constraint(equalTo: cell.bottomAnchor)
+	      ])
+	    }
+	  }
+	}
+
+	private struct RootView: View {
   @ObservedObject var model: NativeReferenceModel
 
   var body: some View {
@@ -178,17 +414,7 @@ private struct RootView: View {
           .textFieldStyle(.roundedBorder)
           .padding([.horizontal, .top], 12)
           .padding(.bottom, 8)
-        List(selection: \$model.selection) {
-          Section("Documents") {
-            Label("Reference Constitution", systemImage: "doc.text")
-              .tag("constitution")
-            Label("Proposals", systemImage: "checklist")
-              .tag("proposals")
-            Label("Collaborators", systemImage: "person.2")
-              .tag("people")
-          }
-        }
-        .listStyle(.sidebar)
+	        NativeSourceList(selection: \$model.selection)
       }
       .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 360)
     } detail: {
