@@ -1,0 +1,343 @@
+#!/bin/sh
+
+set -eu
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}
+export PATH
+
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+
+say() {
+  printf '%s\n' "$1"
+}
+
+has_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+os_name() {
+  uname -s 2>/dev/null || printf unknown
+}
+
+arch_name() {
+  uname -m 2>/dev/null || printf unknown
+}
+
+run_privileged() {
+  if "$@" 2>/dev/null; then
+    return 0
+  fi
+  if type run_sudo_cmd >/dev/null 2>&1; then
+    run_sudo_cmd "$@"
+    return 0
+  fi
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+    return 0
+  fi
+  if has_cmd sudo; then
+    sudo "$@"
+    return 0
+  fi
+  "$@"
+}
+
+user_bin_dir() {
+  if [ -n "${XDG_BIN_HOME:-}" ]; then
+    printf '%s\n' "$XDG_BIN_HOME"
+  else
+    printf '%s\n' "${HOME:?}/.local/bin"
+  fi
+}
+
+pkg_manager() {
+  if has_cmd apt-get; then
+    printf apt
+  elif has_cmd dnf; then
+    printf dnf
+  elif has_cmd pacman; then
+    printf pacman
+  elif has_cmd zypper; then
+    printf zypper
+  elif has_cmd pkgin; then
+    printf pkgin
+  elif has_cmd brew; then
+    printf brew
+  elif has_cmd nix-env; then
+    printf nix-env
+  else
+    printf none
+  fi
+}
+
+install_package() {
+  apt_package=$1
+  dnf_package=$2
+  pacman_package=$3
+  brew_package=$4
+  nix_package=$5
+  zypper_package=${6:-$dnf_package}
+  pkgin_package=${7:-$brew_package}
+
+  case "$(pkg_manager)" in
+    apt)
+      run_privileged apt-get update -y >/dev/null
+      run_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y "$apt_package" >/dev/null
+      ;;
+    dnf)
+      run_privileged dnf install -y "$dnf_package" >/dev/null
+      ;;
+    pacman)
+      run_privileged pacman -Sy --noconfirm "$pacman_package" >/dev/null
+      ;;
+    zypper)
+      run_privileged zypper --non-interactive install "$zypper_package" >/dev/null
+      ;;
+    pkgin)
+      run_privileged pkgin -y install "$pkgin_package" >/dev/null
+      ;;
+    brew)
+      brew install "$brew_package" >/dev/null
+      ;;
+    nix-env)
+      nix-env -iA "nixpkgs.$nix_package" >/dev/null
+      ;;
+    *)
+      say "native-desktop-compilation: no supported package manager found." >&2
+      exit 1
+      ;;
+  esac
+}
+
+tool_command() {
+  case "$1" in
+    appimagetool) printf appimagetool ;;
+    c-compiler) printf cc ;;
+    desktop-file-utils) printf desktop-file-validate ;;
+    dpkg-dev) printf dpkg-deb ;;
+    gtk3) printf pkg-config ;;
+    gtk4) printf pkg-config ;;
+    jq) printf jq ;;
+    meson) printf meson ;;
+    ninja) printf ninja ;;
+    nix) printf nix ;;
+    pkg-config) printf pkg-config ;;
+    swift) printf swift ;;
+    webkitgtk) printf pkg-config ;;
+    xcode-clt) printf xcode-select ;;
+    *) return 1 ;;
+  esac
+}
+
+tool_label() {
+  case "$1" in
+    appimagetool) printf 'AppImage tool' ;;
+    c-compiler) printf 'C compiler' ;;
+    desktop-file-utils) printf 'desktop-file-utils' ;;
+    dpkg-dev) printf 'Debian packaging tools' ;;
+    gtk3) printf 'GTK3 development headers' ;;
+    gtk4) printf 'GTK4 development headers' ;;
+    jq) printf 'jq' ;;
+    meson) printf 'Meson' ;;
+    ninja) printf 'Ninja' ;;
+    nix) printf 'Nix' ;;
+    pkg-config) printf 'pkg-config' ;;
+    swift) printf 'Swift toolchain' ;;
+    webkitgtk) printf 'WebKitGTK 4.1 development headers' ;;
+    xcode-clt) printf 'Xcode Command Line Tools' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+platform_tool_ids() {
+  printf '%s\n' c-compiler jq pkg-config meson ninja
+  case "$(os_name)" in
+    Darwin)
+      printf '%s\n' xcode-clt swift gtk4 nix
+      ;;
+    Linux)
+      printf '%s\n' gtk3 webkitgtk gtk4 appimagetool dpkg-dev desktop-file-utils nix
+      ;;
+    *)
+      printf '%s\n' gtk3 webkitgtk gtk4 appimagetool dpkg-dev desktop-file-utils nix
+      ;;
+  esac
+}
+
+is_tool_installed() {
+  tool=$1
+  case "$tool" in
+    c-compiler)
+      has_cmd cc || has_cmd clang || has_cmd gcc
+      ;;
+    gtk4)
+      has_cmd pkg-config && pkg-config --exists gtk4
+      ;;
+    gtk3)
+      has_cmd pkg-config && pkg-config --exists gtk+-3.0
+      ;;
+    webkitgtk)
+      has_cmd pkg-config && pkg-config --exists webkit2gtk-4.1
+      ;;
+    xcode-clt)
+      [ "$(os_name)" != "Darwin" ] || xcode-select -p >/dev/null 2>&1
+      ;;
+    nix)
+      has_cmd nix || has_cmd nix-env
+      ;;
+    *)
+      cmd=$(tool_command "$tool" 2>/dev/null || true)
+      [ -n "$cmd" ] && has_cmd "$cmd"
+      ;;
+  esac
+}
+
+print_tool_status() {
+  tool=$1
+  label=$(tool_label "$tool")
+  if is_tool_installed "$tool"; then
+    printf '[X] %s\n' "$label"
+  else
+    printf '[ ] %s\n' "$label"
+  fi
+}
+
+install_tool_main() {
+  tool=$1
+  shift || true
+  case "${1-}" in
+    --help|--usage|-h)
+      cat <<USAGE
+Usage: install-$tool
+
+Installs $(tool_label "$tool") for native desktop application builds when a supported installer is available on this platform.
+USAGE
+      return 0
+      ;;
+  esac
+  install_tool "$tool"
+}
+
+install_appimagetool() {
+  if is_tool_installed appimagetool; then
+    say "appimagetool is already installed"
+    return 0
+  fi
+  [ "$(os_name)" = "Linux" ] || {
+    say "install-appimagetool: AppImage tooling is only available on Linux." >&2
+    exit 1
+  }
+  case "$(arch_name)" in
+    x86_64|amd64) appimage_arch=x86_64 ;;
+    aarch64|arm64) appimage_arch=aarch64 ;;
+    *)
+      say "install-appimagetool: unsupported architecture $(arch_name)" >&2
+      exit 1
+      ;;
+  esac
+  if has_cmd curl; then
+    fetch_cmd="curl -fsSL"
+  elif has_cmd wget; then
+    fetch_cmd="wget -qO-"
+  else
+    say "install-appimagetool: curl or wget is required." >&2
+    exit 1
+  fi
+  bin_dir=$(user_bin_dir)
+  mkdir -p "$bin_dir"
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/appimagetool.XXXXXX")
+  trap 'rm -f "$tmp_file"' EXIT HUP INT TERM
+  url="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${appimage_arch}.AppImage"
+  # shellcheck disable=SC2086
+  $fetch_cmd "$url" >"$tmp_file"
+  chmod 755 "$tmp_file"
+  mv "$tmp_file" "$bin_dir/appimagetool.AppImage"
+  cat >"$bin_dir/appimagetool" <<'APPIMAGETOOL_WRAPPER'
+#!/bin/sh
+APPIMAGE_EXTRACT_AND_RUN=${APPIMAGE_EXTRACT_AND_RUN:-1}
+export APPIMAGE_EXTRACT_AND_RUN
+exec "$(dirname "$0")/appimagetool.AppImage" "$@"
+APPIMAGETOOL_WRAPPER
+  chmod 755 "$bin_dir/appimagetool" "$bin_dir/appimagetool.AppImage"
+  say "Installed appimagetool to $bin_dir/appimagetool"
+}
+
+install_xcode_clt() {
+  [ "$(os_name)" = "Darwin" ] || {
+    say "Xcode Command Line Tools are not required on this platform."
+    return 0
+  }
+  if is_tool_installed xcode-clt; then
+    say "Xcode Command Line Tools are already installed"
+    return 0
+  fi
+  xcode-select --install
+  say "Started Xcode Command Line Tools installer."
+}
+
+install_tool() {
+  tool=$1
+  case "$tool" in
+    appimagetool)
+      install_appimagetool
+      ;;
+    c-compiler)
+      install_package build-essential gcc base-devel gcc gcc stdenv.cc gcc gcc
+      ;;
+    desktop-file-utils)
+      install_package desktop-file-utils desktop-file-utils desktop-file-utils desktop-file-utils desktop-file-utils desktop-file-utils desktop-file-utils
+      ;;
+    dpkg-dev)
+      install_package dpkg-dev dpkg-dev dpkg dpkg dpkg dpkg dpkg
+      ;;
+    gtk3)
+      install_package libgtk-3-dev gtk3-devel gtk3 gtk+3 gtk3 gtk3-devel gtk3
+      ;;
+    gtk4)
+      install_package libgtk-4-dev gtk4-devel gtk4 gtk4 gtk4 gtk4-devel gtk4
+      ;;
+    jq)
+      install_package jq jq jq jq jq jq jq
+      ;;
+    meson)
+      install_package meson meson meson meson meson meson meson
+      ;;
+    ninja)
+      install_package ninja-build ninja-build ninja ninja ninja ninja ninja-build
+      ;;
+    nix)
+      if is_tool_installed nix; then
+        say "Nix is already installed"
+      else
+        say "install-nix: use the official installer at https://nixos.org/download/ for this platform." >&2
+        exit 1
+      fi
+      ;;
+    pkg-config)
+      install_package pkg-config pkgconf pkgconf pkg-config pkg-config pkgconf pkg-config
+      ;;
+    swift)
+      if is_tool_installed swift; then
+        say "Swift is already installed"
+      elif [ "$(os_name)" = "Darwin" ]; then
+        install_xcode_clt
+      else
+        say "install-swift: install the Swift toolchain from https://www.swift.org/install/ for this platform." >&2
+        exit 1
+      fi
+      ;;
+    webkitgtk)
+      install_package libwebkit2gtk-4.1-dev webkit2gtk4.1-devel webkit2gtk-4.1 webkitgtk webkitgtk_4_1 webkit2gtk4-devel webkit-gtk
+      ;;
+    xcode-clt)
+      install_xcode_clt
+      ;;
+    *)
+      say "native-desktop-compilation: unknown tool '$tool'" >&2
+      exit 2
+      ;;
+  esac
+  if is_tool_installed "$tool"; then
+    say "$(tool_label "$tool") is installed"
+  fi
+}

@@ -474,10 +474,37 @@ printf '%s\n' "$arcana" | grep -E '^wizardry-apps\|(installed|partial install|no
   printf '%s\n' "list-arcana-install should normalize wizardry-apps status" >&2
   exit 1
 }
+printf '%s\n' "$arcana" | grep -E '^native-desktop-compilation\|(installed|partial install|not installed|ready|running)' >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-install missing native desktop compilation module" >&2
+  exit 1
+}
 
 arcana_items=$(sh "$backend" list-arcana-module-items web-wizardry "$root/spells/.arcana")
 printf '%s\n' "$arcana_items" | grep -F "|web-wizardry-menu|" >/dev/null 2>&1 || {
   printf '%s\n' "list-arcana-module-items missing web-wizardry-menu" >&2
+  exit 1
+}
+
+native_arcana_items=$(sh "$backend" list-arcana-module-items native-desktop-compilation "$root/spells/.arcana")
+printf '%s\n' "$native_arcana_items" | grep -F "install|install-appimagetool|install appimagetool" >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-module-items missing appimagetool installer" >&2
+  exit 1
+}
+printf '%s\n' "$native_arcana_items" | grep -F "install|install-gtk4|install gtk4" >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-module-items missing gtk4 installer" >&2
+  exit 1
+}
+printf '%s\n' "$native_arcana_items" | grep -F "install|install-webkitgtk|install webkitgtk" >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-module-items missing WebKitGTK installer" >&2
+  exit 1
+}
+printf '%s\n' "$native_arcana_items" | grep -E '^status-detail\|\[[ X]\] ' >/dev/null 2>&1 || {
+  printf '%s\n' "list-arcana-module-items missing native compilation status details" >&2
+  exit 1
+}
+native_help=$(sh "$backend" run-arcana-module-item native-desktop-compilation install-appimagetool "$root/spells/.arcana" --help 2>/dev/null || true)
+printf '%s\n' "$native_help" | grep -F "Usage: install-appimagetool" >/dev/null 2>&1 || {
+  printf '%s\n' "run-arcana-module-item did not execute first-class installer help" >&2
   exit 1
 }
 

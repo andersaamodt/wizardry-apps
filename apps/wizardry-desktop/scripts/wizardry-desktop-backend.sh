@@ -2245,6 +2245,7 @@ arcana_label_for_name() {
     mud) printf 'wizardry MUD' ;;
     web-wizardry) printf 'web wizardry' ;;
     wizardry-apps) printf 'wizardry apps' ;;
+    native-desktop-compilation) printf 'native desktop compilation' ;;
     ai-dev) printf 'AI dev' ;;
     yt-dlp) printf 'yt-dlp' ;;
     voice-recognition) printf 'voice recognition' ;;
@@ -2265,7 +2266,7 @@ arcana_entry_names() {
     return
   fi
 
-  preferred='core mud web-wizardry wizardry-apps ai-dev yt-dlp voice-recognition nostr btcpay'
+  preferred='core mud web-wizardry wizardry-apps native-desktop-compilation ai-dev yt-dlp voice-recognition nostr btcpay'
   for name in $preferred; do
     [ -e "$install_root/$name" ] && printf '%s\n' "$name"
   done
@@ -2274,7 +2275,7 @@ arcana_entry_names() {
     [ -e "$entry" ] || continue
     entry_name=$(basename "$entry")
     case "$entry_name" in
-      core|mud|web-wizardry|wizardry-apps|ai-dev|yt-dlp|voice-recognition|nostr|btcpay|import-arcanum|.)
+      core|mud|web-wizardry|wizardry-apps|native-desktop-compilation|ai-dev|yt-dlp|voice-recognition|nostr|btcpay|import-arcanum|.)
         continue
         ;;
     esac
@@ -2685,6 +2686,73 @@ cmd_run_arcana_menu() {
   exit 2
 }
 
+resolve_arcana_module_item_script() {
+  module_name=${1-}
+  item_name=${2-}
+  install_root=${3-}
+  safe_name "$module_name" || return 1
+  safe_name "$item_name" || return 1
+
+  if [ -n "$install_root" ] && [ -d "$install_root" ]; then
+    if [ -f "$install_root/$module_name/$item_name" ] && [ ! -d "$install_root/$module_name/$item_name" ]; then
+      printf '%s\n' "$install_root/$module_name/$item_name"
+      return
+    fi
+  else
+    root=$(require_root "")
+    for candidate in "$root/spells/.arcana" "$WIZARDRY_DIR_FALLBACK/spells/.arcana" "$WIZARDRY_APPS_ROOT_FALLBACK/spells/.arcana"; do
+      [ -d "$candidate" ] || continue
+      if [ -f "$candidate/$module_name/$item_name" ] && [ ! -d "$candidate/$module_name/$item_name" ]; then
+        printf '%s\n' "$candidate/$module_name/$item_name"
+        return
+      fi
+    done
+  fi
+  printf '\n'
+}
+
+cmd_run_arcana_module_item() {
+  module_name=${1-}
+  item_name=${2-}
+  install_root=${3-}
+  if [ "$#" -ge 3 ]; then
+    shift 3
+  else
+    set --
+  fi
+  safe_name "$module_name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid arcana module: $module_name" >&2
+    exit 2
+  }
+  safe_name "$item_name" || {
+    printf '%s\n' "wizardry-desktop-backend: invalid arcana module item: $item_name" >&2
+    exit 2
+  }
+  case "$(arcana_item_kind_for_file "$item_name")" in
+    install|uninstall|toggle|action|check) ;;
+    *)
+      printf '%s\n' "wizardry-desktop-backend: unsupported arcana module item: $item_name" >&2
+      exit 2
+      ;;
+  esac
+  script=$(resolve_arcana_module_item_script "$module_name" "$item_name" "$install_root")
+  app_label=$(normalize_watch_actor "$module_name")
+  app_label=${app_label-}
+  [ -n "$app_label" ] || app_label='wizardry-arcana'
+  if [ -n "$script" ]; then
+    if sh "$script" "$@"; then
+      record_watch "app" "arcana:item:$module_name:$item_name" "$app_label" "ok"
+      return
+    fi
+    code=$?
+    record_watch "app" "arcana:item:$module_name:$item_name" "$app_label" "failed:$code"
+    exit 2
+  fi
+  record_watch "app" "arcana:item:$module_name:$item_name" "$app_label" "failed:missing"
+  printf '%s\n' "wizardry-desktop-backend: no arcana module item '$item_name' for '$module_name'" >&2
+  exit 2
+}
+
 cmd_app_help() {
   target=${1-}
   root=${2-}
@@ -2752,6 +2820,9 @@ cmd_run_action() {
         record_watch "app" "arcana:install:$arg1" "wizardry-core" "failed:$code"
         exit 2
       fi
+      ;;
+    arcana:item)
+      cmd_run_arcana_module_item "$arg1" "$arg2" "$root/spells/.arcana"
       ;;
     arcana:themes)
       record_watch "app" "arcana:themes" "wizardry-core" "queued"
@@ -2965,6 +3036,9 @@ case "$action" in
     ;;
   run-arcana-install)
     cmd_run_arcana_install "$@"
+    ;;
+  run-arcana-module-item)
+    cmd_run_arcana_module_item "$@"
     ;;
   run-action)
     cmd_run_action "$@"

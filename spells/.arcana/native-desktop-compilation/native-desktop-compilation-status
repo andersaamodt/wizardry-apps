@@ -1,0 +1,23 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: native-desktop-compilation-status
+
+Reports install status for native desktop compilation tools.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}
+export PATH
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+. "$script_dir/_toolchain"
+
+platform_tool_ids | while IFS= read -r tool || [ -n "$tool" ]; do
+  [ -n "$tool" ] || continue
+  print_tool_status "$tool"
+done

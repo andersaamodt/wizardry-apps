@@ -1,0 +1,43 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: native-desktop-compilation-menu
+
+Shows native desktop compilation tools as [X] install toggles.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}
+export PATH
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+. "$script_dir/_toolchain"
+
+if ! command -v menu >/dev/null 2>&1; then
+  "$script_dir/native-desktop-compilation-status"
+  exit 0
+fi
+
+while true; do
+  set --
+  for tool in $(platform_tool_ids); do
+    label=$(tool_label "$tool")
+    if is_tool_installed "$tool"; then
+      set -- "$@" "[X] $label%$script_dir/install-$tool"
+    else
+      set -- "$@" "[ ] $label%$script_dir/install-$tool"
+    fi
+  done
+  exit_label=$(exit-label 2>/dev/null || printf 'Exit')
+  set -- "$@" "---" "$exit_label%kill -TERM \$PPID"
+  menu_status=0
+  menu "Native Desktop Compilation" "$@" || menu_status=$?
+  if [ "$menu_status" -eq 130 ]; then
+    printf 'ESC\n' >&2
+    exit 0
+  fi
+done

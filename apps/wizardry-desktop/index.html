@@ -180,6 +180,7 @@
         'arcana:reload': { label: 'Reload arcana index', requiresArg: false, minArgs: 0, maxArgs: 0 },
         'arcana:install-menu': { label: 'Arcana install menu', requiresArg: false, minArgs: 0, maxArgs: 0 },
         'arcana:module-menu': { label: 'Arcana module menu', requiresArg: true, minArgs: 1, maxArgs: 1 },
+        'arcana:item': { label: 'Arcana module item', requiresArg: true, minArgs: 2, maxArgs: 2 },
         'menu:list': { label: 'List all wizardry menus', requiresArg: false, minArgs: 0, maxArgs: 0 },
         'menu:help': { label: 'Show menu help', requiresArg: true, minArgs: 1, maxArgs: 1 },
         'menu:run': { label: 'Run menu command', requiresArg: true, minArgs: 1, maxArgs: 2 },
@@ -2589,10 +2590,18 @@
             for (var itemIdx = 0; itemIdx < moduleItems.length; itemIdx += 1) {
               var item = moduleItems[itemIdx];
               var label = item.kind === 'status-detail' ? String(item.value || '') : safeShortText(item.label || item.value || item.name || '');
+              var runnable = item.kind === 'install' || item.kind === 'uninstall' || item.kind === 'toggle' || item.kind === 'action' || item.kind === 'check';
+              var actionLabel = arcanaItemKindLabel(item.kind);
               detailHtml += '<div class="wd-list-row">';
               detailHtml += '<span class="wd-list-main wd-col-2">' + escapeText(label) + '</span>';
               detailHtml += '<span class="wd-list-meta"><code>' + safeShortText(item.name || item.value || '') + '</code></span>';
-              detailHtml += '<span class="wd-row-actions"><span class="wd-pill">' + escapeText(arcanaItemKindLabel(item.kind)) + '</span></span>';
+              detailHtml += '<span class="wd-row-actions">';
+              if (runnable) {
+                detailHtml += '<button type="button" class="wd-polite-btn wd-tiny" data-arcana-item-install="' + escapeAttrValue(selectedModule.name + '|' + item.name) + '">' + escapeText(actionLabel) + '</button>';
+              } else {
+                detailHtml += '<span class="wd-pill">' + escapeText(actionLabel) + '</span>';
+              }
+              detailHtml += '</span>';
               detailHtml += '</div>';
             }
             detailHtml += '</div>';
@@ -3485,6 +3494,35 @@
         runQuickAction(kind, module, options);
       }
 
+      function runArcanaItem(moduleName, itemName, options) {
+        options = options || {};
+        var module = String(moduleName || '').trim();
+        var item = String(itemName || '').trim();
+        if (!module || !item || state.actionInFlight) {
+          return;
+        }
+        state.actionInFlight = true;
+        setOutputBlock(options.outputId, 'Running ' + item + ' ...');
+        pushActivity('app', 'Queued arcana item ' + module + ': ' + item, { kind: 'arcana:item', target: module + ':' + item, section: 'app', app: 'wizardry-core', status: 'queued' });
+        callBackend('run-action', ['arcana:item', module, item]).then(function (text) {
+          var output = String(text || '').trim() || ('Arcana item ' + item + ' complete.');
+          if (options.outputId) {
+            setOutputBlock(options.outputId, output);
+          }
+          pushActivity('app', 'Arcana item completed', { kind: 'arcana:item', target: module + ':' + item, output: output, section: 'app', app: 'wizardry-core', status: 'ok' });
+        }).catch(function (error) {
+          var message = String(error && error.message ? error.message : error || 'Action failed.');
+          if (options.outputId) {
+            setOutputBlock(options.outputId, message);
+          }
+          pushActivity('app', 'Arcana item failed: ' + message, { kind: 'arcana:item', target: module + ':' + item, section: 'app', app: 'wizardry-core', status: 'error' });
+        }).finally(function () {
+          loadArcanaInstall();
+          loadArcanaModuleItems(module);
+          state.actionInFlight = false;
+        });
+      }
+
       function runMenuInApp(menuName, menuArg, outputId, contextName) {
         var name = String(menuName || '').trim();
         if (!name || state.actionInFlight) {
@@ -4369,6 +4407,22 @@
                 runArcanaAction('arcana:menu', menuModule, {
                   outputId: 'arcana-output',
                   refreshArcana: true
+                });
+              }
+              return;
+            }
+
+            var arcanaItemInstall = event.target.closest('[data-arcana-item-install]');
+            if (arcanaItemInstall) {
+              var itemValue = arcanaItemInstall.getAttribute('data-arcana-item-install');
+              if (itemValue && itemValue.indexOf('|') >= 0) {
+                var itemPair = itemValue.split('|');
+                if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                  composerOpenWithTokens(['run-action', 'arcana:item', itemPair[0], itemPair[1]], { userInitiated: true });
+                  return;
+                }
+                runArcanaItem(itemPair[0], itemPair[1], {
+                  outputId: 'arcana-output'
                 });
               }
               return;
