@@ -103,6 +103,8 @@ private final class NativeReferenceModel: ObservableObject {
   @Published var sync = true
 
   let sections = SectionDraft.samples
+  let proposals = ProposalDraft.samples
+  let collaborators = CollaboratorDraft.samples
 
   var title: String {
     switch selection {
@@ -112,6 +114,30 @@ private final class NativeReferenceModel: ObservableObject {
     default: return "$app_name"
     }
   }
+}
+
+private struct ProposalDraft: Identifiable {
+  let id: String
+  let clause: String
+  let author: String
+  let status: String
+
+  static let samples = [
+    ProposalDraft(id: "notice", clause: "Notice and hearing", author: "Aster Vale", status: "Review"),
+    ProposalDraft(id: "archive", clause: "Archive duty", author: "Lin Arbor", status: "Draft")
+  ]
+}
+
+private struct CollaboratorDraft: Identifiable {
+  let id: String
+  let name: String
+  let handle: String
+  let role: String
+
+  static let samples = [
+    CollaboratorDraft(id: "aster", name: "Aster Vale", handle: "@aster", role: "Editor"),
+    CollaboratorDraft(id: "lin", name: "Lin Arbor", handle: "@lin", role: "Reviewer")
+  ]
 }
 
 private struct SectionDraft: Identifiable {
@@ -166,7 +192,7 @@ private struct RootView: View {
       }
       .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 360)
     } detail: {
-      DocumentView(model: model)
+      DetailView(model: model)
         .navigationTitle(model.title)
         .toolbar {
           ToolbarItemGroup(placement: .primaryAction) {
@@ -185,6 +211,21 @@ private struct RootView: View {
             }
           }
         }
+    }
+  }
+}
+
+private struct DetailView: View {
+  @ObservedObject var model: NativeReferenceModel
+
+  var body: some View {
+    switch model.selection {
+    case "proposals":
+      ProposalReviewView(model: model)
+    case "people":
+      CollaboratorsView(model: model)
+    default:
+      DocumentView(model: model)
     }
   }
 }
@@ -242,6 +283,47 @@ private struct DocumentView: View {
           .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
       }
     }
+  }
+}
+
+private struct ProposalReviewView: View {
+  @ObservedObject var model: NativeReferenceModel
+  @State private var selectedProposal: ProposalDraft.ID?
+
+  var body: some View {
+    Table(model.proposals, selection: \$selectedProposal) {
+      TableColumn("Clause") { proposal in
+        Text(proposal.clause)
+      }
+      TableColumn("Author") { proposal in
+        Text(proposal.author)
+      }
+      TableColumn("Status") { proposal in
+        Text(proposal.status)
+      }
+    }
+  }
+}
+
+private struct CollaboratorsView: View {
+  @ObservedObject var model: NativeReferenceModel
+
+  var body: some View {
+    List(model.collaborators) { collaborator in
+      HStack {
+        VStack(alignment: .leading, spacing: 3) {
+          Text(collaborator.name)
+            .font(.headline)
+          Text(collaborator.handle)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        Text(collaborator.role)
+          .foregroundStyle(.secondary)
+      }
+      .padding(.vertical, 4)
+    }
+    .listStyle(.inset)
   }
 }
 

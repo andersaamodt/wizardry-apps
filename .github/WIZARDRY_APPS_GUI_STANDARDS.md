@@ -237,6 +237,7 @@
 - Composer/create flows should be specific to the command that opened them. Do not expose unrelated object types or summaries/preambles when the user chose a narrow native command such as New Constitution.
 - Keep web/product/process implementation terms out of native UI labels unless they are user-facing domain concepts.
 - Validate native GUI changes in the running macOS app, including row hit targets, menu state, toolbar layout, settings window behavior, and text editing shortcuts.
+- The native reference starter must continue to demonstrate these ten conversion targets: native source list selection, document-feeling mini-doc editing, native toolbar, native forms/sheets, `List`/`Table` data surfaces instead of cards, native sidebar behavior, validated menu state, Settings-window preferences, domain terminology, and platform controls for routine chrome.
 
 ## Conflict Resolution Order
 - If an app implementation conflicts with this file, treat this file as canonical for new work and move touched legacy code toward it.
