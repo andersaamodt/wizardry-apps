@@ -230,12 +230,17 @@
 - For SwiftUI/AppKit native macOS apps, prefer platform-owned controls over web-style reproductions of controls.
 - Use `NavigationSplitView` with native source-list controls for selector sidebars. `List(selection:)` is acceptable for straightforward SwiftUI sidebars; use an AppKit `NSOutlineView`/`NSTableView` wrapper when the app needs source-list group rows, full-row hit testing, embedded row controls, or warning-free accessibility traversal. Do not rebuild selectable listboxes from `ScrollView`, custom `Button` rows, and manual selection backgrounds unless a native control cannot represent the interaction.
 - Put window-level actions in SwiftUI `.toolbar`/`NSToolbar`, not in a custom in-window title bar that imitates a toolbar.
+- Ship the standard macOS menu shape: app menu with About/Settings/Services/Hide/Quit, File for document lifecycle/export, Edit for standard text selectors plus Find, View for stateful visibility toggles, Window for Minimize/Zoom/Bring All to Front, and Help for app help.
 - Put document commands such as Export, import/open, preview toggles, indentation visibility, review actions, and settings access in macOS menus with correct keyboard shortcuts and validation/state.
 - Use a `Settings` scene or AppKit settings/preferences window for app preferences. Do not present routine app settings as a generic modal web-form sheet.
 - In AppKit-lifecycle SwiftUI apps, let the app delegate own the settings/preferences `NSWindow`; do not attach a hidden `NSViewRepresentable` presenter to root content just to open settings.
-- Use native `NSSearchField` for document/search affordances in macOS toolbars; do not leave search as an in-content rounded text field when it is global to the current document.
+- Keep the system titlebar visible and platform-owned. Do not hide titles, force transparent titlebars, inject `.fullSizeContentView`, or make custom draggable title regions unless the app is deliberately doing custom chrome.
+- Use native `NSSearchField` for document/search affordances in macOS toolbars and sidebars; do not leave search as an in-content rounded text field when it is global to the current document or native source list.
 - Use normal AppKit/SwiftUI windows or settings scenes for composer/export/preferences flows. Avoid routine `.sheet` presentation for independent document commands that macOS users expect as separate utility/document windows.
 - Treat right-side preview/inspector/comparison areas as split-view columns or inspectors, not animated overlay drawers with custom shadows.
+- Long-running backend/process work must not run on the main actor. Use Swift concurrency or AppKit async process APIs so launch, menu commands, toolbar actions, and settings probes never freeze the window.
+- Use native open/save panels for import, upload, export, and collection path selection. Do not simulate file browsing with plain text fields alone.
+- Expose transient command feedback in a native toolbar/status area or durable diagnostics surface; do not update hidden status state that users cannot see.
 - Segmented inspector modes should use `Picker(...).pickerStyle(.segmented)` or AppKit segmented controls instead of hand-painted tab buttons.
 - Use native `Form`, `GroupBox`, `List`, `Table`, `OutlineGroup`, `DisclosureGroup`, inspectors, and split views before inventing card-heavy surfaces.
 - For document-like apps, keep the primary surface readable as a document with native text selection/editing behavior. When the domain has independently editable mini-documents, represent those sections as first-class native document parts with in-place editing/proposal affordances instead of isolated decorative bubbles.
@@ -243,9 +248,14 @@
 - Composer/create flows should be specific to the command that opened them. Do not expose unrelated object types or summaries/preambles when the user chose a narrow native command such as New Constitution.
 - Keep web/product/process implementation terms out of native UI labels unless they are user-facing domain concepts.
 - Validate native GUI changes in the running macOS app, including row hit targets, menu state, toolbar layout, settings window behavior, and text editing shortcuts.
-- For GTK/Linux native apps, use `GtkApplicationWindow` with `GtkHeaderBar` for top-level window actions, `GtkSearchEntry` for search in headerbars/search areas, `GtkListBox` for full-row sidebar/list selection, `GtkStack` plus `GtkStackSwitcher`/`GtkStackSidebar` for mode changes, `GtkTextView` for editable document text, and `GtkFrame`/form rows for grouped settings. Do not implement primary navigation as label-only boxes or duplicate sidebar navigation with a visible `GtkNotebook`.
+- For GTK/Linux native apps, use `GtkApplicationWindow` with `GtkHeaderBar` for top-level window actions, `GtkSearchEntry` for search in headerbars/search areas, `GtkListBox` for full-row sidebar/list selection, `GtkStack` plus `GtkStackSwitcher`/`GtkStackSidebar` for mode changes, and `GtkTextView` for editable document text. Do not implement primary navigation as label-only boxes or duplicate sidebar navigation with a visible `GtkNotebook`.
+- GTK/Linux headerbar actions should be icon buttons with tooltips for compact secondary commands, with `GtkApplication` accelerators for important actions.
 - GTK/Linux settings should use a stack/sidebar preferences layout or another platform-native preferences pattern; avoid a tabbed generic modal when the settings categories are persistent app preferences.
 - GTK/Linux document apps should keep the main document in the center stack and put inspector/preview/review surfaces in a right stack or split pane. Avoid showing every inspector, comparison, and preview panel simultaneously unless the workflow explicitly needs that density.
+- GTK/Linux secondary windows should be `GtkApplication`-owned, transient when appropriate, and hide-on-close for reusable settings/composer/export windows.
+- GTK/Linux backend/process work must run through async tasks or subprocess APIs rather than blocking the GTK main loop with synchronous spawn calls from action handlers.
+- GTK/Linux secret inputs use password entries, file workflows use native file chooser dialogs, and document sections should rest as readable text with expandable/in-place editors rather than always-open text views.
+- Prefer flat GTK sections with headers, spacing, and separators. Use frames sparingly; do not recreate card-heavy web group boxes for every document section.
 - The native reference starter must continue to demonstrate these conversion targets on both platforms: native source list/sidebar selection, document-feeling mini-doc editing, native toolbar/headerbar, native forms/windows/preferences, `List`/`Table`/`NSOutlineView`/`GtkListBox` data surfaces instead of cards, native sidebar behavior, validated menu state, settings-window preferences, domain terminology, and platform controls for routine chrome.
 
 ## Conflict Resolution Order

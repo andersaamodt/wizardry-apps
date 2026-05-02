@@ -28,6 +28,16 @@
 - Keep tests POSIX-sh entrypoints under `.tests/` and keep test output outside the repo.
 - Add packaging/release workflows before calling an app 1.0; release polish includes distribution, not just UI.
 
+## Native Desktop 1.0 Minimum
+- Native macOS apps must build with a warning-free `swift build` and launch as packaged `.app` bundles.
+- Native macOS apps must use platform-owned titlebar/menu/window behavior, not WebView-style custom chrome.
+- Native macOS apps must keep long backend/process work off the main actor.
+- Native macOS apps must verify row hit targets, native search fields, native file panels, and in-place text editing in a running app.
+- Native GTK apps must compile in CI with GTK development headers and keep generated source covered by render contracts.
+- Native GTK apps must keep long backend/process work off the GTK main loop.
+- Native GTK apps must use native search entries, listboxes, headerbar controls, file choosers, password entries, and application accelerators.
+- Native desktop release notes should state which platform runtimes were actually built and smoke-tested.
+
 ## Readiness Surface Minimum
 - Include permissions, local storage/config roots, external services, hardware/runtime bridge, and updates when relevant.
 - Show `last tested` and `last successful` timestamps where the dependency can drift over time.

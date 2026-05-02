@@ -6,23 +6,26 @@ The generated macOS app intentionally demonstrates platform-owned controls:
 
 - `NavigationSplitView` with an AppKit-backed `NSOutlineView` source list for grouped sidebar selection.
 - SwiftUI toolbar items, including a native `NSSearchField`, instead of a custom in-window top bar.
-- macOS `Commands` and a `Settings` scene/window for menu and preferences behavior.
+- macOS `Commands`, standard menu placement, and a `Settings` scene/window for menu and preferences behavior.
+- Platform-owned titlebar/window chrome with no hidden transparent titlebar.
 - `Form`, `GroupBox`, `List`, and `Table` instead of card-heavy custom selectors.
 - A document surface that treats independently editable sections as first-class native document parts with in-place proposal editing.
 - A proposal table for review queues instead of custom button cards.
 - A collaborators list using native rows instead of isolated bubbles.
 - Settings content in the Settings scene, with compact native form controls.
+- Native file panels for document import/export-style commands.
+- Visible status feedback in the toolbar/status area.
 - Domain labels in user-facing copy, with implementation terms kept out of visible UI.
 
 The generated GTK/Linux app demonstrates the equivalent native idiom:
 
-- `GtkHeaderBar` for window actions.
+- `GtkHeaderBar` icon buttons with tooltips for window actions.
 - `GtkSearchEntry` in the headerbar for app/document search.
 - `GtkListBox` sidebars and document/supporting-document lists with full-row selection.
 - `GtkStack` and `GtkStackSwitcher` for center navigation and right-side inspector modes instead of duplicating sidebar state with `GtkNotebook`.
 - `GtkStackSidebar` for preferences-style settings categories.
-- `GtkTextView` for editable mini-document text and proposal edits.
-- `GtkFrame`/form groups for settings and inspector sections instead of custom cards.
+- Readable mini-document text that expands into `GtkTextView` proposal edits on demand.
+- Flat GTK sections, form rows, native file choosers, password entries, and app accelerators instead of custom card/chrome patterns.
 
 Native conversion checklist covered by this reference:
 
@@ -36,5 +39,7 @@ Native conversion checklist covered by this reference:
 8. Preferences live in `Settings`, app-owned windows, or GTK stack/sidebar preference layouts.
 9. UI labels use domain concepts rather than implementation/product terms.
 10. Custom drawing is reserved for domain content; platform controls own chrome, lists, forms, and tables.
+11. Backend/process work belongs on async tasks/subprocess callbacks, not AppKit/GTK main loops.
+12. Import/export/path flows use native open/save panels or GTK file chooser dialogs.
 
 Keep this starter updated whenever Wizardry native desktop guidance changes.

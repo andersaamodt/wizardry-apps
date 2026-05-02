@@ -50,6 +50,7 @@ cat > "$macos_dir/Sources/App/App.swift" <<EOF
 // Generated from ir/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
 	import AppKit
 	import SwiftUI
+	import UniformTypeIdentifiers
 
 private let canonicalIR = """
 $pretty_ir
@@ -71,6 +72,10 @@ struct GeneratedNativeDesktopApp: App {
     }
     .commands {
       CommandGroup(after: .newItem) {
+        Button("Import Supporting Document…") {
+          chooseImportDocument(model: model)
+        }
+        .keyboardShortcut("o")
         Button("Export Document…") {
           model.status = "Export prepared from the native File menu."
         }
@@ -82,6 +87,12 @@ struct GeneratedNativeDesktopApp: App {
           model.status = "Focused proposal review."
         }
         Toggle("Show Inspector", isOn: \$model.showInspector)
+      }
+      CommandMenu("Find") {
+        Button("Find in Document") {
+          model.status = "Find is handled by the toolbar NSSearchField."
+        }
+        .keyboardShortcut("f")
       }
     }
 
@@ -100,6 +111,7 @@ private final class NativeReferenceModel: ObservableObject {
   @Published var find = ""
   @Published var showInspector = true
   @Published var selectedSection: SectionDraft.ID? = SectionDraft.samples.first?.id
+  @Published var editingSection: SectionDraft.ID?
   @Published var editorText = SectionDraft.samples.first?.body ?? ""
   @Published var autosave = true
   @Published var sync = true
@@ -428,6 +440,11 @@ private struct CollaboratorDraft: Identifiable {
           }
           ToolbarItemGroup(placement: .primaryAction) {
             Button {
+              chooseImportDocument(model: model)
+            } label: {
+              Label("Import", systemImage: "doc.badge.plus")
+            }
+            Button {
               model.status = "Created a native document section."
             } label: {
               Label("New Section", systemImage: "plus")
@@ -441,8 +458,30 @@ private struct CollaboratorDraft: Identifiable {
               Label("Inspector", systemImage: "sidebar.right")
             }
           }
+          ToolbarItem(placement: .status) {
+            Text(model.status)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+          }
         }
     }
+  }
+}
+
+@MainActor
+private func chooseImportDocument(model: NativeReferenceModel) {
+  let panel = NSOpenPanel()
+  panel.title = "Import Supporting Document"
+  panel.prompt = "Import"
+  panel.canChooseFiles = true
+  panel.canChooseDirectories = false
+  panel.allowsMultipleSelection = false
+  panel.allowedContentTypes = [.plainText, .text, .pdf, .rtf, .data]
+  if panel.runModal() == .OK, let url = panel.url {
+    model.status = "Imported \(url.lastPathComponent) with a native file panel."
+  } else {
+    model.status = "Import cancelled."
   }
 }
 
@@ -466,53 +505,88 @@ private struct DocumentView: View {
 
   var body: some View {
     HSplitView {
-      VStack(alignment: .leading, spacing: 0) {
-        List(model.sections, selection: \$model.selectedSection) { section in
-          VStack(alignment: .leading, spacing: 4) {
-            Text("\(section.number). \(section.title)")
-              .font(.headline)
-            Text(section.body)
-              .lineLimit(2)
-              .foregroundStyle(.secondary)
-          }
-          .padding(.vertical, 4)
-          .tag(section.id)
-        }
-        .listStyle(.inset)
-        .onChange(of: model.selectedSection) { id in
-          if let section = model.sections.first(where: { \$0.id == id }) {
-            model.editorText = section.body
+      ScrollView {
+        VStack(alignment: .leading, spacing: 14) {
+          Text("Reference Constitution")
+            .font(.system(size: 22, weight: .semibold, design: .serif))
+          ForEach(model.sections) { section in
+            DocumentSectionRow(model: model, section: section)
           }
         }
-
-        Divider()
-        Text(model.status)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .padding(8)
+        .frame(maxWidth: 760, alignment: .leading)
+        .padding(24)
       }
-
-      VStack(alignment: .leading, spacing: 12) {
-        TextEditor(text: \$model.editorText)
-          .font(.body)
-          .scrollContentBackground(.hidden)
-          .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
-        HStack {
-          Button("Save Proposal") {
-            model.status = "Saved the current section as a proposal."
-          }
-          .buttonStyle(.borderedProminent)
-          Button("Discard") {
-            model.status = "Discarded local proposal text."
-          }
-        }
-      }
-      .padding(16)
+      .frame(minWidth: 420, maxWidth: .infinity)
 
       if model.showInspector {
         InspectorView()
           .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
       }
+    }
+  }
+}
+
+private struct DocumentSectionRow: View {
+  @ObservedObject var model: NativeReferenceModel
+  let section: SectionDraft
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .firstTextBaseline, spacing: 10) {
+        Text(section.number)
+          .font(.system(size: 13, weight: .semibold, design: .monospaced))
+          .foregroundStyle(.secondary)
+          .frame(width: 34, alignment: .leading)
+        Text(section.title)
+          .font(.headline)
+      }
+
+      if model.editingSection == section.id {
+        VStack(alignment: .leading, spacing: 8) {
+          TextEditor(text: \$model.editorText)
+            .font(.body)
+            .frame(minHeight: 120)
+          HStack(spacing: 8) {
+            Button("Cancel") {
+              model.editingSection = nil
+              model.status = "Cancelled proposal edit."
+            }
+            Button("Save Proposal") {
+              model.editingSection = nil
+              model.status = "Saved \(section.title) as a proposal."
+            }
+            .buttonStyle(.borderedProminent)
+          }
+        }
+        .padding(.leading, 44)
+      } else {
+        Button {
+          model.selectedSection = section.id
+          model.editingSection = section.id
+          model.editorText = section.body
+          model.status = "Editing \(section.title) as a proposal."
+        } label: {
+          Text(section.body)
+            .font(.body)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 44)
+        .contextMenu {
+          Button("Edit as Proposal") {
+            model.editingSection = section.id
+            model.editorText = section.body
+          }
+          Button("Inspect Section") {
+            model.selectedSection = section.id
+            model.showInspector = true
+          }
+        }
+      }
+
+      Divider()
     }
   }
 }
@@ -660,6 +734,7 @@ static const char *wizardry_app_ir =
   "$linux_ir_literal";
 
 typedef struct {
+  GtkWindow *window;
   GtkStack *main_stack;
 } AppState;
 
@@ -675,6 +750,69 @@ static void append_label(GtkWidget *box, const char *text) {
   gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
   gtk_label_set_wrap(GTK_LABEL(label), TRUE);
   gtk_box_append(GTK_BOX(box), label);
+}
+
+static GtkWidget *make_icon_button(const char *icon_name, const char *tooltip) {
+  GtkWidget *button = gtk_button_new_from_icon_name(icon_name);
+  gtk_widget_set_tooltip_text(button, tooltip);
+  return button;
+}
+
+static GtkWidget *make_password_entry(const char *placeholder) {
+  GtkWidget *entry = gtk_entry_new();
+  gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
+  gtk_entry_set_placeholder_text(GTK_ENTRY(entry), placeholder);
+  gtk_widget_set_hexpand(entry, TRUE);
+  return entry;
+}
+
+static void file_chooser_response(GtkNativeDialog *dialog, int response, gpointer user_data) {
+  (void)user_data;
+  if (response == GTK_RESPONSE_ACCEPT) {
+    GtkFileChooser *chooser = GTK_FILE_CHOOSER(dialog);
+    GFile *file = gtk_file_chooser_get_file(chooser);
+    if (file != NULL) {
+      g_object_unref(file);
+    }
+  }
+  g_object_unref(dialog);
+}
+
+static void choose_file(GtkWindow *parent, GtkFileChooserAction action, const char *title, const char *accept_label) {
+  GtkFileChooserNative *dialog = gtk_file_chooser_native_new(title, parent, action, accept_label, "Cancel");
+  if (action == GTK_FILE_CHOOSER_ACTION_SAVE) {
+    gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), "reference-document.pdf");
+  }
+  g_signal_connect(dialog, "response", G_CALLBACK(file_chooser_response), NULL);
+  gtk_native_dialog_show(GTK_NATIVE_DIALOG(dialog));
+}
+
+static void import_document_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+  AppState *state = user_data;
+  (void)action;
+  (void)parameter;
+  choose_file(state->window, GTK_FILE_CHOOSER_ACTION_OPEN, "Import Supporting Document", "Import");
+}
+
+static void export_document_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+  AppState *state = user_data;
+  (void)action;
+  (void)parameter;
+  choose_file(state->window, GTK_FILE_CHOOSER_ACTION_SAVE, "Export Reference Document", "Export");
+}
+
+static void new_section_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+  AppState *state = user_data;
+  (void)action;
+  (void)parameter;
+  gtk_stack_set_visible_child_name(state->main_stack, "document");
+}
+
+static void review_proposals_action(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+  AppState *state = user_data;
+  (void)action;
+  (void)parameter;
+  gtk_stack_set_visible_child_name(state->main_stack, "proposals");
 }
 
 static void append_sidebar_row(GtkListBox *list, const char *page_name, const char *title, const char *subtitle) {
@@ -716,18 +854,23 @@ static GtkWidget *make_text_editor(const char *text) {
 static GtkWidget *make_document_page(void) {
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
   GtkWidget *document_list = gtk_list_box_new();
-  GtkWidget *section = gtk_frame_new("Editable Section");
+  GtkWidget *section = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  GtkWidget *section_heading = gtk_label_new("Editable Section");
+  GtkWidget *expander = gtk_expander_new("Edit as Proposal");
   GtkWidget *section_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   set_margin(box, 18);
-  set_margin(section_box, 12);
+  gtk_label_set_xalign(GTK_LABEL(section_heading), 0.0f);
+  gtk_widget_add_css_class(section_heading, "heading");
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(document_list), GTK_SELECTION_SINGLE);
   append_sidebar_row(GTK_LIST_BOX(document_list), "document", "Reference Constitution", "Native document list row");
   append_sidebar_row(GTK_LIST_BOX(document_list), "document", "Supporting Memo", "Full-row selectable supporting document");
   gtk_box_append(GTK_BOX(box), document_list);
-  append_label(section_box, "Each section behaves like an independently editable mini-document.");
+  gtk_box_append(GTK_BOX(section), section_heading);
+  append_label(section, "Each section behaves like an independently editable mini-document while resting as readable document text.");
   gtk_box_append(GTK_BOX(section_box), make_text_editor("Edit this section in place, then save it as a proposal."));
   gtk_box_append(GTK_BOX(section_box), gtk_button_new_with_label("Save Proposal"));
-  gtk_frame_set_child(GTK_FRAME(section), section_box);
+  gtk_expander_set_child(GTK_EXPANDER(expander), section_box);
+  gtk_box_append(GTK_BOX(section), expander);
   gtk_box_append(GTK_BOX(box), section);
   return box;
 }
@@ -751,12 +894,15 @@ static GtkWidget *make_collaborators_page(void) {
 }
 
 static GtkWidget *make_inspector_section(const char *title, const char *body) {
-  GtkWidget *frame = gtk_frame_new(title);
+  GtkWidget *section = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  GtkWidget *heading = gtk_label_new(title);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-  set_margin(box, 12);
+  gtk_label_set_xalign(GTK_LABEL(heading), 0.0f);
+  gtk_widget_add_css_class(heading, "heading");
+  gtk_box_append(GTK_BOX(section), heading);
   append_label(box, body);
-  gtk_frame_set_child(GTK_FRAME(frame), box);
-  return frame;
+  gtk_box_append(GTK_BOX(section), box);
+  return section;
 }
 
 static GtkWidget *make_inspector_pane(void) {
@@ -794,6 +940,8 @@ static GtkWidget *make_preferences_page(void) {
   gtk_box_append(GTK_BOX(general), gtk_check_button_new_with_label("Sync review state"));
   append_label(review, "Review mode");
   gtk_box_append(GTK_BOX(review), gtk_check_button_new_with_label("Show inspector"));
+  append_label(review, "Secret example");
+  gtk_box_append(GTK_BOX(review), make_password_entry("token or local secret"));
   gtk_stack_add_titled(GTK_STACK(stack), general, "general", "General");
   gtk_stack_add_titled(GTK_STACK(stack), review, "review", "Review");
   gtk_stack_sidebar_set_stack(GTK_STACK_SIDEBAR(sidebar), GTK_STACK(stack));
@@ -808,20 +956,41 @@ static void activate(GtkApplication *app, gpointer user_data) {
   GtkWidget *window = gtk_application_window_new(app);
   GtkWidget *header = gtk_header_bar_new();
   GtkWidget *header_search = gtk_search_entry_new();
+  GtkWidget *import_button = make_icon_button("document-open-symbolic", "Import supporting document");
+  GtkWidget *new_button = make_icon_button("document-new-symbolic", "New section");
+  GtkWidget *review_button = make_icon_button("view-list-symbolic", "Review proposals");
+  GtkWidget *export_button = make_icon_button("document-save-as-symbolic", "Export document");
   GtkWidget *body = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
   GtkWidget *sidebar = gtk_list_box_new();
   GtkWidget *center = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
   GtkWidget *inspector = make_inspector_pane();
+  const char *new_accels[] = {"<Primary>n", NULL};
+  const char *export_accels[] = {"<Primary>e", NULL};
+  const GActionEntry app_actions[] = {
+    {"import-document", import_document_action, NULL, NULL, NULL},
+    {"export-document", export_document_action, NULL, NULL, NULL},
+    {"new-section", new_section_action, NULL, NULL, NULL},
+    {"review-proposals", review_proposals_action, NULL, NULL, NULL}
+  };
 
   (void)wizardry_app_ir;
+  state->window = GTK_WINDOW(window);
 
   gtk_window_set_title(GTK_WINDOW(window), "$window_title");
   gtk_window_set_default_size(GTK_WINDOW(window), 960, 640);
   gtk_window_set_titlebar(GTK_WINDOW(window), header);
+  g_action_map_add_action_entries(G_ACTION_MAP(app), app_actions, G_N_ELEMENTS(app_actions), state);
+  gtk_application_set_accels_for_action(app, "app.new-section", new_accels);
+  gtk_application_set_accels_for_action(app, "app.export-document", export_accels);
   gtk_widget_set_size_request(header_search, 220, -1);
-  gtk_header_bar_pack_start(GTK_HEADER_BAR(header), gtk_button_new_with_label("New Section"));
-  gtk_header_bar_pack_start(GTK_HEADER_BAR(header), gtk_button_new_with_label("Review"));
-  gtk_header_bar_pack_end(GTK_HEADER_BAR(header), gtk_button_new_with_label("Export"));
+  gtk_actionable_set_action_name(GTK_ACTIONABLE(import_button), "app.import-document");
+  gtk_actionable_set_action_name(GTK_ACTIONABLE(new_button), "app.new-section");
+  gtk_actionable_set_action_name(GTK_ACTIONABLE(review_button), "app.review-proposals");
+  gtk_actionable_set_action_name(GTK_ACTIONABLE(export_button), "app.export-document");
+  gtk_header_bar_pack_start(GTK_HEADER_BAR(header), import_button);
+  gtk_header_bar_pack_start(GTK_HEADER_BAR(header), new_button);
+  gtk_header_bar_pack_start(GTK_HEADER_BAR(header), review_button);
+  gtk_header_bar_pack_end(GTK_HEADER_BAR(header), export_button);
   gtk_header_bar_pack_end(GTK_HEADER_BAR(header), header_search);
 
   state->main_stack = GTK_STACK(gtk_stack_new());
