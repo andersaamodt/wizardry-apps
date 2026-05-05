@@ -36,6 +36,7 @@
 - Native GTK apps must compile in CI with GTK development headers and keep generated source covered by render contracts.
 - Native GTK apps must keep long backend/process work off the GTK main loop.
 - Native GTK apps must use native search entries, listboxes, headerbar controls, file choosers, password entries, and application accelerators.
+- Native GTK apps with backend/domain state must exercise structured snapshot hydration into native widgets; do not release a Linux port whose primary rows are static generated placeholders while macOS reads live model state.
 - Native desktop release notes should state which platform runtimes were actually built and smoke-tested.
 
 ## Readiness Surface Minimum

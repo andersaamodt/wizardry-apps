@@ -717,11 +717,12 @@ cat > "$linux_dir/meson.build" <<EOF
 project('$app_id', 'c', version: '0.1.0')
 
 gtk_dep = dependency('gtk4')
+json_dep = dependency('json-glib-1.0')
 
 executable(
   '$app_id',
   ['src/main.c'],
-  dependencies: [gtk_dep],
+  dependencies: [gtk_dep, json_dep],
   install: false,
 )
 EOF
@@ -729,13 +730,24 @@ EOF
 cat > "$linux_dir/src/main.c" <<EOF
 /* Generated from ir/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh. */
 #include <gtk/gtk.h>
+#include <json-glib/json-glib.h>
 
 static const char *wizardry_app_ir =
   "$linux_ir_literal";
 
+static const char *reference_snapshot_json =
+  "{"
+  "\\"documents\\":["
+  "{\\"title\\":\\"Reference Constitution\\",\\"subtitle\\":\\"Live backend snapshot row\\"},"
+  "{\\"title\\":\\"Supporting Memo\\",\\"subtitle\\":\\"Full-row selectable supporting document\\"}"
+  "]"
+  "}";
+
 typedef struct {
   GtkWindow *window;
   GtkStack *main_stack;
+  GtkListBox *document_list;
+  GtkLabel *status_label;
 } AppState;
 
 static void set_margin(GtkWidget *widget, int margin) {
@@ -826,6 +838,62 @@ static void append_sidebar_row(GtkListBox *list, const char *page_name, const ch
   gtk_list_box_append(list, row);
 }
 
+static const char *json_string_member(JsonObject *object, const char *name, const char *fallback) {
+  if (object == NULL || !json_object_has_member(object, name)) {
+    return fallback;
+  }
+  JsonNode *node = json_object_get_member(object, name);
+  if (node == NULL || json_node_get_node_type(node) != JSON_NODE_VALUE || json_node_get_value_type(node) != G_TYPE_STRING) {
+    return fallback;
+  }
+  return json_node_get_string(node);
+}
+
+static void clear_list_box(GtkListBox *list) {
+  GtkWidget *child = gtk_widget_get_first_child(GTK_WIDGET(list));
+  while (child != NULL) {
+    gtk_list_box_remove(list, child);
+    child = gtk_widget_get_first_child(GTK_WIDGET(list));
+  }
+}
+
+static void apply_reference_snapshot(AppState *state, const char *json_text) {
+  JsonParser *parser = json_parser_new();
+  JsonNode *root_node;
+  JsonObject *root;
+  JsonArray *documents;
+  if (state->document_list == NULL || !json_parser_load_from_data(parser, json_text, -1, NULL)) {
+    g_object_unref(parser);
+    return;
+  }
+  root_node = json_parser_get_root(parser);
+  if (root_node == NULL || json_node_get_node_type(root_node) != JSON_NODE_OBJECT) {
+    g_object_unref(parser);
+    return;
+  }
+  root = json_node_get_object(root_node);
+  documents = json_object_get_array_member(root, "documents");
+  if (documents == NULL) {
+    g_object_unref(parser);
+    return;
+  }
+  clear_list_box(state->document_list);
+  for (guint index = 0; index < json_array_get_length(documents); index++) {
+    JsonObject *document = json_array_get_object_element(documents, index);
+    append_sidebar_row(
+      state->document_list,
+      "document",
+      json_string_member(document, "title", "Untitled document"),
+      json_string_member(document, "subtitle", "Live document")
+    );
+  }
+  if (state->status_label != NULL) {
+    gtk_label_set_text(state->status_label, "Loaded native JSON snapshot into GTK list rows.");
+  }
+  gtk_list_box_select_row(state->document_list, gtk_list_box_get_row_at_index(state->document_list, 0));
+  g_object_unref(parser);
+}
+
 static void sidebar_row_selected(GtkListBox *list, GtkListBoxRow *row, gpointer user_data) {
   AppState *state = user_data;
   const char *page_name;
@@ -851,20 +919,25 @@ static GtkWidget *make_text_editor(const char *text) {
   return scroller;
 }
 
-static GtkWidget *make_document_page(void) {
+static GtkWidget *make_document_page(AppState *state) {
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
   GtkWidget *document_list = gtk_list_box_new();
   GtkWidget *section = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   GtkWidget *section_heading = gtk_label_new("Editable Section");
   GtkWidget *expander = gtk_expander_new("Edit as Proposal");
   GtkWidget *section_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  GtkWidget *status = gtk_label_new("Waiting for native document state.");
   set_margin(box, 18);
   gtk_label_set_xalign(GTK_LABEL(section_heading), 0.0f);
   gtk_widget_add_css_class(section_heading, "heading");
+  gtk_label_set_xalign(GTK_LABEL(status), 0.0f);
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(document_list), GTK_SELECTION_SINGLE);
   append_sidebar_row(GTK_LIST_BOX(document_list), "document", "Reference Constitution", "Native document list row");
   append_sidebar_row(GTK_LIST_BOX(document_list), "document", "Supporting Memo", "Full-row selectable supporting document");
+  state->document_list = GTK_LIST_BOX(document_list);
+  state->status_label = GTK_LABEL(status);
   gtk_box_append(GTK_BOX(box), document_list);
+  gtk_box_append(GTK_BOX(box), status);
   gtk_box_append(GTK_BOX(section), section_heading);
   append_label(section, "Each section behaves like an independently editable mini-document while resting as readable document text.");
   gtk_box_append(GTK_BOX(section_box), make_text_editor("Edit this section in place, then save it as a proposal."));
@@ -995,7 +1068,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
   state->main_stack = GTK_STACK(gtk_stack_new());
   gtk_stack_set_transition_type(state->main_stack, GTK_STACK_TRANSITION_TYPE_CROSSFADE);
-  gtk_stack_add_titled(state->main_stack, make_document_page(), "document", "Document");
+  gtk_stack_add_titled(state->main_stack, make_document_page(state), "document", "Document");
   gtk_stack_add_titled(state->main_stack, make_proposals_page(), "proposals", "Proposals");
   gtk_stack_add_titled(state->main_stack, make_collaborators_page(), "people", "Collaborators");
   gtk_stack_add_titled(state->main_stack, make_preferences_page(), "preferences", "Preferences");
@@ -1017,6 +1090,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
   gtk_paned_set_end_child(GTK_PANED(body), center);
   gtk_paned_set_position(GTK_PANED(body), 230);
   gtk_window_set_child(GTK_WINDOW(window), body);
+  apply_reference_snapshot(state, reference_snapshot_json);
   gtk_window_present(GTK_WINDOW(window));
 }
 

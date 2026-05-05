@@ -10,7 +10,7 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_AUDIT.md` when doing cross-app GUI sweeps so audits stay source-linked and non-redundant.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/adversarial-testing.md` when doing adversarial testing, security-minded bug hunts, release hardening, or GUI edge-case sweeps.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_LESSONS.md` for known host/WebView pitfalls and regression lessons.
-- For new cross-platform app shells, reference `/Users/andersaamodt/git/wizardry-apps/apps/forge/starter-templates/web/reference-app/` first; for native-style desktop app shells, reference `/Users/andersaamodt/git/wizardry-apps/apps/forge/starter-templates/native-desktop/reference-app/` first. Keep the relevant reference updated when Wizardry standards evolve.
+- For new cross-platform app shells, reference `/Users/andersaamodt/git/wizardry-apps/apps/forge/starter-templates/web/reference-app/` first; for native-style desktop app shells, reference `/Users/andersaamodt/git/wizardry-apps/apps/forge/starter-templates/native-desktop/reference-app/` first. Keep the relevant reference updated when Wizardry standards evolve; the native reference should show platform-owned controls plus live backend snapshot hydration, especially JSON-Glib-backed GTK row/detail rebuilding on Linux.
 - Read app-local docs (for example `apps/forge/README.md`) before changing an app.
 
 ## Canonicality

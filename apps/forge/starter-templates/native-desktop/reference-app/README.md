@@ -24,6 +24,7 @@ The generated GTK/Linux app demonstrates the equivalent native idiom:
 - `GtkHeaderBar` icon buttons with tooltips for window actions.
 - `GtkSearchEntry` in the headerbar for app/document search.
 - `GtkListBox` sidebars and document/supporting-document lists with full-row selection.
+- JSON-GLib snapshot hydration into native GTK rows, so generated IR provides the shell while live backend state owns document content.
 - `GtkStack` and `GtkStackSwitcher` for center navigation and right-side inspector modes instead of duplicating sidebar state with `GtkNotebook`.
 - `GtkStackSidebar` for preferences-style settings categories.
 - Readable mini-document text that expands into `GtkTextView` proposal edits on demand.
@@ -43,6 +44,7 @@ Native conversion checklist covered by this reference:
 10. Custom drawing is reserved for domain content; platform controls own chrome, lists, forms, and tables.
 11. Backend/process work belongs on async tasks/subprocess callbacks, not AppKit/GTK main loops.
 12. Import/export/path flows use native open/save panels or GTK file chooser dialogs.
+13. Linux live document rows decode structured backend snapshots with JSON-GLib and rebuild native lists while preserving native selection behavior.
 
 Keep this starter updated whenever Wizardry native desktop guidance changes.
 

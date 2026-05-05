@@ -18,6 +18,7 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 [ -f "$root/apps/forge/starter-templates/web/reference-app/index.html" ]
 [ -f "$root/apps/forge/starter-templates/web/reference-app/script.js" ]
 [ -f "$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh" ]
+[ -f "$root/apps/forge/starter-templates/native-desktop/reference-app/scripts/render-native-desktop.sh" ]
 [ -f "$root/apps/forge/starter-templates/web/minimal/style.css" ]
 [ -f "$root/apps/.host/shared/wizardry-bridge.js" ]
 [ -f "$root/apps/.host/macos/main.m" ]
@@ -52,8 +53,14 @@ grep -F "Emission material notice" "$root/apps/forge/starter-templates/web/minim
 grep -F "Canonical reference note" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
 grep -F "__wizardry_host_boot_ready" "$root/apps/forge/starter-templates/web/reference-app/script.js" >/dev/null
 reference_backend="$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh"
+native_reference_render="$root/apps/forge/starter-templates/native-desktop/reference-app/scripts/render-native-desktop.sh"
 grep -F "get-ui-prefs" "$reference_backend" >/dev/null
 sh -n "$reference_backend"
+sh -n "$native_reference_render"
+grep -F "json-glib-1.0" "$native_reference_render" >/dev/null
+grep -F "#include <json-glib/json-glib.h>" "$native_reference_render" >/dev/null
+grep -F "apply_reference_snapshot" "$native_reference_render" >/dev/null
+grep -F "Loaded native JSON snapshot into GTK list rows." "$native_reference_render" >/dev/null
 if XDG_CONFIG_HOME="$scratch/.config" sh "$reference_backend" set-ui-pref "ab/key" value >/tmp/forge-reference-invalid-pref.out 2>/tmp/forge-reference-invalid-pref.err; then
   printf '%s\n' "reference app backend accepted invalid UI pref key" >&2
   exit 1

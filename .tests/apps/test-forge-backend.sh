@@ -679,6 +679,9 @@ printf '%s\n' "$workspace_native_reference_out" | grep -F "created=$workspaces_r
 grep -F "Native Desktop Reference App" "$workspaces_root/workspace-native-reference/README.md" >/dev/null
 grep -F "NSOutlineView" "$workspaces_root/workspace-native-reference/generated/macos/Sources/App/App.swift" >/dev/null
 grep -F "gtk_header_bar_new" "$workspaces_root/workspace-native-reference/generated/linux/src/main.c" >/dev/null
+grep -F "json-glib-1.0" "$workspaces_root/workspace-native-reference/generated/linux/meson.build" >/dev/null
+grep -F "#include <json-glib/json-glib.h>" "$workspaces_root/workspace-native-reference/generated/linux/src/main.c" >/dev/null
+grep -F "apply_reference_snapshot" "$workspaces_root/workspace-native-reference/generated/linux/src/main.c" >/dev/null
 grep -F "starter=reference-app" "$workspaces_root/workspace-native-reference/wizardry.workspace.conf" >/dev/null
 
 bad_native_ir=$(mktemp "${TMPDIR:-/tmp}/forge-bad-native-ir.XXXXXX")
