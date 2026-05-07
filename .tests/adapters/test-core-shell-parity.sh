@@ -3,7 +3,7 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-shell_adapter="$ROOT_DIR/adapters/shell-reference/rpc-shell-reference"
+shell_adapter="$ROOT_DIR/runtime/adapters/shell-reference/rpc-shell-reference"
 out_dir="$ROOT_DIR/_tmp/core-parity"
 core_bin="$out_dir/rpc_session"
 
@@ -17,9 +17,9 @@ trap cleanup EXIT HUP INT TERM
 
 mkdir -p "$out_dir"
 cc -std=c99 -Wall -Wextra -Werror \
-  -I"$ROOT_DIR/core/include" \
-  "$ROOT_DIR/core/src/wizardry_core.c" \
-  "$ROOT_DIR/core/tests/rpc_session.c" \
+  -I"$ROOT_DIR/runtime/core/include" \
+  "$ROOT_DIR/runtime/core/src/wizardry_core.c" \
+  "$ROOT_DIR/runtime/core/tests/rpc_session.c" \
   -o "$core_bin"
 
 core_req() {

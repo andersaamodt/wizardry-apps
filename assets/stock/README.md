@@ -1,6 +1,6 @@
 # stock
 
-`stock/` is a flat convenience shelf of copied and extracted reusable non-app-specific Wizardry app icons and SVGs.
+`assets/stock/` is a flat convenience shelf of copied and extracted reusable non-app-specific Wizardry app icons and SVGs.
 
 - It is not a runtime source of truth.
 - Canonical asset sources remain under `apps/<slug>/assets`.
@@ -20,7 +20,7 @@
 - `forge-tab-remove.svg` extracted from the minitab remove icon in `apps/forge/index.html`
 - `wizardry-desktop-command-composer.svg` extracted from the composer button in `apps/wizardry-desktop/index.html`
 - `wizardry-desktop-casting-watch.svg` extracted from the activity drawer button in `apps/wizardry-desktop/index.html`
-- `web-demo-chat-members.svg` extracted from the members button in `web/demo/pages/chat.md`
-- `web-demo-loading-spinner.svg` extracted from the SVG data URL in `web/demo/static/style.css`
+- `web-demo-chat-members.svg` extracted from the members button in `templates/web/demo/pages/chat.md`
+- `web-demo-loading-spinner.svg` extracted from the SVG data URL in `templates/web/demo/static/style.css`
 - `wizardry-desktop` app icon files are excluded because they are app-brand icon material.
 - `chatroom` is not represented here because it currently has no repo-local asset directory.

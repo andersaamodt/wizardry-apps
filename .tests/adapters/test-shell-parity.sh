@@ -3,8 +3,8 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-shell_adapter="$ROOT_DIR/adapters/shell-reference/rpc-shell-reference"
-http_adapter="$ROOT_DIR/adapters/http-cgi/wizardry-core-api"
+shell_adapter="$ROOT_DIR/runtime/adapters/shell-reference/rpc-shell-reference"
+http_adapter="$ROOT_DIR/runtime/adapters/http-cgi/wizardry-core-api"
 
 state_shell=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-shell-parity.XXXXXX")
 state_http=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-http-parity.XXXXXX")

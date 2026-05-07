@@ -95,7 +95,7 @@ jobs:
           set -eu
           out="dist/godot"
           mkdir -p "$out"
-          sh godot/scripts/export-godot-desktop.sh "$out" "${{ matrix.target }}"
+          sh templates/godot/scripts/export-godot-desktop.sh "$out" "${{ matrix.target }}"
 
       - name: Smoke check exported artifact
         run: |

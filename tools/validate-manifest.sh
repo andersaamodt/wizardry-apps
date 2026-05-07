@@ -23,7 +23,7 @@ if [ -z "$ROOT_DIR" ]; then
 else
   ROOT_DIR=$(CDPATH= cd -- "$ROOT_DIR" && pwd -P)
 fi
-MANIFEST_DIR="$ROOT_DIR/config"
+MANIFEST_DIR="$ROOT_DIR/runtime/config"
 
 for file in "$MANIFEST_DIR"/*.manifest.json; do
   jq . "$file" >/dev/null 2>&1 || {

@@ -7,7 +7,7 @@ case "${1-}" in
   cat <<'USAGE'
 Usage: test_core.sh
 
-Builds and runs core/tests/test_core.c against core/src/wizardry_core.c
+Builds and runs runtime/core/tests/test_core.c against runtime/core/src/wizardry_core.c
 USAGE
   exit 0
   ;;
@@ -15,16 +15,16 @@ esac
 
 set -eu
 
-ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
+ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd -P)
 OUT_DIR="$ROOT_DIR/_tmp/core-tests"
 BIN="$OUT_DIR/test_core"
 
 mkdir -p "$OUT_DIR"
 
 cc -std=c99 -Wall -Wextra -Werror \
-  -I"$ROOT_DIR/core/include" \
-  "$ROOT_DIR/core/src/wizardry_core.c" \
-  "$ROOT_DIR/core/tests/test_core.c" \
+  -I"$ROOT_DIR/runtime/core/include" \
+  "$ROOT_DIR/runtime/core/src/wizardry_core.c" \
+  "$ROOT_DIR/runtime/core/tests/test_core.c" \
   -o "$BIN"
 
 "$BIN"

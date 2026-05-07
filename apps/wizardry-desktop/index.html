@@ -1743,12 +1743,12 @@
         if (!theme) {
           theme = 'adept';
         }
-        var primary = ensureRootHint() + '/web/.themes/' + theme + '.css';
+        var primary = ensureRootHint() + '/templates/web/.themes/' + theme + '.css';
         if (state.rootHint && theme === 'psionic') {
-          primary = ensureRootHint() + '/web/.themes/' + theme + '.css';
+          primary = ensureRootHint() + '/templates/web/.themes/' + theme + '.css';
         }
         if (!state.rootHint) {
-          primary = 'web/.themes/' + theme + '.css';
+          primary = 'templates/web/.themes/' + theme + '.css';
         }
         return primary + '?v=' + ASSET_VERSION + '&ts=' + Date.now();
       }

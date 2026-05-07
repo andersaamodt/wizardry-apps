@@ -2,12 +2,12 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
-artificer_dir="$root/web/artificer"
+artificer_dir="$root/templates/web/artificer"
 [ -d "$artificer_dir" ] || {
   printf '%s\n' "skip: optional artificer app is not checked out"
   exit 0
 }
-script="$root/web/artificer/scripts/assay-cycle.sh"
+script="$root/templates/web/artificer/scripts/assay-cycle.sh"
 fixtures="$root/.tests/apps/fixtures/artificer-decision-surfacing-fixtures.psv"
 
 assert_contains() {

@@ -3,7 +3,7 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-adapter="$ROOT_DIR/adapters/http-cgi/wizardry-core-api"
+adapter="$ROOT_DIR/runtime/adapters/http-cgi/wizardry-core-api"
 state_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-httpcgi-test.XXXXXX")
 vault_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-httpcgi-vault.XXXXXX")
 

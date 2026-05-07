@@ -38,24 +38,24 @@ if tr '\r' '\n' <"$tmp_dir/get-bundle-bad-slug.err" | grep -E '^forged=' >/dev/n
 fi
 
 bad_manifest_root="$tmp_dir/bad-manifest-root"
-mkdir -p "$bad_manifest_root/config" "$bad_manifest_root/apps" "$bad_manifest_root/web"
-cp "$ROOT_DIR/config/templates.manifest.json" "$bad_manifest_root/config/templates.manifest.json"
-cp "$ROOT_DIR/config/apps.manifest.json" "$bad_manifest_root/config/apps.manifest.json"
-jq '.apps[0].name = "Bad\nName"' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
+mkdir -p "$bad_manifest_root/runtime/config" "$bad_manifest_root/apps" "$bad_manifest_root/templates/web"
+cp "$ROOT_DIR/runtime/config/templates.manifest.json" "$bad_manifest_root/runtime/config/templates.manifest.json"
+cp "$ROOT_DIR/runtime/config/apps.manifest.json" "$bad_manifest_root/runtime/config/apps.manifest.json"
+jq '.apps[0].name = "Bad\nName"' "$ROOT_DIR/runtime/config/apps.manifest.json" >"$bad_manifest_root/runtime/config/apps.manifest.json"
 if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer >"$tmp_dir/bad-app-name.out" 2>"$tmp_dir/bad-app-name.err"; then
   printf '%s\n' "get-app-name accepted unsafe manifest app name" >&2
   exit 1
 fi
 grep -F "unsafe app name" "$tmp_dir/bad-app-name.err" >/dev/null
 
-jq '.apps[0].name = "Bad/../../Name"' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
+jq '.apps[0].name = "Bad/../../Name"' "$ROOT_DIR/runtime/config/apps.manifest.json" >"$bad_manifest_root/runtime/config/apps.manifest.json"
 if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer >"$tmp_dir/bad-app-path-name.out" 2>"$tmp_dir/bad-app-path-name.err"; then
   printf '%s\n' "get-app-name accepted path-shaped manifest app name" >&2
   exit 1
 fi
 grep -F "unsafe app name" "$tmp_dir/bad-app-path-name.err" >/dev/null
 
-jq '.apps[0].bundleIds.android = "com.example/../../bad"' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
+jq '.apps[0].bundleIds.android = "com.example/../../bad"' "$ROOT_DIR/runtime/config/apps.manifest.json" >"$bad_manifest_root/runtime/config/apps.manifest.json"
 if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer >"$tmp_dir/bad-bundle-id.out" 2>"$tmp_dir/bad-bundle-id.err"; then
   printf '%s\n' "get-app-bundle-id accepted unsafe manifest bundle id" >&2
   exit 1
@@ -69,7 +69,7 @@ jq '.apps += [{
   "distribution":"core",
   "bundleIds":{"macos":"com.example.bad","ios":"com.example.bad","android":"com.example.bad"},
   "targets":"macos"
-}]' "$ROOT_DIR/config/apps.manifest.json" >"$bad_manifest_root/config/apps.manifest.json"
+}]' "$ROOT_DIR/runtime/config/apps.manifest.json" >"$bad_manifest_root/runtime/config/apps.manifest.json"
 if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/list-production-apps.sh" >"$tmp_dir/bad-production-slug.out" 2>"$tmp_dir/bad-production-slug.err"; then
   printf '%s\n' "list-production-apps accepted unsafe production app slug" >&2
   exit 1
@@ -81,14 +81,14 @@ mkdir -p \
   "$fake_stage_root/tools/release" \
   "$fake_stage_root/apps/forge" \
   "$fake_stage_root/apps/.host/shared" \
-  "$fake_stage_root/web/.themes" \
-  "$fake_stage_root/core/include" \
-  "$fake_stage_root/core/src"
+  "$fake_stage_root/templates/web/.themes" \
+  "$fake_stage_root/runtime/core/include" \
+  "$fake_stage_root/runtime/core/src"
 cp "$ROOT_DIR/tools/release/stage-web-assets.sh" "$fake_stage_root/tools/release/stage-web-assets.sh"
 printf '%s\n' "source marker" >"$fake_stage_root/apps/forge/index.html"
 printf '%s\n' "bridge" >"$fake_stage_root/apps/.host/shared/wizardry-bridge.js"
-printf '%s\n' "header" >"$fake_stage_root/core/include/wizardry.h"
-printf '%s\n' "source" >"$fake_stage_root/core/src/wizardry.c"
+printf '%s\n' "header" >"$fake_stage_root/runtime/core/include/wizardry.h"
+printf '%s\n' "source" >"$fake_stage_root/runtime/core/src/wizardry.c"
 if sh "$fake_stage_root/tools/release/stage-web-assets.sh" forge "$fake_stage_root/apps/forge" >"$tmp_dir/stage-into-source.out" 2>"$tmp_dir/stage-into-source.err"; then
   printf '%s\n' "stage-web-assets accepted destination inside app source" >&2
   exit 1
@@ -353,7 +353,7 @@ sh "$ROOT_DIR/tools/sync-from-wizardry.sh" "$sync_source" "$sync_target" > "$tmp
 [ -f "$sync_target/spells/web/site-spell" ]
 [ -f "$sync_target/spells/web/.site-hidden" ]
 [ -f "$sync_target/spells/.arcana/web-wizardry/install" ]
-[ -f "$sync_target/web/index.html" ]
+[ -f "$sync_target/templates/web/index.html" ]
 [ -f "$sync_target/apps/forge/app.txt" ]
 [ -f "$sync_target/.tests/web/test-web" ]
 [ -f "$sync_target/.tests/.arcana/web-wizardry/test-arcana" ]

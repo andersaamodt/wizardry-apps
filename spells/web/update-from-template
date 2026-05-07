@@ -33,6 +33,14 @@ resolve_template_dir() {
     printf '%s\n' "$wizardry_root/web/$template_name"
     return 0
   fi
+  if [ -n "$template_name" ] && [ -d "$wizardry_root/templates/web/$template_name" ]; then
+    printf '%s\n' "$wizardry_root/templates/web/$template_name"
+    return 0
+  fi
+  if [ -n "$template_name" ] && [ -d "$HOME/git/wizardry-apps/templates/web/$template_name" ]; then
+    printf '%s\n' "$HOME/git/wizardry-apps/templates/web/$template_name"
+    return 0
+  fi
   case "$template_name" in
     blog)
       if [ -d "$HOME/git/nostr-blog" ]; then
@@ -50,8 +58,12 @@ resolve_shared_theme_dir() {
     printf '%s\n' "$wizardry_root/web/.themes"
     return 0
   fi
-  if [ -d "$HOME/git/wizardry-apps/web/.themes" ]; then
-    printf '%s\n' "$HOME/git/wizardry-apps/web/.themes"
+  if [ -d "$wizardry_root/templates/web/.themes" ]; then
+    printf '%s\n' "$wizardry_root/templates/web/.themes"
+    return 0
+  fi
+  if [ -d "$HOME/git/wizardry-apps/templates/web/.themes" ]; then
+    printf '%s\n' "$HOME/git/wizardry-apps/templates/web/.themes"
     return 0
   fi
   return 1

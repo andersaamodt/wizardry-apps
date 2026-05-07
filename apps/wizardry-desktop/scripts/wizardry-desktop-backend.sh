@@ -302,9 +302,9 @@ theme_files() {
 cmd_list_themes() {
   root=$(require_root "${1-}")
   root="${root:-$WIZARDRY_APPS_ROOT_FALLBACK}"
-  themes=$(theme_files "$root/web/.themes")
-  if [ -z "$themes" ] && [ -d "$WIZARDRY_APPS_ROOT_FALLBACK/web/.themes" ]; then
-    themes=$(theme_files "$WIZARDRY_APPS_ROOT_FALLBACK/web/.themes")
+  themes=$(theme_files "$root/templates/web/.themes")
+  if [ -z "$themes" ] && [ -d "$WIZARDRY_APPS_ROOT_FALLBACK/templates/web/.themes" ]; then
+    themes=$(theme_files "$WIZARDRY_APPS_ROOT_FALLBACK/templates/web/.themes")
   fi
   if [ -z "$themes" ] && [ -d "$root/apps/forge/themes" ]; then
     themes=$(theme_files "$root/apps/forge/themes")

@@ -22,20 +22,20 @@
 ## Technical Repo Map
 - `spells/web` and `spells/.arcana/web-wizardry` are migrated from `~/.wizardry`.
 - `spells/.arcana/wizardry-apps` owns the top-level app pipeline arcana and menus.
-- `web` templates are migrated from `~/.wizardry/web`.
+- `templates/web` templates are migrated from `~/.wizardry/web`.
 - `apps` desktop app surfaces are migrated from `~/.wizardry/apps`.
 - `apps/.host` owns shared macOS, Linux, iOS, Android, and bridge host code.
 - `apps/forge` owns the App Forge desktop control plane.
-- `stock/` is a flat convenience shelf of reusable non-app-specific icons/SVGs; canonical runtime assets stay under `apps/<slug>/assets`.
-- `config/` manifests define production release allowlists.
-- `schemas/` contracts define RPC, events, metadata, and native desktop IR formats.
-- `core/` owns wizardry-core runtime contracts and implementation.
-- `adapters/` contains shell and HTTP/CGI reference adapters.
+- `assets/stock/` is a flat convenience shelf of reusable non-app-specific icons/SVGs; canonical runtime assets stay under `apps/<slug>/assets`.
+- `runtime/config/` manifests define production release allowlists.
+- `runtime/schemas/` contracts define RPC, events, metadata, and native desktop IR formats.
+- `runtime/core/` owns wizardry-core runtime contracts and implementation.
+- `runtime/adapters/` contains shell and HTTP/CGI reference adapters.
 - CI workflows in `.github/workflows/` implement lint, test, build, and release gates.
 
 ## Local Validation Commands
 - Validate manifests with `sh tools/validate-manifest.sh`.
-- Run core tests with `sh core/tests/test_core.sh`.
+- Run core tests with `sh runtime/core/tests/test_core.sh`.
 - Run adapter tests with `.tests/adapters/test-*.sh`.
 - Run wizardry-apps arcana tests with `.tests/.arcana/wizardry-apps/test-*.sh`.
 - Run flagship desktop app tests with `.tests/apps/test-*.sh`.

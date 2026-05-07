@@ -114,7 +114,7 @@ assert_not_contains "$ui" "Play the MUD with the currently installed wizardry ca
 
 # Centralized theme and backend root contracts.
 assert_matches "$ui" "buildThemeStylesheetHref\\(themeName\\)"
-assert_contains "$ui" "/web/.themes/"
+assert_contains "$ui" "/templates/web/.themes/"
 assert_contains "$ui" "function loadRootHint()"
 assert_contains "$ui" "callBackend('root-hint')"
 assert_contains "$ui" "workspaceMarker = '/wizardry-desktop/app/index.html'"

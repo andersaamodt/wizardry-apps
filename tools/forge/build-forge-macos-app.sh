@@ -122,8 +122,8 @@ forge_bundle_input_hash() {
     printf 'host_src=%s\n' "$(hash_path_sha256 "$root/apps/.host/macos/main.m")"
     printf 'forge_app=%s\n' "$(hash_path_sha256 "$root/apps/forge")"
     printf 'shared=%s\n' "$(hash_path_sha256 "$root/apps/.host/shared")"
-    printf 'core_include=%s\n' "$(hash_path_sha256 "$root/core/include")"
-    printf 'core_src=%s\n' "$(hash_path_sha256 "$root/core/src")"
+    printf 'core_include=%s\n' "$(hash_path_sha256 "$root/runtime/core/include")"
+    printf 'core_src=%s\n' "$(hash_path_sha256 "$root/runtime/core/src")"
     printf 'icon_builder=%s\n' "$(hash_path_sha256 "$root/tools/forge/build-forge-icon.sh")"
     printf 'bundle_builder=%s\n' "$(hash_path_sha256 "$root/tools/forge/build-forge-macos-app.sh")"
   } | hash_stdin_sha256
@@ -240,8 +240,8 @@ for req in \
   }
 done
 
-[ -d "$root/web/.themes" ] || {
-  printf '%s\n' "build-forge-macos-app: missing required directory: $root/web/.themes" >&2
+[ -d "$root/templates/web/.themes" ] || {
+  printf '%s\n' "build-forge-macos-app: missing required directory: $root/templates/web/.themes" >&2
   exit 1
 }
 
@@ -310,8 +310,8 @@ done
 mkdir -p "$resources_dir/forge/.host"
 cp -R "$root/apps/.host/shared" "$resources_dir/forge/.host/"
 cp -R "$root/apps/.host/shared" "$resources_dir/.host/"
-cp -R "$root/core/include" "$resources_dir/wizardry-apps/core/"
-cp -R "$root/core/src" "$resources_dir/wizardry-apps/core/"
+cp -R "$root/runtime/core/include" "$resources_dir/wizardry-apps/core/"
+cp -R "$root/runtime/core/src" "$resources_dir/wizardry-apps/core/"
 printf '%s\n' "$root" > "$resources_dir/wizardry-apps-root.txt"
 printf '%s\n' "$expected_hash" > "$resources_dir/wizardry-build-input.sha256"
 

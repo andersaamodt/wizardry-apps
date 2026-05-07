@@ -7,7 +7,7 @@ while [ ! -f "$test_root/spells/.imps/test/test-bootstrap" ] && [ "$test_root" !
 done
 . "$test_root/spells/.imps/test/test-bootstrap"
 
-if [ ! -d "$ROOT_DIR/web/blog" ]; then
+if [ ! -d "$ROOT_DIR/templates/web/blog" ]; then
   printf '%s\n' "skip: blog template is not local in this clone"
   exit 0
 fi

@@ -1,16 +1,16 @@
 #!/bin/sh
 
-# Print production app slugs from config/apps.manifest.json.
+# Print production app slugs from runtime/config/apps.manifest.json.
 
 set -eu
 
 is_workspace_root() {
   root=${1-}
   [ -n "$root" ] || return 1
-  [ -f "$root/config/apps.manifest.json" ] || return 1
-  [ -f "$root/config/templates.manifest.json" ] || return 1
+  [ -f "$root/runtime/config/apps.manifest.json" ] || return 1
+  [ -f "$root/runtime/config/templates.manifest.json" ] || return 1
   [ -d "$root/apps" ] || return 1
-  [ -d "$root/web" ] || return 1
+  [ -d "$root/templates/web" ] || return 1
 }
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
@@ -23,7 +23,7 @@ if ! is_workspace_root "$ROOT_DIR"; then
   exit 1
 fi
 
-manifest="$ROOT_DIR/config/apps.manifest.json"
+manifest="$ROOT_DIR/runtime/config/apps.manifest.json"
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "list-production-apps: jq is required" >&2

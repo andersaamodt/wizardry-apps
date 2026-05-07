@@ -116,8 +116,8 @@ test_build_help() {
 test_build_generates_html_for_every_template() {
   skip-if-compiled || return $?
 
-  if [ ! -d "$ROOT_DIR/web" ]; then
-    TEST_FAILURE_REASON="template directory missing: $ROOT_DIR/web"
+  if [ ! -d "$ROOT_DIR/templates/web" ]; then
+    TEST_FAILURE_REASON="template directory missing: $ROOT_DIR/templates/web"
     return 1
   fi
 
@@ -125,7 +125,7 @@ test_build_generates_html_for_every_template() {
   stub_dir=$(make_build_stub_dir)
 
   found_template=0
-  for template_path in "$ROOT_DIR/web"/*; do
+  for template_path in "$ROOT_DIR/templates/web"/*; do
     [ -d "$template_path" ] || continue
     found_template=1
     template=$(basename "$template_path")
@@ -172,7 +172,7 @@ test_build_generates_html_for_every_template() {
   done
 
   if [ "$found_template" -ne 1 ]; then
-    TEST_FAILURE_REASON="no templates found in $ROOT_DIR/web"
+    TEST_FAILURE_REASON="no templates found in $ROOT_DIR/templates/web"
     rm -rf "$test_web_root" "$stub_dir"
     return 1
   fi
@@ -430,7 +430,7 @@ run_test_case "build cache falls back to site data cache" test_build_cache_falls
 run_test_case "build runs site pre-build hook" test_build_runs_site_pre_build_hook
 run_test_case "build prunes stale html for removed pages" test_build_prunes_stale_html_for_removed_pages
 run_test_case "build rejects site path traversal" test_build_rejects_site_path_traversal
-if [ -d "$ROOT_DIR/web/blog" ]; then
+if [ -d "$ROOT_DIR/templates/web/blog" ]; then
   run_test_case "blog build renders nested posts and feeds" test_build_blog_generates_posts_and_feeds
 fi
 

@@ -75,6 +75,9 @@ The user-facing entrypoint is Forge. The source is organized around apps, starte
 - `apps/forge/` contains App Forge
 - `apps/.host/` contains shared desktop and mobile host code
 - `apps/<slug>/` contains built-in wizardry apps
+- `templates/` contains shared web and Godot template material
+- `runtime/` contains manifests, schemas, adapters, and wizardry-core code
+- `assets/stock/` contains reusable stock icons and SVGs
 - `spells/` contains wizardry app pipeline commands
 - `tools/` contains validation, icon, sync, and release helpers
 - `.github/` contains AI-facing standards and contributor policy

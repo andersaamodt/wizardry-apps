@@ -22,11 +22,11 @@ esac
 
 set -eu
 
-ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
+ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd -P)
 out_dir=${1:-$ROOT_DIR/dist/godot}
 target=${2-all}
-project_dir="$ROOT_DIR/godot/tools/wizardry-lab"
-presets_src="$ROOT_DIR/godot/export-presets/export_presets.cfg"
+project_dir="$ROOT_DIR/templates/godot/tools/wizardry-lab"
+presets_src="$ROOT_DIR/templates/godot/export-presets/export_presets.cfg"
 
 case "$target" in
   all|linux|macos) ;;

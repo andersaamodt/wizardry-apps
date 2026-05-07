@@ -2,12 +2,12 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-artificer_dir="$root/web/artificer"
+artificer_dir="$root/templates/web/artificer"
 [ -d "$artificer_dir" ] || {
   printf '%s\n' "skip: optional artificer app is not checked out"
   exit 0
 }
-mode_runtime_lib="$root/web/artificer/cgi/mode-runtime-lib.sh"
+mode_runtime_lib="$root/templates/web/artificer/cgi/mode-runtime-lib.sh"
 
 trim() {
   printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'

@@ -8,16 +8,16 @@ tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-manifest-validation.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
 fixture_root="$tmp_dir/root"
-mkdir -p "$fixture_root/config" "$fixture_root/apps" "$fixture_root/web"
-cp "$ROOT_DIR/config/apps.manifest.json" "$fixture_root/config/apps.manifest.json"
-cp "$ROOT_DIR/config/templates.manifest.json" "$fixture_root/config/templates.manifest.json"
+mkdir -p "$fixture_root/runtime/config" "$fixture_root/apps" "$fixture_root/templates/web"
+cp "$ROOT_DIR/runtime/config/apps.manifest.json" "$fixture_root/runtime/config/apps.manifest.json"
+cp "$ROOT_DIR/runtime/config/templates.manifest.json" "$fixture_root/runtime/config/templates.manifest.json"
 
 sh "$ROOT_DIR/tools/validate-manifest.sh" "$fixture_root"
 
 bad_root="$tmp_dir/bad-root"
-mkdir -p "$bad_root/config" "$bad_root/apps" "$bad_root/web"
-cp "$fixture_root/config/apps.manifest.json" "$bad_root/config/apps.manifest.json"
-cp "$fixture_root/config/templates.manifest.json" "$bad_root/config/templates.manifest.json"
+mkdir -p "$bad_root/runtime/config" "$bad_root/apps" "$bad_root/templates/web"
+cp "$fixture_root/runtime/config/apps.manifest.json" "$bad_root/runtime/config/apps.manifest.json"
+cp "$fixture_root/runtime/config/templates.manifest.json" "$bad_root/runtime/config/templates.manifest.json"
 
 jq '.apps += [{
   "slug":"bad/../../slug",
@@ -26,75 +26,75 @@ jq '.apps += [{
   "distribution":"core",
   "bundleIds":{"macos":"com.example.bad","ios":"com.example.bad","android":"com.example.bad"},
   "targets":"macos"
-}]' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+}]' "$fixture_root/runtime/config/apps.manifest.json" > "$bad_root/runtime/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-slug.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted path-shaped app slug" >&2
   exit 1
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-slug.out" >/dev/null
 
-jq '.apps[0].name = "Injected\nbundleIds={}"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+jq '.apps[0].name = "Injected\nbundleIds={}"' "$fixture_root/runtime/config/apps.manifest.json" > "$bad_root/runtime/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-name.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted newline app name" >&2
   exit 1
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-name.out" >/dev/null
 
-jq '.apps[0].name = "Injected\tbundleIds={}"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+jq '.apps[0].name = "Injected\tbundleIds={}"' "$fixture_root/runtime/config/apps.manifest.json" > "$bad_root/runtime/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-tab-name.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted tab-delimited app name" >&2
   exit 1
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-tab-name.out" >/dev/null
 
-jq '.apps[0].name = "Bad</string><key>Injected</key>"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+jq '.apps[0].name = "Bad</string><key>Injected</key>"' "$fixture_root/runtime/config/apps.manifest.json" > "$bad_root/runtime/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-plist-name.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted plist-shaped app name" >&2
   exit 1
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-plist-name.out" >/dev/null
 
-jq '.apps[0].bundleIds.ios = "com.example/../../bad"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+jq '.apps[0].bundleIds.ios = "com.example/../../bad"' "$fixture_root/runtime/config/apps.manifest.json" > "$bad_root/runtime/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-bundle.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted path-shaped bundle id" >&2
   exit 1
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-bundle.out" >/dev/null
 
-jq '.apps |= map(if (.distribution // "optional") == "optional" then (.source.subdir = "../escape") else . end)' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+jq '.apps |= map(if (.distribution // "optional") == "optional" then (.source.subdir = "../escape") else . end)' "$fixture_root/runtime/config/apps.manifest.json" > "$bad_root/runtime/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-app-subdir.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted escaping app source subdir" >&2
   exit 1
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-app-subdir.out" >/dev/null
 
-jq '.apps[0].hostedWeb.path = "../escape"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+jq '.apps[0].hostedWeb.path = "../escape"' "$fixture_root/runtime/config/apps.manifest.json" > "$bad_root/runtime/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-hosted-web-path.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted escaping hosted web path" >&2
   exit 1
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-hosted-web-path.out" >/dev/null
 
-jq '.apps[0].hostedWeb.mode = "external/../../local"' "$fixture_root/config/apps.manifest.json" > "$bad_root/config/apps.manifest.json"
+jq '.apps[0].hostedWeb.mode = "external/../../local"' "$fixture_root/runtime/config/apps.manifest.json" > "$bad_root/runtime/config/apps.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-hosted-web-mode.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted unsafe hosted web mode" >&2
   exit 1
 fi
 grep -F "apps.manifest.json validation failed" "$tmp_dir/bad-hosted-web-mode.out" >/dev/null
 
-cp "$fixture_root/config/apps.manifest.json" "$bad_root/config/apps.manifest.json"
+cp "$fixture_root/runtime/config/apps.manifest.json" "$bad_root/runtime/config/apps.manifest.json"
 jq '.templates += [{
   "slug":"bad/../../template",
   "publish":true,
   "distribution":"core"
-}]' "$fixture_root/config/templates.manifest.json" > "$bad_root/config/templates.manifest.json"
+}]' "$fixture_root/runtime/config/templates.manifest.json" > "$bad_root/runtime/config/templates.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-template.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted path-shaped template slug" >&2
   exit 1
 fi
 grep -F "templates.manifest.json validation failed" "$tmp_dir/bad-template.out" >/dev/null
 
-jq '.templates |= map(if (.distribution // "optional") == "optional" then (.source.subdir = "../escape") else . end)' "$fixture_root/config/templates.manifest.json" > "$bad_root/config/templates.manifest.json"
+jq '.templates |= map(if (.distribution // "optional") == "optional" then (.source.subdir = "../escape") else . end)' "$fixture_root/runtime/config/templates.manifest.json" > "$bad_root/runtime/config/templates.manifest.json"
 if sh "$ROOT_DIR/tools/validate-manifest.sh" "$bad_root" >"$tmp_dir/bad-template-subdir.out" 2>&1; then
   printf '%s\n' "validate-manifest accepted escaping template source subdir" >&2
   exit 1

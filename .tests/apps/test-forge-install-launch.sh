@@ -94,17 +94,17 @@ mkdir -p \
   "$preserve_build_root/apps/.host/macos" \
   "$preserve_build_root/apps/.host/shared" \
   "$preserve_build_root/apps/forge" \
-  "$preserve_build_root/web/.themes" \
-  "$preserve_build_root/core/include" \
-  "$preserve_build_root/core/src" \
+  "$preserve_build_root/templates/web/.themes" \
+  "$preserve_build_root/runtime/core/include" \
+  "$preserve_build_root/runtime/core/src" \
   "$preserve_build_bin" \
   "$preserve_build_target/Contents"
 cp "$root/tools/forge/build-forge-macos-app.sh" "$preserve_build_root/tools/forge/build-forge-macos-app.sh"
 printf '%s\n' "int main(void){return 0;}" >"$preserve_build_root/apps/.host/macos/main.m"
 printf '%s\n' "<main></main>" >"$preserve_build_root/apps/forge/index.html"
 printf '%s\n' "bridge" >"$preserve_build_root/apps/.host/shared/wizardry-bridge.js"
-printf '%s\n' "header" >"$preserve_build_root/core/include/wizardry.h"
-printf '%s\n' "source" >"$preserve_build_root/core/src/wizardry.c"
+printf '%s\n' "header" >"$preserve_build_root/runtime/core/include/wizardry.h"
+printf '%s\n' "source" >"$preserve_build_root/runtime/core/src/wizardry.c"
 printf '%s\n' "preserve" >"$preserve_build_target/marker"
 cat >"$preserve_build_bin/uname" <<'SH'
 #!/bin/sh

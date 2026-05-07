@@ -231,26 +231,26 @@ printf '%s\n' "$test_root" > "$home_dir/.config/wizardry-apps/forge-root"
 config_doctor=$(HOME="$home_dir" "$bundle_scripts/forge-backend.sh" doctor)
 printf '%s\n' "$config_doctor" | grep -F "root=$test_root" >/dev/null
 
-mkdir -p "$scratch/config" "$scratch/apps" "$scratch/web" "$scratch/godot/tools/base-tool"
-printf '%s\n' "; test scaffold" > "$scratch/godot/tools/base-tool/project.godot"
-cp "$test_root/config/apps.manifest.json" "$scratch/config/apps.manifest.json"
-cp "$test_root/config/templates.manifest.json" "$scratch/config/templates.manifest.json"
+mkdir -p "$scratch/runtime/config" "$scratch/apps" "$scratch/templates/web" "$scratch/templates/godot/tools/base-tool"
+printf '%s\n' "; test scaffold" > "$scratch/templates/godot/tools/base-tool/project.godot"
+cp "$test_root/runtime/config/apps.manifest.json" "$scratch/runtime/config/apps.manifest.json"
+cp "$test_root/runtime/config/templates.manifest.json" "$scratch/runtime/config/templates.manifest.json"
 cp -R "$test_root/licenses" "$scratch/licenses"
 cp -R "$test_root/apps/.host" "$scratch/apps/.host"
 mkdir -p "$scratch/apps/forge"
 cp -R "$test_root/apps/forge/starter-templates" "$scratch/apps/forge/starter-templates"
-cp -R "$test_root/core" "$scratch/core"
-mkdir -p "$scratch/schemas"
-cp "$test_root/schemas/native-desktop-ir-v1.json" "$scratch/schemas/native-desktop-ir-v1.json"
+cp -R "$test_root/runtime/core" "$scratch/runtime/core"
+mkdir -p "$scratch/runtime/schemas"
+cp "$test_root/runtime/schemas/native-desktop-ir-v1.json" "$scratch/runtime/schemas/native-desktop-ir-v1.json"
 cp -R "$test_root/tools" "$scratch/tools"
-cp -R "$test_root/web/demo" "$scratch/web/demo"
-cp -R "$test_root/web/.themes" "$scratch/web/.themes"
+cp -R "$test_root/templates/web/demo" "$scratch/templates/web/demo"
+cp -R "$test_root/templates/web/.themes" "$scratch/templates/web/.themes"
 
 bad_root_hint="$scratch/root
 forged=1"
-mkdir -p "$bad_root_hint/config" "$bad_root_hint/apps" "$bad_root_hint/web"
-cp "$scratch/config/apps.manifest.json" "$bad_root_hint/config/apps.manifest.json"
-cp "$scratch/config/templates.manifest.json" "$bad_root_hint/config/templates.manifest.json"
+mkdir -p "$bad_root_hint/runtime/config" "$bad_root_hint/apps" "$bad_root_hint/templates/web"
+cp "$scratch/runtime/config/apps.manifest.json" "$bad_root_hint/runtime/config/apps.manifest.json"
+cp "$scratch/runtime/config/templates.manifest.json" "$bad_root_hint/runtime/config/templates.manifest.json"
 if sh "$backend" list-apps "$bad_root_hint" >"$scratch/forge-bad-root-hint.out" 2>"$scratch/forge-bad-root-hint.err"; then
   printf '%s\n' "forge list-apps accepted line-break root hint" >&2
   exit 1
@@ -262,8 +262,8 @@ if tr '\r' '\n' <"$scratch/forge-bad-root-hint.out" | grep -E '^forged=' >/dev/n
 fi
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main\rforged=1") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main\rforged=1") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 app_status_injected=$(sh "$backend" app-status "$scratch" artificer)
 if printf '%s\n' "$app_status_injected" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
   printf '%s\n' "forge app-status emitted forged key-value output from manifest source ref" >&2
@@ -271,12 +271,12 @@ if printf '%s\n' "$app_status_injected" | tr '\r' '\n' | grep -E '^forged=' >/de
 fi
 printf '%s\n' "$app_status_injected" | grep -F "ref=main forged=1" >/dev/null
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
-jq '.templates |= map(if .slug == "blog" then (.source.ref = "main\rforged=1") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
+jq '.templates |= map(if .slug == "blog" then (.source.ref = "main\rforged=1") else . end)' "$scratch/runtime/config/templates.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/templates.manifest.json"
 template_status_injected=$(sh "$backend" template-status "$scratch" blog)
 if printf '%s\n' "$template_status_injected" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
   printf '%s\n' "forge template-status emitted forged key-value output from manifest source ref" >&2
@@ -284,32 +284,32 @@ if printf '%s\n' "$template_status_injected" | tr '\r' '\n' | grep -E '^forged='
 fi
 printf '%s\n' "$template_status_injected" | grep -F "ref=main forged=1" >/dev/null
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
-jq '.templates |= map(if .slug == "blog" then (.source.ref = "main") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
+jq '.templates |= map(if .slug == "blog" then (.source.ref = "main") else . end)' "$scratch/runtime/config/templates.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/templates.manifest.json"
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.subdir = "../escape") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+jq '.apps |= map(if .slug == "artificer" then (.source.subdir = "../escape") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 if sh "$backend" download-app "$scratch" artificer >"$scratch/forge-bad-app-subdir.out" 2>"$scratch/forge-bad-app-subdir.err"; then
   printf '%s\n' "forge download-app accepted escaping source subdir" >&2
   exit 1
 fi
 grep -F "invalid source subdir" "$scratch/forge-bad-app-subdir.err" >/dev/null
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.subdir = ".") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+jq '.apps |= map(if .slug == "artificer" then (.source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
-jq '.templates |= map(if .slug == "blog" then (.source.subdir = "../escape") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
+jq '.templates |= map(if .slug == "blog" then (.source.subdir = "../escape") else . end)' "$scratch/runtime/config/templates.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/templates.manifest.json"
 if sh "$backend" download-template "$scratch" blog >"$scratch/forge-bad-template-subdir.out" 2>"$scratch/forge-bad-template-subdir.err"; then
   printf '%s\n' "forge download-template accepted escaping source subdir" >&2
   exit 1
 fi
 grep -F "invalid source subdir" "$scratch/forge-bad-template-subdir.err" >/dev/null
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
-jq '.templates |= map(if .slug == "blog" then (.source.subdir = ".") else . end)' "$scratch/config/templates.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/templates.manifest.json"
+jq '.templates |= map(if .slug == "blog" then (.source.subdir = ".") else . end)' "$scratch/runtime/config/templates.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/templates.manifest.json"
 
 source_repo_cr="$scratch/source$(printf '\r')forged=1"
 mkdir -p "$source_repo_cr"
@@ -321,8 +321,8 @@ mkdir -p "$source_repo_cr"
   git -c user.name=Forge -c user.email=forge@example.invalid commit -q -m init
 )
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq --arg repo "$source_repo_cr" '.apps |= map(if .slug == "artificer" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = ".") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+jq --arg repo "$source_repo_cr" '.apps |= map(if .slug == "artificer" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 if XDG_STATE_HOME="$scratch/bad-source-state" sh "$backend" download-app "$scratch" artificer >"$scratch/forge-bad-source-repo.out" 2>"$scratch/forge-bad-source-repo.err"; then
   printf '%s\n' "forge download-app accepted line-break source repo" >&2
   exit 1
@@ -345,8 +345,8 @@ printf '%s\n' "outside" >"$source_repo_outside/leaked.txt"
   git -c user.name=Forge -c user.email=forge@example.invalid commit -q -m init
 )
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq --arg repo "$source_repo_escape" '.apps |= map(if .slug == "artificer" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = "payload") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+jq --arg repo "$source_repo_escape" '.apps |= map(if .slug == "artificer" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = "payload") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 if XDG_STATE_HOME="$scratch/escape-source-state" sh "$backend" download-app "$scratch" artificer >"$scratch/forge-escape-source-subdir.out" 2>"$scratch/forge-escape-source-subdir.err"; then
   printf '%s\n' "forge download-app accepted source subdir symlink escaping repo" >&2
   exit 1
@@ -357,8 +357,8 @@ if [ -e "$scratch/escape-source-state/wizardry-apps/forge/catalog/apps/artificer
   exit 1
 fi
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.repo = "https://github.com/example/artificer.git" | .source.ref = "main" | .source.subdir = ".") else . end)' "$scratch/config/apps.manifest.json" >"$tmp_manifest"
-mv "$tmp_manifest" "$scratch/config/apps.manifest.json"
+jq '.apps |= map(if .slug == "artificer" then (.source.repo = "https://github.com/example/artificer.git" | .source.ref = "main" | .source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 
 if sh "$backend" run-task "$scratch" "../escape-task" >/tmp/forge-invalid-run-task.out 2>/tmp/forge-invalid-run-task.err; then
   printf '%s\n' "forge backend test: invalid run-task name accepted" >&2
@@ -372,7 +372,7 @@ sh "$backend" scaffold-app "$scratch" sandbox-tool "Sandbox Tool" minimal >/tmp/
 [ -f "$scratch/apps/sandbox-tool/index.html" ]
 [ -f "$scratch/apps/sandbox-tool/style.css" ]
 
-jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false and .targets == "hosted-web,macos,linux")' "$scratch/config/apps.manifest.json" >/dev/null
+jq -e '.apps[] | select(.slug == "sandbox-tool" and .production == false and .targets == "hosted-web,macos,linux")' "$scratch/runtime/config/apps.manifest.json" >/dev/null
 sh "$test_root/tools/validate-manifest.sh" "$scratch" >/tmp/forge-scaffold-manifest-valid.out
 
 for web_starter in panel topbar dashboard studio; do
@@ -380,7 +380,7 @@ for web_starter in panel topbar dashboard studio; do
   sh "$backend" scaffold-app "$scratch" "$starter_slug" "Sandbox $web_starter" "$web_starter" >/tmp/forge-scaffold-"$web_starter".log
   [ -f "$scratch/apps/$starter_slug/index.html" ]
   [ -f "$scratch/apps/$starter_slug/style.css" ]
-  jq -e --arg slug "$starter_slug" '.apps[] | select(.slug == $slug and .targets == "hosted-web,macos,linux")' "$scratch/config/apps.manifest.json" >/dev/null
+  jq -e --arg slug "$starter_slug" '.apps[] | select(.slug == $slug and .targets == "hosted-web,macos,linux")' "$scratch/runtime/config/apps.manifest.json" >/dev/null
 done
 sh "$test_root/tools/validate-manifest.sh" "$scratch" >/tmp/forge-scaffold-all-web-manifest-valid.out
 
@@ -976,7 +976,7 @@ grep -F "project app index not found" /tmp/forge-run-generic.err >/dev/null
 
 set_app_targets_out=$(sh "$backend" set-app-targets "$scratch" sandbox-tool "hosted-web,macos,linux,ios,android")
 printf '%s\n' "$set_app_targets_out" | grep -F "slug=sandbox-tool" >/dev/null
-jq -e '.apps[] | select(.slug == "sandbox-tool" and .targets == "hosted-web,macos,linux,ios,android")' "$scratch/config/apps.manifest.json" >/dev/null
+jq -e '.apps[] | select(.slug == "sandbox-tool" and .targets == "hosted-web,macos,linux,ios,android")' "$scratch/runtime/config/apps.manifest.json" >/dev/null
 apps_after_set=$(sh "$backend" list-apps "$scratch")
 printf '%s\n' "$apps_after_set" | grep -E '^sandbox-tool\t' | grep -F "$(printf '\thosted-web,macos,linux,ios,android')" >/dev/null
 

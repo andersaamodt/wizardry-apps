@@ -26,7 +26,7 @@ Wizardry Desktop is a built-in desktop control plane for wizardry spells and app
 
 ## Theme Contract
 
-- Theme palette source is centralized under `web/.themes`.
+- Theme palette source is centralized under `templates/web/.themes`.
 - Backend `list-themes` and frontend `buildThemeStylesheetHref` resolve those shared theme files.
 - Theme changes apply immediately and persist through backend prefs.
 

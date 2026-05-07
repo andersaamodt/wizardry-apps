@@ -83,16 +83,16 @@ default_chat_url() {
 }
 
 find_chat_template() {
-  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -f "$WIZARDRY_APPS_ROOT/web/demo/pages/chat.md" ]; then
-    printf '%s\n' "$WIZARDRY_APPS_ROOT/web/demo/pages/chat.md"
+  if [ -n "${WIZARDRY_APPS_ROOT-}" ] && [ -f "$WIZARDRY_APPS_ROOT/templates/web/demo/pages/chat.md" ]; then
+    printf '%s\n' "$WIZARDRY_APPS_ROOT/templates/web/demo/pages/chat.md"
     return 0
   fi
   if [ -n "${WIZARDRY_DIR-}" ] && [ -f "$WIZARDRY_DIR/web/demo/pages/chat.md" ]; then
     printf '%s\n' "$WIZARDRY_DIR/web/demo/pages/chat.md"
     return 0
   fi
-  if [ -f "$HOME/git/wizardry-apps/web/demo/pages/chat.md" ]; then
-    printf '%s\n' "$HOME/git/wizardry-apps/web/demo/pages/chat.md"
+  if [ -f "$HOME/git/wizardry-apps/templates/web/demo/pages/chat.md" ]; then
+    printf '%s\n' "$HOME/git/wizardry-apps/templates/web/demo/pages/chat.md"
     return 0
   fi
   return 1
@@ -110,7 +110,7 @@ ensure_demo_chat_page() {
     return 0
   fi
   src=$(find_chat_template) || {
-    printf '%s\n' "chatroom-backend: chat template missing (expected web/demo/pages/chat.md in wizardry-apps root)" >&2
+    printf '%s\n' "chatroom-backend: chat template missing (expected templates/web/demo/pages/chat.md in wizardry-apps root)" >&2
     exit 1
   }
   mkdir -p "$(dirname "$target")"

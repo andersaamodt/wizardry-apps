@@ -51,7 +51,7 @@ jobs:
             mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$app" "$appdir/usr/share/wizardry-apps/core"
             cp -R "apps/$app"/. "$appdir/usr/share/$app/"
             cp -R apps/.host/shared "$appdir/usr/share/$app/.host"
-            cp -R core/include core/src "$appdir/usr/share/wizardry-apps/core/"
+            cp -R runtime/core/include runtime/core/src "$appdir/usr/share/wizardry-apps/core/"
             cp wizardry-host "$appdir/usr/bin/"
             cat > "$appdir/AppRun" <<'APP'
 #!/bin/sh
@@ -105,7 +105,7 @@ APP
             mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources/$app" "$bundle/Contents/Resources/wizardry-apps/core"
             cp -R "apps/$app"/. "$bundle/Contents/Resources/$app/"
             cp -R apps/.host/shared "$bundle/Contents/Resources/$app/.host"
-            cp -R core/include core/src "$bundle/Contents/Resources/wizardry-apps/core/"
+            cp -R runtime/core/include runtime/core/src "$bundle/Contents/Resources/wizardry-apps/core/"
             cp wizardry-host "$bundle/Contents/MacOS/wizardry-host"
             cat > "$bundle/Contents/MacOS/$app" <<'APP'
 #!/bin/sh

@@ -75,8 +75,14 @@ copy_dir_contents() {
 
 copy_path() {
   rel_path=$1
+  copy_path_to "$rel_path" "$rel_path"
+}
+
+copy_path_to() {
+  rel_path=$1
+  dest_rel_path=$2
   src_path="$source_dir/$rel_path"
-  dest_path="$target_dir/$rel_path"
+  dest_path="$target_dir/$dest_rel_path"
 
   [ -e "$src_path" ] || {
     printf 'skipped=%s\n' "$rel_path"
@@ -91,7 +97,7 @@ copy_path() {
   fi
 
   SYNCED_ANY=1
-  printf 'synced=%s\n' "$rel_path"
+  printf 'synced=%s\n' "$dest_rel_path"
 }
 
 sync_apps() {
@@ -117,7 +123,7 @@ SYNCED_ANY=0
 
 copy_path "spells/web"
 copy_path "spells/.arcana/web-wizardry"
-copy_path "web"
+copy_path_to "web" "templates/web"
 sync_apps
 copy_path ".tests/web"
 copy_path ".tests/.arcana/web-wizardry"

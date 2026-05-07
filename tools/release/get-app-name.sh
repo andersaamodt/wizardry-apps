@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Print app display name for a slug from config/apps.manifest.json.
+# Print app display name for a slug from runtime/config/apps.manifest.json.
 
 case "${1-}" in
 --help|--usage|-h)
@@ -44,10 +44,10 @@ is_safe_slug "$slug" || {
 is_workspace_root() {
   root=${1-}
   [ -n "$root" ] || return 1
-  [ -f "$root/config/apps.manifest.json" ] || return 1
-  [ -f "$root/config/templates.manifest.json" ] || return 1
+  [ -f "$root/runtime/config/apps.manifest.json" ] || return 1
+  [ -f "$root/runtime/config/templates.manifest.json" ] || return 1
   [ -d "$root/apps" ] || return 1
-  [ -d "$root/web" ] || return 1
+  [ -d "$root/templates/web" ] || return 1
 }
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
@@ -60,7 +60,7 @@ if ! is_workspace_root "$ROOT_DIR"; then
   exit 1
 fi
 
-manifest="$ROOT_DIR/config/apps.manifest.json"
+manifest="$ROOT_DIR/runtime/config/apps.manifest.json"
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "get-app-name: jq is required" >&2

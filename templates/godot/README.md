@@ -15,10 +15,10 @@ v1 scope:
 
 ```sh
 # Linux export
-sh godot/scripts/export-godot-desktop.sh dist/godot linux
+sh templates/godot/scripts/export-godot-desktop.sh dist/godot linux
 
 # macOS export
-sh godot/scripts/export-godot-desktop.sh dist/godot macos
+sh templates/godot/scripts/export-godot-desktop.sh dist/godot macos
 ```
 
 Requires a `godot4`/`godot` CLI binary and matching export templates.

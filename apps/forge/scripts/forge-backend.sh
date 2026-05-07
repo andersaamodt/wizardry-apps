@@ -84,10 +84,10 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 is_workspace_root() {
   root=${1-}
   [ -n "$root" ] || return 1
-  [ -f "$root/config/apps.manifest.json" ] || return 1
-  [ -f "$root/config/templates.manifest.json" ] || return 1
+  [ -f "$root/runtime/config/apps.manifest.json" ] || return 1
+  [ -f "$root/runtime/config/templates.manifest.json" ] || return 1
   [ -d "$root/apps" ] || return 1
-  [ -d "$root/web" ] || return 1
+  [ -d "$root/templates/web" ] || return 1
 }
 
 find_root_from() {
@@ -377,13 +377,13 @@ desktop_build_input_hash() {
     printf 'slug=%s\n' "$slug"
     printf 'target=%s\n' "$target"
     printf 'bundle_id=%s\n' "$bundle_id"
-    printf 'manifest=%s\n' "$(hash_path_sha256 "$root/config/apps.manifest.json")"
+    printf 'manifest=%s\n' "$(hash_path_sha256 "$root/runtime/config/apps.manifest.json")"
     printf 'host=%s\n' "$(hash_path_sha256 "$host_src")"
     printf 'app=%s\n' "$(hash_path_sha256 "$app_dir")"
     printf 'app_icon_override=%s\n' "$(hash_path_sha256 "$(app_icon_override_path "$slug")")"
     printf 'shared=%s\n' "$(hash_path_sha256 "$root/apps/.host/shared")"
-    printf 'core_include=%s\n' "$(hash_path_sha256 "$root/core/include")"
-    printf 'core_src=%s\n' "$(hash_path_sha256 "$root/core/src")"
+    printf 'core_include=%s\n' "$(hash_path_sha256 "$root/runtime/core/include")"
+    printf 'core_src=%s\n' "$(hash_path_sha256 "$root/runtime/core/src")"
     printf 'backend=%s\n' "$(hash_path_sha256 "$SCRIPT_DIR/forge-backend.sh")"
   } | hash_stdin_sha256
 }
@@ -842,51 +842,51 @@ icon_source_format_for_path() {
 manifest_app_exists() {
   root=$1
   slug=$2
-  jq -e --arg slug "$slug" '.apps[] | select(.slug == $slug)' "$root/config/apps.manifest.json" >/dev/null 2>&1
+  jq -e --arg slug "$slug" '.apps[] | select(.slug == $slug)' "$root/runtime/config/apps.manifest.json" >/dev/null 2>&1
 }
 
 manifest_template_exists() {
   root=$1
   slug=$2
-  jq -e --arg slug "$slug" '.templates[] | select(.slug == $slug)' "$root/config/templates.manifest.json" >/dev/null 2>&1
+  jq -e --arg slug "$slug" '.templates[] | select(.slug == $slug)' "$root/runtime/config/templates.manifest.json" >/dev/null 2>&1
 }
 
 app_distribution() {
   root=$1
   slug=$2
-  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.distribution // "optional")' "$root/config/apps.manifest.json"
+  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.distribution // "optional")' "$root/runtime/config/apps.manifest.json"
 }
 
 template_distribution() {
   root=$1
   slug=$2
-  jq -r --arg slug "$slug" '.templates[] | select(.slug == $slug) | (.distribution // "optional")' "$root/config/templates.manifest.json"
+  jq -r --arg slug "$slug" '.templates[] | select(.slug == $slug) | (.distribution // "optional")' "$root/runtime/config/templates.manifest.json"
 }
 
 app_source_field() {
   root=$1
   slug=$2
   key=$3
-  jq -r --arg slug "$slug" --arg key "$key" '.apps[] | select(.slug == $slug) | (.source[$key] // "")' "$root/config/apps.manifest.json"
+  jq -r --arg slug "$slug" --arg key "$key" '.apps[] | select(.slug == $slug) | (.source[$key] // "")' "$root/runtime/config/apps.manifest.json"
 }
 
 template_source_field() {
   root=$1
   slug=$2
   key=$3
-  jq -r --arg slug "$slug" --arg key "$key" '.templates[] | select(.slug == $slug) | (.source[$key] // "")' "$root/config/templates.manifest.json"
+  jq -r --arg slug "$slug" --arg key "$key" '.templates[] | select(.slug == $slug) | (.source[$key] // "")' "$root/runtime/config/templates.manifest.json"
 }
 
 app_hosted_web_mode() {
   root=$1
   slug=$2
-  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.hostedWeb.mode // "local")' "$root/config/apps.manifest.json"
+  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.hostedWeb.mode // "local")' "$root/runtime/config/apps.manifest.json"
 }
 
 app_hosted_web_path() {
   root=$1
   slug=$2
-  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.hostedWeb.path // "")' "$root/config/apps.manifest.json"
+  jq -r --arg slug "$slug" '.apps[] | select(.slug == $slug) | (.hostedWeb.path // "")' "$root/runtime/config/apps.manifest.json"
 }
 
 app_cache_dir() {
@@ -995,7 +995,7 @@ resolve_template_dir() {
   distribution=$(template_distribution "$root" "$slug")
   case "$distribution" in
     core)
-      dir="$root/web/$slug"
+      dir="$root/templates/web/$slug"
       [ -d "$dir" ] || return 1
       printf '%s\n' "$dir"
       return 0
@@ -1016,7 +1016,7 @@ template_status() {
   distribution=$(template_distribution "$root" "$slug")
   case "$distribution" in
     core)
-      path="$root/web/$slug"
+      path="$root/templates/web/$slug"
       if [ -d "$path" ]; then
         printf '%s\t%s\n' "core_present" "$path"
       else
@@ -1074,7 +1074,7 @@ resolve_template_dir_or_error() {
       printf '%s\n' "forge-backend: template not downloaded: $slug (run download-template)" >&2
       ;;
     core_missing)
-      printf '%s\n' "forge-backend: core template directory missing: $root/web/$slug" >&2
+      printf '%s\n' "forge-backend: core template directory missing: $root/templates/web/$slug" >&2
       ;;
     *)
       printf '%s\n' "forge-backend: template not found: $slug" >&2
@@ -2189,11 +2189,11 @@ cmd_doctor() {
   done
 
   if [ -n "$root" ] && command -v jq >/dev/null 2>&1; then
-    printf 'apps_manifest=%s\n' "$(kv_output_value "$root/config/apps.manifest.json")"
-    printf 'templates_manifest=%s\n' "$(kv_output_value "$root/config/templates.manifest.json")"
-    printf 'apps_total=%s\n' "$(jq -r '.apps | length' "$root/config/apps.manifest.json")"
-    printf 'apps_production=%s\n' "$(jq -r '[.apps[] | select(.production == true)] | length' "$root/config/apps.manifest.json")"
-    printf 'templates_total=%s\n' "$(jq -r '.templates | length' "$root/config/templates.manifest.json")"
+    printf 'apps_manifest=%s\n' "$(kv_output_value "$root/runtime/config/apps.manifest.json")"
+    printf 'templates_manifest=%s\n' "$(kv_output_value "$root/runtime/config/templates.manifest.json")"
+    printf 'apps_total=%s\n' "$(jq -r '.apps | length' "$root/runtime/config/apps.manifest.json")"
+    printf 'apps_production=%s\n' "$(jq -r '[.apps[] | select(.production == true)] | length' "$root/runtime/config/apps.manifest.json")"
+    printf 'templates_total=%s\n' "$(jq -r '.templates | length' "$root/runtime/config/templates.manifest.json")"
   fi
 }
 
@@ -2201,7 +2201,7 @@ cmd_list_apps() {
   root=$(require_root "${1-}")
   require_jq
 
-  manifest="$root/config/apps.manifest.json"
+  manifest="$root/runtime/config/apps.manifest.json"
   list_apps_tmp=$(mktemp "${TMPDIR:-/tmp}/forge-list-apps.XXXXXX")
   jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (if has("targets") then (.targets // "") else "__FORGE_TARGETS_MISSING__" end), (.distribution // "optional")] | @tsv' "$manifest" > "$list_apps_tmp"
   while IFS="$(printf '\t')" read -r slug name production bundle_targets manifest_targets distribution; do
@@ -2215,7 +2215,7 @@ cmd_list_apps() {
         ;;
     esac
     development_context=web
-    if [ "$distribution" = "core" ] && [ -d "$root/godot/tools/$slug" ]; then
+    if [ "$distribution" = "core" ] && [ -d "$root/templates/godot/tools/$slug" ]; then
       development_context=godot
     fi
 
@@ -2233,7 +2233,7 @@ cmd_list_apps() {
           targets="$targets,android"
           ;;
       esac
-      if [ -d "$root/web/$slug" ]; then
+      if [ -d "$root/templates/web/$slug" ]; then
         targets="hosted-web,$targets"
       fi
     fi
@@ -2265,7 +2265,7 @@ cmd_list_templates() {
   root=$(require_root "${1-}")
   require_jq
 
-  manifest="$root/config/templates.manifest.json"
+  manifest="$root/runtime/config/templates.manifest.json"
   jq -r '.templates[] | [.slug, (if .publish then "true" else "false" end), (.distribution // "optional")] | @tsv' "$manifest" |
   while IFS="$(printf '\t')" read -r slug publish distribution; do
     status_line=$(template_status "$root" "$slug")
@@ -2485,7 +2485,7 @@ theme_names_from_dir() {
 
 cmd_list_themes() {
   root=$(require_root "${1-}")
-  theme_root="$root/web/.themes"
+  theme_root="$root/templates/web/.themes"
   app_theme_dir="$root/apps/forge/themes"
 
   themes=$(theme_names_from_dir "$theme_root" || true)
@@ -2500,7 +2500,7 @@ cmd_list_themes() {
 
 cmd_list_godot_tools() {
   root=$(require_root "${1-}")
-  tools_dir="$root/godot/tools"
+  tools_dir="$root/templates/godot/tools"
   [ -d "$tools_dir" ] || return 0
 
   for path in "$tools_dir"/*; do
@@ -4648,7 +4648,7 @@ cmd_set_app_targets() {
   targets=$(normalize_targets_value "$targets")
   require_jq
 
-  manifest="$root/config/apps.manifest.json"
+  manifest="$root/runtime/config/apps.manifest.json"
   tmp_file=$(mktemp "${TMPDIR:-/tmp}/app-forge-manifest.XXXXXX")
   jq --arg slug "$slug" --arg targets "$targets" '
     if any(.apps[]; .slug == $slug) then
@@ -5355,8 +5355,8 @@ cmd_build_desktop() {
         cp -R "$root/apps/.host/shared" "$bundle/Contents/Resources/.host/"
         printf '%s\n' "$root" > "$bundle/Contents/Resources/wizardry-apps-root.txt"
         printf '%s\n' "$expected_hash" > "$hash_path"
-        cp -R "$root/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
-        cp -R "$root/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
+        cp -R "$root/runtime/core/include" "$bundle/Contents/Resources/wizardry-apps/core/"
+        cp -R "$root/runtime/core/src" "$bundle/Contents/Resources/wizardry-apps/core/"
         cp "$host_bin" "$bundle/Contents/MacOS/wizardry-host"
 
         icon_source=''
@@ -5492,8 +5492,8 @@ PLIST
         cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
         printf '%s\n' "$root" > "$appdir/usr/share/wizardry-apps-root.txt"
         printf '%s\n' "$expected_hash" > "$hash_path"
-        cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
-        cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
+        cp -R "$root/runtime/core/include" "$appdir/usr/share/wizardry-apps/core/"
+        cp -R "$root/runtime/core/src" "$appdir/usr/share/wizardry-apps/core/"
         cp "$host_bin" "$appdir/usr/bin/wizardry-host"
 
         cat > "$appdir/AppRun" <<APP
@@ -6040,8 +6040,8 @@ PLIST
       mkdir -p "$appdir/usr/share/$workspace_slug/.host"
       cp -R "$root/apps/.host/shared" "$appdir/usr/share/$workspace_slug/.host/"
       cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
-      cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
-      cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
+      cp -R "$root/runtime/core/include" "$appdir/usr/share/wizardry-apps/core/"
+      cp -R "$root/runtime/core/src" "$appdir/usr/share/wizardry-apps/core/"
       cp "$host_bin" "$appdir/usr/bin/wizardry-host"
 
       cat > "$appdir/AppRun" <<APP
@@ -7203,8 +7203,8 @@ PLIST
     mkdir -p "$appdir/usr/share/$bundle_slug/.host"
     cp -R "$root/apps/.host/shared" "$appdir/usr/share/$bundle_slug/.host/"
     cp -R "$root/apps/.host/shared" "$appdir/usr/share/.host/"
-    cp -R "$root/core/include" "$appdir/usr/share/wizardry-apps/core/"
-    cp -R "$root/core/src" "$appdir/usr/share/wizardry-apps/core/"
+    cp -R "$root/runtime/core/include" "$appdir/usr/share/wizardry-apps/core/"
+    cp -R "$root/runtime/core/src" "$appdir/usr/share/wizardry-apps/core/"
     cp "$host_bin" "$appdir/usr/bin/wizardry-host"
 
     cat > "$appdir/AppRun" <<APP
@@ -7256,7 +7256,7 @@ cmd_serve_hosted_web() {
       hosted_mode=$(app_hosted_web_mode "$root" "$slug")
       case "$hosted_mode" in
         local)
-          template_dir="$root/web/$slug"
+          template_dir="$root/templates/web/$slug"
           [ -d "$template_dir" ] || {
             printf '%s\n' "forge-backend: hosted web template not found for app: $slug" >&2
             exit 1
@@ -7640,7 +7640,7 @@ write_native_desktop_starter_template() {
     render_native_template_file "$template_dir/README.md" "$workspace_dir/README.md" "$app_name" "$app_id"
   fi
   chmod +x "$workspace_dir/scripts/render-native-desktop.sh" "$workspace_dir/scripts/validate-native-desktop-ir.sh"
-  cp "$root/schemas/native-desktop-ir-v1.json" "$workspace_dir/schemas/native-desktop-ir-v1.json"
+  cp "$root/runtime/schemas/native-desktop-ir-v1.json" "$workspace_dir/schemas/native-desktop-ir-v1.json"
   (
     cd "$workspace_dir"
     sh "scripts/render-native-desktop.sh"
@@ -7720,7 +7720,7 @@ append_manifest_app() {
   slug=$2
   name=$3
 
-  manifest="$root/config/apps.manifest.json"
+  manifest="$root/runtime/config/apps.manifest.json"
   tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/wizardry-apps-manifest.XXXXXX")
 
   if jq -e --arg slug "$slug" '.apps[] | select(.slug == $slug)' "$manifest" >/dev/null 2>&1; then
@@ -7810,7 +7810,7 @@ cmd_scaffold_app() {
   append_manifest_app "$root" "$slug" "$app_name"
 
   printf 'created=%s\n' "$app_dir"
-  printf 'manifest=%s\n' "$root/config/apps.manifest.json"
+  printf 'manifest=%s\n' "$root/runtime/config/apps.manifest.json"
 }
 
 cmd_scaffold_workspace() {
@@ -7997,7 +7997,7 @@ GDSCRIPT
 
           source_dir=''
           for candidate in \
-            "$root/godot/tools/$source" \
+            "$root/templates/godot/tools/$source" \
             "$project_root/$source"; do
             if [ -d "$candidate" ]; then
               source_dir=$candidate
@@ -8119,10 +8119,10 @@ cmd_scaffold_site() {
     mv "$site_dir/includes" "$site_dir/site/"
   fi
 
-  if [ -d "$root/web/.themes" ]; then
+  if [ -d "$root/templates/web/.themes" ]; then
     mkdir -p "$site_dir/site/static"
     rm -rf "$site_dir/site/static/themes"
-    ln -s "$root/web/.themes" "$site_dir/site/static/themes"
+    ln -s "$root/templates/web/.themes" "$site_dir/site/static/themes"
   fi
 
   mkdir -p "$site_dir/site/uploads" "$site_dir/build"
@@ -8177,7 +8177,7 @@ cmd_run_task() {
       run_logged_step "$task_log" "validate-manifest" "$root/tools/validate-manifest.sh" || status=$?
       ;;
     test-core)
-      run_logged_step "$task_log" "core-tests" "$root/core/tests/test_core.sh" || status=$?
+      run_logged_step "$task_log" "core-tests" "$root/runtime/core/tests/test_core.sh" || status=$?
       [ "$status" -eq 0 ] && run_logged_step "$task_log" "core-rpc-tests" "$root/.tests/core/test-core-rpc.sh" || status=$?
       ;;
     test-adapters)

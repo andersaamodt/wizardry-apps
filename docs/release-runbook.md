@@ -2,7 +2,7 @@
 
 ## 1. Preflight
 
-- Ensure `config/apps.manifest.json` and `config/templates.manifest.json` are valid.
+- Ensure `runtime/config/apps.manifest.json` and `runtime/config/templates.manifest.json` are valid.
 - Ensure CI green on main branch.
 - Confirm signing secrets exist in GitHub environment.
 

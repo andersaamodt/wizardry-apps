@@ -10,8 +10,8 @@ Usage: stage-web-assets.sh APP_SLUG DEST_DIR
 Copies:
   apps/APP_SLUG/* -> DEST_DIR/app/
   apps/.host/shared/* -> DEST_DIR/app/.host/shared/
-  app/themes -> symlink to web/.themes
-  core/include + core/src -> DEST_DIR/core/
+  app/themes -> symlink to templates/web/.themes
+  runtime/core/include + runtime/core/src -> DEST_DIR/core/
 USAGE
   exit 0
   ;;
@@ -64,7 +64,7 @@ fi
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 app_dir="$ROOT_DIR/apps/$slug"
 shared_dir="$ROOT_DIR/apps/.host/shared"
-theme_dir="$ROOT_DIR/web/.themes"
+theme_dir="$ROOT_DIR/templates/web/.themes"
 
 dest_abs() {
   path=$1
@@ -120,7 +120,7 @@ case "$dest" in
     exit 2
     ;;
 esac
-for source_dir in "$app_dir" "$shared_dir" "$theme_dir" "$ROOT_DIR/core"; do
+for source_dir in "$app_dir" "$shared_dir" "$theme_dir" "$ROOT_DIR/runtime/core"; do
   if paths_overlap "$dest" "$source_dir"; then
     printf '%s\n' "stage-web-assets: destination overlaps source: $dest" >&2
     exit 2
@@ -141,7 +141,7 @@ done
 
 ln -s "$theme_dir" "$dest/app/themes"
 cp -R "$shared_dir"/. "$dest/app/.host/shared/"
-cp -R "$ROOT_DIR/core/include" "$dest/core/include"
-cp -R "$ROOT_DIR/core/src" "$dest/core/src"
+cp -R "$ROOT_DIR/runtime/core/include" "$dest/core/include"
+cp -R "$ROOT_DIR/runtime/core/src" "$dest/core/src"
 
 printf '%s\n' "stage-web-assets: staged $slug -> $dest"

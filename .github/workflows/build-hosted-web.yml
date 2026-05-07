@@ -32,10 +32,10 @@ jobs:
         run: |
           set -eu
           mkdir -p dist/hosted-web
-          for template in $(jq -r '.templates[] | select((.publish == true) and ((.distribution // "optional") == "core")) | .slug' config/templates.manifest.json); do
-            [ -d "web/$template" ] || { echo "missing template: $template" >&2; exit 1; }
+          for template in $(jq -r '.templates[] | select((.publish == true) and ((.distribution // "optional") == "core")) | .slug' runtime/config/templates.manifest.json); do
+            [ -d "templates/web/$template" ] || { echo "missing template: $template" >&2; exit 1; }
             mkdir -p "dist/hosted-web/$template"
-            cp -R "web/$template"/. "dist/hosted-web/$template/"
+            cp -R "templates/web/$template"/. "dist/hosted-web/$template/"
           done
           cp -R spells/web dist/hosted-web/spells-web
           cp -R spells/.arcana/web-wizardry dist/hosted-web/arcana-web-wizardry
