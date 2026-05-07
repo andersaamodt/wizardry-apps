@@ -1,139 +1,82 @@
 # wizardry-apps
 
-wizardry-apps is the dedicated repository for [wizardry](https://github.com/andersaamodt/wizardry) application surfaces outside the canonical POSIX CLI suite.
+wizardry-apps is the app-building companion to [wizardry](https://github.com/andersaamodt/wizardry).
 
-This repository owns:
-- hosted web templates and packaging
-- desktop WebView hosts (macOS + Linux)
-- mobile WebView hosts (iOS + Android)
-- native desktop app scaffolding and IR schemas for Forge-generated projects
-- wizardry-core runtime contracts and implementation
-- release pipelines for app distribution
+Its main app is **App Forge**, a desktop tool for creating, running, installing, and publishing wizardry apps. Forge is meant for people who want the convenience of a GUI without hiding the files, scripts, and Git history that make an app understandable.
 
-The `wizardry` repository remains canonical for POSIX shell orchestration and spell implementations.
+## What Forge Does
 
-## Design Stance
+Forge helps you:
+- create new app projects from starters
+- run and rebuild apps while you work
+- install wizardry apps locally
+- import existing projects into your Forge app list
+- manage project Git settings
+- publish your own apps through GitHub-backed release flows
 
-wizardry-apps follows wizardry ethos:
-- POSIX-first orchestration where shell is the reference semantics
-- file-first data model (Markdown + filesystem metadata)
-- low-to-the-ground implementation with minimal moving parts
-- explicit behavior and compatibility-first command UX
+Forge keeps projects file-first. A generated app is an ordinary folder with source files, assets, metadata, and scripts that can be opened in an editor, committed to Git, and published from GitHub.
 
-## Repository Highlights
+## Install And Run Forge
 
-- `spells/web` and `spells/.arcana/web-wizardry` are migrated from `~/.wizardry`
-- `spells/.arcana/wizardry-apps` provides the top-level app pipeline arcana and menus
-- `web` templates are migrated from `~/.wizardry/web`
-- `apps` desktop app surfaces are migrated from `~/.wizardry/apps`
-- `stock/` is a flat convenience shelf of copied and extracted reusable non-app-specific icons/SVGs; canonical runtime sources remain under `apps/<slug>/assets`
-- manifests in `config/` define production release allowlists
-- contracts in `schemas/` define RPC/events/metadata formats
-- CI workflows in `.github/workflows/` implement lint/test/build/release gates
-
-## Assumptions
-
-- The canonical `wizardry` CLI suite is installed (default: `~/.wizardry`)
-- desktop/mobile correctness does not require CLI availability
-- CLI-backed operations are optional and explicit
-
-## Local Setup
+From this repository:
 
 ```sh
-# Validate manifests
-sh tools/validate-manifest.sh
-
-# Run core tests
-sh core/tests/test_core.sh
-
-# Run adapter tests
-sh .tests/adapters/test-http-cgi.sh
-sh .tests/adapters/test-shell-parity.sh
-sh .tests/adapters/test-core-shell-parity.sh
-sh .tests/adapters/test-bridge-contract.sh
-sh .tests/adapters/test-bridge-behavior.sh
-
-# Run wizardry-apps arcana tests
-for t in .tests/.arcana/wizardry-apps/test-*.sh; do
-  sh "$t"
-done
-
-# Run flagship desktop app tests
-for t in .tests/apps/test-*.sh; do
-  sh "$t"
-done
-```
-
-## App Arcana Menus
-
-```sh
-# Open top-level apps arcana menu
-spells/.arcana/wizardry-apps/wizardry-apps
-
-# Open web/desktop/mobile admin submenus directly
-spells/.arcana/wizardry-apps/wizardry-apps web-admin
-spells/.arcana/wizardry-apps/wizardry-apps desktop-admin
-spells/.arcana/wizardry-apps/wizardry-apps mobile-admin
-```
-
-## Flagship Desktop App
-
-```sh
-# App Forge (desktop control plane)
-# Download-and-run from this repository:
+# Run Forge directly from the checkout
 ./run-forge
 
-# Install user-local app launcher integration (macOS/Linux):
+# Install Forge into your desktop app launcher
 ./install-forge
 
-# macOS options:
-# force /Applications install
-./install-forge --system
-# force ~/Applications install
-./install-forge --user
-
-# Remove launcher integration:
+# Remove the installed launcher/app integration
 ./uninstall-forge
-
-# Inspect backend directly:
-sh apps/forge/scripts/forge-backend.sh --help
 ```
 
 After `./install-forge`:
-- macOS: launch `/Applications/App Forge.app` (falls back to `~/Applications` if needed)
-- Linux: launch `App Forge` from your desktop app menu (or run `~/.local/bin/app-forge`)
+- macOS opens Forge as `App Forge.app` from `/Applications` or `~/Applications`
+- Linux opens Forge as `App Forge` from the desktop menu, or with `~/.local/bin/app-forge`
 
-The macOS app bundle is first-class:
-- embedded native host binary
-- Dock/Finder icon resource
-- proper Dock + menu-bar app behavior
+On macOS, the installed Forge app is a normal app bundle with a Dock icon and menu bar behavior. On Linux, Forge installs a desktop launcher and local app files.
 
-## Mobile Build Helpers
+## App Types
 
-```sh
-# Stage app assets for native hosts
-sh tools/release/stage-web-assets.sh artificer apps/.host/android/app/src/main/assets
+Forge can scaffold several kinds of projects. You do not need to know every tool on day one, but it helps to understand what each target is made from.
 
-# iOS simulator smoke artifact
-sh tools/release/build-ios-app.sh artificer dist/ios smoke
-```
+**Cross-platform apps** use HTML, CSS, and JavaScript for the interface. They can run as hosted web apps and can also be wrapped in desktop or mobile WebView hosts. This is the most direct path for small tools, dashboards, control panels, and apps that should share one interface across platforms.
 
-## Sync Policy
+**Native desktop apps** start from a simple app description file, then generate platform-native code. macOS output uses Swift/SwiftUI. Linux output uses GTK. This path is for apps that should feel more like platform-owned desktop software, with native menus, windows, lists, settings, and file panels.
 
-Use `tools/sync-from-wizardry.sh` for all upstream imports from `~/.wizardry`.
-No other import path is considered canonical.
-The sync preserves local `apps/.host` ownership for native desktop/mobile hosts.
+**Game projects** use Godot project scaffolding. This path is for interactive games or game-like tools where a dedicated game engine is a better fit than a document-style app UI.
 
-## Licensing FAQ
+**Hosted web sites** use wizardry web templates and shell-backed site tooling. This path is for sites and lightweight web surfaces that should remain easy to inspect and publish.
 
-**Can I sell an app I create with Forge?**
+## Publishing
 
-Yes, if it is a blank emitted project from Forge's generic starters. Those projects are emitted under `AGPL-3.0-or-later` plus `Wizardry Addendum 1.0`, so they may be sold and hosted as long as the whole emitted app remains copyleft and the complete corresponding source is made available.
+Forge expects publishing to happen through GitHub.
 
-**Can I sell Wizardry itself, wizardry-apps core, Forge itself, or built-in Wizardry apps?**
+For your own app, Forge can help initialize or connect a Git repository, set an `origin`, switch branches, fetch, pull, push, and open GitHub URLs for the project. Release and install flows are built around GitHub-hosted repositories and release artifacts, so the path from "local app" to "shareable app" stays visible in Git.
 
-No. `wizardry`, `wizardry-apps` core, Forge itself, and built-in Wizardry apps remain under `OWL 3.0`, which prohibits commercial exploitation under the public license.
+Forge also supports installing wizardry apps from release artifacts when a supported macOS or Linux asset is available for the current machine.
 
-**Can I say my app is "built with Wizardry" or use the Wizardry name in advertising?**
+## Built-In Apps And Your Apps
 
-Truthful descriptive references are allowed, such as saying an app was built with or generated by Wizardry. You may not use `Wizardry` or `Open Wizardry` in a way that implies endorsement, sponsorship, official status, or association, and you should not present your product as an official Wizardry product unless it actually is one.
+Forge shows built-in wizardry apps and your own managed projects in one app list.
+
+Built-in apps come from this repository. Your apps usually live outside this repository, commonly under `~/git`, and Forge recognizes them by a `wizardry.workspace.conf` file in the project folder. You can create projects with Forge or drag an existing project folder into Forge to register it.
+
+## Licensing
+
+wizardry-apps, Forge itself, and built-in wizardry apps are licensed under `OWL 3.0`, which permits non-commercial use, copying, modification, and sharing.
+
+Blank projects emitted from Forge's generic starters are different: they are generated under `AGPL-3.0-or-later` plus `Wizardry Addendum 1.0`. Those generated projects are intended to be sellable and hostable as long as the whole emitted app remains copyleft, complete corresponding source is made available, and the Wizardry name is not used in a way that implies endorsement or official status.
+
+## For Contributors
+
+The user-facing entrypoint is Forge. The source is organized around apps, starters, hosts, release tools, and the shell-backed wizardry app pipeline:
+- `apps/forge/` contains App Forge
+- `apps/.host/` contains shared desktop and mobile host code
+- `apps/<slug>/` contains built-in wizardry apps
+- `spells/` contains wizardry app pipeline commands
+- `tools/` contains validation, icon, sync, and release helpers
+- `.github/` contains AI-facing standards and contributor policy
+
+For deeper implementation notes, read `.github/AI_DOCS.md` first.

@@ -19,6 +19,37 @@
 - This repo may specialize rules for GUI/runtime concerns without violating upstream ethos.
 - If specialization conflicts with upstream, prefer upstream unless user instruction overrides.
 
+## Technical Repo Map
+- `spells/web` and `spells/.arcana/web-wizardry` are migrated from `~/.wizardry`.
+- `spells/.arcana/wizardry-apps` owns the top-level app pipeline arcana and menus.
+- `web` templates are migrated from `~/.wizardry/web`.
+- `apps` desktop app surfaces are migrated from `~/.wizardry/apps`.
+- `apps/.host` owns shared macOS, Linux, iOS, Android, and bridge host code.
+- `apps/forge` owns the App Forge desktop control plane.
+- `stock/` is a flat convenience shelf of reusable non-app-specific icons/SVGs; canonical runtime assets stay under `apps/<slug>/assets`.
+- `config/` manifests define production release allowlists.
+- `schemas/` contracts define RPC, events, metadata, and native desktop IR formats.
+- `core/` owns wizardry-core runtime contracts and implementation.
+- `adapters/` contains shell and HTTP/CGI reference adapters.
+- CI workflows in `.github/workflows/` implement lint, test, build, and release gates.
+
+## Local Validation Commands
+- Validate manifests with `sh tools/validate-manifest.sh`.
+- Run core tests with `sh core/tests/test_core.sh`.
+- Run adapter tests with `.tests/adapters/test-*.sh`.
+- Run wizardry-apps arcana tests with `.tests/.arcana/wizardry-apps/test-*.sh`.
+- Run flagship desktop app tests with `.tests/apps/test-*.sh`.
+- Run release helper tests with `.tests/release/test-*.sh`.
+
+## Arcana And Sync Notes
+- Open the top-level apps arcana with `spells/.arcana/wizardry-apps/wizardry-apps`.
+- Use `spells/.arcana/wizardry-apps/wizardry-apps web-admin` for web app administration.
+- Use `spells/.arcana/wizardry-apps/wizardry-apps desktop-admin` for desktop app administration.
+- Use `spells/.arcana/wizardry-apps/wizardry-apps mobile-admin` for mobile app administration.
+- Use `tools/sync-from-wizardry.sh` for all upstream imports from `~/.wizardry`.
+- No other import path is considered canonical.
+- The sync preserves local `apps/.host` ownership for native desktop and mobile hosts.
+
 ## Authoring Style For AI Docs
 - Keep docs as flat bullet lists.
 - Keep bullets to short one-liners when possible.
