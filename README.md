@@ -1,6 +1,6 @@
 # wizardry-apps
 
-wizardry-apps is the dedicated repository for Wizardry application surfaces outside the canonical POSIX CLI suite.
+wizardry-apps is the dedicated repository for [wizardry](https://github.com/andersaamodt/wizardry) application surfaces outside the canonical POSIX CLI suite.
 
 This repository owns:
 - hosted web templates and packaging
