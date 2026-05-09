@@ -11,15 +11,15 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 [ -f "$root/apps/forge/README.md" ]
 [ -f "$root/licenses/AGPL-3.0-or-later.txt" ]
 [ -f "$root/licenses/WIZARDRY_ADDENDUM.md" ]
-[ -f "$root/apps/forge/starter-templates/web/sidebar/index.html" ]
-[ -f "$root/apps/forge/starter-templates/web/topbar/index.html" ]
-[ -f "$root/apps/forge/starter-templates/web/dashboard/index.html" ]
-[ -f "$root/apps/forge/starter-templates/web/studio/index.html" ]
-[ -f "$root/apps/forge/starter-templates/web/reference-app/index.html" ]
-[ -f "$root/apps/forge/starter-templates/web/reference-app/script.js" ]
-[ -f "$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh" ]
-[ -f "$root/apps/forge/starter-templates/native-desktop/reference-app/scripts/render-native-desktop.sh" ]
-[ -f "$root/apps/forge/starter-templates/web/minimal/style.css" ]
+[ -f "$root/templates/forge/web/sidebar/index.html" ]
+[ -f "$root/templates/forge/web/topbar/index.html" ]
+[ -f "$root/templates/forge/web/dashboard/index.html" ]
+[ -f "$root/templates/forge/web/studio/index.html" ]
+[ -f "$root/templates/forge/web/reference-app/index.html" ]
+[ -f "$root/templates/forge/web/reference-app/script.js" ]
+[ -f "$root/templates/forge/web/reference-app/scripts/__APP_SLUG__-backend.sh" ]
+[ -f "$root/templates/forge/native-desktop/reference-app/scripts/render-native-desktop.sh" ]
+[ -f "$root/templates/forge/web/minimal/style.css" ]
 [ -f "$root/apps/.host/shared/wizardry-bridge.js" ]
 [ -f "$root/apps/.host/macos/main.m" ]
 [ -f "$root/apps/.host/linux/main.c" ]
@@ -48,12 +48,12 @@ grep -F "method !== 'bridge.exec'" "$root/apps/.host/shared/wizardry-bridge.js" 
 grep -F "Emission material notice" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "version 3 or (at your option) any later version" "$root/licenses/AGPL-3.0-or-later.txt" >/dev/null
 grep -F "Remote Network Interaction" "$root/licenses/AGPL-3.0-or-later.txt" >/dev/null
-grep -F "Emission material notice" "$root/apps/forge/starter-templates/web/minimal/index.html" >/dev/null
-grep -F "Emission material notice" "$root/apps/forge/starter-templates/web/minimal/style.css" >/dev/null
-grep -F "Canonical reference note" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
-grep -F "__wizardry_host_boot_ready" "$root/apps/forge/starter-templates/web/reference-app/script.js" >/dev/null
-reference_backend="$root/apps/forge/starter-templates/web/reference-app/scripts/__APP_SLUG__-backend.sh"
-native_reference_render="$root/apps/forge/starter-templates/native-desktop/reference-app/scripts/render-native-desktop.sh"
+grep -F "Emission material notice" "$root/templates/forge/web/minimal/index.html" >/dev/null
+grep -F "Emission material notice" "$root/templates/forge/web/minimal/style.css" >/dev/null
+grep -F "Canonical reference note" "$root/templates/forge/web/reference-app/index.html" >/dev/null
+grep -F "__wizardry_host_boot_ready" "$root/templates/forge/web/reference-app/script.js" >/dev/null
+reference_backend="$root/templates/forge/web/reference-app/scripts/__APP_SLUG__-backend.sh"
+native_reference_render="$root/templates/forge/native-desktop/reference-app/scripts/render-native-desktop.sh"
 grep -F "get-ui-prefs" "$reference_backend" >/dev/null
 sh -n "$reference_backend"
 sh -n "$native_reference_render"
@@ -82,8 +82,8 @@ if printf '%s\n' "$reference_pref_out" | grep -F "ab/key=" >/dev/null 2>&1; then
   printf '%s\n' "reference app backend emitted invalid hand-edited UI pref key" >&2
   exit 1
 fi
-grep -F "assets/forge-icon.png" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
-grep -F "Reference App" "$root/apps/forge/starter-templates/web/reference-app/index.html" >/dev/null
+grep -F "assets/forge-icon.png" "$root/templates/forge/web/reference-app/index.html" >/dev/null
+grep -F "Reference App" "$root/templates/forge/web/reference-app/index.html" >/dev/null
 grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "territory-master.png" "$root/apps/.host/macos/main.m" >/dev/null

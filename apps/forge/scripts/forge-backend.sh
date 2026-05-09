@@ -7568,7 +7568,7 @@ write_web_starter_template() {
   app_name=$4
   app_slug=$5
 
-  template_dir="$root/apps/forge/starter-templates/web/$starter"
+  template_dir="$root/templates/forge/web/$starter"
   [ -d "$template_dir" ] || {
     printf '%s\n' "forge-backend: web starter template directory missing: $template_dir" >&2
     exit 1
@@ -7620,7 +7620,7 @@ write_native_desktop_starter_template() {
       ;;
   esac
 
-  template_dir="$root/apps/forge/starter-templates/native-desktop/$starter"
+  template_dir="$root/templates/forge/native-desktop/$starter"
   [ -d "$template_dir" ] || {
     printf '%s\n' "forge-backend: native desktop starter template directory missing: $template_dir" >&2
     exit 1

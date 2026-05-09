@@ -238,7 +238,7 @@ cp "$test_root/runtime/config/templates.manifest.json" "$scratch/runtime/config/
 cp -R "$test_root/licenses" "$scratch/licenses"
 cp -R "$test_root/apps/.host" "$scratch/apps/.host"
 mkdir -p "$scratch/apps/forge"
-cp -R "$test_root/apps/forge/starter-templates" "$scratch/apps/forge/starter-templates"
+cp -R "$test_root/templates/forge" "$scratch/templates/forge"
 cp -R "$test_root/runtime/core" "$scratch/runtime/core"
 mkdir -p "$scratch/runtime/schemas"
 cp "$test_root/runtime/schemas/native-desktop-ir-v1.json" "$scratch/runtime/schemas/native-desktop-ir-v1.json"
