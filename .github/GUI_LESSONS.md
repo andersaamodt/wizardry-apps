@@ -88,6 +88,7 @@
 - High-regression Forge flows such as Run, import/drop, scaffold, and workspace rebuild detection need executable behavior tests with fake host/tool stubs, not just static `grep` contract checks.
 - macOS status/tray items can fail to render when the app bundle launches through a shell `CFBundleExecutable`; launch packaged apps with a native host binary and pass app entry via `WizardryAppEntry` instead.
 - In Safari/WebKit split-pane UIs, missing `minmax(0, 1fr)` on the main track or missing `min-height: 0` on intermediate panels can make scrollable content overflow downward and read as bottom-aligned.
+- Do not use hover/focus translate, margin, or position nudges on buttons; button feedback should not make controls jump under the pointer.
 - Visual listbox highlights are not enough for robust keyboard behavior; keep `role=listbox` plus `role=option`/`aria-selected` and a synced `aria-activedescendant`.
 - Installed App Forge bundles embed their own `apps/forge` resources; repo-side UI fixes do not reach `/Applications/App Forge.app` until `install-forge` rebuilds and reinstalls the bundle.
 - Native Linux conversions should hydrate GTK lists and detail panes from the same structured backend snapshots as macOS; static generated IR rows are useful scaffolding, not feature parity.

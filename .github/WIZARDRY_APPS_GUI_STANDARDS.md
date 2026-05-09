@@ -53,6 +53,7 @@
 - Use polite button style for most primary workflow buttons (Build, Run, Create, Save, Apply).
 - Polite button style is a simple outlined button with rounded corners and a clear hover highlight.
 - Polite toggle buttons must stay visibly highlighted while toggled on.
+- Button hover and focus states must not move controls; change color, border, shadow, or opacity without translate/margin/position shifts.
 - For in-field icon helpers, reserve input padding so text never overlaps the icon hit target.
 - Keep both button styles keyboard focusable with obvious focus-visible states.
 
