@@ -56,19 +56,20 @@ jobs:
           for app in $(sh tools/release/list-production-apps.sh); do
             app_name=$(sh tools/release/get-app-name.sh "$app")
             app_id=$(sh tools/release/get-app-bundle-id.sh android "$app")
+            android_project="$RUNNER_TEMP/wizardry-android-$app"
 
-            sh tools/release/stage-web-assets.sh "$app" "apps/.host/android/app/src/main/assets"
+            sh tools/release/prepare-android-host.sh "$app" "$android_project"
 
-            gradle -p apps/.host/android :app:assembleDebug \
+            gradle -p "$android_project" :app:assembleDebug \
               -PwizardryApplicationId="$app_id" \
               -PwizardryAppName="$app_name" \
               -PwizardryVersionName="$version_name" \
               -PwizardryVersionCode="$version_code"
 
-            apk=$(find apps/.host/android/app/build/outputs/apk/debug -type f -name '*.apk' | head -n 1)
+            apk=$(find "$android_project/app/build/outputs/apk/debug" -type f -name '*.apk' | head -n 1)
             [ -n "$apk" ]
             cp "$apk" "dist/android/smoke/wizardry-$app-debug.apk"
-            rm -rf apps/.host/android/app/build
+            rm -rf "$android_project"
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -140,10 +141,11 @@ jobs:
           for app in $(sh tools/release/list-production-apps.sh); do
             app_name=$(sh tools/release/get-app-name.sh "$app")
             app_id=$(sh tools/release/get-app-bundle-id.sh android "$app")
+            android_project="$RUNNER_TEMP/wizardry-android-$app"
 
-            sh tools/release/stage-web-assets.sh "$app" "apps/.host/android/app/src/main/assets"
+            sh tools/release/prepare-android-host.sh "$app" "$android_project"
 
-            gradle -p apps/.host/android :app:bundleRelease \
+            gradle -p "$android_project" :app:bundleRelease \
               -PwizardryApplicationId="$app_id" \
               -PwizardryAppName="$app_name" \
               -PwizardryVersionName="$version_name" \
@@ -153,10 +155,10 @@ jobs:
               -PandroidKeyAlias="$ANDROID_KEY_ALIAS" \
               -PandroidKeyPassword="$ANDROID_KEY_PASSWORD"
 
-            aab=$(find apps/.host/android/app/build/outputs/bundle/release -type f -name '*.aab' | head -n 1)
+            aab=$(find "$android_project/app/build/outputs/bundle/release" -type f -name '*.aab' | head -n 1)
             [ -n "$aab" ]
             cp "$aab" "dist/android/wizardry-$app-release.aab"
-            rm -rf apps/.host/android/app/build
+            rm -rf "$android_project"
           done
       - uses: actions/upload-artifact@v4
         with:

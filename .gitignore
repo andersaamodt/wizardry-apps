@@ -73,7 +73,7 @@ dist/
 out/
 target/
 debug/
-release/
+/release/
 cmake-build-*/
 CMakeFiles/
 compile_commands.json
@@ -94,6 +94,8 @@ compile_commands.json
 # Mobile and native build caches
 .gradle/
 **/build/
+apps/.host/android/app/src/main/assets/
+apps/.host/android/app/src/main/res/mipmap-*/
 DerivedData/
 
 # Wizardry-generated and test-local files

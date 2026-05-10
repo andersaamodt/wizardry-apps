@@ -26,6 +26,7 @@
 - `templates/web` templates are migrated from `~/.wizardry/web`.
 - `apps` desktop app surfaces are migrated from `~/.wizardry/apps`.
 - `apps/.host` owns shared macOS, Linux, iOS, Android, and bridge host code.
+- Android app assets are staged into disposable projects with `tools/release/prepare-android-host.sh`; do not commit staged Android assets under `apps/.host`.
 - `apps/forge` owns the App Forge desktop control plane.
 - `assets/stock/` is a flat convenience shelf of reusable non-app-specific icons/SVGs; canonical runtime assets stay under `apps/<slug>/assets`.
 - `runtime/config/` defines production release allowlists and Forge template configuration.

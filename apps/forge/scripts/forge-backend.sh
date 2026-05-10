@@ -7468,19 +7468,19 @@ cmd_build_android_debug() {
   app_name=$(app_name_from_manifest "$root" "$slug")
   app_id=$(bundle_id_from_manifest "$root" android "$slug")
 
-  sh "$root/tools/release/stage-web-assets.sh" "$slug" "$root/apps/.host/android/app/src/main/assets"
-  sh "$root/tools/icons/stage-android-launcher-icons.sh" "$root/apps/$slug" "$root/apps/.host/android/app/src/main/res"
+  android_project="$root/_tmp/workbench/android/$slug"
+  sh "$root/tools/release/prepare-android-host.sh" "$slug" "$android_project" >/dev/null
 
   version_name="0.0.0-local"
   version_code=$(date +%s)
 
-  gradle -p "$root/apps/.host/android" :app:assembleDebug \
+  gradle -p "$android_project" :app:assembleDebug \
     -PwizardryApplicationId="$app_id" \
     -PwizardryAppName="$app_name" \
     -PwizardryVersionName="$version_name" \
     -PwizardryVersionCode="$version_code"
 
-  apk=$(find "$root/apps/.host/android/app/build/outputs/apk/debug" -type f -name '*.apk' | head -n 1)
+  apk=$(find "$android_project/app/build/outputs/apk/debug" -type f -name '*.apk' | head -n 1)
   [ -n "$apk" ] || {
     printf '%s\n' "forge-backend: debug APK not found" >&2
     exit 1

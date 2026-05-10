@@ -29,6 +29,11 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 [ -x "$root/tools/forge/uninstall-forge.sh" ]
 [ -x "$root/tools/forge/build-forge-icon.sh" ]
 [ -x "$root/tools/forge/build-forge-macos-app.sh" ]
+[ -x "$root/tools/release/prepare-android-host.sh" ]
+if [ -e "$root/apps/.host/android/app/src/main/assets/app/index.html" ]; then
+  printf '%s\n' "forge UI asset tests: Android host source contains staged app assets" >&2
+  exit 1
+fi
 if [ ! -f "$root/apps/forge/assets/forge-icon.svg" ] && [ ! -f "$root/apps/forge/assets/forge-icon.png" ]; then
   printf '%s\n' "forge icon asset missing (expected forge-icon.svg or forge-icon.png)" >&2
   exit 1
