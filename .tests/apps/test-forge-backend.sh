@@ -146,6 +146,7 @@ bundle_install_bin="$scratch/bundle-install-bin"
 bundle_install_src="$scratch/Source.app"
 bundle_install_dest="$scratch/Installed.app"
 mkdir -p "$bundle_install_bin" "$bundle_install_src/Contents/MacOS" "$bundle_install_dest/Contents"
+printf '%s\n' "stale" >"$bundle_install_dest/Contents/stale-file"
 printf '%s\n' '<plist></plist>' >"$bundle_install_src/Contents/Info.plist"
 printf '%s\n' '#!/bin/sh' 'exit 0' >"$bundle_install_src/Contents/MacOS/probe"
 chmod +x "$bundle_install_src/Contents/MacOS/probe"
@@ -170,9 +171,13 @@ FORGE_DITTO_LOG="$scratch/bundle-install-ditto.log" \
   printf '%s\n' "forge backend test: macOS bundle install did not populate destination" >&2
   exit 1
 }
+[ ! -e "$bundle_install_dest/Contents/stale-file" ] || {
+  printf '%s\n' "forge backend test: macOS bundle install left stale destination files" >&2
+  exit 1
+}
 ditto_calls=$(wc -l <"$scratch/bundle-install-ditto.log" | tr -d ' ')
-[ "$ditto_calls" = "2" ] || {
-  printf '%s\n' "forge backend test: expected staged and final bundle ditto calls" >&2
+[ "$ditto_calls" = "1" ] || {
+  printf '%s\n' "forge backend test: expected one staged bundle ditto call" >&2
   exit 1
 }
 if awk -F '\t' '$1 == $2 { found = 1 } END { exit found ? 0 : 1 }' "$scratch/bundle-install-ditto.log"; then

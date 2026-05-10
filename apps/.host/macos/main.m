@@ -3668,7 +3668,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                 task.launchPath = @"/bin/sh";
                 task.arguments = @[
                     @"-c",
-                    @"sleep \"$WIZARDRY_RESTART_DELAY\"; /usr/bin/open \"$WIZARDRY_RESTART_BUNDLE\""
+                    @"sleep \"$WIZARDRY_RESTART_DELAY\"; /usr/bin/open -n \"$WIZARDRY_RESTART_BUNDLE\""
                 ];
                 NSMutableDictionary *env = [NSMutableDictionary dictionaryWithDictionary:[[NSProcessInfo processInfo] environment]];
                 env[@"WIZARDRY_RESTART_BUNDLE"] = bundlePath;

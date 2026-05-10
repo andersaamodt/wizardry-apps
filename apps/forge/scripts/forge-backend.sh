@@ -1869,10 +1869,14 @@ install_macos_bundle() {
     return 1
   fi
 
-  if ! copy_macos_bundle_contents "$macos_install_stage_bundle" "$macos_install_dest_bundle"; then
+  rm -rf "$macos_install_dest_bundle" || {
     rm -rf "$macos_install_stage_root"
     return 1
-  fi
+  }
+  mv "$macos_install_stage_bundle" "$macos_install_dest_bundle" || {
+    rm -rf "$macos_install_stage_root"
+    return 1
+  }
   touch "$macos_install_dest_bundle" >/dev/null 2>&1 || :
   touch "$macos_install_dest_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
   if ! ensure_macos_bundle_signature "$macos_install_dest_bundle"; then
@@ -1881,6 +1885,28 @@ install_macos_bundle() {
   fi
   rm -rf "$macos_install_stage_root"
   return 0
+}
+
+current_macos_backend_bundle() {
+  macos_current_dir=$SCRIPT_DIR
+  while :; do
+    macos_current_base=${macos_current_dir##*/}
+    case "$macos_current_base" in
+      *.app)
+        printf '%s\n' "$macos_current_dir"
+        return 0
+        ;;
+    esac
+    [ "$macos_current_dir" = "/" ] && break
+    macos_current_dir=$(dirname "$macos_current_dir")
+  done
+  return 1
+}
+
+canonical_dir_path() {
+  canonical_dir=${1-}
+  [ -d "$canonical_dir" ] || return 1
+  (CDPATH= cd -- "$canonical_dir" && pwd -P)
 }
 
 macos_user_app_install_path() {
@@ -6476,6 +6502,9 @@ cmd_run_desktop() {
     exit 1
   }
   os=$(os_id)
+  if [ "$os" = "darwin" ] && [ "$slug" = "forge" ] && [ "$run_mode" = "install-first" ]; then
+    run_mode='normal'
+  fi
   if [ "$run_mode" = "install-first" ]; then
     install_out=$(cmd_install_desktop "$root" "$slug")
     bundle_artifact=$(printf '%s\n' "$install_out" | kv_read artifact)
@@ -6586,11 +6615,27 @@ cmd_run_desktop() {
         printf '%s\n' "forge-backend: built bundle artifact missing: $bundle_artifact" >&2
         exit 1
       }
-      if ! synced_install=$(prepare_macos_run_bundle "$bundle_artifact" "$app_name"); then
-        printf '%s\n' "forge-backend: failed to prepare durable macOS run bundle for $slug" >&2
-        exit 1
+      synced_install=''
+      launch_bundle=''
+      if [ "$self_relaunch" -eq 1 ]; then
+        target_install=$(macos_user_app_install_path "$app_name")
+        current_bundle=$(current_macos_backend_bundle 2>/dev/null || true)
+        target_install_canonical=$(canonical_dir_path "$target_install" 2>/dev/null || printf '%s\n' "$target_install")
+        current_bundle_canonical=''
+        if [ -n "$current_bundle" ]; then
+          current_bundle_canonical=$(canonical_dir_path "$current_bundle" 2>/dev/null || printf '%s\n' "$current_bundle")
+        fi
+        if [ -n "$current_bundle_canonical" ] && [ "$current_bundle_canonical" = "$target_install_canonical" ]; then
+          launch_bundle="$bundle_artifact"
+        fi
       fi
-      launch_bundle="$synced_install"
+      if [ -z "$launch_bundle" ]; then
+        if ! synced_install=$(prepare_macos_run_bundle "$bundle_artifact" "$app_name"); then
+          printf '%s\n' "forge-backend: failed to prepare durable macOS run bundle for $slug" >&2
+          exit 1
+        fi
+        launch_bundle="$synced_install"
+      fi
       [ -d "$launch_bundle" ] || {
         printf '%s\n' "forge-backend: durable macOS run bundle missing: $launch_bundle" >&2
         exit 1

@@ -54,13 +54,6 @@ if [ ! -d "$root/apps/forge" ] || [ ! -x "$root/apps/forge/scripts/forge-backend
 fi
 
 stop_running_macos_forge() {
-  if command -v osascript >/dev/null 2>&1; then
-    osascript \
-      -e 'if application "App Forge" is running then' \
-      -e 'tell application "App Forge" to quit' \
-      -e 'end if' >/dev/null 2>&1 || true
-  fi
-
   if command -v pkill >/dev/null 2>&1; then
     pkill -f "/App Forge.app/Contents/MacOS/wizardry-host" >/dev/null 2>&1 || true
     pkill -f "/App Forge.app/Contents/MacOS/app-forge" >/dev/null 2>&1 || true
