@@ -30,6 +30,13 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 [ -x "$root/tools/forge/build-forge-icon.sh" ]
 [ -x "$root/tools/forge/build-forge-macos-app.sh" ]
 [ -x "$root/tools/release/prepare-android-host.sh" ]
+[ -x "$root/forge-menu" ]
+[ -x "$root/spells/.imps/forge/run-forge" ]
+[ -x "$root/spells/.imps/forge/install-forge" ]
+[ -x "$root/spells/.imps/forge/uninstall-forge" ]
+[ ! -e "$root/run-forge" ]
+[ ! -e "$root/install-forge" ]
+[ ! -e "$root/uninstall-forge" ]
 if [ -e "$root/apps/.host/android/app/src/main/assets/app/index.html" ]; then
   printf '%s\n' "forge UI asset tests: Android host source contains staged app assets" >&2
   exit 1
@@ -38,10 +45,6 @@ if [ ! -f "$root/apps/forge/assets/forge-icon.svg" ] && [ ! -f "$root/apps/forge
   printf '%s\n' "forge icon asset missing (expected forge-icon.svg or forge-icon.png)" >&2
   exit 1
 fi
-[ -x "$root/run-forge" ]
-[ -x "$root/install-forge" ]
-[ -x "$root/uninstall-forge" ]
-
 grep -F "App Forge" "$root/apps/forge/index.html" >/dev/null
 grep -F "forge-backend.sh" "$root/apps/forge/index.html" >/dev/null
 grep -F "window.wizardry.exec" "$root/apps/forge/index.html" >/dev/null
@@ -132,7 +135,7 @@ grep -F -- "-webkit-mask-image: var(--catalog-thumb-image, none);" "$root/apps/f
 grep -F -- "-webkit-mask-image: linear-gradient(white, white);" "$root/apps/forge/style.css" >/dev/null
 grep -F -- "background-size: contain;" "$root/apps/forge/style.css" >/dev/null
 grep -F "scaffold-app" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
-grep -F "./install-forge" "$root/README.md" >/dev/null
+grep -F "./forge-menu" "$root/README.md" >/dev/null
 grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-forge.sh" >/dev/null
 [ -f "$root/apps/forge/assets/icons/meta/territory-master.png" ]
 [ -f "$root/apps/wizardry-desktop/assets/icons/meta/territory-master.png" ]

@@ -21,17 +21,13 @@ Forge keeps projects file-first. A generated app is an ordinary folder with sour
 From this repository:
 
 ```sh
-# Run Forge directly from the checkout
-./run-forge
-
-# Install Forge into your desktop app launcher
-./install-forge
-
-# Remove the installed launcher/app integration
-./uninstall-forge
+# Open the Forge menu
+./forge-menu
 ```
 
-After `./install-forge`:
+The menu can install Forge, uninstall it, and run it after installation.
+
+After installing Forge:
 - macOS opens Forge as `App Forge.app` from `/Applications` or `~/Applications`
 - Linux opens Forge as `App Forge` from the desktop menu, or with `~/.local/bin/app-forge`
 

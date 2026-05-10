@@ -1,0 +1,7 @@
+#!/bin/sh
+# Install App Forge launchers from this wizardry-apps checkout.
+
+set -eu
+
+ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd -P)
+exec "$ROOT_DIR/tools/forge/install-forge" --root "$ROOT_DIR" "$@"

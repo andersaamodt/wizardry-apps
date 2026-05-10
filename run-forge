@@ -1,4 +1,0 @@
-#!/bin/bash
-# Entry point for the forge application
-# Placeholder for actual forge command
-forge start

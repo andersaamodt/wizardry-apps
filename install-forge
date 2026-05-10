@@ -1,4 +1,0 @@
-#!/bin/sh
-set -eu
-ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
-exec "$ROOT_DIR/tools/forge/install-forge" --root "$ROOT_DIR" "$@"

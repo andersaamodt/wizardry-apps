@@ -12,9 +12,13 @@ uninstall="$root/tools/forge/uninstall-forge.sh"
 [ -x "$install" ]
 [ -x "$uninstall" ]
 [ -x "$root/tools/forge/build-forge-macos-app.sh" ]
-[ -x "$root/run-forge" ]
-[ -x "$root/install-forge" ]
-[ -x "$root/uninstall-forge" ]
+[ -x "$root/forge-menu" ]
+[ -x "$root/spells/.imps/forge/run-forge" ]
+[ -x "$root/spells/.imps/forge/install-forge" ]
+[ -x "$root/spells/.imps/forge/uninstall-forge" ]
+[ ! -e "$root/run-forge" ]
+[ ! -e "$root/install-forge" ]
+[ ! -e "$root/uninstall-forge" ]
 
 build_icns_from_png() {
   png_source=$1
@@ -34,12 +38,48 @@ build_icns_from_png() {
 sh "$launch" --help | grep -F "Usage:" >/dev/null
 sh "$install" --help | grep -F "Usage:" >/dev/null
 sh "$uninstall" --help | grep -F "Usage:" >/dev/null
+sh "$root/forge-menu" --help | grep -F "Usage:" >/dev/null
+sh "$root/spells/.imps/forge/install-forge" --help | grep -F "Usage:" >/dev/null
+sh "$root/spells/.imps/forge/uninstall-forge" --help | grep -F "Usage:" >/dev/null
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-install.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
 fake_home="$scratch/home"
 mkdir -p "$fake_home"
+
+stub_bin="$scratch/stubs"
+mkdir -p "$stub_bin"
+cat > "$stub_bin/require-wizardry" <<'STUB'
+#!/bin/sh
+exit 0
+STUB
+cat > "$stub_bin/require" <<'STUB'
+#!/bin/sh
+exit 0
+STUB
+cat > "$stub_bin/menu" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$@" > "$MENU_CAPTURE"
+exit 0
+STUB
+chmod +x "$stub_bin/require-wizardry" "$stub_bin/require" "$stub_bin/menu"
+
+menu_home="$scratch/menu-home"
+mkdir -p "$menu_home"
+MENU_CAPTURE="$scratch/menu-not-installed.out" WIZARDRY_FORGE_MENU_INSTALLED=0 HOME="$menu_home" PATH="$stub_bin:$PATH" sh "$root/forge-menu"
+sed -n '2p' "$scratch/menu-not-installed.out" | grep -F "Install Forge%" >/dev/null
+if sed -n '2p' "$scratch/menu-not-installed.out" | grep -F "Run Forge%" >/dev/null; then
+  printf '%s\n' "forge menu shows Run Forge before installation" >&2
+  exit 1
+fi
+
+mkdir -p "$menu_home/.local/bin"
+: > "$menu_home/.local/bin/app-forge"
+chmod +x "$menu_home/.local/bin/app-forge"
+MENU_CAPTURE="$scratch/menu-installed.out" WIZARDRY_FORGE_MENU_INSTALLED=1 HOME="$menu_home" PATH="$stub_bin:$PATH" sh "$root/forge-menu"
+sed -n '2p' "$scratch/menu-installed.out" | grep -F "Run Forge%" >/dev/null
+sed -n '3p' "$scratch/menu-installed.out" | grep -F "Uninstall Forge%" >/dev/null
 
 newline_root="$scratch/root
 status=forged"
