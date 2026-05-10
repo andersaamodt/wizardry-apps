@@ -93,6 +93,49 @@ fi
 grep -F "root path must not contain line breaks" "$scratch/launch-newline.err" >/dev/null
 [ ! -e "$scratch/launch-config/wizardry-apps/forge-root" ]
 
+launch_mac_root="$scratch/launch-mac-root"
+launch_mac_home="$scratch/launch-mac-home"
+launch_mac_bin="$scratch/launch-mac-bin"
+launch_mac_app="$launch_mac_home/Applications/App Forge.app"
+mkdir -p "$launch_mac_root/apps/forge/scripts" "$launch_mac_root/tools/forge" "$launch_mac_bin"
+printf '%s\n' '#!/bin/sh' 'exit 0' > "$launch_mac_root/apps/forge/scripts/forge-backend"
+chmod +x "$launch_mac_root/apps/forge/scripts/forge-backend"
+cat > "$launch_mac_root/tools/forge/install-forge" <<'SH'
+#!/bin/sh
+set -eu
+app_path=$HOME/Applications/App\ Forge.app
+mkdir -p "$app_path"
+printf 'installed_app=%s\n' "$app_path"
+SH
+cat > "$launch_mac_bin/uname" <<'SH'
+#!/bin/sh
+printf '%s\n' Darwin
+SH
+cat > "$launch_mac_bin/open" <<'SH'
+#!/bin/sh
+printf '%s\n' "$@" > "$OPEN_CAPTURE"
+exit 0
+SH
+cat > "$launch_mac_bin/osascript" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat > "$launch_mac_bin/pkill" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$launch_mac_root/tools/forge/install-forge" "$launch_mac_bin/uname" "$launch_mac_bin/open" \
+  "$launch_mac_bin/osascript" "$launch_mac_bin/pkill"
+OPEN_CAPTURE="$scratch/launch-open.out" \
+  HOME="$launch_mac_home" \
+  PATH="$launch_mac_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
+  XDG_CONFIG_HOME="$scratch/launch-mac-config" \
+  XDG_STATE_HOME="$scratch/launch-mac-state" \
+  sh "$launch" --root "$launch_mac_root" >"$scratch/launch-mac.out"
+grep -Fx "App Forge launched ($launch_mac_app)" "$scratch/launch-mac.out" >/dev/null
+sed -n '1p' "$scratch/launch-open.out" | grep -Fx -- "-n" >/dev/null
+sed -n '2p' "$scratch/launch-open.out" | grep -Fx "$launch_mac_app" >/dev/null
+
 if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$scratch/Bad.app" --bundle-id 'com.example/../../bad' >"$scratch/bad-bundle.out" 2>"$scratch/bad-bundle.err"; then
   printf '%s\n' "build-forge-macos-app accepted invalid bundle id" >&2
   exit 1
@@ -352,6 +395,48 @@ if PATH="$preserve_install_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
   exit 1
 fi
 grep -Fx "preserve" "$preserve_install_target/marker" >/dev/null
+
+stale_install_root="$scratch/stale-install-root"
+stale_install_bin="$scratch/stale-install-bin"
+stale_install_target="$scratch/stale-install/App Forge.app"
+mkdir -p "$stale_install_root/tools/forge" "$stale_install_root/apps/forge" \
+  "$stale_install_bin" "$stale_install_target/Contents/Resources/stale"
+printf '%s\n' "stale" >"$stale_install_target/Contents/Resources/stale/old-file"
+cat >"$stale_install_root/tools/forge/launch-forge" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat >"$stale_install_root/tools/forge/build-forge-macos-app" <<'SH'
+#!/bin/sh
+out=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --out)
+      shift
+      out=${1-}
+      ;;
+  esac
+  shift
+done
+[ -n "$out" ] || exit 2
+mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$out/Contents/MacOS/app-forge"
+chmod +x "$out/Contents/MacOS/app-forge"
+printf '%s\n' "fresh" >"$out/Contents/Resources/fresh-file"
+printf '%s\n' '<plist></plist>' >"$out/Contents/Info.plist"
+SH
+cat >"$stale_install_bin/uname" <<'SH'
+#!/bin/sh
+printf '%s\n' Darwin
+SH
+chmod +x "$stale_install_root/tools/forge/launch-forge" \
+  "$stale_install_root/tools/forge/build-forge-macos-app" \
+  "$stale_install_bin/uname"
+PATH="$stale_install_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
+  sh "$install" --root "$stale_install_root" --home "$fake_home" \
+  --app-dir "$stale_install_target" >"$scratch/install-stale.out"
+grep -Fx "fresh" "$stale_install_target/Contents/Resources/fresh-file" >/dev/null
+[ ! -e "$stale_install_target/Contents/Resources/stale/old-file" ]
 
 install_out=$(sh "$install" --root "$root" --home "$fake_home")
 printf '%s\n' "$install_out" | grep -F "installed_command=$fake_home/.local/bin/app-forge" >/dev/null

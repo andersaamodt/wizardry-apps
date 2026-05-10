@@ -171,39 +171,37 @@ install_macos_bundle() {
   target=$1
   stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-app.XXXXXX")
   stage_bundle="$stage_root/App Forge.app"
+  target_parent=$(dirname "$target")
+  target_base=${target##*/}
+  target_stage="$target_parent/.$target_base.install.$$"
+
   if ! "$root/tools/forge/build-forge-macos-app" --root "$root" --out "$stage_bundle" >/dev/null 2>&1; then
     rm -rf "$stage_root"
     return 1
   fi
 
-  parent_dir=$(dirname "$target")
-
-  if [ -w "$parent_dir" ] || [ ! -e "$parent_dir" ]; then
-    mkdir -p "$parent_dir"
+  if [ -w "$target_parent" ] || [ ! -e "$target_parent" ]; then
+    mkdir -p "$target_parent"
+    rm -rf "$target_stage"
     if command -v ditto >/dev/null 2>&1; then
-      ditto "$stage_bundle" "$target" || {
+      ditto "$stage_bundle" "$target_stage" || {
+        rm -rf "$target_stage"
         rm -rf "$stage_root"
         return 1
       }
     else
-      if [ -d "$target" ]; then
-        (
-          cd "$stage_bundle" || exit 1
-          tar -cf - .
-        ) | (
-          cd "$target" || exit 1
-          tar -xf -
-        ) || {
-          rm -rf "$stage_root"
-          return 1
-        }
-      else
-        cp -R "$stage_bundle" "$target" || {
-          rm -rf "$stage_root"
-          return 1
-        }
-      fi
+      cp -R "$stage_bundle" "$target_stage" || {
+        rm -rf "$target_stage"
+        rm -rf "$stage_root"
+        return 1
+      }
     fi
+    rm -rf "$target"
+    mv "$target_stage" "$target" || {
+      rm -rf "$target_stage"
+      rm -rf "$stage_root"
+      return 1
+    }
     rm -rf "$stage_root"
     printf '%s\n' "$target"
     return 0
@@ -212,15 +210,9 @@ install_macos_bundle() {
   if command -v sudo >/dev/null 2>&1; then
     set +e
     if command -v ditto >/dev/null 2>&1; then
-      sudo mkdir -p "$parent_dir" && sudo ditto "$stage_bundle" "$target"
+      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo ditto "$stage_bundle" "$target_stage" && sudo rm -rf "$target" && sudo mv "$target_stage" "$target"
     else
-      (
-        cd "$stage_bundle" || exit 1
-        tar -cf - .
-      ) | (
-        sudo mkdir -p "$target" || exit 1
-        sudo tar -xf - -C "$target"
-      )
+      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo cp -R "$stage_bundle" "$target_stage" && sudo rm -rf "$target" && sudo mv "$target_stage" "$target"
     fi
     sudo_rc=$?
     set -e
@@ -229,6 +221,7 @@ install_macos_bundle() {
       printf '%s\n' "$target"
       return 0
     fi
+    sudo rm -rf "$target_stage" >/dev/null 2>&1 || true
   fi
 
   rm -rf "$stage_root"

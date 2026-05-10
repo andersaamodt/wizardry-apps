@@ -53,6 +53,20 @@ if [ ! -d "$root/apps/forge" ] || [ ! -x "$root/apps/forge/scripts/forge-backend
   exit 1
 fi
 
+stop_running_macos_forge() {
+  if command -v osascript >/dev/null 2>&1; then
+    osascript \
+      -e 'if application "App Forge" is running then' \
+      -e 'tell application "App Forge" to quit' \
+      -e 'end if' >/dev/null 2>&1 || true
+  fi
+
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -f "/App Forge.app/Contents/MacOS/wizardry-host" >/dev/null 2>&1 || true
+    pkill -f "/App Forge.app/Contents/MacOS/app-forge" >/dev/null 2>&1 || true
+  fi
+}
+
 config_root="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps"
 config_file="$config_root/forge-root"
 mkdir -p "$config_root"
@@ -70,7 +84,8 @@ if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
   if [ "$status" -eq 0 ]; then
     installed_app=$(printf '%s\n' "$out" | sed -n 's/^installed_app=//p' | head -n 1)
     if [ -n "$installed_app" ] && [ -d "$installed_app" ] && command -v open >/dev/null 2>&1; then
-      open "$installed_app" >/dev/null 2>&1
+      stop_running_macos_forge
+      open -n "$installed_app" >/dev/null 2>&1
       open_status=$?
       if [ "$open_status" -eq 0 ]; then
         out=$(printf '%s\n%s\n' "$out" "opened_app=$installed_app")
