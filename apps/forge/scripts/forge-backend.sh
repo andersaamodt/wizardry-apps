@@ -2120,9 +2120,12 @@ stop_desktop_instances_for_slug() {
     pkill -f "wizardry-host.*/Resources/$slug" >/dev/null 2>&1 || true
     if [ -n "$app_name" ]; then
       pkill -f "/$app_name.app/Contents/MacOS/wizardry-host" >/dev/null 2>&1 || true
+      pkill -f "/$app_name.app/Contents/MacOS/" >/dev/null 2>&1 || true
     fi
     if [ -n "$root" ]; then
       pkill -f "wizardry-host.*$root/_tmp/workbench/dist/.*/$slug" >/dev/null 2>&1 || true
+      pkill -f "$root/_tmp/workbench/dist/macos-native-workspaces/$slug/.*/Contents/MacOS/" >/dev/null 2>&1 || true
+      pkill -f "$root/_tmp/workbench/dist/linux-native-workspaces/$slug/" >/dev/null 2>&1 || true
     fi
   fi
 
@@ -2133,7 +2136,13 @@ stop_desktop_instances_for_slug() {
       still_running=$(
         ps -axo command= 2>/dev/null \
           | awk -v slug="$slug" -v root="$root" -v app_name="$app_name" '
-              index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0)) { found=1; exit }
+              {
+                host = index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0))
+                native_app = app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/") > 0
+                native_macos = root != "" && index($0, root "/_tmp/workbench/dist/macos-native-workspaces/" slug "/") > 0 && index($0, "/Contents/MacOS/") > 0
+                native_linux = root != "" && index($0, root "/_tmp/workbench/dist/linux-native-workspaces/" slug "/") > 0
+                if (host || native_app || native_macos || native_linux) { found=1; exit }
+              }
               END { if (found) print "1"; else print "0" }
             '
       )
@@ -2146,7 +2155,13 @@ stop_desktop_instances_for_slug() {
       stubborn_pids=$(
         ps -axo pid=,command= 2>/dev/null \
           | awk -v slug="$slug" -v root="$root" -v app_name="$app_name" '
-              index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0)) { print $1 }
+              {
+                host = index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0))
+                native_app = app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/") > 0
+                native_macos = root != "" && index($0, root "/_tmp/workbench/dist/macos-native-workspaces/" slug "/") > 0 && index($0, "/Contents/MacOS/") > 0
+                native_linux = root != "" && index($0, root "/_tmp/workbench/dist/linux-native-workspaces/" slug "/") > 0
+                if (host || native_app || native_macos || native_linux) { print $1 }
+              }
             ' \
           | tr '\n' ' ' \
           | sed 's/[[:space:]]*$//'
@@ -6823,7 +6838,8 @@ cmd_run_workspace() {
               printf '%s\n' "forge-backend: open command not available on this system" >&2
               exit 1
             }
-            open "$installed_path"
+            stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
+            open -n "$installed_path"
             printf 'launched=1\n'
             printf 'mode=native-desktop-installed\n'
             printf 'artifact=%s\n' "$installed_path"
@@ -6871,6 +6887,7 @@ cmd_run_workspace() {
         esac
       fi
 
+      stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
       run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
       build_out=$(build_native_workspace_host "$root" "$workspace_path" "$workspace_conf")
       artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
@@ -6885,7 +6902,8 @@ cmd_run_workspace() {
             printf '%s\n' "forge-backend: open command not available on this system" >&2
             exit 1
           }
-          open "$artifact"
+          stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
+          open -n "$artifact"
           printf 'launched=1\n'
           printf 'mode=native-desktop-executable\n'
           printf 'artifact=%s\n' "$artifact"
