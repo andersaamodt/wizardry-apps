@@ -65,15 +65,13 @@ wizardry-apps, Forge itself, and built-in wizardry apps are licensed under `OWL 
 
 Blank projects emitted from Forge's generic starters are different: they are generated under `AGPL-3.0-or-later` plus `Wizardry Addendum 1.0`. Those generated projects are intended to be sellable and hostable as long as the whole emitted app remains copyleft, complete corresponding source is made available, and the Wizardry name is not used in a way that implies endorsement or official status.
 
-## For Contributors
+## Repository Map
 
-This repository keeps one user-facing README: this file. App-specific implementation notes and agent guidance belong in `.github/`, not in nested README files.
-
-The user-facing entrypoint is Forge. The source is organized around apps, starters, hosts, release tools, and the shell-backed wizardry app pipeline:
+The source tree is organized around apps, starters, hosts, release tools, and the shell-backed wizardry app pipeline:
 - `apps/forge/` contains App Forge
-- `apps/.host/` contains shared desktop and mobile host code
+- `apps/.host/` contains reusable desktop and mobile host wrappers
 - `apps/<slug>/` contains built-in wizardry apps
-- `templates/` contains Forge starters, shared web templates, and Godot template material
+- `templates/` contains Forge starters, shared web templates, and Godot material
 - `runtime/config/` contains release and template configuration used by Forge and publishing tools
 - `runtime/schemas/` contains app, RPC, event, metadata, and native desktop IR contracts
 - `runtime/adapters/` contains shell and HTTP/CGI reference adapters
@@ -82,5 +80,9 @@ The user-facing entrypoint is Forge. The source is organized around apps, starte
 - `spells/` contains wizardry app pipeline commands
 - `tools/` contains validation, icon, sync, and release helpers
 - `.github/` contains AI-facing standards and contributor policy
+
+## For Contributors
+
+This repository keeps one user-facing README: this file. App-specific implementation notes and agent guidance belong in `.github/`, not in nested README files.
 
 For deeper implementation notes, read `.github/AI_DOCS.md` first.
