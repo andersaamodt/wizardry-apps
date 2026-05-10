@@ -1883,6 +1883,24 @@ install_macos_bundle() {
   return 0
 }
 
+macos_user_app_install_path() {
+  macos_user_app_name=${1-}
+  [ -n "$macos_user_app_name" ] || return 1
+  validate_macos_app_bundle_name "$macos_user_app_name.app"
+  printf '%s/Applications/%s.app\n' "$HOME" "$macos_user_app_name"
+}
+
+prepare_macos_run_bundle() {
+  macos_run_src_bundle=${1-}
+  macos_run_app_name=${2-}
+  [ -d "$macos_run_src_bundle" ] || return 1
+  [ -n "$macos_run_app_name" ] || return 1
+
+  macos_run_dest_bundle=$(macos_user_app_install_path "$macos_run_app_name") || return 1
+  install_macos_bundle "$macos_run_src_bundle" "$macos_run_dest_bundle" || return 1
+  printf '%s\n' "$macos_run_dest_bundle"
+}
+
 copy_macos_bundle() {
   install_macos_bundle "${1-}" "${2-}"
 }
@@ -6568,11 +6586,15 @@ cmd_run_desktop() {
         printf '%s\n' "forge-backend: built bundle artifact missing: $bundle_artifact" >&2
         exit 1
       }
-      launch_bundle="$bundle_artifact"
-      synced_install=$(sync_existing_macos_installs_from_bundle "$bundle_artifact" "$app_name" 2>/dev/null || true)
-      if [ -n "$synced_install" ] && [ -d "$synced_install" ]; then
-        launch_bundle="$synced_install"
+      if ! synced_install=$(prepare_macos_run_bundle "$bundle_artifact" "$app_name"); then
+        printf '%s\n' "forge-backend: failed to prepare durable macOS run bundle for $slug" >&2
+        exit 1
       fi
+      launch_bundle="$synced_install"
+      [ -d "$launch_bundle" ] || {
+        printf '%s\n' "forge-backend: durable macOS run bundle missing: $launch_bundle" >&2
+        exit 1
+      }
       command -v open >/dev/null 2>&1 || {
         printf '%s\n' "forge-backend: open command not available on this system" >&2
         exit 1
@@ -6583,7 +6605,7 @@ cmd_run_desktop() {
         printf 'mode=desktop-executable\n'
         printf 'artifact=%s\n' "$launch_bundle"
         printf 'built_artifact=%s\n' "$bundle_artifact"
-        [ -n "$synced_install" ] && printf 'installed_synced=%s\n' "$synced_install"
+        [ -n "$synced_install" ] && printf 'installed=%s\n' "$synced_install"
         printf 'restart_bundle=%s\n' "$launch_bundle"
         exit 0
       else
@@ -6593,7 +6615,7 @@ cmd_run_desktop() {
       printf 'mode=desktop-executable\n'
       printf 'artifact=%s\n' "$launch_bundle"
       printf 'built_artifact=%s\n' "$bundle_artifact"
-      [ -n "$synced_install" ] && printf 'installed_synced=%s\n' "$synced_install"
+      [ -n "$synced_install" ] && printf 'installed=%s\n' "$synced_install"
       exit 0
       ;;
     linux)

@@ -163,6 +163,25 @@ HOST
 chmod +x "$out"
 SH_CC
 chmod +x "$fake_bin/cc"
+cp "$fake_bin/cc" "$fake_bin/clang"
+chmod +x "$fake_bin/clang"
+
+cat > "$fake_bin/codesign" <<'SH_CODESIGN'
+#!/bin/sh
+exit 0
+SH_CODESIGN
+chmod +x "$fake_bin/codesign"
+
+cat > "$fake_bin/lipo" <<'SH_LIPO'
+#!/bin/sh
+case "${1-}" in
+  -archs)
+    printf '%s\n' "arm64 x86_64"
+    ;;
+esac
+exit 0
+SH_LIPO
+chmod +x "$fake_bin/lipo"
 
 cat > "$fake_bin/open" <<'SH_OPEN'
 #!/bin/sh
@@ -200,6 +219,25 @@ desktop_entry=$(printf '%s\n' "$desktop_out" | kv_read entry)
 [ -n "$desktop_entry" ]
 [ -f "$desktop_entry/index.html" ]
 wait_for_file_contains "$desktop_log" "$desktop_entry" 60
+
+# Behavior: macOS run uses a durable Applications bundle, not the disposable
+# workbench bundle that Dock pins can later lose.
+macos_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$backend" run-desktop "$root" forge)
+assert_contains "$macos_out" "launched=1"
+assert_contains "$macos_out" "mode=desktop-executable"
+macos_installed=$(printf '%s\n' "$macos_out" | kv_read installed)
+macos_artifact=$(printf '%s\n' "$macos_out" | kv_read artifact)
+macos_built=$(printf '%s\n' "$macos_out" | kv_read built_artifact)
+[ "$macos_installed" = "$test_home/Applications/App Forge.app" ]
+[ "$macos_artifact" = "$macos_installed" ]
+case "$macos_built" in
+  "$root/_tmp/workbench/dist/macos/App Forge.app") ;;
+  *)
+    printf '%s\n' "expected built_artifact to remain a workbench bundle, got: $macos_built" >&2
+    exit 1
+    ;;
+esac
+[ -x "$macos_installed/Contents/MacOS/wizardry-host" ]
 
 # Behavior: workspace preferring host target launches desktop mode even when hosted-web is enabled.
 workspace_host="$scratch/workspace-host"

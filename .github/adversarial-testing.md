@@ -163,6 +163,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - AppImage and launcher installers should reject remote artifact names that would break generated shell scripts, including `"`, `$`, backticks, and backslashes.
 - macOS app installers must stage and verify the new bundle before copying over an existing Applications bundle; never delete the installed app before the replacement copy succeeds.
 - macOS app bundle builders with explicit `--out` paths must copy and sign a staged bundle before moving aside an existing output bundle.
+- macOS app run flows must launch durable Applications bundles, not repo-local `_tmp` build bundles, because Dock pins to disposable paths become question marks after rebuild or cleanup.
 - Explicit artifact paths passed to BSD tools should reject bare leading-dash basenames unless every downstream command uses `--`.
 - Bundle IDs rendered into plist or native project files need direct validation at each packaging entrypoint, not just manifest-derived paths.
 - App bundle names discovered inside downloaded release archives are remote metadata; reject CR/LF before deriving install paths or printing `installed=`.
