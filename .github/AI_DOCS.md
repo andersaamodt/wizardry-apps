@@ -11,7 +11,8 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/adversarial-testing.md` when doing adversarial testing, security-minded bug hunts, release hardening, or GUI edge-case sweeps.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_LESSONS.md` for known host/WebView pitfalls and regression lessons.
 - For new cross-platform app shells, reference `/Users/andersaamodt/git/wizardry-apps/templates/forge/web/reference-app/` first; for native-style desktop app shells, reference `/Users/andersaamodt/git/wizardry-apps/templates/forge/native-desktop/reference-app/` first. Keep the relevant reference updated when Wizardry standards evolve; the native reference should show platform-owned controls plus live backend snapshot hydration, especially JSON-Glib-backed GTK row/detail rebuilding on Linux.
-- Read app-local docs (for example `apps/forge/README.md`) before changing an app.
+- Keep one user-facing repo README at `/Users/andersaamodt/git/wizardry-apps/README.md`; do not add app-local or template-local README files.
+- Put app-specific implementation notes in `.github/` when they are AI-facing, or fold user-facing summaries into the root README.
 
 ## Canonicality
 - Wizardry core ethos in `~/.wizardry/README.md` is upstream-canonical.
@@ -27,7 +28,7 @@
 - `apps/.host` owns shared macOS, Linux, iOS, Android, and bridge host code.
 - `apps/forge` owns the App Forge desktop control plane.
 - `assets/stock/` is a flat convenience shelf of reusable non-app-specific icons/SVGs; canonical runtime assets stay under `apps/<slug>/assets`.
-- `runtime/config/` manifests define production release allowlists.
+- `runtime/config/` defines production release allowlists and Forge template configuration.
 - `runtime/schemas/` contracts define RPC, events, metadata, and native desktop IR formats.
 - `runtime/core/` owns wizardry-core runtime contracts and implementation.
 - `runtime/adapters/` contains shell and HTTP/CGI reference adapters.

@@ -16,7 +16,6 @@ extractor="$app_dir/scripts/extract_norms.sh"
 [ -d "$app_dir" ]
 [ -f "$app_dir/index.html" ]
 [ -f "$app_dir/style.css" ]
-[ -f "$app_dir/README.md" ]
 [ -f "$app_dir/manifesto.md" ]
 [ -f "$app_dir/norms.jsonl" ]
 [ -x "$backend" ]
@@ -28,7 +27,6 @@ grep -F "virtual-redditor-backend.sh" "$app_dir/index.html" >/dev/null
 grep -F "bridge.exec" "$app_dir/index.html" >/dev/null
 
 grep -F "launchd-install" "$daemon" >/dev/null
-grep -F "reply -> randomized delay -> ban" "$app_dir/README.md" >/dev/null
 grep -F "apply_reply_delay" "$daemon" >/dev/null
 grep -F "latencyJitterSec" "$daemon" >/dev/null
 

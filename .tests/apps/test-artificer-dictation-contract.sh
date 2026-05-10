@@ -14,7 +14,6 @@ page_md="$root/templates/web/artificer/pages/index.md"
 ui_js="$root/templates/web/artificer/static/artificer-app.js"
 ui_js_source="$root/templates/web/artificer/static/app.js"
 style="$root/templates/web/artificer/static/style.css"
-readme="$root/templates/web/artificer/README.md"
 
 fail() {
   printf '%s\n' "FAIL: $*" >&2
@@ -40,7 +39,6 @@ assert_file "$page_md"
 assert_file "$ui_js"
 assert_file "$ui_js_source"
 assert_file "$style"
-assert_file "$readme"
 
 assert_contains "$api" 'DICTATE_BIN=${DICTATE_BIN:-$WIZARDRY_DIR/spells/psi/dictate}'
 assert_contains "$api" "resolve_dictate_bin()"
@@ -138,11 +136,11 @@ assert_contains "$ui_js_source" "apiPost(\"dictation_install_cancel\", { job_id:
 assert_contains "$ui_js_source" "apiPost(\"dictation_uninstall\", {}, { timeoutMs: 12000 })"
 assert_contains "$ui_js_source" "apiGet(\"dictation_install_status\", { job_id: id }, { timeoutMs: 12000 })"
 
-assert_contains "$readme" '- `dictate` (POST)'
-assert_contains "$readme" '- `dictation_status` (GET)'
-assert_contains "$readme" '- `dictation_uninstall` (POST)'
-assert_contains "$readme" '- `dictation_install_info` (GET)'
-assert_contains "$readme" '- `dictation_install_start` (POST)'
-assert_contains "$readme" '- `dictation_install_status` (GET)'
+assert_contains "$api" "dictate)"
+assert_contains "$api" "dictation_status)"
+assert_contains "$api" "dictation_uninstall)"
+assert_contains "$api" "dictation_install_info)"
+assert_contains "$api" "dictation_install_start)"
+assert_contains "$api" "dictation_install_status)"
 
 printf '%s\n' "artificer dictation contract tests passed"

@@ -13,7 +13,6 @@ ui_js="$root/templates/web/artificer/static/artificer-app.js"
 page_md="$root/templates/web/artificer/pages/index.md"
 page_html="$root/templates/web/artificer/pages/index.html"
 style="$root/templates/web/artificer/static/style.css"
-readme="$root/templates/web/artificer/README.md"
 backlog="$root/templates/web/artificer/INTELLIGENCE_BACKLOG.md"
 
 fail() {
@@ -40,7 +39,6 @@ assert_file "$ui_js"
 assert_file "$page_md"
 assert_file "$page_html"
 assert_file "$style"
-assert_file "$readme"
 assert_file "$backlog"
 
 # Backend contracts: failure taxonomy and manual proposal governance exist.
@@ -149,14 +147,14 @@ assert_contains "$style" ".mode-runtime-proposal-item"
 assert_contains "$style" ".mode-runtime-taxonomy-query-controls"
 assert_contains "$style" ".mode-runtime-query-error"
 
-# Documentation contracts.
-assert_contains "$readme" "failure_taxonomy_state"
-assert_contains "$readme" "failure_taxonomy_query"
-assert_contains "$readme" "improvement_proposal_generate"
-assert_contains "$readme" "controller_variants_state"
-assert_contains "$readme" "controller_variant_promote"
-assert_contains "$readme" "quality_scorecard_state"
-assert_contains "$readme" "quality-scorecard/regression-proposal-cooldowns.tsv"
+# Source contract names that used to be mirrored in optional app README docs.
+assert_contains "$api" "failure_taxonomy_state"
+assert_contains "$api" "failure_taxonomy_query"
+assert_contains "$api" "improvement_proposal_generate"
+assert_contains "$api" "controller_variants_state"
+assert_contains "$api" "controller_variant_promote"
+assert_contains "$api" "quality_scorecard_state"
+assert_contains "$mode_runtime_lib" "quality-scorecard/regression-proposal-cooldowns.tsv"
 assert_contains "$backlog" "INT-001 Failure taxonomy persistence"
 assert_contains "$backlog" "INT-003 Contained self-improvement proposals"
 assert_contains "$backlog" "INT-008 Multi-run learning loop for controller prompts"

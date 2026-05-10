@@ -71,12 +71,17 @@ Blank projects emitted from Forge's generic starters are different: they are gen
 
 ## For Contributors
 
+This repository keeps one user-facing README: this file. App-specific implementation notes and agent guidance belong in `.github/`, not in nested README files.
+
 The user-facing entrypoint is Forge. The source is organized around apps, starters, hosts, release tools, and the shell-backed wizardry app pipeline:
 - `apps/forge/` contains App Forge
 - `apps/.host/` contains shared desktop and mobile host code
 - `apps/<slug>/` contains built-in wizardry apps
 - `templates/` contains Forge starters, shared web templates, and Godot template material
-- `runtime/` contains manifests, schemas, adapters, and wizardry-core code
+- `runtime/config/` contains release and template configuration used by Forge and publishing tools
+- `runtime/schemas/` contains app, RPC, event, metadata, and native desktop IR contracts
+- `runtime/adapters/` contains shell and HTTP/CGI reference adapters
+- `runtime/core/` contains wizardry-core code
 - `assets/stock/` contains reusable stock icons and SVGs
 - `spells/` contains wizardry app pipeline commands
 - `tools/` contains validation, icon, sync, and release helpers

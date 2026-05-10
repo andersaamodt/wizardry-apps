@@ -8,7 +8,7 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
 [ -f "$root/apps/forge/index.html" ]
 [ -f "$root/apps/forge/style.css" ]
-[ -f "$root/apps/forge/README.md" ]
+[ -f "$root/README.md" ]
 [ -f "$root/licenses/AGPL-3.0-or-later.txt" ]
 [ -f "$root/licenses/WIZARDRY_ADDENDUM.md" ]
 [ -f "$root/templates/forge/web/sidebar/index.html" ]
@@ -127,7 +127,7 @@ grep -F -- "-webkit-mask-image: var(--catalog-thumb-image, none);" "$root/apps/f
 grep -F -- "-webkit-mask-image: linear-gradient(white, white);" "$root/apps/forge/style.css" >/dev/null
 grep -F -- "background-size: contain;" "$root/apps/forge/style.css" >/dev/null
 grep -F "scaffold-app" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
-grep -F "Install user-local launchers/integration" "$root/apps/forge/README.md" >/dev/null
+grep -F "./install-forge" "$root/README.md" >/dev/null
 grep -F 'forge-backend" run-desktop "$root" forge' "$root/tools/forge/launch-forge.sh" >/dev/null
 [ -f "$root/apps/forge/assets/icons/meta/territory-master.png" ]
 [ -f "$root/apps/wizardry-desktop/assets/icons/meta/territory-master.png" ]

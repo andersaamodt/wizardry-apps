@@ -9,7 +9,6 @@ artificer_dir="$root/templates/web/artificer"
 }
 api="$root/templates/web/artificer/cgi/artificer-api"
 backlog="$root/templates/web/artificer/INTELLIGENCE_BACKLOG.md"
-readme="$root/templates/web/artificer/README.md"
 
 fail() {
   printf '%s\n' "FAIL: $*" >&2
@@ -31,7 +30,6 @@ assert_contains() {
 
 assert_file "$api"
 assert_file "$backlog"
-assert_file "$readme"
 
 # Mode policies for security specialist modes.
 assert_contains "$api" "run_mode_policy_instructions()"
@@ -56,6 +54,6 @@ assert_contains "$api" 'if [ "$run_mode" = "pentest" ] || [ "$run_mode" = "secur
 
 # Documentation/backlog references for this upgrade area.
 assert_contains "$backlog" "INT-009 Security specialist modes"
-assert_contains "$readme" 'Run-mode picker includes a `More modes` expander'
+assert_contains "$backlog" 'Run-mode picker includes a `More modes` expander'
 
 printf '%s\n' "artificer security modes contract tests passed"

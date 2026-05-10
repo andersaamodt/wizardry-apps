@@ -204,7 +204,8 @@
 ## File and Path Conventions
 - Keep app entrypoint at `apps/<slug>/index.html`.
 - Keep app backend at `apps/<slug>/scripts/<slug>-backend.sh` when backend logic exists.
-- Keep app-scoped docs in `apps/<slug>/README.md` for runtime paths and operator notes.
+- Keep one user-facing repo README at the repository root; do not add app-local README files.
+- Keep app-scoped AI/operator notes in `.github/` or fold user-facing summaries into the root README.
 - Keep naming consistent with hyphenated app slugs.
 
 ## Icon Assets and Licensing

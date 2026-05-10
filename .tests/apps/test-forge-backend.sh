@@ -676,7 +676,7 @@ printf '%s\n' "$workspace_native_reference_out" | grep -F "created=$workspaces_r
 [ -f "$workspaces_root/workspace-native-reference/ir/app.ir.yaml" ]
 [ -f "$workspaces_root/workspace-native-reference/generated/macos/Sources/App/App.swift" ]
 [ -f "$workspaces_root/workspace-native-reference/generated/linux/src/main.c" ]
-grep -F "Native Desktop Reference App" "$workspaces_root/workspace-native-reference/README.md" >/dev/null
+grep -F "Native desktop app scaffolded by App Forge." "$workspaces_root/workspace-native-reference/README.md" >/dev/null
 grep -F "NSOutlineView" "$workspaces_root/workspace-native-reference/generated/macos/Sources/App/App.swift" >/dev/null
 grep -F "gtk_header_bar_new" "$workspaces_root/workspace-native-reference/generated/linux/src/main.c" >/dev/null
 grep -F "json-glib-1.0" "$workspaces_root/workspace-native-reference/generated/linux/meson.build" >/dev/null
