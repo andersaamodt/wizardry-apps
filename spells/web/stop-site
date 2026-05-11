@@ -22,70 +22,181 @@ site_name=${1-}
 if [ -z "$site_name" ]; then
   die 2 "stop-site: SITENAME required"
 fi
+
 case "$site_name" in
-  ""|*[!A-Za-z0-9_-]*)
+  .|..|*[!a-zA-Z0-9._-]*)
     die 2 "stop-site: invalid site name"
     ;;
 esac
 
-WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
-SITES_DIR="$WEB_ROOT"
-SITE_DIR="$SITES_DIR/$site_name"
+web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+sites_dir="$web_root"
+site_dir="$sites_dir/$site_name"
 
-if [ ! -d "$SITE_DIR" ]; then
+if [ ! -d "$site_dir" ]; then
   die "stop-site: site '$site_name' not found"
 fi
 
-nginx_pid_active() {
-  pid_file="$SITE_DIR/nginx/nginx.pid"
-  nginx_cfg="$SITE_DIR/nginx/nginx.conf"
-  [ -f "$pid_file" ] || return 1
-  pid=$(cat "$pid_file" 2>/dev/null || echo "")
-  [ -n "$pid" ] || return 1
-  kill -0 "$pid" 2>/dev/null || return 1
-  ps -p "$pid" -o command= 2>/dev/null | grep -F "$nginx_cfg" >/dev/null 2>&1 || return 1
+stop_site_run_priv() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+    return
+  fi
+  if has sudo; then
+    if tty >/dev/null 2>&1; then
+      sudo "$@" </dev/tty
+    else
+      sudo "$@"
+    fi
+    return
+  fi
+  die "stop-site: root or sudo is required"
 }
 
-# Check if nginx is running
-if [ ! -f "$SITE_DIR/nginx/nginx.pid" ]; then
-  warn "stop-site: site '$site_name' is not running (no PID file)"
-  exit 0
-fi
+nginx_pid_file="$site_dir/nginx/nginx.pid"
+nginx_was_running=0
 
-pid=$(cat "$SITE_DIR/nginx/nginx.pid" 2>/dev/null || echo "")
-if [ -z "$pid" ]; then
-  warn "stop-site: could not read PID file"
-  rm -f "$SITE_DIR/nginx/nginx.pid"
-  exit 0
-fi
+stop_site_nginx_pid_running() {
+  pid=$1
+  case "$pid" in
+    ''|*[!0-9]*)
+      return 1
+      ;;
+  esac
 
-if ! nginx_pid_active; then
-  warn "stop-site: site '$site_name' is not running (stale PID file)"
-  rm -f "$SITE_DIR/nginx/nginx.pid"
-  exit 0
-fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    return 1
+  fi
 
-# Stop nginx gracefully
-step "Stopping nginx for $site_name..."
-if kill -QUIT "$pid" 2>/dev/null; then
-  # Wait for graceful shutdown
-  for _ in 1 2 3 4 5; do
+  if ! has ps; then
+    return 0
+  fi
+
+  cmd=$(ps -p "$pid" -o command= 2>/dev/null || printf '')
+  if [ -z "$cmd" ]; then
+    return 1
+  fi
+
+  set -- $cmd
+  exe=${1-}
+  base=${exe##*/}
+  case "$base" in
+    nginx|nginx:|nginx-daemon)
+      return 0
+      ;;
+  esac
+
+  case "$cmd" in
+    *"$site_dir"*nginx*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+stop_nginx_process() {
+  if [ ! -f "$nginx_pid_file" ]; then
+    return 0
+  fi
+
+  pid=$(cat "$nginx_pid_file" 2>/dev/null || printf '')
+  if [ -z "$pid" ]; then
+    rm -f "$nginx_pid_file"
+    return 0
+  fi
+
+  if ! stop_site_nginx_pid_running "$pid"; then
+    rm -f "$nginx_pid_file"
+    return 0
+  fi
+
+  nginx_was_running=1
+
+  shutdown_grace_seconds=${WEB_STOP_SITE_GRACE_SECONDS:-2}
+  shutdown_poll_seconds=${WEB_STOP_SITE_POLL_SECONDS:-0.2}
+  case "$shutdown_grace_seconds" in
+    ''|*[!0-9.]*) shutdown_grace_seconds=2 ;;
+  esac
+  case "$shutdown_poll_seconds" in
+    ''|*[!0-9.]*) shutdown_poll_seconds=0.2 ;;
+  esac
+
+  max_checks=$(awk -v grace="$shutdown_grace_seconds" -v poll="$shutdown_poll_seconds" 'BEGIN {
+    if (poll <= 0) poll = 0.2;
+    checks = int((grace / poll) + 0.999);
+    if (checks < 1) checks = 1;
+    print checks;
+  }')
+
+  if ! kill -QUIT "$pid" 2>/dev/null; then
+    stop_site_run_priv kill -QUIT "$pid" 2>/dev/null || true
+  fi
+
+  i=1
+  while [ "$i" -le "$max_checks" ]; do
     if ! kill -0 "$pid" 2>/dev/null; then
-      break
+      rm -f "$nginx_pid_file"
+      return 0
     fi
-    sleep 1
+    sleep "$shutdown_poll_seconds"
+    i=$((i + 1))
   done
-  
-  # If still running, force kill
+
   if kill -0 "$pid" 2>/dev/null; then
-    warn "stop-site: graceful shutdown timed out, forcing..."
-    kill -KILL "$pid" 2>/dev/null || true
+    warn "stop-site: graceful shutdown timed out after ${shutdown_grace_seconds}s, forcing..."
+    if ! kill -KILL "$pid" 2>/dev/null; then
+      stop_site_run_priv kill -KILL "$pid" 2>/dev/null || true
+    fi
+  fi
+  sleep 1
+
+  if kill -0 "$pid" 2>/dev/null; then
+    die "stop-site: failed to stop nginx process (PID $pid)"
+  fi
+
+  rm -f "$nginx_pid_file"
+}
+
+daemon_mode=""
+if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && has launchctl; then
+  daemon_mode="launchd"
+  label="org.wizardry.web.${site_name}"
+  daemon_artifact="${LAUNCHD_PLIST_DIR:-/Library/LaunchDaemons}/${label}.plist"
+elif has systemctl; then
+  daemon_mode="systemd"
+  unit="wizardry-site-${site_name}.service"
+  daemon_artifact="${SERVICE_DIR:-/etc/systemd/system}/$unit"
+else
+  die "stop-site: systemd or launchd is required"
+fi
+
+daemon_stopped=0
+
+if [ -f "$daemon_artifact" ]; then
+  step "Stopping daemon for $site_name..."
+
+  if [ "$daemon_mode" = "launchd" ]; then
+    if stop_site_run_priv launchctl bootout "system/$label" >/dev/null 2>&1 \
+      || stop_site_run_priv launchctl bootout system "$daemon_artifact" >/dev/null 2>&1 \
+      || stop_site_run_priv launchctl unload "$daemon_artifact" >/dev/null 2>&1; then
+      daemon_stopped=1
+    elif stop_site_run_priv launchctl print "system/$label" >/dev/null 2>&1; then
+      die "stop-site: failed to stop daemon for '$site_name'"
+    fi
+  elif [ "$daemon_mode" = "systemd" ]; then
+    if systemctl is-active --quiet "$unit" 2>/dev/null; then
+      stop_site_run_priv systemctl stop "$unit"
+      daemon_stopped=1
+    fi
   fi
 else
-  warn "stop-site: could not send QUIT signal to nginx"
+  warn "stop-site: daemon not configured for '$site_name' (stopping nginx by PID if running)"
 fi
 
-# Clean up PID file
-rm -f "$SITE_DIR/nginx/nginx.pid"
+stop_nginx_process
 
-success "Site '$site_name' stopped"
+if [ "$daemon_stopped" -eq 1 ] || [ "$nginx_was_running" -eq 1 ]; then
+  success "Site '$site_name' stopped"
+else
+  warn "stop-site: site '$site_name' is not running"
+fi

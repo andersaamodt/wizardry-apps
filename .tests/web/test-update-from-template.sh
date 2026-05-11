@@ -151,6 +151,101 @@ EOF
   rm -rf "$test_web_root" "$fake_wizardry_root"
 }
 
+test_update_handles_wizardry_dir_with_spaces() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  tmp_parent=$(temp-dir wizardry-template-parent)
+  fake_wizardry_root="$tmp_parent/wizardry root"
+  template_root="$fake_wizardry_root/web/minimal"
+
+  mkdir -p "$template_root/pages" "$fake_wizardry_root/web/.themes"
+  cat > "$template_root/pages/index.md" <<'EOF'
+# from space root v1
+EOF
+  printf '%s\n' "body { color: black; }" > "$fake_wizardry_root/web/.themes/space-root.css"
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template minisite minimal
+  assert_success || return 1
+
+  cat > "$template_root/pages/index.md" <<'EOF'
+# from space root v2
+EOF
+  rm -f "$test_web_root/minisite/site/static/themes/space-root.css"
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/update-from-template minisite --force
+  assert_success || return 1
+
+  if ! grep -q "from space root v2" "$test_web_root/minisite/site/pages/index.md"; then
+    TEST_FAILURE_REASON="update-from-template did not resolve WIZARDRY_DIR with spaces"
+    rm -rf "$test_web_root" "$tmp_parent"
+    return 1
+  fi
+  if [ ! -f "$test_web_root/minisite/site/static/themes/space-root.css" ]; then
+    TEST_FAILURE_REASON="update-from-template did not resolve shared themes from WIZARDRY_DIR with spaces"
+    rm -rf "$test_web_root" "$tmp_parent"
+    return 1
+  fi
+
+  rm -rf "$test_web_root" "$tmp_parent"
+}
+
+test_update_rejects_path_shaped_site_name() {
+  skip-if-compiled || return $?
+
+  tmpdir=$(make_tempdir)
+  web_root="$tmpdir/sites"
+  escape_dir="$tmpdir/escape"
+  fake_wizardry_root="$tmpdir/wizardry"
+  mkdir -p "$web_root" "$escape_dir/site/pages" "$fake_wizardry_root/web/minimal/pages"
+  printf '%s\n' keep > "$escape_dir/site/pages/keep"
+  cat > "$escape_dir/site.conf" <<'EOF'
+template=minimal
+EOF
+  cat > "$fake_wizardry_root/web/minimal/pages/index.md" <<'EOF'
+# Minimal
+EOF
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$web_root" \
+    run_spell spells/web/update-from-template ../escape --force
+
+  assert_failure || return 1
+  assert_error_contains "invalid site name" || return 1
+  if [ ! -f "$escape_dir/site/pages/keep" ]; then
+    TEST_FAILURE_REASON="update-from-template removed files outside WEB_WIZARDRY_ROOT"
+    return 1
+  fi
+}
+
+test_update_rejects_path_shaped_template_name() {
+  skip-if-compiled || return $?
+
+  tmpdir=$(make_tempdir)
+  web_root="$tmpdir/sites"
+  fake_wizardry_root="$tmpdir/wizardry"
+  site_dir="$web_root/minisite"
+  mkdir -p "$site_dir/site/pages" "$fake_wizardry_root/web/.themes/pages"
+  printf '%s\n' keep > "$site_dir/site/pages/keep"
+  cat > "$site_dir/site.conf" <<'EOF'
+template=../.themes
+EOF
+  cat > "$fake_wizardry_root/web/.themes/pages/index.md" <<'EOF'
+# Not A Template
+EOF
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$web_root" \
+    run_spell spells/web/update-from-template minisite --force
+
+  assert_failure || return 1
+  assert_error_contains "invalid template name" || return 1
+  if [ ! -f "$site_dir/site/pages/keep" ]; then
+    TEST_FAILURE_REASON="update-from-template removed existing pages before rejecting template traversal"
+    return 1
+  fi
+}
+
 test_update_refreshes_requirements_file() {
   skip-if-compiled || return $?
 
@@ -188,40 +283,49 @@ EOF
   rm -rf "$test_web_root" "$fake_wizardry_root"
 }
 
-test_rejects_template_path_traversal() {
+test_update_resolves_external_repo_templates() {
   skip-if-compiled || return $?
 
+  fake_home=$(temp-dir wizardry-home)
+  fake_wizardry_root="$fake_home/.wizardry"
+  fake_git_root="$fake_home/git"
   test_web_root=$(temp-dir web-wizardry-test)
-  fake_wizardry_root=$(temp-dir wizardry-template-root)
-  site_dir="$test_web_root/minisite"
+  template_root="$fake_git_root/unix-settings/hosted-web"
 
-  mkdir -p "$fake_wizardry_root/web" "$fake_wizardry_root/outside-template/pages"
-  printf '# outside template\n' > "$fake_wizardry_root/outside-template/pages/index.md"
-  mkdir -p "$site_dir/site/pages" "$site_dir/site/static" "$site_dir/cgi"
-  printf '# original\n' > "$site_dir/site/pages/index.md"
-  cat > "$site_dir/site.conf" <<'EOF'
-site-name=minisite
-site-user=
-template=../outside-template
-port=8080
-domain=localhost
-https=false
+  mkdir -p "$fake_wizardry_root"
+  mkdir -p "$template_root/pages" "$template_root/static"
+  cat > "$template_root/pages/index.md" <<'EOF'
+# external template v1
+EOF
+  cat > "$template_root/static/style.css" <<'EOF'
+body { color: #111; }
 EOF
 
-  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/update-from-template minisite --force
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$fake_wizardry_root"
-    return 1
-  }
+  HOME="$fake_home" WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template settings unix-settings
+  assert_success || return 1
 
-  if ! grep -q '# original' "$site_dir/site/pages/index.md"; then
-    TEST_FAILURE_REASON="update-from-template used template path outside WIZARDRY_DIR/web"
-    rm -rf "$test_web_root" "$fake_wizardry_root"
+  echo "custom line" >> "$test_web_root/settings/site/pages/index.md"
+  cat > "$template_root/pages/index.md" <<'EOF'
+# external template v2
+EOF
+
+  HOME="$fake_home" WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/update-from-template settings --force
+  assert_success || return 1
+
+  if grep -q "custom line" "$test_web_root/settings/site/pages/index.md"; then
+    TEST_FAILURE_REASON="update-from-template did not overwrite from external template"
+    rm -rf "$fake_home" "$test_web_root"
+    return 1
+  fi
+  if ! grep -q "external template v2" "$test_web_root/settings/site/pages/index.md"; then
+    TEST_FAILURE_REASON="updated external template content not copied"
+    rm -rf "$fake_home" "$test_web_root"
     return 1
   fi
 
-  rm -rf "$test_web_root" "$fake_wizardry_root"
+  rm -rf "$fake_home" "$test_web_root"
 }
 
 run_test_case "update-from-template shows help" test_help
@@ -229,7 +333,10 @@ run_test_case "update-from-template updates files from template" test_updates_fr
 run_test_case "update-from-template preserves uploads" test_preserves_uploads
 run_test_case "update-from-template fails for nonexistent site" test_fails_for_nonexistent_site
 run_test_case "update-from-template resolves templates from web" test_update_uses_web_template_directory
+run_test_case "update-from-template handles WIZARDRY_DIR paths with spaces" test_update_handles_wizardry_dir_with_spaces
+run_test_case "update-from-template rejects path-shaped site names" test_update_rejects_path_shaped_site_name
+run_test_case "update-from-template rejects path-shaped template names" test_update_rejects_path_shaped_template_name
 run_test_case "update-from-template refreshes requirements file" test_update_refreshes_requirements_file
-run_test_case "update-from-template rejects template path traversal" test_rejects_template_path_traversal
+run_test_case "update-from-template resolves external repo templates" test_update_resolves_external_repo_templates
 
 finish_tests

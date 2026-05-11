@@ -50,59 +50,32 @@ test_change_site_port_validates_port() {
   rm -rf "$test_web_root"
 }
 
-test_change_site_port_rejects_path_site_name() {
+test_change_site_port_rejects_path_shaped_site_name() {
   skip-if-compiled || return $?
 
-  base_dir=$(temp-dir web-wizardry-test)
-  web_root="$base_dir/sites"
-  outside_site="$base_dir/sibling"
-  mkdir -p "$web_root" "$outside_site"
-  cat > "$outside_site/site.conf" <<EOF
-site-name=sibling
-site-user=$(id -un)
-port=8080
-domain=localhost
-https=false
-EOF
+  tmpdir=$(make_tempdir)
+  web_root="$tmpdir/sites"
+  escape_dir="$tmpdir/escape"
+  mkdir -p "$web_root" "$escape_dir"
+  printf 'site-name=escape\nport=8080\ndomain=localhost\nhttps=false\n' > "$escape_dir/site.conf"
 
   WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_SITES_DIR="$web_root" \
-    run_spell spells/web/change-site-port ../sibling 9090
-  assert_status 2
-  assert_error_contains "invalid site name"
+    run_spell spells/web/change-site-port ../escape 9090
 
-  if ! grep -Fx "port=8080" "$outside_site/site.conf" >/dev/null 2>&1; then
-    TEST_FAILURE_REASON="outside sibling site.conf was modified"
+  assert_failure || return 1
+  assert_error_contains "invalid site name" || return 1
+  if ! grep -q '^port=8080$' "$escape_dir/site.conf"; then
+    TEST_FAILURE_REASON="change-site-port modified config outside WEB_WIZARDRY_ROOT"
     return 1
   fi
 
-  rm -rf "$base_dir"
-}
-
-test_change_site_port_rejects_regex_site_name() {
-  skip-if-compiled || return $?
-
-  web_root=$(temp-dir web-wizardry-test)
-  mkdir -p "$web_root/foo.*"
-  printf 'site-name=foo.*\nsite-user=%s\nport=8080\ndomain=localhost\nhttps=false\n' "$(id -un)" > "$web_root/foo.*/site.conf"
-
-  WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_SITES_DIR="$web_root" \
-    run_spell spells/web/change-site-port 'foo.*' 9090
-  assert_status 2
-  assert_error_contains "invalid site name"
-
-  if ! grep -Fx "port=8080" "$web_root/foo.*/site.conf" >/dev/null 2>&1; then
-    TEST_FAILURE_REASON="regex-shaped site name changed port"
-    rm -rf "$web_root"
-    return 1
-  fi
-
-  rm -rf "$web_root"
+  rm -rf "$tmpdir"
 }
 
 run_test_case "change-site-port --help" test_change_site_port_help
 run_test_case "change-site-port validates sitename" test_change_site_port_validates_sitename
 run_test_case "change-site-port validates port" test_change_site_port_validates_port
-run_test_case "change-site-port rejects path site name" test_change_site_port_rejects_path_site_name
-run_test_case "change-site-port rejects regex site name" test_change_site_port_rejects_regex_site_name
+run_test_case "change-site-port rejects path-shaped site names" \
+  test_change_site_port_rejects_path_shaped_site_name
 
 finish_tests

@@ -7,7 +7,7 @@ done
 
 test_uninstall_fcgiwrap_help() {
   run_spell "spells/.arcana/web-wizardry/uninstall-fcgiwrap" --help
-  assert_success && assert_output_contains "Usage:"
+  assert_success && assert_output_contains "certbot"
 }
 
 run_test_case "uninstall-fcgiwrap shows help" test_uninstall_fcgiwrap_help

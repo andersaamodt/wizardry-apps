@@ -7,7 +7,7 @@ done
 
 test_uninstall_acme_help() {
   _run_spell "spells/.arcana/web-wizardry/uninstall-acme" --help
-  assert_success && assert_output_contains "Usage:"
+  assert_success && assert_output_contains "certbot"
 }
 
 _run_test_case "uninstall-acme shows help" test_uninstall_acme_help

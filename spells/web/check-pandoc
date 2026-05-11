@@ -1,4 +1,6 @@
 #!/bin/sh
+# Check whether pandoc is installed and callable.
+# Used by static site build and content conversion flows.
 
 case "${1-}" in
 --help|--usage|-h)
@@ -12,6 +14,7 @@ USAGE
 esac
 
 set -eu
+. env-clear
 
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}
 

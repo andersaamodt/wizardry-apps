@@ -7,7 +7,7 @@ done
 
 test_web_wizardry_status_help() {
   run_spell "spells/.arcana/web-wizardry/web-wizardry-status" --help
-  assert_success && assert_output_contains "Usage:"
+  assert_success && assert_output_contains "fauxzilla"
 }
 
 run_test_case "web-wizardry-status shows help" test_web_wizardry_status_help

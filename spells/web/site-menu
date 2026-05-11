@@ -25,51 +25,101 @@ set -eu
 . colors
 . declare-globals
 
-WEB_ROOT="${WIZARDRY_SITES_DIR}"
+web_root="${WIZARDRY_SITES_DIR}"
 
 # Try to auto-detect site from current directory if no arg given
 site_name=${1-}
 if [ -z "$site_name" ]; then
   current_dir=$(pwd -P)
 
-  # Check if current directory is within WEB_ROOT
+  # Check if current directory is within web_root
   case "$current_dir" in
-    "$WEB_ROOT"/*)
+    "$web_root"/*)
       # Extract site name from path
-      site_path="${current_dir#"$WEB_ROOT"/}"
+      site_path="${current_dir#"$web_root"/}"
       site_name="${site_path%%/*}"
 
       # Verify this is a valid site directory
-      if [ -n "$site_name" ] && [ -d "$WEB_ROOT/$site_name/site" ]; then
+      if [ -n "$site_name" ] && [ -d "$web_root/$site_name/site" ]; then
         info "Auto-detected site: $site_name"
       else
         die 2 "site-menu: not in a valid site directory. Current: $current_dir"
       fi
       ;;
     *)
-      die 2 "site-menu: SITENAME required (not in $WEB_ROOT)"
+      die 2 "site-menu: SITENAME required (not in $web_root)"
       ;;
   esac
 fi
-
 case "$site_name" in
-  ""|*[!a-zA-Z0-9_-]*)
-    die 2 "site-menu: invalid site name (use alphanumeric, dash, underscore only)"
+  .|..|*[!a-zA-Z0-9._-]*)
+    die 2 "site-menu: invalid site name"
     ;;
 esac
 
-SITES_DIR="$WEB_ROOT"
-SITE_DIR="$SITES_DIR/$site_name"
-SITE_DATA_DIR="$SITES_DIR/.sitedata/$site_name"
-site_template=$(config-get "$SITE_DIR/site.conf" template 2>/dev/null || printf '')
+sites_dir="$web_root"
+site_dir="$sites_dir/$site_name"
+site_data_dir="$sites_dir/.sitedata/$site_name"
+site_template=$(config-get "$site_dir/site.conf" template 2>/dev/null || printf '')
 
-if [ ! -d "$SITE_DIR" ]; then
+if [ ! -d "$site_dir" ]; then
   die "site-menu: site '$site_name' not found"
 fi
 
-site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '-' '_')"
-site_user=$(config-get "$SITE_DIR/site.conf" site-user 2>/dev/null || printf '')
+site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '.-' '__')"
+site_user=$(config-get "$site_dir/site.conf" site-user 2>/dev/null || printf '')
 [ -z "$site_user" ] && site_user="$site_user_default"
+case "$site_user" in
+  ''|.|..|-*|*[!a-zA-Z0-9._-]*)
+    die 2 "site-menu: invalid site-user in site.conf"
+    ;;
+esac
+
+site_menu_shell_quote() {
+  printf "'"
+  printf '%s' "$1" | sed "s/'/'\\\\''/g"
+  printf "'"
+}
+
+site_menu_valid_port() {
+  port_value=$1
+  case "$port_value" in
+    ''|*[!0-9]*)
+      return 1
+      ;;
+  esac
+  [ "$port_value" -ge 1 ] && [ "$port_value" -le 65535 ]
+}
+
+valid_requirement_id() {
+  requirement_value=$1
+  case "$requirement_value" in
+    ''|.|..|*/*|*\\*|*[!A-Za-z0-9._-]*)
+      return 1
+      ;;
+  esac
+}
+
+hidden_service_dir_for_site() {
+  torrc_file=$1
+  while IFS= read -r line; do
+    case "$line" in
+      HiddenServiceDir*)
+        hidden_service_match_dir=$(printf '%s\n' "$line" | awk '{print $2; exit}')
+        hidden_service_match_dir=${hidden_service_match_dir%/}
+        if [ "${hidden_service_match_dir##*/}" = "$site_name" ]; then
+          printf '%s\n' "$hidden_service_match_dir"
+          return 0
+        fi
+        ;;
+    esac
+  done < "$torrc_file"
+  return 1
+}
+
+quoted_site_name=$(site_menu_shell_quote "$site_name")
+quoted_site_dir=$(site_menu_shell_quote "$site_dir")
+quoted_site_data_dir=$(site_menu_shell_quote "$site_data_dir")
 
 # Note: We don't re-exec as site user here - individual commands will use sudo if needed
 # This allows "Open site directory" and "Open site data" to work as the actual user
@@ -79,18 +129,18 @@ if [ -n "$site_user" ] && ! id -u "$site_user" >/dev/null 2>&1; then
 fi
 
 # Use temp file for selection tracking (same pattern as core-menu)
-SELECTION_FILE=$(temp-file site-menu-selection)
-export SELECTION_FILE
+selection_file=$(temp-file site-menu-selection)
+export selection_file
 
 # Catch Ctrl-C and TERM signal to exit cleanly and clean up
-trap 'cleanup-file "$SELECTION_FILE" 2>/dev/null || true; exit 130' INT
-trap 'cleanup-file "$SELECTION_FILE" 2>/dev/null || true; exit 0' TERM
-trap 'cleanup-file "$SELECTION_FILE" 2>/dev/null || true' EXIT
+trap 'cleanup-file "$selection_file" 2>/dev/null || true; exit 130' INT
+trap 'cleanup-file "$selection_file" 2>/dev/null || true; exit 0' TERM
+trap 'cleanup-file "$selection_file" 2>/dev/null || true' EXIT
 
 while true; do
   # Read last selected item label from temp file
-  if [ -f "$SELECTION_FILE" ]; then
-    saved_label=$(cat "$SELECTION_FILE" 2>/dev/null || printf '')
+  if [ -f "$selection_file" ]; then
+    saved_label=$(cat "$selection_file" 2>/dev/null || printf '')
   else
     saved_label=""
   fi
@@ -100,16 +150,19 @@ while true; do
 
   # Check if site is being served
   is_serving=0
-  if [ -f "$SITE_DIR/nginx/nginx.pid" ]; then
-    pid=$(cat "$SITE_DIR/nginx/nginx.pid" 2>/dev/null || echo "")
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+  case "$status" in
+    *", serving")
       is_serving=1
-    fi
-  fi
+      ;;
+  esac
 
   # Get port from config
-  port=$(config-get "$SITE_DIR/site.conf" port 2>/dev/null || true)
+  port=$(config-get "$site_dir/site.conf" port 2>/dev/null || true)
   [ -z "$port" ] && port=8080
+  if ! site_menu_valid_port "$port"; then
+    warn "site-menu: invalid configured port '$port'; using 8080 for menu actions."
+    port=8080
+  fi
 
   # Check if tor hosting is enabled for this site
   # Only show tor hosting option if tor is installed
@@ -119,17 +172,17 @@ while true; do
     if command -v torrc-path >/dev/null 2>&1; then
       tor_config_path=$(torrc-path 2>/dev/null || echo "")
       if [ -n "$tor_config_path" ] && [ -f "$tor_config_path" ]; then
-        if grep -q "^HiddenServiceDir.*${site_name}" "$tor_config_path" 2>/dev/null; then
+        if hidden_service_dir_for_site "$tor_config_path" >/dev/null; then
           tor_hosting_enabled=1
-          tor_hosting_option="[X] Tor hosting%toggle-site-tor-hosting \"$site_name\""
+          tor_hosting_option="[X] Tor hosting%toggle-site-tor-hosting $quoted_site_name"
         else
-          tor_hosting_option="[ ] Tor hosting%toggle-site-tor-hosting \"$site_name\""
+          tor_hosting_option="[ ] Tor hosting%toggle-site-tor-hosting $quoted_site_name"
         fi
       else
-        tor_hosting_option="[ ] Tor hosting%toggle-site-tor-hosting \"$site_name\""
+        tor_hosting_option="[ ] Tor hosting%toggle-site-tor-hosting $quoted_site_name"
       fi
     else
-      tor_hosting_option="[ ] Tor hosting%toggle-site-tor-hosting \"$site_name\""
+      tor_hosting_option="[ ] Tor hosting%toggle-site-tor-hosting $quoted_site_name"
     fi
   fi
 
@@ -137,8 +190,7 @@ while true; do
   copy_site_onion=""
   if [ "$tor_hosting_enabled" -eq 1 ] && [ -n "$tor_config_path" ]; then
     # Extract the HiddenServiceDir path from torrc for this site
-    site_hostname_dir=$(grep "^HiddenServiceDir.*${site_name}" "$tor_config_path" 2>/dev/null \
-      | awk '{print $2}' | head -1)
+    site_hostname_dir=$(hidden_service_dir_for_site "$tor_config_path" 2>/dev/null || printf '')
     if [ -n "$site_hostname_dir" ]; then
       # Remove trailing slash if present
       site_hostname_dir="${site_hostname_dir%/}"
@@ -153,27 +205,37 @@ while true; do
   https_option=""
   if check-https-status "$site_name" 2>/dev/null; then
     # HTTPS is configured - show renew and disable options
-    https_option="Renew HTTPS%renew-https \"$site_name\""
-    https_disable_option="Disable HTTPS%disable-https \"$site_name\""
+    https_option="Renew HTTPS%renew-https $quoted_site_name"
+    https_disable_option="Disable HTTPS%disable-https $quoted_site_name"
   else
     # HTTPS is not configured - show setup option
-    https_option="Set up HTTPS%setup-https \"$site_name\""
+    https_option="Set up HTTPS%setup-https $quoted_site_name"
     https_disable_option=""
   fi
 
   serve_on_startup_option=""
   if is-site-daemon-enabled "$site_name" 2>/dev/null; then
-    serve_on_startup_option="[X] Serve on startup%disable-site-daemon \"$site_name\""
+    serve_on_startup_option="[X] Serve on startup%disable-site-daemon $quoted_site_name"
   else
-    serve_on_startup_option="[ ] Serve on startup%enable-site-daemon \"$site_name\""
+    serve_on_startup_option="[ ] Serve on startup%enable-site-daemon $quoted_site_name"
+  fi
+
+  autorebuild_toggle_option=""
+  autorebuild_status_output=$(site-autorebuild status "$site_name" 2>/dev/null || true)
+  autorebuild_enabled=0
+  if printf '%s\n' "$autorebuild_status_output" | grep -q '^enabled=yes$'; then
+    autorebuild_enabled=1
+    autorebuild_toggle_option="[X] Auto-rebuild watcher%site-autorebuild toggle $quoted_site_name"
+  else
+    autorebuild_toggle_option="[ ] Auto-rebuild watcher%site-autorebuild toggle $quoted_site_name"
   fi
 
   exit_label=$(exit-label)
 
-  if has systemctl; then
-    daemon_artifact="${SERVICE_DIR:-/etc/systemd/system}/wizardry-site-${site_name}.service"
+  if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && has launchctl; then
+    daemon_artifact="${LAUNCHD_PLIST_DIR:-/Library/LaunchDaemons}/org.wizardry.web.${site_name}.plist"
   else
-    daemon_artifact="/Library/LaunchDaemons/org.wizardry.web.${site_name}.plist"
+    daemon_artifact="${SERVICE_DIR:-/etc/systemd/system}/wizardry-site-${site_name}.service"
   fi
   daemon_label="Repair server daemon"
   if [ ! -f "$daemon_artifact" ]; then
@@ -182,41 +244,36 @@ while true; do
 
   # Helper to wrap command with selection memory
   # Saves the menu item label (not numeric index) for reliable restoration
-  # Note: $SELECTION_FILE is exported, so it expands at runtime
+  # Note: $selection_file is exported, so it expands at runtime
   wrap_cmd() {
     item_label=$1
     cmd=$2
     # Escape single quotes in label for safe embedding in shell command
     safe_label=$(printf '%s' "$item_label" | sed "s/'/'\\\\''/g")
     # Save label to file after command executes
-    printf "%s; printf '%%s' '%s' > \"\$SELECTION_FILE\"" "$cmd" "$safe_label"
+    printf "%s; printf '%%s' '%s' > \"\$selection_file\"" "$cmd" "$safe_label"
   }
 
   # Build menu - original order preserved
   # Conditional: Open in browser (serving only)
   open_browser_option=""
   if [ "$is_serving" -eq 1 ]; then
-    open_browser_cmd="command -v xdg-open >/dev/null 2>&1"
-    open_browser_cmd="$open_browser_cmd && xdg-open http://localhost:$port"
-    open_browser_cmd="$open_browser_cmd || command -v open >/dev/null 2>&1"
-    open_browser_cmd="$open_browser_cmd && open http://localhost:$port"
-    open_browser_cmd="$open_browser_cmd || printf 'Visit: http://localhost:$port\n'"
+    open_browser_url=$(site_menu_shell_quote "http://localhost:$port")
+    open_browser_cmd="browse-url $open_browser_url"
     open_browser_cmd_wrapped=$(wrap_cmd "Open in browser" "$open_browser_cmd")
     open_browser_option="Open in browser%$open_browser_cmd_wrapped"
   fi
   
   # Always: Build all & restart server
-  build_restart_cmd="build \"$site_name\" --full"
-  build_restart_cmd="$build_restart_cmd && stop-site \"$site_name\""
-  build_restart_cmd="$build_restart_cmd && serve-site \"$site_name\""
+  build_restart_cmd="web-wizardry rebuild $quoted_site_name"
   build_restart_cmd_wrapped=$(wrap_cmd "Build all & restart server" \
     "$build_restart_cmd")
   
   # Always: Update from template
   update_template_cmd_wrapped=$(wrap_cmd "Update from template" \
-    "update-from-template \"$site_name\"")
+    "update-from-template $quoted_site_name")
 
-  site_requirements_file="$SITE_DIR/wizardry-server-requirements.conf"
+  site_requirements_file="$site_dir/wizardry-server-requirements.conf"
   if [ ! -f "$site_requirements_file" ] && [ "$site_template" = "blog" ] && [ -f "$HOME/git/nostr-blog/wizardry-server-requirements.conf" ]; then
     site_requirements_file="$HOME/git/nostr-blog/wizardry-server-requirements.conf"
   fi
@@ -254,11 +311,20 @@ while true; do
       requirement_id=${requirement_line%%=*}
       requirement_id=$(printf '%s' "$requirement_id" | tr -d '[:space:]')
       [ -n "$requirement_id" ] || continue
-      label=$(requirement_meta_value "$requirement_id" label 2>/dev/null || printf '%s' "$requirement_id")
-      install_label=$(requirement_meta_value "$requirement_id" install_label 2>/dev/null || printf 'Install %s' "$label")
-      uninstall_label=$(requirement_meta_value "$requirement_id" uninstall_label 2>/dev/null || printf 'Uninstall %s' "$label")
-      install_spell=$(requirement_meta_value "$requirement_id" install_spell 2>/dev/null || printf '')
-      uninstall_spell=$(requirement_meta_value "$requirement_id" uninstall_spell 2>/dev/null || printf '')
+      if ! valid_requirement_id "$requirement_id"; then
+        warn "site-menu: skipping invalid requirement id '$requirement_id'"
+        continue
+      fi
+      label=$(requirement_meta_value "$requirement_id" label 2>/dev/null || \
+        printf '%s' "$requirement_id")
+      install_label=$(requirement_meta_value "$requirement_id" install_label 2>/dev/null || \
+        printf 'Install %s' "$label")
+      uninstall_label=$(requirement_meta_value "$requirement_id" uninstall_label 2>/dev/null || \
+        printf 'Uninstall %s' "$label")
+      install_spell=$(requirement_meta_value "$requirement_id" install_spell 2>/dev/null || \
+        printf '')
+      uninstall_spell=$(requirement_meta_value "$requirement_id" uninstall_spell 2>/dev/null || \
+        printf '')
       requirement_state=$(requirement_status "$requirement_id" 2>/dev/null || printf 'bad')
       if [ "$requirement_state" = "ok" ] && [ -n "$uninstall_spell" ]; then
         uninstall_cmd_wrapped=$(wrap_cmd "$uninstall_label" "$uninstall_spell")
@@ -273,7 +339,7 @@ while true; do
   mirror_nostr_option=""
   if [ "$site_template" = "blog" ]; then
     mirror_nostr_cmd_wrapped=$(wrap_cmd "Mirror Nostr events" \
-      "blog-nostr-mirror \"$site_name\"")
+      "blog-nostr-mirror $quoted_site_name")
     mirror_nostr_option="Mirror Nostr events%$mirror_nostr_cmd_wrapped"
   fi
   
@@ -286,38 +352,34 @@ while true; do
   
   # Always: Open site directory
   open_dir_cmd_wrapped=$(wrap_cmd "Open site directory" \
-    "cd \"$SITE_DIR\" && exec \$SHELL")
+    "browse $quoted_site_dir")
   
   # Always: Open site data
-  open_data_cmd="[ -d \"$SITE_DATA_DIR\" ]"
-  open_data_cmd="$open_data_cmd && cd \"$SITE_DATA_DIR\" && exec \$SHELL"
-  open_data_cmd="$open_data_cmd || { printf 'No site data yet"
-  open_data_cmd="$open_data_cmd (will be created when needed)\\n';"
-  open_data_cmd="$open_data_cmd read -r dummy; }"
-  open_data_cmd_wrapped=$(wrap_cmd "Open site data" "$open_data_cmd")
+  open_data_cmd_wrapped=$(wrap_cmd "Open site data" \
+    "browse $quoted_site_data_dir")
   
   # Conditional: Restart server (serving only)
   restart_server_option=""
   if [ "$is_serving" -eq 1 ]; then
     restart_cmd_wrapped=$(wrap_cmd "Restart server" \
-      "stop-site \"$site_name\" && serve-site \"$site_name\"")
+      "restart-site $quoted_site_name")
     restart_server_option="Restart server%$restart_cmd_wrapped"
   fi
   
   # Always: Start/Stop server toggle
   if [ "$is_serving" -eq 1 ]; then
-    server_toggle_cmd=$(wrap_cmd "Stop server" "stop-site \"$site_name\"")
+    server_toggle_cmd=$(wrap_cmd "Stop server" "stop-site $quoted_site_name")
     server_toggle_option="Stop server%$server_toggle_cmd"
   else
-    server_toggle_cmd=$(wrap_cmd "Start server" "serve-site \"$site_name\"")
+    server_toggle_cmd=$(wrap_cmd "Start server" "serve-site $quoted_site_name")
     server_toggle_option="Start server%$server_toggle_cmd"
   fi
   
   # Always: Build
-  build_cmd_wrapped=$(wrap_cmd "Build" "build \"$site_name\"")
+  build_cmd_wrapped=$(wrap_cmd "Build" "build $quoted_site_name")
   
   # Always: Build all
-  build_all_cmd_wrapped=$(wrap_cmd "Build all" "build \"$site_name\" --full")
+  build_all_cmd_wrapped=$(wrap_cmd "Build all" "build $quoted_site_name --full")
   
   
   # Conditional: Tor hosting toggle
@@ -336,10 +398,18 @@ while true; do
     startup_label=$(printf '%s' "$serve_on_startup_option" | cut -d% -f1)
     serve_on_startup_option="${startup_label}%$startup_cmd_wrapped"
   fi
+
+  if [ -n "$autorebuild_toggle_option" ]; then
+    autorebuild_cmd_wrapped=$(wrap_cmd \
+      "$(printf '%s' "$autorebuild_toggle_option" | cut -d% -f1)" \
+      "$(printf '%s' "$autorebuild_toggle_option" | cut -d% -f2-)")
+    autorebuild_label=$(printf '%s' "$autorebuild_toggle_option" | cut -d% -f1)
+    autorebuild_toggle_option="${autorebuild_label}%$autorebuild_cmd_wrapped"
+  fi
   
   # Always: Change port
   port_cmd_wrapped=$(wrap_cmd "Change port (current: $port)" \
-    "change-site-port \"$site_name\"")
+    "change-site-port $quoted_site_name")
   
   # Conditional: HTTPS setup/renew
   if [ -n "$https_option" ]; then
@@ -360,22 +430,22 @@ while true; do
   
   # Always: Rebuild nginx.conf
   nginx_conf_cmd_wrapped=$(wrap_cmd "Rebuild nginx.conf" \
-    "configure-nginx \"$site_name\"")
+    "configure-nginx $quoted_site_name")
   
   # Always: Repair/Create server daemon
   daemon_cmd_wrapped=$(wrap_cmd "$daemon_label" \
-    "repair-site-daemon \"$site_name\"")
+    "repair-site-daemon $quoted_site_name")
   
   # Always: Fix permissions
   perms_cmd_wrapped=$(wrap_cmd "Fix permissions" \
-    "fix-site-security \"$site_name\"")
+    "fix-site-security $quoted_site_name")
   
   # Always: Manage allowed dirs
   dirs_cmd_wrapped=$(wrap_cmd "Manage allowed dirs" \
-    "manage-allowed-dirs \"$site_name\"")
+    "manage-allowed-dirs $quoted_site_name")
 
   # Always: Delete site
-  delete_cmd_wrapped=$(wrap_cmd "Delete site" "delete-site \"$site_name\"")
+  delete_cmd_wrapped=$(wrap_cmd "Delete site" "delete-site $quoted_site_name")
   
   # Always: Exit
   exit_cmd_wrapped=$(wrap_cmd "$exit_label" "kill -TERM \$PPID")
@@ -404,6 +474,7 @@ while true; do
     "---" \
     ${tor_hosting_option:+"$tor_hosting_option"} \
     ${serve_on_startup_option:+"$serve_on_startup_option"} \
+    ${autorebuild_toggle_option:+"$autorebuild_toggle_option"} \
     "Change port (current: $port)%$port_cmd_wrapped" \
     ${https_option:+"$https_option"} \
     ${https_disable_option:+"$https_disable_option"} \
@@ -421,6 +492,16 @@ while true; do
     search_label="Start server"
   elif [ "$saved_label" = "Start server" ] && [ "$is_serving" -eq 1 ]; then
     search_label="Stop server"
+  elif [ "$saved_label" = "[X] Serve on startup" ] \
+    && ! is-site-daemon-enabled "$site_name" 2>/dev/null; then
+    search_label="[ ] Serve on startup"
+  elif [ "$saved_label" = "[ ] Serve on startup" ] \
+    && is-site-daemon-enabled "$site_name" 2>/dev/null; then
+    search_label="[X] Serve on startup"
+  elif [ "$saved_label" = "[X] Auto-rebuild watcher" ] && [ "$autorebuild_enabled" -eq 0 ]; then
+    search_label="[ ] Auto-rebuild watcher"
+  elif [ "$saved_label" = "[ ] Auto-rebuild watcher" ] && [ "$autorebuild_enabled" -eq 1 ]; then
+    search_label="[X] Auto-rebuild watcher"
   fi
   
   # Find position of search_label in menu (skip separators)

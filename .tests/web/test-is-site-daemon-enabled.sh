@@ -29,15 +29,43 @@ EOF
   chmod +x "$dir/systemctl"
 }
 
-test_is_site_daemon_enabled_true() {
+write_plist() {
+  plist_path=$1
+  run_at_load=$2
+  keep_alive=$3
+  cat >"$plist_path" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>org.wizardry.web.mysite</string>
+  <key>RunAtLoad</key>
+  <$run_at_load/>
+  <key>KeepAlive</key>
+  <$keep_alive/>
+</dict>
+</plist>
+EOF
+}
+
+write_uname_darwin() {
+  dir=$1
+  cat >"$dir/uname" <<'EOF'
+#!/bin/sh
+printf 'Darwin\n'
+EOF
+  chmod +x "$dir/uname"
+}
+
+test_is_site_daemon_enabled_true_systemctl() {
   skip-if-compiled || return $?
 
   web_root=$(temp-dir web-wizardry-test)
-  site_dir="$web_root/mysite"
-  mkdir -p "$site_dir"
+  mkdir -p "$web_root/mysite"
 
   stub_dir=$(temp-dir web-wizardry-stub)
   write_systemctl_stub "$stub_dir"
+  stub-uname-linux "$stub_dir"
 
   PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" SYSTEMCTL_IS_ENABLED_STATUS=0 \
     run_spell spells/web/is-site-daemon-enabled mysite
@@ -46,15 +74,15 @@ test_is_site_daemon_enabled_true() {
   rm -rf "$web_root" "$stub_dir"
 }
 
-test_is_site_daemon_enabled_false() {
+test_is_site_daemon_enabled_false_systemctl() {
   skip-if-compiled || return $?
 
   web_root=$(temp-dir web-wizardry-test)
-  site_dir="$web_root/mysite"
-  mkdir -p "$site_dir"
+  mkdir -p "$web_root/mysite"
 
   stub_dir=$(temp-dir web-wizardry-stub)
   write_systemctl_stub "$stub_dir"
+  stub-uname-linux "$stub_dir"
 
   PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" SYSTEMCTL_IS_ENABLED_STATUS=1 \
     run_spell spells/web/is-site-daemon-enabled mysite
@@ -63,25 +91,85 @@ test_is_site_daemon_enabled_false() {
   rm -rf "$web_root" "$stub_dir"
 }
 
-test_is_site_daemon_enabled_rejects_unit_shaped_name() {
+test_is_site_daemon_enabled_true_launchctl() {
   skip-if-compiled || return $?
 
   web_root=$(temp-dir web-wizardry-test)
-  mkdir -p "$web_root/foo.*/site"
+  mkdir -p "$web_root/mysite"
 
   stub_dir=$(temp-dir web-wizardry-stub)
-  write_systemctl_stub "$stub_dir"
+  stub-launchctl "$stub_dir"
+  write_uname_darwin "$stub_dir"
+  stub-forget-command systemctl "$stub_dir"
+  . "$stub_dir/forget-systemctl"
 
-  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" run_spell spells/web/is-site-daemon-enabled 'foo.*'
-  assert_status 2 || return 1
-  assert_error_contains "invalid site name" || return 1
+  plist_dir="$stub_dir/Library/LaunchDaemons"
+  mkdir -p "$plist_dir"
+  write_plist "$plist_dir/org.wizardry.web.mysite.plist" true true
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" LAUNCHD_PLIST_DIR="$plist_dir" \
+    run_spell spells/web/is-site-daemon-enabled mysite
+  assert_success
+
+  rm -rf "$web_root" "$stub_dir"
+}
+
+test_is_site_daemon_enabled_false_launchctl() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  mkdir -p "$web_root/mysite"
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-launchctl "$stub_dir"
+  write_uname_darwin "$stub_dir"
+  stub-forget-command systemctl "$stub_dir"
+  . "$stub_dir/forget-systemctl"
+
+  plist_dir="$stub_dir/Library/LaunchDaemons"
+  mkdir -p "$plist_dir"
+  write_plist "$plist_dir/org.wizardry.web.mysite.plist" false false
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" LAUNCHD_PLIST_DIR="$plist_dir" \
+    run_spell spells/web/is-site-daemon-enabled mysite
+  assert_failure
+
+  rm -rf "$web_root" "$stub_dir"
+}
+
+test_is_site_daemon_enabled_false_launchctl_partial_flags() {
+  skip-if-compiled || return $?
+
+  web_root=$(temp-dir web-wizardry-test)
+  mkdir -p "$web_root/mysite"
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-launchctl "$stub_dir"
+  write_uname_darwin "$stub_dir"
+  stub-forget-command systemctl "$stub_dir"
+  . "$stub_dir/forget-systemctl"
+
+  plist_dir="$stub_dir/Library/LaunchDaemons"
+  mkdir -p "$plist_dir"
+  write_plist "$plist_dir/org.wizardry.web.mysite.plist" true false
+
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" LAUNCHD_PLIST_DIR="$plist_dir" \
+    run_spell spells/web/is-site-daemon-enabled mysite
+  assert_failure
 
   rm -rf "$web_root" "$stub_dir"
 }
 
 run_test_case "is-site-daemon-enabled --help works" test_is_site_daemon_enabled_help
-run_test_case "is-site-daemon-enabled returns success when enabled" test_is_site_daemon_enabled_true
-run_test_case "is-site-daemon-enabled returns failure when disabled" test_is_site_daemon_enabled_false
-run_test_case "is-site-daemon-enabled rejects unit-shaped site name" test_is_site_daemon_enabled_rejects_unit_shaped_name
+run_test_case "is-site-daemon-enabled returns success when enabled (systemctl)" \
+  test_is_site_daemon_enabled_true_systemctl
+run_test_case "is-site-daemon-enabled returns failure when disabled (systemctl)" \
+  test_is_site_daemon_enabled_false_systemctl
+run_test_case "is-site-daemon-enabled returns success when enabled (launchctl plist flags)" \
+  test_is_site_daemon_enabled_true_launchctl
+run_test_case "is-site-daemon-enabled returns failure when disabled (launchctl plist flags)" \
+  test_is_site_daemon_enabled_false_launchctl
+run_test_case "is-site-daemon-enabled requires both RunAtLoad and KeepAlive true" \
+  test_is_site_daemon_enabled_false_launchctl_partial_flags
 
 finish_tests

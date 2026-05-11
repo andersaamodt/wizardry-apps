@@ -27,54 +27,110 @@ shows_help() {
 
 run_test_case "toggle-site-tor-hosting shows help" shows_help
 
-rejects_regex_site_name() {
-  skip-if-compiled || return $?
+rejects_path_shaped_site_name() {
+  tmpdir=$(temp-dir toggle-site-tor-hosting-path-test)
+  web_root="$tmpdir/sites"
+  escape_dir="$tmpdir/escape"
+  mkdir -p "$web_root" "$escape_dir"
+  printf 'site-name=escape\nport=8080\n' > "$escape_dir/site.conf"
 
-  web_root=$(temp-dir web-wizardry-test)
-  mkdir -p "$web_root/foo.*"
-  printf 'site-name=foo.*\nport=8080\n' > "$web_root/foo.*/site.conf"
+  WIZARDRY_SITES_DIR="$web_root" run_spell spells/web/toggle-site-tor-hosting ../escape
+  assert_failure || return 1
+  assert_error_contains "invalid site name" || return 1
 
-  WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_SITES_DIR="$web_root" \
-    run_spell spells/web/toggle-site-tor-hosting 'foo.*'
-  assert_status 2
-  assert_error_contains "invalid site name"
-
-  rm -rf "$web_root"
+  rm -rf "$tmpdir"
 }
 
-run_test_case "toggle-site-tor-hosting rejects regex site name" rejects_regex_site_name
+run_test_case "toggle-site-tor-hosting rejects path-shaped site names" \
+  rejects_path_shaped_site_name
 
-rejects_configured_nonnumeric_port_before_tor_side_effects() {
-  skip-if-compiled || return $?
+rejects_imported_port_injection() {
+  tmpdir=$(temp-dir toggle-site-tor-hosting-port-test)
+  web_root="$tmpdir/sites"
+  site_dir="$web_root/mysite"
+  mkdir -p "$site_dir"
+  cat >"$site_dir/site.conf" <<'EOF'
+site-name=mysite
+port=8080;
+HiddenServiceDir /tmp/evil
+EOF
 
-  web_root=$(temp-dir web-wizardry-test)
-  mkdir -p "$web_root/mysite"
-  printf 'site-name=mysite\nport=abc;HiddenServiceDir /tmp/owned\n' > "$web_root/mysite/site.conf"
+  WIZARDRY_SITES_DIR="$web_root" run_spell spells/web/toggle-site-tor-hosting mysite
+  assert_failure || return 1
+  assert_error_contains "invalid port" || return 1
 
-  WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_SITES_DIR="$web_root" \
-    run_spell spells/web/toggle-site-tor-hosting mysite
-  assert_status 2
-  assert_error_contains "port must be numeric"
-
-  rm -rf "$web_root"
+  rm -rf "$tmpdir"
 }
 
-run_test_case "toggle-site-tor-hosting rejects configured nonnumeric port before tor side effects" rejects_configured_nonnumeric_port_before_tor_side_effects
+run_test_case "toggle-site-tor-hosting rejects imported port injection" \
+  rejects_imported_port_injection
 
-rejects_configured_out_of_range_port_before_tor_side_effects() {
-  skip-if-compiled || return $?
+does_not_treat_site_name_as_regex() {
+  tmpdir=$(temp-dir toggle-site-tor-hosting-regex-test)
+  web_root="$tmpdir/sites"
+  site_dir="$web_root/a.b"
+  tor_data="$tmpdir/tor-data"
+  torrc="$tmpdir/torrc"
+  stub_dir="$tmpdir/stubs"
+  mkdir -p "$site_dir" "$tor_data/axb" "$stub_dir"
+  printf 'site-name=a.b\nport=8080\n' > "$site_dir/site.conf"
+  cat >"$torrc" <<EOF
+DataDirectory $tor_data
+HiddenServiceDir $tor_data/axb
+HiddenServiceVersion 3
+HiddenServicePort 80 127.0.0.1:8080
+EOF
 
-  web_root=$(temp-dir web-wizardry-test)
-  mkdir -p "$web_root/mysite"
-  printf 'site-name=mysite\nport=70000\n' > "$web_root/mysite/site.conf"
+  stub-sudo "$stub_dir"
+  cat >"$stub_dir/torrc-path" <<EOF
+#!/bin/sh
+printf '%s\n' '$torrc'
+EOF
+  cat >"$stub_dir/is-tor-installed" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+  cat >"$stub_dir/is-tor-daemon-enabled" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+  cat >"$stub_dir/is-tor-running" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+  cat >"$stub_dir/detect-distro" <<'EOF'
+#!/bin/sh
+printf '%s\n' linux
+EOF
+  cat >"$stub_dir/repair-tor-permissions" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+  cat >"$stub_dir/restart-tor" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+  chmod +x "$stub_dir/torrc-path" "$stub_dir/is-tor-installed" \
+    "$stub_dir/is-tor-daemon-enabled" "$stub_dir/is-tor-running" \
+    "$stub_dir/detect-distro" "$stub_dir/repair-tor-permissions" \
+    "$stub_dir/restart-tor"
 
-  WEB_WIZARDRY_ROOT="$web_root" WIZARDRY_SITES_DIR="$web_root" \
-    run_spell spells/web/toggle-site-tor-hosting mysite
-  assert_status 2
-  assert_error_contains "port must be between 1 and 65535"
+  PATH="$stub_dir:$PATH" WIZARDRY_SITES_DIR="$web_root" \
+    run_spell spells/web/toggle-site-tor-hosting a.b
+  assert_success || return 1
 
-  rm -rf "$web_root"
+  if ! grep -F "HiddenServiceDir $tor_data/axb" "$torrc" >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="regex-like site name removed sibling axb hidden service"
+    return 1
+  fi
+  if ! grep -F "HiddenServiceDir $tor_data/a.b/" "$torrc" >/dev/null 2>&1; then
+    TEST_FAILURE_REASON="toggle-site-tor-hosting did not add exact a.b hidden service"
+    return 1
+  fi
+
+  rm -rf "$tmpdir"
 }
 
-run_test_case "toggle-site-tor-hosting rejects configured out-of-range port before tor side effects" rejects_configured_out_of_range_port_before_tor_side_effects
+run_test_case "toggle-site-tor-hosting treats dotted site names literally" \
+  does_not_treat_site_name_as_regex
 finish_tests

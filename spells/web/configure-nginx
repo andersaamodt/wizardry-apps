@@ -29,9 +29,10 @@ site_name=${1-}
 if [ -z "$site_name" ]; then
   die 2 "configure-nginx: SITENAME required"
 fi
+
 case "$site_name" in
-  ""|*[!a-zA-Z0-9_-]*)
-    die 2 "configure-nginx: invalid site name (use alphanumeric, dash, underscore only)"
+  .|..|*[!a-zA-Z0-9._-]*)
+    die 2 "configure-nginx: invalid site name"
     ;;
 esac
 shift
@@ -40,6 +41,51 @@ shift
 port=8080
 domain=localhost
 use_https=false
+
+configure_nginx_valid_port() {
+  port_value=$1
+  case "$port_value" in
+    ''|*[!0-9]*|??????*)
+      return 1
+      ;;
+  esac
+  [ "$port_value" -ge 1 ] && [ "$port_value" -le 65535 ]
+}
+
+configure_nginx_valid_domain() {
+  domain_value=$1
+  case "$domain_value" in
+    ''|.|..|.*|*.|*..*|*[!A-Za-z0-9._-]*)
+      return 1
+      ;;
+  esac
+}
+
+valid_nginx_quoted_path() {
+  path_value=$1
+  newline='
+'
+  carriage_return=$(printf '\r')
+  case "$path_value" in
+    ''|*\"*|*\\*|*';'*|*'{'*|*'}'*|*"$newline"*|*"$carriage_return"*)
+      return 1
+      ;;
+  esac
+}
+
+configure_nginx_hidden_service_line_matches_site() {
+  line=$1
+  case "$line" in
+    HiddenServiceDir*)
+      hidden_service_match_dir=$(printf '%s\n' "$line" | awk '{print $2; exit}')
+      hidden_service_match_dir=${hidden_service_match_dir%/}
+      [ "${hidden_service_match_dir##*/}" = "$site_name" ]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -67,17 +113,22 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
-SITES_DIR="$WEB_ROOT"
-SITE_DIR="$SITES_DIR/$site_name"
+web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+sites_dir="$web_root"
+site_dir="$sites_dir/$site_name"
 
-if [ ! -d "$SITE_DIR" ]; then
+if [ ! -d "$site_dir" ]; then
   die "configure-nginx: site '$site_name' not found"
 fi
 
-site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '-' '_')"
-site_user=$(config-get "$SITE_DIR/site.conf" site-user 2>/dev/null || printf '')
+site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '.-' '__')"
+site_user=$(config-get "$site_dir/site.conf" site-user 2>/dev/null || printf '')
 [ -z "$site_user" ] && site_user="$site_user_default"
+case "$site_user" in
+  ''|.|..|-*|*[!a-zA-Z0-9._-]*)
+    die 2 "configure-nginx: invalid site-user in site.conf"
+    ;;
+esac
 
 # Note: configure-nginx runs as actual user to modify both nginx.conf and site.conf
 # nginx.conf is owned by site user, but we can write to it as actual user
@@ -86,107 +137,85 @@ site_user=$(config-get "$SITE_DIR/site.conf" site-user 2>/dev/null || printf '')
 
 # Read existing values from site.conf if options were not provided
 # This preserves existing configuration when rebuilding nginx.conf
-if [ "$port" = "8080" ] && [ -f "$SITE_DIR/site.conf" ]; then
+if [ "$port" = "8080" ] && [ -f "$site_dir/site.conf" ]; then
   # No --port option was given, use existing port from config
-  existing_port=$(config-get "$SITE_DIR/site.conf" port 2>/dev/null || echo "")
+  existing_port=$(config-get "$site_dir/site.conf" port 2>/dev/null || echo "")
   if [ -n "$existing_port" ]; then
     port=$existing_port
   fi
 fi
 
-if [ "$domain" = "localhost" ] && [ -f "$SITE_DIR/site.conf" ]; then
+if [ "$domain" = "localhost" ] && [ -f "$site_dir/site.conf" ]; then
   # No --domain option was given, use existing domain from config
-  existing_domain=$(config-get "$SITE_DIR/site.conf" domain 2>/dev/null || echo "")
+  existing_domain=$(config-get "$site_dir/site.conf" domain 2>/dev/null || echo "")
   if [ -n "$existing_domain" ]; then
     domain=$existing_domain
   fi
 fi
 
-if [ "$use_https" = "false" ] && [ -f "$SITE_DIR/site.conf" ]; then
+if [ "$use_https" = "false" ] && [ -f "$site_dir/site.conf" ]; then
   # No --https option was given, use existing https setting from config
-  existing_https=$(config-get "$SITE_DIR/site.conf" https 2>/dev/null || echo "")
+  existing_https=$(config-get "$site_dir/site.conf" https 2>/dev/null || echo "")
   if [ "$existing_https" = "true" ]; then
     use_https=true
   fi
 fi
 
-case "$port" in
-  ''|*[!0-9]*)
-    die 2 "configure-nginx: port must be numeric"
-    ;;
-esac
-if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
-  die 2 "configure-nginx: port must be between 1 and 65535"
+if ! configure_nginx_valid_port "$port"; then
+  die 2 "configure-nginx: invalid port"
 fi
 
-case "$domain" in
-  ''|*[!A-Za-z0-9._-]*)
-    die 2 "configure-nginx: invalid domain"
-    ;;
-esac
-
-validate_cgi_dir_value() {
-  cgi_value=${1-}
-  [ -n "$cgi_value" ] || return 0
-  nl_char=$(printf '\nX')
-  nl_char=${nl_char%X}
-  cr_char=$(printf '\r')
-  case "$cgi_value" in
-    *"$nl_char"*|*"$cr_char"*|*'"'*|*'\'*|*'$'*|*';'*|*'{'*|*'}'*|*'#'*)
-      die 2 "configure-nginx: invalid cgi-dir"
-      ;;
-  esac
-  case "$cgi_value" in
-    /*)
-      ;;
-    .|..|../*|*/../*|*/..)
-      die 2 "configure-nginx: invalid cgi-dir"
-      ;;
-  esac
-}
-
-# Path to CGI scripts (site-specific first, then shared)
-WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
-CGI_DIR="$WIZARDRY_DIR/spells/.imps/cgi"
-SITE_CGI_DIR=$(config-get "$SITE_DIR/site.conf" cgi-dir 2>/dev/null || printf '')
-validate_cgi_dir_value "$SITE_CGI_DIR"
-if [ -z "$SITE_CGI_DIR" ]; then
-  SITE_CGI_DIR="$SITE_DIR/cgi"
-elif [ "${SITE_CGI_DIR#/*}" = "$SITE_CGI_DIR" ]; then
-  SITE_CGI_DIR="$SITE_DIR/$SITE_CGI_DIR"
+if ! configure_nginx_valid_domain "$domain"; then
+  die 2 "configure-nginx: invalid domain"
 fi
 
 # Create nginx config directory
-NGINX_CONF_DIR="$SITE_DIR/nginx"
-mkdir -p "$NGINX_CONF_DIR"
+nginx_conf_dir="$site_dir/nginx"
+mkdir -p "$nginx_conf_dir"
 
 # Ensure nginx temp directories exist with proper permissions
 # nginx/ is owned by actual user, but may have stale permissions from old sites
 # Call fix-site-security to fix ownership/permissions before creating
-if [ ! -d "$NGINX_CONF_DIR/temp/client_body" ] || \
-   [ ! -d "$NGINX_CONF_DIR/temp/proxy" ] || \
-   [ ! -d "$NGINX_CONF_DIR/temp/fastcgi" ] || \
-   [ ! -d "$NGINX_CONF_DIR/temp/uwsgi" ] || \
-   [ ! -d "$NGINX_CONF_DIR/temp/scgi" ]; then
+if [ ! -d "$nginx_conf_dir/temp/client_body" ] || \
+   [ ! -d "$nginx_conf_dir/temp/proxy" ] || \
+   [ ! -d "$nginx_conf_dir/temp/fastcgi" ] || \
+   [ ! -d "$nginx_conf_dir/temp/uwsgi" ] || \
+   [ ! -d "$nginx_conf_dir/temp/scgi" ]; then
   # Fix permissions first (handles stale ownership from old wizardry versions)
   has fix-site-security && fix-site-security "$site_name" >/dev/null 2>&1 || true
   # Now create temp directories (fix-site-security may have already created them)
-  mkdir -p "$NGINX_CONF_DIR/temp/client_body" 2>/dev/null || true
-  mkdir -p "$NGINX_CONF_DIR/temp/proxy" 2>/dev/null || true
-  mkdir -p "$NGINX_CONF_DIR/temp/fastcgi" 2>/dev/null || true
-  mkdir -p "$NGINX_CONF_DIR/temp/uwsgi" 2>/dev/null || true
-  mkdir -p "$NGINX_CONF_DIR/temp/scgi" 2>/dev/null || true
+  mkdir -p "$nginx_conf_dir/temp/client_body" 2>/dev/null || true
+  mkdir -p "$nginx_conf_dir/temp/proxy" 2>/dev/null || true
+  mkdir -p "$nginx_conf_dir/temp/fastcgi" 2>/dev/null || true
+  mkdir -p "$nginx_conf_dir/temp/uwsgi" 2>/dev/null || true
+  mkdir -p "$nginx_conf_dir/temp/scgi" 2>/dev/null || true
+fi
+
+# Path to CGI scripts (site-specific first, then shared)
+WIZARDRY_DIR=${WIZARDRY_DIR:-$HOME/.wizardry}
+cgi_dir="$WIZARDRY_DIR/spells/.imps/cgi"
+site_cgi_dir=$(config-get "$site_dir/site.conf" cgi-dir 2>/dev/null || printf '')
+if [ -z "$site_cgi_dir" ]; then
+  site_cgi_dir="$site_dir/cgi"
+elif [ "${site_cgi_dir#/*}" = "$site_cgi_dir" ]; then
+  site_cgi_dir="$site_dir/$site_cgi_dir"
+fi
+if ! valid_nginx_quoted_path "$site_cgi_dir"; then
+  die 2 "configure-nginx: invalid cgi-dir"
+fi
+if ! valid_nginx_quoted_path "$cgi_dir"; then
+  die 2 "configure-nginx: invalid wizardry cgi path"
 fi
 
 # Copy mime.types to local directory if not exists
 # nginx/ is owned by actual user, so we can write directly
-MIME_TYPES="$NGINX_CONF_DIR/mime.types"
-if [ ! -f "$MIME_TYPES" ]; then
+mime_types="$nginx_conf_dir/mime.types"
+if [ ! -f "$mime_types" ]; then
   if [ -f /etc/nginx/mime.types ]; then
-    cp /etc/nginx/mime.types "$MIME_TYPES"
+    cp /etc/nginx/mime.types "$mime_types"
   else
     # Create minimal mime.types if system one doesn't exist
-    cat > "$MIME_TYPES" <<'MIMETYPES'
+    cat > "$mime_types" <<'MIMETYPES'
 types {
     text/html                                        html htm shtml;
     text/css                                         css;
@@ -207,36 +236,36 @@ MIMETYPES
 fi
 
 # Generate nginx configuration
-NGINX_CONF="$NGINX_CONF_DIR/nginx.conf"
+nginx_conf="$nginx_conf_dir/nginx.conf"
 
 step "Generating nginx configuration for $site_name"
 
-cat > "$NGINX_CONF" <<EOF
+cat > "$nginx_conf" <<EOF
 # nginx configuration for $site_name
 # Generated by web-wizardry
 # Config version: 4
 
 worker_processes 1;
 daemon off;
-error_log $SITE_DIR/nginx/error.log warn;
-pid $SITE_DIR/nginx/nginx.pid;
+error_log $site_dir/nginx/error.log warn;
+pid $site_dir/nginx/nginx.pid;
 
 events {
-    worker_connections 1024;
+    worker_connections 256;
 }
 
 http {
-    include $NGINX_CONF_DIR/mime.types;
+    include $nginx_conf_dir/mime.types;
     default_type application/octet-stream;
     
     # Use local temp directories instead of system paths
-    client_body_temp_path $NGINX_CONF_DIR/temp/client_body;
-    proxy_temp_path $NGINX_CONF_DIR/temp/proxy;
-    fastcgi_temp_path $NGINX_CONF_DIR/temp/fastcgi;
-    uwsgi_temp_path $NGINX_CONF_DIR/temp/uwsgi;
-    scgi_temp_path $NGINX_CONF_DIR/temp/scgi;
+    client_body_temp_path $nginx_conf_dir/temp/client_body;
+    proxy_temp_path $nginx_conf_dir/temp/proxy;
+    fastcgi_temp_path $nginx_conf_dir/temp/fastcgi;
+    uwsgi_temp_path $nginx_conf_dir/temp/uwsgi;
+    scgi_temp_path $nginx_conf_dir/temp/scgi;
     
-    access_log $SITE_DIR/nginx/access.log;
+    access_log $site_dir/nginx/access.log;
     
     sendfile on;
     keepalive_timeout 65;
@@ -249,7 +278,7 @@ http {
         # Accept configured domain and any .onion address (for Tor hidden services)
         server_name $domain *.onion;
         
-        root $SITE_DIR/build;
+        root $site_dir/build;
 
         # Agent runs can take minutes; keep FastCGI timeouts high globally.
         fastcgi_connect_timeout 30s;
@@ -259,15 +288,25 @@ http {
         # Disable directory listing
         autoindex off;
         
-        # Root path - serve main index page
+        # Root path should always resolve to the app shell.
+        # Using an exact-match block avoids "/" being treated as a
+        # directory and returning 403 when autoindex is disabled.
         location = / {
-            try_files /pages/index.html =404;
+            try_files /pages/index.html /pages/blog.html =404;
         }
 
         # Serve pretty post URLs directly via CGI so post pages render
         # in a single server response (no client-side route repair).
         location ~ ^/posts/([A-Za-z0-9-]+)/?$ {
-            rewrite ^/posts/([A-Za-z0-9-]+)/?$ /cgi/blog-open-post?path=posts/\$1 last;
+            rewrite ^/posts/([A-Za-z0-9-]+)/?$ /cgi/blog-open-post?path=posts/\$1.md last;
+        }
+
+        # Deep-link routing:
+        # - serve real files when they exist
+        # - map extensionless paths (e.g. /oeuvre) to /pages/<slug>.html
+        # - finally fall back to the app shell for SPA-like routes
+        location / {
+            try_files \$uri \$uri/ /pages\$uri /pages\$uri.html /pages\$uri/index.html /pages/index.html /pages/blog.html;
         }
         
         # Serve pages
@@ -278,19 +317,21 @@ http {
         
         # Serve static files
         location /static/ {
-            alias $SITE_DIR/build/static/;
+            alias $site_dir/build/static/;
         }
-        
-        # Serve uploaded files (from site data directory)
-        location /uploads/ {
-            alias $SITES_DIR/.sitedata/$site_name/uploads/;
+
+        # Authorized attachments are handed off from CGI using X-Accel-Redirect
+        # so nginx serves the file bytes directly instead of shell CGI streaming them.
+        location /__site-files/ {
+            internal;
+            alias $sites_dir/.sitedata/$site_name/files/;
         }
         
         # SSE endpoint - requires unbuffered streaming
         location ~ ^/cgi/chat-stream$ {
             # Resolve site-specific CGI first, then shared CGI
-            set \$site_cgi "$SITE_CGI_DIR/chat-stream";
-            set \$shared_cgi "$CGI_DIR/chat-stream";
+            set \$site_cgi "$site_cgi_dir/chat-stream";
+            set \$shared_cgi "$cgi_dir/chat-stream";
             set \$cgi_path \$shared_cgi;
             if (-f \$site_cgi) {
                 set \$cgi_path \$site_cgi;
@@ -315,7 +356,7 @@ http {
             fastcgi_send_timeout 300s;
             
             # FastCGI configuration
-            fastcgi_pass unix:$SITE_DIR/nginx/fcgiwrap.sock;
+            fastcgi_pass unix:$site_dir/nginx/fcgiwrap.sock;
             fastcgi_param SCRIPT_FILENAME \$cgi_path;
             fastcgi_param QUERY_STRING \$query_string;
             fastcgi_param REQUEST_METHOD \$request_method;
@@ -337,8 +378,8 @@ http {
         location ~ ^/cgi/(.+)$ {
             # Resolve site-specific CGI first, then shared CGI
             set \$cgi_script \$1;
-            set \$site_cgi "$SITE_CGI_DIR/\$cgi_script";
-            set \$shared_cgi "$CGI_DIR/\$cgi_script";
+            set \$site_cgi "$site_cgi_dir/\$cgi_script";
+            set \$shared_cgi "$cgi_dir/\$cgi_script";
             set \$cgi_path \$shared_cgi;
             if (-f \$site_cgi) {
                 set \$cgi_path \$site_cgi;
@@ -353,7 +394,7 @@ http {
             fastcgi_read_timeout 900s;
             
             # FastCGI configuration
-            fastcgi_pass unix:$SITE_DIR/nginx/fcgiwrap.sock;
+            fastcgi_pass unix:$site_dir/nginx/fcgiwrap.sock;
             fastcgi_param SCRIPT_FILENAME \$cgi_path;
             fastcgi_param QUERY_STRING \$query_string;
             fastcgi_param REQUEST_METHOD \$request_method;
@@ -374,19 +415,36 @@ http {
 }
 EOF
 
-# Update site config
-config-set "$SITE_DIR/site.conf" port "$port"
-config-set "$SITE_DIR/site.conf" domain "$domain"
-config-set "$SITE_DIR/site.conf" https "$use_https"
+# Update site config only when values changed so preview restarts do not
+# make Headquarters think a fresh build is immediately stale again.
+current_port=$(config-get "$site_dir/site.conf" port 2>/dev/null || printf '')
+if [ "$current_port" != "$port" ]; then
+  config-set "$site_dir/site.conf" port "$port"
+fi
+
+current_domain=$(config-get "$site_dir/site.conf" domain 2>/dev/null || printf '')
+if [ "$current_domain" != "$domain" ]; then
+  config-set "$site_dir/site.conf" domain "$domain"
+fi
+
+current_https=$(config-get "$site_dir/site.conf" https 2>/dev/null || printf '')
+if [ "$current_https" != "$use_https" ]; then
+  config-set "$site_dir/site.conf" https "$use_https"
+fi
 
 # Update Tor hidden service port if Tor hosting is enabled for this site
 if is-tor-installed; then
   tor_config_path=$(torrc-path 2>/dev/null || echo "")
   if [ -n "$tor_config_path" ] && [ -f "$tor_config_path" ]; then
     # Check if Tor hosting is enabled by looking for this site's HiddenServiceDir
-    # Use a more specific pattern to avoid false matches with similar site names
-    if grep -q "^HiddenServiceDir.*/${site_name}/\?\$" "$tor_config_path" 2>/dev/null || \
-       grep -q "^HiddenServiceDir.*/${site_name}\$" "$tor_config_path" 2>/dev/null; then
+    tor_hosting_enabled=0
+    while IFS= read -r line; do
+      if configure_nginx_hidden_service_line_matches_site "$line"; then
+        tor_hosting_enabled=1
+        break
+      fi
+    done < "$tor_config_path"
+    if [ "$tor_hosting_enabled" -eq 1 ]; then
       # Tor hosting is enabled for this site - update the port
       step "Updating Tor hidden service port to $port..."
       
@@ -395,9 +453,7 @@ if is-tor-installed; then
       
       while IFS= read -r line; do
         # Check if we're entering this site's hidden service block
-        # Match lines ending with /site_name or /site_name/
-        if printf '%s' "$line" | grep -q "^HiddenServiceDir.*/${site_name}/\?\$" || \
-           printf '%s' "$line" | grep -q "^HiddenServiceDir.*/${site_name}\$"; then
+        if configure_nginx_hidden_service_line_matches_site "$line"; then
           in_site_block=1
           printf '%s\n' "$line" >> "$temp_torrc"
           continue
@@ -427,7 +483,7 @@ if is-tor-installed; then
   fi
 fi
 
-success "nginx configuration written to $NGINX_CONF"
+success "nginx configuration written to $nginx_conf"
 info "Port: $port"
 info "Domain: $domain"
 

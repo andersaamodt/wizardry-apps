@@ -166,129 +166,147 @@ test_configure_nginx_preserves_existing_port() {
   rm -rf "$test_web_root" "$stub_dir"
 }
 
-test_configure_nginx_rejects_site_path_traversal() {
+test_configure_nginx_rejects_path_shaped_site_name() {
   skip-if-compiled || return $?
 
-  test_web_root=$(temp-dir web-wizardry-test)
-  outside_dir="$(dirname "$test_web_root")/wizardry-nginx-escape-$$"
+  tmpdir=$(make_tempdir)
+  web_root="$tmpdir/sites"
+  escape_dir="$tmpdir/escape"
+  mkdir -p "$web_root" "$escape_dir"
+  printf 'site-name=escape\n' > "$escape_dir/site.conf"
+
   stub_dir=$(temp-dir web-wizardry-stub)
   stub-sudo "$stub_dir"
-  rm -rf "$outside_dir"
-  mkdir -p "$outside_dir"
 
-  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/configure-nginx "../$(basename "$outside_dir")"
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$web_root" \
+    run_spell spells/web/configure-nginx ../escape
+
+  assert_failure || return 1
+  assert_error_contains "invalid site name" || return 1
+  if [ -d "$escape_dir/nginx" ]; then
+    TEST_FAILURE_REASON="configure-nginx created nginx paths outside WEB_WIZARDRY_ROOT"
     return 1
-  }
+  fi
 
-  [ ! -e "$outside_dir/nginx/nginx.conf" ] || {
-    TEST_FAILURE_REASON="configure-nginx wrote nginx.conf outside WEB_WIZARDRY_ROOT"
-    rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
-    return 1
-  }
-
-  rm -rf "$test_web_root" "$stub_dir" "$outside_dir"
+  rm -rf "$tmpdir" "$stub_dir"
 }
 
-test_configure_nginx_rejects_regex_site_name() {
+test_configure_nginx_rejects_imported_port_injection() {
   skip-if-compiled || return $?
 
   test_web_root=$(temp-dir web-wizardry-test)
+  export WEB_WIZARDRY_ROOT="$test_web_root"
+
   stub_dir=$(temp-dir web-wizardry-stub)
   stub-sudo "$stub_dir"
-  mkdir -p "$test_web_root/foo.*"
-  printf 'site-name=foo.*\nport=8080\ndomain=localhost\nhttps=false\n' > "$test_web_root/foo.*/site.conf"
+  export PATH="$stub_dir:$PATH"
 
-  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/configure-nginx 'foo.*'
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$stub_dir"
-    return 1
-  }
-  assert_error_contains "invalid site name" || {
-    rm -rf "$test_web_root" "$stub_dir"
-    return 1
-  }
+  mkdir -p "$test_web_root/mytestsite"
+  cat >"$test_web_root/mytestsite/site.conf" <<'EOF'
+site-name=mytestsite
+port=8080;
+include /tmp/evil.conf
+domain=localhost
+https=false
+EOF
 
-  [ ! -f "$test_web_root/foo.*/nginx/nginx.conf" ] || {
-    TEST_FAILURE_REASON="configure-nginx wrote nginx.conf for regex-shaped site name"
-    rm -rf "$test_web_root" "$stub_dir"
+  run_spell spells/web/configure-nginx mytestsite
+  assert_failure || return 1
+  assert_error_contains "invalid port" || return 1
+  if [ -f "$test_web_root/mytestsite/nginx/nginx.conf" ]; then
+    TEST_FAILURE_REASON="configure-nginx wrote nginx.conf for invalid imported port"
     return 1
-  }
+  fi
 
   rm -rf "$test_web_root" "$stub_dir"
 }
 
-test_configure_nginx_rejects_config_injection_values() {
+test_configure_nginx_rejects_imported_domain_injection() {
   skip-if-compiled || return $?
 
   test_web_root=$(temp-dir web-wizardry-test)
+  export WEB_WIZARDRY_ROOT="$test_web_root"
+
   stub_dir=$(temp-dir web-wizardry-stub)
   stub-sudo "$stub_dir"
+  export PATH="$stub_dir:$PATH"
+
   mkdir -p "$test_web_root/mytestsite"
+  cat >"$test_web_root/mytestsite/site.conf" <<'EOF'
+site-name=mytestsite
+port=8080
+domain=example.com;
+include /tmp/evil.conf
+https=false
+EOF
 
-  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/configure-nginx mytestsite --port '8080; return 200'
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$stub_dir"
+  run_spell spells/web/configure-nginx mytestsite
+  assert_failure || return 1
+  assert_error_contains "invalid domain" || return 1
+  if [ -f "$test_web_root/mytestsite/nginx/nginx.conf" ]; then
+    TEST_FAILURE_REASON="configure-nginx wrote nginx.conf for invalid imported domain"
     return 1
-  }
-
-  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/configure-nginx mytestsite --domain 'example.com; return 200'
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$stub_dir"
-    return 1
-  }
+  fi
 
   rm -rf "$test_web_root" "$stub_dir"
 }
 
-test_configure_nginx_rejects_unsafe_cgi_dir() {
+test_configure_nginx_rejects_imported_cgi_dir_injection() {
   skip-if-compiled || return $?
 
   test_web_root=$(temp-dir web-wizardry-test)
+  export WEB_WIZARDRY_ROOT="$test_web_root"
+
   stub_dir=$(temp-dir web-wizardry-stub)
   stub-sudo "$stub_dir"
-  mkdir -p "$test_web_root/mytestsite"
+  export PATH="$stub_dir:$PATH"
 
-  cat > "$test_web_root/mytestsite/site.conf" <<'EOF'
+  mkdir -p "$test_web_root/mytestsite"
+  cat >"$test_web_root/mytestsite/site.conf" <<'EOF'
 site-name=mytestsite
 port=8080
 domain=localhost
+cgi-dir=cgi"; include /tmp/evil.conf; #
 https=false
-cgi-dir=cgi"; return 200; #
 EOF
 
-  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/configure-nginx mytestsite
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$stub_dir"
+  run_spell spells/web/configure-nginx mytestsite
+  assert_failure || return 1
+  assert_error_contains "invalid cgi-dir" || return 1
+  if [ -f "$test_web_root/mytestsite/nginx/nginx.conf" ]; then
+    TEST_FAILURE_REASON="configure-nginx wrote nginx.conf for invalid imported cgi-dir"
     return 1
-  }
-  assert_error_contains "invalid cgi-dir" || {
-    rm -rf "$test_web_root" "$stub_dir"
-    return 1
-  }
-  [ ! -f "$test_web_root/mytestsite/nginx/nginx.conf" ] || {
-    TEST_FAILURE_REASON="configure-nginx rendered nginx.conf with unsafe cgi-dir"
-    rm -rf "$test_web_root" "$stub_dir"
-    return 1
-  }
+  fi
 
-  printf 'site-name=mytestsite\nport=8080\ndomain=localhost\nhttps=false\ncgi-dir=../outside-cgi\n' > "$test_web_root/mytestsite/site.conf"
-  PATH="$stub_dir:$PATH" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/configure-nginx mytestsite
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$stub_dir"
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
+test_configure_nginx_rejects_invalid_imported_site_user() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  export WEB_WIZARDRY_ROOT="$test_web_root"
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-sudo "$stub_dir"
+  export PATH="$stub_dir:$PATH"
+
+  mkdir -p "$test_web_root/mytestsite"
+  cat >"$test_web_root/mytestsite/site.conf" <<'EOF'
+site-name=mytestsite
+site-user=#0
+port=8080
+domain=localhost
+https=false
+EOF
+
+  run_spell spells/web/configure-nginx mytestsite
+  assert_failure || return 1
+  assert_error_contains "invalid site-user" || return 1
+  if [ -f "$test_web_root/mytestsite/nginx/nginx.conf" ]; then
+    TEST_FAILURE_REASON="configure-nginx wrote nginx.conf for invalid imported site-user"
     return 1
-  }
-  assert_error_contains "invalid cgi-dir" || {
-    rm -rf "$test_web_root" "$stub_dir"
-    return 1
-  }
+  fi
 
   rm -rf "$test_web_root" "$stub_dir"
 }
@@ -297,9 +315,15 @@ run_test_case "configure-nginx --help" test_configure_nginx_help
 run_test_case "configure-nginx creates local mime.types" test_configure_nginx_creates_local_mimetypes
 run_test_case "configure-nginx supports .onion addresses" test_configure_nginx_supports_onion_addresses
 run_test_case "configure-nginx preserves existing port" test_configure_nginx_preserves_existing_port
-run_test_case "configure-nginx rejects site path traversal" test_configure_nginx_rejects_site_path_traversal
-run_test_case "configure-nginx rejects regex site name" test_configure_nginx_rejects_regex_site_name
-run_test_case "configure-nginx rejects config injection values" test_configure_nginx_rejects_config_injection_values
-run_test_case "configure-nginx rejects unsafe cgi-dir" test_configure_nginx_rejects_unsafe_cgi_dir
+run_test_case "configure-nginx rejects path-shaped site names" \
+  test_configure_nginx_rejects_path_shaped_site_name
+run_test_case "configure-nginx rejects imported port injection" \
+  test_configure_nginx_rejects_imported_port_injection
+run_test_case "configure-nginx rejects imported domain injection" \
+  test_configure_nginx_rejects_imported_domain_injection
+run_test_case "configure-nginx rejects imported cgi-dir injection" \
+  test_configure_nginx_rejects_imported_cgi_dir_injection
+run_test_case "configure-nginx rejects invalid imported site-user" \
+  test_configure_nginx_rejects_invalid_imported_site_user
 
 finish_tests

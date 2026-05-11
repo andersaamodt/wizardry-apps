@@ -12,11 +12,16 @@ UNIX-centric websites with interactivity backed by POSIX shell scripts.
 
 Commands:
   create SITENAME    Create a new website
+  create-from-template SITENAME TEMPLATE
+                    Create a website from a named template and build it
   build SITENAME     Build a website
+  rebuild SITENAME   Build everything and restart the site server
   serve SITENAME     Start serving a website
   stop SITENAME      Stop serving a website
   status [SITENAME]  Show website status
   configure SITENAME Configure website settings
+  autorebuild SITENAME [status|enable|disable|toggle]
+                    Manage automatic rebuild watcher + cron for a site
   nostr-mirror SITENAME  Mirror Nostr events for a blog site
   check-filesystem-tools Check filesystem growth tooling
   install-filesystem-tools Ensure filesystem growth tooling is installed
@@ -24,6 +29,10 @@ Commands:
   check-nostril    Check Nostr server tooling
   install-nostril Ensure nostril is installed
   uninstall-nostril Remove nostril
+  btcpay-status   Show BTCPay install status text
+  check-btcpay    Check BTCPay Server tooling/runtime
+  install-btcpay Ensure BTCPay Server is installed
+  uninstall-btcpay Remove BTCPay Server
 
 Without arguments, opens an interactive menu.
 
@@ -55,12 +64,32 @@ trap 'exit 130' INT
 trap 'exit 0' TERM
 
 # Default web root directory
-WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
-SITES_DIR="$WEB_ROOT"
+web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+sites_dir="$web_root"
+
+web_site_name_is_valid() {
+  case "${1-}" in
+    .|..|''|*[!a-zA-Z0-9._-]*)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+require_web_site_name() {
+  command_name=$1
+  site_name=${2-}
+  if [ -z "$site_name" ]; then
+    die 2 "web-wizardry: $command_name requires SITENAME argument"
+  fi
+  if ! web_site_name_is_valid "$site_name"; then
+    die 2 "web-wizardry: invalid site name"
+  fi
+}
 
 # Ensure web root exists
-if [ ! -d "$WEB_ROOT" ]; then
-  mkdir -p "$WEB_ROOT"
+if [ ! -d "$web_root" ]; then
+  mkdir -p "$web_root"
 fi
 
 # Handle command-line arguments
@@ -68,30 +97,50 @@ cmd=${1-}
 case "$cmd" in
   create)
     site_name=${2-}
-    if [ -z "$site_name" ]; then
-      die 2 "web-wizardry: create requires SITENAME argument"
-    fi
+    require_web_site_name create "$site_name"
     create-site "$site_name"
+    exit 0
+    ;;
+  create-from-template)
+    site_name=${2-}
+    template_name=${3-}
+    if [ -z "$site_name" ] || [ -z "$template_name" ]; then
+      die 2 "web-wizardry: create-from-template requires SITENAME and TEMPLATE"
+    fi
+    if ! web_site_name_is_valid "$site_name"; then
+      die 2 "web-wizardry: invalid site name"
+    fi
+    create-from-template "$site_name" "$template_name"
+    build "$site_name"
     exit 0
     ;;
   build)
     site_name=${2-}
-    if [ -z "$site_name" ]; then
-      die 2 "web-wizardry: build requires SITENAME argument"
-    fi
+    require_web_site_name build "$site_name"
     build "$site_name"
+    exit 0
+    ;;
+  rebuild)
+    site_name=${2-}
+    require_web_site_name rebuild "$site_name"
+    build "$site_name" --full
+    restart-site "$site_name"
     exit 0
     ;;
   status)
     site_name=${2-}
     if [ -n "$site_name" ]; then
+      if ! web_site_name_is_valid "$site_name"; then
+        die 2 "web-wizardry: invalid site name"
+      fi
       site-status "$site_name"
     else
       # Show all sites
-      if [ -d "$SITES_DIR" ]; then
-        for site in "$SITES_DIR"/*; do
+      if [ -d "$sites_dir" ]; then
+        for site in "$sites_dir"/*; do
           [ -d "$site" ] || continue
           name=$(basename "$site")
+          web_site_name_is_valid "$name" || continue
           printf '%s: ' "$name"
           site-status "$name"
         done
@@ -103,34 +152,40 @@ case "$cmd" in
     ;;
   serve)
     site_name=${2-}
-    if [ -z "$site_name" ]; then
-      die 2 "web-wizardry: serve requires SITENAME argument"
-    fi
+    require_web_site_name serve "$site_name"
     serve-site "$site_name"
     exit 0
     ;;
   stop)
     site_name=${2-}
-    if [ -z "$site_name" ]; then
-      die 2 "web-wizardry: stop requires SITENAME argument"
-    fi
+    require_web_site_name stop "$site_name"
     stop-site "$site_name"
     exit 0
     ;;
   configure)
     site_name=${2-}
-    if [ -z "$site_name" ]; then
-      die 2 "web-wizardry: configure requires SITENAME argument"
-    fi
+    require_web_site_name configure "$site_name"
     shift 2
     configure-nginx "$site_name" "$@"
     exit 0
     ;;
+  autorebuild)
+    site_name=${2-}
+    require_web_site_name autorebuild "$site_name"
+    autorebuild_action=${3-status}
+    case "$autorebuild_action" in
+      status|enable|disable|toggle)
+        site-autorebuild "$autorebuild_action" "$site_name"
+        ;;
+      *)
+        die 2 "web-wizardry: autorebuild action must be status|enable|disable|toggle"
+        ;;
+    esac
+    exit 0
+    ;;
   nostr-mirror)
     site_name=${2-}
-    if [ -z "$site_name" ]; then
-      die 2 "web-wizardry: nostr-mirror requires SITENAME argument"
-    fi
+    require_web_site_name nostr-mirror "$site_name"
     blog-nostr-mirror "$site_name"
     exit 0
     ;;
@@ -158,6 +213,22 @@ case "$cmd" in
     uninstall-nostril
     exit 0
     ;;
+  btcpay-status)
+    btcpay-status
+    exit 0
+    ;;
+  check-btcpay)
+    check-btcpay
+    exit 0
+    ;;
+  install-btcpay)
+    install-btcpay
+    exit 0
+    ;;
+  uninstall-btcpay)
+    uninstall-btcpay
+    exit 0
+    ;;
   '')
     # No command - show interactive menu
     ;;
@@ -175,8 +246,8 @@ while true; do
   site_count=0
   
   # Add existing sites as menu items first
-  if [ -d "$SITES_DIR" ]; then
-    for site in "$SITES_DIR"/*; do
+  if [ -d "$sites_dir" ]; then
+    for site in "$sites_dir"/*; do
       [ -d "$site" ] || continue
       name=$(basename "$site")
       set -- "$@" "${name}%site-menu \"${name}\""

@@ -7,7 +7,7 @@ done
 
 test_nginx_admin_help() {
   run_spell "spells/.arcana/web-wizardry/nginx-admin" --help
-  assert_success && assert_output_contains "Usage:"
+  assert_success && assert_output_contains "certbot"
 }
 
 run_test_case "nginx-admin shows help" test_nginx_admin_help

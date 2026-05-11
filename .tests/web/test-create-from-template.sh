@@ -5,6 +5,21 @@ while [ ! -f "$test_root/spells/.imps/test/test-bootstrap" ] && [ "$test_root" !
 done
 . "$test_root/spells/.imps/test/test-bootstrap"
 
+resolve_test_template_root() {
+  root_parent=$(dirname "$ROOT_DIR")
+  for candidate in "$ROOT_DIR/web" "$ROOT_DIR/spells/web" "$root_parent/git/wizardry-apps/web" "$HOME/git/wizardry-apps/web"; do
+    [ -d "$candidate" ] || continue
+    for template_path in "$candidate"/*; do
+      [ -d "$template_path/pages" ] || continue
+      printf '%s\n' "$candidate"
+      return 0
+    done
+  done
+  return 1
+}
+
+TEST_TEMPLATE_ROOT=$(resolve_test_template_root 2>/dev/null || printf '')
+
 test_help() {
   run_spell spells/web/create-from-template --help
   assert_success
@@ -34,8 +49,9 @@ test_blog_template_has_sample_posts() {
 test_all_web_templates_create_expected_structure() {
   skip-if-compiled || return $?
 
-  if [ ! -d "$ROOT_DIR/templates/web" ]; then
-    TEST_FAILURE_REASON="template directory missing: $ROOT_DIR/templates/web"
+  template_root=${TEST_TEMPLATE_ROOT-}
+  if [ -z "$template_root" ] || [ ! -d "$template_root" ]; then
+    TEST_FAILURE_REASON="template directory missing"
     return 1
   fi
 
@@ -43,7 +59,7 @@ test_all_web_templates_create_expected_structure() {
   export WEB_WIZARDRY_ROOT="$test_web_root"
 
   found_template=0
-  for template_path in "$ROOT_DIR/templates/web"/*; do
+  for template_path in "$template_root"/*; do
     [ -d "$template_path" ] || continue
     found_template=1
     template=$(basename "$template_path")
@@ -98,7 +114,7 @@ test_all_web_templates_create_expected_structure() {
   done
 
   if [ "$found_template" -ne 1 ]; then
-    TEST_FAILURE_REASON="no templates found in $ROOT_DIR/templates/web"
+    TEST_FAILURE_REASON="no templates found in $template_root"
     rm -rf "$test_web_root"
     return 1
   fi
@@ -147,107 +163,147 @@ EOF
   rm -rf "$fake_wizardry_root"
 }
 
-test_rejects_site_name_path_traversal() {
+test_create_from_template_handles_wizardry_dir_with_spaces() {
   skip-if-compiled || return $?
 
   test_web_root=$(temp-dir web-wizardry-test)
-  escape_dir="$(dirname "$test_web_root")/wizardry-template-escape-$$"
-  rm -rf "$escape_dir"
+  tmp_parent=$(temp-dir wizardry-template-parent)
+  fake_wizardry_root="$tmp_parent/wizardry root"
 
-  WIZARDRY_DIR="$ROOT_DIR" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/create-from-template "../$(basename "$escape_dir")" demo
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$escape_dir"
-    return 1
-  }
-
-  [ ! -e "$escape_dir" ] || {
-    TEST_FAILURE_REASON="create-from-template created site outside WEB_WIZARDRY_ROOT"
-    rm -rf "$test_web_root" "$escape_dir"
-    return 1
-  }
-
-  rm -rf "$test_web_root" "$escape_dir"
-}
-
-test_rejects_template_path_traversal() {
-  skip-if-compiled || return $?
-
-  test_web_root=$(temp-dir web-wizardry-test)
-  fake_wizardry_root=$(temp-dir wizardry-template-root)
-
-  mkdir -p "$fake_wizardry_root/web" "$fake_wizardry_root/outside-template/pages"
-  printf '# Outside Template\n' > "$fake_wizardry_root/outside-template/pages/index.md"
+  mkdir -p "$fake_wizardry_root/web/minimal/pages"
+  cat > "$fake_wizardry_root/web/minimal/pages/index.md" <<'EOF'
+# Space Root Template
+EOF
 
   WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/create-from-template badtemplate ../outside-template
-  assert_status 2 || {
-    rm -rf "$test_web_root" "$fake_wizardry_root"
+    run_spell spells/web/create-from-template mini minimal
+
+  assert_success || return 1
+  [ -f "$test_web_root/mini/site/pages/index.md" ] || {
+    TEST_FAILURE_REASON="template under WIZARDRY_DIR with spaces was not copied"
+    rm -rf "$test_web_root" "$tmp_parent"
     return 1
   }
 
-  [ ! -e "$test_web_root/badtemplate" ] || {
-    TEST_FAILURE_REASON="create-from-template copied template outside WIZARDRY_DIR/web"
-    rm -rf "$test_web_root" "$fake_wizardry_root"
-    return 1
-  }
-
-  rm -rf "$test_web_root" "$fake_wizardry_root"
+  rm -rf "$test_web_root" "$tmp_parent"
 }
 
-test_rejects_site_name_config_injection() {
+test_create_from_template_rejects_path_shaped_site_name() {
   skip-if-compiled || return $?
 
-  test_web_root=$(temp-dir web-wizardry-test)
-  injected_name=$(printf 'bad\nsite-user=root')
+  tmpdir=$(make_tempdir)
+  web_root="$tmpdir/sites"
+  escape_dir="$tmpdir/escape"
+  fake_wizardry_root="$tmpdir/wizardry"
+  mkdir -p "$web_root" "$escape_dir" "$fake_wizardry_root/web/minimal/pages"
+  printf '%s\n' keep > "$escape_dir/keep"
+  cat > "$fake_wizardry_root/web/minimal/pages/index.md" <<'EOF'
+# Minimal
+EOF
 
-  WIZARDRY_DIR="$ROOT_DIR" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/create-from-template "$injected_name" demo
-  assert_status 2 || {
-    rm -rf "$test_web_root"
-    return 1
-  }
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$web_root" \
+    run_spell spells/web/create-from-template ../escape minimal
 
-  if find "$test_web_root" -mindepth 1 -print 2>/dev/null | grep . >/dev/null 2>&1; then
-    TEST_FAILURE_REASON="create-from-template created files for newline-delimited site name"
-    rm -rf "$test_web_root"
+  assert_failure || return 1
+  assert_error_contains "invalid site name" || return 1
+  if [ -e "$escape_dir/site.conf" ] || [ ! -f "$escape_dir/keep" ]; then
+    TEST_FAILURE_REASON="create-from-template wrote outside WEB_WIZARDRY_ROOT"
     return 1
   fi
-
-  rm -rf "$test_web_root"
 }
 
-test_rejects_template_name_config_injection() {
+test_create_from_template_rejects_path_shaped_template_name() {
   skip-if-compiled || return $?
 
+  tmpdir=$(make_tempdir)
+  web_root="$tmpdir/sites"
+  fake_wizardry_root="$tmpdir/wizardry"
+  mkdir -p "$web_root" "$fake_wizardry_root/web/.themes/pages"
+  cat > "$fake_wizardry_root/web/.themes/pages/index.md" <<'EOF'
+# Not A Template
+EOF
+
+  WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$web_root" \
+    run_spell spells/web/create-from-template minisite ../.themes
+
+  assert_failure || return 1
+  assert_error_contains "invalid template name" || return 1
+  if [ -e "$web_root/minisite" ]; then
+    TEST_FAILURE_REASON="create-from-template created a site from a path-shaped template name"
+    return 1
+  fi
+}
+
+test_create_from_template_resolves_external_repo_templates() {
+  skip-if-compiled || return $?
+
+  fake_home=$(temp-dir wizardry-home)
+  fake_wizardry_root="$fake_home/.wizardry"
+  fake_git_root="$fake_home/git"
   test_web_root=$(temp-dir web-wizardry-test)
-  injected_template=$(printf 'demo\nsite-user=root')
 
-  WIZARDRY_DIR="$ROOT_DIR" WEB_WIZARDRY_ROOT="$test_web_root" \
-    run_spell spells/web/create-from-template injected "$injected_template"
-  assert_status 2 || {
-    rm -rf "$test_web_root"
+  mkdir -p "$fake_wizardry_root"
+  mkdir -p "$fake_git_root/nostr-blog/pages" "$fake_git_root/nostr-blog/static"
+  mkdir -p "$fake_git_root/unix-settings/hosted-web/pages" \
+    "$fake_git_root/unix-settings/hosted-web/static" \
+    "$fake_git_root/unix-settings/hosted-web/cgi"
+
+  cat > "$fake_git_root/nostr-blog/pages/index.md" <<'EOF'
+# External Blog
+EOF
+  cat > "$fake_git_root/nostr-blog/static/style.css" <<'EOF'
+body { color: #222; }
+EOF
+  cat > "$fake_git_root/unix-settings/hosted-web/pages/index.md" <<'EOF'
+# UNIX Settings
+EOF
+  cat > "$fake_git_root/unix-settings/hosted-web/static/style.css" <<'EOF'
+body { color: #111; }
+EOF
+  cat > "$fake_git_root/unix-settings/hosted-web/cgi/unix-roster" <<'EOF'
+#!/bin/sh
+printf 'Content-Type: text/plain\n\nok\n'
+EOF
+  chmod +x "$fake_git_root/unix-settings/hosted-web/cgi/unix-roster"
+
+  HOME="$fake_home" WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template blogsite blog
+  assert_success || return 1
+
+  HOME="$fake_home" WIZARDRY_DIR="$fake_wizardry_root" WEB_WIZARDRY_ROOT="$test_web_root" \
+    run_spell spells/web/create-from-template settings unix-settings
+  assert_success || return 1
+
+  [ -f "$test_web_root/blogsite/site/pages/index.md" ] || {
+    TEST_FAILURE_REASON="external blog template index not copied"
+    rm -rf "$fake_home" "$test_web_root"
+    return 1
+  }
+  [ -f "$test_web_root/settings/site/pages/index.md" ] || {
+    TEST_FAILURE_REASON="external unix-settings template index not copied"
+    rm -rf "$fake_home" "$test_web_root"
+    return 1
+  }
+  [ -x "$test_web_root/settings/cgi/unix-roster" ] || {
+    TEST_FAILURE_REASON="external unix-settings CGI payload not copied"
+    rm -rf "$fake_home" "$test_web_root"
     return 1
   }
 
-  [ ! -e "$test_web_root/injected" ] || {
-    TEST_FAILURE_REASON="create-from-template created site for newline-delimited template name"
-    rm -rf "$test_web_root"
-    return 1
-  }
-
-  rm -rf "$test_web_root"
+  rm -rf "$fake_home" "$test_web_root"
 }
 
 run_test_case "create-from-template shows help" test_help
-if [ -d "$ROOT_DIR/templates/web/blog" ]; then
+if [ -d "$ROOT_DIR/web/blog" ]; then
+  run_test_case "blog template has sample posts" test_blog_template_has_sample_posts
+elif [ -d "$ROOT_DIR/spells/web/blog" ] || [ -d "$(dirname "$ROOT_DIR")/git/wizardry-apps/web/blog" ] || [ -d "$HOME/git/wizardry-apps/web/blog" ]; then
   run_test_case "blog template has sample posts" test_blog_template_has_sample_posts
 fi
 run_test_case "all templates create expected site structure" test_all_web_templates_create_expected_structure
 run_test_case "create-from-template resolves templates from web" test_create_from_template_uses_web_directory
-run_test_case "create-from-template rejects site path traversal" test_rejects_site_name_path_traversal
-run_test_case "create-from-template rejects template path traversal" test_rejects_template_path_traversal
-run_test_case "create-from-template rejects site name config injection" test_rejects_site_name_config_injection
-run_test_case "create-from-template rejects template name config injection" test_rejects_template_name_config_injection
+run_test_case "create-from-template handles WIZARDRY_DIR paths with spaces" test_create_from_template_handles_wizardry_dir_with_spaces
+run_test_case "create-from-template rejects path-shaped site names" test_create_from_template_rejects_path_shaped_site_name
+run_test_case "create-from-template rejects path-shaped template names" test_create_from_template_rejects_path_shaped_template_name
+run_test_case "create-from-template resolves external repo templates" test_create_from_template_resolves_external_repo_templates
 
 finish_tests

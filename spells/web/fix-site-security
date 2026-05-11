@@ -25,24 +25,25 @@ site_name=${1-}
 if [ -z "$site_name" ]; then
   die 2 "fix-site-security: SITENAME required"
 fi
+
 case "$site_name" in
-  ""|*[!A-Za-z0-9_-]*)
+  .|..|*[!a-zA-Z0-9._-]*)
     die 2 "fix-site-security: invalid site name"
     ;;
 esac
 
-WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
-SITES_DIR="$WEB_ROOT"
-SITE_DIR="$SITES_DIR/$site_name"
-SITE_DATA_DIR="$SITES_DIR/.sitedata/$site_name"
-SITE_CONFIG="$SITE_DIR/site.conf"
-ALLOWLIST_FILE="$SITE_DIR/site.allowlist"
+web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+sites_dir="$web_root"
+site_dir="$sites_dir/$site_name"
+site_data_dir="$sites_dir/.sitedata/$site_name"
+site_config="$site_dir/site.conf"
+allowlist_file="$site_dir/site.allowlist"
 
-if [ ! -d "$SITE_DIR" ]; then
+if [ ! -d "$site_dir" ]; then
   die "fix-site-security: site '$site_name' not found"
 fi
 
-run_priv() {
+fix_security_run_priv() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
     return
@@ -56,21 +57,21 @@ run_priv() {
   die "fix-site-security: root or sudo is required"
 }
 
-site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '-' '_')"
-site_user=$(config-get "$SITE_CONFIG" site-user 2>/dev/null || printf '')
+site_user_default="ww_$(printf '%s' "$site_name" | tr 'A-Z' 'a-z' | tr '.-' '__')"
+site_user=$(config-get "$site_config" site-user 2>/dev/null || printf '')
 if [ -z "$site_user" ]; then
   site_user="$site_user_default"
-  if [ -w "$SITE_CONFIG" ]; then
-    config-set "$SITE_CONFIG" site-user "$site_user"
+  if [ -w "$site_config" ]; then
+    config-set "$site_config" site-user "$site_user"
   elif [ "$(id -u)" -eq 0 ] || has sudo; then
-    run_priv config-set "$SITE_CONFIG" site-user "$site_user"
+    fix_security_run_priv config-set "$site_config" site-user "$site_user"
   else
     warn "fix-site-security: cannot update site.conf without root or sudo"
   fi
 fi
 case "$site_user" in
-  ''|[!A-Za-z_]*|*[!A-Za-z0-9_-]*)
-    die 2 "fix-site-security: invalid site user"
+  ''|.|..|-*|*[!a-zA-Z0-9._-]*)
+    die 2 "fix-site-security: invalid site-user in site.conf"
     ;;
 esac
 site_group="$site_user"
@@ -88,31 +89,77 @@ group_exists() {
 }
 
 ensure_site_group() {
-  if [ "$(uname -s 2>/dev/null)" != "Darwin" ] || ! has dscl; then
-    return 0
-  fi
   if group_exists "$site_group"; then
     return 0
   fi
 
-  max_gid=$(dscl . -list /Groups PrimaryGroupID 2>/dev/null | awk '{print $2}' | sort -n | tail -1)
-  case "$max_gid" in
-    ''|*[!0-9]*) max_gid=500 ;;
-  esac
-  gid=$((max_gid + 1))
+  if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && has dscl; then
+    max_gid=$(dscl . -list /Groups PrimaryGroupID 2>/dev/null | \
+      awk '{print $2}' | sort -n | tail -1)
+    case "$max_gid" in
+      ''|*[!0-9]*) max_gid=500 ;;
+    esac
+    gid=$((max_gid + 1))
 
-  run_priv dscl . -create "/Groups/$site_group"
-  run_priv dscl . -create "/Groups/$site_group" PrimaryGroupID "$gid"
-  run_priv dscl . -create "/Groups/$site_group" RealName "Wizardry Site $site_name"
-  run_priv dscl . -create "/Groups/$site_group" GroupMembership "$site_user"
-  run_priv dscl . -create "/Users/$site_user" PrimaryGroupID "$gid"
+    fix_security_run_priv dscl . -create "/Groups/$site_group"
+    fix_security_run_priv dscl . -create "/Groups/$site_group" PrimaryGroupID "$gid"
+    fix_security_run_priv dscl . -create "/Groups/$site_group" RealName "Wizardry Site $site_name"
+    fix_security_run_priv dscl . -create "/Groups/$site_group" GroupMembership "$site_user"
+    fix_security_run_priv dscl . -create "/Users/$site_user" PrimaryGroupID "$gid"
+    return 0
+  fi
+
+  if has groupadd; then
+    fix_security_run_priv groupadd "$site_group"
+    return 0
+  fi
+
+  if has addgroup; then
+    if addgroup --help 2>&1 | grep -q -- '--system'; then
+      fix_security_run_priv addgroup --system "$site_group"
+    else
+      fix_security_run_priv addgroup "$site_group"
+    fi
+    return 0
+  fi
+
+  if has pw; then
+    fix_security_run_priv pw groupadd "$site_group"
+    return 0
+  fi
+
+  die "fix-site-security: unable to create group '$site_group'"
 }
 
 ensure_staff_membership() {
   if [ "$(uname -s 2>/dev/null)" != "Darwin" ] || ! has dscl; then
     return 0
   fi
-  run_priv dscl . -append /Groups/staff GroupMembership "$site_user" >/dev/null 2>&1 || true
+  fix_security_run_priv dscl . -append /Groups/staff GroupMembership "$site_user" \
+    >/dev/null 2>&1 || true
+}
+
+assign_site_user_primary_group() {
+  current_group=$(id -gn "$site_user" 2>/dev/null || printf '')
+  if [ -n "$current_group" ] && [ "$current_group" = "$site_group" ]; then
+    return 0
+  fi
+
+  if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && has dscl; then
+    return 0
+  fi
+
+  if has usermod; then
+    fix_security_run_priv usermod -g "$site_group" "$site_user"
+    return 0
+  fi
+
+  if has pw; then
+    fix_security_run_priv pw usermod "$site_user" -g "$site_group"
+    return 0
+  fi
+
+  die "fix-site-security: unable to assign primary group '$site_group' to '$site_user'"
 }
 
 ensure_site_user() {
@@ -133,16 +180,16 @@ ensure_site_user() {
       ''|*[!0-9]*) max_gid=500 ;;
     esac
     gid=$((max_gid + 1))
-    run_priv dscl . -create "/Users/$site_user"
-    run_priv dscl . -create "/Users/$site_user" UserShell /usr/sbin/nologin
-    run_priv dscl . -create "/Users/$site_user" RealName "Wizardry Site $site_name"
-    run_priv dscl . -create "/Users/$site_user" UniqueID "$uid"
-    run_priv dscl . -create "/Groups/$site_user"
-    run_priv dscl . -create "/Groups/$site_user" PrimaryGroupID "$gid"
-    run_priv dscl . -create "/Groups/$site_user" RealName "Wizardry Site $site_name"
-    run_priv dscl . -create "/Groups/$site_user" GroupMembership "$site_user"
-    run_priv dscl . -create "/Users/$site_user" PrimaryGroupID "$gid"
-    run_priv dscl . -create "/Users/$site_user" NFSHomeDirectory /var/empty
+    fix_security_run_priv dscl . -create "/Users/$site_user"
+    fix_security_run_priv dscl . -create "/Users/$site_user" UserShell /usr/sbin/nologin
+    fix_security_run_priv dscl . -create "/Users/$site_user" RealName "Wizardry Site $site_name"
+    fix_security_run_priv dscl . -create "/Users/$site_user" UniqueID "$uid"
+    fix_security_run_priv dscl . -create "/Groups/$site_user"
+    fix_security_run_priv dscl . -create "/Groups/$site_user" PrimaryGroupID "$gid"
+    fix_security_run_priv dscl . -create "/Groups/$site_user" RealName "Wizardry Site $site_name"
+    fix_security_run_priv dscl . -create "/Groups/$site_user" GroupMembership "$site_user"
+    fix_security_run_priv dscl . -create "/Users/$site_user" PrimaryGroupID "$gid"
+    fix_security_run_priv dscl . -create "/Users/$site_user" NFSHomeDirectory /var/empty
     return 0
   fi
 
@@ -156,19 +203,19 @@ ensure_site_user() {
 
   if has useradd; then
     if useradd_supports -m && useradd_supports -s; then
-      run_priv useradd -m -s /usr/sbin/nologin "$site_user"
+      fix_security_run_priv useradd -m -s /usr/sbin/nologin "$site_user"
     elif useradd_supports -m; then
-      run_priv useradd -m "$site_user"
+      fix_security_run_priv useradd -m "$site_user"
     elif useradd_supports -s; then
-      run_priv useradd -s /usr/sbin/nologin "$site_user"
+      fix_security_run_priv useradd -s /usr/sbin/nologin "$site_user"
     else
-      run_priv useradd "$site_user"
+      fix_security_run_priv useradd "$site_user"
     fi
     return 0
   fi
 
   if has adduser; then
-    run_priv adduser --disabled-login --gecos "" --shell /usr/sbin/nologin "$site_user"
+    fix_security_run_priv adduser --disabled-login --gecos "" --shell /usr/sbin/nologin "$site_user"
     return 0
   fi
 
@@ -181,28 +228,71 @@ set_secure_perms() {
     return 0
   fi
 
-  run_priv find "$target" -type d -exec chmod 750 {} +
-  run_priv find "$target" -type f -exec chmod 640 {} +
+  fix_security_run_priv find "$target" -type d -exec chmod 750 {} +
+  fix_security_run_priv find "$target" -type f -exec chmod 640 {} +
 }
 
-allowlist_path_is_too_broad() {
-  candidate=$1
-  candidate_real=$(CDPATH= cd -- "$candidate" 2>/dev/null && pwd -P) || return 1
-  web_root_real=$(CDPATH= cd -- "$WEB_ROOT" 2>/dev/null && pwd -P) || web_root_real=$WEB_ROOT
+fix_security_canonical_dir() {
+  (CDPATH= cd -- "$1" 2>/dev/null && pwd -P)
+}
 
-  if [ "$candidate_real" = "/" ]; then
-    return 0
-  fi
-  case "$web_root_real" in
-    "$candidate_real"|"$candidate_real"/*)
-      return 0
+allowlist_dir_is_safe() {
+  allow_path=$1
+  case "$allow_path" in
+    *"$(printf '\r')"*)
+      warn "fix-site-security: allowlist path contains control characters"
+      return 1
+      ;;
+    /*) ;;
+    *)
+      warn "fix-site-security: allowlist path must be absolute: $allow_path"
+      return 1
       ;;
   esac
-  return 1
+  if [ ! -d "$allow_path" ]; then
+    warn "fix-site-security: allowlist path must be an existing directory: $allow_path"
+    return 1
+  fi
+
+  allow_real=$(fix_security_canonical_dir "$allow_path") || {
+    warn "fix-site-security: allowlist path cannot be resolved: $allow_path"
+    return 1
+  }
+  sites_real=$(fix_security_canonical_dir "$sites_dir") || sites_real=$sites_dir
+  site_real=$(fix_security_canonical_dir "$site_dir") || site_real=$site_dir
+  sitedata_root_real=$(fix_security_canonical_dir "$sites_dir/.sitedata" 2>/dev/null || printf '')
+  home_real=
+  if [ -n "${HOME-}" ]; then
+    home_real=$(fix_security_canonical_dir "$HOME" 2>/dev/null || printf '')
+  fi
+
+  case "$allow_real" in
+    /)
+      warn "fix-site-security: allowlist path is too broad: $allow_path"
+      return 1
+      ;;
+    "$sites_real"|"$site_real"|"$site_real"/*)
+      warn "fix-site-security: allowlist path is managed by this site already: $allow_path"
+      return 1
+      ;;
+  esac
+  if [ -n "$sitedata_root_real" ]; then
+    case "$allow_real" in
+      "$sitedata_root_real"|"$sitedata_root_real"/*)
+        warn "fix-site-security: allowlist path is managed site data: $allow_path"
+        return 1
+        ;;
+    esac
+  fi
+  if [ -n "$home_real" ] && [ "$allow_real" = "$home_real" ]; then
+    warn "fix-site-security: allowlist path is too broad: $allow_path"
+    return 1
+  fi
+  return 0
 }
 
 apply_allowlist() {
-  if [ ! -f "$ALLOWLIST_FILE" ]; then
+  if [ ! -f "$allowlist_file" ]; then
     return 0
   fi
 
@@ -210,34 +300,18 @@ apply_allowlist() {
     line=$(printf '%s' "$line" | sed 's/#.*$//' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     [ -z "$line" ] && continue
 
-    case "$line" in
-      /*) ;;
-      *)
-        warn "fix-site-security: allowlist path must be absolute: $line"
-        continue
-        ;;
-    esac
-
-    if [ ! -e "$line" ]; then
-      warn "fix-site-security: allowlist path not found: $line"
-      continue
-    fi
-    if [ ! -d "$line" ]; then
-      warn "fix-site-security: allowlist path must be a directory: $line"
-      continue
-    fi
-    if allowlist_path_is_too_broad "$line"; then
-      warn "fix-site-security: allowlist path is too broad: $line"
+    if ! allowlist_dir_is_safe "$line"; then
       continue
     fi
 
-    run_priv chown -R "$site_user":"$site_group" "$line"
+    fix_security_run_priv chown -R "$site_user":"$site_group" "$line"
     set_secure_perms "$line"
-  done < "$ALLOWLIST_FILE"
+  done < "$allowlist_file"
 }
 
 ensure_site_user
 ensure_site_group
+assign_site_user_primary_group
 ensure_staff_membership
 if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && ! group_exists "$site_group"; then
   site_group=staff
@@ -249,93 +323,88 @@ actual_user="${SUDO_USER:-$(id -un)}"
 # Don't use site user as actual user
 if [ "$actual_user" = "$site_user" ]; then
   # If we can't determine actual user, check who owns site.conf
-  if [ -f "$SITE_CONFIG" ]; then
+  if [ -f "$site_config" ]; then
     # Try stat (Linux and BSD/macOS have different syntax)
     if command -v stat >/dev/null 2>&1; then
       # Try GNU stat first (Linux)
-      actual_user=$(stat -c '%U' "$SITE_CONFIG" 2>/dev/null) || \
+      actual_user=$(stat -c '%U' "$site_config" 2>/dev/null) || \
         # Try BSD stat (macOS)
-        actual_user=$(stat -f '%Su' "$SITE_CONFIG" 2>/dev/null) || \
+        actual_user=$(stat -f '%Su' "$site_config" 2>/dev/null) || \
         # Fallback to ls parsing if stat fails
-        actual_user=$(ls -ld "$SITE_CONFIG" 2>/dev/null | awk '{print $3}')
+        actual_user=$(ls -ld "$site_config" 2>/dev/null | awk '{print $3}')
     else
       # No stat available, use ls
-      actual_user=$(ls -ld "$SITE_CONFIG" 2>/dev/null | awk '{print $3}')
+      actual_user=$(ls -ld "$site_config" 2>/dev/null | awk '{print $3}')
     fi
   fi
 fi
 
-run_priv mkdir -p "$SITES_DIR/.sitedata" "$SITE_DATA_DIR"
-run_priv mkdir -p "$SITE_DIR/build" "$SITE_DIR/nginx"
+fix_security_run_priv mkdir -p "$sites_dir/.sitedata" "$site_data_dir"
+fix_security_run_priv mkdir -p "$site_dir/build" "$site_dir/nginx"
 
 # Set ownership based on who needs to write vs who needs to read
 # - build/: actual user builds, site user (nginx) reads → actual user owns
-# - nginx/: actual user (configure-nginx) writes, site user reads → actual user owns
+# - nginx/: actual user and site user both write runtime files → actual user owns + group-writable
 # - .sitedata/: actual user (runs nginx/fcgiwrap/CGI) writes → actual user owns
-run_priv chown -R "$actual_user":"$site_group" "$SITE_DIR/build"
-run_priv chown -R "$actual_user":"$site_group" "$SITE_DIR/nginx"
-run_priv chown -R "$actual_user":"$site_group" "$SITE_DATA_DIR"
+fix_security_run_priv chown -R "$actual_user":"$site_group" "$site_dir/build"
+fix_security_run_priv chown -R "$actual_user":"$site_group" "$site_dir/nginx"
+fix_security_run_priv chown -R "$actual_user":"$site_group" "$site_data_dir"
 
 # Set permissions on build directory - actual user writes, site user reads
-if [ -d "$SITE_DIR/build" ]; then
-  run_priv find "$SITE_DIR/build" -type d -exec chmod 755 {} + 2>/dev/null || true
-  run_priv find "$SITE_DIR/build" -type f -exec chmod 644 {} + 2>/dev/null || true
+if [ -d "$site_dir/build" ]; then
+  fix_security_run_priv find "$site_dir/build" -type d -exec chmod 755 {} + 2>/dev/null || true
+  fix_security_run_priv find "$site_dir/build" -type f -exec chmod 644 {} + 2>/dev/null || true
 fi
 
-# Set permissions on nginx directory - actual user writes config, site user reads
+# Set permissions on nginx directory - both actual user and site user need write access.
 # Create nginx temp directories if they don't exist (nginx writes to these)
-if [ -d "$SITE_DIR/nginx" ]; then
-  run_priv mkdir -p "$SITE_DIR/nginx/temp/client_body"
-  run_priv mkdir -p "$SITE_DIR/nginx/temp/proxy"
-  run_priv mkdir -p "$SITE_DIR/nginx/temp/fastcgi"
-  run_priv mkdir -p "$SITE_DIR/nginx/temp/uwsgi"
-  run_priv mkdir -p "$SITE_DIR/nginx/temp/scgi"
+if [ -d "$site_dir/nginx" ]; then
+  fix_security_run_priv mkdir -p "$site_dir/nginx/temp/client_body"
+  fix_security_run_priv mkdir -p "$site_dir/nginx/temp/proxy"
+  fix_security_run_priv mkdir -p "$site_dir/nginx/temp/fastcgi"
+  fix_security_run_priv mkdir -p "$site_dir/nginx/temp/uwsgi"
+  fix_security_run_priv mkdir -p "$site_dir/nginx/temp/scgi"
   
-  # Set nginx/ directory and config files to 755/644 (actual user writes, site user reads)
-  run_priv find "$SITE_DIR/nginx" -type d -not -path "*/temp*" \
-    -exec chmod 755 {} + 2>/dev/null || true
-  run_priv find "$SITE_DIR/nginx" -type f -exec chmod 644 {} + 2>/dev/null || true
-  
-  # Set temp directories to 775 so site user can write (nginx needs to write temp files)
-  run_priv chmod 775 "$SITE_DIR/nginx/temp" 2>/dev/null || true
-  run_priv find "$SITE_DIR/nginx/temp" -type d -exec chmod 775 {} + 2>/dev/null || true
+  # Group-write allows the site user to create/update pid, logs, sockets, and temp files.
+  fix_security_run_priv find "$site_dir/nginx" -type d -exec chmod 775 {} + 2>/dev/null || true
+  fix_security_run_priv find "$site_dir/nginx" -type f -exec chmod 664 {} + 2>/dev/null || true
 fi
 
 # Set permissions on site data directory - make it accessible to actual user
 # so "Open site data" works. Use 755 for dirs so user can cd into it.
 # Files need 664 so site user (owner) can write to them (e.g., chat logs)
-if [ -d "$SITE_DATA_DIR" ]; then
-  run_priv find "$SITE_DATA_DIR" -type d -exec chmod 755 {} + 2>/dev/null || true
-  run_priv find "$SITE_DATA_DIR" -type f -exec chmod 664 {} + 2>/dev/null || true
+if [ -d "$site_data_dir" ]; then
+  fix_security_run_priv find "$site_data_dir" -type d -exec chmod 755 {} + 2>/dev/null || true
+  fix_security_run_priv find "$site_data_dir" -type f -exec chmod 664 {} + 2>/dev/null || true
 fi
 
 # Ensure site directory itself is accessible (755) and owned by actual user
-if [ -d "$SITE_DIR" ]; then
-  run_priv chown "$actual_user":"$site_group" "$SITE_DIR"
-  run_priv chmod 755 "$SITE_DIR"
+if [ -d "$site_dir" ]; then
+  fix_security_run_priv chown "$actual_user":"$site_group" "$site_dir"
+  fix_security_run_priv chmod 755 "$site_dir"
 fi
 
 # Ensure source directories are owned by actual user and readable by site user
-if [ -d "$SITE_DIR/site" ]; then
-  run_priv chown -R "$actual_user":"$site_group" "$SITE_DIR/site"
-  run_priv find "$SITE_DIR/site" -type d -exec chmod 755 {} + 2>/dev/null || true
-  run_priv find "$SITE_DIR/site" -type f -exec chmod 644 {} + 2>/dev/null || true
+if [ -d "$site_dir/site" ]; then
+  fix_security_run_priv chown -R "$actual_user":"$site_group" "$site_dir/site"
+  fix_security_run_priv find "$site_dir/site" -type d -exec chmod 755 {} + 2>/dev/null || true
+  fix_security_run_priv find "$site_dir/site" -type f -exec chmod 644 {} + 2>/dev/null || true
 fi
 
 # Fix allowlist permissions BEFORE reading it in apply_allowlist
-if [ -f "$ALLOWLIST_FILE" ]; then
+if [ -f "$allowlist_file" ]; then
   # Keep allowlist owned by actual user but readable by site user
-  run_priv chown "$actual_user":"$site_group" "$ALLOWLIST_FILE"
-  run_priv chmod 644 "$ALLOWLIST_FILE"
+  fix_security_run_priv chown "$actual_user":"$site_group" "$allowlist_file"
+  fix_security_run_priv chmod 644 "$allowlist_file"
 fi
 
 # Now we can safely read the allowlist file
 apply_allowlist
 
-if [ -f "$SITE_CONFIG" ]; then
+if [ -f "$site_config" ]; then
   # Keep config owned by actual user but readable by site user
-  run_priv chown "$actual_user":"$site_group" "$SITE_CONFIG"
-  run_priv chmod 644 "$SITE_CONFIG"
+  fix_security_run_priv chown "$actual_user":"$site_group" "$site_config"
+  fix_security_run_priv chmod 644 "$site_config"
 fi
 
 success "Site security fixed for '$site_name' (user: $site_user)"

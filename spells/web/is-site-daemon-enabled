@@ -23,32 +23,52 @@ if [ -z "$site_name" ]; then
   die 2 "is-site-daemon-enabled: SITENAME required"
 fi
 case "$site_name" in
-  ""|*[!A-Za-z0-9_-]*)
+  .|..|*[!a-zA-Z0-9._-]*)
     die 2 "is-site-daemon-enabled: invalid site name"
     ;;
 esac
 
-WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
-SITES_DIR="$WEB_ROOT"
-SITE_DIR="$SITES_DIR/$site_name"
+web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+sites_dir="$web_root"
+site_dir="$sites_dir/$site_name"
 
-if [ ! -d "$SITE_DIR" ]; then
+if [ ! -d "$site_dir" ]; then
   exit 1
 fi
 
 unit="wizardry-site-${site_name}.service"
-plist="/Library/LaunchDaemons/org.wizardry.web.${site_name}.plist"
-label="org.wizardry.web.${site_name}"
+plist="${LAUNCHD_PLIST_DIR:-/Library/LaunchDaemons}/org.wizardry.web.${site_name}.plist"
 
-if has systemctl; then
-  if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && has launchctl; then
+  # Check if plist exists
+  if [ ! -f "$plist" ]; then
+    exit 1
+  fi
+
+  plist_bool_value() {
+    key_name=$1
+    awk -v key="$key_name" '
+      $0 ~ "<key>" key "</key>" { found=1; next }
+      found {
+        if ($0 ~ /<true\/>/) { print "true"; exit }
+        if ($0 ~ /<false\/>/) { print "false"; exit }
+        if ($0 ~ /<key>/ || $0 ~ /<\/dict>/) { exit }
+      }
+    ' "$plist"
+  }
+
+  run_at_load=$(plist_bool_value RunAtLoad || printf '')
+  keep_alive=$(plist_bool_value KeepAlive || printf '')
+
+  # Startup is considered enabled only when both flags are true.
+  if [ "$run_at_load" = "true" ] && [ "$keep_alive" = "true" ]; then
     exit 0
   fi
   exit 1
 fi
 
-if [ "$(uname -s 2>/dev/null)" = "Darwin" ] && has launchctl; then
-  if [ -f "$plist" ]; then
+if has systemctl; then
+  if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
     exit 0
   fi
   exit 1

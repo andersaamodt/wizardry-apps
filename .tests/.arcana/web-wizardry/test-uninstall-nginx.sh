@@ -7,7 +7,7 @@ done
 
 test_uninstall_nginx_help() {
   run_spell "spells/.arcana/web-wizardry/uninstall-nginx" --help
-  assert_success && assert_output_contains "Usage:"
+  assert_success && assert_output_contains "certbot"
 }
 
 run_test_case "uninstall-nginx shows help" test_uninstall_nginx_help
