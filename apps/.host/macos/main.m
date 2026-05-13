@@ -136,6 +136,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 @property (assign) BOOL keepRunningInBackground;
 @property (assign) BOOL showStatusItem;
 @property (assign) BOOL explicitQuitRequested;
+@property (assign) BOOL systemTerminationRequested;
 @property (strong) NSStatusItem *statusItem;
 @property (assign) NSInteger statusItemRepairAttempts;
 @property (strong) NSDictionary<NSString *, NSString *> *stonrStatusSnapshot;
@@ -183,6 +184,8 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)openMainWindowFromStatusItem:(id)sender;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
 - (void)quitFromStatusItem:(id)sender;
+- (void)handleWorkspaceWillPowerOff:(NSNotification *)notification;
+- (BOOL)isSystemTerminationRequest;
 - (BOOL)isStonrApp;
 - (BOOL)isArtificerApp;
 - (BOOL)isMatchbookApp;
@@ -2020,6 +2023,37 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [NSApp terminate:nil];
 }
 
+- (void)handleWorkspaceWillPowerOff:(NSNotification *)notification {
+    (void)notification;
+    self.systemTerminationRequested = YES;
+}
+
+- (BOOL)isSystemTerminationRequest {
+    if (self.systemTerminationRequested) {
+        return YES;
+    }
+
+    NSAppleEventDescriptor *event = [[NSAppleEventManager sharedAppleEventManager] currentAppleEvent];
+    if (!event || event.eventClass != kCoreEventClass || event.eventID != kAEQuitApplication) {
+        return NO;
+    }
+
+    NSAppleEventDescriptor *reasonDescriptor = [event paramDescriptorForKeyword:kAEQuitReason];
+    if (!reasonDescriptor) {
+        return NO;
+    }
+
+    OSType reason = reasonDescriptor.enumCodeValue;
+    if (reason == 0) {
+        reason = reasonDescriptor.typeCodeValue;
+    }
+
+    return reason == kAEQuitAll
+        || reason == kAEShutDown
+        || reason == kAERestart
+        || reason == kAEReallyLogOut;
+}
+
 - (NSImage *)renderedStatusItemImageForRelayState:(NSString *)relayState busy:(BOOL)busy {
     CGFloat side = MAX(14.0, [NSStatusBar systemStatusBar].thickness - 4.0);
     NSImage *rendered = [[NSImage alloc] initWithSize:NSMakeSize(side, side)];
@@ -2963,6 +2997,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     (void)note;
     // Ensure command-line launched hosts behave like regular foreground apps.
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
+                                                           selector:@selector(handleWorkspaceWillPowerOff:)
+                                                               name:NSWorkspaceWillPowerOffNotification
+                                                             object:nil];
 
     // Get app directory from command line argument
     NSArray *args = [[NSProcessInfo processInfo] arguments];
@@ -4215,7 +4253,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     (void)sender;
     [self syncBellheimBackgroundModeFromConfig];
-    if (self.explicitQuitRequested) {
+    if (self.explicitQuitRequested || [self isSystemTerminationRequest]) {
         return NSTerminateNow;
     }
     if (self.keepRunningInBackground || self.showStatusItem) {
@@ -4262,6 +4300,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
     (void)notification;
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self
+                                                                  name:NSWorkspaceWillPowerOffNotification
+                                                                object:nil];
     [[NSDistributedNotificationCenter defaultCenter] removeObserver:self
                                                                name:WizardryHostShowWindowNotification
                                                              object:nil];

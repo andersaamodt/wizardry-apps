@@ -24,6 +24,13 @@ grep -F 'clapperRadius' "$mac_host" >/dev/null
 grep -F 'lineToPoint:NSMakePoint(minX + side * 0.005, lipY)' "$mac_host" >/dev/null
 grep -F 'backgroundMode' "$mac_host" >/dev/null
 grep -F 'syncBellheimBackgroundModeFromConfig' "$mac_host" >/dev/null
+grep -F 'NSWorkspaceWillPowerOffNotification' "$mac_host" >/dev/null
+grep -F 'isSystemTerminationRequest' "$mac_host" >/dev/null
+grep -F 'kAEQuitReason' "$mac_host" >/dev/null
+grep -F 'kAEShutDown' "$mac_host" >/dev/null
+grep -F 'kAERestart' "$mac_host" >/dev/null
+grep -F 'kAEReallyLogOut' "$mac_host" >/dev/null
+grep -F 'self.explicitQuitRequested || [self isSystemTerminationRequest]' "$mac_host" >/dev/null
 grep -F '[self syncBellheimBackgroundModeFromConfig];' "$mac_host" >/dev/null
 grep -F 'NSVariableStatusItemLength' "$mac_host" >/dev/null
 grep -F 'setTemplate:YES' "$mac_host" >/dev/null
