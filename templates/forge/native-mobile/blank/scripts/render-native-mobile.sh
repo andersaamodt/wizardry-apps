@@ -31,7 +31,7 @@ mkdir -p "$android_dir/app/src/main/java/app/wizardry/generated/$package_part" "
 screen_titles=$(jq -r '.app.screens[].title' "$ir_path")
 primary_title=$(printf '%s\n' "$screen_titles" | sed -n '1p')
 [ -n "$primary_title" ] || primary_title="$app_name"
-android_items=$(jq -r '.app.screens[] | "items.add(\"" + (.title | gsub("\\\\";"\\\\\\\\") | gsub("\"";"\\\"")) + "\");"' "$ir_path")
+android_items=$(jq -r '.app.screens[] | "        items.add(\"" + (.title | gsub("\\\\";"\\\\\\") | gsub("\"";"\\\"")) + "\");"' "$ir_path")
 ios_items=$(jq -r '.app.screens[] | "        \"" + (.title | gsub("\\\\";"\\\\\\\\") | gsub("\"";"\\\"")) + "\","' "$ir_path")
 
 cat >"$android_dir/settings.gradle" <<GRADLE
