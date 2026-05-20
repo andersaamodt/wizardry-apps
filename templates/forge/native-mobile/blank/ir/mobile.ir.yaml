@@ -1,0 +1,32 @@
+{
+  "version": "native-mobile-ir/v1",
+  "format": "yaml-1.2-json-compatible",
+  "app": {
+    "id": "__APP_ID__",
+    "name": "__APP_NAME__",
+    "targets": ["android", "ios"],
+    "offlineFirst": true,
+    "storePolicy": "direct-first",
+    "permissions": ["network"],
+    "actions": [
+      {"id": "refresh", "title": "Refresh"},
+      {"id": "compose", "title": "Compose"}
+    ],
+    "screens": [
+      {
+        "id": "home",
+        "title": "__APP_NAME__",
+        "node": {
+          "id": "screen.home",
+          "type": "NavigationStack",
+          "children": [
+            {"id": "section.main", "type": "Section", "title": "Inbox"},
+            {"id": "text.empty", "type": "Text", "value": "No messages yet."},
+            {"id": "button.compose", "type": "Button", "title": "Compose", "action": "compose"}
+          ]
+        }
+      }
+    ]
+  },
+  "extensions": []
+}

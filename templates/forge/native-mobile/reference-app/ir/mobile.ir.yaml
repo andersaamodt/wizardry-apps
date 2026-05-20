@@ -1,0 +1,46 @@
+{
+  "version": "native-mobile-ir/v1",
+  "format": "yaml-1.2-json-compatible",
+  "app": {
+    "id": "__APP_ID__",
+    "name": "__APP_NAME__",
+    "targets": ["android", "ios"],
+    "offlineFirst": true,
+    "storePolicy": "direct-first",
+    "permissions": ["network", "notifications"],
+    "actions": [
+      {"id": "open_inbox", "title": "Inbox"},
+      {"id": "open_people", "title": "People"},
+      {"id": "send_message", "title": "Send"},
+      {"id": "sync_now", "title": "Sync"}
+    ],
+    "screens": [
+      {
+        "id": "inbox",
+        "title": "Inbox",
+        "node": {
+          "id": "screen.inbox",
+          "type": "NavigationStack",
+          "children": [
+            {"id": "timeline.primary", "type": "Timeline", "title": "Recent"},
+            {"id": "composer.quick", "type": "Composer", "title": "Reply"},
+            {"id": "button.sync", "type": "Button", "title": "Sync", "action": "sync_now"}
+          ]
+        }
+      },
+      {
+        "id": "people",
+        "title": "People",
+        "node": {
+          "id": "screen.people",
+          "type": "List",
+          "children": [
+            {"id": "person.one", "type": "Label", "title": "Ada"},
+            {"id": "person.two", "type": "Label", "title": "Grace"}
+          ]
+        }
+      }
+    ]
+  },
+  "extensions": []
+}

@@ -307,6 +307,12 @@
                     <span class="type-title">Native Desktop App</span>
                     <span class="type-desc">A macOS and Linux desktop project driven by a canonical native UI IR.</span>
                   </label>
+                  <label class="type-option" id="type-native-mobile-card">
+                    <input type="radio" name="project-type" value="native-mobile">
+                    <span class="type-icon">▣</span>
+                    <span class="type-title">Native Mobile App</span>
+                    <span class="type-desc">A shared native mobile IR that generates Android and iOS apps, with direct Android distribution first.</span>
+                  </label>
                   <label class="type-option" id="type-game-card">
                     <input type="radio" name="project-type" value="game">
                     <span class="type-icon">🎮</span>
@@ -354,6 +360,14 @@
                   </select>
                 </div>
 
+                <div id="starter-native-mobile" class="starter-pane">
+                  <label for="starter-native-mobile-select">Native mobile starter</label>
+                  <select id="starter-native-mobile-select" class="starter-select">
+                    <option value="blank">Blank native mobile project</option>
+                    <option value="reference-app">Wizardry Native Mobile Reference App</option>
+                  </select>
+                </div>
+
                 <div id="starter-game" class="starter-pane">
                   <label for="starter-game-select">Game starter</label>
                   <select id="starter-game-select" class="starter-select">
@@ -370,8 +384,8 @@
                   <div class="target-item" data-target-groups="application"><input id="target-hosted-web" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-hosted-web.svg" alt=""></span>Hosted Web</div>
                   <div class="target-item" data-target-groups="application,native-desktop,game"><input id="target-macos" type="checkbox" checked><span class="target-icon" aria-hidden="true"></span>macOS Desktop</div>
                   <div class="target-item" data-target-groups="application,native-desktop,game"><input id="target-linux" type="checkbox" checked><span class="target-icon" aria-hidden="true"><img src="assets/target-linux.svg" alt=""></span>Linux Desktop</div>
-                  <div class="target-item" data-target-groups="application,game"><input id="target-ios" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-ios.svg" alt=""></span>iOS</div>
-                  <div class="target-item" data-target-groups="application,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</div>
+                  <div class="target-item" data-target-groups="application,native-mobile,game"><input id="target-ios" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-ios.svg" alt=""></span>iOS</div>
+                  <div class="target-item" data-target-groups="application,native-mobile,game"><input id="target-android" type="checkbox"><span class="target-icon" aria-hidden="true"><img src="assets/target-android.svg" alt=""></span>Android</div>
                 </div>
                 <p class="sub target-grid-note">You can change this later.</p>
               </div>
@@ -2372,6 +2386,25 @@
               els.starterNativeDesktopSelect.appendChild(opt);
             });
         }
+        if (els.starterNativeMobileSelect) {
+          els.starterNativeMobileSelect.innerHTML = '';
+          var mobileBlank = document.createElement('option');
+          mobileBlank.value = 'blank';
+          mobileBlank.textContent = 'Blank native mobile project';
+          els.starterNativeMobileSelect.appendChild(mobileBlank);
+          var mobileReference = document.createElement('option');
+          mobileReference.value = 'reference-app';
+          mobileReference.textContent = 'Wizardry Native Mobile Reference App';
+          els.starterNativeMobileSelect.appendChild(mobileReference);
+          state.workspaces
+            .filter(function (ws) { return ws.projectType === nativeMobileProjectTypeKey(); })
+            .forEach(function (ws) {
+              var opt = document.createElement('option');
+              opt.value = 'clone:' + ws.id;
+              opt.textContent = 'Clone ' + ws.title;
+              els.starterNativeMobileSelect.appendChild(opt);
+            });
+        }
         if (els.starterGameSelect) {
           els.starterGameSelect.innerHTML = '';
           var blank = document.createElement('option');
@@ -2517,6 +2550,10 @@
         return 'native-desktop';
       }
 
+      function nativeMobileProjectTypeKey() {
+        return 'native-mobile';
+      }
+
       function createProjectTypeConfig(projectType) {
         if (projectType === 'game') {
           return {
@@ -2526,6 +2563,16 @@
             starterPaneId: 'starter-game',
             starterSelectId: 'starterGameSelect',
             targetGroups: ['game']
+          };
+        }
+        if (projectType === nativeMobileProjectTypeKey()) {
+          return {
+            key: nativeMobileProjectTypeKey(),
+            label: 'Native Mobile App',
+            context: 'native-mobile',
+            starterPaneId: 'starter-native-mobile',
+            starterSelectId: 'starterNativeMobileSelect',
+            targetGroups: [nativeMobileProjectTypeKey()]
           };
         }
         if (projectType === nativeDesktopProjectTypeKey()) {
@@ -2554,6 +2601,9 @@
         }
         if (ctx === 'native-desktop') {
           return 'Native Desktop App';
+        }
+        if (ctx === 'native-mobile') {
+          return 'Native Mobile App';
         }
         return 'Cross-Platform App';
       }
@@ -2610,6 +2660,9 @@
         if (ctx === 'native-desktop') {
           return nativeDesktopProjectTypeKey();
         }
+        if (ctx === 'native-mobile') {
+          return nativeMobileProjectTypeKey();
+        }
         return 'application';
       }
 
@@ -2644,6 +2697,11 @@
         if (projectType === nativeDesktopProjectTypeKey()) {
           return specs.filter(function (item) {
             return item.id === 'macos' || item.id === 'linux';
+          });
+        }
+        if (projectType === nativeMobileProjectTypeKey()) {
+          return specs.filter(function (item) {
+            return item.id === 'android' || item.id === 'ios';
           });
         }
         return specs;
@@ -2765,7 +2823,7 @@
           return state.os === 'linux';
         }
         if (targetId === 'ios' || targetId === 'android') {
-          return false;
+          return true;
         }
         return false;
       }
@@ -7514,6 +7572,10 @@
           renderSelectedTargetsEditor(selectedCatalogItem());
           return;
         }
+        if (selected.context === 'native-mobile' && (targetId === 'ios' || targetId === 'android')) {
+          await runWorkspacePipelineAction(targetId, selected);
+          return;
+        }
         if (targetId === 'ios' || targetId === 'android') {
           throw new Error('This target cannot be run directly from the current desktop host.');
         }
@@ -7675,14 +7737,17 @@
         var projectType = selectedProjectType();
         var applicationActive = projectType === 'application';
         var nativeDesktopActive = projectType === nativeDesktopProjectTypeKey();
+        var nativeMobileActive = projectType === nativeMobileProjectTypeKey();
         var gameActive = projectType === 'game';
 
         document.getElementById('starter-application').classList.toggle('active', applicationActive);
         document.getElementById('starter-native-desktop').classList.toggle('active', nativeDesktopActive);
+        document.getElementById('starter-native-mobile').classList.toggle('active', nativeMobileActive);
         document.getElementById('starter-game').classList.toggle('active', gameActive);
 
         document.getElementById('type-application-card').classList.toggle('active', applicationActive);
         document.getElementById('type-native-desktop-card').classList.toggle('active', nativeDesktopActive);
+        document.getElementById('type-native-mobile-card').classList.toggle('active', nativeMobileActive);
         document.getElementById('type-game-card').classList.toggle('active', gameActive);
 
         if (state.lastProjectType !== projectType) {
@@ -7708,6 +7773,9 @@
         }
         if (els.starterNativeDesktopSelect && els.starterNativeDesktopSelect.options.length) {
           els.starterNativeDesktopSelect.selectedIndex = 0;
+        }
+        if (els.starterNativeMobileSelect && els.starterNativeMobileSelect.options.length) {
+          els.starterNativeMobileSelect.selectedIndex = 0;
         }
         if (els.starterGameSelect && els.starterGameSelect.options.length) {
           els.starterGameSelect.selectedIndex = 0;
@@ -8059,8 +8127,38 @@
           return;
         }
 
+        if (selected.context === 'native-mobile' && (kind === 'ios' || kind === 'android')) {
+          var mode = kind === 'android' ? 'release' : 'debug';
+          var mobile = await backend('build-native-mobile-workspace', [selected.path, kind, mode]);
+          var mobileOut = kv(mobile.stdout || '');
+          setTargetRuntime(projectKey, kind, 'built', mobileOut.artifact || mobileOut.project || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
+          var actions = [];
+          if (kind === 'android' && mobileOut.artifact && /\.aab$/i.test(mobileOut.artifact)) {
+            actions.push({
+              label: 'Upload to Play',
+              run: function () { return backend('upload-native-mobile-play', [selected.path, mobileOut.artifact, 'internal']); }
+            });
+          }
+          renderResult({
+            status: 'ok',
+            summary: selected.title + ' native ' + (kind === 'android' ? 'Android release' : 'iOS smoke') + ' build completed.',
+            paths: [
+              mobileOut.artifact ? { label: kind === 'android' ? 'Android artifact' : 'iOS artifact', path: mobileOut.artifact, canReveal: true } : null,
+              mobileOut.project ? { label: 'Generated project', path: mobileOut.project, canReveal: true } : null
+            ].filter(Boolean),
+            actions: actions,
+            help: {
+              title: kind === 'android' ? 'Android direct-first release' : 'iOS build',
+              body: kind === 'android'
+                ? 'Forge built a direct-distribution Android artifact. Play upload is optional and uses configured publisher credentials.'
+                : 'Forge generated and built the native iOS project on this Mac.'
+            }
+          });
+          return;
+        }
         if (kind === 'stage' || kind === 'ios' || kind === 'android') {
-          throw new Error('Mobile packaging actions are currently available for wizardry apps.');
+          throw new Error('Mobile packaging actions are currently available for wizardry apps and native mobile workspaces.');
         }
       }
 
@@ -8916,6 +9014,7 @@
 
         els.starterApplicationSelect.addEventListener('change', syncCreateUI);
         els.starterNativeDesktopSelect.addEventListener('change', syncCreateUI);
+        els.starterNativeMobileSelect.addEventListener('change', syncCreateUI);
         els.starterGameSelect.addEventListener('change', syncCreateUI);
         [els.targetHostedWeb, els.targetMacos, els.targetLinux, els.targetIos, els.targetAndroid].forEach(function (checkbox) {
           checkbox.addEventListener('change', syncCreateDraftList);
@@ -9562,6 +9661,7 @@
         els.createPathPreview = document.getElementById('create-path-preview');
         els.starterApplicationSelect = document.getElementById('starter-application-select');
         els.starterNativeDesktopSelect = document.getElementById('starter-native-desktop-select');
+        els.starterNativeMobileSelect = document.getElementById('starter-native-mobile-select');
         els.starterGameSelect = document.getElementById('starter-game-select');
         els.createInitGit = document.getElementById('create-init-git');
         els.createSubmit = document.getElementById('create-submit');

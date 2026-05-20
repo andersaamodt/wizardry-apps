@@ -41,6 +41,8 @@ Forge can scaffold several kinds of projects. You do not need to know every tool
 
 **Native desktop apps** start from a simple app description file, then generate platform-native code. macOS output uses Swift/SwiftUI. Linux output uses GTK. This path is for apps that should feel more like platform-owned desktop software, with native menus, windows, lists, settings, and file panels.
 
+**Native mobile apps** start from a shared mobile-native IR, then generate Android and iOS projects. Android release is direct-distribution first, with optional Play upload when publisher credentials are configured. The generated Android app avoids Play Services by default.
+
 **Game projects** use Godot project scaffolding. This path is for interactive games or game-like tools where a dedicated game engine is a better fit than a document-style app UI.
 
 **Hosted web sites** use wizardry web templates and shell-backed site tooling. This path is for sites and lightweight web surfaces that should remain easy to inspect and publish.

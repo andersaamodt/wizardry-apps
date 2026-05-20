@@ -247,6 +247,7 @@ cp -R "$test_root/templates/forge" "$scratch/templates/forge"
 cp -R "$test_root/runtime/core" "$scratch/runtime/core"
 mkdir -p "$scratch/runtime/schemas"
 cp "$test_root/runtime/schemas/native-desktop-ir-v1.json" "$scratch/runtime/schemas/native-desktop-ir-v1.json"
+cp "$test_root/runtime/schemas/native-mobile-ir-v1.json" "$scratch/runtime/schemas/native-mobile-ir-v1.json"
 cp -R "$test_root/tools" "$scratch/tools"
 cp -R "$test_root/templates/web/demo" "$scratch/templates/web/demo"
 cp -R "$test_root/templates/web/.themes" "$scratch/templates/web/.themes"
@@ -1201,4 +1202,26 @@ printf '%s\n' "$run_workspace_open" | grep -F "entry=$workspaces_root/workspace-
 run_workspace_infer=$(sh "$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot")
 printf '%s\n' "$run_workspace_infer" | grep -E "mode=(godot|open)" >/dev/null
 
+
+native_mobile_root="$scratch/native-mobile-root"
+native_mobile_out=$(sh "$backend" scaffold-workspace "$scratch" "pocket-owl" "Pocket Owl" native-mobile reference-app android,ios "" "$native_mobile_root")
+native_mobile_created=$(printf '%s\n' "$native_mobile_out" | awk -F= '/^created=/{print $2; exit}')
+[ -f "$native_mobile_created/ir/mobile.ir.yaml" ] || {
+  printf '%s\n' "forge backend test: native mobile IR was not scaffolded" >&2
+  exit 1
+}
+[ -f "$native_mobile_created/generated/mobile/android/settings.gradle" ] || {
+  printf '%s\n' "forge backend test: native Android project was not generated" >&2
+  exit 1
+}
+[ -f "$native_mobile_created/generated/mobile/ios/project.yml" ] || {
+  printf '%s\n' "forge backend test: native iOS project was not generated" >&2
+  exit 1
+}
+grep -F "project_type=native-mobile" "$native_mobile_created/wizardry.workspace.conf" >/dev/null
+grep -F "mobile_ir_path=ir/mobile.ir.yaml" "$native_mobile_created/wizardry.workspace.conf" >/dev/null
+if grep -R "com.google.android.gms" "$native_mobile_created/generated/mobile/android" >/dev/null 2>&1; then
+  printf '%s\n' "forge backend test: native mobile starter introduced Play Services dependency" >&2
+  exit 1
+fi
 printf '%s\n' "forge backend tests passed"

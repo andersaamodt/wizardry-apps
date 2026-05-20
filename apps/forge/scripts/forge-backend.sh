@@ -59,6 +59,8 @@ Commands:
   stage-mobile [ROOT_HINT] APP_SLUG
   build-ios-smoke [ROOT_HINT] APP_SLUG
   build-android-debug [ROOT_HINT] APP_SLUG
+  build-native-mobile-workspace [ROOT_HINT] WORKSPACE_PATH android|ios [debug|release]
+  upload-native-mobile-play [ROOT_HINT] WORKSPACE_PATH AAB_PATH [TRACK]
   scaffold-app [ROOT_HINT] APP_SLUG APP_NAME TEMPLATE [SOURCE_APP]
   scaffold-workspace [ROOT_HINT] APP_SLUG APP_NAME CONTEXT STARTER TARGETS [SOURCE] [PROJECT_ROOT]
   scaffold-site [ROOT_HINT] SITE_NAME TEMPLATE [DEST_ROOT]
@@ -71,7 +73,7 @@ TEMPLATE values for scaffold-app:
   minimal | reference-app | panel | sidebar | topbar | dashboard | studio | clone
 
 CONTEXT values for scaffold-workspace:
-  web | native-desktop | godot
+  web | native-desktop | native-mobile | godot
 USAGE
   exit 0
   ;;
@@ -2730,6 +2732,21 @@ detect_workspace_native_ir_path() {
   return 1
 }
 
+detect_workspace_mobile_ir_path() {
+  workspace_path=${1-}
+  for candidate in \
+    "$workspace_path/ir/mobile.ir.yaml" \
+    "$workspace_path/ir/mobile.ir.yml" \
+    "$workspace_path/mobile.ir.yaml" \
+    "$workspace_path/mobile.ir.yml"
+  do
+    [ -f "$candidate" ] || continue
+    printf '%s\n' "${candidate#"$workspace_path"/}"
+    return 0
+  done
+  return 1
+}
+
 resolve_workspace_godot_subpath() {
   workspace_path=${1-}
   conf_path=${2-}
@@ -2778,6 +2795,26 @@ resolve_workspace_native_ir_path() {
   fi
 
   detect_workspace_native_ir_path "$workspace_path"
+}
+
+resolve_workspace_mobile_ir_path() {
+  workspace_path=${1-}
+  conf_path=${2-}
+
+  mobile_ir_path=""
+  if [ -n "$conf_path" ] && [ -f "$conf_path" ]; then
+    mobile_ir_path=$(workspace_field "$conf_path" mobile_ir_path "")
+  fi
+
+  if [ -n "$mobile_ir_path" ]; then
+    mobile_ir_abs=$(resolve_workspace_relative_path "$workspace_path" "$mobile_ir_path" 2>/dev/null || true)
+    if [ -n "$mobile_ir_abs" ] && [ -f "$mobile_ir_abs" ]; then
+      printf '%s\n' "$mobile_ir_path"
+      return 0
+    fi
+  fi
+
+  detect_workspace_mobile_ir_path "$workspace_path"
 }
 
 resolve_workspace_app_dir() {
@@ -2835,12 +2872,15 @@ ensure_importable_workspace_profile() {
     existing_app_subpath=$(workspace_field "$conf_path" app_subpath "")
     existing_godot_subpath=$(workspace_field "$conf_path" godot_subpath "")
     existing_native_ir_path=$(workspace_field "$conf_path" native_ir_path "")
+    existing_mobile_ir_path=$(workspace_field "$conf_path" mobile_ir_path "")
     needs_detection=0
     if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ]; then
       needs_detection=1
     elif [ "$existing_context" = "godot" ]; then
       needs_detection=0
     elif [ "$existing_context" = "native-desktop" ] && [ -n "$existing_native_ir_path" ]; then
+      needs_detection=0
+    elif [ "$existing_context" = "native-mobile" ] && [ -n "$existing_mobile_ir_path" ]; then
       needs_detection=0
     elif [ "$existing_context" = "web" ] && [ -n "$existing_app_subpath" ]; then
       needs_detection=0
@@ -2853,6 +2893,7 @@ ensure_importable_workspace_profile() {
     if [ "$needs_detection" -eq 1 ]; then
       detected_godot_subpath=$(detect_workspace_godot_subpath "$workspace_path" 2>/dev/null || true)
       detected_native_ir_path=$(detect_workspace_native_ir_path "$workspace_path" 2>/dev/null || true)
+      detected_mobile_ir_path=$(detect_workspace_mobile_ir_path "$workspace_path" 2>/dev/null || true)
       detected_app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true)
       if [ -n "$detected_godot_subpath" ]; then
         if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ "$existing_context" != "godot" ]; then
@@ -2879,6 +2920,17 @@ ensure_importable_workspace_profile() {
         fi
         if [ "$existing_native_ir_path" != "$detected_native_ir_path" ]; then
           write_key_value_file "$conf_path" native_ir_path "$detected_native_ir_path"
+        fi
+      elif [ -n "$detected_mobile_ir_path" ] && [ "$existing_context" != "godot" ]; then
+        if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ "$existing_context" != "native-mobile" ]; then
+          write_key_value_file "$conf_path" project_type "native-mobile"
+          write_key_value_file "$conf_path" development_context "native-mobile"
+          write_key_value_file "$conf_path" starter "import-native-mobile"
+          write_key_value_file "$conf_path" profile_kind "detected"
+          write_key_value_file "$conf_path" targets "android,ios"
+        fi
+        if [ "$existing_mobile_ir_path" != "$detected_mobile_ir_path" ]; then
+          write_key_value_file "$conf_path" mobile_ir_path "$detected_mobile_ir_path"
         fi
       elif [ -n "$detected_app_subpath" ] && [ "$existing_context" != "godot" ]; then
         if [ "$existing_profile_kind" = "generic" ] || [ -z "$existing_targets" ] || [ -z "$existing_app_subpath" ]; then
@@ -2912,6 +2964,7 @@ ensure_importable_workspace_profile() {
   profile_kind="detected"
   app_subpath=""
   native_ir_path=""
+  mobile_ir_path=""
   if godot_subpath=$(detect_workspace_godot_subpath "$workspace_path" 2>/dev/null || true) && [ -n "$godot_subpath" ]; then
     context="godot"
     project_type="game"
@@ -2922,6 +2975,11 @@ ensure_importable_workspace_profile() {
     project_type="native-desktop"
     targets="macos,linux"
     starter="import-native-desktop"
+  elif mobile_ir_path=$(detect_workspace_mobile_ir_path "$workspace_path" 2>/dev/null || true) && [ -n "$mobile_ir_path" ]; then
+    context="native-mobile"
+    project_type="native-mobile"
+    targets="android,ios"
+    starter="import-native-mobile"
   elif app_subpath=$(detect_workspace_app_subpath "$workspace_path" 2>/dev/null || true) && [ -n "$app_subpath" ]; then
     context="web"
     project_type="application"
@@ -2958,6 +3016,9 @@ CONF
   fi
   if [ -n "$native_ir_path" ]; then
     printf 'native_ir_path=%s\n' "$native_ir_path" >>"$conf_path"
+  fi
+  if [ -n "$mobile_ir_path" ]; then
+    printf 'mobile_ir_path=%s\n' "$mobile_ir_path" >>"$conf_path"
   fi
   printf 'run_rebuild_command=%s\n' ":" >>"$conf_path"
 
@@ -3908,6 +3969,7 @@ cmd_get_workspace_profile() {
   printf 'profile_kind=%s\n' "$(kv_output_value "$(workspace_field "$conf" profile_kind "")")"
   printf 'app_subpath=%s\n' "$(kv_output_value "$(workspace_field "$conf" app_subpath "")")"
   printf 'native_ir_path=%s\n' "$(kv_output_value "$(workspace_field "$conf" native_ir_path "")")"
+  printf 'mobile_ir_path=%s\n' "$(kv_output_value "$(workspace_field "$conf" mobile_ir_path "")")"
   printf 'hosted_web_mode=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_mode "")")"
   printf 'hosted_web_site_name=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_site_name "")")"
   printf 'hosted_web_serve_script=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_serve_script "")")"
@@ -4528,7 +4590,7 @@ cmd_pick_workspace_subpath() {
 validate_workspace_profile_field_key() {
   key=${1-}
   case "$key" in
-    project_type|development_context|starter|app_subpath|native_ir_path|hosted_web_mode|hosted_web_site_name|hosted_web_serve_script|hosted_web_serve_action|run_rebuild_command)
+    project_type|development_context|starter|app_subpath|native_ir_path|mobile_ir_path|hosted_web_mode|hosted_web_site_name|hosted_web_serve_script|hosted_web_serve_action|run_rebuild_command)
       return 0
       ;;
   esac
@@ -4596,25 +4658,25 @@ cmd_set_workspace_field() {
   case "$key" in
     project_type)
       case "$normalized_value" in
-        application|native-desktop|game) ;;
+        application|native-desktop|native-mobile|game) ;;
         *)
-          printf '%s\n' "forge-backend: project_type must be application, native-desktop, or game" >&2
+          printf '%s\n' "forge-backend: project_type must be application, native-desktop, native-mobile, or game" >&2
           exit 2
           ;;
       esac
       ;;
     development_context)
       case "$normalized_value" in
-        web|native-desktop|godot) ;;
+        web|native-desktop|native-mobile|godot) ;;
         *)
-          printf '%s\n' "forge-backend: development_context must be web, native-desktop, or godot" >&2
+          printf '%s\n' "forge-backend: development_context must be web, native-desktop, native-mobile, or godot" >&2
           exit 2
           ;;
       esac
       ;;
     starter)
       case "$normalized_value" in
-        ""|import-web|import-native-desktop|import-godot|import-generic|blank|minimal|reference-app|panel|sidebar|topbar|dashboard|studio|clone)
+        ""|import-web|import-native-desktop|import-native-mobile|import-godot|import-generic|blank|minimal|reference-app|panel|sidebar|topbar|dashboard|studio|clone)
           ;;
         *)
           printf '%s\n' "forge-backend: unsupported starter '$normalized_value'" >&2
@@ -5618,6 +5680,94 @@ resolve_native_workspace_metadata() {
   printf 'workspace_slug=%s\n' "$workspace_slug"
 }
 
+resolve_native_mobile_workspace_metadata() {
+  workspace_path=${1-}
+  workspace_conf=${2-}
+  [ -n "$workspace_path" ] || return 1
+  [ -n "$workspace_conf" ] || return 1
+  require_jq
+
+  mobile_ir_rel=$(resolve_workspace_mobile_ir_path "$workspace_path" "$workspace_conf")
+  mobile_ir="$workspace_path/$mobile_ir_rel"
+  [ -f "$mobile_ir" ] || return 1
+
+  app_id=$(jq -r '.app.id // ""' "$mobile_ir")
+  app_name=$(jq -r '.app.name // ""' "$mobile_ir")
+  [ -n "$app_id" ] || return 1
+  printf '%s\n' "$app_id" | LC_ALL=C grep -Eq '^[A-Za-z][A-Za-z0-9-]*$' || return 1
+  app_name=$(safe_generated_display_name "$app_name" "$(workspace_display_title "$workspace_path" "$workspace_conf")")
+  workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
+
+  printf 'ir=%s\n' "$mobile_ir"
+  printf 'app_id=%s\n' "$app_id"
+  printf 'app_name=%s\n' "$app_name"
+  printf 'workspace_slug=%s\n' "$workspace_slug"
+}
+
+build_native_mobile_workspace_target() {
+  root=${1-}
+  workspace_path=${2-}
+  workspace_conf=${3-}
+  target=${4-}
+  mode=${5:-debug}
+
+  case "$target" in android|ios) ;; *) printf '%s\n' "forge-backend: native mobile target must be android or ios" >&2; exit 2 ;; esac
+  case "$mode" in debug|release) ;; *) printf '%s\n' "forge-backend: native mobile build mode must be debug or release" >&2; exit 2 ;; esac
+
+  meta=$(resolve_native_mobile_workspace_metadata "$workspace_path" "$workspace_conf") || {
+    printf '%s\n' "forge-backend: native mobile workspace IR is missing or invalid: $workspace_path" >&2
+    exit 1
+  }
+  app_id=$(printf '%s\n' "$meta" | kv_read app_id)
+  app_name=$(printf '%s\n' "$meta" | kv_read app_name)
+  workspace_slug=$(printf '%s\n' "$meta" | kv_read workspace_slug)
+
+  run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+
+  case "$target" in
+    android)
+      require_tool gradle
+      require_tool java
+      project_dir="$workspace_path/generated/mobile/android"
+      [ -f "$project_dir/settings.gradle" ] || { printf '%s\n' "forge-backend: native Android project is missing settings.gradle: $project_dir" >&2; exit 1; }
+      out_dir="$root/_tmp/workbench/dist/native-mobile/$workspace_slug/android"
+      mkdir -p "$out_dir"
+      task="assembleDebug"
+      [ "$mode" = "release" ] && task="bundleRelease"
+      gradle -p "$project_dir" ":app:$task"
+      if [ "$mode" = "release" ]; then
+        artifact=$(find "$project_dir/app/build/outputs/bundle/release" -type f -name '*.aab' | head -n 1)
+        [ -n "$artifact" ] || { printf '%s\n' "forge-backend: Android release AAB not found" >&2; exit 1; }
+        out_artifact="$out_dir/$app_id-release.aab"
+      else
+        artifact=$(find "$project_dir/app/build/outputs/apk/debug" -type f -name '*.apk' | head -n 1)
+        [ -n "$artifact" ] || { printf '%s\n' "forge-backend: Android debug APK not found" >&2; exit 1; }
+        out_artifact="$out_dir/$app_id-debug.apk"
+      fi
+      cp "$artifact" "$out_artifact"
+      printf 'status=ok\n'
+      printf 'target=android\n'
+      printf 'mode=%s\n' "$mode"
+      printf 'app_name=%s\n' "$app_name"
+      printf 'artifact=%s\n' "$out_artifact"
+      printf 'project=%s\n' "$project_dir"
+      ;;
+    ios)
+      [ "$(os_id)" = "darwin" ] || { printf '%s\n' "forge-backend: native iOS builds are supported on macOS only" >&2; exit 1; }
+      require_tool xcodegen
+      require_tool xcodebuild
+      project_dir="$workspace_path/generated/mobile/ios"
+      [ -f "$project_dir/project.yml" ] || { printf '%s\n' "forge-backend: native iOS project is missing project.yml: $project_dir" >&2; exit 1; }
+      ( cd "$project_dir" && xcodegen generate >/dev/null && xcodebuild -scheme "$app_id" -destination 'generic/platform=iOS Simulator' build >/dev/null )
+      printf 'status=ok\n'
+      printf 'target=ios\n'
+      printf 'mode=%s\n' "$mode"
+      printf 'app_name=%s\n' "$app_name"
+      printf 'project=%s\n' "$project_dir"
+      ;;
+  esac
+}
+
 workspace_native_bundle_icon_path() {
   workspace_path=${1-}
   if [ -n "$workspace_path" ]; then
@@ -6154,10 +6304,10 @@ cmd_install_workspace() {
   fi
   [ -n "$context" ] || context='web'
   case "$context" in
-    native-desktop|web|godot)
+    native-desktop|native-mobile|web|godot)
       ;;
     *)
-      printf '%s\n' "forge-backend: install-workspace currently supports web, native-desktop, and macOS Godot projects only" >&2
+      printf '%s\n' "forge-backend: install-workspace currently supports web, native-desktop, native-mobile, and macOS Godot projects only" >&2
       exit 1
       ;;
   esac
@@ -6750,6 +6900,10 @@ cmd_rebuild_workspace() {
       printf 'app_entry=%s\n' "$workspace_path/generated"
       printf 'native_ir=%s\n' "$(resolve_workspace_native_ir_path "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path/ir/app.ir.yaml")"
       ;;
+    native-mobile)
+      printf 'app_entry=%s\n' "$workspace_path/generated/mobile"
+      printf 'mobile_ir=%s\n' "$(resolve_workspace_mobile_ir_path "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path/ir/mobile.ir.yaml")"
+      ;;
     *)
       printf 'app_entry=%s\n' "$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path")"
       ;;
@@ -7007,6 +7161,10 @@ cmd_run_workspace() {
           ;;
       esac
       ;;
+    native-mobile)
+      printf '%s\n' "forge-backend: native mobile projects are built with per-target Android/iOS actions" >&2
+      exit 1
+      ;;
     web)
       os=$(os_id)
       host_target=$(host_workspace_target_id 2>/dev/null || true)
@@ -7080,7 +7238,7 @@ cmd_run_workspace() {
       fi
       ;;
     *)
-      printf '%s\n' "forge-backend: project context must be web, native-desktop, or godot" >&2
+      printf '%s\n' "forge-backend: project context must be web, native-desktop, native-mobile, or godot" >&2
       exit 2
       ;;
   esac
@@ -7468,6 +7626,38 @@ PY
   esac
 }
 
+cmd_build_native_mobile_workspace() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  target=${3-}
+  mode=${4:-debug}
+  [ -n "$workspace_path" ] || { printf '%s\n' "forge-backend: build-native-mobile-workspace requires WORKSPACE_PATH" >&2; exit 2; }
+  [ -d "$workspace_path" ] || { printf '%s\n' "forge-backend: project not found: $workspace_path" >&2; exit 1; }
+  reject_line_breaks "$workspace_path" "project path"
+  workspace_conf="$workspace_path/wizardry.workspace.conf"
+  [ -f "$workspace_conf" ] || { printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2; exit 1; }
+  build_native_mobile_workspace_target "$root" "$workspace_path" "$workspace_conf" "$target" "$mode"
+}
+
+cmd_upload_native_mobile_play() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  aab_path=${3-}
+  track=${4:-internal}
+  [ -n "$workspace_path" ] || { printf '%s\n' "forge-backend: upload-native-mobile-play requires WORKSPACE_PATH" >&2; exit 2; }
+  [ -n "$aab_path" ] || { printf '%s\n' "forge-backend: upload-native-mobile-play requires AAB_PATH" >&2; exit 2; }
+  [ -d "$workspace_path" ] || { printf '%s\n' "forge-backend: project not found: $workspace_path" >&2; exit 1; }
+  [ -f "$aab_path" ] || { printf '%s\n' "forge-backend: Android AAB not found: $aab_path" >&2; exit 1; }
+  reject_line_breaks "$workspace_path" "project path"
+  reject_line_breaks "$aab_path" "Android AAB path"
+  workspace_conf="$workspace_path/wizardry.workspace.conf"
+  [ -f "$workspace_conf" ] || { printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2; exit 1; }
+  meta=$(resolve_native_mobile_workspace_metadata "$workspace_path" "$workspace_conf") || { printf '%s\n' "forge-backend: native mobile workspace IR is missing or invalid: $workspace_path" >&2; exit 1; }
+  app_id=$(printf '%s\n' "$meta" | kv_read app_id | tr '-' '_')
+  package_name="app.wizardry.generated.$app_id"
+  sh "$root/tools/release/upload-play-internal.sh" "$aab_path" "$package_name" "$track"
+}
+
 cmd_stage_mobile() {
   root=$(require_root "${1-}")
   slug=${2-}
@@ -7609,7 +7799,7 @@ workspace_uses_emitted_project_license() {
   starter=${1-}
   context=${2-}
   case "$context:$starter" in
-    web:minimal|web:reference-app|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank|native-desktop:reference-app)
+    web:minimal|web:reference-app|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank|native-desktop:reference-app|native-mobile:blank|native-mobile:reference-app)
       return 0
       ;;
   esac
@@ -7644,6 +7834,45 @@ render_native_template_file() {
     -e "s/__APP_NAME__/$escaped_name/g" \
     -e "s/__APP_ID__/$escaped_id/g" \
     "$src_path" > "$dest_path"
+}
+
+write_native_mobile_starter_template() {
+  root=$1
+  workspace_dir=$2
+  app_name=$3
+  app_id=$4
+  starter=${5:-blank}
+
+  case "$starter" in
+    blank|reference-app) ;;
+    *)
+      printf '%s\n' "forge-backend: unknown native mobile starter template: $starter" >&2
+      exit 2
+      ;;
+  esac
+
+  template_dir="$root/templates/forge/native-mobile/$starter"
+  [ -d "$template_dir" ] || {
+    printf '%s\n' "forge-backend: native mobile starter template directory missing: $template_dir" >&2
+    exit 1
+  }
+
+  mkdir -p \
+    "$workspace_dir/ir" \
+    "$workspace_dir/scripts" \
+    "$workspace_dir/generated/mobile/android" \
+    "$workspace_dir/generated/mobile/ios" \
+    "$workspace_dir/schemas"
+
+  render_native_template_file "$template_dir/ir/mobile.ir.yaml" "$workspace_dir/ir/mobile.ir.yaml" "$app_name" "$app_id"
+  render_native_template_file "$template_dir/scripts/render-native-mobile.sh" "$workspace_dir/scripts/render-native-mobile.sh" "$app_name" "$app_id"
+  render_native_template_file "$template_dir/scripts/validate-native-mobile-ir.sh" "$workspace_dir/scripts/validate-native-mobile-ir.sh" "$app_name" "$app_id"
+  chmod +x "$workspace_dir/scripts/render-native-mobile.sh" "$workspace_dir/scripts/validate-native-mobile-ir.sh"
+  cp "$root/runtime/schemas/native-mobile-ir-v1.json" "$workspace_dir/schemas/native-mobile-ir-v1.json"
+  (
+    cd "$workspace_dir"
+    sh "scripts/render-native-mobile.sh"
+  )
 }
 
 write_web_starter_template() {
@@ -7752,6 +7981,9 @@ write_emitted_project_readme_if_missing() {
   case "$context" in
     native-desktop)
       summary="Native desktop app scaffolded by App Forge."
+      ;;
+    native-mobile)
+      summary="Native mobile app scaffolded by App Forge."
       ;;
   esac
 
@@ -8039,6 +8271,45 @@ cmd_scaffold_workspace() {
 
       ;;
 
+    native-mobile)
+      project_type=native-mobile
+      development_context=native-mobile
+
+      case "$starter" in
+        blank|reference-app|clone) ;;
+        *)
+          printf '%s\n' "forge-backend: scaffold-workspace unknown native mobile starter: $starter" >&2
+          exit 2
+          ;;
+      esac
+
+      mkdir -p "$workspace_dir"
+      mobile_ir_path="ir/mobile.ir.yaml"
+
+      case "$starter" in
+        blank|reference-app)
+          write_native_mobile_starter_template "$root" "$workspace_dir" "$app_name" "$slug" "$starter"
+          write_emitted_project_legal_files "$root" "$workspace_dir"
+          write_emitted_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
+          ;;
+        clone)
+          [ -n "$source" ] || { printf '%s\n' "forge-backend: scaffold-workspace native mobile clone requires SOURCE" >&2; exit 2; }
+          validate_slug "$source"
+          source_dir=''
+          for candidate in "$project_root/$source" "$root/apps/$source"; do
+            if [ -d "$candidate" ]; then source_dir=$candidate; break; fi
+          done
+          [ -d "$source_dir" ] || { printf '%s\n' "forge-backend: source native mobile project not found: $source" >&2; exit 1; }
+          rm -rf "$workspace_dir"
+          mkdir -p "$workspace_dir"
+          cp -R "$source_dir"/. "$workspace_dir/"
+          mobile_ir_path=$(resolve_workspace_mobile_ir_path "$workspace_dir" "$workspace_dir/wizardry.workspace.conf" 2>/dev/null || printf '%s' "ir/mobile.ir.yaml")
+          write_imported_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
+          ;;
+      esac
+
+      ;;
+
     godot)
       project_type=game
       development_context=godot
@@ -8106,7 +8377,7 @@ GDSCRIPT
       ;;
 
     *)
-      printf '%s\n' "forge-backend: scaffold-workspace context must be web, native-desktop, or godot" >&2
+      printf '%s\n' "forge-backend: scaffold-workspace context must be web, native-desktop, native-mobile, or godot" >&2
       exit 2
       ;;
   esac
@@ -8115,6 +8386,9 @@ GDSCRIPT
   case "$development_context" in
     native-desktop)
       run_rebuild_command="sh scripts/render-native-desktop.sh"
+      ;;
+    native-mobile)
+      run_rebuild_command="sh scripts/render-native-mobile.sh"
       ;;
   esac
 
@@ -8147,6 +8421,9 @@ CONF
       ;;
     native-desktop)
       printf 'native_ir_path=%s\n' "${native_ir_path:-ir/app.ir.yaml}" >>"$profile"
+      ;;
+    native-mobile)
+      printf 'mobile_ir_path=%s\n' "${mobile_ir_path:-ir/mobile.ir.yaml}" >>"$profile"
       ;;
   esac
 
@@ -8447,6 +8724,12 @@ case "$cmd" in
     ;;
   build-android-debug)
     cmd_build_android_debug "${2-}" "${3-}"
+    ;;
+  build-native-mobile-workspace)
+    cmd_build_native_mobile_workspace "${2-}" "${3-}" "${4-}" "${5-}"
+    ;;
+  upload-native-mobile-play)
+    cmd_upload_native_mobile_play "${2-}" "${3-}" "${4-}" "${5-}"
     ;;
   scaffold-app)
     cmd_scaffold_app "${2-}" "${3-}" "${4-}" "${5-}" "${6-}"
