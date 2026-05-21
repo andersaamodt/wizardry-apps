@@ -97,6 +97,23 @@
       "targets": "linux,ios,android,macos"
     },
     {
+      "slug": "priorities-mobile",
+      "name": "Priorities Mobile",
+      "production": false,
+      "distribution": "optional",
+      "source": {
+        "repo": "../priorities",
+        "ref": "main",
+        "subdir": "."
+      },
+      "bundleIds": {
+        "macos": "com.wizardry.apps.prioritiesmobile.macos",
+        "ios": "com.wizardry.apps.prioritiesmobile.ios",
+        "android": "com.wizardry.apps.prioritiesmobile.android"
+      },
+      "targets": "ios,android"
+    },
+    {
       "slug": "virtual-redditor",
       "name": "Virtual Redditor",
       "production": false,

@@ -120,6 +120,42 @@ sh "$ROOT_DIR/tools/release/stage-web-assets.sh" chatroom "$tmp_dir/chatroom-ass
 [ -f "$tmp_dir/chatroom-assets/app/index.html" ]
 [ -f "$tmp_dir/chatroom-assets/app/.host/shared/wizardry-bridge.js" ]
 
+optional_source_root="$tmp_dir/optional-source-root"
+optional_stage_root="$tmp_dir/optional-stage-root"
+mkdir -p \
+  "$optional_source_root" \
+  "$optional_stage_root/tools/release" \
+  "$optional_stage_root/apps/.host/shared" \
+  "$optional_stage_root/templates/web/.themes" \
+  "$optional_stage_root/runtime/config" \
+  "$optional_stage_root/runtime/core/include" \
+  "$optional_stage_root/runtime/core/src"
+cp "$ROOT_DIR/tools/release/stage-web-assets.sh" "$optional_stage_root/tools/release/stage-web-assets.sh"
+cp "$ROOT_DIR/runtime/config/templates.manifest.json" "$optional_stage_root/runtime/config/templates.manifest.json"
+printf '%s\n' "optional app" >"$optional_source_root/index.html"
+mkdir -p "$optional_source_root/.git"
+: >"$optional_source_root/.log"
+printf '%s\n' "bridge" >"$optional_stage_root/apps/.host/shared/wizardry-bridge.js"
+printf '%s\n' "theme" >"$optional_stage_root/templates/web/.themes/psionic.css"
+printf '%s\n' "core header" >"$optional_stage_root/runtime/core/include/wizardry.h"
+printf '%s\n' "core source" >"$optional_stage_root/runtime/core/src/wizardry.c"
+jq -n --arg repo "$optional_source_root" '{
+  schemaVersion:"1",
+  apps:[{
+    slug:"optional-mobile",
+    name:"Optional Mobile",
+    production:false,
+    distribution:"optional",
+    source:{repo:$repo, ref:"main", subdir:"."},
+    bundleIds:{macos:"com.example.optional.macos", ios:"com.example.optional.ios", android:"com.example.optional.android"},
+    targets:"ios,android"
+  }]
+}' >"$optional_stage_root/runtime/config/apps.manifest.json"
+sh "$optional_stage_root/tools/release/stage-web-assets.sh" optional-mobile "$tmp_dir/optional-mobile-assets"
+grep -Fx "optional app" "$tmp_dir/optional-mobile-assets/app/index.html" >/dev/null
+[ ! -e "$tmp_dir/optional-mobile-assets/app/.git" ]
+[ ! -e "$tmp_dir/optional-mobile-assets/app/.log" ]
+
 partial_icon_app="$tmp_dir/partial-icon-app"
 partial_icon_res="$tmp_dir/partial-icon-res"
 mkdir -p "$partial_icon_app/assets/icons/android/mipmap-mdpi" "$partial_icon_app/assets/icons/android/mipmap-hdpi" "$partial_icon_app/assets"

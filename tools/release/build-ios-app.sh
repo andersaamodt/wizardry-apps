@@ -86,6 +86,38 @@ IOS_ROOT="$ROOT_DIR/apps/.host/ios"
 APP_NAME=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" "$slug")
 BUNDLE_ID=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" ios "$slug")
 VERSION_NAME=${RELEASE_VERSION:-0.1.0}
+manifest="$ROOT_DIR/runtime/config/apps.manifest.json"
+
+resolve_manifest_source_app_dir() {
+  app_slug=$1
+  [ -f "$manifest" ] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+  repo=$(jq -r --arg slug "$app_slug" '.apps[] | select(.slug == $slug) | (.source.repo // "")' "$manifest")
+  subdir=$(jq -r --arg slug "$app_slug" '.apps[] | select(.slug == $slug) | (.source.subdir // ".")' "$manifest")
+  [ -n "$repo" ] || return 1
+  case "$repo" in *"
+"*|*"
+"*|*"	"*) return 1 ;; esac
+  case "$subdir" in ""|".") subdir=. ;; /*|*"
+"*|*"
+"*|*"	"*|*\\*|*..*|*//*) return 1 ;; esac
+  case "$repo" in /*) repo_path=$repo ;; *) repo_path=$ROOT_DIR/$repo ;; esac
+  [ -d "$repo_path" ] || return 1
+  repo_abs=$(CDPATH= cd -- "$repo_path" && pwd -P)
+  if [ "$subdir" = "." ]; then app_source=$repo_abs; else app_source=$repo_abs/$subdir; fi
+  [ -d "$app_source" ] || return 1
+  app_source_abs=$(CDPATH= cd -- "$app_source" && pwd -P)
+  case "$app_source_abs" in "$repo_abs"|"$repo_abs"/*) ;; *) return 1 ;; esac
+  printf '%s\n' "$app_source_abs"
+}
+
+if [ -d "$ROOT_DIR/apps/$slug" ]; then
+  APP_DIR="$ROOT_DIR/apps/$slug"
+elif APP_DIR=$(resolve_manifest_source_app_dir "$slug" 2>/dev/null); then
+  :
+else
+  APP_DIR="$ROOT_DIR/apps/$slug"
+fi
 case "$VERSION_NAME" in
   v*) VERSION_NAME=${VERSION_NAME#v} ;;
 esac
@@ -164,7 +196,7 @@ cat > "$project_dir/Host/Assets.xcassets/Contents.json" <<'JSON'
   }
 }
 JSON
-sh "$ROOT_DIR/tools/icons/stage-ios-appiconset.sh" "$ROOT_DIR/apps/$slug" "$project_dir/Host/Assets.xcassets"
+sh "$ROOT_DIR/tools/icons/stage-ios-appiconset.sh" "$APP_DIR" "$project_dir/Host/Assets.xcassets"
 
 project_yml="$project_dir/project.yml"
 cp "$IOS_ROOT/project-template.yml" "$project_yml"

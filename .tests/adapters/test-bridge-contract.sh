@@ -32,10 +32,11 @@ assert_matches() {
 # Shared JS bridge API contract.
 assert_contains "$bridge" 'window.__wizardry_callbacks'
 assert_matches "$bridge" 'function execCommand\(argv\)'
+assert_matches "$bridge" 'function postRpc\(method, params\)'
 assert_matches "$bridge" 'window\.wizardry\.exec = execCommand;'
 assert_matches "$bridge" 'window\.wizardry\.rpc = rpcBridge;'
-assert_contains "$bridge" "method !== 'bridge.exec'"
-assert_contains "$bridge" "unsupported rpc method"
+assert_contains "$bridge" "if (method === 'bridge.exec')"
+assert_contains "$bridge" "post({ id: id, type: 'rpc', method: method, params: params || {} })"
 
 # Shared bridge transport should support both iOS and Android message paths.
 assert_contains "$bridge" 'window.webkit.messageHandlers.wizardry'
@@ -52,5 +53,8 @@ for m in core.ping vault.mount vault.info txn.begin txn.commit txn.rollback; do
   assert_contains "$android" "\"$m\""
   assert_contains "$ios" "\"$m\""
 done
+
+assert_contains "$android" "\"priorities.exec\""
+assert_contains "$ios" "\"priorities.exec\""
 
 printf '%s\n' "bridge contract checks passed"

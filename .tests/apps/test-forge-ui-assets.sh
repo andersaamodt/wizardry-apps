@@ -52,7 +52,8 @@ grep -F "window.wizardry.exec" "$root/apps/forge/index.html" >/dev/null
 grep -F "window.wizardry.exec" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "window.wizardry.rpc" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "window.wizardry.nativeAvailable" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
-grep -F "method !== 'bridge.exec'" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
+grep -F "if (method === 'bridge.exec')" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
+grep -F "postRpc(method, payload || {})" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "Emission material notice" "$root/apps/.host/shared/wizardry-bridge.js" >/dev/null
 grep -F "version 3 or (at your option) any later version" "$root/licenses/AGPL-3.0-or-later.txt" >/dev/null
 grep -F "Remote Network Interaction" "$root/licenses/AGPL-3.0-or-later.txt" >/dev/null

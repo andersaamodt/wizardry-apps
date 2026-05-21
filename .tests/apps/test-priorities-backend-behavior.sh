@@ -194,6 +194,9 @@ assert_eq "$expanded_md" "$expanded_clip" "expanded copy should write the same m
 printf '%s\n' "$expanded_md" | grep -F -- "- [ ] alpha" >/dev/null || fail "expanded copy should include top-level alpha"
 printf '%s\n' "$expanded_md" | grep -F -- "  - [ ] alpha child" >/dev/null || fail "expanded copy should include indented alpha child"
 printf '%s\n' "$expanded_md" | grep -F -- "- [x] beta" >/dev/null || fail "expanded copy should include checked beta"
+if printf '%s\n' "$expanded_md" | grep -F -- "  - [x] beta" >/dev/null; then
+  fail "expanded copy should not keep sibling rows indented after recursive project output"
+fi
 
 cat > "$fake_bin/open" <<'EOF'
 #!/bin/sh

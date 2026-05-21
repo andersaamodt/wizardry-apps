@@ -7671,16 +7671,6 @@ cmd_stage_mobile() {
     printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
     exit 1
   }
-  distribution=$(app_distribution "$root" "$slug")
-  [ "$distribution" = "core" ] || {
-    printf '%s\n' "forge-backend: stage-mobile currently supports core apps only: $slug" >&2
-    exit 1
-  }
-  app_exists "$root" "$slug" || {
-    printf '%s\n' "forge-backend: app not found: $slug" >&2
-    exit 1
-  }
-
   dest="$root/_tmp/workbench/stage/mobile-$slug"
   sh "$root/tools/release/stage-web-assets.sh" "$slug" "$dest"
   printf 'staged=%s\n' "$dest"
@@ -7695,16 +7685,6 @@ cmd_build_ios_smoke() {
   }
   validate_slug "$slug"
   require_jq
-  distribution=$(app_distribution "$root" "$slug")
-  [ "$distribution" = "core" ] || {
-    printf '%s\n' "forge-backend: build-ios-smoke currently supports core apps only: $slug" >&2
-    exit 1
-  }
-  app_exists "$root" "$slug" || {
-    printf '%s\n' "forge-backend: app not found: $slug" >&2
-    exit 1
-  }
-
   [ "$(os_id)" = "darwin" ] || {
     printf '%s\n' "forge-backend: build-ios-smoke is supported on macOS only" >&2
     exit 1
@@ -7727,16 +7707,6 @@ cmd_build_android_debug() {
   }
   validate_slug "$slug"
   require_jq
-  distribution=$(app_distribution "$root" "$slug")
-  [ "$distribution" = "core" ] || {
-    printf '%s\n' "forge-backend: build-android-debug currently supports core apps only: $slug" >&2
-    exit 1
-  }
-  app_exists "$root" "$slug" || {
-    printf '%s\n' "forge-backend: app not found: $slug" >&2
-    exit 1
-  }
-
   require_tool gradle
   require_tool java
 

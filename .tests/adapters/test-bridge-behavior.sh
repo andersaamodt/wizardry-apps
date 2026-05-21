@@ -38,9 +38,10 @@ assert_contains "$bridge" "stderr: 'native bridge unavailable'"
 assert_contains "$bridge" 'exit_code: 1'
 assert_contains "$bridge" 'setTimeout(function () {'
 
-# RPC wrapper behavior should only allow bridge.exec and normalize argv payload.
-assert_contains "$bridge" "if (method !== 'bridge.exec')"
-assert_contains "$bridge" "unsupported rpc method"
+# RPC wrapper behavior should keep bridge.exec compatibility and forward native RPCs.
+assert_contains "$bridge" "if (method === 'bridge.exec')"
+assert_contains "$bridge" "postRpc(method, payload || {})"
+assert_contains "$bridge" "post({ id: id, type: 'rpc', method: method, params: params || {} })"
 assert_contains "$bridge" 'Array.isArray(payload.argv)'
 assert_contains "$bridge" 'argv = payload.argv;'
 

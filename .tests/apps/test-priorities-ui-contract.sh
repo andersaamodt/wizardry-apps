@@ -30,6 +30,8 @@ assert_contains() {
 
 # Backend resolution must support bundled app path and workspace path.
 assert_contains "function detectBackendScriptCandidates()"
+assert_contains "function tryMobilePrioritiesExec(args)"
+assert_contains "window.wizardry.rpc('priorities.exec', { argv: args })"
 assert_contains "var appMarker = '/priorities/index.html';"
 assert_contains "out.push(pagePath.slice(0, appIdx) + '/priorities/scripts/priorities-backend.sh');"
 assert_contains "out.push(pagePath.slice(0, idx) + '/apps/priorities/scripts/priorities-backend.sh');"
@@ -90,6 +92,10 @@ assert_contains "function openCurrentRootInFileBrowser()"
 assert_contains "await runBackend(['open-dir', currentRoot]);"
 assert_contains "titleFolder.addEventListener('dblclick', openTitleFolderIfDouble);"
 assert_contains "titleFolder.addEventListener('mouseup', function (event) {"
+
+# Syncthing sync guidance should live in Settings near folder selection.
+assert_contains "https://syncthing.net/"
+assert_contains "point this at a folder synced by"
 
 # Width auto-grow should not read status text width.
 if sed -n '/function computeAutoWindowWidthFromContent()/,/^    }/p' "$app" | grep -F "statusEl" >/dev/null 2>&1; then

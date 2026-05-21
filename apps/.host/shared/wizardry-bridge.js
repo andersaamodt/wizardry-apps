@@ -65,15 +65,40 @@
     });
   }
 
-  function rpcBridge(method, payload) {
-    if (method !== 'bridge.exec') {
-      return Promise.reject(new Error('unsupported rpc method: ' + String(method || '')));
+  function postRpc(method, params) {
+    return new Promise(function (resolve) {
+      var id = nextId();
+      window.__wizardry_callbacks[id] = function (payload) {
+        resolve(payload || {});
+      };
+
+      if (!post({ id: id, type: 'rpc', method: method, params: params || {} })) {
+        setTimeout(function () {
+          window.__wizardry_callbacks[id]({
+            error: {
+              code: -32000,
+              message: 'native bridge unavailable'
+            }
+          });
+        }, 0);
+      }
+    });
+  }
+
+  async function rpcBridge(method, payload) {
+    if (method === 'bridge.exec') {
+      var argv = payload;
+      if (payload && typeof payload === 'object' && Array.isArray(payload.argv)) {
+        argv = payload.argv;
+      }
+      return execCommand(argv);
     }
-    var argv = payload;
-    if (payload && typeof payload === 'object' && Array.isArray(payload.argv)) {
-      argv = payload.argv;
+
+    var response = await postRpc(method, payload || {});
+    if (response && response.error && !response.result && typeof response.exit_code === 'undefined') {
+      return response;
     }
-    return execCommand(argv);
+    return response && Object.prototype.hasOwnProperty.call(response, 'result') ? response.result : response;
   }
 
   window.wizardry = window.wizardry || {};
