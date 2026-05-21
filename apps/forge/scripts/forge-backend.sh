@@ -3737,6 +3737,30 @@ cmd_list_workspaces() {
       ensure_importable_workspace_profile "$path" >/dev/null 2>&1 || true
     fi
 
+    profile_root=$(workspace_field "$conf" root "")
+    if [ -n "$profile_root" ]; then
+      case "$profile_root" in
+        /*) profile_root_abs=$(resolve_existing_dir_path "$profile_root" 2>/dev/null || true) ;;
+        *) profile_root_abs=$(resolve_existing_dir_path "$path/$profile_root" 2>/dev/null || true) ;;
+      esac
+      path_abs=$(resolve_existing_dir_path "$path" 2>/dev/null || true)
+      if [ -n "$path_abs" ] && [ "$profile_root_abs" != "$path_abs" ]; then
+        old_profile_id=$(workspace_field "$conf" project_id "")
+        [ -n "$old_profile_id" ] || old_profile_id=$(workspace_field "$conf" slug "")
+        old_root_slug=""
+        if [ -n "$profile_root_abs" ]; then
+          old_root_slug=$(derive_workspace_slug "$(basename "$profile_root_abs")")
+        elif [ "$profile_root" != "." ]; then
+          old_root_slug=$(derive_workspace_slug "$(basename "$profile_root")")
+        fi
+        new_root_slug=$(derive_workspace_slug "$(basename "$path_abs")")
+        write_key_value_file "$conf" root "$path_abs"
+        if [ -n "$old_profile_id" ] && [ -n "$old_root_slug" ] && [ "$old_profile_id" = "$old_root_slug" ] && [ "$new_root_slug" != "$old_profile_id" ]; then
+          write_key_value_file "$conf" project_id "$new_root_slug"
+        fi
+      fi
+    fi
+
     project_id=$(workspace_field "$conf" project_id "")
     [ -n "$project_id" ] || project_id=$(workspace_field "$conf" slug "")
     if ! is_valid_slug_value "$project_id"; then

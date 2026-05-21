@@ -497,6 +497,39 @@ grep -F "Wizardry Addendum 1.0" "$workspaces_root/workspace-web/WIZARDRY_ADDENDU
 grep -F "Starter: Sidebar" "$workspaces_root/workspace-web/app/index.html" >/dev/null
 grep -F "Emission material notice" "$workspaces_root/workspace-web/app/index.html" >/dev/null
 
+native_renamed="$workspaces_root/owl"
+web_renamed="$workspaces_root/owl-nonnative"
+mkdir -p "$native_renamed/ir" "$web_renamed/app"
+native_renamed_abs=$(CDPATH= cd -- "$native_renamed" && pwd -P)
+web_renamed_abs=$(CDPATH= cd -- "$web_renamed" && pwd -P)
+printf '%s\n' 'app:' >"$native_renamed/ir/app.ir.yaml"
+printf '%s\n' '<!doctype html><title>Owl</title>' >"$web_renamed/app/index.html"
+cat >"$native_renamed/wizardry.workspace.conf" <<CONF
+project_id=owl
+title=Owl
+project_type=native-desktop
+development_context=native-desktop
+targets=macos,linux
+root=.
+native_ir_path=ir/app.ir.yaml
+run_rebuild_command=:
+CONF
+cat >"$web_renamed/wizardry.workspace.conf" <<CONF
+project_id=owl
+title=Owl
+project_type=application
+development_context=web
+targets=hosted-web,macos,linux
+root=$native_renamed_abs
+app_subpath=app
+run_rebuild_command=:
+CONF
+renamed_workspaces=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
+printf '%s\n' "$renamed_workspaces" | grep -F "owl	"
+printf '%s\n' "$renamed_workspaces" | grep -F "owl-nonnative	"
+grep -Fx "project_id=owl-nonnative" "$web_renamed/wizardry.workspace.conf" >/dev/null
+grep -Fx "root=$web_renamed_abs" "$web_renamed/wizardry.workspace.conf" >/dev/null
+
 source_inject_workspace_out=$(sh "$backend" scaffold-workspace "$scratch" source-inject "Source Inject" web sidebar "hosted-web" "unused
 run_rebuild_command=bad" "$workspaces_root")
 printf '%s\n' "$source_inject_workspace_out" | grep -F "created=$workspaces_root/source-inject" >/dev/null

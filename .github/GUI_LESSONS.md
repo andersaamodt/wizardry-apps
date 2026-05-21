@@ -96,3 +96,4 @@
 - macOS app installers should copy into a temporary bundle and swap it into place; overlay copies can leave stale sealed resources that break code-signature verification.
 - Forge self-restart must not replace the bundle it is currently running from; stage the rebuilt app elsewhere and open it only after the old host has quit.
 - Native Linux conversions should hydrate GTK lists and detail panes from the same structured backend snapshots as macOS; static generated IR rows are useful scaffolding, not feature parity.
+- Forge row overflow actions should close and repaint the row menu before awaiting backend work so destructive-looking operations never feel unresponsive.

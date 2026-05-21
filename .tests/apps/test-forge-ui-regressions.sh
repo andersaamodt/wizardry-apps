@@ -75,6 +75,12 @@ assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 13\)'
 assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 17\)'
 assert_matches "$ui" 'function buildCatalogGitPill\(item\)'
 assert_contains "$ui" 'catalog-git-pill'
+assert_matches "$ui" 'function setDownloadedAppVisibleState\(appId, exists\)'
+assert_matches "$ui" 'setDownloadedAppVisibleState\(item\.id, false\);'
+assert_contains "$ui" "successLabel: item.title + ' removed from Forge.'"
+assert_contains "$ui" "state.activeCatalogRowMenuKey = '';"
+assert_matches "$ui" '^[[:space:]]*renderCatalogList\(\);$'
+assert_matches "$ui" '^[[:space:]]*handler\(\);$'
 assert_matches "$ui" 'navigator\.platform'
 assert_matches "$ui" 'runtimePlatform\.indexOf\('"'"'mac'"'"'\)[[:space:]]*>=[[:space:]]*0'
 assert_matches "$ui" "__wizardry_host_restart_self"

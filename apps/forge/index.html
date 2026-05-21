@@ -4305,6 +4305,7 @@
             event.preventDefault();
             event.stopPropagation();
             state.activeCatalogRowMenuKey = '';
+            renderCatalogList();
             handler();
           });
           rowMenu.appendChild(button);
@@ -4370,11 +4371,12 @@
             } else {
               appendAction('Remove', function () {
                 perform('Remove downloaded app', async function () {
+                  setDownloadedAppVisibleState(item.id, false);
                   await backend('remove-downloaded-app', [item.id]);
                   await refreshApps({ quiet: true, render: false });
                   renderCatalogList();
                   renderSelectedBuiltIn();
-                }, { swallow: true, noToast: true });
+                }, { swallow: true, keepResult: true, successLabel: item.title + ' removed from Forge.' });
               });
             }
           }
@@ -4412,6 +4414,33 @@
       function isBuiltInNotDownloaded(selected) {
         var app = selectedBuiltInEntry(selected);
         return !!(app && app.distribution === 'optional' && app.exists === false);
+      }
+
+      function setDownloadedAppVisibleState(appId, exists) {
+        var targetId = String(appId || '');
+        if (!targetId) {
+          return;
+        }
+        state.apps = state.apps.map(function (app) {
+          if (!app || app.id !== targetId) {
+            return app;
+          }
+          var next = Object.assign({}, app);
+          next.exists = !!exists;
+          next.resolvedStatus = exists ? 'optional_downloaded' : 'not_downloaded';
+          if (!exists) {
+            next.resolvedPath = '';
+            next.gitRepoPresent = 'no';
+            next.gitStatusLabel = '';
+            next.gitStatusTone = 'muted';
+            next.gitStatusReason = '';
+            next.gitReleaseAvailable = 'no';
+          }
+          return next;
+        });
+        saveStorage(CACHED_APPS_KEY, JSON.stringify(state.apps));
+        renderCatalogList();
+        renderSelectedBuiltIn();
       }
 
       function renderSelectedBuiltIn() {
