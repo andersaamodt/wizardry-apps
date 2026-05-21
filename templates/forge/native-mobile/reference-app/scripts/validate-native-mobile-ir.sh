@@ -2,7 +2,7 @@
 
 set -eu
 
-ir_path=${1:-ir/mobile.ir.yaml}
+ir_path=${1:-app-blueprint/mobile.ir.yaml}
 schema_path=${2:-schemas/native-mobile-ir-v1.json}
 
 case "$ir_path" in *"

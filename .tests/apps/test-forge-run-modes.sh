@@ -206,7 +206,7 @@ assert_contains "$help_out" "run-workspace [ROOT_HINT] WORKSPACE_PATH [CONTEXT]"
 assert_contains "$help_out" "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]"
 assert_contains "$help_out" "rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE"
 assert_contains "$help_out" "CONTEXT values for scaffold-workspace:"
-assert_contains "$help_out" "  web | native-desktop | godot"
+assert_contains "$help_out" "  web | native-desktop | native-mobile | godot"
 
 # Behavior: desktop app targets launch desktop host mode.
 desktop_log="$scratch/desktop-host.log"
@@ -331,8 +331,8 @@ make_native_workspace() {
   app_id=$5
   app_name=$6
 
-  mkdir -p "$workspace/ir" "$workspace/generated/linux/src"
-  cat > "$workspace/ir/app.ir.yaml" <<IR
+  mkdir -p "$workspace/app-blueprint" "$workspace/generated/linux/src"
+  cat > "$workspace/app-blueprint/app.ir.yaml" <<IR
 {
   "schemaVersion": "1.0",
   "app": {
@@ -359,7 +359,7 @@ development_context=native-desktop
 targets=$targets
 root=$workspace
 starter=import-native-desktop
-native_ir_path=ir/app.ir.yaml
+native_ir_path=app-blueprint/app.ir.yaml
 run_rebuild_command=:
 CONF
 }

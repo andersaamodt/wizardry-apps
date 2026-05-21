@@ -499,10 +499,10 @@ grep -F "Emission material notice" "$workspaces_root/workspace-web/app/index.htm
 
 native_renamed="$workspaces_root/owl"
 web_renamed="$workspaces_root/owl-nonnative"
-mkdir -p "$native_renamed/ir" "$web_renamed/app"
+mkdir -p "$native_renamed/app-blueprint" "$web_renamed/app"
 native_renamed_abs=$(CDPATH= cd -- "$native_renamed" && pwd -P)
 web_renamed_abs=$(CDPATH= cd -- "$web_renamed" && pwd -P)
-printf '%s\n' 'app:' >"$native_renamed/ir/app.ir.yaml"
+printf '%s\n' 'app:' >"$native_renamed/app-blueprint/app.ir.yaml"
 printf '%s\n' '<!doctype html><title>Owl</title>' >"$web_renamed/app/index.html"
 cat >"$native_renamed/wizardry.workspace.conf" <<CONF
 project_id=owl
@@ -511,7 +511,7 @@ project_type=native-desktop
 development_context=native-desktop
 targets=macos,linux
 root=.
-native_ir_path=ir/app.ir.yaml
+native_ir_path=app-blueprint/app.ir.yaml
 run_rebuild_command=:
 CONF
 cat >"$web_renamed/wizardry.workspace.conf" <<CONF
@@ -695,7 +695,7 @@ workspace_native_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-nat
 printf '%s\n' "$workspace_native_out" | grep -F "created=$workspaces_root/workspace-native" >/dev/null
 workspace_native_abs=$(CDPATH= cd -- "$workspaces_root/workspace-native" && pwd -P)
 [ -f "$workspaces_root/workspace-native/wizardry.workspace.conf" ]
-[ -f "$workspaces_root/workspace-native/ir/app.ir.yaml" ]
+[ -f "$workspaces_root/workspace-native/app-blueprint/app.ir.yaml" ]
 [ -f "$workspaces_root/workspace-native/scripts/render-native-desktop.sh" ]
 [ -f "$workspaces_root/workspace-native/generated/macos/Package.swift" ]
 [ -f "$workspaces_root/workspace-native/generated/linux/meson.build" ]
@@ -706,13 +706,13 @@ grep -F "project_type=native-desktop" "$workspaces_root/workspace-native/wizardr
 grep -F "development_context=native-desktop" "$workspaces_root/workspace-native/wizardry.workspace.conf" >/dev/null
 grep -F "targets=macos,linux" "$workspaces_root/workspace-native/wizardry.workspace.conf" >/dev/null
 grep -F "run_rebuild_command=sh scripts/render-native-desktop.sh" "$workspaces_root/workspace-native/wizardry.workspace.conf" >/dev/null
-grep -F '"type": "Window"' "$workspaces_root/workspace-native/ir/app.ir.yaml" >/dev/null
+grep -F '"type": "Window"' "$workspaces_root/workspace-native/app-blueprint/app.ir.yaml" >/dev/null
 grep -F "Native desktop app scaffolded by App Forge." "$workspaces_root/workspace-native/README.md" >/dev/null
 grep -F "// swift-tools-version:" "$workspaces_root/workspace-native/generated/macos/Package.swift" >/dev/null
 
 workspace_native_reference_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-native-reference "Workspace Native Reference" native-desktop reference-app "macos,linux" "" "$workspaces_root")
 printf '%s\n' "$workspace_native_reference_out" | grep -F "created=$workspaces_root/workspace-native-reference" >/dev/null
-[ -f "$workspaces_root/workspace-native-reference/ir/app.ir.yaml" ]
+[ -f "$workspaces_root/workspace-native-reference/app-blueprint/app.ir.yaml" ]
 [ -f "$workspaces_root/workspace-native-reference/generated/macos/Sources/App/App.swift" ]
 [ -f "$workspaces_root/workspace-native-reference/generated/linux/src/main.c" ]
 grep -F "Native desktop app scaffolded by App Forge." "$workspaces_root/workspace-native-reference/README.md" >/dev/null
@@ -724,7 +724,7 @@ grep -F "apply_reference_snapshot" "$workspaces_root/workspace-native-reference/
 grep -F "starter=reference-app" "$workspaces_root/workspace-native-reference/wizardry.workspace.conf" >/dev/null
 
 bad_native_ir=$(mktemp "${TMPDIR:-/tmp}/forge-bad-native-ir.XXXXXX")
-jq '.app.name = "Bad \"Name" | .app.window.title = "Bad \"Title"' "$workspaces_root/workspace-native/ir/app.ir.yaml" >"$bad_native_ir"
+jq '.app.name = "Bad \"Name" | .app.window.title = "Bad \"Title"' "$workspaces_root/workspace-native/app-blueprint/app.ir.yaml" >"$bad_native_ir"
 if sh "$workspaces_root/workspace-native/scripts/validate-native-desktop-ir.sh" "$bad_native_ir" "$workspaces_root/workspace-native/schemas/native-desktop-ir-v1.json" >/tmp/forge-bad-native-ir.out 2>/tmp/forge-bad-native-ir.err; then
   printf '%s\n' "forge backend test: native desktop IR accepted render-breaking strings" >&2
   exit 1
@@ -734,7 +734,7 @@ rm -f "$bad_native_ir"
 
 bad_native_ir_path="$scratch/native-ir
 status=forged.json"
-cp "$workspaces_root/workspace-native/ir/app.ir.yaml" "$bad_native_ir_path"
+cp "$workspaces_root/workspace-native/app-blueprint/app.ir.yaml" "$bad_native_ir_path"
 if sh "$workspaces_root/workspace-native/scripts/validate-native-desktop-ir.sh" "$bad_native_ir_path" "$workspaces_root/workspace-native/schemas/native-desktop-ir-v1.json" >"$scratch/forge-native-ir-path.out" 2>"$scratch/forge-native-ir-path.err"; then
   printf '%s\n' "forge backend test: native desktop IR accepted line-break IR path" >&2
   exit 1
@@ -1239,7 +1239,7 @@ printf '%s\n' "$run_workspace_infer" | grep -E "mode=(godot|open)" >/dev/null
 native_mobile_root="$scratch/native-mobile-root"
 native_mobile_out=$(sh "$backend" scaffold-workspace "$scratch" "pocket-owl" "Pocket Owl" native-mobile reference-app android,ios "" "$native_mobile_root")
 native_mobile_created=$(printf '%s\n' "$native_mobile_out" | awk -F= '/^created=/{print $2; exit}')
-[ -f "$native_mobile_created/ir/mobile.ir.yaml" ] || {
+[ -f "$native_mobile_created/app-blueprint/mobile.ir.yaml" ] || {
   printf '%s\n' "forge backend test: native mobile IR was not scaffolded" >&2
   exit 1
 }
@@ -1252,7 +1252,7 @@ native_mobile_created=$(printf '%s\n' "$native_mobile_out" | awk -F= '/^created=
   exit 1
 }
 grep -F "project_type=native-mobile" "$native_mobile_created/wizardry.workspace.conf" >/dev/null
-grep -F "mobile_ir_path=ir/mobile.ir.yaml" "$native_mobile_created/wizardry.workspace.conf" >/dev/null
+grep -F "mobile_ir_path=app-blueprint/mobile.ir.yaml" "$native_mobile_created/wizardry.workspace.conf" >/dev/null
 if grep -R "com.google.android.gms" "$native_mobile_created/generated/mobile/android" >/dev/null 2>&1; then
   printf '%s\n' "forge backend test: native mobile starter introduced Play Services dependency" >&2
   exit 1

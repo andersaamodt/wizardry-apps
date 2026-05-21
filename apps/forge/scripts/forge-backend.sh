@@ -2720,6 +2720,8 @@ detect_workspace_godot_subpath() {
 detect_workspace_native_ir_path() {
   workspace_path=${1-}
   for candidate in \
+    "$workspace_path/app-blueprint/app.ir.yaml" \
+    "$workspace_path/app-blueprint/app.ir.yml" \
     "$workspace_path/ir/app.ir.yaml" \
     "$workspace_path/ir/app.ir.yml" \
     "$workspace_path/app.ir.yaml" \
@@ -2735,6 +2737,8 @@ detect_workspace_native_ir_path() {
 detect_workspace_mobile_ir_path() {
   workspace_path=${1-}
   for candidate in \
+    "$workspace_path/app-blueprint/mobile.ir.yaml" \
+    "$workspace_path/app-blueprint/mobile.ir.yml" \
     "$workspace_path/ir/mobile.ir.yaml" \
     "$workspace_path/ir/mobile.ir.yml" \
     "$workspace_path/mobile.ir.yaml" \
@@ -6922,11 +6926,11 @@ cmd_rebuild_workspace() {
   case "$context" in
     native-desktop)
       printf 'app_entry=%s\n' "$workspace_path/generated"
-      printf 'native_ir=%s\n' "$(resolve_workspace_native_ir_path "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path/ir/app.ir.yaml")"
+      printf 'native_ir=%s\n' "$(resolve_workspace_native_ir_path "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path/app-blueprint/app.ir.yaml")"
       ;;
     native-mobile)
       printf 'app_entry=%s\n' "$workspace_path/generated/mobile"
-      printf 'mobile_ir=%s\n' "$(resolve_workspace_mobile_ir_path "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path/ir/mobile.ir.yaml")"
+      printf 'mobile_ir=%s\n' "$(resolve_workspace_mobile_ir_path "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path/app-blueprint/mobile.ir.yaml")"
       ;;
     *)
       printf 'app_entry=%s\n' "$(resolve_workspace_app_dir "$workspace_path" "$workspace_conf" 2>/dev/null || printf '%s' "$workspace_path")"
@@ -7852,13 +7856,13 @@ write_native_mobile_starter_template() {
   }
 
   mkdir -p \
-    "$workspace_dir/ir" \
+    "$workspace_dir/app-blueprint" \
     "$workspace_dir/scripts" \
     "$workspace_dir/generated/mobile/android" \
     "$workspace_dir/generated/mobile/ios" \
     "$workspace_dir/schemas"
 
-  render_native_template_file "$template_dir/ir/mobile.ir.yaml" "$workspace_dir/ir/mobile.ir.yaml" "$app_name" "$app_id"
+  render_native_template_file "$template_dir/app-blueprint/mobile.ir.yaml" "$workspace_dir/app-blueprint/mobile.ir.yaml" "$app_name" "$app_id"
   render_native_template_file "$template_dir/scripts/render-native-mobile.sh" "$workspace_dir/scripts/render-native-mobile.sh" "$app_name" "$app_id"
   render_native_template_file "$template_dir/scripts/validate-native-mobile-ir.sh" "$workspace_dir/scripts/validate-native-mobile-ir.sh" "$app_name" "$app_id"
   chmod +x "$workspace_dir/scripts/render-native-mobile.sh" "$workspace_dir/scripts/validate-native-mobile-ir.sh"
@@ -7935,13 +7939,13 @@ write_native_desktop_starter_template() {
   }
 
   mkdir -p \
-    "$workspace_dir/ir" \
+    "$workspace_dir/app-blueprint" \
     "$workspace_dir/scripts" \
     "$workspace_dir/generated/macos/Sources/App" \
     "$workspace_dir/generated/linux/src" \
     "$workspace_dir/schemas"
 
-  render_native_template_file "$template_dir/ir/app.ir.yaml" "$workspace_dir/ir/app.ir.yaml" "$app_name" "$app_id"
+  render_native_template_file "$template_dir/app-blueprint/app.ir.yaml" "$workspace_dir/app-blueprint/app.ir.yaml" "$app_name" "$app_id"
   render_native_template_file "$template_dir/scripts/render-native-desktop.sh" "$workspace_dir/scripts/render-native-desktop.sh" "$app_name" "$app_id"
   render_native_template_file "$template_dir/scripts/validate-native-desktop-ir.sh" "$workspace_dir/scripts/validate-native-desktop-ir.sh" "$app_name" "$app_id"
   if [ -f "$template_dir/README.md" ]; then
@@ -8226,7 +8230,7 @@ cmd_scaffold_workspace() {
       esac
 
       mkdir -p "$workspace_dir"
-      native_ir_path="ir/app.ir.yaml"
+      native_ir_path="app-blueprint/app.ir.yaml"
 
       case "$starter" in
         blank|reference-app)
@@ -8258,7 +8262,7 @@ cmd_scaffold_workspace() {
           rm -rf "$workspace_dir"
           mkdir -p "$workspace_dir"
           cp -R "$source_dir"/. "$workspace_dir/"
-          native_ir_path=$(resolve_workspace_native_ir_path "$workspace_dir" "$workspace_dir/wizardry.workspace.conf" 2>/dev/null || printf '%s' "ir/app.ir.yaml")
+          native_ir_path=$(resolve_workspace_native_ir_path "$workspace_dir" "$workspace_dir/wizardry.workspace.conf" 2>/dev/null || printf '%s' "app-blueprint/app.ir.yaml")
           write_imported_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
           ;;
       esac
@@ -8278,7 +8282,7 @@ cmd_scaffold_workspace() {
       esac
 
       mkdir -p "$workspace_dir"
-      mobile_ir_path="ir/mobile.ir.yaml"
+      mobile_ir_path="app-blueprint/mobile.ir.yaml"
 
       case "$starter" in
         blank|reference-app)
@@ -8297,7 +8301,7 @@ cmd_scaffold_workspace() {
           rm -rf "$workspace_dir"
           mkdir -p "$workspace_dir"
           cp -R "$source_dir"/. "$workspace_dir/"
-          mobile_ir_path=$(resolve_workspace_mobile_ir_path "$workspace_dir" "$workspace_dir/wizardry.workspace.conf" 2>/dev/null || printf '%s' "ir/mobile.ir.yaml")
+          mobile_ir_path=$(resolve_workspace_mobile_ir_path "$workspace_dir" "$workspace_dir/wizardry.workspace.conf" 2>/dev/null || printf '%s' "app-blueprint/mobile.ir.yaml")
           write_imported_project_readme_if_missing "$workspace_dir" "$app_name" "$development_context"
           ;;
       esac
@@ -8414,10 +8418,10 @@ CONF
       fi
       ;;
     native-desktop)
-      printf 'native_ir_path=%s\n' "${native_ir_path:-ir/app.ir.yaml}" >>"$profile"
+      printf 'native_ir_path=%s\n' "${native_ir_path:-app-blueprint/app.ir.yaml}" >>"$profile"
       ;;
     native-mobile)
-      printf 'mobile_ir_path=%s\n' "${mobile_ir_path:-ir/mobile.ir.yaml}" >>"$profile"
+      printf 'mobile_ir_path=%s\n' "${mobile_ir_path:-app-blueprint/mobile.ir.yaml}" >>"$profile"
       ;;
   esac
 

@@ -4,7 +4,7 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 project_dir=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
-ir_path="$project_dir/ir/mobile.ir.yaml"
+ir_path="$project_dir/app-blueprint/mobile.ir.yaml"
 schema_path="$project_dir/schemas/native-mobile-ir-v1.json"
 generated_root="$project_dir/generated/mobile"
 android_dir="$generated_root/android"
@@ -207,7 +207,7 @@ SWIFT
 cat >"$generated_root/README.md" <<README
 # $app_name Native Mobile Build
 
-Generated from \`ir/mobile.ir.yaml\`.
+Generated from \`app-blueprint/mobile.ir.yaml\`.
 
 - Android output is a plain Gradle Android project with no Play Services dependency.
 - Android direct distribution is the primary release route; Play upload is optional.

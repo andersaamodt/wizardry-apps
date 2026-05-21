@@ -4,7 +4,7 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 project_dir=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
-ir_path="$project_dir/ir/app.ir.yaml"
+ir_path="$project_dir/app-blueprint/app.ir.yaml"
 schema_path="$project_dir/schemas/native-desktop-ir-v1.json"
 generated_root="$project_dir/generated"
 macos_dir="$generated_root/macos"
@@ -25,7 +25,7 @@ pretty_ir=$(jq '.' "$ir_path")
 mkdir -p "$macos_dir/Sources/App" "$linux_dir/src"
 
 cat > "$macos_dir/Package.swift" <<EOF
-// Generated from ir/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
+// Generated from app-blueprint/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
 // swift-tools-version: 6.0
 import PackageDescription
 
@@ -47,7 +47,7 @@ let package = Package(
 EOF
 
 cat > "$macos_dir/Sources/App/App.swift" <<EOF
-// Generated from ir/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
+// Generated from app-blueprint/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
 import SwiftUI
 
 private let canonicalIR = """
@@ -106,7 +106,7 @@ EOF
 linux_ir_literal=$(printf '%s' "$pretty_ir" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n')
 
 cat > "$linux_dir/meson.build" <<EOF
-# Generated from ir/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
+# Generated from app-blueprint/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh.
 project('$app_id', 'c', version: '0.1.0')
 
 gtk_dep = dependency('gtk4')
@@ -120,7 +120,7 @@ executable(
 EOF
 
 cat > "$linux_dir/src/main.c" <<EOF
-/* Generated from ir/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh. */
+/* Generated from app-blueprint/app.ir.yaml. Regenerate with scripts/render-native-desktop.sh. */
 #include <gtk/gtk.h>
 
 static const char *wizardry_app_ir =
