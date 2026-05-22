@@ -4487,7 +4487,7 @@
         }
 
         if (els.selectedTitle) {
-          text(els.selectedTitle, selected.title);
+          text(els.selectedTitle, selected.draft || state.route === 'create' ? 'Create App' : selected.title);
         }
         if (els.selectedTypeBadge) {
           var isGameType = selected.context === 'godot';
