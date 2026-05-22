@@ -121,6 +121,7 @@ forge_bundle_input_hash() {
     printf 'bundle_id=%s\n' "$bundle_id"
     printf 'host_src=%s\n' "$(hash_path_sha256 "$root/apps/.host/macos/main.m")"
     printf 'forge_app=%s\n' "$(hash_path_sha256 "$root/apps/forge")"
+    printf 'themes=%s\n' "$(hash_path_sha256 "$root/templates/web/.themes")"
     printf 'shared=%s\n' "$(hash_path_sha256 "$root/apps/.host/shared")"
     printf 'core_include=%s\n' "$(hash_path_sha256 "$root/runtime/core/include")"
     printf 'core_src=%s\n' "$(hash_path_sha256 "$root/runtime/core/src")"
@@ -307,6 +308,8 @@ for entry in "$root/apps/forge"/* "$root/apps/forge"/.[!.]* "$root/apps/forge"/.
   [ "$base" = "themes" ] && continue
   cp -R "$entry" "$resources_dir/forge/"
 done
+mkdir -p "$resources_dir/forge/themes"
+cp -R "$root/templates/web/.themes/." "$resources_dir/forge/themes/"
 mkdir -p "$resources_dir/forge/.host"
 cp -R "$root/apps/.host/shared" "$resources_dir/forge/.host/"
 cp -R "$root/apps/.host/shared" "$resources_dir/.host/"

@@ -500,6 +500,7 @@ case "$os" in
     [ -x "$mac_build_out/Contents/MacOS/wizardry-host" ]
     [ -x "$mac_build_out/Contents/MacOS/app-forge" ]
     [ -f "$mac_build_out/Contents/Resources/forge/index.html" ]
+    [ -f "$mac_build_out/Contents/Resources/forge/themes/psionic.css" ]
     [ -f "$mac_build_out/Contents/Resources/forge/.host/shared/wizardry-bridge.js" ]
     [ -f "$mac_build_out/Contents/Resources/.host/shared/wizardry-bridge.js" ]
     [ -f "$mac_build_out/Contents/Resources/wizardry-build-input.sha256" ]
