@@ -151,6 +151,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (NSString *)normalizedCommandPath;
 - (NSString *)resolvedWizardryAppsRoot;
 - (NSString *)resolvedSharedThemeFileForTheme:(NSString *)themeName;
+- (void)loadSerenityBootPalette;
 - (void)addResolvedDraggedPathCandidate:(NSString *)candidate
                                 toPaths:(NSMutableArray<NSString *> *)paths
                                    seen:(NSMutableSet<NSString *> *)seen;
@@ -1575,6 +1576,18 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     self.prioritiesBootBgColor = bg ?: [NSColor colorWithSRGBRed:0.925 green:0.918 blue:0.957 alpha:1.0];
     self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.365 green:0.392 blue:0.525 alpha:1.0];
+}
+
+- (void)loadSerenityBootPalette {
+    NSString *theme = @"athenian";
+    NSString *themeFile = [[self.appPath stringByAppendingPathComponent:@"themes"] stringByAppendingPathComponent:[theme stringByAppendingString:@".css"]];
+    NSDictionary<NSString *, NSString *> *vars = [self readThemeVariablesFromFile:themeFile];
+    NSColor *bg = [self parseCSSColorToken:vars[@"bg"]];
+    NSColor *text = [self parseCSSColorToken:vars[@"text"]];
+    NSColor *muted = [self parseCSSColorToken:vars[@"light-text"]];
+
+    self.prioritiesBootBgColor = bg ?: [NSColor colorWithSRGBRed:0.949 green:0.965 blue:0.949 alpha:1.0];
+    self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.361 green:0.431 blue:0.388 alpha:1.0];
 }
 
 - (void)loadCounterspellBootPalette {
@@ -3129,21 +3142,24 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     BOOL isForgeApp = [appSlug isEqualToString:@"forge"];
     BOOL isArtificerApp = [appSlug isEqualToString:@"artificer"];
     BOOL isCounterspellApp = [appSlug isEqualToString:@"counterspell"];
+    BOOL isSerenityApp = [appSlug isEqualToString:@"serenity"];
     BOOL prefersMaxInitialFrame = [appSlug isEqualToString:@"binder"];
     BOOL prefersFullHeightInitialFrame = [appSlug isEqualToString:@"bellheim"];
     self.enableNativeViewMenu = [appSlug isEqualToString:@"priorities"];
     self.enableHeaderDragHoles = prefersHeaderDragHoles;
     self.prefersLeftOnlyHeaderDragArea = prefersLeftOnlyHeaderDragArea;
     self.enableForgeAppMenu = (isForgeApp || isArtificerApp);
-    self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp || isCounterspellApp;
+    self.enableNativeBootSplash = self.enableNativeViewMenu || isForgeApp || isArtificerApp || isCounterspellApp || isSerenityApp;
     self.prefersWideDragStrip = [appSlug isEqualToString:@"virtual-redditor"];
-    self.bootSplashLogoSize = isForgeApp ? 156.0 : ((isArtificerApp || isCounterspellApp) ? 96.0 : 192.0);
+    self.bootSplashLogoSize = isForgeApp ? 156.0 : ((isArtificerApp || isCounterspellApp || isSerenityApp) ? 96.0 : 192.0);
     if (self.enableNativeViewMenu) {
         [self loadPrioritiesBootPalette];
     } else if (isCounterspellApp) {
         [self loadCounterspellBootPalette];
     } else if (isArtificerApp) {
         [self loadArtificerBootPalette];
+    } else if (isSerenityApp) {
+        [self loadSerenityBootPalette];
     } else if (self.enableNativeBootSplash) {
         [self loadForgeBootPalette];
     }
@@ -3261,6 +3277,23 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             frame.size.height = visible.size.height;
             frame.origin.x = NSMinX(visible) + floor((visible.size.width - frame.size.width) / 2.0);
             frame.origin.y = NSMinY(visible);
+        }
+    }
+    if (isSerenityApp) {
+        NSScreen *screen = [NSScreen mainScreen];
+        minSize = NSMakeSize(980, 560);
+        if (screen) {
+            NSRect visible = [screen visibleFrame];
+            CGFloat targetHeight = floor(visible.size.height);
+            CGFloat targetInnerWidth = MAX(1220.0, targetHeight * 1.48);
+            CGFloat targetWidth = MIN(MAX(980.0, targetInnerWidth), floor(visible.size.width * 0.92));
+            frame.size.width = targetWidth;
+            frame.size.height = targetHeight;
+            frame.origin.x = NSMinX(visible) + floor((visible.size.width - frame.size.width) / 2.0);
+            frame.origin.y = NSMinY(visible);
+        } else {
+            frame.size.width = 1220.0;
+            frame.size.height = 760.0;
         }
     }
     if (self.enableNativeViewMenu) {
