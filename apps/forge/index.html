@@ -305,13 +305,13 @@
                     <input type="radio" name="project-type" value="native-desktop">
                     <span class="type-icon">🪟</span>
                     <span class="type-title">Native Desktop App</span>
-                    <span class="type-desc">A macOS and Linux desktop project driven by a canonical native UI IR.</span>
+                    <span class="type-desc">A macOS and Linux desktop project driven by a canonical native UI definition.</span>
                   </label>
                   <label class="type-option" id="type-native-mobile-card">
                     <input type="radio" name="project-type" value="native-mobile">
                     <span class="type-icon">▣</span>
                     <span class="type-title">Native Mobile App</span>
-                    <span class="type-desc">A shared native mobile IR that generates Android and iOS apps, with direct Android distribution first.</span>
+                    <span class="type-desc">A shared native mobile UI definition that generates Android and iOS apps, with direct Android distribution first.</span>
                   </label>
                   <label class="type-option" id="type-game-card">
                     <input type="radio" name="project-type" value="game">
@@ -7189,7 +7189,7 @@
         if (profile.development_context === 'native-desktop') {
           fields.appendChild(createWorkspaceProfilePathField(selected, {
             field: 'native_ir_path',
-            label: 'Canonical IR path',
+            label: 'Canonical UI definition path',
             value: profile.native_ir_path,
             path: true,
             placeholder: 'app-blueprint/app.ir.yaml',
