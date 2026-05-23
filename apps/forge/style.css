@@ -1033,18 +1033,6 @@ input[type="checkbox"]:disabled {
   z-index: 40;
 }
 
-.catalog-row.menu-open .catalog-line {
-  align-items: flex-start;
-}
-
-.catalog-row.menu-open .catalog-row-actions {
-  display: grid;
-  grid-template-columns: auto auto auto;
-  justify-items: end;
-  align-items: center;
-  transform: none;
-}
-
 .catalog-row.dragging {
   opacity: 0.52;
 }
@@ -1398,6 +1386,7 @@ input[type="checkbox"]:disabled {
 }
 
 .catalog-row-menu {
+  position: fixed;
   display: grid;
   gap: 0.08rem;
   min-width: 116px;
@@ -1408,17 +1397,11 @@ input[type="checkbox"]:disabled {
   padding: 0.24rem;
   -webkit-app-region: no-drag;
   pointer-events: auto;
-  z-index: 60 !important;
+  z-index: 10000 !important;
 }
 
 .catalog-row-menu.hidden {
   display: none;
-}
-
-.catalog-row.menu-open .catalog-row-menu {
-  grid-column: 1 / -1;
-  justify-self: end;
-  margin-top: 0.2rem;
 }
 
 .catalog-row-menu button {

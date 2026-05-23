@@ -181,25 +181,20 @@ row_menu_clickable=$(awk '
   in_row && /position:[[:space:]]*relative;/ { row_position=1 }
   in_row && /z-index:[[:space:]]*40;/ { row_z=1 }
   in_row && /^}/ { in_row=0 }
-  /^\.catalog-row\.menu-open \.catalog-row-actions[[:space:]]*\{/ { in_actions=1 }
-  in_actions && /display:[[:space:]]*grid;/ { actions_grid=1 }
-  in_actions && /^}/ { in_actions=0 }
   /^\.catalog-row-menu[[:space:]]*\{/ { in_menu=1 }
+  in_menu && /position:[[:space:]]*fixed;/ { menu_fixed=1 }
   in_menu && /display:[[:space:]]*grid;/ { menu_grid=1 }
   in_menu && /-webkit-app-region:[[:space:]]*no-drag;/ { menu_no_drag=1 }
   in_menu && /pointer-events:[[:space:]]*auto;/ { menu_pointer=1 }
-  in_menu && /z-index:[[:space:]]*60[[:space:]]*!important;/ { menu_z=1 }
+  in_menu && /z-index:[[:space:]]*10000[[:space:]]*!important;/ { menu_z=1 }
   in_menu && /^}/ { in_menu=0 }
   /^\.catalog-row-menu\.hidden[[:space:]]*\{/ { in_hidden=1 }
   in_hidden && /display:[[:space:]]*none;/ { menu_hidden=1 }
   in_hidden && /^}/ { in_hidden=0 }
-  /^\.catalog-row\.menu-open \.catalog-row-menu[[:space:]]*\{/ { in_open_menu=1 }
-  in_open_menu && /grid-column:[[:space:]]*1[[:space:]]*\/[[:space:]]*-1;/ { open_menu_grid=1 }
-  in_open_menu && /^}/ { in_open_menu=0 }
-  END { if (row_position && row_z && actions_grid && menu_grid && menu_no_drag && menu_pointer && menu_z && menu_hidden && open_menu_grid) print "yes" }
+  END { if (row_position && row_z && menu_fixed && menu_grid && menu_no_drag && menu_pointer && menu_z && menu_hidden) print "yes" }
 ' "$css")
 [ "$row_menu_clickable" = "yes" ] || {
-  printf '%s\n' "Forge row overflow menus must stay inside the open row hit-test area" >&2
+  printf '%s\n' "Forge row overflow menus must render as fixed top-layer portals" >&2
   exit 1
 }
 
@@ -225,6 +220,16 @@ fi
 
 if ! rg -q "function routeCatalogRowMenuPointer" "$ui" || ! rg -q "routeCatalogRowMenuPointer\\(event\\)" "$ui"; then
   printf '%s\n' "Forge row overflow clicks must be routed from the visible menu rectangle during capture" >&2
+  exit 1
+fi
+
+if rg -q "rowActions\\.appendChild\\(rowMenu\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow menus must not be inserted inline into catalog rows" >&2
+  exit 1
+fi
+
+if ! rg -q "function renderCatalogRowMenuPortal" "$ui" || ! rg -q "document\\.body\\.appendChild\\(menu\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow menus must be rendered through a document-level portal" >&2
   exit 1
 fi
 

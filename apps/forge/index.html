@@ -3903,9 +3903,11 @@
           empty.className = 'empty';
           empty.textContent = emptyCatalogMessage();
           els.catalogList.appendChild(empty);
+          removeCatalogRowMenuPortal();
           syncHostDropZones();
           return;
         }
+        renderCatalogRowMenuPortal(visibleItems);
         syncHostDropZones();
       }
 
@@ -4259,10 +4261,6 @@
           });
           rowActions.appendChild(rowMenuBtn);
 
-          var rowMenu = buildCatalogRowMenu(item);
-          if (rowMenu) {
-            rowActions.appendChild(rowMenu);
-          }
           line.appendChild(rowActions);
         }
 
@@ -4433,7 +4431,7 @@
       }
 
       function routeCatalogRowMenuPointer(event) {
-        var menu = document.querySelector('.catalog-row.menu-open .catalog-row-menu:not(.hidden)');
+        var menu = document.querySelector('.catalog-row-menu:not(.hidden)');
         if (!menu || !event) {
           return false;
         }
@@ -4463,6 +4461,58 @@
           }
         }
         return false;
+      }
+
+      function removeCatalogRowMenuPortal() {
+        document.querySelectorAll('.catalog-row-menu').forEach(function (menu) {
+          menu.remove();
+        });
+      }
+
+      function catalogRowByKey(key) {
+        var rows = Array.prototype.slice.call(els.catalogList.querySelectorAll('.catalog-row'));
+        return rows.find(function (row) {
+          return row.dataset.catalogItemKey === key;
+        }) || null;
+      }
+
+      function renderCatalogRowMenuPortal(visibleItems) {
+        removeCatalogRowMenuPortal();
+        if (!state.activeCatalogRowMenuKey) {
+          return;
+        }
+        var item = visibleItems.find(function (candidate) {
+          return candidate.key === state.activeCatalogRowMenuKey;
+        });
+        if (!item) {
+          return;
+        }
+        var row = catalogRowByKey(item.key);
+        var trigger = row ? row.querySelector('.row-overflow') : null;
+        if (!trigger) {
+          return;
+        }
+        var menu = buildCatalogRowMenu(item);
+        if (!menu) {
+          return;
+        }
+        var triggerRect = trigger.getBoundingClientRect();
+        menu.style.visibility = 'hidden';
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+        document.body.appendChild(menu);
+        var menuRect = menu.getBoundingClientRect();
+        var margin = 8;
+        var left = triggerRect.right - menuRect.width;
+        left = Math.max(margin, Math.min(left, window.innerWidth - menuRect.width - margin));
+        var top = triggerRect.bottom + 6;
+        if (top + menuRect.height + margin > window.innerHeight) {
+          top = triggerRect.top - menuRect.height - 6;
+        }
+        top = Math.max(margin, Math.min(top, window.innerHeight - menuRect.height - margin));
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+        menu.style.visibility = 'visible';
       }
 
       function selectedBuiltInApp() {
