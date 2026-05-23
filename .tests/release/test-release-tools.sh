@@ -226,6 +226,10 @@ chmod +x "$fake_icon_bin/sips"
 PATH="$fake_icon_bin:$PATH" sh "$ROOT_DIR/tools/icons/stage-ios-appiconset.sh" "$partial_ios_app" "$partial_ios_assets"
 grep -Fx "rendered icon" "$partial_ios_assets/AppIcon.appiconset/icon-1024.png" >/dev/null
 [ -f "$partial_ios_assets/AppIcon.appiconset/Contents.json" ]
+grep -F "GENERATE_INFOPLIST_FILE: YES" "$ROOT_DIR/apps/.host/ios/project-template.yml" >/dev/null || {
+  printf '%s\n' "iOS project template must generate Info.plist from INFOPLIST_KEY settings" >&2
+  exit 1
+}
 
 fake_ios_bin="$tmp_dir/fake-ios-bin"
 mkdir -p "$fake_ios_bin"

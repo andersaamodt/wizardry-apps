@@ -19,6 +19,7 @@ targets:
       base:
         PRODUCT_NAME: "__APP_NAME__"
         PRODUCT_BUNDLE_IDENTIFIER: __BUNDLE_ID__
+        GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: "__APP_NAME__"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
