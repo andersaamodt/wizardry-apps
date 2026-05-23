@@ -4353,6 +4353,9 @@
           appendAction('Remove', function () {
             perform('Remove project from Forge', async function () {
               var removedPath = item.path || '';
+              if (removedPath) {
+                await backend('hide-workspace', [removedPath], { quiet: true });
+              }
               hideWorkspacePath(removedPath);
               await refreshWorkspaces({ quiet: true, render: false });
               if (state.selectedCatalog === item.key) {
@@ -5276,6 +5279,12 @@
 
         var res = await backend('import-workspace', [folderPath, state.projectsRoot]);
         var out = kv(res.stdout || '');
+        if (out.workspace) {
+          await backend('unhide-workspace', [out.workspace], { quiet: true });
+        }
+        if (out.registered_path && normalizePathForCompare(out.registered_path) !== normalizePathForCompare(out.workspace || '')) {
+          await backend('unhide-workspace', [out.registered_path], { quiet: true });
+        }
         unhideWorkspacePath(out.workspace || '');
         unhideWorkspacePath(out.registered_path || '');
         await refreshWorkspaces({ quiet: true, render: false });
@@ -8513,6 +8522,10 @@
         });
 
         state.createDraftActive = false;
+        if (out.created) {
+          await backend('unhide-workspace', [out.created], { quiet: true });
+          unhideWorkspacePath(out.created);
+        }
         await refreshWorkspaces();
         var createdPath = normalizePathForCompare(out.created || '');
         var createdWorkspace = state.workspaces.find(function (ws) {

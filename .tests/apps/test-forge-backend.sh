@@ -38,6 +38,8 @@ fi
 out=$(sh "$backend" --help)
 printf '%s' "$out" | grep -F "Usage:" >/dev/null
 printf '%s\n' "$out" | grep -F "import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]" >/dev/null
+printf '%s\n' "$out" | grep -F "hide-workspace [ROOT_HINT] WORKSPACE_PATH" >/dev/null
+printf '%s\n' "$out" | grep -F "unhide-workspace [ROOT_HINT] WORKSPACE_PATH" >/dev/null
 printf '%s\n' "$out" | grep -F "rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_TITLE" >/dev/null
 printf '%s\n' "$out" | grep -F "workspace-git-init [ROOT_HINT] WORKSPACE_PATH [REMOTE_URL] [BRANCH]" >/dev/null
 printf '%s\n' "$out" | grep -F "workspace-git-install-release [ROOT_HINT] WORKSPACE_PATH" >/dev/null
@@ -803,6 +805,26 @@ printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
 printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
 printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-native" { if (NF != 13 || $8 != "1" || $9 != "no") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
 printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-web" { if (NF != 13 || $9 != "no" || $10 != "") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+
+hidden_workspace_home="$scratch/hidden-workspace-home"
+hide_workspace_out=$(XDG_CONFIG_HOME="$hidden_workspace_home/.config" sh "$backend" hide-workspace "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$hide_workspace_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
+hidden_workspaces=$(XDG_CONFIG_HOME="$hidden_workspace_home/.config" sh "$backend" list-workspaces "$scratch" "$workspaces_root")
+if printf '%s\n' "$hidden_workspaces" | grep -E '^workspace-web\t' >/dev/null 2>&1; then
+  printf '%s\n' "forge list-workspaces included hidden workspace" >&2
+  exit 1
+fi
+printf '%s\n' "$hidden_workspaces" | grep -E '^workspace-native\t' >/dev/null
+unhide_workspace_out=$(XDG_CONFIG_HOME="$hidden_workspace_home/.config" sh "$backend" unhide-workspace "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$unhide_workspace_out" | grep -F "workspace=$workspaces_root/workspace-web" >/dev/null
+unhidden_workspaces=$(XDG_CONFIG_HOME="$hidden_workspace_home/.config" sh "$backend" list-workspaces "$scratch" "$workspaces_root")
+printf '%s\n' "$unhidden_workspaces" | grep -E '^workspace-web\t' >/dev/null
+bad_hide_workspace=$(printf '%s\nforged=1' "$workspaces_root/workspace-web")
+if XDG_CONFIG_HOME="$hidden_workspace_home/.config" sh "$backend" hide-workspace "$scratch" "$bad_hide_workspace" >"$scratch/forge-bad-hide-workspace.out" 2>"$scratch/forge-bad-hide-workspace.err"; then
+  printf '%s\n' "forge hide-workspace accepted line-break workspace path" >&2
+  exit 1
+fi
+grep -F "workspace path must not contain line breaks" "$scratch/forge-bad-hide-workspace.err" >/dev/null
 
 workspace_web_profile=$(sh "$backend" get-workspace-profile "$scratch" "$workspaces_root/workspace-web")
 printf '%s\n' "$workspace_web_profile" | grep -F "git_repo_present=no" >/dev/null

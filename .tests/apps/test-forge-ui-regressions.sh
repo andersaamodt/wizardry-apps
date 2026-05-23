@@ -88,6 +88,10 @@ assert_matches "$ui" 'function buildCatalogGitPill\(item\)'
 assert_contains "$ui" 'catalog-git-pill'
 assert_matches "$ui" 'function setDownloadedAppVisibleState\(appId, exists\)'
 assert_matches "$ui" 'setDownloadedAppVisibleState\(item\.id, false\);'
+assert_matches "$ui" "backend\('hide-workspace', \[removedPath\]"
+assert_matches "$ui" "backend\('unhide-workspace', \[out\.workspace\]"
+assert_matches "$ui" "backend\('unhide-workspace', \[out\.registered_path\]"
+assert_matches "$ui" "backend\('unhide-workspace', \[out\.created\]"
 assert_contains "$ui" "successLabel: item.title + ' removed from Forge.'"
 assert_contains "$ui" "state.activeCatalogRowMenuKey = '';"
 assert_matches "$ui" '^[[:space:]]*renderCatalogList\(\);$'

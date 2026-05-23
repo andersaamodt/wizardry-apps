@@ -17,6 +17,8 @@ Commands:
   list-godot-tools [ROOT_HINT]
   list-workspaces [ROOT_HINT] [PROJECT_ROOT]
   import-workspace [ROOT_HINT] WORKSPACE_PATH [PROJECT_ROOT]
+  hide-workspace [ROOT_HINT] WORKSPACE_PATH
+  unhide-workspace [ROOT_HINT] WORKSPACE_PATH
   get-workspace-profile [ROOT_HINT] WORKSPACE_PATH
   workspace-git-status [ROOT_HINT] WORKSPACE_PATH
   workspace-git-init [ROOT_HINT] WORKSPACE_PATH [REMOTE_URL] [BRANCH]
@@ -3084,6 +3086,92 @@ forge_ui_prefs_file() {
   printf '%s\n' "$base/forge-ui.conf"
 }
 
+forge_hidden_workspaces_file() {
+  base="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps"
+  mkdir -p "$base"
+  printf '%s\n' "$base/forge-hidden-workspaces.txt"
+}
+
+normalize_hidden_workspace_path() {
+  hidden_path=${1-}
+  [ -n "$hidden_path" ] || return 1
+  reject_line_breaks "$hidden_path" "workspace path"
+  printf '%s' "$hidden_path" | sed 's#/*$##'
+}
+
+workspace_hidden_path_matches() {
+  hidden_line=${1-}
+  workspace_path=${2-}
+  [ -n "$hidden_line" ] || return 1
+  [ -n "$workspace_path" ] || return 1
+  normalized_workspace=$(normalize_hidden_workspace_path "$workspace_path") || return 1
+  [ "$hidden_line" = "$normalized_workspace" ] && return 0
+  if [ -d "$workspace_path" ]; then
+    canonical_workspace=$(canonical_dir_path "$workspace_path" 2>/dev/null || printf '%s\n' "")
+    [ -n "$canonical_workspace" ] || return 1
+    canonical_workspace=$(normalize_hidden_workspace_path "$canonical_workspace") || return 1
+    [ "$hidden_line" = "$canonical_workspace" ] && return 0
+  fi
+  return 1
+}
+
+workspace_is_hidden() {
+  workspace_path=${1-}
+  hidden_file=$(forge_hidden_workspaces_file)
+  [ -f "$hidden_file" ] || return 1
+  while IFS= read -r hidden_line || [ -n "$hidden_line" ]; do
+    workspace_hidden_path_matches "$hidden_line" "$workspace_path" && return 0
+  done <"$hidden_file"
+  return 1
+}
+
+cmd_hide_workspace() {
+  require_root "${1-}" >/dev/null
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: hide-workspace requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  normalized_workspace=$(normalize_hidden_workspace_path "$workspace_path") || {
+    printf '%s\n' "forge-backend: invalid workspace path" >&2
+    exit 1
+  }
+  hidden_file=$(forge_hidden_workspaces_file)
+  [ -f "$hidden_file" ] || : > "$hidden_file"
+  if ! workspace_is_hidden "$normalized_workspace"; then
+    printf '%s\n' "$normalized_workspace" >>"$hidden_file"
+  fi
+  printf 'workspace=%s\n' "$(kv_output_value "$normalized_workspace")"
+  printf 'hidden=%s\n' "$(kv_output_value "$hidden_file")"
+}
+
+cmd_unhide_workspace() {
+  require_root "${1-}" >/dev/null
+  workspace_path=${2-}
+  [ -n "$workspace_path" ] || {
+    printf '%s\n' "forge-backend: unhide-workspace requires WORKSPACE_PATH" >&2
+    exit 2
+  }
+  normalized_workspace=$(normalize_hidden_workspace_path "$workspace_path") || {
+    printf '%s\n' "forge-backend: invalid workspace path" >&2
+    exit 1
+  }
+  hidden_file=$(forge_hidden_workspaces_file)
+  [ -f "$hidden_file" ] || {
+    printf 'workspace=%s\n' "$(kv_output_value "$normalized_workspace")"
+    printf 'hidden=%s\n' "$(kv_output_value "$hidden_file")"
+    return 0
+  }
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/forge-hidden-workspaces.XXXXXX")
+  while IFS= read -r hidden_line || [ -n "$hidden_line" ]; do
+    workspace_hidden_path_matches "$hidden_line" "$normalized_workspace" && continue
+    printf '%s\n' "$hidden_line" >>"$tmp_file"
+  done <"$hidden_file"
+  mv "$tmp_file" "$hidden_file"
+  printf 'workspace=%s\n' "$(kv_output_value "$normalized_workspace")"
+  printf 'hidden=%s\n' "$(kv_output_value "$hidden_file")"
+}
+
 forge_workspace_git_state_dir() {
   base="${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps/forge/git"
   mkdir -p "$base/cache" "$base/releases"
@@ -3767,6 +3855,7 @@ cmd_list_workspaces() {
 
   for path in "$project_root"/*; do
     [ -d "$path" ] || continue
+    workspace_is_hidden "$path" && continue
     conf="$path/wizardry.workspace.conf"
     [ -f "$conf" ] || continue
 
@@ -8649,6 +8738,12 @@ case "$cmd" in
     ;;
   import-workspace)
     cmd_import_workspace "${2-}" "${3-}" "${4-}"
+    ;;
+  hide-workspace)
+    cmd_hide_workspace "${2-}" "${3-}"
+    ;;
+  unhide-workspace)
+    cmd_unhide_workspace "${2-}" "${3-}"
     ;;
   get-workspace-profile)
     cmd_get_workspace_profile "${2-}" "${3-}"
