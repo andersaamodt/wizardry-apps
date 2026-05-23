@@ -3956,7 +3956,7 @@
         row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
         row.classList.remove('catalog-row-filtered');
         row.removeAttribute('aria-hidden');
-        if (!state.inlineRenameKey && !item.draft) {
+        if (!state.inlineRenameKey && !state.activeCatalogRowMenuKey && !item.draft) {
           row.setAttribute('draggable', 'true');
         } else {
           row.removeAttribute('draggable');
@@ -4088,7 +4088,7 @@
       function buildCatalogRow(item) {
         var row = document.createElement('div');
         row.className = 'list-row catalog-row';
-        row.setAttribute('role', 'button');
+        row.setAttribute('role', 'group');
         row.setAttribute('tabindex', '0');
         row.setAttribute('data-catalog-item-key', item.key);
         syncCatalogRowState(row, item);
@@ -4329,7 +4329,7 @@
 
       function buildCatalogRowMenu(item) {
         var rowMenu = document.createElement('div');
-        rowMenu.className = 'floating-menu catalog-row-menu' + (state.activeCatalogRowMenuKey === item.key ? '' : ' hidden');
+        rowMenu.className = 'catalog-row-menu' + (state.activeCatalogRowMenuKey === item.key ? '' : ' hidden');
 
         var hasItems = false;
 
@@ -4338,13 +4338,20 @@
           button.type = 'button';
           button.textContent = label;
           button.disabled = state.busy;
-          button.addEventListener('click', function (event) {
+          var didRun = false;
+          function runRowMenuAction(event) {
             event.preventDefault();
             event.stopPropagation();
+            if (didRun || button.disabled) {
+              return;
+            }
+            didRun = true;
             state.activeCatalogRowMenuKey = '';
             renderCatalogList();
             handler();
-          });
+          }
+          button.addEventListener('pointerdown', runRowMenuAction);
+          button.addEventListener('click', runRowMenuAction);
           rowMenu.appendChild(button);
           hasItems = true;
         }
@@ -4423,6 +4430,39 @@
         }
 
         return hasItems ? rowMenu : null;
+      }
+
+      function routeCatalogRowMenuPointer(event) {
+        var menu = document.querySelector('.catalog-row.menu-open .catalog-row-menu:not(.hidden)');
+        if (!menu || !event) {
+          return false;
+        }
+        var rect = menu.getBoundingClientRect();
+        if (
+          event.clientX < rect.left ||
+          event.clientX > rect.right ||
+          event.clientY < rect.top ||
+          event.clientY > rect.bottom
+        ) {
+          return false;
+        }
+        var buttons = Array.prototype.slice.call(menu.querySelectorAll('button'));
+        for (var index = 0; index < buttons.length; index += 1) {
+          var button = buttons[index];
+          var buttonRect = button.getBoundingClientRect();
+          if (
+            event.clientY >= buttonRect.top &&
+            event.clientY <= buttonRect.bottom &&
+            event.clientX >= buttonRect.left &&
+            event.clientX <= buttonRect.right
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            button.click();
+            return true;
+          }
+        }
+        return false;
       }
 
       function selectedBuiltInApp() {
@@ -8977,6 +9017,12 @@
             }
           }
         });
+
+        document.addEventListener('click', function (event) {
+          if (routeCatalogRowMenuPointer(event)) {
+            return;
+          }
+        }, true);
 
         document.addEventListener('click', function (event) {
           if (

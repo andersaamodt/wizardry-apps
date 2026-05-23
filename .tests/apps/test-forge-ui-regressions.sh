@@ -176,6 +176,58 @@ theme_button_fit=$(awk '
   exit 1
 }
 
+row_menu_clickable=$(awk '
+  /^\.catalog-row\.menu-open[[:space:]]*\{/ { in_row=1 }
+  in_row && /position:[[:space:]]*relative;/ { row_position=1 }
+  in_row && /z-index:[[:space:]]*40;/ { row_z=1 }
+  in_row && /^}/ { in_row=0 }
+  /^\.catalog-row\.menu-open \.catalog-row-actions[[:space:]]*\{/ { in_actions=1 }
+  in_actions && /display:[[:space:]]*grid;/ { actions_grid=1 }
+  in_actions && /^}/ { in_actions=0 }
+  /^\.catalog-row-menu[[:space:]]*\{/ { in_menu=1 }
+  in_menu && /display:[[:space:]]*grid;/ { menu_grid=1 }
+  in_menu && /-webkit-app-region:[[:space:]]*no-drag;/ { menu_no_drag=1 }
+  in_menu && /pointer-events:[[:space:]]*auto;/ { menu_pointer=1 }
+  in_menu && /z-index:[[:space:]]*60[[:space:]]*!important;/ { menu_z=1 }
+  in_menu && /^}/ { in_menu=0 }
+  /^\.catalog-row-menu\.hidden[[:space:]]*\{/ { in_hidden=1 }
+  in_hidden && /display:[[:space:]]*none;/ { menu_hidden=1 }
+  in_hidden && /^}/ { in_hidden=0 }
+  /^\.catalog-row\.menu-open \.catalog-row-menu[[:space:]]*\{/ { in_open_menu=1 }
+  in_open_menu && /grid-column:[[:space:]]*1[[:space:]]*\/[[:space:]]*-1;/ { open_menu_grid=1 }
+  in_open_menu && /^}/ { in_open_menu=0 }
+  END { if (row_position && row_z && actions_grid && menu_grid && menu_no_drag && menu_pointer && menu_z && menu_hidden && open_menu_grid) print "yes" }
+' "$css")
+[ "$row_menu_clickable" = "yes" ] || {
+  printf '%s\n' "Forge row overflow menus must stay inside the open row hit-test area" >&2
+  exit 1
+}
+
+if rg -q "rowMenu\\.className = 'floating-menu catalog-row-menu" "$ui"; then
+  printf '%s\n' "Forge row overflow menus must not use the shared floating-menu hit-test path" >&2
+  exit 1
+fi
+
+if ! rg -q "!state\\.inlineRenameKey && !state\\.activeCatalogRowMenuKey && !item\\.draft" "$ui"; then
+  printf '%s\n' "Forge rows must not stay draggable while an overflow menu is open" >&2
+  exit 1
+fi
+
+if rg -q "row\\.setAttribute\\('role', 'button'\\)" "$ui"; then
+  printf '%s\n' "Forge catalog rows must not use a button role around nested action buttons" >&2
+  exit 1
+fi
+
+if ! rg -q "button\\.addEventListener\\('pointerdown', runRowMenuAction\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow actions must fire on pointerdown before WebKit can retarget the click" >&2
+  exit 1
+fi
+
+if ! rg -q "function routeCatalogRowMenuPointer" "$ui" || ! rg -q "routeCatalogRowMenuPointer\\(event\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow clicks must be routed from the visible menu rectangle during capture" >&2
+  exit 1
+fi
+
 boot_reveal_line=$(awk '/async function boot\(\)/{in_boot=1} in_boot && /revealBootUi\(\);/{print NR; exit}' "$ui")
 boot_bridge_line=$(awk '/async function boot\(\)/{in_boot=1} in_boot && /runInitialBridgeBootstrap\(\);/{print NR; exit}' "$ui")
 boot_load_themes_before_reveal=$(awk '

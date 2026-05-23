@@ -97,6 +97,7 @@
 - Forge self-restart must not replace the bundle it is currently running from; stage the rebuilt app elsewhere and open it only after the old host has quit.
 - Native Linux conversions should hydrate GTK lists and detail panes from the same structured backend snapshots as macOS; static generated IR rows are useful scaffolding, not feature parity.
 - Forge row overflow actions should close and repaint the row menu before awaiting backend work so destructive-looking operations never feel unresponsive.
+- Open Forge row overflow menus must render as inline row action panels, disable row dragging while open, avoid wrapping nested action buttons in a `role=button` row, handle pointerdown as well as click, and route clicks from the visible menu rectangle during capture; WebKit can route clicks through floated, draggable, or conflicting row-menu surfaces instead of the visible action.
 - Forge workspace Remove must persist through a backend-owned hidden-workspace list; UI-only filtering can be undone by catalog refresh or app restart.
 - Create workflow draft selections should keep toolbar identity on the workflow label, not the mutable app title being typed into the form.
 - macOS bundles that may touch the microphone must include `NSMicrophoneUsageDescription` before signing; TCC kills the app at startup before normal error handling can recover.
