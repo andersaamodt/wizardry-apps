@@ -1959,7 +1959,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)syncStonrActivationPolicy {
-    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp] && ![self isBellheimApp]) {
+    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp]) {
         return;
     }
     BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
@@ -4286,7 +4286,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     (void)sender;
     [self syncBellheimBackgroundModeFromConfig];
-    if (self.explicitQuitRequested || [self isSystemTerminationRequest]) {
+    if (self.explicitQuitRequested || [self isSystemTerminationRequest] || [self isBellheimApp]) {
         return NSTerminateNow;
     }
     if (self.keepRunningInBackground || self.showStatusItem) {

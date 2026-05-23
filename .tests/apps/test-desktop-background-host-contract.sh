@@ -19,7 +19,6 @@ grep -F 'NSStatusItem *statusItem' "$mac_host" >/dev/null
 grep -F 'renderedStatusItemImage' "$mac_host" >/dev/null
 grep -F 'isMatchbookApp' "$mac_host" >/dev/null
 grep -F 'isBellheimApp' "$mac_host" >/dev/null
-grep -F '&& ![self isBellheimApp]' "$mac_host" >/dev/null
 grep -F 'Bellheim is running in background' "$mac_host" >/dev/null
 grep -F 'clapperRadius' "$mac_host" >/dev/null
 grep -F 'lineToPoint:NSMakePoint(minX + side * 0.005, lipY)' "$mac_host" >/dev/null
@@ -31,12 +30,18 @@ grep -F 'kAEQuitReason' "$mac_host" >/dev/null
 grep -F 'kAEShutDown' "$mac_host" >/dev/null
 grep -F 'kAERestart' "$mac_host" >/dev/null
 grep -F 'kAEReallyLogOut' "$mac_host" >/dev/null
-grep -F 'self.explicitQuitRequested || [self isSystemTerminationRequest]' "$mac_host" >/dev/null
+grep -F 'self.explicitQuitRequested || [self isSystemTerminationRequest] || [self isBellheimApp]' "$mac_host" >/dev/null
 grep -F '[self syncBellheimBackgroundModeFromConfig];' "$mac_host" >/dev/null
 grep -F 'NSVariableStatusItemLength' "$mac_host" >/dev/null
 grep -F 'setTemplate:YES' "$mac_host" >/dev/null
 grep -F 'windowShouldClose:' "$mac_host" >/dev/null
 grep -F 'applicationShouldHandleReopen:' "$mac_host" >/dev/null
+awk '
+  /- \(void\)syncStonrActivationPolicy/ { in_sync=1; next }
+  in_sync && /^- \(/ { in_sync=0 }
+  in_sync && /isBellheimApp/ { bad=1 }
+  END { exit bad ? 1 : 0 }
+' "$mac_host"
 
 grep -F '__wizardry_host_set_background_mode' "$linux_host" >/dev/null
 grep -F 'GtkStatusIcon *status_icon' "$linux_host" >/dev/null
