@@ -239,6 +239,38 @@ case "$macos_built" in
 esac
 [ -x "$macos_installed/Contents/MacOS/wizardry-host" ]
 
+# Behavior: app install detection does not confuse a native workspace bundle
+# with a catalog app that happens to use the same visible app name.
+mkdir -p "$test_home/Applications/Artificer.app/Contents"
+cat >"$test_home/Applications/Artificer.app/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.wizardry.workspace.artificer.native</string>
+</dict></plist>
+PLIST
+artificer_mismatch_status=$(
+  test_env FORGE_TEST_UNAME=Darwin sh "$backend" list-apps "$root" |
+    awk -F "$(printf '\t')" '$1 == "artificer" { print $11 "|" $12; exit }'
+)
+[ "$artificer_mismatch_status" = "0|" ] || {
+  printf '%s\n' "native Artificer bundle was reported as catalog Artificer install: $artificer_mismatch_status" >&2
+  exit 1
+}
+cat >"$test_home/Applications/Artificer.app/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.wizardry.apps.artificer.macos</string>
+</dict></plist>
+PLIST
+artificer_match_status=$(
+  test_env FORGE_TEST_UNAME=Darwin sh "$backend" list-apps "$root" |
+    awk -F "$(printf '\t')" '$1 == "artificer" { print $11 "|" $12; exit }'
+)
+[ "$artificer_match_status" = "1|$test_home/Applications/Artificer.app" ] || {
+  printf '%s\n' "catalog Artificer bundle was not reported as installed: $artificer_match_status" >&2
+  exit 1
+}
+
 # Behavior: Forge self-run from the installed bundle does not replace the live
 # bundle while the current host is still running from it.
 self_bundle_backend="$macos_installed/Contents/Resources/forge/scripts/forge-backend.sh"

@@ -1006,10 +1006,13 @@ host_install_status_for_app() {
     darwin)
       app_name=$app_name_hint
       [ -n "$app_name" ] || app_name=$slug
+      expected_bundle_id=$(bundle_id_from_manifest "$root" macos "$slug" 2>/dev/null || true)
       for candidate in "/Applications/$app_name.app" "$HOME/Applications/$app_name.app"; do
         if [ -d "$candidate" ]; then
-          printf '%s\t%s\n' "1" "$candidate"
-          return 0
+          if [ -z "$expected_bundle_id" ] || macos_bundle_has_identifier "$candidate" "$expected_bundle_id"; then
+            printf '%s\t%s\n' "1" "$candidate"
+            return 0
+          fi
         fi
       done
       ;;
@@ -1980,6 +1983,33 @@ copy_macos_bundle() {
   install_macos_bundle "${1-}" "${2-}"
 }
 
+macos_bundle_identifier() {
+  bundle_path=${1-}
+  [ -n "$bundle_path" ] || return 1
+  plist_path="$bundle_path/Contents/Info.plist"
+  [ -f "$plist_path" ] || return 1
+
+  if command -v plutil >/dev/null 2>&1; then
+    bundle_id=$(plutil -extract CFBundleIdentifier raw -o - "$plist_path" 2>/dev/null || true)
+    if [ -n "$bundle_id" ]; then
+      printf '%s\n' "$bundle_id"
+      return 0
+    fi
+  fi
+
+  tr '\n' ' ' <"$plist_path" |
+    sed -n 's/.*<key>CFBundleIdentifier<\/key>[[:space:]]*<string>\([^<]*\)<\/string>.*/\1/p' |
+    head -n 1
+}
+
+macos_bundle_has_identifier() {
+  bundle_path=${1-}
+  expected_bundle_id=${2-}
+  [ -n "$expected_bundle_id" ] || return 1
+  actual_bundle_id=$(macos_bundle_identifier "$bundle_path" 2>/dev/null || true)
+  [ "$actual_bundle_id" = "$expected_bundle_id" ]
+}
+
 macos_app_is_running() {
   app_name=${1-}
   [ -n "$app_name" ] || return 1
@@ -1999,12 +2029,16 @@ macos_app_is_running() {
 sync_existing_macos_installs_from_bundle() {
   bundle_path=${1-}
   app_name=${2-}
+  expected_bundle_id=${3-}
   [ -d "$bundle_path" ] || return 1
   [ -n "$app_name" ] || return 1
 
   synced_path=''
   for candidate in "/Applications/$app_name.app" "$HOME/Applications/$app_name.app"; do
     [ -d "$candidate" ] || continue
+    if [ -n "$expected_bundle_id" ] && ! macos_bundle_has_identifier "$candidate" "$expected_bundle_id"; then
+      continue
+    fi
     if copy_macos_bundle "$bundle_path" "$candidate"; then
       [ -n "$synced_path" ] || synced_path="$candidate"
     fi
@@ -2022,9 +2056,10 @@ sync_macos_install_for_slug() {
   [ "$(os_id)" = "darwin" ] || return 1
 
   app_name=$(app_name_from_manifest "$root" "$slug")
+  expected_bundle_id=$(bundle_id_from_manifest "$root" macos "$slug" 2>/dev/null || true)
   has_install=0
   for candidate in "/Applications/$app_name.app" "$HOME/Applications/$app_name.app"; do
-    if [ -d "$candidate" ]; then
+    if [ -d "$candidate" ] && { [ -z "$expected_bundle_id" ] || macos_bundle_has_identifier "$candidate" "$expected_bundle_id"; }; then
       has_install=1
       break
     fi
@@ -2039,7 +2074,7 @@ sync_macos_install_for_slug() {
   build_out=$(cmd_build_desktop "$root" "$slug" 2>/dev/null || true)
   bundle_path=$(printf '%s\n' "$build_out" | kv_read artifact)
   [ -n "$bundle_path" ] || return 1
-  sync_existing_macos_installs_from_bundle "$bundle_path" "$app_name"
+  sync_existing_macos_installs_from_bundle "$bundle_path" "$app_name" "$expected_bundle_id"
 }
 
 stop_host_instances_for_app() {
