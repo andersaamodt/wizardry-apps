@@ -765,14 +765,15 @@ body.settings-open #settings-panel {
   flex: 0 0 auto;
   display: flex;
   align-self: stretch;
-  min-width: 5.2rem;
+  min-width: 0;
+  max-width: calc(var(--left-rail-width, 240px) - 2.12rem);
 }
 
 .footer-theme-btn {
   height: 100%;
-  min-width: 5.2rem;
-  width: 5.2rem;
-  max-width: 5.2rem;
+  min-width: max-content;
+  width: max-content;
+  max-width: calc(var(--left-rail-width, 240px) - 2.12rem);
   border: 0;
   border-right: 1px solid var(--line);
   border-radius: 0;
@@ -786,7 +787,7 @@ body.settings-open #settings-panel {
   gap: 0.34rem;
   box-shadow: none;
   transform: none;
-  flex: 0 0 5.2rem;
+  flex: 0 1 auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

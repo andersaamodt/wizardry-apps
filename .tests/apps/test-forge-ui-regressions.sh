@@ -156,6 +156,20 @@ footer_bar_overflow=$(awk '
   exit 1
 }
 
+theme_button_fit=$(awk '
+  /^\.footer-theme-btn[[:space:]]*\{/ { in_rule=1 }
+  in_rule && /width:[[:space:]]*max-content;/ { width=1 }
+  in_rule && /min-width:[[:space:]]*max-content;/ { min_width=1 }
+  in_rule && /max-width:[[:space:]]*calc\(var\(--left-rail-width/ { max_width=1 }
+  in_rule && /flex:[[:space:]]*0 1 auto;/ { flex=1 }
+  in_rule && /^}/ { in_rule=0 }
+  END { if (width && min_width && max_width && flex) print "yes" }
+' "$css")
+[ "$theme_button_fit" = "yes" ] || {
+  printf '%s\n' "Forge theme selector must fit normal theme labels within the rail" >&2
+  exit 1
+}
+
 boot_reveal_line=$(awk '/async function boot\(\)/{in_boot=1} in_boot && /revealBootUi\(\);/{print NR; exit}' "$ui")
 boot_bridge_line=$(awk '/async function boot\(\)/{in_boot=1} in_boot && /runInitialBridgeBootstrap\(\);/{print NR; exit}' "$ui")
 boot_load_themes_before_reveal=$(awk '
