@@ -6,17 +6,17 @@
 - Keep this file aligned with user-approved policy decisions from the thread that introduced it.
 
 ## Repo License Split
-- `wizardry` itself remains under `OWL 3.0`.
-- `wizardry-apps` as a repo remains under `OWL 3.0` by default.
-- Built-in Wizardry apps in `apps/` remain under `OWL 3.0`.
-- Forge itself remains under `OWL 3.0`.
+- `wizardry` itself remains under `OWL 3.1`.
+- `wizardry-apps` as a repo remains under `OWL 3.1` by default.
+- Built-in Wizardry apps in `apps/` remain under `OWL 3.1`.
+- Forge itself remains under `OWL 3.1`.
 - Only blank emitted projects created from generic starters switch to `AGPL-3.0-or-later` plus `Wizardry Addendum 1.0`.
 
-## OWL 3.0 Draft
-- Use this exact draft when creating or updating the root `OWL 3.0` text:
+## OWL 3.1 Draft
+- Use this exact draft when creating or updating the root `OWL 3.1` text:
 
 ```text
- ,___,   OPEN WIZARDRY LICENSE 3.0
+ ,___,   OPEN WIZARDRY LICENSE 3.1
  (O,O)
  /)  )   Permission: You may use, copy,
 ="=="=   modify, and share this project for
@@ -56,6 +56,12 @@ Covered Work: "Covered work" means this project
 and any modified or derivative version of it.
 Independent works that merely accompany it are
 not covered.
+
+No Further Restrictions: Covered work you make
+publicly available must remain available under
+this license, without additional legal or
+technical restrictions that limit the rights
+granted here.
 
 Notice: This license must accompany any public
 distribution of this project or its files.
@@ -109,7 +115,7 @@ or association.
 
 ## Starter Classification
 - Blank generic starters must emit `AGPL-3.0-or-later` plus `Wizardry Addendum 1.0`.
-- Built-in Wizardry apps and any starter that is really a Wizardry-owned app surface stay under `OWL 3.0`.
+- Built-in Wizardry apps and any starter that is really a Wizardry-owned app surface stay under `OWL 3.1`.
 - Clone-based starters inherit the source project's license and must not be silently relicensed by Forge.
 - Imported existing projects must not be silently relicensed by Forge.
 
@@ -126,8 +132,8 @@ or association.
 ## Emission Material Rule
 - Generic starter payloads that Forge copies into emitted projects are emission material.
 - Shared runtime or bridge files that emitted projects require are emission material.
-- Emission material must be usable under both repo-internal `OWL 3.0` use and emitted-project `AGPL` use.
-- Implement emission material as dual-licensed `OWL 3.0 OR AGPL-3.0-or-later` when code changes are made.
+- Emission material must be usable under both repo-internal `OWL 3.1` use and emitted-project `AGPL` use.
+- Implement emission material as dual-licensed `OWL 3.1 OR AGPL-3.0-or-later` when code changes are made.
 - Built-in apps may rely on the `OWL` side of that dual license.
 - Blank emitted projects may rely on the `AGPL` side of that dual license.
 
@@ -158,7 +164,7 @@ Additional terms apply; see WIZARDRY_ADDENDUM.md.
 - Use project metadata such as `starter=` and project origin to decide whether verification/restoration applies.
 
 ## Operational Intent
-- `OWL 3.0` keeps Wizardry itself non-commercial, non-coercive, and protected against false association.
+- `OWL 3.1` keeps Wizardry itself non-commercial, non-coercive, protected against false association, and protected against downstream additional restrictions.
 - Emitted blank projects are intended for one-person and small-team app creation, but the emitted-project license must not add field-of-endeavor restrictions.
 - The branding addendum exists to prevent false association and misrepresentation, not to ban truthful descriptive references.
 - Agents must preserve this split when implementing Forge scaffolding, project verification, README generation, or future template work.

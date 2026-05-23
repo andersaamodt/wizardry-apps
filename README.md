@@ -63,7 +63,7 @@ Built-in apps come from this repository. Your apps usually live outside this rep
 
 ## Licensing
 
-wizardry-apps, Forge itself, and built-in wizardry apps are licensed under `OWL 3.0`, which permits non-commercial use, copying, modification, and sharing.
+wizardry-apps, Forge itself, and built-in wizardry apps are licensed under `OWL 3.1`, which permits non-commercial use, copying, modification, and sharing.
 
 Blank projects emitted from Forge's generic starters are different: they are generated under `AGPL-3.0-or-later` plus `Wizardry Addendum 1.0`. Those generated projects are intended to be sellable and hostable as long as the whole emitted app remains copyleft, complete corresponding source is made available, and the Wizardry name is not used in a way that implies endorsement or official status.
 

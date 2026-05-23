@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Emission material notice:
-# Repo-internal Wizardry use follows OWL 3.0.
+# Repo-internal Wizardry use follows OWL 3.1.
 # Generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.
 
 case "${1-}" in
