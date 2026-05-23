@@ -2325,7 +2325,7 @@
             gitReleaseAvailable: String(row && row.gitReleaseAvailable || 'no')
           };
         }).filter(function (row) {
-          return !!row.id;
+          return !!row.id && appSupportsCurrentHost(row);
         });
       }
 
@@ -2440,12 +2440,19 @@
         state.appsLoaded = !!cachedAppsRaw;
         state.workspaces = cachedWorkspaces;
         state.workspacesLoaded = !!cachedWorkspacesRaw;
-        if (!state.selectedBuiltIn && state.apps.length) {
-          state.selectedBuiltIn = state.apps[0].id;
-        }
+        ensureSelectedBuiltInAvailable();
         cleanupMiniTabState();
         applyPreferredSystemMiniTabMode();
         syncStarterOptionsFromCatalog();
+      }
+
+      function ensureSelectedBuiltInAvailable() {
+        if (state.selectedBuiltIn && !state.apps.some(function (app) { return app.id === state.selectedBuiltIn; })) {
+          state.selectedBuiltIn = '';
+        }
+        if (!state.selectedBuiltIn && state.apps.length) {
+          state.selectedBuiltIn = state.apps[0].id;
+        }
       }
 
       function syncSettingsSaveButtons() {
@@ -2688,6 +2695,14 @@
           out.push(part);
         });
         return out;
+      }
+
+      function appSupportsCurrentHost(app) {
+        var hostTarget = hostTargetId();
+        if (!hostTarget) {
+          return true;
+        }
+        return parseTargetsCSV(app && app.targets || '').indexOf(hostTarget) >= 0;
       }
 
       function targetSpecs(projectType) {
@@ -7976,14 +7991,13 @@
             gitStatusReason: row[15] || '',
             gitReleaseAvailable: row[16] || 'no'
           };
+        }).filter(function (app) {
+          return appSupportsCurrentHost(app);
         });
         state.appsLoaded = true;
         migrateLegacyInstallBeforeRunPreference();
         saveStorage(CACHED_APPS_KEY, JSON.stringify(state.apps));
-
-        if (!state.selectedBuiltIn && state.apps.length) {
-          state.selectedBuiltIn = state.apps[0].id;
-        }
+        ensureSelectedBuiltInAvailable();
 
         if (shouldRender) {
           renderCatalogList();

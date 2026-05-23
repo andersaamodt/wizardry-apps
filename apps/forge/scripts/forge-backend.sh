@@ -716,6 +716,24 @@ normalize_targets_value() {
   printf '%s\n' "$value"
 }
 
+host_catalog_target_id() {
+  case "$(os_id)" in
+    darwin) printf '%s\n' "macos" ;;
+    linux) printf '%s\n' "linux" ;;
+    *) printf '%s\n' "" ;;
+  esac
+}
+
+targets_include_host() {
+  targets=${1-}
+  host_target=$(host_catalog_target_id)
+  [ -n "$host_target" ] || return 0
+  case ",$targets," in
+    *,"$host_target",*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 normalize_generated_display_name() {
   printf '%s' "${1-}" | tr '\r\n\t' '   ' | sed 's/[[:space:]][[:space:]]*/ /g; s/^[[:space:]]*//; s/[[:space:]]*$//'
 }
@@ -2298,6 +2316,8 @@ cmd_list_apps() {
         targets="hosted-web,$targets"
       fi
     fi
+
+    targets_include_host "$targets" || continue
 
     install_line=$(host_install_status_for_app "$root" "$slug" "$name")
     host_installed=$(printf '%s\n' "$install_line" | cut -f1)
