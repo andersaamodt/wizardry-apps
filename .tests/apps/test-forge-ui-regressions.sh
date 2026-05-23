@@ -223,13 +223,13 @@ if ! rg -q "button\\.forgeRunRowMenuAction = runRowMenuAction" "$ui" || ! rg -q 
   exit 1
 fi
 
-if ! rg -q "rowMenuBtn\\.forgeToggleRowMenu = toggleRowMenu" "$ui" || ! rg -q "function routeCatalogRowOverflowPointer" "$ui"; then
-  printf '%s\n' "Forge row overflow triggers must expose a direct handler for routed native events" >&2
+if ! rg -q "function stopRowMenuEvent" "$ui" || ! rg -q "stopImmediatePropagation" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must stop row and splitter event handling directly" >&2
   exit 1
 fi
 
-if ! rg -q "rowMenuBtn\\.addEventListener\\('pointerdown', toggleRowMenu\\)" "$ui" || ! rg -q "rowMenuBtn\\.addEventListener\\('mousedown', toggleRowMenu\\)" "$ui"; then
-  printf '%s\n' "Forge row overflow triggers must fire before draggable rows can steal the click" >&2
+if ! rg -q "rowMenuBtn\\.addEventListener\\('pointerdown', toggleRowMenu\\)" "$ui" || ! rg -q "rowMenuBtn\\.addEventListener\\('mousedown', toggleRowMenu\\)" "$ui" || ! rg -q "rowMenuBtn\\.addEventListener\\('click', toggleRowMenu\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must fire on pointerdown, mousedown, and click" >&2
   exit 1
 fi
 
@@ -238,13 +238,13 @@ if ! rg -q "function routeCatalogRowMenuPointer" "$ui" || ! rg -q "button\\.forg
   exit 1
 fi
 
-if ! rg -q "routeCatalogRowOverflowPointer\\(event\\)" "$ui"; then
-  printf '%s\n' "Forge row overflow trigger clicks must be routed from the visible button rectangle during capture" >&2
+if ! rg -q "rowMenuPointerHandledUntil" "$ui"; then
+  printf '%s\n' "Forge row overflow trigger routing must suppress repeated native events from one gesture" >&2
   exit 1
 fi
 
-if ! rg -q "rowMenuTriggerRoutedUntil" "$ui"; then
-  printf '%s\n' "Forge row overflow trigger routing must suppress repeated native events from one gesture" >&2
+if rg -q "function routeCatalogRowOverflowPointer" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers should not rely on document-capture hit testing" >&2
   exit 1
 fi
 

@@ -539,7 +539,6 @@
         dragCueWatchdogTimer: 0,
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
-        rowMenuTriggerRoutedUntil: 0,
         workspaceProfileCache: {},
         workspaceProfileLoadingKey: '',
         workspaceProfileStatusKey: '',
@@ -4250,15 +4249,23 @@
           rowMenuBtn.setAttribute('aria-label', 'More actions');
           rowMenuBtn.textContent = '⋮';
           rowMenuBtn.disabled = state.busy;
-          var didToggleRowMenu = false;
-          function toggleRowMenu(event) {
+          var rowMenuPointerHandledUntil = 0;
+          function stopRowMenuEvent(event) {
             event.preventDefault();
             event.stopPropagation();
-            if (didToggleRowMenu || rowMenuBtn.disabled) {
+            if (event.stopImmediatePropagation) {
+              event.stopImmediatePropagation();
+            }
+          }
+          function toggleRowMenu(event) {
+            stopRowMenuEvent(event);
+            if (Date.now() < rowMenuPointerHandledUntil) {
               return;
             }
-            didToggleRowMenu = true;
-            state.rowMenuTriggerRoutedUntil = Date.now() + 350;
+            if (rowMenuBtn.disabled) {
+              return;
+            }
+            rowMenuPointerHandledUntil = Date.now() + 500;
             if (state.activeCatalogRowMenuKey === item.key) {
               state.activeCatalogRowMenuKey = '';
             } else {
@@ -4266,7 +4273,6 @@
             }
             renderCatalogList();
           }
-          rowMenuBtn.forgeToggleRowMenu = toggleRowMenu;
           rowMenuBtn.addEventListener('pointerdown', toggleRowMenu);
           rowMenuBtn.addEventListener('mousedown', toggleRowMenu);
           rowMenuBtn.addEventListener('click', toggleRowMenu);
@@ -4471,39 +4477,6 @@
             event.stopPropagation();
             if (typeof button.forgeRunRowMenuAction === 'function') {
               button.forgeRunRowMenuAction(event);
-            } else {
-              button.click();
-            }
-            return true;
-          }
-        }
-        return false;
-      }
-
-      function routeCatalogRowOverflowPointer(event) {
-        if (!event) {
-          return false;
-        }
-        if (state.rowMenuTriggerRoutedUntil && Date.now() < state.rowMenuTriggerRoutedUntil) {
-          event.preventDefault();
-          event.stopPropagation();
-          return true;
-        }
-        var buttons = Array.prototype.slice.call(els.catalogList.querySelectorAll('.catalog-row:not(.catalog-row-filtered) .row-overflow'));
-        for (var index = 0; index < buttons.length; index += 1) {
-          var button = buttons[index];
-          var rect = button.getBoundingClientRect();
-          if (
-            event.clientY >= rect.top &&
-            event.clientY <= rect.bottom &&
-            event.clientX >= rect.left &&
-            event.clientX <= rect.right
-          ) {
-            event.preventDefault();
-            event.stopPropagation();
-            state.rowMenuTriggerRoutedUntil = Date.now() + 350;
-            if (typeof button.forgeToggleRowMenu === 'function') {
-              button.forgeToggleRowMenu(event);
             } else {
               button.click();
             }
@@ -9122,23 +9095,14 @@
           if (routeCatalogRowMenuPointer(event)) {
             return;
           }
-          if (routeCatalogRowOverflowPointer(event)) {
-            return;
-          }
         }, true);
         document.addEventListener('pointerdown', function (event) {
           if (routeCatalogRowMenuPointer(event)) {
             return;
           }
-          if (routeCatalogRowOverflowPointer(event)) {
-            return;
-          }
         }, true);
         document.addEventListener('mousedown', function (event) {
           if (routeCatalogRowMenuPointer(event)) {
-            return;
-          }
-          if (routeCatalogRowOverflowPointer(event)) {
             return;
           }
         }, true);
