@@ -1064,6 +1064,12 @@ input[type="checkbox"]:disabled {
   user-select: none;
 }
 
+.row-play {
+  -webkit-app-region: no-drag;
+  -webkit-user-drag: none;
+  pointer-events: auto;
+}
+
 .catalog-content {
   min-width: 0;
   display: block;
@@ -1087,7 +1093,7 @@ input[type="checkbox"]:disabled {
   position: relative;
   z-index: 2;
   margin-left: 0.26rem;
-  transform: translateY(-2px);
+  -webkit-app-region: no-drag;
 }
 
 .catalog-git-pill {
@@ -1365,6 +1371,10 @@ input[type="checkbox"]:disabled {
   height: 1.5rem;
   padding: 0;
   margin-left: 0.04rem;
+  -webkit-app-region: no-drag;
+  -webkit-user-drag: none;
+  pointer-events: auto;
+  flex: 0 0 auto;
 }
 
 .row-play:not(:disabled):hover {

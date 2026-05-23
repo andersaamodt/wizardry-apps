@@ -539,6 +539,7 @@
         dragCueWatchdogTimer: 0,
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
+        suppressNextCatalogDocumentClick: false,
         workspaceProfileCache: {},
         workspaceProfileLoadingKey: '',
         workspaceProfileStatusKey: '',
@@ -4241,6 +4242,7 @@
             play.className = 'row-play';
             play.title = 'Run';
             play.textContent = '▶';
+            play.setAttribute('draggable', 'false');
             play.disabled = state.busy;
             if (item.kind === 'builtin') {
               var itemApp = appById(item.id);
@@ -4273,9 +4275,9 @@
           rowMenuBtn.className = 'row-overflow';
           rowMenuBtn.title = 'More actions';
           rowMenuBtn.setAttribute('aria-label', 'More actions');
+          rowMenuBtn.dataset.catalogItemKey = item.key;
+          rowMenuBtn.setAttribute('draggable', 'false');
           rowMenuBtn.textContent = '⋮';
-          rowMenuBtn.disabled = state.busy;
-          var rowMenuPointerHandledUntil = 0;
           function stopRowMenuEvent(event) {
             event.preventDefault();
             event.stopPropagation();
@@ -4285,13 +4287,6 @@
           }
           function toggleRowMenu(event) {
             stopRowMenuEvent(event);
-            if (Date.now() < rowMenuPointerHandledUntil) {
-              return;
-            }
-            if (rowMenuBtn.disabled) {
-              return;
-            }
-            rowMenuPointerHandledUntil = Date.now() + 500;
             if (state.activeCatalogRowMenuKey === item.key) {
               state.activeCatalogRowMenuKey = '';
             } else {
@@ -4299,10 +4294,44 @@
             }
             renderCatalogList();
           }
-          rowMenuBtn.addEventListener('pointerdown', toggleRowMenu);
-          rowMenuBtn.addEventListener('mousedown', toggleRowMenu);
-          rowMenuBtn.addEventListener('click', toggleRowMenu);
+          var rowMenuPressHandled = false;
+          function toggleRowMenuFromPress(event) {
+            if (rowMenuPressHandled) {
+              stopRowMenuEvent(event);
+              return;
+            }
+            rowMenuPressHandled = true;
+            state.suppressNextCatalogDocumentClick = true;
+            toggleRowMenu(event);
+            setTimeout(function () {
+              rowMenuPressHandled = false;
+            }, 0);
+          }
+          function toggleRowMenuFromClick(event) {
+            if (state.suppressNextCatalogDocumentClick) {
+              stopRowMenuEvent(event);
+              return;
+            }
+            toggleRowMenu(event);
+          }
+          function toggleRowMenuFromActions(event) {
+            var target = event.target;
+            if (target.closest('.row-play')) {
+              return;
+            }
+            if (!target.closest('.row-overflow') && target !== rowActions) {
+              return;
+            }
+            toggleRowMenu(event);
+          }
+          rowMenuBtn.addEventListener('pointerdown', toggleRowMenuFromPress);
+          rowMenuBtn.addEventListener('mousedown', toggleRowMenuFromPress);
+          rowMenuBtn.addEventListener('click', toggleRowMenuFromClick);
+          rowMenuBtn.addEventListener('dragstart', function (event) {
+            event.preventDefault();
+          });
           rowActions.appendChild(rowMenuBtn);
+          rowActions.addEventListener('click', toggleRowMenuFromActions);
 
           line.appendChild(rowActions);
         }
@@ -4335,7 +4364,19 @@
           }
           renderSelectedBuiltIn();
         }
-        row.addEventListener('click', selectItem);
+        row.addEventListener('click', function (event) {
+          if (isCatalogRowMenuGutterClick(event, row)) {
+            var trigger = row.querySelector('.row-overflow');
+            if (trigger) {
+              trigger.click();
+            }
+            return;
+          }
+          if (event.target.closest('.catalog-row-actions, button, input, select, textarea, a')) {
+            return;
+          }
+          selectItem();
+        });
         row.addEventListener('keydown', function (event) {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
@@ -4410,8 +4451,10 @@
 
         if (item.kind === 'workspace') {
           appendAction('Rename', function () {
-            state.inlineRenameKey = item.key;
-            renderCatalogList();
+            setTimeout(function () {
+              state.inlineRenameKey = item.key;
+              renderCatalogList();
+            }, 0);
           });
           appendAction('Remove', function () {
             perform('Remove project from Forge', async function () {
@@ -4510,6 +4553,43 @@
           }
         }
         return false;
+      }
+
+      function isCatalogRowMenuGutterClick(event, row) {
+        if (!event || !row) {
+          return false;
+        }
+        if (event.target.closest('.row-play')) {
+          return false;
+        }
+        var trigger = row.querySelector('.row-overflow');
+        if (!trigger) {
+          return false;
+        }
+        var rowRect = row.getBoundingClientRect();
+        var triggerRect = trigger.getBoundingClientRect();
+        var clientX = event.clientX;
+        var clientY = event.clientY;
+        var actions = row.querySelector('.catalog-row-actions');
+        var actionsRect = actions ? actions.getBoundingClientRect() : null;
+        var gutterLeft = Math.max(triggerRect.left, rowRect.right - 220);
+        var gutterRight = rowRect.right;
+        if (actionsRect) {
+          gutterLeft = triggerRect.left;
+          gutterRight = Math.min(rowRect.right, actionsRect.right + 4);
+          var play = row.querySelector('.row-play');
+          if (play) {
+            gutterLeft = Math.min(Math.max(actionsRect.left, play.getBoundingClientRect().right + 2), rowRect.right - 180);
+          } else {
+            gutterLeft = Math.max(actionsRect.left, actionsRect.right - 34);
+          }
+        }
+        return (
+          clientY >= rowRect.top &&
+          clientY <= rowRect.bottom &&
+          clientX >= gutterLeft &&
+          clientX <= gutterRight
+        );
       }
 
       function removeCatalogRowMenuPortal() {
@@ -9122,18 +9202,13 @@
             return;
           }
         }, true);
-        document.addEventListener('pointerdown', function (event) {
-          if (routeCatalogRowMenuPointer(event)) {
-            return;
-          }
-        }, true);
-        document.addEventListener('mousedown', function (event) {
-          if (routeCatalogRowMenuPointer(event)) {
-            return;
-          }
-        }, true);
-
         document.addEventListener('click', function (event) {
+          if (state.suppressNextCatalogDocumentClick) {
+            state.suppressNextCatalogDocumentClick = false;
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
           if (
             event.target.closest('#organize-menu') ||
             event.target.closest('#organize-btn') ||

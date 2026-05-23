@@ -232,18 +232,53 @@ if ! rg -q "function stopRowMenuEvent" "$ui" || ! rg -q "stopImmediatePropagatio
   exit 1
 fi
 
-if ! rg -q "rowMenuBtn\\.addEventListener\\('pointerdown', toggleRowMenu\\)" "$ui" || ! rg -q "rowMenuBtn\\.addEventListener\\('mousedown', toggleRowMenu\\)" "$ui" || ! rg -q "rowMenuBtn\\.addEventListener\\('click', toggleRowMenu\\)" "$ui"; then
-  printf '%s\n' "Forge row overflow triggers must fire on pointerdown, mousedown, and click" >&2
+if rg -q "rowMenuBtn\\.disabled = state\\.busy" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must open even while background work is busy" >&2
+  exit 1
+fi
+
+if ! rg -q "rowMenuBtn\\.addEventListener\\('click', toggleRowMenuFromClick\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must open on the browser-native click event" >&2
+  exit 1
+fi
+
+if ! rg -q "rowMenuBtn\\.setAttribute\\('draggable', 'false'\\)" "$ui" || ! rg -q "play\\.setAttribute\\('draggable', 'false'\\)" "$ui"; then
+  printf '%s\n' "Forge row action buttons must opt out of draggable row behavior" >&2
+  exit 1
+fi
+
+if ! rg -q "rowActions\\.addEventListener\\('click', toggleRowMenuFromActions\\)" "$ui" || ! rg -q "target\\.closest\\('\\.row-play'\\)" "$ui"; then
+  printf '%s\n' "Forge row action strips must delegate overflow clicks without stealing Run clicks" >&2
+  exit 1
+fi
+
+if ! rg -q "function isCatalogRowMenuGutterClick" "$ui" || ! rg -q "play\\.getBoundingClientRect\\(\\)\\.right \\+ 2" "$ui" || ! rg -q "trigger\\.click\\(\\)" "$ui"; then
+  printf '%s\n' "Forge row menu gutter clicks must route the action strip after Run to the row overflow trigger" >&2
+  exit 1
+fi
+
+if ! rg -q "event\\.target\\.closest\\('\\.catalog-row-actions, button, input, select, textarea, a'\\)" "$ui"; then
+  printf '%s\n' "Forge row selection must ignore clicks from row action controls" >&2
+  exit 1
+fi
+
+if rg -q "function routeCatalogRowOverflowClick" "$ui" || rg -q "function eventHitsCatalogRowOverflowZone" "$ui" || rg -q "toggleRowMenuFromRowHit" "$ui" || rg -q "rowRect\\.right - 44" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must not use broad document or row-edge hit-test fallbacks" >&2
+  exit 1
+fi
+
+if ! rg -q "rowMenuBtn\\.addEventListener\\('pointerdown', toggleRowMenuFromPress\\)" "$ui" || ! rg -q "rowMenuBtn\\.addEventListener\\('mousedown', toggleRowMenuFromPress\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must open on early press events because WebKit can lose the completed click" >&2
+  exit 1
+fi
+
+if ! rg -q "suppressNextCatalogDocumentClick" "$ui" || ! rg -q "state\\.suppressNextCatalogDocumentClick = true" "$ui"; then
+  printf '%s\n' "Forge row overflow press-open must suppress the follow-up document click" >&2
   exit 1
 fi
 
 if ! rg -q "function routeCatalogRowMenuPointer" "$ui" || ! rg -q "button\\.forgeRunRowMenuAction\\(event\\)" "$ui"; then
-  printf '%s\n' "Forge row overflow clicks must be routed from the visible menu rectangle during capture" >&2
-  exit 1
-fi
-
-if ! rg -q "rowMenuPointerHandledUntil" "$ui"; then
-  printf '%s\n' "Forge row overflow trigger routing must suppress repeated native events from one gesture" >&2
+  printf '%s\n' "Forge row overflow clicks must be routed from the visible menu rectangle during click capture" >&2
   exit 1
 fi
 
@@ -252,8 +287,13 @@ if rg -q "function routeCatalogRowOverflowPointer" "$ui"; then
   exit 1
 fi
 
-if ! rg -q "document\\.addEventListener\\('pointerdown'" "$ui" || ! rg -q "document\\.addEventListener\\('mousedown'" "$ui"; then
-  printf '%s\n' "Forge row overflow routing must capture pointerdown and mousedown, not only click" >&2
+if ! rg -q "appendAction\\('Rename', function \\(\\)" "$ui" || ! rg -q "setTimeout\\(function \\(\\)" "$ui" || ! rg -q "state\\.inlineRenameKey = item\\.key" "$ui"; then
+  printf '%s\n' "Forge row menu Rename must defer inline edit until after the physical click finishes" >&2
+  exit 1
+fi
+
+if rg -q "document\\.addEventListener\\('pointerdown'.*routeCatalogRowMenuPointer" "$ui"; then
+  printf '%s\n' "Forge row menu document-level pointerdown routing must not fire actions before the menu owns the event" >&2
   exit 1
 fi
 
