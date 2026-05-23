@@ -273,6 +273,28 @@ if tr '\r' '\n' <"$scratch/forge-bad-root-hint.out" | grep -E '^forged=' >/dev/n
   printf '%s\n' "forge list-apps emitted forged rows from root hint" >&2
   exit 1
 fi
+remove_state="$scratch/remove-state"
+remove_app_cache="$remove_state/wizardry-apps/forge/catalog/apps/artificer"
+mkdir -p "$remove_app_cache/deep"
+printf '%s\n' "cached" >"$remove_app_cache/deep/file.txt"
+remove_app_out=$(XDG_STATE_HOME="$remove_state" sh "$backend" remove-downloaded-app "$scratch" artificer)
+printf '%s\n' "$remove_app_out" | grep -F "slug=artificer" >/dev/null
+printf '%s\n' "$remove_app_out" | grep -F "removed=$remove_app_cache" >/dev/null
+if [ -e "$remove_app_cache" ] || [ -L "$remove_app_cache" ]; then
+  printf '%s\n' "forge remove-downloaded-app left active app cache in place" >&2
+  exit 1
+fi
+
+remove_template_cache="$remove_state/wizardry-apps/forge/catalog/templates/blog"
+mkdir -p "$remove_template_cache/deep"
+printf '%s\n' "cached" >"$remove_template_cache/deep/file.txt"
+remove_template_out=$(XDG_STATE_HOME="$remove_state" sh "$backend" remove-downloaded-template "$scratch" blog)
+printf '%s\n' "$remove_template_out" | grep -F "slug=blog" >/dev/null
+printf '%s\n' "$remove_template_out" | grep -F "removed=$remove_template_cache" >/dev/null
+if [ -e "$remove_template_cache" ] || [ -L "$remove_template_cache" ]; then
+  printf '%s\n' "forge remove-downloaded-template left active template cache in place" >&2
+  exit 1
+fi
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
 jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main\rforged=1") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"

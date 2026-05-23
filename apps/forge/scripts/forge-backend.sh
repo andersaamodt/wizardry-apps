@@ -919,6 +919,33 @@ template_cache_dir() {
   printf '%s\n' "$(forge_catalog_templates_dir)/$slug"
 }
 
+catalog_deleting_dir() {
+  printf '%s\n' "$(forge_catalog_root)/.deleting"
+}
+
+remove_catalog_cache_dir_async() {
+  cache_dir=$1
+  cache_slug=$2
+  deleting_root=$(catalog_deleting_dir)
+
+  if [ ! -e "$cache_dir" ] && [ ! -L "$cache_dir" ]; then
+    printf '%s\n' ""
+    return 0
+  fi
+
+  mkdir -p "$deleting_root"
+  deleting_target="$deleting_root/$cache_slug.$$"
+  deleting_suffix=0
+  while [ -e "$deleting_target" ] || [ -L "$deleting_target" ]; do
+    deleting_suffix=$((deleting_suffix + 1))
+    deleting_target="$deleting_root/$cache_slug.$$-$deleting_suffix"
+  done
+
+  mv "$cache_dir" "$deleting_target"
+  ( rm -rf "$deleting_target" ) >/dev/null 2>&1 &
+  printf '%s\n' "$deleting_target"
+}
+
 resolve_app_dir() {
   root=$1
   slug=$2
@@ -2486,9 +2513,10 @@ cmd_remove_downloaded_app() {
     exit 1
   }
   dest_dir=$(app_cache_dir "$slug")
-  rm -rf "$dest_dir"
-  printf 'slug=%s\n' "$slug"
-  printf 'removed=%s\n' "$dest_dir"
+  deleting_dir=$(remove_catalog_cache_dir_async "$dest_dir" "$slug")
+  printf 'slug=%s\n' "$(kv_output_value "$slug")"
+  printf 'removed=%s\n' "$(kv_output_value "$dest_dir")"
+  [ -n "$deleting_dir" ] && printf 'cleanup=%s\n' "$(kv_output_value "$deleting_dir")"
 }
 
 cmd_download_template() {
@@ -2549,9 +2577,10 @@ cmd_remove_downloaded_template() {
     exit 1
   }
   dest_dir=$(template_cache_dir "$slug")
-  rm -rf "$dest_dir"
-  printf 'slug=%s\n' "$slug"
-  printf 'removed=%s\n' "$dest_dir"
+  deleting_dir=$(remove_catalog_cache_dir_async "$dest_dir" "$slug")
+  printf 'slug=%s\n' "$(kv_output_value "$slug")"
+  printf 'removed=%s\n' "$(kv_output_value "$dest_dir")"
+  [ -n "$deleting_dir" ] && printf 'cleanup=%s\n' "$(kv_output_value "$deleting_dir")"
 }
 
 theme_names_from_dir() {
