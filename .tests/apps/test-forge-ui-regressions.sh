@@ -87,6 +87,10 @@ assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Install latest release'
 assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 13\)'
 assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 17\)'
 assert_matches "$ui" 'function buildCatalogGitPill\(item\)'
+assert_matches "$ui" 'function workspaceCatalogKey\(workspace\)'
+assert_matches "$ui" "return 'workspace-path:' \\+ normalizedPath;"
+assert_matches "$ui" 'key:[[:space:]]*workspaceCatalogKey\(ws\)'
+assert_matches "$ui" "state\\.selectedCatalog\\.indexOf\\('workspace:'\\)[[:space:]]*===[[:space:]]*0"
 assert_contains "$ui" 'catalog-git-pill'
 assert_matches "$ui" 'function setDownloadedAppVisibleState\(appId, exists\)'
 assert_matches "$ui" 'setDownloadedAppVisibleState\(item\.id, false\);'
