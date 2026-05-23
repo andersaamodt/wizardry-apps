@@ -224,7 +224,7 @@ if [ "$mode" = "smoke" ]; then
     CODE_SIGNING_ALLOWED=NO \
     build >/tmp/wizardry-ios-smoke-$slug.log
 
-  app_path="$derived_data/Build/Products/Debug-iphonesimulator/WizardryHost.app"
+  app_path="$derived_data/Build/Products/Debug-iphonesimulator/$APP_NAME.app"
   [ -d "$app_path" ] || {
     printf '%s\n' "build-ios-app: smoke app bundle not found: $app_path" >&2
     exit 1

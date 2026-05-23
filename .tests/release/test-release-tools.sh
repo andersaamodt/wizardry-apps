@@ -230,6 +230,10 @@ grep -F "GENERATE_INFOPLIST_FILE: YES" "$ROOT_DIR/apps/.host/ios/project-templat
   printf '%s\n' "iOS project template must generate Info.plist from INFOPLIST_KEY settings" >&2
   exit 1
 }
+grep -F 'app_path="$derived_data/Build/Products/Debug-iphonesimulator/$APP_NAME.app"' "$ROOT_DIR/tools/release/build-ios-app.sh" >/dev/null || {
+  printf '%s\n' "build-ios-app must package the generated product app name, not the template target name" >&2
+  exit 1
+}
 
 fake_ios_bin="$tmp_dir/fake-ios-bin"
 mkdir -p "$fake_ios_bin"
@@ -256,6 +260,7 @@ while [ "$#" -gt 0 ]; do
 done
 if [ -n "$derived" ]; then
   mkdir -p "$derived/Build/Products/Debug-iphonesimulator/WizardryHost.app"
+  mkdir -p "$derived/Build/Products/Debug-iphonesimulator/App Forge.app"
 fi
 if [ -n "$export_path" ]; then
   mkdir -p "$export_path"
