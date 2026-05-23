@@ -44,6 +44,13 @@ printf '%s\n' "$out" | grep -F "workspace-git-install-release [ROOT_HINT] WORKSP
 grep -F 'self_relaunch=1' "$backend" >/dev/null
 grep -F 'open "$launch_bundle"' "$backend" >/dev/null
 grep -F 'install_macos_bundle "$artifact" "$install_path"' "$backend" >/dev/null
+mic_usage_count=$(grep -F '<key>NSMicrophoneUsageDescription</key><string>This app uses the microphone for local voice input and voice automation commands.</string>' "$backend" | wc -l | tr -d ' ')
+case "$mic_usage_count" in
+  ''|0|1|2|3)
+    printf '%s\n' "forge backend test: macOS bundle templates are missing microphone usage descriptions" >&2
+    exit 1
+    ;;
+esac
 if grep -F 'rm -rf "$install_path"' "$backend" >/dev/null; then
   printf '%s\n' "forge backend test: macOS install path is removed before replacement" >&2
   exit 1

@@ -5569,6 +5569,7 @@ cmd_build_desktop() {
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>wizardry-host</string>
 <key>WizardryAppEntry</key><string>Resources/$slug</string>
+<key>NSMicrophoneUsageDescription</key><string>This app uses the microphone for local voice input and voice automation commands.</string>
 $icon_key
 </dict></plist>
 PLIST
@@ -6041,6 +6042,7 @@ build_native_workspace_host() {
 <key>CFBundleVersion</key><string>$bundle_version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>$app_id</string>
+<key>NSMicrophoneUsageDescription</key><string>This app uses the microphone for local voice input and voice automation commands.</string>
 $icon_key
 </dict></plist>
 PLIST
@@ -6231,6 +6233,7 @@ build_workspace_desktop_host() {
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>wizardry-host</string>
 <key>WizardryAppEntry</key><string>$bundle_app_dir</string>
+<key>NSMicrophoneUsageDescription</key><string>This app uses the microphone for local voice input and voice automation commands.</string>
 $icon_key
 </dict></plist>
 PLIST
@@ -7422,6 +7425,7 @@ cmd_run_workspace() {
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>wizardry-host</string>
 <key>WizardryAppEntry</key><string>$bundle_app_dir</string>
+<key>NSMicrophoneUsageDescription</key><string>This app uses the microphone for local voice input and voice automation commands.</string>
 $desktop_window_keys$icon_key
 </dict></plist>
 PLIST
