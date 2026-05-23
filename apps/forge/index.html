@@ -509,6 +509,7 @@
         startupWindowSized: false,
         lastWindowFitHeight: 0,
         windowFitInFlight: false,
+        refreshWorkspaceInFlight: null,
         createDraftActive: false,
         leftRailWidth: 240,
         iconSquircleOnDrop: true,
@@ -7870,6 +7871,21 @@
       }
 
       async function refreshWorkspace(options) {
+        if (state.refreshWorkspaceInFlight) {
+          return state.refreshWorkspaceInFlight;
+        }
+        var refreshPromise = refreshWorkspaceNow(options);
+        state.refreshWorkspaceInFlight = refreshPromise;
+        try {
+          return await refreshPromise;
+        } finally {
+          if (state.refreshWorkspaceInFlight === refreshPromise) {
+            state.refreshWorkspaceInFlight = null;
+          }
+        }
+      }
+
+      async function refreshWorkspaceNow(options) {
         options = options || {};
         var quiet = !!options.quiet;
         var shouldRender = options.render !== false;

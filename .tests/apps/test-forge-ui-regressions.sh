@@ -67,6 +67,9 @@ assert_matches "$ui" 'window\.wizardry\.nativeAvailable'
 assert_contains "$ui" "'wizardry.forge.cached_workspaces.v2': 'cached_workspaces'"
 assert_not_contains "$ui" "'wizardry.forge.cached_workspaces.v1': 'cached_workspaces'"
 assert_not_contains "$ui" 'await runInitialBridgeBootstrap();'
+assert_matches "$ui" 'refreshWorkspaceInFlight:[[:space:]]*null'
+assert_matches "$ui" 'if \(state\.refreshWorkspaceInFlight\)'
+assert_matches "$ui" 'async function refreshWorkspaceNow\(options\)'
 assert_matches "$ui" 'function renderWorkspaceGitEditor\(selected\)'
 assert_matches "$ui" 'function saveWorkspaceGitRemote\(selected, value\)'
 assert_matches "$ui" 'function saveWorkspaceGitBranch\(selected, value\)'
