@@ -64,6 +64,9 @@ assert_not_contains "$ui" 'installBeforeRunHasUserPref'
 assert_matches "$ui" 'function hostTargetId\(\)'
 assert_matches "$ui" 'function bridgeAvailable\(\)'
 assert_matches "$ui" 'window\.wizardry\.nativeAvailable'
+assert_contains "$ui" "'wizardry.forge.cached_workspaces.v2': 'cached_workspaces'"
+assert_not_contains "$ui" "'wizardry.forge.cached_workspaces.v1': 'cached_workspaces'"
+assert_not_contains "$ui" 'await runInitialBridgeBootstrap();'
 assert_matches "$ui" 'function renderWorkspaceGitEditor\(selected\)'
 assert_matches "$ui" 'function saveWorkspaceGitRemote\(selected, value\)'
 assert_matches "$ui" 'function saveWorkspaceGitBranch\(selected, value\)'
@@ -133,5 +136,22 @@ assert_contains "$host_macos" '__wizardry_host_restart_self'
 assert_contains "$host_macos" 'if (launchedFromPackagedBundle && resolvedBundleIcon)'
 assert_contains "$host_macos" 'else if (resolvedFileIcon)'
 assert_contains "$host_macos" '[NSApp setApplicationIconImage:resolvedBundleIcon];'
+
+boot_reveal_line=$(awk '/async function boot\(\)/{in_boot=1} in_boot && /revealBootUi\(\);/{print NR; exit}' "$ui")
+boot_bridge_line=$(awk '/async function boot\(\)/{in_boot=1} in_boot && /runInitialBridgeBootstrap\(\);/{print NR; exit}' "$ui")
+boot_load_themes_before_reveal=$(awk '
+  /async function boot\(\)/ { in_boot=1 }
+  in_boot && /revealBootUi\(\);/ { exit }
+  in_boot && /await loadThemes\(\);/ { found=1 }
+  END { if (found) print "yes" }
+' "$ui")
+[ -n "$boot_reveal_line" ] && [ -n "$boot_bridge_line" ] && [ "$boot_reveal_line" -lt "$boot_bridge_line" ] || {
+  printf '%s\n' "Forge startup should reveal cached UI before bridge bootstrap" >&2
+  exit 1
+}
+[ -z "$boot_load_themes_before_reveal" ] || {
+  printf '%s\n' "Forge startup should not wait for theme discovery before splash handoff" >&2
+  exit 1
+}
 
 printf '%s\n' "forge ui regression contracts passed"

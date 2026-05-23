@@ -465,7 +465,7 @@
         'wizardry.forge.selected.catalog.v1': 'selected_catalog',
         'wizardry.forge.hidden.workspaces.v1': 'hidden_workspaces',
         'wizardry.forge.cached_apps.v1': 'cached_apps',
-        'wizardry.forge.cached_workspaces.v1': 'cached_workspaces',
+        'wizardry.forge.cached_workspaces.v2': 'cached_workspaces',
         'wizardry.forge.mini_tabs.v1': 'mini_tabs',
         'wizardry.forge.active_mini_tab.v1': 'active_mini_tab',
         'wizardry.forge.mini_tab_assignments.v1': 'mini_tab_assignments',
@@ -642,9 +642,8 @@
         try {
           await hydratePrefsFromBackend();
           refreshStateFromStorage();
+          loadCatalogCachesFromStorage();
           applyTheme(state.activeTheme, { allowUnlisted: true });
-          await loadThemes();
-          applyTheme(state.activeTheme);
           renderThemePicker();
           setOrganizeShow(state.organizeShow);
           setOrganizeSort(state.organizeSort);
@@ -659,6 +658,12 @@
             els.settingsProjectsRoot.value = state.projectsRoot;
           }
           syncSettingsSaveButtons();
+          renderCatalogList();
+          renderSelectedBuiltIn();
+          await waitForStartupPaint();
+          await loadThemes();
+          applyTheme(state.activeTheme);
+          renderThemePicker();
           await refreshWorkspace({ quiet: true });
           text(els.qualityScope, 'Global checks for repository: ' + (state.rootHint || '(not set)'));
           text(els.qualityHelp, 'These checks run against the repository and pipeline tooling, not one selected app.');
@@ -1434,6 +1439,9 @@
       }
 
       function revealBootUi() {
+        if (!document.body.classList.contains('forge-booting')) {
+          return;
+        }
         document.body.classList.remove('forge-booting');
         notifyHostBootReady(0);
       }
@@ -9753,8 +9761,6 @@
           refreshStateFromStorage();
           loadCatalogCachesFromStorage();
           applyTheme(state.activeTheme, { allowUnlisted: true });
-          await loadThemes();
-          applyTheme(state.activeTheme);
           renderThemePicker();
           setOrganizeShow(state.organizeShow);
           setOrganizeSort(state.organizeSort);
@@ -9779,6 +9785,7 @@
           renderCatalogList();
           renderSelectedBuiltIn();
           await waitForStartupPaint();
+          revealBootUi();
 
           if (state.rootHint) {
             setWorkspaceRoot(state.rootHint);
@@ -9791,7 +9798,7 @@
           if (bridgeAvailable()) {
             setBridgeStatus(true, 'Bridge: connected');
             setActivity('idle', 'Loading');
-            await runInitialBridgeBootstrap();
+            runInitialBridgeBootstrap();
             return;
           }
 
