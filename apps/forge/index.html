@@ -2915,15 +2915,7 @@
         if (!seen.psionic) {
           out.unshift('psionic');
         }
-        out.sort(function (a, b) {
-          if (a === 'psionic') {
-            return -1;
-          }
-          if (b === 'psionic') {
-            return 1;
-          }
-          return a.localeCompare(b);
-        });
+        sortThemeNames(out);
         return out;
       }
 
@@ -2939,11 +2931,32 @@
         return list;
       }
 
+      function validThemeName(value) {
+        return /^[a-z0-9_-]+$/.test(String(value || '').toLowerCase().trim());
+      }
+
+      function sortThemeNames(list) {
+        return list.sort(function (a, b) {
+          if (a === 'psionic') {
+            return -1;
+          }
+          if (b === 'psionic') {
+            return 1;
+          }
+          return a.localeCompare(b);
+        });
+      }
+
       function ensureActiveThemeInList() {
         if (!Array.isArray(state.themes) || !state.themes.length) {
           state.themes = ['psionic'];
         }
         if (state.themes.indexOf(state.activeTheme) < 0) {
+          if (validThemeName(state.activeTheme)) {
+            state.themes.push(state.activeTheme);
+            sortThemeNames(state.themes);
+            return;
+          }
           if (state.themes.indexOf('psionic') >= 0) {
             state.activeTheme = 'psionic';
           } else {
