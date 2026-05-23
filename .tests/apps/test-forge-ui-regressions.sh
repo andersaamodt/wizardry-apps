@@ -218,8 +218,38 @@ if ! rg -q "button\\.addEventListener\\('pointerdown', runRowMenuAction\\)" "$ui
   exit 1
 fi
 
-if ! rg -q "function routeCatalogRowMenuPointer" "$ui" || ! rg -q "routeCatalogRowMenuPointer\\(event\\)" "$ui"; then
+if ! rg -q "button\\.forgeRunRowMenuAction = runRowMenuAction" "$ui" || ! rg -q "button\\.addEventListener\\('mousedown', runRowMenuAction\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow actions must expose a direct handler for routed native events" >&2
+  exit 1
+fi
+
+if ! rg -q "rowMenuBtn\\.forgeToggleRowMenu = toggleRowMenu" "$ui" || ! rg -q "function routeCatalogRowOverflowPointer" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must expose a direct handler for routed native events" >&2
+  exit 1
+fi
+
+if ! rg -q "rowMenuBtn\\.addEventListener\\('pointerdown', toggleRowMenu\\)" "$ui" || ! rg -q "rowMenuBtn\\.addEventListener\\('mousedown', toggleRowMenu\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must fire before draggable rows can steal the click" >&2
+  exit 1
+fi
+
+if ! rg -q "function routeCatalogRowMenuPointer" "$ui" || ! rg -q "button\\.forgeRunRowMenuAction\\(event\\)" "$ui"; then
   printf '%s\n' "Forge row overflow clicks must be routed from the visible menu rectangle during capture" >&2
+  exit 1
+fi
+
+if ! rg -q "routeCatalogRowOverflowPointer\\(event\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow trigger clicks must be routed from the visible button rectangle during capture" >&2
+  exit 1
+fi
+
+if ! rg -q "rowMenuTriggerRoutedUntil" "$ui"; then
+  printf '%s\n' "Forge row overflow trigger routing must suppress repeated native events from one gesture" >&2
+  exit 1
+fi
+
+if ! rg -q "document\\.addEventListener\\('pointerdown'" "$ui" || ! rg -q "document\\.addEventListener\\('mousedown'" "$ui"; then
+  printf '%s\n' "Forge row overflow routing must capture pointerdown and mousedown, not only click" >&2
   exit 1
 fi
 
@@ -230,6 +260,11 @@ fi
 
 if ! rg -q "function renderCatalogRowMenuPortal" "$ui" || ! rg -q "document\\.body\\.appendChild\\(menu\\)" "$ui"; then
   printf '%s\n' "Forge row overflow menus must be rendered through a document-level portal" >&2
+  exit 1
+fi
+
+if ! rg -q "padding: 0 0\\.62rem 0 0\\.4rem" "$css" || ! rg -q "width: 1\\.5rem" "$css"; then
+  printf '%s\n' "Forge row overflow triggers must stay inset from the splitter with a stable hit target" >&2
   exit 1
 fi
 

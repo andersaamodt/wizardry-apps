@@ -539,6 +539,7 @@
         dragCueWatchdogTimer: 0,
         refreshSuppressedUntil: 0,
         activeCatalogRowMenuKey: '',
+        rowMenuTriggerRoutedUntil: 0,
         workspaceProfileCache: {},
         workspaceProfileLoadingKey: '',
         workspaceProfileStatusKey: '',
@@ -4249,16 +4250,26 @@
           rowMenuBtn.setAttribute('aria-label', 'More actions');
           rowMenuBtn.textContent = '⋮';
           rowMenuBtn.disabled = state.busy;
-          rowMenuBtn.addEventListener('click', function (event) {
+          var didToggleRowMenu = false;
+          function toggleRowMenu(event) {
             event.preventDefault();
             event.stopPropagation();
+            if (didToggleRowMenu || rowMenuBtn.disabled) {
+              return;
+            }
+            didToggleRowMenu = true;
+            state.rowMenuTriggerRoutedUntil = Date.now() + 350;
             if (state.activeCatalogRowMenuKey === item.key) {
               state.activeCatalogRowMenuKey = '';
             } else {
               state.activeCatalogRowMenuKey = item.key;
             }
             renderCatalogList();
-          });
+          }
+          rowMenuBtn.forgeToggleRowMenu = toggleRowMenu;
+          rowMenuBtn.addEventListener('pointerdown', toggleRowMenu);
+          rowMenuBtn.addEventListener('mousedown', toggleRowMenu);
+          rowMenuBtn.addEventListener('click', toggleRowMenu);
           rowActions.appendChild(rowMenuBtn);
 
           line.appendChild(rowActions);
@@ -4348,7 +4359,9 @@
             renderCatalogList();
             handler();
           }
+          button.forgeRunRowMenuAction = runRowMenuAction;
           button.addEventListener('pointerdown', runRowMenuAction);
+          button.addEventListener('mousedown', runRowMenuAction);
           button.addEventListener('click', runRowMenuAction);
           rowMenu.appendChild(button);
           hasItems = true;
@@ -4456,7 +4469,44 @@
           ) {
             event.preventDefault();
             event.stopPropagation();
-            button.click();
+            if (typeof button.forgeRunRowMenuAction === 'function') {
+              button.forgeRunRowMenuAction(event);
+            } else {
+              button.click();
+            }
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function routeCatalogRowOverflowPointer(event) {
+        if (!event) {
+          return false;
+        }
+        if (state.rowMenuTriggerRoutedUntil && Date.now() < state.rowMenuTriggerRoutedUntil) {
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
+        }
+        var buttons = Array.prototype.slice.call(els.catalogList.querySelectorAll('.catalog-row:not(.catalog-row-filtered) .row-overflow'));
+        for (var index = 0; index < buttons.length; index += 1) {
+          var button = buttons[index];
+          var rect = button.getBoundingClientRect();
+          if (
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom &&
+            event.clientX >= rect.left &&
+            event.clientX <= rect.right
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            state.rowMenuTriggerRoutedUntil = Date.now() + 350;
+            if (typeof button.forgeToggleRowMenu === 'function') {
+              button.forgeToggleRowMenu(event);
+            } else {
+              button.click();
+            }
             return true;
           }
         }
@@ -9070,6 +9120,25 @@
 
         document.addEventListener('click', function (event) {
           if (routeCatalogRowMenuPointer(event)) {
+            return;
+          }
+          if (routeCatalogRowOverflowPointer(event)) {
+            return;
+          }
+        }, true);
+        document.addEventListener('pointerdown', function (event) {
+          if (routeCatalogRowMenuPointer(event)) {
+            return;
+          }
+          if (routeCatalogRowOverflowPointer(event)) {
+            return;
+          }
+        }, true);
+        document.addEventListener('mousedown', function (event) {
+          if (routeCatalogRowMenuPointer(event)) {
+            return;
+          }
+          if (routeCatalogRowOverflowPointer(event)) {
             return;
           }
         }, true);
