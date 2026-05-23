@@ -19,6 +19,7 @@ grep -F 'NSStatusItem *statusItem' "$mac_host" >/dev/null
 grep -F 'renderedStatusItemImage' "$mac_host" >/dev/null
 grep -F 'isMatchbookApp' "$mac_host" >/dev/null
 grep -F 'isBellheimApp' "$mac_host" >/dev/null
+grep -F '&& ![self isBellheimApp]' "$mac_host" >/dev/null
 grep -F 'Bellheim is running in background' "$mac_host" >/dev/null
 grep -F 'clapperRadius' "$mac_host" >/dev/null
 grep -F 'lineToPoint:NSMakePoint(minX + side * 0.005, lipY)' "$mac_host" >/dev/null

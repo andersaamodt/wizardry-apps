@@ -1959,7 +1959,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)syncStonrActivationPolicy {
-    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp]) {
+    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp] && ![self isBellheimApp]) {
         return;
     }
     BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
