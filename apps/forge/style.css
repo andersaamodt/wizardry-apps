@@ -725,7 +725,7 @@ body.settings-open #settings-panel {
   background: color-mix(in srgb, var(--panel-solid, #fff) 95%, transparent);
   width: 100%;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .footer-icon-btn {

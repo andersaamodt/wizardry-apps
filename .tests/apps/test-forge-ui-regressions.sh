@@ -4,6 +4,7 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 ui="$root/apps/forge/index.html"
+css="$root/apps/forge/style.css"
 host_macos="$root/apps/.host/macos/main.m"
 
 [ -f "$ui" ] || {
@@ -12,6 +13,10 @@ host_macos="$root/apps/.host/macos/main.m"
 }
 [ -f "$host_macos" ] || {
   printf '%s\n' "forge macOS host file missing: $host_macos" >&2
+  exit 1
+}
+[ -f "$css" ] || {
+  printf '%s\n' "forge css file missing: $css" >&2
   exit 1
 }
 
@@ -139,6 +144,17 @@ assert_contains "$host_macos" '__wizardry_host_restart_self'
 assert_contains "$host_macos" 'if (launchedFromPackagedBundle && resolvedBundleIcon)'
 assert_contains "$host_macos" 'else if (resolvedFileIcon)'
 assert_contains "$host_macos" '[NSApp setApplicationIconImage:resolvedBundleIcon];'
+
+footer_bar_overflow=$(awk '
+  /^\.footer-bar[[:space:]]*\{/ { in_rule=1 }
+  in_rule && /overflow:[[:space:]]*visible;/ { found=1 }
+  in_rule && /^}/ { in_rule=0 }
+  END { if (found) print "yes" }
+' "$css")
+[ "$footer_bar_overflow" = "yes" ] || {
+  printf '%s\n' "Forge footer bar must allow the theme menu to escape its bounds" >&2
+  exit 1
+}
 
 boot_reveal_line=$(awk '/async function boot\(\)/{in_boot=1} in_boot && /revealBootUi\(\);/{print NR; exit}' "$ui")
 boot_bridge_line=$(awk '/async function boot\(\)/{in_boot=1} in_boot && /runInitialBridgeBootstrap\(\);/{print NR; exit}' "$ui")
