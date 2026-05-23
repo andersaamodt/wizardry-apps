@@ -3400,6 +3400,11 @@ workspace_git_repo_root() {
   git -C "$workspace_path" rev-parse --show-toplevel 2>/dev/null || true
 }
 
+workspace_git_status_porcelain() {
+  workspace_path=${1-}
+  git -C "$workspace_path" status --porcelain -- . ':(exclude).forge-source.lock' 2>/dev/null || true
+}
+
 workspace_git_current_branch() {
   workspace_path=${1-}
   branch=$(git -C "$workspace_path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
@@ -3677,7 +3682,7 @@ workspace_git_collect_status() {
   git_branch=$(workspace_git_current_branch "$workspace_path")
   git_head=$(workspace_git_head_commit "$workspace_path")
   git_head_short=$(workspace_git_head_short "$workspace_path")
-  if [ -n "$(git -C "$workspace_path" status --porcelain 2>/dev/null || true)" ]; then
+  if [ -n "$(workspace_git_status_porcelain "$workspace_path")" ]; then
     git_dirty='yes'
   fi
 
@@ -4377,7 +4382,7 @@ cmd_workspace_git_pull() {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
     exit 1
   }
-  if [ -n "$(git -C "$workspace_abs" status --porcelain 2>/dev/null || true)" ]; then
+  if [ -n "$(workspace_git_status_porcelain "$workspace_abs")" ]; then
     printf '%s\n' "forge-backend: commit or stash local changes before pull" >&2
     exit 1
   fi
@@ -4430,7 +4435,7 @@ cmd_workspace_git_push() {
     printf '%s\n' "forge-backend: project does not have a git repo yet" >&2
     exit 1
   }
-  if [ -n "$(git -C "$workspace_abs" status --porcelain 2>/dev/null || true)" ]; then
+  if [ -n "$(workspace_git_status_porcelain "$workspace_abs")" ]; then
     printf '%s\n' "forge-backend: commit local changes before push" >&2
     exit 1
   fi

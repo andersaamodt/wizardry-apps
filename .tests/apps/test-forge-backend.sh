@@ -859,6 +859,14 @@ workspace_web_push=$(sh "$backend" workspace-git-push "$scratch" "$workspaces_ro
 printf '%s\n' "$workspace_web_push" | grep -F "git_status_label=Current" >/dev/null
 printf '%s\n' "$workspace_web_push" | grep -F "git_upstream_present=yes" >/dev/null
 
+printf '%s\n' 'repo=test' 'ref=main' 'subdir=.' 'commit=test' > "$workspaces_root/workspace-web/.forge-source.lock"
+workspace_web_lock_only=$(sh "$backend" workspace-git-status "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_lock_only" | grep -F "git_dirty=no" >/dev/null
+printf '%s\n' "$workspace_web_lock_only" | grep -F "git_status_label=Current" >/dev/null
+workspace_web_lock_push=$(sh "$backend" workspace-git-push "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_lock_push" | grep -F "git_status_label=Current" >/dev/null
+rm -f "$workspaces_root/workspace-web/.forge-source.lock"
+
 workspace_web_remote_clone="$scratch/workspace-web-remote-clone"
 git clone "$workspace_web_remote" "$workspace_web_remote_clone" >/dev/null 2>&1
 git -C "$workspace_web_remote_clone" config user.name "Forge Test"
