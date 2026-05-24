@@ -329,4 +329,21 @@ boot_load_themes_before_reveal=$(awk '
   exit 1
 }
 
+if ! rg -q "bridgePrefsHydrated: false" "$ui" || ! rg -q "state\\.bridgePrefsHydrated = true" "$ui"; then
+  printf '%s\n' "Forge startup must track when bridge prefs are already hydrated" >&2
+  exit 1
+fi
+
+if ! awk '
+  /async function runInitialBridgeBootstrap\(\)/ { in_bootstrap=1 }
+  in_bootstrap && /if \(!state\.bridgePrefsHydrated\)/ { guarded=1 }
+  in_bootstrap && /await hydratePrefsFromBackend\(\);/ && guarded { hydrate_after_guard=1 }
+  in_bootstrap && /loadCatalogCachesFromStorage\(\);/ && guarded { cache_after_guard=1 }
+  in_bootstrap && /await refreshWorkspace\(\{ quiet: true \}\);/ { exit }
+  END { exit !(guarded && hydrate_after_guard && cache_after_guard) }
+' "$ui"; then
+  printf '%s\n' "Forge bridge bootstrap must not replay cached prefs over already-clickable startup minitabs" >&2
+  exit 1
+fi
+
 printf '%s\n' "forge ui regression contracts passed"

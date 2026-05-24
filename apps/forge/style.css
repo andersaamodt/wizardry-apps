@@ -422,7 +422,7 @@ body.settings-open #settings-panel {
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
 }
 
 .left-rail.panel,
@@ -482,7 +482,7 @@ body.settings-open #settings-panel {
   border-radius: 0;
   background: var(--bg-panel);
   padding: calc(0.5rem + 20px) 0.5rem 0.42rem;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
   position: relative;
   z-index: 0;
 }

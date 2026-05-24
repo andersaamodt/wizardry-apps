@@ -519,6 +519,7 @@
         iconProcessingByKey: {},
         catalogThumbCache: {},
         catalogRowCache: {},
+        bridgePrefsHydrated: false,
         targetRuntime: {},
         targetSectionByRow: {},
         iconVersionByKey: {},
@@ -635,6 +636,7 @@
           var res = await backend('get-ui-prefs', [], { quiet: true });
           var prefs = kv((res && res.stdout) || '');
           mergePrefsIntoState(prefs);
+          state.bridgePrefsHydrated = true;
         } catch (_err) {
           return;
         }
@@ -642,17 +644,19 @@
 
       async function runInitialBridgeBootstrap() {
         try {
-          await hydratePrefsFromBackend();
-          refreshStateFromStorage();
-          loadCatalogCachesFromStorage();
-          applyTheme(state.activeTheme, { allowUnlisted: true });
-          renderThemePicker();
-          setOrganizeShow(state.organizeShow);
-          setOrganizeSort(state.organizeSort);
-          setOrganizeBuiltinFirst(state.organizeBuiltinFirst);
-          setUseMiniTabs(state.useMiniTabs);
-          setLeftRailWidth(state.leftRailWidth);
-          setIconSquircleOnDrop(state.iconSquircleOnDrop);
+          if (!state.bridgePrefsHydrated) {
+            await hydratePrefsFromBackend();
+            refreshStateFromStorage();
+            loadCatalogCachesFromStorage();
+            applyTheme(state.activeTheme, { allowUnlisted: true });
+            renderThemePicker();
+            setOrganizeShow(state.organizeShow);
+            setOrganizeSort(state.organizeSort);
+            setOrganizeBuiltinFirst(state.organizeBuiltinFirst);
+            setUseMiniTabs(state.useMiniTabs);
+            setLeftRailWidth(state.leftRailWidth);
+            setIconSquircleOnDrop(state.iconSquircleOnDrop);
+          }
           if (state.rootHint) {
             setWorkspaceRoot(state.rootHint);
           }
