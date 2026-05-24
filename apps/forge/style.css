@@ -917,16 +917,12 @@ button {
   cursor: pointer;
   color: var(--text);
   background: color-mix(in srgb, var(--panel-solid, #fff) 94%, transparent);
-  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  transition: box-shadow 120ms ease, border-color 120ms ease, background-color 120ms ease;
 }
 
 button:hover {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
   box-shadow: 0 5px 12px color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-button:active {
-  transform: translateY(1px);
 }
 
 button.primary {

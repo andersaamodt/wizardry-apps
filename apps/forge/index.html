@@ -3989,11 +3989,7 @@
         row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
         row.classList.remove('catalog-row-filtered');
         row.removeAttribute('aria-hidden');
-        if (!state.inlineRenameKey && !state.activeCatalogRowMenuKey && !item.draft) {
-          row.setAttribute('draggable', 'true');
-        } else {
-          row.removeAttribute('draggable');
-        }
+        row.removeAttribute('draggable');
         row.setAttribute('tabindex', '0');
       }
 
@@ -4228,6 +4224,7 @@
         if (!item.draft) {
           var rowActions = document.createElement('span');
           rowActions.className = 'catalog-row-actions menu-anchor';
+          rowActions.setAttribute('draggable', 'false');
           var gitPill = buildCatalogGitPill(item);
           if (gitPill) {
             rowActions.appendChild(gitPill);
@@ -4310,6 +4307,9 @@
             setTimeout(function () {
               rowMenuPressHandled = false;
             }, 0);
+            setTimeout(function () {
+              state.suppressNextCatalogDocumentClick = false;
+            }, 1500);
           }
           function toggleRowMenuFromClick(event) {
             if (state.suppressNextCatalogDocumentClick) {
@@ -4318,16 +4318,40 @@
             }
             toggleRowMenu(event);
           }
+          function eventHitsRowMenuButton(event) {
+            if (!event || typeof event.clientX !== 'number' || typeof event.clientY !== 'number') {
+              return false;
+            }
+            var buttonRect = rowMenuBtn.getBoundingClientRect();
+            var actionsRect = rowActions.getBoundingClientRect();
+            var playButton = rowActions.querySelector('.row-play');
+            var playRect = playButton ? playButton.getBoundingClientRect() : null;
+            var hitSlop = 8;
+            var left = Math.max(actionsRect.left, buttonRect.left - hitSlop);
+            if (playRect) {
+              left = Math.max(left, playRect.right + 2);
+            }
+            var right = Math.min(actionsRect.right + 2, buttonRect.right + hitSlop);
+            var top = Math.max(actionsRect.top, buttonRect.top - 3);
+            var bottom = Math.min(actionsRect.bottom, buttonRect.bottom + 3);
+            return (
+              event.clientX >= left &&
+              event.clientX <= right &&
+              event.clientY >= top &&
+              event.clientY <= bottom
+            );
+          }
           function toggleRowMenuFromActions(event) {
             var target = event.target;
-            if (target.closest('.row-play')) {
+            if (target && target.closest('.row-play')) {
               return;
             }
-            if (!target.closest('.row-overflow') && target !== rowActions) {
+            if (!eventHitsRowMenuButton(event)) {
               return;
             }
-            toggleRowMenu(event);
+            toggleRowMenuFromPress(event);
           }
+          rowMenuBtn.forgeToggleRowMenuFromPointer = toggleRowMenuFromPress;
           rowMenuBtn.addEventListener('pointerdown', toggleRowMenuFromPress);
           rowMenuBtn.addEventListener('mousedown', toggleRowMenuFromPress);
           rowMenuBtn.addEventListener('click', toggleRowMenuFromClick);
@@ -4335,6 +4359,8 @@
             event.preventDefault();
           });
           rowActions.appendChild(rowMenuBtn);
+          rowActions.addEventListener('pointerdown', toggleRowMenuFromActions);
+          rowActions.addEventListener('mousedown', toggleRowMenuFromActions);
           rowActions.addEventListener('click', toggleRowMenuFromActions);
 
           line.appendChild(rowActions);
@@ -4343,6 +4369,22 @@
         content.appendChild(line);
         row.appendChild(thumb);
         row.appendChild(content);
+        function isCatalogRowControlTarget(target) {
+          return !!(target && target.closest('.catalog-row-actions, button, input, select, textarea, a'));
+        }
+        function prepareCatalogRowDrag(event) {
+          if (
+            !event ||
+            isCatalogRowControlTarget(event.target) ||
+            state.inlineRenameKey ||
+            state.activeCatalogRowMenuKey ||
+            item.draft
+          ) {
+            row.removeAttribute('draggable');
+            return;
+          }
+          row.setAttribute('draggable', 'true');
+        }
         function selectItem() {
           if (state.inlineRenameKey) {
             return;
@@ -4368,15 +4410,11 @@
           }
           renderSelectedBuiltIn();
         }
+        row.addEventListener('pointerdown', prepareCatalogRowDrag);
+        row.addEventListener('mousedown', prepareCatalogRowDrag);
         row.addEventListener('click', function (event) {
-          if (isCatalogRowMenuGutterClick(event, row)) {
-            var trigger = row.querySelector('.row-overflow');
-            if (trigger) {
-              trigger.click();
-            }
-            return;
-          }
-          if (event.target.closest('.catalog-row-actions, button, input, select, textarea, a')) {
+          row.removeAttribute('draggable');
+          if (isCatalogRowControlTarget(event.target)) {
             return;
           }
           selectItem();
@@ -4388,8 +4426,14 @@
           }
         });
         row.addEventListener('dragstart', function (event) {
+          if (isCatalogRowControlTarget(event.target) || !row.hasAttribute('draggable')) {
+            event.preventDefault();
+            row.removeAttribute('draggable');
+            return;
+          }
           if (state.inlineRenameKey || item.draft) {
             event.preventDefault();
+            row.removeAttribute('draggable');
             return;
           }
           state.dragCatalogItemKey = item.key;
@@ -4405,6 +4449,7 @@
         });
         row.addEventListener('dragend', function () {
           row.classList.remove('dragging');
+          row.removeAttribute('draggable');
           setTimeout(function () {
             clearCatalogDragState();
             renderMiniTabs();
@@ -4428,17 +4473,23 @@
           function runRowMenuAction(event) {
             event.preventDefault();
             event.stopPropagation();
+            if (event.stopImmediatePropagation) {
+              event.stopImmediatePropagation();
+            }
             if (didRun || button.disabled) {
               return;
             }
             didRun = true;
+            state.suppressNextCatalogDocumentClick = false;
             state.activeCatalogRowMenuKey = '';
             renderCatalogList();
             handler();
           }
           button.forgeRunRowMenuAction = runRowMenuAction;
           button.addEventListener('pointerdown', runRowMenuAction);
+          button.addEventListener('pointerup', runRowMenuAction);
           button.addEventListener('mousedown', runRowMenuAction);
+          button.addEventListener('mouseup', runRowMenuAction);
           button.addEventListener('click', runRowMenuAction);
           rowMenu.appendChild(button);
           hasItems = true;
@@ -4527,6 +4578,9 @@
         if (!menu || !event) {
           return false;
         }
+        if (typeof event.clientX !== 'number' || typeof event.clientY !== 'number') {
+          return false;
+        }
         var rect = menu.getBoundingClientRect();
         if (
           event.clientX < rect.left ||
@@ -4548,6 +4602,9 @@
           ) {
             event.preventDefault();
             event.stopPropagation();
+            if (event.stopImmediatePropagation) {
+              event.stopImmediatePropagation();
+            }
             if (typeof button.forgeRunRowMenuAction === 'function') {
               button.forgeRunRowMenuAction(event);
             } else {
@@ -4559,41 +4616,53 @@
         return false;
       }
 
-      function isCatalogRowMenuGutterClick(event, row) {
-        if (!event || !row) {
+      function routeCatalogRowOverflowPointer(event) {
+        if (!event || typeof event.clientX !== 'number' || typeof event.clientY !== 'number') {
           return false;
         }
-        if (event.target.closest('.row-play')) {
-          return false;
-        }
-        var trigger = row.querySelector('.row-overflow');
-        if (!trigger) {
-          return false;
-        }
-        var rowRect = row.getBoundingClientRect();
-        var triggerRect = trigger.getBoundingClientRect();
-        var clientX = event.clientX;
-        var clientY = event.clientY;
-        var actions = row.querySelector('.catalog-row-actions');
-        var actionsRect = actions ? actions.getBoundingClientRect() : null;
-        var gutterLeft = Math.max(triggerRect.left, rowRect.right - 220);
-        var gutterRight = rowRect.right;
-        if (actionsRect) {
-          gutterLeft = triggerRect.left;
-          gutterRight = Math.min(rowRect.right, actionsRect.right + 4);
-          var play = row.querySelector('.row-play');
-          if (play) {
-            gutterLeft = Math.min(Math.max(actionsRect.left, play.getBoundingClientRect().right + 2), rowRect.right - 180);
-          } else {
-            gutterLeft = Math.max(actionsRect.left, actionsRect.right - 34);
+        var buttons = Array.prototype.slice.call(document.querySelectorAll('.row-overflow'));
+        for (var index = 0; index < buttons.length; index += 1) {
+          var button = buttons[index];
+          if (!button || button.disabled) {
+            continue;
+          }
+          var rect = button.getBoundingClientRect();
+          if (
+            event.clientX >= rect.left &&
+            event.clientX <= rect.right &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.bottom
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.stopImmediatePropagation) {
+              event.stopImmediatePropagation();
+            }
+            if (typeof button.forgeToggleRowMenuFromPointer === 'function') {
+              button.forgeToggleRowMenuFromPointer(event);
+            }
+            return true;
           }
         }
-        return (
-          clientY >= rowRect.top &&
-          clientY <= rowRect.bottom &&
-          clientX >= gutterLeft &&
-          clientX <= gutterRight
-        );
+        return false;
+      }
+
+      function consumeSuppressedCatalogDocumentEvent(event) {
+        if (!state.suppressNextCatalogDocumentClick || !event) {
+          return false;
+        }
+        if (event.type !== 'pointerdown' && event.type !== 'mousedown' && event.type !== 'click') {
+          return false;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.stopImmediatePropagation) {
+          event.stopImmediatePropagation();
+        }
+        if (event.type === 'click') {
+          state.suppressNextCatalogDocumentClick = false;
+        }
+        return true;
       }
 
       function removeCatalogRowMenuPortal() {
@@ -9201,11 +9270,19 @@
           }
         });
 
-        document.addEventListener('click', function (event) {
-          if (routeCatalogRowMenuPointer(event)) {
-            return;
-          }
-        }, true);
+        ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click'].forEach(function (eventName) {
+          document.addEventListener(eventName, function (event) {
+            if (routeCatalogRowMenuPointer(event)) {
+              return;
+            }
+            if (consumeSuppressedCatalogDocumentEvent(event)) {
+              return;
+            }
+            if (routeCatalogRowOverflowPointer(event)) {
+              return;
+            }
+          }, true);
+        });
         document.addEventListener('click', function (event) {
           if (state.suppressNextCatalogDocumentClick) {
             state.suppressNextCatalogDocumentClick = false;

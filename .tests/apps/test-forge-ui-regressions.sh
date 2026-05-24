@@ -207,8 +207,8 @@ if rg -q "rowMenu\\.className = 'floating-menu catalog-row-menu" "$ui"; then
   exit 1
 fi
 
-if ! rg -q "!state\\.inlineRenameKey && !state\\.activeCatalogRowMenuKey && !item\\.draft" "$ui"; then
-  printf '%s\n' "Forge rows must not stay draggable while an overflow menu is open" >&2
+if ! rg -q "function prepareCatalogRowDrag" "$ui" || ! rg -q "isCatalogRowControlTarget\\(event\\.target\\)" "$ui" || ! rg -q "row\\.setAttribute\\('draggable', 'true'\\)" "$ui"; then
+  printf '%s\n' "Forge rows must only become draggable from non-control row presses" >&2
   exit 1
 fi
 
@@ -242,27 +242,59 @@ if ! rg -q "rowMenuBtn\\.addEventListener\\('click', toggleRowMenuFromClick\\)" 
   exit 1
 fi
 
-if ! rg -q "rowMenuBtn\\.setAttribute\\('draggable', 'false'\\)" "$ui" || ! rg -q "play\\.setAttribute\\('draggable', 'false'\\)" "$ui"; then
+if ! rg -q "rowActions\\.setAttribute\\('draggable', 'false'\\)" "$ui" || ! rg -q "rowMenuBtn\\.setAttribute\\('draggable', 'false'\\)" "$ui" || ! rg -q "play\\.setAttribute\\('draggable', 'false'\\)" "$ui"; then
   printf '%s\n' "Forge row action buttons must opt out of draggable row behavior" >&2
   exit 1
 fi
 
-if ! rg -q "rowActions\\.addEventListener\\('click', toggleRowMenuFromActions\\)" "$ui" || ! rg -q "target\\.closest\\('\\.row-play'\\)" "$ui"; then
-  printf '%s\n' "Forge row action strips must delegate overflow clicks without stealing Run clicks" >&2
+if ! rg -q "width: 1\\.5rem" "$css" || ! rg -q "height: 1\\.5rem" "$css"; then
+  printf '%s\n' "Forge row overflow must keep the compact visible button size" >&2
   exit 1
 fi
 
-if ! rg -q "function isCatalogRowMenuGutterClick" "$ui" || ! rg -q "play\\.getBoundingClientRect\\(\\)\\.right \\+ 2" "$ui" || ! rg -q "trigger\\.click\\(\\)" "$ui"; then
-  printf '%s\n' "Forge row menu gutter clicks must route the action strip after Run to the row overflow trigger" >&2
+if ! awk '
+  /^\.left-rail[[:space:]]*\{/ { in_left=1 }
+  in_left && /-webkit-app-region:[[:space:]]*no-drag;/ { left_no_drag=1 }
+  in_left && /^}/ { in_left=0 }
+  /^\.apps-list-card[[:space:]]*\{/ { in_card=1 }
+  in_card && /-webkit-app-region:[[:space:]]*no-drag;/ { card_no_drag=1 }
+  in_card && /^}/ { in_card=0 }
+  /^\.catalog-list[[:space:]]*\{/ { in_list=1 }
+  in_list && /-webkit-app-region:[[:space:]]*no-drag;/ { list_no_drag=1 }
+  in_list && /^}/ { in_list=0 }
+  /^\.catalog-row-actions[[:space:]]*\{/ { in_actions=1 }
+  in_actions && /-webkit-app-region:[[:space:]]*no-drag;/ { actions_no_drag=1 }
+  in_actions && /^}/ { in_actions=0 }
+  /^\.row-overflow[[:space:]]*\{/ { in_overflow=1 }
+  in_overflow && /-webkit-app-region:[[:space:]]*no-drag;/ { overflow_no_drag=1 }
+  in_overflow && /^}/ { in_overflow=0 }
+  END { exit (left_no_drag && card_no_drag && list_no_drag && actions_no_drag && overflow_no_drag) ? 0 : 1 }
+' "$css"; then
+  printf '%s\n' "Forge left catalog and row controls must not be native drag regions" >&2
   exit 1
 fi
 
-if ! rg -q "event\\.target\\.closest\\('\\.catalog-row-actions, button, input, select, textarea, a'\\)" "$ui"; then
+if rg -q "button:active[[:space:]]*\\{" "$css" || rg -q "transform:[[:space:]]*translateY\\(1px\\)" "$css"; then
+  printf '%s\n' "Forge buttons must not move on press" >&2
+  exit 1
+fi
+
+if rg -q "function isCatalogRowMenuGutterClick" "$ui" || rg -q "trigger\\.click\\(\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow must not use coordinate-based row fallback clicks" >&2
+  exit 1
+fi
+
+if ! rg -q "function eventHitsRowMenuButton" "$ui" || ! rg -q "hitSlop = 8" "$ui" || ! rg -q "playRect\\.right \\+ 2" "$ui" || ! rg -q "rowActions\\.addEventListener\\('pointerdown', toggleRowMenuFromActions\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow must have a tight invisible hit zone around the compact button without stealing Run clicks" >&2
+  exit 1
+fi
+
+if ! rg -q "function isCatalogRowControlTarget" "$ui" || ! rg -q "isCatalogRowControlTarget\\(event\\.target\\)" "$ui"; then
   printf '%s\n' "Forge row selection must ignore clicks from row action controls" >&2
   exit 1
 fi
 
-if rg -q "function routeCatalogRowOverflowClick" "$ui" || rg -q "function eventHitsCatalogRowOverflowZone" "$ui" || rg -q "toggleRowMenuFromRowHit" "$ui" || rg -q "rowRect\\.right - 44" "$ui"; then
+if rg -q "function routeCatalogRowOverflowClick" "$ui" || rg -q "function eventHitsCatalogRowOverflowZone" "$ui" || rg -q "toggleRowMenuFromRowHit" "$ui" || rg -q "rowRect\\.right - 44" "$ui" || rg -q "rowRect\\.right - 220" "$ui"; then
   printf '%s\n' "Forge row overflow triggers must not use broad document or row-edge hit-test fallbacks" >&2
   exit 1
 fi
@@ -272,18 +304,18 @@ if ! rg -q "rowMenuBtn\\.addEventListener\\('pointerdown', toggleRowMenuFromPres
   exit 1
 fi
 
-if ! rg -q "suppressNextCatalogDocumentClick" "$ui" || ! rg -q "state\\.suppressNextCatalogDocumentClick = true" "$ui"; then
-  printf '%s\n' "Forge row overflow press-open must suppress the follow-up document click" >&2
+if ! rg -q "function consumeSuppressedCatalogDocumentEvent" "$ui" || ! rg -q "state\\.suppressNextCatalogDocumentClick = true" "$ui" || ! rg -q "event\\.type !== 'pointerdown'" "$ui" || ! rg -q "consumeSuppressedCatalogDocumentEvent\\(event\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow press-open must suppress follow-up pointerdown/mousedown/click events after rerender" >&2
   exit 1
 fi
 
 if ! rg -q "function routeCatalogRowMenuPointer" "$ui" || ! rg -q "button\\.forgeRunRowMenuAction\\(event\\)" "$ui"; then
-  printf '%s\n' "Forge row overflow clicks must be routed from the visible menu rectangle during click capture" >&2
+  printf '%s\n' "Forge row overflow actions must be routed from the visible menu rectangle when native hit testing retargets the event" >&2
   exit 1
 fi
 
-if rg -q "function routeCatalogRowOverflowPointer" "$ui"; then
-  printf '%s\n' "Forge row overflow triggers should not rely on document-capture hit testing" >&2
+if ! rg -q "function routeCatalogRowOverflowPointer" "$ui" || ! rg -q "document\\.querySelectorAll\\('\\.row-overflow'\\)" "$ui" || ! rg -q "button\\.forgeToggleRowMenuFromPointer\\(event\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow trigger routing must use exact visible button rectangles when native hit testing retargets the event" >&2
   exit 1
 fi
 
@@ -292,8 +324,27 @@ if ! rg -q "appendAction\\('Rename', function \\(\\)" "$ui" || ! rg -q "setTimeo
   exit 1
 fi
 
-if rg -q "document\\.addEventListener\\('pointerdown'.*routeCatalogRowMenuPointer" "$ui"; then
-  printf '%s\n' "Forge row menu document-level pointerdown routing must not fire actions before the menu owns the event" >&2
+if ! rg -q "\\['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click'\\]\\.forEach" "$ui" || ! rg -q "document\\.addEventListener\\(eventName" "$ui"; then
+  printf '%s\n' "Forge row overflow menu routing must catch down/up/click retargeting" >&2
+  exit 1
+fi
+
+if ! rg -q "button\\.addEventListener\\('pointerup', runRowMenuAction\\)" "$ui" || ! rg -q "button\\.addEventListener\\('mouseup', runRowMenuAction\\)" "$ui"; then
+  printf '%s\n' "Forge row menu actions must also fire on release events in the native host" >&2
+  exit 1
+fi
+
+if ! awk '
+  /document\.addEventListener\(eventName/ { in_listener=1; route_line=0; suppress_line=0 }
+  in_listener && /routeCatalogRowMenuPointer\(event\)/ && !route_line { route_line=NR }
+  in_listener && /consumeSuppressedCatalogDocumentEvent\(event\)/ && !suppress_line { suppress_line=NR }
+  in_listener && /}, true\);/ {
+    if (route_line && suppress_line && route_line < suppress_line) found=1
+    in_listener=0
+  }
+  END { exit found ? 0 : 1 }
+' "$ui"; then
+  printf '%s\n' "Forge row menu actions must route before press-open suppression can swallow them" >&2
   exit 1
 fi
 
@@ -307,7 +358,7 @@ if ! rg -q "function renderCatalogRowMenuPortal" "$ui" || ! rg -q "document\\.bo
   exit 1
 fi
 
-if ! rg -q "padding: 0 0\\.62rem 0 0\\.4rem" "$css" || ! rg -q "width: 1\\.5rem" "$css"; then
+if ! rg -q "padding: 0 0\\.62rem 0 0\\.4rem" "$css" || ! rg -q "padding: 0;" "$css"; then
   printf '%s\n' "Forge row overflow triggers must stay inset from the splitter with a stable hit target" >&2
   exit 1
 fi
