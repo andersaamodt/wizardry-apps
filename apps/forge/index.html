@@ -2370,6 +2370,7 @@
             gitStatusLabel: String(row && row.gitStatusLabel || ''),
             gitStatusTone: String(row && row.gitStatusTone || 'muted'),
             gitStatusReason: String(row && row.gitStatusReason || ''),
+            gitRepoPrivate: String(row && row.gitRepoPrivate || ''),
             gitReleaseAvailable: String(row && row.gitReleaseAvailable || 'no')
           };
         }).filter(function (row) {
@@ -2393,6 +2394,7 @@
             gitStatusLabel: String(row && row.gitStatusLabel || ''),
             gitStatusTone: String(row && row.gitStatusTone || 'muted'),
             gitStatusReason: String(row && row.gitStatusReason || ''),
+            gitRepoPrivate: String(row && row.gitRepoPrivate || ''),
             gitReleaseAvailable: String(row && row.gitReleaseAvailable || 'no')
           };
         }).filter(function (row) {
@@ -3216,6 +3218,7 @@
             gitStatusLabel: app.gitStatusLabel || '',
             gitStatusTone: app.gitStatusTone || 'muted',
             gitStatusReason: app.gitStatusReason || '',
+            gitRepoPrivate: app.gitRepoPrivate || '',
             gitReleaseAvailable: app.gitReleaseAvailable || 'no'
           };
         });
@@ -3237,6 +3240,7 @@
             gitStatusLabel: ws.gitStatusLabel || '',
             gitStatusTone: ws.gitStatusTone || 'muted',
             gitStatusReason: ws.gitStatusReason || '',
+            gitRepoPrivate: ws.gitRepoPrivate || '',
             gitReleaseAvailable: ws.gitReleaseAvailable || 'no'
           };
         });
@@ -4002,6 +4006,7 @@
           item.gitStatusLabel || '',
           item.gitStatusTone || '',
           item.gitStatusReason || '',
+          item.gitRepoPrivate || '',
           rowApp ? rowApp.distribution : '',
           rowApp && rowApp.exists === false ? 'missing' : 'present'
         ].join('|');
@@ -4079,12 +4084,22 @@
         }
         var nextPill = buildCatalogGitPill(item);
         var existingPill = rowActions.querySelector('.catalog-git-pill');
+        var nextPrivacyIcon = buildCatalogGitPrivacyIcon(item);
+        var existingPrivacyIcon = rowActions.querySelector('.catalog-git-privacy-icon');
         var runSlot = rowActions.querySelector('.row-run-slot');
         if (!nextPill) {
+          if (existingPrivacyIcon && existingPrivacyIcon.parentNode === rowActions) {
+            existingPrivacyIcon.parentNode.removeChild(existingPrivacyIcon);
+          }
           if (existingPill && existingPill.parentNode === rowActions) {
             existingPill.parentNode.removeChild(existingPill);
           }
           return;
+        }
+        if (nextPrivacyIcon && !existingPrivacyIcon) {
+          rowActions.insertBefore(nextPrivacyIcon, existingPill || runSlot || rowActions.firstChild || null);
+        } else if (!nextPrivacyIcon && existingPrivacyIcon && existingPrivacyIcon.parentNode === rowActions) {
+          existingPrivacyIcon.parentNode.removeChild(existingPrivacyIcon);
         }
         if (!existingPill) {
           rowActions.insertBefore(nextPill, runSlot || rowActions.firstChild || null);
@@ -4137,6 +4152,21 @@
         pill.title = item.gitStatusReason || displayLabel;
         pill.setAttribute('aria-label', 'Git status: ' + displayLabel + (item.gitStatusReason ? '. ' + item.gitStatusReason : ''));
         return pill;
+      }
+
+      function buildCatalogGitPrivacyIcon(item) {
+        if (!item || item.gitRepoPresent !== 'yes' || item.gitRepoPrivate !== 'yes') {
+          return null;
+        }
+        if (!buildCatalogGitPill(item)) {
+          return null;
+        }
+        var icon = document.createElement('span');
+        icon.className = 'catalog-git-privacy-icon';
+        icon.title = 'Private repository';
+        icon.setAttribute('aria-label', 'Private repository');
+        icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>';
+        return icon;
       }
 
       function buildCatalogRow(item) {
@@ -4250,6 +4280,10 @@
           var rowActions = document.createElement('span');
           rowActions.className = 'catalog-row-actions menu-anchor';
           rowActions.setAttribute('draggable', 'false');
+          var privacyIcon = buildCatalogGitPrivacyIcon(item);
+          if (privacyIcon) {
+            rowActions.appendChild(privacyIcon);
+          }
           var gitPill = buildCatalogGitPill(item);
           if (gitPill) {
             rowActions.appendChild(gitPill);
@@ -4844,6 +4878,7 @@
             next.gitStatusLabel = '';
             next.gitStatusTone = 'muted';
             next.gitStatusReason = '';
+            next.gitRepoPrivate = '';
             next.gitReleaseAvailable = 'no';
           }
           return next;
@@ -6357,6 +6392,7 @@
           git_remote_origin: String(raw.git_remote_origin || ''),
           git_remote_browser_url: String(raw.git_remote_browser_url || ''),
           git_github_slug: String(raw.git_github_slug || ''),
+          git_repo_private: String(raw.git_repo_private || ''),
           git_branch: String(raw.git_branch || ''),
           git_default_branch: String(raw.git_default_branch || 'main'),
           git_head: String(raw.git_head || ''),
@@ -6472,6 +6508,38 @@
         }, kv((res && res.stdout) || '')));
       }
 
+      function applyGitProfileToCatalogItem(selected, profile) {
+        if (!selected || !profile) {
+          return;
+        }
+        function applyFields(row) {
+          if (!row) {
+            return row;
+          }
+          var next = Object.assign({}, row);
+          next.gitRepoPresent = profile.git_repo_present || 'no';
+          next.gitStatusLabel = profile.git_status_label || '';
+          next.gitStatusTone = profile.git_status_tone || 'muted';
+          next.gitStatusReason = profile.git_status_reason || '';
+          next.gitRepoPrivate = profile.git_repo_private || '';
+          next.gitReleaseAvailable = profile.git_release_available || 'no';
+          return next;
+        }
+        if (selected.kind === 'workspace') {
+          state.workspaces = state.workspaces.map(function (ws) {
+            return workspaceProfileCacheKey(ws.path) === workspaceProfileCacheKey(selected.path)
+              ? applyFields(ws)
+              : ws;
+          });
+          saveStorage(CACHED_WORKSPACES_KEY, JSON.stringify(state.workspaces));
+        } else if (selected.kind === 'builtin') {
+          state.apps = state.apps.map(function (app) {
+            return app && app.id === selected.id ? applyFields(app) : app;
+          });
+          saveStorage(CACHED_APPS_KEY, JSON.stringify(state.apps));
+        }
+      }
+
       async function ensureWorkspaceProfileLoaded(selected) {
         if (!selected || !selected.path) {
           return;
@@ -6491,6 +6559,7 @@
           state.workspaceProfileCache[key] = selected.kind === 'workspace'
             ? await fetchWorkspaceProfile(selected.path)
             : await fetchCatalogGitProfile(selected.path);
+          applyGitProfileToCatalogItem(selected, state.workspaceProfileCache[key]);
           clearWorkspaceProfileStatus(selected.path);
           clearWorkspaceGitStatus(selected.path);
         } catch (err) {
@@ -6506,6 +6575,7 @@
           var current = selectedCatalogItem();
           if (current && current.path && workspaceProfileCacheKey(current.path) === key) {
             preserveActiveRouteScroll(function () {
+              renderCatalogList();
               renderWorkspaceProfileEditor(current);
               renderWorkspaceGitEditor(current);
             });
@@ -8402,7 +8472,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-apps', [], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 17);
+        var rows = parseTSV(res.stdout || '', 18);
         state.apps = rows.map(function (row) {
           return {
             id: row[0],
@@ -8421,7 +8491,8 @@
             gitStatusLabel: row[13] || '',
             gitStatusTone: row[14] || 'muted',
             gitStatusReason: row[15] || '',
-            gitReleaseAvailable: row[16] || 'no'
+            gitRepoPrivate: row[16] || '',
+            gitReleaseAvailable: row[17] || 'no'
           };
         }).filter(function (app) {
           return appSupportsCurrentHost(app);
@@ -8442,7 +8513,7 @@
         options = options || {};
         var shouldRender = options.render !== false;
         var res = await backend('list-workspaces', [state.projectsRoot], { quiet: !!options.quiet });
-        var rows = parseTSV(res.stdout || '', 13);
+        var rows = parseTSV(res.stdout || '', 14);
         var hiddenPaths = hiddenWorkspacePathSet();
         var builtInPaths = builtInCatalogPathSet();
         state.workspaces = rows.map(function (row) {
@@ -8459,7 +8530,8 @@
             gitStatusLabel: row[9] || '',
             gitStatusTone: row[10] || 'muted',
             gitStatusReason: row[11] || '',
-            gitReleaseAvailable: row[12] || 'no'
+            gitRepoPrivate: row[12] || '',
+            gitReleaseAvailable: row[13] || 'no'
           };
         }).filter(function (ws) {
           var normalizedPath = normalizePathForCompare(ws.path);

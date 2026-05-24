@@ -2438,6 +2438,7 @@ cmd_list_apps() {
     git_status_label=''
     git_status_tone='muted'
     git_status_reason=''
+    git_repo_private=''
     git_release_available='no'
     if [ -n "$resolved_path" ] && [ -d "$resolved_path" ]; then
       git_info=$(workspace_git_collect_status "$resolved_path" "0" "0")
@@ -2445,11 +2446,12 @@ cmd_list_apps() {
       git_status_label=$(printf '%s\n' "$git_info" | kv_read git_status_label)
       git_status_tone=$(printf '%s\n' "$git_info" | kv_read git_status_tone)
       git_status_reason=$(printf '%s\n' "$git_info" | kv_read git_status_reason)
+      git_repo_private=$(printf '%s\n' "$git_info" | kv_read git_repo_private)
       git_release_available=$(printf '%s\n' "$git_info" | kv_read git_release_available)
     fi
 
     mtime_epoch=$(path_mtime_epoch "$resolved_path")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path" "$mtime_epoch" "$host_installed" "$host_install_path" "$git_repo_present" "$git_status_label" "$git_status_tone" "$git_status_reason" "$git_release_available"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$production" "$exists" "$development_context" "$targets" "$distribution" "$resolved_status" "$resolved_path" "$mtime_epoch" "$host_installed" "$host_install_path" "$git_repo_present" "$git_status_label" "$git_status_tone" "$git_status_reason" "$git_repo_private" "$git_release_available"
   done < "$list_apps_tmp"
   rm -f "$list_apps_tmp"
 }
@@ -3267,6 +3269,8 @@ workspace_git_state_key() {
     printf '%s\n' "forge-backend: workspace_git_state_key requires WORKSPACE_PATH" >&2
     exit 2
   }
+  resolved_workspace_path=$(resolve_existing_dir_path "$workspace_path" 2>/dev/null || true)
+  [ -n "$resolved_workspace_path" ] && workspace_path=$resolved_workspace_path
   printf '%s' "$workspace_path" | hash_stdin_sha256
 }
 
@@ -3470,6 +3474,80 @@ workspace_git_github_slug_from_remote() {
       ;;
   esac
   printf '%s\n' ""
+}
+
+workspace_git_repo_private_from_json() {
+  repo_json=${1-}
+  [ -n "$repo_json" ] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+  private=$(printf '%s' "$repo_json" | jq -r 'if .private == true then "yes" elif .private == false then "no" else "" end' 2>/dev/null || true)
+  case "$private" in
+    yes|no)
+      printf '%s\n' "$private"
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+workspace_git_fetch_repo_private() {
+  github_slug=${1-}
+  [ -n "$github_slug" ] || return 1
+  valid_github_slug "$github_slug" || return 1
+
+  if command -v gh >/dev/null 2>&1; then
+    repo_json=$(GH_PROMPT_DISABLED=1 gh api "repos/$github_slug" 2>/dev/null || true)
+    if private=$(workspace_git_repo_private_from_json "$repo_json"); then
+      printf '%s\n' "$private"
+      return 0
+    fi
+  fi
+
+  if command -v curl >/dev/null 2>&1; then
+    if [ -n "${GH_TOKEN-}" ]; then
+      repo_json=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$github_slug" 2>/dev/null || true)
+    elif [ -n "${GITHUB_TOKEN-}" ]; then
+      repo_json=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/$github_slug" 2>/dev/null || true)
+    else
+      repo_json=$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$github_slug" 2>/dev/null || true)
+    fi
+    if private=$(workspace_git_repo_private_from_json "$repo_json"); then
+      printf '%s\n' "$private"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+workspace_git_collect_repo_privacy() {
+  workspace_path=${1-}
+  github_slug=${2-}
+  refresh_privacy=${3-0}
+  if [ -z "$github_slug" ]; then
+    printf 'git_repo_private=%s\n' ""
+    return 0
+  fi
+  state_file=$(workspace_git_state_file "$workspace_path")
+  repo_private=$(workspace_git_cached_value_file "$state_file" repo_private)
+  repo_private_slug=$(workspace_git_cached_value_file "$state_file" repo_private_slug)
+  if [ "$repo_private_slug" != "$github_slug" ]; then
+    repo_private=''
+  fi
+  case "$repo_private" in
+    yes|no) ;;
+    *) repo_private='' ;;
+  esac
+
+  if [ "$refresh_privacy" = "1" ]; then
+    if fetched_private=$(workspace_git_fetch_repo_private "$github_slug"); then
+      repo_private=$fetched_private
+      workspace_git_state_write "$workspace_path" repo_private_slug "$github_slug"
+      workspace_git_state_write "$workspace_path" repo_private "$repo_private"
+    fi
+  fi
+
+  printf 'git_repo_private=%s\n' "$repo_private"
 }
 
 workspace_git_repo_exists() {
@@ -3710,6 +3788,7 @@ workspace_git_collect_status() {
   git_remote_origin=''
   git_remote_browser_url=''
   git_github_slug=''
+  git_repo_private=''
   git_branch=''
   git_head=''
   git_head_short=''
@@ -3738,6 +3817,7 @@ workspace_git_collect_status() {
   if [ "$git_available" != 'yes' ]; then
     printf 'git_available=%s\n' "$git_available"
     printf 'git_repo_present=%s\n' "$git_repo_present"
+    printf 'git_repo_private=%s\n' ""
     printf 'git_status_label=%s\n' ""
     printf 'git_status_tone=%s\n' "$git_status_tone"
     printf 'git_status_reason=%s\n' "git is not available on this machine."
@@ -3749,6 +3829,7 @@ workspace_git_collect_status() {
   if ! workspace_git_repo_exists "$workspace_path"; then
     printf 'git_available=%s\n' "$git_available"
     printf 'git_repo_present=%s\n' "$git_repo_present"
+    printf 'git_repo_private=%s\n' ""
     printf 'git_status_label=%s\n' ""
     printf 'git_status_tone=%s\n' "$git_status_tone"
     printf 'git_status_reason=%s\n' ""
@@ -3762,6 +3843,7 @@ workspace_git_collect_status() {
   git_remote_origin=$(git -C "$workspace_path" remote get-url origin 2>/dev/null || true)
   git_remote_browser_url=$(workspace_git_browser_url_from_remote "$git_remote_origin")
   git_github_slug=$(workspace_git_github_slug_from_remote "$git_remote_origin")
+  git_repo_private=$(workspace_git_collect_repo_privacy "$workspace_path" "$git_github_slug" "$refresh_remote" | kv_read git_repo_private)
   git_branch=$(workspace_git_current_branch "$workspace_path")
   git_head=$(workspace_git_head_commit "$workspace_path")
   git_head_short=$(workspace_git_head_short "$workspace_path")
@@ -3854,6 +3936,7 @@ workspace_git_collect_status() {
   printf 'git_remote_origin=%s\n' "$(kv_output_value "$git_remote_origin")"
   printf 'git_remote_browser_url=%s\n' "$(kv_output_value "$git_remote_browser_url")"
   printf 'git_github_slug=%s\n' "$(kv_output_value "$git_github_slug")"
+  printf 'git_repo_private=%s\n' "$git_repo_private"
   printf 'git_branch=%s\n' "$(kv_output_value "$git_branch")"
   printf 'git_head=%s\n' "$git_head"
   printf 'git_head_short=%s\n' "$git_head_short"
@@ -4028,9 +4111,10 @@ cmd_list_workspaces() {
     git_status_label=$(printf '%s\n' "$git_info" | kv_read git_status_label)
     git_status_tone=$(printf '%s\n' "$git_info" | kv_read git_status_tone)
     git_status_reason=$(printf '%s\n' "$git_info" | kv_read git_status_reason)
+    git_repo_private=$(printf '%s\n' "$git_info" | kv_read git_repo_private)
     git_release_available=$(printf '%s\n' "$git_info" | kv_read git_release_available)
     mtime_epoch=$(path_mtime_epoch "$path")
-    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$(tsv_output_value "$project_id")" \
       "$(tsv_output_value "$title")" \
       "$(tsv_output_value "$project_type")" \
@@ -4043,6 +4127,7 @@ cmd_list_workspaces() {
       "$(tsv_output_value "$git_status_label")" \
       "$(tsv_output_value "$git_status_tone")" \
       "$(tsv_output_value "$git_status_reason")" \
+      "$(tsv_output_value "$git_repo_private")" \
       "$(tsv_output_value "$git_release_available")"
   done | sort
 }

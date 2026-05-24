@@ -799,13 +799,13 @@ grep -F "development_context=godot" "$workspaces_root/workspace-godot/wizardry.w
 grep -F "starter=clone" "$workspaces_root/workspace-godot/wizardry.workspace.conf" >/dev/null
 
 apps_list=$(sh "$backend" list-apps "$scratch")
-printf '%s\n' "$apps_list" | awk -F'\t' 'NF != 17 { exit 1 } END { exit(NR > 0 ? 0 : 1) }'
+printf '%s\n' "$apps_list" | awk -F'\t' 'NF != 18 { exit 1 } END { exit(NR > 0 ? 0 : 1) }'
 
 workspaces=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
 printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
-printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-native" { if (NF != 13 || $8 != "1" || $9 != "no") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
-printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-web" { if (NF != 13 || $9 != "no" || $10 != "") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-native" { if (NF != 14 || $8 != "1" || $9 != "no" || $13 != "") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-web" { if (NF != 14 || $9 != "no" || $10 != "" || $13 != "") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
 
 hidden_workspace_home="$scratch/hidden-workspace-home"
 hide_workspace_out=$(XDG_CONFIG_HOME="$hidden_workspace_home/.config" sh "$backend" hide-workspace "$scratch" "$workspaces_root/workspace-web")
@@ -909,6 +909,25 @@ git -C "$workspaces_root/workspace-web" remote set-url origin 'https://github.co
 workspace_web_path_remote=$(sh "$backend" workspace-git-status "$scratch" "$workspaces_root/workspace-web")
 printf '%s\n' "$workspace_web_path_remote" | grep -Fx "git_remote_browser_url=" >/dev/null
 printf '%s\n' "$workspace_web_path_remote" | grep -Fx "git_github_slug=" >/dev/null
+git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
+
+git -C "$workspaces_root/workspace-web" remote set-url origin 'git@github.com:example/workspace-web.git'
+git -C "$workspaces_root/workspace-web" config core.sshCommand false
+privacy_bin="$scratch/privacy-bin"
+mkdir -p "$privacy_bin"
+cat >"$privacy_bin/gh" <<'SH'
+#!/bin/sh
+set -eu
+[ "$1" = "api" ] || exit 2
+[ "$2" = "repos/example/workspace-web" ] || exit 3
+printf '%s\n' '{"private":true}'
+SH
+chmod +x "$privacy_bin/gh"
+workspace_web_private=$(PATH="$privacy_bin:$PATH" sh "$backend" workspace-git-status "$scratch" "$workspaces_root/workspace-web")
+printf '%s\n' "$workspace_web_private" | grep -Fx "git_repo_private=yes" >/dev/null
+workspaces_private_cache=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
+printf '%s\n' "$workspaces_private_cache" | awk -F'\t' '$1 == "workspace-web" { if ($13 != "yes") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+git -C "$workspaces_root/workspace-web" config --unset core.sshCommand
 git -C "$workspaces_root/workspace-web" remote set-url origin "$workspace_web_remote"
 
 git -C "$workspaces_root/workspace-web" checkout -b 'feat#fragment' >/dev/null 2>&1
@@ -1058,7 +1077,7 @@ printf '%s\n' "$workspaces_after_import" | grep -E '^plain-web\t' >/dev/null
 printf '%s\n' "$workspaces_after_import" | grep -E '^direct-space\t' >/dev/null
 printf '%s\n' "$workspaces_after_import" | grep -E '^generic-repo\t' >/dev/null
 row_tab=$(printf '\t')
-if printf '%s\n' "$workspaces_after_import" | awk -F "$row_tab" 'NF != 13 { bad = 1 } END { exit bad ? 0 : 1 }'; then
+if printf '%s\n' "$workspaces_after_import" | awk -F "$row_tab" 'NF != 14 { bad = 1 } END { exit bad ? 0 : 1 }'; then
   printf '%s\n' "forge list-workspaces emitted malformed tab-delimited rows" >&2
   exit 1
 fi

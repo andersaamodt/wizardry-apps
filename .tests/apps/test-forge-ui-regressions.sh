@@ -89,9 +89,12 @@ assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Fetch git remote', 'wor
 assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Pull and rebuild workspace', 'workspace-git-pull'"
 assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Push workspace branch', 'workspace-git-push'"
 assert_contains "$ui" "runWorkspaceGitCommand(selected, 'Install latest release', 'workspace-git-install-release'"
-assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 13\)'
-assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 17\)'
+assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 14\)'
+assert_matches "$ui" 'parseTSV\(res\.stdout \|\| '"'"''"'"', 18\)'
 assert_matches "$ui" 'function buildCatalogGitPill\(item\)'
+assert_matches "$ui" 'function buildCatalogGitPrivacyIcon\(item\)'
+assert_contains "$ui" 'catalog-git-privacy-icon'
+assert_contains "$ui" 'Private repository'
 assert_matches "$ui" 'function workspaceCatalogKey\(workspace\)'
 assert_matches "$ui" 'function builtInCatalogPathSet\(\)'
 assert_matches "$ui" "return 'workspace-path:' \\+ normalizedPath;"

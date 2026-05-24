@@ -104,3 +104,4 @@
 - Forge workspace Remove must persist through a backend-owned hidden-workspace list; UI-only filtering can be undone by catalog refresh or app restart.
 - Create workflow draft selections should keep toolbar identity on the workflow label, not the mutable app title being typed into the form.
 - macOS bundles that may touch the microphone must include `NSMicrophoneUsageDescription` before signing; TCC kills the app at startup before normal error handling can recover.
+- Forge git-state caches should key by canonical workspace path so `/var/...` and `/private/var/...` resolve to the same status metadata on macOS.
