@@ -3492,8 +3492,10 @@ workspace_git_repo_private_from_json() {
 
 workspace_git_fetch_repo_private() {
   github_slug=${1-}
+  remote_reachable=${2-}
   [ -n "$github_slug" ] || return 1
   valid_github_slug "$github_slug" || return 1
+  public_api_status=''
 
   if command -v gh >/dev/null 2>&1; then
     repo_json=$(GH_PROMPT_DISABLED=1 gh api "repos/$github_slug" 2>/dev/null || true)
@@ -3509,12 +3511,20 @@ workspace_git_fetch_repo_private() {
     elif [ -n "${GITHUB_TOKEN-}" ]; then
       repo_json=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/$github_slug" 2>/dev/null || true)
     else
-      repo_json=$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$github_slug" 2>/dev/null || true)
+      repo_json_file=$(mktemp "${TMPDIR:-/tmp}/forge-github-repo.XXXXXX")
+      public_api_status=$(curl -sS -o "$repo_json_file" -w '%{http_code}' -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$github_slug" 2>/dev/null || true)
+      repo_json=$(cat "$repo_json_file" 2>/dev/null || true)
+      rm -f "$repo_json_file"
     fi
     if private=$(workspace_git_repo_private_from_json "$repo_json"); then
       printf '%s\n' "$private"
       return 0
     fi
+  fi
+
+  if [ "$remote_reachable" = "yes" ] && [ "$public_api_status" = "404" ]; then
+    printf '%s\n' "yes"
+    return 0
   fi
 
   return 1
@@ -3524,6 +3534,7 @@ workspace_git_collect_repo_privacy() {
   workspace_path=${1-}
   github_slug=${2-}
   refresh_privacy=${3-0}
+  remote_reachable=${4-no}
   if [ -z "$github_slug" ]; then
     printf 'git_repo_private=%s\n' ""
     return 0
@@ -3540,7 +3551,7 @@ workspace_git_collect_repo_privacy() {
   esac
 
   if [ "$refresh_privacy" = "1" ]; then
-    if fetched_private=$(workspace_git_fetch_repo_private "$github_slug"); then
+    if fetched_private=$(workspace_git_fetch_repo_private "$github_slug" "$remote_reachable"); then
       repo_private=$fetched_private
       workspace_git_state_write "$workspace_path" repo_private_slug "$github_slug"
       workspace_git_state_write "$workspace_path" repo_private "$repo_private"
@@ -3804,6 +3815,7 @@ workspace_git_collect_status() {
   git_last_checked_epoch=$(date +%s 2>/dev/null || printf '0')
   git_last_fetch_epoch=''
   git_last_fetch_error=''
+  git_remote_reachable='no'
   git_has_release='no'
 
   if command -v git >/dev/null 2>&1; then
@@ -3843,7 +3855,6 @@ workspace_git_collect_status() {
   git_remote_origin=$(git -C "$workspace_path" remote get-url origin 2>/dev/null || true)
   git_remote_browser_url=$(workspace_git_browser_url_from_remote "$git_remote_origin")
   git_github_slug=$(workspace_git_github_slug_from_remote "$git_remote_origin")
-  git_repo_private=$(workspace_git_collect_repo_privacy "$workspace_path" "$git_github_slug" "$refresh_remote" | kv_read git_repo_private)
   git_branch=$(workspace_git_current_branch "$workspace_path")
   git_head=$(workspace_git_head_commit "$workspace_path")
   git_head_short=$(workspace_git_head_short "$workspace_path")
@@ -3853,6 +3864,7 @@ workspace_git_collect_status() {
 
   if [ "$refresh_remote" = "1" ] && [ -n "$git_remote_origin" ]; then
     if workspace_git_fetch_origin "$workspace_path" >/dev/null 2>&1; then
+      git_remote_reachable='yes'
       git_last_fetch_epoch=$(date +%s 2>/dev/null || printf '0')
       git_last_fetch_error=''
       workspace_git_state_write "$workspace_path" remote_check_epoch "$git_last_fetch_epoch"
@@ -3864,6 +3876,11 @@ workspace_git_collect_status() {
       workspace_git_state_write "$workspace_path" remote_check_error "$git_last_fetch_error"
     fi
   fi
+  if [ "$refresh_remote" != "1" ] && [ -n "$git_remote_origin" ] && [ -z "$git_last_fetch_error" ]; then
+    git_remote_reachable='yes'
+  fi
+
+  git_repo_private=$(workspace_git_collect_repo_privacy "$workspace_path" "$git_github_slug" "$refresh_remote" "$git_remote_reachable" | kv_read git_repo_private)
 
   git_upstream=$(git -C "$workspace_path" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
   if [ -n "$git_upstream" ]; then
