@@ -1,7 +1,8 @@
 :root {
   --accent: #0a84ff;
   --accent-strong: var(--accent-dark, #0063d1);
-  --bg: #eef3fa;
+  --bg: #eceaf4;
+  --forge-boot-bg: var(--bg, #eceaf4);
   --bg-panel: var(--light-bg, color-mix(in srgb, var(--bg) 90%, #ffffff));
   --bg-panel-2: color-mix(in srgb, var(--bg-panel) 88%, var(--bg));
   --panel: var(--bg-panel);
@@ -170,7 +171,7 @@ body {
 
 /* Keep a stable boot backdrop so theme background swaps do not flash onscreen. */
 body.forge-booting {
-  background: #edf2fa !important;
+  background: var(--forge-boot-bg) !important;
 }
 
 body.forge-booting::before {
@@ -178,7 +179,7 @@ body.forge-booting::before {
   position: fixed;
   inset: 0;
   z-index: 2147483647;
-  background: #edf2fa;
+  background: var(--forge-boot-bg);
   pointer-events: none;
 }
 

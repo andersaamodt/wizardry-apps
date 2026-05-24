@@ -97,6 +97,13 @@ grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/nul
 grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "territory-master.png" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "plain-master.png" "$root/apps/.host/macos/main.m" >/dev/null
+grep -F "templates/web/.themes" "$root/apps/.host/macos/main.m" >/dev/null
+grep -F -- "--forge-boot-bg: var(--bg, #eceaf4);" "$root/apps/forge/style.css" >/dev/null
+grep -F -- "--forge-boot-bg: var(--bg, #eceaf4);" "$root/apps/forge/index.html" >/dev/null
+if grep -F "#edf2fa" "$root/apps/forge/style.css" "$root/apps/forge/index.html" "$root/apps/.host/macos/main.m" >/dev/null; then
+  printf '%s\n' "forge UI asset tests: Forge splash must not use the old bluish fallback" >&2
+  exit 1
+fi
 grep -F "underPageBackgroundColor = childPageBackingColor" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "underPageBackgroundColor = pageBackingColor" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "DESKTOP_BRIDGE_BOOTSTRAP" "$root/apps/.host/linux/main.c" >/dev/null

@@ -1407,9 +1407,15 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     NSString *repoRoot = [self resolvedWizardryAppsRoot];
     if (repoRoot.length) {
-        NSString *sharedThemePath = [[[repoRoot stringByAppendingPathComponent:@"web/.themes"] stringByAppendingPathComponent:cleanTheme] stringByAppendingString:@".css"];
-        if ([[NSFileManager defaultManager] fileExistsAtPath:sharedThemePath]) {
-            return sharedThemePath;
+        NSArray<NSString *> *sharedThemeRoots = @[
+            [repoRoot stringByAppendingPathComponent:@"templates/web/.themes"],
+            [repoRoot stringByAppendingPathComponent:@"web/.themes"]
+        ];
+        for (NSString *themeRoot in sharedThemeRoots) {
+            NSString *sharedThemePath = [[themeRoot stringByAppendingPathComponent:cleanTheme] stringByAppendingString:@".css"];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:sharedThemePath]) {
+                return sharedThemePath;
+            }
         }
     }
 
@@ -1537,7 +1543,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSColor *text = [self parseCSSColorToken:vars[@"text"]];
     NSColor *muted = [self parseCSSColorToken:vars[@"light-text"]];
 
-    self.prioritiesBootBgColor = bg ?: [NSColor colorWithSRGBRed:0.93 green:0.95 blue:0.98 alpha:1.0];
+    self.prioritiesBootBgColor = bg ?: [NSColor colorWithSRGBRed:0.925 green:0.918 blue:0.957 alpha:1.0];
     self.prioritiesBootTextColor = muted ?: text ?: [NSColor colorWithSRGBRed:0.42 green:0.45 blue:0.50 alpha:1.0];
 }
 
