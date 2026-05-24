@@ -799,7 +799,7 @@ body.settings-open #settings-panel {
   min-width: 0;
   min-height: 1.9rem;
   padding: 0 0.68rem;
-  border-left: 1px solid var(--line);
+  border-left: 0;
   color: color-mix(in srgb, var(--text) 74%, var(--muted));
   font-size: 0.74rem;
   font-weight: 560;

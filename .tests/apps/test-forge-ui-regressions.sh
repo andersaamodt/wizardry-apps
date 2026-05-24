@@ -187,6 +187,17 @@ theme_button_fit=$(awk '
   exit 1
 }
 
+footer_status_single_divider=$(awk '
+  /^\.footer-status[[:space:]]*\{/ { in_rule=1 }
+  in_rule && /border-left:[[:space:]]*0;/ { no_left_border=1 }
+  in_rule && /^}/ { in_rule=0 }
+  END { if (no_left_border) print "yes" }
+' "$css")
+[ "$footer_status_single_divider" = "yes" ] || {
+  printf '%s\n' "Forge footer status must not draw a second divider next to the theme selector" >&2
+  exit 1
+}
+
 row_menu_clickable=$(awk '
   /^\.catalog-row\.menu-open[[:space:]]*\{/ { in_row=1 }
   in_row && /position:[[:space:]]*relative;/ { row_position=1 }
