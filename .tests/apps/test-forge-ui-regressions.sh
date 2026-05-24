@@ -77,6 +77,8 @@ assert_not_contains "$ui" "'wizardry.forge.cached_workspaces.v1': 'cached_worksp
 assert_not_contains "$ui" 'await runInitialBridgeBootstrap();'
 assert_matches "$ui" 'function validThemeName\(value\)'
 assert_matches "$ui" 'state\.themes\.push\(state\.activeTheme\);'
+assert_not_contains "$ui" "if (a === 'psionic')"
+assert_not_contains "$ui" "if (b === 'psionic')"
 assert_matches "$ui" 'refreshWorkspaceInFlight:[[:space:]]*null'
 assert_matches "$ui" 'if \(state\.refreshWorkspaceInFlight\)'
 assert_matches "$ui" 'async function refreshWorkspaceNow\(options\)'

@@ -2971,12 +2971,6 @@
 
       function sortThemeNames(list) {
         return list.sort(function (a, b) {
-          if (a === 'psionic') {
-            return -1;
-          }
-          if (b === 'psionic') {
-            return 1;
-          }
           return a.localeCompare(b);
         });
       }
