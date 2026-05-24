@@ -99,8 +99,9 @@ assert_matches "$ui" "backend\('unhide-workspace', \[out\.workspace\]"
 assert_matches "$ui" "backend\('unhide-workspace', \[out\.registered_path\]"
 assert_matches "$ui" "backend\('unhide-workspace', \[out\.created\]"
 assert_contains "$ui" "successLabel: item.title + ' removed from Forge.'"
-assert_contains "$ui" "state.activeCatalogRowMenuKey = '';"
+assert_contains "$ui" "setActiveCatalogRowMenuKey('');"
 assert_matches "$ui" '^[[:space:]]*renderCatalogList\(\);$'
+assert_matches "$ui" '^[[:space:]]*closeCatalogRowMenu\(\);$'
 assert_matches "$ui" '^[[:space:]]*handler\(\);$'
 assert_matches "$ui" 'navigator\.platform'
 assert_matches "$ui" 'runtimePlatform\.indexOf\('"'"'mac'"'"'\)[[:space:]]*>=[[:space:]]*0'
@@ -242,6 +243,31 @@ if ! rg -q "rowMenuBtn\\.addEventListener\\('click', toggleRowMenuFromClick\\)" 
   exit 1
 fi
 
+if ! rg -q "function setActiveCatalogRowMenuKey" "$ui" || ! rg -q "function renderActiveCatalogRowMenuPortal" "$ui" || ! rg -q "function closeCatalogRowMenu" "$ui"; then
+  printf '%s\n' "Forge row overflow menu state must update through direct lightweight helpers" >&2
+  exit 1
+fi
+
+if ! awk '
+  /function toggleRowMenu\(event\)/ { in_toggle=1; depth=0 }
+  in_toggle {
+    depth += gsub(/\{/, "{")
+    depth -= gsub(/\}/, "}")
+    if (/renderActiveCatalogRowMenuPortal\(\);/) { direct=1 }
+    if (/renderCatalogList\(\);/) { full_render=1 }
+    if (in_toggle && depth == 0) { in_toggle=0 }
+  }
+  END { exit (direct && !full_render) ? 0 : 1 }
+' "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must open the portal directly without a full catalog render" >&2
+  exit 1
+fi
+
+if rg -q "activeCatalogRowMenuKey === item\\.key \\? 'menu' : 'closed'" "$ui"; then
+  printf '%s\n' "Forge row overflow open state must not force catalog row rebuilds" >&2
+  exit 1
+fi
+
 if ! rg -q "rowActions\\.setAttribute\\('draggable', 'false'\\)" "$ui" || ! rg -q "rowMenuBtn\\.setAttribute\\('draggable', 'false'\\)" "$ui" || ! rg -q "play\\.setAttribute\\('draggable', 'false'\\)" "$ui"; then
   printf '%s\n' "Forge row action buttons must opt out of draggable row behavior" >&2
   exit 1
@@ -317,6 +343,22 @@ fi
 if ! rg -q "function routeCatalogRowOverflowPointer" "$ui" || ! rg -q "document\\.querySelectorAll\\('\\.row-overflow'\\)" "$ui" || ! rg -q "button\\.forgeToggleRowMenuFromPointer\\(event\\)" "$ui"; then
   printf '%s\n' "Forge row overflow trigger routing must use exact visible button rectangles when native hit testing retargets the event" >&2
   exit 1
+fi
+
+if ! rg -q "event\\.type !== 'pointerup'" "$ui" && ! rg -q "event\\.type !== 'mouseup'" "$ui"; then
+  if ! awk '
+    /function routeCatalogRowOverflowPointer\(event\)/ { in_route=1; depth=0 }
+    in_route {
+      depth += gsub(/\{/, "{")
+      depth -= gsub(/\}/, "}")
+      if (/event\.type !== '\''pointerdown'\'' && event\.type !== '\''mousedown'\'' && event\.type !== '\''click'\''/) { guarded=1 }
+      if (in_route && depth == 0) { in_route=0 }
+    }
+    END { exit guarded ? 0 : 1 }
+  ' "$ui"; then
+    printf '%s\n' "Forge row overflow trigger routing must ignore release events so one click cannot immediately close the menu" >&2
+    exit 1
+  fi
 fi
 
 if ! rg -q "appendAction\\('Rename', function \\(\\)" "$ui" || ! rg -q "setTimeout\\(function \\(\\)" "$ui" || ! rg -q "state\\.inlineRenameKey = item\\.key" "$ui"; then

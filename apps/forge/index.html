@@ -3901,7 +3901,7 @@
         var orderedItems = catalogItems().slice();
         orderedItems.sort(compareCatalogItems);
         if (state.activeCatalogRowMenuKey && !visibleItems.some(function (item) { return item.key === state.activeCatalogRowMenuKey; })) {
-          state.activeCatalogRowMenuKey = '';
+          setActiveCatalogRowMenuKey('');
         }
         if (state.inlineRenameKey && !visibleItems.some(function (item) { return item.key === state.inlineRenameKey; })) {
           state.inlineRenameKey = '';
@@ -3970,7 +3970,6 @@
           item.context,
           item.draft ? 'draft' : 'saved',
           state.inlineRenameKey === item.key ? 'rename' : 'plain',
-          state.activeCatalogRowMenuKey === item.key ? 'menu' : 'closed',
           isWizardrySuiteItem(item) ? 'suite' : 'plain',
           hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item) ? 'run' : 'norun',
           item.gitRepoPresent || 'no',
@@ -3984,7 +3983,7 @@
 
       function syncCatalogRowState(row, item) {
         row.classList.toggle('active', state.selectedCatalog === item.key);
-        row.classList.toggle('menu-open', state.activeCatalogRowMenuKey === item.key);
+        setCatalogRowMenuOpen(row, state.activeCatalogRowMenuKey === item.key);
         row.classList.toggle('run-pending', state.catalogRunPendingKey === item.key);
         row.classList.toggle('dragging', state.dragCatalogItemKey === item.key);
         row.classList.remove('catalog-row-filtered');
@@ -4276,6 +4275,8 @@
           rowMenuBtn.className = 'row-overflow';
           rowMenuBtn.title = 'More actions';
           rowMenuBtn.setAttribute('aria-label', 'More actions');
+          rowMenuBtn.setAttribute('aria-haspopup', 'menu');
+          rowMenuBtn.setAttribute('aria-expanded', state.activeCatalogRowMenuKey === item.key ? 'true' : 'false');
           rowMenuBtn.dataset.catalogItemKey = item.key;
           rowMenuBtn.setAttribute('draggable', 'false');
           rowMenuBtn.textContent = '⋮';
@@ -4288,12 +4289,13 @@
           }
           function toggleRowMenu(event) {
             stopRowMenuEvent(event);
+            closeFloatingMenus();
             if (state.activeCatalogRowMenuKey === item.key) {
-              state.activeCatalogRowMenuKey = '';
+              setActiveCatalogRowMenuKey('');
             } else {
-              state.activeCatalogRowMenuKey = item.key;
+              setActiveCatalogRowMenuKey(item.key);
             }
-            renderCatalogList();
+            renderActiveCatalogRowMenuPortal();
           }
           var rowMenuPressHandled = false;
           function toggleRowMenuFromPress(event) {
@@ -4306,7 +4308,7 @@
             toggleRowMenu(event);
             setTimeout(function () {
               rowMenuPressHandled = false;
-            }, 0);
+            }, 350);
             setTimeout(function () {
               state.suppressNextCatalogDocumentClick = false;
             }, 1500);
@@ -4481,8 +4483,7 @@
             }
             didRun = true;
             state.suppressNextCatalogDocumentClick = false;
-            state.activeCatalogRowMenuKey = '';
-            renderCatalogList();
+            closeCatalogRowMenu();
             handler();
           }
           button.forgeRunRowMenuAction = runRowMenuAction;
@@ -4620,6 +4621,9 @@
         if (!event || typeof event.clientX !== 'number' || typeof event.clientY !== 'number') {
           return false;
         }
+        if (event.type !== 'pointerdown' && event.type !== 'mousedown' && event.type !== 'click') {
+          return false;
+        }
         var buttons = Array.prototype.slice.call(document.querySelectorAll('.row-overflow'));
         for (var index = 0; index < buttons.length; index += 1) {
           var button = buttons[index];
@@ -4671,6 +4675,17 @@
         });
       }
 
+      function setCatalogRowMenuOpen(row, open) {
+        if (!row) {
+          return;
+        }
+        row.classList.toggle('menu-open', !!open);
+        var button = row.querySelector('.row-overflow');
+        if (button) {
+          button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+      }
+
       function catalogRowByKey(key) {
         var rows = Array.prototype.slice.call(els.catalogList.querySelectorAll('.catalog-row'));
         return rows.find(function (row) {
@@ -4678,15 +4693,52 @@
         }) || null;
       }
 
+      function syncCatalogRowMenuState(previousKey, nextKey) {
+        var seen = {};
+        [previousKey, nextKey].forEach(function (itemKey) {
+          itemKey = String(itemKey || '').trim();
+          if (!itemKey || seen[itemKey]) {
+            return;
+          }
+          seen[itemKey] = true;
+          var row = catalogRowByKey(itemKey);
+          if (row) {
+            setCatalogRowMenuOpen(row, itemKey === state.activeCatalogRowMenuKey && !row.classList.contains('catalog-row-filtered'));
+          }
+        });
+      }
+
+      function setActiveCatalogRowMenuKey(value) {
+        var previous = state.activeCatalogRowMenuKey || '';
+        var next = String(value || '').trim();
+        if (previous === next) {
+          syncCatalogRowMenuState(previous, next);
+          return;
+        }
+        state.activeCatalogRowMenuKey = next;
+        syncCatalogRowMenuState(previous, next);
+      }
+
+      function closeCatalogRowMenu() {
+        setActiveCatalogRowMenuKey('');
+        removeCatalogRowMenuPortal();
+      }
+
+      function renderActiveCatalogRowMenuPortal() {
+        renderCatalogRowMenuPortal(filteredCatalogItems());
+      }
+
       function renderCatalogRowMenuPortal(visibleItems) {
         removeCatalogRowMenuPortal();
         if (!state.activeCatalogRowMenuKey) {
           return;
         }
-        var item = visibleItems.find(function (candidate) {
+        var candidateItems = Array.isArray(visibleItems) ? visibleItems : filteredCatalogItems();
+        var item = candidateItems.find(function (candidate) {
           return candidate.key === state.activeCatalogRowMenuKey;
         });
         if (!item) {
+          setActiveCatalogRowMenuKey('');
           return;
         }
         var row = catalogRowByKey(item.key);
@@ -9305,12 +9357,16 @@
           ) {
             return;
           }
-          state.activeCatalogRowMenuKey = '';
+          var hadCatalogRowMenu = !!state.activeCatalogRowMenuKey;
+          var hadMiniTabEdit = !!state.editingMiniTabId;
+          closeCatalogRowMenu();
           if (state.editingMiniTabId) {
             commitMiniTabEdit(state.editingMiniTabId, state.editingMiniTabDraft);
           }
           closeFloatingMenus();
-          renderCatalogList();
+          if (hadMiniTabEdit || !hadCatalogRowMenu) {
+            renderCatalogList();
+          }
         });
 
         if (els.settingsPanel) {
@@ -9806,6 +9862,11 @@
           if (event.key === 'Escape' && state.settingsOpen) {
             event.preventDefault();
             setPanel('settings', false);
+            return;
+          }
+          if (event.key === 'Escape' && state.activeCatalogRowMenuKey) {
+            event.preventDefault();
+            closeCatalogRowMenu();
             return;
           }
 
