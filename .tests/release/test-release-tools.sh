@@ -5,13 +5,19 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 
 name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer)
-[ "$name" = "Artificer" ]
+[ "$name" = "Artificer (non-native)" ]
+
+native_name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer-native)
+[ "$native_name" = "Artificer" ]
 
 forge_name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" forge)
 [ "$forge_name" = "App Forge" ]
 
 bundle_id=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer)
 printf '%s' "$bundle_id" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'
+
+native_bundle_id=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" macos artificer-native)
+[ "$native_bundle_id" = "com.artificer.app" ]
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-stage-assets.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM

@@ -82,6 +82,9 @@ jq -e '
     type == "object"
     and ((.mode // "local") | (. == "local" or . == "external"))
     and ((.path // "") | valid_source_subdir);
+  def valid_development_context:
+    type == "string"
+    and (. == "web" or . == "native-desktop" or . == "native-mobile" or . == "godot");
 
   .apps
   | type == "array"
@@ -92,10 +95,12 @@ jq -e '
   and all(.[]; .targets | valid_targets)
   and all(.[]; .bundleIds | type == "object")
   and all(.[]; . as $app | all(["macos", "ios", "android"][]; ($app.bundleIds[.] | valid_bundle_id)))
-  and all(.[]; if (.distribution // "optional") == "optional" then (.source | valid_source) else true end)
+  and all(.[]; if has("source") then (.source | valid_source) else true end)
+  and all(.[]; if has("developmentContext") then (.developmentContext | valid_development_context) else true end)
+  and all(.[]; if has("development_context") then (.development_context | valid_development_context) else true end)
   and all(.[]; if has("hostedWeb") then (.hostedWeb | valid_hosted_web) else true end)
 ' "$MANIFEST_DIR/apps.manifest.json" >/dev/null || {
-  printf '%s\n' "apps.manifest.json validation failed: app slugs, names, targets, bundle ids, distributions, and optional sources must be release-safe"
+  printf '%s\n' "apps.manifest.json validation failed: app slugs, names, targets, bundle ids, distributions, contexts, and sources must be release-safe"
   exit 1
 }
 

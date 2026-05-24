@@ -3,7 +3,7 @@
   "apps": [
     {
       "slug": "artificer",
-      "name": "Artificer",
+      "name": "Artificer (non-native)",
       "production": false,
       "distribution": "optional",
       "source": {
@@ -21,6 +21,24 @@
         "android": "com.wizardry.apps.artificer.android"
       },
       "targets": "hosted-web,linux,macos"
+    },
+    {
+      "slug": "artificer-native",
+      "name": "Artificer",
+      "production": false,
+      "distribution": "core",
+      "developmentContext": "native-desktop",
+      "source": {
+        "repo": "../artificer",
+        "ref": "main",
+        "subdir": "."
+      },
+      "bundleIds": {
+        "macos": "com.artificer.app",
+        "ios": "com.artificer.app.ios",
+        "android": "com.artificer.app.android"
+      },
+      "targets": "macos,linux"
     },
     {
       "slug": "unix-settings",

@@ -954,6 +954,13 @@ resolve_app_dir() {
   distribution=$(app_distribution "$root" "$slug")
   case "$distribution" in
     core)
+      if source_dir=$(resolve_app_source_dir "$root" "$slug" 2>/dev/null); then
+        printf '%s\n' "$source_dir"
+        return 0
+      fi
+      if [ -n "$(app_source_field "$root" "$slug" repo)" ]; then
+        return 1
+      fi
       dir="$root/apps/$slug"
       [ -d "$dir" ] || return 1
       printf '%s\n' "$dir"
@@ -975,6 +982,14 @@ app_status() {
   distribution=$(app_distribution "$root" "$slug")
   case "$distribution" in
     core)
+      if path=$(resolve_app_source_dir "$root" "$slug" 2>/dev/null); then
+        printf '%s\t%s\n' "core_present" "$path"
+        return 0
+      fi
+      if [ -n "$(app_source_field "$root" "$slug" repo)" ]; then
+        printf '%s\t%s\n' "core_missing" ""
+        return 0
+      fi
       path="$root/apps/$slug"
       if [ -d "$path" ]; then
         printf '%s\t%s\n' "core_present" "$path"
@@ -1280,6 +1295,35 @@ resolve_source_repo() {
       return 0
       ;;
   esac
+}
+
+resolve_app_source_dir() {
+  root=$1
+  slug=$2
+  repo=$(app_source_field "$root" "$slug" repo)
+  ref=$(app_source_field "$root" "$slug" ref)
+  subdir=$(app_source_field "$root" "$slug" subdir)
+  [ -n "$repo" ] || return 1
+  [ -n "$subdir" ] || subdir=.
+  validate_source_repo "$repo"
+  validate_source_ref "$ref"
+  validate_source_subdir "$subdir" "source subdir"
+  repo=$(resolve_source_repo "$root" "$repo")
+  [ -d "$repo" ] || return 1
+  repo_abs=$(CDPATH= cd -- "$repo" 2>/dev/null && pwd -P) || return 1
+  source_dir="$repo_abs"
+  if [ "$subdir" != "." ]; then
+    source_dir="$repo_abs/$subdir"
+  fi
+  [ -d "$source_dir" ] || return 1
+  source_abs=$(CDPATH= cd -- "$source_dir" 2>/dev/null && pwd -P) || return 1
+  case "$source_abs" in
+    "$repo_abs"|"$repo_abs"/*)
+      printf '%s\n' "$source_abs"
+      return 0
+      ;;
+  esac
+  return 1
 }
 
 lock_field() {
@@ -2346,8 +2390,8 @@ cmd_list_apps() {
 
   manifest="$root/runtime/config/apps.manifest.json"
   list_apps_tmp=$(mktemp "${TMPDIR:-/tmp}/forge-list-apps.XXXXXX")
-  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (if has("targets") then (.targets // "") else "__FORGE_TARGETS_MISSING__" end), (.distribution // "optional")] | @tsv' "$manifest" > "$list_apps_tmp"
-  while IFS="$(printf '\t')" read -r slug name production bundle_targets manifest_targets distribution; do
+  jq -r '.apps[] | [.slug, .name, (if .production then "true" else "false" end), ((.bundleIds // {}) | keys | join(",")), (if has("targets") then (.targets // "") else "__FORGE_TARGETS_MISSING__" end), (.distribution // "optional"), (.developmentContext // .development_context // "")] | @tsv' "$manifest" > "$list_apps_tmp"
+  while IFS="$(printf '\t')" read -r slug name production bundle_targets manifest_targets distribution manifest_context; do
     status_line=$(app_status "$root" "$slug")
     resolved_status=$(printf '%s\n' "$status_line" | cut -f1)
     resolved_path=$(printf '%s\n' "$status_line" | cut -f2)
@@ -2357,10 +2401,14 @@ cmd_list_apps() {
         exists=1
         ;;
     esac
-    development_context=web
-    if [ "$distribution" = "core" ] && [ -d "$root/templates/godot/tools/$slug" ]; then
+    development_context=${manifest_context:-web}
+    if [ -z "$manifest_context" ] && [ "$distribution" = "core" ] && [ -d "$root/templates/godot/tools/$slug" ]; then
       development_context=godot
     fi
+    case "$development_context" in
+      web|native-desktop|native-mobile|godot) ;;
+      *) development_context=web ;;
+    esac
 
     if [ "$manifest_targets" != "__FORGE_TARGETS_MISSING__" ]; then
       targets=$manifest_targets

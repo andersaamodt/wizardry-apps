@@ -2045,6 +2045,7 @@
 
       function builtInListGroup(appId) {
         var nonWizardryBuiltIns = {
+          artificer: true,
           priorities: true,
           'virtual-redditor': true
         };
@@ -2056,6 +2057,23 @@
 
       function isWizardrySuiteItem(item) {
         return !!(item && item.listGroup === 'wizardry');
+      }
+
+      function isWorkspaceBackedBuiltIn(item) {
+        return !!(
+          item &&
+          item.kind === 'builtin' &&
+          item.path &&
+          (
+            item.context === 'native-desktop' ||
+            item.context === 'native-mobile' ||
+            item.context === 'godot'
+          )
+        );
+      }
+
+      function usesWorkspacePipeline(item) {
+        return !!(item && (item.kind === 'workspace' || isWorkspaceBackedBuiltIn(item)) && item.path);
       }
 
       function compareCatalogItems(a, b) {
@@ -3183,7 +3201,7 @@
             context: app.context,
             projectType: inferProjectTypeFromContext(app.context).toLowerCase(),
             targets: app.targets || '',
-            path: app.resolvedPath || (state.rootHint ? (state.rootHint + '/apps/' + app.id) : ''),
+            path: app.resolvedPath || '',
             sortTimestamp: parseInt(app.sortTimestamp, 10) || 0,
             runnable: true,
             gitRepoPresent: app.gitRepoPresent || 'no',
@@ -3445,8 +3463,8 @@
       }
 
       async function runWorkspaceItem(item, runMode) {
-        if (!item || item.kind !== 'workspace') {
-          throw new Error('Select a user-created app to run');
+        if (!usesWorkspacePipeline(item)) {
+          throw new Error('Select a project to run');
         }
         runMode = String(runMode || 'normal').trim();
         if (!runMode) {
@@ -3456,7 +3474,7 @@
         suppressTransientRefresh();
         var res = await backend('run-workspace', [item.path, item.context, runMode]);
         var out = kv(res.stdout || '');
-        var workspaceKey = item.key || ('workspace:' + item.id);
+        var workspaceKey = item.key || (item.kind === 'builtin' ? ('builtin:' + item.id) : ('workspace:' + item.id));
         var launchedMode = out.mode || (item.context === 'godot' ? 'godot' : (item.context === 'native-desktop' ? 'native-desktop-executable' : 'desktop-executable'));
         var launchedUrl = String(out.url || '').trim();
         if (item.context === 'web') {
@@ -4827,6 +4845,17 @@
         renderSelectedBuiltIn();
       }
 
+      function builtInCatalogPathSet() {
+        var out = {};
+        state.apps.forEach(function (app) {
+          if (!app || !app.exists || !app.resolvedPath) {
+            return;
+          }
+          out[normalizePathForCompare(app.resolvedPath)] = true;
+        });
+        return out;
+      }
+
       function renderSelectedBuiltIn() {
         var selected = selectedCatalogItem();
         els.selectedAppGrid.innerHTML = '';
@@ -5030,7 +5059,7 @@
         if (isBuiltInNotDownloaded(selected)) {
           return false;
         }
-        if (selected.kind === 'workspace') {
+        if (usesWorkspacePipeline(selected)) {
           return hasEnabledHostRunTarget(selected) || hasEnabledHostedWebTarget(selected);
         }
         return true;
@@ -5104,10 +5133,10 @@
         if (!selected || !hostTarget) {
           return false;
         }
-        if (selected.kind === 'builtin') {
+        if (selected.kind === 'builtin' && !isWorkspaceBackedBuiltIn(selected)) {
           return true;
         }
-        return selected.kind === 'workspace' && selected.context !== 'godot';
+        return usesWorkspacePipeline(selected) && selected.context !== 'godot';
       }
 
       function defaultInstallBeforeRunForSelected(selected) {
@@ -7949,6 +7978,35 @@
           throw new Error('Select an app first');
         }
         var hostTarget = hostTargetId();
+        if (usesWorkspacePipeline(selected)) {
+          if (selected.context === 'native-mobile' && (targetId === 'ios' || targetId === 'android')) {
+            await runWorkspacePipelineAction(targetId, selected);
+            return;
+          }
+          if (targetId === 'ios' || targetId === 'android') {
+            throw new Error('This target cannot be run directly from the current desktop host.');
+          }
+          if (targetId === 'hosted-web') {
+            await serveHostedWebTarget(selected);
+            return;
+          }
+          if (selected.context === 'native-desktop') {
+            if (hostTarget && targetId === hostTarget) {
+              await runWorkspacePipelineAction('run', selected);
+              return;
+            }
+            await runWorkspacePipelineAction('build', selected);
+            return;
+          }
+          if (targetId === 'macos' && state.os !== 'darwin') {
+            throw new Error('macOS target can only be run on macOS.');
+          }
+          if (targetId === 'linux' && state.os !== 'linux') {
+            throw new Error('Linux target can only be run on Linux.');
+          }
+          await runWorkspaceItem(selected);
+          return;
+        }
         if (selected.kind === 'builtin') {
           state.selectedBuiltIn = selected.id;
           if (targetId === 'ios') {
@@ -8036,10 +8094,10 @@
         }
 
         var res;
-        if (selected.kind === 'builtin') {
-          res = await backend('install-desktop', [selected.id, targetId]);
-        } else if (selected.kind === 'workspace' && canInstallHostTargetForSelected(selected)) {
+        if (usesWorkspacePipeline(selected)) {
           res = await backend('install-workspace', [selected.path, selected.context, targetId]);
+        } else if (selected.kind === 'builtin') {
+          res = await backend('install-desktop', [selected.id, targetId]);
         } else {
           throw new Error('Install is currently available for desktop-targeted apps on this host.');
         }
@@ -8051,17 +8109,17 @@
         renderSelectedTargetsEditor(selectedCatalogItem());
 
         var summary = selected.title + ' installed for ' + (targetId === 'macos' ? 'macOS' : 'Linux') + '.';
-        var installHelp = selected.kind === 'builtin'
-          ? (targetId === 'macos'
-            ? 'Install auto-builds latest output, then copies the .app bundle into /Applications.'
-            : 'Install auto-builds latest output, then installs AppDir to ~/.local/share with a launcher in ~/.local/bin.')
-          : (selected.context === 'native-desktop'
+        var installHelp = usesWorkspacePipeline(selected)
+          ? (selected.context === 'native-desktop'
             ? (targetId === 'macos'
               ? 'Install compiles the native workspace, then copies the .app bundle into /Applications.'
               : 'Install compiles the native workspace, then installs the launcher under ~/.local with a desktop entry.')
             : (targetId === 'macos'
               ? 'Install rebuilds the project and copies the desktop app bundle into /Applications.'
-              : 'Install rebuilds the project and installs its AppDir under ~/.local/share with a launcher in ~/.local/bin.'));
+              : 'Install rebuilds the project and installs its AppDir under ~/.local/share with a launcher in ~/.local/bin.'))
+          : (targetId === 'macos'
+            ? 'Install auto-builds latest output, then copies the .app bundle into /Applications.'
+            : 'Install auto-builds latest output, then installs AppDir to ~/.local/share with a launcher in ~/.local/bin.');
         renderResult({
           status: 'ok',
           summary: summary,
@@ -8378,6 +8436,7 @@
         var res = await backend('list-workspaces', [state.projectsRoot], { quiet: !!options.quiet });
         var rows = parseTSV(res.stdout || '', 13);
         var hiddenPaths = hiddenWorkspacePathSet();
+        var builtInPaths = builtInCatalogPathSet();
         state.workspaces = rows.map(function (row) {
           return {
             id: row[0],
@@ -8395,7 +8454,8 @@
             gitReleaseAvailable: row[12] || 'no'
           };
         }).filter(function (ws) {
-          return !hiddenPaths[normalizePathForCompare(ws.path)];
+          var normalizedPath = normalizePathForCompare(ws.path);
+          return !hiddenPaths[normalizedPath] && !builtInPaths[normalizedPath];
         });
         state.workspacesLoaded = true;
         saveStorage(CACHED_WORKSPACES_KEY, JSON.stringify(state.workspaces));
@@ -8489,7 +8549,7 @@
       }
 
       async function runWorkspacePipelineAction(kind, selected) {
-        if (!selected || selected.kind !== 'workspace') {
+        if (!usesWorkspacePipeline(selected)) {
           throw new Error('Select a project first');
         }
         if (selected.draft) {
@@ -8605,7 +8665,7 @@
           await runTargetAction(selected, 'hosted-web');
           return;
         }
-        if (selected.kind === 'workspace' || (selected.kind !== 'builtin' && !!selected.path)) {
+        if (usesWorkspacePipeline(selected) || (selected.kind !== 'builtin' && !!selected.path)) {
           return runWorkspacePipelineAction(kind, selected);
         }
         state.selectedBuiltIn = selected.id;

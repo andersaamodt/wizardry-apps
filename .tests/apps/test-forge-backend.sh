@@ -113,7 +113,8 @@ if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ]; then
 fi
 
 apps=$(sh "$backend" list-apps "$test_root")
-printf '%s\n' "$apps" | grep -E '^artificer\t' >/dev/null
+printf '%s\n' "$apps" | awk -F'\t' '$1 == "artificer" { if ($2 != "Artificer (non-native)" || $5 != "web" || $7 != "optional") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+printf '%s\n' "$apps" | awk -F'\t' '$1 == "artificer-native" { if ($2 != "Artificer" || $5 != "native-desktop" || $7 != "core") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
 printf '%s\n' "$apps" | grep -E '^forge\t' >/dev/null
 
 templates=$(sh "$backend" list-templates "$test_root")
