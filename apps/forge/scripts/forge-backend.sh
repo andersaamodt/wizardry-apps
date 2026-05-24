@@ -2441,7 +2441,7 @@ cmd_list_apps() {
     git_repo_private=''
     git_release_available='no'
     if [ -n "$resolved_path" ] && [ -d "$resolved_path" ]; then
-      git_info=$(workspace_git_collect_status "$resolved_path" "0" "0")
+      git_info=$(workspace_git_collect_status "$resolved_path" "auto" "0")
       git_repo_present=$(printf '%s\n' "$git_info" | kv_read git_repo_present)
       git_status_label=$(printf '%s\n' "$git_info" | kv_read git_status_label)
       git_status_tone=$(printf '%s\n' "$git_info" | kv_read git_status_tone)
@@ -3542,20 +3542,40 @@ workspace_git_collect_repo_privacy() {
   state_file=$(workspace_git_state_file "$workspace_path")
   repo_private=$(workspace_git_cached_value_file "$state_file" repo_private)
   repo_private_slug=$(workspace_git_cached_value_file "$state_file" repo_private_slug)
+  repo_private_check_epoch=$(workspace_git_cached_value_file "$state_file" repo_private_check_epoch)
+  now_epoch=$(date +%s 2>/dev/null || printf '0')
   if [ "$repo_private_slug" != "$github_slug" ]; then
     repo_private=''
+    repo_private_check_epoch=''
   fi
   case "$repo_private" in
     yes|no) ;;
     *) repo_private='' ;;
   esac
 
-  if [ "$refresh_privacy" = "1" ]; then
+  should_refresh_privacy=0
+  case "$refresh_privacy" in
+    1)
+      should_refresh_privacy=1
+      ;;
+    auto)
+      if [ -z "$repo_private" ]; then
+        if [ -z "$repo_private_check_epoch" ]; then
+          should_refresh_privacy=1
+        elif [ $((now_epoch - repo_private_check_epoch)) -gt 21600 ] 2>/dev/null; then
+          should_refresh_privacy=1
+        fi
+      fi
+      ;;
+  esac
+
+  if [ "$should_refresh_privacy" -eq 1 ]; then
     if fetched_private=$(workspace_git_fetch_repo_private "$github_slug" "$remote_reachable"); then
       repo_private=$fetched_private
-      workspace_git_state_write "$workspace_path" repo_private_slug "$github_slug"
       workspace_git_state_write "$workspace_path" repo_private "$repo_private"
     fi
+    workspace_git_state_write "$workspace_path" repo_private_slug "$github_slug"
+    workspace_git_state_write "$workspace_path" repo_private_check_epoch "$now_epoch"
   fi
 
   printf 'git_repo_private=%s\n' "$repo_private"
@@ -4123,7 +4143,7 @@ cmd_list_workspaces() {
         fi
         ;;
     esac
-    git_info=$(workspace_git_collect_status "$path" "0" "0")
+    git_info=$(workspace_git_collect_status "$path" "auto" "0")
     git_repo_present=$(printf '%s\n' "$git_info" | kv_read git_repo_present)
     git_status_label=$(printf '%s\n' "$git_info" | kv_read git_status_label)
     git_status_tone=$(printf '%s\n' "$git_info" | kv_read git_status_tone)
