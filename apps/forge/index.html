@@ -1291,8 +1291,12 @@
         state.refreshSuppressedUntil = Math.max(state.refreshSuppressedUntil || 0, Date.now() + duration);
       }
 
+      function activeCatalogRowMenuPortal() {
+        return document.querySelector('.catalog-row-menu:not(.hidden)');
+      }
+
       function refreshIsSuppressed() {
-        return Date.now() < (state.refreshSuppressedUntil || 0);
+        return Date.now() < (state.refreshSuppressedUntil || 0) || !!activeCatalogRowMenuPortal();
       }
 
       function selectLogText() {
@@ -1584,7 +1588,7 @@
       function setBusy(flag) {
         state.busy = flag;
         document.body.classList.toggle('is-busy', flag);
-        document.querySelectorAll('.action, .row-play, .row-mini, .row-overflow, .catalog-row-menu button').forEach(function (btn) {
+        document.querySelectorAll('.action, .row-play, .row-mini, .catalog-row-menu button').forEach(function (btn) {
           btn.disabled = flag;
         });
         document.querySelectorAll('.catalog-mini-tab, .catalog-mini-tab-add').forEach(function (btn) {
@@ -4350,7 +4354,7 @@
           function toggleRowMenu(event) {
             stopRowMenuEvent(event);
             closeFloatingMenus();
-            if (state.activeCatalogRowMenuKey === item.key) {
+            if (state.activeCatalogRowMenuKey === item.key && activeCatalogRowMenuPortal()) {
               setActiveCatalogRowMenuKey('');
             } else {
               setActiveCatalogRowMenuKey(item.key);
@@ -4804,10 +4808,12 @@
         var row = catalogRowByKey(item.key);
         var trigger = row ? row.querySelector('.row-overflow') : null;
         if (!trigger) {
+          setActiveCatalogRowMenuKey('');
           return;
         }
         var menu = buildCatalogRowMenu(item);
         if (!menu) {
+          setActiveCatalogRowMenuKey('');
           return;
         }
         var triggerRect = trigger.getBoundingClientRect();

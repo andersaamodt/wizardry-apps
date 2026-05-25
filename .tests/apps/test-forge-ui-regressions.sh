@@ -330,6 +330,20 @@ if rg -q "function isCatalogRowMenuGutterClick" "$ui" || rg -q "trigger\\.click\
   exit 1
 fi
 
+if awk '
+  /function setBusy\(flag\)/ { in_busy=1; depth=0 }
+  in_busy {
+    depth += gsub(/\{/, "{")
+    depth -= gsub(/\}/, "}")
+    if (/querySelectorAll\(/ && /\.row-overflow/) { disables_overflow=1 }
+    if (in_busy && depth == 0) { in_busy=0 }
+  }
+  END { exit disables_overflow ? 0 : 1 }
+' "$ui"; then
+  printf '%s\n' "Forge row overflow triggers must stay enabled while Forge is busy so the menu never becomes inert" >&2
+  exit 1
+fi
+
 if ! rg -q "function eventHitsRowMenuButton" "$ui" || ! rg -q "hitSlop = 8" "$ui" || ! rg -q "playRect\\.right \\+ 2" "$ui" || ! rg -q "rowActions\\.addEventListener\\('pointerdown', toggleRowMenuFromActions\\)" "$ui"; then
   printf '%s\n' "Forge row overflow must have a tight invisible hit zone around the compact button without stealing Run clicks" >&2
   exit 1
@@ -417,6 +431,42 @@ fi
 
 if ! rg -q "function renderCatalogRowMenuPortal" "$ui" || ! rg -q "document\\.body\\.appendChild\\(menu\\)" "$ui"; then
   printf '%s\n' "Forge row overflow menus must be rendered through a document-level portal" >&2
+  exit 1
+fi
+
+if ! rg -q "function activeCatalogRowMenuPortal" "$ui" || ! rg -q "state\\.activeCatalogRowMenuKey === item\\.key && activeCatalogRowMenuPortal\\(\\)" "$ui"; then
+  printf '%s\n' "Forge row overflow toggles must treat a missing menu portal as closed" >&2
+  exit 1
+fi
+
+if ! awk '
+  /function renderCatalogRowMenuPortal\(visibleItems\)/ { in_render=1; depth=0 }
+  in_render {
+    depth += gsub(/\{/, "{")
+    depth -= gsub(/\}/, "}")
+    if (/if \(!trigger\)/) { in_no_trigger=1 }
+    if (in_no_trigger && /setActiveCatalogRowMenuKey\('\'''\''\);/) { clears_missing_trigger=1; in_no_trigger=0 }
+    if (/if \(!menu\)/) { in_no_menu=1 }
+    if (in_no_menu && /setActiveCatalogRowMenuKey\('\'''\''\);/) { clears_missing_menu=1; in_no_menu=0 }
+    if (in_render && depth == 0) { in_render=0 }
+  }
+  END { exit (clears_missing_trigger && clears_missing_menu) ? 0 : 1 }
+' "$ui"; then
+  printf '%s\n' "Forge row overflow portal rendering must clear stale open state when the trigger or menu disappears" >&2
+  exit 1
+fi
+
+if ! awk '
+  /function refreshIsSuppressed\(\)/ { in_refresh=1; depth=0 }
+  in_refresh {
+    depth += gsub(/\{/, "{")
+    depth -= gsub(/\}/, "}")
+    if (/activeCatalogRowMenuPortal\(\)/) { pauses_for_menu=1 }
+    if (in_refresh && depth == 0) { in_refresh=0 }
+  }
+  END { exit pauses_for_menu ? 0 : 1 }
+' "$ui"; then
+  printf '%s\n' "Forge background refresh must pause while a row overflow menu is visibly open" >&2
   exit 1
 fi
 
