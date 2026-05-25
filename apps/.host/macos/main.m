@@ -4292,7 +4292,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     (void)sender;
     [self syncBellheimBackgroundModeFromConfig];
-    if (self.explicitQuitRequested || [self isSystemTerminationRequest] || [self isBellheimApp]) {
+    if (self.explicitQuitRequested || [self isSystemTerminationRequest]) {
         return NSTerminateNow;
     }
     if (self.keepRunningInBackground || self.showStatusItem) {

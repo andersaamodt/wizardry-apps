@@ -30,7 +30,11 @@ grep -F 'kAEQuitReason' "$mac_host" >/dev/null
 grep -F 'kAEShutDown' "$mac_host" >/dev/null
 grep -F 'kAERestart' "$mac_host" >/dev/null
 grep -F 'kAEReallyLogOut' "$mac_host" >/dev/null
-grep -F 'self.explicitQuitRequested || [self isSystemTerminationRequest] || [self isBellheimApp]' "$mac_host" >/dev/null
+grep -F 'if (self.explicitQuitRequested || [self isSystemTerminationRequest]) {' "$mac_host" >/dev/null
+if grep -F 'self.explicitQuitRequested || [self isSystemTerminationRequest] || [self isBellheimApp]' "$mac_host" >/dev/null; then
+  printf '%s\n' "Bellheim Dock Quit must respect background mode" >&2
+  exit 1
+fi
 grep -F '[self syncBellheimBackgroundModeFromConfig];' "$mac_host" >/dev/null
 grep -F 'NSVariableStatusItemLength' "$mac_host" >/dev/null
 grep -F 'setTemplate:YES' "$mac_host" >/dev/null
