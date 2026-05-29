@@ -127,6 +127,45 @@ test_configure_nginx_supports_onion_addresses() {
   rm -rf "$test_web_root" "$stub_dir"
 }
 
+test_configure_nginx_supports_desk_domain() {
+  skip-if-compiled || return $?
+
+  test_web_root=$(temp-dir web-wizardry-test)
+  export WEB_WIZARDRY_ROOT="$test_web_root"
+
+  stub_dir=$(temp-dir web-wizardry-stub)
+  stub-sudo "$stub_dir"
+  export PATH="$stub_dir:$PATH"
+
+  mkdir -p "$test_web_root/mytestsite"
+  cat > "$test_web_root/mytestsite/site.conf" <<'EOF'
+site-name=mytestsite
+port=8080
+domain=example.com
+https=false
+desk_domain=desk.example.com
+EOF
+
+  run_spell spells/web/configure-nginx mytestsite
+  assert_success
+
+  nginx_conf="$test_web_root/mytestsite/nginx/nginx.conf"
+  grep -q "server_name example.com desk.example.com \\*.onion" "$nginx_conf" || {
+    TEST_FAILURE_REASON="nginx.conf server_name does not include desk_domain"
+    return 1
+  }
+  grep -q 'if (\$host = desk.example.com)' "$nginx_conf" || {
+    TEST_FAILURE_REASON="nginx.conf does not rewrite desk_domain host"
+    return 1
+  }
+  grep -q "location = /artificer" "$nginx_conf" || {
+    TEST_FAILURE_REASON="nginx.conf does not preserve /artificer before desk_domain catch-all"
+    return 1
+  }
+
+  rm -rf "$test_web_root" "$stub_dir"
+}
+
 test_configure_nginx_preserves_existing_port() {
   skip-if-compiled || return $?
   
@@ -296,6 +335,7 @@ EOF
 run_test_case "configure-nginx --help" test_configure_nginx_help
 run_test_case "configure-nginx creates local mime.types" test_configure_nginx_creates_local_mimetypes
 run_test_case "configure-nginx supports .onion addresses" test_configure_nginx_supports_onion_addresses
+run_test_case "configure-nginx supports desk_domain" test_configure_nginx_supports_desk_domain
 run_test_case "configure-nginx preserves existing port" test_configure_nginx_preserves_existing_port
 run_test_case "configure-nginx rejects site path traversal" test_configure_nginx_rejects_site_path_traversal
 run_test_case "configure-nginx rejects regex site name" test_configure_nginx_rejects_regex_site_name

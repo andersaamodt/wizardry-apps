@@ -10,9 +10,10 @@ Usage: configure-nginx SITENAME [OPTIONS]
 Generates nginx configuration for a website.
 
 Options:
-  --port PORT       Port number (default: 8080)
-  --domain DOMAIN   Domain name (default: localhost)
-  --https           Enable HTTPS with Let's Encrypt
+  --port PORT              Port number (default: 8080)
+  --domain DOMAIN          Domain name (default: localhost)
+  --domain-aliases LIST    Space-separated additional hostnames
+  --https                  Enable HTTPS with Let's Encrypt
 
 Examples:
   web-configure-nginx mysite
@@ -39,7 +40,17 @@ shift
 # Parse options
 port=8080
 domain=localhost
+domain_aliases=
 use_https=false
+
+configure_nginx_valid_domain() {
+  domain_value=$1
+  case "$domain_value" in
+    ''|.|..|.*|*.|*..*|*[!A-Za-z0-9._-]*)
+      return 1
+      ;;
+  esac
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -54,6 +65,13 @@ while [ $# -gt 0 ]; do
       domain=${2-}
       if [ -z "$domain" ]; then
         die 2 "configure-nginx: --domain requires value"
+      fi
+      shift 2
+      ;;
+    --domain-aliases)
+      domain_aliases=${2-}
+      if [ -z "$domain_aliases" ]; then
+        die 2 "configure-nginx: --domain-aliases requires value"
       fi
       shift 2
       ;;
@@ -102,6 +120,21 @@ if [ "$domain" = "localhost" ] && [ -f "$SITE_DIR/site.conf" ]; then
   fi
 fi
 
+if [ -z "$domain_aliases" ] && [ -f "$SITE_DIR/site.conf" ]; then
+  existing_domain_aliases=$(config-get "$SITE_DIR/site.conf" domain-aliases 2>/dev/null || printf '')
+  if [ -z "$existing_domain_aliases" ]; then
+    existing_domain_aliases=$(config-get "$SITE_DIR/site.conf" domain_aliases 2>/dev/null || printf '')
+  fi
+  if [ -n "$existing_domain_aliases" ]; then
+    domain_aliases=$existing_domain_aliases
+  fi
+fi
+
+desk_domain=
+if [ -f "$SITE_DIR/site.conf" ]; then
+  desk_domain=$(config-get "$SITE_DIR/site.conf" desk_domain 2>/dev/null || printf '')
+fi
+
 if [ "$use_https" = "false" ] && [ -f "$SITE_DIR/site.conf" ]; then
   # No --https option was given, use existing https setting from config
   existing_https=$(config-get "$SITE_DIR/site.conf" https 2>/dev/null || echo "")
@@ -119,11 +152,51 @@ if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
   die 2 "configure-nginx: port must be between 1 and 65535"
 fi
 
-case "$domain" in
-  ''|*[!A-Za-z0-9._-]*)
-    die 2 "configure-nginx: invalid domain"
-    ;;
-esac
+if ! configure_nginx_valid_domain "$domain"; then
+  die 2 "configure-nginx: invalid domain"
+fi
+for domain_alias in $domain_aliases; do
+  if ! configure_nginx_valid_domain "$domain_alias"; then
+    die 2 "configure-nginx: invalid domain-aliases"
+  fi
+done
+if [ -n "$desk_domain" ] && ! configure_nginx_valid_domain "$desk_domain"; then
+  die 2 "configure-nginx: invalid desk_domain"
+fi
+
+server_names=$domain
+seen_server_names=" $domain "
+for domain_alias in $domain_aliases; do
+  case "$seen_server_names" in
+    *" $domain_alias "*)
+      continue
+      ;;
+  esac
+  server_names="$server_names $domain_alias"
+  seen_server_names="$seen_server_names$domain_alias "
+done
+if [ -n "$desk_domain" ]; then
+  case "$seen_server_names" in
+    *" $desk_domain "*)
+      ;;
+    *)
+      server_names="$server_names $desk_domain"
+      seen_server_names="$seen_server_names$desk_domain "
+      ;;
+  esac
+fi
+server_names="$server_names *.onion"
+
+desk_host_root_rewrite=
+desk_host_path_rewrite=
+if [ -n "$desk_domain" ]; then
+  desk_host_root_rewrite="            if (\$host = $desk_domain) {
+                rewrite ^ /pages/desk.html last;
+            }"
+  desk_host_path_rewrite="            if (\$host = $desk_domain) {
+                rewrite ^ /pages/desk.html last;
+            }"
+fi
 
 validate_cgi_dir_value() {
   cgi_value=${1-}
@@ -247,7 +320,7 @@ http {
     server {
         listen $port;
         # Accept configured domain and any .onion address (for Tor hidden services)
-        server_name $domain *.onion;
+        server_name $server_names;
         
         root $SITE_DIR/build;
 
@@ -261,13 +334,40 @@ http {
         
         # Root path - serve main index page
         location = / {
-            try_files /pages/index.html =404;
+$desk_host_root_rewrite
+            try_files /pages/index.html /pages/blog.html =404;
+        }
+
+        # Artificer Web lives at /artificer while the temporary public host is
+        # desk.andersaamodt.com. Keep it from being swallowed by the Desk host
+        # catch-all rewrite.
+        location = /artificer {
+            try_files /pages/artificer.html =404;
+        }
+
+        location ^~ /artificer/ {
+            try_files /pages/artificer.html =404;
         }
 
         # Serve pretty post URLs directly via CGI so post pages render
         # in a single server response (no client-side route repair).
         location ~ ^/posts/([A-Za-z0-9-]+)/?$ {
             rewrite ^/posts/([A-Za-z0-9-]+)/?$ /cgi/blog-open-post?path=posts/\$1 last;
+        }
+
+        # Desk moved to desk.andersaamodt.com. Do not keep the retired
+        # canonical /desk mount alive or redirect it.
+        location ~ ^/desk(?:/.*)?$ {
+            return 404;
+        }
+
+        # Deep-link routing:
+        # - serve real files when they exist
+        # - map extensionless paths to /pages/<slug>.html
+        # - fall back to the blog shell for SPA-like routes
+        location / {
+$desk_host_path_rewrite
+            try_files \$uri \$uri/ /pages\$uri /pages\$uri.html /pages\$uri/index.html /pages/index.html /pages/blog.html;
         }
         
         # Serve pages
