@@ -113,7 +113,7 @@ if [ "$os_name" = "Darwin" ] && [ -x /usr/libexec/PlistBuddy ]; then
 fi
 
 apps=$(sh "$backend" list-apps "$test_root")
-printf '%s\n' "$apps" | awk -F'\t' '$1 == "artificer" { if ($2 != "Artificer (non-native)" || $5 != "web" || $7 != "optional") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+printf '%s\n' "$apps" | awk -F'\t' '$1 == "artificer-web" { if ($2 != "Artificer Web" || $5 != "web" || $7 != "optional") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
 printf '%s\n' "$apps" | awk -F'\t' '$1 == "artificer-native" { if ($2 != "Artificer" || $5 != "native-desktop" || $7 != "core") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
 printf '%s\n' "$apps" | grep -E '^forge\t' >/dev/null
 
@@ -277,11 +277,11 @@ if tr '\r' '\n' <"$scratch/forge-bad-root-hint.out" | grep -E '^forged=' >/dev/n
   exit 1
 fi
 remove_state="$scratch/remove-state"
-remove_app_cache="$remove_state/wizardry-apps/forge/catalog/apps/artificer"
+remove_app_cache="$remove_state/wizardry-apps/forge/catalog/apps/artificer-web"
 mkdir -p "$remove_app_cache/deep"
 printf '%s\n' "cached" >"$remove_app_cache/deep/file.txt"
-remove_app_out=$(XDG_STATE_HOME="$remove_state" sh "$backend" remove-downloaded-app "$scratch" artificer)
-printf '%s\n' "$remove_app_out" | grep -F "slug=artificer" >/dev/null
+remove_app_out=$(XDG_STATE_HOME="$remove_state" sh "$backend" remove-downloaded-app "$scratch" artificer-web)
+printf '%s\n' "$remove_app_out" | grep -F "slug=artificer-web" >/dev/null
 printf '%s\n' "$remove_app_out" | grep -F "removed=$remove_app_cache" >/dev/null
 if [ -e "$remove_app_cache" ] || [ -L "$remove_app_cache" ]; then
   printf '%s\n' "forge remove-downloaded-app left active app cache in place" >&2
@@ -300,16 +300,16 @@ if [ -e "$remove_template_cache" ] || [ -L "$remove_template_cache" ]; then
 fi
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main\rforged=1") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+jq '.apps |= map(if .slug == "artificer-web" then (.source.ref = "main\rforged=1") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
-app_status_injected=$(sh "$backend" app-status "$scratch" artificer)
+app_status_injected=$(sh "$backend" app-status "$scratch" artificer-web)
 if printf '%s\n' "$app_status_injected" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 2>&1; then
   printf '%s\n' "forge app-status emitted forged key-value output from manifest source ref" >&2
   exit 1
 fi
 printf '%s\n' "$app_status_injected" | grep -F "ref=main forged=1" >/dev/null
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.ref = "main") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+jq '.apps |= map(if .slug == "artificer-web" then (.source.ref = "main") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
@@ -326,15 +326,15 @@ jq '.templates |= map(if .slug == "blog" then (.source.ref = "main") else . end)
 mv "$tmp_manifest" "$scratch/runtime/config/templates.manifest.json"
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.subdir = "../escape") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+jq '.apps |= map(if .slug == "artificer-web" then (.source.subdir = "../escape") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
-if sh "$backend" download-app "$scratch" artificer >"$scratch/forge-bad-app-subdir.out" 2>"$scratch/forge-bad-app-subdir.err"; then
+if sh "$backend" download-app "$scratch" artificer-web >"$scratch/forge-bad-app-subdir.out" 2>"$scratch/forge-bad-app-subdir.err"; then
   printf '%s\n' "forge download-app accepted escaping source subdir" >&2
   exit 1
 fi
 grep -F "invalid source subdir" "$scratch/forge-bad-app-subdir.err" >/dev/null
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+jq '.apps |= map(if .slug == "artificer-web" then (.source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-template-manifest.XXXXXX")
@@ -359,9 +359,9 @@ mkdir -p "$source_repo_cr"
   git -c user.name=Forge -c user.email=forge@example.invalid commit -q -m init
 )
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq --arg repo "$source_repo_cr" '.apps |= map(if .slug == "artificer" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+jq --arg repo "$source_repo_cr" '.apps |= map(if .slug == "artificer-web" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
-if XDG_STATE_HOME="$scratch/bad-source-state" sh "$backend" download-app "$scratch" artificer >"$scratch/forge-bad-source-repo.out" 2>"$scratch/forge-bad-source-repo.err"; then
+if XDG_STATE_HOME="$scratch/bad-source-state" sh "$backend" download-app "$scratch" artificer-web >"$scratch/forge-bad-source-repo.out" 2>"$scratch/forge-bad-source-repo.err"; then
   printf '%s\n' "forge download-app accepted line-break source repo" >&2
   exit 1
 fi
@@ -383,19 +383,19 @@ printf '%s\n' "outside" >"$source_repo_outside/leaked.txt"
   git -c user.name=Forge -c user.email=forge@example.invalid commit -q -m init
 )
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq --arg repo "$source_repo_escape" '.apps |= map(if .slug == "artificer" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = "payload") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+jq --arg repo "$source_repo_escape" '.apps |= map(if .slug == "artificer-web" then (.source.repo = $repo | .source.ref = "HEAD" | .source.subdir = "payload") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
-if XDG_STATE_HOME="$scratch/escape-source-state" sh "$backend" download-app "$scratch" artificer >"$scratch/forge-escape-source-subdir.out" 2>"$scratch/forge-escape-source-subdir.err"; then
+if XDG_STATE_HOME="$scratch/escape-source-state" sh "$backend" download-app "$scratch" artificer-web >"$scratch/forge-escape-source-subdir.out" 2>"$scratch/forge-escape-source-subdir.err"; then
   printf '%s\n' "forge download-app accepted source subdir symlink escaping repo" >&2
   exit 1
 fi
 grep -F "source subdir must stay inside the cloned repo" "$scratch/forge-escape-source-subdir.err" >/dev/null
-if [ -e "$scratch/escape-source-state/wizardry-apps/forge/catalog/apps/artificer" ] || [ -L "$scratch/escape-source-state/wizardry-apps/forge/catalog/apps/artificer" ]; then
+if [ -e "$scratch/escape-source-state/wizardry-apps/forge/catalog/apps/artificer-web" ] || [ -L "$scratch/escape-source-state/wizardry-apps/forge/catalog/apps/artificer-web" ]; then
   printf '%s\n' "forge download-app left cache path for rejected source subdir" >&2
   exit 1
 fi
 tmp_manifest=$(mktemp "${TMPDIR:-/tmp}/forge-app-manifest.XXXXXX")
-jq '.apps |= map(if .slug == "artificer" then (.source.repo = "https://github.com/example/artificer.git" | .source.ref = "main" | .source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
+jq '.apps |= map(if .slug == "artificer-web" then (.source.repo = "https://github.com/example/artificer.git" | .source.ref = "main" | .source.subdir = ".") else . end)' "$scratch/runtime/config/apps.manifest.json" >"$tmp_manifest"
 mv "$tmp_manifest" "$scratch/runtime/config/apps.manifest.json"
 
 if sh "$backend" run-task "$scratch" "../escape-task" >/tmp/forge-invalid-run-task.out 2>/tmp/forge-invalid-run-task.err; then

@@ -240,7 +240,7 @@ esac
 [ -x "$macos_installed/Contents/MacOS/wizardry-host" ]
 
 # Behavior: app install detection assigns the native Artificer bundle to the
-# native built-in entry, not the non-native catalog app.
+# native built-in entry, not the web-only Artificer Web catalog app.
 mkdir -p "$test_home/Applications/Artificer.app/Contents"
 cat >"$test_home/Applications/Artificer.app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -258,14 +258,14 @@ native_artificer_status=$(
 }
 non_native_artificer_status=$(
   test_env FORGE_TEST_UNAME=Darwin sh "$backend" list-apps "$root" |
-    awk -F "$(printf '\t')" '$1 == "artificer" { print $11 "|" $12; exit }'
+    awk -F "$(printf '\t')" '$1 == "artificer-web" { print $11 "|" $12; exit }'
 )
 [ "$non_native_artificer_status" = "0|" ] || {
-  printf '%s\n' "native Artificer bundle was reported as non-native Artificer install: $non_native_artificer_status" >&2
+  printf '%s\n' "native Artificer bundle was reported as Artificer Web install: $non_native_artificer_status" >&2
   exit 1
 }
-mkdir -p "$test_home/Applications/Artificer (non-native).app/Contents"
-cat >"$test_home/Applications/Artificer (non-native).app/Contents/Info.plist" <<'PLIST'
+mkdir -p "$test_home/Applications/Artificer Web.app/Contents"
+cat >"$test_home/Applications/Artificer Web.app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>com.wizardry.apps.artificer.macos</string>
@@ -273,10 +273,10 @@ cat >"$test_home/Applications/Artificer (non-native).app/Contents/Info.plist" <<
 PLIST
 non_native_artificer_match_status=$(
   test_env FORGE_TEST_UNAME=Darwin sh "$backend" list-apps "$root" |
-    awk -F "$(printf '\t')" '$1 == "artificer" { print $11 "|" $12; exit }'
+    awk -F "$(printf '\t')" '$1 == "artificer-web" { print $11 "|" $12; exit }'
 )
-[ "$non_native_artificer_match_status" = "1|$test_home/Applications/Artificer (non-native).app" ] || {
-  printf '%s\n' "non-native Artificer bundle was not reported as installed: $non_native_artificer_match_status" >&2
+[ "$non_native_artificer_match_status" = "0|" ] || {
+  printf '%s\n' "web-only Artificer Web was reported as a desktop install: $non_native_artificer_match_status" >&2
   exit 1
 }
 

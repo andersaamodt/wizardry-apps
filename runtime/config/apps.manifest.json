@@ -2,8 +2,8 @@
   "schemaVersion": "1",
   "apps": [
     {
-      "slug": "artificer",
-      "name": "Artificer (non-native)",
+      "slug": "artificer-web",
+      "name": "Artificer Web",
       "production": false,
       "distribution": "optional",
       "source": {
@@ -13,14 +13,14 @@
       },
       "hostedWeb": {
         "mode": "external",
-        "path": "web/artificer"
+        "path": "web/artificer-web"
       },
       "bundleIds": {
         "macos": "com.wizardry.apps.artificer.macos",
         "ios": "com.wizardry.apps.artificer.ios",
         "android": "com.wizardry.apps.artificer.android"
       },
-      "targets": "hosted-web,linux,macos"
+      "targets": "hosted-web"
     },
     {
       "slug": "artificer-native",

@@ -731,6 +731,17 @@ targets_include_host() {
   host_target=$(host_catalog_target_id)
   [ -n "$host_target" ] || return 0
   case ",$targets," in
+    *,hosted-web,*) return 0 ;;
+    *,"$host_target",*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+targets_include_native_host() {
+  targets=${1-}
+  host_target=$(host_catalog_target_id)
+  [ -n "$host_target" ] || return 1
+  case ",$targets," in
     *,"$host_target",*) return 0 ;;
     *) return 1 ;;
   esac
@@ -2431,9 +2442,13 @@ cmd_list_apps() {
 
     targets_include_host "$targets" || continue
 
-    install_line=$(host_install_status_for_app "$root" "$slug" "$name")
-    host_installed=$(printf '%s\n' "$install_line" | cut -f1)
-    host_install_path=$(printf '%s\n' "$install_line" | cut -f2)
+    host_installed=0
+    host_install_path=''
+    if targets_include_native_host "$targets"; then
+      install_line=$(host_install_status_for_app "$root" "$slug" "$name")
+      host_installed=$(printf '%s\n' "$install_line" | cut -f1)
+      host_install_path=$(printf '%s\n' "$install_line" | cut -f2)
+    fi
     git_repo_present='no'
     git_status_label=''
     git_status_tone='muted'

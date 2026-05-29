@@ -4,8 +4,8 @@ set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 
-name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer)
-[ "$name" = "Artificer (non-native)" ]
+name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer-web)
+[ "$name" = "Artificer Web" ]
 
 native_name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer-native)
 [ "$native_name" = "Artificer" ]
@@ -13,7 +13,7 @@ native_name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer-native)
 forge_name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" forge)
 [ "$forge_name" = "App Forge" ]
 
-bundle_id=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer)
+bundle_id=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer-web)
 printf '%s' "$bundle_id" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'
 
 native_bundle_id=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" macos artificer-native)
@@ -48,21 +48,21 @@ mkdir -p "$bad_manifest_root/runtime/config" "$bad_manifest_root/apps" "$bad_man
 cp "$ROOT_DIR/runtime/config/templates.manifest.json" "$bad_manifest_root/runtime/config/templates.manifest.json"
 cp "$ROOT_DIR/runtime/config/apps.manifest.json" "$bad_manifest_root/runtime/config/apps.manifest.json"
 jq '.apps[0].name = "Bad\nName"' "$ROOT_DIR/runtime/config/apps.manifest.json" >"$bad_manifest_root/runtime/config/apps.manifest.json"
-if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer >"$tmp_dir/bad-app-name.out" 2>"$tmp_dir/bad-app-name.err"; then
+if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer-web >"$tmp_dir/bad-app-name.out" 2>"$tmp_dir/bad-app-name.err"; then
   printf '%s\n' "get-app-name accepted unsafe manifest app name" >&2
   exit 1
 fi
 grep -F "unsafe app name" "$tmp_dir/bad-app-name.err" >/dev/null
 
 jq '.apps[0].name = "Bad/../../Name"' "$ROOT_DIR/runtime/config/apps.manifest.json" >"$bad_manifest_root/runtime/config/apps.manifest.json"
-if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer >"$tmp_dir/bad-app-path-name.out" 2>"$tmp_dir/bad-app-path-name.err"; then
+if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-name.sh" artificer-web >"$tmp_dir/bad-app-path-name.out" 2>"$tmp_dir/bad-app-path-name.err"; then
   printf '%s\n' "get-app-name accepted path-shaped manifest app name" >&2
   exit 1
 fi
 grep -F "unsafe app name" "$tmp_dir/bad-app-path-name.err" >/dev/null
 
 jq '.apps[0].bundleIds.android = "com.example/../../bad"' "$ROOT_DIR/runtime/config/apps.manifest.json" >"$bad_manifest_root/runtime/config/apps.manifest.json"
-if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer >"$tmp_dir/bad-bundle-id.out" 2>"$tmp_dir/bad-bundle-id.err"; then
+if WIZARDRY_APPS_ROOT="$bad_manifest_root" sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer-web >"$tmp_dir/bad-bundle-id.out" 2>"$tmp_dir/bad-bundle-id.err"; then
   printf '%s\n' "get-app-bundle-id accepted unsafe manifest bundle id" >&2
   exit 1
 fi
