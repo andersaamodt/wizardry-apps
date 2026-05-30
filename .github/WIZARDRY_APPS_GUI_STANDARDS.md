@@ -62,6 +62,7 @@
 ## Visual Hierarchy Contract
 - Prefer visual hierarchy with spacing, typography, and separating lines over heavy frame-within-frame boxes.
 - Use separators and section headers to create structure before adding extra borders.
+- Do not use a "left border only" accent as the main treatment for panels, callouts, errors, empty states, or login gates; it reads as overwrought and distracting rather than refined.
 - Do not render UI labels in all caps and do not use `text-transform: uppercase` for section labels, controls, or status text.
 - Keep dense control groups compact, aligned, and scannable; avoid decorative wrappers that hide hierarchy.
 - Avoid stacking multiple decorative borders around the same logical group; one container boundary is usually enough.
