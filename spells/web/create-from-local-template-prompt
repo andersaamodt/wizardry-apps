@@ -1,0 +1,41 @@
+#!/bin/sh
+
+# Prompt for a local git template directory and create a site from it.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: create-from-local-template-prompt SITENAME
+
+Prompts for a local template path (defaults to ~/git/<name>) and creates a site.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+. env-clear
+
+site_name=${1-}
+if [ -z "$site_name" ]; then
+  die 2 "create-from-local-template-prompt: SITENAME required"
+fi
+
+printf 'Enter local template directory (or repo name under ~/git): '
+read -r template_input
+
+if [ -z "$template_input" ]; then
+  warn "create-from-local-template-prompt: no template entered"
+  exit 1
+fi
+
+case "$template_input" in
+  */*|~*)
+    template_path=$template_input
+    ;;
+  *)
+    template_path="$HOME/git/$template_input"
+    ;;
+esac
+
+create-from-local-template "$site_name" "$template_path"

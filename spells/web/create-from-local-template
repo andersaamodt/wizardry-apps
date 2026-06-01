@@ -1,0 +1,122 @@
+#!/bin/sh
+
+# Create a site from a local template directory.
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: create-from-local-template SITENAME TEMPLATE_PATH
+
+Creates a new site by copying a local template directory.
+Examples:
+  create-from-local-template hegemonicon.org ~/git/hegemonicon
+  create-from-local-template mysite /absolute/path/to/template
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+. env-clear
+
+site_name=${1-}
+template_path_raw=${2-}
+
+if [ -z "$site_name" ]; then
+  die 2 "create-from-local-template: SITENAME required"
+fi
+if [ -z "$template_path_raw" ]; then
+  die 2 "create-from-local-template: TEMPLATE_PATH required"
+fi
+
+case "$site_name" in
+  ""|*[!a-zA-Z0-9_.-]*)
+    die 2 "create-from-local-template: invalid site name"
+    ;;
+esac
+
+case "$template_path_raw" in
+  ~/*) template_path="$HOME/${template_path_raw#~/}" ;;
+  *) template_path="$template_path_raw" ;;
+esac
+
+template_path=$(cd "$template_path" 2>/dev/null && pwd -P) || die "create-from-local-template: template path not found: $template_path_raw"
+
+WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
+SITE_DIR="$WEB_ROOT/$site_name"
+
+if [ -d "$SITE_DIR" ]; then
+  die "create-from-local-template: site '$site_name' already exists"
+fi
+
+# If a repo root is provided, use common source directories when present.
+source_dir="$template_path"
+if [ -d "$template_path/site" ] || [ -d "$template_path/pages" ] || [ -d "$template_path/static" ] || [ -d "$template_path/includes" ]; then
+  source_dir="$template_path"
+elif [ -d "$template_path/template" ]; then
+  source_dir="$template_path/template"
+fi
+
+step "Creating site '$site_name' from local template '$template_path'..."
+mkdir -p "$SITE_DIR"
+# Copy template content while excluding VCS internals.
+(
+  cd "$source_dir"
+  tar -cf - --exclude=.git .
+) | (
+  cd "$SITE_DIR"
+  tar -xf -
+)
+
+# Normalize old template structure to site/ layout.
+if [ -d "$SITE_DIR/pages" ]; then
+  mkdir -p "$SITE_DIR/site"
+  mv "$SITE_DIR/pages" "$SITE_DIR/site/"
+fi
+if [ -d "$SITE_DIR/static" ]; then
+  [ -d "$SITE_DIR/site" ] || mkdir -p "$SITE_DIR/site"
+  mv "$SITE_DIR/static" "$SITE_DIR/site/"
+fi
+if [ -d "$SITE_DIR/includes" ]; then
+  [ -d "$SITE_DIR/site" ] || mkdir -p "$SITE_DIR/site"
+  mv "$SITE_DIR/includes" "$SITE_DIR/site/"
+fi
+
+mkdir -p "$SITE_DIR/site/uploads" "$SITE_DIR/build"
+
+if [ ! -f "$SITE_DIR/site.conf" ]; then
+  template_tag="local:$(basename "$template_path")"
+  cat > "$SITE_DIR/site.conf" <<EOC
+# Site configuration for $site_name
+site-name=$site_name
+site-user=
+template=$template_tag
+local-template=$template_path
+port=8080
+domain=localhost
+https=false
+EOC
+else
+  config-set "$SITE_DIR/site.conf" site-name "$site_name" || true
+  config-set "$SITE_DIR/site.conf" local-template "$template_path" || true
+fi
+
+if [ ! -f "$SITE_DIR/site.allowlist" ]; then
+  cat > "$SITE_DIR/site.allowlist" <<'EOC'
+# List additional absolute paths this site may access.
+# One path per line. Lines starting with # are ignored.
+EOC
+fi
+
+if [ "${WIZARDRY_TEST_HELPERS_ONLY:-0}" = "1" ]; then
+  info "Skipping fix-site-security in test mode"
+else
+  step "Securing site directories for $site_name"
+  if ! fix-site-security "$site_name"; then
+    warn "create-from-local-template: fix-site-security did not complete in this shell."
+    warn "Run manually in an interactive terminal: web-wizardry fix-site-security \"$site_name\""
+  fi
+fi
+
+success "Site '$site_name' created from local template"
+info "Site directory: $SITE_DIR"

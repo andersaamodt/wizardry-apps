@@ -42,11 +42,27 @@ fi
 
 # Template menu
 exit_label=$(exit-label)
+seen_templates=':'
+set --
+for template_root in "$WIZARDRY_DIR/templates/web" "$WIZARDRY_DIR/web"; do
+  [ -d "$template_root" ] || continue
+  for template_path in "$template_root"/*; do
+    [ -d "$template_path" ] || continue
+    template_name=$(basename "$template_path")
+    [ "$template_name" = ".themes" ] && continue
+    case "$template_name" in
+      ''|*[!a-zA-Z0-9_-]*) continue ;;
+    esac
+    case "$seen_templates" in
+      *:"$template_name":*) continue ;;
+    esac
+    seen_templates="${seen_templates}${template_name}:"
+    label=$(printf '%s' "$template_name" | tr '_' ' ' | tr '-' ' ')
+    set -- "$@" "${label}%create-from-template \"$site_name\" \"$template_name\""
+  done
+done
 
-set -- \
-  "Demo Site (Interactive CGI demos)%create-from-template \"$site_name\" demo && web-wizardry build \"$site_name\"" \
-  "Personal Blog (Content-addressable posts)%create-from-template \"$site_name\" blog && web-wizardry build \"$site_name\"" \
-  "${exit_label}%kill -TERM \$PPID"
+set -- "$@" "Local Git Template...%create-from-local-template-prompt \"$site_name\"" "${exit_label}%kill -TERM \$PPID"
 
 menu "${BOLD}${CYAN}Select Template for '$site_name'" "$@" || menu_status=$?
 menu_status=${menu_status:-0}
