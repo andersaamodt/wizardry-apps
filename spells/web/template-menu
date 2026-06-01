@@ -62,7 +62,7 @@ for template_root in "$WIZARDRY_DIR/templates/web" "$WIZARDRY_DIR/web"; do
   done
 done
 
-set -- "$@" "Local Git Template...%create-from-local-template-prompt \"$site_name\"" "${exit_label}%kill -TERM \$PPID"
+set -- "$@" "${exit_label}%kill -TERM \$PPID"
 
 menu "${BOLD}${CYAN}Select Template for '$site_name'" "$@" || menu_status=$?
 menu_status=${menu_status:-0}
