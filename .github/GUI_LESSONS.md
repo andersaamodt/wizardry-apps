@@ -95,6 +95,8 @@
 - Visual listbox highlights are not enough for robust keyboard behavior; keep `role=listbox` plus `role=option`/`aria-selected` and a synced `aria-activedescendant`.
 - Installed App Forge bundles embed their own `apps/forge` resources; repo-side UI fixes do not reach `/Applications/App Forge.app` until `install-forge` rebuilds and reinstalls the bundle.
 - When multiple macOS App Forge bundles share a bundle id, quit the stale running app before opening the rebuilt bundle; duplicate-launch handling will otherwise activate the old copy and exit the new one.
+- macOS duplicate-launch recovery should notify the existing instance for every app, not just tray-style apps; otherwise Forge can bounce a workspace app and exit the new process without surfacing the already-running window.
+- macOS reopen/duplicate-launch recovery must treat a minimized main window as hidden work and explicitly deminiaturize it; `hasVisibleWindows` alone is not enough to surface the app again.
 - macOS app installers should copy into a temporary bundle and swap it into place; overlay copies can leave stale sealed resources that break code-signature verification.
 - Forge self-restart must not replace the bundle it is currently running from; stage the rebuilt app elsewhere and open it only after the old host has quit.
 - Native Linux conversions should hydrate GTK lists and detail panes from the same structured backend snapshots as macOS; static generated IR rows are useful scaffolding, not feature parity.

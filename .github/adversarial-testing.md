@@ -52,6 +52,9 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - Generic bridge helpers such as help/about actions must map friendly targets to a fixed allowlist; do not execute an arbitrary argument with `--help`.
 - Menu-run and terminal-run paths must share one-line argument validation so an in-app run cannot accept values the terminal path rejects.
 - Busy/write actions must reject overlapping triggers so double-clicks cannot race profile writes, installs, icon generation, or release downloads.
+- Background job, daemon, and auto-refresh features need adversarial tests for crash, force-quit, early-cancel, and stale-lock paths; assert lease expiry, lock cleanup, and no surviving child/grandchild process roots.
+- Cancellation paths that track both wrapper and worker processes must persist and reap both identities; test the race where cancel fires before the inner worker PID is recorded.
+- Leak-closure work is not complete after one patch; run a fresh audit over timers, caches, temp artifacts, detached subprocesses, locks, and shutdown hooks to catch the next exposed leak class.
 
 ## GUI Adversarial Inputs
 - Try empty strings, whitespace-only strings, very long labels, quotes, angle brackets, ampersands, slashes, backslashes, leading hyphens, `..`, commas, and line breaks.
@@ -164,6 +167,7 @@ Use this when auditing Wizardry app backends, WebView bridges, release helpers, 
 - macOS app installers must stage and verify the new bundle before copying over an existing Applications bundle; never delete the installed app before the replacement copy succeeds.
 - macOS app bundle builders with explicit `--out` paths must copy and sign a staged bundle before moving aside an existing output bundle.
 - macOS app run flows must launch durable Applications bundles, not repo-local `_tmp` build bundles, because Dock pins to disposable paths become question marks after rebuild or cleanup.
+- macOS normal-run flows must force Launch Services to open the freshly prepared bundle path, because a stale installed bundle can share the same bundle identifier.
 - Explicit artifact paths passed to BSD tools should reject bare leading-dash basenames unless every downstream command uses `--`.
 - Bundle IDs rendered into plist or native project files need direct validation at each packaging entrypoint, not just manifest-derived paths.
 - App bundle names discovered inside downloaded release archives are remote metadata; reject CR/LF before deriving install paths or printing `installed=`.

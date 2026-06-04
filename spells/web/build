@@ -683,8 +683,8 @@ build_site() {
 
       htmx_header=$(temp-file htmx-header)
       cat > "$htmx_header" <<'HTMX_HEADER'
-<script src="/static/js/htmx.min.js"></script>
-<script src="/static/js/idiomorph-ext.min.js"></script>
+<script defer src="/static/js/htmx.min.js"></script>
+<script defer src="/static/js/idiomorph-ext.min.js"></script>
 HTMX_HEADER
 
       includes_dir="$SITE_DIR/site/includes"

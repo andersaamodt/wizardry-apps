@@ -58,6 +58,39 @@ stop_running_macos_forge() {
     pkill -f "/App Forge.app/Contents/MacOS/wizardry-host" >/dev/null 2>&1 || true
     pkill -f "/App Forge.app/Contents/MacOS/app-forge" >/dev/null 2>&1 || true
   fi
+  if command -v ps >/dev/null 2>&1; then
+    forge_pids=$(
+      ps -axo pid=,command= 2>/dev/null \
+        | awk '
+            index($0, "/App Forge.app/Contents/MacOS/wizardry-host") > 0 ||
+            index($0, "/App Forge.app/Contents/MacOS/app-forge") > 0 {
+              print $1
+            }
+          ' \
+        | tr '\n' ' ' \
+        | sed 's/[[:space:]]*$//'
+    )
+    if [ -n "$forge_pids" ]; then
+      # shellcheck disable=SC2086
+      kill $forge_pids >/dev/null 2>&1 || true
+      sleep 0.2
+    fi
+    stubborn_forge_pids=$(
+      ps -axo pid=,command= 2>/dev/null \
+        | awk '
+            index($0, "/App Forge.app/Contents/MacOS/wizardry-host") > 0 ||
+            index($0, "/App Forge.app/Contents/MacOS/app-forge") > 0 {
+              print $1
+            }
+          ' \
+        | tr '\n' ' ' \
+        | sed 's/[[:space:]]*$//'
+    )
+    if [ -n "$stubborn_forge_pids" ]; then
+      # shellcheck disable=SC2086
+      kill -9 $stubborn_forge_pids >/dev/null 2>&1 || true
+    fi
+  fi
 }
 
 config_root="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps"
@@ -72,8 +105,22 @@ mkdir -p "$state_dir"
 
 set +e
 if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
-  out=$("$root/tools/forge/install-forge" --root "$root" --user 2>&1)
-  status=$?
+  stop_running_macos_forge
+  installed_app=''
+  for candidate_app in "$HOME/Applications/App Forge.app" "/Applications/App Forge.app"; do
+    if [ -x "$candidate_app/Contents/MacOS/app-forge" ] && \
+       [ -x "$candidate_app/Contents/MacOS/wizardry-host" ]; then
+      installed_app=$candidate_app
+      break
+    fi
+  done
+  if [ -n "$installed_app" ]; then
+    out=$(printf 'installed_app=%s\nnote=using existing App Forge bundle\n' "$installed_app")
+    status=0
+  else
+    out=$("$root/tools/forge/install-forge" --root "$root" --user 2>&1)
+    status=$?
+  fi
   if [ "$status" -eq 0 ]; then
     installed_app=$(printf '%s\n' "$out" | sed -n 's/^installed_app=//p' | head -n 1)
     if [ -n "$installed_app" ] && [ -d "$installed_app" ] && command -v open >/dev/null 2>&1; then
@@ -82,6 +129,11 @@ if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
       open_status=$?
       if [ "$open_status" -eq 0 ]; then
         out=$(printf '%s\n%s\n' "$out" "opened_app=$installed_app")
+        printf '%s\n' "[$(date '+%Y-%m-%d %H:%M:%S')] launch root=$root status=0" >> "$log_file"
+        printf '%s\n' "$out" >> "$log_file"
+        printf '%s\n' "App Forge launched ($installed_app)"
+        printf '%s\n' "Launch log: $log_file"
+        exit 0
       else
         status=$open_status
         out=$(printf '%s\n%s\n' "$out" "launch-forge: failed to open installed app: $installed_app")

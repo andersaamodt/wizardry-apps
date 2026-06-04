@@ -184,6 +184,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)showMainWindow;
 - (void)openMainWindowFromStatusItem:(id)sender;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
+- (void)quitFromAppMenu:(id)sender;
 - (void)quitFromStatusItem:(id)sender;
 - (void)handleWorkspaceWillPowerOff:(NSNotification *)notification;
 - (BOOL)isSystemTerminationRequest;
@@ -1959,13 +1960,18 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return;
     }
     [self syncStonrActivationPolicy];
+    if ([self.window isMiniaturized]) {
+        [self.window deminiaturize:nil];
+    }
+    [NSApp unhide:nil];
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
+    [self syncStonrActivationPolicy];
     [self updateStatusItemVisibility];
 }
 
 - (void)syncStonrActivationPolicy {
-    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp]) {
+    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp] && ![self isBellheimApp]) {
         return;
     }
     BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
@@ -2006,9 +2012,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)handleDistributedShowWindowRequest:(NSNotification *)notification {
-    if (![self isStonrApp]) {
-        return;
-    }
     NSDictionary *info = [notification userInfo];
     NSString *slug = [info isKindOfClass:[NSDictionary class]] ? info[WizardryHostShowWindowSlugKey] : nil;
     if (slug.length > 0 && ![[slug lowercaseString] isEqualToString:[self.appSlug lowercaseString]]) {
@@ -2029,11 +2032,35 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     if ([self.window isVisible]) {
         [self.window orderOut:nil];
+        [NSApp hide:nil];
         [self syncStonrActivationPolicy];
         [self updateStatusItemVisibility];
         return;
     }
     [self showMainWindow];
+}
+
+- (void)quitFromAppMenu:(id)sender {
+    (void)sender;
+    [self syncBellheimBackgroundModeFromConfig];
+    if ((self.keepRunningInBackground || self.showStatusItem) && ![self isSystemTerminationRequest]) {
+        if (self.window) {
+            [self.window orderOut:nil];
+        }
+        [NSApp hide:nil];
+        [self syncStonrActivationPolicy];
+        [self updateStatusItemVisibility];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.window) {
+                [self.window orderOut:nil];
+            }
+            [NSApp hide:nil];
+            [self syncStonrActivationPolicy];
+            [self updateStatusItemVisibility];
+        });
+        return;
+    }
+    [NSApp terminate:nil];
 }
 
 - (void)quitFromStatusItem:(id)sender {
@@ -2846,7 +2873,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [appMenu addItem:[NSMenuItem separatorItem]];
 
     NSString *quitTitle = [NSString stringWithFormat:@"Quit %@", appName];
-    [appMenu addItemWithTitle:quitTitle action:@selector(terminate:) keyEquivalent:@"q"];
+    NSMenuItem *quitItem = [appMenu addItemWithTitle:quitTitle
+                                              action:@selector(quitFromAppMenu:)
+                                       keyEquivalent:@"q"];
+    [quitItem setTarget:self];
 
     [appMenuItem setSubmenu:appMenu];
 
@@ -3084,12 +3114,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         self.appSlug = @"stonr";
         appSlug = self.appSlug;
     }
-    if ([appSlug isEqualToString:@"stonr"]) {
-        [[NSDistributedNotificationCenter defaultCenter] addObserver:self
-                                                            selector:@selector(handleDistributedShowWindowRequest:)
-                                                                name:WizardryHostShowWindowNotification
-                                                              object:nil];
-    }
+    [[NSDistributedNotificationCenter defaultCenter] addObserver:self
+                                                        selector:@selector(handleDistributedShowWindowRequest:)
+                                                            name:WizardryHostShowWindowNotification
+                                                          object:nil];
     if ([self handleDuplicateLaunchByActivatingExistingInstance]) {
         return;
     }
@@ -4303,11 +4331,20 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return NSTerminateNow;
     }
     if (self.keepRunningInBackground || self.showStatusItem) {
-        if (self.window && [self.window isVisible]) {
+        if (self.window) {
             [self.window orderOut:nil];
         }
+        [NSApp hide:nil];
         [self syncStonrActivationPolicy];
         [self updateStatusItemVisibility];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.window) {
+                [self.window orderOut:nil];
+            }
+            [NSApp hide:nil];
+            [self syncStonrActivationPolicy];
+            [self updateStatusItemVisibility];
+        });
         return NSTerminateCancel;
     }
     return NSTerminateNow;
@@ -4315,7 +4352,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
     (void)sender;
-    if (!flag) {
+    if (!flag || (self.window && [self.window isMiniaturized])) {
         [self showMainWindow];
     }
     return YES;
@@ -4325,8 +4362,17 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [self syncBellheimBackgroundModeFromConfig];
     if ((self.keepRunningInBackground || self.showStatusItem) && sender == self.window) {
         [sender orderOut:nil];
+        [NSApp hide:nil];
         [self syncStonrActivationPolicy];
         [self updateStatusItemVisibility];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.window) {
+                [self.window orderOut:nil];
+            }
+            [NSApp hide:nil];
+            [self syncStonrActivationPolicy];
+            [self updateStatusItemVisibility];
+        });
         return NO;
     }
     return YES;

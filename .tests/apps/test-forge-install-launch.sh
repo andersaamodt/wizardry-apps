@@ -124,9 +124,24 @@ cat > "$launch_mac_bin/pkill" <<'SH'
 #!/bin/sh
 exit 0
 SH
+cat > "$launch_mac_bin/ps" <<'SH'
+#!/bin/sh
+[ -f "$FORGE_STALE_STOPPED" ] && exit 0
+printf '%s\n' '12345 /tmp/workbench/dist/macos/App Forge.app/Contents/MacOS/wizardry-host'
+SH
+cat > "$launch_mac_bin/kill" <<'SH'
+#!/bin/sh
+printf '%s\n' "$@" >> "$KILL_CAPTURE"
+case " $* " in
+  *" 12345 "*) : > "$FORGE_STALE_STOPPED" ;;
+esac
+exit 0
+SH
 chmod +x "$launch_mac_root/tools/forge/install-forge" "$launch_mac_bin/uname" "$launch_mac_bin/open" \
-  "$launch_mac_bin/osascript" "$launch_mac_bin/pkill"
+  "$launch_mac_bin/osascript" "$launch_mac_bin/pkill" "$launch_mac_bin/ps" "$launch_mac_bin/kill"
 OPEN_CAPTURE="$scratch/launch-open.out" \
+  KILL_CAPTURE="$scratch/launch-kill.out" \
+  FORGE_STALE_STOPPED="$scratch/launch-stale-stopped" \
   HOME="$launch_mac_home" \
   PATH="$launch_mac_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
   XDG_CONFIG_HOME="$scratch/launch-mac-config" \
@@ -135,6 +150,8 @@ OPEN_CAPTURE="$scratch/launch-open.out" \
 grep -Fx "App Forge launched ($launch_mac_app)" "$scratch/launch-mac.out" >/dev/null
 sed -n '1p' "$scratch/launch-open.out" | grep -Fx -- "-n" >/dev/null
 sed -n '2p' "$scratch/launch-open.out" | grep -Fx "$launch_mac_app" >/dev/null
+grep -Fx "12345" "$scratch/launch-kill.out" >/dev/null
+grep -Fx -- "-9" "$scratch/launch-kill.out" >/dev/null
 
 if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$scratch/Bad.app" --bundle-id 'com.example/../../bad' >"$scratch/bad-bundle.out" 2>"$scratch/bad-bundle.err"; then
   printf '%s\n' "build-forge-macos-app accepted invalid bundle id" >&2
