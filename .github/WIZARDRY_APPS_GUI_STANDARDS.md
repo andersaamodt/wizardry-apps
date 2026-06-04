@@ -58,6 +58,7 @@
 - Do not create one-edge button artifacts: avoid transparent/native borders on themed buttons, set `appearance: none` and `-webkit-appearance: none`, explicitly zero all physical and logical border sides when a button should be borderless, remove `border-image`, and clip painted backgrounds with `background-clip: padding-box`, `background-origin: padding-box`, and `clip-path: inset(0 round <radius>)`.
 - In Safari/WebKit, verify compact icon/text toolbar buttons visually; computed `border: 0` is not enough if a box shadow, inset highlight, native appearance, or unclipped background still paints a right-edge line.
 - For in-field icon helpers, reserve input padding so text never overlaps the icon hit target.
+- Never make weirdly tall text boxes; text inputs and textareas should use a normal, appropriate control height instead of oversized vertical padding with no clear purpose.
 - Keep both button styles keyboard focusable with obvious focus-visible states.
 
 ## Visual Hierarchy Contract
