@@ -2093,8 +2093,15 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         NSBezierPath *runningStone = [NSBezierPath bezierPathWithOvalInRect:runningRect];
         NSString *normalized = [[relayState ?: @"unknown" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (busy) {
-            [runningStone fill];
-            [[NSColor whiteColor] setFill];
+            BOOL relayStillRunning = [normalized isEqualToString:@"running"];
+            if (relayStillRunning) {
+                [runningStone fill];
+                [[NSColor whiteColor] setFill];
+            } else {
+                [stone setLineWidth:outlineStrokeWidth];
+                [stone stroke];
+                [[NSColor blackColor] setFill];
+            }
             CGFloat dotSide = MAX(2.0, floor(side * 0.16));
             NSRect dotRect = NSMakeRect(floor((side - dotSide) / 2.0), floor((side - dotSide) / 2.0), dotSide, dotSide);
             [[NSBezierPath bezierPathWithOvalInRect:dotRect] fill];

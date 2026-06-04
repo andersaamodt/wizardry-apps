@@ -38,6 +38,8 @@ fi
 grep -F '[self syncBellheimBackgroundModeFromConfig];' "$mac_host" >/dev/null
 grep -F 'NSVariableStatusItemLength' "$mac_host" >/dev/null
 grep -F 'setTemplate:YES' "$mac_host" >/dev/null
+grep -F 'BOOL relayStillRunning = [normalized isEqualToString:@"running"];' "$mac_host" >/dev/null
+grep -F 'if (relayStillRunning) {' "$mac_host" >/dev/null
 grep -F 'windowShouldClose:' "$mac_host" >/dev/null
 grep -F 'applicationShouldHandleReopen:' "$mac_host" >/dev/null
 awk '
