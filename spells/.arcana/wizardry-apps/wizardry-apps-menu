@@ -87,6 +87,9 @@ while true; do
     "Disable all mobile%$script_dir/toggle-all-wizardry-apps-mobile --disable" \
     "Mobile admin%$script_dir/wizardry-apps-mobile-admin" \
     "---" \
+    "Core runtime:" \
+    "Governed Work Kernel%$script_dir/../governed-work-kernel/governed-work-kernel-menu" \
+    "---" \
     "$all_toggle" \
     "$exit_item" || menu_status=$?
 

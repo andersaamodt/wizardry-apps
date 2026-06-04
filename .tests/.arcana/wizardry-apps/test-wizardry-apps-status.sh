@@ -24,6 +24,17 @@ test_wizardry_apps_status_section() {
   assert_output_contains "[ ] Android host pipeline" || return 1
 }
 
+test_wizardry_apps_status_core_runtime() {
+  tmp=$(make_tempdir)
+  trap 'rm -rf "$tmp"' EXIT INT TERM
+
+  XDG_DATA_HOME="$tmp/data" XDG_BIN_HOME="$tmp/bin" run_spell "spells/.arcana/wizardry-apps/wizardry-apps-status" --section core-runtime
+  assert_success || return 1
+  assert_output_contains "core-runtime" || return 1
+  assert_output_contains "[ ] Governed Work Kernel" || return 1
+}
+
 run_test_case "wizardry-apps-status shows help" test_wizardry_apps_status_help
 run_test_case "wizardry-apps-status reports section state" test_wizardry_apps_status_section
+run_test_case "wizardry-apps-status reports governed work kernel state" test_wizardry_apps_status_core_runtime
 finish_tests

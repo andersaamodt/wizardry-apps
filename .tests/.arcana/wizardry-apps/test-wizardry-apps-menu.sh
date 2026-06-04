@@ -27,6 +27,8 @@ test_wizardry_apps_menu_sections() {
   grep -q "Web:" "$tmp/menu.log" || { TEST_FAILURE_REASON="missing Web section"; return 1; }
   grep -q "Desktop:" "$tmp/menu.log" || { TEST_FAILURE_REASON="missing Desktop section"; return 1; }
   grep -q "Mobile:" "$tmp/menu.log" || { TEST_FAILURE_REASON="missing Mobile section"; return 1; }
+  grep -q "Core runtime:" "$tmp/menu.log" || { TEST_FAILURE_REASON="missing Core runtime section"; return 1; }
+  grep -q "Governed Work Kernel%" "$tmp/menu.log" || { TEST_FAILURE_REASON="missing Governed Work Kernel menu item"; return 1; }
   grep -q "Enable all web%" "$tmp/menu.log" || { TEST_FAILURE_REASON="missing web enable-all"; return 1; }
   grep -q "Disable all desktop%" "$tmp/menu.log" || { TEST_FAILURE_REASON="missing desktop disable-all"; return 1; }
   grep -q "Enable all mobile%" "$tmp/menu.log" || { TEST_FAILURE_REASON="missing mobile enable-all"; return 1; }

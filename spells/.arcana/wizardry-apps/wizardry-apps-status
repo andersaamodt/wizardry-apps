@@ -62,6 +62,14 @@ if [ -z "$section" ]; then
   print_desktop
   printf '---\n'
   print_mobile
+  printf '---\n'
+  printf 'core-runtime\n'
+  kernel_status_script="$script_dir/../governed-work-kernel/check-governed-work-kernel"
+  if [ -x "$kernel_status_script" ] && kernel_status=$("$kernel_status_script" 2>/dev/null | sed -n 's/^status=//p' | sed -n '1p') && [ "$kernel_status" = "ok" ]; then
+    printf '[X] Governed Work Kernel\n'
+  else
+    printf '[ ] Governed Work Kernel\n'
+  fi
   exit 0
 fi
 
@@ -69,6 +77,15 @@ case "$section" in
   web) print_web ;;
   desktop) print_desktop ;;
   mobile) print_mobile ;;
+  core|core-runtime)
+    printf 'core-runtime\n'
+    kernel_status_script="$script_dir/../governed-work-kernel/check-governed-work-kernel"
+    if [ -x "$kernel_status_script" ] && kernel_status=$("$kernel_status_script" 2>/dev/null | sed -n 's/^status=//p' | sed -n '1p') && [ "$kernel_status" = "ok" ]; then
+      printf '[X] Governed Work Kernel\n'
+    else
+      printf '[ ] Governed Work Kernel\n'
+    fi
+    ;;
   *)
     printf '%s\n' "wizardry-apps-status: unknown section '$section'" >&2
     exit 2

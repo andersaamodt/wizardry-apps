@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://wizardry.app/schemas/native-desktop-ir-v1.json",
   "title": "Wizardry Native Desktop IR v1",
+  "$comment": "Emission material: repo-internal Wizardry use follows OWL 3.1; generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.",
   "type": "object",
   "required": ["version", "format", "app", "extensions"],
   "properties": {

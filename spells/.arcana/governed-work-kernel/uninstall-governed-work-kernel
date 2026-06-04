@@ -1,0 +1,20 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: uninstall-governed-work-kernel
+
+Removes the Wizardry-installed Governed Work Kernel wrapper and source checkout.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+. "$script_dir/_kernel"
+
+rm -f "$(kernel_bin_path)"
+rm -rf "$(kernel_root)"
+say "Removed $kernel_name"

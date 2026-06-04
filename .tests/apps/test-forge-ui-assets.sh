@@ -9,6 +9,8 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 [ -f "$root/apps/forge/index.html" ]
 [ -f "$root/apps/forge/style.css" ]
 [ -f "$root/README.md" ]
+[ -f "$root/LICENSE" ]
+[ -f "$root/licenses/OWL-3.1.txt" ]
 [ -f "$root/licenses/AGPL-3.0-or-later.txt" ]
 [ -f "$root/licenses/WIZARDRY_ADDENDUM.md" ]
 [ -f "$root/templates/forge/web/sidebar/index.html" ]
@@ -98,6 +100,58 @@ grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/
 grep -F "territory-master.png" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "plain-master.png" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "templates/web/.themes" "$root/apps/.host/macos/main.m" >/dev/null
+
+grep -F "wizardry-apps Licensing" "$root/LICENSE" >/dev/null
+grep -F "Generic blank projects emitted by Forge are different." "$root/LICENSE" >/dev/null
+grep -F "intended to be sellable and hostable" "$root/LICENSE" >/dev/null
+grep -F "Open Wizardry License 3.1" "$root/LICENSE" >/dev/null
+grep -F "GNU AGPL-3.0-or-later with Wizardry Addendum 1.0" "$root/LICENSE" >/dev/null
+grep -F "OPEN WIZARDRY LICENSE 3.1" "$root/licenses/OWL-3.1.txt" >/dev/null
+grep -F "No Enclosure" "$root/licenses/OWL-3.1.txt" >/dev/null
+grep -F "root \`LICENSE\` as the public-facing licensing overview" "$root/.github/WIZARDRY_APPS_LICENSING.md" >/dev/null
+
+for emission_file in \
+  "$root/apps/.host/shared/wizardry-bridge.js" \
+  "$root/runtime/schemas/native-desktop-ir-v1.json" \
+  "$root/runtime/schemas/native-mobile-ir-v1.json" \
+  "$root/templates/forge/web/minimal/index.html" \
+  "$root/templates/forge/web/minimal/style.css" \
+  "$root/templates/forge/web/sidebar/index.html" \
+  "$root/templates/forge/web/sidebar/style.css" \
+  "$root/templates/forge/web/topbar/index.html" \
+  "$root/templates/forge/web/topbar/style.css" \
+  "$root/templates/forge/web/dashboard/index.html" \
+  "$root/templates/forge/web/dashboard/style.css" \
+  "$root/templates/forge/web/studio/index.html" \
+  "$root/templates/forge/web/studio/style.css" \
+  "$root/templates/forge/web/panel/index.html" \
+  "$root/templates/forge/web/panel/style.css" \
+  "$root/templates/forge/web/reference-app/index.html" \
+  "$root/templates/forge/web/reference-app/style.css" \
+  "$root/templates/forge/web/reference-app/script.js" \
+  "$root/templates/forge/web/reference-app/scripts/__APP_SLUG__-backend.sh" \
+  "$root/templates/forge/native-desktop/blank/app-blueprint/app.ir.yaml" \
+  "$root/templates/forge/native-desktop/reference-app/app-blueprint/app.ir.yaml" \
+  "$root/templates/forge/native-desktop/blank/scripts/render-native-desktop.sh" \
+  "$root/templates/forge/native-desktop/reference-app/scripts/render-native-desktop.sh" \
+  "$root/templates/forge/native-desktop/blank/scripts/validate-native-desktop-ir.sh" \
+  "$root/templates/forge/native-desktop/reference-app/scripts/validate-native-desktop-ir.sh" \
+  "$root/templates/forge/native-mobile/blank/app-blueprint/mobile.ir.yaml" \
+  "$root/templates/forge/native-mobile/reference-app/app-blueprint/mobile.ir.yaml" \
+  "$root/templates/forge/native-mobile/blank/scripts/render-native-mobile.sh" \
+  "$root/templates/forge/native-mobile/reference-app/scripts/render-native-mobile.sh" \
+  "$root/templates/forge/native-mobile/blank/scripts/validate-native-mobile-ir.sh" \
+  "$root/templates/forge/native-mobile/reference-app/scripts/validate-native-mobile-ir.sh"
+do
+  grep -F "OWL 3.1" "$emission_file" >/dev/null || {
+    printf '%s\n' "forge UI asset tests: emission material missing OWL notice: $emission_file" >&2
+    exit 1
+  }
+  grep -F "AGPL-3.0-or-later" "$emission_file" >/dev/null || {
+    printf '%s\n' "forge UI asset tests: emission material missing AGPL notice: $emission_file" >&2
+    exit 1
+  }
+done
 grep -F -- "--forge-boot-bg: var(--bg, #eceaf4);" "$root/apps/forge/style.css" >/dev/null
 grep -F -- "--forge-boot-bg: var(--bg, #eceaf4);" "$root/apps/forge/index.html" >/dev/null
 if grep -F "#edf2fa" "$root/apps/forge/style.css" "$root/apps/forge/index.html" "$root/apps/.host/macos/main.m" >/dev/null; then

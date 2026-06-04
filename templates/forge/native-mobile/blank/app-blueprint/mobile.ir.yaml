@@ -1,6 +1,7 @@
 {
   "version": "native-mobile-ir/v1",
   "format": "yaml-1.2-json-compatible",
+  "licenseNotice": "Emission material: repo-internal Wizardry use follows OWL 3.1; generated blank projects may use this file under AGPL-3.0-or-later with the Wizardry Addendum.",
   "app": {
     "id": "__APP_ID__",
     "name": "__APP_NAME__",

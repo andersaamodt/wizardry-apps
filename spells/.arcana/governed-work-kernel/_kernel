@@ -1,0 +1,188 @@
+#!/bin/sh
+
+set -eu
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}
+export PATH
+
+kernel_name='Governed Work Kernel'
+upstream_name='Earmark Hardened Kernel'
+upstream_url=${GOVERNED_WORK_KERNEL_SOURCE_URL:-https://github.com/Mikhail-Shakhnazarov/earmark-workspace}
+upstream_ref=${GOVERNED_WORK_KERNEL_REF:-main}
+
+say() {
+  printf '%s\n' "$1"
+}
+
+has_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+data_home() {
+  if [ -n "${XDG_DATA_HOME:-}" ]; then
+    printf '%s\n' "$XDG_DATA_HOME"
+  else
+    printf '%s\n' "${HOME:?}/.local/share"
+  fi
+}
+
+user_bin_dir() {
+  if [ -n "${XDG_BIN_HOME:-}" ]; then
+    printf '%s\n' "$XDG_BIN_HOME"
+  elif [ -d "${HOME:?}/.cargo/bin" ] && printf ':%s:' "${PATH:-}" | grep -F ":$HOME/.cargo/bin:" >/dev/null 2>&1; then
+    printf '%s\n' "$HOME/.cargo/bin"
+  elif [ -d "$HOME/.local/bin" ] && printf ':%s:' "${PATH:-}" | grep -F ":$HOME/.local/bin:" >/dev/null 2>&1; then
+    printf '%s\n' "$HOME/.local/bin"
+  else
+    printf '%s\n' "$HOME/.local/bin"
+  fi
+}
+
+kernel_root() {
+  if [ -n "${GOVERNED_WORK_KERNEL_HOME:-}" ]; then
+    printf '%s\n' "$GOVERNED_WORK_KERNEL_HOME"
+  else
+    printf '%s\n' "$(data_home)/wizardry-apps/governed-work-kernel"
+  fi
+}
+
+kernel_source_dir() {
+  printf '%s\n' "$(kernel_root)/source"
+}
+
+kernel_bin_path() {
+  printf '%s\n' "$(user_bin_dir)/governed-work-kernel"
+}
+
+kernel_license_file() {
+  printf '%s\n' "$(kernel_source_dir)/LICENSE"
+}
+
+kernel_build_stamp() {
+  printf '%s\n' "$(kernel_root)/build.stamp"
+}
+
+is_kernel_source_present() {
+  [ -f "$(kernel_source_dir)/Cargo.toml" ] && [ -f "$(kernel_source_dir)/LICENSE" ]
+}
+
+is_kernel_wrapper_present() {
+  [ -x "$(kernel_bin_path)" ]
+}
+
+is_kernel_installed() {
+  is_kernel_source_present && is_kernel_wrapper_present
+}
+
+print_kernel_status() {
+  if is_kernel_installed; then
+    printf 'status=installed\n'
+  else
+    printf 'status=missing\n'
+  fi
+  printf 'name=%s\n' "$kernel_name"
+  printf 'upstream=%s\n' "$upstream_name"
+  printf 'license=AGPL-3.0-or-later\n'
+  printf 'source_url=%s\n' "$upstream_url"
+  printf 'source_dir=%s\n' "$(kernel_source_dir)"
+  printf 'bin=%s\n' "$(kernel_bin_path)"
+  if [ -f "$(kernel_build_stamp)" ]; then
+    printf 'build_stamp=%s\n' "$(sed -n '1p' "$(kernel_build_stamp)")"
+  fi
+}
+
+write_kernel_wrapper() {
+  bin_dir=$(user_bin_dir)
+  bin_path=$(kernel_bin_path)
+  source_dir=$(kernel_source_dir)
+  mkdir -p "$bin_dir"
+  tmp_file=$(mktemp "${TMPDIR:-/tmp}/governed-work-kernel.XXXXXX")
+  cat >"$tmp_file" <<WRAPPER
+#!/bin/sh
+set -eu
+source_dir=\${GOVERNED_WORK_KERNEL_SOURCE_DIR:-$source_dir}
+
+case "\${1:-status}" in
+  --help|-h|help)
+    cat <<'USAGE'
+Usage: governed-work-kernel COMMAND [ARGS...]
+
+Commands:
+  status   Report installed source and license status.
+  source   Print the external source checkout path.
+  license  Print the upstream license text.
+  check    Run cargo check for the external kernel workspace.
+  test     Run cargo test for the external kernel workspace.
+  cargo    Run cargo in the external kernel workspace.
+
+This wrapper is Wizardry-owned glue. The kernel source it points at is external
+AGPL-3.0-or-later code and is not vendored into Wizardry or Artificer.
+USAGE
+    ;;
+  status)
+    printf 'status=%s\\n' installed
+    printf 'source_dir=%s\\n' "\$source_dir"
+    printf 'license=%s\\n' AGPL-3.0-or-later
+    ;;
+  source)
+    printf '%s\\n' "\$source_dir"
+    ;;
+  license)
+    sed -n '1,120p' "\$source_dir/LICENSE"
+    ;;
+  check)
+    cd "\$source_dir"
+    cargo check --workspace --exclude earmark-fuzz
+    ;;
+  test)
+    cd "\$source_dir"
+    cargo test --workspace --exclude earmark-fuzz
+    ;;
+  cargo)
+    shift
+    cd "\$source_dir"
+    cargo "\$@"
+    ;;
+  *)
+    printf '%s\\n' "governed-work-kernel: unknown command: \$1" >&2
+    exit 2
+    ;;
+esac
+WRAPPER
+  chmod 755 "$tmp_file"
+  mv "$tmp_file" "$bin_path"
+}
+
+clone_or_update_source() {
+  source_dir=$(kernel_source_dir)
+  mkdir -p "$(kernel_root)"
+  if [ -d "$source_dir/.git" ]; then
+    git -C "$source_dir" fetch origin >/dev/null
+    if [ -z "$(git -C "$source_dir" status --porcelain)" ]; then
+      git -C "$source_dir" checkout "$upstream_ref" >/dev/null 2>&1 || git -C "$source_dir" checkout -B "$upstream_ref" "origin/$upstream_ref" >/dev/null
+      git -C "$source_dir" pull --ff-only origin "$upstream_ref" >/dev/null 2>&1 || true
+    else
+      say "$kernel_name source has local changes; leaving checkout as-is."
+    fi
+  elif [ -e "$source_dir" ]; then
+    say "install-governed-work-kernel: source path exists but is not a git checkout: $source_dir" >&2
+    exit 1
+  else
+    git clone "$upstream_url" "$source_dir" >/dev/null
+    git -C "$source_dir" checkout "$upstream_ref" >/dev/null 2>&1 || true
+  fi
+}
+
+build_kernel_workspace() {
+  [ "${GOVERNED_WORK_KERNEL_SKIP_BUILD:-0}" = "1" ] && return 0
+  if ! has_cmd cargo; then
+    say "install-governed-work-kernel: cargo is required to compile $kernel_name." >&2
+    exit 1
+  fi
+  source_dir=$(kernel_source_dir)
+  (
+    cd "$source_dir"
+    cargo build --workspace --exclude earmark-fuzz
+  )
+  date -u +"%Y-%m-%dT%H:%M:%SZ" >"$(kernel_build_stamp)"
+}

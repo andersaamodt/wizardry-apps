@@ -1,27 +1,3 @@
-wizardry-apps Licensing
-
-The wizardry-apps repository, Forge itself, and built-in Wizardry apps are
-licensed under Open Wizardry License 3.1. See `licenses/OWL-3.1.txt`.
-
-Generic blank projects emitted by Forge are different. They are generated
-under GNU AGPL-3.0-or-later plus Wizardry Addendum 1.0. Those generated
-projects are intended to be sellable and hostable as long as the whole emitted
-app remains copyleft, complete corresponding source is made available, and the
-Wizardry name is not used in a way that implies endorsement, sponsorship,
-official status, or association.
-
-Emission material copied from this repository into those generated projects is
-available under either of these license paths:
-
-- Open Wizardry License 3.1
-- GNU AGPL-3.0-or-later with Wizardry Addendum 1.0
-
-The AGPL text used for generated projects is in
-`licenses/AGPL-3.0-or-later.txt`. The additional Wizardry branding terms are in
-`licenses/WIZARDRY_ADDENDUM.md`.
-
-Open Wizardry License 3.1
-
  ,___,   OPEN WIZARDRY LICENSE 3.1
  (O,O)
  /)  )   Permission: You may use, copy,

@@ -1,0 +1,30 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: check-governed-work-kernel
+
+Checks whether the external Governed Work Kernel dependency is installed.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+. "$script_dir/_kernel"
+
+if is_kernel_installed; then
+  printf 'status=ok\n'
+  printf 'summary=%s is installed as an external AGPL runtime dependency.\n' "$kernel_name"
+  printf 'bin=%s\n' "$(kernel_bin_path)"
+  printf 'source_dir=%s\n' "$(kernel_source_dir)"
+  exit 0
+fi
+
+printf 'status=bad\n'
+printf 'summary=%s is not installed.\n' "$kernel_name"
+printf 'license=AGPL-3.0-or-later\n'
+printf 'install=%s/install-governed-work-kernel\n' "$script_dir"
+exit 0
