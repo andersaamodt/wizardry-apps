@@ -54,6 +54,7 @@
 - Polite button style is a simple outlined button with rounded corners and a clear hover highlight.
 - Polite toggle buttons must stay visibly highlighted while toggled on.
 - Button hover and focus states must not move controls; change color, border, shadow, or opacity without translate/margin/position shifts.
+- Never use hover/focus/active `transform`, `translate`, `top`, `left`, or margin nudges on buttons, split-button halves, menu buttons, toolbar buttons, or icon controls.
 - Do not create one-edge button artifacts: avoid transparent/native borders on themed buttons, set `appearance: none` and `-webkit-appearance: none`, explicitly zero all physical and logical border sides when a button should be borderless, remove `border-image`, and clip painted backgrounds with `background-clip: padding-box`, `background-origin: padding-box`, and `clip-path: inset(0 round <radius>)`.
 - In Safari/WebKit, verify compact icon/text toolbar buttons visually; computed `border: 0` is not enough if a box shadow, inset highlight, native appearance, or unclipped background still paints a right-edge line.
 - For in-field icon helpers, reserve input padding so text never overlaps the icon hit target.
@@ -111,7 +112,7 @@
 - In split-pane grid/flex desktop layouts, constrain the main content track with `minmax(0, 1fr)` and set `min-height: 0` on intermediate panel containers so Safari/WebKit does not overflow panels downward and make content appear bottom-anchored.
 - In scrollable desktop panes, do not leave decorative gutter outside the scrollbar; if the pane is intended to reach the window edge, make the scroll track sit flush to that edge and keep content padding inside the scrolling area instead.
 - Validate GUI layout and interaction quality with Safari automations for desktop app surfaces when making GUI changes.
-- Validate startup (no flicker), focus states, hover states, and split-pane behavior in that QA pass.
+- Validate startup (no flicker), focus states, non-moving hover states, and split-pane behavior in that QA pass.
 - When validating startup for macOS desktop apps, explicitly check the very first visible frame for correct host background color and immediate icon presence, not just the later web splash state.
 
 ## Command and Bridge Rules
