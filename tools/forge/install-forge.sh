@@ -132,12 +132,12 @@ if [ -n "$app_dir" ]; then
   }
 fi
 
-if [ ! -x "$root/tools/forge/launch-forge" ] || [ ! -d "$root/apps/forge" ]; then
+if [ ! -f "$root/tools/forge/launch-forge.sh" ] || [ ! -d "$root/apps/forge" ]; then
   printf '%s\n' "install-forge: invalid wizardry-apps root: $root" >&2
   exit 1
 fi
 
-[ -x "$root/tools/forge/build-forge-macos-app" ] || {
+[ -f "$root/tools/forge/build-forge-macos-app.sh" ] || {
   printf '%s\n' "install-forge: missing build-forge-macos-app" >&2
   exit 1
 }
@@ -160,7 +160,7 @@ config_file="$config_root/forge-root"
 cat > "$shim" <<SHIM
 #!/bin/sh
 set -eu
-exec "$root/tools/forge/launch-forge" --root "$root" "\$@"
+exec sh "$root/tools/forge/launch-forge.sh" --root "$root" "\$@"
 SHIM
 chmod +x "$shim"
 
@@ -175,7 +175,7 @@ install_macos_bundle() {
   target_base=${target##*/}
   target_stage="$target_parent/.$target_base.install.$$"
 
-  if ! "$root/tools/forge/build-forge-macos-app" --root "$root" --out "$stage_bundle" >/dev/null 2>&1; then
+  if ! sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$stage_bundle" >/dev/null 2>&1; then
     rm -rf "$stage_root"
     return 1
   fi

@@ -117,8 +117,9 @@ ensure_macos_bundle_signature() {
 
 forge_bundle_input_hash() {
   {
-    printf 'v=2\n'
+    printf 'v=3\n'
     printf 'bundle_id=%s\n' "$bundle_id"
+    printf 'host_build_signature=%s\n' "$host_build_signature"
     printf 'host_src=%s\n' "$(hash_path_sha256 "$root/apps/.host/macos/main.m")"
     printf 'forge_app=%s\n' "$(hash_path_sha256 "$root/apps/forge")"
     printf 'themes=%s\n' "$(hash_path_sha256 "$root/templates/web/.themes")"
@@ -254,13 +255,18 @@ command -v clang >/dev/null 2>&1 || {
 cache_dir="$root/_tmp/forge-build-cache"
 host_src="$root/apps/.host/macos/main.m"
 host_bin="$cache_dir/wizardry-host-macos"
+host_flags_file="$cache_dir/wizardry-host-macos.flags"
+host_build_signature="macos-host-v2-frameworks=Cocoa,WebKit,Carbon"
 module_cache="$cache_dir/clang-module-cache"
 
 mkdir -p "$cache_dir" "$module_cache"
 
-if [ ! -x "$host_bin" ] || [ "$host_src" -nt "$host_bin" ]; then
+cached_host_build_signature=''
+[ ! -f "$host_flags_file" ] || cached_host_build_signature=$(head -n 1 "$host_flags_file" 2>/dev/null | tr -d '\r')
+if [ ! -x "$host_bin" ] || [ "$host_src" -nt "$host_bin" ] || [ "$cached_host_build_signature" != "$host_build_signature" ]; then
   CLANG_MODULE_CACHE_PATH="$module_cache" \
-    clang -O2 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit
+    clang -O2 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit -framework Carbon
+  printf '%s\n' "$host_build_signature" > "$host_flags_file"
 fi
 
 expected_hash=$(forge_bundle_input_hash)
@@ -345,7 +351,15 @@ APP
 chmod +x "$macos_dir/app-forge"
 
 icon_key=''
-if [ -f "$root/apps/forge/assets/icons/macos/forge.icns" ]; then
+resolved_icon="$stage_root/forge-icon.icns"
+if [ -f "$root/tools/forge/build-forge-icon.sh" ] \
+    && sh "$root/tools/forge/build-forge-icon.sh" --root "$root" --out "$resolved_icon" >/dev/null 2>&1 \
+    && [ -f "$resolved_icon" ]; then
+  icon_hash=$(hash_file_sha256 "$resolved_icon")
+  icon_name="forge-${icon_hash}.icns"
+  cp "$resolved_icon" "$resources_dir/$icon_name"
+  icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
+elif [ -f "$root/apps/forge/assets/icons/macos/forge.icns" ]; then
   icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/icons/macos/forge.icns")
   icon_name="forge-${icon_hash}.icns"
   cp "$root/apps/forge/assets/icons/macos/forge.icns" "$resources_dir/$icon_name"

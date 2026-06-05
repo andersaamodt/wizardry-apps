@@ -117,7 +117,7 @@ if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
     out=$(printf 'installed_app=%s\nnote=using existing App Forge bundle\n' "$installed_app")
     status=0
   else
-    out=$("$root/tools/forge/install-forge" --root "$root" --user 2>&1)
+    out=$(sh "$root/tools/forge/install-forge.sh" --root "$root" --user 2>&1)
     status=$?
   fi
   if [ "$status" -eq 0 ]; then

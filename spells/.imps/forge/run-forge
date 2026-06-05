@@ -4,4 +4,4 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd -P)
-exec "$ROOT_DIR/tools/forge/launch-forge" --root "$ROOT_DIR" "$@"
+exec sh "$ROOT_DIR/tools/forge/launch-forge.sh" --root "$ROOT_DIR" "$@"

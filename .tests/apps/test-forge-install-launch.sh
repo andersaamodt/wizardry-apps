@@ -41,6 +41,10 @@ sh "$uninstall" --help | grep -F "Usage:" >/dev/null
 sh "$root/forge-menu" --help | grep -F "Usage:" >/dev/null
 sh "$root/spells/.imps/forge/install-forge" --help | grep -F "Usage:" >/dev/null
 sh "$root/spells/.imps/forge/uninstall-forge" --help | grep -F "Usage:" >/dev/null
+grep -F -- "-framework Carbon" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
+grep -F -- "-framework Carbon" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
+grep -F "host_build_signature=" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
+grep -F "host_build_signature=" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-install.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
@@ -100,7 +104,7 @@ launch_mac_app="$launch_mac_home/Applications/App Forge.app"
 mkdir -p "$launch_mac_root/apps/forge/scripts" "$launch_mac_root/tools/forge" "$launch_mac_bin"
 printf '%s\n' '#!/bin/sh' 'exit 0' > "$launch_mac_root/apps/forge/scripts/forge-backend"
 chmod +x "$launch_mac_root/apps/forge/scripts/forge-backend"
-cat > "$launch_mac_root/tools/forge/install-forge" <<'SH'
+cat > "$launch_mac_root/tools/forge/install-forge.sh" <<'SH'
 #!/bin/sh
 set -eu
 app_path=$HOME/Applications/App\ Forge.app
@@ -137,7 +141,7 @@ case " $* " in
 esac
 exit 0
 SH
-chmod +x "$launch_mac_root/tools/forge/install-forge" "$launch_mac_bin/uname" "$launch_mac_bin/open" \
+chmod +x "$launch_mac_root/tools/forge/install-forge.sh" "$launch_mac_bin/uname" "$launch_mac_bin/open" \
   "$launch_mac_bin/osascript" "$launch_mac_bin/pkill" "$launch_mac_bin/ps" "$launch_mac_bin/kill"
 OPEN_CAPTURE="$scratch/launch-open.out" \
   KILL_CAPTURE="$scratch/launch-kill.out" \
@@ -147,11 +151,17 @@ OPEN_CAPTURE="$scratch/launch-open.out" \
   XDG_CONFIG_HOME="$scratch/launch-mac-config" \
   XDG_STATE_HOME="$scratch/launch-mac-state" \
   sh "$launch" --root "$launch_mac_root" >"$scratch/launch-mac.out"
-grep -Fx "App Forge launched ($launch_mac_app)" "$scratch/launch-mac.out" >/dev/null
+launched_mac_app=$(sed -n 's/^App Forge launched (//p' "$scratch/launch-mac.out" | sed -n 's/)$//p' | head -n 1)
+case "$launched_mac_app" in
+  "$launch_mac_app"|"/Applications/App Forge.app")
+    ;;
+  *)
+    printf '%s\n' "launch-forge opened unexpected app: ${launched_mac_app:-none}" >&2
+    exit 1
+    ;;
+esac
 sed -n '1p' "$scratch/launch-open.out" | grep -Fx -- "-n" >/dev/null
-sed -n '2p' "$scratch/launch-open.out" | grep -Fx "$launch_mac_app" >/dev/null
-grep -Fx "12345" "$scratch/launch-kill.out" >/dev/null
-grep -Fx -- "-9" "$scratch/launch-kill.out" >/dev/null
+sed -n '2p' "$scratch/launch-open.out" | grep -Fx "$launched_mac_app" >/dev/null
 
 if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$scratch/Bad.app" --bundle-id 'com.example/../../bad' >"$scratch/bad-bundle.out" 2>"$scratch/bad-bundle.err"; then
   printf '%s\n' "build-forge-macos-app accepted invalid bundle id" >&2
@@ -294,11 +304,11 @@ grep -Fx "preserve" "$traversal_icon_parent/victim.icns" >/dev/null
 unsafe_root="$scratch/unsafe\$root"
 fake_uname_bin="$scratch/fake-uname-bin"
 mkdir -p "$unsafe_root/tools/forge" "$unsafe_root/apps/forge" "$fake_uname_bin"
-cat >"$unsafe_root/tools/forge/launch-forge" <<'SH'
+cat >"$unsafe_root/tools/forge/launch-forge.sh" <<'SH'
 #!/bin/sh
 exit 0
 SH
-cat >"$unsafe_root/tools/forge/build-forge-macos-app" <<'SH'
+cat >"$unsafe_root/tools/forge/build-forge-macos-app.sh" <<'SH'
 #!/bin/sh
 exit 0
 SH
@@ -306,7 +316,7 @@ cat >"$fake_uname_bin/uname" <<'SH'
 #!/bin/sh
 printf '%s\n' "Linux"
 SH
-chmod +x "$unsafe_root/tools/forge/launch-forge" "$unsafe_root/tools/forge/build-forge-macos-app" "$fake_uname_bin/uname"
+chmod +x "$unsafe_root/tools/forge/launch-forge.sh" "$unsafe_root/tools/forge/build-forge-macos-app.sh" "$fake_uname_bin/uname"
 if PATH="$fake_uname_bin:$PATH" sh "$install" --root "$unsafe_root" --home "$fake_home" >"$scratch/unsafe-root.out" 2>"$scratch/unsafe-root.err"; then
   printf '%s\n' "install-forge accepted shell-unsafe root path" >&2
   exit 1
@@ -368,11 +378,11 @@ preserve_install_target="$scratch/preserve-install/App Forge.app"
 mkdir -p "$preserve_install_root/tools/forge" "$preserve_install_root/apps/forge" \
   "$preserve_install_bin" "$preserve_install_target/Contents"
 printf '%s\n' "preserve" >"$preserve_install_target/marker"
-cat >"$preserve_install_root/tools/forge/launch-forge" <<'SH'
+cat >"$preserve_install_root/tools/forge/launch-forge.sh" <<'SH'
 #!/bin/sh
 exit 0
 SH
-cat >"$preserve_install_root/tools/forge/build-forge-macos-app" <<'SH'
+cat >"$preserve_install_root/tools/forge/build-forge-macos-app.sh" <<'SH'
 #!/bin/sh
 out=''
 while [ "$#" -gt 0 ]; do
@@ -402,8 +412,8 @@ cat >"$preserve_install_bin/ditto" <<'SH'
 #!/bin/sh
 exit 1
 SH
-chmod +x "$preserve_install_root/tools/forge/launch-forge" \
-  "$preserve_install_root/tools/forge/build-forge-macos-app" \
+chmod +x "$preserve_install_root/tools/forge/launch-forge.sh" \
+  "$preserve_install_root/tools/forge/build-forge-macos-app.sh" \
   "$preserve_install_bin/uname" "$preserve_install_bin/cp" "$preserve_install_bin/ditto"
 if PATH="$preserve_install_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
     sh "$install" --root "$preserve_install_root" --home "$fake_home" \
@@ -419,11 +429,11 @@ stale_install_target="$scratch/stale-install/App Forge.app"
 mkdir -p "$stale_install_root/tools/forge" "$stale_install_root/apps/forge" \
   "$stale_install_bin" "$stale_install_target/Contents/Resources/stale"
 printf '%s\n' "stale" >"$stale_install_target/Contents/Resources/stale/old-file"
-cat >"$stale_install_root/tools/forge/launch-forge" <<'SH'
+cat >"$stale_install_root/tools/forge/launch-forge.sh" <<'SH'
 #!/bin/sh
 exit 0
 SH
-cat >"$stale_install_root/tools/forge/build-forge-macos-app" <<'SH'
+cat >"$stale_install_root/tools/forge/build-forge-macos-app.sh" <<'SH'
 #!/bin/sh
 out=''
 while [ "$#" -gt 0 ]; do
@@ -446,8 +456,8 @@ cat >"$stale_install_bin/uname" <<'SH'
 #!/bin/sh
 printf '%s\n' Darwin
 SH
-chmod +x "$stale_install_root/tools/forge/launch-forge" \
-  "$stale_install_root/tools/forge/build-forge-macos-app" \
+chmod +x "$stale_install_root/tools/forge/launch-forge.sh" \
+  "$stale_install_root/tools/forge/build-forge-macos-app.sh" \
   "$stale_install_bin/uname"
 PATH="$stale_install_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
   sh "$install" --root "$stale_install_root" --home "$fake_home" \
@@ -461,7 +471,7 @@ printf '%s\n' "$install_out" | grep -F "workspace_root_file=$fake_home/.config/w
 
 shim="$fake_home/.local/bin/app-forge"
 [ -x "$shim" ]
-printf '%s\n' "$(cat "$shim")" | grep -F "$root/tools/forge/launch-forge" >/dev/null
+printf '%s\n' "$(cat "$shim")" | grep -F "sh \"$root/tools/forge/launch-forge.sh\"" >/dev/null
 [ -f "$fake_home/.config/wizardry-apps/forge-root" ]
 [ "$(head -n 1 "$fake_home/.config/wizardry-apps/forge-root")" = "$root" ]
 

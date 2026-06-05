@@ -4,4 +4,4 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd -P)
-exec "$ROOT_DIR/tools/forge/uninstall-forge" "$@"
+exec sh "$ROOT_DIR/tools/forge/uninstall-forge.sh" "$@"
