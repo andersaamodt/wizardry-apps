@@ -5629,6 +5629,32 @@ write_project_icon_from_file() {
   printf 'status=updated\n'
 }
 
+sync_workspace_app_icon_assets() {
+  workspace_path=$1
+  workspace_app_dir="$workspace_path/app"
+  workspace_assets_dir="$workspace_path/assets"
+  workspace_app_assets_dir="$workspace_app_dir/assets"
+  workspace_icons_dir="$workspace_assets_dir/icons"
+  workspace_app_icons_dir="$workspace_app_assets_dir/icons"
+  workspace_icon_path="$workspace_assets_dir/forge-icon.png"
+  workspace_app_icon_path="$workspace_app_assets_dir/forge-icon.png"
+  workspace_app_legacy_icns_path="$workspace_app_assets_dir/forge.icns"
+
+  [ -f "$workspace_app_dir/index.html" ] || return 0
+
+  mkdir -p "$workspace_app_assets_dir"
+  rm -f "$workspace_app_icon_path" "$workspace_app_legacy_icns_path"
+  rm -rf "$workspace_app_icons_dir"
+
+  if [ -f "$workspace_icon_path" ]; then
+    cp "$workspace_icon_path" "$workspace_app_icon_path"
+  fi
+
+  if [ -d "$workspace_icons_dir" ]; then
+    cp -R "$workspace_icons_dir" "$workspace_app_assets_dir/"
+  fi
+}
+
 cmd_set_app_icon() {
   root=$(require_root "${1-}")
   slug=${2-}
@@ -5690,12 +5716,9 @@ cmd_set_workspace_icon() {
   reject_line_breaks "$workspace_path" "project path"
 
   write_project_icon_from_data_url "$workspace_path" "$data_url" "$shape_mode"
-  workspace_app_dir="$workspace_path/app"
-  if [ -f "$workspace_app_dir/index.html" ]; then
-    # Keep workspace root and nested app icon assets synchronized so runtime,
-    # splash, and bundle icon resolution cannot diverge.
-  write_project_icon_from_data_url "$workspace_app_dir" "$data_url" "$shape_mode" >/dev/null
-  fi
+  # Keep workspace root and nested app icon assets synchronized so runtime,
+  # splash, and bundle icon resolution cannot diverge.
+  sync_workspace_app_icon_assets "$workspace_path"
   sync_workspace_godot_icon_config_if_needed "$workspace_path"
   printf 'workspace=%s\n' "$workspace_path"
 }
@@ -5750,10 +5773,7 @@ cmd_set_workspace_icon_file() {
   reject_line_breaks "$workspace_path" "project path"
 
   write_project_icon_from_file "$workspace_path" "$image_path" "$shape_mode"
-  workspace_app_dir="$workspace_path/app"
-  if [ -f "$workspace_app_dir/index.html" ]; then
-    write_project_icon_from_file "$workspace_app_dir" "$image_path" "$shape_mode" >/dev/null
-  fi
+  sync_workspace_app_icon_assets "$workspace_path"
   sync_workspace_godot_icon_config_if_needed "$workspace_path"
   printf 'workspace=%s\n' "$workspace_path"
 }
@@ -5810,10 +5830,7 @@ cmd_regenerate_workspace_icon_assets() {
 
   root=$(require_root "${1-}")
   regenerate_project_icon_assets "$root" "$workspace_path" "$requested_mode"
-  workspace_app_dir="$workspace_path/app"
-  if [ -f "$workspace_app_dir/index.html" ]; then
-    regenerate_project_icon_assets "$root" "$workspace_app_dir" "$requested_mode"
-  fi
+  sync_workspace_app_icon_assets "$workspace_path"
   sync_workspace_godot_icon_config_if_needed "$workspace_path"
   printf 'icon=%s\n' "$workspace_path/assets/forge-icon.png"
   printf 'status=regenerated\n'

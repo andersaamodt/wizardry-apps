@@ -1192,6 +1192,32 @@ printf '%s\n' "$clear_workspace_icon_out" | grep -F "workspace=$renamed_workspac
 [ ! -f "$renamed_workspace/assets/forge-icon.png" ]
 [ ! -f "$renamed_workspace/app/assets/forge-icon.png" ]
 
+icon_stub_workspace="$scratch/workspaces/dictator"
+mkdir -p "$icon_stub_workspace/app"
+printf '%s\n' '<!doctype html><title>Dictator</title>' > "$icon_stub_workspace/app/index.html"
+icon_stub_bin="$scratch/icon-stub-bin"
+mkdir -p "$icon_stub_bin"
+icon_stub_log="$scratch/icon-sips.log"
+: > "$icon_stub_log"
+cat > "$icon_stub_bin/sips" <<'SH'
+#!/bin/sh
+set -eu
+if [ "\${1-}" = "-s" ] && [ "\${2-}" = "format" ] && [ "\${3-}" = "png" ] && [ "\${4-}" = "-z" ] && [ "\${5-}" = "1024" ] && [ "\${6-}" = "1024" ]; then
+  printf '%s\\n' "\$*" >>"\${ICON_STUB_LOG?missing ICON_STUB_LOG}"
+fi
+exec /usr/bin/sips "\$@"
+SH
+chmod +x "$icon_stub_bin/sips"
+ICON_STUB_LOG="$icon_stub_log" PATH="$icon_stub_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
+  /bin/sh "$backend" set-workspace-icon-file "$test_root" "$icon_stub_workspace" "$icon_seed" plain >/tmp/forge-workspace-icon-file.out
+icon_stub_calls=$(wc -l <"$icon_stub_log" | tr -d ' ')
+[ "$icon_stub_calls" = "1" ] || {
+  printf '%s\n' "forge backend test: workspace icon file update resized the dropped icon more than once" >&2
+  exit 1
+}
+[ -f "$icon_stub_workspace/assets/forge-icon.png" ]
+[ -f "$icon_stub_workspace/app/assets/forge-icon.png" ]
+
 icon_escape_workspace="$scratch/icon-escape"
 mkdir -p "$icon_escape_workspace/assets/icons/meta"
 printf '%s\n' "not an icon" > "$scratch/outside-original.png"
