@@ -108,8 +108,7 @@ if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
   stop_running_macos_forge
   installed_app=''
   for candidate_app in "$HOME/Applications/App Forge.app" "/Applications/App Forge.app"; do
-    if [ -x "$candidate_app/Contents/MacOS/app-forge" ] && \
-       [ -x "$candidate_app/Contents/MacOS/wizardry-host" ]; then
+    if [ -x "$candidate_app/Contents/MacOS/wizardry-host" ]; then
       installed_app=$candidate_app
       break
     fi

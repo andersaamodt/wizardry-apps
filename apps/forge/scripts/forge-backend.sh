@@ -3602,6 +3602,50 @@ workspace_git_repo_exists() {
   git -C "$workspace_path" rev-parse --is-inside-work-tree >/dev/null 2>&1
 }
 
+workspace_git_collect_list_status() {
+  workspace_path=${1-}
+  git_repo_present='no'
+  git_status_label=''
+  git_status_tone='muted'
+  git_status_reason=''
+  git_repo_private=''
+  git_release_available='no'
+
+  state_file=$(workspace_git_state_file "$workspace_path")
+
+  if [ -d "$workspace_path/.git" ] || [ -f "$workspace_path/.git" ]; then
+    git_repo_present='yes'
+  fi
+
+  if [ -f "$state_file" ]; then
+    git_status_label=$(workspace_git_cached_value_file "$state_file" git_status_label)
+    git_status_tone=$(workspace_git_cached_value_file "$state_file" git_status_tone)
+    git_status_reason=$(workspace_git_cached_value_file "$state_file" git_status_reason)
+    git_repo_private=$(workspace_git_cached_value_file "$state_file" repo_private)
+    git_release_available=$(workspace_git_cached_value_file "$state_file" release_available)
+  fi
+
+  case "$git_status_tone" in
+    muted|ok|working|bad) ;;
+    *) git_status_tone='muted' ;;
+  esac
+  case "$git_release_available" in
+    yes|no) ;;
+    *) git_release_available='no' ;;
+  esac
+  case "$git_repo_private" in
+    yes|no) ;;
+    *) git_repo_private='' ;;
+  esac
+
+  printf 'git_repo_present=%s\n' "$git_repo_present"
+  printf 'git_status_label=%s\n' "$(kv_output_value "$git_status_label")"
+  printf 'git_status_tone=%s\n' "$git_status_tone"
+  printf 'git_status_reason=%s\n' "$(kv_output_value "$git_status_reason")"
+  printf 'git_repo_private=%s\n' "$git_repo_private"
+  printf 'git_release_available=%s\n' "$git_release_available"
+}
+
 workspace_git_repo_root() {
   workspace_path=${1-}
   git -C "$workspace_path" rev-parse --show-toplevel 2>/dev/null || true
@@ -4158,7 +4202,9 @@ cmd_list_workspaces() {
         fi
         ;;
     esac
-    git_info=$(workspace_git_collect_status "$path" "auto" "0")
+    # Keep workspace enumeration responsive. Detailed git refreshes happen on
+    # the per-workspace status path, not during every full list pass.
+    git_info=$(workspace_git_collect_list_status "$path")
     git_repo_present=$(printf '%s\n' "$git_info" | kv_read git_repo_present)
     git_status_label=$(printf '%s\n' "$git_info" | kv_read git_status_label)
     git_status_tone=$(printf '%s\n' "$git_info" | kv_read git_status_tone)

@@ -269,7 +269,6 @@ root_file="$out_bundle/Contents/Resources/wizardry-apps-root.txt"
 plist_file="$out_bundle/Contents/Info.plist"
 
 if [ -d "$out_bundle" ] &&
-   [ -x "$out_bundle/Contents/MacOS/app-forge" ] &&
    [ -x "$out_bundle/Contents/MacOS/wizardry-host" ] &&
    [ -f "$hash_file" ] &&
    [ -f "$root_file" ] &&
@@ -346,34 +345,11 @@ APP
 chmod +x "$macos_dir/app-forge"
 
 icon_key=''
-if [ -x "$root/tools/forge/build-forge-icon" ]; then
-  built_icon_tmp="$stage_root/forge-icon-built.icns"
-  if "$root/tools/forge/build-forge-icon" --root "$root" --out "$built_icon_tmp" >/dev/null 2>&1; then
-    icon_hash=$(hash_file_sha256 "$built_icon_tmp")
-    icon_name="forge-${icon_hash}.icns"
-    cp "$built_icon_tmp" "$resources_dir/$icon_name"
-    icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
-  elif [ -f "$root/apps/forge/assets/icons/meta/apple-master.png" ]; then
-    icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/icons/meta/apple-master.png")
-    icon_name="forge-icon-${icon_hash}.png"
-    cp "$root/apps/forge/assets/icons/meta/apple-master.png" "$resources_dir/$icon_name"
-    icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
-  elif [ -f "$root/apps/forge/assets/forge-icon.png" ]; then
-    icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/forge-icon.png")
-    icon_name="forge-icon-${icon_hash}.png"
-    cp "$root/apps/forge/assets/forge-icon.png" "$resources_dir/$icon_name"
-    icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
-  elif [ -f "$root/apps/forge/assets/icons/macos/forge.icns" ]; then
-    icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/icons/macos/forge.icns")
-    icon_name="forge-${icon_hash}.icns"
-    cp "$root/apps/forge/assets/icons/macos/forge.icns" "$resources_dir/$icon_name"
-    icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
-  elif [ -f "$root/apps/forge/assets/icons/meta/territory-master.png" ]; then
-    icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/icons/meta/territory-master.png")
-    icon_name="forge-icon-${icon_hash}.png"
-    cp "$root/apps/forge/assets/icons/meta/territory-master.png" "$resources_dir/$icon_name"
-    icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
-  fi
+if [ -f "$root/apps/forge/assets/icons/macos/forge.icns" ]; then
+  icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/icons/macos/forge.icns")
+  icon_name="forge-${icon_hash}.icns"
+  cp "$root/apps/forge/assets/icons/macos/forge.icns" "$resources_dir/$icon_name"
+  icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
 elif [ -f "$root/apps/forge/assets/icons/meta/apple-master.png" ]; then
   icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/icons/meta/apple-master.png")
   icon_name="forge-icon-${icon_hash}.png"
@@ -384,11 +360,6 @@ elif [ -f "$root/apps/forge/assets/forge-icon.png" ]; then
   icon_name="forge-icon-${icon_hash}.png"
   cp "$root/apps/forge/assets/forge-icon.png" "$resources_dir/$icon_name"
   icon_key="<key>CFBundleIconFile</key><string>$icon_name</string>"
-elif [ -f "$root/apps/forge/assets/icons/macos/forge.icns" ]; then
-  icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/icons/macos/forge.icns")
-  icon_name="forge-${icon_hash}.icns"
-  cp "$root/apps/forge/assets/icons/macos/forge.icns" "$resources_dir/$icon_name"
-  icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
 elif [ -f "$root/apps/forge/assets/icons/meta/territory-master.png" ]; then
   icon_hash=$(hash_file_sha256 "$root/apps/forge/assets/icons/meta/territory-master.png")
   icon_name="forge-icon-${icon_hash}.png"
@@ -408,7 +379,8 @@ cat > "$plist" <<PLIST
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
 <key>CFBundleVersion</key><string>$bundle_version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleExecutable</key><string>app-forge</string>
+<key>CFBundleExecutable</key><string>wizardry-host</string>
+<key>WizardryAppEntry</key><string>Resources/forge</string>
 $icon_key
 </dict></plist>
 PLIST
