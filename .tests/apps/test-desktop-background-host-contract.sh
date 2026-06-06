@@ -20,6 +20,7 @@ grep -F 'renderedStatusItemImage' "$mac_host" >/dev/null
 grep -F 'isMatchbookApp' "$mac_host" >/dev/null
 grep -F 'isBellheimApp' "$mac_host" >/dev/null
 grep -F 'isHeadquartersApp' "$mac_host" >/dev/null
+grep -F '[slug isEqualToString:@"artificer-native"]' "$mac_host" >/dev/null
 grep -F 'Bellheim is running in background' "$mac_host" >/dev/null
 grep -F 'Headquarters is running in background' "$mac_host" >/dev/null
 grep -F 'clapperRadius' "$mac_host" >/dev/null
@@ -31,6 +32,7 @@ grep -F 'Hide Headquarters' "$mac_host" >/dev/null
 grep -F 'Open Headquarters' "$mac_host" >/dev/null
 grep -F 'backgroundMode' "$mac_host" >/dev/null
 grep -F 'syncBellheimBackgroundModeFromConfig' "$mac_host" >/dev/null
+grep -F 'self.appSlug = @"artificer";' "$mac_host" >/dev/null
 grep -F 'NSWorkspaceWillPowerOffNotification' "$mac_host" >/dev/null
 grep -F 'isSystemTerminationRequest' "$mac_host" >/dev/null
 grep -F 'kAEQuitReason' "$mac_host" >/dev/null

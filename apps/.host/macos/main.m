@@ -1682,7 +1682,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (BOOL)isArtificerApp {
     NSString *slug = [[[self.appSlug ?: @"" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
-    return [slug isEqualToString:@"artificer"];
+    return [slug isEqualToString:@"artificer"] || [slug isEqualToString:@"artificer-native"];
 }
 
 - (BOOL)isMatchbookApp {
@@ -3279,6 +3279,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     self.appSlug = appSlug;
     if ([self isStonrApp]) {
         self.appSlug = @"stonr";
+        appSlug = self.appSlug;
+    } else if ([self isArtificerApp]) {
+        // Native Artificer bundles stage the app under Resources/artificer-native,
+        // but the host-level prefs, menu-bar behavior, and boot styling all key off
+        // the canonical Artificer slug.
+        self.appSlug = @"artificer";
         appSlug = self.appSlug;
     }
     [[NSDistributedNotificationCenter defaultCenter] addObserver:self
