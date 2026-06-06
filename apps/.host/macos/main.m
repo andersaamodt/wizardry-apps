@@ -181,6 +181,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)handleDistributedShowWindowRequest:(NSNotification *)notification;
 - (void)syncStonrActivationPolicy;
 - (BOOL)syncBellheimBackgroundModeFromConfig;
+- (BOOL)syncHeadquartersBackgroundModeFromConfig;
 - (void)showMainWindow;
 - (void)openMainWindowFromStatusItem:(id)sender;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
@@ -192,6 +193,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (BOOL)isArtificerApp;
 - (BOOL)isMatchbookApp;
 - (BOOL)isBellheimApp;
+- (BOOL)isHeadquartersApp;
 - (NSString *)stonrBackendScriptPath;
 - (NSString *)matchbookPrefsPath;
 - (NSDictionary<NSString *, NSString *> *)dictionaryFromKeyValueBlob:(NSString *)blob;
@@ -1692,6 +1694,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return [slug isEqualToString:@"bellheim"];
 }
 
+- (BOOL)isHeadquartersApp {
+    NSString *slug = [[[self.appSlug ?: @"" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+    return [slug isEqualToString:@"headquarters"];
+}
+
 - (BOOL)syncBellheimBackgroundModeFromConfig {
     if (![self isBellheimApp]) {
         return NO;
@@ -1714,6 +1721,47 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return YES;
     }
     return NO;
+}
+
+- (BOOL)syncHeadquartersBackgroundModeFromConfig {
+    if (![self isHeadquartersApp]) {
+        return NO;
+    }
+    NSString *xdgConfig = [[[NSProcessInfo processInfo] environment] objectForKey:@"XDG_CONFIG_HOME"];
+    NSString *configRoot = xdgConfig.length > 0 ? xdgConfig : [NSHomeDirectory() stringByAppendingPathComponent:@".config"];
+    NSString *prefsPath = [[[[configRoot stringByAppendingPathComponent:@"wizardry-apps"] stringByAppendingPathComponent:@"headquarters"] stringByAppendingPathComponent:@"ui-prefs.tsv"] copy];
+    NSString *content = [NSString stringWithContentsOfFile:prefsPath encoding:NSUTF8StringEncoding error:nil];
+    if (!content.length) {
+        return NO;
+    }
+    BOOL foundBackground = NO;
+    BOOL foundStatusItem = NO;
+    BOOL keepRunning = NO;
+    BOOL showStatusItem = NO;
+    NSArray<NSString *> *lines = [content componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+    for (NSString *line in lines) {
+        NSRange delimiter = [line rangeOfString:@"\t"];
+        if (delimiter.location == NSNotFound || delimiter.location == 0) {
+            continue;
+        }
+        NSString *key = [[line substringToIndex:delimiter.location] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *value = [[[line substringFromIndex:(delimiter.location + 1)] lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        BOOL truthy = [@[@"1", @"true", @"yes", @"on"] containsObject:value];
+        if ([key isEqualToString:@"desktop_background_mode"]) {
+            foundBackground = YES;
+            keepRunning = truthy;
+        } else if ([key isEqualToString:@"desktop_menu_bar_icon"]) {
+            foundStatusItem = YES;
+            showStatusItem = truthy;
+        }
+    }
+    if (!foundBackground && !foundStatusItem) {
+        return NO;
+    }
+    BOOL enabled = keepRunning || showStatusItem;
+    self.keepRunningInBackground = enabled;
+    self.showStatusItem = enabled;
+    return enabled;
 }
 
 - (NSString *)stonrBackendScriptPath {
@@ -1971,7 +2019,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)syncStonrActivationPolicy {
-    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp] && ![self isBellheimApp]) {
+    if (![self isStonrApp] && ![self isArtificerApp] && ![self isMatchbookApp] && ![self isBellheimApp] && ![self isHeadquartersApp]) {
         return;
     }
     BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
@@ -2043,6 +2091,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (void)quitFromAppMenu:(id)sender {
     (void)sender;
     [self syncBellheimBackgroundModeFromConfig];
+    [self syncHeadquartersBackgroundModeFromConfig];
     if ((self.keepRunningInBackground || self.showStatusItem) && ![self isSystemTerminationRequest]) {
         if (self.window) {
             [self.window orderOut:nil];
@@ -2380,6 +2429,60 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                 [slash stroke];
             }
         }
+    } else if ([self isHeadquartersApp]) {
+        CGFloat inset = MAX(1.0, floor(side * 0.10));
+        CGFloat boardSide = side - inset * 2.0;
+        CGFloat boardMinX = inset;
+        CGFloat boardMinY = inset;
+        CGFloat boardMaxX = boardMinX + boardSide;
+        CGFloat boardMaxY = boardMinY + boardSide;
+        CGFloat cornerSquareSide = MAX(1.7, floor(side * 0.11));
+        CGFloat pawnCenterX = floor(side * 0.5);
+        CGFloat pawnHeadRadius = MAX(1.6, floor(side * 0.10));
+        CGFloat pawnHeadCenterY = boardMinY + boardSide * 0.63;
+        CGFloat pawnBodyTopY = pawnHeadCenterY - pawnHeadRadius * 0.92;
+        CGFloat pawnShoulderY = boardMinY + boardSide * 0.42;
+        CGFloat pawnBaseY = boardMinY + boardSide * 0.20;
+        CGFloat pawnFootWidth = boardSide * 0.34;
+        CGFloat pawnStemHalfWidth = MAX(1.0, floor(side * 0.06));
+
+        [[NSColor blackColor] setStroke];
+        [[NSColor blackColor] setFill];
+
+        NSBezierPath *board = [NSBezierPath bezierPathWithRect:NSMakeRect(boardMinX, boardMinY, boardSide, boardSide)];
+        [board setLineWidth:MAX(1.2, floor(side * 0.075))];
+        [board stroke];
+
+        NSArray<NSValue *> *cornerSquares = @[
+            [NSValue valueWithRect:NSMakeRect(boardMinX - cornerSquareSide * 0.35, boardMaxY - cornerSquareSide * 0.65, cornerSquareSide, cornerSquareSide)],
+            [NSValue valueWithRect:NSMakeRect(boardMaxX - cornerSquareSide * 0.65, boardMaxY - cornerSquareSide * 0.65, cornerSquareSide, cornerSquareSide)],
+            [NSValue valueWithRect:NSMakeRect(boardMinX - cornerSquareSide * 0.35, boardMinY - cornerSquareSide * 0.35, cornerSquareSide, cornerSquareSide)],
+            [NSValue valueWithRect:NSMakeRect(boardMaxX - cornerSquareSide * 0.65, boardMinY - cornerSquareSide * 0.35, cornerSquareSide, cornerSquareSide)]
+        ];
+        for (NSValue *value in cornerSquares) {
+            [[NSBezierPath bezierPathWithRect:[value rectValue]] fill];
+        }
+
+        [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(pawnCenterX - pawnHeadRadius,
+                                                           pawnHeadCenterY - pawnHeadRadius,
+                                                           pawnHeadRadius * 2.0,
+                                                           pawnHeadRadius * 2.0)] fill];
+
+        NSBezierPath *pawn = [NSBezierPath bezierPath];
+        [pawn moveToPoint:NSMakePoint(pawnCenterX, pawnBodyTopY)];
+        [pawn curveToPoint:NSMakePoint(pawnCenterX + boardSide * 0.16, pawnShoulderY)
+             controlPoint1:NSMakePoint(pawnCenterX + boardSide * 0.10, pawnBodyTopY - side * 0.03)
+             controlPoint2:NSMakePoint(pawnCenterX + boardSide * 0.17, pawnBodyTopY - side * 0.10)];
+        [pawn lineToPoint:NSMakePoint(pawnCenterX + pawnStemHalfWidth, pawnBaseY + side * 0.07)];
+        [pawn lineToPoint:NSMakePoint(pawnCenterX + pawnFootWidth * 0.5, pawnBaseY)];
+        [pawn lineToPoint:NSMakePoint(pawnCenterX - pawnFootWidth * 0.5, pawnBaseY)];
+        [pawn lineToPoint:NSMakePoint(pawnCenterX - pawnStemHalfWidth, pawnBaseY + side * 0.07)];
+        [pawn lineToPoint:NSMakePoint(pawnCenterX - boardSide * 0.16, pawnShoulderY)];
+        [pawn curveToPoint:NSMakePoint(pawnCenterX, pawnBodyTopY)
+             controlPoint1:NSMakePoint(pawnCenterX - boardSide * 0.17, pawnBodyTopY - side * 0.10)
+             controlPoint2:NSMakePoint(pawnCenterX - boardSide * 0.10, pawnBodyTopY - side * 0.03)];
+        [pawn closePath];
+        [pawn fill];
     } else if ([self isBellheimApp]) {
         CGFloat inset = MAX(0.5, floor(side * 0.04));
         CGFloat minX = inset;
@@ -2527,6 +2630,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             button.image = [self renderedStatusItemImageForRelayState:@"running" busy:NO];
             button.imagePosition = NSImageOnly;
             button.toolTip = @"Bellheim is running in background";
+        } else if ([self isHeadquartersApp]) {
+            button.title = @"";
+            button.image = [self renderedStatusItemImageForRelayState:@"running" busy:NO];
+            button.imagePosition = NSImageOnly;
+            button.toolTip = @"Headquarters is running in background";
         } else {
             button.image = nil;
             button.title = @"St";
@@ -2536,7 +2644,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     } else {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        self.statusItem.title = ([self isStonrApp] || [self isArtificerApp] || [self isMatchbookApp] || [self isBellheimApp]) ? @"" : @"St";
+        self.statusItem.title = ([self isStonrApp] || [self isArtificerApp] || [self isMatchbookApp] || [self isBellheimApp] || [self isHeadquartersApp]) ? @"" : @"St";
 #pragma clang diagnostic pop
     }
 
@@ -2714,6 +2822,8 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         NSString *toggleTitle = [self.window isVisible] ? @"Hide Window" : @"Show Window";
         if ([self isBellheimApp]) {
             toggleTitle = [self.window isVisible] ? @"Hide Bellheim" : @"Open Bellheim";
+        } else if ([self isHeadquartersApp]) {
+            toggleTitle = [self.window isVisible] ? @"Hide Headquarters" : @"Open Headquarters";
         }
         NSMenuItem *toggleItem = [[NSMenuItem alloc] initWithTitle:toggleTitle
                                                             action:@selector(toggleMainWindowFromStatusItem:)
@@ -3175,6 +3285,8 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
     } else if ([appSlug isEqualToString:@"bellheim"]) {
         [self syncBellheimBackgroundModeFromConfig];
+    } else if ([appSlug isEqualToString:@"headquarters"]) {
+        [self syncHeadquartersBackgroundModeFromConfig];
     }
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];
@@ -4320,6 +4432,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     (void)sender;
     [self syncBellheimBackgroundModeFromConfig];
+    [self syncHeadquartersBackgroundModeFromConfig];
     [self syncStonrActivationPolicy];
     return !(self.keepRunningInBackground || self.showStatusItem);
 }
@@ -4327,6 +4440,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     (void)sender;
     [self syncBellheimBackgroundModeFromConfig];
+    [self syncHeadquartersBackgroundModeFromConfig];
     if (self.explicitQuitRequested || [self isSystemTerminationRequest]) {
         return NSTerminateNow;
     }
@@ -4360,6 +4474,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (BOOL)windowShouldClose:(NSWindow *)sender {
     [self syncBellheimBackgroundModeFromConfig];
+    [self syncHeadquartersBackgroundModeFromConfig];
     if ((self.keepRunningInBackground || self.showStatusItem) && sender == self.window) {
         [sender orderOut:nil];
         [NSApp hide:nil];
