@@ -3823,6 +3823,18 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [NSApp unhide:nil];
         [NSApp activateIgnoringOtherApps:YES];
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            // Start-at-login launches can switch into accessory/tray mode before
+            // this delayed activation runs. Forcing main-window promotion after
+            // that transition trips AppKit assertions on macOS 26.
+            BOOL foregroundWindowReassertionAllowed =
+                self.window &&
+                [self.window isVisible] &&
+                ![NSApp isHidden] &&
+                [NSApp activationPolicy] == NSApplicationActivationPolicyRegular &&
+                !self.keepRunningInBackground;
+            if (!foregroundWindowReassertionAllowed) {
+                return;
+            }
             [self.window makeMainWindow];
             [self.window makeKeyAndOrderFront:nil];
             [self.window orderFrontRegardless];
