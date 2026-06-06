@@ -175,6 +175,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem;
 - (void)updateStatusItemVisibility;
 - (NSImage *)renderedStatusItemImageForRelayState:(NSString *)relayState busy:(BOOL)busy;
+- (NSImage *)artificerStatusItemBaseImageForSide:(CGFloat)side alpha:(CGFloat)alpha;
 - (NSString *)writePNGPreviewForImage:(NSImage *)image prefix:(NSString *)prefix preferredPath:(NSString *)preferredPath;
 - (BOOL)isStatusItemRendered;
 - (BOOL)handleDuplicateLaunchByActivatingExistingInstance;
@@ -2310,6 +2311,16 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
     } else if ([self isArtificerApp]) {
         NSString *normalized = [[relayState ?: @"idle" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        CGFloat baseAlpha = [normalized isEqualToString:@"disabled"] ? 0.74 : 1.0;
+        NSImage *assetImage = [self artificerStatusItemBaseImageForSide:side alpha:baseAlpha];
+        if (assetImage) {
+            [assetImage drawInRect:NSMakeRect(0.0, 0.0, side, side)
+                          fromRect:NSZeroRect
+                         operation:NSCompositingOperationSourceOver
+                          fraction:1.0
+                    respectFlipped:NO
+                             hints:@{ NSImageHintInterpolation: @(NSImageInterpolationHigh) }];
+        }
         CGFloat inset = MAX(0.0, floor(side * 0.02));
         NSRect glyphRect = NSInsetRect(NSMakeRect(0.0, 0.0, side, side), inset, inset);
         CGFloat minX = NSMinX(glyphRect);
@@ -2379,7 +2390,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             [badge fill];
         };
 
-        if ([normalized isEqualToString:@"running"]) {
+        if (assetImage && ![normalized isEqualToString:@"paused"] && ![normalized isEqualToString:@"error"] && ![normalized isEqualToString:@"disabled"]) {
+            // The bundled menu bar icon asset is more legible at real menu bar size
+            // than the older stroke-only braid, so use it directly for normal states.
+        } else if ([normalized isEqualToString:@"running"]) {
             strokeGlyphWithColor([NSColor blackColor]);
         } else if ([normalized isEqualToString:@"paused"]) {
             strokeGlyphWithColor([NSColor blackColor]);
@@ -2547,6 +2561,49 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [rendered unlockFocus];
     [rendered setTemplate:YES];
     return rendered;
+}
+
+- (NSImage *)artificerStatusItemBaseImageForSide:(CGFloat)side alpha:(CGFloat)alpha {
+    if (![self isArtificerApp] || !self.appPath.length) {
+        return nil;
+    }
+    NSArray<NSString *> *candidatePaths = @[
+        [self.appPath stringByAppendingPathComponent:@"assets/menu-bar-icon.png"],
+        [self.appPath stringByAppendingPathComponent:@"generated/macos/Sources/App/Resources/menu-bar-icon.png"],
+        [self.appPath stringByAppendingPathComponent:@"generated/macos/.build/arm64-apple-macosx/debug/artificer-native_App.bundle/menu-bar-icon.png"]
+    ];
+    for (NSString *candidatePath in candidatePaths) {
+        if (!candidatePath.length || ![[NSFileManager defaultManager] fileExistsAtPath:candidatePath]) {
+            continue;
+        }
+        NSImage *sourceImage = [[NSImage alloc] initWithContentsOfFile:candidatePath];
+        if (!sourceImage) {
+            continue;
+        }
+        NSImage *rendered = [[NSImage alloc] initWithSize:NSMakeSize(side, side)];
+        [rendered lockFocus];
+        NSRectFillUsingOperation(NSMakeRect(0.0, 0.0, side, side), NSCompositingOperationClear);
+        NSSize sourceSize = sourceImage.size;
+        CGFloat fitWidth = sourceSize.width > 0.0 ? sourceSize.width : side;
+        CGFloat fitHeight = sourceSize.height > 0.0 ? sourceSize.height : side;
+        CGFloat scale = MIN(side / fitWidth, side / fitHeight);
+        CGFloat drawWidth = fitWidth * scale;
+        CGFloat drawHeight = fitHeight * scale;
+        NSRect drawRect = NSMakeRect(floor((side - drawWidth) * 0.5),
+                                     floor((side - drawHeight) * 0.5),
+                                     drawWidth,
+                                     drawHeight);
+        [sourceImage drawInRect:drawRect
+                       fromRect:NSZeroRect
+                      operation:NSCompositingOperationSourceOver
+                       fraction:MAX(0.0, MIN(alpha, 1.0))
+                 respectFlipped:NO
+                          hints:@{ NSImageHintInterpolation: @(NSImageInterpolationHigh) }];
+        [rendered unlockFocus];
+        [rendered setTemplate:YES];
+        return rendered;
+    }
+    return nil;
 }
 
 - (BOOL)isStatusItemRendered {
