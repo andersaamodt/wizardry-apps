@@ -6406,7 +6406,6 @@ build_native_workspace_host() {
       build_dir="$root/_tmp/workbench/build/native-macos-workspaces/$workspace_slug"
       bundle_root="$root/_tmp/workbench/dist/macos-native-workspaces/$workspace_slug"
       bundle="$bundle_root/$app_name.app"
-      rm -rf "$build_dir"
       mkdir -p "$build_dir"
       (
         cd "$workspace_path" &&
