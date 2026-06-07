@@ -163,6 +163,77 @@ esac
 sed -n '1p' "$scratch/launch-open.out" | grep -Fx -- "-n" >/dev/null
 sed -n '2p' "$scratch/launch-open.out" | grep -Fx "$launched_mac_app" >/dev/null
 
+stale_launch_root="$scratch/stale-launch-root"
+stale_launch_home="$scratch/stale-launch-home"
+stale_launch_bin="$scratch/stale-launch-bin"
+stale_launch_app="$stale_launch_home/Applications/App Forge.app"
+mkdir -p \
+  "$stale_launch_root/apps/forge/scripts" \
+  "$stale_launch_root/tools/forge" \
+  "$stale_launch_app/Contents/MacOS" \
+  "$stale_launch_bin"
+printf '%s\n' '#!/bin/sh' 'exit 0' > "$stale_launch_root/apps/forge/scripts/forge-backend"
+chmod +x "$stale_launch_root/apps/forge/scripts/forge-backend"
+printf '%s\n' '#!/bin/sh' 'exit 0' > "$stale_launch_app/Contents/MacOS/wizardry-host"
+chmod +x "$stale_launch_app/Contents/MacOS/wizardry-host"
+cat > "$stale_launch_root/tools/forge/build-forge-macos-app.sh" <<'SH'
+#!/bin/sh
+set -eu
+out=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --out)
+      out=${2-}
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+[ -n "$out" ] || exit 2
+printf '%s\n' "$out" > "$BUILD_CAPTURE"
+mkdir -p "$out/Contents/MacOS"
+printf '%s\n' '#!/bin/sh' 'exit 0' > "$out/Contents/MacOS/wizardry-host"
+chmod +x "$out/Contents/MacOS/wizardry-host"
+SH
+cat > "$stale_launch_root/tools/forge/install-forge.sh" <<'SH'
+#!/bin/sh
+printf '%s\n' "install-forge should not run for an existing refreshable bundle" >&2
+exit 9
+SH
+cat > "$stale_launch_bin/uname" <<'SH'
+#!/bin/sh
+printf '%s\n' Darwin
+SH
+cat > "$stale_launch_bin/open" <<'SH'
+#!/bin/sh
+printf '%s\n' "$@" > "$OPEN_CAPTURE"
+exit 0
+SH
+cat > "$stale_launch_bin/pkill" <<'SH'
+#!/bin/sh
+exit 0
+SH
+cat > "$stale_launch_bin/ps" <<'SH'
+#!/bin/sh
+exit 0
+SH
+chmod +x "$stale_launch_root/tools/forge/build-forge-macos-app.sh" \
+  "$stale_launch_root/tools/forge/install-forge.sh" \
+  "$stale_launch_bin/uname" "$stale_launch_bin/open" "$stale_launch_bin/pkill" "$stale_launch_bin/ps"
+BUILD_CAPTURE="$scratch/stale-launch-build.out" \
+  OPEN_CAPTURE="$scratch/stale-launch-open.out" \
+  HOME="$stale_launch_home" \
+  PATH="$stale_launch_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
+  XDG_CONFIG_HOME="$scratch/stale-launch-config" \
+  XDG_STATE_HOME="$scratch/stale-launch-state" \
+  sh "$launch" --root "$stale_launch_root" > "$scratch/stale-launch.out"
+grep -Fx "$stale_launch_app" "$scratch/stale-launch-build.out" >/dev/null
+grep -F "note=refreshed existing App Forge bundle" "$scratch/stale-launch-state/wizardry-apps/forge-launch.log" >/dev/null
+sed -n '1p' "$scratch/stale-launch-open.out" | grep -Fx -- "-n" >/dev/null
+sed -n '2p' "$scratch/stale-launch-open.out" | grep -Fx "$stale_launch_app" >/dev/null
+
 if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$scratch/Bad.app" --bundle-id 'com.example/../../bad' >"$scratch/bad-bundle.out" 2>"$scratch/bad-bundle.err"; then
   printf '%s\n' "build-forge-macos-app accepted invalid bundle id" >&2
   exit 1
