@@ -144,8 +144,9 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 @property (strong) NSDictionary<NSString *, id> *matchbookStatusSnapshot;
 @property (assign) BOOL stonrStatusCommandInFlight;
 @property (strong) NSString *stonrStatusCommandLabel;
-- (BOOL)hostTestHiddenModeEnabled;
+- (BOOL)hostStartHiddenModeEnabled;
 - (NSString *)hostTestQueryString;
+- (BOOL)hostArgumentsRequestStartHidden:(NSArray<NSString *> *)args;
 - (void)emitGlobalFavoriteTrackHotkey;
 - (NSDictionary<NSString *, NSString *> *)resolvedCommandEnvironment;
 - (NSString *)normalizedCommandPath;
@@ -720,16 +721,30 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     return environment;
 }
 
-- (BOOL)hostTestHiddenModeEnabled {
-    NSString *raw = [[[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_HOST_TEST_HIDDEN"] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (!raw.length) {
-        return NO;
+- (BOOL)hostStartHiddenModeEnabled {
+    NSArray<NSString *> *keys = @[@"WIZARDRY_HOST_START_HIDDEN", @"WIZARDRY_HOST_TEST_HIDDEN"];
+    for (NSString *key in keys) {
+        NSString *raw = [[[[NSProcessInfo processInfo] environment] objectForKey:key] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (!raw.length) {
+            continue;
+        }
+        NSString *lower = [raw lowercaseString];
+        return !([lower isEqualToString:@"0"] ||
+                 [lower isEqualToString:@"false"] ||
+                 [lower isEqualToString:@"no"] ||
+                 [lower isEqualToString:@"off"]);
     }
-    NSString *lower = [raw lowercaseString];
-    return !([lower isEqualToString:@"0"] ||
-             [lower isEqualToString:@"false"] ||
-             [lower isEqualToString:@"no"] ||
-             [lower isEqualToString:@"off"]);
+    return NO;
+}
+
+- (BOOL)hostArgumentsRequestStartHidden:(NSArray<NSString *> *)args {
+    for (NSUInteger index = 1; index < args.count; index += 1) {
+        NSString *arg = [[NSString stringWithFormat:@"%@", args[index] ?: @""] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if ([arg isEqualToString:@"--wizardry-start-hidden"]) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
 - (NSString *)hostTestQueryString {
@@ -3228,9 +3243,16 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     // Get app directory from command line argument
     NSArray *args = [[NSProcessInfo processInfo] arguments];
     NSString *resolvedAppPath = @"";
-    if (args.count >= 2) {
-        resolvedAppPath = [NSString stringWithFormat:@"%@", args[1]];
-    } else {
+    BOOL hiddenStartMode = [self hostStartHiddenModeEnabled] || [self hostArgumentsRequestStartHidden:args];
+    for (NSUInteger index = 1; index < args.count; index += 1) {
+        NSString *arg = [[NSString stringWithFormat:@"%@", args[index] ?: @""] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (!arg.length || [arg isEqualToString:@"--wizardry-start-hidden"]) {
+            continue;
+        }
+        resolvedAppPath = arg;
+        break;
+    }
+    if (!resolvedAppPath.length) {
         NSString *envAppPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"WIZARDRY_APP_ENTRY"];
         if (envAppPath.length) {
             resolvedAppPath = envAppPath;
@@ -3477,8 +3499,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     // Prefer a direct packaged/workspace icon file for the splash logo because
     // it is more reliable than bundle-icon lookup during early startup.
     self.appIconImage = resolvedSplashIcon ?: resolvedBundleIcon;
-    BOOL hiddenTestMode = [self hostTestHiddenModeEnabled];
-    if (!hiddenTestMode) {
+    if (!hiddenStartMode) {
         [NSApp unhide:nil];
         [NSApp activateIgnoringOtherApps:YES];
     }
@@ -3807,7 +3828,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     [self updateStatusItemVisibility];
 
-    if (hiddenTestMode) {
+    if (hiddenStartMode) {
         NSRect offscreenFrame = [self.window frame];
         offscreenFrame.origin.x = -20000.0;
         offscreenFrame.origin.y = -20000.0;
