@@ -115,6 +115,21 @@ ensure_macos_bundle_signature() {
   macos_bundle_signature_is_usable "$bundle_path"
 }
 
+scrub_macos_bundle_launch_metadata() {
+  scrub_macos_bundle_launch_metadata_bundle=${1-}
+  [ -d "$scrub_macos_bundle_launch_metadata_bundle" ] || return 1
+  command -v xattr >/dev/null 2>&1 || return 0
+  for scrub_macos_bundle_launch_metadata_attr in \
+    com.apple.quarantine \
+    com.apple.provenance \
+    com.apple.macl \
+    com.apple.FinderInfo \
+    com.apple.ResourceFork
+  do
+    xattr -r -d "$scrub_macos_bundle_launch_metadata_attr" "$scrub_macos_bundle_launch_metadata_bundle" >/dev/null 2>&1 || true
+  done
+}
+
 forge_bundle_input_hash() {
   {
     printf 'v=3\n'
@@ -408,6 +423,10 @@ backup_bundle="$final_stage_root/previous-$out_base"
 
 cp -R "$stage_bundle" "$final_bundle" || {
   printf '%s\n' "build-forge-macos-app: failed to copy macOS app bundle: $out_bundle" >&2
+  exit 1
+}
+scrub_macos_bundle_launch_metadata "$final_bundle" || {
+  printf '%s\n' "build-forge-macos-app: failed to scrub macOS app bundle metadata: $out_bundle" >&2
   exit 1
 }
 ensure_macos_bundle_signature "$final_bundle" || {

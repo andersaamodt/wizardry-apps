@@ -167,6 +167,21 @@ chmod +x "$shim"
 mkdir -p "$config_root"
 printf '%s\n' "$root" > "$config_file"
 
+scrub_macos_bundle_launch_metadata() {
+  scrub_macos_bundle_launch_metadata_bundle=${1-}
+  [ -d "$scrub_macos_bundle_launch_metadata_bundle" ] || return 1
+  command -v xattr >/dev/null 2>&1 || return 0
+  for scrub_macos_bundle_launch_metadata_attr in \
+    com.apple.quarantine \
+    com.apple.provenance \
+    com.apple.macl \
+    com.apple.FinderInfo \
+    com.apple.ResourceFork
+  do
+    xattr -r -d "$scrub_macos_bundle_launch_metadata_attr" "$scrub_macos_bundle_launch_metadata_bundle" >/dev/null 2>&1 || true
+  done
+}
+
 install_macos_bundle() {
   target=$1
   stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-app.XXXXXX")
@@ -179,6 +194,10 @@ install_macos_bundle() {
     rm -rf "$stage_root"
     return 1
   fi
+  scrub_macos_bundle_launch_metadata "$stage_bundle" || {
+    rm -rf "$stage_root"
+    return 1
+  }
 
   if [ -w "$target_parent" ] || [ ! -e "$target_parent" ]; then
     mkdir -p "$target_parent"

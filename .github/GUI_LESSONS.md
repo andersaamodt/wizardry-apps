@@ -107,3 +107,4 @@
 - Create workflow draft selections should keep toolbar identity on the workflow label, not the mutable app title being typed into the form.
 - macOS bundles that may touch the microphone must include `NSMicrophoneUsageDescription` before signing; TCC kills the app at startup before normal error handling can recover.
 - Forge git-state caches should key by canonical workspace path so `/var/...` and `/private/var/...` resolve to the same status metadata on macOS.
+- Scrub inherited quarantine and resource-fork xattrs from staged macOS app bundles before signing; copied asset metadata can push repeated launch validation into `syspolicyd`.

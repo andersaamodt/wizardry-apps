@@ -35,6 +35,18 @@ build_icns_from_png() {
   rm -rf "$iconset"
 }
 
+assert_no_macos_launch_metadata() {
+  assert_no_macos_launch_metadata_path=$1
+  command -v xattr >/dev/null 2>&1 || return 0
+  LC_ALL=C xattr -lr "$assert_no_macos_launch_metadata_path" >"$scratch/xattr-check.out" 2>/dev/null || true
+  if grep -F "com.apple.quarantine" "$scratch/xattr-check.out" >/dev/null \
+      || grep -F "com.apple.ResourceFork" "$scratch/xattr-check.out" >/dev/null; then
+    printf '%s\n' "macOS app bundle retained launch metadata: $assert_no_macos_launch_metadata_path" >&2
+    cat "$scratch/xattr-check.out" >&2
+    exit 1
+  fi
+}
+
 sh "$launch" --help | grep -F "Usage:" >/dev/null
 sh "$install" --help | grep -F "Usage:" >/dev/null
 sh "$uninstall" --help | grep -F "Usage:" >/dev/null
@@ -605,6 +617,7 @@ case "$os" in
     [ -f "$mac_build_out/Contents/Resources/wizardry-apps-root.txt" ]
     [ "$(head -n 1 "$mac_build_out/Contents/Resources/wizardry-apps-root.txt")" = "$root" ]
     [ -f "$mac_build_out/Contents/Info.plist" ]
+    assert_no_macos_launch_metadata "$mac_build_out"
 
     app_bundle="$fake_home/Applications/App Forge.app"
     [ -x "$app_bundle/Contents/MacOS/app-forge" ]
@@ -627,6 +640,7 @@ case "$os" in
     [ -f "$app_bundle/Contents/Resources/wizardry-build-input.sha256" ]
     [ -f "$app_bundle/Contents/Resources/wizardry-apps-root.txt" ]
     [ "$(head -n 1 "$app_bundle/Contents/Resources/wizardry-apps-root.txt")" = "$root" ]
+    assert_no_macos_launch_metadata "$app_bundle"
     rm -f "$expected_icon"
     ;;
   Linux)
