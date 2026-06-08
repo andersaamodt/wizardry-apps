@@ -4,7 +4,8 @@
 
 - Ensure `runtime/config/apps.manifest.json` and `runtime/config/templates.manifest.json` are valid.
 - Ensure CI green on main branch.
-- Confirm signing secrets exist in GitHub environment.
+- Confirm Theurgy is installed or installable from the release environment.
+- Confirm app publish secrets exist only in the protected release environment.
 
 ## 2. Tag Build
 
@@ -22,13 +23,11 @@
 ## 4. Publication
 
 - GitHub release artifacts uploaded.
-- macOS signed + notarized artifacts attached.
-- iOS uploaded to TestFlight.
-- Android uploaded to Play internal track.
+- macOS signing/notarization, TestFlight upload, Play upload, and store promotion run through Theurgy-owned release scripts.
 - Hosted web deploy runs only when deploy secrets are configured.
 
 Desktop publish blockers:
-- macOS notarization must pass (`sign_notarize_macos` job).
+- Theurgy macOS publish verification must pass.
 - Linux AppImage smoke checks must pass in desktop build workflow.
 
 ## 5. Promotion
@@ -36,10 +35,7 @@ Desktop publish blockers:
 - Use `promote-stores.yml` for production promotion.
 - Promotion is separate from tag build and requires explicit run.
 - Android promotion is automated from internal -> production per app allowlist.
-- iOS promotion is automated via App Store Connect API per app allowlist:
-  - attaches selected TestFlight build to App Store version
-  - submits for review when version state is `PREPARE_FOR_SUBMISSION`
-  - optional release trigger when state is `PENDING_DEVELOPER_RELEASE`
+- iOS promotion is delegated to Theurgy because App Store Connect review gates and special publish keys are platform-policing machinery.
 - Promotion workflow inputs:
   - `ios_build` (optional build number)
   - `ios_version` (optional marketing version)
@@ -49,7 +45,7 @@ Desktop publish blockers:
 
 ## 6. Verification
 
-- Verify macOS notarization ticket and app launch.
-- Verify TestFlight build visibility.
-- Verify Play internal artifact visibility.
+- Verify Theurgy reports successful macOS app verification and launch readiness.
+- Verify Theurgy reports TestFlight build visibility.
+- Verify Theurgy reports Play internal artifact visibility.
 - Verify hosted web smoke endpoint if deployed.

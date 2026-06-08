@@ -40,5 +40,5 @@
 
 - Tag-triggered build matrix.
 - Protected approval gate before publishing.
-- macOS notarization required for release.
-- Mobile publication stages to TestFlight and Play internal first.
+- App publishing, notarization, store review, verification, and publish-key workflows are delegated to Theurgy.
+- Wizardry Apps keeps compatibility wrapper paths for CI and menus, but does not own the platform-store implementation layer.

@@ -11,7 +11,7 @@ test_theurgy_arcana_help() {
     spells/.arcana/theurgy/uninstall-theurgy \
     spells/.arcana/theurgy/is-theurgy-installed \
     spells/.arcana/theurgy/check-theurgy \
-    spells/.arcana/theurgy/ensure-theurgy \
+    spells/.arcana/theurgy/invoke-theurgy \
     spells/.arcana/theurgy/theurgy-status \
     spells/.arcana/theurgy/theurgy-menu
   do
