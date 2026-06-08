@@ -11,9 +11,8 @@
 
 - Push annotated tag: `vX.Y.Z`.
 - Wait for `release.yml` to complete build + validation jobs.
-- Mobile build artifacts are produced per production app:
-  - `dist/android/wizardry-<slug>-release.aab`
-  - `dist/ios/wizardry-<slug>-ios.ipa`
+- Wizardry Apps release artifacts are unsigned/unpoliced project artifacts.
+- Signed mobile artifacts, notarized apps, store uploads, and store promotion are produced by Theurgy.
 
 ## 3. Approval Gate
 
@@ -33,8 +32,8 @@ Desktop publish blockers:
 ## 5. Promotion
 
 - Use `promote-stores.yml` for production promotion.
-- Promotion is separate from tag build and requires explicit run.
-- Android promotion is automated from internal -> production per app allowlist.
+- Store promotion is separate from the Wizardry Apps tag build and belongs to Theurgy.
+- Android promotion is delegated to Theurgy.
 - iOS promotion is delegated to Theurgy because App Store Connect review gates and special publish keys are platform-policing machinery.
 - Promotion workflow inputs:
   - `ios_build` (optional build number)

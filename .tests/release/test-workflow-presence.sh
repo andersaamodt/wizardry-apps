@@ -13,7 +13,6 @@ for wf in \
   build-hosted-web.yml \
   build-godot.yml \
   release.yml \
-  promote-stores.yml \
   sync-from-wizardry.yml
  do
   [ -f "$ROOT_DIR/.github/workflows/$wf" ] || {
