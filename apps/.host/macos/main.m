@@ -2042,7 +2042,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
     BOOL hasVisibleMainWindow = (self.window && [self.window isVisible]);
-    NSApplicationActivationPolicy targetPolicy = (keepBackground && (!hasVisibleMainWindow || self.hostHiddenStartMode))
+    NSApplicationActivationPolicy targetPolicy = (self.hostHiddenStartMode || (keepBackground && !hasVisibleMainWindow))
                                                      ? NSApplicationActivationPolicyAccessory
                                                      : NSApplicationActivationPolicyRegular;
     if ([NSApp activationPolicy] != targetPolicy) {
@@ -2936,8 +2936,13 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 }
 
 - (void)applyBackgroundModeEnabled:(BOOL)enabled showStatusItem:(BOOL)showStatusItem {
-    self.keepRunningInBackground = enabled || showStatusItem;
-    self.showStatusItem = showStatusItem;
+    if (self.hostHiddenStartMode) {
+        self.keepRunningInBackground = YES;
+        self.showStatusItem = YES;
+    } else {
+        self.keepRunningInBackground = enabled || showStatusItem;
+        self.showStatusItem = showStatusItem;
+    }
     [self syncStonrActivationPolicy];
     [self updateStatusItemVisibility];
 }
@@ -3374,6 +3379,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [self syncBellheimBackgroundModeFromConfig];
     } else if ([appSlug isEqualToString:@"headquarters"]) {
         [self syncHeadquartersBackgroundModeFromConfig];
+    }
+    if (self.hostHiddenStartMode) {
+        self.keepRunningInBackground = YES;
+        self.showStatusItem = YES;
     }
     BOOL prefersNarrowTallLayout = [appSlug isEqualToString:@"owl"];
     BOOL prefersSideDragZones = [appSlug isEqualToString:@"owl"];

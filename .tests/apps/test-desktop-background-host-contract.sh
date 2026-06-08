@@ -71,6 +71,22 @@ grep -F 'self.hostHiddenStartMode = hiddenStartMode;' "$mac_host" >/dev/null
 grep -F '[NSApp setActivationPolicy:(hiddenStartMode ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular)];' "$mac_host" >/dev/null
 grep -F 'self.hostHiddenStartMode = NO;' "$mac_host" >/dev/null
 grep -F '[self.window orderOut:nil];' "$mac_host" >/dev/null
+grep -F 'self.hostHiddenStartMode || (keepBackground && !hasVisibleMainWindow)' "$mac_host" >/dev/null
+awk '
+  /if \(self.hostHiddenStartMode\) \{/ { in_hidden=1; next }
+  in_hidden && /^    \}/ { in_hidden=0 }
+  in_hidden && /self.keepRunningInBackground = YES;/ { background=1 }
+  in_hidden && /self.showStatusItem = YES;/ { status_item=1 }
+  END { exit (background && status_item) ? 0 : 1 }
+' "$mac_host"
+awk '
+  /- \(void\)applyBackgroundModeEnabled:/ { in_apply=1; next }
+  in_apply && /^- \(/ { in_apply=0 }
+  in_apply && /if \(self.hostHiddenStartMode\) \{/ { hidden_guard=1 }
+  in_apply && /self.keepRunningInBackground = YES;/ { background=1 }
+  in_apply && /self.showStatusItem = YES;/ { status_item=1 }
+  END { exit (hidden_guard && background && status_item) ? 0 : 1 }
+' "$mac_host"
 if grep -F 'offscreenFrame.origin.x = -20000.0' "$mac_host" >/dev/null; then
   printf '%s\n' "hidden startup must not order an offscreen main window front" >&2
   exit 1
