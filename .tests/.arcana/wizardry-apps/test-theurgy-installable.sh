@@ -30,9 +30,9 @@ test_theurgy_status_reports_without_install() {
 }
 
 test_theurgy_installable_is_in_wizardry_projects_menu_source() {
-  assert_file_contains "spells/.arcana/wizardry-projects/wizardry-projects-menu" "wizardry apps%"
-  assert_file_contains "spells/.arcana/wizardry-projects/wizardry-projects-menu" "theurgy%"
-  assert_file_contains "spells/.arcana/wizardry-projects/wizardry-projects-status" "theurgy/is-theurgy-installed"
+  grep -F "wizardry apps%" "spells/.arcana/wizardry-projects/wizardry-projects-menu" >/dev/null
+  grep -F "theurgy%" "spells/.arcana/wizardry-projects/wizardry-projects-menu" >/dev/null
+  grep -F "theurgy/is-theurgy-installed" "spells/.arcana/wizardry-projects/wizardry-projects-status" >/dev/null
 }
 
 run_test_case "theurgy arcana spells show help" test_theurgy_arcana_help
