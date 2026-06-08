@@ -66,6 +66,15 @@ grep -F 'windowShouldClose:' "$mac_host" >/dev/null
 grep -F 'applicationShouldHandleReopen:' "$mac_host" >/dev/null
 grep -F '[self.window deminiaturize:nil];' "$mac_host" >/dev/null
 grep -F '[self.window isMiniaturized]' "$mac_host" >/dev/null
+grep -F 'BOOL hiddenStartMode = [self hostStartHiddenModeEnabled] || [self hostArgumentsRequestStartHidden:args];' "$mac_host" >/dev/null
+grep -F 'self.hostHiddenStartMode = hiddenStartMode;' "$mac_host" >/dev/null
+grep -F '[NSApp setActivationPolicy:(hiddenStartMode ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular)];' "$mac_host" >/dev/null
+grep -F 'self.hostHiddenStartMode = NO;' "$mac_host" >/dev/null
+grep -F '[self.window orderOut:nil];' "$mac_host" >/dev/null
+if grep -F 'offscreenFrame.origin.x = -20000.0' "$mac_host" >/dev/null; then
+  printf '%s\n' "hidden startup must not order an offscreen main window front" >&2
+  exit 1
+fi
 grep -F 'WizardryHostShowWindowNotification' "$mac_host" >/dev/null
 grep -F 'handleDistributedShowWindowRequest:' "$mac_host" >/dev/null
 awk '
@@ -79,8 +88,9 @@ awk '
   in_sync && /^- \(/ { in_sync=0 }
   in_sync && /isBellheimApp/ { bellheim=1 }
   in_sync && /isHeadquartersApp/ { headquarters=1 }
+  in_sync && /self.hostHiddenStartMode/ { hidden=1 }
   in_sync && /NSApplicationActivationPolicyAccessory/ { accessory=1 }
-  END { exit (bellheim && headquarters && accessory) ? 0 : 1 }
+  END { exit (bellheim && headquarters && hidden && accessory) ? 0 : 1 }
 ' "$mac_host"
 
 grep -F '__wizardry_host_set_background_mode' "$linux_host" >/dev/null

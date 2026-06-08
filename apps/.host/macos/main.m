@@ -135,6 +135,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 @property (assign) EventHandlerRef favoriteTrackHotKeyHandlerRef;
 @property (assign) BOOL keepRunningInBackground;
 @property (assign) BOOL showStatusItem;
+@property (assign) BOOL hostHiddenStartMode;
 @property (assign) BOOL explicitQuitRequested;
 @property (assign) BOOL systemTerminationRequested;
 @property (strong) NSStatusItem *statusItem;
@@ -2023,6 +2024,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     if (!self.window) {
         return;
     }
+    self.hostHiddenStartMode = NO;
     [self syncStonrActivationPolicy];
     if ([self.window isMiniaturized]) {
         [self.window deminiaturize:nil];
@@ -2040,7 +2042,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     }
     BOOL keepBackground = (self.keepRunningInBackground || self.showStatusItem);
     BOOL hasVisibleMainWindow = (self.window && [self.window isVisible]);
-    NSApplicationActivationPolicy targetPolicy = (keepBackground && !hasVisibleMainWindow)
+    NSApplicationActivationPolicy targetPolicy = (keepBackground && (!hasVisibleMainWindow || self.hostHiddenStartMode))
                                                      ? NSApplicationActivationPolicyAccessory
                                                      : NSApplicationActivationPolicyRegular;
     if ([NSApp activationPolicy] != targetPolicy) {
@@ -3233,8 +3235,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
     (void)note;
-    // Ensure command-line launched hosts behave like regular foreground apps.
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
                                                            selector:@selector(handleWorkspaceWillPowerOff:)
                                                                name:NSWorkspaceWillPowerOffNotification
@@ -3244,6 +3244,8 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     NSArray *args = [[NSProcessInfo processInfo] arguments];
     NSString *resolvedAppPath = @"";
     BOOL hiddenStartMode = [self hostStartHiddenModeEnabled] || [self hostArgumentsRequestStartHidden:args];
+    self.hostHiddenStartMode = hiddenStartMode;
+    [NSApp setActivationPolicy:(hiddenStartMode ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular)];
     for (NSUInteger index = 1; index < args.count; index += 1) {
         NSString *arg = [[NSString stringWithFormat:@"%@", args[index] ?: @""] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (!arg.length || [arg isEqualToString:@"--wizardry-start-hidden"]) {
@@ -3829,11 +3831,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [self updateStatusItemVisibility];
 
     if (hiddenStartMode) {
-        NSRect offscreenFrame = [self.window frame];
-        offscreenFrame.origin.x = -20000.0;
-        offscreenFrame.origin.y = -20000.0;
-        [self.window setFrame:offscreenFrame display:NO];
-        [self.window orderFront:nil];
+        [self.window orderOut:nil];
+        [NSApp hide:nil];
+        [self syncStonrActivationPolicy];
+        [self updateStatusItemVisibility];
     } else {
         [self.window makeKeyAndOrderFront:nil];
         [self.window orderFrontRegardless];
