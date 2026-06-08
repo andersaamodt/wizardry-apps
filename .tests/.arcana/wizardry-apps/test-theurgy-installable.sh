@@ -29,12 +29,13 @@ test_theurgy_status_reports_without_install() {
   rm -rf "$tmp_home" "$tmp_bin"
 }
 
-test_theurgy_installable_is_in_wizardry_apps_menu_source() {
-  assert_file_contains "spells/.arcana/wizardry-apps/wizardry-apps-menu" "Theurgy%"
-  assert_file_contains "spells/.arcana/wizardry-apps/wizardry-apps-status" "[X] Theurgy"
+test_theurgy_installable_is_in_wizardry_projects_menu_source() {
+  assert_file_contains "spells/.arcana/wizardry-projects/wizardry-projects-menu" "wizardry apps%"
+  assert_file_contains "spells/.arcana/wizardry-projects/wizardry-projects-menu" "theurgy%"
+  assert_file_contains "spells/.arcana/wizardry-projects/wizardry-projects-status" "theurgy/is-theurgy-installed"
 }
 
 run_test_case "theurgy arcana spells show help" test_theurgy_arcana_help
 run_test_case "theurgy status reports missing install" test_theurgy_status_reports_without_install
-run_test_case "theurgy is wired into wizardry-apps menu/status" test_theurgy_installable_is_in_wizardry_apps_menu_source
+run_test_case "theurgy is wired into wizardry projects menu/status" test_theurgy_installable_is_in_wizardry_projects_menu_source
 finish_tests
