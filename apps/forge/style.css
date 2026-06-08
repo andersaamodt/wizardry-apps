@@ -3,6 +3,7 @@
   --accent-strong: var(--accent-dark, #0063d1);
   --bg: #eceaf4;
   --forge-boot-bg: var(--bg, #eceaf4);
+  --host-grow-corner-size: 1.35rem;
   --bg-panel: var(--light-bg, color-mix(in srgb, var(--bg) 90%, #ffffff));
   --bg-panel-2: color-mix(in srgb, var(--bg-panel) 88%, var(--bg));
   --panel: var(--bg-panel);
@@ -413,6 +414,8 @@ body.settings-open #settings-panel {
   min-width: 0;
   min-height: 0;
   height: 100%;
+  padding-bottom: var(--host-grow-corner-size);
+  background: var(--bg);
 }
 
 .left-rail {
@@ -710,6 +713,17 @@ body.settings-open #settings-panel {
   position: relative;
   justify-self: stretch;
   -webkit-app-region: no-drag;
+}
+
+.sidebar-footer::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: calc(-1 * var(--host-grow-corner-size));
+  width: var(--host-grow-corner-size);
+  height: var(--host-grow-corner-size);
+  background: inherit;
+  pointer-events: none;
 }
 
 .sidebar-footer::after {
@@ -2144,7 +2158,8 @@ input[type="checkbox"]:disabled {
   min-height: 0;
   height: 100%;
   overflow: auto;
-  padding-right: 0;
+  padding-right: var(--host-grow-corner-size);
+  padding-bottom: var(--host-grow-corner-size);
   align-content: start;
   width: 100%;
   -webkit-app-region: no-drag;
@@ -2154,7 +2169,7 @@ input[type="checkbox"]:disabled {
   background: transparent;
   border: 0;
   border-radius: 0;
-  padding: 0;
+  padding: 0 var(--host-grow-corner-size) var(--host-grow-corner-size) 0;
   min-height: 100%;
   box-sizing: border-box;
 }
