@@ -64,6 +64,12 @@ if [ -z "$section" ]; then
   print_mobile
   printf '---\n'
   printf 'core-runtime\n'
+  theurgy_status_script="$script_dir/../theurgy/check-theurgy"
+  if [ -x "$theurgy_status_script" ] && theurgy_status=$("$theurgy_status_script" 2>/dev/null | sed -n 's/^status=//p' | sed -n '1p') && [ "$theurgy_status" = "ok" ]; then
+    printf '[X] Theurgy\n'
+  else
+    printf '[ ] Theurgy\n'
+  fi
   kernel_status_script="$script_dir/../governed-work-kernel/check-governed-work-kernel"
   if [ -x "$kernel_status_script" ] && kernel_status=$("$kernel_status_script" 2>/dev/null | sed -n 's/^status=//p' | sed -n '1p') && [ "$kernel_status" = "ok" ]; then
     printf '[X] Governed Work Kernel\n'
@@ -79,6 +85,12 @@ case "$section" in
   mobile) print_mobile ;;
   core|core-runtime)
     printf 'core-runtime\n'
+    theurgy_status_script="$script_dir/../theurgy/check-theurgy"
+    if [ -x "$theurgy_status_script" ] && theurgy_status=$("$theurgy_status_script" 2>/dev/null | sed -n 's/^status=//p' | sed -n '1p') && [ "$theurgy_status" = "ok" ]; then
+      printf '[X] Theurgy\n'
+    else
+      printf '[ ] Theurgy\n'
+    fi
     kernel_status_script="$script_dir/../governed-work-kernel/check-governed-work-kernel"
     if [ -x "$kernel_status_script" ] && kernel_status=$("$kernel_status_script" 2>/dev/null | sed -n 's/^status=//p' | sed -n '1p') && [ "$kernel_status" = "ok" ]; then
       printf '[X] Governed Work Kernel\n'
