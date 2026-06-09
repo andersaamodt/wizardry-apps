@@ -44,7 +44,8 @@ printf '%s\n' "$out" | grep -F "rename-workspace [ROOT_HINT] WORKSPACE_PATH NEW_
 printf '%s\n' "$out" | grep -F "workspace-git-init [ROOT_HINT] WORKSPACE_PATH [REMOTE_URL] [BRANCH]" >/dev/null
 printf '%s\n' "$out" | grep -F "workspace-git-install-release [ROOT_HINT] WORKSPACE_PATH" >/dev/null
 grep -F 'self_relaunch=1' "$backend" >/dev/null
-grep -F 'open "$launch_bundle"' "$backend" >/dev/null
+grep -F 'launch_workspace_bundle_macos "$launch_bundle" "$launch_bundle/Contents/MacOS/wizardry-host" "$launch_app_dir"' "$backend" >/dev/null
+grep -F 'launch_workspace_bundle_macos "$installed_path" "$installed_path/Contents/MacOS/wizardry-host" "$installed_app_dir"' "$backend" >/dev/null
 grep -F 'open -n "$bundle"' "$backend" >/dev/null
 grep -F 'launch_bundle=$(prepare_macos_run_bundle "$final_bundle" "$workspace_title")' "$backend" >/dev/null
 grep -F 'printf '\''built_artifact=%s\n'\'' "$final_bundle"' "$backend" >/dev/null

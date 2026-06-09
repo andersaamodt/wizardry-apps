@@ -183,18 +183,82 @@ exit 0
 SH_LIPO
 chmod +x "$fake_bin/lipo"
 
+cat > "$fake_bin/ditto" <<'SH_DITTO'
+#!/bin/sh
+set -eu
+src=${1-}
+dest=${2-}
+[ -d "$src" ] || exit 1
+[ -n "$dest" ] || exit 1
+mkdir -p "$dest/Contents/MacOS" "$dest/Contents/Resources"
+if [ -f "$src/Contents/Info.plist" ]; then
+  cp "$src/Contents/Info.plist" "$dest/Contents/Info.plist"
+else
+  printf '%s\n' '<plist version="1.0"><dict></dict></plist>' > "$dest/Contents/Info.plist"
+fi
+if [ -x "$src/Contents/MacOS/wizardry-host" ]; then
+  cp "$src/Contents/MacOS/wizardry-host" "$dest/Contents/MacOS/wizardry-host"
+else
+  printf '%s\n' '#!/bin/sh' 'while :; do sleep 1; done' > "$dest/Contents/MacOS/wizardry-host"
+fi
+chmod +x "$dest/Contents/MacOS/wizardry-host"
+exit 0
+SH_DITTO
+chmod +x "$fake_bin/ditto"
+
 cat > "$fake_bin/open" <<'SH_OPEN'
 #!/bin/sh
+set -eu
+bundle=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -n)
+      shift
+      ;;
+    -*)
+      shift
+      ;;
+    *)
+      bundle=$1
+      shift
+      ;;
+  esac
+done
+[ -n "$bundle" ] || exit 1
+if [ -n "${FORGE_TEST_OPENED_BUNDLE-}" ]; then
+  printf '%s\n' "$bundle" > "$FORGE_TEST_OPENED_BUNDLE"
+fi
 exit 0
 SH_OPEN
 chmod +x "$fake_bin/open"
 
+cat > "$fake_bin/ps" <<'SH_PS'
+#!/bin/sh
+if [ -n "${FORGE_TEST_OPENED_BUNDLE-}" ] && [ -f "$FORGE_TEST_OPENED_BUNDLE" ]; then
+  bundle=$(cat "$FORGE_TEST_OPENED_BUNDLE")
+  printf '%s %s\n' "12345" "$bundle/Contents/MacOS/wizardry-host"
+fi
+exit 0
+SH_PS
+chmod +x "$fake_bin/ps"
+
+cat > "$fake_bin/kill" <<'SH_KILL'
+#!/bin/sh
+if [ -n "${FORGE_TEST_OPENED_BUNDLE-}" ]; then
+  rm -f "$FORGE_TEST_OPENED_BUNDLE"
+fi
+exit 0
+SH_KILL
+chmod +x "$fake_bin/kill"
+
 test_home="$scratch/home"
 mkdir -p "$test_home"
+test_opened_bundle="$scratch/opened-bundle"
 
 test_env() {
   env \
     HOME="$test_home" \
+    FORGE_TEST_OPENED_BUNDLE="$test_opened_bundle" \
     PATH="$fake_bin:$PATH" \
     "$@"
 }

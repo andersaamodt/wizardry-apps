@@ -7156,7 +7156,11 @@ cmd_run_desktop() {
           [ -n "$launcher_path" ] && printf 'launcher=%s\n' "$launcher_path"
           exit 0
         else
-          open "$installed_path"
+          installed_app_dir="$installed_path/Contents/Resources/$slug"
+          if ! launch_workspace_bundle_macos "$installed_path" "$installed_path/Contents/MacOS/wizardry-host" "$installed_app_dir"; then
+            printf '%s\n' "forge-backend: failed to launch installed macOS app: $installed_path" >&2
+            exit 1
+          fi
         fi
         printf 'launched=1\n'
         printf 'mode=desktop-installed\n'
@@ -7265,7 +7269,11 @@ cmd_run_desktop() {
         printf 'restart_bundle=%s\n' "$launch_bundle"
         exit 0
       else
-        open "$launch_bundle"
+        launch_app_dir="$launch_bundle/Contents/Resources/$slug"
+        if ! launch_workspace_bundle_macos "$launch_bundle" "$launch_bundle/Contents/MacOS/wizardry-host" "$launch_app_dir"; then
+          printf '%s\n' "forge-backend: failed to launch macOS app: $launch_bundle" >&2
+          exit 1
+        fi
       fi
       printf 'launched=1\n'
       printf 'mode=desktop-executable\n'
@@ -7652,14 +7660,19 @@ cmd_run_workspace() {
               printf '%s\n' "forge-backend: open command not available on this system" >&2
               exit 1
             }
-            open "$installed_path"
+            installed_entry=$(printf '%s\n' "$install_out" | kv_read entry)
+            [ -n "$installed_entry" ] || installed_entry="$installed_path/Contents/Resources/$workspace_slug/app"
+            if ! launch_workspace_bundle_macos "$installed_path" "$installed_path/Contents/MacOS/wizardry-host" "$installed_entry"; then
+              printf '%s\n' "forge-backend: failed to launch installed project bundle: $installed_path" >&2
+              exit 1
+            fi
             printf 'launched=1\n'
             printf 'mode=desktop-installed\n'
             printf 'artifact=%s\n' "$installed_path"
             printf 'built_artifact=%s\n' "$built_artifact"
             printf 'installed=%s\n' "$installed_path"
             [ -n "$launcher_path" ] && printf 'launcher=%s\n' "$launcher_path"
-            printf 'entry=%s\n' "$(printf '%s\n' "$install_out" | kv_read entry)"
+            printf 'entry=%s\n' "$installed_entry"
             printf 'log=%s\n' "$log_path"
             return 0
             ;;

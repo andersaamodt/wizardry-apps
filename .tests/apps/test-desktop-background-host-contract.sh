@@ -70,6 +70,12 @@ grep -F 'BOOL hiddenStartMode = [self hostStartHiddenModeEnabled] || [self hostA
 grep -F 'self.hostHiddenStartMode = hiddenStartMode;' "$mac_host" >/dev/null
 grep -F '[NSApp setActivationPolicy:(hiddenStartMode ? NSApplicationActivationPolicyAccessory : NSApplicationActivationPolicyRegular)];' "$mac_host" >/dev/null
 grep -F 'self.hostHiddenStartMode = NO;' "$mac_host" >/dev/null
+grep -F 'safelyShowMainWindowActivatingApp:' "$mac_host" >/dev/null
+grep -F 'skipped unsafe window activation' "$mac_host" >/dev/null
+if grep -F '[self.window makeMainWindow];' "$mac_host" >/dev/null; then
+  printf '%s\n' "macOS host must not force makeMainWindow during startup activation" >&2
+  exit 1
+fi
 grep -F '[self.window orderOut:nil];' "$mac_host" >/dev/null
 grep -F 'self.hostHiddenStartMode || (keepBackground && !hasVisibleMainWindow)' "$mac_host" >/dev/null
 awk '

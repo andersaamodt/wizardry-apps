@@ -186,6 +186,7 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (BOOL)syncBellheimBackgroundModeFromConfig;
 - (BOOL)syncHeadquartersBackgroundModeFromConfig;
 - (void)showMainWindow;
+- (void)safelyShowMainWindowActivatingApp:(BOOL)activateApp orderRegardless:(BOOL)orderRegardless;
 - (void)openMainWindowFromStatusItem:(id)sender;
 - (void)toggleMainWindowFromStatusItem:(id)sender;
 - (void)quitFromAppMenu:(id)sender;
@@ -2025,15 +2026,38 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         return;
     }
     self.hostHiddenStartMode = NO;
-    [self syncStonrActivationPolicy];
-    if ([self.window isMiniaturized]) {
-        [self.window deminiaturize:nil];
+    if ([self isStonrApp] || [self isArtificerApp] || [self isMatchbookApp] || [self isBellheimApp] || [self isHeadquartersApp]) {
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     }
-    [NSApp unhide:nil];
-    [self.window makeKeyAndOrderFront:nil];
-    [NSApp activateIgnoringOtherApps:YES];
+    [self safelyShowMainWindowActivatingApp:YES orderRegardless:NO];
     [self syncStonrActivationPolicy];
     [self updateStatusItemVisibility];
+}
+
+- (void)safelyShowMainWindowActivatingApp:(BOOL)activateApp orderRegardless:(BOOL)orderRegardless {
+    if (!self.window) {
+        return;
+    }
+    @try {
+        if ([self.window isMiniaturized]) {
+            [self.window deminiaturize:nil];
+        }
+        [NSApp unhide:nil];
+        [self.window makeKeyAndOrderFront:nil];
+        if (orderRegardless) {
+            [self.window orderFrontRegardless];
+        }
+        if (self.webView) {
+            [self.window makeFirstResponder:self.webView];
+        }
+        if (activateApp) {
+            NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
+            [currentApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
+            [NSApp activateIgnoringOtherApps:YES];
+        }
+    } @catch (NSException *exception) {
+        NSLog(@"wizardry-host: skipped unsafe window activation for %@: %@", self.appSlug ?: @"app", exception.reason ?: @"unknown AppKit exception");
+    }
 }
 
 - (void)syncStonrActivationPolicy {
@@ -3512,7 +3536,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     self.appIconImage = resolvedSplashIcon ?: resolvedBundleIcon;
     if (!hiddenStartMode) {
         [NSApp unhide:nil];
-        [NSApp activateIgnoringOtherApps:YES];
     }
     
     // Create window
@@ -3845,14 +3868,9 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         [self syncStonrActivationPolicy];
         [self updateStatusItemVisibility];
     } else {
-        [self.window makeKeyAndOrderFront:nil];
-        [self.window orderFrontRegardless];
         // Re-activate after the window exists so workspace launches behave like
         // regular desktop apps (not hidden/background-only processes).
-        NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
-        [currentApp activateWithOptions:(NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows)];
-        [NSApp unhide:nil];
-        [NSApp activateIgnoringOtherApps:YES];
+        [self safelyShowMainWindowActivatingApp:YES orderRegardless:YES];
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.08 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             // Start-at-login launches can switch into accessory/tray mode before
             // this delayed activation runs. Forcing main-window promotion after
@@ -3866,14 +3884,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             if (!foregroundWindowReassertionAllowed) {
                 return;
             }
-            [self.window makeMainWindow];
-            [self.window makeKeyAndOrderFront:nil];
-            [self.window orderFrontRegardless];
-            if (self.webView) {
-                [self.window makeFirstResponder:self.webView];
-            }
-            [NSApp unhide:nil];
-            [NSApp activateIgnoringOtherApps:YES];
+            [self safelyShowMainWindowActivatingApp:YES orderRegardless:YES];
         });
     }
     
