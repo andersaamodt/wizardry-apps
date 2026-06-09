@@ -3,7 +3,7 @@
   --accent-strong: var(--accent-dark, #0063d1);
   --bg: #eceaf4;
   --forge-boot-bg: var(--bg, #eceaf4);
-  --host-grow-corner-size: 1.35rem;
+  --host-grow-corner-size: 0rem;
   --bg-panel: var(--light-bg, color-mix(in srgb, var(--bg) 90%, #ffffff));
   --bg-panel-2: color-mix(in srgb, var(--bg-panel) 88%, var(--bg));
   --panel: var(--bg-panel);
