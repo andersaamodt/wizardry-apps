@@ -1483,6 +1483,32 @@ ensure_macos_bundle_signature() {
   macos_bundle_signature_is_usable "$bundle_path"
 }
 
+clear_stale_swiftpm_lock() {
+  scratch_dir=${1-}
+  [ -n "$scratch_dir" ] || return 0
+  lock_path="$scratch_dir/.lock"
+  [ -f "$lock_path" ] || return 0
+
+  lock_pid=$(tr -cd '0-9' < "$lock_path" 2>/dev/null || true)
+  if [ -n "$lock_pid" ] && ps -p "$lock_pid" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  rm -f "$lock_path"
+}
+
+launch_macos_bundle_async() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  command -v open >/dev/null 2>&1 || return 1
+  if command -v nohup >/dev/null 2>&1; then
+    nohup open -n "$bundle_path" >/dev/null 2>&1 &
+  else
+    open -n "$bundle_path" >/dev/null 2>&1 &
+  fi
+  return 0
+}
+
 ensure_linux_host() {
   root=$1
   require_tool cc
@@ -6423,6 +6449,7 @@ build_native_workspace_host() {
       bundle_root="$root/_tmp/workbench/dist/macos-native-workspaces/$workspace_slug"
       bundle="$bundle_root/$app_name.app"
       mkdir -p "$build_dir"
+      clear_stale_swiftpm_lock "$build_dir"
       (
         cd "$workspace_path" &&
         swift build --package-path "$package_dir" --scratch-path "$build_dir"
@@ -7540,12 +7567,11 @@ cmd_run_workspace() {
               printf '%s\n' "forge-backend: installed native macOS bundle missing: $installed_path" >&2
               exit 1
             }
-            command -v open >/dev/null 2>&1 || {
-              printf '%s\n' "forge-backend: open command not available on this system" >&2
+            stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
+            launch_macos_bundle_async "$installed_path" || {
+              printf '%s\n' "forge-backend: failed to queue launch for native macOS bundle: $installed_path" >&2
               exit 1
             }
-            stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
-            open -n "$installed_path"
             printf 'launched=1\n'
             printf 'mode=native-desktop-installed\n'
             printf 'artifact=%s\n' "$installed_path"
@@ -7604,12 +7630,11 @@ cmd_run_workspace() {
             printf '%s\n' "forge-backend: built native macOS bundle missing: $artifact" >&2
             exit 1
           }
-          command -v open >/dev/null 2>&1 || {
-            printf '%s\n' "forge-backend: open command not available on this system" >&2
+          stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
+          launch_macos_bundle_async "$artifact" || {
+            printf '%s\n' "forge-backend: failed to queue launch for native macOS bundle: $artifact" >&2
             exit 1
           }
-          stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
-          open -n "$artifact"
           printf 'launched=1\n'
           printf 'mode=native-desktop-executable\n'
           printf 'artifact=%s\n' "$artifact"
