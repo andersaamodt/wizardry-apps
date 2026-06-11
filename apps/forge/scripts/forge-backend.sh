@@ -3105,9 +3105,25 @@ ensure_importable_workspace_profile() {
         fi
       fi
     fi
-    if [ -z "$(workspace_rebuild_command "$conf_path")" ]; then
-      write_key_value_file "$conf_path" run_rebuild_command ":"
-    fi
+    current_context=$(workspace_field "$conf_path" development_context "")
+    current_rebuild=$(workspace_rebuild_command "$conf_path")
+    case "$current_context" in
+      native-desktop)
+        if { [ -z "$current_rebuild" ] || [ "$current_rebuild" = ":" ]; } && [ -f "$workspace_path/scripts/render-native-desktop.sh" ]; then
+          write_key_value_file "$conf_path" run_rebuild_command "sh scripts/render-native-desktop.sh"
+        fi
+        ;;
+      native-mobile)
+        if { [ -z "$current_rebuild" ] || [ "$current_rebuild" = ":" ]; } && [ -f "$workspace_path/scripts/render-native-mobile.sh" ]; then
+          write_key_value_file "$conf_path" run_rebuild_command "sh scripts/render-native-mobile.sh"
+        fi
+        ;;
+      *)
+        if [ -z "$current_rebuild" ]; then
+          write_key_value_file "$conf_path" run_rebuild_command ":"
+        fi
+        ;;
+    esac
     printf '%s\t%s\n' "$conf_path" "0"
     return 0
   fi

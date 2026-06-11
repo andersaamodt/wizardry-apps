@@ -127,6 +127,44 @@ printf '%s\n' "$templates" | grep -E '^demo\t' >/dev/null
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-backend.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
+native_repair_ws="$scratch/native-repair"
+mkdir -p "$native_repair_ws/app-blueprint" "$native_repair_ws/scripts"
+cat >"$native_repair_ws/app-blueprint/app.ir.yaml" <<'IR'
+{
+  "schemaVersion": "1.0",
+  "app": {
+    "id": "native-repair",
+    "name": "Native Repair"
+  },
+  "window": {
+    "id": "main-window",
+    "type": "Window",
+    "title": "Native Repair"
+  }
+}
+IR
+cat >"$native_repair_ws/scripts/render-native-desktop.sh" <<'SH'
+#!/bin/sh
+set -eu
+mkdir -p generated/macos
+SH
+chmod +x "$native_repair_ws/scripts/render-native-desktop.sh"
+cat >"$native_repair_ws/wizardry.workspace.conf" <<CONF
+# Wizardry Apps project profile
+project_id=native-repair
+title=Native Repair
+project_type=native-desktop
+development_context=native-desktop
+starter=import-native-desktop
+profile_kind=detected
+targets=macos,linux
+root=$native_repair_ws
+native_ir_path=app-blueprint/app.ir.yaml
+run_rebuild_command=:
+CONF
+sh "$backend" import-workspace "$test_root" "$native_repair_ws" "$scratch" >/dev/null
+grep -F 'run_rebuild_command=sh scripts/render-native-desktop.sh' "$native_repair_ws/wizardry.workspace.conf" >/dev/null
+
 bundle_install_functions=$(awk '
   /^copy_macos_bundle_contents\(\)/ { printing = 1 }
   /^macos_app_is_running\(\)/ { printing = 0 }
