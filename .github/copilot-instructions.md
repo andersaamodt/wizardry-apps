@@ -9,6 +9,7 @@
 
 ## Hard Rules
 - Follow Wizardry ethos and keep behavior file-first, explicit, and discoverable.
+- Wizardry-family projects are POSIX sh-first by default; Python or Rust are never implicitly authorized just because the ecosystem can touch them, and an AI must not introduce or preserve them without explicit user approval.
 - Keep user-facing language non-imperative and self-healing in tone.
 - Desktop-first apps do not use `localStorage` for durable state.
 - Persist desktop preferences/state through backend plaintext files in XDG paths.
