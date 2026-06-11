@@ -108,3 +108,8 @@
 - macOS bundles that may touch the microphone must include `NSMicrophoneUsageDescription` before signing; TCC kills the app at startup before normal error handling can recover.
 - Forge git-state caches should key by canonical workspace path so `/var/...` and `/private/var/...` resolve to the same status metadata on macOS.
 - Scrub inherited quarantine and resource-fork xattrs from staged macOS app bundles before signing; copied asset metadata can push repeated launch validation into `syspolicyd`.
+- Sidebars and detail drawers opened from toolbar buttons should slide in/out only for open and close; if one drawer is already open, switching to another should replace content instantly instead of animating a full close-then-open.
+- In sectioned detail panes, persistent automation toggles that govern that section should live in the section header accessory at top right instead of consuming body rows.
+- Controls that change how local work reaches production, such as Auto-push, belong in the Production or publish section rather than in deployment identity/config sections.
+- Native theme selectors should use keyboard-cycleable popup controls with immediate optimistic repaint, not menu-only pickers that wait for backend refresh before the theme visibly changes.
+- In unified macOS titlebar windows, remove the visible window title, move top toolbars into the titlebar band, and reserve explicit left drag-safe space so controls never collide with the traffic-light cluster.
