@@ -105,3 +105,4 @@
 - Most Wizardry apps should default to `~/<appname>` for durable app data; alternate standard folders and shared storage roots need explicit justification.
 - Durable app data should stay plain-text by default, with YAML-plus-Markdown preferred for user-facing editable files and JSON reserved for app-facing machine state.
 - Wizardry app tests belong under `.tests/`.
+- If a native port reuses another app's runtime or storage roots, that exception must be documented in repo-local AI-facing docs, not only in the user README.
