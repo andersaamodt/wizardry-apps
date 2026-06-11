@@ -3140,8 +3140,12 @@ ensure_importable_workspace_profile() {
         fi
         ;;
       native-mobile)
-        if { [ -z "$current_rebuild" ] || [ "$current_rebuild" = ":" ]; } && [ -f "$workspace_path/scripts/render-native-mobile.sh" ]; then
-          write_key_value_file "$conf_path" run_rebuild_command "sh scripts/render-native-mobile.sh"
+        if [ -z "$current_rebuild" ] || [ "$current_rebuild" = ":" ]; then
+          if [ -f "$workspace_path/scripts/render-native-mobile.sh" ]; then
+            write_key_value_file "$conf_path" run_rebuild_command "sh scripts/render-native-mobile.sh"
+          elif [ -f "$workspace_path/scripts/render-mobile.sh" ]; then
+            write_key_value_file "$conf_path" run_rebuild_command "sh scripts/render-mobile.sh"
+          fi
         fi
         ;;
       *)
@@ -4188,6 +4192,8 @@ cmd_list_workspaces() {
       needs_profile_repair=1
     elif [ "$profile_context" = "native-desktop" ] && ! resolve_workspace_native_ir_path "$path" "$conf" >/dev/null 2>&1; then
       needs_profile_repair=1
+    elif [ "$profile_context" = "native-mobile" ] && ! resolve_workspace_mobile_ir_path "$path" "$conf" >/dev/null 2>&1; then
+      needs_profile_repair=1
     fi
     if [ "$needs_profile_repair" -eq 1 ]; then
       ensure_importable_workspace_profile "$path" >/dev/null 2>&1 || true
@@ -4240,6 +4246,11 @@ cmd_list_workspaces() {
         ;;
       native-desktop)
         if resolve_workspace_native_ir_path "$path" "$conf" >/dev/null 2>&1; then
+          runnable=1
+        fi
+        ;;
+      native-mobile)
+        if resolve_workspace_mobile_ir_path "$path" "$conf" >/dev/null 2>&1; then
           runnable=1
         fi
         ;;
