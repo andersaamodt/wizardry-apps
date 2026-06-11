@@ -53,6 +53,9 @@
 - Built-in apps should expose calm descriptive language and avoid decorative or generic-product framing that breaks Wizardry identity.
 
 ### 3. Storage And State Discipline
+- All durable app data should live in plain-text files unless a different format is clearly necessary.
+- For durable files users are likely to inspect or edit directly, prefer YAML plus Markdown-oriented text conventions over JSON.
+- JSON is acceptable for app-facing machine state, caches, transport payloads, or other files whose primary consumer is the app rather than the user.
 - Durable app state belongs in app-owned XDG config or state paths, not browser-owned storage.
 - Passive reads, status refreshes, and startup hydration must not mutate durable state.
 - Deployment-specific paths such as site names, served-site roots, or machine-local bundle locations must not become the canonical durable state home for desktop apps.
