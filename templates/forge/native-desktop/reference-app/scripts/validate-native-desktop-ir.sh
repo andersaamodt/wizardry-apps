@@ -108,9 +108,11 @@ if ! jq -e '
   def allowed_type:
     . == "Window" or . == "MenuBar" or . == "Menu" or . == "MenuItem" or . == "Toolbar" or
     . == "Sidebar" or . == "Content" or . == "Section" or . == "Stack" or . == "Split" or
-    . == "Tabs" or . == "List" or . == "Detail" or . == "Form" or . == "Group" or
-    . == "Text" or . == "Label" or . == "Button" or . == "Input" or . == "Toggle" or
-    . == "Select" or . == "Image" or . == "Spacer" or . == "Modal" or . == "StatusBar";
+    . == "SplitPane" or . == "Tabs" or . == "List" or . == "TreeList" or . == "TreeNode" or
+    . == "Detail" or . == "DetailDrawer" or . == "Form" or . == "Group" or
+    . == "Text" or . == "Label" or . == "StatusPill" or . == "Button" or . == "ActionMenu" or
+    . == "Input" or . == "Toggle" or . == "ToggleGroup" or . == "Select" or . == "Image" or
+    . == "Spacer" or . == "Modal" or . == "ProgressModal" or . == "StatusBar";
   (nodes | all((.type | allowed_type) and ((.id | type) == "string") and (.id | length > 0))) and
   ((nodes | map(.id) | length) == (nodes | map(.id) | unique | length))
 ' "$ir_path" >/dev/null 2>&1; then

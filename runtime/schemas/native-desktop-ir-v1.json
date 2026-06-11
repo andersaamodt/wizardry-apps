@@ -63,20 +63,28 @@
             "Section",
             "Stack",
             "Split",
+            "SplitPane",
             "Tabs",
             "List",
+            "TreeList",
+            "TreeNode",
             "Detail",
+            "DetailDrawer",
             "Form",
             "Group",
             "Text",
             "Label",
+            "StatusPill",
             "Button",
+            "ActionMenu",
             "Input",
             "Toggle",
+            "ToggleGroup",
             "Select",
             "Image",
             "Spacer",
             "Modal",
+            "ProgressModal",
             "StatusBar"
           ]
         },
@@ -93,6 +101,21 @@
           "$ref": "#/$defs/node"
         },
         "platformOverrides": {
+          "type": "object"
+        },
+        "stateKey": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "binding": {
+          "type": "object"
+        },
+        "tokens": {
           "type": "object"
         }
       },
