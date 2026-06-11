@@ -53,10 +53,13 @@
 - Built-in apps should expose calm descriptive language and avoid decorative or generic-product framing that breaks Wizardry identity.
 
 ### 3. Storage And State Discipline
+- Most Wizardry apps should store their primary durable app data under `~/<appname>`.
+- An app may use other standard config or state folders when there is a concrete project-specific reason, but that exception must be explicit in repo-facing documentation and easy for the next auditor to find.
+- Shared storage roots between a native app and another app/runtime must be explicitly justified; they are not the default.
 - All durable app data should live in plain-text files unless a different format is clearly necessary.
 - For durable files users are likely to inspect or edit directly, prefer YAML plus Markdown-oriented text conventions over JSON.
 - JSON is acceptable for app-facing machine state, caches, transport payloads, or other files whose primary consumer is the app rather than the user.
-- Durable app state belongs in app-owned XDG config or state paths, not browser-owned storage.
+- Durable app state must not depend on browser-owned storage.
 - Passive reads, status refreshes, and startup hydration must not mutate durable state.
 - Deployment-specific paths such as site names, served-site roots, or machine-local bundle locations must not become the canonical durable state home for desktop apps.
 - Repo-local generated files, logs, and staging artifacts must stay out of tracked source unless they are deliberate fixtures.
@@ -81,6 +84,7 @@
 - Cross-platform app shells should not reimplement native/runtime concerns ad hoc inside each app.
 
 ### 7. Testing And Release Readiness
+- Tests belong under `.tests/` in a Wizardry app repo.
 - Every shipped app needs backend contract coverage.
 - Every shipped GUI app also needs a UI/static contract or regression surface, not only backend shell tests.
 - High-risk app flows need adversarial coverage, especially bridge actions, path handling, persistence, run/build/install flows, and drag/drop.
@@ -98,3 +102,6 @@
 - Frontends should not scrape `/cgi/system-info` or similar generic diagnostics for core endpoint or identity state when a backend action should provide that contract.
 - Every shipped GUI app should have both backend tests and UI/static contract tests.
 - Rolling audit results must include an explicit non-shell language inventory with justification.
+- Most Wizardry apps should default to `~/<appname>` for durable app data; alternate standard folders and shared storage roots need explicit justification.
+- Durable app data should stay plain-text by default, with YAML-plus-Markdown preferred for user-facing editable files and JSON reserved for app-facing machine state.
+- Wizardry app tests belong under `.tests/`.
