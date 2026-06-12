@@ -112,4 +112,7 @@
 - In sectioned detail panes, persistent automation toggles that govern that section should live in the section header accessory at top right instead of consuming body rows.
 - Controls that change how local work reaches production, such as Auto-push, belong in the Production or publish section rather than in deployment identity/config sections.
 - Native theme selectors should use keyboard-cycleable popup controls with immediate optimistic repaint, not menu-only pickers that wait for backend refresh before the theme visibly changes.
+- In SwiftUI native dark themes, do not rely on default `.secondary` text or default control appearance in detail panes; provide palette-owned primary/secondary text colors and set the pane color scheme explicitly when the theme is dark.
+- For AppKit popup/theme selectors inside themed native windows, style both the control and its menu with the active palette and dark/light appearance; otherwise dark themes can render black text on dark control backgrounds.
+- Time-based spinners are safer than `onAppear` plus local-state repeat animations for list rows that can be rebuilt frequently; use timeline-driven rotation so the first active row does not restart or drift.
 - In unified macOS titlebar windows, remove the visible window title, move top toolbars into the titlebar band, and reserve explicit left drag-safe space so controls never collide with the traffic-light cluster.
