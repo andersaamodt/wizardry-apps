@@ -34,6 +34,8 @@
 - Separate app-specific findings from repo-wide criteria discovered during the pass.
 - Treat a missing test surface or undocumented language exception as an audit finding, not as a note to maybe revisit later.
 - If a finding is safe to fix during the audit, fix it and update the standards in the same change.
+- Record recurring violations under stable category names so later reports can be grouped by problem class instead of only by app.
+- Prefer category-first aggregation for round summaries: severity first, then recurrence count, then affected apps.
 
 ## Audit Axes
 
@@ -74,6 +76,10 @@
 ### 5. GUI Contract
 - Follow `.github/WIZARDRY_APPS_GUI_STANDARDS.md` and `.github/GUI_AUDIT.md`.
 - Theme controls, keyboard support, fit-content controls, split-pane behavior, and settings/drawer patterns are mandatory where applicable.
+- Apps that use Wizardry themes must discover available themes from the real Wizardry theme set rather than from a hardcoded app-local list.
+- Theme picker lists should be alphabetized consistently.
+- When a closed theme picker has focus, up/down arrow keys should cycle themes correctly without requiring the menu to open first.
+- Theme application should be deep and complete across the app shell, not partial decoration layered on top of un-themed surfaces.
 - Built-in apps should integrate settings into the primary app shell; loading a separate settings document in an iframe counts as drift unless the app is explicitly designed as a document multiplexer.
 - Use semantic controls and roles instead of inline `onclick` anchors or other placeholder-era interaction patterns.
 - Avoid `alert()`-driven fallback UX and imperative “go run this in a terminal” messaging when the app can present durable inline state and guided next actions.
@@ -106,3 +112,4 @@
 - Durable app data should stay plain-text by default, with YAML-plus-Markdown preferred for user-facing editable files and JSON reserved for app-facing machine state.
 - Wizardry app tests belong under `.tests/`.
 - If a native port reuses another app's runtime or storage roots, that exception must be documented in repo-local AI-facing docs, not only in the user README.
+- Apps that use Wizardry themes must source the actual available theme set, keep picker behavior keyboard-correct, keep the list alphabetized, and apply theming deeply rather than cosmetically.

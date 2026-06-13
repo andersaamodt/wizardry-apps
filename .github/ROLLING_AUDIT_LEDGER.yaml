@@ -1,0 +1,241 @@
+version: 1
+description: >
+  Shared category-first ledger for Wizardry-family rolling audits. Record one
+  normalized entry per recurring violation class and append affected apps as
+  new audits discover them.
+
+categories:
+  - id: storage-default-home-missing
+    title: App does not use the default app-home storage layout
+    policy_axes:
+      - Storage And State Discipline
+    default_severity: high
+    affected_apps:
+      - dictator
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Decide whether to migrate to ~/appname or document a narrow approved exception.
+
+  - id: storage-exception-undocumented
+    title: Storage exception is real but not documented where auditors look
+    policy_axes:
+      - Storage And State Discipline
+      - Documentation And Auditability
+    default_severity: medium
+    affected_apps:
+      - binder
+      - dictator
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Add repo-local AI-facing exception notes and keep them in sync with runtime behavior.
+
+  - id: plain-text-durable-state-violated
+    title: Durable app state is not stored as plain text without justification
+    policy_axes:
+      - Storage And State Discipline
+    default_severity: high
+    affected_apps: []
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Move durable state to plain-text formats and reserve opaque formats for narrow justified cases.
+
+  - id: user-facing-config-not-yaml-md
+    title: User-facing durable config does not use the preferred YAML plus Markdown text conventions
+    policy_axes:
+      - Storage And State Discipline
+    default_severity: medium
+    affected_apps:
+      - bellheim
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Move user-facing durable config to YAML-oriented text or document a narrow exception.
+
+  - id: human-contract-format-not-yaml-md
+    title: Primary human-edited project contracts do not use the preferred YAML plus Markdown family
+    policy_axes:
+      - Storage And State Discipline
+      - Documentation And Auditability
+    default_severity: medium
+    affected_apps:
+      - theurgy
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Keep machine ABI envelopes in JSON when needed, but move human-owned project contracts toward YAML-oriented text.
+
+  - id: language-exception-undocumented
+    title: Non-shell language exceptions are present without a clear exception ledger
+    policy_axes:
+      - Language And Boundary Discipline
+      - Documentation And Auditability
+    default_severity: medium
+    affected_apps:
+      - bellheim
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Enumerate each approved non-shell boundary and keep the exception set explicit.
+
+  - id: generated-state-in-checkout
+    title: Generated defaults normalize runtime or durable state inside the source checkout
+    policy_axes:
+      - Storage And State Discipline
+    default_severity: high
+    affected_apps:
+      - theurgy
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Move generated runtime-state defaults to explicit user-local state roots outside the checkout.
+
+  - id: tests-not-under-dot-tests
+    title: Test surfaces are not organized under .tests
+    policy_axes:
+      - Testing And Release Readiness
+    default_severity: medium
+    affected_apps:
+      - dictator
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Move test entrypoints under .tests and leave non-test helpers elsewhere.
+
+  - id: python-exception-undocumented
+    title: Python is used without an explicit bounded exception
+    policy_axes:
+      - Language And Boundary Discipline
+      - Documentation And Auditability
+    default_severity: high
+    affected_apps:
+      - binder
+      - dictator
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Replace Python where not justified or document the retained runtime/tooling boundary explicitly.
+
+  - id: theme-catalog-hardcoded
+    title: Theme picker uses a hardcoded list instead of the real Wizardry theme set
+    policy_axes:
+      - GUI Contract
+    default_severity: medium
+    affected_apps: []
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Source the available themes from the shared theme directory or backend contract.
+
+  - id: theme-picker-keyboard-broken
+    title: Theme picker keyboard behavior does not match Wizardry expectations
+    policy_axes:
+      - GUI Contract
+    default_severity: medium
+    affected_apps: []
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Make focused closed pickers cycle themes with up/down arrows and keep open-list behavior consistent.
+
+  - id: theme-picker-not-alphabetized
+    title: Theme picker list is not alphabetized consistently
+    policy_axes:
+      - GUI Contract
+    default_severity: low
+    affected_apps: []
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Sort theme names consistently at the contract source.
+
+  - id: theme-application-incomplete
+    title: Theme application is partial or cosmetic rather than deep
+    policy_axes:
+      - GUI Contract
+    default_severity: medium
+    affected_apps: []
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Push theme tokens through all major app surfaces and remove un-themed holdouts.
+
+  - id: settings-shell-split
+    title: Settings live outside the main app shell without justification
+    policy_axes:
+      - GUI Contract
+    default_severity: high
+    affected_apps:
+      - chatroom
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Integrate settings into the primary shell unless the app is explicitly a document multiplexer.
+
+  - id: bridge-shell-fragment-execution
+    title: Frontend bridge falls back to shell fragments instead of hardcoded argv actions
+    policy_axes:
+      - Execution And Security Boundary
+    default_severity: high
+    affected_apps:
+      - chatroom
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Move execution into explicit backend actions and remove sh -c fallbacks.
+
+  - id: frontend-machine-state-scraping
+    title: Frontend scrapes generic diagnostics for machine state instead of using a backend contract
+    policy_axes:
+      - Execution And Security Boundary
+      - GUI Contract
+    default_severity: medium
+    affected_apps:
+      - chatroom
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Expose the required machine or endpoint state through a dedicated backend contract.
+
+  - id: inline-guided-fallback-missing
+    title: App uses alert-driven or send-away fallback UX instead of guided inline state
+    policy_axes:
+      - GUI Contract
+    default_severity: medium
+    affected_apps:
+      - chatroom
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Replace alert and imperative fallback messaging with durable inline status and guided next actions.
+
+  - id: read-path-mutates-state
+    title: Passive reads or refreshes mutate durable app state
+    policy_axes:
+      - Storage And State Discipline
+      - GUI Contract
+    default_severity: high
+    affected_apps:
+      - chatroom
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Separate hydration/read paths from write paths and add regression coverage.
+
+  - id: ui-static-tests-missing
+    title: Shipped GUI app lacks UI or static contract coverage
+    policy_axes:
+      - Testing And Release Readiness
+    default_severity: high
+    affected_apps:
+      - chatroom
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Add UI/static contract tests alongside backend coverage in .tests.
+
+  - id: repo-ai-standards-missing
+    title: Repo lacks a local AI-facing standards or exception surface
+    policy_axes:
+      - Documentation And Auditability
+    default_severity: medium
+    affected_apps:
+      - binder
+      - dictator
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Add a repo-local .github note that records standards specializations and approved exceptions.
+
+  - id: validation-suite-red
+    title: Canonical validation or contract test suite is not green
+    policy_axes:
+      - Testing And Release Readiness
+    default_severity: high
+    affected_apps:
+      - theurgy
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Restore the canonical test suite to green before treating the contract layer as stable.

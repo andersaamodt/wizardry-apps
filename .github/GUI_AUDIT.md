@@ -21,6 +21,10 @@
 ## Cross-App Checklist
 - [ ] Startup and splash behavior matches `Startup Splash Contract` where applicable to the app host.
 - [ ] Theme controls and theme application match `Theme System Contract`.
+- [ ] Theme pickers discover the real Wizardry theme set instead of using a hardcoded list.
+- [ ] Theme picker lists are alphabetized consistently.
+- [ ] When a closed theme picker has focus, up/down arrow keys cycle themes correctly without first opening the list.
+- [ ] Theming is deep and complete across the app shell rather than partial decoration over un-themed surfaces.
 - [ ] Desktop theme persistence uses backend prefs and plaintext files, not browser-owned durability (`Theme System Contract` + `Storage Rules`).
 - [ ] Minor icon actions and primary actions match `Button And Icon Style Contract`.
 - [ ] Dense top/menu bars use icon controls for secondary actions; text buttons are reserved for primary workflow actions (`Button And Icon Style Contract` + `Discoverability and Navigation`).
