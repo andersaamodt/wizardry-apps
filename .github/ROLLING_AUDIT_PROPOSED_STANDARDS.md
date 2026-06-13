@@ -17,6 +17,7 @@
 - Browser or WebView local storage may be used only as a short-lived bootstrap cache when a canonical file-backed preference contract remains authoritative and can fully restore state.
 - Browser or WebView local storage should not hold durable authentication secrets, pairing secrets, or account-recovery material as the canonical contract.
 - Repo checkouts should never become app-instance state directories. User settings, runtime logs, temp homes, browser profiles, caches, and similar operator-local cruft should live outside the checkout.
+- Build artifacts, generated release products, scratch workspaces, package-manager caches, compiled helper outputs, and other disposable cruft should not be created inside app source repos unless they are deliberate checked-in fixtures; use temp, XDG cache/state, or another explicit external build root.
 - Generated project defaults should not normalize repo-local runtime-state directories inside new source trees.
 - Generated staging trees for native or web build pipelines should remain disposable and rerender-safe even after normal local tool artifacts appear inside them.
 

@@ -114,6 +114,19 @@
 - Needs re-check:
   - all repos and all generated templates
 
+### `repo-cruft-and-build-artifact-discipline`
+- Late criterion source:
+  - user direction during pass 2
+- Standard candidate:
+  - Apps should not create build artifacts, package outputs, caches, compiled helper outputs, scratch workspaces, runtime logs, or other disposable cruft inside source repos unless the files are deliberate fixtures.
+  - Use temp, XDG cache/state, or another explicit external build root for disposable outputs.
+- Status:
+  - recorded as a standard candidate
+  - not yet audited in this pass
+- Needs re-check:
+  - all app repos
+  - generated templates and Forge build/release flows
+
 ## Initial Round 2 Audit Order
 1. Built-in Wizardry Apps surfaces:
    - `forge`

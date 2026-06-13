@@ -238,3 +238,16 @@ variance_items:
       current_state:
         - all audited app repos
     phronesis_candidate: true
+
+  - id: repo-cruft-and-build-output-placement
+    title: Apps may vary in where build artifacts, caches, scratch workspaces, and generated outputs are written
+    status: standard-proposed
+    candidate_standard: >
+      Source repos should not receive disposable build artifacts, package
+      outputs, caches, compiled helper outputs, scratch workspaces, runtime
+      logs, or app-instance state. Use temp, XDG cache/state, or an explicit
+      external build root unless the file is a deliberate checked-in fixture.
+    affected_examples:
+      current_state:
+        - not yet audited in pass 2
+    phronesis_candidate: true
