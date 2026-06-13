@@ -6320,15 +6320,11 @@ build_native_mobile_workspace_target() {
   app_name=$(printf '%s\n' "$meta" | kv_read app_name)
   workspace_slug=$(printf '%s\n' "$meta" | kv_read workspace_slug)
 
-  run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
-
   case "$target" in
     android)
       project_dir="$workspace_path/generated/mobile/android"
-      [ -f "$project_dir/settings.gradle" ] || { printf '%s\n' "forge-backend: native Android project is missing settings.gradle: $project_dir" >&2; exit 1; }
-      out_dir="$(forge_workbench_root "$root")/dist/native-mobile/$workspace_slug/android"
-      mkdir -p "$out_dir"
       if ! command -v gradle >/dev/null 2>&1; then
+        run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
         printf 'status=prepared\n'
         printf 'target=android\n'
         printf 'mode=%s\n' "$mode"
@@ -6339,6 +6335,7 @@ build_native_mobile_workspace_target() {
         return 0
       fi
       if ! command -v java >/dev/null 2>&1; then
+        run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
         printf 'status=prepared\n'
         printf 'target=android\n'
         printf 'mode=%s\n' "$mode"
@@ -6348,6 +6345,10 @@ build_native_mobile_workspace_target() {
         printf 'message=%s\n' "Android project generated. Install a Java runtime to produce APK/AAB artifacts."
         return 0
       fi
+      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+      [ -f "$project_dir/settings.gradle" ] || { printf '%s\n' "forge-backend: native Android project is missing settings.gradle: $project_dir" >&2; exit 1; }
+      out_dir="$(forge_workbench_root "$root")/dist/native-mobile/$workspace_slug/android"
+      mkdir -p "$out_dir"
       task="assembleDebug"
       [ "$mode" = "release" ] && task="bundleRelease"
       build_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-android-build.log"
@@ -6382,8 +6383,8 @@ build_native_mobile_workspace_target() {
     ios)
       [ "$(os_id)" = "darwin" ] || { printf '%s\n' "forge-backend: native iOS builds are supported on macOS only" >&2; exit 1; }
       project_dir="$workspace_path/generated/mobile/ios"
-      [ -f "$project_dir/project.yml" ] || { printf '%s\n' "forge-backend: native iOS project is missing project.yml: $project_dir" >&2; exit 1; }
       if ! command -v xcodegen >/dev/null 2>&1; then
+        run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
         printf 'status=prepared\n'
         printf 'target=ios\n'
         printf 'mode=%s\n' "$mode"
@@ -6394,6 +6395,7 @@ build_native_mobile_workspace_target() {
         return 0
       fi
       if ! command -v xcodebuild >/dev/null 2>&1; then
+        run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
         printf 'status=prepared\n'
         printf 'target=ios\n'
         printf 'mode=%s\n' "$mode"
@@ -6403,6 +6405,8 @@ build_native_mobile_workspace_target() {
         printf 'message=%s\n' "iOS project generated. Install full Xcode to produce simulator builds."
         return 0
       fi
+      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+      [ -f "$project_dir/project.yml" ] || { printf '%s\n' "forge-backend: native iOS project is missing project.yml: $project_dir" >&2; exit 1; }
       build_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-ios-build.log"
       mkdir -p "$(dirname "$build_log")"
       if ! ( cd "$project_dir" && xcodegen generate >/dev/null && xcodebuild -scheme "$app_id" -destination 'generic/platform=iOS Simulator' build >"$build_log" 2>&1 ); then
