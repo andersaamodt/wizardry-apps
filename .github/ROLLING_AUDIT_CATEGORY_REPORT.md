@@ -275,37 +275,43 @@
 - Affected:
   - `theurgy`
 
-### 19. `tests-not-under-dot-tests`
+### 19. `generated-native-theme-catalog-hardcoded`
+- Affected:
+  - `binder`
+- Fix direction:
+  - make every generated native platform target consume the same discovered shared Wizardry theme catalog instead of embedding static platform-specific theme option lists
+
+### 20. `tests-not-under-dot-tests`
 - Affected:
   - `dictator`
   - `hegelizer`
   - `pleroma`
 
-### 20. `config-example-stale`
+### 21. `config-example-stale`
 - Affected:
   - `fauxzilla`
 
-### 21. `frontend-machine-state-scraping`
+### 22. `frontend-machine-state-scraping`
 - Affected:
   - `chatroom`
 
-### 22. `inline-guided-fallback-missing`
+### 23. `inline-guided-fallback-missing`
 - Affected:
   - `chatroom`
 
-### 23. `audit-surface-stale`
+### 24. `audit-surface-stale`
 - Affected:
   - `wizardry`
 
-### 24. `gnu-tool-dependency-undocumented`
+### 25. `gnu-tool-dependency-undocumented`
 - Affected:
   - `wizardry`
 
-### 25. `theme-picker-keyboard-broken`
+### 26. `theme-picker-keyboard-broken`
 - Affected:
   - `wizardry-desktop`
 
-### 26. `frontend-derived-backend-path`
+### 27. `frontend-derived-backend-path`
 - Severity: medium
 - Recurrence: 12 app surfaces
 - Affected:
@@ -324,13 +330,13 @@
 - Fix direction:
   - move backend path resolution into the host or backend contract and expose explicit actions only
 
-### 27. `generated-staging-not-disposable`
+### 28. `generated-staging-not-disposable`
 - Affected:
   - `organizer`
 - Fix direction:
   - keep generated native staging trees disposable and rerender-safe even after ordinary local build artifacts appear
 
-### 28. `cargo-runtime-layer-present`
+### 29. `cargo-runtime-layer-present`
 - Severity: high
 - Recurrence: 1 repo
 - Affected:
@@ -338,7 +344,7 @@
 - Batch fix direction:
   - remove Cargo from ordinary shipped runtime paths or move the helper into an explicitly approved host or Theurgy boundary
 
-### 29. `bridge-shell-fragment-execution`
+### 30. `bridge-shell-fragment-execution`
 - Severity: high
 - Recurrence: 3 app surfaces
 - Affected:
@@ -350,7 +356,7 @@
 
 ## Low-Severity Recurring Categories
 
-### 30. `theme-picker-not-alphabetized`
+### 31. `theme-picker-not-alphabetized`
 - Severity: low
 - Recurrence: 4 app surfaces
 - Affected:

@@ -218,6 +218,18 @@ categories:
     evidence_refs: []
     fix_strategy: Source the available themes from the shared theme directory or backend contract.
 
+  - id: generated-native-theme-catalog-hardcoded
+    title: Generated native theme picker embeds static theme options instead of using discovered themes
+    policy_axes:
+      - GUI Contract
+      - Native And Host Boundary Discipline
+    default_severity: medium
+    affected_apps:
+      - binder
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Make generated native theme controls consume the same discovered shared theme catalog on every platform target.
+
   - id: theme-picker-keyboard-broken
     title: Theme picker keyboard behavior does not match Wizardry expectations
     policy_axes:

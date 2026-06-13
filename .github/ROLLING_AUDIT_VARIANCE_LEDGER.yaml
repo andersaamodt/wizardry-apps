@@ -11,13 +11,17 @@ variance_items:
     observed_patterns:
       - shared_wizardry_themes
       - shared_wizardry_themes_with_frontend_fallback_catalog
+      - generated_native_shared_themes_with_static_platform_catalog
+      - undeclared_app_local_theme_catalog
       - app_local_theme_system
       - single_fixed_palette
+      - no_app_theme_picker
     candidate_standard: >
       Forge-generated Wizardry apps should default to shared Wizardry themes.
       App-local theme systems are allowed only when explicitly documented as
       app identity, with their own keyboard, ordering, persistence, and depth
-      contract.
+      contract. Generated native targets must not regress from discovered
+      shared theme catalogs to static platform-specific option lists.
     affected_examples:
       shared_wizardry_themes:
         - forge
@@ -27,11 +31,25 @@ variance_items:
         - serenity
         - simplerchat
         - wizardry-desktop
+      generated_native_shared_themes_with_static_platform_catalog:
+        - binder
+      undeclared_app_local_theme_catalog:
+        - boycott
       app_local_theme_system:
         - matchbook
         - pleroma
       single_fixed_palette:
         - hegelizer
+        - pieplate
+      no_app_theme_picker:
+        - applegate
+        - book-club
+        - counterspell
+        - dictator
+        - eye
+        - fauxzilla
+        - organizer
+        - stellar
     phronesis_candidate: true
 
   - id: durable-root-layout

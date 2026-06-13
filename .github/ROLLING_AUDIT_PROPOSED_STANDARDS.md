@@ -50,9 +50,11 @@
 - Forge-generated Wizardry apps should default to shared Wizardry themes unless the app declares an explicit app-local theme identity.
 - App-local theme systems should still define their own keyboard, ordering, persistence, and full-depth application contract.
 - Apps that use Wizardry themes should discover the real shared Wizardry theme set rather than keep app-local hardcoded theme catalogs.
+- Generated native targets that expose Wizardry themes should consume the same discovered shared theme catalog on every platform; static generated platform option lists are drift even if another platform target already discovers themes correctly.
 - Theme lists should be alphabetized consistently at the contract source.
 - When a focused theme picker is closed, up/down arrow keys should still cycle themes correctly.
 - Theme application should be deep and complete across the whole app shell rather than partial decoration over un-themed surfaces.
+- Apps with no theme picker or a fixed palette should document that as an intentional app-local visual contract, not leave auditors to infer whether shared themes were forgotten.
 - Built-in app settings should live in the main shell by default rather than a second document or iframe.
 - Passive reads and status refreshes should never mutate durable app state.
 - Fallback UX should prefer guided inline state over `alert()` or send-away instructions.

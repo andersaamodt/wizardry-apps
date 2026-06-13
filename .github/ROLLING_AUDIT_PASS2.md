@@ -90,6 +90,26 @@
   - Apps either use shared Wizardry themes correctly or explicitly declare an app-local theme system and its behavior contract.
 - Needs re-check:
   - every app with a theme picker, hardcoded palette list, or `data-theme`/theme class contract
+- Checked so far:
+  - `forge`: pass; shared Wizardry themes are backend-discovered, sorted, and keyboard-cyclable
+  - `wizardry-desktop`: fail; shared-theme backend discovery exists, but frontend fallback catalog is hardcoded, unsorted, and closed-picker cycling is missing
+  - `bellheim`: fail; shared-theme backend discovery and closed-picker cycling exist, but frontend still carries a hardcoded fallback catalog
+  - `binder`: fail for generated native target variance; macOS generated app discovers shared themes, but Linux generated/template code still appends a static theme list
+  - `book-club`: no app theme picker surfaced in focused scan
+  - `boycott`: fail; frontend owns an undeclared hardcoded app theme list and ordering is not alphabetic
+  - `counterspell`: no app theme picker surfaced in focused scan
+  - `dictator`: no app theme picker surfaced in focused scan
+  - `eye`: no app theme picker surfaced in focused scan
+  - `fauxzilla`: no Wizardry app theme picker surfaced in focused scan
+  - `hegelizer`: fixed monochrome palette; acceptable only if documented as an app-local fixed-palette exception
+  - `matchbook`: app-local theme system; not counted as shared-theme failure, but requires explicit local exception documentation
+  - `mecha`: fail; shared-theme backend discovery exists, but frontend fallback catalog is hardcoded and not alphabetized
+  - `organizer`: no app theme picker surfaced in focused scan
+  - `pieplate`: fixed/public website visual theme rather than Wizardry theme picker in focused scan
+  - `pleroma`: app-local theme preset system with closed-picker arrow cycling; not counted as shared-theme failure, but requires explicit local exception documentation
+  - `serenity`: fail; claims Wizardry app themes but starts from a hardcoded frontend catalog and browser-owned theme bootstrap
+  - `simplerchat`: fail; backend discovery exists and closed-picker cycling works, but frontend fallback catalog remains hardcoded and `psionic` is pinned before alphabetic order
+  - `stellar`: no Wizardry theme picker surfaced; has app-local bubble color preferences and mobile native platform theme constants outside the shared-theme picker contract
 
 ### `repo-local-ai-exception-ledger`
 - Late criterion source:

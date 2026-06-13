@@ -95,6 +95,7 @@
 - `tests.shipped-backend-contract`: shipped apps need backend contract tests.
 - `tests.shipped-ui-contract`: shipped GUI apps need UI/static contract tests.
 - `themes.shared-catalog-authority`: apps using Wizardry themes must discover the real shared theme catalog.
+- `themes.native-shared-catalog-parity`: generated native targets exposing Wizardry themes must use the same discovered catalog across platform outputs.
 - `bridge.no-shell-fragments`: frontends call explicit backend actions and never send shell fragments.
 - `bridge.backend-resolution-owned`: frontend code does not derive backend executable paths from document paths.
 - `runtime.no-cargo-on-demand`: shipped backend paths do not compile Cargo-managed helpers on demand.

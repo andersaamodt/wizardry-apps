@@ -85,6 +85,7 @@
 - Follow `.github/WIZARDRY_APPS_GUI_STANDARDS.md` and `.github/GUI_AUDIT.md`.
 - Theme controls, keyboard support, fit-content controls, split-pane behavior, and settings/drawer patterns are mandatory where applicable.
 - Apps that use Wizardry themes must discover available themes from the real Wizardry theme set rather than from a hardcoded app-local list.
+- Generated native targets that expose shared Wizardry themes must consume the discovered theme catalog on every platform target, not embed static per-platform option lists.
 - Theme picker lists should be alphabetized consistently.
 - When a closed theme picker has focus, up/down arrow keys should cycle themes correctly without requiring the menu to open first.
 - Theme application should be deep and complete across the app shell, not partial decoration layered on top of un-themed surfaces.
