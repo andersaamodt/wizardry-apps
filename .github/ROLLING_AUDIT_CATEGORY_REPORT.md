@@ -14,7 +14,7 @@
 
 ### 1. `python-exception-undocumented`
 - Severity: high
-- Recurrence: 8 repos
+- Recurrence: 10 repos
 - Affected:
   - `binder`
   - `book-club`
@@ -23,7 +23,9 @@
   - `fauxzilla`
   - `organizer`
   - `pieplate`
+  - `serenity`
   - `simplerchat`
+  - `stellar`
 - Why it ranks first:
   - This is the broadest high-severity recurring language-discipline problem found so far.
   - It cuts across native ports, shell-first apps, extension-plus-hub architecture, and mixed hosted/desktop repos.
@@ -34,7 +36,7 @@
 
 ### 2. `repo-ai-standards-missing`
 - Severity: medium
-- Recurrence: 11 repos
+- Recurrence: 13 repos
 - Affected:
   - `applegate`
   - `binder`
@@ -46,7 +48,9 @@
   - `mecha`
   - `organizer`
   - `pieplate`
+  - `serenity`
   - `simplerchat`
+  - `stellar`
 - Why it ranks near the top:
   - This is currently the broadest recurring documentation/governance gap.
   - It directly slows every future audit and makes exception handling too implicit.
@@ -56,10 +60,11 @@
 
 ### 3. `validation-suite-red`
 - Severity: high
-- Recurrence: 3 repos
+- Recurrence: 4 repos
 - Affected:
   - `hegelizer`
   - `pieplate`
+  - `stellar`
   - `theurgy`
 - Why it ranks high:
   - A red claimed validation suite blocks confidence in the contract layer directly.
@@ -68,11 +73,12 @@
 
 ### 4. `storage-default-home-missing`
 - Severity: high
-- Recurrence: 3 repos
+- Recurrence: 4 repos
 - Affected:
   - `dictator`
   - `mecha`
   - `pieplate`
+  - `stellar`
 - Why it ranks high:
   - This is a direct miss against the default Wizardry durable-state posture.
 - Batch fix direction:
@@ -81,10 +87,11 @@
 
 ### 5. `browser-owned-durable-state`
 - Severity: high
-- Recurrence: 2 repos
+- Recurrence: 3 repos
 - Affected:
   - `fauxzilla`
   - `pieplate`
+  - `serenity`
 - Why it ranks high:
   - This combines high-severity storage drift with user-secret and identity-state risk.
 - Batch fix direction:
@@ -92,11 +99,12 @@
 
 ### 6. `ui-static-tests-missing`
 - Severity: high
-- Recurrence: 3 repos
+- Recurrence: 4 repos
 - Affected:
   - `applegate`
   - `chatroom`
   - `eye`
+  - `serenity`
 - Why it ranks high:
   - These are shipped GUI surfaces without matching UI/static contract protection.
 - Batch fix direction:
@@ -135,11 +143,17 @@
 - Fix direction:
   - separate read/hydration from persistence
 
+### 12. `backend-contract-tests-missing`
+- Affected:
+  - `serenity`
+- Fix direction:
+  - add backend contract coverage under `.tests/` before treating the bridge or monitor contract as stable
+
 ## Medium-Severity Recurring Categories
 
-### 12. `language-exception-undocumented`
+### 13. `language-exception-undocumented`
 - Severity: medium
-- Recurrence: 8 repos
+- Recurrence: 9 repos
 - Affected:
   - `bellheim`
   - `book-club`
@@ -148,6 +162,7 @@
   - `matchbook`
   - `organizer`
   - `pieplate`
+  - `stellar`
   - `simplerchat`
 - Batch fix direction:
   - enumerate all non-shell boundaries in local standards notes
@@ -166,22 +181,24 @@
 
 ### 14. `shared-xdg-app-namespace`
 - Severity: medium
-- Recurrence: 5 repos
+- Recurrence: 6 repos
 - Affected:
   - `book-club`
   - `counterspell`
   - `hegelizer`
   - `mecha`
   - `pieplate`
+  - `stellar`
 - Batch fix direction:
   - if XDG roots remain, move them to app-owned names rather than `wizardry-apps/...` or `wizardry/...`
 
 ### 15. `theme-catalog-hardcoded`
 - Severity: medium
-- Recurrence: 4 app surfaces
+- Recurrence: 5 app surfaces
 - Affected:
   - `bellheim`
   - `mecha`
+  - `serenity`
   - `simplerchat`
   - `wizardry-desktop`
 - Batch fix direction:
@@ -240,9 +257,18 @@
 - Fix direction:
   - keep generated native staging trees disposable and rerender-safe even after ordinary local build artifacts appear
 
+### 26. `bridge-shell-fragment-execution`
+- Severity: high
+- Recurrence: 2 repos
+- Affected:
+  - `chatroom`
+  - `serenity`
+- Batch fix direction:
+  - move execution into explicit backend actions and remove frontend-owned shell fragments or `sh -c`-style bridge payloads
+
 ## Low-Severity Recurring Categories
 
-### 26. `theme-picker-not-alphabetized`
+### 27. `theme-picker-not-alphabetized`
 - Severity: low
 - Recurrence: 3 app surfaces
 - Affected:

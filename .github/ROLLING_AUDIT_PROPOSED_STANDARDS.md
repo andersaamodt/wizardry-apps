@@ -22,9 +22,11 @@
 
 ### Tests And Auditability
 - Wizardry-family test entrypoints should live under `.tests/`.
+- Shipped apps need backend contract coverage under `.tests/`; UI-only or manual validation is not enough.
 - For native apps, IR/schema validation alone should not count as sufficient GUI coverage; add a `.tests/` UI/static regression surface for the shipped native shell or generated output.
 - Existing audit surfaces should be treated as active contracts and must be refreshed when they become stale; stale audit tables are a standards violation, not harmless historical clutter.
 - Approved exceptions should be documented in repo-local AI-facing docs where the next auditor will actually look.
+- Repo-local AI docs should name the repo’s own storage and language exceptions explicitly, not only redirect readers to upstream canonical docs.
 - AI-facing standards docs should not contain contradictory approved patterns; one canonical pattern should win.
 - Checked-in config examples and copyable setup templates should match current runtime defaults exactly; stale legacy-path examples are a standards violation.
 

@@ -104,6 +104,8 @@
 ## Criteria Learned In Round 1
 - Shared cross-app namespace roots are still drift even in standard platform folders like Application Support, not only in XDG paths.
 - For native apps, IR/schema validation alone does not satisfy the GUI contract requirement; the shipped native shell still needs `.tests/` UI/static regression coverage.
+- A shipped app with no backend contract coverage under `.tests/` fails the testing axis even if manual or UI-facing behavior exists.
+- Repo-local AI docs must enumerate repo-specific exception boundaries; pointing only to upstream canonical docs is not enough when the repo retains real local exceptions.
 - Passive status and refresh paths must not write prefs or other durable app state.
 - Built-in app settings should be part of the main app shell, not a second HTML document mounted in an iframe.
 - Built-in app fallback UX should avoid `alert()` and imperative “Please start...” messaging in favor of inline guided status.

@@ -11,6 +11,7 @@ categories:
       - Storage And State Discipline
     default_severity: high
     affected_apps:
+      - stellar
       - dictator
       - hegelizer
       - mecha
@@ -41,6 +42,7 @@ categories:
       - Storage And State Discipline
     default_severity: medium
     affected_apps:
+      - stellar
       - book-club
       - counterspell
       - hegelizer
@@ -69,6 +71,7 @@ categories:
     affected_apps:
       - fauxzilla
       - pieplate
+      - serenity
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Keep browser storage cache-only where needed and move canonical durable state to app-owned plain-text surfaces or another explicit exportable contract.
@@ -115,6 +118,7 @@ categories:
       - matchbook
       - organizer
       - pieplate
+      - stellar
       - simplerchat
     approved_exceptions: []
     evidence_refs: []
@@ -180,7 +184,9 @@ categories:
       - fauxzilla
       - organizer
       - pieplate
+      - serenity
       - simplerchat
+      - stellar
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Replace Python where not justified or document the retained runtime/tooling boundary explicitly.
@@ -193,6 +199,7 @@ categories:
     affected_apps:
       - bellheim
       - mecha
+      - serenity
       - simplerchat
       - wizardry-desktop
     approved_exceptions: []
@@ -251,6 +258,7 @@ categories:
     default_severity: high
     affected_apps:
       - chatroom
+      - serenity
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Move execution into explicit backend actions and remove sh -c fallbacks.
@@ -311,6 +319,7 @@ categories:
       - applegate
       - chatroom
       - eye
+      - serenity
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add UI/static contract tests alongside backend coverage in .tests.
@@ -331,10 +340,23 @@ categories:
       - mecha
       - organizer
       - pieplate
+      - serenity
       - simplerchat
+      - stellar
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add a repo-local .github note that records standards specializations and approved exceptions.
+
+  - id: backend-contract-tests-missing
+    title: Shipped app lacks backend contract coverage under .tests
+    policy_axes:
+      - Testing And Release Readiness
+    default_severity: high
+    affected_apps:
+      - serenity
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Add backend contract coverage in .tests before relying on manual or UI-only validation.
 
   - id: audit-surface-stale
     title: Existing audit surface is stale or inaccurate relative to current source
@@ -367,6 +389,7 @@ categories:
     affected_apps:
       - hegelizer
       - pieplate
+      - stellar
       - theurgy
     approved_exceptions: []
     evidence_refs: []

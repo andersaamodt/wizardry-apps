@@ -30,7 +30,9 @@
 - `mecha`
 - `organizer`
 - `pieplate`
+- `serenity`
 - `simplerchat`
+- `stellar`
 
 ## In Progress Branches
 - `applegate`: `codex/audit-applegate-round1`
@@ -46,7 +48,9 @@
 - `mecha`: `codex/audit-mecha-round1`
 - `organizer`: `codex/audit-organizer-round1`
 - `pieplate`: `codex/audit-pieplate-round1`
+- `serenity`: `codex/audit-serenity-round1`
 - `simplerchat`: `codex/audit-simplerchat-round1`
+- `stellar`: `codex/audit-stellar-round1`
 - `theurgy`: `codex/audit-theurgy-round1`
 - `wizardry-apps`: `codex/rolling-audit-wizardry-apps`
 - `wizardry`: `codex/audit-wizardry-round1`
@@ -55,13 +59,9 @@
 - none currently
 
 ## Deferred For Worktree Safety Or Scope Triage
-- `stellar`
-  - unrelated dirty icon work was already present during audit passes
 - `boycott`
   - unrelated dirty icon work was already present during audit passes
 - `pleroma`
-  - unrelated dirty work was already present during audit passes
-- `serenity`
   - unrelated dirty work was already present during audit passes
 
 ## Notes
