@@ -108,6 +108,7 @@ entry=$(
     }
   ' "$bundle/Contents/Info.plist"
 )
+[ -n "${WIZARDRY_FAKE_HOST_LOG:-}" ] && printf 'open-launch bundle=%s launcher=%s entry=%s\n' "$bundle" "$launcher" "$entry" >>"$WIZARDRY_FAKE_HOST_LOG"
 nohup "$launcher" "$entry" "$@" >/dev/null 2>&1 &
 exit 0
 SH
@@ -139,15 +140,20 @@ CONF
 app_entry=$(CDPATH= cd -- "$workspace/app" && pwd -P)
 
 host_log="$scratch/host.log"
-run_out=$(
+run_err="$scratch/run.err"
+if ! run_out=$(
   env \
     PATH="$fake_bin:$PATH" \
     WIZARDRY_APPS_STATE_DIR="$state_root" \
     WIZARDRY_APPS_CACHE_DIR="$cache_root" \
     WIZARDRY_FAKE_HOST_LOG="$host_log" \
     WIZARDRY_FAKE_HOST_SLEEP=8 \
-    sh "$backend" run-workspace "$root" "$workspace"
-)
+    sh "$backend" run-workspace "$root" "$workspace" 2>"$run_err"
+); then
+  cat "$run_err" >&2
+  [ -f "$host_log" ] && cat "$host_log" >&2
+  exit 1
+fi
 
 printf '%s\n' "$run_out" | grep -F "launched=1" >/dev/null
 printf '%s\n' "$run_out" | grep -F "mode=desktop-executable" >/dev/null
