@@ -89,6 +89,7 @@
 - `human-contract-format-not-yaml-md`
 - `language-exception-undocumented`
 - `generated-state-in-checkout`
+- `standards-guidance-contradictory`
 - `settings-shell-split`
 - `bridge-shell-fragment-execution`
 - `frontend-machine-state-scraping`
@@ -96,6 +97,8 @@
 - `read-path-mutates-state`
 - `ui-static-tests-missing`
 - `repo-ai-standards-missing`
+- `audit-surface-stale`
+- `gnu-tool-dependency-undocumented`
 - `validation-suite-red`
 
 ## Next Step

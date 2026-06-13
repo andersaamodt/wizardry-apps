@@ -85,6 +85,17 @@ categories:
     evidence_refs: []
     fix_strategy: Move generated runtime-state defaults to explicit user-local state roots outside the checkout.
 
+  - id: standards-guidance-contradictory
+    title: AI-facing standards docs contradict each other on the approved pattern
+    policy_axes:
+      - Documentation And Auditability
+    default_severity: high
+    affected_apps:
+      - wizardry
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Collapse conflicting guidance into one canonical approved pattern and remove the losing variant.
+
   - id: tests-not-under-dot-tests
     title: Test surfaces are not organized under .tests
     policy_axes:
@@ -228,6 +239,29 @@ categories:
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add a repo-local .github note that records standards specializations and approved exceptions.
+
+  - id: audit-surface-stale
+    title: Existing audit surface is stale or inaccurate relative to current source
+    policy_axes:
+      - Documentation And Auditability
+    default_severity: medium
+    affected_apps:
+      - wizardry
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Revalidate or regenerate the audit surface from current source before treating it as active evidence.
+
+  - id: gnu-tool-dependency-undocumented
+    title: Repo relies on GNU-specific tool behavior without explicit portability handling
+    policy_axes:
+      - Language And Boundary Discipline
+      - Testing And Release Readiness
+    default_severity: medium
+    affected_apps:
+      - wizardry
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Replace GNU-specific behavior with a POSIX-safe path or add explicit portability guards and tests.
 
   - id: validation-suite-red
     title: Canonical validation or contract test suite is not green
