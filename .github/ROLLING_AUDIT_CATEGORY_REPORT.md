@@ -14,17 +14,18 @@
 
 ### 1. `python-exception-undocumented`
 - Severity: high
-- Recurrence: 6 repos
+- Recurrence: 7 repos
 - Affected:
   - `binder`
   - `counterspell`
   - `dictator`
   - `fauxzilla`
   - `organizer`
+  - `pieplate`
   - `simplerchat`
 - Why it ranks first:
   - This is the broadest high-severity recurring language-discipline problem found so far.
-  - It cuts across native ports, shell-first apps, and extension-plus-hub architecture.
+  - It cuts across native ports, shell-first apps, extension-plus-hub architecture, and mixed hosted/desktop repos.
 - Batch fix direction:
   - decide repo-by-repo whether Python is being removed or explicitly retained
   - where retained, add a repo-local exception ledger in `.github/`
@@ -32,7 +33,7 @@
 
 ### 2. `repo-ai-standards-missing`
 - Severity: medium
-- Recurrence: 8 repos
+- Recurrence: 9 repos
 - Affected:
   - `binder`
   - `dictator`
@@ -41,6 +42,7 @@
   - `hegelizer`
   - `mecha`
   - `organizer`
+  - `pieplate`
   - `simplerchat`
 - Why it ranks near the top:
   - This is currently the broadest recurring documentation/governance gap.
@@ -49,19 +51,43 @@
   - add a minimal repo-local `.github` standards note template
   - require each repo to list storage exceptions, language boundaries, and any accepted architecture-specific variance
 
-### 3. `storage-default-home-missing`
+### 3. `validation-suite-red`
 - Severity: high
-- Recurrence: 2 repos
+- Recurrence: 3 repos
+- Affected:
+  - `hegelizer`
+  - `pieplate`
+  - `theurgy`
+- Why it ranks high:
+  - A red claimed validation suite blocks confidence in the contract layer directly.
+- Batch fix direction:
+  - restore each repo’s canonical validation suite to green before treating the contract surface as stable
+
+### 4. `storage-default-home-missing`
+- Severity: high
+- Recurrence: 3 repos
 - Affected:
   - `dictator`
   - `mecha`
+  - `pieplate`
 - Why it ranks high:
   - This is a direct miss against the default Wizardry durable-state posture.
 - Batch fix direction:
   - migrate primary durable state to `~/<appname>` where appropriate
   - otherwise promote a narrow documented exception instead of treating the current layout as ordinary
 
-### 4. `ui-static-tests-missing`
+### 5. `browser-owned-durable-state`
+- Severity: high
+- Recurrence: 2 repos
+- Affected:
+  - `fauxzilla`
+  - `pieplate`
+- Why it ranks high:
+  - This combines high-severity storage drift with user-secret and identity-state risk.
+- Batch fix direction:
+  - narrow browser-owned storage to cache/bootstrap use and move canonical durable state and secrets into app-owned explicit contracts
+
+### 6. `ui-static-tests-missing`
 - Severity: high
 - Recurrence: 2 repos
 - Affected:
@@ -75,89 +101,73 @@
 
 ## High-Severity Single-Repo Categories
 
-### 5. `generated-state-in-checkout`
-- Severity: high
+### 7. `generated-state-in-checkout`
 - Affected:
   - `theurgy`
 - Fix direction:
   - generated defaults must stop normalizing runtime state into source trees
 
-### 6. `standards-guidance-contradictory`
-- Severity: high
+### 8. `standards-guidance-contradictory`
 - Affected:
   - `wizardry`
 - Fix direction:
   - choose one canonical shell pattern and delete the conflicting one from AI-facing docs
 
-### 7. `browser-owned-durable-state`
-- Severity: high
-- Affected:
-  - `fauxzilla`
-- Fix direction:
-  - narrow extension storage to cache/bootstrap use
-  - mirror canonical durable state into an app-owned plain-text contract
-
-### 8. `settings-shell-split`
-- Severity: high
+### 9. `settings-shell-split`
 - Affected:
   - `chatroom`
 - Fix direction:
   - move settings into the main shell
 
-### 9. `bridge-shell-fragment-execution`
-- Severity: high
+### 10. `bridge-shell-fragment-execution`
 - Affected:
   - `chatroom`
 - Fix direction:
   - replace `sh -c` bridge fallbacks with explicit backend actions
 
-### 10. `read-path-mutates-state`
-- Severity: high
+### 11. `read-path-mutates-state`
 - Affected:
   - `chatroom`
 - Fix direction:
   - separate read/hydration from persistence
 
-### 11. `validation-suite-red`
-- Severity: high
-- Affected:
-  - `theurgy`
-- Fix direction:
-  - restore the canonical suite to green before treating the contract as stable
-
 ## Medium-Severity Recurring Categories
 
-### 12. `storage-exception-undocumented`
+### 12. `language-exception-undocumented`
 - Severity: medium
-- Recurrence: 3 repos
-- Affected:
-  - `binder`
-  - `dictator`
-  - `mecha`
-- Batch fix direction:
-  - document real storage exceptions where auditors look first
-
-### 13. `user-facing-config-not-yaml-md`
-- Severity: medium
-- Recurrence: 3 repos
-- Affected:
-  - `bellheim`
-  - `counterspell`
-  - `fauxzilla`
-- Batch fix direction:
-  - convert user-facing durable config toward YAML-plus-Markdown or explicitly justify non-YAML text
-
-### 14. `language-exception-undocumented`
-- Severity: medium
-- Recurrence: 5 repos
+- Recurrence: 6 repos
 - Affected:
   - `bellheim`
   - `counterspell`
   - `fauxzilla`
   - `organizer`
+  - `pieplate`
   - `simplerchat`
 - Batch fix direction:
   - enumerate all non-shell boundaries in local standards notes
+
+### 13. `storage-exception-undocumented`
+- Severity: medium
+- Recurrence: 5 repos
+- Affected:
+  - `binder`
+  - `dictator`
+  - `hegelizer`
+  - `mecha`
+  - `pieplate`
+- Batch fix direction:
+  - document real storage exceptions where auditors look first
+
+### 14. `shared-xdg-app-namespace`
+- Severity: medium
+- Recurrence: 4 repos
+- Affected:
+  - `counterspell`
+  - `hegelizer`
+  - `mecha`
+  - `pieplate`
+- Batch fix direction:
+  - if XDG roots remain, move them to app-owned names rather than `wizardry-apps/...` or `wizardry/...`
 
 ### 15. `theme-catalog-hardcoded`
 - Severity: medium
@@ -170,14 +180,16 @@
 - Batch fix direction:
   - remove app-local theme catalogs and derive from the authoritative shared theme set
 
-### 16. `shared-xdg-app-namespace`
+### 16. `user-facing-config-not-yaml-md`
 - Severity: medium
-- Recurrence: 2 repos
+- Recurrence: 4 repos
 - Affected:
+  - `bellheim`
   - `counterspell`
-  - `mecha`
+  - `fauxzilla`
+  - `pieplate`
 - Batch fix direction:
-  - if XDG roots remain, move them to app-owned names rather than `wizardry-apps/...` or `wizardry/...`
+  - convert user-facing durable config toward YAML-plus-Markdown or explicitly justify non-YAML text
 
 ## Medium-Severity Single-Repo Categories
 
@@ -239,19 +251,22 @@
 ## Current Batch Order Recommendation
 1. `python-exception-undocumented`
 2. `repo-ai-standards-missing`
-3. `storage-default-home-missing`
-4. `storage-exception-undocumented`
-5. `shared-xdg-app-namespace`
-6. `theme-catalog-hardcoded`
-7. `ui-static-tests-missing`
-8. `user-facing-config-not-yaml-md`
-9. `language-exception-undocumented`
-10. high-severity single-repo categories after the broad recurring classes are under control
+3. `validation-suite-red`
+4. `storage-default-home-missing`
+5. `browser-owned-durable-state`
+6. `language-exception-undocumented`
+7. `storage-exception-undocumented`
+8. `shared-xdg-app-namespace`
+9. `theme-catalog-hardcoded`
+10. `ui-static-tests-missing`
+11. `user-facing-config-not-yaml-md`
+12. high-severity single-repo categories after the broad recurring classes are under control
 
 ## Notes For The Fix-It Phase
 - Some categories overlap deliberately. For example:
   - `storage-default-home-missing`
   - `storage-exception-undocumented`
   - `shared-xdg-app-namespace`
+  - `browser-owned-durable-state`
 - Fixes should collapse redundant symptoms by solving the highest-order policy problem first.
 - The repo-local AI-facing standards note template will likely unlock multiple category reductions at once.

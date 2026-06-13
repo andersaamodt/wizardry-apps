@@ -14,6 +14,7 @@ categories:
       - dictator
       - hegelizer
       - mecha
+      - pieplate
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Decide whether to migrate to ~/appname or document a narrow approved exception.
@@ -29,6 +30,7 @@ categories:
       - dictator
       - hegelizer
       - mecha
+      - pieplate
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add repo-local AI-facing exception notes and keep them in sync with runtime behavior.
@@ -42,6 +44,7 @@ categories:
       - counterspell
       - hegelizer
       - mecha
+      - pieplate
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Prefer app-owned roots such as ~/.appname or app-specific XDG directories over shared wizardry-apps namespace paths.
@@ -64,6 +67,7 @@ categories:
     default_severity: high
     affected_apps:
       - fauxzilla
+      - pieplate
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Keep browser storage cache-only where needed and move canonical durable state to app-owned plain-text surfaces or another explicit exportable contract.
@@ -77,6 +81,7 @@ categories:
       - bellheim
       - counterspell
       - fauxzilla
+      - pieplate
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Move user-facing durable config to YAML-oriented text or document a narrow exception.
@@ -104,6 +109,7 @@ categories:
       - counterspell
       - fauxzilla
       - organizer
+      - pieplate
       - simplerchat
     approved_exceptions: []
     evidence_refs: []
@@ -167,6 +173,7 @@ categories:
       - dictator
       - fauxzilla
       - organizer
+      - pieplate
       - simplerchat
     approved_exceptions: []
     evidence_refs: []
@@ -314,6 +321,7 @@ categories:
       - hegelizer
       - mecha
       - organizer
+      - pieplate
       - simplerchat
     approved_exceptions: []
     evidence_refs: []
@@ -349,6 +357,7 @@ categories:
     default_severity: high
     affected_apps:
       - hegelizer
+      - pieplate
       - theurgy
     approved_exceptions: []
     evidence_refs: []
