@@ -40,6 +40,7 @@ assert_no_macos_launch_metadata() {
   command -v xattr >/dev/null 2>&1 || return 0
   LC_ALL=C xattr -lr "$assert_no_macos_launch_metadata_path" >"$scratch/xattr-check.out" 2>/dev/null || true
   if grep -F "com.apple.quarantine" "$scratch/xattr-check.out" >/dev/null \
+      || grep -F "com.apple.provenance" "$scratch/xattr-check.out" >/dev/null \
       || grep -F "com.apple.ResourceFork" "$scratch/xattr-check.out" >/dev/null; then
     printf '%s\n' "macOS app bundle retained launch metadata: $assert_no_macos_launch_metadata_path" >&2
     cat "$scratch/xattr-check.out" >&2
@@ -57,6 +58,8 @@ grep -F -- "-framework Carbon" "$root/tools/forge/build-forge-macos-app.sh" >/de
 grep -F -- "-framework Carbon" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "host_build_signature=" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
 grep -F "host_build_signature=" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
+grep -F "macos_codesign_identity()" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
+grep -F 'codesign --force --sign "$signing_identity" "$executable"' "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-install.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM

@@ -142,14 +142,30 @@ macos_bundle_signature_is_usable() {
   codesign --verify --deep --strict "$bundle_path" >/dev/null 2>&1
 }
 
+macos_codesign_identity() {
+  if [ -n "${WIZARDRY_CODESIGN_IDENTITY-}" ]; then
+    printf '%s\n' "$WIZARDRY_CODESIGN_IDENTITY"
+    return 0
+  fi
+  if command -v security >/dev/null 2>&1; then
+    security find-identity -v -p codesigning 2>/dev/null | awk -F '"' '/"/ { print $2; exit }'
+    return 0
+  fi
+  printf '%s\n' "-"
+}
+
 ensure_macos_bundle_signature() {
   bundle_path=$1
   [ -d "$bundle_path" ] || return 1
   command -v codesign >/dev/null 2>&1 || return 0
-  if macos_bundle_signature_is_usable "$bundle_path"; then
-    return 0
-  fi
-  codesign --force --deep --sign - "$bundle_path" >/dev/null 2>&1 || return 1
+  signing_identity=$(macos_codesign_identity)
+  [ -n "$signing_identity" ] || signing_identity=-
+  for executable in "$bundle_path/Contents/MacOS"/*; do
+    [ -f "$executable" ] || continue
+    [ -x "$executable" ] || continue
+    codesign --force --sign "$signing_identity" "$executable" >/dev/null 2>&1 || return 1
+  done
+  codesign --force --deep --sign "$signing_identity" "$bundle_path" >/dev/null 2>&1 || return 1
   macos_bundle_signature_is_usable "$bundle_path"
 }
 
