@@ -59,6 +59,11 @@ assert_matches "$ui" 'function shouldShowFooterStatusForAction\(label, opts\)'
 assert_matches "$ui" 'function buildActionLabel\(item\)'
 assert_matches "$ui" 'function runActionLabel\(item\)'
 assert_matches "$ui" 'function ranActionLabel\(item\)'
+assert_matches "$ui" 'function hasEnabledMobileRunTarget\(selected\)'
+assert_matches "$ui" 'function defaultMobileRunTargetForSelected\(selected\)'
+assert_contains "$ui" 'hasEnabledHostRunTarget(selected) || hasEnabledHostedWebTarget(selected) || hasEnabledMobileRunTarget(selected)'
+assert_contains "$ui" "await runTargetAction(selected, mobileTarget);"
+assert_contains "$ui" "Build ' + (mobileRunTarget === 'ios' ? 'iOS' : 'Android') + ' app"
 assert_matches "$ui" 'function regenerateSelectedIconAssets\(\)'
 assert_matches "$ui" 'function parseInstallBeforeRunPrefs\(raw\)'
 assert_matches "$ui" 'function installBeforeRunPreferenceForSelected\(selected\)'

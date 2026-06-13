@@ -3443,6 +3443,9 @@
         if (item && shouldInstallBeforeRun(item)) {
           return 'Installing and running ' + itemStatusName(item);
         }
+        if (item && hasEnabledMobileRunTarget(item)) {
+          return 'Building ' + itemStatusName(item) + ' for mobile';
+        }
         if (item && item.kind === 'builtin' && hasEnabledHostRunTarget(item)) {
           return buildActionLabel(item);
         }
@@ -3450,6 +3453,9 @@
       }
 
       function ranActionLabel(item) {
+        if (item && hasEnabledMobileRunTarget(item)) {
+          return 'Built ' + itemStatusName(item);
+        }
         return 'Ran ' + itemStatusName(item);
       }
 
@@ -4017,7 +4023,7 @@
           item.draft ? 'draft' : 'saved',
           state.inlineRenameKey === item.key ? 'rename' : 'plain',
           isWizardrySuiteItem(item) ? 'suite' : 'plain',
-          hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item) ? 'run' : 'norun',
+          hasMeaningfulRun(item) ? 'run' : 'norun',
           item.gitRepoPresent || 'no',
           item.gitStatusLabel || '',
           item.gitStatusTone || '',
@@ -4306,7 +4312,7 @@
           }
           var rowRunSlot = document.createElement('span');
           rowRunSlot.className = 'row-run-slot';
-          var canRowRun = hasEnabledHostRunTarget(item) || hasEnabledHostedWebTarget(item);
+          var canRowRun = hasMeaningfulRun(item);
           if (canRowRun) {
             var rowRunSpinner = document.createElement('span');
             rowRunSpinner.className = 'row-run-spinner status-inline-spinner';
@@ -5121,7 +5127,7 @@
           return false;
         }
         if (usesWorkspacePipeline(selected)) {
-          return hasEnabledHostRunTarget(selected) || hasEnabledHostedWebTarget(selected);
+          return hasEnabledHostRunTarget(selected) || hasEnabledHostedWebTarget(selected) || hasEnabledMobileRunTarget(selected);
         }
         return true;
       }
@@ -5187,6 +5193,38 @@
         var projectType = projectTypeKeyForContext(selected.context);
         var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
         return activeTargets.indexOf('hosted-web') >= 0;
+      }
+
+      function enabledMobileTargetsForSelected(selected) {
+        if (!selected) {
+          return [];
+        }
+        if (isBuiltInNotDownloaded(selected)) {
+          return [];
+        }
+        if (selected.kind === 'workspace' && selected.runnable === false) {
+          return [];
+        }
+        var projectType = projectTypeKeyForContext(selected.context);
+        var activeTargets = uiTargetsFromStored(projectType, parseTargetsCSV(selected.targets));
+        return activeTargets.filter(function (targetId) {
+          return targetId === 'android' || targetId === 'ios';
+        });
+      }
+
+      function hasEnabledMobileRunTarget(selected) {
+        return selected && selected.context === 'native-mobile' && enabledMobileTargetsForSelected(selected).length > 0;
+      }
+
+      function defaultMobileRunTargetForSelected(selected) {
+        var mobileTargets = enabledMobileTargetsForSelected(selected);
+        if (mobileTargets.indexOf('android') >= 0) {
+          return 'android';
+        }
+        if (mobileTargets.indexOf('ios') >= 0) {
+          return 'ios';
+        }
+        return '';
       }
 
       function canInstallHostTargetForSelected(selected) {
@@ -6018,6 +6056,8 @@
         var runTargetName = state.os === 'darwin' ? 'macOS' : (state.os === 'linux' ? 'Linux' : 'desktop');
         var canRunHost = showRunSplit && hasEnabledHostRunTarget(selected);
         var canServeWebHost = showRunSplit && hasEnabledHostedWebTarget(selected);
+        var mobileRunTarget = showRunSplit ? defaultMobileRunTargetForSelected(selected) : '';
+        var canRunMobile = showRunSplit && !!mobileRunTarget;
         if (els.actionRun) {
           els.actionRun.classList.toggle('hidden', !showRunSplit);
           var runTitle = canRunHost
@@ -6026,10 +6066,12 @@
               : ('Run ' + runTargetName + ' app'))
             : (canServeWebHost
               ? 'Run hosted web'
-              : ('Enable ' + runTargetName + ' target to run native app'));
+              : (canRunMobile
+                ? ('Build ' + (mobileRunTarget === 'ios' ? 'iOS' : 'Android') + ' app')
+                : ('Enable ' + runTargetName + ' target to run native app')));
           els.actionRun.title = runTitle;
           els.actionRun.setAttribute('aria-label', runTitle);
-          els.actionRun.disabled = !!state.busy || (!canRunHost && !canServeWebHost);
+          els.actionRun.disabled = !!state.busy || (!canRunHost && !canServeWebHost && !canRunMobile);
         }
         if (els.actionRunMenu) {
           els.actionRunMenu.classList.toggle('hidden', !canServeWebHost);
@@ -8667,7 +8709,12 @@
             await runTargetAction(selected, 'hosted-web');
             return;
           }
-          throw new Error('Enable either Hosted Web or the current desktop target to run this project.');
+          var mobileTarget = defaultMobileRunTargetForSelected(selected);
+          if (mobileTarget) {
+            await runTargetAction(selected, mobileTarget);
+            return;
+          }
+          throw new Error('Enable Hosted Web, the current desktop target, or a mobile target to run this project.');
         }
 
         if (kind === 'build') {
@@ -9555,9 +9602,9 @@
           if (!selected) {
             return;
           }
-          if (!hasEnabledHostRunTarget(selected) && !hasEnabledHostedWebTarget(selected)) {
+          if (!hasMeaningfulRun(selected)) {
             var runTargetName = state.os === 'darwin' ? 'macOS' : (state.os === 'linux' ? 'Linux' : 'desktop');
-            toast('Enable Hosted Web or the ' + runTargetName + ' target to run this app.', 'bad');
+            toast('Enable Hosted Web, the ' + runTargetName + ' target, or a mobile target to run this app.', 'bad');
             return;
           }
           perform(runActionLabel(selected), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(selected), catalogRunKey: selected.key });
