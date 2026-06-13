@@ -25,6 +25,7 @@
 - `fauxzilla`
 - `hegelizer`
 - `mecha`
+- `simplerchat`
 
 ## In Progress Branches
 - `bellheim`: `codex/audit-bellheim-round1`
@@ -35,6 +36,7 @@
 - `fauxzilla`: `codex/audit-fauxzilla-round1`
 - `hegelizer`: `codex/audit-hegelizer-round1`
 - `mecha`: `codex/audit-mecha-round1`
+- `simplerchat`: `codex/audit-simplerchat-round1`
 - `theurgy`: `codex/audit-theurgy-round1`
 - `wizardry-apps`: `codex/rolling-audit-wizardry-apps`
 - `wizardry`: `codex/audit-wizardry-round1`
@@ -45,7 +47,6 @@
 - `matchbook`
 - `organizer`
 - `pieplate`
-- `simplerchat`
 
 ## Deferred For Worktree Safety Or Scope Triage
 - `stellar`

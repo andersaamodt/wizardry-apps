@@ -103,6 +103,7 @@ categories:
       - bellheim
       - counterspell
       - fauxzilla
+      - simplerchat
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Enumerate each approved non-shell boundary and keep the exception set explicit.
@@ -164,6 +165,7 @@ categories:
       - counterspell
       - dictator
       - fauxzilla
+      - simplerchat
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Replace Python where not justified or document the retained runtime/tooling boundary explicitly.
@@ -176,6 +178,7 @@ categories:
     affected_apps:
       - bellheim
       - mecha
+      - simplerchat
       - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
@@ -199,6 +202,7 @@ categories:
     default_severity: low
     affected_apps:
       - mecha
+      - simplerchat
       - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
@@ -295,6 +299,7 @@ categories:
       - fauxzilla
       - hegelizer
       - mecha
+      - simplerchat
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add a repo-local .github note that records standards specializations and approved exceptions.

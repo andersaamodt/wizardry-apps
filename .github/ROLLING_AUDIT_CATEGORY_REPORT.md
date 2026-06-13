@@ -14,12 +14,13 @@
 
 ### 1. `python-exception-undocumented`
 - Severity: high
-- Recurrence: 4 repos
+- Recurrence: 5 repos
 - Affected:
   - `binder`
   - `counterspell`
   - `dictator`
   - `fauxzilla`
+  - `simplerchat`
 - Why it ranks first:
   - This is the broadest high-severity recurring language-discipline problem found so far.
   - It cuts across native ports, shell-first apps, and extension-plus-hub architecture.
@@ -30,13 +31,15 @@
 
 ### 2. `repo-ai-standards-missing`
 - Severity: medium
-- Recurrence: 5 repos
+- Recurrence: 7 repos
 - Affected:
   - `binder`
   - `dictator`
   - `eye`
   - `fauxzilla`
+  - `hegelizer`
   - `mecha`
+  - `simplerchat`
 - Why it ranks near the top:
   - This is currently the broadest recurring documentation/governance gap.
   - It directly slows every future audit and makes exception handling too implicit.
@@ -144,20 +147,22 @@
 
 ### 14. `language-exception-undocumented`
 - Severity: medium
-- Recurrence: 3 repos
+- Recurrence: 4 repos
 - Affected:
   - `bellheim`
   - `counterspell`
   - `fauxzilla`
+  - `simplerchat`
 - Batch fix direction:
   - enumerate all non-shell boundaries in local standards notes
 
 ### 15. `theme-catalog-hardcoded`
 - Severity: medium
-- Recurrence: 3 app surfaces
+- Recurrence: 4 app surfaces
 - Affected:
   - `bellheim`
   - `mecha`
+  - `simplerchat`
   - `wizardry-desktop`
 - Batch fix direction:
   - remove app-local theme catalogs and derive from the authoritative shared theme set
@@ -209,9 +214,10 @@
 
 ### 25. `theme-picker-not-alphabetized`
 - Severity: low
-- Recurrence: 2 app surfaces
+- Recurrence: 3 app surfaces
 - Affected:
   - `mecha`
+  - `simplerchat`
   - `wizardry-desktop`
 - Batch fix direction:
   - sort theme names at the authoritative source and stop keeping unsorted fallbacks
