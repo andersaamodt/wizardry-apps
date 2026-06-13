@@ -135,12 +135,15 @@
 
 ### 7. `ui-static-tests-missing`
 - Severity: high
-- Recurrence: 5 repos
+- Recurrence: 8 repos
 - Affected:
   - `boycott`
   - `applegate`
   - `chatroom`
+  - `dictator`
   - `eye`
+  - `hegelizer`
+  - `pleroma`
   - `serenity`
 - Why it ranks high:
   - These are shipped GUI surfaces without matching UI/static contract protection.
@@ -148,40 +151,47 @@
   - add lightweight DOM/static/bridge tests first
   - only then rely on backend tests as sufficient for release confidence
 
+### 8. `backend-contract-tests-missing`
+- Severity: high
+- Recurrence: 5 repos
+- Affected:
+  - `boycott`
+  - `dictator`
+  - `hegelizer`
+  - `pleroma`
+  - `serenity`
+- Why it ranks high:
+  - These repos either have no `.tests/` tree or keep relevant backend/smoke tests outside the required `.tests/` surface.
+  - Without backend contract tests under `.tests/`, bridge and runtime changes cannot be audited consistently.
+- Batch fix direction:
+  - move useful existing tests from `app/tests/` or `tools/release/` into `.tests/`
+  - add missing backend contract coverage where no test surface exists
+
 ## High-Severity Single-Repo Categories
 
-### 8. `generated-state-in-checkout`
+### 9. `generated-state-in-checkout`
 - Affected:
   - `theurgy`
 - Fix direction:
   - generated defaults must stop normalizing runtime state into source trees
 
-### 9. `standards-guidance-contradictory`
+### 10. `standards-guidance-contradictory`
 - Affected:
   - `wizardry`
 - Fix direction:
   - choose one canonical shell pattern and delete the conflicting one from AI-facing docs
 
-### 10. `settings-shell-split`
+### 11. `settings-shell-split`
 - Affected:
   - `chatroom`
 - Fix direction:
   - move settings into the main shell
 
-### 11. `read-path-mutates-state`
+### 12. `read-path-mutates-state`
 - Affected:
   - `chatroom`
 - Fix direction:
   - separate read/hydration from persistence
-
-### 12. `backend-contract-tests-missing`
-- Severity: high
-- Recurrence: 2 repos
-- Affected:
-  - `boycott`
-  - `serenity`
-- Fix direction:
-  - add backend contract coverage under `.tests/` before treating the bridge or monitor contract as stable
 
 ## Medium-Severity Recurring Categories
 
@@ -367,10 +377,11 @@
 8. `storage-exception-undocumented`
 9. `shared-xdg-app-namespace`
 10. `ui-static-tests-missing`
-11. `user-facing-config-not-yaml-md`
-12. `theme-catalog-hardcoded`
-13. `tests-not-under-dot-tests`
-14. high-severity single-repo categories after the broad recurring classes are under control
+11. `backend-contract-tests-missing`
+12. `user-facing-config-not-yaml-md`
+13. `theme-catalog-hardcoded`
+14. `tests-not-under-dot-tests`
+15. high-severity single-repo categories after the broad recurring classes are under control
 
 ## Notes For The Fix-It Phase
 - Some categories overlap deliberately. For example:

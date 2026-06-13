@@ -105,6 +105,11 @@ variance_items:
   - id: test-entrypoint-location
     title: Apps vary between `.tests/`, `app/tests/`, and release-tool test locations
     status: standard-proposed
+    observed_patterns:
+      - dot_tests
+      - app_tests
+      - root_tests
+      - release_tool_tests
     candidate_standard: >
       All Wizardry-family test entrypoints live under `.tests/`. Other folders
       may hold fixtures or helpers, but runnable tests should be discoverable
@@ -125,6 +130,13 @@ variance_items:
         - dictator
         - hegelizer
         - pleroma
+      app_tests:
+        - hegelizer
+        - pleroma
+      root_tests:
+        - hegelizer
+      release_tool_tests:
+        - dictator
     phronesis_candidate: true
 
   - id: backend-resolution-contract

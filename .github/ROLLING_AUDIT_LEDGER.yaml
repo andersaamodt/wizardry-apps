@@ -368,7 +368,10 @@ categories:
       - boycott
       - applegate
       - chatroom
+      - dictator
       - eye
+      - hegelizer
+      - pleroma
       - serenity
     approved_exceptions: []
     evidence_refs: []
@@ -436,6 +439,9 @@ categories:
     default_severity: high
     affected_apps:
       - boycott
+      - dictator
+      - hegelizer
+      - pleroma
       - serenity
     approved_exceptions: []
     evidence_refs: []

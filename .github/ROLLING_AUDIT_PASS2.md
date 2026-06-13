@@ -141,6 +141,25 @@
   - Every shipped app needs backend contract coverage under `.tests/`.
 - Needs re-check:
   - every repo whose round-1 report predates this explicit category
+- Checked so far:
+  - `applegate`: backend coverage present under `.tests/scripts/test-applegate-backend.sh`
+  - `bellheim`: backend coverage present under `.tests/apps/test-bellheim-backend.sh`
+  - `binder`: backend coverage present under `.tests/native/test-backend-contract.sh`
+  - `book-club`: native/calls/relay/security coverage present under `.tests/`
+  - `boycott`: fail; no `.tests/` tree and shipped backend exists
+  - `counterspell`: shell and CGI contract coverage present under `.tests/`
+  - `dictator`: fail; tests live under `tools/release/`, not `.tests/`
+  - `eye`: shell/runtime coverage present under `.tests/test-eye.sh`
+  - `fauxzilla`: broad API/runtime coverage present under `.tests/`
+  - `hegelizer`: fail; smoke and preference tests live outside `.tests/`
+  - `matchbook`: backend coverage present under `.tests/apps/test-matchbook-backend.sh`
+  - `mecha`: backend/static contract coverage present under `.tests/test-mecha-contracts.sh`
+  - `organizer`: backend contract coverage present under `.tests/backend-contract.sh`
+  - `pieplate`: backend coverage present under `.tests/test-pieplate.sh`
+  - `pleroma`: fail; backend smoke test lives under `app/tests/`, not `.tests/`
+  - `serenity`: fail; no `.tests/` tree
+  - `simplerchat`: backend coverage present under `.tests/backend/`
+  - `stellar`: backend coverage present under `.tests/native/test-backend-contract.sh`
 
 ### `ui-static-tests-missing`
 - Late criterion source:
@@ -150,6 +169,25 @@
   - Every shipped GUI app needs UI/static contract coverage under `.tests/`.
 - Needs re-check:
   - every repo that has backend tests but no GUI/static tests
+- Checked so far:
+  - `applegate`: fail; backend and guardian tests exist, but no dedicated native GUI/static contract under `.tests/`
+  - `bellheim`: UI/static coverage present under `.tests/apps/test-bellheim-ui-contract.sh` plus Safari/file-boot smoke tests
+  - `binder`: generated native IR/render/native package coverage present under `.tests/native/`
+  - `book-club`: GUI/native coverage present under `.tests/gui/` and `.tests/native/`
+  - `boycott`: fail; no `.tests/` tree
+  - `counterspell`: shell contract includes app-surface assertions under `.tests/`
+  - `dictator`: fail; no `.tests/` GUI/static contract
+  - `eye`: fail; `.tests/test-eye.sh` covers shell/runtime behavior only
+  - `fauxzilla`: extension/UI behavior coverage present under `.tests/`
+  - `hegelizer`: fail; UI/runtime smoke tests live outside `.tests/`
+  - `matchbook`: UI/static coverage present under `.tests/apps/test-matchbook-ui-contract.sh` and `.tests/apps/test-matchbook-frontend.mjs`
+  - `mecha`: static/UI inventory coverage present under `.tests/test-mecha-contracts.sh`
+  - `organizer`: native IR validation and render/compile readiness coverage present under `.tests/release-ready.sh`
+  - `pieplate`: UI/static coverage present under `.tests/test-pieplate.sh`, but the suite is red under the existing `validation-suite-red` finding
+  - `pleroma`: fail; Safari smoke test lives under `app/tests/`, not `.tests/`
+  - `serenity`: fail; no `.tests/` tree
+  - `simplerchat`: frontend/static coverage present under `.tests/frontend/test-frontend-contract.sh`
+  - `stellar`: native IR/render/mobile coverage present under `.tests/native/`
 
 ### `variance.reasoned`
 - Late criterion source:

@@ -23,6 +23,7 @@
 
 ### Tests And Auditability
 - Wizardry-family test entrypoints should live under `.tests/`.
+- Tests under `app/tests/`, `tools/release/`, or ad hoc root `tests/` can be migrated as useful evidence, but they should not count as compliant shipped-app test entrypoints until exposed under `.tests/`.
 - Shipped apps need backend contract coverage under `.tests/`; UI-only or manual validation is not enough.
 - For native apps, IR/schema validation alone should not count as sufficient GUI coverage; add a `.tests/` UI/static regression surface for the shipped native shell or generated output.
 - Existing audit surfaces should be treated as active contracts and must be refreshed when they become stale; stale audit tables are a standards violation, not harmless historical clutter.

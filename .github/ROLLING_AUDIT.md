@@ -99,6 +99,7 @@
 
 ### 7. Testing And Release Readiness
 - Tests belong under `.tests/` in a Wizardry app repo.
+- Test entrypoints outside `.tests/` may be useful migration evidence, but they do not satisfy the standard until exposed under `.tests/`.
 - Every shipped app needs backend contract coverage.
 - Every shipped GUI app also needs a UI/static contract or regression surface, not only backend shell tests.
 - High-risk app flows need adversarial coverage, especially bridge actions, path handling, persistence, run/build/install flows, and drag/drop.
