@@ -6546,16 +6546,22 @@ build_native_workspace_host() {
         exit 1
       }
 
+      log_dir="$(forge_workbench_root "$root")/log"
       build_dir="$(forge_workbench_root "$root")/build/native-macos-workspaces/$workspace_slug"
       bundle_root="$(forge_workbench_root "$root")/dist/macos-native-workspaces/$workspace_slug"
       bundle="$bundle_root/$app_name.app"
+      build_log="$log_dir/workspace-$workspace_slug-native-build.log"
+      mkdir -p "$log_dir"
       mkdir -p "$build_dir"
       clear_stale_swiftpm_lock "$build_dir"
       clear_stale_swiftpm_module_cache "$build_dir"
-      (
+      if ! (
         cd "$workspace_path" &&
         swift build --package-path "$package_dir" --scratch-path "$build_dir"
-      ) >/dev/null
+      ) >"$build_log" 2>&1; then
+        printf '%s\n' "forge-backend: native macOS workspace build failed (see log: $build_log)" >&2
+        exit 1
+      fi
 
       built_exec=$(find "$build_dir" -type f -path "*/debug/$app_id" | head -n 1)
       [ -n "$built_exec" ] && [ -x "$built_exec" ] || {
