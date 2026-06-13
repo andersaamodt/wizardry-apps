@@ -110,6 +110,7 @@
 - Built-in app settings should be part of the main app shell, not a second HTML document mounted in an iframe.
 - Built-in app fallback UX should avoid `alert()` and imperative “Please start...” messaging in favor of inline guided status.
 - Frontends should not scrape `/cgi/system-info` or similar generic diagnostics for core endpoint or identity state when a backend action should provide that contract.
+- Frontends should not derive backend executable paths from `window.location`, served document paths, or similar frontend-owned filesystem guesses; the host or backend contract should own backend resolution.
 - Every shipped GUI app should have both backend tests and UI/static contract tests.
 - Rolling audit results must include an explicit non-shell language inventory with justification.
 - Most Wizardry apps should default to `~/<appname>` for durable app data; alternate standard folders and shared storage roots need explicit justification.
@@ -117,3 +118,4 @@
 - Wizardry app tests belong under `.tests/`.
 - If a native port reuses another app's runtime or storage roots, that exception must be documented in repo-local AI-facing docs, not only in the user README.
 - Apps that use Wizardry themes must source the actual available theme set, keep picker behavior keyboard-correct, keep the list alphabetized, and apply theming deeply rather than cosmetically.
+- Shipped app runtime paths should not compile Cargo-managed helpers on demand; if a Rust helper is retained at all, it belongs in an explicitly approved packaged host or Theurgy boundary rather than ordinary repo-owned backend execution.

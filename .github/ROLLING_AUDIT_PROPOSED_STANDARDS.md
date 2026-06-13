@@ -35,6 +35,8 @@
 - When a native port or higher-runtime app retains Python, Rust, Swift, Node, or other non-shell surfaces, each retained boundary should be explicitly justified.
 - If a native port reuses another app's runtime or storage roots, that should be documented as an explicit exception rather than presented as ordinary layout.
 - GNU-specific tool behavior should not be relied on silently in shell-first repos; if a GNU dependency is real, document it and test it, otherwise replace it with a POSIX-safe path.
+- Frontends should never derive backend executable paths from `window.location`, served-document paths, or other frontend-owned filesystem guesses; backend resolution belongs to the host or backend contract.
+- Shipped app runtime paths should not compile Cargo-managed helpers on demand; retained Rust helpers should live behind an explicitly approved packaged host or Theurgy boundary instead of ordinary repo-owned backend execution.
 
 ### Themes And GUI
 - If an app intentionally uses an app-local theme system instead of the shared Wizardry themes, document that choice explicitly so audits know whether to apply the shared-theme contract or an app-local design contract.

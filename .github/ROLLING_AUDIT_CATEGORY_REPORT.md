@@ -36,8 +36,9 @@
 
 ### 2. `repo-ai-standards-missing`
 - Severity: medium
-- Recurrence: 13 repos
+- Recurrence: 14 repos
 - Affected:
+  - `boycott`
   - `applegate`
   - `binder`
   - `dictator`
@@ -73,9 +74,11 @@
 
 ### 4. `storage-default-home-missing`
 - Severity: high
-- Recurrence: 4 repos
+- Recurrence: 6 repos
 - Affected:
+  - `boycott`
   - `dictator`
+  - `hegelizer`
   - `mecha`
   - `pieplate`
   - `stellar`
@@ -87,8 +90,9 @@
 
 ### 5. `browser-owned-durable-state`
 - Severity: high
-- Recurrence: 3 repos
+- Recurrence: 4 repos
 - Affected:
+  - `boycott`
   - `fauxzilla`
   - `pieplate`
   - `serenity`
@@ -99,8 +103,9 @@
 
 ### 6. `ui-static-tests-missing`
 - Severity: high
-- Recurrence: 4 repos
+- Recurrence: 5 repos
 - Affected:
+  - `boycott`
   - `applegate`
   - `chatroom`
   - `eye`
@@ -144,7 +149,10 @@
   - separate read/hydration from persistence
 
 ### 12. `backend-contract-tests-missing`
+- Severity: high
+- Recurrence: 2 repos
 - Affected:
+  - `boycott`
   - `serenity`
 - Fix direction:
   - add backend contract coverage under `.tests/` before treating the bridge or monitor contract as stable
@@ -169,8 +177,9 @@
 
 ### 13. `storage-exception-undocumented`
 - Severity: medium
-- Recurrence: 5 repos
+- Recurrence: 6 repos
 - Affected:
+  - `boycott`
   - `binder`
   - `dictator`
   - `hegelizer`
@@ -181,8 +190,9 @@
 
 ### 14. `shared-xdg-app-namespace`
 - Severity: medium
-- Recurrence: 6 repos
+- Recurrence: 7 repos
 - Affected:
+  - `boycott`
   - `book-club`
   - `counterspell`
   - `hegelizer`
@@ -194,8 +204,9 @@
 
 ### 15. `theme-catalog-hardcoded`
 - Severity: medium
-- Recurrence: 5 app surfaces
+- Recurrence: 6 app surfaces
 - Affected:
+  - `boycott`
   - `bellheim`
   - `mecha`
   - `serenity`
@@ -206,8 +217,9 @@
 
 ### 16. `user-facing-config-not-yaml-md`
 - Severity: medium
-- Recurrence: 6 repos
+- Recurrence: 7 repos
 - Affected:
+  - `boycott`
   - `applegate`
   - `bellheim`
   - `counterspell`
@@ -251,13 +263,19 @@
 - Affected:
   - `wizardry-desktop`
 
-### 25. `generated-staging-not-disposable`
+### 25. `frontend-derived-backend-path`
+- Affected:
+  - `boycott`
+- Fix direction:
+  - move backend path resolution into the host or backend contract and expose explicit actions only
+
+### 26. `generated-staging-not-disposable`
 - Affected:
   - `organizer`
 - Fix direction:
   - keep generated native staging trees disposable and rerender-safe even after ordinary local build artifacts appear
 
-### 26. `bridge-shell-fragment-execution`
+### 27. `bridge-shell-fragment-execution`
 - Severity: high
 - Recurrence: 2 repos
 - Affected:
@@ -268,10 +286,11 @@
 
 ## Low-Severity Recurring Categories
 
-### 27. `theme-picker-not-alphabetized`
+### 28. `theme-picker-not-alphabetized`
 - Severity: low
-- Recurrence: 3 app surfaces
+- Recurrence: 4 app surfaces
 - Affected:
+  - `boycott`
   - `mecha`
   - `simplerchat`
   - `wizardry-desktop`

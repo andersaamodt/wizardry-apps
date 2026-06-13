@@ -19,6 +19,7 @@
 ### App Repos Audited
 - `applegate`
 - `bellheim`
+- `boycott`
 - `binder`
 - `book-club`
 - `counterspell`
@@ -29,6 +30,7 @@
 - `matchbook`
 - `mecha`
 - `organizer`
+- `pleroma`
 - `pieplate`
 - `serenity`
 - `simplerchat`
@@ -37,6 +39,7 @@
 ## In Progress Branches
 - `applegate`: `codex/audit-applegate-round1`
 - `bellheim`: `codex/audit-bellheim-round1`
+- `boycott`: `codex/audit-boycott-round1`
 - `binder`: `codex/audit-binder-round1`
 - `book-club`: `codex/audit-book-club-round1`
 - `counterspell`: `codex/audit-counterspell-round1`
@@ -47,6 +50,7 @@
 - `matchbook`: `codex/audit-matchbook-round1`
 - `mecha`: `codex/audit-mecha-round1`
 - `organizer`: `codex/audit-organizer-round1`
+- `pleroma`: `codex/audit-pleroma-round1`
 - `pieplate`: `codex/audit-pieplate-round1`
 - `serenity`: `codex/audit-serenity-round1`
 - `simplerchat`: `codex/audit-simplerchat-round1`
@@ -59,10 +63,7 @@
 - none currently
 
 ## Deferred For Worktree Safety Or Scope Triage
-- `boycott`
-  - unrelated dirty icon work was already present during audit passes
-- `pleroma`
-  - unrelated dirty work was already present during audit passes
+- none currently
 
 ## Notes
 - This file is a planning surface, not a claim that every listed candidate definitely belongs in the final family scope.

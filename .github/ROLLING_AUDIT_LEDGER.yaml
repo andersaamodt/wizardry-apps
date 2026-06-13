@@ -11,6 +11,8 @@ categories:
       - Storage And State Discipline
     default_severity: high
     affected_apps:
+      - boycott
+      - pleroma
       - stellar
       - dictator
       - hegelizer
@@ -27,6 +29,8 @@ categories:
       - Documentation And Auditability
     default_severity: medium
     affected_apps:
+      - boycott
+      - pleroma
       - binder
       - dictator
       - hegelizer
@@ -42,6 +46,8 @@ categories:
       - Storage And State Discipline
     default_severity: medium
     affected_apps:
+      - boycott
+      - pleroma
       - stellar
       - book-club
       - counterspell
@@ -69,6 +75,7 @@ categories:
       - Documentation And Auditability
     default_severity: high
     affected_apps:
+      - boycott
       - fauxzilla
       - pieplate
       - serenity
@@ -82,6 +89,8 @@ categories:
       - Storage And State Discipline
     default_severity: medium
     affected_apps:
+      - boycott
+      - pleroma
       - applegate
       - bellheim
       - counterspell
@@ -117,6 +126,7 @@ categories:
       - fauxzilla
       - matchbook
       - organizer
+      - pleroma
       - pieplate
       - stellar
       - simplerchat
@@ -154,6 +164,7 @@ categories:
     affected_apps:
       - dictator
       - hegelizer
+      - pleroma
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Move test entrypoints under .tests and leave non-test helpers elsewhere.
@@ -197,6 +208,7 @@ categories:
       - GUI Contract
     default_severity: medium
     affected_apps:
+      - boycott
       - bellheim
       - mecha
       - serenity
@@ -223,6 +235,7 @@ categories:
       - GUI Contract
     default_severity: low
     affected_apps:
+      - boycott
       - mecha
       - simplerchat
       - wizardry-desktop
@@ -239,6 +252,19 @@ categories:
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Push theme tokens through all major app surfaces and remove un-themed holdouts.
+
+  - id: cargo-runtime-layer-present
+    title: Shipped app runtime depends on a direct Cargo-managed helper layer
+    policy_axes:
+      - Language And Boundary Discipline
+      - Native And Host Boundary Discipline
+      - Testing And Release Readiness
+    default_severity: high
+    affected_apps:
+      - pleroma
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Remove Cargo from ordinary shipped runtime paths or move the helper into an explicitly approved host or Theurgy boundary.
 
   - id: settings-shell-split
     title: Settings live outside the main app shell without justification
@@ -286,6 +312,18 @@ categories:
     evidence_refs: []
     fix_strategy: Replace alert and imperative fallback messaging with durable inline status and guided next actions.
 
+  - id: frontend-derived-backend-path
+    title: Frontend derives backend executable paths from document location instead of using a host-owned contract
+    policy_axes:
+      - Execution And Security Boundary
+    default_severity: medium
+    affected_apps:
+      - boycott
+      - pleroma
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Keep backend path resolution inside the host or backend contract and expose only explicit actions to the frontend.
+
   - id: read-path-mutates-state
     title: Passive reads or refreshes mutate durable app state
     policy_axes:
@@ -316,6 +354,7 @@ categories:
       - Testing And Release Readiness
     default_severity: high
     affected_apps:
+      - boycott
       - applegate
       - chatroom
       - eye
@@ -330,6 +369,7 @@ categories:
       - Documentation And Auditability
     default_severity: medium
     affected_apps:
+      - boycott
       - applegate
       - binder
       - dictator
@@ -339,6 +379,7 @@ categories:
       - matchbook
       - mecha
       - organizer
+      - pleroma
       - pieplate
       - serenity
       - simplerchat
@@ -353,6 +394,7 @@ categories:
       - Testing And Release Readiness
     default_severity: high
     affected_apps:
+      - boycott
       - serenity
     approved_exceptions: []
     evidence_refs: []
