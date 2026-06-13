@@ -119,6 +119,7 @@ assert_matches "$ui" 'function forgeCanBackgroundRefresh\(\)'
 assert_matches "$ui" "document\.hidden"
 assert_matches "$ui" "document\.hasFocus\(\)"
 assert_matches "$ui" "suppressTransientRefresh\(90000\);"
+assert_not_contains "$ui" 'state.autoRefreshTimer = setInterval(function () {'
 
 # Backend actions should remain explicit and structured.
 assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context, runMode\]\);"

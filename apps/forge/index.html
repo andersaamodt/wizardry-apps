@@ -10170,20 +10170,6 @@
       }
 
       function startAutoRefresh() {
-        if (state.autoRefreshTimer) {
-          clearInterval(state.autoRefreshTimer);
-          state.autoRefreshTimer = null;
-        }
-
-        state.autoRefreshTimer = setInterval(function () {
-          if (state.busy || !bridgeAvailable() || refreshIsSuppressed() || !forgeCanBackgroundRefresh()) {
-            return;
-          }
-          refreshWorkspace({ quiet: true }).catch(function (err) {
-            appendLog('background refresh error: ' + String(err && err.message ? err.message : err));
-          });
-        }, 15000);
-
         window.addEventListener('focus', function () {
           if (state.busy || !bridgeAvailable() || refreshIsSuppressed() || !forgeCanBackgroundRefresh()) {
             return;
