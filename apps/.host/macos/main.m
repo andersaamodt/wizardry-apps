@@ -3988,8 +3988,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
         if ([program isEqualToString:@"__wizardry_host_restart_self"]) {
             NSString *bundlePath = [[[NSBundle mainBundle] bundlePath] stringByStandardizingPath];
+            NSString *stagedBundlePath = @"";
             if (args.count >= 1) {
                 bundlePath = [[[NSString stringWithFormat:@"%@", args[0]] stringByExpandingTildeInPath] stringByStandardizingPath];
+            }
+            if (args.count >= 2) {
+                stagedBundlePath = [[[NSString stringWithFormat:@"%@", args[1]] stringByExpandingTildeInPath] stringByStandardizingPath];
             }
 
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -4004,16 +4008,34 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                                          error:nil];
                     return;
                 }
+                if (stagedBundlePath.length > 0) {
+                    BOOL isStagedDirectory = NO;
+                    if (![fm fileExistsAtPath:stagedBundlePath isDirectory:&isStagedDirectory] || !isStagedDirectory) {
+                        [self sendResultToWebView:sourceWebViewCopy
+                                         messageId:messageIdCopy
+                                            stdout:@""
+                                            stderr:@"staged restart bundle not found"
+                                          exitCode:1
+                                             error:nil];
+                        return;
+                    }
+                }
 
                 NSTask *task = [[NSTask alloc] init];
                 task.launchPath = @"/bin/sh";
                 task.arguments = @[
                     @"-c",
-                    @"sleep \"$WIZARDRY_RESTART_DELAY\"; /usr/bin/open -n \"$WIZARDRY_RESTART_BUNDLE\""
+                    @"while /bin/kill -0 \"$WIZARDRY_RESTART_PID\" >/dev/null 2>&1; do /bin/sleep 0.1; done; "
+                    @"if [ -n \"$WIZARDRY_RESTART_STAGE\" ]; then "
+                    @"  /bin/rm -rf \"$WIZARDRY_RESTART_BUNDLE\"; "
+                    @"  /bin/mv \"$WIZARDRY_RESTART_STAGE\" \"$WIZARDRY_RESTART_BUNDLE\" || exit 1; "
+                    @"fi; "
+                    @"/usr/bin/open -n \"$WIZARDRY_RESTART_BUNDLE\""
                 ];
                 NSMutableDictionary *env = [NSMutableDictionary dictionaryWithDictionary:[[NSProcessInfo processInfo] environment]];
                 env[@"WIZARDRY_RESTART_BUNDLE"] = bundlePath;
-                env[@"WIZARDRY_RESTART_DELAY"] = @"0.8";
+                env[@"WIZARDRY_RESTART_STAGE"] = stagedBundlePath ?: @"";
+                env[@"WIZARDRY_RESTART_PID"] = [NSString stringWithFormat:@"%d", (int)[[NSProcessInfo processInfo] processIdentifier]];
                 task.environment = env;
 
                 NSFileHandle *nullDevice = [NSFileHandle fileHandleWithNullDevice];

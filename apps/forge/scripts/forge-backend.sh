@@ -2065,6 +2065,39 @@ prepare_macos_run_bundle() {
   printf '%s\n' "$macos_run_dest_bundle"
 }
 
+stage_macos_bundle_replacement() {
+  macos_stage_src_bundle=${1-}
+  macos_stage_dest_bundle=${2-}
+  [ -d "$macos_stage_src_bundle" ] || return 1
+  [ -n "$macos_stage_dest_bundle" ] || return 1
+
+  macos_stage_parent=$(dirname "$macos_stage_dest_bundle")
+  macos_stage_base=$(basename "$macos_stage_dest_bundle")
+  validate_macos_app_bundle_name "$macos_stage_base"
+  mkdir -p "$macos_stage_parent"
+
+  macos_stage_bundle="$macos_stage_parent/.${macos_stage_base}.restart.$$"
+  rm -rf "$macos_stage_bundle"
+  if command -v ditto >/dev/null 2>&1; then
+    ditto "$macos_stage_src_bundle" "$macos_stage_bundle" || {
+      rm -rf "$macos_stage_bundle"
+      return 1
+    }
+  else
+    cp -R "$macos_stage_src_bundle" "$macos_stage_bundle" || {
+      rm -rf "$macos_stage_bundle"
+      return 1
+    }
+  fi
+  touch "$macos_stage_bundle" >/dev/null 2>&1 || :
+  touch "$macos_stage_bundle/Contents/Info.plist" >/dev/null 2>&1 || :
+  if ! ensure_macos_bundle_signature "$macos_stage_bundle"; then
+    rm -rf "$macos_stage_bundle"
+    return 1
+  fi
+  printf '%s\n' "$macos_stage_bundle"
+}
+
 copy_macos_bundle() {
   install_macos_bundle "${1-}" "${2-}"
 }
@@ -7286,6 +7319,7 @@ cmd_run_desktop() {
       }
       synced_install=''
       launch_bundle=''
+      restart_stage=''
       if [ "$self_relaunch" -eq 1 ]; then
         target_install=$(macos_user_app_install_path "$app_name")
         current_bundle=$(current_macos_backend_bundle 2>/dev/null || true)
@@ -7295,7 +7329,12 @@ cmd_run_desktop() {
           current_bundle_canonical=$(canonical_dir_path "$current_bundle" 2>/dev/null || printf '%s\n' "$current_bundle")
         fi
         if [ -n "$current_bundle_canonical" ] && [ "$current_bundle_canonical" = "$target_install_canonical" ]; then
-          launch_bundle="$bundle_artifact"
+          if ! restart_stage=$(stage_macos_bundle_replacement "$bundle_artifact" "$target_install"); then
+            printf '%s\n' "forge-backend: failed to stage durable macOS restart bundle for $slug" >&2
+            exit 1
+          fi
+          synced_install="$target_install"
+          launch_bundle="$target_install"
         fi
       fi
       if [ -z "$launch_bundle" ]; then
@@ -7320,6 +7359,7 @@ cmd_run_desktop() {
         printf 'artifact=%s\n' "$launch_bundle"
         printf 'built_artifact=%s\n' "$bundle_artifact"
         [ -n "$synced_install" ] && printf 'installed=%s\n' "$synced_install"
+        [ -n "$restart_stage" ] && printf 'restart_stage=%s\n' "$restart_stage"
         printf 'restart_bundle=%s\n' "$launch_bundle"
         exit 0
       else

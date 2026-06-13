@@ -8817,7 +8817,8 @@
 
             if (restartBundle && bridgeAvailable()) {
               // Ask the native host to restart this running app instance.
-              execArgv(['__wizardry_host_restart_self', restartBundle]).catch(function () {
+              var restartStage = String(runOut.restart_stage || '').trim();
+              execArgv(['__wizardry_host_restart_self', restartBundle, restartStage]).catch(function () {
                 return;
               });
             }

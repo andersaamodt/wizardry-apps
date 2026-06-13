@@ -345,7 +345,7 @@ non_native_artificer_match_status=$(
 }
 
 # Behavior: Forge self-run from the installed bundle does not replace the live
-# bundle while the current host is still running from it.
+# bundle with a disposable workbench path while the current host is still running.
 self_bundle_backend="$macos_installed/Contents/Resources/forge/scripts/forge-backend.sh"
 mkdir -p "$(dirname "$self_bundle_backend")"
 cp "$backend" "$self_bundle_backend"
@@ -353,12 +353,23 @@ chmod +x "$self_bundle_backend"
 self_run_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$self_bundle_backend" run-desktop "$root" forge)
 assert_contains "$self_run_out" "launched=1"
 assert_contains "$self_run_out" "restart_bundle="
+self_run_stage=$(printf '%s\n' "$self_run_out" | kv_read restart_stage)
 self_run_artifact=$(printf '%s\n' "$self_run_out" | kv_read artifact)
 self_run_restart=$(printf '%s\n' "$self_run_out" | kv_read restart_bundle)
 self_run_installed=$(printf '%s\n' "$self_run_out" | kv_read installed)
-[ "$self_run_artifact" = "$macos_built" ]
-[ "$self_run_restart" = "$macos_built" ]
-[ -z "$self_run_installed" ]
+[ "$self_run_artifact" = "$macos_installed" ]
+[ "$self_run_restart" = "$macos_installed" ]
+[ "$self_run_installed" = "$macos_installed" ]
+[ -n "$self_run_stage" ]
+[ -d "$self_run_stage" ]
+case "$self_run_stage" in
+  "$test_home/Applications/.App Forge.app.restart."*)
+    ;;
+  *)
+    printf '%s\n' "expected staged self-restart bundle under test home Applications, got: $self_run_stage" >&2
+    exit 1
+    ;;
+esac
 
 # Behavior: workspace preferring host target launches desktop mode even when hosted-web is enabled.
 workspace_host="$scratch/workspace-host"

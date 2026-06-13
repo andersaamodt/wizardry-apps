@@ -28,6 +28,7 @@ build_icns_from_png() {
 # Forge self-run should return a restart bundle for host-owned relaunch.
 grep -F 'printf '\''restart_bundle=%s\n'\'' "$installed_path"' "$backend" >/dev/null
 grep -F 'printf '\''restart_bundle=%s\n'\'' "$launch_bundle"' "$backend" >/dev/null
+grep -F 'printf '\''restart_stage=%s\n'\'' "$restart_stage"' "$backend" >/dev/null
 grep -F "elif [ -f \"\$app_dir/assets/forge-icon.png\" ];" "$backend" >/dev/null
 
 if ! command -v jq >/dev/null 2>&1; then
