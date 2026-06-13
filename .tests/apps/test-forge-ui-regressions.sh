@@ -153,6 +153,10 @@ assert_contains "$ui" 'value="native-mobile"'
 assert_matches "$ui" 'function nativeMobileProjectTypeKey\(\)'
 assert_matches "$ui" "function nativeDesktopProjectTypeKey\(\)"
 assert_matches "$ui" "function createProjectTypeConfig\(projectType\)"
+assert_contains "$ui" "return 'Prepared ' + itemStatusName(item);"
+assert_contains "$ui" "mobilePrepared ? 'ready' : 'built'"
+assert_contains "$ui" 'Open Generated Project'
+assert_contains "$ui" 'build toolchain setup is still needed'
 
 # Native host icon-drop bridge contracts (allow variable renames in callsites).
 assert_matches "$ui" "window\.forgeHostFileDrag[[:space:]]*=[[:space:]]*handleForgeHostFileDrag;"

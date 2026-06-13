@@ -3454,7 +3454,7 @@
 
       function ranActionLabel(item) {
         if (item && hasEnabledMobileRunTarget(item)) {
-          return 'Built ' + itemStatusName(item);
+          return 'Prepared ' + itemStatusName(item);
         }
         return 'Ran ' + itemStatusName(item);
       }
@@ -8769,11 +8769,18 @@
           var mode = kind === 'android' ? 'release' : 'debug';
           var mobile = await backend('build-native-mobile-workspace', [selected.path, kind, mode]);
           var mobileOut = kv(mobile.stdout || '');
-          setTargetRuntime(projectKey, kind, 'built', mobileOut.artifact || mobileOut.project || '');
-          renderSelectedTargetsEditor(selectedCatalogItem());
           var mobilePrepared = mobileOut.status === 'prepared';
+          setTargetRuntime(projectKey, kind, mobilePrepared ? 'ready' : 'built', mobileOut.artifact || mobileOut.project || '');
+          renderSelectedTargetsEditor(selectedCatalogItem());
           var mobilePlatformLabel = kind === 'android' ? 'Android' : 'iOS';
           var actions = [];
+          if (mobilePrepared && mobileOut.project) {
+            actions.push({
+              label: 'Open Generated Project',
+              primary: true,
+              run: function () { return openPath(mobileOut.project, true); }
+            });
+          }
           if (kind === 'android' && mobileOut.artifact && /\.aab$/i.test(mobileOut.artifact)) {
             actions.push({
               label: 'Upload to Play',

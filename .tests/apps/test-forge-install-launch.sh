@@ -617,11 +617,13 @@ case "$os" in
     [ -f "$mac_build_out/Contents/Resources/wizardry-apps-root.txt" ]
     [ "$(head -n 1 "$mac_build_out/Contents/Resources/wizardry-apps-root.txt")" = "$root" ]
     [ -f "$mac_build_out/Contents/Info.plist" ]
+    /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$mac_build_out/Contents/Info.plist" | grep -F 'app-forge' >/dev/null
     assert_no_macos_launch_metadata "$mac_build_out"
 
     app_bundle="$fake_home/Applications/App Forge.app"
     [ -x "$app_bundle/Contents/MacOS/app-forge" ]
     [ -f "$app_bundle/Contents/Info.plist" ]
+    /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_bundle/Contents/Info.plist" | grep -F 'app-forge' >/dev/null
     grep -F "<key>CFBundleIconFile</key>" "$app_bundle/Contents/Info.plist" >/dev/null
     app_icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app_bundle/Contents/Info.plist")
     [ -n "$app_icon_file" ]

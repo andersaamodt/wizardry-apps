@@ -448,7 +448,7 @@ cat > "$plist" <<PLIST
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
 <key>CFBundleVersion</key><string>$bundle_version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleExecutable</key><string>wizardry-host</string>
+<key>CFBundleExecutable</key><string>app-forge</string>
 <key>WizardryAppEntry</key><string>Resources/forge</string>
 $icon_key
 </dict></plist>
