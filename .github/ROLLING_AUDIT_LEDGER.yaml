@@ -126,6 +126,7 @@ categories:
       - GUI Contract
     default_severity: medium
     affected_apps:
+      - bellheim
       - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
