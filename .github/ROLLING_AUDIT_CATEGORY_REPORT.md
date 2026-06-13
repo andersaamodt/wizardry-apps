@@ -8,7 +8,7 @@
   - `.github/ROLLING_AUDIT_LEDGER.yaml`
   - repo-local `ROLLING_AUDIT.md` reports
   - `.github/ROLLING_AUDIT_RESULTS.md` for built-in `wizardry-apps` app surfaces
-- This is an interim rolling snapshot, not the final complete-family report. Additional repos still need first-pass audit coverage.
+- First-pass coverage is complete for the currently tracked Wizardry-family scope.
 
 ## Highest-Priority Categories
 
@@ -36,7 +36,7 @@
 
 ### 2. `repo-ai-standards-missing`
 - Severity: medium
-- Recurrence: 14 repos
+- Recurrence: 15 repos
 - Affected:
   - `boycott`
   - `applegate`
@@ -48,6 +48,7 @@
   - `matchbook`
   - `mecha`
   - `organizer`
+  - `pleroma`
   - `pieplate`
   - `serenity`
   - `simplerchat`
@@ -74,12 +75,13 @@
 
 ### 4. `storage-default-home-missing`
 - Severity: high
-- Recurrence: 6 repos
+- Recurrence: 7 repos
 - Affected:
   - `boycott`
   - `dictator`
   - `hegelizer`
   - `mecha`
+  - `pleroma`
   - `pieplate`
   - `stellar`
 - Why it ranks high:
@@ -161,7 +163,7 @@
 
 ### 13. `language-exception-undocumented`
 - Severity: medium
-- Recurrence: 9 repos
+- Recurrence: 10 repos
 - Affected:
   - `bellheim`
   - `book-club`
@@ -169,40 +171,43 @@
   - `fauxzilla`
   - `matchbook`
   - `organizer`
+  - `pleroma`
   - `pieplate`
   - `stellar`
   - `simplerchat`
 - Batch fix direction:
   - enumerate all non-shell boundaries in local standards notes
 
-### 13. `storage-exception-undocumented`
+### 14. `storage-exception-undocumented`
 - Severity: medium
-- Recurrence: 6 repos
+- Recurrence: 7 repos
 - Affected:
   - `boycott`
   - `binder`
   - `dictator`
   - `hegelizer`
   - `mecha`
+  - `pleroma`
   - `pieplate`
 - Batch fix direction:
   - document real storage exceptions where auditors look first
 
-### 14. `shared-xdg-app-namespace`
+### 15. `shared-xdg-app-namespace`
 - Severity: medium
-- Recurrence: 7 repos
+- Recurrence: 8 repos
 - Affected:
   - `boycott`
   - `book-club`
   - `counterspell`
   - `hegelizer`
   - `mecha`
+  - `pleroma`
   - `pieplate`
   - `stellar`
 - Batch fix direction:
   - if XDG roots remain, move them to app-owned names rather than `wizardry-apps/...` or `wizardry/...`
 
-### 15. `theme-catalog-hardcoded`
+### 16. `theme-catalog-hardcoded`
 - Severity: medium
 - Recurrence: 6 app surfaces
 - Affected:
@@ -215,9 +220,9 @@
 - Batch fix direction:
   - remove app-local theme catalogs and derive from the authoritative shared theme set
 
-### 16. `user-facing-config-not-yaml-md`
+### 17. `user-facing-config-not-yaml-md`
 - Severity: medium
-- Recurrence: 7 repos
+- Recurrence: 8 repos
 - Affected:
   - `boycott`
   - `applegate`
@@ -225,57 +230,71 @@
   - `counterspell`
   - `fauxzilla`
   - `matchbook`
+  - `pleroma`
   - `pieplate`
 - Batch fix direction:
   - convert user-facing durable config toward YAML-plus-Markdown or explicitly justify non-YAML text
 
 ## Medium-Severity Single-Repo Categories
 
-### 17. `human-contract-format-not-yaml-md`
+### 18. `human-contract-format-not-yaml-md`
 - Affected:
   - `theurgy`
 
-### 18. `tests-not-under-dot-tests`
+### 19. `tests-not-under-dot-tests`
 - Affected:
   - `dictator`
+  - `hegelizer`
+  - `pleroma`
 
-### 19. `config-example-stale`
+### 20. `config-example-stale`
 - Affected:
   - `fauxzilla`
 
-### 20. `frontend-machine-state-scraping`
+### 21. `frontend-machine-state-scraping`
 - Affected:
   - `chatroom`
 
-### 21. `inline-guided-fallback-missing`
+### 22. `inline-guided-fallback-missing`
 - Affected:
   - `chatroom`
 
-### 22. `audit-surface-stale`
+### 23. `audit-surface-stale`
 - Affected:
   - `wizardry`
 
-### 23. `gnu-tool-dependency-undocumented`
+### 24. `gnu-tool-dependency-undocumented`
 - Affected:
   - `wizardry`
 
-### 24. `theme-picker-keyboard-broken`
+### 25. `theme-picker-keyboard-broken`
 - Affected:
   - `wizardry-desktop`
 
-### 25. `frontend-derived-backend-path`
+### 26. `frontend-derived-backend-path`
+- Severity: medium
+- Recurrence: 2 repos
 - Affected:
   - `boycott`
+  - `pleroma`
 - Fix direction:
   - move backend path resolution into the host or backend contract and expose explicit actions only
 
-### 26. `generated-staging-not-disposable`
+### 27. `generated-staging-not-disposable`
 - Affected:
   - `organizer`
 - Fix direction:
   - keep generated native staging trees disposable and rerender-safe even after ordinary local build artifacts appear
 
-### 27. `bridge-shell-fragment-execution`
+### 28. `cargo-runtime-layer-present`
+- Severity: high
+- Recurrence: 1 repo
+- Affected:
+  - `pleroma`
+- Batch fix direction:
+  - remove Cargo from ordinary shipped runtime paths or move the helper into an explicitly approved host or Theurgy boundary
+
+### 29. `bridge-shell-fragment-execution`
 - Severity: high
 - Recurrence: 2 repos
 - Affected:
@@ -286,7 +305,7 @@
 
 ## Low-Severity Recurring Categories
 
-### 28. `theme-picker-not-alphabetized`
+### 30. `theme-picker-not-alphabetized`
 - Severity: low
 - Recurrence: 4 app surfaces
 - Affected:
@@ -311,10 +330,11 @@
 6. `language-exception-undocumented`
 7. `storage-exception-undocumented`
 8. `shared-xdg-app-namespace`
-9. `theme-catalog-hardcoded`
-10. `ui-static-tests-missing`
-11. `user-facing-config-not-yaml-md`
-12. high-severity single-repo categories after the broad recurring classes are under control
+9. `ui-static-tests-missing`
+10. `user-facing-config-not-yaml-md`
+11. `theme-catalog-hardcoded`
+12. `tests-not-under-dot-tests`
+13. high-severity single-repo categories after the broad recurring classes are under control
 
 ## Notes For The Fix-It Phase
 - Some categories overlap deliberately. For example:
