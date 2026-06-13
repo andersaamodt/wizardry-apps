@@ -12,6 +12,7 @@ categories:
     default_severity: high
     affected_apps:
       - dictator
+      - hegelizer
       - mecha
     approved_exceptions: []
     evidence_refs: []
@@ -26,6 +27,7 @@ categories:
     affected_apps:
       - binder
       - dictator
+      - hegelizer
       - mecha
     approved_exceptions: []
     evidence_refs: []
@@ -38,6 +40,7 @@ categories:
     default_severity: medium
     affected_apps:
       - counterspell
+      - hegelizer
       - mecha
     approved_exceptions: []
     evidence_refs: []
@@ -133,6 +136,7 @@ categories:
     default_severity: medium
     affected_apps:
       - dictator
+      - hegelizer
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Move test entrypoints under .tests and leave non-test helpers elsewhere.
@@ -289,6 +293,7 @@ categories:
       - dictator
       - eye
       - fauxzilla
+      - hegelizer
       - mecha
     approved_exceptions: []
     evidence_refs: []
@@ -323,6 +328,7 @@ categories:
       - Testing And Release Readiness
     default_severity: high
     affected_apps:
+      - hegelizer
       - theurgy
     approved_exceptions: []
     evidence_refs: []
