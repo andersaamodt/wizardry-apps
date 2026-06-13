@@ -147,10 +147,6 @@ macos_codesign_identity() {
     printf '%s\n' "$WIZARDRY_CODESIGN_IDENTITY"
     return 0
   fi
-  if command -v security >/dev/null 2>&1; then
-    security find-identity -v -p codesigning 2>/dev/null | awk -F '"' '/"/ { print $2; exit }'
-    return 0
-  fi
   printf '%s\n' "-"
 }
 
