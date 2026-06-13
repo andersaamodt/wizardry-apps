@@ -24,6 +24,39 @@ esac
 
 set -eu
 
+forge_cache_root() {
+  printf '%s\n' "${WIZARDRY_APPS_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/wizardry-apps}"
+}
+
+hash_stdin_sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{ print $1 }'
+    return 0
+  fi
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 | awk '{ print $NF }'
+    return 0
+  fi
+  printf '%s\n' "build-forge-icon: sha256 tool not available (requires shasum, sha256sum, or openssl)" >&2
+  exit 1
+}
+
+forge_checkout_key() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s' "$root" | hash_stdin_sha256
+}
+
+forge_build_cache_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s/%s/build-cache\n' "$(forge_cache_root)/forge/checkouts" "$(forge_checkout_key "$root")"
+}
+
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 DEFAULT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)
 
@@ -65,7 +98,7 @@ has_line_break() {
 }
 
 if [ -z "$out_file" ]; then
-  out_file="$root/_tmp/forge-build-cache/forge.icns"
+  out_file="$(forge_build_cache_root "$root")/forge.icns"
 fi
 
 valid_icns_output_path() {

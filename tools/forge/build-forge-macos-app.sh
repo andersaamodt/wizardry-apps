@@ -20,6 +20,14 @@ esac
 
 set -eu
 
+forge_state_root() {
+  printf '%s\n' "${WIZARDRY_APPS_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps}"
+}
+
+forge_cache_root() {
+  printf '%s\n' "${WIZARDRY_APPS_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/wizardry-apps}"
+}
+
 hash_stdin_sha256() {
   if command -v shasum >/dev/null 2>&1; then
     shasum -a 256 | awk '{ print $1 }'
@@ -97,6 +105,36 @@ hash_path_sha256() {
   rm -f "$listing"
 }
 
+forge_checkout_key() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s' "$root" | hash_stdin_sha256
+}
+
+forge_checkout_state_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s/%s\n' "$(forge_state_root)/forge/checkouts" "$(forge_checkout_key "$root")"
+}
+
+forge_checkout_cache_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s/%s\n' "$(forge_cache_root)/forge/checkouts" "$(forge_checkout_key "$root")"
+}
+
+forge_workbench_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s\n' "$(forge_checkout_state_root "$root")/workbench"
+}
+
+forge_build_cache_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s\n' "$(forge_checkout_cache_root "$root")/build-cache"
+}
+
 macos_bundle_signature_is_usable() {
   bundle_path=$1
   [ -d "$bundle_path" ] || return 1
@@ -150,7 +188,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 DEFAULT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)
 
 root=$DEFAULT_ROOT
-out_bundle="$root/_tmp/workbench/dist/macos/App Forge.app"
+out_bundle="$(forge_workbench_root "$root")/dist/macos/App Forge.app"
 bundle_id="com.wizardry.apps.forge.macos"
 
 while [ "$#" -gt 0 ]; do
@@ -267,7 +305,7 @@ command -v clang >/dev/null 2>&1 || {
   exit 1
 }
 
-cache_dir="$root/_tmp/forge-build-cache"
+cache_dir="$(forge_build_cache_root "$root")"
 host_src="$root/apps/.host/macos/main.m"
 host_bin="$cache_dir/wizardry-host-macos"
 host_flags_file="$cache_dir/wizardry-host-macos.flags"

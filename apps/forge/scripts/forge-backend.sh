@@ -229,6 +229,44 @@ os_id() {
   esac
 }
 
+forge_state_root() {
+  printf '%s\n' "${WIZARDRY_APPS_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps}"
+}
+
+forge_cache_root() {
+  printf '%s\n' "${WIZARDRY_APPS_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/wizardry-apps}"
+}
+
+forge_checkout_key() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s' "$root" | hash_stdin_sha256
+}
+
+forge_checkout_state_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s/%s\n' "$(forge_state_root)/forge/checkouts" "$(forge_checkout_key "$root")"
+}
+
+forge_checkout_cache_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s/%s\n' "$(forge_cache_root)/forge/checkouts" "$(forge_checkout_key "$root")"
+}
+
+forge_workbench_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s\n' "$(forge_checkout_state_root "$root")/workbench"
+}
+
+forge_build_cache_root() {
+  root=${1-}
+  [ -n "$root" ] || return 1
+  printf '%s\n' "$(forge_checkout_cache_root "$root")/build-cache"
+}
+
 path_mtime_epoch() {
   path=${1-}
   [ -n "$path" ] || {
@@ -1427,11 +1465,12 @@ ensure_macos_host() {
   root=$1
   require_tool clang
 
-  host_bin="$root/_tmp/workbench/bin/wizardry-host-macos"
+  workbench_root=$(forge_workbench_root "$root")
+  host_bin="$workbench_root/bin/wizardry-host-macos"
   host_src="$root/apps/.host/macos/main.m"
-  host_flags_file="$root/_tmp/workbench/bin/wizardry-host-macos.flags"
+  host_flags_file="$workbench_root/bin/wizardry-host-macos.flags"
   host_build_signature="macos-host-v2-universal-frameworks=Cocoa,WebKit,Carbon"
-  module_cache="$root/_tmp/workbench/clang-module-cache"
+  module_cache="$workbench_root/clang-module-cache"
 
   mkdir -p "$(dirname "$host_bin")"
   needs_rebuild=0
@@ -1514,7 +1553,8 @@ ensure_linux_host() {
   require_tool cc
   require_tool pkg-config
 
-  host_bin="$root/_tmp/workbench/bin/wizardry-host-linux"
+  workbench_root=$(forge_workbench_root "$root")
+  host_bin="$workbench_root/bin/wizardry-host-linux"
   host_src="$root/apps/.host/linux/main.c"
 
   mkdir -p "$(dirname "$host_bin")"
@@ -1591,7 +1631,7 @@ run_workspace_rebuild() {
   esac
 
   workspace_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
-  log_dir="$root/_tmp/workbench/log"
+  log_dir="$(forge_workbench_root "$root")/log"
   mkdir -p "$log_dir"
   log_path="$log_dir/workspace-$workspace_slug-rebuild.log"
 
@@ -1801,7 +1841,7 @@ serve_workspace_managed_hosted_web() {
 
   web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
   site_dir="$web_root/$site_name"
-  web_log="$root/_tmp/workbench/log/hosted-web/$site_name-workspace-web-wizardry.log"
+  web_log="$(forge_workbench_root "$root")/log/hosted-web/$site_name-workspace-web-wizardry.log"
   mkdir -p "$(dirname "$web_log")"
 
   if ! (
@@ -2352,8 +2392,14 @@ stop_desktop_instances_for_slug() {
   app_name=${3-}
   os_name=${4-}
   skip_gui_quit=${5-}
+  workbench_root=''
+  dist_root=''
 
   [ -n "$slug" ] || return 0
+  if [ -n "$root" ]; then
+    workbench_root=$(forge_workbench_root "$root")
+    dist_root="$workbench_root/dist"
+  fi
 
   if [ "$os_name" = "darwin" ] && [ -n "$app_name" ] && [ "$skip_gui_quit" != "1" ] && command -v osascript >/dev/null 2>&1; then
     osascript \
@@ -2369,10 +2415,10 @@ stop_desktop_instances_for_slug() {
       pkill -f "/$app_name.app/Contents/MacOS/wizardry-host" >/dev/null 2>&1 || true
       pkill -f "/$app_name.app/Contents/MacOS/" >/dev/null 2>&1 || true
     fi
-    if [ -n "$root" ]; then
-      pkill -f "wizardry-host.*$root/_tmp/workbench/dist/.*/$slug" >/dev/null 2>&1 || true
-      pkill -f "$root/_tmp/workbench/dist/macos-native-workspaces/$slug/.*/Contents/MacOS/" >/dev/null 2>&1 || true
-      pkill -f "$root/_tmp/workbench/dist/linux-native-workspaces/$slug/" >/dev/null 2>&1 || true
+    if [ -n "$dist_root" ]; then
+      pkill -f "wizardry-host.*$dist_root/.*/$slug" >/dev/null 2>&1 || true
+      pkill -f "$dist_root/macos-native-workspaces/$slug/.*/Contents/MacOS/" >/dev/null 2>&1 || true
+      pkill -f "$dist_root/linux-native-workspaces/$slug/" >/dev/null 2>&1 || true
     fi
   fi
 
@@ -2382,12 +2428,12 @@ stop_desktop_instances_for_slug() {
     while [ "$i" -lt 20 ]; do
       still_running=$(
         ps -axo command= 2>/dev/null \
-          | awk -v slug="$slug" -v root="$root" -v app_name="$app_name" '
+          | awk -v slug="$slug" -v dist_root="$dist_root" -v app_name="$app_name" '
               {
-                host = index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0))
+                host = index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (dist_root != "" && index($0, dist_root "/") > 0 && index($0, "/" slug) > 0))
                 native_app = app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/") > 0
-                native_macos = root != "" && index($0, root "/_tmp/workbench/dist/macos-native-workspaces/" slug "/") > 0 && index($0, "/Contents/MacOS/") > 0
-                native_linux = root != "" && index($0, root "/_tmp/workbench/dist/linux-native-workspaces/" slug "/") > 0
+                native_macos = dist_root != "" && index($0, dist_root "/macos-native-workspaces/" slug "/") > 0 && index($0, "/Contents/MacOS/") > 0
+                native_linux = dist_root != "" && index($0, dist_root "/linux-native-workspaces/" slug "/") > 0
                 if (host || native_app || native_macos || native_linux) { found=1; exit }
               }
               END { if (found) print "1"; else print "0" }
@@ -2401,12 +2447,12 @@ stop_desktop_instances_for_slug() {
     if [ "$still_running" = "1" ]; then
       stubborn_pids=$(
         ps -axo pid=,command= 2>/dev/null \
-          | awk -v slug="$slug" -v root="$root" -v app_name="$app_name" '
+          | awk -v slug="$slug" -v dist_root="$dist_root" -v app_name="$app_name" '
               {
-                host = index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (root != "" && index($0, root "/_tmp/workbench/dist/") > 0 && index($0, "/" slug) > 0))
+                host = index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (dist_root != "" && index($0, dist_root "/") > 0 && index($0, "/" slug) > 0))
                 native_app = app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/") > 0
-                native_macos = root != "" && index($0, root "/_tmp/workbench/dist/macos-native-workspaces/" slug "/") > 0 && index($0, "/Contents/MacOS/") > 0
-                native_linux = root != "" && index($0, root "/_tmp/workbench/dist/linux-native-workspaces/" slug "/") > 0
+                native_macos = dist_root != "" && index($0, dist_root "/macos-native-workspaces/" slug "/") > 0 && index($0, "/Contents/MacOS/") > 0
+                native_linux = dist_root != "" && index($0, dist_root "/linux-native-workspaces/" slug "/") > 0
                 if (host || native_app || native_macos || native_linux) { print $1 }
               }
             ' \
@@ -5992,7 +6038,7 @@ cmd_build_desktop() {
       host_bin=$(ensure_macos_host "$root")
       app_name=$(app_name_from_manifest "$root" "$slug")
       bundle_id=$(bundle_id_from_manifest "$root" macos "$slug")
-      dist_dir="$root/_tmp/workbench/dist/macos"
+      dist_dir="$(forge_workbench_root "$root")/dist/macos"
       bundle="$dist_dir/$app_name.app"
       zip_path="$dist_dir/$app_name.zip"
       hash_path="$bundle/Contents/Resources/wizardry-build-input.sha256"
@@ -6117,7 +6163,7 @@ PLIST
 
     linux)
       host_bin=$(ensure_linux_host "$root")
-      dist_dir="$root/_tmp/workbench/dist/linux"
+      dist_dir="$(forge_workbench_root "$root")/dist/linux"
       appdir="$dist_dir/AppDir-$slug"
       artifact=''
       hash_path="$appdir/usr/share/wizardry-build-input.sha256"
@@ -6276,7 +6322,7 @@ build_native_mobile_workspace_target() {
       require_tool java
       project_dir="$workspace_path/generated/mobile/android"
       [ -f "$project_dir/settings.gradle" ] || { printf '%s\n' "forge-backend: native Android project is missing settings.gradle: $project_dir" >&2; exit 1; }
-      out_dir="$root/_tmp/workbench/dist/native-mobile/$workspace_slug/android"
+      out_dir="$(forge_workbench_root "$root")/dist/native-mobile/$workspace_slug/android"
       mkdir -p "$out_dir"
       task="assembleDebug"
       [ "$mode" = "release" ] && task="bundleRelease"
@@ -6342,7 +6388,7 @@ build_godot_workspace_macos_launcher() {
 
   workspace_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
   workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
-  bundle_root="$root/_tmp/workbench/dist/macos-godot-workspaces/$workspace_slug"
+  bundle_root="$(forge_workbench_root "$root")/dist/macos-godot-workspaces/$workspace_slug"
   final_bundle="$bundle_root/$workspace_title.app"
   hash_path="$final_bundle/Contents/Resources/wizardry-build-input.sha256"
 
@@ -6489,8 +6535,8 @@ build_native_workspace_host() {
         exit 1
       }
 
-      build_dir="$root/_tmp/workbench/build/native-macos-workspaces/$workspace_slug"
-      bundle_root="$root/_tmp/workbench/dist/macos-native-workspaces/$workspace_slug"
+      build_dir="$(forge_workbench_root "$root")/build/native-macos-workspaces/$workspace_slug"
+      bundle_root="$(forge_workbench_root "$root")/dist/macos-native-workspaces/$workspace_slug"
       bundle="$bundle_root/$app_name.app"
       mkdir -p "$build_dir"
       clear_stale_swiftpm_lock "$build_dir"
@@ -6598,7 +6644,7 @@ PLIST
         exit 1
       }
 
-      build_root="$root/_tmp/workbench/dist/linux-native-workspaces/$workspace_slug"
+      build_root="$(forge_workbench_root "$root")/dist/linux-native-workspaces/$workspace_slug"
       built_exec="$build_root/$app_id"
       mkdir -p "$build_root"
       cc -O2 $(pkg-config --cflags gtk4) "$src" -o "$built_exec" $(pkg-config --libs gtk4)
@@ -6681,7 +6727,7 @@ build_workspace_desktop_host() {
   case "$os" in
     darwin)
       host_bin=$(ensure_macos_host "$root")
-      bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
+      bundle_root="$(forge_workbench_root "$root")/dist/macos-workspaces/$workspace_slug"
       final_bundle="$bundle_root/$workspace_title.app"
       staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")
       staged_bundle="$staged_root/$workspace_title.app"
@@ -6779,7 +6825,7 @@ PLIST
       ;;
     linux)
       host_bin=$(ensure_linux_host "$root")
-      bundle_root="$root/_tmp/workbench/dist/linux-workspaces/$workspace_slug"
+      bundle_root="$(forge_workbench_root "$root")/dist/linux-workspaces/$workspace_slug"
       appdir="$bundle_root/AppDir"
       rm -rf "$appdir"
       mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$workspace_slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
@@ -7274,7 +7320,7 @@ cmd_run_desktop() {
           printf '%s\n' "forge-backend: installed Linux launcher missing for $slug" >&2
           exit 1
         }
-        log_dir="$root/_tmp/workbench/log"
+        log_dir="$(forge_workbench_root "$root")/log"
         mkdir -p "$log_dir"
         log_path="$log_dir/$slug-run.log"
         if command -v nohup >/dev/null 2>&1; then
@@ -7398,7 +7444,7 @@ cmd_run_desktop() {
       ;;
   esac
 
-  log_dir="$root/_tmp/workbench/log"
+  log_dir="$(forge_workbench_root "$root")/log"
   mkdir -p "$log_dir"
   log_path="$log_dir/$slug-run.log"
   app_dir="$appdir/usr/share/$slug"
@@ -7541,7 +7587,7 @@ cmd_run_workspace() {
         }
 
         workspace_id=$(basename "$workspace_path")
-        log_dir="$root/_tmp/workbench/log"
+        log_dir="$(forge_workbench_root "$root")/log"
         mkdir -p "$log_dir"
         log_path="$log_dir/workspace-$workspace_id-godot.log"
 
@@ -7563,7 +7609,7 @@ cmd_run_workspace() {
       }
 
       workspace_id=$(basename "$workspace_path")
-      log_dir="$root/_tmp/workbench/log"
+      log_dir="$(forge_workbench_root "$root")/log"
       mkdir -p "$log_dir"
       log_path="$log_dir/workspace-$workspace_id-godot.log"
 
@@ -7606,7 +7652,7 @@ cmd_run_workspace() {
         darwin) host_target=macos ;;
         linux) host_target=linux ;;
       esac
-      log_dir="$root/_tmp/workbench/log"
+      log_dir="$(forge_workbench_root "$root")/log"
       mkdir -p "$log_dir"
       log_path="$log_dir/workspace-$workspace_slug-native.log"
 
@@ -7735,7 +7781,7 @@ cmd_run_workspace() {
       os=$(os_id)
       host_target=$(host_workspace_target_id 2>/dev/null || true)
       workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
-      log_dir="$root/_tmp/workbench/log"
+      log_dir="$(forge_workbench_root "$root")/log"
       mkdir -p "$log_dir"
       log_path="$log_dir/workspace-$workspace_slug-run.log"
       if [ "$run_mode" = 'install-first' ]; then
@@ -7870,7 +7916,7 @@ cmd_run_workspace() {
   esac
 
   workspace_id=$(basename "$workspace_path")
-  log_dir="$root/_tmp/workbench/log"
+  log_dir="$(forge_workbench_root "$root")/log"
   mkdir -p "$log_dir"
   log_path="$log_dir/workspace-$workspace_id-run.log"
 
@@ -7878,7 +7924,7 @@ cmd_run_workspace() {
     workspace_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
     workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
 
-    bundle_root="$root/_tmp/workbench/dist/macos-workspaces/$workspace_slug"
+    bundle_root="$(forge_workbench_root "$root")/dist/macos-workspaces/$workspace_slug"
     final_bundle="$bundle_root/$workspace_title.app"
     staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")
     staged_bundle="$staged_root/$workspace_title.app"
@@ -8001,7 +8047,7 @@ PLIST
 
   if [ "$os" = "linux" ]; then
     bundle_slug=$(sanitize_bundle_component "$(basename "$workspace_path")")
-    bundle_root="$root/_tmp/workbench/dist/linux-workspaces/$bundle_slug"
+    bundle_root="$(forge_workbench_root "$root")/dist/linux-workspaces/$bundle_slug"
     appdir="$bundle_root/AppDir"
     rm -rf "$appdir"
     mkdir -p "$appdir/usr/bin" "$appdir/usr/share/$bundle_slug" "$appdir/usr/share/.host" "$appdir/usr/share/wizardry-apps/core"
@@ -8096,7 +8142,7 @@ cmd_serve_hosted_web() {
       web_root=${WEB_WIZARDRY_ROOT:-$HOME/sites}
       site_name="forge-$slug"
       site_dir="$web_root/$site_name"
-      web_log="$root/_tmp/workbench/log/hosted-web/$site_name-web-wizardry.log"
+      web_log="$(forge_workbench_root "$root")/log/hosted-web/$site_name-web-wizardry.log"
       mkdir -p "$(dirname "$web_log")"
 
       command -v web-wizardry >/dev/null 2>&1 || {
@@ -8181,7 +8227,7 @@ print(s.getsockname()[1])
 s.close()
 PY
 )
-      web_log="$root/_tmp/workbench/log/hosted-web/workspace-$workspace_slug-python.log"
+      web_log="$(forge_workbench_root "$root")/log/hosted-web/workspace-$workspace_slug-python.log"
       mkdir -p "$(dirname "$web_log")"
       if command -v nohup >/dev/null 2>&1; then
         nohup python3 -m http.server "$port" --bind 127.0.0.1 --directory "$app_dir" >"$web_log" 2>&1 &
@@ -8249,7 +8295,7 @@ cmd_stage_mobile() {
     printf '%s\n' "forge-backend: app not found in manifest: $slug" >&2
     exit 1
   }
-  dest="$root/_tmp/workbench/stage/mobile-$slug"
+  dest="$(forge_workbench_root "$root")/stage/mobile-$slug"
   sh "$root/tools/release/stage-web-assets.sh" "$slug" "$dest"
   printf 'staged=%s\n' "$dest"
 }
@@ -8270,7 +8316,7 @@ cmd_build_ios_smoke() {
   require_tool xcodegen
   require_tool xcodebuild
 
-  out_dir="$root/_tmp/workbench/dist/ios"
+  out_dir="$(forge_workbench_root "$root")/dist/ios"
   mkdir -p "$out_dir"
   sh "$root/tools/release/build-ios-app.sh" "$slug" "$out_dir" smoke
   printf 'out=%s\n' "$out_dir"
@@ -8291,7 +8337,7 @@ cmd_build_android_debug() {
   app_name=$(app_name_from_manifest "$root" "$slug")
   app_id=$(bundle_id_from_manifest "$root" android "$slug")
 
-  android_project="$root/_tmp/workbench/android/$slug"
+  android_project="$(forge_workbench_root "$root")/android/$slug"
   sh "$root/tools/release/prepare-android-host.sh" "$slug" "$android_project" >/dev/null
 
   version_name="0.0.0-local"
@@ -8309,7 +8355,7 @@ cmd_build_android_debug() {
     exit 1
   }
 
-  out_dir="$root/_tmp/workbench/dist/android"
+  out_dir="$(forge_workbench_root "$root")/dist/android"
   mkdir -p "$out_dir"
   out_apk="$out_dir/wizardry-$slug-debug.apk"
   cp "$apk" "$out_apk"
@@ -9074,7 +9120,7 @@ cmd_run_task() {
       ;;
   esac
 
-  task_log_dir="$root/_tmp/workbench/log/tasks"
+  task_log_dir="$(forge_workbench_root "$root")/log/tasks"
   mkdir -p "$task_log_dir"
   task_log="$task_log_dir/$task-$(date +%Y%m%d-%H%M%S).log"
   {
