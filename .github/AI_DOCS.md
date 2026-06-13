@@ -17,6 +17,7 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT.md` when doing whole-app or cross-app audits that need language, storage, execution, testing, and GUI criteria together.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_COMPLIANCE_FRAMEWORK.md` when normalizing findings across many apps or planning cross-app remediation by category.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_PASS2.md` when continuing the second rolling-audit pass focused on `phronesis`, unreasoned variance, and back-applying late criteria.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_PASS2_DECISION_QUEUE.md` before switching from audit work to standards approval or fix-it planning.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/PHRONESIS_EXTRACTION_PLAN.md` before creating or populating the proposed `phronesis` standards repository.
 - Read `/Users/andersaamodt/git/phronesis/README.md` and `/Users/andersaamodt/git/phronesis/standards/repo-hygiene/README.md` for extracted cross-repo standards that have already moved into the phronesis seed.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/PHRONESIS_POLICY_MATRIX_SCHEMA.yaml` when designing `phronesis` policy IDs, app compliance records, or generator/audit enforcement hooks.

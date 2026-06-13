@@ -216,6 +216,9 @@
   - Any meaningful app-to-app difference must be decisioned into a standard, an approved exception, or a pending decision record.
 - Needs re-check:
   - all repos and all generated templates
+- Status:
+  - variance ledger is populated and all current variance items now have `standard-proposed` status
+  - pre-fix-it review queue is recorded in `.github/ROLLING_AUDIT_PASS2_DECISION_QUEUE.md`
 
 ### `repo-cruft-and-build-artifact-discipline`
 - Late criterion source:
@@ -279,6 +282,7 @@
 
 ## Pass 2 Outputs
 - `PHRONESIS_EXTRACTION_PLAN.md`
+- `ROLLING_AUDIT_PASS2_DECISION_QUEUE.md`
 - `ROLLING_AUDIT_VARIANCE_LEDGER.yaml`
 - updates to `ROLLING_AUDIT_PROPOSED_STANDARDS.md`
 - updates to per-app `ROLLING_AUDIT.md` reports only when a late criterion is newly applied

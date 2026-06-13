@@ -7,7 +7,7 @@ description: >
 variance_items:
   - id: theme-system-source
     title: Apps vary between shared Wizardry themes and app-local theme systems
-    status: pending-decision
+    status: standard-proposed
     observed_patterns:
       - shared_wizardry_themes
       - shared_wizardry_themes_with_frontend_fallback_catalog
@@ -54,7 +54,7 @@ variance_items:
 
   - id: durable-root-layout
     title: Apps vary between app-home roots, dot-app roots, XDG roots, shared namespaces, and domain roots
-    status: pending-decision
+    status: standard-proposed
     observed_patterns:
       - home_appname
       - home_dot_appname
@@ -93,7 +93,7 @@ variance_items:
 
   - id: preference-file-format
     title: Apps vary between YAML-oriented config, env files, key-value prefs, JSON state, and browser storage
-    status: pending-decision
+    status: standard-proposed
     observed_patterns:
       - yaml_or_markdown_text
       - env_or_key_value_text
@@ -183,7 +183,7 @@ variance_items:
 
   - id: native-backend-resolution-contract
     title: Native/generated apps vary in whether backend path resolution is host-owned, generated, or environment-overridden
-    status: pending-decision
+    status: standard-proposed
     candidate_standard: >
       Native and generated app shells may know their packaged backend resource
       path only inside the generated host boundary. Development fallback paths
@@ -201,7 +201,7 @@ variance_items:
 
   - id: non_shell_runtime_boundary
     title: Apps vary in how non-shell language surfaces are justified
-    status: pending-decision
+    status: standard-proposed
     observed_patterns:
       - generated_native_output
       - host_owned_native_boundary
