@@ -1536,6 +1536,16 @@ clear_stale_swiftpm_lock() {
   rm -f "$lock_path"
 }
 
+clear_stale_swiftpm_module_cache() {
+  scratch_dir=${1-}
+  [ -n "$scratch_dir" ] || return 0
+  [ -d "$scratch_dir" ] || return 0
+
+  # SwiftPM module caches embed absolute scratch paths in generated PCH data.
+  # When Forge's workbench root moves, those cached modules become unusable.
+  find "$scratch_dir" -type d \( -name ModuleCache -o -name ModuleCache.noindex -o -name prebuilt-modules \) -prune -exec rm -rf {} + >/dev/null 2>&1 || true
+}
+
 launch_macos_bundle_async() {
   bundle_path=${1-}
   [ -d "$bundle_path" ] || return 1
@@ -6540,6 +6550,7 @@ build_native_workspace_host() {
       bundle="$bundle_root/$app_name.app"
       mkdir -p "$build_dir"
       clear_stale_swiftpm_lock "$build_dir"
+      clear_stale_swiftpm_module_cache "$build_dir"
       (
         cd "$workspace_path" &&
         swift build --package-path "$package_dir" --scratch-path "$build_dir"

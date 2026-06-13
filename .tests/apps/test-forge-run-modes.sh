@@ -183,6 +183,76 @@ exit 0
 SH_LIPO
 chmod +x "$fake_bin/lipo"
 
+cat > "$fake_bin/swift" <<'SH_SWIFT'
+#!/bin/sh
+set -eu
+
+scratch_path=''
+package_path=''
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    build)
+      shift
+      ;;
+    --scratch-path)
+      scratch_path=${2-}
+      shift 2
+      ;;
+    --package-path)
+      package_path=${2-}
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+[ -n "$scratch_path" ] || {
+  printf '%s\n' "fake swift requires --scratch-path" >&2
+  exit 2
+}
+[ -n "$package_path" ] || {
+  printf '%s\n' "fake swift requires --package-path" >&2
+  exit 2
+}
+
+if find "$scratch_path" -type d \( -name ModuleCache -o -name ModuleCache.noindex -o -name prebuilt-modules \) -print -quit | grep . >/dev/null 2>&1; then
+  printf '%s\n' "fake swift found stale module cache under $scratch_path" >&2
+  exit 1
+fi
+
+workspace_root=$(CDPATH= cd -- "$package_path/../.." && pwd -P)
+app_id=$(awk -F= '
+  $1 ~ /^[[:space:]]*#/ { next }
+  {
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+    if ($1 == "project_id") {
+      v=$0
+      sub(/^[^=]*=/, "", v)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+      print v
+      exit
+    }
+  }
+' "$workspace_root/wizardry.workspace.conf")
+[ -n "$app_id" ] || {
+  printf '%s\n' "fake swift could not resolve app id" >&2
+  exit 1
+}
+
+out_dir="$scratch_path/arm64-apple-macosx/debug"
+mkdir -p "$out_dir"
+cat > "$out_dir/$app_id" <<'HOST'
+#!/bin/sh
+exit 0
+HOST
+chmod +x "$out_dir/$app_id"
+exit 0
+SH_SWIFT
+chmod +x "$fake_bin/swift"
+
 cat > "$fake_bin/ditto" <<'SH_DITTO'
 #!/bin/sh
 set -eu
@@ -448,6 +518,7 @@ make_native_workspace() {
   app_name=$6
 
   mkdir -p "$workspace/app-blueprint" "$workspace/generated/linux/src"
+  mkdir -p "$workspace/generated/macos"
   cat > "$workspace/app-blueprint/app.ir.yaml" <<IR
 {
   "schemaVersion": "1.0",
@@ -467,6 +538,9 @@ int main(void) {
   return 0;
 }
 C
+  cat > "$workspace/generated/macos/Package.swift" <<'SWIFT'
+// fake swift package for Forge tests
+SWIFT
   cat > "$workspace/wizardry.workspace.conf" <<CONF
 project_id=$project_id
 title=$title
@@ -516,5 +590,21 @@ workspace_native_install_run_root=$(printf '%s\n' "$workspace_native_install_run
 [ -x "$workspace_native_install_run_launcher" ]
 [ -x "$workspace_native_install_run_root/bin/binder-native" ]
 wait_for_file_contains "$workspace_native_install_log" "$workspace_native_install_run_root/bin/binder-native" 60
+
+# Behavior: macOS native workspace runs purge stale SwiftPM module caches left
+# behind by older workbench roots before rebuilding in the current state path.
+workspace_native_macos="$scratch/workspace-native-macos"
+make_native_workspace "$workspace_native_macos" "workspace-native-macos" "Workspace Native Mac" "macos" "workspace-native-macos" "Workspace Native Mac"
+checkout_key=$(printf %s "$root" | shasum -a 256 | awk '{ print $1 }')
+workspace_native_macos_build="$test_home/.local/state/wizardry-apps/forge/checkouts/$checkout_key/workbench/build/native-macos-workspaces/workspace-native-macos"
+mkdir -p "$workspace_native_macos_build/arm64-apple-macosx/debug/ModuleCache/legacy"
+printf '%s\n' "stale" > "$workspace_native_macos_build/arm64-apple-macosx/debug/ModuleCache/legacy/stale.pcm"
+workspace_native_macos_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$backend" run-workspace "$root" "$workspace_native_macos" native-desktop normal)
+assert_contains "$workspace_native_macos_out" "launched=1"
+assert_contains "$workspace_native_macos_out" "mode=native-desktop-executable"
+workspace_native_macos_artifact=$(printf '%s\n' "$workspace_native_macos_out" | kv_read artifact)
+[ -d "$workspace_native_macos_artifact" ]
+[ ! -d "$workspace_native_macos_build/arm64-apple-macosx/debug/ModuleCache" ]
+[ "$(cat "$test_opened_bundle")" = "$workspace_native_macos_artifact" ]
 
 printf '%s\n' "forge run-mode behavior tests passed"
