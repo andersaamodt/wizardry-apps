@@ -115,6 +115,10 @@ assert_matches "$ui" '^[[:space:]]*handler\(\);$'
 assert_matches "$ui" 'navigator\.platform'
 assert_matches "$ui" 'runtimePlatform\.indexOf\('"'"'mac'"'"'\)[[:space:]]*>=[[:space:]]*0'
 assert_matches "$ui" "__wizardry_host_restart_self"
+assert_matches "$ui" 'function forgeCanBackgroundRefresh\(\)'
+assert_matches "$ui" "document\.hidden"
+assert_matches "$ui" "document\.hasFocus\(\)"
+assert_matches "$ui" "suppressTransientRefresh\(90000\);"
 
 # Backend actions should remain explicit and structured.
 assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context, runMode\]\);"

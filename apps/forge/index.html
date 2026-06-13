@@ -1291,6 +1291,16 @@
         state.refreshSuppressedUntil = Math.max(state.refreshSuppressedUntil || 0, Date.now() + duration);
       }
 
+      function forgeCanBackgroundRefresh() {
+        if (document.hidden) {
+          return false;
+        }
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
+          return false;
+        }
+        return true;
+      }
+
       function activeCatalogRowMenuPortal() {
         return document.querySelector('.catalog-row-menu:not(.hidden)');
       }
@@ -3487,7 +3497,7 @@
           runMode = 'normal';
         }
 
-        suppressTransientRefresh();
+        suppressTransientRefresh(90000);
         var res = await backend('run-workspace', [item.path, item.context, runMode]);
         var out = kv(res.stdout || '');
         var workspaceKey = item.key || (item.kind === 'builtin' ? ('builtin:' + item.id) : ('workspace:' + item.id));
@@ -8806,7 +8816,7 @@
               : ('Building ' + itemStatusName(app) + '...');
             setActivity('working', buildingLabel);
             setFooterStatus('working', buildingLabel);
-            suppressTransientRefresh();
+            suppressTransientRefresh(90000);
             var runInstallFirst = shouldInstallBeforeRun(selected);
             var run = await backend('run-desktop', runInstallFirst ? [app.id, 'install-first'] : [app.id]);
             var runOut = kv(run.stdout || '');
@@ -10166,7 +10176,7 @@
         }
 
         state.autoRefreshTimer = setInterval(function () {
-          if (state.busy || !bridgeAvailable() || refreshIsSuppressed()) {
+          if (state.busy || !bridgeAvailable() || refreshIsSuppressed() || !forgeCanBackgroundRefresh()) {
             return;
           }
           refreshWorkspace({ quiet: true }).catch(function (err) {
@@ -10175,7 +10185,7 @@
         }, 15000);
 
         window.addEventListener('focus', function () {
-          if (state.busy || !bridgeAvailable() || refreshIsSuppressed()) {
+          if (state.busy || !bridgeAvailable() || refreshIsSuppressed() || !forgeCanBackgroundRefresh()) {
             return;
           }
           refreshWorkspace({ quiet: true }).catch(function (_err) {
@@ -10184,7 +10194,7 @@
         });
 
         document.addEventListener('visibilitychange', function () {
-          if (document.hidden || state.busy || !bridgeAvailable() || refreshIsSuppressed()) {
+          if (state.busy || !bridgeAvailable() || refreshIsSuppressed() || !forgeCanBackgroundRefresh()) {
             return;
           }
           refreshWorkspace({ quiet: true }).catch(function (_err) {
