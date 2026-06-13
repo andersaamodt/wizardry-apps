@@ -15,6 +15,8 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
 rm -f "$root/_tmp/workbench/bin/wizardry-host-macos"
 rm -rf "$root/_tmp/workbench/dist/macos-workspaces/workspace-source-run"
+state_root="$scratch/state"
+cache_root="$scratch/cache"
 
 fake_bin="$scratch/fake-bin"
 mkdir -p "$fake_bin"
@@ -140,6 +142,8 @@ host_log="$scratch/host.log"
 run_out=$(
   env \
     PATH="$fake_bin:$PATH" \
+    WIZARDRY_APPS_STATE_DIR="$state_root" \
+    WIZARDRY_APPS_CACHE_DIR="$cache_root" \
     WIZARDRY_FAKE_HOST_LOG="$host_log" \
     WIZARDRY_FAKE_HOST_SLEEP=8 \
     sh "$backend" run-workspace "$root" "$workspace"
