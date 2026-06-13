@@ -4031,10 +4031,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                     }
                 }
 
-                NSTask *task = [[NSTask alloc] init];
-                task.launchPath = @"/bin/sh";
-                task.arguments = @[
-                    @"-c",
+                NSString *restartScript =
                     @"log_root=\"${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps\"; "
                     @"log_file=\"$log_root/host-restart.log\"; "
                     @"mkdir -p \"$log_root\" || exit 1; "
@@ -4071,8 +4068,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
                     @"if [ -n \"$backup_bundle\" ] && [ -d \"$backup_bundle\" ]; then "
                     @"  /bin/rm -rf \"$backup_bundle\"; "
                     @"fi; "
-                    @"printf '[%s] restart reopened bundle=%s\\n' \"$(timestamp)\" \"$WIZARDRY_RESTART_BUNDLE\" >> \"$log_file\""
-                ];
+                    @"printf '[%s] restart reopened bundle=%s\\n' \"$(timestamp)\" \"$WIZARDRY_RESTART_BUNDLE\" >> \"$log_file\"";
+
+                NSTask *task = [[NSTask alloc] init];
+                task.launchPath = @"/bin/sh";
+                task.arguments = @[ @"-c", restartScript ];
                 NSMutableDictionary *env = [NSMutableDictionary dictionaryWithDictionary:[[NSProcessInfo processInfo] environment]];
                 env[@"WIZARDRY_RESTART_BUNDLE"] = bundlePath;
                 env[@"WIZARDRY_RESTART_STAGE"] = stagedBundlePath ?: @"";
