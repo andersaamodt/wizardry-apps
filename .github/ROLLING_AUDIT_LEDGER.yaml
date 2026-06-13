@@ -269,6 +269,7 @@ categories:
     default_severity: high
     affected_apps:
       - chatroom
+      - eye
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add UI/static contract tests alongside backend coverage in .tests.
@@ -281,6 +282,7 @@ categories:
     affected_apps:
       - binder
       - dictator
+      - eye
       - fauxzilla
     approved_exceptions: []
     evidence_refs: []
