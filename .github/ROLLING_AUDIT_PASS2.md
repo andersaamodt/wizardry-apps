@@ -99,9 +99,39 @@
   - `pleroma`
 - Standard:
   - A repo-local AI-facing document must list local language, storage, theme, runtime, and test exceptions.
+- Required shape:
+  - import the canonical upstream standards by path
+  - name every approved or pending language boundary
+  - name the durable storage root and any deviation from `~/<appname>`
+  - state whether user-facing editable files use YAML plus Markdown-oriented text, JSON, key-value text, browser storage, or another format
+  - classify theme behavior as shared Wizardry themes, app-local theme system, fixed palette, or no theme system
+  - name backend/native/runtime bridge boundaries, including who owns backend path resolution
+  - name test entrypoints under `.tests/` and any known gaps
+  - name release/build/generated-output roots and say where disposable cruft belongs
 - Needs re-check:
   - every repo marked `repo-ai-standards-missing`
   - every repo whose local docs only point upstream without enumerating local exceptions
+- Checked so far:
+  - `applegate`: fail; no local AI-facing exception ledger beyond audit report
+  - `bellheim`: fail; no local AI-facing exception ledger beyond audit report
+  - `binder`: fail; no local AI-facing exception ledger beyond audit report
+  - `book-club`: fail; `.github/AI_DOCS.md` redirects upstream but does not enumerate local generated-native or Python helper boundaries
+  - `boycott`: fail; no local AI-facing exception ledger beyond audit report
+  - `counterspell`: fail; `.github/README.md` is a thin pointer and does not enumerate Python or Swift exceptions
+  - `dictator`: fail; no local AI-facing exception ledger beyond audit report
+  - `eye`: fail; no local AI-facing exception ledger beyond audit report
+  - `fauxzilla`: fail; no local AI-facing exception ledger beyond audit report
+  - `hegelizer`: fail; no local AI-facing exception ledger beyond audit report
+  - `matchbook`: fail; no local AI-facing exception ledger beyond audit report
+  - `mecha`: fail; no local AI-facing exception ledger beyond audit report
+  - `organizer`: fail; no local AI-facing exception ledger beyond audit report
+  - `pieplate`: fail; no local AI-facing exception ledger beyond audit report
+  - `pleroma`: fail; no local AI-facing exception ledger beyond audit report
+  - `serenity`: fail; `.github/CODEX.md` is feature-specific and omits storage/language/theme/runtime/test exceptions
+  - `simplerchat`: fail; no local AI-facing exception ledger beyond audit report
+  - `stellar`: fail; no local AI-facing exception ledger beyond audit report
+  - `theurgy`: partial pass for project-local AI docs, but generated app defaults still need the same ledger shape
+  - `wizardry-apps`: partial pass for repo-local AI docs; the built-in `tools/check-gh-issue.py` language exception should be moved from implicit inventory to an explicit exception ledger
 
 ### `backend-contract-tests-missing`
 - Late criterion source:

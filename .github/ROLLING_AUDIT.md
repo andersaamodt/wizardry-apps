@@ -107,6 +107,8 @@
 ### 8. Documentation And Auditability
 - AI-facing standards belong in `.github/`.
 - If an exception is real, document it where the next auditor will actually look.
+- Repo-local AI docs must include a local exception ledger when the repo has local language, storage, theme, runtime, test, release, generated-output, or build-cruft boundaries.
+- Redirect-only AI docs fail this axis when repo-specific exceptions exist.
 - Audit notes should cite the canonical section names instead of restating full policy text.
 
 ## Criteria Learned In Round 1
@@ -114,6 +116,7 @@
 - For native apps, IR/schema validation alone does not satisfy the GUI contract requirement; the shipped native shell still needs `.tests/` UI/static regression coverage.
 - A shipped app with no backend contract coverage under `.tests/` fails the testing axis even if manual or UI-facing behavior exists.
 - Repo-local AI docs must enumerate repo-specific exception boundaries; pointing only to upstream canonical docs is not enough when the repo retains real local exceptions.
+- The local exception ledger should name upstream imports, language boundaries, durable storage roots, durable file formats, theme-system classification, bridge/runtime ownership, `.tests/` entrypoints and gaps, release/build/generated-output roots, and repo-cruft policy.
 - Passive status and refresh paths must not write prefs or other durable app state.
 - Built-in app settings should be part of the main app shell, not a second HTML document mounted in an iframe.
 - Built-in app fallback UX should avoid `alert()` and imperative “Please start...” messaging in favor of inline guided status.

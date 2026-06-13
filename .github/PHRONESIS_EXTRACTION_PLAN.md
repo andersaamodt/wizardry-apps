@@ -32,7 +32,7 @@
 - `policies/`
   - stable policy IDs and enforcement levels
 - `templates/`
-  - repo-local `AI_DOCS.md`, `CODEX.md`, exception ledger, and audit report templates
+  - repo-local `AI_DOCS.md`, `CODEX.md`, exception ledger, policy matrix, and audit report templates
 - `lessons/`
   - promoted lessons distilled from Wizardry-family audits
 - `tools/`
@@ -99,6 +99,20 @@
 - `bridge.backend-resolution-owned`: frontend code does not derive backend executable paths from document paths.
 - `runtime.no-cargo-on-demand`: shipped backend paths do not compile Cargo-managed helpers on demand.
 - `docs.local-exceptions`: each repo keeps local AI-facing docs for its own exceptions and boundaries.
+- `docs.exception-ledger-shape`: local AI docs must enumerate storage, language, theme, runtime, test, release, generated-output, and repo-cruft boundaries in a predictable shape.
+
+## First Template To Seed
+- Repo-local `AI_DOCS.md` should start with upstream standards imports.
+- It should then include a local exception ledger with these headings:
+  - language boundaries
+  - storage roots
+  - durable file formats
+  - theme system
+  - runtime and bridge ownership
+  - tests and known gaps
+  - release, build, generated-output, and cruft policy
+  - approved exceptions and pending decisions
+- Redirect-only docs are acceptable only for repos with no local exceptions; otherwise, the local exceptions must be named where agents look first.
 
 ## Open Design Decisions
 - Whether `phronesis` should store only prose policy first, or include a machine-readable policy registry from day one.

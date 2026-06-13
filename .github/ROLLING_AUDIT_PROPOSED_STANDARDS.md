@@ -29,6 +29,9 @@
 - Approved exceptions should be documented in repo-local AI-facing docs where the next auditor will actually look.
 - Repo-local AI docs should name the repo’s own storage and language exceptions explicitly, not only redirect readers to upstream canonical docs.
 - Repo-local AI docs should enumerate local storage, language, theme, runtime, test, release, and generated-output boundaries in one predictable exception ledger shape.
+- The repo-local exception ledger shape should include upstream import paths, approved or pending language boundaries, durable storage root, user-facing file formats, theme-system classification, bridge/backend/native ownership, `.tests/` entrypoints and gaps, release/build/generated-output roots, and disposable-cruft policy.
+- A repo-local AI doc that only redirects to upstream canonical docs is insufficient when the repo has local generated-native, Python, Rust, Swift, Node, storage, theme, build-output, or bridge exceptions.
+- A feature-specific `CODEX.md` can coexist with the ledger, but it should not be the only AI-facing standards surface unless it also covers the full local exception contract.
 - AI-facing standards docs should not contain contradictory approved patterns; one canonical pattern should win.
 - Checked-in config examples and copyable setup templates should match current runtime defaults exactly; stale legacy-path examples are a standards violation.
 

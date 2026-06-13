@@ -34,7 +34,37 @@
   - where retained, add a repo-local exception ledger in `.github/`
   - where not retained, plan replacement in shell, Rust, or other explicitly approved boundaries
 
-### 2. `repo-ai-standards-missing`
+### 2. `repo-local-exception-ledger-incomplete`
+- Severity: medium
+- Recurrence: 18 app repos
+- Affected:
+  - `applegate`
+  - `bellheim`
+  - `binder`
+  - `book-club`
+  - `boycott`
+  - `counterspell`
+  - `dictator`
+  - `eye`
+  - `fauxzilla`
+  - `hegelizer`
+  - `matchbook`
+  - `mecha`
+  - `organizer`
+  - `pieplate`
+  - `pleroma`
+  - `serenity`
+  - `simplerchat`
+  - `stellar`
+- Why it ranks near the top:
+  - It is now the broadest recurring governance failure found in the app repos.
+  - It also blocks clean remediation of language, storage, theme, build-output, and bridge exceptions because the accepted boundaries are not recorded where agents look first.
+- Batch fix direction:
+  - create the `phronesis` repo-local exception-ledger template first
+  - then add or expand each app’s local AI docs from that template
+  - require explicit entries for language, storage root, durable format, theme system, bridge/runtime ownership, `.tests/` coverage, release/build/generated-output roots, and repo-cruft policy
+
+### 3. `repo-ai-standards-missing`
 - Severity: medium
 - Recurrence: 15 repos
 - Affected:
@@ -60,7 +90,7 @@
   - add a minimal repo-local `.github` standards note template
   - require each repo to list storage exceptions, language boundaries, and any accepted architecture-specific variance
 
-### 3. `validation-suite-red`
+### 4. `validation-suite-red`
 - Severity: high
 - Recurrence: 4 repos
 - Affected:
@@ -73,7 +103,7 @@
 - Batch fix direction:
   - restore each repo’s canonical validation suite to green before treating the contract surface as stable
 
-### 4. `storage-default-home-missing`
+### 5. `storage-default-home-missing`
 - Severity: high
 - Recurrence: 7 repos
 - Affected:
@@ -90,7 +120,7 @@
   - migrate primary durable state to `~/<appname>` where appropriate
   - otherwise promote a narrow documented exception instead of treating the current layout as ordinary
 
-### 5. `browser-owned-durable-state`
+### 6. `browser-owned-durable-state`
 - Severity: high
 - Recurrence: 4 repos
 - Affected:
@@ -103,7 +133,7 @@
 - Batch fix direction:
   - narrow browser-owned storage to cache/bootstrap use and move canonical durable state and secrets into app-owned explicit contracts
 
-### 6. `ui-static-tests-missing`
+### 7. `ui-static-tests-missing`
 - Severity: high
 - Recurrence: 5 repos
 - Affected:
@@ -120,29 +150,23 @@
 
 ## High-Severity Single-Repo Categories
 
-### 7. `generated-state-in-checkout`
+### 8. `generated-state-in-checkout`
 - Affected:
   - `theurgy`
 - Fix direction:
   - generated defaults must stop normalizing runtime state into source trees
 
-### 8. `standards-guidance-contradictory`
+### 9. `standards-guidance-contradictory`
 - Affected:
   - `wizardry`
 - Fix direction:
   - choose one canonical shell pattern and delete the conflicting one from AI-facing docs
 
-### 9. `settings-shell-split`
+### 10. `settings-shell-split`
 - Affected:
   - `chatroom`
 - Fix direction:
   - move settings into the main shell
-
-### 10. `bridge-shell-fragment-execution`
-- Affected:
-  - `chatroom`
-- Fix direction:
-  - replace `sh -c` bridge fallbacks with explicit backend actions
 
 ### 11. `read-path-mutates-state`
 - Affected:
@@ -334,18 +358,19 @@
 
 ## Current Batch Order Recommendation
 1. `python-exception-undocumented`
-2. `repo-ai-standards-missing`
-3. `validation-suite-red`
-4. `storage-default-home-missing`
-5. `browser-owned-durable-state`
-6. `language-exception-undocumented`
-7. `storage-exception-undocumented`
-8. `shared-xdg-app-namespace`
-9. `ui-static-tests-missing`
-10. `user-facing-config-not-yaml-md`
-11. `theme-catalog-hardcoded`
-12. `tests-not-under-dot-tests`
-13. high-severity single-repo categories after the broad recurring classes are under control
+2. `repo-local-exception-ledger-incomplete`
+3. `repo-ai-standards-missing`
+4. `validation-suite-red`
+5. `storage-default-home-missing`
+6. `browser-owned-durable-state`
+7. `language-exception-undocumented`
+8. `storage-exception-undocumented`
+9. `shared-xdg-app-namespace`
+10. `ui-static-tests-missing`
+11. `user-facing-config-not-yaml-md`
+12. `theme-catalog-hardcoded`
+13. `tests-not-under-dot-tests`
+14. high-severity single-repo categories after the broad recurring classes are under control
 
 ## Notes For The Fix-It Phase
 - Some categories overlap deliberately. For example:

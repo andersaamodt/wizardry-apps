@@ -399,6 +399,36 @@ categories:
     evidence_refs: []
     fix_strategy: Add a repo-local .github note that records standards specializations and approved exceptions.
 
+  - id: repo-local-exception-ledger-incomplete
+    title: Repo-local AI docs do not enumerate local exception boundaries in the required shape
+    policy_axes:
+      - Documentation And Auditability
+      - Language And Boundary Discipline
+      - Storage And State Discipline
+    default_severity: medium
+    affected_apps:
+      - applegate
+      - bellheim
+      - binder
+      - book-club
+      - boycott
+      - counterspell
+      - dictator
+      - eye
+      - fauxzilla
+      - hegelizer
+      - matchbook
+      - mecha
+      - organizer
+      - pieplate
+      - pleroma
+      - serenity
+      - simplerchat
+      - stellar
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Add or expand repo-local AI docs so storage, language, theme, runtime, test, release, generated-output, and repo-cruft boundaries are explicit.
+
   - id: backend-contract-tests-missing
     title: Shipped app lacks backend contract coverage under .tests
     policy_axes:

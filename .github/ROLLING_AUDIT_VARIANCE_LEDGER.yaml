@@ -204,12 +204,20 @@ variance_items:
   - id: repo-local-ai-doc-shape
     title: Apps vary in whether local AI docs enumerate exceptions or only rely on upstream docs
     status: standard-proposed
+    observed_patterns:
+      - missing
+      - redirect_only
+      - feature_specific_but_incomplete
+      - audit_report_only
+      - repo_scope_map_with_partial_exceptions
+      - project_policy_doc
     candidate_standard: >
       Every repo should have a local AI-facing standards surface that imports
       ecosystem policy and then lists repo-specific storage, language, theme,
-      runtime, test, and release exceptions.
+      runtime, test, release, generated-output, and repo-cruft boundaries in a
+      predictable exception-ledger shape.
     affected_examples:
-      missing_or_too_thin:
+      missing:
         - applegate
         - binder
         - boycott
@@ -222,11 +230,19 @@ variance_items:
         - organizer
         - pieplate
         - pleroma
-        - serenity
         - simplerchat
         - stellar
-      stronger_reference:
+      redirect_only:
         - book-club
+        - counterspell
+      feature_specific_but_incomplete:
+        - serenity
+      audit_report_only:
+        - bellheim
+      repo_scope_map_with_partial_exceptions:
+        - wizardry-apps
+      project_policy_doc:
+        - theurgy
     phronesis_candidate: true
 
   - id: app-policy-matrix
