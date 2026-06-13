@@ -1541,9 +1541,10 @@ clear_stale_swiftpm_module_cache() {
   [ -n "$scratch_dir" ] || return 0
   [ -d "$scratch_dir" ] || return 0
 
-  # SwiftPM module caches embed absolute scratch paths in generated PCH data.
-  # When Forge's workbench root moves, those cached modules become unusable.
-  find "$scratch_dir" -type d \( -name ModuleCache -o -name ModuleCache.noindex -o -name prebuilt-modules \) -prune -exec rm -rf {} + >/dev/null 2>&1 || true
+  # SwiftPM build products embed absolute scratch paths in cached compiler
+  # state. When Forge's workbench root moves, a clean scratch tree is the
+  # reliable way to avoid stale-path build failures.
+  find "$scratch_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} + >/dev/null 2>&1 || true
 }
 
 launch_macos_bundle_async() {
