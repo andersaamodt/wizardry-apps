@@ -29,6 +29,17 @@ categories:
     evidence_refs: []
     fix_strategy: Add repo-local AI-facing exception notes and keep them in sync with runtime behavior.
 
+  - id: shared-xdg-app-namespace
+    title: Standard-folder storage uses a shared cross-app namespace instead of an app-owned root
+    policy_axes:
+      - Storage And State Discipline
+    default_severity: medium
+    affected_apps:
+      - counterspell
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Prefer app-owned roots such as ~/.appname or app-specific XDG directories over shared wizardry-apps namespace paths.
+
   - id: plain-text-durable-state-violated
     title: Durable app state is not stored as plain text without justification
     policy_axes:
@@ -46,6 +57,7 @@ categories:
     default_severity: medium
     affected_apps:
       - bellheim
+      - counterspell
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Move user-facing durable config to YAML-oriented text or document a narrow exception.
@@ -70,6 +82,7 @@ categories:
     default_severity: medium
     affected_apps:
       - bellheim
+      - counterspell
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Enumerate each approved non-shell boundary and keep the exception set explicit.
@@ -115,6 +128,7 @@ categories:
     default_severity: high
     affected_apps:
       - binder
+      - counterspell
       - dictator
     approved_exceptions: []
     evidence_refs: []

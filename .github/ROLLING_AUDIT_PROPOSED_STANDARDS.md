@@ -9,6 +9,7 @@
 
 ### Storage And State
 - Most Wizardry apps should store their primary durable app data under `~/<appname>`, with alternate standard-folder layouts treated as explicit exceptions rather than defaults.
+- If an app does use standard folders such as XDG config/state, prefer app-owned roots like `${XDG_CONFIG_HOME:-$HOME/.config}/<appname>` rather than shared cross-app namespace paths such as `wizardry-apps/<appname>`.
 - Durable app data should stay plain-text by default.
 - YAML plus Markdown-oriented text should be the preferred format family for user-facing durable files and human-edited project contracts.
 - JSON is acceptable for app-facing machine state, typed envelopes, caches, and ABI contracts whose primary consumer is the app rather than the user.
