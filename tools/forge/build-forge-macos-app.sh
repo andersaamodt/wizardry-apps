@@ -317,6 +317,8 @@ mkdir -p "$cache_dir" "$module_cache"
 cached_host_build_signature=''
 [ ! -f "$host_flags_file" ] || cached_host_build_signature=$(head -n 1 "$host_flags_file" 2>/dev/null | tr -d '\r')
 if [ ! -x "$host_bin" ] || [ "$host_src" -nt "$host_bin" ] || [ "$cached_host_build_signature" != "$host_build_signature" ]; then
+  rm -rf "$module_cache"
+  mkdir -p "$module_cache"
   CLANG_MODULE_CACHE_PATH="$module_cache" \
     clang -O2 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit -framework Carbon
   printf '%s\n' "$host_build_signature" > "$host_flags_file"

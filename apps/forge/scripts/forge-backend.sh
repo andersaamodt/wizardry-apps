@@ -1489,6 +1489,7 @@ ensure_macos_host() {
   fi
 
   if [ "$needs_rebuild" -eq 1 ]; then
+    rm -rf "$module_cache"
     mkdir -p "$module_cache"
     CLANG_MODULE_CACHE_PATH="$module_cache" \
       clang -O2 -fobjc-arc -fmodules -arch arm64 -arch x86_64 "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit -framework Carbon
