@@ -1548,6 +1548,44 @@ clear_stale_swiftpm_module_cache() {
   find "$scratch_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} + >/dev/null 2>&1 || true
 }
 
+swift_build_retryable_failure() {
+  build_log=${1-}
+  [ -n "$build_log" ] || return 1
+  [ -f "$build_log" ] || return 1
+  grep -E 'Build cancelled!|Killed: 9|signal 9|SIGKILL|interrupted|unable to spawn process|Resource temporarily unavailable|Operation not permitted' "$build_log" >/dev/null 2>&1
+}
+
+run_swift_build_with_retry() {
+  package_dir=${1-}
+  scratch_dir=${2-}
+  build_log=${3-}
+  [ -n "$package_dir" ] || return 2
+  [ -n "$scratch_dir" ] || return 2
+  [ -n "$build_log" ] || return 2
+  attempts=${FORGE_SWIFT_BUILD_ATTEMPTS:-4}
+  case "$attempts" in ''|*[!0-9]*) attempts=4 ;; esac
+  [ "$attempts" -gt 0 ] || attempts=1
+  attempt=1
+  while [ "$attempt" -le "$attempts" ]; do
+    if [ "$attempt" -gt 1 ]; then
+      {
+        printf '\n'
+        printf 'forge-backend: retrying swift build after transient cancellation (attempt %s/%s)\n' "$attempt" "$attempts"
+      } >>"$build_log"
+    fi
+    if swift build --package-path "$package_dir" --scratch-path "$scratch_dir" >>"$build_log" 2>&1; then
+      return 0
+    fi
+    if [ "$attempt" -ge "$attempts" ] || ! swift_build_retryable_failure "$build_log"; then
+      return 1
+    fi
+    sleep $((attempt * 5))
+    clear_stale_swiftpm_lock "$scratch_dir"
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
 launch_macos_bundle_async() {
   bundle_path=${1-}
   [ -d "$bundle_path" ] || return 1
@@ -6612,10 +6650,11 @@ build_native_workspace_host() {
       mkdir -p "$build_dir"
       clear_stale_swiftpm_lock "$build_dir"
       clear_stale_swiftpm_module_cache "$build_dir"
+      : >"$build_log"
       if ! (
         cd "$workspace_path" &&
-        swift build --package-path "$package_dir" --scratch-path "$build_dir"
-      ) >"$build_log" 2>&1; then
+        run_swift_build_with_retry "$package_dir" "$build_dir" "$build_log"
+      ); then
         printf '%s\n' "forge-backend: native macOS workspace build failed (see log: $build_log)" >&2
         exit 1
       fi
