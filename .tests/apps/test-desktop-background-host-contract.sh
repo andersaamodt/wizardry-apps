@@ -72,13 +72,34 @@ grep -F '[NSApp setActivationPolicy:(hiddenStartMode ? NSApplicationActivationPo
 grep -F 'self.hostHiddenStartMode = NO;' "$mac_host" >/dev/null
 grep -F 'safelyShowMainWindowActivatingApp:' "$mac_host" >/dev/null
 grep -F 'skipped unsafe window activation' "$mac_host" >/dev/null
-grep -F 'runtimeCommandInFlight' "$mac_host" >/dev/null
-grep -F 'runtimeCommandBackoffUntil' "$mac_host" >/dev/null
-grep -F 'acquireRuntimeCommandSlotWithError' "$mac_host" >/dev/null
-grep -F 'markRuntimeCommandLaunchPressure' "$mac_host" >/dev/null
-grep -F 'runtime command deferred because macOS launch assessment is under pressure' "$mac_host" >/dev/null
-grep -F 'runtime command timed out before startup completed; deferred to avoid macOS launch-assessment pressure' "$mac_host" >/dev/null
-grep -F 'dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15.0 * NSEC_PER_SEC))' "$mac_host" >/dev/null
+if grep -F 'runtimeCommandInFlight' "$mac_host" >/dev/null; then
+  printf '%s\n' "macOS host must not serialize runtime commands behind a launch-pressure gate" >&2
+  exit 1
+fi
+if grep -F 'runtimeCommandBackoffUntil' "$mac_host" >/dev/null; then
+  printf '%s\n' "macOS host must not keep launch-pressure backoff state" >&2
+  exit 1
+fi
+if grep -F 'acquireRuntimeCommandSlotWithError' "$mac_host" >/dev/null; then
+  printf '%s\n' "macOS host must not defer runtime commands behind a launch-pressure check" >&2
+  exit 1
+fi
+if grep -F 'markRuntimeCommandLaunchPressure' "$mac_host" >/dev/null; then
+  printf '%s\n' "macOS host must not synthesize launch-pressure failures" >&2
+  exit 1
+fi
+if grep -F 'launch assessment is under pressure' "$mac_host" >/dev/null; then
+  printf '%s\n' "macOS host must not report launch-pressure defer messages" >&2
+  exit 1
+fi
+if grep -F 'deferred to avoid macOS launch-assessment pressure' "$mac_host" >/dev/null; then
+  printf '%s\n' "macOS host must not enforce launch-pressure startup timeouts" >&2
+  exit 1
+fi
+if grep -F 'dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15.0 * NSEC_PER_SEC))' "$mac_host" >/dev/null; then
+  printf '%s\n' "macOS host must not impose the removed launch-pressure startup timeout" >&2
+  exit 1
+fi
 if grep -F '[self.window makeMainWindow];' "$mac_host" >/dev/null; then
   printf '%s\n' "macOS host must not force makeMainWindow during startup activation" >&2
   exit 1

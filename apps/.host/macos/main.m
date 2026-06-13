@@ -145,8 +145,6 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 @property (strong) NSDictionary<NSString *, id> *matchbookStatusSnapshot;
 @property (assign) BOOL stonrStatusCommandInFlight;
 @property (strong) NSString *stonrStatusCommandLabel;
-@property (assign) BOOL runtimeCommandInFlight;
-@property (strong) NSDate *runtimeCommandBackoffUntil;
 - (BOOL)hostStartHiddenModeEnabled;
 - (NSString *)hostTestQueryString;
 - (BOOL)hostArgumentsRequestStartHidden:(NSArray<NSString *> *)args;
@@ -207,9 +205,6 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
                        arguments:(NSArray<NSString *> *)arguments
                           stdout:(NSString **)stdout
                           stderr:(NSString **)stderr;
-- (BOOL)acquireRuntimeCommandSlotWithError:(NSString **)errorMessage;
-- (void)releaseRuntimeCommandSlot;
-- (void)markRuntimeCommandLaunchPressure;
 - (NSDictionary<NSString *, NSString *> *)stonrRelayStatusSnapshot;
 - (void)runStonrBackendCommandAsync:(NSString *)command actionLabel:(NSString *)actionLabel;
 - (void)dispatchStonrMenuAction:(NSString *)actionName;
@@ -1214,23 +1209,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 
     self.forgeIconDropBusy = YES;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSString *launchGateError = nil;
-        if (![self acquireRuntimeCommandSlotWithError:&launchGateError]) {
-            NSDictionary *payload = @{
-                @"ok": @NO,
-                @"itemKey": itemKey ?: @"",
-                @"imagePath": trimmedPath ?: @"",
-                @"stdout": @"",
-                @"stderr": launchGateError ?: @"runtime command launch deferred",
-                @"exitCode": @75,
-                @"error": launchGateError ?: @"runtime command launch deferred"
-            };
-            dispatch_async(dispatch_get_main_queue(), ^{
-                self.forgeIconDropBusy = NO;
-                [self dispatchForgeHostCallbackNamed:@"forgeHostIconDropResult" payload:payload toWebView:resolvedTarget];
-            });
-            return;
-        }
         NSTask *task = [[NSTask alloc] init];
         task.launchPath = @"/bin/sh";
         task.arguments = commandArgs;
@@ -1249,8 +1227,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         @try {
             [task launch];
         } @catch (NSException *exception) {
-            [self markRuntimeCommandLaunchPressure];
-            [self releaseRuntimeCommandSlot];
             NSDictionary *payload = @{
                 @"ok": @NO,
                 @"itemKey": itemKey ?: @"",
@@ -1267,30 +1243,10 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             return;
         }
 
-        if (dispatch_semaphore_wait(doneSemaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15.0 * NSEC_PER_SEC))) != 0) {
-            [self markRuntimeCommandLaunchPressure];
-            [task terminate];
-            dispatch_semaphore_wait(doneSemaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)));
-            [self releaseRuntimeCommandSlot];
-            NSDictionary *payload = @{
-                @"ok": @NO,
-                @"itemKey": itemKey ?: @"",
-                @"imagePath": trimmedPath ?: @"",
-                @"stdout": @"",
-                @"stderr": @"runtime command timed out before startup completed; deferred to avoid macOS launch-assessment pressure",
-                @"exitCode": @124,
-                @"error": @"runtime command timed out before startup completed; deferred to avoid macOS launch-assessment pressure"
-            };
-            dispatch_async(dispatch_get_main_queue(), ^{
-                self.forgeIconDropBusy = NO;
-                [self dispatchForgeHostCallbackNamed:@"forgeHostIconDropResult" payload:payload toWebView:resolvedTarget];
-            });
-            return;
-        }
+        dispatch_semaphore_wait(doneSemaphore, DISPATCH_TIME_FOREVER);
 
         NSData *outData = [[outPipe fileHandleForReading] readDataToEndOfFile];
         NSData *errData = [[errPipe fileHandleForReading] readDataToEndOfFile];
-        [self releaseRuntimeCommandSlot];
         NSString *stdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
         NSString *stderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
         int exitCode = [task terminationStatus];
@@ -1882,14 +1838,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         }
         return 1;
     }
-    NSString *launchGateError = nil;
-    if (![self acquireRuntimeCommandSlotWithError:&launchGateError]) {
-        if (stderr) {
-            *stderr = launchGateError ?: @"runtime command launch deferred";
-        }
-        return 75;
-    }
-
     NSTask *task = [[NSTask alloc] init];
     task.launchPath = launchPath;
     task.arguments = arguments ?: @[];
@@ -1908,8 +1856,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     @try {
         [task launch];
     } @catch (NSException *exception) {
-        [self markRuntimeCommandLaunchPressure];
-        [self releaseRuntimeCommandSlot];
         if (stderr) {
             *stderr = [NSString stringWithFormat:@"failed to launch command: %@", exception.reason ?: @"unknown error"];
         }
@@ -1929,20 +1875,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         errData = captured ?: [NSData data];
     });
 
-    if (dispatch_semaphore_wait(doneSemaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15.0 * NSEC_PER_SEC))) != 0) {
-        [self markRuntimeCommandLaunchPressure];
-        [task terminate];
-        dispatch_semaphore_wait(doneSemaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)));
-        dispatch_group_wait(streamGroup, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)));
-        if (stdout) {
-            *stdout = @"";
-        }
-        if (stderr) {
-            *stderr = @"runtime command timed out before startup completed; deferred to avoid macOS launch-assessment pressure";
-        }
-        [self releaseRuntimeCommandSlot];
-        return 124;
-    }
+    dispatch_semaphore_wait(doneSemaphore, DISPATCH_TIME_FOREVER);
     dispatch_group_wait(streamGroup, DISPATCH_TIME_FOREVER);
     NSString *capturedStdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
     NSString *capturedStderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
@@ -1953,41 +1886,7 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         *stderr = capturedStderr;
     }
     int status = [task terminationStatus];
-    [self releaseRuntimeCommandSlot];
     return status;
-}
-
-- (BOOL)acquireRuntimeCommandSlotWithError:(NSString **)errorMessage {
-    @synchronized (self) {
-        NSDate *now = [NSDate date];
-        if (self.runtimeCommandBackoffUntil && [now compare:self.runtimeCommandBackoffUntil] == NSOrderedAscending) {
-            if (errorMessage) {
-                *errorMessage = @"runtime command deferred because macOS launch assessment is under pressure";
-            }
-            return NO;
-        }
-        if (self.runtimeCommandInFlight) {
-            [self markRuntimeCommandLaunchPressure];
-            if (errorMessage) {
-                *errorMessage = @"runtime command deferred because another runtime command is still launching";
-            }
-            return NO;
-        }
-        self.runtimeCommandInFlight = YES;
-        return YES;
-    }
-}
-
-- (void)releaseRuntimeCommandSlot {
-    @synchronized (self) {
-        self.runtimeCommandInFlight = NO;
-    }
-}
-
-- (void)markRuntimeCommandLaunchPressure {
-    @synchronized (self) {
-        self.runtimeCommandBackoffUntil = [[NSDate date] dateByAddingTimeInterval:45.0];
-    }
 }
 
 - (NSDictionary<NSString *, NSString *> *)stonrRelayStatusSnapshot {
@@ -4569,19 +4468,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             return;
         }
 
-        NSString *launchGateError = nil;
-        if (![self acquireRuntimeCommandSlotWithError:&launchGateError]) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self sendResultToWebView:sourceWebViewCopy
-                                messageId:messageIdCopy
-                                   stdout:@""
-                                   stderr:(launchGateError ?: @"runtime command launch deferred")
-                                 exitCode:75
-                                    error:nil];
-            });
-            return;
-        }
-
         NSTask *task = [[NSTask alloc] init];
         task.launchPath = @"/usr/bin/env";
         task.environment = [self resolvedCommandEnvironment];
@@ -4604,8 +4490,6 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
         @try {
             [task launch];
         } @catch (NSException *exception) {
-            [self markRuntimeCommandLaunchPressure];
-            [self releaseRuntimeCommandSlot];
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self sendErrorToWebView:sourceWebViewCopy messageId:messageIdCopy message:[NSString stringWithFormat:@"Failed to launch: %@", exception.reason]];
             });
@@ -4625,28 +4509,12 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
             errData = captured ?: [NSData data];
         });
 
-        if (dispatch_semaphore_wait(doneSemaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15.0 * NSEC_PER_SEC))) != 0) {
-            [self markRuntimeCommandLaunchPressure];
-            [task terminate];
-            dispatch_semaphore_wait(doneSemaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)));
-            dispatch_group_wait(streamGroup, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)));
-            [self releaseRuntimeCommandSlot];
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self sendResultToWebView:sourceWebViewCopy
-                                messageId:messageIdCopy
-                                   stdout:@""
-                                   stderr:@"runtime command timed out before startup completed; deferred to avoid macOS launch-assessment pressure"
-                                 exitCode:124
-                                    error:nil];
-            });
-            return;
-        }
+        dispatch_semaphore_wait(doneSemaphore, DISPATCH_TIME_FOREVER);
         dispatch_group_wait(streamGroup, DISPATCH_TIME_FOREVER);
 
         NSString *stdout = [[NSString alloc] initWithData:outData encoding:NSUTF8StringEncoding] ?: @"";
         NSString *stderr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] ?: @"";
         int exitCode = [task terminationStatus];
-        [self releaseRuntimeCommandSlot];
 
         dispatch_async(dispatch_get_main_queue(), ^{
             [self sendResultToWebView:sourceWebViewCopy messageId:messageIdCopy stdout:stdout stderr:stderr exitCode:exitCode error:nil];
