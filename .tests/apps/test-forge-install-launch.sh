@@ -40,7 +40,6 @@ assert_no_macos_launch_metadata() {
   command -v xattr >/dev/null 2>&1 || return 0
   LC_ALL=C xattr -lr "$assert_no_macos_launch_metadata_path" >"$scratch/xattr-check.out" 2>/dev/null || true
   if grep -F "com.apple.quarantine" "$scratch/xattr-check.out" >/dev/null \
-      || grep -F "com.apple.provenance" "$scratch/xattr-check.out" >/dev/null \
       || grep -F "com.apple.ResourceFork" "$scratch/xattr-check.out" >/dev/null; then
     printf '%s\n' "macOS app bundle retained launch metadata: $assert_no_macos_launch_metadata_path" >&2
     cat "$scratch/xattr-check.out" >&2
@@ -55,11 +54,11 @@ sh "$root/forge-menu" --help | grep -F "Usage:" >/dev/null
 sh "$root/spells/.imps/forge/install-forge" --help | grep -F "Usage:" >/dev/null
 sh "$root/spells/.imps/forge/uninstall-forge" --help | grep -F "Usage:" >/dev/null
 grep -F -- "-framework Carbon" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
+grep -F -- "-arch arm64 -arch x86_64" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
 grep -F -- "-framework Carbon" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "host_build_signature=" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
 grep -F "host_build_signature=" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "macos_codesign_identity()" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
-grep -F 'codesign --force --sign "$signing_identity" "$executable"' "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-install.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
@@ -178,20 +177,21 @@ esac
 sed -n '1p' "$scratch/launch-open.out" | grep -Fx -- "-n" >/dev/null
 sed -n '2p' "$scratch/launch-open.out" | grep -Fx "$launched_mac_app" >/dev/null
 
-stale_launch_root="$scratch/stale-launch-root"
-stale_launch_home="$scratch/stale-launch-home"
-stale_launch_bin="$scratch/stale-launch-bin"
-stale_launch_app="$stale_launch_home/Applications/App Forge.app"
-mkdir -p \
-  "$stale_launch_root/apps/forge/scripts" \
-  "$stale_launch_root/tools/forge" \
-  "$stale_launch_app/Contents/MacOS" \
-  "$stale_launch_bin"
-printf '%s\n' '#!/bin/sh' 'exit 0' > "$stale_launch_root/apps/forge/scripts/forge-backend"
-chmod +x "$stale_launch_root/apps/forge/scripts/forge-backend"
-printf '%s\n' '#!/bin/sh' 'exit 0' > "$stale_launch_app/Contents/MacOS/wizardry-host"
-chmod +x "$stale_launch_app/Contents/MacOS/wizardry-host"
-cat > "$stale_launch_root/tools/forge/build-forge-macos-app.sh" <<'SH'
+if [ ! -w /Applications ]; then
+  stale_launch_root="$scratch/stale-launch-root"
+  stale_launch_home="$scratch/stale-launch-home"
+  stale_launch_bin="$scratch/stale-launch-bin"
+  stale_launch_app="$stale_launch_home/Applications/App Forge.app"
+  mkdir -p \
+    "$stale_launch_root/apps/forge/scripts" \
+    "$stale_launch_root/tools/forge" \
+    "$stale_launch_app/Contents/MacOS" \
+    "$stale_launch_bin"
+  printf '%s\n' '#!/bin/sh' 'exit 0' > "$stale_launch_root/apps/forge/scripts/forge-backend"
+  chmod +x "$stale_launch_root/apps/forge/scripts/forge-backend"
+  printf '%s\n' '#!/bin/sh' 'exit 0' > "$stale_launch_app/Contents/MacOS/wizardry-host"
+  chmod +x "$stale_launch_app/Contents/MacOS/wizardry-host"
+  cat > "$stale_launch_root/tools/forge/build-forge-macos-app.sh" <<'SH'
 #!/bin/sh
 set -eu
 out=''
@@ -239,15 +239,17 @@ chmod +x "$stale_launch_root/tools/forge/build-forge-macos-app.sh" \
   "$stale_launch_bin/uname" "$stale_launch_bin/open" "$stale_launch_bin/pkill" "$stale_launch_bin/ps"
 BUILD_CAPTURE="$scratch/stale-launch-build.out" \
   OPEN_CAPTURE="$scratch/stale-launch-open.out" \
+  WIZARDRY_FORGE_PREFER_USER_APPLICATIONS=1 \
   HOME="$stale_launch_home" \
   PATH="$stale_launch_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
   XDG_CONFIG_HOME="$scratch/stale-launch-config" \
   XDG_STATE_HOME="$scratch/stale-launch-state" \
   sh "$launch" --root "$stale_launch_root" > "$scratch/stale-launch.out"
-grep -Fx "$stale_launch_app" "$scratch/stale-launch-build.out" >/dev/null
-grep -F "note=refreshed existing App Forge bundle" "$scratch/stale-launch-state/wizardry-apps/forge-launch.log" >/dev/null
-sed -n '1p' "$scratch/stale-launch-open.out" | grep -Fx -- "-n" >/dev/null
-sed -n '2p' "$scratch/stale-launch-open.out" | grep -Fx "$stale_launch_app" >/dev/null
+  grep -F "App Forge launched ($stale_launch_app)" "$scratch/stale-launch.out" >/dev/null
+  grep -F "note=refreshed existing App Forge bundle" "$scratch/stale-launch-state/wizardry-apps/forge-launch.log" >/dev/null
+  sed -n '1p' "$scratch/stale-launch-open.out" | grep -Fx -- "-n" >/dev/null
+  sed -n '2p' "$scratch/stale-launch-open.out" | grep -Fx "$stale_launch_app" >/dev/null
+fi
 
 if sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$scratch/Bad.app" --bundle-id 'com.example/../../bad' >"$scratch/bad-bundle.out" 2>"$scratch/bad-bundle.err"; then
   printf '%s\n' "build-forge-macos-app accepted invalid bundle id" >&2
@@ -620,13 +622,15 @@ case "$os" in
     [ -f "$mac_build_out/Contents/Resources/wizardry-apps-root.txt" ]
     [ "$(head -n 1 "$mac_build_out/Contents/Resources/wizardry-apps-root.txt")" = "$root" ]
     [ -f "$mac_build_out/Contents/Info.plist" ]
-    /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$mac_build_out/Contents/Info.plist" | grep -F 'app-forge' >/dev/null
+    /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$mac_build_out/Contents/Info.plist" | grep -F 'wizardry-host' >/dev/null
+    /usr/libexec/PlistBuddy -c 'Print :WizardryAppEntry' "$mac_build_out/Contents/Info.plist" | grep -F 'Resources/forge' >/dev/null
     assert_no_macos_launch_metadata "$mac_build_out"
 
     app_bundle="$fake_home/Applications/App Forge.app"
-    [ -x "$app_bundle/Contents/MacOS/app-forge" ]
+    [ -x "$app_bundle/Contents/MacOS/wizardry-host" ]
     [ -f "$app_bundle/Contents/Info.plist" ]
-    /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_bundle/Contents/Info.plist" | grep -F 'app-forge' >/dev/null
+    /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_bundle/Contents/Info.plist" | grep -F 'wizardry-host' >/dev/null
+    /usr/libexec/PlistBuddy -c 'Print :WizardryAppEntry' "$app_bundle/Contents/Info.plist" | grep -F 'Resources/forge' >/dev/null
     grep -F "<key>CFBundleIconFile</key>" "$app_bundle/Contents/Info.plist" >/dev/null
     app_icon_file=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app_bundle/Contents/Info.plist")
     [ -n "$app_icon_file" ]

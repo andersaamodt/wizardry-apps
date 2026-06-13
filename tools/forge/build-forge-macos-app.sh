@@ -156,11 +156,6 @@ ensure_macos_bundle_signature() {
   command -v codesign >/dev/null 2>&1 || return 0
   signing_identity=$(macos_codesign_identity)
   [ -n "$signing_identity" ] || signing_identity=-
-  for executable in "$bundle_path/Contents/MacOS"/*; do
-    [ -f "$executable" ] || continue
-    [ -x "$executable" ] || continue
-    codesign --force --sign "$signing_identity" "$executable" >/dev/null 2>&1 || return 1
-  done
   codesign --force --deep --sign "$signing_identity" "$bundle_path" >/dev/null 2>&1 || return 1
   macos_bundle_signature_is_usable "$bundle_path"
 }
@@ -321,7 +316,7 @@ cache_dir="$(forge_build_cache_root "$root")"
 host_src="$root/apps/.host/macos/main.m"
 host_bin="$cache_dir/wizardry-host-macos"
 host_flags_file="$cache_dir/wizardry-host-macos.flags"
-host_build_signature="macos-host-v2-frameworks=Cocoa,WebKit,Carbon"
+host_build_signature="macos-host-v3-universal-frameworks=Cocoa,WebKit,Carbon"
 module_cache="$cache_dir/clang-module-cache"
 
 mkdir -p "$cache_dir" "$module_cache"
@@ -331,8 +326,13 @@ cached_host_build_signature=''
 if [ ! -x "$host_bin" ] || [ "$host_src" -nt "$host_bin" ] || [ "$cached_host_build_signature" != "$host_build_signature" ]; then
   rm -rf "$module_cache"
   mkdir -p "$module_cache"
-  CLANG_MODULE_CACHE_PATH="$module_cache" \
-    clang -O2 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit -framework Carbon
+  if ! CLANG_MODULE_CACHE_PATH="$module_cache" \
+      clang -O2 -arch arm64 -arch x86_64 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit -framework Carbon; then
+    rm -rf "$module_cache"
+    mkdir -p "$module_cache"
+    CLANG_MODULE_CACHE_PATH="$module_cache" \
+      clang -O2 -fobjc-arc -fmodules "$host_src" -o "$host_bin" -framework Cocoa -framework WebKit -framework Carbon
+  fi
   printf '%s\n' "$host_build_signature" > "$host_flags_file"
 fi
 
@@ -460,7 +460,7 @@ cat > "$plist" <<PLIST
 <key>CFBundleIdentifier</key><string>$bundle_id</string>
 <key>CFBundleVersion</key><string>$bundle_version</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleExecutable</key><string>app-forge</string>
+<key>CFBundleExecutable</key><string>wizardry-host</string>
 <key>WizardryAppEntry</key><string>Resources/forge</string>
 $icon_key
 </dict></plist>

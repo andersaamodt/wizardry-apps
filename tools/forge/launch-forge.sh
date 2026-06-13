@@ -114,7 +114,12 @@ set +e
 if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
   stop_running_macos_forge
   installed_app=''
-  for candidate_app in "$HOME/Applications/App Forge.app" "/Applications/App Forge.app"; do
+  for candidate_app in "/Applications/App Forge.app" "$HOME/Applications/App Forge.app"; do
+    if [ "$candidate_app" = "$HOME/Applications/App Forge.app" ] \
+        && [ "${WIZARDRY_FORGE_PREFER_USER_APPLICATIONS-}" != "1" ] \
+        && [ -w "/Applications" ]; then
+      continue
+    fi
     if [ -x "$candidate_app/Contents/MacOS/wizardry-host" ]; then
       installed_app=$candidate_app
       break
@@ -125,11 +130,11 @@ if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
       out=$(printf 'installed_app=%s\nnote=refreshed existing App Forge bundle\n' "$installed_app")
       status=0
     else
-      out=$(sh "$root/tools/forge/install-forge.sh" --root "$root" --user 2>&1)
+      out=$(sh "$root/tools/forge/install-forge.sh" --root "$root" 2>&1)
       status=$?
     fi
   else
-    out=$(sh "$root/tools/forge/install-forge.sh" --root "$root" --user 2>&1)
+    out=$(sh "$root/tools/forge/install-forge.sh" --root "$root" 2>&1)
     status=$?
   fi
   if [ "$status" -eq 0 ]; then
