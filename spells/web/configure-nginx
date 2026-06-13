@@ -87,6 +87,7 @@ done
 
 WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
 SITES_DIR="$WEB_ROOT"
+SITES_DATA_DIR=${WIZARDRY_SITES_DATA_DIR:-$SITES_DIR/.sitedata}
 SITE_DIR="$SITES_DIR/$site_name"
 
 if [ ! -d "$SITE_DIR" ]; then
@@ -383,7 +384,7 @@ $desk_host_path_rewrite
         
         # Serve uploaded files (from site data directory)
         location /uploads/ {
-            alias $SITES_DIR/.sitedata/$site_name/uploads/;
+            alias $SITES_DATA_DIR/$site_name/uploads/;
         }
         
         # SSE endpoint - requires unbuffered streaming
@@ -430,6 +431,7 @@ $desk_host_path_rewrite
             fastcgi_param SERVER_NAME \$server_name;
             fastcgi_param SERVER_PROTOCOL \$server_protocol;
             fastcgi_param WIZARDRY_DIR $WIZARDRY_DIR;
+            fastcgi_param WIZARDRY_SITES_DATA_DIR $SITES_DATA_DIR;
             fastcgi_param WIZARDRY_SITE_NAME $site_name;
         }
         
@@ -468,6 +470,7 @@ $desk_host_path_rewrite
             fastcgi_param SERVER_NAME \$server_name;
             fastcgi_param SERVER_PROTOCOL \$server_protocol;
             fastcgi_param WIZARDRY_DIR $WIZARDRY_DIR;
+            fastcgi_param WIZARDRY_SITES_DATA_DIR $SITES_DATA_DIR;
             fastcgi_param WIZARDRY_SITE_NAME $site_name;
         }
     }

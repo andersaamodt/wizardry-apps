@@ -51,8 +51,9 @@ done
 
 WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
 SITES_DIR="$WEB_ROOT"
+SITES_DATA_DIR=${WIZARDRY_SITES_DATA_DIR:-$SITES_DIR/.sitedata}
 SITE_DIR="$SITES_DIR/$site_name"
-SITE_DATA_DIR="$SITES_DIR/.sitedata/$site_name"
+SITE_DATA_DIR="$SITES_DATA_DIR/$site_name"
 
 if [ ! -d "$SITE_DIR" ]; then
   die "build: site '$site_name' not found"
@@ -216,6 +217,7 @@ run_site_pre_build_hook() {
 
   info "Running site pre-build hook..."
   WIZARDRY_SITES_DIR="$SITES_DIR" \
+    WIZARDRY_SITES_DATA_DIR="$SITES_DATA_DIR" \
     WIZARDRY_SITE_NAME="$site_name" \
     WIZARDRY_DIR="$WIZARDRY_DIR" \
     WEB_WIZARDRY_ROOT="$WEB_ROOT" \
@@ -411,6 +413,7 @@ render_cgi_fragment() {
     export QUERY_STRING="$query_string"
     export WIZARDRY_DIR
     export WIZARDRY_SITES_DIR="$SITES_DIR"
+    export WIZARDRY_SITES_DATA_DIR="$SITES_DATA_DIR"
     export WIZARDRY_SITE_NAME="$site_name"
     "$script_path"
   ) > "$raw_tmp" 2>/dev/null || {
@@ -607,7 +610,7 @@ build_site() {
   fi
 
   if [ "$site_template" = "blog" ] && [ -x "$SITE_DIR/cgi/blog-nostr-rebuild" ]; then
-    if ! WIZARDRY_SITES_DIR="$SITES_DIR" WIZARDRY_SITE_NAME="$site_name" "$SITE_DIR/cgi/blog-nostr-rebuild" >/dev/null 2>&1; then
+    if ! WIZARDRY_SITES_DIR="$SITES_DIR" WIZARDRY_SITES_DATA_DIR="$SITES_DATA_DIR" WIZARDRY_SITE_NAME="$site_name" "$SITE_DIR/cgi/blog-nostr-rebuild" >/dev/null 2>&1; then
       warn "build: blog Nostr derived rebuild failed; continuing with existing local files"
     fi
   fi

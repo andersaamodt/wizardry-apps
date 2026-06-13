@@ -33,6 +33,7 @@ esac
 
 WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
 SITES_DIR="$WEB_ROOT"
+SITES_DATA_DIR=${WIZARDRY_SITES_DATA_DIR:-$SITES_DIR/.sitedata}
 SITE_DIR="$SITES_DIR/$site_name"
 
 if [ ! -d "$SITE_DIR" ]; then
@@ -122,6 +123,7 @@ if command -v fcgiwrap >/dev/null 2>&1; then
 
     export WIZARDRY_DIR
     export WIZARDRY_SITES_DIR="$SITES_DIR"
+    export WIZARDRY_SITES_DATA_DIR="$SITES_DATA_DIR"
     export WIZARDRY_SITE_NAME="$site_name"
 
     printf 'Starting fcgiwrap with %s workers...\n' "$fcgiwrap_workers" >&2
@@ -129,6 +131,7 @@ if command -v fcgiwrap >/dev/null 2>&1; then
     env PATH="$FCGI_PATH" \
         WIZARDRY_DIR="$WIZARDRY_DIR" \
         WIZARDRY_SITES_DIR="$SITES_DIR" \
+        WIZARDRY_SITES_DATA_DIR="$SITES_DATA_DIR" \
         WIZARDRY_SITE_NAME="$site_name" \
         fcgiwrap -c "$fcgiwrap_workers" -s "unix:$FCGI_SOCK" &
     fcgi_pid=$!

@@ -32,7 +32,8 @@ esac
 
 SITES_DIR="${WIZARDRY_SITES_DIR}"
 SITE_DIR="$SITES_DIR/$site_name"
-SITE_DATA_DIR="$SITES_DIR/.sitedata/$site_name"
+SITES_DATA_DIR=${WIZARDRY_SITES_DATA_DIR:-$SITES_DIR/.sitedata}
+SITE_DATA_DIR="$SITES_DATA_DIR/$site_name"
 
 if [ ! -d "$SITE_DIR" ]; then
   die "delete-site: site '$site_name' not found"

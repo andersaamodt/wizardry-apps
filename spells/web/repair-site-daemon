@@ -30,6 +30,7 @@ esac
 
 WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
 SITES_DIR="$WEB_ROOT"
+SITES_DATA_DIR=${WIZARDRY_SITES_DATA_DIR:-$SITES_DIR/.sitedata}
 SITE_DIR="$SITES_DIR/$site_name"
 SITE_CONFIG="$SITE_DIR/site.conf"
 
@@ -89,6 +90,7 @@ User=$site_user
 WorkingDirectory=$SITE_DIR
 Environment=WIZARDRY_DIR=$wizardry_dir
 Environment=WIZARDRY_SITES_DIR=$SITES_DIR
+Environment=WIZARDRY_SITES_DATA_DIR=$SITES_DATA_DIR
 Environment=PATH=$daemon_path
 ExecStart=$daemon_script $site_name
 Restart=on-failure
@@ -134,6 +136,8 @@ launchd_install() {
     <string>$wizardry_dir</string>
     <key>WIZARDRY_SITES_DIR</key>
     <string>$SITES_DIR</string>
+    <key>WIZARDRY_SITES_DATA_DIR</key>
+    <string>$SITES_DATA_DIR</string>
     <key>PATH</key>
     <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
   </dict>
