@@ -137,9 +137,11 @@ variance_items:
     affected_examples:
       frontend_derived_paths:
         - boycott
-        - pleroma
-      explicit_backend_actions:
+        - chatroom
         - forge
+        - pleroma
+        - wizardry-desktop
+      explicit_backend_actions:
         - matchbook
         - simplerchat
     phronesis_candidate: true

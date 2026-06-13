@@ -284,6 +284,7 @@ categories:
     default_severity: high
     affected_apps:
       - chatroom
+      - wizardry-desktop
       - serenity
     approved_exceptions: []
     evidence_refs: []
@@ -319,7 +320,10 @@ categories:
     default_severity: medium
     affected_apps:
       - boycott
+      - chatroom
+      - forge
       - pleroma
+      - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Keep backend path resolution inside the host or backend contract and expose only explicit actions to the frontend.

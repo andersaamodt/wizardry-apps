@@ -10,6 +10,7 @@
 - `phronesis` extraction plan started
 - unreasoned variance ledger started
 - late round-1 criterion back-application checklist started
+- built-in Wizardry Apps surfaces checked for backend path derivation, shell-fragment fallback, and Cargo runtime layers
 - no app code remediation has started
 
 ### Core And Shared

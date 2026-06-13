@@ -114,3 +114,51 @@
   - open-menu-only arrow-key cycling: `apps/wizardry-desktop/index.html:3923-3940`, `apps/wizardry-desktop/index.html:4655-4672`
 - Follow-up:
   - Remove the hardcoded fallback catalog, keep the shared theme contract authoritative, and add focused closed-picker arrow-key handling on the theme button itself.
+
+## Round 2 Backend-Resolution Back-Application
+- Date: 2026-06-13
+- Scope: built-in shipped app surfaces checked against the late `frontend-derived-backend-path`, `bridge-shell-fragment-execution`, and `cargo-runtime-layer-present` criteria.
+
+### App: forge
+- Pass: no
+- Severity: medium
+- Findings:
+  - Forge derives its backend script path from `window.location.pathname` through `inferAppDir()`, then executes `state.appDir + '/scripts/forge-backend.sh'` from the frontend bridge.
+  - This is not a shell-fragment violation because the argv remains explicit, but it does violate the newer host-owned backend-resolution standard.
+  - No Cargo-managed shipped runtime layer surfaced in the built-in Forge app path.
+- Evidence:
+  - frontend path inference: `apps/forge/index.html:588-590`
+  - backend path construction: `apps/forge/index.html:1234-1236`
+  - bridge argv construction: `apps/forge/index.html:1576-1586`
+- Follow-up:
+  - Move backend resolution behind a stable host/backend contract so Forge frontend code calls actions without constructing executable paths.
+
+### App: wizardry-desktop
+- Pass: no
+- Severity: high
+- Findings:
+  - Wizardry Desktop derives backend script candidates from `window.location.pathname`, mutates root hints from those paths, and executes the selected script path from frontend bridge code.
+  - It also retains a `sh -c` fallback for backend resolution, so the built-in app now fails both backend-resolution and shell-fragment criteria.
+  - No Cargo-managed shipped runtime layer surfaced in the built-in Wizardry Desktop app path.
+- Evidence:
+  - frontend backend candidate detection: `apps/wizardry-desktop/index.html:320-354`
+  - root hint inference from frontend-owned paths: `apps/wizardry-desktop/index.html:361-394`
+  - frontend bridge execution of derived path: `apps/wizardry-desktop/index.html:415-440`
+  - `sh -c` fallback: `apps/wizardry-desktop/index.html:451-458`
+- Follow-up:
+  - Replace frontend candidate detection and `sh -c` fallback with a host/backend-owned action contract.
+
+### App: chatroom
+- Pass: no
+- Severity: high
+- Findings:
+  - Chatroom already failed for shell-fragment bridge execution in round 1.
+  - Under the late backend-resolution criterion, it also fails because both `index.html` and `settings.html` derive backend script candidates from `window.location.pathname`.
+  - No Cargo-managed shipped runtime layer surfaced in the built-in Chatroom app path.
+- Evidence:
+  - frontend backend candidate detection in main shell: `apps/chatroom/index.html:92-115`
+  - frontend bridge execution of derived path in main shell: `apps/chatroom/index.html:138-172`
+  - frontend backend candidate detection in settings shell: `apps/chatroom/settings.html:245-268`
+  - frontend bridge execution of derived path in settings shell: `apps/chatroom/settings.html:287-322`
+- Follow-up:
+  - Fold backend resolution into the same modernization work already required for Chatroom shell/settings/bridge cleanup.

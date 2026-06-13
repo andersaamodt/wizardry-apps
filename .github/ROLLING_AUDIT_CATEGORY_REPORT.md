@@ -273,10 +273,13 @@
 
 ### 26. `frontend-derived-backend-path`
 - Severity: medium
-- Recurrence: 2 repos
+- Recurrence: 5 app surfaces
 - Affected:
   - `boycott`
+  - `chatroom`
+  - `forge`
   - `pleroma`
+  - `wizardry-desktop`
 - Fix direction:
   - move backend path resolution into the host or backend contract and expose explicit actions only
 
@@ -296,10 +299,11 @@
 
 ### 29. `bridge-shell-fragment-execution`
 - Severity: high
-- Recurrence: 2 repos
+- Recurrence: 3 app surfaces
 - Affected:
   - `chatroom`
   - `serenity`
+  - `wizardry-desktop`
 - Batch fix direction:
   - move execution into explicit backend actions and remove frontend-owned shell fragments or `sh -c`-style bridge payloads
 
