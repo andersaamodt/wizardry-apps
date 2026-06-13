@@ -12,6 +12,7 @@ categories:
     default_severity: high
     affected_apps:
       - dictator
+      - mecha
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Decide whether to migrate to ~/appname or document a narrow approved exception.
@@ -25,6 +26,7 @@ categories:
     affected_apps:
       - binder
       - dictator
+      - mecha
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add repo-local AI-facing exception notes and keep them in sync with runtime behavior.
@@ -36,6 +38,7 @@ categories:
     default_severity: medium
     affected_apps:
       - counterspell
+      - mecha
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Prefer app-owned roots such as ~/.appname or app-specific XDG directories over shared wizardry-apps namespace paths.
@@ -168,6 +171,7 @@ categories:
     default_severity: medium
     affected_apps:
       - bellheim
+      - mecha
       - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
@@ -190,6 +194,7 @@ categories:
       - GUI Contract
     default_severity: low
     affected_apps:
+      - mecha
       - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
@@ -284,6 +289,7 @@ categories:
       - dictator
       - eye
       - fauxzilla
+      - mecha
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add a repo-local .github note that records standards specializations and approved exceptions.
