@@ -58,6 +58,14 @@
   - `book-club`: no frontend-derived backend execution found in focused scan
   - `organizer`: no frontend-derived backend execution found in focused scan
   - `simplerchat`: fail
+  - `applegate`: no frontend-derived backend execution found in focused scan
+  - `eye`: fail
+  - `mecha`: fail
+  - `pieplate`: fail
+  - `serenity`: no frontend-derived backend execution found in focused scan; separate shell-fragment bridge finding already recorded
+  - `stellar`: no frontend-derived backend execution found in focused scan
+  - `boycott`: fail already recorded in round-1 report
+  - `pleroma`: fail already recorded in round-1 report
 
 ### `cargo-runtime-layer-present`
 - Late criterion source:
@@ -70,6 +78,8 @@
   - built-in `forge`, `wizardry-desktop`, and `chatroom`: no Cargo-managed shipped runtime layer found
   - `bellheim`, `binder`, `dictator`, `counterspell`, and `fauxzilla`: no Cargo-managed shipped runtime layer found in focused scan
   - `matchbook`, `book-club`, `organizer`, and `simplerchat`: no Cargo-managed shipped runtime layer found in focused scan
+  - `applegate`, `eye`, `mecha`, `pieplate`, `serenity`, `stellar`, and `boycott`: no Cargo-managed shipped runtime layer found in focused scan
+  - `pleroma`: fail already recorded; direct Cargo-managed runtime helper build remains the known violation
 
 ### `app-local-theme-system-documented`
 - Late criterion source:
