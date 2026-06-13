@@ -13,6 +13,10 @@
 - Keep user-facing language non-imperative and self-healing in tone.
 - Desktop-first apps do not use `localStorage` for durable state.
 - Persist desktop preferences/state through backend plaintext files in XDG paths.
+- Never put app-instance state, user settings, runtime logs, browser profiles, temp homes, caches, or other operator-local cruft inside a repo checkout.
+- Treat repo folders as canonical source/development context only, never as per-machine app-instance directories.
+- Put transient output in an appropriate temp path such as `/tmp` or `${TMPDIR:-/tmp}`, and put durable operator-local state in XDG/user-local state directories outside the checkout.
+- If an app or tool writes cruft into a repo, treat that as a bug to fix at the source, not a mess to preserve or paper over with ignores.
 - Keep command execution constrained to hardcoded argv patterns in GUI code.
 - Do not let user input construct executable names or arbitrary shell syntax.
 - Preserve CLI parity for new GUI capabilities.

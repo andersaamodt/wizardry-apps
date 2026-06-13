@@ -6,6 +6,9 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_ETHOS.md` for policy and tone.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_LICENSING.md` before changing licensing, scaffolding, starter templates, emitted project files, or Forge project-generation behavior.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/WIZARDRY_APPS_GUI_STANDARDS.md` for mandatory GUI patterns and behavior contracts.
+- Never store app-instance state, user settings, runtime logs, browser profiles, temp homes, caches, or other operator-local cruft inside any repo checkout.
+- Treat repo folders as canonical source/development contexts only, not app-instance directories; fix repo-local cruft at the source instead of hiding it with ignores.
+- Put transient output in an appropriate temp path such as `/tmp` or `${TMPDIR:-/tmp}`, and put durable operator-local state in XDG/user-local state directories outside the checkout.
 - Keep `wizardry-apps` script-pure: no Rust runtime, Cargo, Swift, SwiftUI, signing, notarization, app verification, app-store policing, special app-publish keys, `.app` lifecycle, or Apple-specific platform machinery belongs here as a direct implementation layer.
 - Use Theurgy for professional native desktop runtime machinery and enterprise web runtime machinery when shell fan-out is the problem; cross that boundary through `spells/.arcana/theurgy/invoke-theurgy` instead of adding ad hoc dependency checks.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/RELEASE_POLISH.md` when doing 1.0 polish, onboarding/readiness work, update surfaces, packaging, or Nostr-specific release hardening.
