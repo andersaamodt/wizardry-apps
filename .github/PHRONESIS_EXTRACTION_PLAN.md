@@ -45,6 +45,9 @@
 - `.github/ROLLING_AUDIT_COMPLIANCE_FRAMEWORK.md`
   - extract: policy/category/finding/status model and reporting rules
   - leave local: Wizardry Apps category seed list only if app-specific
+- `.github/PHRONESIS_POLICY_MATRIX_SCHEMA.yaml`
+  - extract: policy matrix status values, record shapes, seed policy groups, and app-record template
+  - leave local: nothing long-term; keep only a pointer once `phronesis` owns the schema
 - `.github/ROLLING_AUDIT_PROPOSED_STANDARDS.md`
   - extract: approved standards after user review
   - leave local: unapproved app-specific candidates until promoted
@@ -126,4 +129,4 @@
 - Review this extraction map with the user.
 - Promote accepted proposed standards into `phronesis` seed docs.
 - Replace duplicated ecosystem-wide text in Wizardry-family repos with short local references plus local exception ledgers.
-- Add a policy matrix so future apps can be generated with every meaningful choice already decisioned.
+- Promote `.github/PHRONESIS_POLICY_MATRIX_SCHEMA.yaml` into `phronesis`, then add app records so future apps can be generated with every meaningful choice already decisioned.

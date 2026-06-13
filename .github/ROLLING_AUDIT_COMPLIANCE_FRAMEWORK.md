@@ -78,6 +78,8 @@
   - evidence links
 - Use that matrix to plan re-audits, track regressions, and identify which standards should move into templates or shared infrastructure.
 - The matrix should also show where an app has chosen a standards-backed variant, such as shared Wizardry themes versus an explicitly documented app-local theme system.
+- Seed schema:
+  - `.github/PHRONESIS_POLICY_MATRIX_SCHEMA.yaml`
 
 ## Phronesis Direction
 - Ecosystem-wide policy, decision records, exception schemas, audit method, and policy IDs should move toward the proposed `phronesis` repository.
@@ -112,3 +114,4 @@
 
 ## Next Step
 - Use `.github/ROLLING_AUDIT_LEDGER.yaml` as the normalized accumulation surface for future app audits.
+- Use `.github/PHRONESIS_POLICY_MATRIX_SCHEMA.yaml` as the proposed `phronesis` app-policy matrix shape before creating per-app records.

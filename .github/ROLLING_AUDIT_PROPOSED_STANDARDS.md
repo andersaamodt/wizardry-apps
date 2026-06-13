@@ -71,6 +71,7 @@
 - New standards should be pushed into the earliest enforceable layer available: canonical docs first, then templates, shared hosts/backends, generators, and tests.
 - Ecosystem-wide standards, exception schemas, audit method, decision records, and policy IDs should be extracted into a `phronesis` repository so implementation repos can stay focused.
 - A machine-readable app policy matrix should track each app's status for every policy ID, including passes, failures, approved exceptions, and evidence links.
+- The app policy matrix should use stable status values (`pass`, `fail`, `exception-approved`, `pending-decision`, `not-applicable`, `unknown`, `not-audited`) so generators, audits, and fix-it planning can share one compliance vocabulary.
 
 ## Promotion Rule
 - Before the fix-it phase, review this list and decide which items should become canonical Wizardry standards.
