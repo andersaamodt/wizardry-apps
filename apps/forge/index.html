@@ -8771,6 +8771,8 @@
           var mobileOut = kv(mobile.stdout || '');
           setTargetRuntime(projectKey, kind, 'built', mobileOut.artifact || mobileOut.project || '');
           renderSelectedTargetsEditor(selectedCatalogItem());
+          var mobilePrepared = mobileOut.status === 'prepared';
+          var mobilePlatformLabel = kind === 'android' ? 'Android' : 'iOS';
           var actions = [];
           if (kind === 'android' && mobileOut.artifact && /\.aab$/i.test(mobileOut.artifact)) {
             actions.push({
@@ -8780,17 +8782,22 @@
           }
           renderResult({
             status: 'ok',
-            summary: selected.title + ' native ' + (kind === 'android' ? 'Android release' : 'iOS smoke') + ' build completed.',
+            summary: mobilePrepared
+              ? selected.title + ' ' + mobilePlatformLabel + ' project is ready; build toolchain setup is still needed.'
+              : selected.title + ' native ' + (kind === 'android' ? 'Android release' : 'iOS smoke') + ' build completed.',
             paths: [
               mobileOut.artifact ? { label: kind === 'android' ? 'Android artifact' : 'iOS artifact', path: mobileOut.artifact, canReveal: true } : null,
-              mobileOut.project ? { label: 'Generated project', path: mobileOut.project, canReveal: true } : null
+              mobileOut.project ? { label: 'Generated project', path: mobileOut.project, canReveal: true } : null,
+              mobileOut.log ? { label: 'Build log', path: mobileOut.log, canReveal: true } : null
             ].filter(Boolean),
             actions: actions,
             help: {
-              title: kind === 'android' ? 'Android direct-first release' : 'iOS build',
-              body: kind === 'android'
-                ? 'Forge built a direct-distribution Android artifact. Play upload is optional and uses configured publisher credentials.'
-                : 'Forge generated and built the native iOS project on this Mac.'
+              title: mobilePrepared ? (mobilePlatformLabel + ' project prepared') : (kind === 'android' ? 'Android direct-first release' : 'iOS build'),
+              body: mobilePrepared
+                ? (mobileOut.message || (mobilePlatformLabel + ' project sources were generated. Install the platform build tools to compile a device artifact.'))
+                : (kind === 'android'
+                  ? 'Forge built a direct-distribution Android artifact. Play upload is optional and uses configured publisher credentials.'
+                  : 'Forge generated and built the native iOS project on this Mac.')
             }
           });
           return;
@@ -9591,6 +9598,7 @@
           if (!hasBuildAction(selected)) {
             return;
           }
+          setPanel('settings', false);
           perform(buildActionLabel(selected), function () { return runPipelineAction('build'); }, { swallow: true });
         });
 
@@ -9607,6 +9615,7 @@
             toast('Enable Hosted Web, the ' + runTargetName + ' target, or a mobile target to run this app.', 'bad');
             return;
           }
+          setPanel('settings', false);
           perform(runActionLabel(selected), function () { return runPipelineAction('run'); }, { swallow: true, successLabel: ranActionLabel(selected), catalogRunKey: selected.key });
         });
 
@@ -9614,6 +9623,7 @@
           if (state.route === 'create') {
             return;
           }
+          setPanel('settings', false);
           perform('Stage mobile assets', function () { return runPipelineAction('stage'); }, { swallow: true });
         });
 

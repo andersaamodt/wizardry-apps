@@ -64,6 +64,9 @@ assert_matches "$ui" 'function defaultMobileRunTargetForSelected\(selected\)'
 assert_contains "$ui" 'hasEnabledHostRunTarget(selected) || hasEnabledHostedWebTarget(selected) || hasEnabledMobileRunTarget(selected)'
 assert_contains "$ui" "await runTargetAction(selected, mobileTarget);"
 assert_contains "$ui" "Build ' + (mobileRunTarget === 'ios' ? 'iOS' : 'Android') + ' app"
+assert_contains "$ui" "build toolchain setup is still needed"
+assert_contains "$ui" "mobileOut.message"
+assert_contains "$ui" "setPanel('settings', false);"
 assert_matches "$ui" 'function regenerateSelectedIconAssets\(\)'
 assert_matches "$ui" 'function parseInstallBeforeRunPrefs\(raw\)'
 assert_matches "$ui" 'function installBeforeRunPreferenceForSelected\(selected\)'

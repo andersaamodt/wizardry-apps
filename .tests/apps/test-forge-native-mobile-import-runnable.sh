@@ -46,7 +46,23 @@ IR
 cat >"$workspace/scripts/render-mobile.sh" <<'SH'
 #!/bin/sh
 set -eu
-mkdir -p generated/mobile
+mkdir -p generated/mobile/android/app
+cat > generated/mobile/android/settings.gradle <<'GRADLE'
+pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+rootProject.name = "mobile-repair"
+include ':app'
+GRADLE
+cat > generated/mobile/android/build.gradle <<'GRADLE'
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+}
+GRADLE
+cat > generated/mobile/android/app/build.gradle <<'GRADLE'
+plugins { id 'com.android.application' }
+
+android { namespace 'app.mobile_repair'; compileSdk 35 }
+GRADLE
 SH
 chmod +x "$workspace/scripts/render-mobile.sh"
 
@@ -81,6 +97,18 @@ printf '%s\n' "$workspace_rows" | awk -F '\t' '
 ' || {
   printf '%s\n' "forge native-mobile import test: workspace did not list as runnable" >&2
   printf '%s\n' "$workspace_rows" >&2
+  exit 1
+}
+
+build_out=$(env PATH="/usr/bin:/bin" sh "$backend" build-native-mobile-workspace "$root" "$workspace" android release)
+printf '%s\n' "$build_out" | grep -F 'status=prepared' >/dev/null || {
+  printf '%s\n' "forge native-mobile import test: missing Gradle should prepare project instead of failing" >&2
+  printf '%s\n' "$build_out" >&2
+  exit 1
+}
+printf '%s\n' "$build_out" | grep -F 'missing_tool=gradle' >/dev/null || {
+  printf '%s\n' "forge native-mobile import test: prepared Android result should report missing Gradle" >&2
+  printf '%s\n' "$build_out" >&2
   exit 1
 }
 
