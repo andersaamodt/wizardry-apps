@@ -82,3 +82,35 @@
 1. Re-audit `forge` and `wizardry-desktop` against the new read-path and language-exception criteria.
 2. Modernize `chatroom` to current shell/settings/bridge standards.
 3. Re-run the full pass so the round-1 learned criteria apply uniformly to every shipped app.
+
+## Round 2 Partial
+- Date: 2026-06-13
+- Scope: focused re-audit of built-in theme surfaces against the newly added theme criteria
+
+### App: forge
+- Pass: yes
+- Summary:
+  - Forge still passes under the stricter theme audit.
+  - It sources themes from the real shared Wizardry theme directories, normalizes and alphabetizes the list, and supports closed-picker arrow-key cycling.
+- Evidence:
+  - backend theme discovery from shared theme roots: `apps/forge/scripts/forge-backend.sh:2810-2833`
+  - frontend normalization and alphabetical sorting: `apps/forge/index.html:2967-3006`
+  - backend-loaded theme list and active-theme inclusion: `apps/forge/index.html:3008-3037`
+  - closed-picker arrow-key cycling: `apps/forge/index.html:9348-9367`
+- Follow-up:
+  - Recheck later only if shared theme contracts or App Forge shell theming change materially.
+
+### App: wizardry-desktop
+- Pass: no
+- Severity: medium
+- Findings:
+  - Theme source contract is only partially aligned. The app does query `list-themes`, but it still carries a hardcoded fallback theme catalog in the frontend instead of treating the shared Wizardry theme set as the sole source of truth.
+  - The hardcoded fallback theme list is not alphabetized.
+  - Closed-picker arrow-key cycling is missing. Arrow-key cycling is implemented only while the theme menu is already open, not when the theme picker button is focused and closed.
+- Evidence:
+  - backend theme discovery is correctly shared and alphabetized: `apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh:292-312`
+  - frontend hardcoded fallback list: `apps/wizardry-desktop/index.html:1795-1802`
+  - backend-loaded list does not normalize/sort again in the frontend: `apps/wizardry-desktop/index.html:1804-1818`
+  - open-menu-only arrow-key cycling: `apps/wizardry-desktop/index.html:3923-3940`, `apps/wizardry-desktop/index.html:4655-4672`
+- Follow-up:
+  - Remove the hardcoded fallback catalog, keep the shared theme contract authoritative, and add focused closed-picker arrow-key handling on the theme button itself.

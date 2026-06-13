@@ -125,7 +125,8 @@ categories:
     policy_axes:
       - GUI Contract
     default_severity: medium
-    affected_apps: []
+    affected_apps:
+      - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Source the available themes from the shared theme directory or backend contract.
@@ -135,7 +136,8 @@ categories:
     policy_axes:
       - GUI Contract
     default_severity: medium
-    affected_apps: []
+    affected_apps:
+      - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Make focused closed pickers cycle themes with up/down arrows and keep open-list behavior consistent.
@@ -145,7 +147,8 @@ categories:
     policy_axes:
       - GUI Contract
     default_severity: low
-    affected_apps: []
+    affected_apps:
+      - wizardry-desktop
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Sort theme names consistently at the contract source.
