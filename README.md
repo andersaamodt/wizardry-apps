@@ -39,6 +39,8 @@ Forge can scaffold several kinds of projects. You do not need to know every tool
 
 **Cross-platform apps** use HTML, CSS, and JavaScript for the interface. They can run as hosted web apps and can also be wrapped in desktop or mobile WebView hosts. This is the most direct path for small tools, dashboards, control panels, and apps that should share one interface across platforms.
 
+**Theurgy-backed cross-platform apps** are still cross-platform web apps, but they start with a first-class path for stronger runtime machinery. Choose this when one app should stay browser-first across desktop and web, yet you already know it will need typed actions, faster state hydration, caches, background work, or other reliability/performance upgrades that should cross into Theurgy instead of growing into a shell rat's nest. This is also the right path when you want one product across desktop and web without maintaining separate native and browser app codebases.
+
 **Native desktop apps** start from a simple app description file, then generate platform-native code. macOS output uses Swift/SwiftUI. Linux output uses GTK. This path is for apps that should feel more like platform-owned desktop software, with native menus, windows, lists, settings, and file panels.
 
 **Native mobile apps** start from a shared mobile-native IR, then generate Android and iOS projects. Android release is direct-distribution first, with optional Play upload when publisher credentials are configured. The generated Android app avoids Play Services by default.
@@ -76,6 +78,7 @@ The source tree is organized around apps, starters, hosts, release tools, and th
 - `apps/.host/` contains reusable desktop and mobile host wrappers
 - `apps/<slug>/` contains built-in wizardry apps
 - `templates/` contains Forge starters, shared web templates, and Godot material
+- `templates/forge/web/theurgy-reference-app/` is the reference starter for Theurgy-backed cross-platform apps
 - `runtime/config/` contains release and template configuration used by Forge and publishing tools
 - `runtime/schemas/` contains app, RPC, event, metadata, and native desktop IR contracts
 - `runtime/adapters/` contains shell and HTTP/CGI reference adapters

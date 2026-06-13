@@ -11,6 +11,7 @@
 - Put transient output in an appropriate temp path such as `/tmp` or `${TMPDIR:-/tmp}`, and put durable operator-local state in XDG/user-local state directories outside the checkout.
 - Keep `wizardry-apps` script-pure: no Rust runtime, Cargo, Swift, SwiftUI, signing, notarization, app verification, app-store policing, special app-publish keys, `.app` lifecycle, or Apple-specific platform machinery belongs here as a direct implementation layer.
 - Use Theurgy for professional native desktop runtime machinery and enterprise web runtime machinery when shell fan-out is the problem; cross that boundary through `spells/.arcana/theurgy/invoke-theurgy` instead of adding ad hoc dependency checks.
+- When adding cross-platform Forge starters, treat “Theurgy-backed cross-platform app” as a valid first-class category: web UI and host flow stay in `wizardry-apps`, while runtime escalation happens through a generated workspace script that calls `spells/.arcana/theurgy/invoke-theurgy`.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/RELEASE_POLISH.md` when doing 1.0 polish, onboarding/readiness work, update surfaces, packaging, or Nostr-specific release hardening.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_AUDIT.md` when doing cross-app GUI sweeps so audits stay source-linked and non-redundant.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT.md` when doing whole-app or cross-app audits that need language, storage, execution, testing, and GUI criteria together.

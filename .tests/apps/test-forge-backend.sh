@@ -622,6 +622,17 @@ printf '%s\n' "$workspace_home_out" | grep -F "created=$workspaces_root/workspac
 [ ! -d "$workspaces_root/workspace-home/app/assets/icons/web" ]
 grep -F "Wizardry Reference App" "$workspaces_root/workspace-home/app/index.html" >/dev/null
 
+workspace_theurgy_out=$(sh "$backend" scaffold-workspace "$scratch" workspace-theurgy "Workspace Theurgy" web theurgy-reference-app "hosted-web,macos,linux" "" "$workspaces_root")
+printf '%s\n' "$workspace_theurgy_out" | grep -F "created=$workspaces_root/workspace-theurgy" >/dev/null
+[ -f "$workspaces_root/workspace-theurgy/app/script.js" ]
+[ -x "$workspaces_root/workspace-theurgy/app/scripts/workspace-theurgy-backend.sh" ]
+[ -x "$workspaces_root/workspace-theurgy/scripts/prepare-theurgy-runtime.sh" ]
+grep -F "starter=theurgy-reference-app" "$workspaces_root/workspace-theurgy/wizardry.workspace.conf" >/dev/null
+grep -F "run_rebuild_command=sh scripts/prepare-theurgy-runtime.sh" "$workspaces_root/workspace-theurgy/wizardry.workspace.conf" >/dev/null
+grep -F "Theurgy App" "$workspaces_root/workspace-theurgy/app/index.html" >/dev/null
+grep -F "prepare-theurgy" "$workspaces_root/workspace-theurgy/app/scripts/workspace-theurgy-backend.sh" >/dev/null
+grep -F "check-theurgy-web-runtime" "$workspaces_root/workspace-theurgy/scripts/prepare-theurgy-runtime.sh" >/dev/null
+
 if sh "$backend" set-workspace-field "$scratch" "$workspaces_root/workspace-home" hosted_web_serve_action "ab/action" >/tmp/forge-invalid-action.out 2>/tmp/forge-invalid-action.err; then
   printf '%s\n' "forge backend test: invalid hosted_web_serve_action accepted" >&2
   exit 1

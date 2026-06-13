@@ -11,6 +11,7 @@
 - Desktop/mobile use embedded `wizardry-core` for fast-path operations.
 - `App Forge` (`apps/forge`) is the desktop control-plane app for build/run/scaffold workflows, implemented as WebView UI + POSIX shell backend.
 - Forge can scaffold three workspace contexts in-repo: cross-platform web (`web`), native desktop IR (`native-desktop`), and Godot (`godot`).
+- The cross-platform web context now includes a first-class Theurgy-backed starter that keeps the UI file-first while using a canonical workspace prepare script to cross into Theurgy through `spells/.arcana/theurgy/invoke-theurgy`.
 - Native desktop workspaces keep canonical UI in `app-blueprint/app.ir.yaml` and regenerate platform source into standard macOS and GTK/Linux project trees.
 - Core API contract is transport-agnostic JSON-RPC 2.0.
 - Core v1 methods implemented in repository:

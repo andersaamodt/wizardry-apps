@@ -20,6 +20,9 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 [ -f "$root/templates/forge/web/reference-app/index.html" ]
 [ -f "$root/templates/forge/web/reference-app/script.js" ]
 [ -f "$root/templates/forge/web/reference-app/scripts/__APP_SLUG__-backend.sh" ]
+[ -f "$root/templates/forge/web/theurgy-reference-app/index.html" ]
+[ -f "$root/templates/forge/web/theurgy-reference-app/script.js" ]
+[ -f "$root/templates/forge/web/theurgy-reference-app/scripts/__APP_SLUG__-backend.sh" ]
 [ -f "$root/templates/forge/native-desktop/reference-app/scripts/render-native-desktop.sh" ]
 [ -f "$root/templates/forge/web/minimal/style.css" ]
 [ -f "$root/apps/.host/shared/wizardry-bridge.js" ]
@@ -64,9 +67,12 @@ grep -F "Emission material notice" "$root/templates/forge/web/minimal/style.css"
 grep -F "Canonical reference note" "$root/templates/forge/web/reference-app/index.html" >/dev/null
 grep -F "__wizardry_host_boot_ready" "$root/templates/forge/web/reference-app/script.js" >/dev/null
 reference_backend="$root/templates/forge/web/reference-app/scripts/__APP_SLUG__-backend.sh"
+theurgy_reference_backend="$root/templates/forge/web/theurgy-reference-app/scripts/__APP_SLUG__-backend.sh"
 native_reference_render="$root/templates/forge/native-desktop/reference-app/scripts/render-native-desktop.sh"
 grep -F "get-ui-prefs" "$reference_backend" >/dev/null
 sh -n "$reference_backend"
+grep -F "prepare-theurgy" "$theurgy_reference_backend" >/dev/null
+sh -n "$theurgy_reference_backend"
 sh -n "$native_reference_render"
 grep -F "json-glib-1.0" "$native_reference_render" >/dev/null
 grep -F "#include <json-glib/json-glib.h>" "$native_reference_render" >/dev/null
@@ -95,6 +101,8 @@ if printf '%s\n' "$reference_pref_out" | grep -F "ab/key=" >/dev/null 2>&1; then
 fi
 grep -F "assets/forge-icon.png" "$root/templates/forge/web/reference-app/index.html" >/dev/null
 grep -F "Reference App" "$root/templates/forge/web/reference-app/index.html" >/dev/null
+grep -F "Theurgy" "$root/templates/forge/web/theurgy-reference-app/index.html" >/dev/null
+grep -F "prepare-theurgy" "$root/templates/forge/web/theurgy-reference-app/scripts/__APP_SLUG__-backend.sh" >/dev/null
 grep -F "desktopBridgeBootstrapSource" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "window.wizardry.exec = execCommand;" "$root/apps/.host/macos/main.m" >/dev/null
 grep -F "territory-master.png" "$root/apps/.host/macos/main.m" >/dev/null
@@ -130,6 +138,10 @@ for emission_file in \
   "$root/templates/forge/web/reference-app/style.css" \
   "$root/templates/forge/web/reference-app/script.js" \
   "$root/templates/forge/web/reference-app/scripts/__APP_SLUG__-backend.sh" \
+  "$root/templates/forge/web/theurgy-reference-app/index.html" \
+  "$root/templates/forge/web/theurgy-reference-app/style.css" \
+  "$root/templates/forge/web/theurgy-reference-app/script.js" \
+  "$root/templates/forge/web/theurgy-reference-app/scripts/__APP_SLUG__-backend.sh" \
   "$root/templates/forge/native-desktop/blank/app-blueprint/app.ir.yaml" \
   "$root/templates/forge/native-desktop/reference-app/app-blueprint/app.ir.yaml" \
   "$root/templates/forge/native-desktop/blank/scripts/render-native-desktop.sh" \
@@ -175,6 +187,7 @@ grep -F 'id="target-active-list"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'id="target-inactive-list"' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Left sidebar' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Wizardry Cross-Platform Desktop Reference App' "$root/apps/forge/index.html" >/dev/null
+grep -F 'Wizardry Cross-Platform Theurgy Reference App' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Wizardry Native Desktop Reference App' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Top bar + graph' "$root/apps/forge/index.html" >/dev/null
 grep -F 'Starter: Dashboard' "$root/apps/forge/index.html" >/dev/null

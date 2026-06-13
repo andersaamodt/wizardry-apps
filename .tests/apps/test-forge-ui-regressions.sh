@@ -132,6 +132,8 @@ assert_matches "$ui" "backend\('rename-workspace'"
 assert_contains "$ui" 'Cross-Platform App'
 assert_contains "$ui" 'Native Desktop App'
 assert_contains "$ui" 'Native Mobile App'
+assert_contains "$ui" 'Wizardry Cross-Platform Theurgy Reference App'
+assert_contains "$ui" 'stronger runtime boundaries and professional-scale behavior'
 assert_contains "$ui" 'canonical native UI definition'
 assert_contains "$ui" 'shared native mobile UI definition'
 assert_contains "$ui" 'Canonical UI definition path'

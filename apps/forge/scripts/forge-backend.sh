@@ -5256,7 +5256,7 @@ cmd_set_workspace_field() {
       ;;
     starter)
       case "$normalized_value" in
-        ""|import-web|import-native-desktop|import-native-mobile|import-godot|import-generic|blank|minimal|reference-app|panel|sidebar|topbar|dashboard|studio|clone)
+        ""|import-web|import-native-desktop|import-native-mobile|import-godot|import-generic|blank|minimal|reference-app|theurgy-reference-app|panel|sidebar|topbar|dashboard|studio|clone)
           ;;
         *)
           printf '%s\n' "forge-backend: unsupported starter '$normalized_value'" >&2
@@ -8395,7 +8395,7 @@ run_logged_step() {
 is_generic_web_starter() {
   starter=${1-}
   case "$starter" in
-    minimal|reference-app|panel|sidebar|topbar|dashboard|studio)
+    minimal|reference-app|theurgy-reference-app|panel|sidebar|topbar|dashboard|studio)
       return 0
       ;;
   esac
@@ -8406,7 +8406,7 @@ workspace_uses_emitted_project_license() {
   starter=${1-}
   context=${2-}
   case "$context:$starter" in
-    web:minimal|web:reference-app|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank|native-desktop:reference-app|native-mobile:blank|native-mobile:reference-app)
+    web:minimal|web:reference-app|web:theurgy-reference-app|web:panel|web:sidebar|web:topbar|web:dashboard|web:studio|godot:blank|native-desktop:blank|native-desktop:reference-app|native-mobile:blank|native-mobile:reference-app)
       return 0
       ;;
   esac
@@ -8524,6 +8524,65 @@ write_web_starter_template() {
       fi
     done
   )
+}
+
+write_theurgy_web_workspace_support() {
+  workspace_dir=$1
+  app_name=$2
+  app_slug=$3
+  escaped_app_name=$(printf '%s' "$app_name" | sed "s/'/'\\\\''/g")
+  escaped_app_slug=$(printf '%s' "$app_slug" | sed "s/'/'\\\\''/g")
+
+  mkdir -p "$workspace_dir/scripts"
+
+  cat > "$workspace_dir/scripts/prepare-theurgy-runtime.sh" <<EOF
+#!/bin/sh
+
+set -eu
+
+app_name='$escaped_app_name'
+app_slug='$escaped_app_slug'
+runtime_root=\${1:-.theurgy-runtime}
+wizardry_root=\${WIZARDRY_APPS_ROOT:-\${WIZARDRY_DIR:-}}
+theurgy_home=\${THEURGY_HOME:-\$HOME/theurgy}
+invoke_script=''
+
+if [ -n "\$wizardry_root" ] && [ -x "\$wizardry_root/spells/.arcana/theurgy/invoke-theurgy" ]; then
+  invoke_script="\$wizardry_root/spells/.arcana/theurgy/invoke-theurgy"
+fi
+
+if [ -n "\$invoke_script" ]; then
+  "\$invoke_script" --yes
+fi
+
+status_spell=''
+for candidate in \
+  "\$theurgy_home/spells/check-theurgy-web-runtime" \
+  "\$theurgy_home/bin/check-theurgy-web-runtime"; do
+  if [ -x "\$candidate" ]; then
+    status_spell="\$candidate"
+    break
+  fi
+done
+
+if [ -z "\$status_spell" ] && command -v check-theurgy-web-runtime >/dev/null 2>&1; then
+  status_spell=\$(command -v check-theurgy-web-runtime)
+fi
+
+[ -n "\$status_spell" ] || {
+  printf '%s\n' "prepare-theurgy-runtime: check-theurgy-web-runtime not found. Install Theurgy first." >&2
+  exit 1
+}
+
+mkdir -p "\$runtime_root"
+"\$status_spell" > "\$runtime_root/web-runtime-status.txt"
+
+printf 'app=%s\n' "\$app_slug"
+printf 'name=%s\n' "\$app_name"
+printf 'runtime_root=%s\n' "\$runtime_root"
+printf 'status_file=%s\n' "\$runtime_root/web-runtime-status.txt"
+EOF
+  chmod +x "$workspace_dir/scripts/prepare-theurgy-runtime.sh"
 }
 
 write_native_desktop_starter_template() {
@@ -8788,7 +8847,7 @@ cmd_scaffold_workspace() {
       development_context=web
 
       case "$starter" in
-        minimal|reference-app|panel|sidebar|topbar|dashboard|studio|clone) ;;
+        minimal|reference-app|theurgy-reference-app|panel|sidebar|topbar|dashboard|studio|clone) ;;
         *)
           printf '%s\n' "forge-backend: scaffold-workspace unknown web starter: $starter" >&2
           exit 2
@@ -8799,8 +8858,11 @@ cmd_scaffold_workspace() {
       mkdir -p "$app_dir"
 
       case "$starter" in
-        minimal|reference-app|panel|sidebar|topbar|dashboard|studio)
+        minimal|reference-app|theurgy-reference-app|panel|sidebar|topbar|dashboard|studio)
           write_web_starter_template "$root" "$starter" "$app_dir" "$app_name" "$slug"
+          if [ "$starter" = "theurgy-reference-app" ]; then
+            write_theurgy_web_workspace_support "$workspace_dir" "$app_name" "$slug"
+          fi
           ;;
         clone)
           [ -n "$source" ] || {
@@ -9000,6 +9062,9 @@ GDSCRIPT
       run_rebuild_command="sh scripts/render-native-mobile.sh"
       ;;
   esac
+  if [ "$development_context" = "web" ] && [ "$starter" = "theurgy-reference-app" ]; then
+    run_rebuild_command="sh scripts/prepare-theurgy-runtime.sh"
+  fi
 
   profile_source=""
   case "$starter" in
