@@ -2052,7 +2052,6 @@ install_macos_bundle() {
     rm -rf "$macos_install_stage_root"
     return 1
   fi
-  touch "$macos_install_stage_bundle" >/dev/null 2>&1 || :
   if ! ensure_macos_bundle_signature "$macos_install_stage_bundle"; then
     rm -rf "$macos_install_stage_root"
     return 1
@@ -2066,7 +2065,6 @@ install_macos_bundle() {
     rm -rf "$macos_install_stage_root"
     return 1
   }
-  touch "$macos_install_dest_bundle" >/dev/null 2>&1 || :
   if ! ensure_macos_bundle_signature "$macos_install_dest_bundle"; then
     rm -rf "$macos_install_stage_root"
     return 1
@@ -2139,7 +2137,6 @@ stage_macos_bundle_replacement() {
       return 1
     }
   fi
-  touch "$macos_stage_bundle" >/dev/null 2>&1 || :
   if ! ensure_macos_bundle_signature "$macos_stage_bundle"; then
     rm -rf "$macos_stage_bundle"
     return 1
