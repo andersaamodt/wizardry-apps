@@ -16,6 +16,7 @@
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT.md` when doing whole-app or cross-app audits that need language, storage, execution, testing, and GUI criteria together.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_COMPLIANCE_FRAMEWORK.md` when normalizing findings across many apps or planning cross-app remediation by category.
 - Use `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_LEDGER.yaml` as the shared accumulation surface for recurring violation classes.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_CATEGORY_REPORT.md` when planning remediation order or wanting the current severity-and-recurrence-sorted category snapshot.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_RESULTS.md` before continuing a prior audit round so newly learned criteria get propagated instead of rediscovered.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/adversarial-testing.md` when doing adversarial testing, security-minded bug hunts, release hardening, or GUI edge-case sweeps.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_LESSONS.md` for known host/WebView pitfalls and regression lessons.
