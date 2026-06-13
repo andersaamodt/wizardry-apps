@@ -50,6 +50,18 @@ categories:
     evidence_refs: []
     fix_strategy: Move durable state to plain-text formats and reserve opaque formats for narrow justified cases.
 
+  - id: browser-owned-durable-state
+    title: Durable app state depends on browser-owned extension storage instead of an app-owned plain-text contract
+    policy_axes:
+      - Storage And State Discipline
+      - Documentation And Auditability
+    default_severity: high
+    affected_apps:
+      - fauxzilla
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Keep browser storage cache-only where needed and move canonical durable state to app-owned plain-text surfaces or another explicit exportable contract.
+
   - id: user-facing-config-not-yaml-md
     title: User-facing durable config does not use the preferred YAML plus Markdown text conventions
     policy_axes:
@@ -58,6 +70,7 @@ categories:
     affected_apps:
       - bellheim
       - counterspell
+      - fauxzilla
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Move user-facing durable config to YAML-oriented text or document a narrow exception.
@@ -83,6 +96,7 @@ categories:
     affected_apps:
       - bellheim
       - counterspell
+      - fauxzilla
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Enumerate each approved non-shell boundary and keep the exception set explicit.
@@ -120,6 +134,18 @@ categories:
     evidence_refs: []
     fix_strategy: Move test entrypoints under .tests and leave non-test helpers elsewhere.
 
+  - id: config-example-stale
+    title: Checked-in config example contradicts current runtime defaults or canonical paths
+    policy_axes:
+      - Documentation And Auditability
+      - Storage And State Discipline
+    default_severity: medium
+    affected_apps:
+      - fauxzilla
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Keep example configs aligned with current runtime defaults and remove legacy path guidance from user-copyable examples.
+
   - id: python-exception-undocumented
     title: Python is used without an explicit bounded exception
     policy_axes:
@@ -130,6 +156,7 @@ categories:
       - binder
       - counterspell
       - dictator
+      - fauxzilla
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Replace Python where not justified or document the retained runtime/tooling boundary explicitly.
@@ -254,6 +281,7 @@ categories:
     affected_apps:
       - binder
       - dictator
+      - fauxzilla
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add a repo-local .github note that records standards specializations and approved exceptions.

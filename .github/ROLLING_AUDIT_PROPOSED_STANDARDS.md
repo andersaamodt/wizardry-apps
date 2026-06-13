@@ -13,6 +13,7 @@
 - Durable app data should stay plain-text by default.
 - YAML plus Markdown-oriented text should be the preferred format family for user-facing durable files and human-edited project contracts.
 - JSON is acceptable for app-facing machine state, typed envelopes, caches, and ABI contracts whose primary consumer is the app rather than the user.
+- Browser extension storage should not be the only durable home for user secrets, pending sync queues, identity state, or other canonical app data; if browser-owned storage is used, keep it cache-like or mirror canonical state into an app-owned plain-text contract.
 - Repo checkouts should never become app-instance state directories. User settings, runtime logs, temp homes, browser profiles, caches, and similar operator-local cruft should live outside the checkout.
 - Generated project defaults should not normalize repo-local runtime-state directories inside new source trees.
 
@@ -21,6 +22,7 @@
 - Existing audit surfaces should be treated as active contracts and must be refreshed when they become stale; stale audit tables are a standards violation, not harmless historical clutter.
 - Approved exceptions should be documented in repo-local AI-facing docs where the next auditor will actually look.
 - AI-facing standards docs should not contain contradictory approved patterns; one canonical pattern should win.
+- Checked-in config examples and copyable setup templates should match current runtime defaults exactly; stale legacy-path examples are a standards violation.
 
 ### Language And Boundary Discipline
 - Wizardry is POSIX `sh`-first; Python and Rust are opt-in exceptions, not ambient permission.
