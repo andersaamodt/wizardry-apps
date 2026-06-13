@@ -51,8 +51,38 @@ done
 
 WEB_ROOT=${WEB_WIZARDRY_ROOT:-$HOME/sites}
 SITES_DIR="$WEB_ROOT"
-SITES_DATA_DIR=${WIZARDRY_SITES_DATA_DIR:-$SITES_DIR/.sitedata}
 SITE_DIR="$SITES_DIR/$site_name"
+
+workspace_state_key() {
+  workspace_state_key_root=${1-}
+  [ -n "$workspace_state_key_root" ] || {
+    printf '%s\n' "workspace"
+    return 0
+  }
+  if has shasum; then
+    workspace_state_key_digest=$(printf '%s' "$workspace_state_key_root" | shasum -a 256 | awk '{print $1}')
+  elif has sha256sum; then
+    workspace_state_key_digest=$(printf '%s' "$workspace_state_key_root" | sha256sum | awk '{print $1}')
+  else
+    workspace_state_key_digest=$(printf '%s' "$workspace_state_key_root" | tr '/ ' '__' | tr -cd '[:alnum:]_.-')
+  fi
+  workspace_state_key_short=$(printf '%s' "$workspace_state_key_digest" | cut -c1-16)
+  [ -n "$workspace_state_key_short" ] || workspace_state_key_short=workspace
+  printf '%s\n' "$workspace_state_key_short"
+}
+
+default_sites_data_dir() {
+  case "$SITES_DIR" in
+    "$HOME"/git|"$HOME"/git/*|/Users/andersaamodt/git|/Users/andersaamodt/git/*)
+      xdg_state_home=${XDG_STATE_HOME:-$HOME/.local/state}
+      printf '%s/wizardry-apps/web-sites/%s/.sitedata\n' "$xdg_state_home" "$(workspace_state_key "$SITES_DIR")"
+      return 0
+      ;;
+  esac
+  printf '%s/.sitedata\n' "$SITES_DIR"
+}
+
+SITES_DATA_DIR=${WIZARDRY_SITES_DATA_DIR:-$(default_sites_data_dir)}
 SITE_DATA_DIR="$SITES_DATA_DIR/$site_name"
 
 if [ ! -d "$SITE_DIR" ]; then

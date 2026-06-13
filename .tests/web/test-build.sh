@@ -312,6 +312,60 @@ test_build_cache_falls_back_to_site_data_only() {
   rm -rf "$test_web_root" "$stub_dir"
 }
 
+test_build_uses_xdg_site_data_for_git_workspace_roots() {
+  skip-if-compiled || return $?
+
+  test_home=$(temp-dir web-build-home)
+  test_web_root="$test_home/git"
+  test_xdg_state=$(temp-dir web-build-state)
+  stub_dir=$(make_build_stub_dir)
+  blocked_cache_path="$test_web_root/blocked-cache-path"
+  site_name="gitrootcache"
+  site_dir="$test_web_root/$site_name"
+
+  mkdir -p "$test_web_root"
+  : > "$blocked_cache_path"
+
+  HOME="$test_home" WEB_WIZARDRY_ROOT="$test_web_root" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/create-from-template "$site_name" demo
+  assert_success
+
+  PATH="$stub_dir:$PATH" HOME="$test_home" XDG_STATE_HOME="$test_xdg_state" WEB_WIZARDRY_ROOT="$test_web_root" \
+    WIZARDRY_WEB_JS_DIR="$blocked_cache_path" WIZARDRY_DIR="$ROOT_DIR" run_spell spells/web/build "$site_name" --full
+  assert_success
+
+  if has shasum; then
+    workspace_key=$(printf '%s' "$test_web_root" | shasum -a 256 | awk '{print $1}' | cut -c1-16)
+  elif has sha256sum; then
+    workspace_key=$(printf '%s' "$test_web_root" | sha256sum | awk '{print $1}' | cut -c1-16)
+  else
+    workspace_key=$(printf '%s' "$test_web_root" | tr '/ ' '__' | tr -cd '[:alnum:]_.-' | cut -c1-16)
+  fi
+  fallback_lib_dir="$test_xdg_state/wizardry-apps/web-sites/$workspace_key/.sitedata/$site_name/.web-libs/js"
+  legacy_lib_dir="$test_web_root/.sitedata/$site_name/.web-libs/js"
+  [ -f "$fallback_lib_dir/htmx.min.js" ] || {
+    TEST_FAILURE_REASON="expected htmx cache at XDG fallback path for git workspace roots"
+    rm -rf "$test_home" "$test_xdg_state" "$stub_dir"
+    return 1
+  }
+  [ -f "$fallback_lib_dir/idiomorph-ext.min.js" ] || {
+    TEST_FAILURE_REASON="expected idiomorph cache at XDG fallback path for git workspace roots"
+    rm -rf "$test_home" "$test_xdg_state" "$stub_dir"
+    return 1
+  }
+  [ ! -e "$legacy_lib_dir" ] || {
+    TEST_FAILURE_REASON="git workspace roots should not recreate repo-local .sitedata web lib caches"
+    rm -rf "$test_home" "$test_xdg_state" "$stub_dir"
+    return 1
+  }
+  [ -f "$site_dir/build/static/js/htmx.min.js" ] || {
+    TEST_FAILURE_REASON="build should still copy htmx into build/static/js"
+    rm -rf "$test_home" "$test_xdg_state" "$stub_dir"
+    return 1
+  }
+
+  rm -rf "$test_home" "$test_xdg_state" "$stub_dir"
+}
+
 test_build_runs_site_pre_build_hook() {
   skip-if-compiled || return $?
 
@@ -427,6 +481,7 @@ EOF
 run_test_case "build --help works" test_build_help
 run_test_case "build generates output for every template" test_build_generates_html_for_every_template
 run_test_case "build cache falls back to site data cache" test_build_cache_falls_back_to_site_data_only
+run_test_case "build uses XDG site data for git workspace roots" test_build_uses_xdg_site_data_for_git_workspace_roots
 run_test_case "build runs site pre-build hook" test_build_runs_site_pre_build_hook
 run_test_case "build prunes stale html for removed pages" test_build_prunes_stale_html_for_removed_pages
 run_test_case "build rejects site path traversal" test_build_rejects_site_path_traversal
