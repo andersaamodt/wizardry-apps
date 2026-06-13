@@ -11,6 +11,7 @@
 - On the next pass, re-audit earlier apps against the expanded rubric so all apps converge on the same bar.
 - If a new criterion is only GUI-specific, also add it to `.github/GUI_AUDIT.md`.
 - If a new criterion changes repo policy, also add it to the most obvious AI-facing source file in `.github/`.
+- Treat meaningful unreasoned app-to-app variance as standards debt: convert it into a standard, an approved exception, or a pending decision record.
 
 ## First-Pass Scope
 - Built-in shipped app surfaces named by `.github/GUI_AUDIT.md`: `forge`, `wizardry-desktop`, and `chatroom`.
@@ -36,8 +37,15 @@
 - If a finding is safe to fix during the audit, fix it and update the standards in the same change.
 - Record recurring violations under stable category names so later reports can be grouped by problem class instead of only by app.
 - Prefer category-first aggregation for round summaries: severity first, then recurrence count, then affected apps.
+- Record meaningful non-violating variance separately from violations so `phronesis` can decision it before future app generation.
 
 ## Audit Axes
+
+### 0. Decision Completeness
+- Every significant implementation, storage, language, testing, theme, GUI, runtime, release, or documentation difference between apps should be decisioned.
+- A difference is decisioned only when it is covered by a canonical standard, an approved exception, or a pending decision with enough evidence to resolve later.
+- New apps should be generated from explicit policy choices, not from accumulated precedent or template accidents.
+- Audit reports should call out unreasoned variance even when it is not yet categorized as a failure.
 
 ### 1. Language And Boundary Discipline
 - `wizardry-apps` is POSIX `sh`-first for orchestration, repo control, backends, tests, and release helpers.

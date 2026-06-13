@@ -6,6 +6,12 @@
 
 ## Covered So Far
 
+### Pass 2 Preparation
+- `phronesis` extraction plan started
+- unreasoned variance ledger started
+- late round-1 criterion back-application checklist started
+- no app code remediation has started
+
 ### Core And Shared
 - `wizardry`
 - `wizardry-apps`

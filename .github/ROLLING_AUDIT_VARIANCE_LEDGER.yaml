@@ -1,0 +1,218 @@
+version: 1
+description: >
+  Second-pass ledger for meaningful Wizardry-family app variance. Each entry
+  should become a standard, an approved exception class, or a pending decision
+  record before the fix-it phase begins.
+
+variance_items:
+  - id: theme-system-source
+    title: Apps vary between shared Wizardry themes and app-local theme systems
+    status: pending-decision
+    observed_patterns:
+      - shared_wizardry_themes
+      - shared_wizardry_themes_with_frontend_fallback_catalog
+      - app_local_theme_system
+      - single_fixed_palette
+    candidate_standard: >
+      Forge-generated Wizardry apps should default to shared Wizardry themes.
+      App-local theme systems are allowed only when explicitly documented as
+      app identity, with their own keyboard, ordering, persistence, and depth
+      contract.
+    affected_examples:
+      shared_wizardry_themes:
+        - forge
+      shared_wizardry_themes_with_frontend_fallback_catalog:
+        - bellheim
+        - mecha
+        - serenity
+        - simplerchat
+        - wizardry-desktop
+      app_local_theme_system:
+        - matchbook
+        - pleroma
+      single_fixed_palette:
+        - hegelizer
+    phronesis_candidate: true
+
+  - id: durable-root-layout
+    title: Apps vary between app-home roots, dot-app roots, XDG roots, shared namespaces, and domain roots
+    status: pending-decision
+    observed_patterns:
+      - home_appname
+      - home_dot_appname
+      - xdg_app_owned
+      - xdg_shared_wizardry_apps
+      - shared_domain_root
+      - application_support_shared_namespace
+    candidate_standard: >
+      Primary durable app state defaults to `~/<appname>`. Existing dot-app
+      roots may be treated as migration-era exceptions if documented. Standard
+      folders are allowed for narrow OS integration or config-only state, but
+      they should use app-owned roots.
+    affected_examples:
+      home_appname:
+        - applegate
+      home_dot_appname:
+        - counterspell
+        - matchbook
+        - organizer
+        - serenity
+        - simplerchat
+      xdg_app_owned:
+        - fauxzilla
+      xdg_shared_wizardry_apps:
+        - boycott
+        - hegelizer
+        - mecha
+        - pieplate
+        - pleroma
+        - stellar
+      shared_domain_root:
+        - stellar
+      application_support_shared_namespace:
+        - book-club
+    phronesis_candidate: true
+
+  - id: preference-file-format
+    title: Apps vary between YAML-oriented config, env files, key-value prefs, JSON state, and browser storage
+    status: pending-decision
+    observed_patterns:
+      - yaml_or_markdown_text
+      - env_or_key_value_text
+      - json_machine_state
+      - browser_storage
+    candidate_standard: >
+      User-facing editable prefs should use YAML-oriented text. Shell-facing
+      env/key-value files are allowed only for narrow backend config that users
+      are not expected to hand-edit frequently. JSON remains acceptable for
+      app-facing machine state and typed envelopes.
+    affected_examples:
+      env_or_key_value_text:
+        - applegate
+        - boycott
+        - matchbook
+        - pleroma
+      json_machine_state:
+        - book-club
+        - pleroma
+      browser_storage:
+        - boycott
+        - fauxzilla
+        - pieplate
+        - serenity
+    phronesis_candidate: true
+
+  - id: test-entrypoint-location
+    title: Apps vary between `.tests/`, `app/tests/`, and release-tool test locations
+    status: standard-proposed
+    candidate_standard: >
+      All Wizardry-family test entrypoints live under `.tests/`. Other folders
+      may hold fixtures or helpers, but runnable tests should be discoverable
+      from `.tests/`.
+    affected_examples:
+      compliant:
+        - applegate
+        - binder
+        - book-club
+        - counterspell
+        - fauxzilla
+        - matchbook
+        - mecha
+        - organizer
+        - simplerchat
+        - stellar
+      noncompliant:
+        - dictator
+        - hegelizer
+        - pleroma
+    phronesis_candidate: true
+
+  - id: backend-resolution-contract
+    title: Apps vary in whether frontend code knows backend executable paths
+    status: standard-proposed
+    candidate_standard: >
+      The host or backend contract owns backend path resolution. Frontends call
+      named actions or stable bridge APIs and should not infer executable paths
+      from served document locations.
+    affected_examples:
+      frontend_derived_paths:
+        - boycott
+        - pleroma
+      explicit_backend_actions:
+        - forge
+        - matchbook
+        - simplerchat
+    phronesis_candidate: true
+
+  - id: non_shell_runtime_boundary
+    title: Apps vary in how non-shell language surfaces are justified
+    status: pending-decision
+    observed_patterns:
+      - generated_native_output
+      - host_owned_native_boundary
+      - test_helper_exception
+      - runtime_python_exception
+      - runtime_rust_helper
+      - direct_cargo_runtime_build
+    candidate_standard: >
+      Non-shell languages require a boundary type. Generated native output and
+      host-owned native code are ordinary only inside approved native/theurgy
+      boundaries. Python and Rust are never ambient permissions; direct Cargo
+      builds in shipped app runtime paths are disallowed unless moved behind an
+      approved host or Theurgy boundary.
+    affected_examples:
+      runtime_python_exception:
+        - binder
+        - book-club
+        - counterspell
+        - dictator
+        - fauxzilla
+        - organizer
+        - pieplate
+        - serenity
+        - simplerchat
+        - stellar
+      direct_cargo_runtime_build:
+        - pleroma
+    phronesis_candidate: true
+
+  - id: repo-local-ai-doc-shape
+    title: Apps vary in whether local AI docs enumerate exceptions or only rely on upstream docs
+    status: standard-proposed
+    candidate_standard: >
+      Every repo should have a local AI-facing standards surface that imports
+      ecosystem policy and then lists repo-specific storage, language, theme,
+      runtime, test, and release exceptions.
+    affected_examples:
+      missing_or_too_thin:
+        - applegate
+        - binder
+        - boycott
+        - dictator
+        - eye
+        - fauxzilla
+        - hegelizer
+        - matchbook
+        - mecha
+        - organizer
+        - pieplate
+        - pleroma
+        - serenity
+        - simplerchat
+        - stellar
+      stronger_reference:
+        - book-club
+    phronesis_candidate: true
+
+  - id: app-policy-matrix
+    title: Apps lack a shared matrix showing which policies they implement, fail, or except
+    status: standard-proposed
+    candidate_standard: >
+      Each app should have a machine-readable policy matrix entry listing
+      policy IDs, status, evidence, and approved exceptions. The matrix should
+      be usable by Forge when planning new apps and by audits when checking
+      drift.
+    affected_examples:
+      current_state:
+        - all audited app repos
+    phronesis_candidate: true

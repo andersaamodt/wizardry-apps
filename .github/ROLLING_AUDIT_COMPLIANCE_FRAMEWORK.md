@@ -11,6 +11,7 @@
 - `finding`: one app-specific instance of a category violation with evidence.
 - `status`: `pass`, `fail`, `exception-approved`, `not-applicable`, or `unknown`.
 - `scope`: the repo, app, or shared host/runtime surface being audited.
+- `variance`: a meaningful difference between apps that may not yet be a violation but still needs a standard, exception class, or decision record.
 
 ## Stable Category Rules
 - Every recurring problem should get a short stable category id.
@@ -30,6 +31,8 @@
 - The shared ledger should record each finding under its category id.
 - If multiple apps show the same bug class, append apps to the same category instead of inventing near-duplicate labels.
 - If a repo has an approved exception, record it as `exception-approved` rather than pretending it passes the base rule.
+- The variance ledger should record meaningful app-to-app differences before they become hidden precedent.
+- A variance item should not be closed until it is converted into a canonical standard, an approved exception class, or an explicit pending decision.
 
 ## Reporting Rules
 - Round summaries should sort categories by:
@@ -74,6 +77,12 @@
   - approved exceptions
   - evidence links
 - Use that matrix to plan re-audits, track regressions, and identify which standards should move into templates or shared infrastructure.
+- The matrix should also show where an app has chosen a standards-backed variant, such as shared Wizardry themes versus an explicitly documented app-local theme system.
+
+## Phronesis Direction
+- Ecosystem-wide policy, decision records, exception schemas, audit method, and policy IDs should move toward the proposed `phronesis` repository.
+- Implementation repos should retain local commands, local evidence, local topology, and local exception instances.
+- The compliance framework should become a `phronesis` seed unless the user rejects the extraction plan.
 
 ## Initial Category Seeds
 - `storage-default-home-missing`

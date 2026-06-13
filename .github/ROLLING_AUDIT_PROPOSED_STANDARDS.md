@@ -27,6 +27,7 @@
 - Existing audit surfaces should be treated as active contracts and must be refreshed when they become stale; stale audit tables are a standards violation, not harmless historical clutter.
 - Approved exceptions should be documented in repo-local AI-facing docs where the next auditor will actually look.
 - Repo-local AI docs should name the repo’s own storage and language exceptions explicitly, not only redirect readers to upstream canonical docs.
+- Repo-local AI docs should enumerate local storage, language, theme, runtime, test, release, and generated-output boundaries in one predictable exception ledger shape.
 - AI-facing standards docs should not contain contradictory approved patterns; one canonical pattern should win.
 - Checked-in config examples and copyable setup templates should match current runtime defaults exactly; stale legacy-path examples are a standards violation.
 
@@ -40,6 +41,8 @@
 
 ### Themes And GUI
 - If an app intentionally uses an app-local theme system instead of the shared Wizardry themes, document that choice explicitly so audits know whether to apply the shared-theme contract or an app-local design contract.
+- Forge-generated Wizardry apps should default to shared Wizardry themes unless the app declares an explicit app-local theme identity.
+- App-local theme systems should still define their own keyboard, ordering, persistence, and full-depth application contract.
 - Apps that use Wizardry themes should discover the real shared Wizardry theme set rather than keep app-local hardcoded theme catalogs.
 - Theme lists should be alphabetized consistently at the contract source.
 - When a focused theme picker is closed, up/down arrow keys should still cycle themes correctly.
@@ -54,8 +57,12 @@
 - Apps with optional external transports or relays should expose a guided live sanity-check flow that verifies a real end-to-end send/receive path against the canonical filesystem corpus, not only configuration presence.
 
 ### Framework And Process
+- Meaningful unreasoned app-to-app variance should be treated as standards debt.
+- Every significant app difference should become a canonical standard, an approved exception class, or a pending decision record.
 - Recurring audit problems should be tracked under stable category IDs so cross-app remediation can happen problem-by-problem instead of app-by-app.
 - New standards should be pushed into the earliest enforceable layer available: canonical docs first, then templates, shared hosts/backends, generators, and tests.
+- Ecosystem-wide standards, exception schemas, audit method, decision records, and policy IDs should be extracted into a `phronesis` repository so implementation repos can stay focused.
+- A machine-readable app policy matrix should track each app's status for every policy ID, including passes, failures, approved exceptions, and evidence links.
 
 ## Promotion Rule
 - Before the fix-it phase, review this list and decide which items should become canonical Wizardry standards.
