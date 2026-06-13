@@ -25,6 +25,7 @@
 - `fauxzilla`
 - `hegelizer`
 - `mecha`
+- `organizer`
 - `simplerchat`
 
 ## In Progress Branches
@@ -36,6 +37,7 @@
 - `fauxzilla`: `codex/audit-fauxzilla-round1`
 - `hegelizer`: `codex/audit-hegelizer-round1`
 - `mecha`: `codex/audit-mecha-round1`
+- `organizer`: `codex/audit-organizer-round1`
 - `simplerchat`: `codex/audit-simplerchat-round1`
 - `theurgy`: `codex/audit-theurgy-round1`
 - `wizardry-apps`: `codex/rolling-audit-wizardry-apps`
@@ -45,7 +47,6 @@
 - `applegate`
 - `book-club`
 - `matchbook`
-- `organizer`
 - `pieplate`
 
 ## Deferred For Worktree Safety Or Scope Triage

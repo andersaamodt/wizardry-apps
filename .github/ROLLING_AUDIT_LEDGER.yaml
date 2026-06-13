@@ -103,6 +103,7 @@ categories:
       - bellheim
       - counterspell
       - fauxzilla
+      - organizer
       - simplerchat
     approved_exceptions: []
     evidence_refs: []
@@ -165,6 +166,7 @@ categories:
       - counterspell
       - dictator
       - fauxzilla
+      - organizer
       - simplerchat
     approved_exceptions: []
     evidence_refs: []
@@ -275,6 +277,18 @@ categories:
     evidence_refs: []
     fix_strategy: Separate hydration/read paths from write paths and add regression coverage.
 
+  - id: generated-staging-not-disposable
+    title: Generated staging tree is not fully disposable or rerender-safe after normal local build artifacts
+    policy_axes:
+      - Native And Host Boundary Discipline
+      - Testing And Release Readiness
+    default_severity: medium
+    affected_apps:
+      - organizer
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Keep generated staging trees disposable, ignore build artifacts there, and make rerender paths robust after ordinary local builds.
+
   - id: ui-static-tests-missing
     title: Shipped GUI app lacks UI or static contract coverage
     policy_axes:
@@ -299,6 +313,7 @@ categories:
       - fauxzilla
       - hegelizer
       - mecha
+      - organizer
       - simplerchat
     approved_exceptions: []
     evidence_refs: []

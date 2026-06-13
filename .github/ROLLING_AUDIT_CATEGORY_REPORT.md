@@ -14,12 +14,13 @@
 
 ### 1. `python-exception-undocumented`
 - Severity: high
-- Recurrence: 5 repos
+- Recurrence: 6 repos
 - Affected:
   - `binder`
   - `counterspell`
   - `dictator`
   - `fauxzilla`
+  - `organizer`
   - `simplerchat`
 - Why it ranks first:
   - This is the broadest high-severity recurring language-discipline problem found so far.
@@ -31,7 +32,7 @@
 
 ### 2. `repo-ai-standards-missing`
 - Severity: medium
-- Recurrence: 7 repos
+- Recurrence: 8 repos
 - Affected:
   - `binder`
   - `dictator`
@@ -39,6 +40,7 @@
   - `fauxzilla`
   - `hegelizer`
   - `mecha`
+  - `organizer`
   - `simplerchat`
 - Why it ranks near the top:
   - This is currently the broadest recurring documentation/governance gap.
@@ -147,11 +149,12 @@
 
 ### 14. `language-exception-undocumented`
 - Severity: medium
-- Recurrence: 4 repos
+- Recurrence: 5 repos
 - Affected:
   - `bellheim`
   - `counterspell`
   - `fauxzilla`
+  - `organizer`
   - `simplerchat`
 - Batch fix direction:
   - enumerate all non-shell boundaries in local standards notes
@@ -210,9 +213,15 @@
 - Affected:
   - `wizardry-desktop`
 
+### 25. `generated-staging-not-disposable`
+- Affected:
+  - `organizer`
+- Fix direction:
+  - keep generated native staging trees disposable and rerender-safe even after ordinary local build artifacts appear
+
 ## Low-Severity Recurring Categories
 
-### 25. `theme-picker-not-alphabetized`
+### 26. `theme-picker-not-alphabetized`
 - Severity: low
 - Recurrence: 3 app surfaces
 - Affected:
