@@ -9,7 +9,7 @@
 
 ### Storage And State
 - Most Wizardry apps should store their primary durable app data under `~/<appname>`, with alternate standard-folder layouts treated as explicit exceptions rather than defaults.
-- If an app does use standard folders such as XDG config/state, prefer app-owned roots like `${XDG_CONFIG_HOME:-$HOME/.config}/<appname>` rather than shared cross-app namespace paths such as `wizardry-apps/<appname>`.
+- If an app does use standard folders such as XDG config/state or macOS Application Support, prefer app-owned roots like `${XDG_CONFIG_HOME:-$HOME/.config}/<appname>` or `Application Support/<appname>` rather than shared cross-app namespace paths such as `wizardry-apps/<appname>`.
 - Durable app data should stay plain-text by default.
 - YAML plus Markdown-oriented text should be the preferred format family for user-facing durable files and human-edited project contracts.
 - JSON is acceptable for app-facing machine state, typed envelopes, caches, and ABI contracts whose primary consumer is the app rather than the user.
@@ -22,6 +22,7 @@
 
 ### Tests And Auditability
 - Wizardry-family test entrypoints should live under `.tests/`.
+- For native apps, IR/schema validation alone should not count as sufficient GUI coverage; add a `.tests/` UI/static regression surface for the shipped native shell or generated output.
 - Existing audit surfaces should be treated as active contracts and must be refreshed when they become stale; stale audit tables are a standards violation, not harmless historical clutter.
 - Approved exceptions should be documented in repo-local AI-facing docs where the next auditor will actually look.
 - AI-facing standards docs should not contain contradictory approved patterns; one canonical pattern should win.

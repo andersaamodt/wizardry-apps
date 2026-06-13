@@ -14,9 +14,10 @@
 
 ### 1. `python-exception-undocumented`
 - Severity: high
-- Recurrence: 7 repos
+- Recurrence: 8 repos
 - Affected:
   - `binder`
+  - `book-club`
   - `counterspell`
   - `dictator`
   - `fauxzilla`
@@ -33,8 +34,9 @@
 
 ### 2. `repo-ai-standards-missing`
 - Severity: medium
-- Recurrence: 10 repos
+- Recurrence: 11 repos
 - Affected:
+  - `applegate`
   - `binder`
   - `dictator`
   - `eye`
@@ -90,8 +92,9 @@
 
 ### 6. `ui-static-tests-missing`
 - Severity: high
-- Recurrence: 2 repos
+- Recurrence: 3 repos
 - Affected:
+  - `applegate`
   - `chatroom`
   - `eye`
 - Why it ranks high:
@@ -136,9 +139,10 @@
 
 ### 12. `language-exception-undocumented`
 - Severity: medium
-- Recurrence: 7 repos
+- Recurrence: 8 repos
 - Affected:
   - `bellheim`
+  - `book-club`
   - `counterspell`
   - `fauxzilla`
   - `matchbook`
@@ -162,8 +166,9 @@
 
 ### 14. `shared-xdg-app-namespace`
 - Severity: medium
-- Recurrence: 4 repos
+- Recurrence: 5 repos
 - Affected:
+  - `book-club`
   - `counterspell`
   - `hegelizer`
   - `mecha`
@@ -184,8 +189,9 @@
 
 ### 16. `user-facing-config-not-yaml-md`
 - Severity: medium
-- Recurrence: 5 repos
+- Recurrence: 6 repos
 - Affected:
+  - `applegate`
   - `bellheim`
   - `counterspell`
   - `fauxzilla`

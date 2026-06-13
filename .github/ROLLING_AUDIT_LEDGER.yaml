@@ -41,13 +41,14 @@ categories:
       - Storage And State Discipline
     default_severity: medium
     affected_apps:
+      - book-club
       - counterspell
       - hegelizer
       - mecha
       - pieplate
     approved_exceptions: []
     evidence_refs: []
-    fix_strategy: Prefer app-owned roots such as ~/.appname or app-specific XDG directories over shared wizardry-apps namespace paths.
+    fix_strategy: Prefer app-owned roots such as ~/.appname or app-specific standard-folder directories over shared wizardry-apps namespace paths.
 
   - id: plain-text-durable-state-violated
     title: Durable app state is not stored as plain text without justification
@@ -78,6 +79,7 @@ categories:
       - Storage And State Discipline
     default_severity: medium
     affected_apps:
+      - applegate
       - bellheim
       - counterspell
       - fauxzilla
@@ -107,6 +109,7 @@ categories:
     default_severity: medium
     affected_apps:
       - bellheim
+      - book-club
       - counterspell
       - fauxzilla
       - matchbook
@@ -171,6 +174,7 @@ categories:
     default_severity: high
     affected_apps:
       - binder
+      - book-club
       - counterspell
       - dictator
       - fauxzilla
@@ -304,6 +308,7 @@ categories:
       - Testing And Release Readiness
     default_severity: high
     affected_apps:
+      - applegate
       - chatroom
       - eye
     approved_exceptions: []
@@ -316,6 +321,7 @@ categories:
       - Documentation And Auditability
     default_severity: medium
     affected_apps:
+      - applegate
       - binder
       - dictator
       - eye

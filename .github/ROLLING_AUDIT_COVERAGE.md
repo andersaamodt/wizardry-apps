@@ -17,8 +17,10 @@
 - `chatroom`
 
 ### App Repos Audited
+- `applegate`
 - `bellheim`
 - `binder`
+- `book-club`
 - `counterspell`
 - `dictator`
 - `eye`
@@ -31,8 +33,10 @@
 - `simplerchat`
 
 ## In Progress Branches
+- `applegate`: `codex/audit-applegate-round1`
 - `bellheim`: `codex/audit-bellheim-round1`
 - `binder`: `codex/audit-binder-round1`
+- `book-club`: `codex/audit-book-club-round1`
 - `counterspell`: `codex/audit-counterspell-round1`
 - `dictator`: `codex/audit-dictator-round1`
 - `eye`: `codex/audit-eye-round1`
@@ -48,8 +52,7 @@
 - `wizardry`: `codex/audit-wizardry-round1`
 
 ## Likely Remaining Candidates
-- `applegate`
-- `book-club`
+- none currently
 
 ## Deferred For Worktree Safety Or Scope Triage
 - `stellar`
