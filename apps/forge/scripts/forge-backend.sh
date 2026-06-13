@@ -6324,15 +6324,44 @@ build_native_mobile_workspace_target() {
 
   case "$target" in
     android)
-      require_tool gradle
-      require_tool java
       project_dir="$workspace_path/generated/mobile/android"
       [ -f "$project_dir/settings.gradle" ] || { printf '%s\n' "forge-backend: native Android project is missing settings.gradle: $project_dir" >&2; exit 1; }
       out_dir="$(forge_workbench_root "$root")/dist/native-mobile/$workspace_slug/android"
       mkdir -p "$out_dir"
+      if ! command -v gradle >/dev/null 2>&1; then
+        printf 'status=prepared\n'
+        printf 'target=android\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'missing_tool=%s\n' "gradle"
+        printf 'message=%s\n' "Android project generated. Install Gradle or add a Gradle wrapper to produce APK/AAB artifacts."
+        return 0
+      fi
+      if ! command -v java >/dev/null 2>&1; then
+        printf 'status=prepared\n'
+        printf 'target=android\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'missing_tool=%s\n' "java"
+        printf 'message=%s\n' "Android project generated. Install a Java runtime to produce APK/AAB artifacts."
+        return 0
+      fi
       task="assembleDebug"
       [ "$mode" = "release" ] && task="bundleRelease"
-      gradle -p "$project_dir" ":app:$task"
+      build_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-android-build.log"
+      mkdir -p "$(dirname "$build_log")"
+      if ! gradle -p "$project_dir" ":app:$task" >"$build_log" 2>&1; then
+        printf 'status=prepared\n'
+        printf 'target=android\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'log=%s\n' "$build_log"
+        printf 'message=%s\n' "Android project generated. Complete the Android Gradle/SDK setup to produce APK/AAB artifacts."
+        return 0
+      fi
       if [ "$mode" = "release" ]; then
         artifact=$(find "$project_dir/app/build/outputs/bundle/release" -type f -name '*.aab' | head -n 1)
         [ -n "$artifact" ] || { printf '%s\n' "forge-backend: Android release AAB not found" >&2; exit 1; }
@@ -6352,11 +6381,40 @@ build_native_mobile_workspace_target() {
       ;;
     ios)
       [ "$(os_id)" = "darwin" ] || { printf '%s\n' "forge-backend: native iOS builds are supported on macOS only" >&2; exit 1; }
-      require_tool xcodegen
-      require_tool xcodebuild
       project_dir="$workspace_path/generated/mobile/ios"
       [ -f "$project_dir/project.yml" ] || { printf '%s\n' "forge-backend: native iOS project is missing project.yml: $project_dir" >&2; exit 1; }
-      ( cd "$project_dir" && xcodegen generate >/dev/null && xcodebuild -scheme "$app_id" -destination 'generic/platform=iOS Simulator' build >/dev/null )
+      if ! command -v xcodegen >/dev/null 2>&1; then
+        printf 'status=prepared\n'
+        printf 'target=ios\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'missing_tool=%s\n' "xcodegen"
+        printf 'message=%s\n' "iOS project generated. Install XcodeGen to produce an Xcode project and simulator build."
+        return 0
+      fi
+      if ! command -v xcodebuild >/dev/null 2>&1; then
+        printf 'status=prepared\n'
+        printf 'target=ios\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'missing_tool=%s\n' "xcodebuild"
+        printf 'message=%s\n' "iOS project generated. Install full Xcode to produce simulator builds."
+        return 0
+      fi
+      build_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-ios-build.log"
+      mkdir -p "$(dirname "$build_log")"
+      if ! ( cd "$project_dir" && xcodegen generate >/dev/null && xcodebuild -scheme "$app_id" -destination 'generic/platform=iOS Simulator' build >"$build_log" 2>&1 ); then
+        printf 'status=prepared\n'
+        printf 'target=ios\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'log=%s\n' "$build_log"
+        printf 'message=%s\n' "iOS project generated. Full Xcode may be required to produce simulator builds."
+        return 0
+      fi
       printf 'status=ok\n'
       printf 'target=ios\n'
       printf 'mode=%s\n' "$mode"
