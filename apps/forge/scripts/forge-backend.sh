@@ -6510,6 +6510,11 @@ build_native_workspace_host() {
       mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources"
       cp "$built_exec" "$staged_bundle/Contents/MacOS/$app_id"
       chmod +x "$staged_bundle/Contents/MacOS/$app_id"
+      built_exec_dir=$(dirname "$built_exec")
+      for resource_bundle in "$built_exec_dir"/*.bundle; do
+        [ -d "$resource_bundle" ] || continue
+        cp -R "$resource_bundle" "$staged_bundle/Contents/Resources/"
+      done
 
       icon_source=$(workspace_native_bundle_icon_path "$workspace_path" || true)
       icon_source_format=''
