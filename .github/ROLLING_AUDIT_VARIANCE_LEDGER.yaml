@@ -141,11 +141,11 @@ variance_items:
         - chatroom
         - counterspell
         - forge
-        - pleroma
-        - wizardry-desktop
-      explicit_backend_actions:
         - matchbook
+        - pleroma
         - simplerchat
+        - wizardry-desktop
+      explicit_backend_actions: []
     phronesis_candidate: true
 
   - id: native-backend-resolution-contract

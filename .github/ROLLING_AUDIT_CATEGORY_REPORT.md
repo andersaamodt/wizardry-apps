@@ -273,14 +273,16 @@
 
 ### 26. `frontend-derived-backend-path`
 - Severity: medium
-- Recurrence: 7 app surfaces
+- Recurrence: 9 app surfaces
 - Affected:
   - `bellheim`
   - `boycott`
   - `chatroom`
   - `counterspell`
   - `forge`
+  - `matchbook`
   - `pleroma`
+  - `simplerchat`
   - `wizardry-desktop`
 - Fix direction:
   - move backend path resolution into the host or backend contract and expose explicit actions only

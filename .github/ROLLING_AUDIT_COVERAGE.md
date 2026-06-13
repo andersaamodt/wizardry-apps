@@ -12,6 +12,7 @@
 - late round-1 criterion back-application checklist started
 - built-in Wizardry Apps surfaces checked for backend path derivation, shell-fragment fallback, and Cargo runtime layers
 - first earlier app batch checked for backend path derivation and Cargo runtime layers: `bellheim`, `binder`, `dictator`, `counterspell`, `fauxzilla`
+- clean/reference-like app batch checked for backend path derivation and Cargo runtime layers: `matchbook`, `book-club`, `organizer`, `simplerchat`
 - no app code remediation has started
 
 ### Core And Shared
