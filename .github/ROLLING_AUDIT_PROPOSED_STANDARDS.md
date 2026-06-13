@@ -34,6 +34,7 @@
 - GNU-specific tool behavior should not be relied on silently in shell-first repos; if a GNU dependency is real, document it and test it, otherwise replace it with a POSIX-safe path.
 
 ### Themes And GUI
+- If an app intentionally uses an app-local theme system instead of the shared Wizardry themes, document that choice explicitly so audits know whether to apply the shared-theme contract or an app-local design contract.
 - Apps that use Wizardry themes should discover the real shared Wizardry theme set rather than keep app-local hardcoded theme catalogs.
 - Theme lists should be alphabetized consistently at the contract source.
 - When a focused theme picker is closed, up/down arrow keys should still cycle themes correctly.

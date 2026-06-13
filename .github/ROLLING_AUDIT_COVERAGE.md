@@ -24,6 +24,7 @@
 - `eye`
 - `fauxzilla`
 - `hegelizer`
+- `matchbook`
 - `mecha`
 - `organizer`
 - `pieplate`
@@ -37,6 +38,7 @@
 - `eye`: `codex/audit-eye-round1`
 - `fauxzilla`: `codex/audit-fauxzilla-round1`
 - `hegelizer`: `codex/audit-hegelizer-round1`
+- `matchbook`: `codex/audit-matchbook-round1`
 - `mecha`: `codex/audit-mecha-round1`
 - `organizer`: `codex/audit-organizer-round1`
 - `pieplate`: `codex/audit-pieplate-round1`
@@ -48,7 +50,6 @@
 ## Likely Remaining Candidates
 - `applegate`
 - `book-club`
-- `matchbook`
 
 ## Deferred For Worktree Safety Or Scope Triage
 - `stellar`

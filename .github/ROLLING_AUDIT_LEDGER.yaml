@@ -81,6 +81,7 @@ categories:
       - bellheim
       - counterspell
       - fauxzilla
+      - matchbook
       - pieplate
     approved_exceptions: []
     evidence_refs: []
@@ -108,6 +109,7 @@ categories:
       - bellheim
       - counterspell
       - fauxzilla
+      - matchbook
       - organizer
       - pieplate
       - simplerchat
@@ -319,6 +321,7 @@ categories:
       - eye
       - fauxzilla
       - hegelizer
+      - matchbook
       - mecha
       - organizer
       - pieplate

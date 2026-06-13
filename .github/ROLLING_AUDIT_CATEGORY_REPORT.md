@@ -33,13 +33,14 @@
 
 ### 2. `repo-ai-standards-missing`
 - Severity: medium
-- Recurrence: 9 repos
+- Recurrence: 10 repos
 - Affected:
   - `binder`
   - `dictator`
   - `eye`
   - `fauxzilla`
   - `hegelizer`
+  - `matchbook`
   - `mecha`
   - `organizer`
   - `pieplate`
@@ -135,11 +136,12 @@
 
 ### 12. `language-exception-undocumented`
 - Severity: medium
-- Recurrence: 6 repos
+- Recurrence: 7 repos
 - Affected:
   - `bellheim`
   - `counterspell`
   - `fauxzilla`
+  - `matchbook`
   - `organizer`
   - `pieplate`
   - `simplerchat`
@@ -182,11 +184,12 @@
 
 ### 16. `user-facing-config-not-yaml-md`
 - Severity: medium
-- Recurrence: 4 repos
+- Recurrence: 5 repos
 - Affected:
   - `bellheim`
   - `counterspell`
   - `fauxzilla`
+  - `matchbook`
   - `pieplate`
 - Batch fix direction:
   - convert user-facing durable config toward YAML-plus-Markdown or explicitly justify non-YAML text
