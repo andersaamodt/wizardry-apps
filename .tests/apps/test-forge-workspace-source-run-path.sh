@@ -109,7 +109,7 @@ entry=$(
   ' "$bundle/Contents/Info.plist"
 )
 [ -n "${WIZARDRY_FAKE_HOST_LOG:-}" ] && printf 'open-launch bundle=%s launcher=%s entry=%s\n' "$bundle" "$launcher" "$entry" >>"$WIZARDRY_FAKE_HOST_LOG"
-nohup "$launcher" "$entry" "$@" >/dev/null 2>&1 &
+nohup sh "$launcher" "$entry" "$@" >/dev/null 2>&1 &
 exit 0
 SH
 chmod +x "$fake_bin/open"
