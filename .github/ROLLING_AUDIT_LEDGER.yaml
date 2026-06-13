@@ -145,6 +145,35 @@ categories:
     evidence_refs: []
     fix_strategy: Move generated runtime-state defaults to explicit user-local state roots outside the checkout.
 
+  - id: tracked-repo-cruft-placeholder
+    title: Repo tracks disposable cruft placeholders such as empty log files
+    policy_axes:
+      - Storage And State Discipline
+      - Testing And Release Readiness
+    default_severity: medium
+    affected_apps:
+      - boycott
+      - mecha
+      - pieplate
+      - pleroma
+      - serenity
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Remove tracked placeholders and ensure runtime/log paths are created outside source checkouts or only as ignored local files when absolutely necessary.
+
+  - id: disposable-output-in-checkout
+    title: Disposable build or dependency output is present in source checkout
+    policy_axes:
+      - Storage And State Discipline
+      - Testing And Release Readiness
+    default_severity: medium
+    affected_apps:
+      - matchbook
+      - pleroma
+    approved_exceptions: []
+    evidence_refs: []
+    fix_strategy: Move dependency caches, build outputs, and package staging to temp, cache, or explicit external build roots; clean existing ignored outputs before release.
+
   - id: standards-guidance-contradictory
     title: AI-facing standards docs contradict each other on the approved pattern
     policy_axes:

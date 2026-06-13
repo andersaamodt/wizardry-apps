@@ -291,12 +291,60 @@ variance_items:
   - id: repo-cruft-and-build-output-placement
     title: Apps may vary in where build artifacts, caches, scratch workspaces, and generated outputs are written
     status: standard-proposed
+    observed_patterns:
+      - no_tracked_suspicious_output_found
+      - tracked_log_placeholder
+      - ignored_local_log_cruft
+      - ignored_dependency_cache_in_checkout
+      - ignored_build_or_dist_output_in_checkout
+      - command_named_build_not_artifact
     candidate_standard: >
       Source repos should not receive disposable build artifacts, package
       outputs, caches, compiled helper outputs, scratch workspaces, runtime
       logs, or app-instance state. Use temp, XDG cache/state, or an explicit
       external build root unless the file is a deliberate checked-in fixture.
     affected_examples:
-      current_state:
-        - not yet audited in pass 2
+      no_tracked_suspicious_output_found:
+        - applegate
+        - bellheim
+        - binder
+        - book-club
+        - counterspell
+        - dictator
+        - eye
+        - fauxzilla
+        - hegelizer
+        - matchbook
+        - organizer
+        - simplerchat
+        - stellar
+        - theurgy
+      tracked_log_placeholder:
+        - boycott
+        - mecha
+        - pieplate
+        - pleroma
+        - serenity
+      ignored_local_log_cruft:
+        - applegate
+        - bellheim
+        - binder
+        - book-club
+        - counterspell
+        - eye
+        - fauxzilla
+        - hegelizer
+        - matchbook
+        - mecha
+        - organizer
+        - simplerchat
+        - stellar
+        - theurgy
+        - wizardry-apps
+      ignored_dependency_cache_in_checkout:
+        - matchbook
+      ignored_build_or_dist_output_in_checkout:
+        - pleroma
+      command_named_build_not_artifact:
+        - wizardry-apps
     phronesis_candidate: true

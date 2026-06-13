@@ -241,7 +241,30 @@
 - Batch fix direction:
   - if XDG roots remain, move them to app-owned names rather than `wizardry-apps/...` or `wizardry/...`
 
-### 16. `theme-catalog-hardcoded`
+### 16. `tracked-repo-cruft-placeholder`
+- Severity: medium
+- Recurrence: 5 repos
+- Affected:
+  - `boycott`
+  - `mecha`
+  - `pieplate`
+  - `pleroma`
+  - `serenity`
+- Batch fix direction:
+  - remove tracked empty `.log` placeholders
+  - use the phronesis canonical `.gitignore` and create runtime/log paths outside source checkouts
+
+### 17. `disposable-output-in-checkout`
+- Severity: medium
+- Recurrence: 2 repos
+- Affected:
+  - `matchbook`
+  - `pleroma`
+- Batch fix direction:
+  - move dependency caches and build/dist outputs to temp, cache, or explicit external build roots
+  - clean existing ignored output directories before release
+
+### 18. `theme-catalog-hardcoded`
 - Severity: medium
 - Recurrence: 6 app surfaces
 - Affected:
@@ -254,7 +277,7 @@
 - Batch fix direction:
   - remove app-local theme catalogs and derive from the authoritative shared theme set
 
-### 17. `user-facing-config-not-yaml-md`
+### 19. `user-facing-config-not-yaml-md`
 - Severity: medium
 - Recurrence: 8 repos
 - Affected:
@@ -271,47 +294,47 @@
 
 ## Medium-Severity Single-Repo Categories
 
-### 18. `human-contract-format-not-yaml-md`
+### 20. `human-contract-format-not-yaml-md`
 - Affected:
   - `theurgy`
 
-### 19. `generated-native-theme-catalog-hardcoded`
+### 21. `generated-native-theme-catalog-hardcoded`
 - Affected:
   - `binder`
 - Fix direction:
   - make every generated native platform target consume the same discovered shared Wizardry theme catalog instead of embedding static platform-specific theme option lists
 
-### 20. `tests-not-under-dot-tests`
+### 22. `tests-not-under-dot-tests`
 - Affected:
   - `dictator`
   - `hegelizer`
   - `pleroma`
 
-### 21. `config-example-stale`
+### 23. `config-example-stale`
 - Affected:
   - `fauxzilla`
 
-### 22. `frontend-machine-state-scraping`
+### 24. `frontend-machine-state-scraping`
 - Affected:
   - `chatroom`
 
-### 23. `inline-guided-fallback-missing`
+### 25. `inline-guided-fallback-missing`
 - Affected:
   - `chatroom`
 
-### 24. `audit-surface-stale`
+### 26. `audit-surface-stale`
 - Affected:
   - `wizardry`
 
-### 25. `gnu-tool-dependency-undocumented`
+### 27. `gnu-tool-dependency-undocumented`
 - Affected:
   - `wizardry`
 
-### 26. `theme-picker-keyboard-broken`
+### 28. `theme-picker-keyboard-broken`
 - Affected:
   - `wizardry-desktop`
 
-### 27. `frontend-derived-backend-path`
+### 29. `frontend-derived-backend-path`
 - Severity: medium
 - Recurrence: 12 app surfaces
 - Affected:
@@ -330,13 +353,13 @@
 - Fix direction:
   - move backend path resolution into the host or backend contract and expose explicit actions only
 
-### 28. `generated-staging-not-disposable`
+### 30. `generated-staging-not-disposable`
 - Affected:
   - `organizer`
 - Fix direction:
   - keep generated native staging trees disposable and rerender-safe even after ordinary local build artifacts appear
 
-### 29. `cargo-runtime-layer-present`
+### 31. `cargo-runtime-layer-present`
 - Severity: high
 - Recurrence: 1 repo
 - Affected:
@@ -344,7 +367,7 @@
 - Batch fix direction:
   - remove Cargo from ordinary shipped runtime paths or move the helper into an explicitly approved host or Theurgy boundary
 
-### 30. `bridge-shell-fragment-execution`
+### 32. `bridge-shell-fragment-execution`
 - Severity: high
 - Recurrence: 3 app surfaces
 - Affected:
@@ -356,7 +379,7 @@
 
 ## Low-Severity Recurring Categories
 
-### 31. `theme-picker-not-alphabetized`
+### 33. `theme-picker-not-alphabetized`
 - Severity: low
 - Recurrence: 4 app surfaces
 - Affected:
@@ -382,12 +405,14 @@
 7. `language-exception-undocumented`
 8. `storage-exception-undocumented`
 9. `shared-xdg-app-namespace`
-10. `ui-static-tests-missing`
-11. `backend-contract-tests-missing`
-12. `user-facing-config-not-yaml-md`
-13. `theme-catalog-hardcoded`
-14. `tests-not-under-dot-tests`
-15. high-severity single-repo categories after the broad recurring classes are under control
+10. `tracked-repo-cruft-placeholder`
+11. `ui-static-tests-missing`
+12. `backend-contract-tests-missing`
+13. `user-facing-config-not-yaml-md`
+14. `theme-catalog-hardcoded`
+15. `disposable-output-in-checkout`
+16. `tests-not-under-dot-tests`
+17. high-severity single-repo categories after the broad recurring classes are under control
 
 ## Notes For The Fix-It Phase
 - Some categories overlap deliberately. For example:

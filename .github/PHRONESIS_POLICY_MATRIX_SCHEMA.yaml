@@ -224,7 +224,10 @@ policy_groups:
       default_status_for_new_apps: pass
       default_severity: high
       enforcement_layer: release-tooling
-      source: /Users/andersaamodt/.wizardry/.github/CODEX.md
+      source: /Users/andersaamodt/git/phronesis/standards/repo-hygiene/wizardry-general.gitignore
+      related_categories:
+        - tracked-repo-cruft-placeholder
+        - disposable-output-in-checkout
 
 app_record_template:
   app: example-app

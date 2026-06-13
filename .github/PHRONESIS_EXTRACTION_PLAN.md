@@ -11,6 +11,13 @@
 - `wizardry-apps` owns Forge, templates, app hosts, app bridges, app build/release machinery, and app-specific audit evidence.
 - `theurgy` owns native runtime generation, native boundary contracts, platform output, and higher-runtime fan-out.
 
+## Repository Status
+- GitHub: `git@github.com:andersaamodt/phronesis.git`
+- Local seed: `/Users/andersaamodt/git/phronesis`
+- Initial seed pushed: 2026-06-13
+- License: Open Wizardry License 3.1
+- First canonical ideal document: `/Users/andersaamodt/git/phronesis/standards/repo-hygiene/wizardry-general.gitignore`
+
 ## Founding Principle
 - Treat unreasoned app-to-app variance as standards debt.
 - Every meaningful difference between apps should be one of:
@@ -69,7 +76,7 @@
   - extract: language authorization boundary, adversarial testing posture, repo hygiene, no contradiction rule
   - leave local: spell layout, POSIX sh templates, imps, and terminal-specific testing commands
 - `.github/PUSH_READY_CHECKLIST.md`
-  - extract: general push-ready hygiene, no repo-local runtime state, generated-artifact policy
+  - extract: general push-ready hygiene, no repo-local runtime state, generated-artifact policy, comprehensive `.gitignore` wisdom
   - leave local: Wizardry-specific release and spell readiness details
 - `.github/PACT_LANGUAGE.md`
   - extract only if pact vocabulary becomes ecosystem-wide policy
@@ -104,6 +111,7 @@
 - `runtime.no-cargo-on-demand`: shipped backend paths do not compile Cargo-managed helpers on demand.
 - `docs.local-exceptions`: each repo keeps local AI-facing docs for its own exceptions and boundaries.
 - `docs.exception-ledger-shape`: local AI docs must enumerate storage, language, theme, runtime, test, release, generated-output, and repo-cruft boundaries in a predictable shape.
+- `repo.no-disposable-cruft`: source repos do not receive tracked placeholders, logs, caches, build products, package outputs, or app-instance state.
 
 ## First Template To Seed
 - Repo-local `AI_DOCS.md` should start with upstream standards imports.

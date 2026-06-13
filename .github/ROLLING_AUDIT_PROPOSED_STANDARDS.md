@@ -18,6 +18,8 @@
 - Browser or WebView local storage should not hold durable authentication secrets, pairing secrets, or account-recovery material as the canonical contract.
 - Repo checkouts should never become app-instance state directories. User settings, runtime logs, temp homes, browser profiles, caches, and similar operator-local cruft should live outside the checkout.
 - Build artifacts, generated release products, scratch workspaces, package-manager caches, compiled helper outputs, and other disposable cruft should not be created inside app source repos unless they are deliberate checked-in fixtures; use temp, XDG cache/state, or another explicit external build root.
+- Empty placeholder logs such as tracked `.log` files are repo cruft, not source; remove them and let runtime tooling create external log/state paths as needed.
+- `phronesis` should own canonical ideal documents such as the comprehensive Wizardry-family `.gitignore`, so implementation repos can import painful learned defaults instead of rediscovering them.
 - Generated project defaults should not normalize repo-local runtime-state directories inside new source trees.
 - Generated staging trees for native or web build pipelines should remain disposable and rerender-safe even after normal local tool artifacts appear inside them.
 
