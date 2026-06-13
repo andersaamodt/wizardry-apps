@@ -37,6 +37,7 @@
 - If a native port reuses another app's runtime or storage roots, that should be documented as an explicit exception rather than presented as ordinary layout.
 - GNU-specific tool behavior should not be relied on silently in shell-first repos; if a GNU dependency is real, document it and test it, otherwise replace it with a POSIX-safe path.
 - Frontends should never derive backend executable paths from `window.location`, served-document paths, or other frontend-owned filesystem guesses; backend resolution belongs to the host or backend contract.
+- Native or generated app shells may resolve packaged backend resources only inside the approved host/native boundary; development fallback paths and environment overrides should be documented and tested as native-boundary exceptions.
 - Shipped app runtime paths should not compile Cargo-managed helpers on demand; retained Rust helpers should live behind an explicitly approved packaged host or Theurgy boundary instead of ordinary repo-owned backend execution.
 
 ### Themes And GUI

@@ -319,8 +319,10 @@ categories:
       - Execution And Security Boundary
     default_severity: medium
     affected_apps:
+      - bellheim
       - boycott
       - chatroom
+      - counterspell
       - forge
       - pleroma
       - wizardry-desktop

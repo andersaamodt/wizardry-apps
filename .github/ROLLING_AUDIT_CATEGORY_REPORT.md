@@ -273,10 +273,12 @@
 
 ### 26. `frontend-derived-backend-path`
 - Severity: medium
-- Recurrence: 5 app surfaces
+- Recurrence: 7 app surfaces
 - Affected:
+  - `bellheim`
   - `boycott`
   - `chatroom`
+  - `counterspell`
   - `forge`
   - `pleroma`
   - `wizardry-desktop`

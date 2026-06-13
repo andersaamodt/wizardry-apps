@@ -136,14 +136,34 @@ variance_items:
       from served document locations.
     affected_examples:
       frontend_derived_paths:
+        - bellheim
         - boycott
         - chatroom
+        - counterspell
         - forge
         - pleroma
         - wizardry-desktop
       explicit_backend_actions:
         - matchbook
         - simplerchat
+    phronesis_candidate: true
+
+  - id: native-backend-resolution-contract
+    title: Native/generated apps vary in whether backend path resolution is host-owned, generated, or environment-overridden
+    status: pending-decision
+    candidate_standard: >
+      Native and generated app shells may know their packaged backend resource
+      path only inside the generated host boundary. Development fallback paths
+      and environment overrides should be documented as native-boundary
+      exceptions and tested separately from frontend bridge contracts.
+    affected_examples:
+      generated_native_backend_path:
+        - dictator
+      needs_more_classification:
+        - applegate
+        - binder
+        - book-club
+        - stellar
     phronesis_candidate: true
 
   - id: non_shell_runtime_boundary

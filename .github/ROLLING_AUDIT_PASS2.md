@@ -45,6 +45,15 @@
   - `stellar`
   - `wizardry-desktop`
   - `chatroom`
+- Checked so far:
+  - `forge`: fail
+  - `wizardry-desktop`: fail
+  - `chatroom`: fail
+  - `bellheim`: fail
+  - `binder`: no frontend-derived backend path found in focused scan
+  - `dictator`: native-generated backend path variance, not this frontend category
+  - `counterspell`: fail
+  - `fauxzilla`: no frontend-derived backend execution found in focused scan
 
 ### `cargo-runtime-layer-present`
 - Late criterion source:
@@ -53,6 +62,9 @@
   - Shipped app runtime paths should not compile Cargo-managed helpers on demand.
 - Needs re-check:
   - all repos with `Cargo.toml`, generated native helpers, or runtime toolchain probing
+- Checked so far:
+  - built-in `forge`, `wizardry-desktop`, and `chatroom`: no Cargo-managed shipped runtime layer found
+  - `bellheim`, `binder`, `dictator`, `counterspell`, and `fauxzilla`: no Cargo-managed shipped runtime layer found in focused scan
 
 ### `app-local-theme-system-documented`
 - Late criterion source:
