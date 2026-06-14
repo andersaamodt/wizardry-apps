@@ -2253,6 +2253,19 @@ canonical_dir_path() {
   (CDPATH= cd -- "$canonical_dir" && pwd -P)
 }
 
+normalize_macos_apps_install_dir() {
+  dir_path=${1-}
+  [ -n "$dir_path" ] || return 1
+  reject_line_breaks "$dir_path" "macOS apps install folder"
+  case "$dir_path" in
+    /*)
+      printf '%s\n' "$(printf '%s' "$dir_path" | sed 's#/*$##')"
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 macos_user_app_install_path() {
   macos_user_app_name=${1-}
   [ -n "$macos_user_app_name" ] || return 1
@@ -2270,6 +2283,12 @@ macos_system_app_install_path() {
 preferred_macos_app_install_path() {
   preferred_macos_app_name=${1-}
   [ -n "$preferred_macos_app_name" ] || return 1
+
+  preferred_pref_dir=$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)
+  if normalized_pref_dir=$(normalize_macos_apps_install_dir "$preferred_pref_dir" 2>/dev/null); then
+    printf '%s/%s.app\n' "$normalized_pref_dir" "$preferred_macos_app_name"
+    return 0
+  fi
 
   preferred_user_bundle=$(macos_user_app_install_path "$preferred_macos_app_name") || return 1
   preferred_system_bundle=$(macos_system_app_install_path "$preferred_macos_app_name") || return 1
@@ -3518,6 +3537,22 @@ forge_ui_prefs_file() {
   base="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps"
   mkdir -p "$base"
   printf '%s\n' "$base/forge-ui.conf"
+}
+
+forge_ui_pref_value() {
+  pref_key=${1-}
+  prefs_file=$(forge_ui_prefs_file)
+  [ -n "$pref_key" ] || return 1
+  [ -f "$prefs_file" ] || return 0
+  while IFS= read -r pref_line || [ -n "$pref_line" ]; do
+    case "$pref_line" in
+      "$pref_key"=*)
+        printf '%s\n' "${pref_line#*=}"
+        return 0
+        ;;
+    esac
+  done <"$prefs_file"
+  return 0
 }
 
 forge_hidden_workspaces_file() {
