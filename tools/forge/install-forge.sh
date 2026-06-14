@@ -100,6 +100,59 @@ desktop_generated_path_is_safe() {
   return 0
 }
 
+normalize_macos_apps_install_dir() {
+  dir_path=${1-}
+  [ -n "$dir_path" ] || return 1
+  has_line_break "$dir_path" && return 1
+  case "$dir_path" in
+    /*)
+      printf '%s\n' "$(printf '%s' "$dir_path" | sed 's#/*$##')"
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+forge_ui_prefs_file() {
+  printf '%s\n' "${XDG_CONFIG_HOME:-$home_dir/.config}/wizardry-apps/forge-ui.conf"
+}
+
+forge_ui_pref_value() {
+  pref_key=${1-}
+  prefs_file=$(forge_ui_prefs_file)
+  [ -n "$pref_key" ] || return 1
+  [ -f "$prefs_file" ] || return 0
+  while IFS= read -r pref_line || [ -n "$pref_line" ]; do
+    case "$pref_line" in
+      "$pref_key"=*)
+        printf '%s\n' "${pref_line#*=}"
+        return 0
+        ;;
+    esac
+  done < "$prefs_file"
+  return 0
+}
+
+preferred_macos_apps_install_dir() {
+  pref_value=$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)
+  if normalized_pref=$(normalize_macos_apps_install_dir "$pref_value" 2>/dev/null); then
+    printf '%s\n' "$normalized_pref"
+    return 0
+  fi
+
+  if [ "${WIZARDRY_FORGE_PREFER_USER_APPLICATIONS-}" = "1" ]; then
+    printf '%s/Applications\n' "$home_dir"
+    return 0
+  fi
+
+  if [ -w /Applications ]; then
+    printf '%s\n' "/Applications"
+    return 0
+  fi
+
+  printf '%s/Applications\n' "$home_dir"
+}
+
 app_bundle_path_is_safe() {
   path_value=${1-}
   has_line_break "$path_value" && return 1
@@ -255,22 +308,11 @@ cleanup_alternate_macos_bundle() {
 
   system_bundle="/Applications/App Forge.app"
   user_bundle="$home_root/Applications/App Forge.app"
-  alternate_bundle=''
-  case "$target_bundle" in
-    "$system_bundle")
-      alternate_bundle=$user_bundle
-      ;;
-    "$user_bundle")
-      alternate_bundle=$system_bundle
-      ;;
-    *)
-      return 0
-      ;;
-  esac
-
-  [ -n "$alternate_bundle" ] || return 0
-  [ -e "$alternate_bundle" ] || return 0
-  rm -rf "$alternate_bundle" >/dev/null 2>&1 || true
+  for alternate_bundle in "$system_bundle" "$user_bundle"; do
+    [ "$alternate_bundle" = "$target_bundle" ] && continue
+    [ -e "$alternate_bundle" ] || continue
+    rm -rf "$alternate_bundle" >/dev/null 2>&1 || true
+  done
 }
 
 case "$os" in
@@ -289,10 +331,10 @@ case "$os" in
           target_app="$home_dir/Applications/App Forge.app"
           ;;
         auto)
-          if [ "$home_explicit" -eq 1 ]; then
+          if [ "$home_explicit" -eq 1 ] && [ -z "$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)" ]; then
             target_app="$home_dir/Applications/App Forge.app"
           else
-            target_app="/Applications/App Forge.app"
+            target_app="$(preferred_macos_apps_install_dir)/App Forge.app"
           fi
           ;;
       esac
