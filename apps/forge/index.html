@@ -46,11 +46,11 @@
           </article>
 
           <article class="card">
-            <h3>macOS App Install Folder</h3>
-            <p class="sub">Used for Install and self-restart on macOS. Leave blank to use Forge's default location policy.</p>
-            <label for="settings-macos-apps-dir">Desktop app bundle folder</label>
+            <h3>Desktop App Install Folder</h3>
+            <p class="sub">Default install folder for desktop app bundles. Forge uses this for installs and self-restart so desktop apps stay in one place.</p>
+            <label for="settings-macos-apps-dir">Desktop app install folder</label>
             <div class="input-row settings-save-row">
-              <input id="settings-macos-apps-dir" type="text" placeholder="/Applications or /Users/you/Applications" spellcheck="false">
+              <input id="settings-macos-apps-dir" type="text" placeholder="/Users/andersaamodt/Applications" spellcheck="false">
               <button id="apply-macos-apps-dir" type="button" class="action settings-save-btn">Save</button>
             </div>
           </article>
@@ -471,7 +471,7 @@
       var ACTIVE_MINI_TAB_KEY = 'wizardry.forge.active_mini_tab.v1';
       var MINI_TAB_ASSIGNMENTS_KEY = 'wizardry.forge.mini_tab_assignments.v1';
       var INSTALL_BEFORE_RUN_KEY = 'wizardry.forge.install_before_run.v1';
-      var MACOS_APPS_INSTALL_DIR_KEY = 'wizardry.forge.macos_apps_install_dir.v1';
+      var DESKTOP_APPS_INSTALL_DIR_KEY = 'wizardry.forge.desktop_apps_install_dir.v1';
       var INTERNAL_CATALOG_DRAG_TYPE = 'application/x-wizardry-forge-catalog-item';
       var INTERNAL_CATALOG_DRAG_PREFIX = 'wizardry-catalog-item:';
       var ASSET_VERSION = 'forge20260218a';
@@ -496,14 +496,14 @@
         'wizardry.forge.active_mini_tab.v1': 'active_mini_tab',
         'wizardry.forge.mini_tab_assignments.v1': 'mini_tab_assignments',
         'wizardry.forge.install_before_run.v1': 'install_before_run',
-        'wizardry.forge.macos_apps_install_dir.v1': 'macos_apps_install_dir'
+        'wizardry.forge.desktop_apps_install_dir.v1': 'desktop_apps_install_dir'
       };
 
       var state = {
         appDir: inferAppDir(),
         rootHint: '',
         projectsRoot: '',
-        macosAppsInstallDir: '',
+        desktopAppsInstallDir: '',
         homeDir: '',
         os: '',
         tools: {},
@@ -654,6 +654,10 @@
           }
           state.uiPrefs[prefKey] = String(prefs[prefKey] || '');
         });
+        if (!Object.prototype.hasOwnProperty.call(state.uiPrefs, 'desktop_apps_install_dir')
+            && Object.prototype.hasOwnProperty.call(prefs, 'macos_apps_install_dir')) {
+          state.uiPrefs.desktop_apps_install_dir = String(prefs.macos_apps_install_dir || '');
+        }
       }
 
       async function hydratePrefsFromBackend() {
@@ -692,7 +696,7 @@
             els.settingsProjectsRoot.value = state.projectsRoot;
           }
           if (els.settingsMacosAppsDir) {
-            els.settingsMacosAppsDir.value = state.macosAppsInstallDir;
+            els.settingsMacosAppsDir.value = state.desktopAppsInstallDir;
           }
           syncSettingsSaveButtons();
           renderCatalogList();
@@ -2222,11 +2226,11 @@
         syncSettingsSaveButtons();
       }
 
-      function setMacosAppsInstallDir(path) {
-        state.macosAppsInstallDir = path || '';
-        saveStorage(MACOS_APPS_INSTALL_DIR_KEY, state.macosAppsInstallDir);
+      function setDesktopAppsInstallDir(path) {
+        state.desktopAppsInstallDir = path || '';
+        saveStorage(DESKTOP_APPS_INSTALL_DIR_KEY, state.desktopAppsInstallDir);
         if (els.settingsMacosAppsDir) {
-          els.settingsMacosAppsDir.value = state.macosAppsInstallDir;
+          els.settingsMacosAppsDir.value = state.desktopAppsInstallDir;
         }
         syncSettingsSaveButtons();
       }
@@ -2341,6 +2345,17 @@
         syncStageActionVisibility(selected);
       }
 
+      function normalizeDesktopAppsInstallDir() {
+        if (state.desktopAppsInstallDir) {
+          return;
+        }
+        if (state.homeDir) {
+          setDesktopAppsInstallDir(state.homeDir + '/Applications');
+          return;
+        }
+        setDesktopAppsInstallDir('~/Applications');
+      }
+
       function normalizedSettingValue(value) {
         return String(value || '').trim();
       }
@@ -2361,7 +2376,7 @@
       function refreshStateFromStorage() {
         state.rootHint = loadStorage(ROOT_KEY);
         state.projectsRoot = loadStorage(PROJECTS_ROOT_KEY);
-        state.macosAppsInstallDir = loadStorage(MACOS_APPS_INSTALL_DIR_KEY);
+        state.desktopAppsInstallDir = loadStorage(DESKTOP_APPS_INSTALL_DIR_KEY);
         state.organizeShow = loadStorage(ORGANIZE_SHOW_KEY) || 'both';
         state.organizeSort = normalizeOrganizeSort(loadStorage(ORGANIZE_SORT_KEY) || 'alphabetical');
         state.organizeGitFilter = normalizeOrganizeGitFilter(loadStorage(ORGANIZE_GIT_FILTER_KEY) || 'all');
@@ -2557,7 +2572,7 @@
           els.applyProjectsRoot.disabled = !!state.busy || !projectsChanged;
         }
         if (els.applyMacosAppsDir && els.settingsMacosAppsDir) {
-          var macosAppsDirChanged = normalizedSettingValue(els.settingsMacosAppsDir.value) !== normalizedSettingValue(state.macosAppsInstallDir);
+          var macosAppsDirChanged = normalizedSettingValue(els.settingsMacosAppsDir.value) !== normalizedSettingValue(state.desktopAppsInstallDir);
           els.applyMacosAppsDir.disabled = !!state.busy || !macosAppsDirChanged;
         }
       }
@@ -5269,7 +5284,16 @@
       }
 
       function defaultInstallBeforeRunForSelected(selected) {
-        return !!(selected && selected.kind === 'builtin');
+        if (!selected) {
+          return false;
+        }
+        if (selected.kind === 'builtin') {
+          return true;
+        }
+        if (state.os === 'darwin' && selected.context === 'native-desktop') {
+          return true;
+        }
+        return false;
       }
 
       function effectiveInstallBeforeRunForSelected(selected) {
@@ -8514,6 +8538,8 @@
 
         normalizeProjectsRoot();
 
+        normalizeDesktopAppsInstallDir();
+
         var doctorLines = [
           'root: ' + (info.root || '(not found)'),
           'os: ' + (info.os || '?'),
@@ -8741,6 +8767,27 @@
           }
           var mobileTarget = defaultMobileRunTargetForSelected(selected);
           if (mobileTarget) {
+            if (selected.context === 'native-mobile' && mobileTarget === 'android') {
+              var mobileRun = await backend('run-native-mobile-workspace', [selected.path, 'android', 'debug']);
+              var mobileRunOut = kv(mobileRun.stdout || '');
+              setTargetRuntime(projectKey, 'android', 'running', mobileRunOut.artifact || mobileRunOut.project || '');
+              renderSelectedTargetsEditor(selectedCatalogItem());
+              renderResult({
+                status: 'ok',
+                summary: selected.title + ' built, installed, and launched on Android.',
+                paths: [
+                  mobileRunOut.artifact ? { label: 'Android APK', path: mobileRunOut.artifact, canReveal: true } : null,
+                  mobileRunOut.project ? { label: 'Generated project', path: mobileRunOut.project, canReveal: true } : null,
+                  mobileRunOut.log ? { label: 'Run log', path: mobileRunOut.log, canReveal: true } : null,
+                  mobileRunOut.build_log ? { label: 'Build log', path: mobileRunOut.build_log, canReveal: true } : null
+                ].filter(Boolean),
+                help: {
+                  title: 'Android run',
+                  body: 'Forge compiled a debug APK, installed it with adb, and opened the launcher activity.'
+                }
+              });
+              return;
+            }
             await runTargetAction(selected, mobileTarget);
             return;
           }
@@ -8799,15 +8846,14 @@
           var mode = kind === 'android' ? 'release' : 'debug';
           var mobile = await backend('build-native-mobile-workspace', [selected.path, kind, mode]);
           var mobileOut = kv(mobile.stdout || '');
-          var mobilePrepared = mobileOut.status === 'prepared';
-          setTargetRuntime(projectKey, kind, mobilePrepared ? 'ready' : 'built', mobileOut.artifact || mobileOut.project || '');
+          setTargetRuntime(projectKey, kind, 'built', mobileOut.artifact || mobileOut.project || '');
           renderSelectedTargetsEditor(selectedCatalogItem());
           var mobilePlatformLabel = kind === 'android' ? 'Android' : 'iOS';
           var actions = [];
-          if (mobilePrepared && mobileOut.project) {
+          if (mobileOut.project) {
             actions.push({
               label: 'Open Generated Project',
-              primary: true,
+              primary: !mobileOut.artifact,
               run: function () { return openPath(mobileOut.project, true); }
             });
           }
@@ -8819,9 +8865,7 @@
           }
           renderResult({
             status: 'ok',
-            summary: mobilePrepared
-              ? selected.title + ' ' + mobilePlatformLabel + ' project is ready; build toolchain setup is still needed.'
-              : selected.title + ' native ' + (kind === 'android' ? 'Android release' : 'iOS smoke') + ' build completed.',
+            summary: selected.title + ' native ' + (kind === 'android' ? 'Android release' : 'iOS smoke') + ' build completed.',
             paths: [
               mobileOut.artifact ? { label: kind === 'android' ? 'Android artifact' : 'iOS artifact', path: mobileOut.artifact, canReveal: true } : null,
               mobileOut.project ? { label: 'Generated project', path: mobileOut.project, canReveal: true } : null,
@@ -8829,12 +8873,10 @@
             ].filter(Boolean),
             actions: actions,
             help: {
-              title: mobilePrepared ? (mobilePlatformLabel + ' project prepared') : (kind === 'android' ? 'Android direct-first release' : 'iOS build'),
-              body: mobilePrepared
-                ? (mobileOut.message || (mobilePlatformLabel + ' project sources were generated. Install the platform build tools to compile a device artifact.'))
-                : (kind === 'android'
+              title: kind === 'android' ? 'Android direct-first release' : 'iOS build',
+              body: kind === 'android'
                   ? 'Forge built a direct-distribution Android artifact. Play upload is optional and uses configured publisher credentials.'
-                  : 'Forge generated and built the native iOS project on this Mac.')
+                  : 'Forge generated and built the native iOS project on this Mac.'
             }
           });
           return;
@@ -9895,12 +9937,12 @@
         if (els.applyMacosAppsDir) {
           els.applyMacosAppsDir.addEventListener('click', function () {
             var nextMacosAppsDir = normalizedSettingValue(els.settingsMacosAppsDir.value);
-            if (nextMacosAppsDir === normalizedSettingValue(state.macosAppsInstallDir)) {
+            if (nextMacosAppsDir === normalizedSettingValue(state.desktopAppsInstallDir)) {
               syncSettingsSaveButtons();
               return;
             }
-            setMacosAppsInstallDir(nextMacosAppsDir);
-            toast('macOS app install folder updated. Future Install and self-restart actions will use this folder.', 'ok');
+            setDesktopAppsInstallDir(nextMacosAppsDir);
+            toast('Desktop app install folder updated. Future installs and self-restart actions will use this folder.', 'ok');
           });
         }
 
@@ -10479,7 +10521,7 @@
             els.settingsProjectsRoot.value = state.projectsRoot;
           }
           if (els.settingsMacosAppsDir) {
-            els.settingsMacosAppsDir.value = state.macosAppsInstallDir;
+            els.settingsMacosAppsDir.value = state.desktopAppsInstallDir;
           }
           syncSettingsSaveButtons();
 

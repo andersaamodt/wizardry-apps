@@ -167,7 +167,7 @@ OPEN_CAPTURE="$scratch/launch-open.out" \
   sh "$launch" --root "$launch_mac_root" >"$scratch/launch-mac.out"
 launched_mac_app=$(sed -n 's/^App Forge launched (//p' "$scratch/launch-mac.out" | sed -n 's/)$//p' | head -n 1)
 case "$launched_mac_app" in
-  "$launch_mac_app"|"/Applications/App Forge.app")
+  "$launch_mac_app")
     ;;
   *)
     printf '%s\n' "launch-forge opened unexpected app: ${launched_mac_app:-none}" >&2
@@ -234,12 +234,11 @@ cat > "$stale_launch_bin/ps" <<'SH'
 #!/bin/sh
 exit 0
 SH
-chmod +x "$stale_launch_root/tools/forge/build-forge-macos-app.sh" \
+  chmod +x "$stale_launch_root/tools/forge/build-forge-macos-app.sh" \
   "$stale_launch_root/tools/forge/install-forge.sh" \
   "$stale_launch_bin/uname" "$stale_launch_bin/open" "$stale_launch_bin/pkill" "$stale_launch_bin/ps"
-BUILD_CAPTURE="$scratch/stale-launch-build.out" \
+  BUILD_CAPTURE="$scratch/stale-launch-build.out" \
   OPEN_CAPTURE="$scratch/stale-launch-open.out" \
-  WIZARDRY_FORGE_PREFER_USER_APPLICATIONS=1 \
   HOME="$stale_launch_home" \
   PATH="$stale_launch_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
   XDG_CONFIG_HOME="$scratch/stale-launch-config" \
@@ -557,7 +556,7 @@ custom_install_home="$scratch/custom-install-home"
 custom_install_apps_dir="$scratch/Custom Apps"
 custom_install_config="$custom_install_home/.config/wizardry-apps"
 mkdir -p "$custom_install_config"
-printf '%s\n' "macos_apps_install_dir=$custom_install_apps_dir" >"$custom_install_config/forge-ui.conf"
+printf '%s\n' "desktop_apps_install_dir=$custom_install_apps_dir" >"$custom_install_config/forge-ui.conf"
 custom_install_out=$(XDG_CONFIG_HOME="$custom_install_home/.config" sh "$install" --root "$root" --home "$custom_install_home")
 printf '%s\n' "$custom_install_out" | grep -F "installed_command=$custom_install_home/.local/bin/app-forge" >/dev/null
 os=$(uname -s 2>/dev/null || printf unknown)
@@ -566,7 +565,6 @@ case "$os" in
     printf '%s\n' "$custom_install_out" | grep -F "installed_app=$custom_install_apps_dir/App Forge.app" >/dev/null
     [ -x "$custom_install_apps_dir/App Forge.app/Contents/MacOS/wizardry-host" ]
     [ ! -e "$custom_install_home/Applications/App Forge.app" ]
-    [ ! -e "/Applications/App Forge.app" ] || [ -d "/Applications/App Forge.app" ]
     ;;
 esac
 

@@ -20,7 +20,7 @@ Usage: install-forge [--root ROOT_DIR] [--home HOME_DIR] [--system|--user] [--ap
 Installs launchers for App Forge.
 
 Defaults:
-  - macOS: installs app bundle to /Applications (first-class desktop app)
+  - macOS: installs app bundle to ~/Applications (first-class desktop app)
   - Linux: installs desktop entry to ~/.local/share/applications
   - all platforms: installs command shim at ~/.local/bin/app-forge
 
@@ -100,7 +100,7 @@ desktop_generated_path_is_safe() {
   return 0
 }
 
-normalize_macos_apps_install_dir() {
+normalize_desktop_apps_install_dir() {
   dir_path=${1-}
   [ -n "$dir_path" ] || return 1
   has_line_break "$dir_path" && return 1
@@ -134,19 +134,12 @@ forge_ui_pref_value() {
 }
 
 preferred_macos_apps_install_dir() {
-  pref_value=$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)
-  if normalized_pref=$(normalize_macos_apps_install_dir "$pref_value" 2>/dev/null); then
+  pref_value=$(forge_ui_pref_value desktop_apps_install_dir 2>/dev/null || true)
+  if [ -z "$pref_value" ]; then
+    pref_value=$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)
+  fi
+  if normalized_pref=$(normalize_desktop_apps_install_dir "$pref_value" 2>/dev/null); then
     printf '%s\n' "$normalized_pref"
-    return 0
-  fi
-
-  if [ "${WIZARDRY_FORGE_PREFER_USER_APPLICATIONS-}" = "1" ]; then
-    printf '%s/Applications\n' "$home_dir"
-    return 0
-  fi
-
-  if [ -w /Applications ]; then
-    printf '%s\n' "/Applications"
     return 0
   fi
 
@@ -331,11 +324,7 @@ case "$os" in
           target_app="$home_dir/Applications/App Forge.app"
           ;;
         auto)
-          if [ "$home_explicit" -eq 1 ] && [ -z "$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)" ]; then
-            target_app="$home_dir/Applications/App Forge.app"
-          else
-            target_app="$(preferred_macos_apps_install_dir)/App Forge.app"
-          fi
+          target_app="$(preferred_macos_apps_install_dir)/App Forge.app"
           ;;
       esac
     fi

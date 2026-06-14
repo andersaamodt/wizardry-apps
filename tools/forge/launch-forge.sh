@@ -100,7 +100,7 @@ refresh_macos_forge_bundle() {
   sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$app_bundle" >/dev/null 2>&1
 }
 
-normalize_macos_apps_install_dir() {
+normalize_desktop_apps_install_dir() {
   dir_path=${1-}
   [ -n "$dir_path" ] || return 1
   has_line_break "$dir_path" && return 1
@@ -134,19 +134,12 @@ forge_ui_pref_value() {
 }
 
 preferred_macos_forge_bundle_path() {
-  pref_value=$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)
-  if normalized_pref=$(normalize_macos_apps_install_dir "$pref_value" 2>/dev/null); then
+  pref_value=$(forge_ui_pref_value desktop_apps_install_dir 2>/dev/null || true)
+  if [ -z "$pref_value" ]; then
+    pref_value=$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)
+  fi
+  if normalized_pref=$(normalize_desktop_apps_install_dir "$pref_value" 2>/dev/null); then
     printf '%s/App Forge.app\n' "$normalized_pref"
-    return 0
-  fi
-
-  if [ "${WIZARDRY_FORGE_PREFER_USER_APPLICATIONS-}" = "1" ]; then
-    printf '%s/Applications/App Forge.app\n' "$HOME"
-    return 0
-  fi
-
-  if [ -w "/Applications" ]; then
-    printf '%s\n' "/Applications/App Forge.app"
     return 0
   fi
 
@@ -168,7 +161,7 @@ if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
   stop_running_macos_forge
   installed_app=''
   preferred_app=$(preferred_macos_forge_bundle_path)
-  for candidate_app in "$preferred_app" "/Applications/App Forge.app" "$HOME/Applications/App Forge.app"; do
+  for candidate_app in "$preferred_app" "$HOME/Applications/App Forge.app" "/Applications/App Forge.app"; do
     [ -n "$candidate_app" ] || continue
     if [ -x "$candidate_app/Contents/MacOS/wizardry-host" ]; then
       installed_app=$candidate_app

@@ -62,6 +62,7 @@ Commands:
   build-ios-smoke [ROOT_HINT] APP_SLUG
   build-android-debug [ROOT_HINT] APP_SLUG
   build-native-mobile-workspace [ROOT_HINT] WORKSPACE_PATH android|ios [debug|release]
+  run-native-mobile-workspace [ROOT_HINT] WORKSPACE_PATH android [debug]
   upload-native-mobile-play [ROOT_HINT] WORKSPACE_PATH AAB_PATH [TRACK]
   scaffold-app [ROOT_HINT] APP_SLUG APP_NAME TEMPLATE [SOURCE_APP]
   scaffold-workspace [ROOT_HINT] APP_SLUG APP_NAME CONTEXT STARTER TARGETS [SOURCE] [PROJECT_ROOT]
@@ -1782,6 +1783,15 @@ native_macos_rebuild_log_path() {
   printf '%s\n' "$(forge_workbench_root "$native_macos_rebuild_log_root")/log/workspace-$native_macos_rebuild_log_workspace_slug-rebuild.log"
 }
 
+native_mobile_rebuild_log_path() {
+  native_mobile_rebuild_log_root=${1-}
+  native_mobile_rebuild_log_workspace_path=${2-}
+  [ -n "$native_mobile_rebuild_log_root" ] || return 1
+  [ -n "$native_mobile_rebuild_log_workspace_path" ] || return 1
+  native_mobile_rebuild_log_workspace_slug=$(sanitize_bundle_component "$(basename "$native_mobile_rebuild_log_workspace_path")")
+  printf '%s\n' "$(forge_workbench_root "$native_mobile_rebuild_log_root")/log/workspace-$native_mobile_rebuild_log_workspace_slug-rebuild.log"
+}
+
 resolve_native_macos_package_dir() {
   resolve_native_macos_package_root=${1-}
   resolve_native_macos_package_workspace_path=${2-}
@@ -1818,6 +1828,111 @@ resolve_native_macos_package_dir() {
   fi
 
   return 1
+}
+
+native_mobile_log_project_dir() {
+  native_mobile_log_project_log=${1-}
+  native_mobile_log_project_key=${2-}
+  [ -n "$native_mobile_log_project_log" ] || return 1
+  [ -n "$native_mobile_log_project_key" ] || return 1
+  [ -f "$native_mobile_log_project_log" ] || return 1
+  awk -F= -v key="$native_mobile_log_project_key" '
+    $1 == key {
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      print value
+    }
+  ' "$native_mobile_log_project_log" | tail -n 1
+}
+
+resolve_native_mobile_project_dir() {
+  resolve_native_mobile_project_workspace_path=${1-}
+  resolve_native_mobile_project_workspace_conf=${2-}
+  resolve_native_mobile_project_workspace_slug=${3-}
+  resolve_native_mobile_project_app_id=${4-}
+  resolve_native_mobile_project_target=${5-}
+  resolve_native_mobile_project_marker=${6-}
+  resolve_native_mobile_project_rebuild_log=${7-}
+
+  [ -n "$resolve_native_mobile_project_workspace_path" ] || return 1
+  [ -n "$resolve_native_mobile_project_workspace_conf" ] || return 1
+  [ -n "$resolve_native_mobile_project_workspace_slug" ] || return 1
+  [ -n "$resolve_native_mobile_project_target" ] || return 1
+  [ -n "$resolve_native_mobile_project_marker" ] || return 1
+
+  resolve_native_mobile_project_candidate=''
+  case "$resolve_native_mobile_project_target" in
+    android)
+      resolve_native_mobile_project_candidate=$(native_mobile_log_project_dir "$resolve_native_mobile_project_rebuild_log" rendered_android 2>/dev/null || true)
+      [ -n "$resolve_native_mobile_project_candidate" ] || resolve_native_mobile_project_candidate=$(native_mobile_log_project_dir "$resolve_native_mobile_project_rebuild_log" android 2>/dev/null || true)
+      ;;
+    ios)
+      resolve_native_mobile_project_candidate=$(native_mobile_log_project_dir "$resolve_native_mobile_project_rebuild_log" rendered_ios 2>/dev/null || true)
+      [ -n "$resolve_native_mobile_project_candidate" ] || resolve_native_mobile_project_candidate=$(native_mobile_log_project_dir "$resolve_native_mobile_project_rebuild_log" ios 2>/dev/null || true)
+      ;;
+  esac
+  if [ -n "$resolve_native_mobile_project_candidate" ] && [ -f "$resolve_native_mobile_project_candidate/$resolve_native_mobile_project_marker" ]; then
+    printf '%s\n' "$resolve_native_mobile_project_candidate"
+    return 0
+  fi
+
+  resolve_native_mobile_project_candidate="$resolve_native_mobile_project_workspace_path/generated/mobile/$resolve_native_mobile_project_target"
+  if [ -f "$resolve_native_mobile_project_candidate/$resolve_native_mobile_project_marker" ]; then
+    printf '%s\n' "$resolve_native_mobile_project_candidate"
+    return 0
+  fi
+
+  resolve_native_mobile_project_project_id=$(workspace_field "$resolve_native_mobile_project_workspace_conf" project_id "$resolve_native_mobile_project_workspace_slug")
+  for resolve_native_mobile_project_state_id in "$resolve_native_mobile_project_project_id" "$resolve_native_mobile_project_app_id" "$resolve_native_mobile_project_workspace_slug"; do
+    [ -n "$resolve_native_mobile_project_state_id" ] || continue
+    resolve_native_mobile_project_candidate="${XDG_STATE_HOME:-$HOME/.local/state}/$resolve_native_mobile_project_state_id/generated/mobile/$resolve_native_mobile_project_target"
+    if [ -f "$resolve_native_mobile_project_candidate/$resolve_native_mobile_project_marker" ]; then
+      printf '%s\n' "$resolve_native_mobile_project_candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+run_android_gradle_task() {
+  run_android_gradle_project_dir=${1-}
+  run_android_gradle_task_name=${2-}
+  run_android_gradle_log=${3-}
+  [ -n "$run_android_gradle_project_dir" ] || return 1
+  [ -n "$run_android_gradle_task_name" ] || return 1
+  [ -n "$run_android_gradle_log" ] || return 1
+
+  if [ -x "$run_android_gradle_project_dir/gradlew" ]; then
+    (
+      cd "$run_android_gradle_project_dir"
+      ./gradlew ":app:$run_android_gradle_task_name"
+    ) >"$run_android_gradle_log" 2>&1
+    return $?
+  fi
+
+  if command -v gradle >/dev/null 2>&1; then
+    gradle -p "$run_android_gradle_project_dir" ":app:$run_android_gradle_task_name" >"$run_android_gradle_log" 2>&1
+    return $?
+  fi
+
+  printf '%s\n' "forge-backend: Gradle is required to build native Android workspaces (install Gradle or add an executable gradlew to the generated Android project)." >"$run_android_gradle_log"
+  return 127
+}
+
+resolve_android_project_application_id() {
+  resolve_android_project_application_id_project_dir=${1-}
+  resolve_android_project_application_id_fallback=${2-}
+  [ -n "$resolve_android_project_application_id_project_dir" ] || return 1
+  resolve_android_project_application_id_build="$resolve_android_project_application_id_project_dir/app/build.gradle"
+  if [ -f "$resolve_android_project_application_id_build" ]; then
+    resolve_android_project_application_id_value=$(sed -n "s/^[[:space:]]*applicationId[[:space:]]*['\"]\\([^'\"]*\\)['\"].*/\\1/p" "$resolve_android_project_application_id_build" | sed -n '1p')
+    if [ -n "$resolve_android_project_application_id_value" ]; then
+      printf '%s\n' "$resolve_android_project_application_id_value"
+      return 0
+    fi
+  fi
+  printf '%s\n' "$resolve_android_project_application_id_fallback"
 }
 
 config_field() {
@@ -2253,10 +2368,10 @@ canonical_dir_path() {
   (CDPATH= cd -- "$canonical_dir" && pwd -P)
 }
 
-normalize_macos_apps_install_dir() {
+normalize_desktop_apps_install_dir() {
   dir_path=${1-}
   [ -n "$dir_path" ] || return 1
-  reject_line_breaks "$dir_path" "macOS apps install folder"
+  reject_line_breaks "$dir_path" "desktop app install folder"
   case "$dir_path" in
     /*)
       printf '%s\n' "$(printf '%s' "$dir_path" | sed 's#/*$##')"
@@ -2284,39 +2399,16 @@ preferred_macos_app_install_path() {
   preferred_macos_app_name=${1-}
   [ -n "$preferred_macos_app_name" ] || return 1
 
-  preferred_pref_dir=$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)
-  if normalized_pref_dir=$(normalize_macos_apps_install_dir "$preferred_pref_dir" 2>/dev/null); then
+  preferred_pref_dir=$(forge_ui_pref_value desktop_apps_install_dir 2>/dev/null || true)
+  if [ -z "$preferred_pref_dir" ]; then
+    preferred_pref_dir=$(forge_ui_pref_value macos_apps_install_dir 2>/dev/null || true)
+  fi
+  if normalized_pref_dir=$(normalize_desktop_apps_install_dir "$preferred_pref_dir" 2>/dev/null); then
     printf '%s/%s.app\n' "$normalized_pref_dir" "$preferred_macos_app_name"
     return 0
   fi
 
-  preferred_user_bundle=$(macos_user_app_install_path "$preferred_macos_app_name") || return 1
-  preferred_system_bundle=$(macos_system_app_install_path "$preferred_macos_app_name") || return 1
-
-  current_bundle=$(current_macos_backend_bundle 2>/dev/null || true)
-  if [ -n "$current_bundle" ]; then
-    current_bundle_canonical=$(canonical_dir_path "$current_bundle" 2>/dev/null || printf '%s\n' "$current_bundle")
-    preferred_user_canonical=$(canonical_dir_path "$preferred_user_bundle" 2>/dev/null || printf '%s\n' "$preferred_user_bundle")
-    preferred_system_canonical=$(canonical_dir_path "$preferred_system_bundle" 2>/dev/null || printf '%s\n' "$preferred_system_bundle")
-    case "$current_bundle_canonical" in
-      "$preferred_user_canonical"|"$preferred_system_canonical")
-        printf '%s\n' "$current_bundle"
-        return 0
-        ;;
-    esac
-  fi
-
-  if [ "${WIZARDRY_FORGE_PREFER_USER_APPLICATIONS-}" = "1" ]; then
-    printf '%s\n' "$preferred_user_bundle"
-    return 0
-  fi
-
-  if [ -w "/Applications" ]; then
-    printf '%s\n' "$preferred_system_bundle"
-    return 0
-  fi
-
-  printf '%s\n' "$preferred_user_bundle"
+  macos_user_app_install_path "$preferred_macos_app_name"
 }
 
 prepare_macos_run_bundle() {
@@ -4455,9 +4547,9 @@ validate_ui_pref_value() {
   pref_key=${1-}
   pref_value=${2-}
   case "$pref_key" in
-    macos_apps_install_dir)
-      if [ -n "$pref_value" ] && ! normalize_macos_apps_install_dir "$pref_value" >/dev/null 2>&1; then
-        printf '%s\n' "forge-backend: invalid macOS apps install folder: $pref_value" >&2
+    desktop_apps_install_dir|macos_apps_install_dir)
+      if [ -n "$pref_value" ] && ! normalize_desktop_apps_install_dir "$pref_value" >/dev/null 2>&1; then
+        printf '%s\n' "forge-backend: invalid desktop app install folder: $pref_value" >&2
         exit 2
       fi
       ;;
@@ -6575,30 +6667,17 @@ build_native_mobile_workspace_target() {
 
   case "$target" in
     android)
-      project_dir="$workspace_path/generated/mobile/android"
-      if ! command -v gradle >/dev/null 2>&1; then
-        run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
-        printf 'status=prepared\n'
-        printf 'target=android\n'
-        printf 'mode=%s\n' "$mode"
-        printf 'app_name=%s\n' "$app_name"
-        printf 'project=%s\n' "$project_dir"
-        printf 'missing_tool=%s\n' "gradle"
-        printf 'message=%s\n' "Android project generated. Install Gradle or add a Gradle wrapper to produce APK/AAB artifacts."
-        return 0
-      fi
       if ! command -v java >/dev/null 2>&1; then
-        run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
-        printf 'status=prepared\n'
-        printf 'target=android\n'
-        printf 'mode=%s\n' "$mode"
-        printf 'app_name=%s\n' "$app_name"
-        printf 'project=%s\n' "$project_dir"
-        printf 'missing_tool=%s\n' "java"
-        printf 'message=%s\n' "Android project generated. Install a Java runtime to produce APK/AAB artifacts."
-        return 0
+        printf '%s\n' "forge-backend: Java is required to build native Android workspaces" >&2
+        exit 1
       fi
-      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+      rebuild_out=$(run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf")
+      rebuild_log=$(printf '%s\n' "$rebuild_out" | kv_read log)
+      [ -n "$rebuild_log" ] || rebuild_log=$(native_mobile_rebuild_log_path "$root" "$workspace_path")
+      project_dir=$(resolve_native_mobile_project_dir "$workspace_path" "$workspace_conf" "$workspace_slug" "$app_id" android settings.gradle "$rebuild_log") || {
+        printf '%s\n' "forge-backend: native Android project is missing settings.gradle after rebuild: $workspace_path" >&2
+        exit 1
+      }
       [ -f "$project_dir/settings.gradle" ] || { printf '%s\n' "forge-backend: native Android project is missing settings.gradle: $project_dir" >&2; exit 1; }
       out_dir="$(forge_workbench_root "$root")/dist/native-mobile/$workspace_slug/android"
       mkdir -p "$out_dir"
@@ -6606,15 +6685,9 @@ build_native_mobile_workspace_target() {
       [ "$mode" = "release" ] && task="bundleRelease"
       build_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-android-build.log"
       mkdir -p "$(dirname "$build_log")"
-      if ! gradle -p "$project_dir" ":app:$task" >"$build_log" 2>&1; then
-        printf 'status=prepared\n'
-        printf 'target=android\n'
-        printf 'mode=%s\n' "$mode"
-        printf 'app_name=%s\n' "$app_name"
-        printf 'project=%s\n' "$project_dir"
-        printf 'log=%s\n' "$build_log"
-        printf 'message=%s\n' "Android project generated. Complete the Android Gradle/SDK setup to produce APK/AAB artifacts."
-        return 0
+      if ! run_android_gradle_task "$project_dir" "$task" "$build_log"; then
+        printf '%s\n' "forge-backend: Android build failed (see log: $build_log)" >&2
+        exit 1
       fi
       if [ "$mode" = "release" ]; then
         artifact=$(find "$project_dir/app/build/outputs/bundle/release" -type f -name '*.aab' | head -n 1)
@@ -6632,45 +6705,31 @@ build_native_mobile_workspace_target() {
       printf 'app_name=%s\n' "$app_name"
       printf 'artifact=%s\n' "$out_artifact"
       printf 'project=%s\n' "$project_dir"
+      printf 'log=%s\n' "$build_log"
       ;;
     ios)
       [ "$(os_id)" = "darwin" ] || { printf '%s\n' "forge-backend: native iOS builds are supported on macOS only" >&2; exit 1; }
-      project_dir="$workspace_path/generated/mobile/ios"
       if ! command -v xcodegen >/dev/null 2>&1; then
-        run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
-        printf 'status=prepared\n'
-        printf 'target=ios\n'
-        printf 'mode=%s\n' "$mode"
-        printf 'app_name=%s\n' "$app_name"
-        printf 'project=%s\n' "$project_dir"
-        printf 'missing_tool=%s\n' "xcodegen"
-        printf 'message=%s\n' "iOS project generated. Install XcodeGen to produce an Xcode project and simulator build."
-        return 0
+        printf '%s\n' "forge-backend: XcodeGen is required to build native iOS workspaces" >&2
+        exit 1
       fi
       if ! command -v xcodebuild >/dev/null 2>&1; then
-        run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
-        printf 'status=prepared\n'
-        printf 'target=ios\n'
-        printf 'mode=%s\n' "$mode"
-        printf 'app_name=%s\n' "$app_name"
-        printf 'project=%s\n' "$project_dir"
-        printf 'missing_tool=%s\n' "xcodebuild"
-        printf 'message=%s\n' "iOS project generated. Install full Xcode to produce simulator builds."
-        return 0
+        printf '%s\n' "forge-backend: full Xcode is required to build native iOS workspaces" >&2
+        exit 1
       fi
-      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+      rebuild_out=$(run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf")
+      rebuild_log=$(printf '%s\n' "$rebuild_out" | kv_read log)
+      [ -n "$rebuild_log" ] || rebuild_log=$(native_mobile_rebuild_log_path "$root" "$workspace_path")
+      project_dir=$(resolve_native_mobile_project_dir "$workspace_path" "$workspace_conf" "$workspace_slug" "$app_id" ios project.yml "$rebuild_log") || {
+        printf '%s\n' "forge-backend: native iOS project is missing project.yml after rebuild: $workspace_path" >&2
+        exit 1
+      }
       [ -f "$project_dir/project.yml" ] || { printf '%s\n' "forge-backend: native iOS project is missing project.yml: $project_dir" >&2; exit 1; }
       build_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-ios-build.log"
       mkdir -p "$(dirname "$build_log")"
       if ! ( cd "$project_dir" && xcodegen generate >/dev/null && xcodebuild -scheme "$app_id" -destination 'generic/platform=iOS Simulator' build >"$build_log" 2>&1 ); then
-        printf 'status=prepared\n'
-        printf 'target=ios\n'
-        printf 'mode=%s\n' "$mode"
-        printf 'app_name=%s\n' "$app_name"
-        printf 'project=%s\n' "$project_dir"
-        printf 'log=%s\n' "$build_log"
-        printf 'message=%s\n' "iOS project generated. Full Xcode may be required to produce simulator builds."
-        return 0
+        printf '%s\n' "forge-backend: iOS build failed (see log: $build_log)" >&2
+        exit 1
       fi
       printf 'status=ok\n'
       printf 'target=ios\n'
@@ -6679,6 +6738,73 @@ build_native_mobile_workspace_target() {
       printf 'project=%s\n' "$project_dir"
       ;;
   esac
+}
+
+run_native_mobile_workspace_target() {
+  root=${1-}
+  workspace_path=${2-}
+  workspace_conf=${3-}
+  target=${4-}
+  mode=${5:-debug}
+
+  case "$target" in android) ;; *) printf '%s\n' "forge-backend: native mobile run currently supports android" >&2; exit 2 ;; esac
+  case "$mode" in debug) ;; *) printf '%s\n' "forge-backend: native mobile run mode must be debug" >&2; exit 2 ;; esac
+
+  build_out=$(build_native_mobile_workspace_target "$root" "$workspace_path" "$workspace_conf" android debug)
+  artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
+  project_dir=$(printf '%s\n' "$build_out" | kv_read project)
+  app_name=$(printf '%s\n' "$build_out" | kv_read app_name)
+  build_log=$(printf '%s\n' "$build_out" | kv_read log)
+  [ -n "$artifact" ] && [ -f "$artifact" ] || {
+    printf '%s\n' "forge-backend: Android debug APK was not produced for run" >&2
+    exit 1
+  }
+  [ -n "$project_dir" ] && [ -d "$project_dir" ] || {
+    printf '%s\n' "forge-backend: generated Android project missing for run" >&2
+    exit 1
+  }
+  command -v adb >/dev/null 2>&1 || {
+    printf '%s\n' "forge-backend: adb is required to install and run native Android workspaces" >&2
+    exit 1
+  }
+  if ! adb get-state >/dev/null 2>&1; then
+    printf '%s\n' "forge-backend: no Android device or emulator is available for Run" >&2
+    exit 1
+  fi
+
+  workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
+  install_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-android-run.log"
+  mkdir -p "$(dirname "$install_log")"
+  if ! adb install -r "$artifact" >"$install_log" 2>&1; then
+    printf '%s\n' "forge-backend: Android install failed (see log: $install_log)" >&2
+    exit 1
+  fi
+
+  meta=$(resolve_native_mobile_workspace_metadata "$workspace_path" "$workspace_conf") || {
+    printf '%s\n' "forge-backend: native mobile workspace IR is missing or invalid: $workspace_path" >&2
+    exit 1
+  }
+  app_id=$(printf '%s\n' "$meta" | kv_read app_id)
+  package_id=$(resolve_android_project_application_id "$project_dir" "$app_id")
+  [ -n "$package_id" ] || {
+    printf '%s\n' "forge-backend: Android package id could not be resolved for run" >&2
+    exit 1
+  }
+  if ! adb shell monkey -p "$package_id" -c android.intent.category.LAUNCHER 1 >>"$install_log" 2>&1; then
+    printf '%s\n' "forge-backend: Android launch failed (see log: $install_log)" >&2
+    exit 1
+  fi
+
+  printf 'status=ok\n'
+  printf 'launched=1\n'
+  printf 'target=android\n'
+  printf 'mode=android-device\n'
+  printf 'app_name=%s\n' "$app_name"
+  printf 'artifact=%s\n' "$artifact"
+  printf 'project=%s\n' "$project_dir"
+  printf 'package=%s\n' "$package_id"
+  [ -n "$build_log" ] && printf 'build_log=%s\n' "$build_log"
+  printf 'log=%s\n' "$install_log"
 }
 
 workspace_native_bundle_icon_path() {
@@ -8060,16 +8186,21 @@ cmd_run_workspace_unlocked() {
             printf '%s\n' "forge-backend: built native macOS bundle missing: $artifact" >&2
             exit 1
           }
+          synced_install=$(prepare_macos_run_bundle "$artifact" "$app_name") || {
+            printf '%s\n' "forge-backend: failed to prepare durable native macOS run bundle for $workspace_slug" >&2
+            exit 1
+          }
           stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
-          launch_macos_bundle_async "$artifact" || {
-            printf '%s\n' "forge-backend: failed to queue launch for native macOS bundle: $artifact" >&2
+          launch_macos_bundle_async "$synced_install" || {
+            printf '%s\n' "forge-backend: failed to queue launch for native macOS bundle: $synced_install" >&2
             exit 1
           }
           printf 'launched=1\n'
-          printf 'mode=native-desktop-executable\n'
-          printf 'artifact=%s\n' "$artifact"
+          printf 'mode=native-desktop-installed\n'
+          printf 'artifact=%s\n' "$synced_install"
           printf 'built_artifact=%s\n' "$artifact"
           printf 'built_exec=%s\n' "$built_exec"
+          printf 'installed=%s\n' "$synced_install"
           printf 'entry=%s\n' "$workspace_path/generated"
           printf 'log=%s\n' "$log_path"
           return 0
@@ -8640,6 +8771,19 @@ cmd_build_native_mobile_workspace() {
   workspace_conf="$workspace_path/wizardry.workspace.conf"
   [ -f "$workspace_conf" ] || { printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2; exit 1; }
   build_native_mobile_workspace_target "$root" "$workspace_path" "$workspace_conf" "$target" "$mode"
+}
+
+cmd_run_native_mobile_workspace() {
+  root=$(require_root "${1-}")
+  workspace_path=${2-}
+  target=${3-}
+  mode=${4:-debug}
+  [ -n "$workspace_path" ] || { printf '%s\n' "forge-backend: run-native-mobile-workspace requires WORKSPACE_PATH" >&2; exit 2; }
+  [ -d "$workspace_path" ] || { printf '%s\n' "forge-backend: project not found: $workspace_path" >&2; exit 1; }
+  reject_line_breaks "$workspace_path" "project path"
+  workspace_conf="$workspace_path/wizardry.workspace.conf"
+  [ -f "$workspace_conf" ] || { printf '%s\n' "forge-backend: project is missing wizardry.workspace.conf: $workspace_path" >&2; exit 1; }
+  run_native_mobile_workspace_target "$root" "$workspace_path" "$workspace_conf" "$target" "$mode"
 }
 
 cmd_upload_native_mobile_play() {
@@ -9777,6 +9921,9 @@ case "$cmd" in
     ;;
   build-native-mobile-workspace)
     cmd_build_native_mobile_workspace "${2-}" "${3-}" "${4-}" "${5-}"
+    ;;
+  run-native-mobile-workspace)
+    cmd_run_native_mobile_workspace "${2-}" "${3-}" "${4-}" "${5-}"
     ;;
   upload-native-mobile-play)
     cmd_upload_native_mobile_play "${2-}" "${3-}" "${4-}" "${5-}"
