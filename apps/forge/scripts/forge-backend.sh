@@ -1903,21 +1903,108 @@ run_android_gradle_task() {
   [ -n "$run_android_gradle_task_name" ] || return 1
   [ -n "$run_android_gradle_log" ] || return 1
 
+  run_android_gradle_java_home=$(resolve_java_home || true)
+  run_android_gradle_sdk_root=$(resolve_android_sdk_root || true)
+  if [ -z "$run_android_gradle_java_home" ]; then
+    printf '%s\n' "forge-backend: Java is required to build native Android workspaces" >"$run_android_gradle_log"
+    return 127
+  fi
+  if [ -z "$run_android_gradle_sdk_root" ]; then
+    printf '%s\n' "forge-backend: Android SDK is required to build native Android workspaces" >"$run_android_gradle_log"
+    return 127
+  fi
   if [ -x "$run_android_gradle_project_dir/gradlew" ]; then
     (
       cd "$run_android_gradle_project_dir"
-      ./gradlew ":app:$run_android_gradle_task_name"
+      env JAVA_HOME="$run_android_gradle_java_home" ANDROID_HOME="$run_android_gradle_sdk_root" ANDROID_SDK_ROOT="$run_android_gradle_sdk_root" ./gradlew ":app:$run_android_gradle_task_name"
     ) >"$run_android_gradle_log" 2>&1
     return $?
   fi
 
-  if command -v gradle >/dev/null 2>&1; then
-    gradle -p "$run_android_gradle_project_dir" ":app:$run_android_gradle_task_name" >"$run_android_gradle_log" 2>&1
+  run_android_gradle_exec=$(resolve_gradle_exec)
+  if [ -n "$run_android_gradle_exec" ]; then
+    env JAVA_HOME="$run_android_gradle_java_home" ANDROID_HOME="$run_android_gradle_sdk_root" ANDROID_SDK_ROOT="$run_android_gradle_sdk_root" \
+      "$run_android_gradle_exec" -p "$run_android_gradle_project_dir" ":app:$run_android_gradle_task_name" >"$run_android_gradle_log" 2>&1
     return $?
   fi
 
   printf '%s\n' "forge-backend: Gradle is required to build native Android workspaces (install Gradle or add an executable gradlew to the generated Android project)." >"$run_android_gradle_log"
   return 127
+}
+
+resolve_gradle_exec() {
+  if command -v gradle >/dev/null 2>&1; then
+    command -v gradle
+    return 0
+  fi
+  for resolve_gradle_exec_candidate in \
+    "${WIZARDRY_GRADLE:-}" \
+    "${HOME:-}/.cache/wizardry-apps/toolchains/gradle/gradle-8.7/bin/gradle" \
+    "${HOME:-}/.local/share/wizardry-apps/toolchains/gradle/gradle-8.7/bin/gradle" \
+    /opt/homebrew/bin/gradle \
+    /usr/local/bin/gradle
+  do
+    [ -n "$resolve_gradle_exec_candidate" ] || continue
+    if [ -x "$resolve_gradle_exec_candidate" ]; then
+      printf '%s\n' "$resolve_gradle_exec_candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_java_home() {
+  for resolve_java_home_candidate in \
+    "${JAVA_HOME:-}" \
+    "${HOME:-}/.cache/wizardry-apps/toolchains/jdk-17.0.19+10/Contents/Home" \
+    "${HOME:-}/.cache/wizardry-apps/toolchains/openjdk/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home" \
+    "${HOME:-}/.local/share/wizardry-apps/toolchains/jdk-17.0.19+10/Contents/Home" \
+    "${HOME:-}/.local/share/wizardry-apps/toolchains/openjdk/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home" \
+    /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home
+  do
+    [ -n "$resolve_java_home_candidate" ] || continue
+    if [ -x "$resolve_java_home_candidate/bin/java" ]; then
+      printf '%s\n' "$resolve_java_home_candidate"
+      return 0
+    fi
+  done
+  if command -v java >/dev/null 2>&1; then
+    resolve_java_exec=$(command -v java)
+    resolve_java_bin_dir=$(dirname "$resolve_java_exec")
+    resolve_java_home_dir=$(dirname "$resolve_java_bin_dir")
+    printf '%s\n' "$resolve_java_home_dir"
+    return 0
+  fi
+  return 1
+}
+
+resolve_android_sdk_root() {
+  for resolve_android_sdk_root_candidate in \
+    "${ANDROID_SDK_ROOT:-}" \
+    "${ANDROID_HOME:-}" \
+    "${HOME:-}/.local/share/android-sdk" \
+    "${HOME:-}/Library/Android/sdk"
+  do
+    [ -n "$resolve_android_sdk_root_candidate" ] || continue
+    if [ -d "$resolve_android_sdk_root_candidate/platforms" ] || [ -x "$resolve_android_sdk_root_candidate/platform-tools/adb" ]; then
+      printf '%s\n' "$resolve_android_sdk_root_candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_adb_exec() {
+  if command -v adb >/dev/null 2>&1; then
+    command -v adb
+    return 0
+  fi
+  resolve_adb_sdk_root=$(resolve_android_sdk_root || true)
+  if [ -n "$resolve_adb_sdk_root" ] && [ -x "$resolve_adb_sdk_root/platform-tools/adb" ]; then
+    printf '%s\n' "$resolve_adb_sdk_root/platform-tools/adb"
+    return 0
+  fi
+  return 1
 }
 
 resolve_android_project_application_id() {
@@ -6667,10 +6754,6 @@ build_native_mobile_workspace_target() {
 
   case "$target" in
     android)
-      if ! command -v java >/dev/null 2>&1; then
-        printf '%s\n' "forge-backend: Java is required to build native Android workspaces" >&2
-        exit 1
-      fi
       rebuild_out=$(run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf")
       rebuild_log=$(printf '%s\n' "$rebuild_out" | kv_read log)
       [ -n "$rebuild_log" ] || rebuild_log=$(native_mobile_rebuild_log_path "$root" "$workspace_path")
@@ -6678,6 +6761,16 @@ build_native_mobile_workspace_target() {
         printf '%s\n' "forge-backend: native Android project is missing settings.gradle after rebuild: $workspace_path" >&2
         exit 1
       }
+      if ! resolve_java_home >/dev/null 2>&1; then
+        printf 'status=prepared\n'
+        printf 'target=android\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'missing_tool=%s\n' "java"
+        printf 'message=%s\n' "Android project generated. Install Java to produce APK/AAB artifacts."
+        return 0
+      fi
       [ -f "$project_dir/settings.gradle" ] || { printf '%s\n' "forge-backend: native Android project is missing settings.gradle: $project_dir" >&2; exit 1; }
       out_dir="$(forge_workbench_root "$root")/dist/native-mobile/$workspace_slug/android"
       mkdir -p "$out_dir"
@@ -6685,7 +6778,21 @@ build_native_mobile_workspace_target() {
       [ "$mode" = "release" ] && task="bundleRelease"
       build_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-android-build.log"
       mkdir -p "$(dirname "$build_log")"
-      if ! run_android_gradle_task "$project_dir" "$task" "$build_log"; then
+      if run_android_gradle_task "$project_dir" "$task" "$build_log"; then
+        :
+      else
+        android_gradle_status=$?
+        if [ "$android_gradle_status" -eq 127 ]; then
+          printf 'status=prepared\n'
+          printf 'target=android\n'
+          printf 'mode=%s\n' "$mode"
+          printf 'app_name=%s\n' "$app_name"
+          printf 'project=%s\n' "$project_dir"
+          printf 'log=%s\n' "$build_log"
+          printf 'missing_tool=%s\n' "android-build-toolchain"
+          printf 'message=%s\n' "Android project generated. Complete the Android build toolchain to produce APK/AAB artifacts."
+          return 0
+        fi
         printf '%s\n' "forge-backend: Android build failed (see log: $build_log)" >&2
         exit 1
       fi
@@ -6709,21 +6816,37 @@ build_native_mobile_workspace_target() {
       ;;
     ios)
       [ "$(os_id)" = "darwin" ] || { printf '%s\n' "forge-backend: native iOS builds are supported on macOS only" >&2; exit 1; }
-      if ! command -v xcodegen >/dev/null 2>&1; then
-        printf '%s\n' "forge-backend: XcodeGen is required to build native iOS workspaces" >&2
-        exit 1
-      fi
-      if ! command -v xcodebuild >/dev/null 2>&1; then
-        printf '%s\n' "forge-backend: full Xcode is required to build native iOS workspaces" >&2
-        exit 1
-      fi
       rebuild_out=$(run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf")
       rebuild_log=$(printf '%s\n' "$rebuild_out" | kv_read log)
       [ -n "$rebuild_log" ] || rebuild_log=$(native_mobile_rebuild_log_path "$root" "$workspace_path")
       project_dir=$(resolve_native_mobile_project_dir "$workspace_path" "$workspace_conf" "$workspace_slug" "$app_id" ios project.yml "$rebuild_log") || {
-        printf '%s\n' "forge-backend: native iOS project is missing project.yml after rebuild: $workspace_path" >&2
-        exit 1
+        printf 'status=prepared\n'
+        printf 'target=ios\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'message=%s\n' "iOS sources were generated, but no XcodeGen project.yml was emitted."
+        return 0
       }
+      if ! command -v xcodegen >/dev/null 2>&1; then
+        printf 'status=prepared\n'
+        printf 'target=ios\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'missing_tool=%s\n' "xcodegen"
+        printf 'message=%s\n' "iOS project generated. Install XcodeGen to produce an Xcode project and simulator build."
+        return 0
+      fi
+      if ! command -v xcodebuild >/dev/null 2>&1; then
+        printf 'status=prepared\n'
+        printf 'target=ios\n'
+        printf 'mode=%s\n' "$mode"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'project=%s\n' "$project_dir"
+        printf 'missing_tool=%s\n' "xcodebuild"
+        printf 'message=%s\n' "iOS project generated. Install full Xcode to produce simulator builds."
+        return 0
+      fi
       [ -f "$project_dir/project.yml" ] || { printf '%s\n' "forge-backend: native iOS project is missing project.yml: $project_dir" >&2; exit 1; }
       build_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-ios-build.log"
       mkdir -p "$(dirname "$build_log")"
@@ -6763,11 +6886,12 @@ run_native_mobile_workspace_target() {
     printf '%s\n' "forge-backend: generated Android project missing for run" >&2
     exit 1
   }
-  command -v adb >/dev/null 2>&1 || {
+  adb_exec=$(resolve_adb_exec || true)
+  [ -n "$adb_exec" ] || {
     printf '%s\n' "forge-backend: adb is required to install and run native Android workspaces" >&2
     exit 1
   }
-  if ! adb get-state >/dev/null 2>&1; then
+  if ! "$adb_exec" get-state >/dev/null 2>&1; then
     printf '%s\n' "forge-backend: no Android device or emulator is available for Run" >&2
     exit 1
   fi
@@ -6775,7 +6899,7 @@ run_native_mobile_workspace_target() {
   workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
   install_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-android-run.log"
   mkdir -p "$(dirname "$install_log")"
-  if ! adb install -r "$artifact" >"$install_log" 2>&1; then
+  if ! "$adb_exec" install -r "$artifact" >"$install_log" 2>&1; then
     printf '%s\n' "forge-backend: Android install failed (see log: $install_log)" >&2
     exit 1
   fi
@@ -6790,7 +6914,7 @@ run_native_mobile_workspace_target() {
     printf '%s\n' "forge-backend: Android package id could not be resolved for run" >&2
     exit 1
   }
-  if ! adb shell monkey -p "$package_id" -c android.intent.category.LAUNCHER 1 >>"$install_log" 2>&1; then
+  if ! "$adb_exec" shell monkey -p "$package_id" -c android.intent.category.LAUNCHER 1 >>"$install_log" 2>&1; then
     printf '%s\n' "forge-backend: Android launch failed (see log: $install_log)" >&2
     exit 1
   fi

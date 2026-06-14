@@ -8767,27 +8767,6 @@
           }
           var mobileTarget = defaultMobileRunTargetForSelected(selected);
           if (mobileTarget) {
-            if (selected.context === 'native-mobile' && mobileTarget === 'android') {
-              var mobileRun = await backend('run-native-mobile-workspace', [selected.path, 'android', 'debug']);
-              var mobileRunOut = kv(mobileRun.stdout || '');
-              setTargetRuntime(projectKey, 'android', 'running', mobileRunOut.artifact || mobileRunOut.project || '');
-              renderSelectedTargetsEditor(selectedCatalogItem());
-              renderResult({
-                status: 'ok',
-                summary: selected.title + ' built, installed, and launched on Android.',
-                paths: [
-                  mobileRunOut.artifact ? { label: 'Android APK', path: mobileRunOut.artifact, canReveal: true } : null,
-                  mobileRunOut.project ? { label: 'Generated project', path: mobileRunOut.project, canReveal: true } : null,
-                  mobileRunOut.log ? { label: 'Run log', path: mobileRunOut.log, canReveal: true } : null,
-                  mobileRunOut.build_log ? { label: 'Build log', path: mobileRunOut.build_log, canReveal: true } : null
-                ].filter(Boolean),
-                help: {
-                  title: 'Android run',
-                  body: 'Forge compiled a debug APK, installed it with adb, and opened the launcher activity.'
-                }
-              });
-              return;
-            }
             await runTargetAction(selected, mobileTarget);
             return;
           }
@@ -8846,14 +8825,15 @@
           var mode = kind === 'android' ? 'release' : 'debug';
           var mobile = await backend('build-native-mobile-workspace', [selected.path, kind, mode]);
           var mobileOut = kv(mobile.stdout || '');
-          setTargetRuntime(projectKey, kind, 'built', mobileOut.artifact || mobileOut.project || '');
+          var mobilePrepared = mobileOut.status === 'prepared';
+          setTargetRuntime(projectKey, kind, mobilePrepared ? 'ready' : 'built', mobileOut.artifact || mobileOut.project || '');
           renderSelectedTargetsEditor(selectedCatalogItem());
           var mobilePlatformLabel = kind === 'android' ? 'Android' : 'iOS';
           var actions = [];
-          if (mobileOut.project) {
+          if (mobilePrepared && mobileOut.project) {
             actions.push({
               label: 'Open Generated Project',
-              primary: !mobileOut.artifact,
+              primary: true,
               run: function () { return openPath(mobileOut.project, true); }
             });
           }
@@ -8865,7 +8845,9 @@
           }
           renderResult({
             status: 'ok',
-            summary: selected.title + ' native ' + (kind === 'android' ? 'Android release' : 'iOS smoke') + ' build completed.',
+            summary: mobilePrepared
+              ? selected.title + ' ' + mobilePlatformLabel + ' project is prepared.'
+              : selected.title + ' native ' + (kind === 'android' ? 'Android release' : 'iOS smoke') + ' build completed.',
             paths: [
               mobileOut.artifact ? { label: kind === 'android' ? 'Android artifact' : 'iOS artifact', path: mobileOut.artifact, canReveal: true } : null,
               mobileOut.project ? { label: 'Generated project', path: mobileOut.project, canReveal: true } : null,
@@ -8873,10 +8855,12 @@
             ].filter(Boolean),
             actions: actions,
             help: {
-              title: kind === 'android' ? 'Android direct-first release' : 'iOS build',
-              body: kind === 'android'
+              title: mobilePrepared ? (mobilePlatformLabel + ' project prepared') : (kind === 'android' ? 'Android direct-first release' : 'iOS build'),
+              body: mobilePrepared
+                ? (mobileOut.message || (mobilePlatformLabel + ' project sources were generated. Build or run them from the platform toolchain, simulator, emulator, or device.'))
+                : (kind === 'android'
                   ? 'Forge built a direct-distribution Android artifact. Play upload is optional and uses configured publisher credentials.'
-                  : 'Forge generated and built the native iOS project on this Mac.'
+                  : 'Forge generated and built the native iOS project on this Mac.')
             }
           });
           return;

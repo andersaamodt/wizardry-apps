@@ -104,15 +104,21 @@ printf '%s\n' "$workspace_rows" | awk -F '\t' '
   exit 1
 }
 
-build_err="$scratch/build.err"
-if env XDG_STATE_HOME="$scratch/state" PATH="/usr/bin:/bin" sh "$backend" build-native-mobile-workspace "$root" "$workspace" android release >"$scratch/build.out" 2>"$build_err"; then
-  printf '%s\n' "forge native-mobile import test: missing Gradle should fail instead of reporting prepared" >&2
-  cat "$scratch/build.out" >&2
+mkdir -p "$scratch/home"
+build_out=$(env HOME="$scratch/home" XDG_STATE_HOME="$scratch/state" PATH="/usr/bin:/bin" sh "$backend" build-native-mobile-workspace "$root" "$workspace" android release)
+printf '%s\n' "$build_out" | grep -F 'status=prepared' >/dev/null || {
+  printf '%s\n' "forge native-mobile import test: missing Gradle should prepare mobile project instead of failing" >&2
+  printf '%s\n' "$build_out" >&2
   exit 1
-fi
-grep -F 'Android build failed' "$build_err" >/dev/null || {
-  printf '%s\n' "forge native-mobile import test: missing Gradle should produce an Android build failure" >&2
-  cat "$build_err" >&2
+}
+printf '%s\n' "$build_out" | grep -F "project=$scratch/state/mobile-repair/generated/mobile/android" >/dev/null || {
+  printf '%s\n' "forge native-mobile import test: prepared Android result should report external generated project path" >&2
+  printf '%s\n' "$build_out" >&2
+  exit 1
+}
+printf '%s\n' "$build_out" | grep -F 'missing_tool=android-build-toolchain' >/dev/null || {
+  printf '%s\n' "forge native-mobile import test: prepared Android result should report build toolchain gap" >&2
+  printf '%s\n' "$build_out" >&2
   exit 1
 }
 grep -F "rendered_android=$scratch/state/mobile-repair/generated/mobile/android" "$(env XDG_STATE_HOME="$scratch/state" sh "$backend" rebuild-workspace "$root" "$workspace" native-mobile | awk -F= '$1 == "log" { print $2; exit }')" >/dev/null || {
