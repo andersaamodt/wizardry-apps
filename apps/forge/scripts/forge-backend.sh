@@ -1586,6 +1586,21 @@ macos_bundle_signature_is_usable() {
   codesign --verify --deep --strict "$bundle_path" >/dev/null 2>&1
 }
 
+scrub_macos_bundle_launch_metadata() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  command -v xattr >/dev/null 2>&1 || return 0
+  for attr_name in \
+    com.apple.quarantine \
+    com.apple.provenance \
+    com.apple.macl \
+    com.apple.FinderInfo \
+    com.apple.ResourceFork
+  do
+    xattr -r -d "$attr_name" "$bundle_path" >/dev/null 2>&1 || true
+  done
+}
+
 macos_codesign_identity() {
   if [ -n "${WIZARDRY_CODESIGN_IDENTITY-}" ]; then
     printf '%s\n' "$WIZARDRY_CODESIGN_IDENTITY"
@@ -1605,6 +1620,7 @@ ensure_macos_bundle_signature() {
   bundle_path=${1-}
   [ -d "$bundle_path" ] || return 1
   command -v codesign >/dev/null 2>&1 || return 0
+  scrub_macos_bundle_launch_metadata "$bundle_path"
   if macos_bundle_signature_is_usable "$bundle_path"; then
     return 0
   fi
@@ -1612,6 +1628,22 @@ ensure_macos_bundle_signature() {
   [ -n "$signing_identity" ] || signing_identity=-
   codesign --force --deep --sign "$signing_identity" "$bundle_path" >/dev/null 2>&1 || return 1
   macos_bundle_signature_is_usable "$bundle_path"
+}
+
+macos_bundle_launch_policy_usable() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  executable_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle_path/Contents/Info.plist" 2>/dev/null || true)
+  [ -n "$executable_name" ] || return 1
+  executable_path="$bundle_path/Contents/MacOS/$executable_name"
+  [ -x "$executable_path" ] || return 1
+  spctl_command=${FORGE_SPCTL_COMMAND:-spctl}
+  /bin/sh -c '
+    spctl_cmd=$1
+    executable=$2
+    command -v "$spctl_cmd" >/dev/null 2>&1 || exit 0
+    "$spctl_cmd" --assess --type exec "$executable" >/dev/null 2>&1
+  ' sh "$spctl_command" "$executable_path"
 }
 
 clear_stale_swiftpm_lock() {
@@ -2433,19 +2465,37 @@ install_macos_bundle() {
     rm -rf "$macos_install_stage_root"
     return 1
   fi
-
-  rm -rf "$macos_install_dest_bundle" || {
+  if ! macos_bundle_launch_policy_usable "$macos_install_stage_bundle"; then
     rm -rf "$macos_install_stage_root"
     return 1
-  }
+  fi
+
+  macos_install_backup_bundle="$macos_install_dest_bundle.previous"
+  rm -rf "$macos_install_backup_bundle" >/dev/null 2>&1 || true
+  if [ -e "$macos_install_dest_bundle" ]; then
+    mv "$macos_install_dest_bundle" "$macos_install_backup_bundle" || {
+      rm -rf "$macos_install_stage_root"
+      return 1
+    }
+  fi
   mv "$macos_install_stage_bundle" "$macos_install_dest_bundle" || {
+    [ ! -e "$macos_install_backup_bundle" ] || mv "$macos_install_backup_bundle" "$macos_install_dest_bundle" >/dev/null 2>&1 || true
     rm -rf "$macos_install_stage_root"
     return 1
   }
   if ! ensure_macos_bundle_signature "$macos_install_dest_bundle"; then
+    rm -rf "$macos_install_dest_bundle" >/dev/null 2>&1 || true
+    [ ! -e "$macos_install_backup_bundle" ] || mv "$macos_install_backup_bundle" "$macos_install_dest_bundle" >/dev/null 2>&1 || true
     rm -rf "$macos_install_stage_root"
     return 1
   fi
+  if ! macos_bundle_launch_policy_usable "$macos_install_dest_bundle"; then
+    rm -rf "$macos_install_dest_bundle" >/dev/null 2>&1 || true
+    [ ! -e "$macos_install_backup_bundle" ] || mv "$macos_install_backup_bundle" "$macos_install_dest_bundle" >/dev/null 2>&1 || true
+    rm -rf "$macos_install_stage_root"
+    return 1
+  fi
+  rm -rf "$macos_install_backup_bundle" >/dev/null 2>&1 || true
   rm -rf "$macos_install_stage_root"
   return 0
 }

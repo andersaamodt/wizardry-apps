@@ -228,6 +228,55 @@ scrub_macos_bundle_launch_metadata() {
   done
 }
 
+macos_bundle_signature_is_usable() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  command -v codesign >/dev/null 2>&1 || return 0
+  codesign --verify --deep --strict "$bundle_path" >/dev/null 2>&1
+}
+
+macos_codesign_identity() {
+  if [ -n "${WIZARDRY_CODESIGN_IDENTITY-}" ]; then
+    printf '%s\n' "$WIZARDRY_CODESIGN_IDENTITY"
+    return 0
+  fi
+  if command -v security >/dev/null 2>&1; then
+    detected_identity=$(security find-identity -p codesigning -v 2>/dev/null | awk -F '"' '/".+"/ { print $2; exit }')
+    if [ -n "$detected_identity" ]; then
+      printf '%s\n' "$detected_identity"
+      return 0
+    fi
+  fi
+  printf '%s\n' "-"
+}
+
+ensure_macos_bundle_signature() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  command -v codesign >/dev/null 2>&1 || return 0
+  scrub_macos_bundle_launch_metadata "$bundle_path"
+  signing_identity=$(macos_codesign_identity)
+  [ -n "$signing_identity" ] || signing_identity=-
+  codesign --force --deep --sign "$signing_identity" "$bundle_path" >/dev/null 2>&1 || return 1
+  macos_bundle_signature_is_usable "$bundle_path"
+}
+
+macos_bundle_launch_policy_usable() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  executable_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle_path/Contents/Info.plist" 2>/dev/null || true)
+  [ -n "$executable_name" ] || return 1
+  executable_path="$bundle_path/Contents/MacOS/$executable_name"
+  [ -x "$executable_path" ] || return 1
+  spctl_command=${FORGE_SPCTL_COMMAND:-spctl}
+  /bin/sh -c '
+    spctl_cmd=$1
+    executable=$2
+    command -v "$spctl_cmd" >/dev/null 2>&1 || exit 0
+    "$spctl_cmd" --assess --type exec "$executable" >/dev/null 2>&1
+  ' sh "$spctl_command" "$executable_path"
+}
+
 install_macos_bundle() {
   target=$1
   stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-app.XXXXXX")
@@ -241,6 +290,14 @@ install_macos_bundle() {
     return 1
   fi
   scrub_macos_bundle_launch_metadata "$stage_bundle" || {
+    rm -rf "$stage_root"
+    return 1
+  }
+  ensure_macos_bundle_signature "$stage_bundle" || {
+    rm -rf "$stage_root"
+    return 1
+  }
+  macos_bundle_launch_policy_usable "$stage_bundle" || {
     rm -rf "$stage_root"
     return 1
   }
@@ -261,12 +318,28 @@ install_macos_bundle() {
         return 1
       }
     fi
-    rm -rf "$target"
+    backup_target="$target.previous"
+    rm -rf "$backup_target"
+    if [ -e "$target" ]; then
+      mv "$target" "$backup_target" || {
+        rm -rf "$target_stage"
+        rm -rf "$stage_root"
+        return 1
+      }
+    fi
     mv "$target_stage" "$target" || {
+      [ ! -e "$backup_target" ] || mv "$backup_target" "$target" >/dev/null 2>&1 || true
       rm -rf "$target_stage"
       rm -rf "$stage_root"
       return 1
     }
+    if ! ensure_macos_bundle_signature "$target" || ! macos_bundle_launch_policy_usable "$target"; then
+      rm -rf "$target" >/dev/null 2>&1 || true
+      [ ! -e "$backup_target" ] || mv "$backup_target" "$target" >/dev/null 2>&1 || true
+      rm -rf "$stage_root"
+      return 1
+    fi
+    rm -rf "$backup_target"
     rm -rf "$stage_root"
     printf '%s\n' "$target"
     return 0
@@ -275,13 +348,39 @@ install_macos_bundle() {
   if command -v sudo >/dev/null 2>&1; then
     set +e
     if command -v ditto >/dev/null 2>&1; then
-      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo ditto "$stage_bundle" "$target_stage" && sudo rm -rf "$target" && sudo mv "$target_stage" "$target"
+      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo ditto "$stage_bundle" "$target_stage"
     else
-      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo cp -R "$stage_bundle" "$target_stage" && sudo rm -rf "$target" && sudo mv "$target_stage" "$target"
+      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo cp -R "$stage_bundle" "$target_stage"
     fi
     sudo_rc=$?
     set -e
     if [ "$sudo_rc" -eq 0 ]; then
+      backup_target="$target.previous"
+      if ! sudo rm -rf "$backup_target" >/dev/null 2>&1; then
+        sudo rm -rf "$target_stage" >/dev/null 2>&1 || true
+        rm -rf "$stage_root"
+        return 1
+      fi
+      if sudo test -e "$target"; then
+        if ! sudo mv "$target" "$backup_target"; then
+          sudo rm -rf "$target_stage" >/dev/null 2>&1 || true
+          rm -rf "$stage_root"
+          return 1
+        fi
+      fi
+      if ! sudo mv "$target_stage" "$target"; then
+        sudo test ! -e "$backup_target" || sudo mv "$backup_target" "$target" >/dev/null 2>&1 || true
+        sudo rm -rf "$target_stage" >/dev/null 2>&1 || true
+        rm -rf "$stage_root"
+        return 1
+      fi
+      if ! ensure_macos_bundle_signature "$target" || ! macos_bundle_launch_policy_usable "$target"; then
+        sudo rm -rf "$target" >/dev/null 2>&1 || true
+        sudo test ! -e "$backup_target" || sudo mv "$backup_target" "$target" >/dev/null 2>&1 || true
+        rm -rf "$stage_root"
+        return 1
+      fi
+      sudo rm -rf "$backup_target" >/dev/null 2>&1 || true
       rm -rf "$stage_root"
       printf '%s\n' "$target"
       return 0

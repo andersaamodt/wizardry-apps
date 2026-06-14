@@ -59,6 +59,8 @@ grep -F -- "-framework Carbon" "$root/apps/forge/scripts/forge-backend.sh" >/dev
 grep -F "host_build_signature=" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
 grep -F "host_build_signature=" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "macos_codesign_identity()" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
+grep -F "macos_bundle_launch_policy_usable()" "$root/tools/forge/install-forge.sh" >/dev/null
+grep -F -- "--assess --type exec" "$root/tools/forge/install-forge.sh" >/dev/null
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-install.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
@@ -485,7 +487,16 @@ done
 mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
 printf '%s\n' '#!/bin/sh' 'exit 0' >"$out/Contents/MacOS/app-forge"
 chmod +x "$out/Contents/MacOS/app-forge"
-printf '%s\n' '<plist></plist>' >"$out/Contents/Info.plist"
+cat >"$out/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key>
+  <string>app-forge</string>
+</dict>
+</plist>
+PLIST
 SH
 cat >"$preserve_install_bin/uname" <<'SH'
 #!/bin/sh
@@ -537,7 +548,16 @@ mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
 printf '%s\n' '#!/bin/sh' 'exit 0' >"$out/Contents/MacOS/app-forge"
 chmod +x "$out/Contents/MacOS/app-forge"
 printf '%s\n' "fresh" >"$out/Contents/Resources/fresh-file"
-printf '%s\n' '<plist></plist>' >"$out/Contents/Info.plist"
+cat >"$out/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key>
+  <string>app-forge</string>
+</dict>
+</plist>
+PLIST
 SH
 cat >"$stale_install_bin/uname" <<'SH'
 #!/bin/sh

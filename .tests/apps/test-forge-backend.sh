@@ -53,6 +53,9 @@ grep -F 'launch_macos_bundle_async "$artifact"' "$backend" >/dev/null
 grep -F 'printf '\''built_artifact=%s\n'\'' "$final_bundle"' "$backend" >/dev/null
 grep -F 'install_macos_bundle "$artifact" "$install_path"' "$backend" >/dev/null
 grep -F 'forge_with_serialized_macos_desktop_operation() {' "$backend" >/dev/null
+grep -F 'scrub_macos_bundle_launch_metadata() {' "$backend" >/dev/null
+grep -F 'macos_bundle_launch_policy_usable() {' "$backend" >/dev/null
+grep -F -- '--assess --type exec' "$backend" >/dev/null
 grep -F 'cmd_run_desktop_unlocked "$cmd_run_desktop_root" "$cmd_run_desktop_slug" "$cmd_run_desktop_mode"' "$backend" >/dev/null
 grep -F 'cmd_run_workspace_unlocked "$cmd_run_workspace_root" "$cmd_run_workspace_path" "$cmd_run_workspace_context" "$cmd_run_workspace_mode"' "$backend" >/dev/null
 grep -F 'cmd_install_workspace_unlocked "$cmd_install_workspace_root" "$cmd_install_workspace_path" "$cmd_install_workspace_context" "$cmd_install_workspace_target"' "$backend" >/dev/null
@@ -197,6 +200,10 @@ ensure_macos_bundle_signature() {
   return 0
 }
 
+macos_bundle_launch_policy_usable() {
+  return 0
+}
+
 $bundle_install_functions
 
 src="\${1?missing source bundle}"
@@ -286,6 +293,10 @@ codesign_identity_fallback=$(PATH="$codesign_identity_bin:/bin:/usr/bin:/usr/sbi
 }
 [ ! -e "$bundle_install_dest/Contents/stale-file" ] || {
   printf '%s\n' "forge backend test: macOS bundle install left stale destination files" >&2
+  exit 1
+}
+[ ! -e "$bundle_install_dest.previous" ] || {
+  printf '%s\n' "forge backend test: macOS bundle install left stale backup bundle" >&2
   exit 1
 }
 ditto_calls=$(wc -l <"$scratch/bundle-install-ditto.log" | tr -d ' ')
