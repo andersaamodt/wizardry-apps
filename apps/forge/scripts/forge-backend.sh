@@ -4451,6 +4451,19 @@ sanitize_ui_pref_value() {
   printf '%s' "$value" | tr '\r\n' ' '
 }
 
+validate_ui_pref_value() {
+  pref_key=${1-}
+  pref_value=${2-}
+  case "$pref_key" in
+    macos_apps_install_dir)
+      if [ -n "$pref_value" ] && ! normalize_macos_apps_install_dir "$pref_value" >/dev/null 2>&1; then
+        printf '%s\n' "forge-backend: invalid macOS apps install folder: $pref_value" >&2
+        exit 2
+      fi
+      ;;
+  esac
+}
+
 cmd_get_ui_prefs() {
   prefs_file=$(forge_ui_prefs_file)
   [ -f "$prefs_file" ] || exit 0
@@ -4477,6 +4490,7 @@ cmd_set_ui_pref() {
   prefs_file=$(forge_ui_prefs_file)
   [ -f "$prefs_file" ] || : > "$prefs_file"
   value=$(sanitize_ui_pref_value "$value")
+  validate_ui_pref_value "$key" "$value"
   write_key_value_file "$prefs_file" "$key" "$value"
   printf 'key=%s\n' "$key"
   printf 'value=%s\n' "$value"

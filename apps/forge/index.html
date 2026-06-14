@@ -46,6 +46,16 @@
           </article>
 
           <article class="card">
+            <h3>macOS App Install Folder</h3>
+            <p class="sub">Used for Install and self-restart on macOS. Leave blank to use Forge's default location policy.</p>
+            <label for="settings-macos-apps-dir">Desktop app bundle folder</label>
+            <div class="input-row settings-save-row">
+              <input id="settings-macos-apps-dir" type="text" placeholder="/Applications or /Users/you/Applications" spellcheck="false">
+              <button id="apply-macos-apps-dir" type="button" class="action settings-save-btn">Save</button>
+            </div>
+          </article>
+
+          <article class="card">
             <h3>Repository Root</h3>
             <label for="repo-root">wizardry-apps root</label>
             <div class="input-row settings-save-row">
@@ -461,6 +471,7 @@
       var ACTIVE_MINI_TAB_KEY = 'wizardry.forge.active_mini_tab.v1';
       var MINI_TAB_ASSIGNMENTS_KEY = 'wizardry.forge.mini_tab_assignments.v1';
       var INSTALL_BEFORE_RUN_KEY = 'wizardry.forge.install_before_run.v1';
+      var MACOS_APPS_INSTALL_DIR_KEY = 'wizardry.forge.macos_apps_install_dir.v1';
       var INTERNAL_CATALOG_DRAG_TYPE = 'application/x-wizardry-forge-catalog-item';
       var INTERNAL_CATALOG_DRAG_PREFIX = 'wizardry-catalog-item:';
       var ASSET_VERSION = 'forge20260218a';
@@ -484,13 +495,15 @@
         'wizardry.forge.mini_tabs.v1': 'mini_tabs',
         'wizardry.forge.active_mini_tab.v1': 'active_mini_tab',
         'wizardry.forge.mini_tab_assignments.v1': 'mini_tab_assignments',
-        'wizardry.forge.install_before_run.v1': 'install_before_run'
+        'wizardry.forge.install_before_run.v1': 'install_before_run',
+        'wizardry.forge.macos_apps_install_dir.v1': 'macos_apps_install_dir'
       };
 
       var state = {
         appDir: inferAppDir(),
         rootHint: '',
         projectsRoot: '',
+        macosAppsInstallDir: '',
         homeDir: '',
         os: '',
         tools: {},
@@ -677,6 +690,9 @@
           }
           if (state.projectsRoot) {
             els.settingsProjectsRoot.value = state.projectsRoot;
+          }
+          if (els.settingsMacosAppsDir) {
+            els.settingsMacosAppsDir.value = state.macosAppsInstallDir;
           }
           syncSettingsSaveButtons();
           renderCatalogList();
@@ -2206,6 +2222,15 @@
         syncSettingsSaveButtons();
       }
 
+      function setMacosAppsInstallDir(path) {
+        state.macosAppsInstallDir = path || '';
+        saveStorage(MACOS_APPS_INSTALL_DIR_KEY, state.macosAppsInstallDir);
+        if (els.settingsMacosAppsDir) {
+          els.settingsMacosAppsDir.value = state.macosAppsInstallDir;
+        }
+        syncSettingsSaveButtons();
+      }
+
       function setIconSquircleOnDrop(enabled) {
         state.iconSquircleOnDrop = !!enabled;
         saveStorage(ICON_SQUIRCLE_ON_DROP_KEY, state.iconSquircleOnDrop ? 'true' : 'false');
@@ -2336,6 +2361,7 @@
       function refreshStateFromStorage() {
         state.rootHint = loadStorage(ROOT_KEY);
         state.projectsRoot = loadStorage(PROJECTS_ROOT_KEY);
+        state.macosAppsInstallDir = loadStorage(MACOS_APPS_INSTALL_DIR_KEY);
         state.organizeShow = loadStorage(ORGANIZE_SHOW_KEY) || 'both';
         state.organizeSort = normalizeOrganizeSort(loadStorage(ORGANIZE_SORT_KEY) || 'alphabetical');
         state.organizeGitFilter = normalizeOrganizeGitFilter(loadStorage(ORGANIZE_GIT_FILTER_KEY) || 'all');
@@ -2529,6 +2555,10 @@
         if (els.applyProjectsRoot && els.settingsProjectsRoot) {
           var projectsChanged = normalizedSettingValue(els.settingsProjectsRoot.value) !== normalizedSettingValue(state.projectsRoot);
           els.applyProjectsRoot.disabled = !!state.busy || !projectsChanged;
+        }
+        if (els.applyMacosAppsDir && els.settingsMacosAppsDir) {
+          var macosAppsDirChanged = normalizedSettingValue(els.settingsMacosAppsDir.value) !== normalizedSettingValue(state.macosAppsInstallDir);
+          els.applyMacosAppsDir.disabled = !!state.busy || !macosAppsDirChanged;
         }
       }
 
@@ -9834,6 +9864,10 @@
           els.settingsProjectsRoot.addEventListener('input', syncSettingsSaveButtons);
         }
 
+        if (els.settingsMacosAppsDir) {
+          els.settingsMacosAppsDir.addEventListener('input', syncSettingsSaveButtons);
+        }
+
         els.applyRepoRoot.addEventListener('click', function () {
           var nextRoot = normalizedSettingValue(els.repoRoot.value);
           if (nextRoot === normalizedSettingValue(state.rootHint)) {
@@ -9857,6 +9891,18 @@
             return refreshWorkspaces({ quiet: true });
           }, { noToast: true, swallow: true, keepResult: true });
         });
+
+        if (els.applyMacosAppsDir) {
+          els.applyMacosAppsDir.addEventListener('click', function () {
+            var nextMacosAppsDir = normalizedSettingValue(els.settingsMacosAppsDir.value);
+            if (nextMacosAppsDir === normalizedSettingValue(state.macosAppsInstallDir)) {
+              syncSettingsSaveButtons();
+              return;
+            }
+            setMacosAppsInstallDir(nextMacosAppsDir);
+            toast('macOS app install folder updated. Future Install and self-restart actions will use this folder.', 'ok');
+          });
+        }
 
         if (els.installXcodegen) {
           els.installXcodegen.addEventListener('click', function () {
@@ -10357,6 +10403,8 @@
         els.applyRepoRoot = document.getElementById('apply-repo-root');
         els.settingsProjectsRoot = document.getElementById('settings-projects-root');
         els.applyProjectsRoot = document.getElementById('apply-projects-root');
+        els.settingsMacosAppsDir = document.getElementById('settings-macos-apps-dir');
+        els.applyMacosAppsDir = document.getElementById('apply-macos-apps-dir');
         els.installXcodegen = document.getElementById('install-xcodegen');
         els.installGradle = document.getElementById('install-gradle');
         els.installJava = document.getElementById('install-java');
@@ -10429,6 +10477,9 @@
           }
           if (state.projectsRoot) {
             els.settingsProjectsRoot.value = state.projectsRoot;
+          }
+          if (els.settingsMacosAppsDir) {
+            els.settingsMacosAppsDir.value = state.macosAppsInstallDir;
           }
           syncSettingsSaveButtons();
 

@@ -282,6 +282,20 @@ if printf '%s\n' "$set_pref_out" | tr '\r' '\n' | grep -E '^forged=' >/dev/null 
 fi
 printf '%s\n' "$set_pref_out" | grep -F "file=" >/dev/null
 
+macos_prefs_home="$scratch/macos-prefs-home"
+macos_prefs_dir="$macos_prefs_home/.config"
+macos_apps_dir="$scratch/custom-macos-apps"
+macos_pref_out=$(XDG_CONFIG_HOME="$macos_prefs_dir" sh "$backend" set-ui-pref "$scratch" "macos_apps_install_dir" "$macos_apps_dir")
+printf '%s\n' "$macos_pref_out" | grep -F "key=macos_apps_install_dir" >/dev/null
+printf '%s\n' "$macos_pref_out" | grep -F "value=$macos_apps_dir" >/dev/null
+grep -F "macos_apps_install_dir=$macos_apps_dir" "$macos_prefs_dir/wizardry-apps/forge-ui.conf" >/dev/null
+
+if XDG_CONFIG_HOME="$macos_prefs_dir" sh "$backend" set-ui-pref "$scratch" "macos_apps_install_dir" "relative/path" >"$scratch/forge-invalid-macos-pref.out" 2>"$scratch/forge-invalid-macos-pref.err"; then
+  printf '%s\n' "forge backend test: invalid macOS apps install folder accepted" >&2
+  exit 1
+fi
+grep -F "invalid macOS apps install folder" "$scratch/forge-invalid-macos-pref.err" >/dev/null
+
 bundle_scripts="$scratch/App Forge.app/Contents/Resources/forge/scripts"
 bundle_root_file="$scratch/App Forge.app/Contents/Resources/wizardry-apps-root.txt"
 mkdir -p "$bundle_scripts"

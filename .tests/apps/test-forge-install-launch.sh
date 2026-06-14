@@ -553,6 +553,23 @@ PATH="$stale_install_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
 grep -Fx "fresh" "$stale_install_target/Contents/Resources/fresh-file" >/dev/null
 [ ! -e "$stale_install_target/Contents/Resources/stale/old-file" ]
 
+custom_install_home="$scratch/custom-install-home"
+custom_install_apps_dir="$scratch/Custom Apps"
+custom_install_config="$custom_install_home/.config/wizardry-apps"
+mkdir -p "$custom_install_config"
+printf '%s\n' "macos_apps_install_dir=$custom_install_apps_dir" >"$custom_install_config/forge-ui.conf"
+custom_install_out=$(XDG_CONFIG_HOME="$custom_install_home/.config" sh "$install" --root "$root" --home "$custom_install_home")
+printf '%s\n' "$custom_install_out" | grep -F "installed_command=$custom_install_home/.local/bin/app-forge" >/dev/null
+os=$(uname -s 2>/dev/null || printf unknown)
+case "$os" in
+  Darwin)
+    printf '%s\n' "$custom_install_out" | grep -F "installed_app=$custom_install_apps_dir/App Forge.app" >/dev/null
+    [ -x "$custom_install_apps_dir/App Forge.app/Contents/MacOS/wizardry-host" ]
+    [ ! -e "$custom_install_home/Applications/App Forge.app" ]
+    [ ! -e "/Applications/App Forge.app" ] || [ -d "/Applications/App Forge.app" ]
+    ;;
+esac
+
 install_out=$(sh "$install" --root "$root" --home "$fake_home")
 printf '%s\n' "$install_out" | grep -F "installed_command=$fake_home/.local/bin/app-forge" >/dev/null
 printf '%s\n' "$install_out" | grep -F "workspace_root_file=$fake_home/.config/wizardry-apps/forge-root" >/dev/null
