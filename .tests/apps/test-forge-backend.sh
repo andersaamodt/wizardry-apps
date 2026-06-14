@@ -234,6 +234,56 @@ FORGE_DITTO_LOG="$scratch/bundle-install-ditto.log" \
   printf '%s\n' "forge backend test: macOS bundle install did not populate destination" >&2
   exit 1
 }
+
+codesign_identity_functions=$(awk '
+  /^macos_codesign_identity\(\)/ { printing = 1 }
+  /^ensure_macos_bundle_signature\(\)/ { printing = 0 }
+  printing { print }
+' "$backend")
+codesign_identity_probe="$scratch/codesign-identity-probe.sh"
+cat >"$codesign_identity_probe" <<SH
+#!/bin/sh
+set -eu
+
+$codesign_identity_functions
+
+macos_codesign_identity
+SH
+chmod +x "$codesign_identity_probe"
+
+codesign_identity_bin="$scratch/codesign-identity-bin"
+mkdir -p "$codesign_identity_bin"
+cat >"$codesign_identity_bin/security" <<'SH'
+#!/bin/sh
+set -eu
+printf '%s\n' '  1) ABCDEF1234567890 "Wizardry Local Code Signing"'
+SH
+chmod +x "$codesign_identity_bin/security"
+
+codesign_identity_detected=$(PATH="$codesign_identity_bin:/bin:/usr/bin:/usr/sbin:/sbin" sh "$codesign_identity_probe")
+[ "$codesign_identity_detected" = "Wizardry Local Code Signing" ] || {
+  printf '%s\n' "forge backend test: macOS codesign identity probe did not prefer detected local identity" >&2
+  exit 1
+}
+
+codesign_identity_override=$(PATH="$codesign_identity_bin:/bin:/usr/bin:/usr/sbin:/sbin" WIZARDRY_CODESIGN_IDENTITY="Manual Override Identity" sh "$codesign_identity_probe")
+[ "$codesign_identity_override" = "Manual Override Identity" ] || {
+  printf '%s\n' "forge backend test: macOS codesign identity probe did not honor WIZARDRY_CODESIGN_IDENTITY" >&2
+  exit 1
+}
+
+cat >"$codesign_identity_bin/security-empty" <<'SH'
+#!/bin/sh
+set -eu
+exit 0
+SH
+chmod +x "$codesign_identity_bin/security-empty"
+ln -sf "$codesign_identity_bin/security-empty" "$codesign_identity_bin/security"
+codesign_identity_fallback=$(PATH="$codesign_identity_bin:/bin:/usr/bin:/usr/sbin:/sbin" sh "$codesign_identity_probe")
+[ "$codesign_identity_fallback" = "-" ] || {
+  printf '%s\n' "forge backend test: macOS codesign identity probe did not fall back to ad hoc signing" >&2
+  exit 1
+}
 [ ! -e "$bundle_install_dest/Contents/stale-file" ] || {
   printf '%s\n' "forge backend test: macOS bundle install left stale destination files" >&2
   exit 1
