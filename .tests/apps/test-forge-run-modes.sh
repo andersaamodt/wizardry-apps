@@ -224,19 +224,25 @@ if find "$scratch_path" -type d \( -name ModuleCache -o -name ModuleCache.noinde
 fi
 
 workspace_root=$(CDPATH= cd -- "$package_path/../.." && pwd -P)
-app_id=$(awk -F= '
-  $1 ~ /^[[:space:]]*#/ { next }
-  {
-    gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
-    if ($1 == "project_id") {
-      v=$0
-      sub(/^[^=]*=/, "", v)
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
-      print v
-      exit
+app_id=''
+if [ -f "$package_path/Package.swift" ]; then
+  app_id=$(awk -F: '$1 == "// app-id" { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit }' "$package_path/Package.swift")
+fi
+if [ -z "$app_id" ] && [ -f "$workspace_root/wizardry.workspace.conf" ]; then
+  app_id=$(awk -F= '
+    $1 ~ /^[[:space:]]*#/ { next }
+    {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+      if ($1 == "project_id") {
+        v=$0
+        sub(/^[^=]*=/, "", v)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+        print v
+        exit
+      }
     }
-  }
-' "$workspace_root/wizardry.workspace.conf")
+  ' "$workspace_root/wizardry.workspace.conf")
+fi
 [ -n "$app_id" ] || {
   printf '%s\n' "fake swift could not resolve app id" >&2
   exit 1
@@ -516,9 +522,10 @@ make_native_workspace() {
   targets=$4
   app_id=$5
   app_name=$6
+  macos_package_dir=${7:-$workspace/generated/macos}
 
   mkdir -p "$workspace/app-blueprint" "$workspace/generated/linux/src"
-  mkdir -p "$workspace/generated/macos"
+  mkdir -p "$macos_package_dir"
   cat > "$workspace/app-blueprint/app.ir.yaml" <<IR
 {
   "schemaVersion": "1.0",
@@ -538,7 +545,8 @@ int main(void) {
   return 0;
 }
 C
-  cat > "$workspace/generated/macos/Package.swift" <<'SWIFT'
+  cat > "$macos_package_dir/Package.swift" <<SWIFT
+// app-id: $app_id
 // fake swift package for Forge tests
 SWIFT
   cat > "$workspace/wizardry.workspace.conf" <<CONF
@@ -606,5 +614,27 @@ workspace_native_macos_artifact=$(printf '%s\n' "$workspace_native_macos_out" | 
 [ -d "$workspace_native_macos_artifact" ]
 [ ! -d "$workspace_native_macos_build/arm64-apple-macosx/debug/ModuleCache" ]
 [ "$(cat "$test_opened_bundle")" = "$workspace_native_macos_artifact" ]
+
+# Behavior: native macOS workspaces can keep generated Swift packages outside
+# the checkout when their render command reports the package location.
+workspace_native_macos_external="$scratch/workspace-native-macos-external"
+workspace_native_macos_external_pkg="$scratch/state/workspace-native-macos-external/generated/macos"
+make_native_workspace "$workspace_native_macos_external" "workspace-native-macos-external" "Workspace Native Mac External" "macos" "workspace-native-macos-external" "Workspace Native Mac External" "$workspace_native_macos_external_pkg"
+cat > "$workspace_native_macos_external/scripts-render.sh" <<SH
+#!/bin/sh
+set -eu
+printf 'status=ok\n'
+printf 'macos=%s\n' "$workspace_native_macos_external_pkg"
+SH
+chmod +x "$workspace_native_macos_external/scripts-render.sh"
+awk '
+  $1 == "run_rebuild_command=:" { print "run_rebuild_command=sh scripts-render.sh"; next }
+  { print }
+' "$workspace_native_macos_external/wizardry.workspace.conf" > "$workspace_native_macos_external/wizardry.workspace.conf.tmp"
+mv "$workspace_native_macos_external/wizardry.workspace.conf.tmp" "$workspace_native_macos_external/wizardry.workspace.conf"
+workspace_native_macos_external_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$backend" run-workspace "$root" "$workspace_native_macos_external" native-desktop normal)
+assert_contains "$workspace_native_macos_external_out" "launched=1"
+workspace_native_macos_external_artifact=$(printf '%s\n' "$workspace_native_macos_external_out" | kv_read artifact)
+[ -d "$workspace_native_macos_external_artifact" ]
 
 printf '%s\n' "forge run-mode behavior tests passed"

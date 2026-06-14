@@ -51,6 +51,13 @@ grep -F 'open -n "$bundle"' "$backend" >/dev/null
 grep -F 'launch_bundle=$(prepare_macos_run_bundle "$final_bundle" "$workspace_title")' "$backend" >/dev/null
 grep -F 'printf '\''built_artifact=%s\n'\'' "$final_bundle"' "$backend" >/dev/null
 grep -F 'install_macos_bundle "$artifact" "$install_path"' "$backend" >/dev/null
+grep -F 'forge_with_serialized_macos_desktop_operation() {' "$backend" >/dev/null
+grep -F 'cmd_run_desktop_unlocked "$cmd_run_desktop_root" "$cmd_run_desktop_slug" "$cmd_run_desktop_mode"' "$backend" >/dev/null
+grep -F 'cmd_run_workspace_unlocked "$cmd_run_workspace_root" "$cmd_run_workspace_path" "$cmd_run_workspace_context" "$cmd_run_workspace_mode"' "$backend" >/dev/null
+grep -F 'cmd_install_workspace_unlocked "$cmd_install_workspace_root" "$cmd_install_workspace_path" "$cmd_install_workspace_context" "$cmd_install_workspace_target"' "$backend" >/dev/null
+grep -F 'resolve_native_macos_package_dir "$root" "$workspace_path" "$workspace_slug"' "$backend" >/dev/null
+grep -F '$1 == "macos" {' "$backend" >/dev/null
+grep -F '${XDG_STATE_HOME:-$HOME/.local/state}/$resolve_native_macos_package_workspace_slug/generated/macos' "$backend" >/dev/null
 mic_usage_count=$(grep -F '<key>NSMicrophoneUsageDescription</key><string>This app uses the microphone for local voice input and voice automation commands.</string>' "$backend" | wc -l | tr -d ' ')
 case "$mic_usage_count" in
   ''|0|1|2|3)

@@ -261,6 +261,79 @@ forge_workbench_root() {
   printf '%s\n' "$(forge_checkout_state_root "$root")/workbench"
 }
 
+forge_macos_desktop_operation_lock_dir() {
+  forge_macos_desktop_operation_lock_root=${1-}
+  [ -n "$forge_macos_desktop_operation_lock_root" ] || return 1
+  printf '%s\n' "$(forge_workbench_root "$forge_macos_desktop_operation_lock_root")/locks/macos-desktop-operation.lock"
+}
+
+forge_macos_desktop_operation_lock_pid_file() {
+  forge_macos_desktop_operation_lock_pid_root=${1-}
+  [ -n "$forge_macos_desktop_operation_lock_pid_root" ] || return 1
+  printf '%s\n' "$(forge_macos_desktop_operation_lock_dir "$forge_macos_desktop_operation_lock_pid_root")/pid"
+}
+
+forge_macos_desktop_operation_release_lock() {
+  forge_macos_desktop_operation_release_root=${1-}
+  [ -n "$forge_macos_desktop_operation_release_root" ] || return 1
+  forge_macos_desktop_operation_release_lock_dir=$(forge_macos_desktop_operation_lock_dir "$forge_macos_desktop_operation_release_root")
+  forge_macos_desktop_operation_release_pid_file=$(forge_macos_desktop_operation_lock_pid_file "$forge_macos_desktop_operation_release_root")
+  rm -f "$forge_macos_desktop_operation_release_pid_file" 2>/dev/null || true
+  rmdir "$forge_macos_desktop_operation_release_lock_dir" 2>/dev/null || true
+}
+
+forge_macos_desktop_operation_acquire_lock() {
+  forge_macos_desktop_operation_acquire_root=${1-}
+  forge_macos_desktop_operation_acquire_label=${2-}
+  [ -n "$forge_macos_desktop_operation_acquire_root" ] || return 1
+  [ -n "$forge_macos_desktop_operation_acquire_label" ] || forge_macos_desktop_operation_acquire_label='macos-desktop-operation'
+  forge_macos_desktop_operation_acquire_lock_dir=$(forge_macos_desktop_operation_lock_dir "$forge_macos_desktop_operation_acquire_root")
+  forge_macos_desktop_operation_acquire_pid_file=$(forge_macos_desktop_operation_lock_pid_file "$forge_macos_desktop_operation_acquire_root")
+  mkdir -p "$(dirname "$forge_macos_desktop_operation_acquire_lock_dir")"
+  forge_macos_desktop_operation_acquire_wait_seconds=${FORGE_MACOS_DESKTOP_OPERATION_LOCK_WAIT_SECONDS:-1800}
+  case "$forge_macos_desktop_operation_acquire_wait_seconds" in ''|*[!0-9]*) forge_macos_desktop_operation_acquire_wait_seconds=1800 ;; esac
+  forge_macos_desktop_operation_acquire_started_at=$(date +%s 2>/dev/null || printf '0')
+  while ! mkdir "$forge_macos_desktop_operation_acquire_lock_dir" 2>/dev/null; do
+    forge_macos_desktop_operation_acquire_owner_pid=''
+    if [ -f "$forge_macos_desktop_operation_acquire_pid_file" ]; then
+      forge_macos_desktop_operation_acquire_owner_pid=$(cat "$forge_macos_desktop_operation_acquire_pid_file" 2>/dev/null || true)
+    fi
+    if [ -n "$forge_macos_desktop_operation_acquire_owner_pid" ] &&
+       kill -0 "$forge_macos_desktop_operation_acquire_owner_pid" 2>/dev/null; then
+      forge_macos_desktop_operation_acquire_now=$(date +%s 2>/dev/null || printf '0')
+      case "$forge_macos_desktop_operation_acquire_now" in ''|*[!0-9]*) forge_macos_desktop_operation_acquire_now=0 ;; esac
+      case "$forge_macos_desktop_operation_acquire_started_at" in ''|*[!0-9]*) forge_macos_desktop_operation_acquire_started_at=0 ;; esac
+      if [ "$forge_macos_desktop_operation_acquire_started_at" -gt 0 ] &&
+         [ "$forge_macos_desktop_operation_acquire_now" -gt 0 ] &&
+         [ $((forge_macos_desktop_operation_acquire_now - forge_macos_desktop_operation_acquire_started_at)) -ge "$forge_macos_desktop_operation_acquire_wait_seconds" ]; then
+        printf '%s\n' "forge-backend: timed out waiting for macOS desktop operation lock during $forge_macos_desktop_operation_acquire_label" >&2
+        exit 1
+      fi
+      sleep 1
+      continue
+    fi
+    rm -f "$forge_macos_desktop_operation_acquire_pid_file" 2>/dev/null || true
+    rm -rf "$forge_macos_desktop_operation_acquire_lock_dir" 2>/dev/null || true
+  done
+  printf '%s\n' "$$" >"$forge_macos_desktop_operation_acquire_pid_file"
+}
+
+forge_with_serialized_macos_desktop_operation() {
+  forge_with_serialized_macos_desktop_operation_root=${1-}
+  forge_with_serialized_macos_desktop_operation_label=${2-}
+  shift 2
+  [ -n "$forge_with_serialized_macos_desktop_operation_root" ] || return 1
+  [ "$#" -gt 0 ] || return 1
+  forge_macos_desktop_operation_acquire_lock "$forge_with_serialized_macos_desktop_operation_root" "$forge_with_serialized_macos_desktop_operation_label"
+  if "$@"; then
+    forge_with_serialized_macos_desktop_operation_status=0
+  else
+    forge_with_serialized_macos_desktop_operation_status=$?
+  fi
+  forge_macos_desktop_operation_release_lock "$forge_with_serialized_macos_desktop_operation_root"
+  return "$forge_with_serialized_macos_desktop_operation_status"
+}
+
 forge_build_cache_root() {
   root=${1-}
   [ -n "$root" ] || return 1
@@ -1698,6 +1771,53 @@ run_workspace_rebuild() {
 
   printf '%s\n' "forge-backend: project rebuild failed (see log: $log_path)" >&2
   exit 1
+}
+
+native_macos_rebuild_log_path() {
+  native_macos_rebuild_log_root=${1-}
+  native_macos_rebuild_log_workspace_path=${2-}
+  [ -n "$native_macos_rebuild_log_root" ] || return 1
+  [ -n "$native_macos_rebuild_log_workspace_path" ] || return 1
+  native_macos_rebuild_log_workspace_slug=$(sanitize_bundle_component "$(basename "$native_macos_rebuild_log_workspace_path")")
+  printf '%s\n' "$(forge_workbench_root "$native_macos_rebuild_log_root")/log/workspace-$native_macos_rebuild_log_workspace_slug-rebuild.log"
+}
+
+resolve_native_macos_package_dir() {
+  resolve_native_macos_package_root=${1-}
+  resolve_native_macos_package_workspace_path=${2-}
+  resolve_native_macos_package_workspace_slug=${3-}
+  [ -n "$resolve_native_macos_package_root" ] || return 1
+  [ -n "$resolve_native_macos_package_workspace_path" ] || return 1
+  [ -n "$resolve_native_macos_package_workspace_slug" ] || return 1
+
+  resolve_native_macos_package_dir="$resolve_native_macos_package_workspace_path/generated/macos"
+  if [ -f "$resolve_native_macos_package_dir/Package.swift" ]; then
+    printf '%s\n' "$resolve_native_macos_package_dir"
+    return 0
+  fi
+
+  resolve_native_macos_package_log=$(native_macos_rebuild_log_path "$resolve_native_macos_package_root" "$resolve_native_macos_package_workspace_path")
+  if [ -f "$resolve_native_macos_package_log" ]; then
+    resolve_native_macos_package_dir=$(awk -F= '
+      $1 == "macos" {
+        v=$0
+        sub(/^[^=]*=/, "", v)
+        print v
+      }
+    ' "$resolve_native_macos_package_log" | tail -n 1)
+    if [ -n "$resolve_native_macos_package_dir" ] && [ -f "$resolve_native_macos_package_dir/Package.swift" ]; then
+      printf '%s\n' "$resolve_native_macos_package_dir"
+      return 0
+    fi
+  fi
+
+  resolve_native_macos_package_dir="${XDG_STATE_HOME:-$HOME/.local/state}/$resolve_native_macos_package_workspace_slug/generated/macos"
+  if [ -f "$resolve_native_macos_package_dir/Package.swift" ]; then
+    printf '%s\n' "$resolve_native_macos_package_dir"
+    return 0
+  fi
+
+  return 1
 }
 
 config_field() {
@@ -5795,6 +5915,7 @@ write_project_icon_from_file() {
     tmp_copy="$tmp_copy_base.png"
     rm -f "$tmp_copy"
     if sips -s format png -z 1024 1024 "$image_path" --out "$tmp_copy" >/dev/null 2>&1; then
+      mkdir -p "$(dirname "$icon_path")"
       mv "$tmp_copy" "$icon_path"
       rm -f "$legacy_icns_path"
       printf 'icon=%s\n' "$icon_path"
@@ -6635,9 +6756,8 @@ build_native_workspace_host() {
   case "$os" in
     darwin)
       require_tool swift
-      package_dir="$workspace_path/generated/macos"
-      [ -f "$package_dir/Package.swift" ] || {
-        printf '%s\n' "forge-backend: native macOS package is missing Package.swift: $package_dir" >&2
+      package_dir=$(resolve_native_macos_package_dir "$root" "$workspace_path" "$workspace_slug") || {
+        printf '%s\n' "forge-backend: native macOS package is missing Package.swift: $workspace_path/generated/macos" >&2
         exit 1
       }
 
@@ -6989,7 +7109,7 @@ APP
   esac
 }
 
-cmd_install_workspace() {
+cmd_install_workspace_unlocked() {
   root=$(require_root "${1-}")
   workspace_path=${2-}
   context_hint=${3-}
@@ -7337,7 +7457,7 @@ DESKTOP
   esac
 }
 
-cmd_run_desktop() {
+cmd_run_desktop_unlocked() {
   root=$(require_root "${1-}")
   slug=${2-}
   run_mode=${3-}
@@ -7638,7 +7758,7 @@ cmd_rebuild_workspace() {
   esac
 }
 
-cmd_run_workspace() {
+cmd_run_workspace_unlocked() {
   root=$(require_root "${1-}")
   workspace_path=${2-}
   context_hint=${3-}
@@ -8209,6 +8329,57 @@ APP
     printf 'log=%s\n' "$log_path"
     return 0
   fi
+}
+
+cmd_install_workspace() {
+  cmd_install_workspace_root=$(require_root "${1-}")
+  cmd_install_workspace_path=${2-}
+  cmd_install_workspace_context=${3-}
+  cmd_install_workspace_target=${4-}
+  cmd_install_workspace_os=$(os_id)
+  cmd_install_workspace_effective_context=$cmd_install_workspace_context
+  if [ -z "$cmd_install_workspace_effective_context" ] && [ -n "$cmd_install_workspace_path" ] && [ -f "$cmd_install_workspace_path/wizardry.workspace.conf" ]; then
+    cmd_install_workspace_effective_context=$(workspace_field "$cmd_install_workspace_path/wizardry.workspace.conf" development_context "")
+  fi
+  [ -n "$cmd_install_workspace_effective_context" ] || cmd_install_workspace_effective_context='web'
+  if [ "$cmd_install_workspace_os" = 'darwin' ] && [ "$cmd_install_workspace_effective_context" != 'native-mobile' ]; then
+    forge_with_serialized_macos_desktop_operation "$cmd_install_workspace_root" "install-workspace:$cmd_install_workspace_effective_context" \
+      cmd_install_workspace_unlocked "$cmd_install_workspace_root" "$cmd_install_workspace_path" "$cmd_install_workspace_context" "$cmd_install_workspace_target"
+    return $?
+  fi
+  cmd_install_workspace_unlocked "$cmd_install_workspace_root" "$cmd_install_workspace_path" "$cmd_install_workspace_context" "$cmd_install_workspace_target"
+}
+
+cmd_run_desktop() {
+  cmd_run_desktop_root=$(require_root "${1-}")
+  cmd_run_desktop_slug=${2-}
+  cmd_run_desktop_mode=${3-}
+  cmd_run_desktop_os=$(os_id)
+  if [ "$cmd_run_desktop_os" = 'darwin' ]; then
+    forge_with_serialized_macos_desktop_operation "$cmd_run_desktop_root" "run-desktop:$cmd_run_desktop_slug" \
+      cmd_run_desktop_unlocked "$cmd_run_desktop_root" "$cmd_run_desktop_slug" "$cmd_run_desktop_mode"
+    return $?
+  fi
+  cmd_run_desktop_unlocked "$cmd_run_desktop_root" "$cmd_run_desktop_slug" "$cmd_run_desktop_mode"
+}
+
+cmd_run_workspace() {
+  cmd_run_workspace_root=$(require_root "${1-}")
+  cmd_run_workspace_path=${2-}
+  cmd_run_workspace_context=${3-}
+  cmd_run_workspace_mode=${4-}
+  cmd_run_workspace_os=$(os_id)
+  cmd_run_workspace_effective_context=$cmd_run_workspace_context
+  if [ -z "$cmd_run_workspace_effective_context" ] && [ -n "$cmd_run_workspace_path" ] && [ -f "$cmd_run_workspace_path/wizardry.workspace.conf" ]; then
+    cmd_run_workspace_effective_context=$(workspace_field "$cmd_run_workspace_path/wizardry.workspace.conf" development_context "")
+  fi
+  [ -n "$cmd_run_workspace_effective_context" ] || cmd_run_workspace_effective_context='web'
+  if [ "$cmd_run_workspace_os" = 'darwin' ] && [ "$cmd_run_workspace_effective_context" != 'native-mobile' ]; then
+    forge_with_serialized_macos_desktop_operation "$cmd_run_workspace_root" "run-workspace:$cmd_run_workspace_effective_context" \
+      cmd_run_workspace_unlocked "$cmd_run_workspace_root" "$cmd_run_workspace_path" "$cmd_run_workspace_context" "$cmd_run_workspace_mode"
+    return $?
+  fi
+  cmd_run_workspace_unlocked "$cmd_run_workspace_root" "$cmd_run_workspace_path" "$cmd_run_workspace_context" "$cmd_run_workspace_mode"
 }
 
 cmd_serve_hosted_web() {
@@ -9165,6 +9336,10 @@ GDSCRIPT
   esac
   if [ "$development_context" = "web" ] && [ "$starter" = "theurgy-reference-app" ]; then
     run_rebuild_command="sh scripts/prepare-theurgy-runtime.sh"
+  fi
+
+  if [ -d "$workspace_dir/app/scripts" ]; then
+    find "$workspace_dir/app/scripts" -type f -name '*.sh' -exec chmod +x {} +
   fi
 
   profile_source=""
