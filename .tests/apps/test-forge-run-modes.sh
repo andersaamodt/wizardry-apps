@@ -360,23 +360,15 @@ desktop_entry=$(printf '%s\n' "$desktop_out" | kv_read entry)
 [ -f "$desktop_entry/index.html" ]
 wait_for_file_contains "$desktop_log" "$desktop_entry" 60
 
-# Behavior: macOS run uses a durable Applications bundle, not the disposable
-# workbench bundle that Dock pins can later lose.
+# Behavior: macOS run launches the compiled bundle directly unless install-first
+# is explicitly requested.
 macos_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$backend" run-desktop "$root" forge)
 assert_contains "$macos_out" "launched=1"
 assert_contains "$macos_out" "mode=desktop-executable"
 macos_installed=$(printf '%s\n' "$macos_out" | kv_read installed)
 macos_artifact=$(printf '%s\n' "$macos_out" | kv_read artifact)
 macos_built=$(printf '%s\n' "$macos_out" | kv_read built_artifact)
-case "$macos_installed" in
-  "$test_home/Applications/App Forge.app")
-    ;;
-  *)
-    printf '%s\n' "expected durable App Forge install path, got: $macos_installed" >&2
-    exit 1
-    ;;
-esac
-[ "$macos_artifact" = "$macos_installed" ]
+[ -z "$macos_installed" ]
 case "$macos_built" in
   "$root/_tmp/workbench/dist/macos/App Forge.app") ;;
   *)
@@ -384,7 +376,8 @@ case "$macos_built" in
     exit 1
     ;;
 esac
-[ -x "$macos_installed/Contents/MacOS/wizardry-host" ]
+[ "$macos_artifact" = "$macos_built" ]
+[ -x "$macos_artifact/Contents/MacOS/wizardry-host" ]
 
 # Behavior: app install detection assigns the native Artificer bundle to the
 # native built-in entry, not the web-only Artificer Web catalog app.
@@ -608,7 +601,7 @@ wait_for_file_contains "$workspace_native_install_log" "$workspace_native_instal
 
 # Behavior: macOS native workspace runs purge stale SwiftPM module caches left
 # behind by older workbench roots before rebuilding in the current state path,
-# then launches the durable installed bundle instead of the transient workbench build.
+# then launches the compiled bundle directly unless install-first is requested.
 workspace_native_macos="$scratch/workspace-native-macos"
 make_native_workspace "$workspace_native_macos" "workspace-native-macos" "Workspace Native Mac" "macos" "workspace-native-macos" "Workspace Native Mac"
 checkout_key=$(printf %s "$root" | shasum -a 256 | awk '{ print $1 }')
@@ -617,21 +610,20 @@ mkdir -p "$workspace_native_macos_build/arm64-apple-macosx/debug/ModuleCache/leg
 printf '%s\n' "stale" > "$workspace_native_macos_build/arm64-apple-macosx/debug/ModuleCache/legacy/stale.pcm"
 workspace_native_macos_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$backend" run-workspace "$root" "$workspace_native_macos" native-desktop normal)
 assert_contains "$workspace_native_macos_out" "launched=1"
-assert_contains "$workspace_native_macos_out" "mode=native-desktop-installed"
+assert_contains "$workspace_native_macos_out" "mode=native-desktop-executable"
 workspace_native_macos_artifact=$(printf '%s\n' "$workspace_native_macos_out" | kv_read artifact)
-workspace_native_macos_installed=$(printf '%s\n' "$workspace_native_macos_out" | kv_read installed)
 [ -d "$workspace_native_macos_artifact" ]
-[ "$workspace_native_macos_artifact" = "$workspace_native_macos_installed" ]
+[ -z "$(printf '%s\n' "$workspace_native_macos_out" | kv_read installed)" ]
 [ ! -d "$workspace_native_macos_build/arm64-apple-macosx/debug/ModuleCache" ]
-case "$workspace_native_macos_installed" in
-  "$test_home/Applications/Workspace Native Mac.app")
+case "$workspace_native_macos_artifact" in
+  "$workspace_native_macos_build/dist/Workspace Native Mac.app")
     ;;
   *)
-    printf '%s\n' "expected durable native macOS install path, got: $workspace_native_macos_installed" >&2
+    printf '%s\n' "expected native macOS run to use the compiled bundle, got: $workspace_native_macos_artifact" >&2
     exit 1
     ;;
 esac
-wait_for_file_contains "$test_opened_bundle" "$workspace_native_macos_installed" 60
+wait_for_file_contains "$test_opened_bundle" "$workspace_native_macos_artifact" 60
 
 # Behavior: native macOS workspaces can keep generated Swift packages outside
 # the checkout when their render command reports the package location.
@@ -652,7 +644,7 @@ awk '
 mv "$workspace_native_macos_external/wizardry.workspace.conf.tmp" "$workspace_native_macos_external/wizardry.workspace.conf"
 workspace_native_macos_external_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$backend" run-workspace "$root" "$workspace_native_macos_external" native-desktop normal)
 assert_contains "$workspace_native_macos_external_out" "launched=1"
-assert_contains "$workspace_native_macos_external_out" "mode=native-desktop-installed"
+assert_contains "$workspace_native_macos_external_out" "mode=native-desktop-executable"
 workspace_native_macos_external_artifact=$(printf '%s\n' "$workspace_native_macos_external_out" | kv_read artifact)
 [ -d "$workspace_native_macos_external_artifact" ]
 wait_for_file_contains "$test_opened_bundle" "$workspace_native_macos_external_artifact" 60

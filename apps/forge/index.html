@@ -5287,12 +5287,6 @@
         if (!selected) {
           return false;
         }
-        if (selected.kind === 'builtin') {
-          return true;
-        }
-        if (state.os === 'darwin' && selected.context === 'native-desktop') {
-          return true;
-        }
         return false;
       }
 

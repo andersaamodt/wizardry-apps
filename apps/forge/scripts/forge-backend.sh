@@ -7967,14 +7967,10 @@ cmd_run_desktop_unlocked() {
         fi
       fi
       if [ -z "$launch_bundle" ]; then
-        if ! synced_install=$(prepare_macos_run_bundle "$bundle_artifact" "$app_name"); then
-          printf '%s\n' "forge-backend: failed to prepare durable macOS run bundle for $slug" >&2
-          exit 1
-        fi
-        launch_bundle="$synced_install"
+        launch_bundle="$bundle_artifact"
       fi
       [ -d "$launch_bundle" ] || {
-        printf '%s\n' "forge-backend: durable macOS run bundle missing: $launch_bundle" >&2
+        printf '%s\n' "forge-backend: macOS run bundle missing: $launch_bundle" >&2
         exit 1
       }
       command -v open >/dev/null 2>&1 || {
@@ -8310,21 +8306,16 @@ cmd_run_workspace_unlocked() {
             printf '%s\n' "forge-backend: built native macOS bundle missing: $artifact" >&2
             exit 1
           }
-          synced_install=$(prepare_macos_run_bundle "$artifact" "$app_name") || {
-            printf '%s\n' "forge-backend: failed to prepare durable native macOS run bundle for $workspace_slug" >&2
-            exit 1
-          }
           stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
-          launch_macos_bundle_async "$synced_install" || {
-            printf '%s\n' "forge-backend: failed to queue launch for native macOS bundle: $synced_install" >&2
+          launch_macos_bundle_async "$artifact" || {
+            printf '%s\n' "forge-backend: failed to queue launch for native macOS bundle: $artifact" >&2
             exit 1
           }
           printf 'launched=1\n'
-          printf 'mode=native-desktop-installed\n'
-          printf 'artifact=%s\n' "$synced_install"
+          printf 'mode=native-desktop-executable\n'
+          printf 'artifact=%s\n' "$artifact"
           printf 'built_artifact=%s\n' "$artifact"
           printf 'built_exec=%s\n' "$built_exec"
-          printf 'installed=%s\n' "$synced_install"
           printf 'entry=%s\n' "$workspace_path/generated"
           printf 'log=%s\n' "$log_path"
           return 0

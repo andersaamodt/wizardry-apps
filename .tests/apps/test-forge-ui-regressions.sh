@@ -64,7 +64,7 @@ assert_matches "$ui" 'function defaultMobileRunTargetForSelected\(selected\)'
 assert_contains "$ui" 'hasEnabledHostRunTarget(selected) || hasEnabledHostedWebTarget(selected) || hasEnabledMobileRunTarget(selected)'
 assert_contains "$ui" "await runTargetAction(selected, mobileTarget);"
 assert_contains "$ui" "Build ' + (mobileRunTarget === 'ios' ? 'iOS' : 'Android') + ' app"
-assert_contains "$ui" "build toolchain setup is still needed"
+assert_contains "$ui" "project sources were generated. Build or run them from the platform toolchain, simulator, emulator, or device."
 assert_contains "$ui" "mobileOut.message"
 assert_contains "$ui" "setPanel('settings', false);"
 assert_matches "$ui" 'function regenerateSelectedIconAssets\(\)'
@@ -134,6 +134,8 @@ assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context, run
 assert_matches "$ui" "backend\('install-workspace', \[selected\.path, selected\.context, targetId\]\);"
 assert_matches "$ui" "usesWorkspacePipeline\\(selected\\) \\|\\| \\(selected\\.kind !== 'builtin' && !!selected\\.path\\)"
 assert_matches "$ui" "backend\('rebuild-workspace', \[selected\.path, selected\.context\]\);"
+assert_not_contains "$ui" "if (selected.kind === 'builtin') {\n          return true;\n        }"
+assert_not_contains "$ui" "if (state.os === 'darwin' && selected.context === 'native-desktop') {\n          return true;\n        }"
 assert_matches "$ui" "perform\('Import project folder'"
 assert_matches "$ui" "backend\('import-workspace'"
 assert_matches "$ui" "backend\('rename-workspace'"
@@ -156,7 +158,7 @@ assert_matches "$ui" "function createProjectTypeConfig\(projectType\)"
 assert_contains "$ui" "return 'Prepared ' + itemStatusName(item);"
 assert_contains "$ui" "mobilePrepared ? 'ready' : 'built'"
 assert_contains "$ui" 'Open Generated Project'
-assert_contains "$ui" 'build toolchain setup is still needed'
+assert_contains "$ui" 'project sources were generated. Build or run them from the platform toolchain, simulator, emulator, or device.'
 
 # Native host icon-drop bridge contracts (allow variable renames in callsites).
 assert_matches "$ui" "window\.forgeHostFileDrag[[:space:]]*=[[:space:]]*handleForgeHostFileDrag;"

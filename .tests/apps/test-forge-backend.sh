@@ -48,7 +48,8 @@ grep -F 'self_relaunch=1' "$backend" >/dev/null
 grep -F 'launch_workspace_bundle_macos "$launch_bundle" "$launch_bundle/Contents/MacOS/wizardry-host" "$launch_app_dir"' "$backend" >/dev/null
 grep -F 'launch_workspace_bundle_macos "$installed_path" "$installed_path/Contents/MacOS/wizardry-host" "$installed_app_dir"' "$backend" >/dev/null
 grep -F 'open -n "$bundle"' "$backend" >/dev/null
-grep -F 'launch_bundle=$(prepare_macos_run_bundle "$final_bundle" "$workspace_title")' "$backend" >/dev/null
+grep -F 'launch_bundle="$bundle_artifact"' "$backend" >/dev/null
+grep -F 'launch_macos_bundle_async "$artifact"' "$backend" >/dev/null
 grep -F 'printf '\''built_artifact=%s\n'\'' "$final_bundle"' "$backend" >/dev/null
 grep -F 'install_macos_bundle "$artifact" "$install_path"' "$backend" >/dev/null
 grep -F 'forge_with_serialized_macos_desktop_operation() {' "$backend" >/dev/null
