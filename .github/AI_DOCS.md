@@ -14,15 +14,17 @@
 - When adding cross-platform Forge starters, treat “theurgy-backed cross-platform app” as a valid first-class category: web UI and host flow stay in `wizardry-apps`, while runtime escalation happens through a generated workspace script that calls `spells/.arcana/theurgy/invoke-theurgy`.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/RELEASE_POLISH.md` when doing 1.0 polish, onboarding/readiness work, update surfaces, packaging, or Nostr-specific release hardening.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_AUDIT.md` when doing cross-app GUI sweeps so audits stay source-linked and non-redundant.
-- Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT.md` when doing whole-app or cross-app audits that need language, storage, execution, testing, and GUI criteria together.
-- Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_COMPLIANCE_FRAMEWORK.md` when normalizing findings across many apps or planning cross-app remediation by category.
+- Read `/Users/andersaamodt/git/phronesis/audits/rolling-audit.md` when doing whole-app or cross-app audits that need language, storage, execution, testing, and GUI criteria together.
+- Read `/Users/andersaamodt/git/phronesis/audits/compliance-framework.md` when normalizing findings across many apps or planning cross-app remediation by category.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT.md` for local wizardry-apps audit scope and evidence surfaces.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_COMPLIANCE_FRAMEWORK.md` only as the local pointer to phronesis and local ledger files.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_PASS2.md` when continuing the second rolling-audit pass focused on `phronesis`, unreasoned variance, and back-applying late criteria.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_PASS2_DECISION_QUEUE.md` before switching from audit work to standards approval or fix-it planning.
-- Read `/Users/andersaamodt/git/wizardry-apps/.github/PHRONESIS_EXTRACTION_PLAN.md` before creating or populating the proposed `phronesis` standards repository.
-- Read `/Users/andersaamodt/git/wizardry-apps/.github/PHRONESIS_INTEGRATION_STATUS.md` before declaring pass 2 complete or starting cross-app fix-it work.
-- Read `/Users/andersaamodt/git/phronesis/README.md` and `/Users/andersaamodt/git/phronesis/standards/repo-hygiene/README.md` for extracted cross-repo standards that have already moved into the phronesis seed.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/PHRONESIS_EXTRACTION_PLAN.md` for the completed migration map from wizardry-apps to phronesis.
+- Read `/Users/andersaamodt/git/wizardry-apps/.github/PHRONESIS_INTEGRATION_STATUS.md` before starting cross-app fix-it work.
+- Read `/Users/andersaamodt/git/phronesis/README.md` and `/Users/andersaamodt/git/phronesis/standards/README.md` for canonical cross-repo standards.
 - Read `/Users/andersaamodt/git/phronesis/policies/policy-matrix-schema.yaml` when designing `phronesis` policy IDs, app compliance records, or generator/audit enforcement hooks.
-- Use `/Users/andersaamodt/git/wizardry-apps/.github/PHRONESIS_POLICY_MATRIX_SCHEMA.yaml` only as the local migration copy until downstream references are cleaned up.
+- Use `/Users/andersaamodt/git/wizardry-apps/.github/PHRONESIS_POLICY_MATRIX_SCHEMA.yaml` only as a compatibility pointer for older local audit references.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_VARIANCE_LEDGER.yaml` when a difference between apps might need to become a standard, an approved exception class, or a pending decision.
 - Use `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_LEDGER.yaml` as the shared accumulation surface for recurring violation classes.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/ROLLING_AUDIT_CATEGORY_REPORT.md` when planning remediation order or wanting the current severity-and-recurrence-sorted category snapshot.
