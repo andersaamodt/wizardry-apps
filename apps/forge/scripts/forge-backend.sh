@@ -2260,13 +2260,53 @@ macos_user_app_install_path() {
   printf '%s/Applications/%s.app\n' "$HOME" "$macos_user_app_name"
 }
 
+macos_system_app_install_path() {
+  macos_system_app_name=${1-}
+  [ -n "$macos_system_app_name" ] || return 1
+  validate_macos_app_bundle_name "$macos_system_app_name.app"
+  printf '/Applications/%s.app\n' "$macos_system_app_name"
+}
+
+preferred_macos_app_install_path() {
+  preferred_macos_app_name=${1-}
+  [ -n "$preferred_macos_app_name" ] || return 1
+
+  preferred_user_bundle=$(macos_user_app_install_path "$preferred_macos_app_name") || return 1
+  preferred_system_bundle=$(macos_system_app_install_path "$preferred_macos_app_name") || return 1
+
+  current_bundle=$(current_macos_backend_bundle 2>/dev/null || true)
+  if [ -n "$current_bundle" ]; then
+    current_bundle_canonical=$(canonical_dir_path "$current_bundle" 2>/dev/null || printf '%s\n' "$current_bundle")
+    preferred_user_canonical=$(canonical_dir_path "$preferred_user_bundle" 2>/dev/null || printf '%s\n' "$preferred_user_bundle")
+    preferred_system_canonical=$(canonical_dir_path "$preferred_system_bundle" 2>/dev/null || printf '%s\n' "$preferred_system_bundle")
+    case "$current_bundle_canonical" in
+      "$preferred_user_canonical"|"$preferred_system_canonical")
+        printf '%s\n' "$current_bundle"
+        return 0
+        ;;
+    esac
+  fi
+
+  if [ "${WIZARDRY_FORGE_PREFER_USER_APPLICATIONS-}" = "1" ]; then
+    printf '%s\n' "$preferred_user_bundle"
+    return 0
+  fi
+
+  if [ -w "/Applications" ]; then
+    printf '%s\n' "$preferred_system_bundle"
+    return 0
+  fi
+
+  printf '%s\n' "$preferred_user_bundle"
+}
+
 prepare_macos_run_bundle() {
   macos_run_src_bundle=${1-}
   macos_run_app_name=${2-}
   [ -d "$macos_run_src_bundle" ] || return 1
   [ -n "$macos_run_app_name" ] || return 1
 
-  macos_run_dest_bundle=$(macos_user_app_install_path "$macos_run_app_name") || return 1
+  macos_run_dest_bundle=$(preferred_macos_app_install_path "$macos_run_app_name") || return 1
   install_macos_bundle "$macos_run_src_bundle" "$macos_run_dest_bundle" || return 1
   printf '%s\n' "$macos_run_dest_bundle"
 }
@@ -7611,7 +7651,7 @@ cmd_run_desktop_unlocked() {
       launch_bundle=''
       restart_stage=''
       if [ "$self_relaunch" -eq 1 ]; then
-        target_install=$(macos_user_app_install_path "$app_name")
+        target_install=$(preferred_macos_app_install_path "$app_name")
         current_bundle=$(current_macos_backend_bundle 2>/dev/null || true)
         target_install_canonical=$(canonical_dir_path "$target_install" 2>/dev/null || printf '%s\n' "$target_install")
         current_bundle_canonical=''

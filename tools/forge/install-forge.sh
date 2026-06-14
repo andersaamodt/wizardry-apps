@@ -247,6 +247,32 @@ install_macos_bundle() {
   return 1
 }
 
+cleanup_alternate_macos_bundle() {
+  target_bundle=${1-}
+  home_root=${2-}
+  [ -n "$target_bundle" ] || return 1
+  [ -n "$home_root" ] || return 1
+
+  system_bundle="/Applications/App Forge.app"
+  user_bundle="$home_root/Applications/App Forge.app"
+  alternate_bundle=''
+  case "$target_bundle" in
+    "$system_bundle")
+      alternate_bundle=$user_bundle
+      ;;
+    "$user_bundle")
+      alternate_bundle=$system_bundle
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  [ -n "$alternate_bundle" ] || return 0
+  [ -e "$alternate_bundle" ] || return 0
+  rm -rf "$alternate_bundle" >/dev/null 2>&1 || true
+}
+
 case "$os" in
   Darwin)
     target_app=''
@@ -284,6 +310,7 @@ case "$os" in
     printf '%s\n' "installed_command=$shim"
     printf '%s\n' "workspace_root_file=$config_file"
     printf '%s\n' "installed_app=$installed_app"
+    cleanup_alternate_macos_bundle "$installed_app" "$home_dir"
     if [ "$fallback_used" -eq 1 ]; then
       printf '%s\n' "note=insufficient permissions for /Applications, installed to $installed_app" >&2
     fi

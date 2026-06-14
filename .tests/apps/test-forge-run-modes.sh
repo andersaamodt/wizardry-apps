@@ -368,7 +368,14 @@ assert_contains "$macos_out" "mode=desktop-executable"
 macos_installed=$(printf '%s\n' "$macos_out" | kv_read installed)
 macos_artifact=$(printf '%s\n' "$macos_out" | kv_read artifact)
 macos_built=$(printf '%s\n' "$macos_out" | kv_read built_artifact)
-[ "$macos_installed" = "$test_home/Applications/App Forge.app" ]
+case "$macos_installed" in
+  "$test_home/Applications/App Forge.app"|"/Applications/App Forge.app")
+    ;;
+  *)
+    printf '%s\n' "expected durable App Forge install path, got: $macos_installed" >&2
+    exit 1
+    ;;
+esac
 [ "$macos_artifact" = "$macos_installed" ]
 case "$macos_built" in
   "$root/_tmp/workbench/dist/macos/App Forge.app") ;;
@@ -439,10 +446,10 @@ self_run_installed=$(printf '%s\n' "$self_run_out" | kv_read installed)
 [ -n "$self_run_stage" ]
 [ -d "$self_run_stage" ]
 case "$self_run_stage" in
-  "$test_home/Applications/.App Forge.app.restart."*)
+  "$(dirname "$macos_installed")/.App Forge.app.restart."*)
     ;;
   *)
-    printf '%s\n' "expected staged self-restart bundle under test home Applications, got: $self_run_stage" >&2
+    printf '%s\n' "expected staged self-restart bundle under durable install parent, got: $self_run_stage" >&2
     exit 1
     ;;
 esac
