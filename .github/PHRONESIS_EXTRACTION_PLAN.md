@@ -1,9 +1,9 @@
 # Phronesis Extraction Plan
 
 ## Purpose
-- Prepare a new `phronesis` repository as the Wizardry-family standards and judgment layer.
+- Prepare a new `phronesis` repository as the wizardry-family standards and judgment layer.
 - Move ecosystem-wide policy out of implementation repos without weakening local repo specificity.
-- Keep Wizardry focused on POSIX sh mastery, Wizardry Apps focused on app/runtime implementation, and Theurgy focused on native/runtime boundaries.
+- Keep wizardry focused on POSIX sh mastery, wizardry-apps focused on app/runtime implementation, and theurgy focused on native/runtime boundaries.
 
 ## Proposed Repository Role
 - `phronesis` owns standards, decision records, exception policy, audit methodology, policy IDs, compliance schemas, and promoted lessons.
@@ -41,17 +41,17 @@
 - `templates/`
   - repo-local `AI_DOCS.md`, `CODEX.md`, exception ledger, policy matrix, and audit report templates
 - `lessons/`
-  - promoted lessons distilled from Wizardry-family audits
+  - promoted lessons distilled from wizardry-family audits
 - `tools/`
   - future validation helpers for policy matrices and report consistency
 
 ## Material To Extract From `wizardry-apps`
 - `.github/ROLLING_AUDIT.md`
   - extract: audit axes, rolling rule, storage/language/test/theme criteria
-  - leave local: Wizardry Apps built-in app scope and repo-specific evidence paths
+  - leave local: wizardry-apps built-in app scope and repo-specific evidence paths
 - `.github/ROLLING_AUDIT_COMPLIANCE_FRAMEWORK.md`
   - extract: policy/category/finding/status model and reporting rules
-  - leave local: Wizardry Apps category seed list only if app-specific
+  - leave local: wizardry-apps category seed list only if app-specific
 - `.github/PHRONESIS_POLICY_MATRIX_SCHEMA.yaml`
   - extract: policy matrix status values, record shapes, seed policy groups, and app-record template
   - leave local: nothing long-term; keep only a pointer once `phronesis` owns the schema
@@ -77,14 +77,14 @@
   - leave local: spell layout, POSIX sh templates, imps, and terminal-specific testing commands
 - `.github/PUSH_READY_CHECKLIST.md`
   - extract: general push-ready hygiene, no repo-local runtime state, generated-artifact policy, comprehensive `.gitignore` wisdom
-  - leave local: Wizardry-specific release and spell readiness details
+  - leave local: wizardry-specific release and spell readiness details
 - `.github/PACT_LANGUAGE.md`
   - extract only if pact vocabulary becomes ecosystem-wide policy
-  - leave local if it remains a Wizardry spell-language convention
+  - leave local if it remains a wizardry spell-language convention
 
 ## Material To Extract From `theurgy`
 - Native boundary policy and generated-runtime exception rules.
-- Human-edited contract format policy if promoted beyond Theurgy.
+- Human-edited contract format policy if promoted beyond theurgy.
 - Generated output, staging, and runtime-state hygiene rules.
 
 ## Material That Should Stay Local
@@ -96,16 +96,16 @@
 
 ## First `phronesis` Standards To Seed
 - `variance.reasoned`: unreasoned meaningful variance is standards debt.
-- `language.shell-first`: Wizardry-family orchestration is POSIX sh-first.
-- `language.exception-ledger`: Python, Rust, Swift, Java, Kotlin, Node, and native outputs require explicit boundary classification.
+- `language.shell-first`: wizardry-family general implementation is POSIX sh-first.
+- `language.exception-ledger`: Python, Rust, C, C++, Swift, Java, Kotlin, Node, and native outputs require explicit boundary classification.
 - `storage.app-home-default`: primary durable app data defaults to `~/<appname>`.
 - `storage.plain-text`: durable app data is plain text unless explicitly justified.
 - `format.user-yaml-md`: user-facing durable files prefer YAML plus Markdown-oriented text.
 - `tests.dot-tests`: tests live under `.tests/`.
 - `tests.shipped-backend-contract`: shipped apps need backend contract tests.
 - `tests.shipped-ui-contract`: shipped GUI apps need UI/static contract tests.
-- `themes.shared-catalog-authority`: apps using Wizardry themes must discover the real shared theme catalog.
-- `themes.native-shared-catalog-parity`: generated native targets exposing Wizardry themes must use the same discovered catalog across platform outputs.
+- `themes.shared-catalog-authority`: apps using wizardry themes must discover the real shared theme catalog.
+- `themes.native-shared-catalog-parity`: generated native targets exposing shared wizardry themes must use the same discovered catalog across platform outputs.
 - `bridge.no-shell-fragments`: frontends call explicit backend actions and never send shell fragments.
 - `bridge.backend-resolution-owned`: frontend code does not derive backend executable paths from document paths.
 - `runtime.no-cargo-on-demand`: shipped backend paths do not compile Cargo-managed helpers on demand.
@@ -130,8 +130,8 @@
 - Whether `phronesis` should store only prose policy first, or include a machine-readable policy registry from day one.
 - Whether policy IDs should use dotted names such as `storage.app-home-default` or existing category slugs such as `storage-default-home-missing`.
 - Whether approved exceptions live centrally in `phronesis` or locally in each repo with central schema validation.
-- Whether Wizardry-specific pact vocabulary belongs in `phronesis` as ecosystem philosophy or stays local to Wizardry.
-- Whether app-local theme systems are allowed freely once documented, or whether Forge-generated apps must default to shared Wizardry themes unless explicitly opted out.
+- Whether wizardry-specific pact vocabulary belongs in `phronesis` as ecosystem philosophy or stays local to wizardry.
+- Whether app-local theme systems are allowed freely once documented, or whether Forge-generated apps must default to shared wizardry themes unless explicitly opted out.
 
 ## Next Actions Before Fix-It Phase
 - Review this extraction map with the user.

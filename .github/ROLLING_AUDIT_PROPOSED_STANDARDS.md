@@ -39,20 +39,23 @@
 - Checked-in config examples and copyable setup templates should match current runtime defaults exactly; stale legacy-path examples are a standards violation.
 
 ### Language And Boundary Discipline
-- Wizardry is POSIX `sh`-first; Python and Rust are opt-in exceptions, not ambient permission.
-- When a native port or higher-runtime app retains Python, Rust, Swift, Node, or other non-shell surfaces, each retained boundary should be explicitly justified.
+- Wizardry-family projects should be strongly POSIX `sh`-first for general implementation, not only orchestration.
+- Python is acceptable but non-preferred relative to POSIX `sh`; in the current audited repos, existing Python runtime surfaces are removal-default unless explicitly re-approved.
+- Rust is the preferred non-shell language when a non-shell language is necessary.
+- C and C++ are acceptable when necessary for low-level, performance-critical, or ecosystem-constrained work.
+- When a native port or higher-runtime app retains Python, Rust, Swift, Node, C, C++, or other non-shell surfaces, each retained boundary should be explicitly justified.
 - If a native port reuses another app's runtime or storage roots, that should be documented as an explicit exception rather than presented as ordinary layout.
 - GNU-specific tool behavior should not be relied on silently in shell-first repos; if a GNU dependency is real, document it and test it, otherwise replace it with a POSIX-safe path.
 - Frontends should never derive backend executable paths from `window.location`, served-document paths, or other frontend-owned filesystem guesses; backend resolution belongs to the host or backend contract.
 - Native or generated app shells may resolve packaged backend resources only inside the approved host/native boundary; development fallback paths and environment overrides should be documented and tested as native-boundary exceptions.
-- Shipped app runtime paths should not compile Cargo-managed helpers on demand; retained Rust helpers should live behind an explicitly approved packaged host or Theurgy boundary instead of ordinary repo-owned backend execution.
+- Shipped app runtime paths should not compile Cargo-managed helpers on demand; retained Rust helpers should live behind an explicitly approved packaged host or theurgy boundary instead of ordinary repo-owned backend execution.
 
 ### Themes And GUI
-- If an app intentionally uses an app-local theme system instead of the shared Wizardry themes, document that choice explicitly so audits know whether to apply the shared-theme contract or an app-local design contract.
-- Forge-generated Wizardry apps should default to shared Wizardry themes unless the app declares an explicit app-local theme identity.
+- If an app intentionally uses an app-local theme system instead of shared wizardry themes, document that choice explicitly so audits know whether to apply the shared-theme contract or an app-local design contract.
+- Apps that use wizardry themes should discover the real shared wizardry theme set rather than keep app-local hardcoded theme catalogs.
+- Generated native targets that expose shared wizardry themes should consume the same discovered shared theme catalog on every platform; static generated platform option lists are drift even if another platform target already discovers themes correctly.
+- Forge-generated apps are not required to default to shared themes automatically, but any app that uses shared themes must follow the standardized wizardry theming contract.
 - App-local theme systems should still define their own keyboard, ordering, persistence, and full-depth application contract.
-- Apps that use Wizardry themes should discover the real shared Wizardry theme set rather than keep app-local hardcoded theme catalogs.
-- Generated native targets that expose Wizardry themes should consume the same discovered shared theme catalog on every platform; static generated platform option lists are drift even if another platform target already discovers themes correctly.
 - Theme lists should be alphabetized consistently at the contract source.
 - When a focused theme picker is closed, up/down arrow keys should still cycle themes correctly.
 - Theme application should be deep and complete across the whole app shell rather than partial decoration over un-themed surfaces.

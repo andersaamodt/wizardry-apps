@@ -79,7 +79,7 @@ policy_groups:
 
   language:
     - id: language.shell-first
-      title: Orchestration defaults to POSIX sh
+      title: General implementation defaults to POSIX sh
       default_status_for_new_apps: pass
       default_severity: high
       enforcement_layer: template
@@ -144,8 +144,14 @@ policy_groups:
         - ui-static-tests-missing
 
   themes:
+    - id: themes.app-local-documented
+      title: App-local theme systems and fixed palettes are explicitly documented
+      default_status_for_new_apps: pass
+      default_severity: medium
+      enforcement_layer: docs
+      source: /Users/andersaamodt/git/phronesis/standards/themes/README.md
     - id: themes.shared-catalog-authority
-      title: Apps using Wizardry themes discover the shared catalog
+      title: Apps using wizardry themes discover the shared catalog
       default_status_for_new_apps: pass
       default_severity: medium
       enforcement_layer: backend-contract
@@ -174,6 +180,12 @@ policy_groups:
       source: .github/ROLLING_AUDIT_LEDGER.yaml
 
   bridge:
+    - id: bridge.native-host-boundary
+      title: Generated native hosts own packaged backend path knowledge
+      default_status_for_new_apps: pass
+      default_severity: medium
+      enforcement_layer: generated-native
+      source: /Users/andersaamodt/git/phronesis/standards/runtime-boundaries/README.md
     - id: bridge.no-shell-fragments
       title: Frontends never send shell fragments or sh -c payloads
       default_status_for_new_apps: pass
@@ -219,6 +231,12 @@ policy_groups:
       source: .github/PHRONESIS_EXTRACTION_PLAN.md
 
   repo_hygiene:
+    - id: repo.canonical-gitignore
+      title: Repos import the canonical phronesis gitignore unless exempted
+      default_status_for_new_apps: pass
+      default_severity: low
+      enforcement_layer: docs
+      source: /Users/andersaamodt/git/phronesis/standards/repo-hygiene/wizardry-general.gitignore
     - id: repo.no-disposable-cruft
       title: Source repos do not receive disposable build artifacts or app-instance state
       default_status_for_new_apps: pass

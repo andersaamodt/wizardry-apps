@@ -82,21 +82,24 @@
 - `format.user-yaml-md`.
 - `tests.dot-tests`.
 - `docs.exception-ledger-shape`.
+- `language.exception-ledger`.
+- `themes.app-local-documented`.
 - `themes.shared-catalog-authority`.
 - `themes.native-shared-catalog-parity`.
+- `bridge.native-host-boundary`.
 - `bridge.backend-resolution-owned`.
 - `bridge.no-shell-fragments`.
 - `runtime.no-cargo-on-demand`.
+- `repo.canonical-gitignore`.
 - `repo.no-disposable-cruft`.
 - canonical policy matrix schema.
 - canonical repo-local AI-doc template.
 - canonical repo-hygiene seed and comprehensive `.gitignore`.
 
-## Still Waiting For User Decision Before Canonical Promotion
-- `language.exception-ledger`: whether retained Python defaults to removal or to documented reduction.
-- `themes.app-local`: whether Forge-generated apps must default to shared wizardry themes unless explicitly opted out.
-- `native.host-boundary`: whether packaged backend-path knowledge is always acceptable inside the generated host boundary.
-- `repo.ignore-canonicality`: whether repos must import the canonical phronesis `.gitignore` verbatim or may keep documented specializations.
+## Remaining Promotion Work
+- move the accepted local prose into future phronesis extraction passes where the current local files still hold the fuller audit rationale
+- replace local migration copies after downstream references are cleaned up
+- convert canonical decisions into any future ADR-per-file layout if that becomes useful
 
 ## What Should Stay Local Even After Integration
 - app-by-app affected lists and evidence paths

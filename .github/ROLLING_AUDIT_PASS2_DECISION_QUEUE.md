@@ -39,11 +39,11 @@
 - Required headings: language, storage, durable formats, themes, runtime/bridge ownership, tests, release/build/generated output, approved exceptions, pending decisions.
 
 ### `themes.shared-catalog-authority`
-- Proposed standard: apps using Wizardry themes discover the real shared theme catalog.
+- Proposed standard: apps using wizardry themes discover the real shared theme catalog.
 - Exception class: app-local theme systems and fixed palettes are allowed only when documented as app identity and held to their own keyboard, ordering, persistence, and depth contract.
 
 ### `themes.native-shared-catalog-parity`
-- Proposed standard: generated native targets exposing shared Wizardry themes must use the same discovered catalog across platform outputs.
+- Proposed standard: generated native targets exposing shared wizardry themes must use the same discovered catalog across platform outputs.
 - Reject as default: one platform discovering themes while another embeds a static generated option list.
 
 ### `bridge.backend-resolution-owned`
@@ -56,41 +56,43 @@
 
 ### `runtime.no-cargo-on-demand`
 - Proposed standard: shipped runtime paths do not compile Cargo-managed helpers on demand.
-- Exception class: Rust helpers belong behind packaged host or Theurgy boundaries.
+- Exception class: Rust helpers belong behind packaged host or theurgy boundaries.
 
 ### `repo.no-disposable-cruft`
 - Proposed standard: source repos do not receive tracked placeholders, logs, caches, build products, package outputs, dependency caches, or app-instance state.
 - Canonical ideal document: `/Users/andersaamodt/git/phronesis/standards/repo-hygiene/wizardry-general.gitignore`.
 
-## Needs User Decision
+## Resolved In User Review
 
 ### `language.exception-ledger`
-- Question: should Python be treated as removable by default in all current app runtimes unless explicitly re-approved, or merely documented as an exception where currently practical?
-- Current user-specific direction:
-  - Dictator Python was not authorized and should be replaced as part of a Theurgy-backed native upgrade.
-- Proposed default:
-  - Python is never ambient permission.
-  - Existing Python runtime surfaces must either be removed or entered into a repo-local exception ledger with reduction/removal plan.
+- Decision:
+  - current audit fix-it policy: existing Python runtime surfaces are removal-default unless explicitly re-approved
+  - forward-looking standard: Python is acceptable but non-preferred relative to POSIX `sh`
+  - Rust is the preferred non-shell language when a non-shell language is necessary
+  - C and C++ are acceptable when necessary for low-level, performance-critical, or ecosystem-constrained work
+- Additional rule:
+  - non-shell boundaries still belong in the repo-local exception ledger
 
 ### `themes.app-local`
-- Question: should Forge-generated apps be required to use shared Wizardry themes unless they explicitly opt out at generation time?
-- Proposed default:
-  - yes; app-local themes and fixed palettes are deliberate identity choices, not silent drift.
+- Decision:
+  - wizardry apps that use shared themes follow the standardized wizardry theming contract
+  - app-local themes and fixed palettes are allowed when explicitly documented as app identity
+  - Forge-generated apps are not required to default to shared themes automatically
 
 ### `native.host-boundary`
-- Question: should generated native hosts be allowed to know packaged backend resource paths directly?
-- Proposed default:
-  - yes, but only inside the generated host/native boundary, with development fallbacks and environment overrides separately documented and tested.
+- Decision:
+  - generated native hosts may know packaged backend and resource paths inside the host-owned native boundary
+  - frontend and web surfaces may not infer those paths
+  - development fallbacks and environment overrides must be documented and tested
 
 ### `repo.ignore-canonicality`
-- Question: should all Wizardry-family repos import phronesis's canonical `.gitignore` verbatim, or keep local specializations with a required diff rationale?
-- Proposed default:
-  - phronesis owns the canonical ideal document.
-  - repos may specialize it only when the specialization is documented in local AI docs or comments.
+- Decision:
+  - phronesis owns the canonical ideal document
+  - repos import the canonical phronesis `.gitignore` verbatim unless an explicit exemption is documented
 
 ## Fix-It Batch Order After Approval
 1. Add or expand repo-local exception ledgers from the phronesis template.
-2. Remove unauthorized or undocumented Python runtime boundaries.
+2. Remove unauthorized or unapproved Python runtime boundaries.
 3. Normalize storage roots and document approved exceptions.
 4. Move tests into `.tests/` and fill backend/UI coverage gaps.
 5. Remove hardcoded/shared-theme drift and generated-native theme catalog drift.
