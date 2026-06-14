@@ -5925,6 +5925,7 @@ write_project_icon_from_file() {
     rm -f "$tmp_copy"
   fi
 
+  mkdir -p "$(dirname "$icon_path")"
   cp "$image_path" "$icon_path"
   rm -f "$legacy_icns_path"
   printf 'icon=%s\n' "$icon_path"
@@ -7891,7 +7892,7 @@ cmd_run_workspace_unlocked() {
       log_path="$log_dir/workspace-$workspace_slug-native.log"
 
       if [ "$run_mode" = 'install-first' ]; then
-        install_out=$(cmd_install_workspace "$root" "$workspace_path" "$context" "$host_target")
+        install_out=$(cmd_install_workspace_unlocked "$root" "$workspace_path" "$context" "$host_target")
         artifact=$(printf '%s\n' "$install_out" | kv_read artifact)
         built_exec=$(printf '%s\n' "$install_out" | kv_read built_exec)
         installed_path=$(printf '%s\n' "$install_out" | kv_read installed)
@@ -8019,7 +8020,7 @@ cmd_run_workspace_unlocked() {
       mkdir -p "$log_dir"
       log_path="$log_dir/workspace-$workspace_slug-run.log"
       if [ "$run_mode" = 'install-first' ]; then
-        install_out=$(cmd_install_workspace "$root" "$workspace_path" "$context" "$host_target")
+        install_out=$(cmd_install_workspace_unlocked "$root" "$workspace_path" "$context" "$host_target")
         built_artifact=$(printf '%s\n' "$install_out" | kv_read artifact)
         installed_path=$(printf '%s\n' "$install_out" | kv_read installed)
         launcher_path=$(printf '%s\n' "$install_out" | kv_read launcher)

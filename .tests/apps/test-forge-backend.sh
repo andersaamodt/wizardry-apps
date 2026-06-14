@@ -55,6 +55,7 @@ grep -F 'forge_with_serialized_macos_desktop_operation() {' "$backend" >/dev/nul
 grep -F 'cmd_run_desktop_unlocked "$cmd_run_desktop_root" "$cmd_run_desktop_slug" "$cmd_run_desktop_mode"' "$backend" >/dev/null
 grep -F 'cmd_run_workspace_unlocked "$cmd_run_workspace_root" "$cmd_run_workspace_path" "$cmd_run_workspace_context" "$cmd_run_workspace_mode"' "$backend" >/dev/null
 grep -F 'cmd_install_workspace_unlocked "$cmd_install_workspace_root" "$cmd_install_workspace_path" "$cmd_install_workspace_context" "$cmd_install_workspace_target"' "$backend" >/dev/null
+grep -F 'install_out=$(cmd_install_workspace_unlocked "$root" "$workspace_path" "$context" "$host_target")' "$backend" >/dev/null
 grep -F 'resolve_native_macos_package_dir "$root" "$workspace_path" "$workspace_slug"' "$backend" >/dev/null
 grep -F '$1 == "macos" {' "$backend" >/dev/null
 grep -F '${XDG_STATE_HOME:-$HOME/.local/state}/$resolve_native_macos_package_workspace_slug/generated/macos' "$backend" >/dev/null
