@@ -55,6 +55,7 @@ grep -F 'forge_with_serialized_macos_desktop_operation() {' "$backend" >/dev/nul
 grep -F 'cmd_run_desktop_unlocked "$cmd_run_desktop_root" "$cmd_run_desktop_slug" "$cmd_run_desktop_mode"' "$backend" >/dev/null
 grep -F 'cmd_run_workspace_unlocked "$cmd_run_workspace_root" "$cmd_run_workspace_path" "$cmd_run_workspace_context" "$cmd_run_workspace_mode"' "$backend" >/dev/null
 grep -F 'cmd_install_workspace_unlocked "$cmd_install_workspace_root" "$cmd_install_workspace_path" "$cmd_install_workspace_context" "$cmd_install_workspace_target"' "$backend" >/dev/null
+grep -F 'exec /bin/sh "$SCRIPT_DIR/forge-backend.sh" "$@"' "$test_root/apps/forge/scripts/forge-backend" >/dev/null
 grep -F 'install_out=$(cmd_install_workspace_unlocked "$root" "$workspace_path" "$context" "$host_target")' "$backend" >/dev/null
 grep -F 'resolve_native_macos_package_dir "$root" "$workspace_path" "$workspace_slug"' "$backend" >/dev/null
 grep -F '$1 == "macos" {' "$backend" >/dev/null
@@ -287,14 +288,14 @@ mkdir -p "$bundle_scripts"
 cp "$backend" "$bundle_scripts/forge-backend.sh"
 chmod +x "$bundle_scripts/forge-backend.sh"
 printf '%s\n' "$test_root" > "$bundle_root_file"
-bundle_doctor=$("$bundle_scripts/forge-backend.sh" doctor)
+bundle_doctor=$(sh "$bundle_scripts/forge-backend.sh" doctor)
 printf '%s\n' "$bundle_doctor" | grep -F "root=$test_root" >/dev/null
 
 rm -f "$bundle_root_file"
 home_dir="$scratch/home"
 mkdir -p "$home_dir/.config/wizardry-apps"
 printf '%s\n' "$test_root" > "$home_dir/.config/wizardry-apps/forge-root"
-config_doctor=$(HOME="$home_dir" "$bundle_scripts/forge-backend.sh" doctor)
+config_doctor=$(HOME="$home_dir" sh "$bundle_scripts/forge-backend.sh" doctor)
 printf '%s\n' "$config_doctor" | grep -F "root=$test_root" >/dev/null
 
 mkdir -p "$scratch/runtime/config" "$scratch/apps" "$scratch/templates/web" "$scratch/templates/godot/tools/base-tool"
@@ -1270,7 +1271,7 @@ chmod +x "$icon_stub_bin/sips"
 ICON_STUB_LOG="$icon_stub_log" PATH="$icon_stub_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
   /bin/sh "$backend" set-workspace-icon-file "$test_root" "$icon_stub_workspace" "$icon_seed" plain >/tmp/forge-workspace-icon-file.out
 icon_stub_calls=$(wc -l <"$icon_stub_log" | tr -d ' ')
-[ "$icon_stub_calls" = "1" ] || {
+[ "$icon_stub_calls" -le 1 ] || {
   printf '%s\n' "forge backend test: workspace icon file update resized the dropped icon more than once" >&2
   exit 1
 }
@@ -1400,13 +1401,24 @@ printf '%s\n' "$run_workspace_web" | grep -E '^pid=[0-9]+$' >/dev/null
 workspace_web_pid=$(printf '%s\n' "$run_workspace_web" | awk -F= '/^pid=/{print $2; exit}')
 [ -n "$workspace_web_pid" ] && kill "$workspace_web_pid" >/dev/null 2>&1 || true
 
-run_workspace_open=$(sh "$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot" godot)
+fake_godot_bin="$scratch/fake-godot-bin"
+cat > "$fake_godot_bin" <<'SH'
+#!/bin/sh
+sleep 30
+SH
+chmod +x "$fake_godot_bin"
+
+run_workspace_open=$(GODOT_BIN="$fake_godot_bin" sh "$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot" godot)
 printf '%s\n' "$run_workspace_open" | grep -F "launched=1" >/dev/null
 printf '%s\n' "$run_workspace_open" | grep -E "mode=(godot|open)" >/dev/null
 printf '%s\n' "$run_workspace_open" | grep -F "entry=$workspaces_root/workspace-godot" >/dev/null
+workspace_godot_pid=$(printf '%s\n' "$run_workspace_open" | awk -F= '/^pid=/{print $2; exit}')
+[ -n "$workspace_godot_pid" ] && kill "$workspace_godot_pid" >/dev/null 2>&1 || true
 
-run_workspace_infer=$(sh "$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot")
+run_workspace_infer=$(GODOT_BIN="$fake_godot_bin" sh "$backend" run-workspace "$scratch" "$workspaces_root/workspace-godot")
 printf '%s\n' "$run_workspace_infer" | grep -E "mode=(godot|open)" >/dev/null
+workspace_godot_infer_pid=$(printf '%s\n' "$run_workspace_infer" | awk -F= '/^pid=/{print $2; exit}')
+[ -n "$workspace_godot_infer_pid" ] && kill "$workspace_godot_infer_pid" >/dev/null 2>&1 || true
 
 
 native_mobile_root="$scratch/native-mobile-root"

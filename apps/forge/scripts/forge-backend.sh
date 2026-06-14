@@ -5726,7 +5726,8 @@ write_project_icon_from_data_url() {
     resized_icon_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon-resized.XXXXXX")
     resized_icon="$resized_icon_base.png"
     rm -f "$resized_icon"
-    if sips -s format png -z 1024 1024 "$tmp_icon" --out "$resized_icon" >/dev/null 2>&1; then
+    if sips -s format png -z 1024 1024 "$tmp_icon" --out "$resized_icon" >/dev/null 2>&1 &&
+      [ -f "$resized_icon" ]; then
       normalized_icon=$resized_icon
     else
       rm -f "$resized_icon"
@@ -5914,7 +5915,8 @@ write_project_icon_from_file() {
     tmp_copy_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon-file.XXXXXX")
     tmp_copy="$tmp_copy_base.png"
     rm -f "$tmp_copy"
-    if sips -s format png -z 1024 1024 "$image_path" --out "$tmp_copy" >/dev/null 2>&1; then
+    if sips -s format png -z 1024 1024 "$image_path" --out "$tmp_copy" >/dev/null 2>&1 &&
+      [ -f "$tmp_copy" ]; then
       mkdir -p "$(dirname "$icon_path")"
       mv "$tmp_copy" "$icon_path"
       rm -f "$legacy_icns_path"
@@ -6017,6 +6019,7 @@ cmd_set_workspace_icon() {
     exit 1
   }
   reject_line_breaks "$workspace_path" "project path"
+  mkdir -p "$workspace_path/assets"
 
   write_project_icon_from_data_url "$workspace_path" "$data_url" "$shape_mode"
   # Keep workspace root and nested app icon assets synchronized so runtime,
@@ -6074,6 +6077,7 @@ cmd_set_workspace_icon_file() {
     exit 1
   }
   reject_line_breaks "$workspace_path" "project path"
+  mkdir -p "$workspace_path/assets"
 
   write_project_icon_from_file "$workspace_path" "$image_path" "$shape_mode"
   sync_workspace_app_icon_assets "$workspace_path"
