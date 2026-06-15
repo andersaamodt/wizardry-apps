@@ -166,7 +166,7 @@
   - `bellheim`: backend coverage present under `.tests/apps/test-bellheim-backend.sh`
   - `binder`: backend coverage present under `.tests/native/test-backend-contract.sh`
   - `book-club`: native/calls/relay/security coverage present under `.tests/`
-  - `boycott`: fail; no `.tests/` tree and shipped backend exists
+  - `boycott`: partial; canonical backend contract coverage now exists under `.tests/`, but UI/static coverage and other repo findings remain
   - `counterspell`: shell and CGI contract coverage present under `.tests/`
   - `dictator`: partial; voice regression surface now exposed under `.tests/voice/run.sh`, but broader release-side normalization still remains
   - `eye`: shell/runtime coverage present under `.tests/test-eye.sh`
