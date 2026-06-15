@@ -168,7 +168,7 @@
   - `book-club`: native/calls/relay/security coverage present under `.tests/`
   - `boycott`: fail; no `.tests/` tree and shipped backend exists
   - `counterspell`: shell and CGI contract coverage present under `.tests/`
-  - `dictator`: fail; tests live under `tools/release/`, not `.tests/`
+  - `dictator`: partial; voice regression surface now exposed under `.tests/voice/run.sh`, but broader release-side normalization still remains
   - `eye`: shell/runtime coverage present under `.tests/test-eye.sh`
   - `fauxzilla`: broad API/runtime coverage present under `.tests/`
   - `hegelizer`: fail; smoke and preference tests live outside `.tests/`
