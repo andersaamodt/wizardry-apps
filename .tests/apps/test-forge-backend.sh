@@ -271,8 +271,8 @@ SH
 chmod +x "$codesign_identity_bin/security"
 
 codesign_identity_detected=$(PATH="$codesign_identity_bin:/bin:/usr/bin:/usr/sbin:/sbin" sh "$codesign_identity_probe")
-[ "$codesign_identity_detected" = "Wizardry Local Code Signing" ] || {
-  printf '%s\n' "forge backend test: macOS codesign identity probe did not prefer detected local identity" >&2
+[ "$codesign_identity_detected" = "-" ] || {
+  printf '%s\n' "forge backend test: macOS codesign identity probe should ignore detected local identities" >&2
   exit 1
 }
 

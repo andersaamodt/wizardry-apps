@@ -1606,13 +1606,6 @@ macos_codesign_identity() {
     printf '%s\n' "$WIZARDRY_CODESIGN_IDENTITY"
     return 0
   fi
-  if command -v security >/dev/null 2>&1; then
-    detected_identity=$(security find-identity -p codesigning -v 2>/dev/null | awk -F '"' '/".+"/ { print $2; exit }')
-    if [ -n "$detected_identity" ]; then
-      printf '%s\n' "$detected_identity"
-      return 0
-    fi
-  fi
   printf '%s\n' "-"
 }
 
@@ -6033,7 +6026,19 @@ write_project_icon_from_data_url() {
 
   rm -rf "$generated_icons_dir"
 
-  if command -v magick >/dev/null 2>&1; then
+  normalized_icon=$tmp_icon
+  if command -v sips >/dev/null 2>&1; then
+    resized_icon_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon-resized.XXXXXX")
+    resized_icon="$resized_icon_base.png"
+    rm -f "$resized_icon"
+    if sips -s format png -z 1024 1024 "$tmp_icon" --out "$resized_icon" >/dev/null 2>&1 &&
+      [ -f "$resized_icon" ]; then
+      normalized_icon=$resized_icon
+    else
+      rm -f "$resized_icon"
+    fi
+  fi
+  if [ "$normalized_icon" = "$tmp_icon" ] && command -v magick >/dev/null 2>&1; then
     root=$(require_root "")
     generator="$root/tools/icons/generate-platform-icons.sh"
     generator_mode=--squircle
@@ -6045,19 +6050,6 @@ write_project_icon_from_data_url() {
       rm -f "$tmp_icon"
       rm -f "$legacy_icns_path"
       return 0
-    fi
-  fi
-
-  normalized_icon=$tmp_icon
-  if command -v sips >/dev/null 2>&1; then
-    resized_icon_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon-resized.XXXXXX")
-    resized_icon="$resized_icon_base.png"
-    rm -f "$resized_icon"
-    if sips -s format png -z 1024 1024 "$tmp_icon" --out "$resized_icon" >/dev/null 2>&1 &&
-      [ -f "$resized_icon" ]; then
-      normalized_icon=$resized_icon
-    else
-      rm -f "$resized_icon"
     fi
   fi
 
@@ -6223,20 +6215,6 @@ write_project_icon_from_file() {
   mkdir -p "$(dirname "$icon_path")"
   rm -rf "$generated_icons_dir"
 
-  if command -v magick >/dev/null 2>&1; then
-    root=$(require_root "")
-    generator="$root/tools/icons/generate-platform-icons.sh"
-    generator_mode=--squircle
-    if [ "$shape_mode" = "plain" ]; then
-      generator_mode=--plain
-    fi
-    if [ -f "$generator" ]; then
-      sh "$generator" "$image_path" "$project_dir" "$generator_mode"
-      rm -f "$legacy_icns_path"
-      return 0
-    fi
-  fi
-
   tmp_copy=''
   if command -v sips >/dev/null 2>&1; then
     tmp_copy_base=$(mktemp "${TMPDIR:-/tmp}/app-forge-icon-file.XXXXXX")
@@ -6252,6 +6230,19 @@ write_project_icon_from_file() {
       return 0
     fi
     rm -f "$tmp_copy"
+  fi
+  if command -v magick >/dev/null 2>&1; then
+    root=$(require_root "")
+    generator="$root/tools/icons/generate-platform-icons.sh"
+    generator_mode=--squircle
+    if [ "$shape_mode" = "plain" ]; then
+      generator_mode=--plain
+    fi
+    if [ -f "$generator" ]; then
+      sh "$generator" "$image_path" "$project_dir" "$generator_mode"
+      rm -f "$legacy_icns_path"
+      return 0
+    fi
   fi
 
   mkdir -p "$(dirname "$icon_path")"
