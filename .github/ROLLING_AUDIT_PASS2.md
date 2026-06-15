@@ -194,7 +194,7 @@
   - `bellheim`: UI/static coverage present under `.tests/apps/test-bellheim-ui-contract.sh` plus Safari/file-boot smoke tests
   - `binder`: generated native IR/render/native package coverage present under `.tests/native/`
   - `book-club`: GUI/native coverage present under `.tests/gui/` and `.tests/native/`
-  - `boycott`: fail; no `.tests/` tree
+  - `boycott`: partial; canonical UI/static contract coverage now exists under `.tests/ui/test-ui-contract.sh`, but theme and other repo findings remain
   - `counterspell`: shell contract includes app-surface assertions under `.tests/`
   - `dictator`: fail; no `.tests/` GUI/static contract
   - `eye`: fail; `.tests/test-eye.sh` covers shell/runtime behavior only

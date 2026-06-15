@@ -135,9 +135,8 @@
 
 ### 7. `ui-static-tests-missing`
 - Severity: high
-- Recurrence: 8 repos
+- Recurrence: 7 repos
 - Affected:
-  - `boycott`
   - `applegate`
   - `chatroom`
   - `dictator`
