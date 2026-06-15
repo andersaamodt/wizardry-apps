@@ -13,6 +13,7 @@
 - Use theurgy for professional native desktop runtime machinery and enterprise web runtime machinery when shell fan-out is the problem; cross that boundary through `spells/.arcana/theurgy/invoke-theurgy` instead of adding ad hoc dependency checks.
 - Use Wizardry's `firewall` spell and Theurgy-backed host firewall backends for adb or other mobile-debug network cages; do not let Forge call adb directly outside the caged path.
 - App Forge and generated app scripts must not paper over macOS launch-assessment pressure with local preflights, repeated bundle churn, or wrapper fanout; fix the native packaging/runtime boundary in Theurgy.
+- macOS tests and run/build paths that create or execute binaries must reuse stable external XDG/workbench scratch roots instead of randomized executable directories; random executable paths multiply `syspolicyd` launch-assessment work.
 - When adding cross-platform Forge starters, treat “theurgy-backed cross-platform app” as a valid first-class category: web UI and host flow stay in `wizardry-apps`, while runtime escalation happens through a generated workspace script that calls `spells/.arcana/theurgy/invoke-theurgy`.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/RELEASE_POLISH.md` when doing 1.0 polish, onboarding/readiness work, update surfaces, packaging, or Nostr-specific release hardening.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/GUI_AUDIT.md` when doing cross-app GUI sweeps so audits stay source-linked and non-redundant.
