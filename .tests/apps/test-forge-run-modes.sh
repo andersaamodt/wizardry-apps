@@ -90,7 +90,11 @@ cleanup() {
   [ -n "${scratch-}" ] && rm -rf "$scratch"
 }
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/forge-run-modes.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+scratch="$scratch_root/forge-run-modes"
+rm -rf "$scratch"
+mkdir -p "$scratch"
 trap cleanup EXIT HUP INT TERM
 
 fake_bin="$scratch/fake-bin"
