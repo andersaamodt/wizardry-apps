@@ -1633,17 +1633,9 @@ ensure_macos_bundle_signature() {
 macos_bundle_launch_policy_usable() {
   bundle_path=${1-}
   [ -d "$bundle_path" ] || return 1
-  executable_name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$bundle_path/Contents/Info.plist" 2>/dev/null || true)
-  [ -n "$executable_name" ] || return 1
-  executable_path="$bundle_path/Contents/MacOS/$executable_name"
-  [ -x "$executable_path" ] || return 1
-  spctl_command=${FORGE_SPCTL_COMMAND:-spctl}
-  /bin/sh -c '
-    spctl_cmd=$1
-    executable=$2
-    command -v "$spctl_cmd" >/dev/null 2>&1 || exit 0
-    "$spctl_cmd" --assess --type exec "$executable" >/dev/null 2>&1
-  ' sh "$spctl_command" "$executable_path"
+  # Let the normal open/launch path perform macOS assessment once. Explicit
+  # spctl probes add avoidable syspolicyd work during install and relaunch.
+  return 0
 }
 
 clear_stale_swiftpm_lock() {

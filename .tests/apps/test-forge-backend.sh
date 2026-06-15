@@ -55,7 +55,10 @@ grep -F 'install_macos_bundle "$artifact" "$install_path"' "$backend" >/dev/null
 grep -F 'forge_with_serialized_macos_desktop_operation() {' "$backend" >/dev/null
 grep -F 'scrub_macos_bundle_launch_metadata() {' "$backend" >/dev/null
 grep -F 'macos_bundle_launch_policy_usable() {' "$backend" >/dev/null
-grep -F -- '--assess --type exec' "$backend" >/dev/null
+if grep -F -- '--assess --type exec' "$backend" >/dev/null; then
+  printf '%s\n' "forge backend test: install/run path must not preflight app launches with spctl" >&2
+  exit 1
+fi
 grep -F 'cmd_run_desktop_unlocked "$cmd_run_desktop_root" "$cmd_run_desktop_slug" "$cmd_run_desktop_mode"' "$backend" >/dev/null
 grep -F 'cmd_run_workspace_unlocked "$cmd_run_workspace_root" "$cmd_run_workspace_path" "$cmd_run_workspace_context" "$cmd_run_workspace_mode"' "$backend" >/dev/null
 grep -F 'cmd_install_workspace_unlocked "$cmd_install_workspace_root" "$cmd_install_workspace_path" "$cmd_install_workspace_context" "$cmd_install_workspace_target"' "$backend" >/dev/null

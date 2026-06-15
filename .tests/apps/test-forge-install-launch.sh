@@ -60,7 +60,10 @@ grep -F "host_build_signature=" "$root/tools/forge/build-forge-macos-app.sh" >/d
 grep -F "host_build_signature=" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "macos_codesign_identity()" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
 grep -F "macos_bundle_launch_policy_usable()" "$root/tools/forge/install-forge.sh" >/dev/null
-grep -F -- "--assess --type exec" "$root/tools/forge/install-forge.sh" >/dev/null
+if grep -F -- "--assess --type exec" "$root/tools/forge/install-forge.sh" >/dev/null; then
+  printf '%s\n' "forge install test: installer must not preflight app launches with spctl" >&2
+  exit 1
+fi
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-install.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
