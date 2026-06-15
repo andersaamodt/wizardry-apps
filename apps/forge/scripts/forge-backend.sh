@@ -83,6 +83,7 @@ USAGE
 esac
 
 set -eu
+export COPYFILE_DISABLE=1
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 
@@ -2412,8 +2413,9 @@ copy_macos_bundle_contents() {
   [ -d "$macos_copy_src_bundle" ] || return 1
   [ -n "$macos_copy_dest_bundle" ] || return 1
   if command -v ditto >/dev/null 2>&1; then
-    ditto "$macos_copy_src_bundle" "$macos_copy_dest_bundle" || return 1
+    ditto --norsrc --noextattr --noqtn --noacl "$macos_copy_src_bundle" "$macos_copy_dest_bundle" || return 1
   else
+    export COPYFILE_DISABLE=1
     if [ -d "$macos_copy_dest_bundle" ]; then
       (
         cd "$macos_copy_src_bundle" || exit 1
@@ -2635,17 +2637,10 @@ stage_macos_bundle_replacement() {
 
   macos_stage_bundle="$macos_stage_parent/.${macos_stage_base}.restart.$$"
   rm -rf "$macos_stage_bundle"
-  if command -v ditto >/dev/null 2>&1; then
-    ditto "$macos_stage_src_bundle" "$macos_stage_bundle" || {
-      rm -rf "$macos_stage_bundle"
-      return 1
-    }
-  else
-    cp -R "$macos_stage_src_bundle" "$macos_stage_bundle" || {
-      rm -rf "$macos_stage_bundle"
-      return 1
-    }
-  fi
+  copy_macos_bundle_contents "$macos_stage_src_bundle" "$macos_stage_bundle" || {
+    rm -rf "$macos_stage_bundle"
+    return 1
+  }
   if ! ensure_macos_bundle_signature "$macos_stage_bundle"; then
     rm -rf "$macos_stage_bundle"
     return 1
@@ -5572,7 +5567,8 @@ cmd_workspace_git_install_release() {
       }
       app_bundle_name=$(basename "$app_bundle")
       validate_release_app_bundle_name "$app_bundle_name"
-      install_path="/Applications/$app_bundle_name"
+      install_app_name=${app_bundle_name%.app}
+      install_path=$(preferred_macos_app_install_path "$install_app_name")
       install_macos_bundle "$app_bundle" "$install_path"
       printf 'root_hint=%s\n' "$root"
       printf 'workspace=%s\n' "$workspace_abs"
@@ -7240,6 +7236,24 @@ build_native_workspace_host() {
         exit 1
       }
 
+      icon_source=$(workspace_native_bundle_icon_path "$workspace_path" || true)
+      icon_source_format=''
+      icon_key=''
+      icon_hash=''
+      if [ -n "$icon_source" ]; then
+        icon_source_format=$(icon_source_format_for_path "$icon_source")
+        icon_hash=$(hash_path_sha256 "$icon_source")
+      fi
+      expected_hash=$({
+        printf 'backend=%s\n' "$(hash_path_sha256 "$SCRIPT_DIR/forge-backend.sh")"
+        printf 'workspace=%s\n' "$(hash_path_sha256 "$workspace_path")"
+        printf 'package=%s\n' "$(hash_path_sha256 "$package_dir")"
+        printf 'app_id=%s\n' "$app_id"
+        printf 'app_name=%s\n' "$app_name"
+        printf 'workspace_slug=%s\n' "$workspace_slug"
+        printf 'icon=%s\n' "${icon_hash:-missing}"
+      } | hash_stdin_sha256)
+
       staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-native-workspace-bundle.XXXXXX")
       staged_bundle="$staged_root/$app_name.app"
       mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources"
@@ -7251,14 +7265,6 @@ build_native_workspace_host() {
         cp -R "$resource_bundle" "$staged_bundle/Contents/Resources/"
       done
 
-      icon_source=$(workspace_native_bundle_icon_path "$workspace_path" || true)
-      icon_source_format=''
-      icon_key=''
-      icon_hash=''
-      if [ -n "$icon_source" ]; then
-        icon_source_format=$(icon_source_format_for_path "$icon_source")
-        icon_hash=$(hash_path_sha256 "$icon_source")
-      fi
       if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
         iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-native-iconset.XXXXXX")
         iconset="${iconset_tmp}.iconset"
@@ -7287,7 +7293,8 @@ build_native_workspace_host() {
       fi
 
       bundle_id="com.wizardry.workspace.$workspace_slug.native"
-      bundle_version=$(printf '%s' "${icon_hash:-$workspace_slug}" | cksum | awk '{ print $1 }')
+      printf '%s\n' "$expected_hash" > "$staged_bundle/Contents/Resources/wizardry-build-input.sha256"
+      bundle_version=$(printf '%s' "$expected_hash" | cksum | awk '{ print $1 }')
       [ -n "$bundle_version" ] || bundle_version=1
       cat > "$staged_bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -7411,6 +7418,7 @@ build_workspace_desktop_host() {
 
   workspace_title=$(workspace_display_title "$workspace_path" "$workspace_conf")
   workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
+  workspace_hash=$(hash_path_sha256 "$workspace_path")
 
   os=$(os_id)
   case "$os" in
@@ -7477,7 +7485,17 @@ build_workspace_desktop_host() {
       fi
 
       bundle_id="com.wizardry.workspace.$workspace_slug"
-      bundle_version=$(printf '%s' "${icon_hash:-$workspace_slug}" | cksum | awk '{ print $1 }')
+      expected_hash=$({
+        printf 'backend=%s\n' "$(hash_path_sha256 "$SCRIPT_DIR/forge-backend.sh")"
+        printf 'host=%s\n' "$(hash_path_sha256 "$host_bin")"
+        printf 'workspace=%s\n' "$workspace_hash"
+        printf 'app_dir=%s\n' "$(hash_path_sha256 "$app_dir")"
+        printf 'workspace_title=%s\n' "$workspace_title"
+        printf 'workspace_slug=%s\n' "$workspace_slug"
+        printf 'icon=%s\n' "${icon_hash:-missing}"
+      } | hash_stdin_sha256)
+      printf '%s\n' "$expected_hash" > "$staged_bundle/Contents/Resources/wizardry-build-input.sha256"
+      bundle_version=$(printf '%s' "$expected_hash" | cksum | awk '{ print $1 }')
       [ -n "$bundle_version" ] || bundle_version=1
       cat > "$staged_bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -7645,11 +7663,11 @@ cmd_install_workspace_unlocked() {
         printf '%s\n' "forge-backend: expected Godot workspace launcher bundle artifact, got: $artifact" >&2
         exit 1
       }
-      install_path="/Applications/$(basename "$artifact")"
+      install_path=$(preferred_macos_app_install_path "$workspace_title")
       install_macos_bundle "$artifact" "$install_path"
       printf 'status=ok\n'
       printf 'target=macos\n'
-      printf 'install_mode=system-applications\n'
+      printf 'install_mode=desktop-applications\n'
       printf 'artifact=%s\n' "$artifact"
       printf 'entry=%s\n' "$project_path"
       printf 'installed=%s\n' "$install_path"
@@ -7671,11 +7689,11 @@ cmd_install_workspace_unlocked() {
             printf '%s\n' "forge-backend: expected native macOS app bundle artifact, got: $artifact" >&2
             exit 1
           }
-          install_path="/Applications/$(basename "$artifact")"
+          install_path=$(preferred_macos_app_install_path "$app_name")
           install_macos_bundle "$artifact" "$install_path"
           printf 'status=ok\n'
           printf 'target=macos\n'
-          printf 'install_mode=system-applications\n'
+          printf 'install_mode=desktop-applications\n'
           printf 'artifact=%s\n' "$artifact"
           printf 'built_exec=%s\n' "$built_exec"
           printf 'installed=%s\n' "$install_path"
@@ -7747,11 +7765,11 @@ DESKTOP
             printf '%s\n' "forge-backend: expected project macOS app bundle artifact, got: $artifact" >&2
             exit 1
           }
-          install_path="/Applications/$(basename "$artifact")"
+          install_path=$(preferred_macos_app_install_path "$workspace_title")
           install_macos_bundle "$artifact" "$install_path"
           printf 'status=ok\n'
           printf 'target=macos\n'
-          printf 'install_mode=system-applications\n'
+          printf 'install_mode=desktop-applications\n'
           printf 'artifact=%s\n' "$artifact"
           printf 'entry=%s\n' "$app_entry"
           printf 'installed=%s\n' "$install_path"
@@ -7850,12 +7868,13 @@ cmd_install_desktop() {
         exit 1
       }
       bundle_name=$(basename "$artifact")
-      install_path="/Applications/$bundle_name"
+      install_app_name=${bundle_name%.app}
+      install_path=$(preferred_macos_app_install_path "$install_app_name")
       install_macos_bundle "$artifact" "$install_path"
 
       printf 'status=ok\n'
       printf 'target=macos\n'
-      printf 'install_mode=system-applications\n'
+      printf 'install_mode=desktop-applications\n'
       printf 'artifact=%s\n' "$artifact"
       printf 'installed=%s\n' "$install_path"
       printf 'app_name=%s\n' "$app_name"

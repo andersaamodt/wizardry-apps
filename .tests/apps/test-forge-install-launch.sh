@@ -356,8 +356,12 @@ if [ "${1-}" = "-R" ]; then
 fi
 exec /bin/cp "$@"
 SH
+cat >"$preserve_build_bin/ditto" <<'SH'
+#!/bin/sh
+exit 1
+SH
 chmod +x "$preserve_build_bin/uname" "$preserve_build_bin/clang" \
-  "$preserve_build_bin/codesign" "$preserve_build_bin/cp"
+  "$preserve_build_bin/codesign" "$preserve_build_bin/cp" "$preserve_build_bin/ditto"
 if PATH="$preserve_build_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
     sh "$root/tools/forge/build-forge-macos-app.sh" \
       --root "$preserve_build_root" \

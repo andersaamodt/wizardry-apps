@@ -3,6 +3,7 @@
 # Install launchers for App Forge.
 
 set -eu
+export COPYFILE_DISABLE=1
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 DEFAULT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)
@@ -274,6 +275,19 @@ macos_bundle_launch_policy_usable() {
   return 0
 }
 
+copy_macos_bundle_contents() {
+  src_bundle=${1-}
+  dest_bundle=${2-}
+  [ -d "$src_bundle" ] || return 1
+  [ -n "$dest_bundle" ] || return 1
+  if command -v ditto >/dev/null 2>&1; then
+    ditto --norsrc --noextattr --noqtn --noacl "$src_bundle" "$dest_bundle" || return 1
+  else
+    export COPYFILE_DISABLE=1
+    cp -R "$src_bundle" "$dest_bundle" || return 1
+  fi
+}
+
 macos_plist_value() {
   bundle_path=${1-}
   key=${2-}
@@ -359,19 +373,11 @@ install_macos_bundle() {
   if [ -w "$target_parent" ] || [ ! -e "$target_parent" ]; then
     mkdir -p "$target_parent"
     rm -rf "$target_stage"
-    if command -v ditto >/dev/null 2>&1; then
-      ditto "$stage_bundle" "$target_stage" || {
-        rm -rf "$target_stage"
-        rm -rf "$stage_root"
-        return 1
-      }
-    else
-      cp -R "$stage_bundle" "$target_stage" || {
-        rm -rf "$target_stage"
-        rm -rf "$stage_root"
-        return 1
-      }
-    fi
+    copy_macos_bundle_contents "$stage_bundle" "$target_stage" || {
+      rm -rf "$target_stage"
+      rm -rf "$stage_root"
+      return 1
+    }
     backup_target="$target.previous"
     rm -rf "$backup_target"
     if [ -e "$target" ]; then
@@ -402,9 +408,9 @@ install_macos_bundle() {
   if command -v sudo >/dev/null 2>&1; then
     set +e
     if command -v ditto >/dev/null 2>&1; then
-      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo ditto "$stage_bundle" "$target_stage"
+      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo ditto --norsrc --noextattr --noqtn --noacl "$stage_bundle" "$target_stage"
     else
-      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo cp -R "$stage_bundle" "$target_stage"
+      sudo mkdir -p "$target_parent" && sudo rm -rf "$target_stage" && sudo COPYFILE_DISABLE=1 cp -R "$stage_bundle" "$target_stage"
     fi
     sudo_rc=$?
     set -e

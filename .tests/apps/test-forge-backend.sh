@@ -230,6 +230,13 @@ chmod +x "$bundle_install_src/Contents/MacOS/probe"
 cat >"$bundle_install_bin/ditto" <<'SH'
 #!/bin/sh
 set -eu
+for expected in --norsrc --noextattr --noqtn --noacl; do
+  [ "${1-}" = "$expected" ] || {
+    printf '%s\n' "ditto missing metadata-clean flag: $expected" >&2
+    exit 8
+  }
+  shift
+done
 src=${1?missing source}
 dest=${2?missing destination}
 if [ "$src" = "$dest" ]; then

@@ -7993,7 +7993,7 @@
             installBtn.type = 'button';
             installBtn.className = 'row-mini row-install';
             if (spec.id === 'macos') {
-              installBtn.title = 'Install (auto-build latest) into /Applications';
+              installBtn.title = 'Install (auto-build latest) into the desktop app install folder';
             } else {
               installBtn.title = 'Install (auto-build latest) into ~/.local/share + ~/.local/bin launcher';
             }
@@ -8298,13 +8298,13 @@
         var installHelp = usesWorkspacePipeline(selected)
           ? (selected.context === 'native-desktop'
             ? (targetId === 'macos'
-              ? 'Install compiles the native workspace, then copies the .app bundle into /Applications.'
+              ? 'Install compiles the native workspace, then copies the .app bundle into the desktop app install folder.'
               : 'Install compiles the native workspace, then installs the launcher under ~/.local with a desktop entry.')
             : (targetId === 'macos'
-              ? 'Install rebuilds the project and copies the desktop app bundle into /Applications.'
+              ? 'Install rebuilds the project and copies the desktop app bundle into the desktop app install folder.'
               : 'Install rebuilds the project and installs its AppDir under ~/.local/share with a launcher in ~/.local/bin.'))
           : (targetId === 'macos'
-            ? 'Install auto-builds latest output, then copies the .app bundle into /Applications.'
+            ? 'Install auto-builds latest output, then copies the .app bundle into the desktop app install folder.'
             : 'Install auto-builds latest output, then installs AppDir to ~/.local/share with a launcher in ~/.local/bin.');
         renderResult({
           status: 'ok',

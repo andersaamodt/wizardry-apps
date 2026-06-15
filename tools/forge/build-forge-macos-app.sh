@@ -19,6 +19,7 @@ USAGE
 esac
 
 set -eu
+export COPYFILE_DISABLE=1
 
 forge_state_root() {
   printf '%s\n' "${WIZARDRY_APPS_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps}"
@@ -173,6 +174,18 @@ scrub_macos_bundle_launch_metadata() {
   do
     xattr -r -d "$scrub_macos_bundle_launch_metadata_attr" "$scrub_macos_bundle_launch_metadata_bundle" >/dev/null 2>&1 || true
   done
+}
+
+copy_macos_bundle_contents() {
+  src_bundle=${1-}
+  dest_bundle=${2-}
+  [ -d "$src_bundle" ] || return 1
+  [ -n "$dest_bundle" ] || return 1
+  if command -v ditto >/dev/null 2>&1; then
+    ditto --norsrc --noextattr --noqtn --noacl "$src_bundle" "$dest_bundle" || return 1
+  else
+    cp -R "$src_bundle" "$dest_bundle" || return 1
+  fi
 }
 
 forge_bundle_input_hash() {
@@ -473,7 +486,7 @@ final_stage_root=$(mktemp -d "$out_parent/.${out_base}.build.XXXXXX")
 final_bundle="$final_stage_root/$out_base"
 backup_bundle="$final_stage_root/previous-$out_base"
 
-cp -R "$stage_bundle" "$final_bundle" || {
+copy_macos_bundle_contents "$stage_bundle" "$final_bundle" || {
   printf '%s\n' "build-forge-macos-app: failed to copy macOS app bundle: $out_bundle" >&2
   exit 1
 }
