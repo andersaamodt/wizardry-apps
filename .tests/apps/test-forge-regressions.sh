@@ -20,6 +20,11 @@ trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 fake_bin="$scratch/fake-bin"
 mkdir -p "$fake_bin"
 
+if grep -E 'mktemp -d .*/wizardry-(native-workspace-bundle|workspace-bundle|native-iconset|ws-iconset)' "$backend" >/dev/null; then
+  printf '%s\n' "Forge must use stable workbench staging paths for macOS workspace bundles and iconsets" >&2
+  exit 1
+fi
+
 assert_contains() {
   haystack=$1
   needle=$2

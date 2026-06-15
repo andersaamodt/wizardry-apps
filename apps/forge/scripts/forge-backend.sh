@@ -7307,7 +7307,10 @@ build_native_workspace_host() {
         printf 'icon=%s\n' "${icon_hash:-missing}"
       } | hash_stdin_sha256)
 
-      staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-native-workspace-bundle.XXXXXX")
+      mkdir -p "$bundle_root"
+      staged_root="$bundle_root/.staging"
+      rm -rf "$staged_root"
+      mkdir -p "$staged_root"
       staged_bundle="$staged_root/$app_name.app"
       mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources"
       cp "$built_exec" "$staged_bundle/Contents/MacOS/$app_id"
@@ -7319,9 +7322,9 @@ build_native_workspace_host() {
       done
 
       if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-        iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-native-iconset.XXXXXX")
-        iconset="${iconset_tmp}.iconset"
-        mv "$iconset_tmp" "$iconset"
+        iconset="$bundle_root/.iconset-staging.iconset"
+        rm -rf "$iconset"
+        mkdir -p "$iconset"
         for size in 16 32 128 256 512; do
           sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
           sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
@@ -7369,7 +7372,6 @@ PLIST
         exit 1
       }
 
-      mkdir -p "$bundle_root"
       rm -rf "$bundle"
       mv "$staged_bundle" "$bundle"
       rmdir "$staged_root" 2>/dev/null || :
@@ -7479,7 +7481,10 @@ build_workspace_desktop_host() {
       host_bin=$(ensure_macos_host "$root")
       bundle_root="$(forge_workbench_root "$root")/dist/macos-workspaces/$workspace_slug"
       final_bundle="$bundle_root/$workspace_title.app"
-      staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")
+      mkdir -p "$bundle_root"
+      staged_root="$bundle_root/.staging"
+      rm -rf "$staged_root"
+      mkdir -p "$staged_root"
       staged_bundle="$staged_root/$workspace_title.app"
       mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources/$workspace_slug" "$staged_bundle/Contents/Resources/.host"
 
@@ -7511,9 +7516,9 @@ build_workspace_desktop_host() {
         icon_hash=$(hash_path_sha256 "$icon_source")
       fi
       if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-        iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-ws-iconset.XXXXXX")
-        iconset="${iconset_tmp}.iconset"
-        mv "$iconset_tmp" "$iconset"
+        iconset="$bundle_root/.iconset-staging.iconset"
+        rm -rf "$iconset"
+        mkdir -p "$iconset"
         for size in 16 32 128 256 512; do
           sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
           sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
@@ -8683,7 +8688,10 @@ cmd_run_workspace_unlocked() {
 
     bundle_root="$(forge_workbench_root "$root")/dist/macos-workspaces/$workspace_slug"
     final_bundle="$bundle_root/$workspace_title.app"
-    staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-workspace-bundle.XXXXXX")
+    mkdir -p "$bundle_root"
+    staged_root="$bundle_root/.staging"
+    rm -rf "$staged_root"
+    mkdir -p "$staged_root"
     staged_bundle="$staged_root/$workspace_title.app"
     mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources/$workspace_slug" "$staged_bundle/Contents/Resources/.host"
 
@@ -8715,9 +8723,9 @@ cmd_run_workspace_unlocked() {
       icon_hash=$(hash_path_sha256 "$icon_source")
     fi
     if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-      iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-ws-iconset.XXXXXX")
-      iconset="${iconset_tmp}.iconset"
-      mv "$iconset_tmp" "$iconset"
+      iconset="$bundle_root/.iconset-staging.iconset"
+      rm -rf "$iconset"
+      mkdir -p "$iconset"
       for size in 16 32 128 256 512; do
         sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
         sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
