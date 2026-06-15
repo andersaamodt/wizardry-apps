@@ -100,6 +100,18 @@ desktop_generated_path_is_safe() {
   return 0
 }
 
+hash_file_sha256() {
+  hash_target=${1-}
+  [ -f "$hash_target" ] || return 1
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$hash_target" | awk '{ print $1 }'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$hash_target" | awk '{ print $1 }'
+  else
+    cksum "$hash_target" | awk '{ print $1 "-" $2 }'
+  fi
+}
+
 normalize_desktop_apps_install_dir() {
   dir_path=${1-}
   [ -n "$dir_path" ] || return 1
@@ -262,6 +274,56 @@ macos_bundle_launch_policy_usable() {
   return 0
 }
 
+macos_plist_value() {
+  bundle_path=${1-}
+  key=${2-}
+  [ -n "$bundle_path" ] || return 1
+  [ -n "$key" ] || return 1
+  plist_path="$bundle_path/Contents/Info.plist"
+  [ -f "$plist_path" ] || return 1
+
+  if command -v plutil >/dev/null 2>&1; then
+    plist_value=$(plutil -extract "$key" raw -o - "$plist_path" 2>/dev/null || true)
+    if [ -n "$plist_value" ]; then
+      printf '%s\n' "$plist_value"
+      return 0
+    fi
+  fi
+
+  tr '\n' ' ' <"$plist_path" |
+    sed -n "s/.*<key>$key<\\/key>[[:space:]]*<string>\\([^<]*\\)<\\/string>.*/\\1/p" |
+    head -n 1
+}
+
+macos_bundle_build_marker() {
+  bundle_path=${1-}
+  [ -d "$bundle_path" ] || return 1
+  marker_path="$bundle_path/Contents/Resources/wizardry-build-input.sha256"
+  [ -f "$marker_path" ] || return 1
+  hash_file_sha256 "$marker_path" 2>/dev/null
+}
+
+macos_bundle_same_install_identity() {
+  src_bundle=${1-}
+  dest_bundle=${2-}
+  [ -d "$src_bundle" ] || return 1
+  [ -d "$dest_bundle" ] || return 1
+
+  src_id=$(macos_plist_value "$src_bundle" CFBundleIdentifier 2>/dev/null || true)
+  dest_id=$(macos_plist_value "$dest_bundle" CFBundleIdentifier 2>/dev/null || true)
+  [ -n "$src_id" ] && [ "$src_id" = "$dest_id" ] || return 1
+
+  src_version=$(macos_plist_value "$src_bundle" CFBundleVersion 2>/dev/null || true)
+  dest_version=$(macos_plist_value "$dest_bundle" CFBundleVersion 2>/dev/null || true)
+  [ -n "$src_version" ] && [ "$src_version" = "$dest_version" ] || return 1
+
+  src_marker=$(macos_bundle_build_marker "$src_bundle" 2>/dev/null || true)
+  dest_marker=$(macos_bundle_build_marker "$dest_bundle" 2>/dev/null || true)
+  [ -z "$src_marker" ] || [ "$src_marker" = "$dest_marker" ] || return 1
+
+  ensure_macos_bundle_signature "$dest_bundle" >/dev/null 2>&1
+}
+
 install_macos_bundle() {
   target=$1
   stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-app.XXXXXX")
@@ -286,6 +348,13 @@ install_macos_bundle() {
     rm -rf "$stage_root"
     return 1
   }
+
+  if macos_bundle_same_install_identity "$stage_bundle" "$target"; then
+    scrub_macos_bundle_launch_metadata "$target" >/dev/null 2>&1 || true
+    rm -rf "$stage_root"
+    printf '%s\n' "$target"
+    return 0
+  fi
 
   if [ -w "$target_parent" ] || [ ! -e "$target_parent" ]; then
     mkdir -p "$target_parent"

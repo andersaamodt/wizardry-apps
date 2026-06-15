@@ -199,6 +199,10 @@ validate_macos_app_bundle_name() {
   esac
 }
 
+hash_file_sha256() {
+  cksum "\$1" | awk '{ print \$1 "-" \$2 }'
+}
+
 ensure_macos_bundle_signature() {
   return 0
 }
@@ -242,6 +246,31 @@ FORGE_DITTO_LOG="$scratch/bundle-install-ditto.log" \
   sh "$bundle_install_probe" "$bundle_install_src" "$bundle_install_dest"
 [ -x "$bundle_install_dest/Contents/MacOS/probe" ] || {
   printf '%s\n' "forge backend test: macOS bundle install did not populate destination" >&2
+  exit 1
+}
+
+bundle_unchanged_src="$scratch/UnchangedSource.app"
+bundle_unchanged_dest="$scratch/UnchangedInstalled.app"
+mkdir -p "$bundle_unchanged_src/Contents/Resources" "$bundle_unchanged_dest/Contents/Resources"
+cat >"$bundle_unchanged_src/Contents/Info.plist" <<'PLIST'
+<plist><dict>
+<key>CFBundleIdentifier</key><string>com.example.unchanged</string>
+<key>CFBundleVersion</key><string>42</string>
+</dict></plist>
+PLIST
+cp "$bundle_unchanged_src/Contents/Info.plist" "$bundle_unchanged_dest/Contents/Info.plist"
+printf '%s\n' "same-build" >"$bundle_unchanged_src/Contents/Resources/wizardry-build-input.sha256"
+printf '%s\n' "same-build" >"$bundle_unchanged_dest/Contents/Resources/wizardry-build-input.sha256"
+printf '%s\n' "preserve" >"$bundle_unchanged_dest/Contents/preserved-file"
+FORGE_DITTO_LOG="$scratch/bundle-install-unchanged-ditto.log" \
+  PATH="$bundle_install_bin:/bin:/usr/bin:/usr/sbin:/sbin" \
+  sh "$bundle_install_probe" "$bundle_unchanged_src" "$bundle_unchanged_dest"
+[ ! -f "$scratch/bundle-install-unchanged-ditto.log" ] || {
+  printf '%s\n' "forge backend test: unchanged macOS bundle install should not recopy destination" >&2
+  exit 1
+}
+grep -Fx "preserve" "$bundle_unchanged_dest/Contents/preserved-file" >/dev/null || {
+  printf '%s\n' "forge backend test: unchanged macOS bundle install should preserve destination contents" >&2
   exit 1
 }
 

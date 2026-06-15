@@ -2429,6 +2429,62 @@ copy_macos_bundle_contents() {
   fi
 }
 
+macos_plist_value() {
+  macos_plist_bundle=${1-}
+  macos_plist_key=${2-}
+  [ -n "$macos_plist_bundle" ] || return 1
+  [ -n "$macos_plist_key" ] || return 1
+  macos_plist_path="$macos_plist_bundle/Contents/Info.plist"
+  [ -f "$macos_plist_path" ] || return 1
+
+  if command -v plutil >/dev/null 2>&1; then
+    macos_plist_result=$(plutil -extract "$macos_plist_key" raw -o - "$macos_plist_path" 2>/dev/null || true)
+    if [ -n "$macos_plist_result" ]; then
+      printf '%s\n' "$macos_plist_result"
+      return 0
+    fi
+  fi
+
+  tr '\n' ' ' <"$macos_plist_path" |
+    sed -n "s/.*<key>$macos_plist_key<\\/key>[[:space:]]*<string>\\([^<]*\\)<\\/string>.*/\\1/p" |
+    head -n 1
+}
+
+macos_bundle_build_marker() {
+  macos_marker_bundle=${1-}
+  [ -d "$macos_marker_bundle" ] || return 1
+  for macos_marker_path in \
+    "$macos_marker_bundle/Contents/Resources/wizardry-build-input.sha256" \
+    "$macos_marker_bundle/Contents/Resources/app-blueprint/product.ir.json" \
+    "$macos_marker_bundle/Contents/Resources/theurgy-runtime.json"
+  do
+    [ -f "$macos_marker_path" ] || continue
+    hash_file_sha256 "$macos_marker_path" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+macos_bundle_same_install_identity() {
+  macos_same_src_bundle=${1-}
+  macos_same_dest_bundle=${2-}
+  [ -d "$macos_same_src_bundle" ] || return 1
+  [ -d "$macos_same_dest_bundle" ] || return 1
+
+  macos_same_src_id=$(macos_plist_value "$macos_same_src_bundle" CFBundleIdentifier 2>/dev/null || true)
+  macos_same_dest_id=$(macos_plist_value "$macos_same_dest_bundle" CFBundleIdentifier 2>/dev/null || true)
+  [ -n "$macos_same_src_id" ] && [ "$macos_same_src_id" = "$macos_same_dest_id" ] || return 1
+
+  macos_same_src_version=$(macos_plist_value "$macos_same_src_bundle" CFBundleVersion 2>/dev/null || true)
+  macos_same_dest_version=$(macos_plist_value "$macos_same_dest_bundle" CFBundleVersion 2>/dev/null || true)
+  [ -n "$macos_same_src_version" ] && [ "$macos_same_src_version" = "$macos_same_dest_version" ] || return 1
+
+  macos_same_src_marker=$(macos_bundle_build_marker "$macos_same_src_bundle" 2>/dev/null || true)
+  macos_same_dest_marker=$(macos_bundle_build_marker "$macos_same_dest_bundle" 2>/dev/null || true)
+  [ -z "$macos_same_src_marker" ] || [ "$macos_same_src_marker" = "$macos_same_dest_marker" ] || return 1
+
+  ensure_macos_bundle_signature "$macos_same_dest_bundle" >/dev/null 2>&1
+}
+
 install_macos_bundle() {
   macos_install_src_bundle=${1-}
   macos_install_dest_bundle=${2-}
@@ -2439,6 +2495,11 @@ install_macos_bundle() {
   validate_macos_app_bundle_name "$macos_install_bundle_name"
   macos_install_parent_dir=$(dirname "$macos_install_dest_bundle")
   mkdir -p "$macos_install_parent_dir" || return 1
+
+  if macos_bundle_same_install_identity "$macos_install_src_bundle" "$macos_install_dest_bundle"; then
+    scrub_macos_bundle_launch_metadata "$macos_install_dest_bundle" >/dev/null 2>&1 || true
+    return 0
+  fi
 
   macos_install_stage_root=$(mktemp -d "$macos_install_parent_dir/.${macos_install_bundle_name}.install.XXXXXX") || return 1
   macos_install_stage_bundle="$macos_install_stage_root/$macos_install_bundle_name"
