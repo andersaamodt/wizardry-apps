@@ -1772,6 +1772,7 @@ run_workspace_rebuild() {
   root=$1
   workspace_path=$2
   workspace_conf=$3
+  rebuild_target=${4-}
 
   rebuild_command=$(workspace_rebuild_command "$workspace_conf")
   if [ -z "$rebuild_command" ]; then
@@ -1794,9 +1795,25 @@ run_workspace_rebuild() {
   mkdir -p "$log_dir"
   log_path="$log_dir/workspace-$workspace_slug-rebuild.log"
 
+  case "$rebuild_target" in
+    ""|macos|linux|ios|android|hosted-web|godot-desktop)
+      ;;
+    *)
+      printf '%s\n' "forge-backend: invalid rebuild target '$rebuild_target'" >&2
+      exit 2
+      ;;
+  esac
+
   if (
     cd "$workspace_path"
-    env WIZARDRY_DIR="$root" WIZARDRY_APPS_ROOT="$root" sh -lc "$rebuild_command"
+    env \
+      WIZARDRY_DIR="$root" \
+      WIZARDRY_APPS_ROOT="$root" \
+      WIZARDRY_APPS_REBUILD_TARGET="$rebuild_target" \
+      WIZARDRY_APPS_REBUILD_TARGETS="$rebuild_target" \
+      WIZARDRY_NATIVE_DESKTOP_TARGET="$rebuild_target" \
+      WIZARDRY_NATIVE_DESKTOP_TARGETS="$rebuild_target" \
+      sh -lc "$rebuild_command"
   ) >"$log_path" 2>&1; then
     printf 'status=ok\n'
     printf 'mode=command\n'
@@ -7710,7 +7727,7 @@ cmd_install_workspace_unlocked() {
       printf 'app_name=%s\n' "$workspace_title"
       ;;
     native-desktop)
-      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" "$expected_target" >/dev/null
       build_out=$(build_native_workspace_host "$root" "$workspace_path" "$workspace_conf")
       artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
       app_name=$(printf '%s\n' "$build_out" | kv_read app_name)
@@ -8462,7 +8479,7 @@ cmd_run_workspace_unlocked() {
       fi
 
       stop_desktop_instances_for_slug "$root" "$workspace_slug" "$app_name" "$os"
-      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" >/dev/null
+      run_workspace_rebuild "$root" "$workspace_path" "$workspace_conf" "$host_target" >/dev/null
       build_out=$(build_native_workspace_host "$root" "$workspace_path" "$workspace_conf")
       artifact=$(printf '%s\n' "$build_out" | kv_read artifact)
       built_exec=$(printf '%s\n' "$build_out" | kv_read built_exec)

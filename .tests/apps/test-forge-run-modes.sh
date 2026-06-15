@@ -575,6 +575,28 @@ workspace_native_artifact=$(printf '%s\n' "$workspace_native_out" | kv_read arti
 [ -x "$workspace_native_artifact" ]
 wait_for_file_contains "$workspace_native_log" "$workspace_native_artifact" 60
 
+# Behavior: native Run tells rebuild scripts to prepare only the current host target.
+workspace_native_targeted="$scratch/workspace-native-targeted"
+make_native_workspace "$workspace_native_targeted" "workspace-native-targeted" "Workspace Native Targeted" "macos,linux" "workspace-native-targeted" "Workspace Native Targeted"
+mkdir -p "$workspace_native_targeted/scripts"
+cat > "$workspace_native_targeted/scripts/render-native-desktop.sh" <<SH
+#!/bin/sh
+set -eu
+printf '%s\n' "\${WIZARDRY_APPS_REBUILD_TARGETS-}" > "$scratch/workspace-native-targeted-target.log"
+SH
+chmod +x "$workspace_native_targeted/scripts/render-native-desktop.sh"
+awk '
+  $1 == "run_rebuild_command=:" { print "run_rebuild_command=sh scripts/render-native-desktop.sh"; next }
+  { print }
+' "$workspace_native_targeted/wizardry.workspace.conf" > "$workspace_native_targeted/wizardry.workspace.conf.tmp"
+mv "$workspace_native_targeted/wizardry.workspace.conf.tmp" "$workspace_native_targeted/wizardry.workspace.conf"
+workspace_native_targeted_log="$scratch/workspace-native-targeted.log"
+workspace_native_targeted_out=$(test_env FORGE_TEST_UNAME=Linux WIZARDRY_FAKE_HOST_LOG="$workspace_native_targeted_log" WIZARDRY_FAKE_HOST_MODE=loop sh "$backend" run-workspace "$root" "$workspace_native_targeted" native-desktop normal)
+assert_contains "$workspace_native_targeted_out" "launched=1"
+workspace_native_targeted_pid=$(printf '%s\n' "$workspace_native_targeted_out" | kv_read pid)
+register_pid "$workspace_native_targeted_pid"
+grep -Fx "linux" "$scratch/workspace-native-targeted-target.log" >/dev/null
+
 # Behavior: native install builds local install assets and returns launcher metadata.
 workspace_native_install_out=$(test_env FORGE_TEST_UNAME=Linux sh "$backend" install-workspace "$root" "$workspace_native" native-desktop linux)
 assert_contains "$workspace_native_install_out" "status=ok"
@@ -624,6 +646,24 @@ case "$workspace_native_macos_artifact" in
     ;;
 esac
 wait_for_file_contains "$test_opened_bundle" "$workspace_native_macos_artifact" 60
+
+workspace_native_macos_targeted="$scratch/workspace-native-macos-targeted"
+make_native_workspace "$workspace_native_macos_targeted" "workspace-native-macos-targeted" "Workspace Native Mac Targeted" "macos,linux" "workspace-native-macos-targeted" "Workspace Native Mac Targeted"
+mkdir -p "$workspace_native_macos_targeted/scripts"
+cat > "$workspace_native_macos_targeted/scripts/render-native-desktop.sh" <<SH
+#!/bin/sh
+set -eu
+printf '%s\n' "\${WIZARDRY_APPS_REBUILD_TARGETS-}" > "$scratch/workspace-native-macos-targeted-target.log"
+SH
+chmod +x "$workspace_native_macos_targeted/scripts/render-native-desktop.sh"
+awk '
+  $1 == "run_rebuild_command=:" { print "run_rebuild_command=sh scripts/render-native-desktop.sh"; next }
+  { print }
+' "$workspace_native_macos_targeted/wizardry.workspace.conf" > "$workspace_native_macos_targeted/wizardry.workspace.conf.tmp"
+mv "$workspace_native_macos_targeted/wizardry.workspace.conf.tmp" "$workspace_native_macos_targeted/wizardry.workspace.conf"
+workspace_native_macos_targeted_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$backend" run-workspace "$root" "$workspace_native_macos_targeted" native-desktop normal)
+assert_contains "$workspace_native_macos_targeted_out" "launched=1"
+grep -Fx "macos" "$scratch/workspace-native-macos-targeted-target.log" >/dev/null
 
 # Behavior: native macOS workspaces can keep generated Swift packages outside
 # the checkout when their render command reports the package location.
