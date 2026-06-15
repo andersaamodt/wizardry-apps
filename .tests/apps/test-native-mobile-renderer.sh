@@ -3,7 +3,11 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
-tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-native-mobile-test.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+tmp_dir="$scratch_root/native-mobile-renderer"
+rm -rf "$tmp_dir"
+mkdir -p "$tmp_dir"
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
 mkdir -p "$tmp_dir/runtime/config" "$tmp_dir/runtime/schemas" "$tmp_dir/apps" "$tmp_dir/templates" "$tmp_dir/licenses"

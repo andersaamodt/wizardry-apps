@@ -4,7 +4,11 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 backend="$root/apps/forge/scripts/forge-backend.sh"
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/forge-release-install.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+scratch="$scratch_root/forge-release-install"
+rm -rf "$scratch"
+mkdir -p "$scratch"
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
 fake_bin="$scratch/bin"

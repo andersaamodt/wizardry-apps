@@ -16,7 +16,11 @@ forge_name=$(sh "$ROOT_DIR/tools/release/get-app-name.sh" forge)
 bundle_id=$(sh "$ROOT_DIR/tools/release/get-app-bundle-id.sh" android artificer-web)
 printf '%s' "$bundle_id" | grep -Eq '^[A-Za-z0-9]+(\.[A-Za-z0-9-]+)+$'
 
-tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-release-tools.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+tmp_dir="$scratch_root/release-tools"
+rm -rf "$tmp_dir"
+mkdir -p "$tmp_dir"
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
 bad_lookup_slug=$(printf 'forge\nforged=1')

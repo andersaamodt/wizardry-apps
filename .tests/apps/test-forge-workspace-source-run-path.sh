@@ -10,7 +10,11 @@ backend="$root/apps/forge/scripts/forge-backend.sh"
   exit 1
 }
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/forge-workspace-source-run.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+scratch="$scratch_root/forge-workspace-source-run"
+rm -rf "$scratch"
+mkdir -p "$scratch"
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
 rm -f "$root/_tmp/workbench/bin/wizardry-host-macos"

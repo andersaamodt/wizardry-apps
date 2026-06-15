@@ -3,6 +3,8 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+test_scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
 
 launch="$root/tools/forge/launch-forge.sh"
 install="$root/tools/forge/install-forge.sh"
@@ -23,9 +25,9 @@ uninstall="$root/tools/forge/uninstall-forge.sh"
 build_icns_from_png() {
   png_source=$1
   out_path=$2
-  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
-  iconset="${iconset_tmp}.iconset"
-  mv "$iconset_tmp" "$iconset"
+  iconset="$test_scratch_root/forge-install-iconset.iconset"
+  rm -rf "$iconset"
+  mkdir -p "$iconset"
   for size in 16 32 128 256 512; do
     sips -s format png -z "$size" "$size" "$png_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
     sips -s format png -z $((size * 2)) $((size * 2)) "$png_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
@@ -67,13 +69,19 @@ if grep -F "find-identity" "$root/tools/forge/install-forge.sh" >/dev/null; then
   printf '%s\n' "forge install test: installer must not auto-detect local codesigning identities" >&2
   exit 1
 fi
+if grep -E 'mktemp -d .*(app-forge-(app|build)|build[.]XXXXXX|install[.][^"]*[$][$])' "$root/tools/forge/install-forge.sh" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null; then
+  printf '%s\n' "forge install test: installer and builder must use stable macOS app staging paths" >&2
+  exit 1
+fi
 grep -F "macos_bundle_launch_policy_usable()" "$root/tools/forge/install-forge.sh" >/dev/null
 if grep -F -- "--assess --type exec" "$root/tools/forge/install-forge.sh" >/dev/null; then
   printf '%s\n' "forge install test: installer must not preflight app launches with spctl" >&2
   exit 1
 fi
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-install.XXXXXX")
+scratch="$test_scratch_root/forge-install"
+rm -rf "$scratch"
+mkdir -p "$scratch"
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
 fake_home="$scratch/home"

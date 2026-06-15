@@ -113,6 +113,18 @@ hash_file_sha256() {
   fi
 }
 
+forge_install_state_root() {
+  printf '%s\n' "${WIZARDRY_APPS_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/wizardry-apps}/forge/install"
+}
+
+forge_install_key() {
+  printf '%s' "$root" | cksum | awk '{ print $1 "-" $2 }'
+}
+
+forge_install_staging_root() {
+  printf '%s/%s\n' "$(forge_install_state_root)" "$(forge_install_key)"
+}
+
 normalize_desktop_apps_install_dir() {
   dir_path=${1-}
   [ -n "$dir_path" ] || return 1
@@ -340,11 +352,13 @@ macos_bundle_same_install_identity() {
 
 install_macos_bundle() {
   target=$1
-  stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-app.XXXXXX")
+  stage_root="$(forge_install_staging_root)/app-forge-app"
+  rm -rf "$stage_root"
+  mkdir -p "$stage_root"
   stage_bundle="$stage_root/App Forge.app"
   target_parent=$(dirname "$target")
   target_base=${target##*/}
-  target_stage="$target_parent/.$target_base.install.$$"
+  target_stage="$target_parent/.$target_base.install-staging"
 
   if ! sh "$root/tools/forge/build-forge-macos-app.sh" --root "$root" --out "$stage_bundle" >/dev/null 2>&1; then
     rm -rf "$stage_root"

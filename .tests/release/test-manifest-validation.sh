@@ -4,7 +4,11 @@ set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 
-tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-manifest-validation.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+tmp_dir="$scratch_root/manifest-validation"
+rm -rf "$tmp_dir"
+mkdir -p "$tmp_dir"
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
 fixture_root="$tmp_dir/root"

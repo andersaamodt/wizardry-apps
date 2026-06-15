@@ -369,7 +369,9 @@ if [ -d "$out_bundle" ] &&
   fi
 fi
 
-stage_root=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-build.XXXXXX")
+stage_root="$(forge_workbench_root "$root")/staging/build-forge-macos-app"
+rm -rf "$stage_root"
+mkdir -p "$stage_root"
 stage_bundle="$stage_root/App Forge.app"
 macos_dir="$stage_bundle/Contents/MacOS"
 resources_dir="$stage_bundle/Contents/Resources"
@@ -482,7 +484,9 @@ PLIST
 out_parent=$(dirname "$out_bundle")
 out_base=$(basename "$out_bundle")
 mkdir -p "$out_parent"
-final_stage_root=$(mktemp -d "$out_parent/.${out_base}.build.XXXXXX")
+final_stage_root="$out_parent/.${out_base}.build-staging"
+rm -rf "$final_stage_root"
+mkdir -p "$final_stage_root"
 final_bundle="$final_stage_root/$out_base"
 backup_bundle="$final_stage_root/previous-$out_base"
 

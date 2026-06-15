@@ -4,6 +4,8 @@ set -eu
 
 test_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 backend="$test_root/apps/forge/scripts/forge-backend.sh"
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+test_scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
 
 [ -x "$backend" ] || {
   printf '%s\n' "forge backend missing or not executable" >&2
@@ -13,9 +15,9 @@ backend="$test_root/apps/forge/scripts/forge-backend.sh"
 build_icns_from_png() {
   png_source=$1
   out_path=$2
-  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
-  iconset="${iconset_tmp}.iconset"
-  mv "$iconset_tmp" "$iconset"
+  iconset="$test_scratch_root/forge-backend-iconset.iconset"
+  rm -rf "$iconset"
+  mkdir -p "$iconset"
   for size in 16 32 128 256 512; do
     sips -s format png -z "$size" "$size" "$png_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
     sips -s format png -z $((size * 2)) $((size * 2)) "$png_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
@@ -141,7 +143,9 @@ printf '%s\n' "$apps" | grep -E '^forge\t' >/dev/null
 templates=$(sh "$backend" list-templates "$test_root")
 printf '%s\n' "$templates" | grep -E '^demo\t' >/dev/null
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-backend.XXXXXX")
+scratch="$test_scratch_root/forge-backend"
+rm -rf "$scratch"
+mkdir -p "$scratch"
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
 native_repair_ws="$scratch/native-repair"
