@@ -192,8 +192,6 @@ categories:
     default_severity: medium
     affected_apps:
       - dictator
-      - hegelizer
-      - pleroma
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Move test entrypoints under .tests and leave non-test helpers elsewhere.
@@ -406,14 +404,10 @@ categories:
       - Testing And Release Readiness
     default_severity: high
     affected_apps:
-      - boycott
       - applegate
       - chatroom
       - dictator
       - eye
-      - hegelizer
-      - pleroma
-      - serenity
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Add UI/static contract tests alongside backend coverage in .tests.

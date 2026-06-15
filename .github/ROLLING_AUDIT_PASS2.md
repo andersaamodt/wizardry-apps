@@ -199,13 +199,13 @@
   - `dictator`: fail; no `.tests/` GUI/static contract
   - `eye`: fail; `.tests/test-eye.sh` covers shell/runtime behavior only
   - `fauxzilla`: extension/UI behavior coverage present under `.tests/`
-  - `hegelizer`: fail; UI/runtime smoke tests live outside `.tests/`
+  - `hegelizer`: partial; canonical UI/static contract entrypoints now exist under `.tests/ui/`, but the smoke harness is still red and broader GUI/static contract depth remains thin
   - `matchbook`: UI/static coverage present under `.tests/apps/test-matchbook-ui-contract.sh` and `.tests/apps/test-matchbook-frontend.mjs`
   - `mecha`: static/UI inventory coverage present under `.tests/test-mecha-contracts.sh`
   - `organizer`: native IR validation and render/compile readiness coverage present under `.tests/release-ready.sh`
   - `pieplate`: UI/static coverage present under `.tests/test-pieplate.sh`, but the suite is red under the existing `validation-suite-red` finding
-  - `pleroma`: fail; Safari smoke test lives under `app/tests/`, not `.tests/`
-  - `serenity`: fail; no `.tests/` tree
+  - `pleroma`: partial; canonical Safari UI/static coverage now exists under `.tests/apps/test-safari-smoke.sh`, but broader runtime-boundary and path-ownership findings remain
+  - `serenity`: partial; canonical UI/static contract coverage now exists under `.tests/ui/test-theme-contract.sh`, but the current theme contract check is intentionally red until the underlying violations are removed
   - `simplerchat`: frontend/static coverage present under `.tests/frontend/test-frontend-contract.sh`
   - `stellar`: native IR/render/mobile coverage present under `.tests/native/`
 
