@@ -153,10 +153,9 @@
 
 ### 8. `backend-contract-tests-missing`
 - Severity: high
-- Recurrence: 3 repos
+- Recurrence: 2 repos
 - Affected:
   - `boycott`
-  - `pleroma`
   - `serenity`
 - Why it ranks high:
   - These repos either have no `.tests/` tree or keep relevant backend/smoke tests outside the required `.tests/` surface.

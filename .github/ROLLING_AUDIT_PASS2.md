@@ -176,7 +176,7 @@
   - `mecha`: backend/static contract coverage present under `.tests/test-mecha-contracts.sh`
   - `organizer`: backend contract coverage present under `.tests/backend-contract.sh`
   - `pieplate`: backend coverage present under `.tests/test-pieplate.sh`
-  - `pleroma`: fail; backend smoke test lives under `app/tests/`, not `.tests/`
+  - `pleroma`: partial; canonical `.tests/` entrypoints now exist, but broader runtime-boundary and path-ownership findings remain
   - `serenity`: fail; no `.tests/` tree
   - `simplerchat`: backend coverage present under `.tests/backend/`
   - `stellar`: backend coverage present under `.tests/native/test-backend-contract.sh`
