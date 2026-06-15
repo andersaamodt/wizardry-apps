@@ -21,7 +21,7 @@ Usage: install-forge [--root ROOT_DIR] [--home HOME_DIR] [--system|--user] [--ap
 Installs launchers for App Forge.
 
 Defaults:
-  - macOS: installs app bundle to ~/Applications (first-class desktop app)
+  - macOS: installs app bundle to /Applications when writable
   - Linux: installs desktop entry to ~/.local/share/applications
   - all platforms: installs command shim at ~/.local/bin/app-forge
 
@@ -156,7 +156,7 @@ preferred_macos_apps_install_dir() {
     return 0
   fi
 
-  printf '%s/Applications\n' "$home_dir"
+  printf '%s\n' "/Applications"
 }
 
 app_bundle_path_is_safe() {

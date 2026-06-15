@@ -50,7 +50,7 @@
             <p class="sub">Default install folder for desktop app bundles. Forge uses this for installs and self-restart so desktop apps stay in one place.</p>
             <label for="settings-macos-apps-dir">Desktop app install folder</label>
             <div class="input-row settings-save-row">
-              <input id="settings-macos-apps-dir" type="text" placeholder="/Users/andersaamodt/Applications" spellcheck="false">
+              <input id="settings-macos-apps-dir" type="text" placeholder="/Applications" spellcheck="false">
               <button id="apply-macos-apps-dir" type="button" class="action settings-save-btn">Save</button>
             </div>
           </article>
@@ -2349,11 +2349,7 @@
         if (state.desktopAppsInstallDir) {
           return;
         }
-        if (state.homeDir) {
-          setDesktopAppsInstallDir(state.homeDir + '/Applications');
-          return;
-        }
-        setDesktopAppsInstallDir('~/Applications');
+        setDesktopAppsInstallDir('/Applications');
       }
 
       function normalizedSettingValue(value) {

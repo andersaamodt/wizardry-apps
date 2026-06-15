@@ -603,7 +603,7 @@ case "$os" in
     ;;
 esac
 
-install_out=$(sh "$install" --root "$root" --home "$fake_home")
+install_out=$(sh "$install" --root "$root" --home "$fake_home" --user)
 printf '%s\n' "$install_out" | grep -F "installed_command=$fake_home/.local/bin/app-forge" >/dev/null
 printf '%s\n' "$install_out" | grep -F "workspace_root_file=$fake_home/.config/wizardry-apps/forge-root" >/dev/null
 

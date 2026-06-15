@@ -143,7 +143,7 @@ preferred_macos_forge_bundle_path() {
     return 0
   fi
 
-  printf '%s/Applications/App Forge.app\n' "$HOME"
+  printf '%s\n' "/Applications/App Forge.app"
 }
 
 config_root="${XDG_CONFIG_HOME:-$HOME/.config}/wizardry-apps"
