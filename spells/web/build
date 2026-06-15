@@ -84,6 +84,7 @@ default_sites_data_dir() {
 
 SITES_DATA_DIR=${WIZARDRY_SITES_DATA_DIR:-$(default_sites_data_dir)}
 SITE_DATA_DIR="$SITES_DATA_DIR/$site_name"
+BUILD_STATE_DIR="$SITE_DATA_DIR/build-state"
 
 if [ ! -d "$SITE_DIR" ]; then
   die "build: site '$site_name' not found"
@@ -806,12 +807,13 @@ BLOG_FOOTER
       fi
       chmod 644 "$html_file"
       built_count=$((built_count + 1))
-      printf '%s\n' "$built_count" > "$SITE_DIR/build/.build-count.tmp"
+      mkdir -p "$BUILD_STATE_DIR"
+      printf '%s\n' "$built_count" > "$BUILD_STATE_DIR/.build-count.tmp"
     done
 
-    if [ -f "$SITE_DIR/build/.build-count.tmp" ]; then
-      built_count=$(cat "$SITE_DIR/build/.build-count.tmp" 2>/dev/null || printf '0')
-      rm -f "$SITE_DIR/build/.build-count.tmp"
+    if [ -f "$BUILD_STATE_DIR/.build-count.tmp" ]; then
+      built_count=$(cat "$BUILD_STATE_DIR/.build-count.tmp" 2>/dev/null || printf '0')
+      rm -f "$BUILD_STATE_DIR/.build-count.tmp"
     fi
   else
     warn "Pages directory not found: $SITE_DIR/site/pages/"
@@ -824,8 +826,9 @@ BLOG_FOOTER
   generate_blog_feeds_and_sitemap
   prerender_blog_dynamic_sections
 
-  date -u +%Y-%m-%dT%H:%M:%SZ > "$SITE_DIR/build/.wizardry-build-stamp"
-  chmod 644 "$SITE_DIR/build/.wizardry-build-stamp" 2>/dev/null || true
+  mkdir -p "$BUILD_STATE_DIR"
+  date -u +%Y-%m-%dT%H:%M:%SZ > "$BUILD_STATE_DIR/.wizardry-build-stamp"
+  chmod 644 "$BUILD_STATE_DIR/.wizardry-build-stamp" 2>/dev/null || true
 
   success "Built $built_count pages for $site_name"
   info "Build output: $SITE_DIR/build/"
