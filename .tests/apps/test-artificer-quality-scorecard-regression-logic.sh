@@ -28,7 +28,11 @@ param() {
   printf '%s' ""
 }
 
-tmp_root=$(mktemp -d)
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+tmp_root="$scratch_root/artificer-quality-scorecard"
+rm -rf "$tmp_root"
+mkdir -p "$tmp_root"
 trap 'rm -rf "$tmp_root"' EXIT
 mode_runtime_root="$tmp_root/mode-runtime"
 

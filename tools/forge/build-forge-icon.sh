@@ -57,6 +57,12 @@ forge_build_cache_root() {
   printf '%s/%s/build-cache\n' "$(forge_cache_root)/forge/checkouts" "$(forge_checkout_key "$root")"
 }
 
+forge_iconset_path() {
+  iconset_name=${1-}
+  [ -n "$iconset_name" ] || return 1
+  printf '%s/iconsets/%s.iconset\n' "$(forge_build_cache_root "$root")" "$iconset_name"
+}
+
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
 DEFAULT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)
 
@@ -199,9 +205,9 @@ if [ -f "$config_path" ]; then
 fi
 
 if [ -f "$apple_source" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
-  iconset="${iconset_tmp}.iconset"
-  mv "$iconset_tmp" "$iconset"
+  iconset=$(forge_iconset_path apple-master)
+  rm -rf "$iconset"
+  mkdir -p "$iconset"
   trap 'rm -rf "$iconset"' EXIT INT TERM
   for size in 16 32 128 256 512; do
     sips -s format png -z "$size" "$size" "$apple_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
@@ -216,9 +222,9 @@ fi
 
 png_icon="$root/apps/forge/assets/forge-icon.png"
 if [ -f "$png_icon" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
-  iconset="${iconset_tmp}.iconset"
-  mv "$iconset_tmp" "$iconset"
+  iconset=$(forge_iconset_path forge-png)
+  rm -rf "$iconset"
+  mkdir -p "$iconset"
   trap 'rm -rf "$iconset"' EXIT INT TERM
   for size in 16 32 128 256 512; do
     sips -s format png -z "$size" "$size" "$png_icon" --out "$iconset/icon_${size}x${size}.png" >/dev/null
@@ -249,9 +255,9 @@ if [ -f "$config_path" ]; then
   fi
 fi
 if [ -f "$territory_source" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
-  iconset="${iconset_tmp}.iconset"
-  mv "$iconset_tmp" "$iconset"
+  iconset=$(forge_iconset_path territory-master)
+  rm -rf "$iconset"
+  mkdir -p "$iconset"
   trap 'rm -rf "$iconset"' EXIT INT TERM
   for size in 16 32 128 256 512; do
     sips -s format png -z "$size" "$size" "$territory_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
@@ -282,9 +288,9 @@ if [ -z "$icon_source" ]; then
 fi
 
 if [ -n "$icon_source" ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-  iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/app-forge-iconset.XXXXXX")
-  iconset="${iconset_tmp}.iconset"
-  mv "$iconset_tmp" "$iconset"
+  iconset=$(forge_iconset_path original-source)
+  rm -rf "$iconset"
+  mkdir -p "$iconset"
   trap 'rm -rf "$iconset"' EXIT INT TERM
   for size in 16 32 128 256 512; do
     sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null

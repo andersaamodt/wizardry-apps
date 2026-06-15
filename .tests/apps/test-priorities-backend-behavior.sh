@@ -22,7 +22,11 @@ if ! command -v hashchant >/dev/null 2>&1; then
 fi
 
 tab=$(printf '\t')
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/priorities-backend.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+scratch="$scratch_root/priorities-backend"
+rm -rf "$scratch"
+mkdir -p "$scratch"
 prefs_home="$scratch/prefs-home"
 mkdir -p "$prefs_home"
 fake_bin="$scratch/fake-bin"

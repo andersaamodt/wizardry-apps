@@ -35,7 +35,11 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-virtual-redditor.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+scratch="$scratch_root/virtual-redditor"
+rm -rf "$scratch"
+mkdir -p "$scratch"
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 state_dir="$scratch/state"
 

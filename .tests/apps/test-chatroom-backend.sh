@@ -4,7 +4,11 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 backend="$root/apps/chatroom/scripts/chatroom-backend.sh"
-tmp_home=$(mktemp -d "${TMPDIR:-/tmp}/chatroom-backend-home.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+tmp_home="$scratch_root/chatroom-backend-home"
+rm -rf "$tmp_home"
+mkdir -p "$tmp_home"
 trap 'rm -rf "$tmp_home"' EXIT HUP INT TERM
 
 [ -f "$backend" ] || {

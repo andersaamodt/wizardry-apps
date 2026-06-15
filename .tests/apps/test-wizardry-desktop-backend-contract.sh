@@ -4,7 +4,11 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 backend="$root/apps/wizardry-desktop/scripts/wizardry-desktop-backend.sh"
-tmp_spellbook=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-desktop-spellbook.XXXXXX")
+state_home=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+scratch_root=${WIZARDRY_APPS_TEST_SCRATCH_ROOT:-"$state_home/wizardry-apps/test-scratch"}
+tmp_spellbook="$scratch_root/wizardry-desktop-spellbook"
+rm -rf "$tmp_spellbook"
+mkdir -p "$tmp_spellbook"
 trap 'rm -rf "$tmp_spellbook"' EXIT
 
 [ -f "$backend" ] || {
@@ -80,7 +84,9 @@ if ! sh "$backend" list-synonyms "$root" >/dev/null 2>&1; then
   exit 1
 fi
 
-tmp_home=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-desktop-home.XXXXXX")
+tmp_home="$scratch_root/wizardry-desktop-home"
+rm -rf "$tmp_home"
+mkdir -p "$tmp_home"
 trap 'rm -rf "$tmp_spellbook" "$tmp_home"' EXIT
 if HOME="$tmp_home" sh "$backend" set-ui-pref "ab/key" value >/tmp/wizardry-desktop-invalid-pref.out 2>/tmp/wizardry-desktop-invalid-pref.err; then
   printf '%s\n' "wizardry-desktop backend accepted invalid UI pref key" >&2

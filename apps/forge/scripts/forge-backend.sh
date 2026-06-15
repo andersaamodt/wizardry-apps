@@ -1349,7 +1349,9 @@ download_into_cache() {
   validate_source_repo "$repo"
   validate_source_ref "$ref"
   validate_source_subdir "$subdir" "source subdir"
-  tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/forge-catalog.XXXXXX")
+  tmp_dir="$dest_dir.download-staging"
+  rm -rf "$tmp_dir"
+  mkdir -p "$tmp_dir"
   trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
   if ! git clone --depth=1 --branch "$ref" "$repo" "$tmp_dir/repo" >/dev/null 2>&1; then
@@ -6683,9 +6685,9 @@ cmd_build_desktop() {
           icon_hash=$(hash_path_sha256 "$icon_source")
         fi
         if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-          iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-iconset.XXXXXX")
-          iconset="${iconset_tmp}.iconset"
-          mv "$iconset_tmp" "$iconset"
+          iconset="$dist_dir/.iconset-staging.iconset"
+          rm -rf "$iconset"
+          mkdir -p "$iconset"
           for size in 16 32 128 256 512; do
             sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
             sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null

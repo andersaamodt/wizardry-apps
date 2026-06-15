@@ -69,7 +69,7 @@ if grep -F "find-identity" "$root/tools/forge/install-forge.sh" >/dev/null; then
   printf '%s\n' "forge install test: installer must not auto-detect local codesigning identities" >&2
   exit 1
 fi
-if grep -E 'mktemp -d .*(app-forge-(app|build)|build[.]XXXXXX|install[.][^"]*[$][$])' "$root/tools/forge/install-forge.sh" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null; then
+if grep -E 'mktemp -d .*(app-forge-(app|build|iconset)|build[.]XXXXXX|install[.][^"]*[$][$])' "$root/tools/forge/install-forge.sh" "$root/tools/forge/build-forge-macos-app.sh" "$root/tools/forge/build-forge-icon.sh" >/dev/null; then
   printf '%s\n' "forge install test: installer and builder must use stable macOS app staging paths" >&2
   exit 1
 fi
