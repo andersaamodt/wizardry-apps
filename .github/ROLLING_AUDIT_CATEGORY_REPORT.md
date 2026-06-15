@@ -153,10 +153,9 @@
 
 ### 8. `backend-contract-tests-missing`
 - Severity: high
-- Recurrence: 4 repos
+- Recurrence: 3 repos
 - Affected:
   - `boycott`
-  - `hegelizer`
   - `pleroma`
   - `serenity`
 - Why it ranks high:

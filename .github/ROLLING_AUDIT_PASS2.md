@@ -171,7 +171,7 @@
   - `dictator`: partial; voice regression surface now exposed under `.tests/voice/run.sh`, but broader release-side normalization still remains
   - `eye`: shell/runtime coverage present under `.tests/test-eye.sh`
   - `fauxzilla`: broad API/runtime coverage present under `.tests/`
-  - `hegelizer`: fail; smoke and preference tests live outside `.tests/`
+  - `hegelizer`: partial; canonical `.tests/` entrypoints now exist, but the smoke harness is still red and GUI/static contract depth remains thin
   - `matchbook`: backend coverage present under `.tests/apps/test-matchbook-backend.sh`
   - `mecha`: backend/static contract coverage present under `.tests/test-mecha-contracts.sh`
   - `organizer`: backend contract coverage present under `.tests/backend-contract.sh`
