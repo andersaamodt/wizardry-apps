@@ -24,6 +24,10 @@ if grep -E 'mktemp -d .*/wizardry-(native-workspace-bundle|workspace-bundle|nati
   printf '%s\n' "Forge must use stable workbench staging paths for macOS workspace bundles and iconsets" >&2
   exit 1
 fi
+if grep -E 'mktemp -d .*(wizardry-godot-(workspace|iconset)|install[.]XXXXXX)' "$backend" >/dev/null; then
+  printf '%s\n' "Forge must use stable staging paths for macOS app installs and Godot bundles" >&2
+  exit 1
+fi
 
 assert_contains() {
   haystack=$1

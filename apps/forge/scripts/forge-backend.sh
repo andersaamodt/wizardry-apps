@@ -2550,7 +2550,9 @@ install_macos_bundle() {
     return 0
   fi
 
-  macos_install_stage_root=$(mktemp -d "$macos_install_parent_dir/.${macos_install_bundle_name}.install.XXXXXX") || return 1
+  macos_install_stage_root="$macos_install_parent_dir/.${macos_install_bundle_name}.install-staging"
+  rm -rf "$macos_install_stage_root" || return 1
+  mkdir -p "$macos_install_stage_root" || return 1
   macos_install_stage_bundle="$macos_install_stage_root/$macos_install_bundle_name"
   if ! copy_macos_bundle_contents "$macos_install_src_bundle" "$macos_install_stage_bundle"; then
     rm -rf "$macos_install_stage_root"
@@ -7157,7 +7159,10 @@ build_godot_workspace_macos_launcher() {
   fi
 
   if [ "$cache_hit" = false ]; then
-    staged_root=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-godot-workspace.XXXXXX")
+    mkdir -p "$bundle_root"
+    staged_root="$bundle_root/.staging"
+    rm -rf "$staged_root"
+    mkdir -p "$staged_root"
     staged_bundle="$staged_root/$workspace_title.app"
     if command -v ditto >/dev/null 2>&1; then
       ditto "$godot_app" "$staged_bundle"
@@ -7191,9 +7196,9 @@ APP
     fi
 
     if [ "$icon_source_format" = 'png' ] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
-      iconset_tmp=$(mktemp -d "${TMPDIR:-/tmp}/wizardry-godot-iconset.XXXXXX")
-      iconset="${iconset_tmp}.iconset"
-      mv "$iconset_tmp" "$iconset"
+      iconset="$bundle_root/.iconset-staging.iconset"
+      rm -rf "$iconset"
+      mkdir -p "$iconset"
       for size in 16 32 128 256 512; do
         sips -s format png -z "$size" "$size" "$icon_source" --out "$iconset/icon_${size}x${size}.png" >/dev/null
         sips -s format png -z $((size * 2)) $((size * 2)) "$icon_source" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
@@ -7226,7 +7231,6 @@ APP
       exit 1
     }
 
-    mkdir -p "$bundle_root"
     rm -rf "$final_bundle"
     mv "$staged_bundle" "$final_bundle"
     rmdir "$staged_root" 2>/dev/null || :
