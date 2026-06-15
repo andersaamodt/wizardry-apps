@@ -53,6 +53,7 @@
 - Minimal moving parts beat framework-heavy abstractions.
 - POSIX shell remains the reference orchestration layer when orchestration is needed.
 - GUI code should expose capabilities already present in backend scripts where possible.
+- Professional native app packaging belongs in Theurgy; wizardry-apps should not assemble `.app` bundles from ad hoc executable chains or repeated launch-assessed wrapper steps.
 - New GUI features should add or preserve a matching CLI/backend action for parity.
 - Behavior must remain cross-platform conscious for macOS, Linux, iOS, Android, and hosted web.
 
