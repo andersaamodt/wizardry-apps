@@ -2042,6 +2042,36 @@ resolve_adb_exec() {
   return 1
 }
 
+resolve_firewalled_adb_exec() {
+  if command -v firewalled-adb >/dev/null 2>&1; then
+    command -v firewalled-adb
+    return 0
+  fi
+  if [ -x "$HOME/.wizardry/spells/wards/firewalled-adb" ]; then
+    printf '%s\n' "$HOME/.wizardry/spells/wards/firewalled-adb"
+    return 0
+  fi
+  return 1
+}
+
+run_firewalled_adb_command() {
+  run_firewalled_adb_command_exec=${1-}
+  run_firewalled_adb_command_serial=${2-}
+  shift 2
+
+  [ -n "$run_firewalled_adb_command_exec" ] || {
+    printf '%s\n' "forge-backend: firewalled-adb wrapper is required for Android device commands" >&2
+    exit 1
+  }
+
+  if [ -n "$run_firewalled_adb_command_serial" ]; then
+    "$run_firewalled_adb_command_exec" --serial "$run_firewalled_adb_command_serial" -- "$@"
+    return $?
+  fi
+
+  "$run_firewalled_adb_command_exec" -- "$@"
+}
+
 resolve_android_project_application_id() {
   resolve_android_project_application_id_project_dir=${1-}
   resolve_android_project_application_id_fallback=${2-}
@@ -6998,7 +7028,13 @@ run_native_mobile_workspace_target() {
     printf '%s\n' "forge-backend: adb is required to install and run native Android workspaces" >&2
     exit 1
   }
-  if ! "$adb_exec" get-state >/dev/null 2>&1; then
+  firewalled_adb_exec=$(resolve_firewalled_adb_exec || true)
+  [ -n "$firewalled_adb_exec" ] || {
+    printf '%s\n' "forge-backend: firewalled-adb is required to run Android device commands safely" >&2
+    exit 1
+  }
+  adb_serial=${WIZARDRY_APPS_ANDROID_SERIAL-}
+  if ! run_firewalled_adb_command "$firewalled_adb_exec" "$adb_serial" get-state >/dev/null 2>&1; then
     printf '%s\n' "forge-backend: no Android device or emulator is available for Run" >&2
     exit 1
   fi
@@ -7006,7 +7042,7 @@ run_native_mobile_workspace_target() {
   workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
   install_log="$(forge_workbench_root "$root")/log/workspace-$workspace_slug-android-run.log"
   mkdir -p "$(dirname "$install_log")"
-  if ! "$adb_exec" install -r "$artifact" >"$install_log" 2>&1; then
+  if ! run_firewalled_adb_command "$firewalled_adb_exec" "$adb_serial" install -r "$artifact" >"$install_log" 2>&1; then
     printf '%s\n' "forge-backend: Android install failed (see log: $install_log)" >&2
     exit 1
   fi
@@ -7021,7 +7057,7 @@ run_native_mobile_workspace_target() {
     printf '%s\n' "forge-backend: Android package id could not be resolved for run" >&2
     exit 1
   }
-  if ! "$adb_exec" shell monkey -p "$package_id" -c android.intent.category.LAUNCHER 1 >>"$install_log" 2>&1; then
+  if ! run_firewalled_adb_command "$firewalled_adb_exec" "$adb_serial" shell monkey -p "$package_id" -c android.intent.category.LAUNCHER 1 >>"$install_log" 2>&1; then
     printf '%s\n' "forge-backend: Android launch failed (see log: $install_log)" >&2
     exit 1
   fi

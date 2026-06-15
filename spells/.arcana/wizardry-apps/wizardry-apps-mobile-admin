@@ -22,11 +22,19 @@ fi
 
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "$script_dir/../../.." && pwd)
+mobile_debugging_menu=mobile-debugging-menu
+
+if ! command -v "$mobile_debugging_menu" >/dev/null 2>&1; then
+  if [ -x "$HOME/.wizardry/spells/.arcana/mobile-debugging/mobile-debugging-menu" ]; then
+    mobile_debugging_menu="$HOME/.wizardry/spells/.arcana/mobile-debugging/mobile-debugging-menu"
+  fi
+fi
 
 while true; do
   exit_label=$(exit-label)
   menu "wizardry-apps mobile admin" \
     "Mobile status%\"$script_dir/wizardry-apps-status\" --section mobile" \
+    "Mobile debugging%$mobile_debugging_menu" \
     "---" \
     "iOS promotion dry-run test%sh \"$repo_root/.tests/release/test-ios-promotion-script.sh\"" \
     "Manifest validation%sh \"$repo_root/tools/validate-manifest.sh\"" \

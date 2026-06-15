@@ -11,6 +11,7 @@
 - Put transient output in an appropriate temp path such as `/tmp` or `${TMPDIR:-/tmp}`, and put durable operator-local state in XDG/user-local state directories outside the checkout.
 - Keep `wizardry-apps` script-pure: no Rust runtime, Cargo, Swift, SwiftUI, signing, notarization, app verification, app-store policing, special app-publish keys, `.app` lifecycle, or Apple-specific platform machinery belongs here as a direct implementation layer.
 - Use theurgy for professional native desktop runtime machinery and enterprise web runtime machinery when shell fan-out is the problem; cross that boundary through `spells/.arcana/theurgy/invoke-theurgy` instead of adding ad hoc dependency checks.
+- Use Wizardry's `firewall` spell and Theurgy-backed host firewall backends for adb or other mobile-debug network cages; do not let Forge call adb directly outside the caged path.
 - App Forge and generated app scripts must not paper over macOS launch-assessment pressure with local preflights, repeated bundle churn, or wrapper fanout; fix the native packaging/runtime boundary in Theurgy.
 - When adding cross-platform Forge starters, treat “theurgy-backed cross-platform app” as a valid first-class category: web UI and host flow stay in `wizardry-apps`, while runtime escalation happens through a generated workspace script that calls `spells/.arcana/theurgy/invoke-theurgy`.
 - Read `/Users/andersaamodt/git/wizardry-apps/.github/RELEASE_POLISH.md` when doing 1.0 polish, onboarding/readiness work, update surfaces, packaging, or Nostr-specific release hardening.
@@ -70,6 +71,7 @@
 - Use `spells/.arcana/wizardry-apps/wizardry-apps web-admin` for web app administration.
 - Use `spells/.arcana/wizardry-apps/wizardry-apps desktop-admin` for desktop app administration.
 - Use `spells/.arcana/wizardry-apps/wizardry-apps mobile-admin` for mobile app administration.
+- Use `mobile-debugging-menu` for Android platform-tools installation and `firewalled-adb` for adb invocation; the source-build adb path remains a documented future project.
 - Use `tools/sync-from-wizardry.sh` for all upstream imports from `~/.wizardry`.
 - No other import path is considered canonical.
 - The sync preserves local `apps/.host` ownership for native desktop and mobile hosts.

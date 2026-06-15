@@ -56,6 +56,7 @@
 - Professional native app packaging belongs in Theurgy; wizardry-apps should not assemble `.app` bundles from ad hoc executable chains or repeated launch-assessed wrapper steps.
 - New GUI features should add or preserve a matching CLI/backend action for parity.
 - Behavior must remain cross-platform conscious for macOS, Linux, iOS, Android, and hosted web.
+- Mobile debugging flows must route adb through Wizardry's `firewalled-adb` path instead of invoking adb directly.
 
 ## Workflow and Documentation
 - AI-facing documentation for this repo lives in `.github/`.
