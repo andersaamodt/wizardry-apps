@@ -265,6 +265,12 @@ macos_codesign_identity() {
     printf '%s\n' "$WIZARDRY_CODESIGN_IDENTITY"
     return 0
   fi
+  default_identity="Artificer Local Development Code Signing"
+  if command -v security >/dev/null 2>&1 \
+      && security find-certificate -c "$default_identity" >/dev/null 2>&1; then
+    printf '%s\n' "$default_identity"
+    return 0
+  fi
   printf '%s\n' "-"
 }
 

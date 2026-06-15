@@ -62,11 +62,11 @@ grep -F "host_build_signature=" "$root/tools/forge/build-forge-macos-app.sh" >/d
 grep -F "host_build_signature=" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "macos_codesign_identity()" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null
 if grep -F "find-identity" "$root/tools/forge/build-forge-macos-app.sh" >/dev/null; then
-  printf '%s\n' "forge install test: macOS app builder must not auto-detect local codesigning identities" >&2
+  printf '%s\n' "forge install test: macOS app builder must not scan arbitrary local codesigning identities" >&2
   exit 1
 fi
 if grep -F "find-identity" "$root/tools/forge/install-forge.sh" >/dev/null; then
-  printf '%s\n' "forge install test: installer must not auto-detect local codesigning identities" >&2
+  printf '%s\n' "forge install test: installer must not scan arbitrary local codesigning identities" >&2
   exit 1
 fi
 if grep -E 'mktemp -d .*(app-forge-(app|build|iconset)|build[.]XXXXXX|install[.][^"]*[$][$])' "$root/tools/forge/install-forge.sh" "$root/tools/forge/build-forge-macos-app.sh" "$root/tools/forge/build-forge-icon.sh" >/dev/null; then

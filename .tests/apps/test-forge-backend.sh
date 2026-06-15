@@ -306,13 +306,18 @@ mkdir -p "$codesign_identity_bin"
 cat >"$codesign_identity_bin/security" <<'SH'
 #!/bin/sh
 set -eu
-printf '%s\n' '  1) ABCDEF1234567890 "Wizardry Local Code Signing"'
+case "$*" in
+  *'Artificer Local Development Code Signing'*)
+    exit 0
+    ;;
+esac
+exit 1
 SH
 chmod +x "$codesign_identity_bin/security"
 
 codesign_identity_detected=$(PATH="$codesign_identity_bin:/bin:/usr/bin:/usr/sbin:/sbin" sh "$codesign_identity_probe")
-[ "$codesign_identity_detected" = "-" ] || {
-  printf '%s\n' "forge backend test: macOS codesign identity probe should ignore detected local identities" >&2
+[ "$codesign_identity_detected" = "Artificer Local Development Code Signing" ] || {
+  printf '%s\n' "forge backend test: macOS codesign identity probe should use the dedicated local identity when present" >&2
   exit 1
 }
 
@@ -325,7 +330,7 @@ codesign_identity_override=$(PATH="$codesign_identity_bin:/bin:/usr/bin:/usr/sbi
 cat >"$codesign_identity_bin/security-empty" <<'SH'
 #!/bin/sh
 set -eu
-exit 0
+exit 1
 SH
 chmod +x "$codesign_identity_bin/security-empty"
 ln -sf "$codesign_identity_bin/security-empty" "$codesign_identity_bin/security"
