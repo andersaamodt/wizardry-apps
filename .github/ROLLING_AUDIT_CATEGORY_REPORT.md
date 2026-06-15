@@ -153,15 +153,15 @@
 
 ### 8. `backend-contract-tests-missing`
 - Severity: high
-- Recurrence: 1 repo
+- Recurrence: 0 repos
 - Affected:
-  - `serenity`
+  - none
 - Why it ranks high:
-  - These repos either have no `.tests/` tree or keep relevant backend/smoke tests outside the required `.tests/` surface.
+  - These repos either had no `.tests/` tree or kept relevant backend/smoke tests outside the required `.tests/` surface.
   - Without backend contract tests under `.tests/`, bridge and runtime changes cannot be audited consistently.
 - Batch fix direction:
-  - move useful existing tests from `app/tests/` or remaining non-canonical release locations into `.tests/`
-  - add missing backend contract coverage where no test surface exists
+  - keep converting partial/red repos into green, higher-depth contract coverage
+  - retain `.tests/` as the canonical entrypoint surface for all future fixes
 
 ## High-Severity Single-Repo Categories
 

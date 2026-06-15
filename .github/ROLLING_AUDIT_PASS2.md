@@ -177,7 +177,7 @@
   - `organizer`: backend contract coverage present under `.tests/backend-contract.sh`
   - `pieplate`: backend coverage present under `.tests/test-pieplate.sh`
   - `pleroma`: partial; canonical `.tests/` entrypoints now exist, but broader runtime-boundary and path-ownership findings remain
-  - `serenity`: fail; no `.tests/` tree
+  - `serenity`: partial; canonical `.tests/` contract entrypoints now exist, but the current backend and theme contract checks are intentionally red until the underlying violations are removed
   - `simplerchat`: backend coverage present under `.tests/backend/`
   - `stellar`: backend coverage present under `.tests/native/test-backend-contract.sh`
 
