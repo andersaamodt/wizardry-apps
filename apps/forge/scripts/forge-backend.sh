@@ -7311,8 +7311,8 @@ build_native_workspace_host() {
       fi
       expected_hash=$({
         printf 'backend=%s\n' "$(hash_path_sha256 "$SCRIPT_DIR/forge-backend.sh")"
-        printf 'workspace=%s\n' "$(hash_path_sha256 "$workspace_path")"
         printf 'package=%s\n' "$(hash_path_sha256 "$package_dir")"
+        printf 'workspace_conf=%s\n' "$(hash_path_sha256 "$workspace_conf")"
         printf 'app_id=%s\n' "$app_id"
         printf 'app_name=%s\n' "$app_name"
         printf 'workspace_slug=%s\n' "$workspace_slug"
