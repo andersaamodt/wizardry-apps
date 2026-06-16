@@ -6865,7 +6865,10 @@ resolve_native_workspace_metadata() {
   app_name=$(jq -r '.app.name // ""' "$native_ir")
   [ -n "$app_id" ] || return 1
   printf '%s\n' "$app_id" | LC_ALL=C grep -Eq '^[A-Za-z][A-Za-z0-9-]*$' || return 1
-  app_name=$(safe_generated_display_name "$app_name" "$(workspace_display_title "$workspace_path" "$workspace_conf")")
+  workspace_title=$(workspace_field "$workspace_conf" title "")
+  [ -n "$workspace_title" ] || workspace_title=$(workspace_field "$workspace_conf" name "")
+  [ -n "$workspace_title" ] || workspace_title=$(basename "$workspace_path")
+  app_name=$(safe_generated_display_name "$app_name" "$workspace_title")
   workspace_slug=$(resolve_workspace_slug "$workspace_conf" "$workspace_path")
 
   printf 'ir=%s\n' "$native_ir"
@@ -7360,11 +7363,17 @@ build_native_workspace_host() {
         icon_key="<key>CFBundleIconFile</key><string>${icon_name%.icns}</string>"
       fi
 
-      bundle_id="com.wizardry.workspace.$workspace_slug.native"
-      printf '%s\n' "$expected_hash" > "$staged_bundle/Contents/Resources/wizardry-build-input.sha256"
-      bundle_version=$(printf '%s' "$expected_hash" | cksum | awk '{ print $1 }')
-      [ -n "$bundle_version" ] || bundle_version=1
-      cat > "$staged_bundle/Contents/Info.plist" <<PLIST
+	      bundle_id="com.wizardry.workspace.$workspace_slug.native"
+	      printf '%s\n' "$expected_hash" > "$staged_bundle/Contents/Resources/wizardry-build-input.sha256"
+	      bundle_version=$(printf '%s' "$expected_hash" | cksum | awk '{ print $1 }')
+	      [ -n "$bundle_version" ] || bundle_version=1
+	      macos_ui_element_key=''
+	      case "$(workspace_field "$workspace_conf" macos_ui_element "")" in
+	        1|true|yes|on)
+	          macos_ui_element_key='<key>LSUIElement</key><true/>'
+	          ;;
+	      esac
+	      cat > "$staged_bundle/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -7375,6 +7384,7 @@ build_native_workspace_host() {
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>$app_id</string>
 <key>NSMicrophoneUsageDescription</key><string>This app uses the microphone for local voice input and voice automation commands.</string>
+$macos_ui_element_key
 $icon_key
 </dict></plist>
 PLIST
