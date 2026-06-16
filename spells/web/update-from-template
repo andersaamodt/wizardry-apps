@@ -43,6 +43,10 @@ resolve_template_dir() {
   fi
   case "$template_name" in
     blog)
+      if [ -d "$HOME/git/gazeta" ]; then
+        printf '%s\n' "$HOME/git/gazeta"
+        return 0
+      fi
       if [ -d "$HOME/git/nostr-blog" ]; then
         printf '%s\n' "$HOME/git/nostr-blog"
         return 0
@@ -101,6 +105,32 @@ template_component_dir() {
     return 0
   fi
   return 1
+}
+
+copy_template_component_entries() {
+  source_dir=${1-}
+  target_dir=${2-}
+  skip_name=${3-}
+  [ -n "$source_dir" ] || return 0
+  [ -d "$source_dir" ] || return 0
+  [ -n "$target_dir" ] || return 0
+  mkdir -p "$target_dir"
+  find "$source_dir" -mindepth 1 -maxdepth 1 -print 2>/dev/null | while IFS= read -r source_entry; do
+    [ -n "$source_entry" ] || continue
+    entry_name=$(basename "$source_entry")
+    if [ -n "$skip_name" ] && [ "$entry_name" = "$skip_name" ]; then
+      continue
+    fi
+    target_entry="$target_dir/$entry_name"
+    rm -rf "$target_entry"
+    if [ -L "$source_entry" ]; then
+      link_target=$(readlink "$source_entry" 2>/dev/null || printf '')
+      [ -n "$link_target" ] || continue
+      ln -s "$link_target" "$target_entry"
+      continue
+    fi
+    cp -R "$source_entry" "$target_entry"
+  done
 }
 
 site_name=${1-}
@@ -305,11 +335,11 @@ template_static_dir=$(template_component_dir "$template_dir" static 2>/dev/null 
 template_includes_dir=$(template_component_dir "$template_dir" includes 2>/dev/null || true)
 
 if [ -n "$template_pages_dir" ] && [ -d "$template_pages_dir" ]; then
-  cp -r "$template_pages_dir" "$SITE_DIR/site/pages"
+  copy_template_component_entries "$template_pages_dir" "$SITE_DIR/site/pages" posts
 fi
 
 if [ -n "$template_static_dir" ] && [ -d "$template_static_dir" ]; then
-  cp -r "$template_static_dir" "$SITE_DIR/site/static"
+  copy_template_component_entries "$template_static_dir" "$SITE_DIR/site/static" themes
 fi
 
 # Point each site at the shared theme catalog.
@@ -320,11 +350,11 @@ if [ -d "$shared_theme_dir" ]; then
 fi
 
 if [ -n "$template_includes_dir" ] && [ -d "$template_includes_dir" ]; then
-  cp -r "$template_includes_dir" "$SITE_DIR/site/includes"
+  copy_template_component_entries "$template_includes_dir" "$SITE_DIR/site/includes" ''
 fi
 
 if [ -d "$template_dir/cgi" ]; then
-  cp -r "$template_dir/cgi" "$SITE_DIR/"
+  copy_template_component_entries "$template_dir/cgi" "$SITE_DIR/cgi" ''
 fi
 
 if [ -f "$template_dir/README.md" ]; then
