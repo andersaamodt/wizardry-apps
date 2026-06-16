@@ -34,6 +34,7 @@ Canonical promoted standards now live in `phronesis`:
 - `repo.canonical-gitignore`
 - `repo.no-disposable-cruft`
 - `gui.main-shell-settings`
+- `gui.startup-splash-contract`
 - `gui.inline-guided-fallback`
 - `gui.passive-read-no-mutation`
 - `adversarial.focused-regression`
