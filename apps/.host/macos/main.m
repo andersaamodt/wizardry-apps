@@ -195,12 +195,14 @@ static CGPathRef WizardryCreateAppleSquirclePath(CGRect rect, NSUInteger steps) 
 - (BOOL)isSystemTerminationRequest;
 - (BOOL)isStonrApp;
 - (BOOL)isArtificerApp;
+- (BOOL)isOpenCodeDesktopApp;
 - (BOOL)isMatchbookApp;
 - (BOOL)isBellheimApp;
 - (BOOL)isHeadquartersApp;
 - (NSString *)stonrBackendScriptPath;
 - (NSString *)matchbookPrefsPath;
 - (NSDictionary<NSString *, NSString *> *)dictionaryFromKeyValueBlob:(NSString *)blob;
+- (void)nativeOpenCodePreferences:(id)sender;
 - (int)runCommandWithLaunchPath:(NSString *)launchPath
                        arguments:(NSArray<NSString *> *)arguments
                           stdout:(NSString **)stdout
@@ -414,7 +416,8 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
 @implementation AppDelegate
 
 - (NSString *)desktopBridgeBootstrapSource {
-    return @"(function () {"
+    NSMutableString *source = [NSMutableString stringWithString:
+           @"(function () {"
            @"  window.__wizardry_callbacks = window.__wizardry_callbacks || {};"
            @"  function nextId() { return Math.random().toString(36).slice(2); }"
            @"  function post(message) {"
@@ -464,7 +467,176 @@ static OSStatus WizardryHandleGlobalHotKey(EventHandlerCallRef nextHandler, Even
            @"  if (typeof window.wizardry.rpc !== 'function') {"
            @"    window.wizardry.rpc = rpcBridge;"
            @"  }"
-           @"})();";
+           @"})();"];
+    if ([self isOpenCodeDesktopApp]) {
+        [source appendString:
+           @"(function () {"
+           @"  function opencodeDesktopHostedPage() {"
+           @"    var host = (window.location && window.location.hostname) ? String(window.location.hostname).toLowerCase() : '';"
+           @"    return host === '127.0.0.1' || host === 'localhost' || host === 'opencode.local';"
+           @"  }"
+           @"  function opencodeDesktopAppBase() {"
+           @"    var marker = '__opencode_desktop_app_base__=';"
+           @"    var name = String(window.name || '');"
+           @"    var index = name.indexOf(marker);"
+           @"    var value = '';"
+           @"    if (index < 0) {"
+           @"      return '';"
+           @"    }"
+           @"    value = name.slice(index + marker.length).split('\n')[0];"
+           @"    if (!value) {"
+           @"      return '';"
+           @"    }"
+           @"    try {"
+           @"      return decodeURIComponent(value);"
+           @"    } catch (error) {"
+           @"      return value;"
+           @"    }"
+           @"  }"
+           @"  function opencodeDesktopOpenPreferences() {"
+           @"    var base = opencodeDesktopAppBase();"
+           @"    var preferencesUrl = '';"
+           @"    if (!base || !window.wizardry || typeof window.wizardry.exec !== 'function') {"
+           @"      return;"
+           @"    }"
+           @"    try {"
+           @"      preferencesUrl = new URL('preferences.html', base).href;"
+           @"    } catch (error) {"
+           @"      return;"
+           @"    }"
+           @"    window.wizardry.exec(['__wizardry_host_open_window', preferencesUrl, 'OpenCode Preferences', '920', '760']).catch(function () {});"
+           @"  }"
+           @"  function opencodeDesktopMountPreferencesButton() {"
+           @"    var button;"
+           @"    if (!opencodeDesktopHostedPage() || !document.body) {"
+           @"      return;"
+           @"    }"
+           @"    button = document.getElementById('opencode-desktop-preferences-btn');"
+           @"    if (button) {"
+           @"      return;"
+           @"    }"
+           @"    button = document.createElement('button');"
+           @"    button.id = 'opencode-desktop-preferences-btn';"
+           @"    button.type = 'button';"
+           @"    button.textContent = 'Preferences';"
+           @"    button.setAttribute('aria-label', 'Open OpenCode Preferences');"
+           @"    button.style.position = 'fixed';"
+           @"    button.style.top = '18px';"
+           @"    button.style.right = '18px';"
+           @"    button.style.zIndex = '2147483647';"
+           @"    button.style.padding = '10px 14px';"
+           @"    button.style.borderRadius = '999px';"
+           @"    button.style.border = '1px solid rgba(27, 31, 36, 0.12)';"
+           @"    button.style.background = 'rgba(255, 250, 243, 0.94)';"
+           @"    button.style.backdropFilter = 'blur(12px)';"
+           @"    button.style.color = '#1f1a16';"
+           @"    button.style.font = '600 13px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif';"
+           @"    button.style.boxShadow = '0 12px 32px rgba(31, 26, 22, 0.18)';"
+           @"    button.style.cursor = 'pointer';"
+           @"    button.addEventListener('click', function (event) {"
+           @"      event.preventDefault();"
+           @"      opencodeDesktopOpenPreferences();"
+           @"    });"
+           @"    document.body.appendChild(button);"
+           @"  }"
+           @"  function opencodeDesktopInstallShortcut() {"
+           @"    if (!opencodeDesktopHostedPage() || window.__opencodeDesktopPrefsShortcutInstalled) {"
+           @"      return;"
+           @"    }"
+           @"    window.__opencodeDesktopPrefsShortcutInstalled = true;"
+           @"    window.addEventListener('keydown', function (event) {"
+           @"      var key = String(event.key || '').toLowerCase();"
+           @"      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && key === ',') {"
+           @"        event.preventDefault();"
+           @"        opencodeDesktopOpenPreferences();"
+           @"      }"
+           @"    }, true);"
+           @"  }"
+           @"  function opencodeDesktopApplyInset() {"
+           @"    var root;"
+           @"    var button;"
+           @"    var wrapper;"
+           @"    var wrapperStyle;"
+           @"    var currentMargin;"
+           @"    var left;"
+           @"    var minLeft;"
+           @"    if (!opencodeDesktopHostedPage()) {"
+           @"      return;"
+           @"    }"
+           @"    root = document.documentElement;"
+           @"    button = document.querySelector('button[aria-label=\"Toggle sidebar\"], button[aria-label=\"Toggle menu\"], button[title=\"Toggle sidebar\"], button[title=\"Toggle menu\"]');"
+           @"    if (!button) {"
+           @"      button = document.querySelector('button[data-sidebar-trigger], button[data-testid=\"sidebar-toggle\"], button[data-testid=\"menu-toggle\"]');"
+           @"    }"
+           @"    if (!root || !button || !button.parentElement) {"
+           @"      return;"
+           @"    }"
+           @"    if (root.style && typeof root.style.setProperty === 'function') {"
+           @"      root.style.setProperty('--dialog-left-margin', '96px');"
+           @"      root.style.setProperty('--sidebar-left-offset', '96px');"
+           @"      root.style.setProperty('--safe-area-left', '96px');"
+           @"    }"
+           @"    wrapper = button.parentElement;"
+           @"    wrapperStyle = window.getComputedStyle ? window.getComputedStyle(wrapper) : null;"
+           @"    currentMargin = wrapperStyle ? parseFloat(wrapperStyle.marginLeft || '0') : 0;"
+           @"    if (!isFinite(currentMargin)) {"
+           @"      currentMargin = 0;"
+           @"    }"
+           @"    left = button.getBoundingClientRect ? button.getBoundingClientRect().left : 0;"
+           @"    minLeft = 96;"
+           @"    if (left < minLeft && wrapper.style) {"
+           @"      wrapper.style.marginLeft = String(Math.ceil(currentMargin + (minLeft - left))) + 'px';"
+           @"    }"
+           @"    if (button.style && left < minLeft) {"
+           @"      button.style.position = button.style.position || 'relative';"
+           @"      button.style.left = String(Math.ceil(minLeft - left)) + 'px';"
+           @"    }"
+           @"  }"
+           @"  function opencodeDesktopRefreshHostUi() {"
+           @"    opencodeDesktopInstallShortcut();"
+           @"    opencodeDesktopMountPreferencesButton();"
+           @"    opencodeDesktopApplyInset();"
+           @"  }"
+           @"  if (window.MutationObserver) {"
+           @"    var opencodeDesktopObserver;"
+           @"    var opencodeDesktopStartObserver;"
+           @"    var opencodeDesktopRefreshSafe = function () {"
+           @"      try {"
+           @"        opencodeDesktopRefreshHostUi();"
+           @"      } catch (error) {"
+           @"      }"
+           @"    };"
+           @"    if (document.readyState === 'loading') {"
+           @"      document.addEventListener('DOMContentLoaded', opencodeDesktopRefreshSafe, { once: true });"
+           @"    } else {"
+           @"      opencodeDesktopRefreshSafe();"
+           @"    }"
+           @"    opencodeDesktopObserver = new MutationObserver(opencodeDesktopRefreshSafe);"
+           @"    opencodeDesktopStartObserver = function () {"
+           @"      var attempts;"
+           @"      var timer;"
+           @"      if (!document.documentElement) {"
+           @"        return;"
+           @"      }"
+           @"      opencodeDesktopObserver.observe(document.documentElement, { childList: true, subtree: true });"
+           @"      attempts = 0;"
+           @"      timer = setInterval(function () {"
+           @"        opencodeDesktopRefreshSafe();"
+           @"        attempts += 1;"
+           @"        if (attempts >= 120) {"
+           @"          clearInterval(timer);"
+           @"        }"
+           @"      }, 250);"
+           @"    };"
+           @"    if (document.documentElement) {"
+           @"      opencodeDesktopStartObserver();"
+           @"    } else {"
+           @"      document.addEventListener('DOMContentLoaded', opencodeDesktopStartObserver, { once: true });"
+           @"    }"
+           @"  }"
+           @"})();"];
+    }
+    return source;
 }
 
 - (void)webView:(WKWebView *)webView
@@ -1705,6 +1877,11 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (BOOL)isArtificerApp {
     NSString *slug = [[[self.appSlug ?: @"" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
     return [slug isEqualToString:@"artificer"] || [slug isEqualToString:@"artificer-native"];
+}
+
+- (BOOL)isOpenCodeDesktopApp {
+    NSString *slug = [[[self.appSlug ?: @"" lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+    return [slug isEqualToString:@"opencode-desktop"] || [slug isEqualToString:@"opencode"];
 }
 
 - (BOOL)isMatchbookApp {
@@ -3062,12 +3239,19 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
     [appMenu addItemWithTitle:aboutTitle action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];
     [appMenu addItem:[NSMenuItem separatorItem]];
 
-    if (self.enableForgeAppMenu) {
-        NSMenuItem *prefs = [appMenu addItemWithTitle:@"Settings…"
-                                               action:@selector(nativeForgeOpenSettings:)
+    if (self.enableForgeAppMenu || [self isOpenCodeDesktopApp]) {
+        SEL prefsAction = [self isOpenCodeDesktopApp] ? @selector(nativeOpenCodePreferences:) : @selector(nativeForgeOpenSettings:);
+        NSString *prefsTitle = [self isOpenCodeDesktopApp] ? @"Preferences…" : @"Settings…";
+        NSMenuItem *prefs = [appMenu addItemWithTitle:prefsTitle
+                                               action:prefsAction
                                         keyEquivalent:@","];
         [prefs setTarget:self];
+        if ([self isOpenCodeDesktopApp] && !self.enableForgeAppMenu) {
+            [appMenu addItem:[NSMenuItem separatorItem]];
+        }
+    }
 
+    if (self.enableForgeAppMenu) {
         NSMenuItem *createMode = [appMenu addItemWithTitle:@"Create App Workflow"
                                                     action:@selector(nativeForgeOpenCreateWorkflow:)
                                              keyEquivalent:@"2"];
@@ -3260,6 +3444,40 @@ windowFeatures:(WKWindowFeatures *)windowFeatures {
 - (void)nativeForgeOpenSettings:(id)sender {
     (void)sender;
     [self dispatchForgeMenuAction:@"open-settings"];
+}
+
+- (void)nativeOpenCodePreferences:(id)sender {
+    (void)sender;
+    if (!self.webView) {
+        return;
+    }
+    NSString *js =
+      @"(function () {"
+       "  var marker = '__opencode_desktop_app_base__=';"
+       "  var name = String(window.name || '');"
+       "  var index = name.indexOf(marker);"
+       "  var base = '';"
+       "  var preferencesUrl = '';"
+       "  if (index >= 0) {"
+       "    base = name.slice(index + marker.length).split('\\n')[0];"
+       "    if (base) {"
+       "      try {"
+       "        base = decodeURIComponent(base);"
+       "      } catch (error) {"
+       "      }"
+       "    }"
+       "  }"
+       "  if (!base || !window.wizardry || typeof window.wizardry.exec !== 'function') {"
+       "    return;"
+       "  }"
+       "  try {"
+       "    preferencesUrl = new URL('preferences.html', base).href;"
+       "  } catch (error) {"
+       "    return;"
+       "  }"
+       "  window.wizardry.exec(['__wizardry_host_open_window', preferencesUrl, 'OpenCode Preferences', '920', '760']).catch(function () {});"
+       "})();";
+    [self.webView evaluateJavaScript:js completionHandler:nil];
 }
 
 - (void)nativeForgeOpenCreateWorkflow:(id)sender {

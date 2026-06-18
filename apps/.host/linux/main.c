@@ -22,6 +22,7 @@ typedef struct _WindowContext WindowContext;
 
 struct _AppState {
     char *app_path;
+    char *app_slug;
     char *app_name;
     char *index_uri;
     GList *windows;
@@ -105,6 +106,188 @@ static const char *DESKTOP_BRIDGE_BOOTSTRAP =
     "    window.wizardry.rpc = rpcBridge;"
     "  }"
     "})();";
+
+static const char *OPENCODE_DESKTOP_BOOTSTRAP =
+    "(function () {"
+    "  function opencodeDesktopHostedPage() {"
+    "    var host = (window.location && window.location.hostname) ? String(window.location.hostname).toLowerCase() : '';"
+    "    return host === '127.0.0.1' || host === 'localhost' || host === 'opencode.local';"
+    "  }"
+    "  function opencodeDesktopAppBase() {"
+    "    var marker = '__opencode_desktop_app_base__=';"
+    "    var name = String(window.name || '');"
+    "    var index = name.indexOf(marker);"
+    "    var value = '';"
+    "    if (index < 0) {"
+    "      return '';"
+    "    }"
+    "    value = name.slice(index + marker.length).split('\\n')[0];"
+    "    if (!value) {"
+    "      return '';"
+    "    }"
+    "    try {"
+    "      return decodeURIComponent(value);"
+    "    } catch (error) {"
+    "      return value;"
+    "    }"
+    "  }"
+    "  function opencodeDesktopOpenPreferences() {"
+    "    var base = opencodeDesktopAppBase();"
+    "    var preferencesUrl = '';"
+    "    if (!base || !window.wizardry || typeof window.wizardry.exec !== 'function') {"
+    "      return;"
+    "    }"
+    "    try {"
+    "      preferencesUrl = new URL('preferences.html', base).href;"
+    "    } catch (error) {"
+    "      return;"
+    "    }"
+    "    window.wizardry.exec(['__wizardry_host_open_window', preferencesUrl, 'OpenCode Preferences', '920', '760']).catch(function () {});"
+    "  }"
+    "  function opencodeDesktopMountPreferencesButton() {"
+    "    var button;"
+    "    if (!opencodeDesktopHostedPage() || !document.body) {"
+    "      return;"
+    "    }"
+    "    button = document.getElementById('opencode-desktop-preferences-btn');"
+    "    if (button) {"
+    "      return;"
+    "    }"
+    "    button = document.createElement('button');"
+    "    button.id = 'opencode-desktop-preferences-btn';"
+    "    button.type = 'button';"
+    "    button.textContent = 'Preferences';"
+    "    button.setAttribute('aria-label', 'Open OpenCode Preferences');"
+    "    button.style.position = 'fixed';"
+    "    button.style.top = '18px';"
+    "    button.style.right = '18px';"
+    "    button.style.zIndex = '2147483647';"
+    "    button.style.padding = '10px 14px';"
+    "    button.style.borderRadius = '999px';"
+    "    button.style.border = '1px solid rgba(27, 31, 36, 0.12)';"
+    "    button.style.background = 'rgba(255, 250, 243, 0.94)';"
+    "    button.style.backdropFilter = 'blur(12px)';"
+    "    button.style.color = '#1f1a16';"
+    "    button.style.font = '600 13px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif';"
+    "    button.style.boxShadow = '0 12px 32px rgba(31, 26, 22, 0.18)';"
+    "    button.style.cursor = 'pointer';"
+    "    button.addEventListener('click', function (event) {"
+    "      event.preventDefault();"
+    "      opencodeDesktopOpenPreferences();"
+    "    });"
+    "    document.body.appendChild(button);"
+    "  }"
+    "  function opencodeDesktopInstallShortcut() {"
+    "    if (!opencodeDesktopHostedPage() || window.__opencodeDesktopPrefsShortcutInstalled) {"
+    "      return;"
+    "    }"
+    "    window.__opencodeDesktopPrefsShortcutInstalled = true;"
+    "    window.addEventListener('keydown', function (event) {"
+    "      var key = String(event.key || '').toLowerCase();"
+    "      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && key === ',') {"
+    "        event.preventDefault();"
+    "        opencodeDesktopOpenPreferences();"
+    "      }"
+    "    }, true);"
+    "  }"
+    "  function opencodeDesktopApplyInset() {"
+    "    var root;"
+    "    var button;"
+    "    var wrapper;"
+    "    var wrapperStyle;"
+    "    var currentMargin;"
+    "    var left;"
+    "    var minLeft;"
+    "    if (!opencodeDesktopHostedPage()) {"
+    "      return;"
+    "    }"
+    "    root = document.documentElement;"
+    "    button = document.querySelector('button[aria-label=\"Toggle sidebar\"], button[aria-label=\"Toggle menu\"], button[title=\"Toggle sidebar\"], button[title=\"Toggle menu\"]');"
+    "    if (!button) {"
+    "      button = document.querySelector('button[data-sidebar-trigger], button[data-testid=\"sidebar-toggle\"], button[data-testid=\"menu-toggle\"]');"
+    "    }"
+    "    if (!root || !button || !button.parentElement) {"
+    "      return;"
+    "    }"
+    "    if (root.style && typeof root.style.setProperty === 'function') {"
+    "      root.style.setProperty('--dialog-left-margin', '96px');"
+    "      root.style.setProperty('--sidebar-left-offset', '96px');"
+    "      root.style.setProperty('--safe-area-left', '96px');"
+    "    }"
+    "    wrapper = button.parentElement;"
+    "    wrapperStyle = window.getComputedStyle ? window.getComputedStyle(wrapper) : null;"
+    "    currentMargin = wrapperStyle ? parseFloat(wrapperStyle.marginLeft || '0') : 0;"
+    "    if (!isFinite(currentMargin)) {"
+    "      currentMargin = 0;"
+    "    }"
+    "    left = button.getBoundingClientRect ? button.getBoundingClientRect().left : 0;"
+    "    minLeft = 96;"
+    "    if (left < minLeft && wrapper.style) {"
+    "      wrapper.style.marginLeft = String(Math.ceil(currentMargin + (minLeft - left))) + 'px';"
+    "    }"
+    "    if (button.style && left < minLeft) {"
+    "      button.style.position = button.style.position || 'relative';"
+    "      button.style.left = String(Math.ceil(minLeft - left)) + 'px';"
+    "    }"
+    "  }"
+    "  function opencodeDesktopRefreshHostUi() {"
+    "    opencodeDesktopInstallShortcut();"
+    "    opencodeDesktopMountPreferencesButton();"
+    "    opencodeDesktopApplyInset();"
+    "  }"
+    "  if (window.MutationObserver) {"
+    "    var opencodeDesktopObserver;"
+    "    var opencodeDesktopStartObserver;"
+    "    var opencodeDesktopRefreshSafe = function () {"
+    "      try {"
+    "        opencodeDesktopRefreshHostUi();"
+    "      } catch (error) {"
+    "      }"
+    "    };"
+    "    if (document.readyState === 'loading') {"
+    "      document.addEventListener('DOMContentLoaded', opencodeDesktopRefreshSafe, { once: true });"
+    "    } else {"
+    "      opencodeDesktopRefreshSafe();"
+    "    }"
+    "    opencodeDesktopObserver = new MutationObserver(opencodeDesktopRefreshSafe);"
+    "    opencodeDesktopStartObserver = function () {"
+    "      var attempts;"
+    "      var timer;"
+    "      if (!document.documentElement) {"
+    "        return;"
+    "      }"
+    "      opencodeDesktopObserver.observe(document.documentElement, { childList: true, subtree: true });"
+    "      attempts = 0;"
+    "      timer = setInterval(function () {"
+    "        opencodeDesktopRefreshSafe();"
+    "        attempts += 1;"
+    "        if (attempts >= 120) {"
+    "          clearInterval(timer);"
+    "        }"
+    "      }, 250);"
+    "    };"
+    "    if (document.documentElement) {"
+    "      opencodeDesktopStartObserver();"
+    "    } else {"
+    "      document.addEventListener('DOMContentLoaded', opencodeDesktopStartObserver, { once: true });"
+    "    }"
+    "  }"
+    "})();";
+
+static gboolean is_opencode_desktop_slug(const char *slug) {
+    if (!slug || !*slug) {
+        return FALSE;
+    }
+    return g_strcmp0(slug, "opencode-desktop") == 0 || g_strcmp0(slug, "opencode") == 0;
+}
+
+static char *desktop_bridge_bootstrap_for_app(const AppState *state) {
+    const char *slug = (state && state->app_slug) ? state->app_slug : "";
+    if (is_opencode_desktop_slug(slug)) {
+        return g_strconcat(DESKTOP_BRIDGE_BOOTSTRAP, OPENCODE_DESKTOP_BOOTSTRAP, NULL);
+    }
+    return g_strdup(DESKTOP_BRIDGE_BOOTSTRAP);
+}
 
 // Escape string for JSON usage in callback payloads.
 static char *escape_json(const char *str) {
@@ -569,12 +752,14 @@ static WindowContext *create_window_context(AppState *state,
         g_warning("failed to register wizardry script message handler");
     }
 
+    char *bridge_bootstrap_source = desktop_bridge_bootstrap_for_app(state);
     WebKitUserScript *bridge_bootstrap = webkit_user_script_new(
-        DESKTOP_BRIDGE_BOOTSTRAP,
+        bridge_bootstrap_source,
         WEBKIT_USER_CONTENT_INJECT_TOP_FRAME,
         WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START,
         NULL,
         NULL);
+    g_free(bridge_bootstrap_source);
     webkit_user_content_manager_add_script(content_manager, bridge_bootstrap);
     webkit_user_script_unref(bridge_bootstrap);
     g_signal_connect(content_manager,
@@ -639,6 +824,7 @@ int main(int argc, char *argv[]) {
 
     AppState state = {0};
     state.app_path = g_strdup(app_path);
+    state.app_slug = g_strdup(app_slug);
     state.app_name = window_title;
     state.index_uri = index_uri;
     state.windows = NULL;
@@ -664,6 +850,7 @@ int main(int argc, char *argv[]) {
 
     g_free(state.index_uri);
     g_free(state.app_name);
+    g_free(state.app_slug);
     g_free(state.app_path);
     g_free(index_path);
     return 0;
