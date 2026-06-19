@@ -321,6 +321,12 @@ fi
 if [ -e "$SITE_DIR/cgi" ] || [ -L "$SITE_DIR/cgi" ]; then
   rm -rf "$SITE_DIR/cgi"
 fi
+if [ -e "$SITE_DIR/app" ] || [ -L "$SITE_DIR/app" ]; then
+  rm -rf "$SITE_DIR/app"
+fi
+if [ -e "$SITE_DIR/scripts" ] || [ -L "$SITE_DIR/scripts" ]; then
+  rm -rf "$SITE_DIR/scripts"
+fi
 # Remove README if it exists (comes from template)
 if [ -f "$SITE_DIR/README.md" ]; then
   rm -f "$SITE_DIR/README.md"
@@ -355,6 +361,14 @@ fi
 
 if [ -d "$template_dir/cgi" ]; then
   copy_template_component_entries "$template_dir/cgi" "$SITE_DIR/cgi" ''
+fi
+
+if [ -d "$template_dir/app" ]; then
+  copy_template_component_entries "$template_dir/app" "$SITE_DIR/app" ''
+fi
+
+if [ -d "$template_dir/scripts" ]; then
+  copy_template_component_entries "$template_dir/scripts" "$SITE_DIR/scripts" ''
 fi
 
 if [ -f "$template_dir/README.md" ]; then
