@@ -327,9 +327,18 @@ fi
 if [ -e "$SITE_DIR/scripts" ] || [ -L "$SITE_DIR/scripts" ]; then
   rm -rf "$SITE_DIR/scripts"
 fi
+if [ -e "$SITE_DIR/seed" ] || [ -L "$SITE_DIR/seed" ]; then
+  rm -rf "$SITE_DIR/seed"
+fi
 # Remove README if it exists (comes from template)
 if [ -f "$SITE_DIR/README.md" ]; then
   rm -f "$SITE_DIR/README.md"
+fi
+if [ -f "$SITE_DIR/site.allowlist" ]; then
+  rm -f "$SITE_DIR/site.allowlist"
+fi
+if [ -f "$SITE_DIR/.site-actions.conf" ]; then
+  rm -f "$SITE_DIR/.site-actions.conf"
 fi
 
 # Copy fresh template files
@@ -371,8 +380,20 @@ if [ -d "$template_dir/scripts" ]; then
   copy_template_component_entries "$template_dir/scripts" "$SITE_DIR/scripts" ''
 fi
 
+if [ -d "$template_dir/seed" ]; then
+  copy_template_component_entries "$template_dir/seed" "$SITE_DIR/seed" ''
+fi
+
 if [ -f "$template_dir/README.md" ]; then
   cp "$template_dir/README.md" "$SITE_DIR/"
+fi
+
+if [ -f "$template_dir/site.allowlist" ]; then
+  cp "$template_dir/site.allowlist" "$SITE_DIR/"
+fi
+
+if [ -f "$template_dir/.site-actions.conf" ]; then
+  cp "$template_dir/.site-actions.conf" "$SITE_DIR/"
 fi
 
 if [ -f "$SITE_DIR/wizardry-server-requirements.conf" ]; then
