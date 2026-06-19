@@ -37,6 +37,10 @@
 - For new cross-platform app shells, reference `/Users/andersaamodt/git/wizardry-apps/templates/forge/web/reference-app/` first; for native-style desktop app shells, reference `/Users/andersaamodt/git/wizardry-apps/templates/forge/native-desktop/reference-app/` first; for native mobile app shells, reference `/Users/andersaamodt/git/wizardry-apps/templates/forge/native-mobile/reference-app/` first. Keep the relevant reference updated when Wizardry standards evolve; the native reference should show platform-owned controls plus live backend snapshot hydration, especially JSON-Glib-backed GTK row/detail rebuilding on Linux.
 - Keep one user-facing repo README at `/Users/andersaamodt/git/wizardry-apps/README.md`; do not add app-local or template-local README files.
 - Put app-specific implementation notes in `.github/` when they are AI-facing, or fold user-facing summaries into the root README.
+- Treat HTTP Basic Auth, private staging domains, unpublished-site gates, and similar access restrictions as hard privacy boundaries; never remove, bypass, or temporarily disable them during migration, publish debugging, or deployment repair unless the user explicitly authorizes making the site public.
+- When migrating a managed site, prefer the canonical managed-site architecture over legacy or ad hoc layouts; fix Deployments or template-update behavior so the site fits the standard model instead of normalizing around an idiosyncratic runtime setup.
+- Before any site migration or publish validation, inventory privacy-sensitive surfaces first: access gates, unpublished content, `.sitedata` or other mutable state, and operator-local secrets; preserving those boundaries is part of correctness, not a later cleanup step.
+- Publish verification for a site that is expected to stay private must include proving that unauthenticated access still fails as expected, not only that authenticated or live-release content is reachable.
 
 ## Canonicality
 - Wizardry core ethos in `~/.wizardry/README.md` is upstream-canonical.
