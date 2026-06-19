@@ -72,6 +72,7 @@ assert_matches "$ui" 'function parseInstallBeforeRunPrefs\(raw\)'
 assert_matches "$ui" 'function installBeforeRunPreferenceForSelected\(selected\)'
 assert_matches "$ui" 'function isWorkspaceBackedBuiltIn\(item\)'
 assert_matches "$ui" 'function usesWorkspacePipeline\(item\)'
+assert_contains "$ui" 'renderSelectedTargetsEditor(selected);'
 assert_contains "$ui" 'artificer: true'
 assert_matches "$ui" 'return usesWorkspacePipeline\(selected\) && selected\.context !== '"'"'godot'"'"';'
 assert_matches "$ui" 'assignmentKeysForItem\(selected\)'
@@ -128,6 +129,8 @@ assert_matches "$ui" "document\.hidden"
 assert_matches "$ui" "document\.hasFocus\(\)"
 assert_matches "$ui" "suppressTransientRefresh\(90000\);"
 assert_not_contains "$ui" 'state.autoRefreshTimer = setInterval(function () {'
+assert_contains "$css" '.target-install-before-run:has(input:disabled) {'
+assert_contains "$css" 'cursor: not-allowed;'
 
 # Backend actions should remain explicit and structured.
 assert_matches "$ui" "backend\('run-workspace', \[item\.path, item\.context, runMode\]\);"

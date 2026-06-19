@@ -2947,6 +2947,16 @@ input[type="checkbox"]:disabled {
   margin: 0;
 }
 
+.target-install-before-run:has(input:disabled) {
+  color: color-mix(in srgb, var(--section-muted) 84%, transparent);
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.target-install-before-run:has(input:disabled) input {
+  cursor: not-allowed;
+}
+
 .targets-subsection {
   margin-top: 0.28rem;
 }

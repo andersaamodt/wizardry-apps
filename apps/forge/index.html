@@ -1629,6 +1629,10 @@
           var hidden = !!(els.installBeforeRunRow && els.installBeforeRunRow.classList.contains('hidden'));
           els.installBeforeRunToggle.disabled = !!flag || hidden;
         }
+        var selected = selectedCatalogItem();
+        if (selected) {
+          renderSelectedTargetsEditor(selected);
+        }
         syncSettingsSaveButtons();
       }
 
