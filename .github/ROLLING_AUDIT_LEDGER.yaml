@@ -190,8 +190,7 @@ categories:
     policy_axes:
       - Testing And Release Readiness
     default_severity: medium
-    affected_apps:
-      - dictator
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Move test entrypoints under .tests and leave non-test helpers elsewhere.
@@ -406,7 +405,6 @@ categories:
     affected_apps:
       - applegate
       - chatroom
-      - dictator
       - eye
     approved_exceptions: []
     evidence_refs: []

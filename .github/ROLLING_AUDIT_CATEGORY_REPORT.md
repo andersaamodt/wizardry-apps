@@ -135,11 +135,10 @@
 
 ### 7. `ui-static-tests-missing`
 - Severity: high
-- Recurrence: 4 repos
+- Recurrence: 3 repos
 - Affected:
   - `applegate`
   - `chatroom`
-  - `dictator`
   - `eye`
 - Why it ranks high:
   - These are shipped GUI surfaces without matching UI/static contract protection.
@@ -298,7 +297,7 @@
 
 ### 22. `tests-not-under-dot-tests`
 - Affected:
-  - `dictator`
+  - none
 
 ### 23. `config-example-stale`
 - Affected:

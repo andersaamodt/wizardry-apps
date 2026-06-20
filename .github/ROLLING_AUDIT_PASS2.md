@@ -168,7 +168,7 @@
   - `book-club`: native/calls/relay/security coverage present under `.tests/`
   - `boycott`: partial; canonical backend contract coverage now exists under `.tests/`, but UI/static coverage and other repo findings remain
   - `counterspell`: shell and CGI contract coverage present under `.tests/`
-  - `dictator`: partial; voice regression surface now exposed under `.tests/voice/run.sh`, but broader release-side normalization still remains
+  - `dictator`: backend and voice entrypoints now live under `.tests/`, including `.tests/backend/test-installables.sh` and `.tests/voice/run.sh`
   - `eye`: shell/runtime coverage present under `.tests/test-eye.sh`
   - `fauxzilla`: broad API/runtime coverage present under `.tests/`
   - `hegelizer`: partial; canonical `.tests/` entrypoints now exist, but the smoke harness is still red and GUI/static contract depth remains thin
@@ -196,7 +196,7 @@
   - `book-club`: GUI/native coverage present under `.tests/gui/` and `.tests/native/`
   - `boycott`: partial; canonical UI/static contract coverage now exists under `.tests/ui/test-ui-contract.sh`, but theme and other repo findings remain
   - `counterspell`: shell contract includes app-surface assertions under `.tests/`
-  - `dictator`: fail; no `.tests/` GUI/static contract
+  - `dictator`: partial; canonical native-shell UI/static coverage now exists under `.tests/ui/test-native-shell-contract.sh`, but broader language and storage findings remain
   - `eye`: fail; `.tests/test-eye.sh` covers shell/runtime behavior only
   - `fauxzilla`: extension/UI behavior coverage present under `.tests/`
   - `hegelizer`: partial; canonical UI/static contract entrypoints now exist under `.tests/ui/`, but the smoke harness is still red and broader GUI/static contract depth remains thin
