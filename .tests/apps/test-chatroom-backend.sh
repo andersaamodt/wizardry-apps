@@ -59,4 +59,14 @@ printf '%s\n' "$newline_url_out" | grep -Fx "chat_url=" >/dev/null 2>&1 || {
   exit 1
 }
 
+network_info=$(HOME="$tmp_home" sh "$backend" get-network-info)
+printf '%s\n' "$network_info" | grep -E '^local_ip=' >/dev/null || {
+  printf '%s\n' "chatroom network info missing local_ip row" >&2
+  exit 1
+}
+printf '%s\n' "$network_info" | grep -E '^tor_address=' >/dev/null || {
+  printf '%s\n' "chatroom network info missing tor_address row" >&2
+  exit 1
+}
+
 printf '%s\n' "chatroom backend tests passed"

@@ -301,8 +301,7 @@ categories:
     policy_axes:
       - GUI Contract
     default_severity: high
-    affected_apps:
-      - chatroom
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Integrate settings into the primary shell unless the app is explicitly a document multiplexer.
@@ -313,7 +312,6 @@ categories:
       - Execution And Security Boundary
     default_severity: high
     affected_apps:
-      - chatroom
       - wizardry-desktop
       - serenity
     approved_exceptions: []
@@ -326,8 +324,7 @@ categories:
       - Execution And Security Boundary
       - GUI Contract
     default_severity: medium
-    affected_apps:
-      - chatroom
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Expose the required machine or endpoint state through a dedicated backend contract.
@@ -337,8 +334,7 @@ categories:
     policy_axes:
       - GUI Contract
     default_severity: medium
-    affected_apps:
-      - chatroom
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Replace alert and imperative fallback messaging with durable inline status and guided next actions.
@@ -371,8 +367,7 @@ categories:
       - Storage And State Discipline
       - GUI Contract
     default_severity: high
-    affected_apps:
-      - chatroom
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Separate hydration/read paths from write paths and add regression coverage.
@@ -396,7 +391,6 @@ categories:
     default_severity: high
     affected_apps:
       - applegate
-      - chatroom
       - eye
     approved_exceptions: []
     evidence_refs: []

@@ -9,6 +9,7 @@ Actions:
   get-ui-prefs
   set-ui-pref KEY VALUE
   get-chat-endpoint
+  get-network-info
   check-chat [URL]
   start-server
   stop-server
@@ -80,6 +81,56 @@ read_demo_port() {
 default_chat_url() {
   port=$(read_demo_port) || return 1
   printf 'http://localhost:%s/pages/chat.html\n' "$port"
+}
+
+local_ip_address() {
+  if command -v ipconfig >/dev/null 2>&1; then
+    for if_name in en0 en1; do
+      ip=$(ipconfig getifaddr "$if_name" 2>/dev/null || :)
+      case "$ip" in
+        ''|127.*)
+          ;;
+        *[!0-9.]*)
+          ;;
+        *)
+          printf '%s\n' "$ip"
+          return 0
+          ;;
+      esac
+    done
+  fi
+
+  if command -v ifconfig >/dev/null 2>&1; then
+    ifconfig 2>/dev/null | awk '
+      $1 == "inet" && $2 !~ /^127[.]/ && $2 ~ /^[0-9.]+$/ {
+        print $2
+        exit
+      }
+    '
+    return 0
+  fi
+
+  return 1
+}
+
+tor_hidden_service_address() {
+  for hostname_file in \
+    "$HOME/.tor/chatroom/hostname" \
+    "$HOME/.local/state/tor/chatroom/hostname" \
+    "/var/lib/tor/chatroom/hostname"; do
+    [ -f "$hostname_file" ] || continue
+    awk '
+      {
+        value = tolower($0)
+      }
+      value ~ /^[a-z2-7]+[.]onion$/ && length(value) >= 22 && length(value) <= 62 {
+        print value
+        exit
+      }
+    ' "$hostname_file"
+    return 0
+  done
+  return 1
 }
 
 find_chat_template() {
@@ -247,6 +298,22 @@ case "$action" in
     fi
     printf 'port=%s\n' "$port"
     printf 'chat_url=%s\n' "$url"
+    ;;
+  get-network-info)
+    local_ip=''
+    tor_address=''
+    if local_ip=$(local_ip_address 2>/dev/null); then
+      :
+    else
+      local_ip=''
+    fi
+    if tor_address=$(tor_hidden_service_address 2>/dev/null); then
+      :
+    else
+      tor_address=''
+    fi
+    printf 'local_ip=%s\n' "$(sanitize_value "$local_ip")"
+    printf 'tor_address=%s\n' "$(sanitize_value "$tor_address")"
     ;;
   check-chat)
     requested=${1-}

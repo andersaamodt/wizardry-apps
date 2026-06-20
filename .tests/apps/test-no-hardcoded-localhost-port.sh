@@ -6,8 +6,7 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd -P)
 
 fail=0
 for f in \
-  "$root/apps/chatroom/index.html" \
-  "$root/apps/chatroom/settings.html"; do
+  "$root/apps/chatroom/index.html"; do
   [ -f "$f" ] || continue
   if rg -n "localhost:8080" "$f" >/dev/null 2>&1; then
     printf '%s\n' "hardcoded localhost:8080 detected in $f" >&2

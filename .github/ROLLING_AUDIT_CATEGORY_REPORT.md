@@ -129,10 +129,9 @@
 
 ### 7. `ui-static-tests-missing`
 - Severity: high
-- Recurrence: 3 repos
+- Recurrence: 2 repos
 - Affected:
   - `applegate`
-  - `chatroom`
   - `eye`
 - Why it ranks high:
   - These are shipped GUI surfaces without matching UI/static contract protection.
@@ -168,15 +167,15 @@
 
 ### 11. `settings-shell-split`
 - Affected:
-  - `chatroom`
+  - none
 - Fix direction:
-  - move settings into the main shell
+  - resolved for current Chatroom; keep settings in the main shell unless an explicit document-multiplexer exception exists
 
 ### 12. `read-path-mutates-state`
 - Affected:
-  - `chatroom`
+  - none
 - Fix direction:
-  - separate read/hydration from persistence
+  - resolved for current Chatroom; keep passive reads and hydration separate from write paths
 
 ## Medium-Severity Recurring Categories
 
@@ -298,11 +297,11 @@
 
 ### 24. `frontend-machine-state-scraping`
 - Affected:
-  - `chatroom`
+  - none
 
 ### 25. `inline-guided-fallback-missing`
 - Affected:
-  - `chatroom`
+  - none
 
 ### 26. `audit-surface-stale`
 - Affected:
@@ -351,9 +350,8 @@
 
 ### 32. `bridge-shell-fragment-execution`
 - Severity: high
-- Recurrence: 3 app surfaces
+- Recurrence: 2 app surfaces
 - Affected:
-  - `chatroom`
   - `serenity`
   - `wizardry-desktop`
 - Batch fix direction:

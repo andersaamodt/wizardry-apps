@@ -59,24 +59,20 @@
 - Pass: no
 - Severity: high
 - Findings:
-  - Stale pre-standards GUI shell. The app still uses a generic gradient banner, inline styles, emoji heading treatment, anchor `onclick` tabs, and a separate settings document instead of the integrated shell/settings patterns required by Wizardry Apps standards.
-  - Imperative and alert-driven fallback UX. The app tells the user to start the server from Settings and uses `alert()` fallback instructions for start, stop, and copy failures instead of durable guided state.
-  - Execution boundary violation. Both `index.html` and `settings.html` fall back to `window.wizardry.exec(['sh', '-c', ...])`, which breaks the hardcoded-argv boundary.
-  - Read path mutates durable state. `loadPort()` writes `chat_url` prefs during passive status loading, which violates the “reads remain non-mutating” ethos and is now a rolling-audit criterion.
-  - Frontend scrapes generic CGI for machine state. `settings.html` pulls `/cgi/system-info` directly to infer IP and Tor state instead of using a dedicated backend contract.
+  - Resolved in fix-it pass: settings now live in the main shell, no separate `settings.html` document remains, and Chatroom has UI/static contract coverage.
+  - Resolved in fix-it pass: frontend `sh -c` fallback execution was removed from Chatroom bridge calls.
+  - Resolved in fix-it pass: passive endpoint reads no longer write durable prefs; `chat_url` is written only through explicit write/start-server paths.
+  - Resolved in fix-it pass: generic `/cgi/system-info` scraping was replaced by the backend `get-network-info` contract.
   - Demo-site coupling is too hardcoded for a shipped built-in app. Backend logic is anchored to `$HOME/sites/demo` and `web-wizardry create demo`, which makes desktop behavior depend on one specific hosted-site instance rather than an app-owned contract.
-  - Test coverage is thin relative to shipped GUI scope. Chatroom has backend coverage, but no matching UI/static contract tests surfaced in the shipped app test set.
+  - Remaining: frontend-derived backend path detection is still open under the later host-owned backend-resolution standard.
 - Evidence:
-  - Old shell and non-semantic tabs: `apps/chatroom/index.html:7-77`
-  - Separate settings document iframe: `apps/chatroom/index.html:79-81`, `apps/chatroom/index.html:260-276`
-  - `sh -c` fallback execution: `apps/chatroom/index.html:138-174`, `apps/chatroom/settings.html:287-325`
-  - Imperative/alert-driven fallback UX: `apps/chatroom/index.html:68-76`, `apps/chatroom/settings.html:475-499`, `apps/chatroom/settings.html:520-532`, `apps/chatroom/settings.html:649-660`
-  - Read-path writes and CGI scraping: `apps/chatroom/settings.html:391-417`, `apps/chatroom/settings.html:544-640`
+  - Integrated shell and settings panel: `apps/chatroom/index.html`
+  - Backend-owned prefs plus network-info contract: `apps/chatroom/scripts/chatroom-backend.sh`
+  - UI/static regression coverage: `.tests/apps/test-chatroom-ui-contract.sh`
   - Hardcoded demo-site architecture: `apps/chatroom/scripts/chatroom-backend.sh:58-122`
-  - Test gap: `.tests/apps/test-chatroom-backend.sh`
 - Follow-up:
-  - Rebuild Chatroom onto the current Wizardry Apps shell patterns before doing polish-only fixes.
-  - Add UI/static contract coverage once the shell is modernized.
+  - Move backend path resolution into a host-owned contract.
+  - Replace demo-site coupling with an app-owned chatroom runtime contract.
 
 ## Recommended Round 2 Order
 1. Re-audit `forge` and `wizardry-desktop` against the new read-path and language-exception criteria.
@@ -152,13 +148,11 @@
 - Pass: no
 - Severity: high
 - Findings:
-  - Chatroom already failed for shell-fragment bridge execution in round 1.
-  - Under the late backend-resolution criterion, it also fails because both `index.html` and `settings.html` derive backend script candidates from `window.location.pathname`.
+  - Resolved in fix-it pass: Chatroom no longer uses `sh -c` fallback bridge execution.
+  - Under the late backend-resolution criterion, it still fails because `index.html` derives backend script candidates from `window.location.pathname`.
   - No Cargo-managed shipped runtime layer surfaced in the built-in Chatroom app path.
 - Evidence:
-  - frontend backend candidate detection in main shell: `apps/chatroom/index.html:92-115`
-  - frontend bridge execution of derived path in main shell: `apps/chatroom/index.html:138-172`
-  - frontend backend candidate detection in settings shell: `apps/chatroom/settings.html:245-268`
-  - frontend bridge execution of derived path in settings shell: `apps/chatroom/settings.html:287-322`
+  - frontend backend candidate detection in main shell: `apps/chatroom/index.html`
+  - explicit argv bridge execution with no shell fragment fallback: `apps/chatroom/index.html`
 - Follow-up:
-  - Fold backend resolution into the same modernization work already required for Chatroom shell/settings/bridge cleanup.
+  - Move backend resolution into host-owned app actions rather than frontend path inference.
