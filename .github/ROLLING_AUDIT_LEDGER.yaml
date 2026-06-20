@@ -389,12 +389,10 @@ categories:
     policy_axes:
       - Testing And Release Readiness
     default_severity: high
-    affected_apps:
-      - applegate
-      - eye
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
-    fix_strategy: Add UI/static contract tests alongside backend coverage in .tests.
+    fix_strategy: Resolved for current tracked surfaces; keep UI/static contract tests alongside backend coverage in .tests.
 
   - id: repo-ai-standards-missing
     title: Repo lacks a local AI-facing standards or exception surface

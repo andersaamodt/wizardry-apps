@@ -129,15 +129,14 @@
 
 ### 7. `ui-static-tests-missing`
 - Severity: high
-- Recurrence: 2 repos
+- Recurrence: 0 repos
 - Affected:
-  - `applegate`
-  - `eye`
+  - none
 - Why it ranks high:
   - These are shipped GUI surfaces without matching UI/static contract protection.
 - Batch fix direction:
-  - add lightweight DOM/static/bridge tests first
-  - only then rely on backend tests as sufficient for release confidence
+  - resolved for current tracked surfaces
+  - keep lightweight DOM/static/bridge tests beside backend tests for shipped GUI surfaces
 
 ### 8. `backend-contract-tests-missing`
 - Severity: high
