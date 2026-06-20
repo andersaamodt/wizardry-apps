@@ -477,8 +477,7 @@ categories:
     policy_axes:
       - Documentation And Auditability
     default_severity: medium
-    affected_apps:
-      - wizardry
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Revalidate or regenerate the audit surface from current source before treating it as active evidence.
@@ -489,8 +488,7 @@ categories:
       - Language And Boundary Discipline
       - Testing And Release Readiness
     default_severity: medium
-    affected_apps:
-      - wizardry
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Replace GNU-specific behavior with a POSIX-safe path or add explicit portability guards and tests.

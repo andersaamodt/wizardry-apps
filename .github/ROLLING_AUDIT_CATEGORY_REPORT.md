@@ -306,11 +306,11 @@
 
 ### 26. `audit-surface-stale`
 - Affected:
-  - `wizardry`
+  - none
 
 ### 27. `gnu-tool-dependency-undocumented`
 - Affected:
-  - `wizardry`
+  - none
 
 ### 28. `theme-picker-keyboard-broken`
 - Affected:
