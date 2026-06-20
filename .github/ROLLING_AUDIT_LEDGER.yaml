@@ -138,11 +138,10 @@ categories:
     policy_axes:
       - Storage And State Discipline
     default_severity: high
-    affected_apps:
-      - theurgy
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
-    fix_strategy: Move generated runtime-state defaults to explicit user-local state roots outside the checkout.
+    fix_strategy: Resolved for current Theurgy scaffolds; keep generated runtime-state defaults in explicit user-local state roots outside the checkout.
 
   - id: tracked-repo-cruft-placeholder
     title: Repo tracks disposable cruft placeholders such as empty log files

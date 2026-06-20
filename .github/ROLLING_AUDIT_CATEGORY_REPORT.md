@@ -156,9 +156,9 @@
 
 ### 9. `generated-state-in-checkout`
 - Affected:
-  - `theurgy`
+  - none
 - Fix direction:
-  - generated defaults must stop normalizing runtime state into source trees
+  - resolved for current Theurgy scaffolds; generated defaults must keep runtime state in explicit user-local state roots outside source trees
 
 ### 10. `standards-guidance-contradictory`
 - Affected:
