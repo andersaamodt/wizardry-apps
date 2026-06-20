@@ -137,7 +137,7 @@
   - `binder`: fail; no local AI-facing exception ledger beyond audit report
   - `book-club`: fail; `.github/AI_DOCS.md` redirects upstream but does not enumerate local generated-native or Python helper boundaries
   - `boycott`: fail; no local AI-facing exception ledger beyond audit report
-  - `counterspell`: fail; `.github/README.md` is a thin pointer and does not enumerate Python or Swift exceptions
+  - `counterspell`: pass; `.github/AI_DOCS.md` now enumerates local language, storage, runtime, test, release, and pending-decision boundaries, and the previous Python filter-baseline boundary has been removed
   - `dictator`: fail; no local AI-facing exception ledger beyond audit report
   - `eye`: fail; no local AI-facing exception ledger beyond audit report
   - `fauxzilla`: fail; no local AI-facing exception ledger beyond audit report

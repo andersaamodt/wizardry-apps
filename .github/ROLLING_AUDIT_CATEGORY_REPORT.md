@@ -14,11 +14,10 @@
 
 ### 1. `python-exception-undocumented`
 - Severity: high
-- Recurrence: 6 repos
+- Recurrence: 5 repos
 - Affected:
   - `binder`
   - `book-club`
-  - `counterspell`
   - `dictator`
   - `fauxzilla`
   - `serenity`
@@ -32,14 +31,13 @@
 
 ### 2. `repo-local-exception-ledger-incomplete`
 - Severity: medium
-- Recurrence: 18 app repos
+- Recurrence: 17 app repos
 - Affected:
   - `applegate`
   - `bellheim`
   - `binder`
   - `book-club`
   - `boycott`
-  - `counterspell`
   - `dictator`
   - `eye`
   - `fauxzilla`
@@ -184,11 +182,10 @@
 
 ### 13. `language-exception-undocumented`
 - Severity: medium
-- Recurrence: 10 repos
+- Recurrence: 9 repos
 - Affected:
   - `bellheim`
   - `book-club`
-  - `counterspell`
   - `fauxzilla`
   - `matchbook`
   - `organizer`

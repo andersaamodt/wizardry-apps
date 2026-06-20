@@ -122,7 +122,6 @@ categories:
     affected_apps:
       - bellheim
       - book-club
-      - counterspell
       - fauxzilla
       - matchbook
       - organizer
@@ -216,7 +215,6 @@ categories:
     affected_apps:
       - binder
       - book-club
-      - counterspell
       - dictator
       - fauxzilla
       - serenity
@@ -444,7 +442,6 @@ categories:
       - binder
       - book-club
       - boycott
-      - counterspell
       - dictator
       - eye
       - fauxzilla
