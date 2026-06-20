@@ -178,8 +178,7 @@ categories:
     policy_axes:
       - Documentation And Auditability
     default_severity: high
-    affected_apps:
-      - wizardry
+    affected_apps: []
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Collapse conflicting guidance into one canonical approved pattern and remove the losing variant.

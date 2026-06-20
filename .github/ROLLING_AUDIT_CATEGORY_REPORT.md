@@ -162,9 +162,9 @@
 
 ### 10. `standards-guidance-contradictory`
 - Affected:
-  - `wizardry`
+  - none
 - Fix direction:
-  - choose one canonical shell pattern and delete the conflicting one from AI-facing docs
+  - resolved for current Wizardry source; keep future AI-facing shell-pattern docs aligned with phronesis and Wizardry lessons
 
 ### 11. `settings-shell-split`
 - Affected:
