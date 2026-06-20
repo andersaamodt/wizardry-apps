@@ -219,11 +219,7 @@ categories:
       - counterspell
       - dictator
       - fauxzilla
-      - organizer
-      - pieplate
       - serenity
-      - simplerchat
-      - stellar
     approved_exceptions: []
     evidence_refs: []
     fix_strategy: Replace Python where not justified or document the retained runtime/tooling boundary explicitly.

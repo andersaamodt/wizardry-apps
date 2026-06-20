@@ -14,20 +14,16 @@
 
 ### 1. `python-exception-undocumented`
 - Severity: high
-- Recurrence: 10 repos
+- Recurrence: 6 repos
 - Affected:
   - `binder`
   - `book-club`
   - `counterspell`
   - `dictator`
   - `fauxzilla`
-  - `organizer`
-  - `pieplate`
   - `serenity`
-  - `simplerchat`
-  - `stellar`
 - Why it ranks first:
-  - This is the broadest high-severity recurring language-discipline problem found so far.
+  - This is the highest-priority language-discipline problem in the current fix-it policy.
   - It cuts across native ports, shell-first apps, extension-plus-hub architecture, and mixed hosted/desktop repos.
 - Batch fix direction:
   - decide repo-by-repo whether Python is being removed or explicitly retained
