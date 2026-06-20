@@ -215,10 +215,9 @@ categories:
       - book-club
       - dictator
       - fauxzilla
-      - serenity
     approved_exceptions: []
     evidence_refs: []
-    fix_strategy: Replace Python where not justified or document the retained runtime/tooling boundary explicitly.
+    fix_strategy: Replace Python where not justified or document the retained runtime/tooling boundary explicitly; resolved for current Serenity runtime source.
 
   - id: theme-catalog-hardcoded
     title: Theme picker uses a hardcoded list instead of the real Wizardry theme set

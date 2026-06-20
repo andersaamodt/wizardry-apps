@@ -14,13 +14,12 @@
 
 ### 1. `python-exception-undocumented`
 - Severity: high
-- Recurrence: 5 repos
+- Recurrence: 4 repos
 - Affected:
   - `binder`
   - `book-club`
   - `dictator`
   - `fauxzilla`
-  - `serenity`
 - Why it ranks first:
   - This is the highest-priority language-discipline problem in the current fix-it policy.
   - It cuts across native ports, shell-first apps, extension-plus-hub architecture, and mixed hosted/desktop repos.
