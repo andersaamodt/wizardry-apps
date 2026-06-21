@@ -1727,10 +1727,8 @@
         if (lower.indexOf('xcodegen is required') >= 0 || lower.indexOf('required tool not found: xcodegen') >= 0) {
           return {
             title: 'xcodegen is required for iOS smoke builds',
-            body: hasBrew
-              ? 'Install xcodegen, then retry.\nCommand: brew install xcodegen'
-              : 'Install xcodegen, then retry.\nHomebrew is not detected, so install it first or install xcodegen manually.',
-            installTool: hasBrew ? 'xcodegen' : ''
+            body: 'Install xcodegen through Wizardry, then retry.',
+            installTool: 'xcodegen'
           };
         }
 
@@ -1784,9 +1782,8 @@
 
         if (els.installXcodegen) {
           var hasXcodegen = toolAvailable('xcodegen');
-          var hasBrew = toolAvailable('brew');
-          els.installXcodegen.disabled = hasXcodegen || !hasBrew;
-          els.installXcodegen.textContent = hasXcodegen ? 'xcodegen installed' : (hasBrew ? 'Install xcodegen' : 'Install xcodegen (requires Homebrew)');
+          els.installXcodegen.disabled = hasXcodegen;
+          els.installXcodegen.textContent = hasXcodegen ? 'xcodegen installed' : 'Install xcodegen';
         }
         if (els.installGradle) {
           var hasGradle = toolAvailable('gradle');
@@ -1843,13 +1840,17 @@
         if (state.os !== 'darwin') {
           throw new Error('automatic install helper is currently available on macOS only');
         }
-        if (!state.tools || state.tools.brew !== '1') {
-          throw new Error('Homebrew is not available on this system; install it first or install ' + tool + ' manually');
-        }
 
         if (tool === 'xcodegen') {
-          await execArgv(['brew', 'install', 'xcodegen']);
+          if (!state.homeDir) {
+            throw new Error('home directory is not available; xcodegen installer path cannot be resolved');
+          }
+          await execArgv([state.homeDir + '/.wizardry/spells/.arcana/wizardry-apps/install-xcodegen']);
           return;
+        }
+
+        if (!state.tools || state.tools.brew !== '1') {
+          throw new Error('Homebrew is not available on this system; install it first or install ' + tool + ' manually');
         }
 
         if (tool === 'gradle') {

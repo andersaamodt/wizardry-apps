@@ -59,6 +59,10 @@ assert_matches "$ui" 'function shouldShowFooterStatusForAction\(label, opts\)'
 assert_matches "$ui" 'function buildActionLabel\(item\)'
 assert_matches "$ui" 'function runActionLabel\(item\)'
 assert_matches "$ui" 'function ranActionLabel\(item\)'
+assert_contains "$ui" "Install xcodegen through Wizardry, then retry."
+assert_contains "$ui" "/.wizardry/spells/.arcana/wizardry-apps/install-xcodegen"
+assert_not_contains "$ui" "brew', 'install', 'xcodegen'"
+assert_not_contains "$ui" "Install xcodegen (requires Homebrew)"
 assert_matches "$ui" 'function hasEnabledMobileRunTarget\(selected\)'
 assert_matches "$ui" 'function defaultMobileRunTargetForSelected\(selected\)'
 assert_contains "$ui" 'hasEnabledHostRunTarget(selected) || hasEnabledHostedWebTarget(selected) || hasEnabledMobileRunTarget(selected)'
