@@ -4330,7 +4330,7 @@ workspace_git_collect_list_status() {
     git_repo_present='yes'
   fi
 
-  if [ -f "$state_file" ]; then
+  if [ "$git_repo_present" = 'yes' ] && [ -f "$state_file" ]; then
     git_status_label=$(workspace_git_cached_value_file "$state_file" git_status_label)
     git_status_tone=$(workspace_git_cached_value_file "$state_file" git_status_tone)
     git_status_reason=$(workspace_git_cached_value_file "$state_file" git_status_reason)
@@ -4478,6 +4478,20 @@ workspace_git_collect_release_info() {
   release_install_reason=$(workspace_git_cached_value_file "$state_file" release_install_reason)
   release_available=$(workspace_git_cached_value_file "$state_file" release_available)
   release_error=$(workspace_git_cached_value_file "$state_file" release_error)
+  release_github_slug=$(workspace_git_cached_value_file "$state_file" release_github_slug)
+  if [ "$release_github_slug" != "$github_slug" ]; then
+    release_check_epoch=''
+    release_name=''
+    release_tag=''
+    release_html_url=''
+    release_published_at=''
+    release_asset_name=''
+    release_asset_url=''
+    release_install_supported='no'
+    release_install_reason=''
+    release_available='no'
+    release_error=''
+  fi
 
   if [ "$refresh_release" = "1" ] &&
      command -v curl >/dev/null 2>&1 &&
@@ -4537,6 +4551,7 @@ workspace_git_collect_release_info() {
       fi
 
       workspace_git_state_write "$workspace_path" release_check_epoch "$now_epoch"
+      workspace_git_state_write "$workspace_path" release_github_slug "$github_slug"
       workspace_git_state_write "$workspace_path" release_name "$release_name"
       workspace_git_state_write "$workspace_path" release_tag "$release_tag"
       workspace_git_state_write "$workspace_path" release_html_url "$release_html_url"
@@ -4561,6 +4576,7 @@ workspace_git_collect_release_info() {
       release_error=$(workspace_git_cached_value_file "$state_file" release_error)
     else
       workspace_git_state_write "$workspace_path" release_check_epoch "$now_epoch"
+      workspace_git_state_write "$workspace_path" release_github_slug "$github_slug"
       workspace_git_state_write "$workspace_path" release_error "GitHub latest release could not be loaded."
       release_check_epoch=$now_epoch
       release_error='GitHub latest release could not be loaded.'
@@ -4615,8 +4631,6 @@ workspace_git_collect_status() {
   fi
 
   state_file=$(workspace_git_state_file "$workspace_path")
-  git_last_fetch_epoch=$(workspace_git_cached_value_file "$state_file" remote_check_epoch)
-  git_last_fetch_error=$(workspace_git_cached_value_file "$state_file" remote_check_error)
 
   if [ "$git_available" != 'yes' ]; then
     printf 'git_available=%s\n' "$git_available"
@@ -4653,17 +4667,24 @@ workspace_git_collect_status() {
   if [ -n "$(workspace_git_status_porcelain "$workspace_path")" ]; then
     git_dirty='yes'
   fi
+  cached_remote_origin=$(workspace_git_cached_value_file "$state_file" remote_check_origin)
+  if [ "$cached_remote_origin" = "$git_remote_origin" ]; then
+    git_last_fetch_epoch=$(workspace_git_cached_value_file "$state_file" remote_check_epoch)
+    git_last_fetch_error=$(workspace_git_cached_value_file "$state_file" remote_check_error)
+  fi
 
   if [ "$refresh_remote" = "1" ] && [ -n "$git_remote_origin" ]; then
     if workspace_git_fetch_origin "$workspace_path" >/dev/null 2>&1; then
       git_remote_reachable='yes'
       git_last_fetch_epoch=$(date +%s 2>/dev/null || printf '0')
       git_last_fetch_error=''
+      workspace_git_state_write "$workspace_path" remote_check_origin "$git_remote_origin"
       workspace_git_state_write "$workspace_path" remote_check_epoch "$git_last_fetch_epoch"
       workspace_git_state_write "$workspace_path" remote_check_error ""
     else
       git_last_fetch_epoch=$(date +%s 2>/dev/null || printf '0')
       git_last_fetch_error='Fetch from origin failed.'
+      workspace_git_state_write "$workspace_path" remote_check_origin "$git_remote_origin"
       workspace_git_state_write "$workspace_path" remote_check_epoch "$git_last_fetch_epoch"
       workspace_git_state_write "$workspace_path" remote_check_error "$git_last_fetch_error"
     fi
@@ -5249,6 +5270,8 @@ cmd_workspace_git_init() {
   fi
   if [ -n "$remote_url" ]; then
     git -C "$workspace_abs" remote add origin "$remote_url" >/dev/null 2>&1 || git -C "$workspace_abs" remote set-url origin "$remote_url" >/dev/null 2>&1
+    workspace_git_state_write "$workspace_abs" remote_check_origin "$remote_url"
+    workspace_git_state_write "$workspace_abs" remote_check_error ""
   fi
   workspace_git_state_write "$workspace_abs" default_branch "$branch_name"
 
@@ -5288,6 +5311,7 @@ cmd_workspace_git_set_remote() {
   else
     git -C "$workspace_abs" remote add origin "$remote_url"
   fi
+  workspace_git_state_write "$workspace_abs" remote_check_origin "$remote_url"
   workspace_git_state_write "$workspace_abs" remote_check_error ""
   printf 'root_hint=%s\n' "$root"
   printf 'workspace=%s\n' "$workspace_abs"
@@ -5355,6 +5379,8 @@ cmd_workspace_git_fetch() {
     exit 1
   }
   workspace_git_fetch_origin "$workspace_abs"
+  remote_origin=$(git -C "$workspace_abs" remote get-url origin 2>/dev/null || true)
+  workspace_git_state_write "$workspace_abs" remote_check_origin "$remote_origin"
   workspace_git_state_write "$workspace_abs" remote_check_epoch "$(date +%s 2>/dev/null || printf '0')"
   workspace_git_state_write "$workspace_abs" remote_check_error ""
   printf 'root_hint=%s\n' "$root"
@@ -5391,6 +5417,8 @@ cmd_workspace_git_pull() {
   [ -n "$branch_name" ] || branch_name=$(workspace_git_cached_value "$workspace_abs" default_branch)
   [ -n "$branch_name" ] || branch_name=main
   workspace_git_fetch_origin "$workspace_abs"
+  remote_origin=$(git -C "$workspace_abs" remote get-url origin 2>/dev/null || true)
+  workspace_git_state_write "$workspace_abs" remote_check_origin "$remote_origin"
   workspace_git_state_write "$workspace_abs" remote_check_epoch "$(date +%s 2>/dev/null || printf '0')"
   workspace_git_state_write "$workspace_abs" remote_check_error ""
 
@@ -5458,6 +5486,8 @@ cmd_workspace_git_push() {
   else
     GIT_TERMINAL_PROMPT=0 git -C "$workspace_abs" push -u origin "$branch_name"
   fi
+  remote_origin=$(git -C "$workspace_abs" remote get-url origin 2>/dev/null || true)
+  workspace_git_state_write "$workspace_abs" remote_check_origin "$remote_origin"
   workspace_git_state_write "$workspace_abs" remote_check_epoch "$(date +%s 2>/dev/null || printf '0')"
   workspace_git_state_write "$workspace_abs" remote_check_error ""
 

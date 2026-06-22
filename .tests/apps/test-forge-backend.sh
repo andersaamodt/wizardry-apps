@@ -997,8 +997,8 @@ printf '%s\n' "$apps_list" | awk -F'\t' 'NF != 18 { exit 1 } END { exit(NR > 0 ?
 workspaces=$(sh "$backend" list-workspaces "$scratch" "$workspaces_root")
 printf '%s\n' "$workspaces" | grep -E '^workspace-godot\t' >/dev/null
 printf '%s\n' "$workspaces" | grep -E '^workspace-web\t' >/dev/null
-printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-native" { if (NF != 14 || $8 != "1" || $9 != "no" || $13 != "") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
-printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-web" { if (NF != 14 || $9 != "no" || $10 != "" || $13 != "") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-native" { if (NF != 14 || $8 != "1" || $9 != "no" || $10 != "" || $11 != "muted" || $12 != "" || $13 != "" || $14 != "no") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
+printf '%s\n' "$workspaces" | awk -F'\t' '$1 == "workspace-web" { if (NF != 14 || $8 != "1" || $9 != "no" || $10 != "" || $11 != "muted" || $12 != "" || $13 != "" || $14 != "no") exit 1; found = 1 } END { exit(found ? 0 : 1) }'
 
 hidden_workspace_home="$scratch/hidden-workspace-home"
 hide_workspace_out=$(XDG_CONFIG_HOME="$hidden_workspace_home/.config" sh "$backend" hide-workspace "$scratch" "$workspaces_root/workspace-web")

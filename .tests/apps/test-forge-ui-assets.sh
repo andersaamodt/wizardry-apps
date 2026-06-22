@@ -215,7 +215,7 @@ grep -F -- "-webkit-mask-image: linear-gradient(white, white);" "$root/apps/forg
 grep -F -- "background-size: contain;" "$root/apps/forge/style.css" >/dev/null
 grep -F "scaffold-app" "$root/apps/forge/scripts/forge-backend.sh" >/dev/null
 grep -F "./forge-menu" "$root/README.md" >/dev/null
-grep -F 'install-forge" --root "$root" --user' "$root/tools/forge/launch-forge.sh" >/dev/null
+grep -F 'install-forge.sh" --root "$root"' "$root/tools/forge/launch-forge.sh" >/dev/null
 grep -F 'opened_app=' "$root/tools/forge/launch-forge.sh" >/dev/null
 [ -f "$root/apps/forge/assets/icons/meta/territory-master.png" ]
 [ -f "$root/apps/wizardry-desktop/assets/icons/meta/territory-master.png" ]
