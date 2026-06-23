@@ -1708,9 +1708,9 @@ launch_macos_bundle_async() {
   [ -d "$bundle_path" ] || return 1
   command -v open >/dev/null 2>&1 || return 1
   if command -v nohup >/dev/null 2>&1; then
-    nohup open -n "$bundle_path" >/dev/null 2>&1 &
+    nohup open "$bundle_path" >/dev/null 2>&1 &
   else
-    open -n "$bundle_path" >/dev/null 2>&1 &
+    open "$bundle_path" >/dev/null 2>&1 &
   fi
   return 0
 }
@@ -2932,7 +2932,7 @@ launch_workspace_bundle_macos() {
   stop_host_instances_for_app "" "$app_dir" "$bundle"
 
   if command -v open >/dev/null 2>&1; then
-    if open -n "$bundle" >/dev/null 2>&1; then
+    if open "$bundle" >/dev/null 2>&1; then
       # A successful open request should not be followed by a second explicit
       # launch attempt; doing both can create duplicate app instances/tray icons
       # on slower startups.
@@ -2994,11 +2994,14 @@ stop_desktop_instances_for_slug() {
     still_running=1
     while [ "$i" -lt 20 ]; do
       still_running=$(
-        ps -axo command= 2>/dev/null \
-          | awk -v slug="$slug" -v dist_root="$dist_root" -v app_name="$app_name" '
+        ps -axo pid=,command= 2>/dev/null \
+          | awk -v slug="$slug" -v dist_root="$dist_root" -v app_name="$app_name" -v self_pid="$$" '
               {
+                pid = $1
+                if (pid == self_pid) next
+                line = $0
                 host = index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (dist_root != "" && index($0, dist_root "/") > 0 && index($0, "/" slug) > 0))
-                native_app = app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/") > 0
+                native_app = app_name != "" && (index(line, "/" app_name ".app/Contents/MacOS/") > 0 || index(line, "/" app_name ".app/Contents/Resources/") > 0)
                 native_macos = dist_root != "" && index($0, dist_root "/macos-native-workspaces/" slug "/") > 0 && index($0, "/Contents/MacOS/") > 0
                 native_linux = dist_root != "" && index($0, dist_root "/linux-native-workspaces/" slug "/") > 0
                 if (host || native_app || native_macos || native_linux) { found=1; exit }
@@ -3014,10 +3017,13 @@ stop_desktop_instances_for_slug() {
     if [ "$still_running" = "1" ]; then
       stubborn_pids=$(
         ps -axo pid=,command= 2>/dev/null \
-          | awk -v slug="$slug" -v dist_root="$dist_root" -v app_name="$app_name" '
+          | awk -v slug="$slug" -v dist_root="$dist_root" -v app_name="$app_name" -v self_pid="$$" '
               {
+                pid = $1
+                if (pid == self_pid) next
+                line = $0
                 host = index($0, "wizardry-host") > 0 && (index($0, "/apps/" slug) > 0 || index($0, "/Resources/" slug) > 0 || (app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/wizardry-host") > 0) || (dist_root != "" && index($0, dist_root "/") > 0 && index($0, "/" slug) > 0))
-                native_app = app_name != "" && index($0, "/" app_name ".app/Contents/MacOS/") > 0
+                native_app = app_name != "" && (index(line, "/" app_name ".app/Contents/MacOS/") > 0 || index(line, "/" app_name ".app/Contents/Resources/") > 0)
                 native_macos = dist_root != "" && index($0, dist_root "/macos-native-workspaces/" slug "/") > 0 && index($0, "/Contents/MacOS/") > 0
                 native_linux = dist_root != "" && index($0, dist_root "/linux-native-workspaces/" slug "/") > 0
                 if (host || native_app || native_macos || native_linux) { print $1 }
