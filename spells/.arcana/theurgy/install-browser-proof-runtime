@@ -1,0 +1,22 @@
+#!/bin/sh
+
+case "${1-}" in
+--help|--usage|-h)
+  cat <<'USAGE'
+Usage: install-browser-proof-runtime [browser...]
+
+Installs Theurgy's quarantined Playwright/browser proof runtime.
+USAGE
+  exit 0
+  ;;
+esac
+
+set -eu
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)
+. "$script_dir/_theurgy"
+
+if ! is_theurgy_installed; then
+  "$script_dir/install-theurgy"
+fi
+
+THEURGY_HOME=$theurgy_home "$theurgy_home/spells/install-theurgy-browser-proof-runtime" "$@"
