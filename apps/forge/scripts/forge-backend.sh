@@ -1776,6 +1776,15 @@ workspace_rebuild_command() {
   printf '%s\n' "$(workspace_field "$conf" rebuild_command "")"
 }
 
+workspace_native_macos_bundle_command() {
+  conf=${1-}
+  if workspace_field_exists "$conf" native_macos_bundle_command; then
+    printf '%s\n' "$(workspace_field "$conf" native_macos_bundle_command "")"
+    return 0
+  fi
+  printf '%s\n' ""
+}
+
 run_workspace_rebuild() {
   root=$1
   workspace_path=$2
@@ -1888,6 +1897,67 @@ resolve_native_macos_package_dir() {
   fi
 
   return 1
+}
+
+run_native_macos_bundle_command() {
+  root=${1-}
+  workspace_path=${2-}
+  workspace_conf=${3-}
+  app_id=${4-}
+  app_name=${5-}
+  workspace_slug=${6-}
+  bundle=${7-}
+  build_log=${8-}
+
+  [ -n "$root" ] || return 1
+  [ -n "$workspace_path" ] || return 1
+  [ -n "$workspace_conf" ] || return 1
+  [ -n "$app_id" ] || return 1
+  [ -n "$app_name" ] || return 1
+  [ -n "$workspace_slug" ] || return 1
+  [ -n "$bundle" ] || return 1
+  [ -n "$build_log" ] || return 1
+
+  bundle_command=$(workspace_native_macos_bundle_command "$workspace_conf")
+  [ -n "$bundle_command" ] || return 1
+  case "$bundle_command" in
+    :|true)
+      return 1
+      ;;
+  esac
+
+  mkdir -p "$(dirname "$bundle")" "$(dirname "$build_log")"
+  if (
+    cd "$workspace_path"
+    env \
+      WIZARDRY_DIR="$root" \
+      WIZARDRY_APPS_ROOT="$root" \
+      WIZARDRY_NATIVE_DESKTOP_TARGET=macos \
+      WIZARDRY_NATIVE_DESKTOP_TARGETS=macos \
+      WIZARDRY_NATIVE_MACOS_BUNDLE_PATH="$bundle" \
+      sh -lc "$bundle_command"
+  ) >"$build_log" 2>&1; then
+    if [ ! -d "$bundle" ]; then
+      printf '%s\n' "forge-backend: native macOS bundle command did not create: $bundle" >&2
+      return 2
+    fi
+    built_exec="$bundle/Contents/MacOS/$app_id"
+    if [ ! -x "$built_exec" ]; then
+      printf '%s\n' "forge-backend: native macOS bundle command did not create executable: $built_exec" >&2
+      return 2
+    fi
+    printf 'status=ok\n'
+    printf 'target=macos\n'
+    printf 'app_name=%s\n' "$app_name"
+    printf 'artifact=%s\n' "$bundle"
+    printf 'built_exec=%s\n' "$built_exec"
+    printf 'command=%s\n' "$(kv_output_value "$bundle_command")"
+    printf 'log=%s\n' "$(kv_output_value "$build_log")"
+    return 0
+  fi
+
+  printf '%s\n' "forge-backend: native macOS bundle command failed (see log: $build_log)" >&2
+  return 2
 }
 
 native_mobile_log_project_dir() {
@@ -5173,6 +5243,7 @@ cmd_get_workspace_profile() {
   printf 'hosted_web_serve_script=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_serve_script "")")"
   printf 'hosted_web_serve_action=%s\n' "$(kv_output_value "$(workspace_field "$conf" hosted_web_serve_action "")")"
   printf 'run_rebuild_command=%s\n' "$(kv_output_value "$(workspace_rebuild_command "$conf")")"
+  printf 'native_macos_bundle_command=%s\n' "$(kv_output_value "$(workspace_native_macos_bundle_command "$conf")")"
   printf 'git_default_branch=%s\n' "$(kv_output_value "$git_branch")"
   printf '%s\n' "$git_info"
 }
@@ -5798,7 +5869,7 @@ cmd_pick_workspace_subpath() {
 validate_workspace_profile_field_key() {
   key=${1-}
   case "$key" in
-    project_type|development_context|starter|app_subpath|native_ir_path|mobile_ir_path|hosted_web_mode|hosted_web_site_name|hosted_web_serve_script|hosted_web_serve_action|run_rebuild_command)
+    project_type|development_context|starter|app_subpath|native_ir_path|mobile_ir_path|hosted_web_mode|hosted_web_site_name|hosted_web_serve_script|hosted_web_serve_action|run_rebuild_command|native_macos_bundle_command)
       return 0
       ;;
   esac
@@ -5951,7 +6022,7 @@ cmd_set_workspace_field() {
           ;;
       esac
       ;;
-    run_rebuild_command)
+    run_rebuild_command|native_macos_bundle_command)
       :
       ;;
   esac
@@ -7310,12 +7381,6 @@ build_native_workspace_host() {
   os=$(os_id)
   case "$os" in
     darwin)
-      require_tool swift
-      package_dir=$(resolve_native_macos_package_dir "$root" "$workspace_path" "$workspace_slug") || {
-        printf '%s\n' "forge-backend: native macOS package is missing Package.swift: $workspace_path/generated/macos" >&2
-        exit 1
-      }
-
       log_dir="$(forge_workbench_root "$root")/log"
       build_dir="$(forge_workbench_root "$root")/build/native-macos-workspaces/$workspace_slug"
       bundle_root="$(forge_workbench_root "$root")/dist/macos-native-workspaces/$workspace_slug"
@@ -7323,6 +7388,21 @@ build_native_workspace_host() {
       build_log="$log_dir/workspace-$workspace_slug-native-build.log"
       mkdir -p "$log_dir"
       mkdir -p "$build_dir"
+
+      bundle_command=$(workspace_native_macos_bundle_command "$workspace_conf")
+      if [ -n "$bundle_command" ] && [ "$bundle_command" != ":" ] && [ "$bundle_command" != "true" ]; then
+        if run_native_macos_bundle_command "$root" "$workspace_path" "$workspace_conf" "$app_id" "$app_name" "$workspace_slug" "$bundle" "$build_log"; then
+          return 0
+        fi
+        exit 1
+      fi
+
+      require_tool swift
+      package_dir=$(resolve_native_macos_package_dir "$root" "$workspace_path" "$workspace_slug") || {
+        printf '%s\n' "forge-backend: native macOS package is missing Package.swift: $workspace_path/generated/macos" >&2
+        exit 1
+      }
+
       clear_stale_swiftpm_lock "$build_dir"
       clear_stale_swiftpm_module_cache "$build_dir"
       : >"$build_log"

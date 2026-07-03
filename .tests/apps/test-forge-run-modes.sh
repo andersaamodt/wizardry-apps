@@ -693,4 +693,36 @@ workspace_native_macos_external_artifact=$(printf '%s\n' "$workspace_native_maco
 [ -d "$workspace_native_macos_external_artifact" ]
 wait_for_file_contains "$test_opened_bundle" "$workspace_native_macos_external_artifact" 60
 
+# Behavior: native macOS workspaces may own their bundle build path when the
+# generic SwiftPM workspace builder is not the correct packaging authority.
+workspace_native_macos_command="$scratch/workspace-native-macos-command"
+make_native_workspace "$workspace_native_macos_command" "workspace-native-macos-command" "Workspace Native Mac Command" "macos" "workspace-native-macos-command" "Workspace Native Mac Command"
+mkdir -p "$workspace_native_macos_command/scripts"
+cat > "$workspace_native_macos_command/scripts/native-macos-bundle.sh" <<SH
+#!/bin/sh
+set -eu
+bundle=\${WIZARDRY_NATIVE_MACOS_BUNDLE_PATH-}
+[ -n "\$bundle" ] || exit 2
+rm -rf "\$bundle"
+mkdir -p "\$bundle/Contents/MacOS" "\$bundle/Contents/Resources"
+cat > "\$bundle/Contents/MacOS/workspace-native-macos-command" <<'APP'
+#!/bin/sh
+exit 0
+APP
+chmod +x "\$bundle/Contents/MacOS/workspace-native-macos-command"
+printf '%s\n' '<plist version="1.0"><dict></dict></plist>' > "\$bundle/Contents/Info.plist"
+printf '%s\n' "\$bundle" > "$scratch/workspace-native-macos-command-bundle.log"
+SH
+chmod +x "$workspace_native_macos_command/scripts/native-macos-bundle.sh"
+cat >> "$workspace_native_macos_command/wizardry.workspace.conf" <<'CONF'
+native_macos_bundle_command=sh scripts/native-macos-bundle.sh
+CONF
+workspace_native_macos_command_out=$(test_env FORGE_TEST_UNAME=Darwin sh "$backend" run-workspace "$root" "$workspace_native_macos_command" native-desktop normal)
+assert_contains "$workspace_native_macos_command_out" "launched=1"
+assert_contains "$workspace_native_macos_command_out" "mode=native-desktop-executable"
+workspace_native_macos_command_artifact=$(printf '%s\n' "$workspace_native_macos_command_out" | kv_read artifact)
+[ -d "$workspace_native_macos_command_artifact" ]
+grep -Fx "$workspace_native_macos_command_artifact" "$scratch/workspace-native-macos-command-bundle.log" >/dev/null
+wait_for_file_contains "$test_opened_bundle" "$workspace_native_macos_command_artifact" 60
+
 printf '%s\n' "forge run-mode behavior tests passed"
